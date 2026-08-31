@@ -19,6 +19,7 @@ DOC_TOPICS = {
     "how-it-works": "How It Works",
     "when-to-use": "When To Use It",
     "limits": "Requirements and Limits",
+    "example": "Simulated End-to-End Research Example",
     "install": "Install",
     "inputs": "Inputs",
     "commands": "Commands",

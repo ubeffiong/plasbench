@@ -84,6 +84,82 @@ reference, which is appropriate for the same isolate. Change it only when the
 biological relationship warrants it and document that choice. gplas remains
 experimental because its output layout varies by release.
 
+## Simulated End-to-End Research Example
+
+This example is deliberately synthetic. It demonstrates the complete scoring,
+aggregation, and reporting workflow without downloading research data or
+claiming a real biological finding.
+
+### Research question
+
+> For two hypothetical bacterial isolates with complete references, how do
+> three hypothetical plasmid-reconstruction behaviours compare when scored
+> against the known plasmid bases?
+
+The demo models two isolates, `sample1` and `sample2`, and three simulated
+tools:
+
+```text
+good   Recovers all plasmid bases without chromosome contamination.
+leaky  Recovers all plasmid bases but includes chromosome sequence.
+shy    Avoids contamination but misses part of the plasmid sequence.
+```
+
+### Run the simulation
+
+From the cloned PlasBench repository with the environment activated:
+
+```bash
+plasbench test
+plasbench demo
+```
+
+`plasbench test` checks the scoring equations on a hand-built case. `plasbench
+demo` then creates synthetic truth tables, predicted FASTAs, and alignments;
+scores every sample/tool pair; aggregates the benchmark; and generates the HTML
+dashboard. It does not use NCBI, SRA, or installed plasmid tools.
+
+### Inspect the results
+
+```bash
+plasbench docs --topic outputs
+```
+
+Open the final report in a browser:
+
+```text
+results_demo/benchmark.report.html
+```
+
+The simulated leaderboard is expected to rank the behaviours as follows:
+
+```text
+Tool    Mean F1   Interpretation
+good    1.000     Complete recovery with no chromosome contamination.
+leaky   0.927     Complete recovery, but reduced precision from chromosome bases.
+shy     0.697     Clean predictions, but lower recall because plasmid bases are missed.
+```
+
+The exact per-sample TP, FP, FN, precision, recall, F1, and unmapped-base
+values are in `results_demo/scores.tsv`. `results_demo/tool_status.tsv` records
+that all synthetic tools completed. The dashboard lets you filter those rows,
+sort tables, inspect a tool across samples, inspect tools within a sample, and
+download each generated artifact.
+
+### Translate the example to a real study
+
+After validating the installation with the demo, replace the synthetic data
+with a curated sample sheet:
+
+```bash
+plasbench run --samples config/accessions.tsv --threads 8
+```
+
+The real sample sheet must link each matched Illumina run to a complete
+reference assembly from the same isolate. Do not expect the simulated ranking
+to predict your real-data ranking: read quality, assembly fragmentation,
+plasmid size, repeat content, and database coverage can change the outcome.
+
 ## Install
 
 ### Native Linux or WSL2
