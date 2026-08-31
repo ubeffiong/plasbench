@@ -169,9 +169,9 @@ def main():
 
     tools = sorted({row["tool"] for row in scores} | {row["tool"] for row in status})
     samples = sorted({row["sample"] for row in scores} | {row["sample"] for row in status})
-    organisms = sorted({row.get("organism", "") for row in metadata.values()} - {""})
-    technologies = sorted({row.get("truth_technology", "") for row in metadata.values()} - {""})
-    tiers = sorted({row.get("truth_quality_tier", "") for row in metadata.values()} - {""})
+    organisms = sorted({row.get("organism") or "" for row in metadata.values()} - {""})
+    technologies = sorted({row.get("truth_technology") or "" for row in metadata.values()} - {""})
+    tiers = sorted({row.get("truth_quality_tier") or "" for row in metadata.values()} - {""})
     status_counts = Counter(row["status"] for row in status)
     best = leaderboard[0] if leaderboard else None
     score_by_sample = defaultdict(list)
