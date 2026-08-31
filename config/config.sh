@@ -41,16 +41,16 @@ export FORCE_RERUN_TOOLS="${FORCE_RERUN_TOOLS:-0}"
 export PLATON_DB="${PLATON_DB:-$DATA_DIR/db/platon/db}"
 
 # --- Read handling -----------------------------------------------------------
-export MIN_READ_LEN=50          # fastp: discard shorter reads
-export FASTP_EXTRA=""           # extra fastp args if you want them
+export MIN_READ_LEN="${MIN_READ_LEN:-50}"   # fastp: discard shorter reads
+export FASTP_EXTRA="${FASTP_EXTRA:-}"       # extra fastp args if you want them
 
 # --- Assembly ----------------------------------------------------------------
 # "spades" (default) or "unicycler". Unicycler gives cleaner graphs but is slower.
-export ASSEMBLER="spades"
+export ASSEMBLER="${ASSEMBLER:-spades}"
 
 # --- Mapping (scoring) -------------------------------------------------------
 # minimap2 preset for aligning predicted-plasmid contigs back to the reference.
-export MINIMAP2_PRESET="asm5"   # asm5 = <5% divergence (same isolate -> good)
+export MINIMAP2_PRESET="${MINIMAP2_PRESET:-asm5}" # asm5 = <5% divergence
 
 # --- Safety: stop early if the sample sheet is missing -----------------------
 if [[ ! -f "$SAMPLE_SHEET" ]]; then

@@ -10,6 +10,10 @@ from pathlib import Path
 from . import __version__
 
 
+STAGE_HELP = """stage numbers: 0=setup, 1=download, 2=truth, 3=assemble,
+4=reconstruct, 5=score, 6=aggregate and HTML report."""
+
+
 def project_root(value):
     root = Path(value).resolve()
     if not (root / "scripts" / "run_all.sh").is_file():
@@ -46,6 +50,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="plasbench",
         description="PlasBench: benchmark plasmid-reconstruction tools against complete references.",
+        epilog="Examples:\n"
+               "  plasbench demo\n"
+               "  plasbench run --samples samples.tsv --threads 8\n"
+               "  plasbench run 3 4 5 6 --platon off --assembler unicycler\n"
+               "  plasbench report --results-dir results",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"plasbench {__version__}")
     parser.add_argument("--project-root", type=project_root, default=Path.cwd(),
@@ -54,11 +64,37 @@ def main(argv=None):
     sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     sub.add_parser("test", help="Run the scoring unit tests.")
     sub.add_parser("check", help="Check configured runtime dependencies.")
+    report_parser = sub.add_parser("report", help="Regenerate the leaderboard and HTML report from scores.")
     run_parser = sub.add_parser("run", help="Run the full benchmark or selected stages.")
     run_parser.add_argument("stages", nargs="*", choices=[str(i) for i in range(7)],
-                            help="Optional stage numbers: 0 setup through 6 report.")
-    run_parser.add_argument("--samples", type=Path, help="Override config/accessions.tsv for this run.")
-    run_parser.add_argument("--threads", type=int, help="Override THREADS for this run.")
+                            help=f"Optional {STAGE_HELP}")
+
+    def add_run_options(command_parser):
+        inputs = command_parser.add_argument_group("inputs and outputs")
+        inputs.add_argument("--samples", type=Path, help="Sample-sheet TSV; defaults to config/accessions.tsv.")
+        inputs.add_argument("--data-dir", type=Path, help="Directory for downloaded references, reads, and assemblies.")
+        inputs.add_argument("--results-dir", type=Path, help="Directory for predictions, scores, and reports.")
+        inputs.add_argument("--log-dir", type=Path, help="Directory for tool and mapping logs.")
+        inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
+        resources = command_parser.add_argument_group("resources and assembly")
+        resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
+        resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
+        resources.add_argument("--assembler", choices=("spades", "unicycler"), help="Short-read assembler.")
+        resources.add_argument("--min-read-len", type=int, help="Discard reads shorter than this after fastp.")
+        resources.add_argument("--minimap2-preset", help="minimap2 assembly preset (default: asm5).")
+        tools = command_parser.add_argument_group("tools")
+        for option, destination, label in (
+            ("--mob-recon", "mob_recon", "Enable or disable MOB-suite reconstruction."),
+            ("--platon", "platon", "Enable or disable Platon classification."),
+            ("--plasmidspades", "plasmidspades", "Enable or disable plasmidSPAdes."),
+            ("--gplas", "gplas", "Enable or disable experimental gplas."),
+        ):
+            tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
+        tools.add_argument("--force-rerun-tools", action="store_true",
+                           help="Discard completed tool results and execute them again.")
+
+    add_run_options(run_parser)
+    add_run_options(report_parser)
 
     args = parser.parse_args(argv)
     root = args.project_root
@@ -70,11 +106,32 @@ def main(argv=None):
         code = run([bash_command(), "scripts/run_all.sh", "0"], root)
     else:
         env = {}
-        if args.samples:
-            env["SAMPLE_SHEET"] = str(args.samples.resolve())
-        if args.threads:
-            if args.threads < 1:
-                parser.error("--threads must be positive")
-            env["THREADS"] = str(args.threads)
-        code = run([bash_command(), "scripts/run_all.sh", *args.stages], root, env)
+        path_options = {
+            "samples": "SAMPLE_SHEET", "data_dir": "DATA_DIR", "results_dir": "RESULTS_DIR",
+            "log_dir": "LOG_DIR", "platon_db": "PLATON_DB",
+        }
+        for argument, variable in path_options.items():
+            value = getattr(args, argument)
+            if value:
+                env[variable] = str(value.resolve())
+        positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN"}
+        for argument, variable in positive_options.items():
+            value = getattr(args, argument)
+            if value is not None:
+                if value < 1:
+                    parser.error(f"--{argument.replace('_', '-')} must be positive")
+                env[variable] = str(value)
+        for argument, variable in (("assembler", "ASSEMBLER"), ("minimap2_preset", "MINIMAP2_PRESET")):
+            value = getattr(args, argument)
+            if value:
+                env[variable] = value
+        for argument, variable in (("mob_recon", "RUN_MOB_RECON"), ("platon", "RUN_PLATON"),
+                                   ("plasmidspades", "RUN_PLASMIDSPADES"), ("gplas", "RUN_GPLAS")):
+            value = getattr(args, argument)
+            if value:
+                env[variable] = "1" if value == "on" else "0"
+        if args.force_rerun_tools:
+            env["FORCE_RERUN_TOOLS"] = "1"
+        stages = ["6"] if args.command == "report" else args.stages
+        code = run([bash_command(), "scripts/run_all.sh", *stages], root, env)
     raise SystemExit(code)
