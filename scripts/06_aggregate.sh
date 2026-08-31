@@ -19,6 +19,7 @@ python3 "$HERE/../python/build_html_report.py" \
     --scores "$SCORES" \
     --tool-status "$RESULTS_DIR/tool_status.tsv" \
     --leaderboard "$RESULTS_DIR/benchmark.leaderboard.tsv" \
+    --sample-sheet "$SAMPLE_SHEET" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 python3 "$HERE/../python/write_manifest.py" \
