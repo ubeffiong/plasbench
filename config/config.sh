@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# =============================================================================
+# PlasBench — central configuration
+# Edit this file, then run scripts/run_all.sh
+# =============================================================================
+# Every script sources this file, so all paths and settings live in one place.
+
+# --- Project root (auto-detected; normally leave as-is) ----------------------
+export PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+# --- Where things go ---------------------------------------------------------
+export DATA_DIR="${DATA_DIR:-$PROJECT_ROOT/data}"          # downloaded refs + reads
+export RESULTS_DIR="${RESULTS_DIR:-$PROJECT_ROOT/results}" # all outputs
+export LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/logs}"
+export TMP_DIR="${TMP_DIR:-$PROJECT_ROOT/tmp}"
+
+# --- Sample sheet ------------------------------------------------------------
+# TSV with header: sample_id  assembly_accession  sra_run
+#   assembly_accession = a COMPLETE genome (GCF_... or GCA_...) with long-read/
+#                        hybrid assembly -> ground truth.
+#   sra_run            = matched Illumina run (SRR/ERR/DRR) for that isolate.
+export SAMPLE_SHEET="${SAMPLE_SHEET:-$PROJECT_ROOT/config/accessions.tsv}"
+
+# --- Compute -----------------------------------------------------------------
+export THREADS="${THREADS:-4}"
+export MEMORY_GB="${MEMORY_GB:-16}"           # SPAdes memory cap (GB)
+
+# --- Which tools to benchmark (1 = on, 0 = off) ------------------------------
+# Turn tools off if you have not installed them yet.
+export RUN_MOB_RECON="${RUN_MOB_RECON:-1}"
+export RUN_PLATON="${RUN_PLATON:-1}"
+export RUN_PLASMIDSPADES="${RUN_PLASMIDSPADES:-1}"
+export RUN_GPLAS="${RUN_GPLAS:-0}"        # experimental; off by default (see adapters/adapt_gplas.sh)
+
+# Reuse a completed tool result by default. Set FORCE_RERUN_TOOLS=1 to discard
+# completed per-tool output and run it again (for example after a tool upgrade).
+export FORCE_RERUN_TOOLS="${FORCE_RERUN_TOOLS:-0}"
+
+# --- Tool databases (set after INSTALL step) ---------------------------------
+# Platon needs its DB downloaded once; point to it here.
+export PLATON_DB="${PLATON_DB:-$DATA_DIR/db/platon/db}"
+
+# --- Read handling -----------------------------------------------------------
+export MIN_READ_LEN=50          # fastp: discard shorter reads
+export FASTP_EXTRA=""           # extra fastp args if you want them
+
+# --- Assembly ----------------------------------------------------------------
+# "spades" (default) or "unicycler". Unicycler gives cleaner graphs but is slower.
+export ASSEMBLER="spades"
+
+# --- Mapping (scoring) -------------------------------------------------------
+# minimap2 preset for aligning predicted-plasmid contigs back to the reference.
+export MINIMAP2_PRESET="asm5"   # asm5 = <5% divergence (same isolate -> good)
+
+# --- Safety: stop early if the sample sheet is missing -----------------------
+if [[ ! -f "$SAMPLE_SHEET" ]]; then
+    echo "WARNING: sample sheet not found at $SAMPLE_SHEET" >&2
+fi

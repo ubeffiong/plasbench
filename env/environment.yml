@@ -1,0 +1,27 @@
+name: plasbench
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # --- data acquisition ---
+  - ncbi-datasets-cli      # download complete assemblies + sequence reports
+  - sra-tools>=3.0         # prefetch / fasterq-dump for Illumina reads
+  - entrez-direct          # optional: metadata queries (esearch/efetch)
+  # --- read QC + assembly ---
+  - fastp                  # adapter/quality trimming
+  - spades>=3.15           # provides spades.py AND plasmidspades.py
+  - unicycler              # optional alternative assembler (cleaner graphs)
+  # --- plasmid reconstruction tools under test ---
+  - mob_suite              # mob_recon
+  - platon                 # contig-level plasmid classification
+  # gplas is installed separately (see INSTALL.md) — it is nextflow/R based
+  # --- scoring / mapping ---
+  - minimap2               # align predicted plasmids back to the reference
+  - samtools               # convenience (sorting/indexing if you extend)
+  # --- glue ---
+  - python>=3.9            # scoring scripts use the stdlib only
+  - pip                    # install the PlasBench command-line wrapper
+  - pigz                   # faster (de)compression
+# NOTE: the Python scoring scripts deliberately use ONLY the standard library,
+# so they run even outside this env (any python3 >= 3.7).

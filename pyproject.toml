@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plasbench"
+version = "0.1.0"
+description = "Benchmark plasmid-reconstruction tools against complete-reference truth."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [{name = "PlasBench contributors"}]
+keywords = ["bioinformatics", "plasmid", "benchmarking", "genomics"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = []
+
+[project.scripts]
+plasbench = "plasbench.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/YOUR_GITHUB_ORG/plasbench"
+Repository = "https://github.com/YOUR_GITHUB_ORG/plasbench"
+Issues = "https://github.com/YOUR_GITHUB_ORG/plasbench/issues"
+
+[tool.setuptools]
+packages = ["plasbench"]

@@ -1,0 +1,96 @@
+# Installation (Ubuntu)
+
+Everything installs through **conda** (via Miniforge). The Python scoring scripts use only
+the standard library, so they run even without the conda env — but the bio-tools do not.
+
+---
+
+## 1. Install Miniforge (conda/mamba)
+
+If you don't already have conda:
+
+```bash
+wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh -b -p "$HOME/miniforge3"
+source "$HOME/miniforge3/etc/profile.d/conda.sh"
+conda config --set channel_priority strict
+```
+
+> `mamba` ships with Miniforge and is a much faster drop-in for `conda`. Use whichever you
+> have; the setup script auto-detects `mamba` and falls back to `conda`.
+
+---
+
+## 2. Create the benchmark environment
+
+```bash
+bash env/setup_conda.sh
+conda activate plasbench
+```
+
+This installs: `ncbi-datasets-cli`, `sra-tools`, `entrez-direct`, `fastp`, `spades`
+(provides `spades.py` **and** `plasmidspades.py`), `unicycler`, `mob_suite`, `platon`,
+`minimap2`, `samtools`, `pigz`.
+
+Verify:
+```bash
+bash scripts/00_setup.sh
+```
+You should see `[ok]` next to each tool you've enabled in `config/config.sh`.
+
+---
+
+## 3. One-time tool databases
+
+### Platon database (required if `RUN_PLATON=1`)
+```bash
+bash env/download_platon_db.sh
+```
+This downloads Platon's database (~1.4 GB) into `data/db/platon/db` and matches the
+`PLATON_DB` path in `config/config.sh`.
+
+### MOB-suite database
+`mob_recon` downloads/uses its bundled databases automatically on first run. If you're on a
+cluster with no internet on compute nodes, run one `mob_recon` on a login node first to
+populate the cache, or set `--database_directory` in `scripts/04_run_tools.sh`.
+
+---
+
+## 4. gplas (optional, experimental — `RUN_GPLAS=0` by default)
+
+gplas is Nextflow/R-based and its output format varies by version, so it's off by default.
+If you want it:
+
+```bash
+# needs nextflow + docker/singularity; see the gplas repo for current instructions
+conda install -n plasbench -c bioconda nextflow
+# install gplas per its README, then set RUN_GPLAS=1 in config/config.sh
+```
+You will likely need to edit `adapters/adapt_gplas.sh` to match your gplas version's output.
+gplas also needs an **assembly graph** — set `ASSEMBLER=unicycler` in the config for the
+cleanest graphs.
+
+---
+
+## 5. Lock your versions (for reproducibility)
+
+After a successful install:
+```bash
+conda env export > env/environment.lock.yml
+```
+Commit that file so collaborators reproduce the exact toolchain.
+
+---
+
+## Troubleshooting
+
+- **`datasets: command not found`** → you didn't `conda activate plasbench`.
+- **SRA download stalls** → run `vdb-config --interactive` once (sets the SRA cache dir),
+  or try `prefetch --max-size 100g <SRR>`.
+- **SPAdes runs out of memory** → lower `MEMORY_GB` won't help; reduce input or use a bigger
+  machine. Bacterial isolates usually assemble in <16 GB.
+- **A tool fails on one sample** → the pipeline logs it, records it in
+  `results/tool_status.tsv`, and excludes it from scoring; check
+  `logs/<sample>.<tool>.log`. A successful tool that predicts no plasmids is still
+  scored as an empty prediction (all true plasmid bases are FN).
+- **Conda solve is slow** → use `mamba`, or `conda config --set channel_priority strict`.

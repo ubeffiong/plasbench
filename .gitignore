@@ -1,0 +1,14 @@
+data/
+results/
+results_demo/
+logs/
+tmp/
+*.sra
+*.fastq
+*.fastq.gz
+__pycache__/
+*.pyc
+env/environment.lock.yml
+build/
+*.egg-info/
+!config/accessions.tsv

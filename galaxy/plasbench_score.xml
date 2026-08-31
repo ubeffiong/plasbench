@@ -1,0 +1,46 @@
+<tool id="plasbench_score" name="PlasBench score predictions" version="0.1.0" profile="23.0">
+    <description>score predicted plasmid sequences against labelled reference alignments</description>
+    <requirements>
+        <container type="docker">quay.io/YOUR_QUAY_NAMESPACE/plasbench:0.1.0</container>
+    </requirements>
+    <command detect_errors="exit_code"><![CDATA[
+python /opt/plasbench/python/score_plasmids.py
+  --truth '$truth'
+  --paf '$paf'
+  --pred-fasta '$prediction'
+  --sample '$sample_name'
+  --tool '$tool_name'
+  --out '$scores'
+    ]]></command>
+    <inputs>
+        <param name="truth" type="data" format="tabular" label="Reference truth labels" help="TSV with sequence_id, molecule_type, length." />
+        <param name="paf" type="data" format="tabular" label="Prediction-to-reference PAF alignment" />
+        <param name="prediction" type="data" format="fasta" label="Predicted-plasmid FASTA" />
+        <param name="sample_name" type="text" label="Sample identifier" />
+        <param name="tool_name" type="text" label="Tool identifier" />
+    </inputs>
+    <outputs>
+        <data name="scores" format="tabular" label="PlasBench scores on ${on_string}" />
+    </outputs>
+    <tests>
+        <test>
+            <param name="truth" value="truth.tsv" />
+            <param name="paf" value="prediction.paf" />
+            <param name="prediction" value="prediction.fasta" />
+            <param name="sample_name" value="synthetic" />
+            <param name="tool_name" value="demo" />
+            <output name="scores"><assert_contents><has_text text="synthetic" /><has_text text="demo" /></assert_contents></output>
+        </test>
+    </tests>
+    <help><![CDATA[
+**PlasBench score predictions** computes base-level precision, recall/completeness,
+and F1 for one predicted-plasmid FASTA against a labelled complete reference.
+
+Use this wrapper after aligning the predicted FASTA to the reference with minimap2.
+The complete Galaxy workflow will combine this wrapper with assembly, prediction,
+alignment, aggregation, and report-generation tools.
+    ]]></help>
+    <citations>
+        <citation type="bibtex">@article{{li2021minimap2, title={{New strategies for sequence alignment with minimap2}}, author={{Li, Heng}}, journal={{Bioinformatics}}, year={{2021}}}}</citation>
+    </citations>
+</tool>

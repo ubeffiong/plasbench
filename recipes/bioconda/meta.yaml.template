@@ -1,0 +1,41 @@
+{% set name = "plasbench" %}
+{% set version = "0.1.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  # Replace YOUR_GITHUB_ORG and SHA256 after creating the GitHub v0.1.0 release.
+  url: https://github.com/YOUR_GITHUB_ORG/plasbench/archive/refs/tags/v{{ version }}.tar.gz
+  sha256: REPLACE_WITH_RELEASE_TARBALL_SHA256
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  entry_points:
+    - plasbench = plasbench.cli:main
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=68
+  run:
+    - python >=3.9
+    - bash
+
+test:
+  commands:
+    - plasbench --help
+
+about:
+  home: https://github.com/YOUR_GITHUB_ORG/plasbench
+  license: MIT
+  license_file: LICENSE
+  summary: Benchmark plasmid-reconstruction tools against complete-reference truth.
+
+extra:
+  recipe-maintainers:
+    - YOUR_BIOCONDA_GITHUB_USERNAME

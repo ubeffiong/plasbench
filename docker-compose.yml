@@ -1,0 +1,16 @@
+services:
+  plasbench:
+    build: .
+    image: plasbench:local
+    working_dir: /opt/plasbench
+    volumes:
+      - ./config:/work/config:ro
+      - ./data:/work/data
+      - ./logs:/work/logs
+      - ./results:/work/results
+    environment:
+      SAMPLE_SHEET: /work/config/accessions.tsv
+      DATA_DIR: /work/data
+      LOG_DIR: /work/logs
+      RESULTS_DIR: /work/results
+      PLATON_DB: /work/data/db/platon/db
