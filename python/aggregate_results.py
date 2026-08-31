@@ -106,20 +106,36 @@ def bootstrap_ci(values, iterations=1000):
     return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
 
 
+def paired_permutation_pvalue(differences, iterations=10000):
+    """Two-sided sign-flip permutation p-value for paired mean differences."""
+    if len(differences) < 2:
+        return None
+    observed = abs(statistics.mean(differences))
+    rng = random.Random(20260901)
+    extreme = 0
+    for _ in range(iterations):
+        value = abs(statistics.mean(item if rng.randrange(2) else -item for item in differences))
+        extreme += value >= observed
+    return (extreme + 1) / (iterations + 1)
+
+
 def write_comparisons(rows, path):
     by_tool = defaultdict(dict)
     for row in rows:
         by_tool[row["tool"]][row["sample"]] = row["f1"]
     tools = sorted(by_tool)
     with open(path, "w") as handle:
-        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\twins_a\tties\twins_b\n")
+        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\twins_a\tties\twins_b\n")
         for i, a in enumerate(tools):
             for b in tools[i + 1:]:
                 shared = sorted(set(by_tool[a]) & set(by_tool[b]))
                 diffs = [by_tool[a][sample] - by_tool[b][sample] for sample in shared]
                 if not diffs:
                     continue
-                handle.write(f"{a}\t{b}\t{len(shared)}\t{statistics.mean(diffs):.4f}\t"
+                low, high = bootstrap_ci(diffs)
+                pvalue = paired_permutation_pvalue(diffs)
+                pvalue_text = f"{pvalue:.6f}" if pvalue is not None else ""
+                handle.write(f"{a}\t{b}\t{len(shared)}\t{statistics.mean(diffs):.4f}\t{low:.4f}\t{high:.4f}\t{pvalue_text}\t"
                              f"{sum(x > 0 for x in diffs)}\t{sum(x == 0 for x in diffs)}\t{sum(x < 0 for x in diffs)}\n")
 
 
