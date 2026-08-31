@@ -334,7 +334,17 @@ The main outputs are written under `results/` unless `--results-dir` is set.
 ```text
 results/scores.tsv
     One row per scored sample/tool: true plasmid bp, TP, FP, FN, unmapped bp,
-    precision, recall, and F1.
+    base-level precision/recall/F1, plasmid-level recovery, and optional AMR
+    gene and circular-plasmid recovery metrics.
+
+results/benchmark.paired_comparisons.tsv
+    Pairwise, shared-sample F1 differences with win/tie/loss counts. Use this
+    with the leaderboard's deterministic bootstrap F1 interval; neither is a
+    substitute for a pre-specified statistical analysis plan.
+
+results/run_manifest.json
+    Machine-readable provenance: input checksums, sample metadata, settings,
+    available tool versions, platform information, and output checksums.
 
 results/tool_status.tsv
     Per sample/tool execution state: completed, reused, failed, or skipped,
@@ -378,6 +388,13 @@ Unmapped predicted bp = predicted bases not aligned to any labelled reference.
 Unmapped prediction is reported separately and is not added to FP. Tool failure
 is not converted into a zero score; it is excluded from the leaderboard and
 shown in execution coverage.
+
+`plasmid_recall` is the fraction of true plasmid replicons recovered to at
+least `PLASMID_RECOVERY_THRESHOLD` (default 0.90). Add curated optional truth
+tables as `data/<sample>/truth_amr.tsv` (`sequence_id`, `start`, `end`; 0-based
+half-open intervals) and `data/<sample>/truth_circular.tsv` (`sequence_id`) to
+activate AMR-gene and circular-plasmid recovery metrics. PlasBench validates
+that these entries refer to labelled plasmid reference sequences.
 
 ## Console Messages
 
