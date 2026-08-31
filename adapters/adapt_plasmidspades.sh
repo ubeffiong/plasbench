@@ -8,8 +8,10 @@
 set -euo pipefail
 OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
 : > "$OUT_FASTA"
+BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 if [[ -s "$OUT_DIR/contigs.fasta" ]]; then
     cat "$OUT_DIR/contigs.fasta" >> "$OUT_FASTA"
+    awk '/^>/ {sub(/^>/,"",$1); print $1 "\t" $1}' "$OUT_DIR/contigs.fasta" >> "$BINS"
 else
     echo "[adapt_plasmidspades] no contigs.fasta in $OUT_DIR (predicted none)" >&2
 fi

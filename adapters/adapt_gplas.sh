@@ -14,11 +14,14 @@
 set -euo pipefail
 OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
 : > "$OUT_FASTA"
+BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 shopt -s nullglob
 found=0
 while IFS= read -r -d '' f; do
     [[ -s "$f" ]] || continue
     cat "$f" >> "$OUT_FASTA"; found=1
+    bin=$(basename "$f" .fasta)
+    awk -v bin="$bin" '/^>/ {sub(/^>/,"",$1); print bin "\t" $1}' "$f" >> "$BINS"
 done < <(find "$OUT_DIR" -type f -iname '*plasmid*.fasta' -print0)
 shopt -u nullglob
 if [[ "$found" -eq 0 ]]; then

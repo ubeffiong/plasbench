@@ -11,11 +11,14 @@
 set -euo pipefail
 OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
 : > "$OUT_FASTA"   # start empty (an empty file is a valid "predicted nothing")
+BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 
 shopt -s nullglob
 found=0
 for f in "$OUT_DIR"/plasmid_*.fasta; do
     cat "$f" >> "$OUT_FASTA"
+    bin=$(basename "$f" .fasta)
+    awk -v bin="$bin" '/^>/ {sub(/^>/,"",$1); print bin "\t" $1}' "$f" >> "$BINS"
     found=1
 done
 shopt -u nullglob
