@@ -56,6 +56,11 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
             --sample "$SAMPLE" --tool "$tool" --out "$SCORES"
+        BINS="$RDIR/pred_${tool}.bins.tsv"
+        if [[ -s "$BINS" ]]; then
+            python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
+                --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv"
+        fi
     done
 done < <(read_samples "$SAMPLE_SHEET")
 
