@@ -34,6 +34,7 @@ def read_scores(path):
                 "recall": float(f[idx["recall"]]),
                 "f1": float(f[idx["f1"]]),
                 "plasmid_recall": float(f[idx["plasmid_recall"]]) if "plasmid_recall" in idx else 0.0,
+                "bin_f1": float(f[idx["bin_f1"]]) if "bin_f1" in idx and f[idx["bin_f1"]] else None,
             })
     return rows
 
@@ -63,13 +64,14 @@ def read_status(path):
 
 
 def summarise(rows, status_counts):
-    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "n": 0})
+    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "n": 0})
     for r in rows:
         t = by_tool[r["tool"]]
         t["precision"].append(r["precision"])
         t["recall"].append(r["recall"])
         t["f1"].append(r["f1"])
         t["plasmid_recall"].append(r["plasmid_recall"])
+        if r["bin_f1"] is not None: t["bin_f1"].append(r["bin_f1"])
         t["n"] += 1
 
     summary = []
@@ -84,6 +86,8 @@ def summarise(rows, status_counts):
             "f1_ci_high": bootstrap_ci(d["f1"])[1],
             "median_f1": statistics.median(d["f1"]),
             "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]),
+            "mean_bin_f1": statistics.mean(d["bin_f1"]) if d["bin_f1"] else None,
+            "n_bin_scored": len(d["bin_f1"]),
             "n_completed": status_counts[tool]["completed"] + status_counts[tool]["reused"],
             "n_failed": status_counts[tool]["failed"],
             "n_skipped": status_counts[tool]["skipped"],
@@ -121,14 +125,14 @@ def write_comparisons(rows, path):
 
 def write_tsv(summary, path):
     cols = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
-            "mean_recall", "mean_plasmid_recall", "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1"]
+            "mean_recall", "mean_plasmid_recall", "n_bin_scored", "mean_bin_f1", "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
             fh.write("\t".join(str(x) for x in [
                 i, s["tool"], s["n_samples"], s["n_completed"], s["n_failed"], s["n_skipped"],
                 f"{s['mean_precision']:.4f}", f"{s['mean_recall']:.4f}",
-                f"{s['mean_plasmid_recall']:.4f}", f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}", f"{s['f1_ci_high']:.4f}", f"{s['median_f1']:.4f}",
+                f"{s['mean_plasmid_recall']:.4f}", s['n_bin_scored'], f"{s['mean_bin_f1']:.4f}" if s['mean_bin_f1'] is not None else "", f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}", f"{s['f1_ci_high']:.4f}", f"{s['median_f1']:.4f}",
             ]) + "\n")
 
 

@@ -59,9 +59,12 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         BINS="$RDIR/pred_${tool}.bins.tsv"
         if [[ -s "$BINS" ]]; then
             python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
-                --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv"
+                --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
+                --summary "$RDIR/${tool}.bin_summary.tsv"
         fi
     done
 done < <(read_samples "$SAMPLE_SHEET")
+
+[[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
 
 log "Stage 5 (score) complete. Combined scores: $SCORES"

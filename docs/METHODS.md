@@ -44,6 +44,11 @@ replicons meeting that threshold. `predicted_record_count` is intentionally a
 sequence-record proxy, not a bin-level precision claim: tools differ in whether
 they output one contig, multiple contigs, or one FASTA per plasmid bin.
 
+For adapters that supply `pred_<tool>.bins.tsv`, PlasBench also performs
+deterministic one-to-one bin matching. Bin precision/recall/F1 use matched bins
+and true plasmids; split events count extra qualifying bins for one true
+plasmid, and merge events count extra qualifying true plasmids for one bin.
+
 ## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,
 mean recall) and ranked by mean F1 (`python/aggregate_results.py`). A
