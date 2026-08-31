@@ -25,7 +25,14 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     RDIR="$RESULTS_DIR/$SAMPLE"; mkdir -p "$RDIR"
     CONTIGS="$SDIR/contigs.fasta"
     T1="$SDIR/${SRA}_1.trim.fastq.gz"; T2="$SDIR/${SRA}_2.trim.fastq.gz"
-    [[ -s "$CONTIGS" ]] || { warn "no contigs for $SAMPLE; run 03_assemble.sh"; continue; }
+    if [[ ! -s "$CONTIGS" ]]; then
+        warn "no contigs for $SAMPLE; run 03_assemble.sh"
+        [[ "${RUN_MOB_RECON:-0}" -eq 1 ]] && record_status "$SAMPLE" "mob_recon" "skipped" "" "assembly contigs unavailable"
+        [[ "${RUN_PLATON:-0}" -eq 1 ]] && record_status "$SAMPLE" "platon" "skipped" "" "assembly contigs unavailable"
+        [[ "${RUN_PLASMIDSPADES:-0}" -eq 1 ]] && record_status "$SAMPLE" "plasmidspades" "skipped" "" "assembly contigs unavailable"
+        [[ "${RUN_GPLAS:-0}" -eq 1 ]] && record_status "$SAMPLE" "gplas" "skipped" "" "assembly contigs unavailable"
+        continue
+    fi
     log "=== Run tools on $SAMPLE ==="
 
     # -------- mob_recon --------

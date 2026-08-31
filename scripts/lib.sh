@@ -2,9 +2,9 @@
 # Shared helpers sourced by every stage script.
 
 # Pretty logging with timestamps.
-log()  { echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-warn() { echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $*" >&2; }
-die()  { echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
+log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
+warn() { printf '[%s] WARNING: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
+die()  { printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; exit 1; }
 
 # Check a command exists; die if not.
 need() {

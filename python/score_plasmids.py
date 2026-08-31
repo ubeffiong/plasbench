@@ -124,20 +124,28 @@ def parse_paf_intervals(path, truth, pred_lengths):
         return covered, sum(pred_lengths.values())
 
     with open(path) as fh:
-        for line in fh:
+        for line_number, line in enumerate(fh, start=1):
             if not line.strip():
                 continue
             f = line.rstrip("\n").split("\t")
+            if len(f) < 12:
+                raise ValueError(
+                    f"PAF line {line_number} has {len(f)} columns; expected at least 12"
+                )
             # PAF mandatory columns (0-based indices):
             # 0 qname 1 qlen 2 qstart 3 qend 4 strand
             # 5 tname 6 tlen 7 tstart 8 tend 9 matches 10 blocklen 11 mapq
             qname = f[0]
-            qlen = int(f[1])
-            qstart = int(f[2])
-            qend = int(f[3])
-            tname = f[5]
-            tstart = int(f[7])
-            tend = int(f[8])
+            try:
+                qlen = int(f[1])
+                qstart = int(f[2])
+                qend = int(f[3])
+                tname = f[5]
+                tlen = int(f[6])
+                tstart = int(f[7])
+                tend = int(f[8])
+            except ValueError as exc:
+                raise ValueError(f"PAF line {line_number} has invalid integer coordinates") from exc
             if qname not in pred_lengths:
                 raise ValueError(f"PAF query '{qname}' is absent from --pred-fasta")
             if qlen != pred_lengths[qname]:
@@ -147,11 +155,21 @@ def parse_paf_intervals(path, truth, pred_lengths):
                 )
             # Only keep alignments to sequences we actually have truth for.
             if tname in truth:
+                truth_length = truth[tname][1]
+                if tlen != truth_length:
+                    raise ValueError(
+                        f"PAF target length for '{tname}' ({tlen}) disagrees with truth "
+                        f"({truth_length})"
+                    )
                 if tend < tstart:
                     tstart, tend = tend, tstart
+                tstart = max(0, min(tstart, truth_length))
+                tend = max(0, min(tend, truth_length))
                 covered[tname].append((tstart, tend))
                 if qend < qstart:
                     qstart, qend = qend, qstart
+                qstart = max(0, min(qstart, qlen))
+                qend = max(0, min(qend, qlen))
                 query_covered[qname].append((qstart, qend))
 
     unmapped_pred_bp = 0

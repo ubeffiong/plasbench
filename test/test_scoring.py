@@ -132,6 +132,37 @@ def main():
           f"{r3['TP_bp']},{r3['FN_bp']},{r3['f1']} -> "
           f"{int(r3['TP_bp'])==0 and int(r3['FN_bp'])==3000 and float(r3['f1'])==0.0}")
 
+    # Coordinates supplied by external callers are bounded to the reference;
+    # a malformed overhang must not inflate a base-level score.
+    paf4 = os.path.join(tmp, "out_of_bounds.paf")
+    pred4 = os.path.join(tmp, "out_of_bounds.fasta")
+    out4 = os.path.join(tmp, "scores4.tsv")
+    with open(paf4, "w") as fh:
+        fh.write("edge\t200\t-50\t150\t+\tplasmidB\t1000\t-50\t150\t200\t200\t60\n")
+    write_fasta(pred4, {"edge": 200})
+    subprocess.run(
+        [sys.executable, SCORER, "--truth", truth, "--paf", paf4, "--pred-fasta", pred4,
+         "--sample", "SYNTH", "--tool", "bounded", "--out", out4],
+        check=True,
+    )
+    with open(out4) as fh:
+        r4 = dict(zip(header, fh.read().strip().splitlines()[1].split("\t")))
+    ok &= (int(r4["TP_bp"]) == 150)
+    print(f"  out-of-bounds PAF is clipped to 150 bp ? {r4['TP_bp']} -> {int(r4['TP_bp'])==150}")
+
+    # Invalid PAFs must fail with a concise scorer error rather than an index
+    # exception that leaves a user guessing which input needs repair.
+    malformed = os.path.join(tmp, "malformed.paf")
+    with open(malformed, "w") as fh:
+        fh.write("too\tfew\tcolumns\n")
+    bad = subprocess.run(
+        [sys.executable, SCORER, "--truth", truth, "--paf", malformed, "--pred-fasta", pred4,
+         "--sample", "SYNTH", "--tool", "malformed", "--out", os.path.join(tmp, "bad.tsv")],
+        text=True, capture_output=True,
+    )
+    ok &= (bad.returncode != 0 and "PAF line 1" in bad.stderr)
+    print(f"  malformed PAF emits a clear error ? {bad.returncode != 0 and 'PAF line 1' in bad.stderr}")
+
     print("\nALL TESTS PASSED" if ok else "\nTESTS FAILED")
     sys.exit(0 if ok else 1)
 

@@ -210,7 +210,7 @@ template and must be populated first.
 ## 4. How scoring works (short version)
 
 For each sample and tool:
-- `minimap2 -x asm5 reference.fna pred_<tool>.plasmid.fasta > <tool>.paf`
+- `minimap2 --secondary=no -x asm5 reference.fna pred_<tool>.plasmid.fasta > <tool>.paf`
 - The reference's true plasmid/chromosome labels come from the NCBI sequence report.
 - Every reference base **covered** by a predicted-plasmid alignment is a base the tool
   "claimed" as plasmid. Then:
@@ -219,6 +219,8 @@ For each sample and tool:
   - `precision = TP/(TP+FP)`, `recall = TP/(TP+FN)`, `f1` = harmonic mean.
 
 Overlapping alignments are merged so bases are never double-counted (unit-tested).
+Secondary mappings are excluded so repetitive sequence is assigned from each
+predicted contig's best reference hit rather than counted on multiple replicons.
 Predicted sequence that doesn't map to the reference at all is reported separately as
 `unmapped_pred_bp` rather than silently punished. Full rationale in `docs/METHODS.md`.
 

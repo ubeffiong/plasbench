@@ -40,7 +40,11 @@ def read_status(path):
     counts = defaultdict(lambda: {"completed": 0, "reused": 0, "failed": 0, "skipped": 0})
     if not path:
         return counts
-    with open(path) as fh:
+    try:
+        fh = open(path)
+    except FileNotFoundError:
+        return counts
+    with fh:
         header = fh.readline().rstrip("\n").split("\t")
         idx = {name: i for i, name in enumerate(header)}
         required = {"tool", "status"}

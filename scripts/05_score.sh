@@ -36,7 +36,9 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         [[ -e "$DONE" ]] || { warn "  ignoring incomplete $tool result for $SAMPLE"; continue; }
         PAF="$RDIR/${tool}.pred_vs_ref.paf"
         if [[ -s "$PRED" ]]; then
-            if ! minimap2 -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
+            # Secondary mappings can make repetitive sequence appear to be claimed on
+            # multiple reference replicons. Score each prediction from its best hit.
+            if ! minimap2 --secondary=no -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
                 rm -f "$PAF"; warn "minimap2 failed for $SAMPLE/$tool; excluded from scoring"; continue
             fi
         else

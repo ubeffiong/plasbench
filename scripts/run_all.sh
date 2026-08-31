@@ -30,7 +30,9 @@ declare -A SCRIPT=(
 log "############ PlasBench ############"
 log "Running stages: ${STAGES[*]}"
 for s in "${STAGES[@]}"; do
-    [[ "$s" != "0" ]] && { validate_sample_sheet "$SAMPLE_SHEET"; break; }
+    # Stages 1-5 operate on individual samples. Aggregation/reporting can be
+    # rerun from an existing scores.tsv, even after the original sheet moved.
+    [[ "$s" =~ ^[1-5]$ ]] && { validate_sample_sheet "$SAMPLE_SHEET"; break; }
 done
 for s in "${STAGES[@]}"; do
     scr="${SCRIPT[$s]:-}"

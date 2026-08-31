@@ -25,7 +25,12 @@ def esc(value):
 
 
 def relative_link(target, report_path):
-    relative = os.path.relpath(target, report_path.parent).replace(os.sep, "/")
+    try:
+        relative = os.path.relpath(target, report_path.parent).replace(os.sep, "/")
+    except ValueError:
+        # Windows cannot compute a relative path across drive letters. A file
+        # URI preserves the report's direct-download explorer in that case.
+        return Path(target).resolve().as_uri()
     return quote(relative, safe="/._-~")
 
 
