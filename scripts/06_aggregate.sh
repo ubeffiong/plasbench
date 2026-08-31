@@ -21,9 +21,15 @@ python3 "$HERE/../python/build_html_report.py" \
     --leaderboard "$RESULTS_DIR/benchmark.leaderboard.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
+python3 "$HERE/../python/write_manifest.py" \
+    --project-root "$PROJECT_ROOT" --sample-sheet "$SAMPLE_SHEET" \
+    --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" \
+    --out "$RESULTS_DIR/run_manifest.json"
+
 log "Stage 6 complete."
 log "  Per-sample scores : $SCORES"
 log "  Tool status       : $RESULTS_DIR/tool_status.tsv"
 log "  Leaderboard (TSV) : $RESULTS_DIR/benchmark.leaderboard.tsv"
 log "  Leaderboard (MD)  : $RESULTS_DIR/benchmark.leaderboard.md"
 log "  HTML dashboard    : $RESULTS_DIR/benchmark.report.html"
+log "  Run manifest      : $RESULTS_DIR/run_manifest.json"

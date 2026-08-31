@@ -28,7 +28,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         log "  downloading assembly $ASM ..."
         ZIP="$SDIR/ncbi.zip"
         datasets download genome accession "$ASM" \
-            --include genome,seq-report \
+            --include genome,seq-report,gff3 \
             --filename "$ZIP" 2> "$LOG_DIR/${SAMPLE}.datasets.log" \
             || die "datasets download failed for $ASM (see $LOG_DIR/${SAMPLE}.datasets.log)"
         rm -rf "$SDIR/ncbi"; mkdir -p "$SDIR/ncbi"

@@ -42,6 +42,10 @@ validate_sample_sheet() {
             print "ERROR: invalid sample-sheet row " NR "; expected sample_id, assembly_accession, sra_run" > "/dev/stderr"
             bad=1; next
         }
+        curated && (NF < 8 || $4 == "" || $5 == "" || $6 !~ /^[ABC]$/ || $7 == "" || $8 == "") {
+            print "ERROR: uncurated sample-sheet row " NR "; require organism, truth_technology, truth_quality_tier (A/B/C), biosample, bioproject" > "/dev/stderr"
+            bad=1; next
+        }
         seen_sample[$1]++ {
             print "ERROR: duplicate sample_id '" $1 "' in sample sheet" > "/dev/stderr"
             bad=1; next
@@ -54,5 +58,5 @@ validate_sample_sheet() {
                 exit 3
             }
         }
-    ' "$sheet" || die "fix sample-sheet errors in $sheet"
+    ' curated="${REQUIRE_CURATED_METADATA:-1}" "$sheet" || die "fix sample-sheet errors in $sheet"
 }

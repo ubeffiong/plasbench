@@ -13,6 +13,7 @@ Standard library only.
 """
 
 import argparse
+import random
 import statistics
 from collections import defaultdict
 
@@ -32,6 +33,7 @@ def read_scores(path):
                 "precision": float(f[idx["precision"]]),
                 "recall": float(f[idx["recall"]]),
                 "f1": float(f[idx["f1"]]),
+                "plasmid_recall": float(f[idx["plasmid_recall"]]) if "plasmid_recall" in idx else 0.0,
             })
     return rows
 
@@ -61,12 +63,13 @@ def read_status(path):
 
 
 def summarise(rows, status_counts):
-    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "n": 0})
+    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "n": 0})
     for r in rows:
         t = by_tool[r["tool"]]
         t["precision"].append(r["precision"])
         t["recall"].append(r["recall"])
         t["f1"].append(r["f1"])
+        t["plasmid_recall"].append(r["plasmid_recall"])
         t["n"] += 1
 
     summary = []
@@ -77,7 +80,10 @@ def summarise(rows, status_counts):
             "mean_precision": statistics.mean(d["precision"]),
             "mean_recall": statistics.mean(d["recall"]),
             "mean_f1": statistics.mean(d["f1"]),
+            "f1_ci_low": bootstrap_ci(d["f1"])[0],
+            "f1_ci_high": bootstrap_ci(d["f1"])[1],
             "median_f1": statistics.median(d["f1"]),
+            "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]),
             "n_completed": status_counts[tool]["completed"] + status_counts[tool]["reused"],
             "n_failed": status_counts[tool]["failed"],
             "n_skipped": status_counts[tool]["skipped"],
@@ -87,16 +93,42 @@ def summarise(rows, status_counts):
     return summary
 
 
+def bootstrap_ci(values, iterations=1000):
+    """Deterministic percentile CI for the mean F1; descriptive, not a p-value."""
+    if len(values) < 2:
+        return statistics.mean(values), statistics.mean(values)
+    rng = random.Random(20260831)
+    means = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(iterations))
+    return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
+
+
+def write_comparisons(rows, path):
+    by_tool = defaultdict(dict)
+    for row in rows:
+        by_tool[row["tool"]][row["sample"]] = row["f1"]
+    tools = sorted(by_tool)
+    with open(path, "w") as handle:
+        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\twins_a\tties\twins_b\n")
+        for i, a in enumerate(tools):
+            for b in tools[i + 1:]:
+                shared = sorted(set(by_tool[a]) & set(by_tool[b]))
+                diffs = [by_tool[a][sample] - by_tool[b][sample] for sample in shared]
+                if not diffs:
+                    continue
+                handle.write(f"{a}\t{b}\t{len(shared)}\t{statistics.mean(diffs):.4f}\t"
+                             f"{sum(x > 0 for x in diffs)}\t{sum(x == 0 for x in diffs)}\t{sum(x < 0 for x in diffs)}\n")
+
+
 def write_tsv(summary, path):
     cols = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
-            "mean_recall", "mean_f1", "median_f1"]
+            "mean_recall", "mean_plasmid_recall", "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
             fh.write("\t".join(str(x) for x in [
                 i, s["tool"], s["n_samples"], s["n_completed"], s["n_failed"], s["n_skipped"],
                 f"{s['mean_precision']:.4f}", f"{s['mean_recall']:.4f}",
-                f"{s['mean_f1']:.4f}", f"{s['median_f1']:.4f}",
+                f"{s['mean_plasmid_recall']:.4f}", f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}", f"{s['f1_ci_high']:.4f}", f"{s['median_f1']:.4f}",
             ]) + "\n")
 
 
@@ -136,6 +168,7 @@ def main():
     summary = summarise(rows, status_counts)
     write_tsv(summary, args.out_prefix + ".leaderboard.tsv")
     write_md(summary, args.out_prefix + ".leaderboard.md")
+    write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv")
 
     # Print the leaderboard to stdout so it appears in the run log.
     print("\n=== LEADERBOARD (mean F1, descending) ===")

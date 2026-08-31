@@ -46,6 +46,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         fi
         python3 "$HERE/../python/score_plasmids.py" \
             --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
+            --plasmid-recovery-threshold "$PLASMID_RECOVERY_THRESHOLD" \
             --sample "$SAMPLE" --tool "$tool" --out "$SCORES"
     done
 done < <(read_samples "$SAMPLE_SHEET")

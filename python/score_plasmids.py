@@ -225,6 +225,8 @@ def main():
     ap.add_argument("--sample", required=True)
     ap.add_argument("--tool", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--plasmid-recovery-threshold", type=float, default=0.90,
+                    help="Fraction of a true plasmid that counts as recovered (default: 0.90).")
     args = ap.parse_args()
 
     truth, total_plasmid = read_truth(args.truth)
@@ -235,17 +237,29 @@ def main():
         raise SystemExit(f"ERROR: {exc}")
     tp, fp, fn = score(truth, total_plasmid, covered)
 
+    if not 0 < args.plasmid_recovery_threshold <= 1:
+        raise SystemExit("ERROR: --plasmid-recovery-threshold must be in (0, 1].")
+    true_plasmids = [seq_id for seq_id, (mol, _) in truth.items() if mol == "PLASMID"]
+    recovered_plasmids = 0
+    for seq_id in true_plasmids:
+        _, covered_bp = merge_intervals(covered.get(seq_id, []))
+        if covered_bp / truth[seq_id][1] >= args.plasmid_recovery_threshold:
+            recovered_plasmids += 1
+    predicted_records = len(pred_lengths)
+
     precision = safe_div(tp, tp + fp)
     recall = safe_div(tp, tp + fn)          # completeness
     f1 = safe_div(2 * precision * recall, precision + recall)
 
     header = [
         "sample", "tool", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
-        "unmapped_pred_bp", "precision", "recall", "f1",
+        "unmapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
+        "plasmid_recall", "predicted_record_count", "precision", "recall", "f1",
     ]
     row = [
         args.sample, args.tool, total_plasmid, tp, fp, fn,
-        unmapped_pred_bp,
+        unmapped_pred_bp, len(true_plasmids), recovered_plasmids,
+        f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}", predicted_records,
         f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}",
     ]
 

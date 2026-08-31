@@ -20,6 +20,14 @@ export TMP_DIR="${TMP_DIR:-$PROJECT_ROOT/tmp}"
 #                        hybrid assembly -> ground truth.
 #   sra_run            = matched Illumina run (SRR/ERR/DRR) for that isolate.
 export SAMPLE_SHEET="${SAMPLE_SHEET:-$PROJECT_ROOT/config/accessions.tsv}"
+# Require cohort metadata for a publishable benchmark. Set to 0 only while
+# exploring a legacy three-column sample sheet.
+export REQUIRE_CURATED_METADATA="${REQUIRE_CURATED_METADATA:-1}"
+
+# A true AMR-gene table is optional per sample. When supplied as
+# data/<sample>/truth_amr.tsv it is scored alongside base-level recovery.
+export PLASMID_RECOVERY_THRESHOLD="${PLASMID_RECOVERY_THRESHOLD:-0.90}"
+export AMR_GENE_RECOVERY_THRESHOLD="${AMR_GENE_RECOVERY_THRESHOLD:-0.90}"
 
 # --- Compute -----------------------------------------------------------------
 export THREADS="${THREADS:-4}"

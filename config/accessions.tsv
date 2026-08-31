@@ -1,10 +1,15 @@
-sample_id	assembly_accession	sra_run
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject
 # ---------------------------------------------------------------------------
 # Fill this in with YOUR matched pairs. One isolate per row.
 #   sample_id          : any short unique name you choose (no spaces)
 #   assembly_accession : a COMPLETE genome assembly (GCF_... or GCA_...)
 #                        built from long-read / hybrid data -> ground truth
 #   sra_run            : the matched Illumina run (SRR/ERR/DRR) for that isolate
+#   organism           : NCBI scientific name, for cohort stratification
+#   truth_technology   : long_read, hybrid, or other documented truth technology
+#   truth_quality_tier : A (closed+validated), B (complete), or C (provisional)
+#   biosample          : matched NCBI BioSample accession (SAMN.../SAMEA...)
+#   bioproject         : NCBI BioProject accession (PRJNA.../PRJEB...)
 #
 # Lines starting with '#' and blank lines are ignored.
 #
@@ -16,6 +21,5 @@ sample_id	assembly_accession	sra_run
 # The three rows below are PLACEHOLDERS to show the format. Replace them.
 # (They are commented out so the pipeline does not try to download them.)
 # ---------------------------------------------------------------------------
-# ecoli_01	GCF_000000000.1	SRR0000001
-# kpneu_01	GCF_000000000.2	SRR0000002
-# ecoli_02	GCA_000000000.3	ERR0000003
+# ecoli_01	GCF_000000000.1	SRR0000001	Escherichia coli	hybrid	A	SAMN00000001	PRJNA000001
+# kpneu_01	GCF_000000000.2	SRR0000002	Klebsiella pneumoniae	long_read	B	SAMN00000002	PRJNA000001
