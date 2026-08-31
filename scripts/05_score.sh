@@ -19,6 +19,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     REF="$SDIR/reference.fna"
     TRUTH="$SDIR/truth.tsv"
     AMR="$SDIR/truth_amr.tsv"
+    CIRCULAR="$SDIR/truth_circular.tsv"
     [[ -s "$REF" && -s "$TRUTH" ]] || { warn "missing reference/truth for $SAMPLE"; continue; }
     log "=== Score $SAMPLE ==="
 
@@ -47,10 +48,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         fi
         AMR_ARGS=()
         [[ -s "$AMR" ]] && AMR_ARGS=(--amr-genes "$AMR" --amr-gene-recovery-threshold "$AMR_GENE_RECOVERY_THRESHOLD")
+        CIRCULAR_ARGS=()
+        [[ -s "$CIRCULAR" ]] && CIRCULAR_ARGS=(--circular-plasmids "$CIRCULAR")
         python3 "$HERE/../python/score_plasmids.py" \
             --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
             --plasmid-recovery-threshold "$PLASMID_RECOVERY_THRESHOLD" \
             "${AMR_ARGS[@]}" \
+            "${CIRCULAR_ARGS[@]}" \
             --sample "$SAMPLE" --tool "$tool" --out "$SCORES"
     done
 done < <(read_samples "$SAMPLE_SHEET")

@@ -239,6 +239,25 @@ def read_amr_genes(path, truth):
     return genes
 
 
+def read_circular_plasmids(path, truth):
+    if not path:
+        return []
+    circular = []
+    with open(path) as handle:
+        header = handle.readline().rstrip("\n").split("\t")
+        if "sequence_id" not in header:
+            raise ValueError("circular truth TSV must contain sequence_id")
+        index = header.index("sequence_id")
+        for line_number, line in enumerate(handle, start=2):
+            if not line.strip():
+                continue
+            seq_id = line.rstrip("\n").split("\t")[index]
+            if seq_id not in truth or truth[seq_id][0] != "PLASMID":
+                raise ValueError(f"circular truth line {line_number} is not a labelled plasmid: {seq_id}")
+            circular.append(seq_id)
+    return circular
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -252,6 +271,7 @@ def main():
                     help="Fraction of a true plasmid that counts as recovered (default: 0.90).")
     ap.add_argument("--amr-genes", help="Optional curated AMR truth TSV (sequence_id, start, end).")
     ap.add_argument("--amr-gene-recovery-threshold", type=float, default=0.90)
+    ap.add_argument("--circular-plasmids", help="Optional curated circular-plasmid TSV (sequence_id).")
     args = ap.parse_args()
 
     truth, total_plasmid = read_truth(args.truth)
@@ -281,6 +301,14 @@ def main():
         overlap = sum(max(0, min(end, e) - max(start, s)) for s, e in merged)
         if end > start and overlap / (end - start) >= args.amr_gene_recovery_threshold:
             recovered_amr += 1
+    try:
+        circular_plasmids = read_circular_plasmids(args.circular_plasmids, truth)
+    except ValueError as exc:
+        raise SystemExit(f"ERROR: {exc}")
+    recovered_circular = sum(
+        1 for seq_id in circular_plasmids
+        if merge_intervals(covered.get(seq_id, []))[1] / truth[seq_id][1] >= args.plasmid_recovery_threshold
+    )
 
     precision = safe_div(tp, tp + fp)
     recall = safe_div(tp, tp + fn)          # completeness
@@ -290,13 +318,15 @@ def main():
         "sample", "tool", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
         "unmapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
         "plasmid_recall", "predicted_record_count", "true_amr_gene_count",
-        "recovered_amr_gene_count", "amr_gene_recall", "precision", "recall", "f1",
+        "recovered_amr_gene_count", "amr_gene_recall", "true_circular_plasmid_count",
+        "recovered_circular_plasmid_count", "circular_plasmid_recall", "precision", "recall", "f1",
     ]
     row = [
         args.sample, args.tool, total_plasmid, tp, fp, fn,
         unmapped_pred_bp, len(true_plasmids), recovered_plasmids,
         f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}", predicted_records,
         len(amr_genes), recovered_amr, f"{safe_div(recovered_amr, len(amr_genes)):.4f}",
+        len(circular_plasmids), recovered_circular, f"{safe_div(recovered_circular, len(circular_plasmids)):.4f}",
         f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}",
     ]
 
