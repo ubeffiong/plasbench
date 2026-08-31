@@ -23,22 +23,68 @@ For each isolate the pipeline:
 
 ---
 
-## 0. TL;DR
+## 0. Clone and run
+
+### Native Linux / WSL2 installation
+
+Use Ubuntu or WSL2 with Git, Conda/Mamba (Miniforge recommended), and at least
+20-40 GB of free disk space. On Windows, run these commands **inside Ubuntu WSL**,
+not PowerShell.
 
 ```bash
-# A) Prove the scoring engine works — no downloads, no bioinformatics tools, ~2 seconds:
-bash test/run_demo.sh
+# 1. Download the source code.
+git clone https://github.com/ubeffiong/plasbench.git
+cd plasbench
 
-# B) Install the real tools (once):
+# 2. Create the reproducible bioinformatics environment (once).
 bash env/setup_conda.sh          # creates the 'plasbench' conda env
 conda activate plasbench
+python -m pip install --no-deps . # installs the `plasbench` terminal command
+
+# 3. Confirm the scoring/report engine works. No downloads or bio-tools needed.
+plasbench test
+plasbench demo
+
+# 4. Install the Platon database if Platon is enabled in config/config.sh.
 bash env/download_platon_db.sh   # one-time Platon database download
 
-# C) Put your matched pairs in config/accessions.tsv (see docs/FINDING_DATA.md), then:
-plasbench run                     # runs stages 0→6 end to end
+# 5. Add matched complete-assembly and Illumina accessions to config/accessions.tsv,
+# then run the full benchmark.
+plasbench run
 ```
 
-The final interactive report lands in `results/benchmark.report.html`.
+The final interactive report is `results/benchmark.report.html`. Run
+`plasbench --help` or `plasbench run --help` to see available commands and options.
+
+### Docker installation
+
+Docker avoids a host Conda installation. Build the image from the cloned repository:
+
+```bash
+git clone https://github.com/ubeffiong/plasbench.git
+cd plasbench
+docker build -t plasbench:local .
+
+# Verify the scoring and HTML-report path.
+docker run --rm plasbench:local plasbench demo
+
+# Run real data while keeping outputs on the host machine.
+docker run --rm \
+  -v "$PWD/config:/work/config:ro" \
+  -v "$PWD/data:/work/data" \
+  -v "$PWD/logs:/work/logs" \
+  -v "$PWD/results:/work/results" \
+  -e DATA_DIR=/work/data \
+  -e LOG_DIR=/work/logs \
+  -e RESULTS_DIR=/work/results \
+  -e PLATON_DB=/work/data/db/platon/db \
+  plasbench:local plasbench --project-root /opt/plasbench run \
+  --samples /work/config/accessions.tsv
+```
+
+If Platon is enabled, mount its versioned database at
+`/work/data/db/platon/db`, or disable Platon with `RUN_PLATON=0`. The container
+does not bundle this large database.
 
 ---
 
@@ -50,7 +96,7 @@ The final interactive report lands in `results/benchmark.report.html`.
 | `conda`/`mamba` (Miniforge recommended) | installs all bio-tools | `INSTALL.md` |
 | ~20–40 GB free disk | assemblies + reads + intermediates | — |
 | Internet access to NCBI/SRA | downloads data | — |
-| Python ≥ 3.7 | scoring scripts (**standard library only**) | already on Ubuntu |
+| Python ≥ 3.9 | CLI and scoring scripts | installed by the Conda environment |
 
 You do **not** need to know how every tool works to run this. The only script worth
 reading closely is `python/score_plasmids.py` — that is the benchmark's logic.
