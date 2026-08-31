@@ -6,8 +6,8 @@ package:
   version: {{ version }}
 
 source:
-  # Replace YOUR_GITHUB_ORG and SHA256 after creating the GitHub v0.1.0 release.
-  url: https://github.com/YOUR_GITHUB_ORG/plasbench/archive/refs/tags/v{{ version }}.tar.gz
+  # Replace SHA256 after creating the GitHub v0.1.0 release.
+  url: https://github.com/ubeffiong/plasbench/archive/refs/tags/v{{ version }}.tar.gz
   sha256: REPLACE_WITH_RELEASE_TARBALL_SHA256
 
 build:
@@ -31,7 +31,7 @@ test:
     - plasbench --help
 
 about:
-  home: https://github.com/YOUR_GITHUB_ORG/plasbench
+  home: https://github.com/ubeffiong/plasbench
   license: MIT
   license_file: LICENSE
   summary: Benchmark plasmid-reconstruction tools against complete-reference truth.

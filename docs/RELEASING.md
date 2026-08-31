@@ -5,7 +5,7 @@ requires maintainer-owned accounts and cannot be performed from a source checkou
 
 ## One-time setup
 
-1. Create `YOUR_GITHUB_ORG/plasbench` and replace every `YOUR_GITHUB_ORG` placeholder.
+1. The canonical source repository is `ubeffiong/plasbench`.
 2. Register the `plasbench` project on PyPI and configure GitHub OIDC trusted publishing.
 3. Create a Quay repository or use the GitHub Container Registry image published by the
    release workflow; replace `YOUR_QUAY_NAMESPACE` in `galaxy/plasbench_score.xml`.

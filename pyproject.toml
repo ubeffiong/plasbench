@@ -23,9 +23,9 @@ dependencies = []
 plasbench = "plasbench.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/YOUR_GITHUB_ORG/plasbench"
-Repository = "https://github.com/YOUR_GITHUB_ORG/plasbench"
-Issues = "https://github.com/YOUR_GITHUB_ORG/plasbench/issues"
+Homepage = "https://github.com/ubeffiong/plasbench"
+Repository = "https://github.com/ubeffiong/plasbench"
+Issues = "https://github.com/ubeffiong/plasbench/issues"
 
 [tool.setuptools]
 packages = ["plasbench"]
