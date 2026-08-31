@@ -36,9 +36,21 @@ Predicted sequence that does not align to the reference at all is reported as
 chromosome or plasmid origin (it usually reflects mis-assembly or contamination). Reporting
 it separately keeps the core precision metric conservative and interpretable.
 
-## Aggregation
+## Plasmid-level recovery
+In addition to base-level F1, PlasBench reports the number of true plasmid
+replicons and the number recovered to at least the configured fraction of their
+reference length (default 90%). `plasmid_recall` is the fraction of true
+replicons meeting that threshold. `predicted_record_count` is intentionally a
+sequence-record proxy, not a bin-level precision claim: tools differ in whether
+they output one contig, multiple contigs, or one FASTA per plasmid bin.
+
+## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,
-mean recall) and ranked by mean F1 (`python/aggregate_results.py`).
+mean recall) and ranked by mean F1 (`python/aggregate_results.py`). A
+deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
+and `benchmark.paired_comparisons.tsv` reports paired per-sample F1
+differences and win/tie/loss counts. These are descriptive uncertainty aids,
+not formal claims of clinical or statistical superiority.
 
 ## Known limitations / honest caveats
 - **Base-level, not object-level.** This metric rewards recovering plasmid *sequence*. It
