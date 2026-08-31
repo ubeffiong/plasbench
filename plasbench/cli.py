@@ -25,7 +25,8 @@ def project_root(value):
 
 def run(command, root, env=None):
     merged_env = os.environ.copy()
-    merged_env["PROJECT_ROOT"] = str(root)
+    # The Bash configuration derives PROJECT_ROOT from its script location. Do
+    # not inject a Windows path here: Git Bash would interpret its backslashes.
     if env:
         merged_env.update(env)
     return subprocess.run(command, cwd=root, env=merged_env, check=False).returncode

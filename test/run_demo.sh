@@ -92,8 +92,18 @@ STATUS="$DEMO/tool_status.tsv"
 
 python3 "$PY/aggregate_results.py" --scores "$SCORES" --tool-status "$STATUS" --out-prefix "$DEMO/benchmark"
 
+python3 "$PY/build_html_report.py" \
+    --project-root "$ROOT" \
+    --scores "$SCORES" \
+    --tool-status "$STATUS" \
+    --leaderboard "$DEMO/benchmark.leaderboard.tsv" \
+    --out "$DEMO/benchmark.report.html"
+
 echo
 echo "===== leaderboard markdown ====="
 cat "$DEMO/benchmark.leaderboard.md"
+echo
+echo "===== interactive HTML report ====="
+echo "$DEMO/benchmark.report.html"
 echo
 echo "Demo outputs are in: $DEMO"
