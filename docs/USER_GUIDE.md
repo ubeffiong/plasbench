@@ -1,12 +1,88 @@
 # PlasBench User Guide
 
-PlasBench benchmarks plasmid-reconstruction tools against complete reference
-assemblies. It converts each tool's plasmid prediction into a common base-level
-comparison: reference plasmid bases are the positive class and reference
-chromosome bases are the negative class.
+## What PlasBench Is
+
+PlasBench is a reproducible bioinformatics benchmark for answering a practical
+question: **which plasmid-reconstruction method performs best for a given set
+of bacterial short-read samples?**
+
+Different tools report plasmids in different ways. Some classify assembled
+contigs as plasmid or chromosome, while others assemble a separate set of
+putative plasmid sequences. PlasBench makes their output comparable by mapping
+every predicted-plasmid FASTA back to a complete reference assembly and scoring
+the same reference bases for every tool.
+
+The current benchmark can compare MOB-suite `mob_recon`, Platon,
+plasmidSPAdes, and experimental gplas. It is designed for bacterial isolates
+with matched Illumina reads and a complete long-read or hybrid reference from
+the same isolate.
 
 Run this guide from a source checkout with `plasbench docs`, or print one
 section with `plasbench docs --topic <name>`.
+
+## What It Does
+
+For every sample, PlasBench:
+
+1. Retrieves a complete reference assembly and matched Illumina reads, or uses
+   data that has already been prepared in its expected locations.
+2. Reads the NCBI sequence report to label each reference sequence as plasmid
+   or chromosome.
+3. Quality-trims and assembles the short reads.
+4. Runs every enabled plasmid-reconstruction tool.
+5. Standardizes each tool's output to a predicted-plasmid FASTA.
+6. Aligns each prediction to the complete reference with minimap2.
+7. Computes base-level precision, recall/completeness, F1, chromosome
+   contamination, and unaligned predicted sequence.
+8. Produces per-sample results, a coverage-aware leaderboard, and an offline
+   interactive HTML report with drill-downs and downloadable artifacts.
+
+## How It Works
+
+The complete reference is the truth source. A base is considered a positive
+reference base when its sequence is labelled `PLASMID`; a chromosome base is a
+negative reference base. When a tool claims sequence is plasmid, PlasBench asks
+where that sequence aligns on the reference:
+
+```text
+Predicted plasmid aligns to reference plasmid   -> true positive (TP)
+Predicted plasmid aligns to reference chromosome -> false positive (FP)
+Reference plasmid not covered by a prediction    -> false negative (FN)
+```
+
+This base-level projection is important: it avoids treating a classifier's
+contig labels and a reassembler's plasmid contigs as incomparable output types.
+Precision measures how much of a claimed plasmid sequence maps to chromosome;
+recall measures how much true plasmid sequence was recovered; F1 balances both.
+
+Tool execution failures are not falsely converted into zero F1. PlasBench
+records them in `tool_status.tsv`, excludes them from score aggregation, and
+shows completed, failed, skipped, and scored counts in the leaderboard.
+
+## When To Use It
+
+Use PlasBench when you need to choose a plasmid-reconstruction method for a
+study, compare methods on local isolates, prepare benchmark evidence for a
+publication or poster, or validate a method configuration against trusted
+complete assemblies.
+
+Do not use it as a clinical diagnostic, as proof that an individual predicted
+plasmid is biologically correct, or to compare samples whose reads and complete
+reference are not from the same isolate. A high score shows agreement with the
+selected reference and parameters; it does not replace laboratory validation or
+broader epidemiological interpretation.
+
+## Requirements and Limits
+
+The full workflow needs a matched reference/read pair for each sample, enough
+compute for assembly, and reliable source metadata. Complete-reference labels
+depend on the NCBI sequence report. Ambiguous, incomplete, contaminated, or
+mismatched reference data can bias every downstream metric.
+
+The default `asm5` mapping preset assumes low divergence between prediction and
+reference, which is appropriate for the same isolate. Change it only when the
+biological relationship warrants it and document that choice. gplas remains
+experimental because its output layout varies by release.
 
 ## Install
 

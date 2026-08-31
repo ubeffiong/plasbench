@@ -14,6 +14,11 @@ STAGE_HELP = """stage numbers: 0=setup, 1=download, 2=truth, 3=assemble,
 4=reconstruct, 5=score, 6=aggregate and HTML report."""
 
 DOC_TOPICS = {
+    "overview": "What PlasBench Is",
+    "what-it-does": "What It Does",
+    "how-it-works": "How It Works",
+    "when-to-use": "When To Use It",
+    "limits": "Requirements and Limits",
     "install": "Install",
     "inputs": "Inputs",
     "commands": "Commands",
