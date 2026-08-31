@@ -54,6 +54,22 @@ def sample_rows(path):
     return rows
 
 
+def directory_identity(path):
+    """Identify a database without hashing multi-gigabyte contents on every run."""
+    if not path:
+        return {"available": False, "path": None}
+    path = Path(path)
+    if not path.is_dir():
+        return {"available": False, "path": str(path)}
+    files = sorted(item for item in path.rglob("*") if item.is_file())
+    digest = hashlib.sha256()
+    for item in files:
+        stat = item.stat()
+        digest.update(f"{item.relative_to(path)}\t{stat.st_size}\t{stat.st_mtime_ns}\n".encode())
+    return {"available": True, "path": str(path.resolve()), "file_count": len(files),
+            "identity_sha256": digest.hexdigest()}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True)
@@ -64,7 +80,7 @@ def main():
     args = parser.parse_args()
     settings = ("THREADS", "MEMORY_GB", "ASSEMBLER", "MIN_READ_LEN", "MINIMAP2_PRESET",
                 "RUN_MOB_RECON", "RUN_PLATON", "RUN_PLASMIDSPADES", "RUN_GPLAS",
-                "PLASMID_RECOVERY_THRESHOLD", "AMR_GENE_RECOVERY_THRESHOLD")
+                "PLASMID_RECOVERY_THRESHOLD", "AMR_GENE_RECOVERY_THRESHOLD", "PLATON_DB")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     truth_tables = {}
@@ -81,6 +97,9 @@ def main():
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "project_root": str(Path(args.project_root).resolve()),
         "platform": {"python": sys.version, "system": platform.platform()},
+        "container": {"image": os.environ.get("CONTAINER_IMAGE"),
+                      "image_digest": os.environ.get("CONTAINER_IMAGE_DIGEST")},
+        "databases": {"platon": directory_identity(os.environ.get("PLATON_DB", ""))},
         "settings": {key: os.environ.get(key) for key in settings},
         "input_checksums": {"sample_sheet": sha256(sample_sheet), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},
