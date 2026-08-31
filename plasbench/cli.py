@@ -13,6 +13,20 @@ from . import __version__
 STAGE_HELP = """stage numbers: 0=setup, 1=download, 2=truth, 3=assemble,
 4=reconstruct, 5=score, 6=aggregate and HTML report."""
 
+DOC_TOPICS = {
+    "install": "Install",
+    "inputs": "Inputs",
+    "commands": "Commands",
+    "options": "Run Options",
+    "workflow": "Workflow",
+    "outputs": "Outputs",
+    "metrics": "Metric Definitions",
+    "console": "Console Messages",
+    "troubleshooting": "Troubleshooting",
+    "reproducibility": "Reproducibility and Citation",
+    "deployment": "Public Deployment",
+}
+
 
 def project_root(value):
     root = Path(value).resolve()
@@ -47,6 +61,22 @@ def bash_command():
     return shutil.which("bash") or "bash"
 
 
+def print_docs(root, topic):
+    guide = root / "docs" / "USER_GUIDE.md"
+    if not guide.is_file():
+        raise SystemExit(f"ERROR: user guide not found at {guide}")
+    text = guide.read_text(encoding="utf-8")
+    if topic == "all":
+        print(text, end="" if text.endswith("\n") else "\n")
+        return
+    heading = "## " + DOC_TOPICS[topic]
+    start = text.find(heading)
+    if start < 0:
+        raise SystemExit(f"ERROR: documentation section not found: {topic}")
+    end = text.find("\n## ", start + len(heading))
+    print(text[start:] if end < 0 else text[start:end])
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="plasbench",
@@ -65,6 +95,9 @@ def main(argv=None):
     sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     sub.add_parser("test", help="Run the scoring unit tests.")
     sub.add_parser("check", help="Check configured runtime dependencies.")
+    docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
+    docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
+                             help="Guide topic to print (default: all).")
     report_parser = sub.add_parser("report", help="Regenerate the leaderboard and HTML report from scores.")
     run_parser = sub.add_parser("run", help="Run the full benchmark or selected stages.")
     run_parser.add_argument("stages", nargs="*", choices=[str(i) for i in range(7)],
@@ -105,6 +138,9 @@ def main(argv=None):
         code = run([sys.executable, "test/test_scoring.py"], root)
     elif args.command == "check":
         code = run([bash_command(), "scripts/run_all.sh", "0"], root)
+    elif args.command == "docs":
+        print_docs(root, args.topic)
+        code = 0
     else:
         env = {}
         path_options = {

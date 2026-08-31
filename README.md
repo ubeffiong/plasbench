@@ -55,6 +55,8 @@ plasbench run
 
 The final interactive report is `results/benchmark.report.html`. Run
 `plasbench --help` or `plasbench run --help` to see available commands and options.
+The complete terminal-accessible guide is available with `plasbench docs`; for
+example, use `plasbench docs --topic outputs` or `plasbench docs --topic troubleshooting`.
 
 ### Docker installation
 
