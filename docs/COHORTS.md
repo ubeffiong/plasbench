@@ -25,6 +25,32 @@ BioProject identifiers exactly match the cohort row. It cannot prove biological
 identity beyond deposited metadata; curators should still review strain/isolate
 names, collection metadata, and associated publications.
 
+## Strict candidate screening
+
+For a 40-60 isolate public release, start with a broad candidate table rather
+than adding unverified rows to a released cohort. It must have
+`assembly_accession` and `sra_run`; `sample_id`, `sample_origin`,
+`read_depth_x`, and `source_study` may be included when known:
+
+```bash
+plasbench curate-cohort --candidates candidates.tsv --out-dir curation \
+  --email you@example.org --truth-technology hybrid --quality-tier A
+```
+
+This creates `curation/accepted.tsv` only when the exact complete plasmid
+reference, BioSample, BioProject, Illumina platform, and paired-end rules all
+pass. `curation/rejected.tsv` retains every unsuitable candidate and its reason.
+Review accepted isolate names, source publication, origin, truth technology,
+and read-depth calculation; then validate and lock the reviewed table:
+
+```bash
+plasbench validate-cohort --samples curation/accepted.tsv --online \
+  --write-lock curation/accepted.lock.json
+```
+
+This workflow keeps cohort scope broad and user-defined while preventing a
+candidate list from being misrepresented as a verified benchmark release.
+
 ## Versioned public panel
 
 [`cohorts/public-v1.tsv`](../cohorts/public-v1.tsv) is a ten-isolate, directly

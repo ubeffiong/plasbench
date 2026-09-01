@@ -110,6 +110,13 @@ def main(argv=None):
     cohort_parser.add_argument("--api-key", help="NCBI API key; defaults to NCBI_API_KEY when omitted.")
     cohort_parser.add_argument("--write-lock", type=Path, help="Write NCBI verification evidence as JSON; requires --online.")
     cohort_parser.add_argument("--verify-lock", type=Path, help="Require a verification lock that matches the cohort TSV.")
+    curate_parser = sub.add_parser("curate-cohort", help="Strictly screen candidate assembly/SRA pairs and write accepted/rejected tables.")
+    curate_parser.add_argument("--candidates", type=Path, required=True)
+    curate_parser.add_argument("--out-dir", type=Path, required=True)
+    curate_parser.add_argument("--email")
+    curate_parser.add_argument("--api-key")
+    curate_parser.add_argument("--truth-technology", choices=("long_read", "hybrid"), default="hybrid")
+    curate_parser.add_argument("--quality-tier", choices=("A", "B", "C"), default="A")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
     install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
@@ -123,6 +130,11 @@ def main(argv=None):
     ladder_parser.add_argument("--out-dir", type=Path, required=True)
     ladder_parser.add_argument("--depths", default="20,40,80,160")
     ladder_parser.add_argument("--seed", type=int, default=20260901)
+    depth_report_parser = sub.add_parser("depth-report", help="Summarize a completed depth-ladder benchmark and create an SVG plot.")
+    depth_report_parser.add_argument("--scores", type=Path, required=True)
+    depth_report_parser.add_argument("--manifest", type=Path, required=True)
+    depth_report_parser.add_argument("--out-prefix", type=Path, required=True)
+    depth_report_parser.add_argument("--metric", choices=("precision", "recall", "f1", "plasmid_recall"), default="f1")
     run_parser = sub.add_parser("run", help="Run the full benchmark or selected stages.")
     run_parser.add_argument("stages", nargs="*", choices=[str(i) for i in range(7)],
                             help=f"Optional {STAGE_HELP}")
@@ -180,12 +192,25 @@ def main(argv=None):
         if args.verify_lock:
             command.extend(["--verify-lock", str(args.verify_lock)])
         code = run(command, root)
+    elif args.command == "curate-cohort":
+        command = [sys.executable, "python/curate_cohort.py", "--candidates", str(args.candidates),
+                   "--out-dir", str(args.out_dir), "--truth-technology", args.truth_technology,
+                   "--quality-tier", args.quality_tier]
+        if args.email:
+            command.extend(["--email", args.email])
+        if args.api_key:
+            command.extend(["--api-key", args.api_key])
+        code = run(command, root)
     elif args.command == "install-tools":
         code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.profile], root)
     elif args.command == "depth-ladder":
         code = run([sys.executable, "python/make_depth_ladder.py", "--samples", str(args.samples),
                     "--data-dir", str(args.data_dir), "--out-dir", str(args.out_dir),
                     "--depths", args.depths, "--seed", str(args.seed)], root)
+    elif args.command == "depth-report":
+        code = run([sys.executable, "python/summarize_depth_ladder.py", "--scores", str(args.scores),
+                    "--manifest", str(args.manifest), "--out-prefix", str(args.out_prefix),
+                    "--metric", args.metric], root)
     elif args.command == "docs":
         print_docs(root, args.topic)
         code = 0

@@ -266,7 +266,19 @@ plasbench depth-ladder --samples cohorts/public-v1.tsv --data-dir data \
 plasbench run --samples depth-ladder/depth_ladder.samples.tsv \
   --data-dir depth-ladder/data --results-dir depth-ladder/results \
   --local-inputs
+
+# Summarise the recovery curve and create a portable SVG for reports.
+plasbench depth-report --scores depth-ladder/results/scores.tsv \
+  --manifest depth-ladder/depth_ladder.manifest.tsv \
+  --out-prefix depth-ladder/results/depth_ladder
 ```
+
+`depth-report` writes `depth_ladder.summary.tsv` (tool, target depth, number
+scored, and mean precision/recall/F1/plasmid recall) and
+`depth_ladder.recovery.svg`. The SVG is a standalone, data-derived recovery
+versus coverage plot; it does not replace per-sample results or uncertainty
+analysis. Compare depths only within the same source cohort, seed, tool version,
+and configuration.
 
 The generated manifest records the parent isolate, sampling fraction, target
 depth, and seed. It never overwrites the original reads or cohort.
