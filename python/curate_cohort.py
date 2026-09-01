@@ -18,7 +18,7 @@ from validate_cohort import assembly_metadata, run_metadata
 
 OUT_COLUMNS = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_technology",
                "truth_quality_tier", "biosample", "bioproject", "sample_origin", "read_depth_x",
-               "assembly_plasmid_count", "source_study")
+               "assembly_plasmid_count", "source_study", "alternate_paired_runs")
 
 
 def read_rows(path):
@@ -43,9 +43,6 @@ def main():
     parser.add_argument("--out-dir", required=True, help="Directory for accepted.tsv and rejected.tsv.")
     parser.add_argument("--email", help="Contact email sent to NCBI E-utilities.")
     parser.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
-    parser.add_argument("--truth-technology", choices=("long_read", "hybrid"), default="hybrid",
-                        help="Provisional technology label. Confirm against the source publication before release.")
-    parser.add_argument("--quality-tier", choices=("A", "B", "C"), default="A")
     args = parser.parse_args()
     candidates = read_rows(args.candidates)
     required = {"assembly_accession", "sra_run"}
@@ -60,6 +57,7 @@ def main():
             reasons = []
             if assembly["assembly_status"].lower() != "complete genome": reasons.append("assembly is not Complete Genome")
             if not assembly["has_plasmid"]: reasons.append("assembly does not declare plasmid replicons")
+            if not assembly["derived_truth_technology"]: reasons.append("Datasets v2 has no explicit long-read sequencing evidence")
             if not assembly["biosample"] or assembly["biosample"] != run["biosample"]: reasons.append("assembly and run BioSample do not match")
             if not run["bioproject"] or run["bioproject"] not in assembly["bioprojects"]: reasons.append("assembly and run BioProject do not match")
             if run["platform"].upper() != "ILLUMINA": reasons.append("run platform is not ILLUMINA")
@@ -70,8 +68,8 @@ def main():
             accepted.append({
                 "sample_id": candidate.get("sample_id") or safe_id(assembly["organism"], index),
                 "assembly_accession": assembly["accession"], "sra_run": run["run"],
-                "organism": assembly["organism"], "truth_technology": args.truth_technology,
-                "truth_quality_tier": args.quality_tier, "biosample": assembly["biosample"],
+                "organism": assembly["organism"], "truth_technology": assembly["derived_truth_technology"],
+                "truth_quality_tier": "A", "biosample": assembly["biosample"],
                 "bioproject": run["bioproject"], "sample_origin": candidate.get("sample_origin", ""),
                 "read_depth_x": candidate.get("read_depth_x", ""),
                 "assembly_plasmid_count": "", "source_study": candidate.get("source_study", ""),

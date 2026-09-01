@@ -17,7 +17,7 @@ CAPABILITIES="$PROJECT_ROOT/config/tool_capabilities.tsv"
 [[ -s "$CAPABILITIES" ]] || die "tool capability registry missing: $CAPABILITIES"
 
 binning_capable() {
-    awk -F'\t' -v tool="$1" 'NR > 1 && $1 == tool { found=1; capable=($3 == "yes"); exit } END { exit(found && capable ? 0 : 1) }' "$CAPABILITIES"
+    python3 "$HERE/../python/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$1" --binning-capable >/dev/null
 }
 
 while IFS=$'\t' read -r SAMPLE ASM SRA; do

@@ -44,8 +44,6 @@ def main():
                         help="Maximum complete assemblies inspected per organism (default: 30).")
     parser.add_argument("--email", default=os.environ.get("NCBI_EMAIL"))
     parser.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
-    parser.add_argument("--truth-technology", choices=("long_read", "hybrid"), default="hybrid")
-    parser.add_argument("--quality-tier", choices=("A", "B", "C"), default="A")
     args = parser.parse_args()
     if args.max_assemblies < 1:
         raise SystemExit("ERROR: --max-assemblies must be positive")
@@ -71,19 +69,26 @@ def main():
                     rejected.append({"assembly_accession": accession, "organism_query": organism, "reason": "assembly is not Complete Genome"}); continue
                 if not assembly["has_plasmid"]:
                     rejected.append({"assembly_accession": accession, "organism_query": organism, "reason": "assembly does not declare plasmid replicons"}); continue
+                if not assembly["derived_truth_technology"]:
+                    rejected.append({"assembly_accession": accession, "organism_query": organism,
+                                     "reason": "Datasets v2 has no explicit long-read sequencing evidence"}); continue
                 runs = runinfo_for_biosample(assembly["biosample"], args.email, args.api_key)
                 paired = [run for run in runs if run.get("Platform", "").upper() == "ILLUMINA" and run.get("LibraryLayout", "").upper() == "PAIRED"
                           and run.get("BioSample") == assembly["biosample"] and run.get("BioProject") in assembly["bioprojects"]]
                 if not paired:
                     rejected.append({"assembly_accession": accession, "biosample": assembly["biosample"], "organism_query": organism,
                                      "reason": "no linked paired-end Illumina run with matching BioProject"}); continue
-                for run in paired:
-                    accepted.append({
+                # One assembly is one biological benchmark unit. Prefer the
+                # deepest paired run and retain alternates for curator review.
+                paired.sort(key=lambda row: int(row.get("bases") or 0), reverse=True)
+                selected, alternates = paired[0], ",".join(row["Run"] for row in paired[1:])
+                accepted.append({
                         "sample_id": safe_id(f"{assembly['organism']}_{accession.split('_')[1].split('.')[0]}", len(accepted) + 1),
-                        "assembly_accession": accession, "sra_run": run["Run"], "organism": assembly["organism"],
-                        "truth_technology": args.truth_technology, "truth_quality_tier": args.quality_tier,
-                        "biosample": assembly["biosample"], "bioproject": run["BioProject"], "sample_origin": "",
+                        "assembly_accession": accession, "sra_run": selected["Run"], "organism": assembly["organism"],
+                        "truth_technology": assembly["derived_truth_technology"], "truth_quality_tier": "A",
+                        "biosample": assembly["biosample"], "bioproject": selected["BioProject"], "sample_origin": "",
                         "read_depth_x": "", "assembly_plasmid_count": "", "source_study": "NCBI_discovery_pending_publication_review",
+                        "alternate_paired_runs": alternates,
                     })
                 time.sleep(0.11 if args.api_key else 0.34)
             except Exception as exc:

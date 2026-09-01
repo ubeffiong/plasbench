@@ -71,6 +71,6 @@ not formal claims of clinical or statistical superiority.
   subsampling experiment to separate tool quality from data quality.
 
 ## Reproducibility
-All randomness-free. Pin tool versions (`conda env export`) and record them per run. The
+All randomness-free. Regenerate the explicit lock with `bash env/lock_environment.sh` and record tool versions per run. The
 scoring scripts depend only on the Python standard library, so they are stable across
 environments.

@@ -537,7 +537,7 @@ sheet, tool versions, database versions, and final report alongside published
 results. After a stable native installation, export the environment:
 
 ```bash
-conda env export --name plasbench > env/environment.lock.yml
+bash env/lock_environment.sh
 ```
 
 Review `docs/METHODS.md` when writing methods. Use the citations for the tools

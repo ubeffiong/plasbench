@@ -9,7 +9,7 @@ elif command -v mamba >/dev/null 2>&1; then SOLVER=(mamba install -y -n "$ENV_NA
 elif command -v conda >/dev/null 2>&1; then SOLVER=(conda install -y -n "$ENV_NAME" -c conda-forge -c bioconda); CREATE=(conda create -y -n "$ENV_NAME")
 else echo "ERROR: install micromamba, mamba, or conda first." >&2; exit 1; fi
 case "$PROFILE" in
- locked) "${CREATE[@]}" --file "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/environment.lock.yml"; exit;;
+ locked) LOCK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/environment.lock.yml"; grep -q '^@EXPLICIT$' "$LOCK" || { echo "ERROR: $LOCK is not a Conda @EXPLICIT lock. Regenerate with: bash env/lock_environment.sh" >&2; exit 2; }; "${CREATE[@]}" $(awk '!/^(@|#|$)/ {print}' "$LOCK"); exit;;
  core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk);;
  assembly) PKGS=(spades unicycler);;
  reconstruction) PKGS=(mob_suite platon);;

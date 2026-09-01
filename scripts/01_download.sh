@@ -21,13 +21,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     if [[ "$LOCAL_INPUTS_ONLY" == "1" ]]; then
         missing=()
         [[ -s "$REF" ]] || missing+=("$REF")
-        [[ -s "$REPORT" ]] || missing+=("$REPORT")
+        [[ -s "$REPORT" || -s "$SDIR/truth.tsv" ]] || missing+=("$REPORT or $SDIR/truth.tsv")
         [[ -s "$R1" ]] || missing+=("$R1")
         [[ -s "$R2" ]] || missing+=("$R2")
         if [[ ${#missing[@]} -gt 0 ]]; then
             die "local-inputs mode is missing for $SAMPLE: ${missing[*]}"
         fi
-        log "  local reference, report, and paired reads verified; download skipped"
+        log "  local reference, truth/report, and paired reads verified; download skipped"
         continue
     fi
 

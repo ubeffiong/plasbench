@@ -13,7 +13,12 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     REF="$SDIR/reference.fna"
     REPORT="$SDIR/sequence_report.jsonl"
     TRUTH="$SDIR/truth.tsv"
-    [[ -s "$REF" && -s "$REPORT" ]] || { warn "missing reference/report for $SAMPLE; run 01_download.sh first"; continue; }
+    [[ -s "$REF" ]] || { warn "missing reference for $SAMPLE; run 01_download.sh first"; continue; }
+    if [[ -s "$TRUTH" ]]; then
+        log "  existing truth.tsv retained for $SAMPLE"
+        continue
+    fi
+    [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; continue; }
     log "=== Truth for $SAMPLE ==="
     python3 "$HERE/../python/make_truth.py" \
         --report "$REPORT" --fasta "$REF" --out "$TRUTH" \

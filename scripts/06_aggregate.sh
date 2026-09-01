@@ -8,6 +8,7 @@ need python3
 
 SCORES="$RESULTS_DIR/scores.tsv"
 [[ -s "$SCORES" ]] || die "no scores found at $SCORES; run 05_score.sh first"
+[[ ! -s "$(dirname "$SAMPLE_SHEET")/depth_ladder.manifest.tsv" ]] || die "depth-ladder sample sheet detected: correlated subsamples cannot produce a headline leaderboard; use plasbench depth-report instead"
 
 python3 "$HERE/../python/aggregate_results.py" \
     --scores "$SCORES" \

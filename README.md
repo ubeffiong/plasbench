@@ -246,7 +246,7 @@ Predicted sequence that doesn't map to the reference at all is reported separate
 
 ## 6. Reproducibility notes
 
-- Pin versions: `conda env export > env/environment.lock.yml` after install and commit it.
+- Regenerate the explicit lock with `bash env/lock_environment.sh`; do not overwrite it with `conda env export`.
 - Record tool versions per run (add `--version` calls to a manifest — a nice sprint task).
 - Deposit your curated sample sheet + truth tables on **Zenodo** for a citable dataset —
   this is the actual publishable artifact SPREAD asks for.

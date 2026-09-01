@@ -20,6 +20,8 @@ REQUIRED = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_tec
             "truth_quality_tier", "biosample", "bioproject")
 ACCESSION = re.compile(r"^GC[AF]_\d+\.\d+$")
 RUN = re.compile(r"^(SRR|ERR|DRR)\d+$")
+LONG_READ = re.compile(r"nanopore|\bont\b|pacbio|\bsmrt\b|minion|promethion|sequel|revio", re.IGNORECASE)
+SHORT_READ = re.compile(r"illumina|mgi|dnbseq|ion torrent", re.IGNORECASE)
 
 
 def read_rows(path):
@@ -48,6 +50,41 @@ def ncbi_json(endpoint, params, email=None, api_key=None, retries=4):
             time.sleep(delay)
 
 
+def datasets_report(accession, email=None, api_key=None, retries=4):
+    """Retrieve Datasets v2 assembly evidence unavailable from E-utilities."""
+    params = {}
+    if email:
+        params["email"] = email
+    if api_key:
+        params["api_key"] = api_key
+    request = Request(
+        "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/"
+        + accession + "/dataset_report" + ("?" + urlencode(params) if params else ""),
+        headers={"User-Agent": "PlasBench/0.1 cohort validator"},
+    )
+    for attempt in range(retries):
+        try:
+            with urlopen(request, timeout=60) as response:
+                reports = json.load(response).get("reports", [])
+            if len(reports) != 1:
+                raise ValueError(f"Datasets v2 did not return one report for {accession}")
+            info = reports[0].get("assembly_info", {})
+            return {"sequencing_tech": info.get("sequencing_tech", ""),
+                    "assembly_method": info.get("assembly_method", ""),
+                    "datasets_assembly_level": info.get("assembly_level", "")}
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+            if attempt == retries - 1 or (isinstance(exc, HTTPError) and exc.code not in (429, 500, 502, 503, 504)):
+                raise ValueError(f"NCBI Datasets v2 request failed after {attempt + 1} attempt(s): {exc}") from exc
+            time.sleep(min(30, 2 ** attempt + random.random()))
+
+
+def derive_truth_technology(sequencing_tech):
+    """Classify reference technology only from explicit deposited evidence."""
+    if not sequencing_tech or not LONG_READ.search(sequencing_tech):
+        return None
+    return "hybrid" if SHORT_READ.search(sequencing_tech) else "long_read"
+
+
 def assembly_metadata(accession, email=None, api_key=None):
     ids = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
                     {"db": "assembly", "term": f"{accession}[Assembly Accession]", "retmax": 2}, email, api_key)["esearchresult"]["idlist"]
@@ -59,9 +96,13 @@ def assembly_metadata(accession, email=None, api_key=None):
     report_url = result.get("ftppath_assembly_rpt", "").replace("ftp://", "https://")
     with urlopen(report_url, timeout=30) as response:
         has_plasmid = any("\tplasmid\t" in line.lower() for line in response.read().decode("utf-8").splitlines())
+    datasets = datasets_report(accession, email, api_key)
+    technology = derive_truth_technology(datasets["sequencing_tech"])
     return {"accession": result["assemblyaccession"], "biosample": result.get("biosampleaccn", ""),
             "bioprojects": sorted(projects), "organism": result.get("speciesname") or result.get("organism", ""),
-            "assembly_status": result.get("assemblystatus", ""), "has_plasmid": has_plasmid}
+            "assembly_status": result.get("assemblystatus", ""), "has_plasmid": has_plasmid,
+            "sequencing_tech": datasets["sequencing_tech"], "assembly_method": datasets["assembly_method"],
+            "datasets_assembly_level": datasets["datasets_assembly_level"], "derived_truth_technology": technology}
 
 
 def run_metadata(run, email=None, api_key=None):
@@ -111,13 +152,23 @@ def verify_row(row, email=None, api_key=None):
     run = run_metadata(row["sra_run"], email, api_key)
     errors = []
     if assembly["assembly_status"].lower() != "complete genome": errors.append("assembly is not Complete Genome")
+    if assembly["datasets_assembly_level"].lower() != "complete genome": errors.append("Datasets v2 assembly level is not Complete Genome")
     if not assembly["has_plasmid"]: errors.append("assembly metadata does not declare plasmid replicons")
+    if not assembly["derived_truth_technology"]:
+        errors.append("Datasets v2 sequencing_tech has no explicit long-read platform")
+    elif row["truth_technology"] != assembly["derived_truth_technology"]:
+        errors.append("declared truth_technology does not match Datasets v2 sequencing evidence")
     if assembly["biosample"] != row["biosample"]: errors.append("assembly BioSample does not match cohort row")
     if row["bioproject"] not in assembly["bioprojects"]: errors.append("assembly BioProject does not match cohort row")
     if run["biosample"] != row["biosample"]: errors.append("SRA BioSample does not match cohort row")
     if run["bioproject"] != row["bioproject"]: errors.append("SRA BioProject does not match cohort row")
     if run["platform"].upper() != "ILLUMINA": errors.append("SRA platform is not ILLUMINA")
     if run["layout"].upper() != "PAIRED": errors.append("SRA library is not paired-end")
+    # Tier A means every deposited linkage and long-read evidence check passed.
+    derived_tier = "A" if not errors else None
+    if derived_tier and row["truth_quality_tier"] != derived_tier:
+        errors.append("declared truth_quality_tier does not match evidence-derived tier A")
+    assembly["derived_truth_quality_tier"] = derived_tier
     return {"sample_id": row["sample_id"], "assembly": assembly, "run": run, "errors": errors}
 
 

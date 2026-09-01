@@ -76,7 +76,7 @@ cleanest graphs.
 
 After a successful install:
 ```bash
-conda env export > env/environment.lock.yml
+bash env/lock_environment.sh
 ```
 Commit that file so collaborators reproduce the exact toolchain.
 
