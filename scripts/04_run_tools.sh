@@ -118,6 +118,31 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         warn "gplas is enabled but not installed; skipped for $SAMPLE"
         record_status "$SAMPLE" "gplas" "skipped" "" "command unavailable"
     fi
+
+    # -------- gplas2 external classifier mode --------
+    if [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]] && have gplas; then
+        TOOL="gplas2_external"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
+        GRAPH="$SDIR/assembly_graph.gfa"
+        CLASSIFIER="${GPLAS2_EXTERNAL_PREDICTIONS_DIR:-}/$SAMPLE.tsv"
+        if is_complete "$DONE" "$PRED"; then
+            log "  $TOOL: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif [[ ! -s "$GRAPH" ]]; then
+            warn "  $TOOL needs an assembly graph; skipped for $SAMPLE"; record_status "$SAMPLE" "$TOOL" "skipped" "" "assembly graph unavailable"
+        elif [[ ! -s "$CLASSIFIER" ]]; then
+            warn "  $TOOL prediction table missing: $CLASSIFIER"; record_status "$SAMPLE" "$TOOL" "skipped" "" "external classifier TSV unavailable"
+        else
+            rm -rf "$OUT" "$PRED" "$DONE"; log "  $TOOL ..."
+            if gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_gplas.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "external classifier TSV: $CLASSIFIER"
+            else
+                rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log"
+            fi
+        fi
+    elif [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]]; then
+        warn "gplas2_external is enabled but gplas is not installed; skipped for $SAMPLE"
+        record_status "$SAMPLE" "gplas2_external" "skipped" "" "command unavailable"
+    fi
 done < <(read_samples "$SAMPLE_SHEET")
 
 log "Stage 4 (run tools) complete."
