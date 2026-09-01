@@ -224,6 +224,25 @@ curation guidance.
 
 ## Commands
 
+### Install dependency tools
+
+After installing the lightweight PlasBench command, install only the optional
+bioinformatics groups required for your planned stages. The command uses
+micromamba, mamba, or conda and installs into `plasbench` by default:
+
+```bash
+plasbench install-tools core
+plasbench install-tools assembly
+plasbench install-tools reconstruction
+plasbench install-tools all
+plasbench install-tools --env myenv mob_suite
+```
+
+`core` installs NCBI download, QC, and minimap2 tools; `assembly` installs
+SPAdes/Unicycler; `reconstruction` installs MOB-suite/Platon. `gplas` and
+`gplas2` remain optional because their classifier/database setup must be
+recorded separately. Run `plasbench install-tools --help` for the exact syntax.
+
 Run `plasbench --help` for the concise command list and `plasbench run --help`
 for all run options.
 
