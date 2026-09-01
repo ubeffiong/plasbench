@@ -33,7 +33,12 @@ def read_scores(path):
                 "precision": float(f[idx["precision"]]),
                 "recall": float(f[idx["recall"]]),
                 "f1": float(f[idx["f1"]]),
-                "plasmid_recall": float(f[idx["plasmid_recall"]]) if "plasmid_recall" in idx else 0.0,
+                # A missing plasmid-level value is not evidence of zero recovery.
+                "plasmid_recall": (
+                    float(f[idx["plasmid_recall"]])
+                    if "plasmid_recall" in idx and f[idx["plasmid_recall"]]
+                    else None
+                ),
                 "bin_f1": float(f[idx["bin_f1"]]) if "bin_f1" in idx and f[idx["bin_f1"]] else None,
             })
     return rows
@@ -70,22 +75,24 @@ def summarise(rows, status_counts):
         t["precision"].append(r["precision"])
         t["recall"].append(r["recall"])
         t["f1"].append(r["f1"])
-        t["plasmid_recall"].append(r["plasmid_recall"])
+        if r["plasmid_recall"] is not None:
+            t["plasmid_recall"].append(r["plasmid_recall"])
         if r["bin_f1"] is not None: t["bin_f1"].append(r["bin_f1"])
         t["n"] += 1
 
     summary = []
     for tool, d in by_tool.items():
+        f1_ci_low, f1_ci_high = bootstrap_ci(d["f1"])
         summary.append({
             "tool": tool,
             "n_samples": d["n"],
             "mean_precision": statistics.mean(d["precision"]),
             "mean_recall": statistics.mean(d["recall"]),
             "mean_f1": statistics.mean(d["f1"]),
-            "f1_ci_low": bootstrap_ci(d["f1"])[0],
-            "f1_ci_high": bootstrap_ci(d["f1"])[1],
+            "f1_ci_low": f1_ci_low,
+            "f1_ci_high": f1_ci_high,
             "median_f1": statistics.median(d["f1"]),
-            "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]),
+            "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]) if d["plasmid_recall"] else None,
             "mean_bin_f1": statistics.mean(d["bin_f1"]) if d["bin_f1"] else None,
             "n_bin_scored": len(d["bin_f1"]),
             "n_completed": status_counts[tool]["completed"] + status_counts[tool]["reused"],
@@ -99,8 +106,9 @@ def summarise(rows, status_counts):
 
 def bootstrap_ci(values, iterations=1000):
     """Deterministic percentile CI for the mean F1; descriptive, not a p-value."""
-    if len(values) < 2:
-        return statistics.mean(values), statistics.mean(values)
+    # Intervals from very small cohorts imply a precision the data do not have.
+    if len(values) < 5:
+        return None, None
     rng = random.Random(20260831)
     means = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(iterations))
     return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
@@ -108,7 +116,7 @@ def bootstrap_ci(values, iterations=1000):
 
 def paired_permutation_pvalue(differences, iterations=10000):
     """Two-sided sign-flip permutation p-value for paired mean differences."""
-    if len(differences) < 2:
+    if len(differences) < 5:
         return None
     observed = abs(statistics.mean(differences))
     rng = random.Random(20260901)
@@ -119,24 +127,56 @@ def paired_permutation_pvalue(differences, iterations=10000):
     return (extreme + 1) / (iterations + 1)
 
 
+def holm_adjust(pvalues):
+    """Return Holm-adjusted p-values keyed by comparison index."""
+    ordered = sorted(((pvalue, index) for index, pvalue in enumerate(pvalues)
+                      if pvalue is not None), key=lambda item: item[0])
+    adjusted = [None] * len(pvalues)
+    previous = 0.0
+    total = len(ordered)
+    for rank, (pvalue, index) in enumerate(ordered):
+        value = min(1.0, max(previous, pvalue * (total - rank)))
+        adjusted[index] = value
+        previous = value
+    return adjusted
+
+
 def write_comparisons(rows, path):
     by_tool = defaultdict(dict)
     for row in rows:
         by_tool[row["tool"]][row["sample"]] = row["f1"]
     tools = sorted(by_tool)
+    comparisons = []
+    for i, a in enumerate(tools):
+        for b in tools[i + 1:]:
+            shared = sorted(set(by_tool[a]) & set(by_tool[b]))
+            diffs = [by_tool[a][sample] - by_tool[b][sample] for sample in shared]
+            if not diffs:
+                continue
+            low, high = bootstrap_ci(diffs)
+            comparisons.append({
+                "tool_a": a, "tool_b": b, "paired_samples": len(shared),
+                "mean_f1_difference": statistics.mean(diffs), "difference_ci_low": low,
+                "difference_ci_high": high, "permutation_p_value": paired_permutation_pvalue(diffs),
+                "wins_a": sum(x > 0 for x in diffs), "ties": sum(x == 0 for x in diffs),
+                "wins_b": sum(x < 0 for x in diffs),
+            })
+    for row, adjusted in zip(comparisons, holm_adjust([x["permutation_p_value"] for x in comparisons])):
+        row["permutation_p_value_holm"] = adjusted
     with open(path, "w") as handle:
-        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\twins_a\tties\twins_b\n")
-        for i, a in enumerate(tools):
-            for b in tools[i + 1:]:
-                shared = sorted(set(by_tool[a]) & set(by_tool[b]))
-                diffs = [by_tool[a][sample] - by_tool[b][sample] for sample in shared]
-                if not diffs:
-                    continue
-                low, high = bootstrap_ci(diffs)
-                pvalue = paired_permutation_pvalue(diffs)
-                pvalue_text = f"{pvalue:.6f}" if pvalue is not None else ""
-                handle.write(f"{a}\t{b}\t{len(shared)}\t{statistics.mean(diffs):.4f}\t{low:.4f}\t{high:.4f}\t{pvalue_text}\t"
-                             f"{sum(x > 0 for x in diffs)}\t{sum(x == 0 for x in diffs)}\t{sum(x < 0 for x in diffs)}\n")
+        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\n")
+        for row in comparisons:
+            low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
+            high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
+            pvalue = row["permutation_p_value"]
+            adjusted = row["permutation_p_value_holm"]
+            pvalue_text = f"{pvalue:.6f}" if pvalue is not None else ""
+            adjusted_text = f"{adjusted:.6f}" if adjusted is not None else ""
+            handle.write(
+                f"{row['tool_a']}\t{row['tool_b']}\t{row['paired_samples']}\t"
+                f"{row['mean_f1_difference']:.4f}\t{low}\t{high}\t{pvalue_text}\t"
+                f"{adjusted_text}\t{row['wins_a']}\t{row['ties']}\t{row['wins_b']}\n"
+            )
 
 
 def write_tsv(summary, path):
@@ -148,7 +188,10 @@ def write_tsv(summary, path):
             fh.write("\t".join(str(x) for x in [
                 i, s["tool"], s["n_samples"], s["n_completed"], s["n_failed"], s["n_skipped"],
                 f"{s['mean_precision']:.4f}", f"{s['mean_recall']:.4f}",
-                f"{s['mean_plasmid_recall']:.4f}", s['n_bin_scored'], f"{s['mean_bin_f1']:.4f}" if s['mean_bin_f1'] is not None else "", f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}", f"{s['f1_ci_high']:.4f}", f"{s['median_f1']:.4f}",
+                f"{s['mean_plasmid_recall']:.4f}" if s["mean_plasmid_recall"] is not None else "",
+                s['n_bin_scored'], f"{s['mean_bin_f1']:.4f}" if s['mean_bin_f1'] is not None else "",
+                f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}" if s["f1_ci_low"] is not None else "",
+                f"{s['f1_ci_high']:.4f}" if s["f1_ci_high"] is not None else "", f"{s['median_f1']:.4f}",
             ]) + "\n")
 
 
@@ -159,7 +202,7 @@ def write_md(summary, path):
                  "(positive class = plasmid).\n\n")
         fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | "
                  "Mean recall | **Mean F1** | Median F1 |\n")
-        fh.write("|---:|:---|---:|---:|---:|---:|---:|---:|---:|\n")
+        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:"]) + "|\n")
         for i, s in enumerate(summary, start=1):
             fh.write(
                 f"| {i} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "

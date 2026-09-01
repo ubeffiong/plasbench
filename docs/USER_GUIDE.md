@@ -233,6 +233,25 @@ Choose reference and read pairs carefully: an assembly and read set from
 different isolates invalidates the benchmark. See `docs/FINDING_DATA.md` for
 curation guidance.
 
+### Local/offline inputs
+
+Use `--local-inputs` when the reference and reads are already on your machine.
+This mode never calls NCBI or SRA clients. Keep a normal sample sheet, then
+place these files under the selected data directory before stages 1--6:
+
+```text
+data/<sample_id>/reference.fna
+data/<sample_id>/sequence_report.jsonl
+data/<sample_id>/<sra_run>_1.fastq.gz
+data/<sample_id>/<sra_run>_2.fastq.gz
+```
+
+For example: `plasbench run --samples local.tsv --data-dir ./data --local-inputs`.
+Stage 1 verifies the four files per sample and stops with their exact paths if
+any are absent; stages 2--6 then run normally. Local inputs still need a
+sequence report so that truth labels are independently derived rather than
+guessed from a tool output.
+
 ## Commands
 
 ### Install dependency tools

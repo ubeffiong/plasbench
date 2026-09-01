@@ -105,15 +105,42 @@ def verify_row(row, email=None):
     return {"sample_id": row["sample_id"], "assembly": assembly, "run": run, "errors": errors}
 
 
+def verify_lock(lock_path, samples_path):
+    """Verify that a cohort sheet is exactly the one verified in its lock file."""
+    try:
+        lock = json.loads(Path(lock_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot read verification lock: {exc}") from exc
+    expected = lock.get("sample_sheet_sha256")
+    if not isinstance(expected, str) or not expected:
+        raise ValueError("verification lock has no sample_sheet_sha256")
+    observed = hashlib.sha256(Path(samples_path).read_bytes()).hexdigest()
+    if observed != expected:
+        raise ValueError(
+            "sample-sheet checksum differs from verification lock; run --online --write-lock again"
+        )
+    evidence = lock.get("evidence")
+    if not isinstance(evidence, list):
+        raise ValueError("verification lock has no evidence list")
+    return len(evidence)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--samples", required=True, help="cohort TSV")
     parser.add_argument("--online", action="store_true", help="verify complete assembly, linked BioSample/BioProject, and paired Illumina run at NCBI")
     parser.add_argument("--email", help="contact email sent to NCBI E-utilities")
     parser.add_argument("--write-lock", help="write retrieved verification evidence as JSON")
+    parser.add_argument("--verify-lock", help="require a verification lock matching --samples")
     args = parser.parse_args()
     rows, fields = read_rows(args.samples)
     errors = schema_errors(rows, fields)
+    if args.verify_lock:
+        try:
+            evidence_count = verify_lock(args.verify_lock, args.samples)
+            print(f"COHORT LOCK VERIFIED: {evidence_count} evidence record(s)")
+        except ValueError as exc:
+            errors.append(str(exc))
     if not rows and not errors:
         print("COHORT VALIDATION PASSED: template contains no samples")
         return
@@ -134,7 +161,7 @@ def main():
         path = Path(args.write_lock)
         path.parent.mkdir(parents=True, exist_ok=True)
         source = Path(args.samples).read_bytes()
-        path.write_text(json.dumps({"schema_version": "1.0", "sample_sheet": str(Path(args.samples)),
+        path.write_text(json.dumps({"schema_version": "1.0", "sample_sheet": Path(args.samples).name,
                                     "sample_sheet_sha256": hashlib.sha256(source).hexdigest(), "evidence": evidence}, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote cohort verification lock: {path}")
     scope = "NCBI-linked pair verified" if args.online else "schema verified"

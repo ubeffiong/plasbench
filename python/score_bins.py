@@ -24,7 +24,7 @@ def bins(path):
     return out
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--truth',required=True);p.add_argument('--paf',required=True);p.add_argument('--bins',required=True);p.add_argument('--out',required=True);p.add_argument('--summary',required=True);p.add_argument('--threshold',type=float,default=.9);a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--truth',required=True);p.add_argument('--paf',required=True);p.add_argument('--bins',required=True);p.add_argument('--out',required=True);p.add_argument('--summary',required=True);p.add_argument('--threshold',type=float,default=.9);p.add_argument('--split-threshold',type=float,default=.1);a=p.parse_args()
     plasmids, chromosomes=truth(a.truth); membership=bins(a.bins); intervals=defaultdict(list); contaminated=set()
     with open(a.paf) as f:
         for line in f:
@@ -40,9 +40,11 @@ def main():
             end = max(end, stop)
         overlaps[key] = covered
     candidates=sorted(((bp,b,t) for (b,t),bp in overlaps.items() if bp/plasmids[t]>=a.threshold),reverse=True)
-    by_target=defaultdict(set); by_bin=defaultdict(set)
+    by_target=defaultdict(set); by_bin=defaultdict(set); split_fragments=defaultdict(set)
     for _,b,t in candidates: by_target[t].add(b); by_bin[b].add(t)
-    splits=sum(len(v)-1 for v in by_target.values() if len(v)>1); merges=sum(len(v)-1 for v in by_bin.values() if len(v)>1)
+    for (b,t), bp in overlaps.items():
+        if bp / plasmids[t] >= a.split_threshold: split_fragments[t].add(b)
+    splits=sum(len(v)-1 for v in split_fragments.values() if len(v)>1); merges=sum(len(v)-1 for v in by_bin.values() if len(v)>1)
     used_b=set();used_t=set();matched=[]
     for bp,b,t in candidates:
         if b not in used_b and t not in used_t: used_b.add(b);used_t.add(t);matched.append((b,t,bp))

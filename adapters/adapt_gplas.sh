@@ -17,12 +17,31 @@ OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 shopt -s nullglob
 found=0
+# gplas versions can write the same sequence in both a combined plasmid FASTA
+# and a per-bin FASTA.  Downstream scoring requires one unambiguous membership.
+declare -A seen_sequence_ids
 while IFS= read -r -d '' f; do
     [[ -s "$f" ]] || continue
-    cat "$f" >> "$OUT_FASTA"; found=1
     bin=$(basename "$f" .fasta)
-    awk -v bin="$bin" '/^>/ {sub(/^>/,"",$1); print bin "\t" $1}' "$f" >> "$BINS"
-done < <(find "$OUT_DIR" -type f \( -iname '*plasmid*.fasta' -o -iname '*_bin_*.fasta' \) -print0)
+    keep_record=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" == '>'* ]]; then
+            sequence_id="${line#>}"
+            sequence_id="${sequence_id%%[[:space:]]*}"
+            if [[ -z "$sequence_id" || -n "${seen_sequence_ids[$sequence_id]+present}" ]]; then
+                keep_record=0
+            else
+                seen_sequence_ids["$sequence_id"]=1
+                keep_record=1
+                found=1
+                printf '%s\n' "$line" >> "$OUT_FASTA"
+                printf '%s\t%s\n' "$bin" "$sequence_id" >> "$BINS"
+            fi
+        elif [[ "$keep_record" -eq 1 ]]; then
+            printf '%s\n' "$line" >> "$OUT_FASTA"
+        fi
+    done < "$f"
+done < <(find "$OUT_DIR" -type f \( -iname '*plasmid*.fasta' -o -iname '*_bin_*.fasta' \) -print0 | sort -z)
 shopt -u nullglob
 if [[ "$found" -eq 0 ]]; then
     echo "[adapt_gplas] could not find a plasmid FASTA in $OUT_DIR." >&2

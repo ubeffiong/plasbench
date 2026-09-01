@@ -26,6 +26,8 @@ python3 "$HERE/../python/build_html_report.py" \
     --leaderboard "$RESULTS_DIR/benchmark.leaderboard.tsv" \
     --sample-sheet "$SAMPLE_SHEET" \
     --manifest "$RESULTS_DIR/run_manifest.json" \
+    --comparisons "$RESULTS_DIR/benchmark.paired_comparisons.tsv" \
+    --score-failures "$RESULTS_DIR/score_failures.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."

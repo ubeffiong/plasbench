@@ -23,6 +23,9 @@ export SAMPLE_SHEET="${SAMPLE_SHEET:-$PROJECT_ROOT/config/accessions.tsv}"
 # Require cohort metadata for a publishable benchmark. Set to 0 only while
 # exploring a legacy three-column sample sheet.
 export REQUIRE_CURATED_METADATA="${REQUIRE_CURATED_METADATA:-1}"
+# When enabled, stage 1 accepts only already staged local inputs and never
+# contacts NCBI/SRA. Expected filenames remain deterministic for every stage.
+export LOCAL_INPUTS_ONLY="${LOCAL_INPUTS_ONLY:-0}"
 
 # A true AMR-gene table is optional per sample. When supplied as
 # data/<sample>/truth_amr.tsv it is scored alongside base-level recovery.

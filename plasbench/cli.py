@@ -108,6 +108,7 @@ def main(argv=None):
     cohort_parser.add_argument("--online", action="store_true", help="Verify NCBI assembly/SRA linkage and library metadata.")
     cohort_parser.add_argument("--email", help="Contact email sent to NCBI E-utilities.")
     cohort_parser.add_argument("--write-lock", type=Path, help="Write NCBI verification evidence as JSON; requires --online.")
+    cohort_parser.add_argument("--verify-lock", type=Path, help="Require a verification lock that matches the cohort TSV.")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
     install_parser.add_argument("profile", nargs="?", default="core", help="core, assembly, reconstruction, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
@@ -128,6 +129,8 @@ def main(argv=None):
         inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
         inputs.add_argument("--gplas2-external-predictions-dir", type=Path,
                             help="Directory containing <sample>.tsv external gplas2 classifier files.")
+        inputs.add_argument("--local-inputs", action="store_true",
+                            help="Use pre-staged data/<sample>/ inputs only; never download from NCBI or SRA.")
         resources = command_parser.add_argument_group("resources and assembly")
         resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
@@ -165,6 +168,8 @@ def main(argv=None):
             command.extend(["--email", args.email])
         if args.write_lock:
             command.extend(["--write-lock", str(args.write_lock)])
+        if args.verify_lock:
+            command.extend(["--verify-lock", str(args.verify_lock)])
         code = run(command, root)
     elif args.command == "install-tools":
         code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.profile], root)
@@ -182,6 +187,8 @@ def main(argv=None):
             value = getattr(args, argument)
             if value:
                 env[variable] = str(value.resolve())
+        if args.local_inputs:
+            env["LOCAL_INPUTS_ONLY"] = "1"
         positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN"}
         for argument, variable in positive_options.items():
             value = getattr(args, argument)

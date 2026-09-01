@@ -11,6 +11,8 @@ need python3
 
 SCORES="$RESULTS_DIR/scores.tsv"
 rm -f "$SCORES"   # rebuild fresh each run
+SCORE_FAILURES="$RESULTS_DIR/score_failures.tsv"
+printf 'sample\ttool\tstage\treason\n' > "$SCORE_FAILURES"
 
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
@@ -50,17 +52,25 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         [[ -s "$AMR" ]] && AMR_ARGS=(--amr-genes "$AMR" --amr-gene-recovery-threshold "$AMR_GENE_RECOVERY_THRESHOLD")
         CIRCULAR_ARGS=()
         [[ -s "$CIRCULAR" ]] && CIRCULAR_ARGS=(--circular-plasmids "$CIRCULAR")
-        python3 "$HERE/../python/score_plasmids.py" \
+        if ! python3 "$HERE/../python/score_plasmids.py" \
             --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
             --plasmid-recovery-threshold "$PLASMID_RECOVERY_THRESHOLD" \
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
-            --sample "$SAMPLE" --tool "$tool" --out "$SCORES"
+            --sample "$SAMPLE" --tool "$tool" --out "$SCORES" \
+            2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
+            warn "scoring failed for $SAMPLE/$tool; excluded from aggregation"
+            printf '%s\t%s\tscore\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$SCORE_FAILURES"
+            continue
+        fi
         BINS="$RDIR/pred_${tool}.bins.tsv"
         if [[ -s "$BINS" ]]; then
-            python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
+            if ! python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
                 --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
-                --summary "$RDIR/${tool}.bin_summary.tsv"
+                --summary "$RDIR/${tool}.bin_summary.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
+                warn "bin scoring failed for $SAMPLE/$tool; retaining base-level score"
+                printf '%s\t%s\tbin_score\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$SCORE_FAILURES"
+            fi
         fi
     done
 done < <(read_samples "$SAMPLE_SHEET")

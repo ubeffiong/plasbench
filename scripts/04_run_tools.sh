@@ -12,7 +12,9 @@ mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 printf 'sample\ttool\tstatus\tprediction_fasta\treason\truntime_seconds\tpeak_rss_kb\n' > "$STATUS"
 
 record_status() {
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "${6:-}" "${7:-$(profile_rss "${PROFILE_RSS_FILE:-}")}" >> "$STATUS"
+    local rss="${7:-}"
+    [[ -z "$rss" && -n "${6:-}" ]] && rss="$(profile_rss "${PROFILE_RSS_FILE:-}")"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "${6:-}" "$rss" >> "$STATUS"
 }
 
 profile_start() { date +%s; }
@@ -34,6 +36,8 @@ is_complete() {
 
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
+    # A skipped/reused entry must never inherit an RSS value from another tool.
+    PROFILE_RSS_FILE=""
     SDIR="$DATA_DIR/$SAMPLE"
     RDIR="$RESULTS_DIR/$SAMPLE"; mkdir -p "$RDIR"
     CONTIGS="$SDIR/contigs.fasta"

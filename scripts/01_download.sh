@@ -7,10 +7,6 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 
-need datasets
-need prefetch
-need fasterq-dump
-
 [[ -f "$SAMPLE_SHEET" ]] || die "sample sheet not found: $SAMPLE_SHEET"
 
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
@@ -18,10 +14,29 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     SDIR="$DATA_DIR/$SAMPLE"
     mkdir -p "$SDIR"
     log "=== Sample $SAMPLE : assembly=$ASM  reads=$SRA ==="
-
-    # ---- (a) reference assembly + sequence report ----
     REF="$SDIR/reference.fna"
     REPORT="$SDIR/sequence_report.jsonl"
+    R1="$SDIR/${SRA}_1.fastq.gz"
+    R2="$SDIR/${SRA}_2.fastq.gz"
+    if [[ "$LOCAL_INPUTS_ONLY" == "1" ]]; then
+        missing=()
+        [[ -s "$REF" ]] || missing+=("$REF")
+        [[ -s "$REPORT" ]] || missing+=("$REPORT")
+        [[ -s "$R1" ]] || missing+=("$R1")
+        [[ -s "$R2" ]] || missing+=("$R2")
+        if [[ ${#missing[@]} -gt 0 ]]; then
+            die "local-inputs mode is missing for $SAMPLE: ${missing[*]}"
+        fi
+        log "  local reference, report, and paired reads verified; download skipped"
+        continue
+    fi
+
+    # Download clients are only required when this sample actually needs them.
+    need datasets
+    need prefetch
+    need fasterq-dump
+
+    # ---- (a) reference assembly + sequence report ----
     if [[ -s "$REF" && -s "$REPORT" ]]; then
         log "  reference already present, skipping download"
     else
@@ -45,8 +60,6 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     fi
 
     # ---- (b) Illumina reads ----
-    R1="$SDIR/${SRA}_1.fastq.gz"
-    R2="$SDIR/${SRA}_2.fastq.gz"
     if [[ -s "$R1" && -s "$R2" ]]; then
         log "  reads already present, skipping download"
     else

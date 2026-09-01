@@ -325,8 +325,10 @@ def main():
         args.sample, args.tool, total_plasmid, tp, fp, fn,
         unmapped_pred_bp, len(true_plasmids), recovered_plasmids,
         f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}", predicted_records,
-        len(amr_genes), recovered_amr, f"{safe_div(recovered_amr, len(amr_genes)):.4f}",
-        len(circular_plasmids), recovered_circular, f"{safe_div(recovered_circular, len(circular_plasmids)):.4f}",
+        len(amr_genes) if args.amr_genes else "", recovered_amr if args.amr_genes else "",
+        f"{safe_div(recovered_amr, len(amr_genes)):.4f}" if args.amr_genes else "",
+        len(circular_plasmids) if args.circular_plasmids else "", recovered_circular if args.circular_plasmids else "",
+        f"{safe_div(recovered_circular, len(circular_plasmids)):.4f}" if args.circular_plasmids else "",
         f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}",
     ]
 

@@ -41,6 +41,7 @@ for s in "${STAGES[@]}"; do
     bash "$HERE/$scr"
 done
 log "############ DONE ############"
-[[ -f "$RESULTS_DIR/benchmark.leaderboard.md" ]] && {
+if [[ -f "$RESULTS_DIR/benchmark.leaderboard.md" ]]; then
     echo; echo "Leaderboard:"; cat "$RESULTS_DIR/benchmark.leaderboard.md"
-}
+fi
+exit 0

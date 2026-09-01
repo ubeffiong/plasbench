@@ -52,6 +52,13 @@ def main():
     assert split["unmatched_bins"] == "1" and split["missed_plasmids"] == "1"
     assert sum(row["match_status"] == "matched" for row in split_matches) == 1
 
+    half_split, _ = run(
+        "a\t50\t0\t50\t+\tp1\t100\t0\t50\t50\t50\t60\n"
+        "b\t50\t0\t50\t+\tp1\t100\t50\t100\t50\t50\t60\n",
+        "bin_id\tsequence_id\nA\ta\nB\tb\n",
+    )
+    assert half_split["matched_bins"] == "0" and half_split["split_events"] == "1"
+
     # One predicted bin has contigs that fully recover two distinct plasmids.
     merge, merge_matches = run(paf("a", "p1") + paf("b", "p2"), "bin_id\tsequence_id\nA\ta\nA\tb\n")
     assert merge["merge_events"] == "1" and merge["split_events"] == "0"
