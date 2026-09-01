@@ -12,8 +12,10 @@ LABEL org.opencontainers.image.title="PlasBench" \
       org.opencontainers.image.created="$BUILD_DATE"
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER env/environment.lock.yml /tmp/environment.lock.yml
-# environment.lock.yml is an explicit package specification, not an environment YAML.
-RUN micromamba create -y -n plasbench --file /tmp/environment.lock.yml && micromamba clean --all --yes
+# environment.lock.yml is Conda's @EXPLICIT format. Micromamba interprets
+# --file as YAML, so supply the lock's exact package URLs as specifications.
+RUN micromamba create -y -n plasbench $(awk '!/^(@|#|$)/ {print}' /tmp/environment.lock.yml) \
+    && micromamba clean --all --yes
 
 WORKDIR /opt/plasbench
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /opt/plasbench
