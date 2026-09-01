@@ -43,7 +43,6 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         [[ "${RUN_MOB_RECON:-0}" -eq 1 ]] && record_status "$SAMPLE" "mob_recon" "skipped" "" "assembly contigs unavailable"
         [[ "${RUN_PLATON:-0}" -eq 1 ]] && record_status "$SAMPLE" "platon" "skipped" "" "assembly contigs unavailable"
         [[ "${RUN_PLASMIDSPADES:-0}" -eq 1 ]] && record_status "$SAMPLE" "plasmidspades" "skipped" "" "assembly contigs unavailable"
-        [[ "${RUN_GPLAS:-0}" -eq 1 ]] && record_status "$SAMPLE" "gplas" "skipped" "" "assembly contigs unavailable"
         [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]] && record_status "$SAMPLE" "gplas2_mob" "skipped" "" "assembly contigs unavailable"
         [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]] && record_status "$SAMPLE" "gplas2_external" "skipped" "" "assembly contigs unavailable"
         continue
@@ -141,31 +140,6 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         record_status "$SAMPLE" "plasmidspades" "skipped" "" "command unavailable"
     fi
 
-    # -------- gplas (experimental) --------
-    if [[ "${RUN_GPLAS:-0}" -eq 1 ]] && have gplas; then
-        TOOL="gplas"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
-        GRAPH="$SDIR/assembly_graph.gfa"
-        if is_complete "$DONE" "$PRED"; then
-            log "  gplas: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
-        elif [[ -s "$GRAPH" ]]; then
-            rm -rf "$OUT" "$PRED" "$DONE"
-            log "  gplas ..."
-            START=$(profile_start)
-            if profile_exec gplas -i "$GRAPH" -c extraction -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_gplas.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
-            else
-                rm -f "$PRED" "$DONE"; warn "gplas failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
-            fi
-        else
-            warn "  gplas needs an assembly graph; none found for $SAMPLE (use Unicycler/SPAdes graph)"
-            record_status "$SAMPLE" "$TOOL" "skipped" "" "assembly graph unavailable"
-        fi
-    elif [[ "${RUN_GPLAS:-0}" -eq 1 ]]; then
-        warn "gplas is enabled but not installed; skipped for $SAMPLE"
-        record_status "$SAMPLE" "gplas" "skipped" "" "command unavailable"
-    fi
-
     # -------- gplas2 external classifier mode --------
     if [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]] && have gplas; then
         TOOL="gplas2_external"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
@@ -180,7 +154,8 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         else
             rm -rf "$OUT" "$PRED" "$DONE"; log "  $TOOL ..."
             START=$(profile_start)
-            if profile_exec_in_dir "$OUT" gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+            if python3 "$HERE/../python/validate_gplas_classifier.py" --graph "$GRAPH" --classifier "$CLASSIFIER" --min-contig-length "$GPLAS2_MIN_CONTIG_LENGTH" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                profile_exec_in_dir "$OUT" gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" >> "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_gplas.sh" "$OUT/results" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "external classifier TSV: $CLASSIFIER" "$(profile_elapsed "$START")"
             else

@@ -56,18 +56,18 @@ populate the cache, or set `--database_directory` in `scripts/04_run_tools.sh`.
 
 ---
 
-## 4. gplas (optional, experimental — `RUN_GPLAS=0` by default)
+## 4. gplas2 modes (optional)
 
-gplas is Nextflow/R-based and its output format varies by version, so it's off by default.
-If you want it:
+Install gplas according to its current documentation. PlasBench uses it only
+through explicit classifier-backed modes, so it remains off by default:
 
 ```bash
-# needs nextflow + docker/singularity; see the gplas repo for current instructions
-conda install -n plasbench -c bioconda nextflow
-# install gplas per its README, then set RUN_GPLAS=1 in config/config.sh
+# install gplas per its README
+# then enable RUN_GPLAS2_MOB=1 or RUN_GPLAS2_EXTERNAL=1 in config/config.sh
 ```
-You will likely need to edit `adapters/adapt_gplas.sh` to match your gplas version's output.
-gplas also needs an **assembly graph** — set `ASSEMBLER=unicycler` in the config for the
+`gplas2_mob` uses deterministic MOB-recon membership from the same assembly
+graph. `gplas2_external` requires one validated `<sample>.tsv` classifier table
+per graph. Both need an **assembly graph**; set `ASSEMBLER=unicycler` for the
 cleanest graphs.
 
 ---

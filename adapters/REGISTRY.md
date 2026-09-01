@@ -10,7 +10,6 @@ rather than assigning an artificial zero score.
 | MOB-suite | short-read assembly | `adapt_mob_recon.sh` | supported |
 | Platon | short-read assembly | `adapt_platon.sh` | supported |
 | plasmidSPAdes | paired reads | `adapt_plasmidspades.sh` | supported |
-| gplas | GFA graph | `adapt_gplas.sh` | experimental |
 | gplas2_mob | GFA graph plus MOB-recon hard-label seed TSV | native mode | optional |
 | gplas2_external | GFA graph plus user classifier TSV | native mode | optional |
 

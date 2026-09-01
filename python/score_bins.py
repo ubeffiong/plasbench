@@ -25,13 +25,20 @@ def bins(path):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--truth',required=True);p.add_argument('--paf',required=True);p.add_argument('--bins',required=True);p.add_argument('--out',required=True);p.add_argument('--summary',required=True);p.add_argument('--threshold',type=float,default=.9);a=p.parse_args()
-    plasmids, chromosomes=truth(a.truth); membership=bins(a.bins); overlaps=defaultdict(int); contaminated=set()
+    plasmids, chromosomes=truth(a.truth); membership=bins(a.bins); intervals=defaultdict(list); contaminated=set()
     with open(a.paf) as f:
         for line in f:
             x=line.rstrip('\n').split('\t')
             if len(x)<12 or x[0] not in membership: continue
-            if x[5] in plasmids: overlaps[(membership[x[0]],x[5])]+=max(0,int(x[8])-int(x[7]))
+            if x[5] in plasmids: intervals[(membership[x[0]],x[5])].append((max(0, int(x[7])), min(plasmids[x[5]], int(x[8]))))
             elif x[5] in chromosomes: contaminated.add(membership[x[0]])
+    overlaps = {}
+    for key, values in intervals.items():
+        covered = 0; end = -1
+        for start, stop in sorted((start, stop) for start, stop in values if stop > start):
+            if stop > max(end, start): covered += stop - max(end, start)
+            end = max(end, stop)
+        overlaps[key] = covered
     candidates=sorted(((bp,b,t) for (b,t),bp in overlaps.items() if bp/plasmids[t]>=a.threshold),reverse=True)
     by_target=defaultdict(set); by_bin=defaultdict(set)
     for _,b,t in candidates: by_target[t].add(b); by_bin[b].add(t)

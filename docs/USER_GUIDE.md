@@ -13,7 +13,7 @@ every predicted-plasmid FASTA back to a complete reference assembly and scoring
 the same reference bases for every tool.
 
 The current benchmark can compare MOB-suite `mob_recon`, Platon,
-plasmidSPAdes, and experimental gplas. It is designed for bacterial isolates
+plasmidSPAdes, and optional classifier-backed gplas2 modes. It is designed for bacterial isolates
 with matched Illumina reads and a complete long-read or hybrid reference from
 the same isolate.
 
@@ -333,7 +333,6 @@ plasbench --project-root /path/to/plasbench demo
 --mob-recon on|off       Enable or disable MOB-suite. Default: on.
 --platon on|off          Enable or disable Platon. Default: on.
 --plasmidspades on|off   Enable or disable plasmidSPAdes. Default: on.
---gplas on|off           Enable or disable experimental gplas. Default: off.
 --gplas2-mob on|off      Run gplas with same-graph MOB-recon hard-label seeds.
 --gplas2-external on|off Run gplas with validated external classifier TSVs.
 --force-rerun-tools      Delete completed tool outputs and run them again.

@@ -43,6 +43,10 @@ def main():
     assert exact["bin_f1"] == "1.0000"
     assert exact["split_events"] == "0" and exact["merge_events"] == "0"
 
+    duplicate, duplicate_matches = run(paf("a", "p1") + paf("a", "p1"), "bin_id\tsequence_id\nA\ta\n")
+    assert duplicate["bin_f1"] == "0.6667"
+    assert next(row for row in duplicate_matches if row["match_status"] == "matched")["aligned_bp"] == "100"
+
     split, split_matches = run(paf("a", "p1") + paf("b", "p1"), "bin_id\tsequence_id\nA\ta\nB\tb\n")
     assert split["split_events"] == "1" and split["merge_events"] == "0"
     assert split["unmatched_bins"] == "1" and split["missed_plasmids"] == "1"

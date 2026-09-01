@@ -38,8 +38,7 @@ export MEMORY_GB="${MEMORY_GB:-16}"           # SPAdes memory cap (GB)
 export RUN_MOB_RECON="${RUN_MOB_RECON:-1}"
 export RUN_PLATON="${RUN_PLATON:-1}"
 export RUN_PLASMIDSPADES="${RUN_PLASMIDSPADES:-1}"
-export RUN_GPLAS="${RUN_GPLAS:-0}"        # experimental; off by default (see adapters/adapt_gplas.sh)
-# gplas2 modes are kept separate because binning quality depends on the source
+ # gplas2 modes are kept separate because binning quality depends on the source
 # classifier. External prediction TSVs must use gplas2's documented columns.
 export RUN_GPLAS2_MOB="${RUN_GPLAS2_MOB:-0}"
 export RUN_GPLAS2_EXTERNAL="${RUN_GPLAS2_EXTERNAL:-0}"

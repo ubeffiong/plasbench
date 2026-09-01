@@ -88,7 +88,7 @@ def main():
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     settings = ("THREADS", "MEMORY_GB", "ASSEMBLER", "MIN_READ_LEN", "MINIMAP2_PRESET",
-                "RUN_MOB_RECON", "RUN_PLATON", "RUN_PLASMIDSPADES", "RUN_GPLAS",
+                "RUN_MOB_RECON", "RUN_PLATON", "RUN_PLASMIDSPADES", "RUN_GPLAS2_MOB", "RUN_GPLAS2_EXTERNAL",
                 "PLASMID_RECOVERY_THRESHOLD", "AMR_GENE_RECOVERY_THRESHOLD", "PLATON_DB")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)

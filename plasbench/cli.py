@@ -101,7 +101,7 @@ def main(argv=None):
                         help="PlasBench source checkout (default: current directory).")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
-    sub.add_parser("test", help="Run the scoring unit tests.")
+    sub.add_parser("test", help="Run the complete offline regression suite.")
     sub.add_parser("check", help="Check configured runtime dependencies.")
     cohort_parser = sub.add_parser("validate-cohort", help="Validate a cohort schema or verify its NCBI-linked pairs.")
     cohort_parser.add_argument("--samples", type=Path, required=True, help="Cohort TSV to validate.")
@@ -139,7 +139,6 @@ def main(argv=None):
             ("--mob-recon", "mob_recon", "Enable or disable MOB-suite reconstruction."),
             ("--platon", "platon", "Enable or disable Platon classification."),
             ("--plasmidspades", "plasmidspades", "Enable or disable plasmidSPAdes."),
-            ("--gplas", "gplas", "Enable or disable experimental gplas."),
             ("--gplas2-mob", "gplas2_mob", "Enable or disable gplas seeded by MOB-recon membership."),
             ("--gplas2-external", "gplas2_external", "Enable or disable gplas with external classifier TSVs."),
         ):
@@ -155,7 +154,7 @@ def main(argv=None):
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
     elif args.command == "test":
-        code = run([sys.executable, "test/test_scoring.py"], root)
+        code = run([bash_command(), "test/run_tests.sh"], root)
     elif args.command == "check":
         code = run([bash_command(), "scripts/run_all.sh", "0"], root)
     elif args.command == "validate-cohort":
@@ -195,7 +194,7 @@ def main(argv=None):
             if value:
                 env[variable] = value
         for argument, variable in (("mob_recon", "RUN_MOB_RECON"), ("platon", "RUN_PLATON"),
-                                   ("plasmidspades", "RUN_PLASMIDSPADES"), ("gplas", "RUN_GPLAS"),
+                                   ("plasmidspades", "RUN_PLASMIDSPADES"),
                                    ("gplas2_mob", "RUN_GPLAS2_MOB"), ("gplas2_external", "RUN_GPLAS2_EXTERNAL")):
             value = getattr(args, argument)
             if value:

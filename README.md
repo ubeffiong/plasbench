@@ -173,7 +173,7 @@ Aim for 10–20 isolates for a hackathon-scale v1.
 
 ### Step 4 — Configure
 Edit `config/config.sh`: set `THREADS`, `MEMORY_GB`, and toggle tools
-(`RUN_MOB_RECON`, `RUN_PLATON`, `RUN_PLASMIDSPADES`, `RUN_GPLAS`). Turn a tool off if
+(`RUN_MOB_RECON`, `RUN_PLATON`, `RUN_PLASMIDSPADES`, `RUN_GPLAS2_MOB`, `RUN_GPLAS2_EXTERNAL`). Turn a tool off if
 you haven't installed it yet — the pipeline just skips it.
 
 ### Step 5 — Run
