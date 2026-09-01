@@ -9,11 +9,20 @@ reference sequence is labelled **plasmid** or **chromosome** using the
 (`python/make_truth.py`). This avoids using any tool-under-test to define truth, which would
 bias the benchmark.
 
+For NCBI cohorts, PlasBench obtains `sequencing_tech` and `assembly_method`
+from NCBI Datasets v2. An assembly without explicit ONT/PacBio/SMRT evidence is
+rejected: “Complete Genome” alone is not sufficient evidence of independent
+long-read/hybrid truth.
+
 ## Predictions
 Each tool emits a set of sequences it considers plasmid. A thin per-tool adapter
 (`adapters/`) normalises these disparate outputs into a single **predicted-plasmid FASTA**:
 - classification tools (Platon, mob_recon) → the contigs/bins they labelled plasmid;
 - re-assembly tools (plasmidSPAdes, gplas) → their reconstructed plasmid contigs.
+
+The present workflow consumes paired short-read FASTQs, usually Illumina. Long
+reads are used to establish the complete reference, not as a native prediction
+input; long-read reconstruction modes are a future extension.
 
 ## Projection onto the reference
 The predicted-plasmid FASTA is aligned to the reference with `minimap2 -x asm5` (same
@@ -68,7 +77,10 @@ not formal claims of clinical or statistical superiority.
 - **minimap2 preset.** `asm5` assumes same-isolate identity. If you deliberately test
   cross-isolate generalisation, revisit the preset.
 - **Depth confound.** Low-coverage runs depress every tool; consider a depth-controlled
-  subsampling experiment to separate tool quality from data quality.
+  subsampling experiment to separate tool quality from data quality. PlasBench
+  measures staged FASTQ bases divided by reference length and rejects a depth
+  ladder whose declared source depth differs by more than 20%. Ladder-derived
+  samples are correlated and are not valid for a headline leaderboard.
 
 ## Reproducibility
 All randomness-free. Regenerate the explicit lock with `bash env/lock_environment.sh` and record tool versions per run. The

@@ -19,7 +19,8 @@ python python/validate_cohort.py --samples config/accessions.tsv --online
 plasbench validate-cohort --samples cohorts/public-v1.tsv --online
 ```
 
-`--online` verifies that the assembly is complete and plasmid-containing, the
+`--online` verifies that the assembly is complete and plasmid-containing, has
+explicit Datasets-v2 long-read/hybrid sequencing evidence, and that the
 selected run is paired-end Illumina, and the Assembly/SRA BioSample and
 BioProject identifiers exactly match the cohort row. It cannot prove biological
 identity beyond deposited metadata; curators should still review strain/isolate
@@ -34,7 +35,7 @@ than adding unverified rows to a released cohort. It must have
 
 ```bash
 plasbench curate-cohort --candidates candidates.tsv --out-dir curation \
-  --email you@example.org --truth-technology hybrid --quality-tier A
+  --email you@example.org
 ```
 
 This creates `curation/accepted.tsv` only when the exact complete plasmid
@@ -68,9 +69,24 @@ plasbench discover-cohort --out-dir curation/ncbi-round1 --max-assemblies 40 \
 ```
 
 The command writes `accepted.tsv` and `rejected.tsv`; acceptance proves the
-deposited metadata linkage only. Curators must still check publications and
-collection metadata before assigning origin, truth technology, quality tier, or
-making a public release claim.
+deposited metadata linkage only. Technology and tier are derived from NCBI
+evidence, never CLI defaults. Curators must still check publications and
+collection metadata before assigning origin or making a public release claim.
+
+## Candidate Review And Balance
+
+Keep raw discoveries as candidates. To detect study dependence and create a
+non-release balanced shortlist without deleting any coverage:
+
+```bash
+plasbench review-candidates --candidates curation/ncbi-round1/accepted.tsv \
+  --out-dir curation/review --max-per-bioproject 3 --max-per-organism 8
+```
+
+This writes the full `candidates.enriched.tsv`, `study_dependence.tsv`, and a
+`balanced_shortlist.pending_review.tsv`. Origin and source-study fields remain
+pending until supported by deposited metadata and/or the cited publication; no
+command automatically adds candidates to `public-v1.tsv`.
 
 ## Versioned public panel
 

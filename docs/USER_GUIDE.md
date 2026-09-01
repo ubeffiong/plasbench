@@ -215,9 +215,20 @@ ecoli_01	GCF_012345678.1	SRR12345678	Escherichia coli	hybrid	A	SAMN123	PRJNA123	
 ```
 
 `sample_id` must be unique. `assembly_accession` must be a complete, preferably
-long-read or hybrid, reference assembly. `sra_run` must be a matched Illumina
+long-read or hybrid, reference assembly. `sra_run` must be a matched paired-end Illumina
 run for the same isolate. The pipeline validates missing fields, duplicate IDs,
 and an empty sheet before starting a data stage.
+
+### Read and reference formats
+
+PlasBench reconstructs plasmids from **paired short-read FASTQ** input. Expected
+local filenames are `<sra_run>_1.fastq.gz` and `<sra_run>_2.fastq.gz`; uncompressed
+`.fastq` files should be compressed before running. The reference is a completed
+FASTA (`reference.fna`) generated using long reads or hybrid sequencing. ONT/PacBio
+FASTQs are not a native reconstruction input in the current version; their role is
+to establish an independent complete reference. Online cohort validation obtains
+`sequencing_tech` and `assembly_method` from NCBI Datasets v2 and rejects truth
+assemblies without explicit long-read evidence.
 
 `sample_origin` is deliberately free text: use the labels meaningful to your
 programme, such as `clinical`, `environmental`, `wastewater`, or `livestock`.
@@ -241,24 +252,25 @@ place these files under the selected data directory before stages 1--6:
 
 ```text
 data/<sample_id>/reference.fna
-data/<sample_id>/sequence_report.jsonl
+data/<sample_id>/truth.tsv                 # OR sequence_report.jsonl
 data/<sample_id>/<sra_run>_1.fastq.gz
 data/<sample_id>/<sra_run>_2.fastq.gz
 ```
 
 For example: `plasbench run --samples local.tsv --data-dir ./data --local-inputs`.
-Stage 1 verifies the four files per sample and stops with their exact paths if
-any are absent; stages 2--6 then run normally. Local inputs still need a
-sequence report so that truth labels are independently derived rather than
-guessed from a tool output.
+Stage 1 verifies the reference, paired FASTQs, and either an NCBI sequence report
+or a user-supplied three-column `truth.tsv` (`sequence_id`, `molecule_type`,
+`length`). Stage 2 records observed depth from the staged FASTQs; this is the
+depth used by the ladder rather than an unverified hand-entered value.
 
 ## Commands
 
 ### Depth ladder
 
 Create a reproducible local-input cohort at fixed target depths after staging
-the original paired reads. Every source row must contain `read_depth_x` and
-every target must not exceed that declared source depth:
+the original paired reads. Run stage 2 first: the ladder uses measured depth
+from `observed_depth.tsv`, rejects a declared depth differing by more than 20%,
+and every target must not exceed observed source depth:
 
 ```bash
 plasbench depth-ladder --samples cohorts/public-v1.tsv --data-dir data \
@@ -281,7 +293,9 @@ analysis. Compare depths only within the same source cohort, seed, tool version,
 and configuration.
 
 The generated manifest records the parent isolate, sampling fraction, target
-depth, and seed. It never overwrites the original reads or cohort.
+depth, and seed. It never overwrites the original reads or cohort. Do not run a
+headline leaderboard on a depth-ladder sheet: subsamples share parent genomes;
+PlasBench blocks this and `depth-report` is the valid analysis path.
 
 ### Install dependency tools
 

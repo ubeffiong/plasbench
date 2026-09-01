@@ -4,6 +4,11 @@ A reproducible, Ubuntu-first pipeline that **benchmarks how well plasmid-reconst
 tools recover plasmids from short reads**, using complete (long-read) assemblies as
 ground truth.
 
+**Read support:** the current reconstruction workflow consumes paired-end short-read
+FASTQ files (`*_1.fastq.gz`, `*_2.fastq.gz`), normally Illumina. Long-read data
+(ONT/PacBio) is supported as evidence for the completed reference truth assembly,
+not as a native long-read FASTQ reconstruction input in this release.
+
 For each isolate the pipeline:
 
 1. downloads a **complete reference assembly** (long-read/hybrid → ground truth) and the
