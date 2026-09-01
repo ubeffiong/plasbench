@@ -111,16 +111,35 @@ This writes the full `candidates.enriched.tsv`, `study_dependence.tsv`, and a
 pending until supported by deposited metadata and/or the cited publication; no
 command automatically adds candidates to `public-v1.tsv`.
 
-## Versioned public panel
+## Versioned public panels
 
-[`cohorts/public-v1.tsv`](../cohorts/public-v1.tsv) is a ten-isolate, directly
-runnable seed cohort with an accompanying NCBI verification lock. It includes
-clinical and food-associated isolates, varies in plasmid count and read depth,
-and is intentionally small enough for an initial reproducible benchmark. Read
-[`cohorts/README.md`](../cohorts/README.md) before using it or extending it.
+Two panels ship with PlasBench, each with its own NCBI verification lock. They
+apply identical evidence rules and differ only in curation grade. Read
+[`cohorts/README.md`](../cohorts/README.md) before using or extending either.
+
+| Panel | Rows | Tier | Use it for |
+|---|---:|---|---|
+| [`public-v1.tsv`](../cohorts/public-v1.tsv) | 10 | all A | reproducible headline results and citation |
+| [`public-v2.tsv`](../cohorts/public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
+
+**`public-v1` is frozen.** Published results reference it by name and its lock
+certifies that exact sheet, so new isolates belong in `public-v2` or your own
+panel — never appended to v1.
+
+`public-v2` adds 22 isolates discovered from public NCBI data, extending the
+panel to six organisms and five African countries. Those rows are tier B: every
+deposited-evidence check passes, but no source publication has been reviewed.
+Promote one to tier A by reviewing its publication, recording it in
+`source_study`, and re-running `--online --write-lock`.
 
 ```bash
-plasbench validate-cohort --samples cohorts/public-v1.tsv --online \
-  --write-lock cohorts/public-v1.lock.json
-plasbench run --samples cohorts/public-v1.tsv
+plasbench run --samples cohorts/public-v1.tsv    # reproducible headline results
+plasbench run --samples cohorts/public-v2.tsv    # broader coverage
+
+plasbench validate-cohort --samples cohorts/public-v2.tsv \
+  --verify-lock cohorts/public-v2.lock.json
 ```
+
+Because the v2 additions are study-clustered (22 rows across 11 BioProjects),
+run them through `review-candidates` with per-BioProject caps before treating
+them as independent observations.

@@ -20,6 +20,9 @@ jobs:
       - run: plasbench test
       - run: plasbench demo
       - run: python -m compileall -q python plasbench
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
   container:
     runs-on: ubuntu-latest
     steps:
@@ -30,3 +33,4 @@ jobs:
           context: .
           push: false
           tags: plasbench:ci
+      - run: docker run --rm plasbench:ci plasbench demo

@@ -1,4 +1,9 @@
 .git
+.ncbi.env
+.env
+.env.*
+*.pem
+*.key
 data
 logs
 results

@@ -1,0 +1,2 @@
+# Cohort TSVs may end with intentional empty optional fields represented by tabs.
+*.tsv -whitespace

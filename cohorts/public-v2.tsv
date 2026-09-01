@@ -1,0 +1,33 @@
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	assembly_plasmid_count	source_study
+upec_ecpf5	GCF_013372425.1	SRR11905454	Escherichia coli	hybrid	A	SAMN15075992	PRJNA636382	clinical_urine	75	2	Snyder_2020_recurrent_UTI
+upec_ecpf7	GCF_013372405.1	SRR11905453	Escherichia coli	hybrid	A	SAMN15075993	PRJNA636382	clinical_urine	75	3	Snyder_2020_recurrent_UTI
+upec_ecpf14	GCF_013372385.1	SRR11905452	Escherichia coli	hybrid	A	SAMN15075994	PRJNA636382	clinical_urine	83	1	Snyder_2020_recurrent_UTI
+upec_ecpf15	GCF_013372365.1	SRR11905451	Escherichia coli	hybrid	A	SAMN15075995	PRJNA636382	clinical_urine	68	2	Snyder_2020_recurrent_UTI
+upec_ecpf16	GCF_013372345.1	SRR11905450	Escherichia coli	hybrid	A	SAMN15075996	PRJNA636382	clinical_urine	218	2	Snyder_2020_recurrent_UTI
+upec_ecpf18	GCF_013372325.1	SRR11905449	Escherichia coli	hybrid	A	SAMN15075997	PRJNA636382	clinical_urine	315	4	Snyder_2020_recurrent_UTI
+upec_ecpf40	GCF_013372305.1	SRR11905448	Escherichia coli	hybrid	A	SAMN15075998	PRJNA636382	clinical_urine	65	4	Snyder_2020_recurrent_UTI
+arbank_0346	GCF_017579865.1	SRR13296941	Escherichia coli	hybrid	A	SAMN12263369	PRJNA554345	clinical_antimicrobial_resistance_bank	125	2	AR_Bank_0346_2021
+arbank_0349	GCF_008152105.1	SRR10076548	Escherichia coli	hybrid	A	SAMN12272266	PRJNA554502	clinical_antimicrobial_resistance_bank	108	1	AR_Bank_0349_2019
+tahini_salmonella	GCF_022162985.1	SRR17858528	Salmonella enterica subsp. enterica serovar Tennessee	hybrid	A	SAMN25597006	PRJNA802760	food_tahini	50	1	Tahini_Salmonella_2022
+acinetobacter_baumannii_007	GCF_052071855.1	SRR33156106	Acinetobacter baumannii	hybrid	B	SAMN48008035	PRJNA1128891	Egypt			
+acinetobacter_baumannii_008	GCF_052905705.1	SRR33156114	Acinetobacter baumannii	hybrid	B	SAMN48008040	PRJNA1128891	Egypt			
+acinetobacter_baumannii_009	GCF_040543095.1	SRR29606790	Acinetobacter baumannii	hybrid	B	SAMN42110409	PRJNA1128891	Egypt			
+escherichia_coli_016	GCF_048572705.1	SRR29213360	Escherichia coli	hybrid	B	SAMN41579897	PRJNA1117783	South Africa			
+escherichia_coli_017	GCF_052063125.1	SRR29213349	Escherichia coli	hybrid	B	SAMN41579907	PRJNA1117783	South Africa			
+escherichia_coli_018	GCF_052884645.1	SRR29213340	Escherichia coli	hybrid	B	SAMN41579871	PRJNA1117783	South Africa			
+escherichia_coli_047	GCF_050749065.1	SRR33679773	Escherichia coli	hybrid	B	SAMN48700594	PRJNA1266646	Egypt			
+escherichia_coli_048	GCF_051136175.1	SRR33679775	Escherichia coli	hybrid	B	SAMN48700602	PRJNA1266646	Egypt			
+escherichia_coli_049	GCF_051136165.1	SRR33679771	Escherichia coli	hybrid	B	SAMN48700596	PRJNA1266646	Egypt			
+escherichia_coli_034	GCF_052907635.1	SRR35329237	Escherichia coli	hybrid	B	SAMN51205877	PRJNA1321367	Kenya			
+escherichia_coli_036	GCF_052938815.1	SRR35329238	Escherichia coli	hybrid	B	SAMN51205876	PRJNA1321367	Kenya			
+klebsiella_pneumoniae_001	GCF_001316565.3	SRR2244244	Klebsiella pneumoniae	long_read	B	SAMN04011426	PRJNA287968	South Africa			
+klebsiella_pneumoniae_006	GCF_011065365.1	SRR8175017	Klebsiella pneumoniae	long_read	B	SAMN10390469	PRJNA503964	Tanzania			
+klebsiella_pneumoniae_002	GCF_017161135.1	SRR10686561	Klebsiella pneumoniae	hybrid	B	SAMN13497075	PRJNA593981	Egypt			
+klebsiella_pneumoniae_003	GCF_017161155.1	SRR12628168	Klebsiella pneumoniae	long_read	B	SAMN14858807	PRJNA593981	Egypt			
+klebsiella_pneumoniae_004	GCF_017161485.1	SRR11248994	Klebsiella pneumoniae	hybrid	B	SAMN14082726	PRJNA593981	Egypt			
+salmonella_enterica_059	GCF_001359015.2	ERR331380	Salmonella enterica	long_read	B	SAMEA2055444	PRJEB3215	Tanzania			
+salmonella_enterica_055	GCF_002266085.2	SRR5627240	Salmonella enterica	long_read	B	SAMN07163940	PRJNA186035	Nigeria			
+salmonella_enterica_056	GCF_009729955.1	SRR9163435	Salmonella enterica	hybrid	B	SAMN11056403	PRJNA231221	Nigeria			
+salmonella_enterica_057	GCF_009729975.1	SRR9163323	Salmonella enterica	hybrid	B	SAMN11056402	PRJNA231221	Nigeria			
+salmonella_enterica_058	GCF_009730015.1	SRR9172122	Salmonella enterica	hybrid	B	SAMN11056427	PRJNA231221	Nigeria			
+staphylococcus_aureus_015	GCF_033061535.1	ERR10898915	Staphylococcus aureus	hybrid	B	SAMEA112648784	PRJEB59926	Tanzania			

@@ -236,9 +236,13 @@ programme, such as `clinical`, `environmental`, `wastewater`, or `livestock`.
 true plasmid size from the reference truth table, so it does not rely on a
 manually entered size.
 
-Use `cohorts/public-v1.tsv` for a ready-to-run, metadata-verified seed panel.
-Run `plasbench validate-cohort --samples cohorts/public-v1.tsv --online` before
-downloading; `cohorts/README.md` documents its scope and sources.
+Two ready-to-run, metadata-verified panels ship with PlasBench.
+`cohorts/public-v1.tsv` is a frozen ten-isolate seed panel where every row is
+tier A (evidence verified and publication reviewed); use it for reproducible
+headline results. `cohorts/public-v2.tsv` adds 22 tier-B isolates for broader
+organism and geographic coverage — evidence verified, publication review
+pending. Run `plasbench validate-cohort --samples <panel> --online` before
+downloading; `cohorts/README.md` documents scope, tiers, and sources.
 
 Choose reference and read pairs carefully: an assembly and read set from
 different isolates invalidates the benchmark. See `docs/FINDING_DATA.md` for
