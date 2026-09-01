@@ -29,6 +29,10 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/plasbench:${{ github.ref_name }}
           tags: ghcr.io/${{ github.repository_owner }}/plasbench:${{ github.ref_name }},ghcr.io/${{ github.repository_owner }}/plasbench:latest
       # Quay publishing is optional. Add QUAY_USERNAME and QUAY_ROBOT_TOKEN
       # repository secrets, then add a quay.io login and a second image tag here.
