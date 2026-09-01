@@ -13,10 +13,10 @@ import re
 import time
 from pathlib import Path
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from curate_cohort import OUT_COLUMNS, safe_id, write_rows
-from validate_cohort import assembly_metadata, ncbi_json
+from validate_cohort import assembly_metadata, fetch, ncbi_json, request_interval
 
 
 def runinfo_for_biosample(biosample, email, api_key):
@@ -32,8 +32,10 @@ def runinfo_for_biosample(biosample, email, api_key):
     if api_key: params["api_key"] = api_key
     request = Request("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + urlencode(params),
                       headers={"User-Agent": "PlasBench/0.1 cohort discovery"})
-    with urlopen(request, timeout=60) as response:
-        return list(csv.DictReader(response.read().decode("utf-8").splitlines()))
+    # Shared retry: a dropped keep-alive here would otherwise discard the row.
+    runinfo = fetch(request, 60, 4, "NCBI run-info request",
+                    parse=lambda payload: payload.decode("utf-8", "replace"))
+    return list(csv.DictReader(runinfo.splitlines()))
 
 
 def main():
@@ -106,10 +108,13 @@ def main():
                         "read_depth_x": "", "assembly_plasmid_count": "", "source_study": "NCBI_discovery_pending_publication_review",
                         "alternate_paired_runs": alternates,
                     })
-                time.sleep(0.11 if args.api_key else 0.34)
             except Exception as exc:
                 rejected.append({"assembly_accession": locals().get("accession", "unknown"), "organism_query": organism,
                                  "reason": f"metadata lookup failed: {exc}"})
+            finally:
+                # Pace failures as well as successes: an unpaced error path is
+                # exactly what turns transient rate limiting into a cascade.
+                time.sleep(request_interval(args.api_key))
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
     write_rows(out / "accepted.tsv", accepted, OUT_COLUMNS)
     rejected_fields = ("assembly_accession", "biosample", "organism_query", "country_query", "country_evidence", "sequencing_tech", "reason")

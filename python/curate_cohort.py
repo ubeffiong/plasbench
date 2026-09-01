@@ -11,9 +11,11 @@ import argparse
 import csv
 import os
 import re
+import time
 from pathlib import Path
 
-from validate_cohort import assembly_metadata, derive_truth_quality_tier, run_metadata
+from validate_cohort import (assembly_metadata, derive_truth_quality_tier,
+                             request_interval, run_metadata)
 
 
 OUT_COLUMNS = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_technology",
@@ -79,6 +81,10 @@ def main():
             })
         except Exception as exc:
             rejected.append({**candidate, "reason": f"metadata lookup failed: {exc}"})
+        finally:
+            # Every candidate costs several NCBI requests; pace the loop so a
+            # large candidate table does not rely on 429 retry to stay legal.
+            time.sleep(request_interval(args.api_key))
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
     write_rows(out / "accepted.tsv", accepted, OUT_COLUMNS)
     rejected_fields = tuple(dict.fromkeys((*candidates[0].keys(), "reason")))

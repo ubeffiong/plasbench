@@ -4,6 +4,7 @@
 import csv
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -102,6 +103,14 @@ def main():
                 text=True, capture_output=True)
             assert blocked.returncode != 0, label
             assert "correlated samples" in blocked.stderr, label
+    # The manifest must record the checkout's version, not a stale installed one.
+    sys.path.insert(0, os.path.join(ROOT, "python"))
+    import write_manifest
+    init = os.path.join(ROOT, "plasbench", "__init__.py")
+    source = re.search(r"""__version__\s*=\s*["']([^"']+)["']""",
+                       open(init, encoding="utf-8").read()).group(1)
+    assert write_manifest.tool_version() == source,         f"manifest version {write_manifest.tool_version()} != checkout {source}"
+
     print("ALL AGGREGATION TESTS PASSED")
 
 

@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -15,6 +16,27 @@ from pathlib import Path
 
 TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycler",
          "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3")
+
+
+def tool_version():
+    """Report the version of the checkout that actually produced this run.
+
+    Stage 6 invokes this script from the source tree, so the sibling package is
+    the code that ran. An installed `plasbench` may be older than the checkout
+    (a stale `pip install .`), and recording that version would misattribute the
+    results, so the checkout wins and the installed package is only a fallback.
+    """
+    init = Path(__file__).resolve().parent.parent / "plasbench" / "__init__.py"
+    if init.is_file():
+        match = re.search(r"""__version__\s*=\s*["']([^"']+)["']""",
+                          init.read_text(encoding="utf-8"))
+        if match:
+            return match.group(1)
+    try:
+        from plasbench import __version__
+        return __version__
+    except ImportError:
+        return "unknown"
 
 
 def sha256(path):
@@ -102,7 +124,7 @@ def main():
         if path.is_file():
             outputs[path.name] = {"sha256": sha256(path), "bytes": path.stat().st_size}
     manifest = {
-        "schema_version": "1.0", "tool": "PlasBench", "tool_version": "0.1.0",
+        "schema_version": "1.0", "tool": "PlasBench", "tool_version": tool_version(),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "project_root": str(Path(args.project_root).resolve()),
         "platform": {"python": sys.version, "system": platform.platform()},

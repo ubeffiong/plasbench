@@ -25,7 +25,15 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         log "  truth -> $TRUTH"
     fi
     R1="$SDIR/${SRA}_1.fastq.gz"; R2="$SDIR/${SRA}_2.fastq.gz"
-    [[ -s "$R1" && -s "$R2" ]] && python3 "$HERE/../python/measure_depth.py" --truth "$TRUTH" --r1 "$R1" --r2 "$R2" --out "$DEPTH"
+    # Coverage measurement decompresses both FASTQs, so keep stage 2 resumable:
+    # recompute only when the reads or truth table are newer than the result.
+    if [[ -s "$R1" && -s "$R2" ]]; then
+        if [[ -s "$DEPTH" && "$DEPTH" -nt "$R1" && "$DEPTH" -nt "$R2" && "$DEPTH" -nt "$TRUTH" ]]; then
+            log "  observed depth already measured for $SAMPLE"
+        else
+            python3 "$HERE/../python/measure_depth.py" --truth "$TRUTH" --r1 "$R1" --r2 "$R2" --out "$DEPTH"
+        fi
+    fi
 done < <(read_samples "$SAMPLE_SHEET")
 
 log "Stage 2 (truth) complete."
