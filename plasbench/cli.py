@@ -88,6 +88,8 @@ def main(argv=None):
         prog="plasbench",
         description="PlasBench: benchmark plasmid-reconstruction tools against complete references.",
         epilog="Examples:\n"
+               "  plasbench install-tools core\n"
+               "  plasbench install-tools all\n"
                "  plasbench demo\n"
                "  plasbench run --samples samples.tsv --threads 8\n"
                "  plasbench run 3 4 5 6 --platon off --assembler unicycler\n"

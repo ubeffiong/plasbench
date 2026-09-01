@@ -41,7 +41,7 @@ bash env/setup_conda.sh          # creates the 'plasbench' conda env
 conda activate plasbench
 python -m pip install --no-deps . # installs the `plasbench` terminal command
 
-# Optional: install only the tool group you need into the same environment.
+# Next: choose and install the tool group you need into the same environment.
 plasbench install-tools core           # download, QC, and scoring tools
 plasbench install-tools assembly       # SPAdes and Unicycler
 plasbench install-tools reconstruction # MOB-suite and Platon
