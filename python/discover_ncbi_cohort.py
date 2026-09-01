@@ -55,7 +55,9 @@ def main():
         result = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi", {
             "db": "assembly", "term": query, "retmax": args.max_assemblies, "sort": "date",
         }, args.email, args.api_key)
-        for uid in result["esearchresult"].get("idlist", []):
+        identifiers = result["esearchresult"].get("idlist", [])
+        print(f"[discovery] {organism}: inspecting {len(identifiers)} complete-assembly candidate(s)", flush=True)
+        for position, uid in enumerate(identifiers, 1):
             try:
                 summary = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi", {
                     "db": "assembly", "id": uid,
@@ -63,6 +65,7 @@ def main():
                 accession = summary["assemblyaccession"]
                 if accession in seen: continue
                 seen.add(accession)
+                print(f"[discovery] {organism}: {position}/{len(identifiers)} {accession}", flush=True)
                 assembly = assembly_metadata(accession, args.email, args.api_key)
                 if assembly["assembly_status"].lower() != "complete genome":
                     rejected.append({"assembly_accession": accession, "organism_query": organism, "reason": "assembly is not Complete Genome"}); continue
