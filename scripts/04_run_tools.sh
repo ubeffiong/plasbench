@@ -9,11 +9,14 @@ source "$HERE/lib.sh"
 ADAPT="$HERE/../adapters"
 STATUS="$RESULTS_DIR/tool_status.tsv"
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
-printf 'sample\ttool\tstatus\tprediction_fasta\treason\n' > "$STATUS"
+printf 'sample\ttool\tstatus\tprediction_fasta\treason\truntime_seconds\tpeak_rss_kb\n' > "$STATUS"
 
 record_status() {
-    printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" >> "$STATUS"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "${6:-}" "${7:-}" >> "$STATUS"
 }
+
+profile_start() { date +%s; }
+profile_elapsed() { printf '%s' "$(( $(date +%s) - $1 ))"; }
 
 is_complete() {
     [[ -e "$1" && -f "$2" && "${FORCE_RERUN_TOOLS:-0}" -ne 1 ]]
@@ -43,11 +46,12 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         else
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  mob_recon ..."
+            START=$(profile_start)
             if mob_recon --infile "$CONTIGS" --outdir "$OUT" --num_threads "$THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_mob_recon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" ""
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "mob_recon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log"
+                rm -f "$PRED" "$DONE"; warn "mob_recon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif [[ "${RUN_MOB_RECON:-0}" -eq 1 ]]; then
@@ -63,11 +67,12 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         else
             rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT"
             log "  platon ..."
+            START=$(profile_start)
             if platon --db "$PLATON_DB" --threads "$THREADS" --output "$OUT" --prefix "$SAMPLE" "$CONTIGS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_platon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" ""
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "platon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log"
+                rm -f "$PRED" "$DONE"; warn "platon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
@@ -83,11 +88,12 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         else
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  plasmidSPAdes ..."
+            START=$(profile_start)
             if plasmidspades.py -1 "$T1" -2 "$T2" -o "$OUT" --threads "$THREADS" --memory "$MEMORY_GB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plasmidspades.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" ""
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "plasmidSPAdes failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log"
+                rm -f "$PRED" "$DONE"; warn "plasmidSPAdes failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif [[ "${RUN_PLASMIDSPADES:-0}" -eq 1 ]]; then
@@ -104,11 +110,12 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         elif [[ -s "$GRAPH" ]]; then
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  gplas ..."
+            START=$(profile_start)
             if gplas -i "$GRAPH" -c extraction -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_gplas.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" ""
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "gplas failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log"
+                rm -f "$PRED" "$DONE"; warn "gplas failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         else
             warn "  gplas needs an assembly graph; none found for $SAMPLE (use Unicycler/SPAdes graph)"
@@ -132,11 +139,12 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             warn "  $TOOL prediction table missing: $CLASSIFIER"; record_status "$SAMPLE" "$TOOL" "skipped" "" "external classifier TSV unavailable"
         else
             rm -rf "$OUT" "$PRED" "$DONE"; log "  $TOOL ..."
+            START=$(profile_start)
             if gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_gplas.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "external classifier TSV: $CLASSIFIER"
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "external classifier TSV: $CLASSIFIER" "$(profile_elapsed "$START")"
             else
-                rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log"
+                rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
     elif [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]]; then
