@@ -51,6 +51,27 @@ plasbench validate-cohort --samples curation/accepted.tsv --online \
 This workflow keeps cohort scope broad and user-defined while preventing a
 candidate list from being misrepresented as a verified benchmark release.
 
+## Automated NCBI discovery
+
+With an NCBI API key, PlasBench can discover strict deposited pairs before the
+manual publication review. Store credentials in a local ignored `.ncbi.env`
+file or export `NCBI_API_KEY` and `NCBI_EMAIL`, then search the required broad
+panel without imposing a geographic or source restriction:
+
+```bash
+plasbench discover-cohort --out-dir curation/ncbi-round1 --max-assemblies 40 \
+  --organism "Klebsiella pneumoniae" \
+  --organism "Acinetobacter baumannii" \
+  --organism "Pseudomonas aeruginosa" \
+  --organism "Enterococcus faecium" \
+  --organism "Staphylococcus aureus"
+```
+
+The command writes `accepted.tsv` and `rejected.tsv`; acceptance proves the
+deposited metadata linkage only. Curators must still check publications and
+collection metadata before assigning origin, truth technology, quality tier, or
+making a public release claim.
+
 ## Versioned public panel
 
 [`cohorts/public-v1.tsv`](../cohorts/public-v1.tsv) is a ten-isolate, directly

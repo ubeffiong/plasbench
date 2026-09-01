@@ -8,6 +8,7 @@ tmp/
 *.fastq.gz
 __pycache__/
 *.pyc
+.ncbi.env
 build/
 *.egg-info/
 !config/accessions.tsv

@@ -117,6 +117,14 @@ def main(argv=None):
     curate_parser.add_argument("--api-key")
     curate_parser.add_argument("--truth-technology", choices=("long_read", "hybrid"), default="hybrid")
     curate_parser.add_argument("--quality-tier", choices=("A", "B", "C"), default="A")
+    discover_parser = sub.add_parser("discover-cohort", help="Discover strict assembly/paired-Illumina candidate pairs from NCBI.")
+    discover_parser.add_argument("--organism", action="append", required=True, help="Scientific name; repeat for each taxon.")
+    discover_parser.add_argument("--out-dir", type=Path, required=True)
+    discover_parser.add_argument("--max-assemblies", type=int, default=30)
+    discover_parser.add_argument("--email")
+    discover_parser.add_argument("--api-key")
+    discover_parser.add_argument("--truth-technology", choices=("long_read", "hybrid"), default="hybrid")
+    discover_parser.add_argument("--quality-tier", choices=("A", "B", "C"), default="A")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
     install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
@@ -196,6 +204,17 @@ def main(argv=None):
         command = [sys.executable, "python/curate_cohort.py", "--candidates", str(args.candidates),
                    "--out-dir", str(args.out_dir), "--truth-technology", args.truth_technology,
                    "--quality-tier", args.quality_tier]
+        if args.email:
+            command.extend(["--email", args.email])
+        if args.api_key:
+            command.extend(["--api-key", args.api_key])
+        code = run(command, root)
+    elif args.command == "discover-cohort":
+        command = [sys.executable, "python/discover_ncbi_cohort.py", "--out-dir", str(args.out_dir),
+                   "--max-assemblies", str(args.max_assemblies), "--truth-technology", args.truth_technology,
+                   "--quality-tier", args.quality_tier]
+        for organism in args.organism:
+            command.extend(["--organism", organism])
         if args.email:
             command.extend(["--email", args.email])
         if args.api_key:
