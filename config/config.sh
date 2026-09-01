@@ -44,6 +44,7 @@ export RUN_GPLAS="${RUN_GPLAS:-0}"        # experimental; off by default (see ad
 export RUN_GPLAS2_MOB="${RUN_GPLAS2_MOB:-0}"
 export RUN_GPLAS2_EXTERNAL="${RUN_GPLAS2_EXTERNAL:-0}"
 export GPLAS2_EXTERNAL_PREDICTIONS_DIR="${GPLAS2_EXTERNAL_PREDICTIONS_DIR:-}"
+export GPLAS2_MIN_CONTIG_LENGTH="${GPLAS2_MIN_CONTIG_LENGTH:-1000}"
 
 # Reuse a completed tool result by default. Set FORCE_RERUN_TOOLS=1 to discard
 # completed per-tool output and run it again (for example after a tool upgrade).

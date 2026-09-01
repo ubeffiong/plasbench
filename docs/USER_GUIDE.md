@@ -250,9 +250,12 @@ plasbench install-tools --env myenv mob_suite
 ```
 
 `core` installs NCBI download, QC, and minimap2 tools; `assembly` installs
-SPAdes/Unicycler; `reconstruction` installs MOB-suite/Platon. `gplas` and
-`gplas2` remain optional because their classifier/database setup must be
-recorded separately. Run `plasbench install-tools --help` for the exact syntax.
+SPAdes/Unicycler; `reconstruction` installs MOB-suite/Platon. Install `gplas`
+separately with its documented dependencies. `RUN_GPLAS2_MOB=1` then seeds
+gplas with deterministic MOB-recon membership from the same assembly graph and
+writes a provenance JSON; these seed values are hard labels, not calibrated
+probabilities. `RUN_GPLAS2_EXTERNAL=1` accepts a validated external classifier
+TSV instead. Run `plasbench install-tools --help` for the exact syntax.
 
 Run `plasbench --help` for the concise command list and `plasbench run --help`
 for all run options.
@@ -310,6 +313,8 @@ plasbench --project-root /path/to/plasbench demo
 --results-dir PATH      Predictions, score tables, leaderboards, and HTML report.
 --log-dir PATH          Per-stage, per-tool, and mapping logs.
 --platon-db PATH        Installed Platon database directory.
+--gplas2-external-predictions-dir PATH
+                       Directory containing one validated <sample>.tsv classifier table per sample.
 ```
 
 ### Resources and assembly
@@ -329,11 +334,15 @@ plasbench --project-root /path/to/plasbench demo
 --platon on|off          Enable or disable Platon. Default: on.
 --plasmidspades on|off   Enable or disable plasmidSPAdes. Default: on.
 --gplas on|off           Enable or disable experimental gplas. Default: off.
+--gplas2-mob on|off      Run gplas with same-graph MOB-recon hard-label seeds.
+--gplas2-external on|off Run gplas with validated external classifier TSVs.
 --force-rerun-tools      Delete completed tool outputs and run them again.
 ```
 
 The CLI options override `config/config.sh` for that invocation only. Edit the
-config file when you want a persistent local default.
+config file when you want a persistent local default. `--gplas2-mob on`
+requires gplas, a successful MOB-recon result, and an assembly graph. It fails
+safely if MOB and graph contig identifiers do not agree.
 
 ## Workflow
 

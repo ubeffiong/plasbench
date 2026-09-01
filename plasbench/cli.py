@@ -126,6 +126,8 @@ def main(argv=None):
         inputs.add_argument("--results-dir", type=Path, help="Directory for predictions, scores, and reports.")
         inputs.add_argument("--log-dir", type=Path, help="Directory for tool and mapping logs.")
         inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
+        inputs.add_argument("--gplas2-external-predictions-dir", type=Path,
+                            help="Directory containing <sample>.tsv external gplas2 classifier files.")
         resources = command_parser.add_argument_group("resources and assembly")
         resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
@@ -138,6 +140,8 @@ def main(argv=None):
             ("--platon", "platon", "Enable or disable Platon classification."),
             ("--plasmidspades", "plasmidspades", "Enable or disable plasmidSPAdes."),
             ("--gplas", "gplas", "Enable or disable experimental gplas."),
+            ("--gplas2-mob", "gplas2_mob", "Enable or disable gplas seeded by MOB-recon membership."),
+            ("--gplas2-external", "gplas2_external", "Enable or disable gplas with external classifier TSVs."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
         tools.add_argument("--force-rerun-tools", action="store_true",
@@ -173,6 +177,7 @@ def main(argv=None):
         path_options = {
             "samples": "SAMPLE_SHEET", "data_dir": "DATA_DIR", "results_dir": "RESULTS_DIR",
             "log_dir": "LOG_DIR", "platon_db": "PLATON_DB",
+            "gplas2_external_predictions_dir": "GPLAS2_EXTERNAL_PREDICTIONS_DIR",
         }
         for argument, variable in path_options.items():
             value = getattr(args, argument)
@@ -190,7 +195,8 @@ def main(argv=None):
             if value:
                 env[variable] = value
         for argument, variable in (("mob_recon", "RUN_MOB_RECON"), ("platon", "RUN_PLATON"),
-                                   ("plasmidspades", "RUN_PLASMIDSPADES"), ("gplas", "RUN_GPLAS")):
+                                   ("plasmidspades", "RUN_PLASMIDSPADES"), ("gplas", "RUN_GPLAS"),
+                                   ("gplas2_mob", "RUN_GPLAS2_MOB"), ("gplas2_external", "RUN_GPLAS2_EXTERNAL")):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"

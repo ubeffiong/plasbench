@@ -6,7 +6,7 @@
 #   <prefix>_bins.tab
 # and can output plasmid node sequences. Because the format is version-specific,
 # this adapter tries, in order:
-#   1) a ready-made *plasmid*.fasta anywhere in the output dir
+#   1) a ready-made *plasmid*.fasta or gplas *_bin_*.fasta anywhere in the output dir
 #   2) otherwise it exits non-zero so the pipeline SKIPS gplas for this sample
 #      (rather than silently producing wrong truth).
 #
@@ -22,7 +22,7 @@ while IFS= read -r -d '' f; do
     cat "$f" >> "$OUT_FASTA"; found=1
     bin=$(basename "$f" .fasta)
     awk -v bin="$bin" '/^>/ {sub(/^>/,"",$1); print bin "\t" $1}' "$f" >> "$BINS"
-done < <(find "$OUT_DIR" -type f -iname '*plasmid*.fasta' -print0)
+done < <(find "$OUT_DIR" -type f \( -iname '*plasmid*.fasta' -o -iname '*_bin_*.fasta' \) -print0)
 shopt -u nullglob
 if [[ "$found" -eq 0 ]]; then
     echo "[adapt_gplas] could not find a plasmid FASTA in $OUT_DIR." >&2
