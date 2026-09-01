@@ -3,7 +3,7 @@
 import argparse,csv
 from pathlib import Path
 
-FIELDS=['bin_precision','bin_recall','bin_f1','matched_bins','unmatched_bins','missed_plasmids']
+FIELDS=['bin_precision','bin_recall','bin_f1','matched_bins','unmatched_bins','missed_plasmids','split_events','merge_events','contaminated_bins']
 def main():
  p=argparse.ArgumentParser();p.add_argument('--scores',required=True);p.add_argument('--results-dir',required=True);a=p.parse_args()
  summaries={}

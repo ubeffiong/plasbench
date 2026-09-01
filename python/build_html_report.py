@@ -257,6 +257,28 @@ def main():
     score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
     score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
 
+    bin_rows = []
+    for row in scores:
+        if not row.get("bin_f1"):
+            continue
+        sample, tool = row["sample"], row["tool"]
+        matches = out.parent / sample / f"{tool}.bin_matches.tsv"
+        detail = "-"
+        if matches.is_file():
+            detail = f"<a href='{relative_link(matches, out)}' download>Download matches TSV</a>"
+        bin_rows.append(
+            "<tr><td>{sample}</td><td>{tool}</td><td>{precision}</td><td>{recall}</td><td><strong class='score {band}'>{f1}</strong></td>"
+            "<td>{matched}</td><td>{unmatched}</td><td>{missed}</td><td>{splits}</td><td>{merges}</td><td>{contaminated}</td><td>{detail}</td></tr>".format(
+                sample=esc(sample), tool=esc(tool), precision=esc(row.get("bin_precision") or "-"),
+                recall=esc(row.get("bin_recall") or "-"), f1=esc(row.get("bin_f1") or "-"),
+                band=score_band(number(row.get("bin_f1"))), matched=esc(row.get("matched_bins") or "0"),
+                unmatched=esc(row.get("unmatched_bins") or "0"), missed=esc(row.get("missed_plasmids") or "0"),
+                splits=esc(row.get("split_events") or "0"), merges=esc(row.get("merge_events") or "0"),
+                contaminated=esc(row.get("contaminated_bins") or "0"), detail=detail,
+            )
+        )
+    bin_diagnostics_html = "".join(bin_rows) or "<tr><td colspan='12'>No tool supplied validated bin membership in this run.</td></tr>"
+
     status_rows = "".join(
         "<tr data-status='{state}'><td>{sample}</td><td>{tool}</td><td><span class='status {state}'>{state}</span></td>"
         "<td>{runtime}</td><td>{memory}</td><td>{reason}</td></tr>".format(
@@ -335,6 +357,7 @@ def main():
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
 <section id='leaderboard'><h2>Benchmark leaderboard</h2><p class='lead'>Ranked by mean base-level F1. Mean bin F1 is shown only when a tool supplied validated bin membership; “not bin-scored” is missing evidence, not a zero. Select a column heading to sort.</p><div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th><th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean recall</th><th>Mean bin F1</th><th>Mean F1</th></tr></thead><tbody>{leaderboard_rows}</tbody></table></div></section>
 <section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{''.join(f"<option>{esc(t)}</option>" for t in tools)}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
+<section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one true plasmid represented by multiple candidate bins; a merge is one candidate bin representing multiple true plasmids; contamination means a bin aligned to chromosome reference sequence. These are diagnostics, not base-level errors.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed or unavailable tool is excluded from F1 aggregation. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
 <section id='samples'><h2>Sample drill-down</h2><p class='lead'>Open a sample to compare every completed tool side-by-side.</p>{''.join(sample_sections) or "<p class='muted'>No samples were found.</p>"}</section>

@@ -22,9 +22,12 @@ def main():
             writer = csv.writer(handle, delimiter="\t")
             writer.writerow([
                 "sample", "tool", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
-                "unmapped_pred_bp", "precision", "recall", "f1",
+                "unmapped_pred_bp", "precision", "recall", "f1", "bin_precision",
+                "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids",
+                "split_events", "merge_events", "contaminated_bins",
             ])
-            writer.writerow(["sample1", "tool_a", 100, 80, 20, 20, 0, "0.8000", "0.8000", "0.8000"])
+            writer.writerow(["sample1", "tool_a", 100, 80, 20, 20, 0, "0.8000", "0.8000", "0.8000",
+                             "0.5", "0.5", "0.5", 1, 1, 1, 2, 3, 4])
 
         subprocess.run([
             sys.executable, AGGREGATE, "--scores", scores,
@@ -73,6 +76,8 @@ def main():
             page = handle.read()
         assert "wastewater" in page and "read_depth_x" not in page
         assert "Tool version" in page and "Plasmid size" in page and "Depth ≥" in page
+        assert "Bin reconstruction diagnostics" in page and "Split events" in page and "Merge events" in page
+        assert "Contaminated bins" in page
     print("ALL AGGREGATION TESTS PASSED")
 
 

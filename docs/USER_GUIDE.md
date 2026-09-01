@@ -361,7 +361,10 @@ The main outputs are written under `results/` unless `--results-dir` is set.
 results/scores.tsv
     One row per scored sample/tool: true plasmid bp, TP, FP, FN, unmapped bp,
     base-level precision/recall/F1, plasmid-level recovery, and optional AMR
-    gene and circular-plasmid recovery metrics.
+    gene and circular-plasmid recovery metrics. When bin membership is supplied,
+    this also includes bin precision/recall/F1, matched/unmatched bins, missed
+    plasmids, split/merge event counts, and bins with chromosome-aligned
+    contamination.
 
 results/benchmark.paired_comparisons.tsv
     Pairwise, shared-sample F1 differences with win/tie/loss counts. Use this
@@ -390,6 +393,8 @@ results/benchmark.report.html
     Score filters include organism, origin, truth technology/tier, truth-derived
     plasmid-size band, read-depth range, and recorded tool version; exported CSV
     contains the exact visible rows and these metadata columns.
+    Its Bin reconstruction diagnostics table links to the record-level
+    `<tool>.bin_matches.tsv` evidence for every bin-scored sample/tool pair.
 
 results/<sample>/
     Standardized prediction FASTAs, alignments, tool output, and completion markers.
