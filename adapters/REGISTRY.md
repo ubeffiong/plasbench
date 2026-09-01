@@ -11,7 +11,8 @@ rather than assigning an artificial zero score.
 | Platon | short-read assembly | `adapt_platon.sh` | supported |
 | plasmidSPAdes | paired reads | `adapt_plasmidspades.sh` | supported |
 | gplas | GFA graph | `adapt_gplas.sh` | experimental |
-| gplas2 | GFA graph plus classifier prediction TSV | external contract below | optional |
+| gplas2_mob | GFA graph plus MOB-derived classifier TSV | native mode | optional |
+| gplas2_external | GFA graph plus user classifier TSV | native mode | optional |
 
 ## gplas2 contract
 
@@ -25,4 +26,6 @@ adapters. Record the gplas2 command and classifier provenance in the run
 manifest's external notes before publication.
 
 This contract supports current and future external methods without coupling
-the core benchmark to unstable third-party command-line interfaces.
+the core benchmark to unstable third-party command-line interfaces. Enable
+`RUN_GPLAS2_MOB=1` or `RUN_GPLAS2_EXTERNAL=1`; the latter reads
+`$GPLAS2_EXTERNAL_PREDICTIONS_DIR/<sample>.tsv`.
