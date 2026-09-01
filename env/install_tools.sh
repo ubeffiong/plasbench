@@ -10,10 +10,10 @@ elif command -v conda >/dev/null 2>&1; then SOLVER=(conda install -y -n "$ENV_NA
 else echo "ERROR: install micromamba, mamba, or conda first." >&2; exit 1; fi
 case "$PROFILE" in
  locked) "${CREATE[@]}" --file "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/environment.lock.yml"; exit;;
- core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2);;
+ core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk);;
  assembly) PKGS=(spades unicycler);;
  reconstruction) PKGS=(mob_suite platon);;
- all) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 spades unicycler mob_suite platon);;
+ all) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk spades unicycler mob_suite platon);;
  *) PKGS=("$PROFILE");;
 esac
 echo "[plasbench] installing into $ENV_NAME: ${PKGS[*]}"

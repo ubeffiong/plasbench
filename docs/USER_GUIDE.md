@@ -254,6 +254,23 @@ guessed from a tool output.
 
 ## Commands
 
+### Depth ladder
+
+Create a reproducible local-input cohort at fixed target depths after staging
+the original paired reads. Every source row must contain `read_depth_x` and
+every target must not exceed that declared source depth:
+
+```bash
+plasbench depth-ladder --samples cohorts/public-v1.tsv --data-dir data \
+  --out-dir depth-ladder --depths 20,40,80,160 --seed 20260901
+plasbench run --samples depth-ladder/depth_ladder.samples.tsv \
+  --data-dir depth-ladder/data --results-dir depth-ladder/results \
+  --local-inputs
+```
+
+The generated manifest records the parent isolate, sampling fraction, target
+depth, and seed. It never overwrites the original reads or cohort.
+
 ### Install dependency tools
 
 After installing the lightweight PlasBench command, install only the optional

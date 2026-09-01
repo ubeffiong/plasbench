@@ -117,6 +117,12 @@ def main(argv=None):
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
                              help="Guide topic to print (default: all).")
     report_parser = sub.add_parser("report", help="Regenerate the leaderboard and HTML report from scores.")
+    ladder_parser = sub.add_parser("depth-ladder", help="Create deterministic local-input depth-ladder cohorts using seqtk.")
+    ladder_parser.add_argument("--samples", type=Path, required=True)
+    ladder_parser.add_argument("--data-dir", type=Path, required=True)
+    ladder_parser.add_argument("--out-dir", type=Path, required=True)
+    ladder_parser.add_argument("--depths", default="20,40,80,160")
+    ladder_parser.add_argument("--seed", type=int, default=20260901)
     run_parser = sub.add_parser("run", help="Run the full benchmark or selected stages.")
     run_parser.add_argument("stages", nargs="*", choices=[str(i) for i in range(7)],
                             help=f"Optional {STAGE_HELP}")
@@ -176,6 +182,10 @@ def main(argv=None):
         code = run(command, root)
     elif args.command == "install-tools":
         code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.profile], root)
+    elif args.command == "depth-ladder":
+        code = run([sys.executable, "python/make_depth_ladder.py", "--samples", str(args.samples),
+                    "--data-dir", str(args.data_dir), "--out-dir", str(args.out_dir),
+                    "--depths", args.depths, "--seed", str(args.seed)], root)
     elif args.command == "docs":
         print_docs(root, args.topic)
         code = 0
