@@ -1,4 +1,4 @@
-sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x
 # ---------------------------------------------------------------------------
 # Fill this in with YOUR matched pairs. One isolate per row.
 #   sample_id          : any short unique name you choose (no spaces)
@@ -10,6 +10,9 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 #   truth_quality_tier : A (closed+validated), B (complete), or C (provisional)
 #   biosample          : matched NCBI BioSample accession (SAMN.../SAMEA...)
 #   bioproject         : NCBI BioProject accession (PRJNA.../PRJEB...)
+#   sample_origin      : optional free-text cohort origin, e.g. clinical, environmental,
+#                        livestock, wastewater, or a more specific local classification
+#   read_depth_x       : optional estimated Illumina depth in fold coverage (for example 80)
 #
 # Lines starting with '#' and blank lines are ignored.
 #
@@ -21,5 +24,5 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 # The three rows below are PLACEHOLDERS to show the format. Replace them.
 # (They are commented out so the pipeline does not try to download them.)
 # ---------------------------------------------------------------------------
-# ecoli_01	GCF_000000000.1	SRR0000001	Escherichia coli	hybrid	A	SAMN00000001	PRJNA000001
-# kpneu_01	GCF_000000000.2	SRR0000002	Klebsiella pneumoniae	long_read	B	SAMN00000002	PRJNA000001
+# ecoli_01	GCF_000000000.1	SRR0000001	Escherichia coli	hybrid	A	SAMN00000001	PRJNA000001	clinical	85
+# kpneu_01	GCF_000000000.2	SRR0000002	Klebsiella pneumoniae	long_read	B	SAMN00000002	PRJNA000001	environmental	60

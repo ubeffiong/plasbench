@@ -206,17 +206,24 @@ The exact copy-paste command is in the README.
 ## Inputs
 
 The default sample sheet is `config/accessions.tsv`. It is a tab-separated file
-with one isolate per row:
+with one isolate per row. The eight curation columns are required; the final two
+are optional but enable cohort dashboard filters:
 
 ```text
-sample_id	assembly_accession	sra_run
-ecoli_01	GCF_012345678.1	SRR12345678
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x
+ecoli_01	GCF_012345678.1	SRR12345678	Escherichia coli	hybrid	A	SAMN123	PRJNA123	clinical	80
 ```
 
 `sample_id` must be unique. `assembly_accession` must be a complete, preferably
 long-read or hybrid, reference assembly. `sra_run` must be a matched Illumina
 run for the same isolate. The pipeline validates missing fields, duplicate IDs,
 and an empty sheet before starting a data stage.
+
+`sample_origin` is deliberately free text: use the labels meaningful to your
+programme, such as `clinical`, `environmental`, `wastewater`, or `livestock`.
+`read_depth_x` is an optional positive numeric fold coverage. The report derives
+true plasmid size from the reference truth table, so it does not rely on a
+manually entered size.
 
 Choose reference and read pairs carefully: an assembly and read set from
 different isolates invalidates the benchmark. See `docs/FINDING_DATA.md` for
@@ -363,7 +370,8 @@ results/benchmark.paired_comparisons.tsv
 
 results/run_manifest.json
     Machine-readable provenance: input checksums, sample metadata, settings,
-    available tool versions, platform information, and output checksums.
+    available tool versions, platform/container/database identity, per-tool
+    runtime and peak RSS where GNU time is available, and output checksums.
 
 results/tool_status.tsv
     Per sample/tool execution state: completed, reused, failed, or skipped,
@@ -379,6 +387,9 @@ results/benchmark.report.html
     Offline interactive final dashboard. It includes filters, sortable tables,
     tool and sample drill-downs, automated descriptive interpretation, metric
     glossary, status coloring, SVG metric chart, and a downloadable file tree.
+    Score filters include organism, origin, truth technology/tier, truth-derived
+    plasmid-size band, read-depth range, and recorded tool version; exported CSV
+    contains the exact visible rows and these metadata columns.
 
 results/<sample>/
     Standardized prediction FASTAs, alignments, tool output, and completion markers.

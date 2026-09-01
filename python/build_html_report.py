@@ -5,6 +5,7 @@ import argparse
 import csv
 import datetime as dt
 import html
+import json
 import os
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -20,6 +21,24 @@ def read_sample_metadata(path):
     if not path or not Path(path).is_file():
         return {}
     return {row["sample_id"]: row for row in read_tsv(path) if row.get("sample_id")}
+
+
+def read_tool_versions(path):
+    """Map report tool labels to versions recorded at the time of the run."""
+    if not path or not Path(path).is_file():
+        return {}
+    try:
+        tools = json.loads(Path(path).read_text(encoding="utf-8")).get("tools", {})
+    except (json.JSONDecodeError, OSError):
+        return {}
+    executable = {
+        "mob_recon": "mob_recon", "platon": "platon",
+        "plasmidspades": "plasmidspades.py", "gplas": "gplas",
+        "gplas2_external": "gplas", "gplas2_mob": "gplas",
+    }
+    return {label: details.get("version", "unreported")
+            for label, name in executable.items()
+            if (details := tools.get(name, {})).get("available")}
 
 
 def number(value):
@@ -92,6 +111,43 @@ def score_band(value):
     return "low"
 
 
+def size_band(bp):
+    if bp < 10_000:
+        return "small"
+    if bp < 100_000:
+        return "medium"
+    return "large"
+
+
+def score_row(row, metadata, tool_versions):
+    sample_metadata = metadata.get(row["sample"], {})
+    depth = sample_metadata.get("read_depth_x", "")
+    try:
+        depth_value = float(depth) if depth else None
+    except ValueError:
+        depth_value = None
+    truth_bp = int(number(row["true_plasmid_bp"]))
+    version = tool_versions.get(row["tool"], "not recorded")
+    band = score_band(number(row["f1"]))
+    return (
+        "<tr data-sample='{sample}' data-tool='{tool}' data-band='{band}' "
+        "data-organism='{organism}' data-tech='{tech}' data-tier='{tier}' "
+        "data-origin='{origin}' data-size='{size}' data-depth='{depth}' data-version='{version}'>"
+        "<td>{sample}</td><td>{tool}</td><td>{version}</td><td>{origin}</td><td>{depth_text}</td>"
+        "<td>{truth:,}</td><td>{tp:,}</td><td>{fp:,}</td><td>{fn:,}</td><td>{unmapped:,}</td>"
+        "<td>{precision}</td><td>{recall}</td><td><strong class='score {band}'>{f1}</strong></td></tr>"
+    ).format(
+        sample=esc(row["sample"]), tool=esc(row["tool"]), version=esc(version),
+        organism=esc(sample_metadata.get("organism", "")), tech=esc(sample_metadata.get("truth_technology", "")),
+        tier=esc(sample_metadata.get("truth_quality_tier", "")), origin=esc(sample_metadata.get("sample_origin", "")),
+        size=size_band(truth_bp), depth="" if depth_value is None else depth_value,
+        depth_text=esc(depth) if depth_value is not None else "-", truth=truth_bp,
+        tp=int(number(row["TP_bp"])), fp=int(number(row["FP_bp"])), fn=int(number(row["FN_bp"])),
+        unmapped=int(number(row["unmapped_pred_bp"])), precision=esc(row["precision"]),
+        recall=esc(row["recall"]), f1=esc(row["f1"]), band=band,
+    )
+
+
 def interpretation(leaderboard, status_counts):
     """Only report directly observed comparisons from the report input tables."""
     notes = []
@@ -156,6 +212,7 @@ def main():
     ap.add_argument("--tool-status", required=True)
     ap.add_argument("--leaderboard", required=True)
     ap.add_argument("--sample-sheet", help="Optional curated sample-sheet TSV for cohort filters.")
+    ap.add_argument("--manifest", help="Optional run manifest used to show/filter tool versions.")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -165,6 +222,7 @@ def main():
     status = read_tsv(args.tool_status) if Path(args.tool_status).is_file() else []
     leaderboard = read_tsv(args.leaderboard)
     metadata = read_sample_metadata(args.sample_sheet)
+    tool_versions = read_tool_versions(args.manifest)
     generated = dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
     tools = sorted({row["tool"] for row in scores} | {row["tool"] for row in status})
@@ -172,6 +230,8 @@ def main():
     organisms = sorted({row.get("organism") or "" for row in metadata.values()} - {""})
     technologies = sorted({row.get("truth_technology") or "" for row in metadata.values()} - {""})
     tiers = sorted({row.get("truth_quality_tier") or "" for row in metadata.values()} - {""})
+    origins = sorted({row.get("sample_origin") or "" for row in metadata.values()} - {""})
+    versions = sorted(set(tool_versions.values()))
     status_counts = Counter(row["status"] for row in status)
     best = leaderboard[0] if leaderboard else None
     score_by_sample = defaultdict(list)
@@ -194,21 +254,8 @@ def main():
         ) for row in leaderboard
     ) or "<tr><td colspan='10'>No scored tools yet.</td></tr>"
 
-    score_rows = "".join(
-        "<tr data-sample='{sample}' data-tool='{tool}' data-band='{band}' data-organism='{organism}' data-tech='{tech}' data-tier='{tier}'><td>{sample}</td><td>{tool}</td>"
-        "<td>{truth:,}</td><td>{tp:,}</td><td>{fp:,}</td><td>{fn:,}</td><td>{unmapped:,}</td>"
-        "<td>{precision}</td><td>{recall}</td><td><strong class='score {band}'>{f1}</strong></td></tr>".format(
-            sample=esc(row["sample"]), tool=esc(row["tool"]),
-            organism=esc(metadata.get(row["sample"], {}).get("organism", "")),
-            tech=esc(metadata.get(row["sample"], {}).get("truth_technology", "")),
-            tier=esc(metadata.get(row["sample"], {}).get("truth_quality_tier", "")),
-            truth=int(number(row["true_plasmid_bp"])), tp=int(number(row["TP_bp"])),
-            fp=int(number(row["FP_bp"])), fn=int(number(row["FN_bp"])),
-            unmapped=int(number(row["unmapped_pred_bp"])), precision=esc(row["precision"]),
-            recall=esc(row["recall"]), f1=esc(row["f1"]),
-            band=score_band(number(row["f1"])),
-        ) for row in scores
-    ) or "<tr><td colspan='10'>No score rows were produced.</td></tr>"
+    score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
+    score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
 
     status_rows = "".join(
         "<tr data-status='{state}'><td>{sample}</td><td>{tool}</td><td><span class='status {state}'>{state}</span></td>"
@@ -287,7 +334,7 @@ def main():
 <section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. These are descriptive comparisons, not statistical significance tests.</p><ul>{insight_html}</ul></div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
 <section id='leaderboard'><h2>Benchmark leaderboard</h2><p class='lead'>Ranked by mean base-level F1. Mean bin F1 is shown only when a tool supplied validated bin membership; “not bin-scored” is missing evidence, not a zero. Select a column heading to sort.</p><div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th><th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean recall</th><th>Mean bin F1</th><th>Mean F1</th></tr></thead><tbody>{leaderboard_rows}</tbody></table></div></section>
-<section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by sample, tool, performance, or curated cohort metadata; export the exact visible subset.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{''.join(f"<option>{esc(t)}</option>" for t in tools)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
+<section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{''.join(f"<option>{esc(t)}</option>" for t in tools)}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed or unavailable tool is excluded from F1 aggregation. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
 <section id='samples'><h2>Sample drill-down</h2><p class='lead'>Open a sample to compare every completed tool side-by-side.</p>{''.join(sample_sections) or "<p class='muted'>No samples were found.</p>"}</section>
@@ -296,9 +343,9 @@ def main():
 <section id='method'><h2>Scoring method and interpretation</h2><div class='method'><p><strong>Truth:</strong> sequences in each complete reference assembly are labelled plasmid or chromosome from the NCBI sequence report.</p><p><strong>Prediction:</strong> each tool’s standardized predicted-plasmid FASTA is aligned to the reference using minimap2.</p><p><strong>Metrics:</strong> covered plasmid reference bases are TP; covered chromosome reference bases are FP; uncovered plasmid bases are FN. Precision measures contamination control; recall measures plasmid completeness; F1 balances both.</p><p><strong>Run integrity:</strong> failed tool execution, failed adaptation, and mapping failure do not become zero-score observations. They appear in execution health and reduce the completed/scored counts shown in the leaderboard.</p></div></section>
 <footer>Inputs: <a href='scores.tsv'>scores.tsv</a>, <a href='tool_status.tsv'>tool_status.tsv</a>, <a href='benchmark.leaderboard.tsv'>benchmark.leaderboard.tsv</a>. Report location: {esc(out.name)}.</footer></main>
 <script>
-const sf=document.getElementById('sample-filter'),tf=document.getElementById('tool-filter'),bf=document.getElementById('band-filter'),of=document.getElementById('organism-filter'),cf=document.getElementById('tech-filter'),qf=document.getElementById('tier-filter');
-function filterScores(){{let visible=0;document.querySelectorAll('#score-table tbody tr').forEach(r=>{{const hide=(sf.value&&r.dataset.sample!==sf.value)||(tf.value&&r.dataset.tool!==tf.value)||(bf.value&&r.dataset.band!==bf.value)||(of.value&&r.dataset.organism!==of.value)||(cf.value&&r.dataset.tech!==cf.value)||(qf.value&&r.dataset.tier!==qf.value);r.hidden=hide;if(!hide)visible++;}});document.getElementById('score-count').textContent=visible+' visible score row(s)';}}
-[sf,tf,bf,of,cf,qf].forEach(el=>el.onchange=filterScores);filterScores();
+const sf=document.getElementById('sample-filter'),tf=document.getElementById('tool-filter'),vf=document.getElementById('version-filter'),bf=document.getElementById('band-filter'),of=document.getElementById('organism-filter'),originf=document.getElementById('origin-filter'),cf=document.getElementById('tech-filter'),qf=document.getElementById('tier-filter'),sizef=document.getElementById('size-filter'),depthMin=document.getElementById('depth-min'),depthMax=document.getElementById('depth-max');
+function filterScores(){{let visible=0;const min=depthMin.value===''?null:Number(depthMin.value),max=depthMax.value===''?null:Number(depthMax.value);document.querySelectorAll('#score-table tbody tr').forEach(r=>{{const depth=r.dataset.depth===''?null:Number(r.dataset.depth),outsideDepth=(min!==null&&(depth===null||depth<min))||(max!==null&&(depth===null||depth>max));const hide=(sf.value&&r.dataset.sample!==sf.value)||(tf.value&&r.dataset.tool!==tf.value)||(vf.value&&r.dataset.version!==vf.value)||(bf.value&&r.dataset.band!==bf.value)||(of.value&&r.dataset.organism!==of.value)||(originf.value&&r.dataset.origin!==originf.value)||(cf.value&&r.dataset.tech!==cf.value)||(qf.value&&r.dataset.tier!==qf.value)||(sizef.value&&r.dataset.size!==sizef.value)||outsideDepth;r.hidden=hide;if(!hide)visible++;}});document.getElementById('score-count').textContent=visible+' visible score row(s)';}}
+[sf,tf,vf,bf,of,originf,cf,qf,sizef].forEach(el=>el.onchange=filterScores);[depthMin,depthMax].forEach(el=>el.oninput=filterScores);filterScores();
 document.getElementById('export-scores').onclick=()=>{{const rows=Array.from(document.querySelectorAll('#score-table tr')).filter(r=>!r.hidden).map(r=>Array.from(r.cells).map(c=>'"'+c.innerText.replaceAll('"','""')+'"').join(','));const blob=new Blob([rows.join('\n')+'\n'],{{type:'text/csv'}}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='plasbench-filtered-scores.csv';link.click();URL.revokeObjectURL(link.href);}};
 const statusFilter=document.getElementById('status-filter');function filterStatus(){{let visible=0;document.querySelectorAll('#status-table tbody tr').forEach(r=>{{const hide=statusFilter.value&&r.dataset.status!==statusFilter.value;r.hidden=hide;if(!hide)visible++;}});document.getElementById('status-count').textContent=visible+' visible execution row(s)';}}statusFilter.onchange=filterStatus;filterStatus();
 document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEventListener('click',()=>{{const table=head.closest('table'),body=table.tBodies[0],rows=Array.from(body.rows),ascending=head.dataset.order!=='asc';rows.sort((a,b)=>{{const av=a.cells[index]?.innerText.trim()||'',bv=b.cells[index]?.innerText.trim()||'',an=Number(av.replace(/[^0-9.-]/g,'')),bn=Number(bv.replace(/[^0-9.-]/g,''));const result=Number.isNaN(an)||Number.isNaN(bn)?av.localeCompare(bv):an-bn;return ascending?result:-result;}});rows.forEach(row=>body.appendChild(row));table.querySelectorAll('th').forEach(h=>delete h.dataset.order);head.dataset.order=ascending?'asc':'desc';}}));

@@ -26,6 +26,12 @@ def main():
         if not RUN.match(r["sra_run"]): errors.append(f"row {n}: invalid SRA run")
         if r["truth_technology"] not in ("long_read","hybrid"): errors.append(f"row {n}: truth_technology must be long_read or hybrid")
         if r["truth_quality_tier"] not in ("A","B","C"): errors.append(f"row {n}: truth_quality_tier must be A/B/C")
+        # Origin is free text so local programmes are not forced into a narrow vocabulary.
+        depth = (r.get("read_depth_x") or "").strip()
+        if depth:
+            try:
+                if float(depth) <= 0: errors.append(f"row {n}: read_depth_x must be greater than zero when supplied")
+            except ValueError: errors.append(f"row {n}: read_depth_x must be numeric when supplied")
         if a.online:
             for db,value,label in (("assembly",r["assembly_accession"],"assembly"),("sra",r["sra_run"],"SRA run"),("biosample",r["biosample"],"BioSample"),("bioproject",r["bioproject"],"BioProject")):
                 try:

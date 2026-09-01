@@ -2,6 +2,7 @@
 """Regression checks for aggregation when execution status is unavailable."""
 
 import csv
+import json
 import os
 import subprocess
 import sys
@@ -48,6 +49,30 @@ def main():
         assert os.path.isfile(report)
         with open(report, encoding="utf-8") as handle:
             assert "tool_a" in handle.read()
+
+        # The direct report builder must preserve optional cohort metadata and
+        # manifest-recorded versions for filtering/export, without requiring a
+        # fixed cohort vocabulary.
+        sample_sheet = os.path.join(tmp, "cohort.tsv")
+        with open(sample_sheet, "w", newline="") as handle:
+            writer = csv.writer(handle, delimiter="\t")
+            writer.writerow(["sample_id", "assembly_accession", "sra_run", "organism", "truth_technology", "truth_quality_tier", "biosample", "bioproject", "sample_origin", "read_depth_x"])
+            writer.writerow(["sample1", "GCF_000000000.1", "SRR0000001", "Example species", "hybrid", "A", "SAMN00000001", "PRJNA000001", "wastewater", "72"])
+        manifest = os.path.join(tmp, "run_manifest.json")
+        with open(manifest, "w", encoding="utf-8") as handle:
+            json.dump({"tools": {"mob_recon": {"available": True, "version": "3.1.9"}}}, handle)
+        rich_report = os.path.join(tmp, "rich.report.html")
+        subprocess.run([
+            sys.executable, os.path.join(ROOT, "python", "build_html_report.py"),
+            "--project-root", ROOT, "--scores", scores,
+            "--tool-status", os.path.join(tmp, "not-created.tsv"),
+            "--leaderboard", prefix + ".leaderboard.tsv", "--sample-sheet", sample_sheet,
+            "--manifest", manifest, "--out", rich_report,
+        ], check=True)
+        with open(rich_report, encoding="utf-8") as handle:
+            page = handle.read()
+        assert "wastewater" in page and "read_depth_x" not in page
+        assert "Tool version" in page and "Plasmid size" in page and "Depth ≥" in page
     print("ALL AGGREGATION TESTS PASSED")
 
 
