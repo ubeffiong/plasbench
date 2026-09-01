@@ -17,11 +17,22 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
+LOCK_SCHEMA_VERSION = "1.1"
 RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 # A dropped keep-alive surfaces as http.client.RemoteDisconnected, which is not a
 # URLError; without it here a single flaky connection discards a whole cohort run.
 TRANSIENT = (URLError, TimeoutError, ConnectionError, http.client.HTTPException,
              json.JSONDecodeError, UnicodeDecodeError)
+
+
+def request_interval(api_key=None):
+    """Seconds to pause between per-record NCBI request bursts.
+
+    NCBI allows 3 requests/second without an API key and 10 with one. Each
+    cohort record costs several requests, so callers that loop over records
+    must pace themselves rather than rely on 429 retry to absorb the overrun.
+    """
+    return 0.11 if api_key else 0.34
 
 
 def fetch(request, timeout=30, retries=4, label="NCBI request", parse=None):
@@ -238,6 +249,22 @@ def verify_lock(lock_path, samples_path):
     evidence = lock.get("evidence")
     if not isinstance(evidence, list):
         raise ValueError("verification lock has no evidence list")
+    # A matching checksum only proves the sheet is unchanged. A lock written
+    # before the sequencing-evidence schema carries none of the fields that
+    # back the long-read truth claim, so report it as stale rather than verified.
+    if str(lock.get("schema_version", "")) != LOCK_SCHEMA_VERSION:
+        raise ValueError(
+            f"verification lock schema is {lock.get('schema_version') or 'absent'}, expected "
+            f"{LOCK_SCHEMA_VERSION}; it predates the sequencing-evidence fields. "
+            "Run --online --write-lock again."
+        )
+    missing = [record.get("sample_id", "?") for record in evidence
+               if not (record.get("assembly") or {}).get("derived_truth_technology")]
+    if missing:
+        raise ValueError(
+            "verification lock has no long-read sequencing evidence for: "
+            + ", ".join(missing[:5]) + (" ..." if len(missing) > 5 else "")
+        )
     return len(evidence)
 
 
@@ -279,8 +306,8 @@ def main():
         path = Path(args.write_lock)
         path.parent.mkdir(parents=True, exist_ok=True)
         source = Path(args.samples).read_bytes()
-        # 1.1 adds Datasets v2 sequencing evidence and the derived technology/tier.
-        path.write_text(json.dumps({"schema_version": "1.1", "sample_sheet": Path(args.samples).name,
+        # LOCK_SCHEMA_VERSION 1.1 adds Datasets v2 sequencing evidence and derived technology/tier.
+        path.write_text(json.dumps({"schema_version": LOCK_SCHEMA_VERSION, "sample_sheet": Path(args.samples).name,
                                     "sample_sheet_sha256": hashlib.sha256(source).hexdigest(), "evidence": evidence}, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote cohort verification lock: {path}")
     scope = "NCBI-linked pair verified" if args.online else "schema verified"

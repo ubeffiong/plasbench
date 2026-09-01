@@ -15,15 +15,35 @@ VALIDATOR = os.path.join(ROOT, "python", "validate_cohort.py")
 def main():
     panel = os.path.join(ROOT, "cohorts", "public-v1.tsv")
     subprocess.run([sys.executable, VALIDATOR, "--samples", panel], check=True)
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as handle:
-        json.dump({"schema_version": "1.0", "sample_sheet": "public-v1.tsv",
-                   "sample_sheet_sha256": hashlib.sha256(open(panel, "rb").read()).hexdigest(),
-                   "evidence": []}, handle)
-        lock = handle.name
-    try:
-        subprocess.run([sys.executable, VALIDATOR, "--samples", panel, "--verify-lock", lock], check=True)
-    finally:
-        os.unlink(lock)
+    # A lock is only trustworthy when its checksum matches AND it carries the
+    # sequencing evidence backing the long-read truth claim. Each of these locks
+    # has a VALID checksum, so only the schema/evidence checks can reject them.
+    digest = hashlib.sha256(open(panel, "rb").read()).hexdigest()
+    evidence = [{"sample_id": "x", "assembly": {"derived_truth_technology": "hybrid"}}]
+    cases = [
+        ("current lock with evidence", "1.1", evidence, True, ""),
+        ("pre-evidence 1.0 lock", "1.0", evidence, False, "predates the sequencing-evidence fields"),
+        ("current lock, no long-read evidence", "1.1",
+         [{"sample_id": "x", "assembly": {}}], False, "no long-read sequencing evidence"),
+    ]
+    for label, version, records, should_pass, expected in cases:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as handle:
+            json.dump({"schema_version": version, "sample_sheet": "public-v1.tsv",
+                       "sample_sheet_sha256": digest, "evidence": records}, handle)
+            lock = handle.name
+        try:
+            result = subprocess.run([sys.executable, VALIDATOR, "--samples", panel,
+                                     "--verify-lock", lock], text=True, capture_output=True)
+            assert (result.returncode == 0) is should_pass, f"{label}: rc={result.returncode}"
+            assert expected in result.stderr, f"{label}: {result.stderr!r}"
+        finally:
+            os.unlink(lock)
+
+    # Both shipped panels must verify against their committed locks.
+    for name in ("public-v1", "public-v2"):
+        subprocess.run([sys.executable, VALIDATOR,
+                        "--samples", os.path.join(ROOT, "cohorts", f"{name}.tsv"),
+                        "--verify-lock", os.path.join(ROOT, "cohorts", f"{name}.lock.json")], check=True)
     with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8") as handle:
         handle.write("sample_id\tassembly_accession\tsra_run\torganism\ttruth_technology\ttruth_quality_tier\tbiosample\tbioproject\tread_depth_x\n")
         handle.write("bad\tGCF_000000000.1\tSRR0000001\tExample\thybrid\tA\tSAMN1\tPRJNA1\tnot-a-number\n")
