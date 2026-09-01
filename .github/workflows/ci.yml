@@ -13,6 +13,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: 'scripts adapters env test'
       - run: python -m pip install --no-deps .
       - run: plasbench test
       - run: plasbench demo

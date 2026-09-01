@@ -5,11 +5,14 @@ import argparse
 import csv
 import hashlib
 import json
+import os
+import random
 import re
 import sys
 import time
 from pathlib import Path
 from urllib.parse import urlencode
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
@@ -25,22 +28,33 @@ def read_rows(path):
         return list(reader), reader.fieldnames or []
 
 
-def ncbi_json(endpoint, params, email=None):
+def ncbi_json(endpoint, params, email=None, api_key=None, retries=4):
+    """Read E-utilities JSON with bounded retry/backoff for transient errors."""
     params = {**params, "retmode": "json"}
     if email:
         params["email"] = email
-    request = Request(endpoint + "?" + urlencode(params), headers={"User-Agent": "PlasBench cohort validator"})
-    with urlopen(request, timeout=30) as response:
-        return json.load(response)
+    if api_key:
+        params["api_key"] = api_key
+    request = Request(endpoint + "?" + urlencode(params), headers={"User-Agent": "PlasBench/0.1 cohort validator"})
+    for attempt in range(retries):
+        try:
+            with urlopen(request, timeout=30) as response:
+                return json.load(response)
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+            if attempt == retries - 1 or (isinstance(exc, HTTPError) and exc.code not in (429, 500, 502, 503, 504)):
+                raise ValueError(f"NCBI request failed after {attempt + 1} attempt(s): {exc}") from exc
+            retry_after = exc.headers.get("Retry-After") if isinstance(exc, HTTPError) else None
+            delay = float(retry_after) if retry_after and retry_after.isdigit() else min(30, 2 ** attempt + random.random())
+            time.sleep(delay)
 
 
-def assembly_metadata(accession, email=None):
+def assembly_metadata(accession, email=None, api_key=None):
     ids = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-                    {"db": "assembly", "term": f"{accession}[Assembly Accession]", "retmax": 2}, email)["esearchresult"]["idlist"]
+                    {"db": "assembly", "term": f"{accession}[Assembly Accession]", "retmax": 2}, email, api_key)["esearchresult"]["idlist"]
     if len(ids) != 1:
         raise ValueError(f"assembly not found uniquely: {accession}")
     result = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
-                       {"db": "assembly", "id": ids[0]}, email)["result"][ids[0]]
+                       {"db": "assembly", "id": ids[0]}, email, api_key)["result"][ids[0]]
     projects = {item["bioprojectaccn"] for key in ("gb_bioprojects", "rs_bioprojects") for item in result.get(key, [])}
     report_url = result.get("ftppath_assembly_rpt", "").replace("ftp://", "https://")
     with urlopen(report_url, timeout=30) as response:
@@ -50,14 +64,16 @@ def assembly_metadata(accession, email=None):
             "assembly_status": result.get("assemblystatus", ""), "has_plasmid": has_plasmid}
 
 
-def run_metadata(run, email=None):
+def run_metadata(run, email=None, api_key=None):
     ids = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-                    {"db": "sra", "term": f"{run}[Accession]", "retmax": 2}, email)["esearchresult"]["idlist"]
+                    {"db": "sra", "term": f"{run}[Accession]", "retmax": 2}, email, api_key)["esearchresult"]["idlist"]
     if len(ids) != 1:
         raise ValueError(f"SRA run not found uniquely: {run}")
     params = {"db": "sra", "id": ids[0], "rettype": "runinfo", "retmode": "text"}
     if email:
         params["email"] = email
+    if api_key:
+        params["api_key"] = api_key
     with urlopen("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + urlencode(params), timeout=30) as response:
         rows = list(csv.DictReader(response.read().decode("utf-8").splitlines()))
     if len(rows) != 1 or rows[0].get("Run") != run:
@@ -89,10 +105,10 @@ def schema_errors(rows, fields):
     return errors
 
 
-def verify_row(row, email=None):
-    assembly = assembly_metadata(row["assembly_accession"], email)
-    time.sleep(0.34)
-    run = run_metadata(row["sra_run"], email)
+def verify_row(row, email=None, api_key=None):
+    assembly = assembly_metadata(row["assembly_accession"], email, api_key)
+    time.sleep(0.11 if api_key else 0.34)
+    run = run_metadata(row["sra_run"], email, api_key)
     errors = []
     if assembly["assembly_status"].lower() != "complete genome": errors.append("assembly is not Complete Genome")
     if not assembly["has_plasmid"]: errors.append("assembly metadata does not declare plasmid replicons")
@@ -130,6 +146,8 @@ def main():
     parser.add_argument("--samples", required=True, help="cohort TSV")
     parser.add_argument("--online", action="store_true", help="verify complete assembly, linked BioSample/BioProject, and paired Illumina run at NCBI")
     parser.add_argument("--email", help="contact email sent to NCBI E-utilities")
+    parser.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"),
+                        help="NCBI API key (default: NCBI_API_KEY); raises the request allowance.")
     parser.add_argument("--write-lock", help="write retrieved verification evidence as JSON")
     parser.add_argument("--verify-lock", help="require a verification lock matching --samples")
     args = parser.parse_args()
@@ -148,7 +166,7 @@ def main():
     if args.online and not errors:
         for row in rows:
             try:
-                result = verify_row(row, args.email)
+                result = verify_row(row, args.email, args.api_key)
                 evidence.append(result)
                 errors.extend(f"{row['sample_id']}: {message}" for message in result["errors"])
             except Exception as exc:

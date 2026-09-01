@@ -107,10 +107,11 @@ def main(argv=None):
     cohort_parser.add_argument("--samples", type=Path, required=True, help="Cohort TSV to validate.")
     cohort_parser.add_argument("--online", action="store_true", help="Verify NCBI assembly/SRA linkage and library metadata.")
     cohort_parser.add_argument("--email", help="Contact email sent to NCBI E-utilities.")
+    cohort_parser.add_argument("--api-key", help="NCBI API key; defaults to NCBI_API_KEY when omitted.")
     cohort_parser.add_argument("--write-lock", type=Path, help="Write NCBI verification evidence as JSON; requires --online.")
     cohort_parser.add_argument("--verify-lock", type=Path, help="Require a verification lock that matches the cohort TSV.")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="core, assembly, reconstruction, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -166,6 +167,8 @@ def main(argv=None):
             command.append("--online")
         if args.email:
             command.extend(["--email", args.email])
+        if args.api_key:
+            command.extend(["--api-key", args.api_key])
         if args.write_lock:
             command.extend(["--write-lock", str(args.write_lock)])
         if args.verify_lock:

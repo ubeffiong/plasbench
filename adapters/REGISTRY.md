@@ -5,13 +5,17 @@ FASTA is a valid completed prediction; an adapter must exit non-zero only when
 its output cannot be interpreted safely. The pipeline then records a failure
 rather than assigning an artificial zero score.
 
-| Tool | Input | Adapter | Status |
+| Tool | Method class | Bin diagnostics | Input | Adapter | Status |
 |---|---|---|---|
-| MOB-suite | short-read assembly | `adapt_mob_recon.sh` | supported |
-| Platon | short-read assembly | `adapt_platon.sh` | supported |
-| plasmidSPAdes | paired reads | `adapt_plasmidspades.sh` | supported |
-| gplas2_mob | GFA graph plus MOB-recon hard-label seed TSV | native mode | optional |
-| gplas2_external | GFA graph plus user classifier TSV | native mode | optional |
+| MOB-suite | binning | applicable | short-read assembly | `adapt_mob_recon.sh` | supported |
+| Platon | classification | not applicable | short-read assembly | `adapt_platon.sh` | supported |
+| plasmidSPAdes | reassembly | not applicable | paired reads | `adapt_plasmidspades.sh` | supported |
+| gplas2_mob | binning | applicable | GFA graph plus MOB-recon hard-label seed TSV | native mode | optional |
+| gplas2_external | binning | applicable | GFA graph plus user classifier TSV | native mode | optional |
+
+The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
+computes bin metrics for declared binning methods; the report labels all other
+tools as not applicable rather than assigning a misleading low bin score.
 
 ## gplas2 contract
 

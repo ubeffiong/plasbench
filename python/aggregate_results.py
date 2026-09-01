@@ -201,16 +201,21 @@ def write_md(summary, path):
         fh.write("Ranked by mean base-level F1 across samples "
                  "(positive class = plasmid).\n\n")
         fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | "
-                 "Mean recall | **Mean F1** | Median F1 |\n")
-        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:"]) + "|\n")
+                 "Mean base recall | Mean plasmid recall | **Mean F1** | 95% F1 CI | Median F1 |\n")
+        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:"]) + "|\n")
         for i, s in enumerate(summary, start=1):
+            plasmid_recall = f"{s['mean_plasmid_recall']:.3f}" if s["mean_plasmid_recall"] is not None else "not annotated"
+            ci = (f"{s['f1_ci_low']:.3f}–{s['f1_ci_high']:.3f}"
+                  if s["f1_ci_low"] is not None else "n < 5")
             fh.write(
                 f"| {i} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "
                 f"{s['mean_precision']:.3f} | {s['mean_recall']:.3f} | "
-                f"**{s['mean_f1']:.3f}** | {s['median_f1']:.3f} |\n"
+                f"{plasmid_recall} | **{s['mean_f1']:.3f}** | {ci} | {s['median_f1']:.3f} |\n"
             )
         fh.write("\n_Recall = completeness (fraction of true plasmid bases "
-                 "recovered). Precision = 1 - chromosomal contamination._\n")
+                 "recovered). Plasmid recall = fraction of truth plasmids meeting the configured "
+                 "recovery threshold; it is not available for legacy score rows. Precision = 1 - "
+                 "chromosomal contamination._\n")
 
 
 def main():

@@ -13,6 +13,12 @@ SCORES="$RESULTS_DIR/scores.tsv"
 rm -f "$SCORES"   # rebuild fresh each run
 SCORE_FAILURES="$RESULTS_DIR/score_failures.tsv"
 printf 'sample\ttool\tstage\treason\n' > "$SCORE_FAILURES"
+CAPABILITIES="$PROJECT_ROOT/config/tool_capabilities.tsv"
+[[ -s "$CAPABILITIES" ]] || die "tool capability registry missing: $CAPABILITIES"
+
+binning_capable() {
+    awk -F'\t' -v tool="$1" 'NR > 1 && $1 == tool { found=1; capable=($3 == "yes"); exit } END { exit(found && capable ? 0 : 1) }' "$CAPABILITIES"
+}
 
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
@@ -64,13 +70,18 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             continue
         fi
         BINS="$RDIR/pred_${tool}.bins.tsv"
-        if [[ -s "$BINS" ]]; then
+        if [[ -s "$BINS" ]] && binning_capable "$tool"; then
             if ! python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
                 --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
                 --summary "$RDIR/${tool}.bin_summary.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
                 warn "bin scoring failed for $SAMPLE/$tool; retaining base-level score"
                 printf '%s\t%s\tbin_score\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$SCORE_FAILURES"
             fi
+        elif [[ -s "$BINS" ]]; then
+            # Contig-level classifiers may emit one record per contig, but that
+            # is not evidence of a biological plasmid bin.
+            rm -f "$RDIR/${tool}.bin_matches.tsv" "$RDIR/${tool}.bin_summary.tsv"
+            log "  $tool: bin diagnostics not applicable to declared method class"
         fi
     done
 done < <(read_samples "$SAMPLE_SHEET")

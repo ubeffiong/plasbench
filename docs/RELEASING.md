@@ -28,6 +28,10 @@ base image; update it only through `env/lock_environment.sh`.
 5. Commit, tag `v<version>`, and push the tag. The GitHub release workflow builds the
    PyPI distribution and pushes the GHCR image after trusted publishing is configured.
 6. Create or update the Bioconda and Galaxy Tool Shed submissions from that immutable tag.
+7. Connect this GitHub repository to Zenodo, create a GitHub release from the
+   verified cohort tag, and archive it. Zenodo reads `.zenodo.json` and mints
+   the DOI; record that DOI in the release notes and cohort README. Do not add
+   a placeholder DOI to scientific output.
 
 ## Docker use
 

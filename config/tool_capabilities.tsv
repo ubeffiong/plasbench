@@ -1,0 +1,6 @@
+tool	method_class	binning_capable	primary_input	description
+mob_recon	binning	yes	assembly	Groups contigs into MOB plasmid reconstructions.
+platon	classification	no	assembly	Classifies individual assembly contigs.
+plasmidspades	reassembly	no	paired_reads	Reassembles plasmid-enriched contigs; contigs are not bins.
+gplas2_mob	binning	yes	assembly_graph	Graph binning seeded from validated MOB membership.
+gplas2_external	binning	yes	assembly_graph	Graph binning with externally validated classifier labels.
