@@ -13,17 +13,19 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     REF="$SDIR/reference.fna"
     REPORT="$SDIR/sequence_report.jsonl"
     TRUTH="$SDIR/truth.tsv"
+    DEPTH="$SDIR/observed_depth.tsv"
     [[ -s "$REF" ]] || { warn "missing reference for $SAMPLE; run 01_download.sh first"; continue; }
     if [[ -s "$TRUTH" ]]; then
         log "  existing truth.tsv retained for $SAMPLE"
-        continue
     fi
-    [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; continue; }
-    log "=== Truth for $SAMPLE ==="
-    python3 "$HERE/../python/make_truth.py" \
-        --report "$REPORT" --fasta "$REF" --out "$TRUTH" \
-        2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2)
-    log "  truth -> $TRUTH"
+    if [[ ! -s "$TRUTH" ]]; then
+        [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; continue; }
+        log "=== Truth for $SAMPLE ==="
+        python3 "$HERE/../python/make_truth.py" --report "$REPORT" --fasta "$REF" --out "$TRUTH" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2)
+        log "  truth -> $TRUTH"
+    fi
+    R1="$SDIR/${SRA}_1.fastq.gz"; R2="$SDIR/${SRA}_2.fastq.gz"
+    [[ -s "$R1" && -s "$R2" ]] && python3 "$HERE/../python/measure_depth.py" --truth "$TRUTH" --r1 "$R1" --r2 "$R2" --out "$DEPTH"
 done < <(read_samples "$SAMPLE_SHEET")
 
 log "Stage 2 (truth) complete."

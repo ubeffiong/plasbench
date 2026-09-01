@@ -37,20 +37,26 @@ def main():
     if shutil.which("gzip") is None:
         raise SystemExit("ERROR: gzip executable not found; it is required to write valid .fastq.gz outputs")
     source_rows = rows(args.samples)
-    if not source_rows or any(not row.get("read_depth_x") for row in source_rows):
-        raise SystemExit("ERROR: every source row needs read_depth_x for deterministic depth fractions")
+    if not source_rows:
+        raise SystemExit("ERROR: source sample sheet has no rows")
     output = Path(args.out_dir)
     data_root = output / "data"
     output.mkdir(parents=True, exist_ok=True)
     manifest = []
     derived_rows = []
     for row in source_rows:
-        source_depth = float(row["read_depth_x"])
         sample = row.get("sample_id", "")
         run = row.get("sra_run", "")
         if not sample or not run:
             raise SystemExit("ERROR: every source row needs sample_id and sra_run")
         source = Path(args.data_dir) / sample
+        depth_file = source / "observed_depth.tsv"
+        if not depth_file.is_file():
+            raise SystemExit(f"ERROR: {sample} has no observed_depth.tsv; run stage 2 first")
+        source_depth = float(rows(depth_file)[0]["observed_depth_x"])
+        declared = float(row["read_depth_x"]) if row.get("read_depth_x") else source_depth
+        if abs(declared - source_depth) / source_depth > 0.20:
+            raise SystemExit(f"ERROR: {sample}: declared read_depth_x={declared:g} disagrees with observed depth {source_depth:g}x by more than 20%")
         required = [source / "reference.fna", source / "sequence_report.jsonl",
                     source / f"{run}_1.fastq.gz", source / f"{run}_2.fastq.gz"]
         missing = [str(path) for path in required if not path.is_file() or not path.stat().st_size]
