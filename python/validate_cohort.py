@@ -4,6 +4,7 @@
 import argparse
 import csv
 import hashlib
+import http.client
 import json
 import os
 import random
@@ -16,12 +17,39 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
+RETRYABLE_STATUS = (429, 500, 502, 503, 504)
+# A dropped keep-alive surfaces as http.client.RemoteDisconnected, which is not a
+# URLError; without it here a single flaky connection discards a whole cohort run.
+TRANSIENT = (URLError, TimeoutError, ConnectionError, http.client.HTTPException,
+             json.JSONDecodeError, UnicodeDecodeError)
+
+
+def fetch(request, timeout=30, retries=4, label="NCBI request", parse=None):
+    """Read a URL with bounded retry across HTTP and connection-level failures."""
+    for attempt in range(retries):
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                payload = response.read()
+            return parse(payload) if parse else payload
+        except (HTTPError, *TRANSIENT) as exc:
+            fatal = isinstance(exc, HTTPError) and exc.code not in RETRYABLE_STATUS
+            if attempt == retries - 1 or fatal:
+                raise ValueError(f"{label} failed after {attempt + 1} attempt(s): {exc}") from exc
+            retry_after = exc.headers.get("Retry-After") if isinstance(exc, HTTPError) else None
+            time.sleep(float(retry_after) if retry_after and retry_after.isdigit()
+                       else min(30, 2 ** attempt + random.random()))
+
+
 REQUIRED = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_technology",
             "truth_quality_tier", "biosample", "bioproject")
 ACCESSION = re.compile(r"^GC[AF]_\d+\.\d+$")
 RUN = re.compile(r"^(SRR|ERR|DRR)\d+$")
 LONG_READ = re.compile(r"nanopore|\bont\b|pacbio|\bsmrt\b|minion|promethion|sequel|revio", re.IGNORECASE)
 SHORT_READ = re.compile(r"illumina|mgi|dnbseq|ion torrent", re.IGNORECASE)
+# A source_study naming one of these is a placeholder, not a reviewed citation.
+# "needs_" catches needs_review and needs_curator_review without demoting a real
+# citation such as Smith_2021_systematic_review.
+UNREVIEWED_STUDY = re.compile(r"pending|needs?_|unverified|unknown|tbd|candidate", re.IGNORECASE)
 
 
 def read_rows(path):
@@ -38,16 +66,7 @@ def ncbi_json(endpoint, params, email=None, api_key=None, retries=4):
     if api_key:
         params["api_key"] = api_key
     request = Request(endpoint + "?" + urlencode(params), headers={"User-Agent": "PlasBench/0.1 cohort validator"})
-    for attempt in range(retries):
-        try:
-            with urlopen(request, timeout=30) as response:
-                return json.load(response)
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-            if attempt == retries - 1 or (isinstance(exc, HTTPError) and exc.code not in (429, 500, 502, 503, 504)):
-                raise ValueError(f"NCBI request failed after {attempt + 1} attempt(s): {exc}") from exc
-            retry_after = exc.headers.get("Retry-After") if isinstance(exc, HTTPError) else None
-            delay = float(retry_after) if retry_after and retry_after.isdigit() else min(30, 2 ** attempt + random.random())
-            time.sleep(delay)
+    return fetch(request, 30, retries, "NCBI request", parse=json.loads)
 
 
 def datasets_report(accession, email=None, api_key=None, retries=4):
@@ -62,20 +81,23 @@ def datasets_report(accession, email=None, api_key=None, retries=4):
         + accession + "/dataset_report" + ("?" + urlencode(params) if params else ""),
         headers={"User-Agent": "PlasBench/0.1 cohort validator"},
     )
-    for attempt in range(retries):
-        try:
-            with urlopen(request, timeout=60) as response:
-                reports = json.load(response).get("reports", [])
-            if len(reports) != 1:
-                raise ValueError(f"Datasets v2 did not return one report for {accession}")
-            info = reports[0].get("assembly_info", {})
-            return {"sequencing_tech": info.get("sequencing_tech", ""),
-                    "assembly_method": info.get("assembly_method", ""),
-                    "datasets_assembly_level": info.get("assembly_level", "")}
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
-            if attempt == retries - 1 or (isinstance(exc, HTTPError) and exc.code not in (429, 500, 502, 503, 504)):
-                raise ValueError(f"NCBI Datasets v2 request failed after {attempt + 1} attempt(s): {exc}") from exc
-            time.sleep(min(30, 2 ** attempt + random.random()))
+    reports = fetch(request, 60, retries, "NCBI Datasets v2 request",
+                    parse=lambda payload: json.loads(payload).get("reports", []))
+    if len(reports) != 1:
+        raise ValueError(f"Datasets v2 did not return one report for {accession}")
+    info = reports[0].get("assembly_info", {})
+    biosample = info.get("biosample", {})
+    return {"sequencing_tech": info.get("sequencing_tech", ""),
+            "assembly_method": info.get("assembly_method", ""),
+            "datasets_assembly_level": info.get("assembly_level", ""),
+            # These controlled BioSample fields provide auditable discovery
+            # evidence; they never replace the exact assembly/SRA linkage rules.
+            "biosample_accession": biosample.get("accession", ""),
+            "bioproject_accession": info.get("bioproject_accession", ""),
+            "geo_loc_name": biosample.get("geo_loc_name", ""),
+            "isolation_source": biosample.get("isolation_source", ""),
+            "host": biosample.get("host", ""),
+            "collection_date": biosample.get("collection_date", "")}
 
 
 def derive_truth_technology(sequencing_tech):
@@ -83,6 +105,22 @@ def derive_truth_technology(sequencing_tech):
     if not sequencing_tech or not LONG_READ.search(sequencing_tech):
         return None
     return "hybrid" if SHORT_READ.search(sequencing_tech) else "long_read"
+
+
+def derive_truth_quality_tier(evidence_errors, source_study):
+    """Grade curation confidence from evidence strength.
+
+    A -- every deposited-evidence check passed AND source_study names a reviewed
+         publication or collection, so the row is release-ready.
+    B -- every evidence check passed but the study is absent or still a
+         review placeholder, so the row is complete but not curator-approved.
+    C -- reserved for rows that have not been verified online at all; online
+         verification always resolves a row to A or B.
+    """
+    if evidence_errors:
+        return None
+    study = (source_study or "").strip()
+    return "B" if not study or UNREVIEWED_STUDY.search(study) else "A"
 
 
 def assembly_metadata(accession, email=None, api_key=None):
@@ -94,15 +132,20 @@ def assembly_metadata(accession, email=None, api_key=None):
                        {"db": "assembly", "id": ids[0]}, email, api_key)["result"][ids[0]]
     projects = {item["bioprojectaccn"] for key in ("gb_bioprojects", "rs_bioprojects") for item in result.get(key, [])}
     report_url = result.get("ftppath_assembly_rpt", "").replace("ftp://", "https://")
-    with urlopen(report_url, timeout=30) as response:
-        has_plasmid = any("\tplasmid\t" in line.lower() for line in response.read().decode("utf-8").splitlines())
+    report_text = fetch(Request(report_url, headers={"User-Agent": "PlasBench/0.1 cohort validator"}),
+                        30, 4, "NCBI assembly report request", parse=lambda payload: payload.decode("utf-8"))
+    has_plasmid = any("\tplasmid\t" in line.lower() for line in report_text.splitlines())
     datasets = datasets_report(accession, email, api_key)
+    if datasets["bioproject_accession"]:
+        projects.add(datasets["bioproject_accession"])
     technology = derive_truth_technology(datasets["sequencing_tech"])
     return {"accession": result["assemblyaccession"], "biosample": result.get("biosampleaccn", ""),
             "bioprojects": sorted(projects), "organism": result.get("speciesname") or result.get("organism", ""),
             "assembly_status": result.get("assemblystatus", ""), "has_plasmid": has_plasmid,
             "sequencing_tech": datasets["sequencing_tech"], "assembly_method": datasets["assembly_method"],
-            "datasets_assembly_level": datasets["datasets_assembly_level"], "derived_truth_technology": technology}
+            "datasets_assembly_level": datasets["datasets_assembly_level"], "derived_truth_technology": technology,
+            "geo_loc_name": datasets["geo_loc_name"], "isolation_source": datasets["isolation_source"],
+            "host": datasets["host"], "collection_date": datasets["collection_date"]}
 
 
 def run_metadata(run, email=None, api_key=None):
@@ -115,8 +158,10 @@ def run_metadata(run, email=None, api_key=None):
         params["email"] = email
     if api_key:
         params["api_key"] = api_key
-    with urlopen("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + urlencode(params), timeout=30) as response:
-        rows = list(csv.DictReader(response.read().decode("utf-8").splitlines()))
+    runinfo = fetch(Request("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + urlencode(params),
+                            headers={"User-Agent": "PlasBench/0.1 cohort validator"}),
+                    30, 4, "NCBI run-info request", parse=lambda payload: payload.decode("utf-8"))
+    rows = list(csv.DictReader(runinfo.splitlines()))
     if len(rows) != 1 or rows[0].get("Run") != run:
         raise ValueError(f"could not retrieve run-info row for {run}")
     row = rows[0]
@@ -164,10 +209,14 @@ def verify_row(row, email=None, api_key=None):
     if run["bioproject"] != row["bioproject"]: errors.append("SRA BioProject does not match cohort row")
     if run["platform"].upper() != "ILLUMINA": errors.append("SRA platform is not ILLUMINA")
     if run["layout"].upper() != "PAIRED": errors.append("SRA library is not paired-end")
-    # Tier A means every deposited linkage and long-read evidence check passed.
-    derived_tier = "A" if not errors else None
+    # Tier grades curation confidence, not just pass/fail: see derive_truth_quality_tier.
+    derived_tier = derive_truth_quality_tier(errors, row.get("source_study"))
     if derived_tier and row["truth_quality_tier"] != derived_tier:
-        errors.append("declared truth_quality_tier does not match evidence-derived tier A")
+        errors.append(
+            f"declared truth_quality_tier {row['truth_quality_tier']} does not match "
+            f"evidence-derived tier {derived_tier} "
+            f"({'reviewed source_study' if derived_tier == 'A' else 'source_study absent or pending review'})"
+        )
     assembly["derived_truth_quality_tier"] = derived_tier
     return {"sample_id": row["sample_id"], "assembly": assembly, "run": run, "errors": errors}
 
@@ -230,7 +279,8 @@ def main():
         path = Path(args.write_lock)
         path.parent.mkdir(parents=True, exist_ok=True)
         source = Path(args.samples).read_bytes()
-        path.write_text(json.dumps({"schema_version": "1.0", "sample_sheet": Path(args.samples).name,
+        # 1.1 adds Datasets v2 sequencing evidence and the derived technology/tier.
+        path.write_text(json.dumps({"schema_version": "1.1", "sample_sheet": Path(args.samples).name,
                                     "sample_sheet_sha256": hashlib.sha256(source).hexdigest(), "evidence": evidence}, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote cohort verification lock: {path}")
     scope = "NCBI-linked pair verified" if args.online else "schema verified"

@@ -13,7 +13,7 @@ import os
 import re
 from pathlib import Path
 
-from validate_cohort import assembly_metadata, run_metadata
+from validate_cohort import assembly_metadata, derive_truth_quality_tier, run_metadata
 
 
 OUT_COLUMNS = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_technology",
@@ -69,7 +69,10 @@ def main():
                 "sample_id": candidate.get("sample_id") or safe_id(assembly["organism"], index),
                 "assembly_accession": assembly["accession"], "sra_run": run["run"],
                 "organism": assembly["organism"], "truth_technology": assembly["derived_truth_technology"],
-                "truth_quality_tier": "A", "biosample": assembly["biosample"],
+                # Tier follows the same evidence rule the validator applies, so a
+                # curated sheet round-trips through `validate-cohort --online`.
+                "truth_quality_tier": derive_truth_quality_tier([], candidate.get("source_study")),
+                "biosample": assembly["biosample"],
                 "bioproject": run["bioproject"], "sample_origin": candidate.get("sample_origin", ""),
                 "read_depth_x": candidate.get("read_depth_x", ""),
                 "assembly_plasmid_count": "", "source_study": candidate.get("source_study", ""),

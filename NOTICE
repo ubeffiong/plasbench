@@ -1,0 +1,23 @@
+PlasBench
+Copyright (c) 2026 Ubokobong Effiong
+
+PlasBench source code is open-source software distributed under the MIT
+License. The copyright and license notice in LICENSE must be retained in all
+copies or substantial portions of the software.
+
+"PlasBench", the PlasBench logo, and associated visual identity are project
+identifiers of Ubokobong Effiong. The MIT License applies to the software
+code; it does not grant permission to use the PlasBench name, logo, or branding
+in a way that suggests endorsement, affiliation, or that a modified version is
+an official PlasBench release.
+
+PlasBench is provided for research and educational use. It is not a clinical
+diagnostic device and must not be used as the sole basis for patient care,
+treatment decisions, or public-health action without appropriate validation.
+
+When publishing results generated with PlasBench, users should cite the
+relevant software release, version, DOI when available, and benchmark cohort.
+
+This notice is not legal advice. Ownership, institutional obligations,
+trademark registration, and data-rights questions should be confirmed with an
+appropriately qualified adviser.

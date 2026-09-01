@@ -9,6 +9,7 @@ assembly and paired Illumina run have the exact same BioSample and BioProject.
 import argparse
 import csv
 import os
+import re
 import time
 from pathlib import Path
 from urllib.parse import urlencode
@@ -40,6 +41,8 @@ def main():
     parser.add_argument("--organism", action="append", required=True,
                         help="Scientific name to search; repeat for each taxon.")
     parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--country", action="append", default=[],
+                        help="Require a country/place term in deposited BioSample geo_loc_name; repeat as needed.")
     parser.add_argument("--max-assemblies", type=int, default=30,
                         help="Maximum complete assemblies inspected per organism (default: 30).")
     parser.add_argument("--email", default=os.environ.get("NCBI_EMAIL"))
@@ -50,6 +53,8 @@ def main():
     accepted, rejected, seen = [], [], set()
     for organism in args.organism:
         query = f'"{organism}"[Organism] AND "complete genome"[Assembly Level]'
+        if args.country:
+            query += " AND (" + " OR ".join(f'\"{country}\"[All Fields]' for country in args.country) + ")"
         result = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi", {
             "db": "assembly", "term": query, "retmax": args.max_assemblies, "sort": "date",
         }, args.email, args.api_key)
@@ -65,18 +70,27 @@ def main():
                 seen.add(accession)
                 print(f"[discovery] {organism}: {position}/{len(identifiers)} {accession}", flush=True)
                 assembly = assembly_metadata(accession, args.email, args.api_key)
+                origin_evidence = "; ".join(value for value in (
+                    assembly.get("geo_loc_name", ""), assembly.get("isolation_source", ""),
+                    assembly.get("host", "")) if value)
+                if args.country and not any(re.search(re.escape(country), assembly.get("geo_loc_name", ""), re.IGNORECASE)
+                                            for country in args.country):
+                    rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""),
+                                     "organism_query": organism, "country_query": ", ".join(args.country),
+                                     "country_evidence": origin_evidence,
+                                     "reason": "BioSample geo_loc_name does not confirm requested country/place"}); continue
                 if assembly["assembly_status"].lower() != "complete genome":
-                    rejected.append({"assembly_accession": accession, "organism_query": organism, "reason": "assembly is not Complete Genome"}); continue
+                    rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""), "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""), "reason": "assembly is not Complete Genome"}); continue
                 if not assembly["has_plasmid"]:
-                    rejected.append({"assembly_accession": accession, "organism_query": organism, "reason": "assembly does not declare plasmid replicons"}); continue
+                    rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""), "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""), "reason": "assembly does not declare plasmid replicons"}); continue
                 if not assembly["derived_truth_technology"]:
-                    rejected.append({"assembly_accession": accession, "organism_query": organism,
+                    rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""), "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""),
                                      "reason": "Datasets v2 has no explicit long-read sequencing evidence"}); continue
                 runs = runinfo_for_biosample(assembly["biosample"], args.email, args.api_key)
                 paired = [run for run in runs if run.get("Platform", "").upper() == "ILLUMINA" and run.get("LibraryLayout", "").upper() == "PAIRED"
                           and run.get("BioSample") == assembly["biosample"] and run.get("BioProject") in assembly["bioprojects"]]
                 if not paired:
-                    rejected.append({"assembly_accession": accession, "biosample": assembly["biosample"], "organism_query": organism,
+                    rejected.append({"assembly_accession": accession, "biosample": assembly["biosample"], "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""),
                                      "reason": "no linked paired-end Illumina run with matching BioProject"}); continue
                 # One assembly is one biological benchmark unit. Prefer the
                 # deepest paired run and retain alternates for curator review.
@@ -85,8 +99,10 @@ def main():
                 accepted.append({
                         "sample_id": safe_id(f"{assembly['organism']}_{accession.split('_')[1].split('.')[0]}", len(accepted) + 1),
                         "assembly_accession": accession, "sra_run": selected["Run"], "organism": assembly["organism"],
-                        "truth_technology": assembly["derived_truth_technology"], "truth_quality_tier": "A",
-                        "biosample": assembly["biosample"], "bioproject": selected["BioProject"], "sample_origin": "",
+                        # Discovery never reviews the source publication, so these
+                        # rows are tier B until a curator supplies a real study.
+                        "truth_technology": assembly["derived_truth_technology"], "truth_quality_tier": "B",
+                        "biosample": assembly["biosample"], "bioproject": selected["BioProject"], "sample_origin": origin_evidence,
                         "read_depth_x": "", "assembly_plasmid_count": "", "source_study": "NCBI_discovery_pending_publication_review",
                         "alternate_paired_runs": alternates,
                     })
@@ -96,7 +112,7 @@ def main():
                                  "reason": f"metadata lookup failed: {exc}"})
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
     write_rows(out / "accepted.tsv", accepted, OUT_COLUMNS)
-    rejected_fields = ("assembly_accession", "biosample", "organism_query", "reason")
+    rejected_fields = ("assembly_accession", "biosample", "organism_query", "country_query", "country_evidence", "sequencing_tech", "reason")
     write_rows(out / "rejected.tsv", rejected, rejected_fields)
     print(f"NCBI discovery complete: accepted_pairs={len(accepted)} rejected_assemblies={len(rejected)}")
     print(f"Review {out / 'accepted.tsv'} against publications before a cohort release.")

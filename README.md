@@ -68,6 +68,25 @@ The final interactive report is `results/benchmark.report.html`. Run
 `plasbench --help` or `plasbench run --help` to see available commands and options.
 The complete terminal-accessible guide is available with `plasbench docs`; for
 example, use `plasbench docs --topic outputs` or `plasbench docs --topic troubleshooting`.
+For a non-technical project overview for research partners and funders, see
+[`docs/CONCEPT_NOTE.md`](docs/CONCEPT_NOTE.md), or run `plasbench concept-note`.
+
+## Ownership, Citation, And Branding
+
+PlasBench is open-source software under the [MIT License](LICENSE), copyright
+2026 Ubokobong Effiong. Please cite the version and benchmark cohort used in
+research outputs; citation metadata is in [`CITATION.cff`](CITATION.cff).
+The PlasBench name and branding may not be used to imply endorsement or an
+official release of a modified version. See [`NOTICE`](NOTICE) and
+[`TRADEMARKS.md`](TRADEMARKS.md).
+
+## Acknowledgements
+
+PlasBench acknowledges the International Research Center of Excellence at the
+Institute of Human Virology Nigeria (IHVN) as the professional organisation of
+project lead Ubokobong Effiong. This acknowledgement does not by itself imply
+institutional ownership, funding, endorsement, or approval. See
+[`ACKNOWLEDGMENTS.md`](ACKNOWLEDGMENTS.md).
 
 ### Docker installation
 

@@ -58,7 +58,54 @@ def main():
                         "--r2", os.path.join(tmp, "r2.fastq.gz"), "--out", depth], check=True)
         with open(depth, newline="", encoding="utf-8") as handle:
             assert next(csv.DictReader(handle, delimiter="\t"))["observed_depth_x"] == "0.800000"
+    check_local_truth_inputs()
     print("ALL DEPTH LADDER TESTS PASSED")
+
+
+def check_local_truth_inputs():
+    """A local cohort supplies truth.tsv instead of an NCBI sequence report."""
+    sys.path.insert(0, os.path.join(HERE, "..", "python"))
+    import types
+    import make_depth_ladder as ladder
+
+    with tempfile.TemporaryDirectory(prefix="ladder_local_") as tmp:
+        sample = os.path.join(tmp, "data", "local")
+        os.makedirs(sample)
+        write_tsv(os.path.join(sample, "truth.tsv"),
+                  ["sequence_id", "molecule_type", "length"], [["chr", "CHROMOSOME", "1000"]])
+        write_tsv(os.path.join(sample, "observed_depth.tsv"),
+                  ["reference_bp", "read_bases", "observed_depth_x"], [["1000", "80000", "80.000000"]])
+        with open(os.path.join(sample, "reference.fna"), "w", encoding="utf-8") as handle:
+            handle.write(">chr\nACGT\n")
+        for mate in (1, 2):
+            with gzip.open(os.path.join(sample, f"SRRL_{mate}.fastq.gz"), "wt", encoding="utf-8") as handle:
+                handle.write("@r\nACGT\n+\n!!!!\n")
+        samples = os.path.join(tmp, "samples.tsv")
+        write_tsv(samples, ["sample_id", "sra_run", "read_depth_x"], [["local", "SRRL", "80"]])
+
+        # Stub the external binaries so the input contract itself is exercised.
+        original = (ladder.shutil.which, ladder.subprocess.Popen, ladder.subprocess.run)
+        ladder.shutil.which = lambda name: "/stub/" + name
+        ladder.subprocess.Popen = lambda cmd, stdout=None: types.SimpleNamespace(
+            stdout=types.SimpleNamespace(close=lambda: None), wait=lambda: 0)
+        ladder.subprocess.run = lambda cmd, stdin=None, stdout=None, check=False: (
+            stdout.write(gzip.compress(b"@r\nACGT\n+\n!!!!\n")), types.SimpleNamespace(returncode=0))[1]
+        out = os.path.join(tmp, "out")
+        argv = sys.argv
+        try:
+            sys.argv = ["make_depth_ladder.py", "--samples", samples, "--data-dir",
+                        os.path.join(tmp, "data"), "--out-dir", out, "--depths", "20"]
+            ladder.main()
+        finally:
+            sys.argv = argv
+            ladder.shutil.which, ladder.subprocess.Popen, ladder.subprocess.run = original
+
+        derived = os.path.join(out, "data", "local__20x")
+        assert os.path.isfile(os.path.join(derived, "truth.tsv"))
+        # Stage 2 recomputes coverage for the subsample; the parent's value is wrong.
+        assert not os.path.exists(os.path.join(derived, "observed_depth.tsv"))
+        with open(os.path.join(out, "depth_ladder.samples.tsv"), newline="", encoding="utf-8") as handle:
+            assert next(csv.DictReader(handle, delimiter="\t"))["parent_sample_id"] == "local"
 
 
 if __name__ == "__main__":

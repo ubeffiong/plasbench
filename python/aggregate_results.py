@@ -13,9 +13,51 @@ Standard library only.
 """
 
 import argparse
+import csv
 import random
+import re
 import statistics
 from collections import defaultdict
+from pathlib import Path
+
+# Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
+# parent_sample_id column, so a copied ladder sheet still cannot be ranked.
+LADDER_SUFFIX = re.compile(r"^(?P<parent>.+)__\d+(?:\.\d+)?x$")
+
+
+def sample_parents(sample_sheet):
+    """Map sample_id -> parent_sample_id for correlated (derived) samples."""
+    parents = {}
+    if not sample_sheet:
+        return parents
+    path = Path(sample_sheet)
+    if not path.is_file():
+        return parents
+    with open(path, newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(
+            (line for line in handle if line.strip() and not line.lstrip().startswith("#")),
+            delimiter="\t")
+        for row in reader:
+            sample = (row.get("sample_id") or "").strip()
+            if sample:
+                parent = (row.get("parent_sample_id") or "").strip()
+                if parent:
+                    parents[sample] = parent
+    return parents
+
+
+def correlated_parents(rows, parents):
+    """Return parent -> scored sample ids, for parents covering several samples."""
+    groups = defaultdict(set)
+    for row in rows:
+        sample = row["sample"]
+        parent = parents.get(sample)
+        if not parent:
+            match = LADDER_SUFFIX.match(sample)
+            parent = match.group("parent") if match else None
+        if parent:
+            groups[parent].add(sample)
+    return {parent: sorted(samples) for parent, samples in groups.items() if len(samples) > 1}
 
 
 def read_scores(path):
@@ -224,11 +266,26 @@ def main():
     ap.add_argument("--scores", required=True, help="combined scores TSV")
     ap.add_argument("--out-prefix", required=True)
     ap.add_argument("--tool-status", help="optional status TSV from stage 4")
+    ap.add_argument("--sample-sheet", help="sample sheet used for the run; read for parent_sample_id.")
     args = ap.parse_args()
 
     rows = read_scores(args.scores)
     if not rows:
         raise SystemExit("No score rows found in " + args.scores)
+
+    # A headline leaderboard treats samples as independent. Depth-ladder points
+    # share a genome, so ranking them would narrow the bootstrap CI and inflate
+    # the effective n behind every paired permutation test.
+    correlated = correlated_parents(rows, sample_parents(args.sample_sheet))
+    if correlated:
+        detail = "; ".join(f"{parent} -> {', '.join(samples)}"
+                           for parent, samples in sorted(correlated.items())[:5])
+        raise SystemExit(
+            "ERROR: scores contain correlated samples derived from the same genome, "
+            "which cannot produce a headline leaderboard: " + detail
+            + (" ..." if len(correlated) > 5 else "")
+            + "\nUse 'plasbench depth-report' to summarise a depth-ladder run."
+        )
     try:
         status_counts = read_status(args.tool_status)
     except ValueError as exc:

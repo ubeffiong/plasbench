@@ -33,6 +33,37 @@ def main():
         assert result.returncode != 0 and "read_depth_x must be numeric" in result.stderr
     finally:
         os.unlink(invalid)
+    # The quality tier grades curation confidence, so B must stay reachable for
+    # rows whose evidence verifies but whose source study is still unreviewed.
+    sys.path.insert(0, os.path.join(ROOT, "python"))
+    from validate_cohort import derive_truth_quality_tier as tier
+    import validate_cohort
+    assert tier([], "Snyder_2020_recurrent_UTI") == "A"
+    assert tier([], "Smith_2021_systematic_review") == "A"
+    assert tier([], "NCBI_discovery_pending_publication_review") == "B"
+    assert tier([], "needs_curator_review") == "B"
+    assert tier([], "") == "B"
+    assert tier(["assembly is not Complete Genome"], "Snyder_2020_recurrent_UTI") is None
+
+    # Country-scoped discovery must use deposited BioSample evidence rather
+    # than relying on an Assembly full-text result alone.
+    original_fetch = validate_cohort.fetch
+    try:
+        validate_cohort.fetch = lambda request, timeout, retries, label, parse: parse(json.dumps({"reports": [{
+            "assembly_info": {"sequencing_tech": "Illumina + Oxford Nanopore",
+                              "assembly_method": "Unicycler",
+                              "assembly_level": "Complete Genome",
+                              "bioproject_accession": "PRJNA123",
+                              "biosample": {"accession": "SAMN123", "geo_loc_name": "Nigeria: Abuja",
+                                            "isolation_source": "clinical swab", "host": "human",
+                                            "collection_date": "2025-01-01"}}
+        }]}).encode("utf-8"))
+        evidence = validate_cohort.datasets_report("GCF_000000000.1")
+    finally:
+        validate_cohort.fetch = original_fetch
+    assert evidence["geo_loc_name"] == "Nigeria: Abuja"
+    assert evidence["isolation_source"] == "clinical swab"
+    assert evidence["bioproject_accession"] == "PRJNA123"
     print("ALL COHORT VALIDATION TESTS PASSED")
 
 

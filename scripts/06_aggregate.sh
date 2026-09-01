@@ -8,11 +8,12 @@ need python3
 
 SCORES="$RESULTS_DIR/scores.tsv"
 [[ -s "$SCORES" ]] || die "no scores found at $SCORES; run 05_score.sh first"
-[[ ! -s "$(dirname "$SAMPLE_SHEET")/depth_ladder.manifest.tsv" ]] || die "depth-ladder sample sheet detected: correlated subsamples cannot produce a headline leaderboard; use plasbench depth-report instead"
-
+# Correlated-sample detection lives in aggregate_results.py, which reads the
+# score rows themselves rather than looking for a file beside the sample sheet.
 python3 "$HERE/../python/aggregate_results.py" \
     --scores "$SCORES" \
     --tool-status "$RESULTS_DIR/tool_status.tsv" \
+    --sample-sheet "$SAMPLE_SHEET" \
     --out-prefix "$RESULTS_DIR/benchmark"
 
 python3 "$HERE/../python/write_manifest.py" \

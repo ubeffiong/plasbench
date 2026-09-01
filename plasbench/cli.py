@@ -83,6 +83,14 @@ def print_docs(root, topic):
     print(text[start:] if end < 0 else text[start:end])
 
 
+def print_concept_note(root):
+    """Print the non-technical project concept note from the source checkout."""
+    note = root / "docs" / "CONCEPT_NOTE.md"
+    if not note.is_file():
+        raise SystemExit(f"ERROR: concept note not found: {note}")
+    print(note.read_text(encoding="utf-8"), end="")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="plasbench",
@@ -118,6 +126,8 @@ def main(argv=None):
     discover_parser = sub.add_parser("discover-cohort", help="Discover strict assembly/paired-Illumina candidate pairs from NCBI.")
     discover_parser.add_argument("--organism", action="append", required=True, help="Scientific name; repeat for each taxon.")
     discover_parser.add_argument("--out-dir", type=Path, required=True)
+    discover_parser.add_argument("--country", action="append", default=[],
+                                 help="Require deposited BioSample geo_loc_name to contain this country/place; repeat as needed.")
     discover_parser.add_argument("--max-assemblies", type=int, default=30)
     discover_parser.add_argument("--email")
     discover_parser.add_argument("--api-key")
@@ -132,6 +142,7 @@ def main(argv=None):
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
                              help="Guide topic to print (default: all).")
+    sub.add_parser("concept-note", help="Print the non-technical researcher and donor concept note.")
     report_parser = sub.add_parser("report", help="Regenerate the leaderboard and HTML report from scores.")
     ladder_parser = sub.add_parser("depth-ladder", help="Create deterministic local-input depth-ladder cohorts using seqtk.")
     ladder_parser.add_argument("--samples", type=Path, required=True)
@@ -214,6 +225,8 @@ def main(argv=None):
                    "--max-assemblies", str(args.max_assemblies)]
         for organism in args.organism:
             command.extend(["--organism", organism])
+        for country in args.country:
+            command.extend(["--country", country])
         if args.email:
             command.extend(["--email", args.email])
         if args.api_key:
@@ -233,6 +246,9 @@ def main(argv=None):
                     "--metric", args.metric], root)
     elif args.command == "docs":
         print_docs(root, args.topic)
+        code = 0
+    elif args.command == "concept-note":
+        print_concept_note(root)
         code = 0
     else:
         env = {}

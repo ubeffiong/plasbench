@@ -73,6 +73,29 @@ deposited metadata linkage only. Technology and tier are derived from NCBI
 evidence, never CLI defaults. Curators must still check publications and
 collection metadata before assigning origin or making a public release claim.
 
+To discover a country-specific candidate set without loosening the benchmark
+rules, add `--country`. PlasBench first narrows the Assembly query, then
+requires the requested term to be present in the deposited BioSample
+`geo_loc_name`. The accepted table preserves the deposited location, isolation
+source, and host in `sample_origin`; the rejected table preserves the same
+evidence and the exact rejection reason. This makes African and Nigerian leads
+auditable without promoting Illumina-only, draft, or unmatched records to the
+release cohort.
+
+```bash
+plasbench discover-cohort --out-dir curation/nigeria --country Nigeria \
+  --max-assemblies 100 --organism "Klebsiella pneumoniae" \
+  --organism "Acinetobacter baumannii" --organism "Pseudomonas aeruginosa" \
+  --organism "Enterococcus faecium" --organism "Staphylococcus aureus"
+```
+
+Discovered rows are therefore **tier B**: every NCBI evidence check passed, but
+no publication has been reviewed. A row becomes **tier A** only once a curator
+replaces the placeholder `source_study` with a real study identifier, which
+`validate-cohort --online` then re-derives and enforces. **Tier C** marks a row
+that has not been verified online at all; online verification always resolves a
+row to A or B.
+
 ## Candidate Review And Balance
 
 Keep raw discoveries as candidates. To detect study dependence and create a

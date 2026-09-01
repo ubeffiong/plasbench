@@ -9,7 +9,7 @@ description = "Benchmark plasmid-reconstruction tools against complete-reference
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
-authors = [{name = "PlasBench contributors"}]
+authors = [{name = "Ubokobong Effiong"}]
 keywords = ["bioinformatics", "plasmid", "benchmarking", "genomics"]
 classifiers = [
   "Development Status :: 3 - Alpha",

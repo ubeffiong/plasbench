@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.0",
-  "sample_sheet": "cohorts\\public-v1.tsv",
+  "schema_version": "1.1",
+  "sample_sheet": "public-v1.tsv",
   "sample_sheet_sha256": "f131acb5f55949f820c5fbd72fe5f7f6d6e738fd675e426ed80a4c554ec80c9f",
   "evidence": [
     {
@@ -14,7 +14,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR11905454",
@@ -38,7 +43,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR11905453",
@@ -62,7 +72,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.10",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR11905452",
@@ -86,7 +101,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.11",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR11905451",
@@ -110,7 +130,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.12",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR11905450",
@@ -134,7 +159,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.13",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR11905449",
@@ -158,7 +188,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.14",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR11905448",
@@ -182,7 +217,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII; PacBio Sequel; Illumina MiSeq; Illumina HiSeq",
+        "assembly_method": "CANU v. 2.1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR13296941",
@@ -206,7 +246,12 @@
         ],
         "organism": "Escherichia coli",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII; Illumina MiSeq",
+        "assembly_method": "Unicycler v. 0.4.4; Canu v. 1.8; Pilon v. 1.23",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR10076548",
@@ -230,7 +275,12 @@
         ],
         "organism": "Salmonella enterica",
         "assembly_status": "Complete Genome",
-        "has_plasmid": true
+        "has_plasmid": true,
+        "sequencing_tech": "Oxford Nanopore MinION; Illumina NextSeq",
+        "assembly_method": "unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "derived_truth_quality_tier": "A"
       },
       "run": {
         "run": "SRR17858528",

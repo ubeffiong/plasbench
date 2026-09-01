@@ -57,9 +57,15 @@ def main():
         declared = float(row["read_depth_x"]) if row.get("read_depth_x") else source_depth
         if abs(declared - source_depth) / source_depth > 0.20:
             raise SystemExit(f"ERROR: {sample}: declared read_depth_x={declared:g} disagrees with observed depth {source_depth:g}x by more than 20%")
-        required = [source / "reference.fna", source / "sequence_report.jsonl",
+        required = [source / "reference.fna",
                     source / f"{run}_1.fastq.gz", source / f"{run}_2.fastq.gz"]
         missing = [str(path) for path in required if not path.is_file() or not path.stat().st_size]
+        # Stage 1 accepts either an NCBI sequence report or a user-supplied
+        # truth table, so the ladder must accept the same pair of inputs.
+        truth_sources = [path for path in (source / "truth.tsv", source / "sequence_report.jsonl")
+                         if path.is_file() and path.stat().st_size]
+        if not truth_sources:
+            missing.append(f"{source / 'truth.tsv'} or {source / 'sequence_report.jsonl'}")
         if missing:
             raise SystemExit(f"ERROR: {sample} is missing local inputs: {', '.join(missing)}")
         for depth in depths:
@@ -72,7 +78,9 @@ def main():
             if destination.exists() and any(destination.iterdir()):
                 raise SystemExit(f"ERROR: refusing to overwrite existing derived input: {destination}")
             destination.mkdir(parents=True, exist_ok=True)
-            for source_file in required[:2]:
+            # observed_depth.tsv is deliberately not copied: stage 2 recomputes it
+            # from the subsampled reads, and the parent's value would be wrong.
+            for source_file in [source / "reference.fna", *truth_sources]:
                 link_or_copy(source_file, destination / source_file.name)
             for mate in (1, 2):
                 source_reads = source / f"{run}_{mate}.fastq.gz"
@@ -95,11 +103,14 @@ def main():
             derived = dict(row)
             derived["sample_id"] = derived_id
             derived["read_depth_x"] = f"{depth:g}"
+            # Aggregation reads this to detect correlated subsamples wherever the
+            # sheet is copied to, rather than relying on a sibling manifest file.
+            derived["parent_sample_id"] = sample
             derived_rows.append(derived)
             manifest.append({"sample_id": derived_id, "parent_sample_id": sample,
                              "target_depth_x": depth, "source_depth_x": source_depth,
                              "fraction": fraction, "seed": args.seed})
-    headers = list(source_rows[0])
+    headers = list(dict.fromkeys([*source_rows[0], "parent_sample_id"]))
     with open(output / "depth_ladder.samples.tsv", "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=headers, delimiter="\t")
         writer.writeheader(); writer.writerows(derived_rows)

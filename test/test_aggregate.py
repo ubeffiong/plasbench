@@ -14,6 +14,13 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 AGGREGATE = os.path.join(HERE, "..", "python", "aggregate_results.py")
 
 
+def write_tsv(path, header, rows):
+    with open(path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle, delimiter="\t")
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="aggregate_test_") as tmp:
         scores = os.path.join(tmp, "scores.tsv")
@@ -78,6 +85,23 @@ def main():
         assert "Tool version" in page and "Plasmid size" in page and "Depth ≥" in page
         assert "Bin reconstruction diagnostics" in page and "Split events" in page and "Merge events" in page
         assert "Contaminated bins" in page
+    # Depth-ladder points share a genome, so they must never be ranked as
+    # independent samples -- detected from the rows, not from a sibling file.
+    with tempfile.TemporaryDirectory() as tmp:
+        correlated = os.path.join(tmp, "scores.tsv")
+        write_tsv(correlated, ["sample", "tool", "precision", "recall", "f1", "plasmid_recall"],
+                  [["s__20x", "tool_a", "0.9", "0.9", "0.9", "1.0"],
+                   ["s__40x", "tool_a", "0.9", "0.9", "0.95", "1.0"]])
+        sheet = os.path.join(tmp, "moved.tsv")
+        write_tsv(sheet, ["sample_id", "sra_run", "parent_sample_id"],
+                  [["s__20x", "SRR1", "s"], ["s__40x", "SRR1", "s"]])
+        for label, argv in (("declared parent", ["--sample-sheet", sheet]), ("id convention only", [])):
+            blocked = subprocess.run(
+                [sys.executable, os.path.join(ROOT, "python", "aggregate_results.py"),
+                 "--scores", correlated, "--out-prefix", os.path.join(tmp, "blocked"), *argv],
+                text=True, capture_output=True)
+            assert blocked.returncode != 0, label
+            assert "correlated samples" in blocked.stderr, label
     print("ALL AGGREGATION TESTS PASSED")
 
 
