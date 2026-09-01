@@ -16,9 +16,25 @@ Validate locally:
 ```bash
 python python/validate_cohort.py --samples config/accessions.tsv
 python python/validate_cohort.py --samples config/accessions.tsv --online
+plasbench validate-cohort --samples cohorts/public-v1.tsv --online
 ```
 
-`--online` checks that the Assembly, SRA, BioSample, and BioProject accessions
-exist at NCBI. It does not prove isolate matching; curators must confirm that
-the assembly and reads derive from the same isolate using BioSample attributes,
-strain/isolate names, collection metadata, and associated publications.
+`--online` verifies that the assembly is complete and plasmid-containing, the
+selected run is paired-end Illumina, and the Assembly/SRA BioSample and
+BioProject identifiers exactly match the cohort row. It cannot prove biological
+identity beyond deposited metadata; curators should still review strain/isolate
+names, collection metadata, and associated publications.
+
+## Versioned public panel
+
+[`cohorts/public-v1.tsv`](../cohorts/public-v1.tsv) is a ten-isolate, directly
+runnable seed cohort with an accompanying NCBI verification lock. It includes
+clinical and food-associated isolates, varies in plasmid count and read depth,
+and is intentionally small enough for an initial reproducible benchmark. Read
+[`cohorts/README.md`](../cohorts/README.md) before using it or extending it.
+
+```bash
+plasbench validate-cohort --samples cohorts/public-v1.tsv --online \
+  --write-lock cohorts/public-v1.lock.json
+plasbench run --samples cohorts/public-v1.tsv
+```

@@ -225,6 +225,10 @@ programme, such as `clinical`, `environmental`, `wastewater`, or `livestock`.
 true plasmid size from the reference truth table, so it does not rely on a
 manually entered size.
 
+Use `cohorts/public-v1.tsv` for a ready-to-run, metadata-verified seed panel.
+Run `plasbench validate-cohort --samples cohorts/public-v1.tsv --online` before
+downloading; `cohorts/README.md` documents its scope and sources.
+
 Choose reference and read pairs carefully: an assembly and read set from
 different isolates invalidates the benchmark. See `docs/FINDING_DATA.md` for
 curation guidance.
@@ -263,6 +267,11 @@ plasbench test
 
 plasbench check
     Run the dependency preflight only (stage 0).
+
+plasbench validate-cohort --samples PATH [--online]
+    Validate cohort schema. With --online, verify complete plasmid-containing
+    assembly metadata plus exact SRA BioSample/BioProject linkage and paired
+    Illumina library metadata. Use --write-lock PATH to save the evidence.
 
 plasbench run [STAGE ...] [OPTIONS]
     Run all stages by default, or only the listed stage numbers.

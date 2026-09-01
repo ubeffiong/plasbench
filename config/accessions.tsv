@@ -15,6 +15,7 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 #   read_depth_x       : optional estimated Illumina depth in fold coverage (for example 80)
 #
 # Lines starting with '#' and blank lines are ignored.
+# A metadata-verified public seed panel is available at cohorts/public-v1.tsv.
 #
 # HOW TO FIND MATCHED PAIRS (see docs/FINDING_DATA.md for the full walkthrough):
 #   1. On NCBI, find complete Enterobacterales assemblies with plasmids.

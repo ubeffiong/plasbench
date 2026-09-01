@@ -1,0 +1,11 @@
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	assembly_plasmid_count	source_study
+upec_ecpf5	GCF_013372425.1	SRR11905454	Escherichia coli	hybrid	A	SAMN15075992	PRJNA636382	clinical_urine	75	2	Snyder_2020_recurrent_UTI
+upec_ecpf7	GCF_013372405.1	SRR11905453	Escherichia coli	hybrid	A	SAMN15075993	PRJNA636382	clinical_urine	75	3	Snyder_2020_recurrent_UTI
+upec_ecpf14	GCF_013372385.1	SRR11905452	Escherichia coli	hybrid	A	SAMN15075994	PRJNA636382	clinical_urine	83	1	Snyder_2020_recurrent_UTI
+upec_ecpf15	GCF_013372365.1	SRR11905451	Escherichia coli	hybrid	A	SAMN15075995	PRJNA636382	clinical_urine	68	2	Snyder_2020_recurrent_UTI
+upec_ecpf16	GCF_013372345.1	SRR11905450	Escherichia coli	hybrid	A	SAMN15075996	PRJNA636382	clinical_urine	218	2	Snyder_2020_recurrent_UTI
+upec_ecpf18	GCF_013372325.1	SRR11905449	Escherichia coli	hybrid	A	SAMN15075997	PRJNA636382	clinical_urine	315	4	Snyder_2020_recurrent_UTI
+upec_ecpf40	GCF_013372305.1	SRR11905448	Escherichia coli	hybrid	A	SAMN15075998	PRJNA636382	clinical_urine	65	4	Snyder_2020_recurrent_UTI
+arbank_0346	GCF_017579865.1	SRR13296941	Escherichia coli	hybrid	A	SAMN12263369	PRJNA554345	clinical_antimicrobial_resistance_bank	125	2	AR_Bank_0346_2021
+arbank_0349	GCF_008152105.1	SRR10076548	Escherichia coli	hybrid	A	SAMN12272266	PRJNA554502	clinical_antimicrobial_resistance_bank	108	1	AR_Bank_0349_2019
+tahini_salmonella	GCF_022162985.1	SRR17858528	Salmonella enterica subsp. enterica serovar Tennessee	hybrid	A	SAMN25597006	PRJNA802760	food_tahini	50	1	Tahini_Salmonella_2022

@@ -1,0 +1,247 @@
+{
+  "schema_version": "1.0",
+  "sample_sheet": "cohorts\\public-v1.tsv",
+  "sample_sheet_sha256": "f131acb5f55949f820c5fbd72fe5f7f6d6e738fd675e426ed80a4c554ec80c9f",
+  "evidence": [
+    {
+      "sample_id": "upec_ecpf5",
+      "assembly": {
+        "accession": "GCF_013372425.1",
+        "biosample": "SAMN15075992",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA636382"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR11905454",
+        "biosample": "SAMN15075992",
+        "bioproject": "PRJNA636382",
+        "sample_name": "EcPF5",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "394907211"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "upec_ecpf7",
+      "assembly": {
+        "accession": "GCF_013372405.1",
+        "biosample": "SAMN15075993",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA636382"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR11905453",
+        "biosample": "SAMN15075993",
+        "bioproject": "PRJNA636382",
+        "sample_name": "EcPF7",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "379369351"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "upec_ecpf14",
+      "assembly": {
+        "accession": "GCF_013372385.1",
+        "biosample": "SAMN15075994",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA636382"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR11905452",
+        "biosample": "SAMN15075994",
+        "bioproject": "PRJNA636382",
+        "sample_name": "EcPF14",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "423026119"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "upec_ecpf15",
+      "assembly": {
+        "accession": "GCF_013372365.1",
+        "biosample": "SAMN15075995",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA636382"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR11905451",
+        "biosample": "SAMN15075995",
+        "bioproject": "PRJNA636382",
+        "sample_name": "EcPF15",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "342982110"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "upec_ecpf16",
+      "assembly": {
+        "accession": "GCF_013372345.1",
+        "biosample": "SAMN15075996",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA636382"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR11905450",
+        "biosample": "SAMN15075996",
+        "bioproject": "PRJNA636382",
+        "sample_name": "EcPF16",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1110739544"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "upec_ecpf18",
+      "assembly": {
+        "accession": "GCF_013372325.1",
+        "biosample": "SAMN15075997",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA636382"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR11905449",
+        "biosample": "SAMN15075997",
+        "bioproject": "PRJNA636382",
+        "sample_name": "EcPF18",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1610765111"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "upec_ecpf40",
+      "assembly": {
+        "accession": "GCF_013372305.1",
+        "biosample": "SAMN15075998",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA636382"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR11905448",
+        "biosample": "SAMN15075998",
+        "bioproject": "PRJNA636382",
+        "sample_name": "EcPF40",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "333580001"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "arbank_0346",
+      "assembly": {
+        "accession": "GCF_017579865.1",
+        "biosample": "SAMN12263369",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA554345"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR13296941",
+        "biosample": "SAMN12263369",
+        "bioproject": "PRJNA554345",
+        "sample_name": "AR346",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "612748984"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "arbank_0349",
+      "assembly": {
+        "accession": "GCF_008152105.1",
+        "biosample": "SAMN12272266",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA554502"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR10076548",
+        "biosample": "SAMN12272266",
+        "bioproject": "PRJNA554502",
+        "sample_name": "AR349",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "572419375"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "tahini_salmonella",
+      "assembly": {
+        "accession": "GCF_022162985.1",
+        "biosample": "SAMN25597006",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA802760"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true
+      },
+      "run": {
+        "run": "SRR17858528",
+        "biosample": "SAMN25597006",
+        "bioproject": "PRJNA802760",
+        "sample_name": "21-SA00318-0",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "244684802"
+      },
+      "errors": []
+    }
+  ]
+}

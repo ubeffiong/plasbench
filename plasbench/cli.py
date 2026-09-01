@@ -103,6 +103,11 @@ def main(argv=None):
     sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     sub.add_parser("test", help="Run the scoring unit tests.")
     sub.add_parser("check", help="Check configured runtime dependencies.")
+    cohort_parser = sub.add_parser("validate-cohort", help="Validate a cohort schema or verify its NCBI-linked pairs.")
+    cohort_parser.add_argument("--samples", type=Path, required=True, help="Cohort TSV to validate.")
+    cohort_parser.add_argument("--online", action="store_true", help="Verify NCBI assembly/SRA linkage and library metadata.")
+    cohort_parser.add_argument("--email", help="Contact email sent to NCBI E-utilities.")
+    cohort_parser.add_argument("--write-lock", type=Path, help="Write NCBI verification evidence as JSON; requires --online.")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
     install_parser.add_argument("profile", nargs="?", default="core", help="core, assembly, reconstruction, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
@@ -149,6 +154,15 @@ def main(argv=None):
         code = run([sys.executable, "test/test_scoring.py"], root)
     elif args.command == "check":
         code = run([bash_command(), "scripts/run_all.sh", "0"], root)
+    elif args.command == "validate-cohort":
+        command = [sys.executable, "python/validate_cohort.py", "--samples", str(args.samples)]
+        if args.online:
+            command.append("--online")
+        if args.email:
+            command.extend(["--email", args.email])
+        if args.write_lock:
+            command.extend(["--write-lock", str(args.write_lock)])
+        code = run(command, root)
     elif args.command == "install-tools":
         code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.profile], root)
     elif args.command == "docs":
