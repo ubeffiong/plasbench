@@ -6,4 +6,3 @@ results_demo
 tmp
 __pycache__
 *.pyc
-env/environment.lock.yml
