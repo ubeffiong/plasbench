@@ -54,6 +54,15 @@ def sample_rows(path):
     return rows
 
 
+def status_rows(results_dir):
+    path = Path(results_dir) / "tool_status.tsv"
+    if not path.is_file():
+        return []
+    import csv
+    with open(path, newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle, delimiter="\t"))
+
+
 def directory_identity(path):
     """Identify a database without hashing multi-gigabyte contents on every run."""
     if not path:
@@ -103,6 +112,7 @@ def main():
         "settings": {key: os.environ.get(key) for key in settings},
         "input_checksums": {"sample_sheet": sha256(sample_sheet), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},
+        "execution_profiles": status_rows(args.results_dir),
         "outputs": outputs,
     }
     with open(args.out, "w", encoding="utf-8") as handle:
