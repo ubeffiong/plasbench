@@ -121,6 +121,11 @@ def main(argv=None):
     discover_parser.add_argument("--max-assemblies", type=int, default=30)
     discover_parser.add_argument("--email")
     discover_parser.add_argument("--api-key")
+    review_parser = sub.add_parser("review-candidates", help="Create an additive, non-release balanced shortlist from NCBI candidates.")
+    review_parser.add_argument("--candidates", type=Path, required=True)
+    review_parser.add_argument("--out-dir", type=Path, required=True)
+    review_parser.add_argument("--max-per-bioproject", type=int, default=3)
+    review_parser.add_argument("--max-per-organism", type=int, default=8)
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
     install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
@@ -214,6 +219,8 @@ def main(argv=None):
         if args.api_key:
             command.extend(["--api-key", args.api_key])
         code = run(command, root)
+    elif args.command == "review-candidates":
+        code = run([sys.executable, "python/review_candidate_cohort.py", "--candidates", str(args.candidates), "--out-dir", str(args.out_dir), "--max-per-bioproject", str(args.max_per_bioproject), "--max-per-organism", str(args.max_per_organism)], root)
     elif args.command == "install-tools":
         code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.profile], root)
     elif args.command == "depth-ladder":
