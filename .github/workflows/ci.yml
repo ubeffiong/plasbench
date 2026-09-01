@@ -16,6 +16,7 @@ jobs:
       - run: python -m pip install --no-deps .
       - run: plasbench test
       - run: plasbench demo
+      - run: python test/test_bin_matching.py
       - run: python test/test_aggregate.py
       - run: python -m py_compile python/*.py plasbench/*.py
   container:
