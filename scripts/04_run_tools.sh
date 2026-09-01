@@ -12,11 +12,16 @@ mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 printf 'sample\ttool\tstatus\tprediction_fasta\treason\truntime_seconds\tpeak_rss_kb\n' > "$STATUS"
 
 record_status() {
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "${6:-}" "${7:-}" >> "$STATUS"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "${6:-}" "${7:-$(profile_rss "${PROFILE_RSS_FILE:-}")}" >> "$STATUS"
 }
 
 profile_start() { date +%s; }
 profile_elapsed() { printf '%s' "$(( $(date +%s) - $1 ))"; }
+profile_rss() { [[ -s "$1" ]] && tr -d '[:space:]' < "$1" || true; }
+profile_exec() {
+    PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
+    if [[ -x /usr/bin/time ]]; then /usr/bin/time -f '%M' -o "$PROFILE_RSS_FILE" "$@"; else "$@"; fi
+}
 
 is_complete() {
     [[ -e "$1" && -f "$2" && "${FORCE_RERUN_TOOLS:-0}" -ne 1 ]]
@@ -47,7 +52,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  mob_recon ..."
             START=$(profile_start)
-            if mob_recon --infile "$CONTIGS" --outdir "$OUT" --num_threads "$THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+            if profile_exec mob_recon --infile "$CONTIGS" --outdir "$OUT" --num_threads "$THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_mob_recon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
@@ -68,7 +73,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT"
             log "  platon ..."
             START=$(profile_start)
-            if platon --db "$PLATON_DB" --threads "$THREADS" --output "$OUT" --prefix "$SAMPLE" "$CONTIGS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+            if profile_exec platon --db "$PLATON_DB" --threads "$THREADS" --output "$OUT" --prefix "$SAMPLE" "$CONTIGS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_platon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
@@ -89,7 +94,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  plasmidSPAdes ..."
             START=$(profile_start)
-            if plasmidspades.py -1 "$T1" -2 "$T2" -o "$OUT" --threads "$THREADS" --memory "$MEMORY_GB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+            if profile_exec plasmidspades.py -1 "$T1" -2 "$T2" -o "$OUT" --threads "$THREADS" --memory "$MEMORY_GB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plasmidspades.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
@@ -111,7 +116,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  gplas ..."
             START=$(profile_start)
-            if gplas -i "$GRAPH" -c extraction -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+            if profile_exec gplas -i "$GRAPH" -c extraction -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_gplas.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
@@ -140,7 +145,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         else
             rm -rf "$OUT" "$PRED" "$DONE"; log "  $TOOL ..."
             START=$(profile_start)
-            if gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+            if profile_exec gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_gplas.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "external classifier TSV: $CLASSIFIER" "$(profile_elapsed "$START")"
             else
