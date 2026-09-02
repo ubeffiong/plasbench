@@ -2,6 +2,8 @@
 """Build the self-contained HTML dashboard emitted after benchmark aggregation."""
 
 import argparse
+import re
+import base64
 import csv
 import datetime as dt
 import html
@@ -573,10 +575,210 @@ function refresh(){renderRows();apply();bindDrag()}
 ['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(refresh,0)));
 ['vq-fit','vq-in','vq-out'].forEach(id=>$(id)?.addEventListener('click',()=>setTimeout(refresh,0)));
 $('vq-heatmap').addEventListener('click',()=>setTimeout(refresh,0));
-document.addEventListener('keydown',e=>{if(e.target.matches('input,select,textarea'))return;
+document.addEventListener('keydown',e=>{if(e.target?.matches?.('input,select,textarea'))return;
  if(e.key==='n'){jump(1)}else if(e.key==='p'){jump(-1)}});
 refresh();})();
 </script>"""
+
+
+def canvas_heatmap_script():
+    """A canvas sample-tool matrix with a drilldown modal, beside the table view.
+
+    This is an additional visual, not a replacement: the semantic table remains
+    the keyboard-navigable, screen-reader-readable view and the accessible
+    fallback. The canvas scales to cohorts where a DOM cell per observation
+    stops being viable, and carries the modal drilldown. The modal is scoped to
+    this view alone so the linked inline panels keep their selection.
+    """
+    return """<style>
+#cv-panel{background:#fff;border:1px solid #d2dad8;margin:16px 0;padding:0 0 14px}
+#cv-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+  padding:12px 15px;border-bottom:1px solid #e3e9e8;background:#f4f7f4}
+#cv-head h3{margin:0;font:600 14px Arial,sans-serif}
+#cv-head .right{display:flex;gap:8px;align-items:center;font:12px Arial,sans-serif}
+#cv-wrap{position:relative;overflow:auto;padding:12px 15px}
+#cv-canvas{display:block;cursor:pointer}
+#cv-tip{position:absolute;pointer-events:none;background:#0c121c;color:#e6edf6;padding:8px 10px;
+  border-radius:4px;font:11px/1.5 Arial,sans-serif;opacity:0;transition:opacity .12s;max-width:280px;z-index:5}
+#cv-legend{display:flex;gap:14px;flex-wrap:wrap;font:11px Arial,sans-serif;color:#5f6d6b;padding:0 15px}
+#cv-legend i{display:inline-block;width:12px;height:12px;margin-right:5px;vertical-align:-2px}
+#cv-modal{position:fixed;inset:0;background:rgba(12,18,28,.62);display:none;z-index:60;
+  align-items:center;justify-content:center;padding:20px}
+#cv-modal.open{display:flex}
+#cv-dialog{background:#fff;max-width:900px;width:100%;max-height:88vh;overflow:auto;border-radius:6px;
+  box-shadow:0 20px 60px rgba(0,0,0,.35)}
+#cv-dialog header{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:14px 18px;border-bottom:1px solid #e3e9e8;position:sticky;top:0;background:#fff}
+#cv-dialog h4{margin:0;font:600 15px Arial,sans-serif}
+#cv-dialog .body{padding:16px 18px}
+#cv-dialog table{width:100%;border-collapse:collapse;font:12px Arial,sans-serif;margin-top:8px}
+#cv-dialog th{background:#edf2ec;text-align:left;padding:7px;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+#cv-dialog td{border-top:1px solid #e3e9e8;padding:6px 7px}
+#cv-dialog .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+#cv-dialog .kv div{background:#f4f7f4;padding:9px 11px}
+#cv-dialog .kv small{display:block;color:#5f6d6b;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+#cv-dialog .kv b{font:600 15px Arial,sans-serif;font-variant-numeric:tabular-nums}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),m=d.matrix;
+const host=document.createElement('section');host.id='cv-panel';
+host.innerHTML=`<div id="cv-head"><h3><i class="fa fa-th"></i> Sample \\u00d7 method matrix</h3>
+ <span class="right"><label>Sort <select id="cv-sort"><option value="sample">Sample ID</option><option value="score">Best score</option><option value="spread">Method disagreement</option></select></label>
+ <span id="cv-note"></span></span></div>
+ <div id="cv-wrap"><canvas id="cv-canvas"></canvas><div id="cv-tip"></div></div>
+ <div id="cv-legend"></div>`;
+$('vq-heatmap').parentElement.after(host);
+const modal=document.createElement('div');modal.id='cv-modal';
+modal.innerHTML=`<div id="cv-dialog" role="dialog" aria-modal="true" aria-labelledby="cv-title">
+ <header><h4 id="cv-title"></h4><span><button class="btn" id="cv-open-inline" type="button">Open in linked explorer</button>
+ <button class="btn" id="cv-close" type="button"><i class="fa fa-times"></i> Close</button></span></header>
+ <div class="body" id="cv-body"></div></div>`;
+document.body.append(modal);
+const canvas=$('cv-canvas'),ctx=canvas.getContext('2d'),tip=$('cv-tip');
+const tools=[...new Set(m.map(x=>x.tool))].sort();
+const LABEL=120,CELL=34,HEAD=26,PAD=2;
+let cells=[],hover=null;
+function metricKey(){return $('vq-metric').value}
+function value(r){const k=metricKey();return k==='status'?null:r[k]}
+function lowerIsBetter(){return ['contamination','unmapped','runtime_min','memory_gb'].includes(metricKey())}
+function norm(v,lo,hi){if(!isFinite(v))return null;if(hi===lo)return .5;
+ const t=(v-lo)/(hi-lo);return lowerIsBetter()?1-t:t}
+function colour(t,status){
+ if(status==='failed')return '#f0d6d2';if(status==='skipped')return '#f4e6cd';
+ if(t===null)return '#e6eae6';
+ // Single-hue ramp: lightness carries magnitude, so it survives greyscale print.
+ const stops=[[233,243,235],[178,220,196],[104,186,151],[42,140,106],[12,80,60]];
+ const x=Math.max(0,Math.min(1,t))*(stops.length-1),i=Math.floor(x),f=x-i;
+ const a=stops[i],b=stops[Math.min(stops.length-1,i+1)];
+ return `rgb(${a.map((v,k)=>Math.round(v+(b[k]-v)*f)).join(',')})`}
+function visibleSamples(){const rows=[...document.querySelectorAll('#vq-heatmap tbody tr:not(.vq-hidden)')];
+ const names=rows.map(tr=>tr.querySelector('td strong')?.textContent||'').filter(Boolean);
+ return names.length?names:[...new Set(m.map(x=>x.sample))].sort()}
+function order(samples){const mode=$('cv-sort').value;
+ const score=s=>{const v=m.filter(r=>r.sample===s).map(value).filter(x=>typeof x==='number'&&isFinite(x));
+  return v.length?v.reduce((a,b)=>a+b,0)/v.length:-Infinity};
+ const spread=s=>{const v=m.filter(r=>r.sample===s).map(value).filter(x=>typeof x==='number'&&isFinite(x));
+  return v.length>1?Math.max(...v)-Math.min(...v):-Infinity};
+ if(mode==='score')return [...samples].sort((a,b)=>score(b)-score(a));
+ if(mode==='spread')return [...samples].sort((a,b)=>spread(b)-spread(a));
+ return [...samples].sort()}
+function draw(){
+ const samples=order(visibleSamples());
+ const values=m.map(value).filter(v=>typeof v==='number'&&isFinite(v));
+ const lo=values.length?Math.min(...values):0,hi=values.length?Math.max(...values):1;
+ const W=LABEL+tools.length*CELL+10,H=HEAD+samples.length*CELL+6;
+ const dpr=window.devicePixelRatio||1;
+ canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+ ctx.font='11px Arial,sans-serif';ctx.textBaseline='middle';
+ ctx.fillStyle='#3b4746';
+ tools.forEach((t,c)=>{ctx.save();ctx.translate(LABEL+c*CELL+CELL/2,HEAD-8);ctx.rotate(-Math.PI/4);
+  ctx.textAlign='left';ctx.fillText(t.slice(0,16),0,0);ctx.restore()});
+ cells=[];
+ samples.forEach((s,r)=>{const y=HEAD+r*CELL;
+  ctx.fillStyle='#3b4746';ctx.textAlign='right';ctx.fillText(s.slice(0,18),LABEL-10,y+CELL/2);
+  tools.forEach((t,c)=>{const x=LABEL+c*CELL,rec=m.find(z=>z.sample===s&&z.tool===t);
+   const v=rec?value(rec):null,st=rec?rec.status:'unavailable';
+   ctx.fillStyle=colour(rec?norm(v,lo,hi):null,st);
+   ctx.fillRect(x+PAD,y+PAD,CELL-PAD*2,CELL-PAD*2);
+   if(hover&&hover.s===s&&hover.t===t){ctx.strokeStyle='#12403a';ctx.lineWidth=2;
+    ctx.strokeRect(x+PAD,y+PAD,CELL-PAD*2,CELL-PAD*2)}
+   // Status is never encoded by colour alone.
+   if(st==='failed'||st==='skipped'){ctx.fillStyle='#7a3b33';ctx.textAlign='center';
+    ctx.fillText(st==='failed'?'\\u2715':'\\u25CB',x+CELL/2,y+CELL/2)}
+   cells.push({x:x+PAD,y:y+PAD,w:CELL-PAD*2,h:CELL-PAD*2,s,t,rec})})});
+ $('cv-note').textContent=`${samples.length} sample(s) \\u00d7 ${tools.length} method(s)`;
+ const label=$('vq-metric').options[$('vq-metric').selectedIndex].textContent;
+ $('cv-legend').innerHTML=`<span><i style="background:${colour(0)}"></i>${lowerIsBetter()?'worse':'lower'} ${label}</span>`
+  +`<span><i style="background:${colour(1)}"></i>${lowerIsBetter()?'better':'higher'} ${label}</span>`
+  +`<span><i style="background:#f0d6d2"></i>\\u2715 failed</span><span><i style="background:#f4e6cd"></i>\\u25CB skipped</span>`
+  +`<span><i style="background:#e6eae6"></i>not applicable</span>`
+  +(values.length?`<span>range ${lo.toFixed(3)} \\u2013 ${hi.toFixed(3)}</span>`:'<span>no measured values</span>')}
+function at(e){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+ return cells.find(c=>x>=c.x&&x<=c.x+c.w&&y>=c.y&&y<=c.y+c.h)||null}
+canvas.addEventListener('mousemove',e=>{const c=at(e);hover=c?{s:c.s,t:c.t}:null;draw();
+ if(!c){tip.style.opacity=0;return}
+ const r=c.rec||{},fmt=v=>typeof v==='number'&&isFinite(v)?v.toFixed(4):'not measured';
+ tip.innerHTML=`<strong>${c.s} \\u00b7 ${c.t}</strong><br>status ${r.status||'unavailable'}<br>`
+  +`F1 ${fmt(r.f1)} \\u00b7 precision ${fmt(r.precision)} \\u00b7 recall ${fmt(r.recall)}<br>`
+  +`plasmid recall ${fmt(r.plasmid_recall)} \\u00b7 contamination ${fmt(r.contamination)}<br>`
+  +`runtime ${fmt(r.runtime_min)} min \\u00b7 peak ${fmt(r.memory_gb)} GB<br><em>click for detail</em>`;
+ const wrap=$('cv-wrap').getBoundingClientRect();
+ tip.style.left=Math.min(e.clientX-wrap.left+14,wrap.width-290)+'px';
+ tip.style.top=(e.clientY-wrap.top+14)+'px';tip.style.opacity=1});
+canvas.addEventListener('mouseleave',()=>{hover=null;tip.style.opacity=0;draw()});
+canvas.addEventListener('click',e=>{const c=at(e);if(c)openModal(c.s,c.t)});
+function openModal(sample,tool){
+ const rec=m.find(z=>z.sample===sample&&z.tool===tool)||{};
+ const a=d.visualizations[sample];
+ const fmt=v=>typeof v==='number'&&isFinite(v)?v.toFixed(4):'not measured';
+ $('cv-title').textContent=`${sample} \\u00b7 ${tool}`;
+ let html=`<div class="kv"><div><small>Base F1</small><b>${fmt(rec.f1)}</b></div>
+  <div><small>Precision</small><b>${fmt(rec.precision)}</b></div>
+  <div><small>Recall</small><b>${fmt(rec.recall)}</b></div>
+  <div><small>Plasmid recall</small><b>${fmt(rec.plasmid_recall)}</b></div>
+  <div><small>Contamination</small><b>${fmt(rec.contamination)}</b></div>
+  <div><small>Status</small><b>${rec.status||'unavailable'}</b></div>
+  <div><small>Runtime (min)</small><b>${fmt(rec.runtime_min)}</b></div>
+  <div><small>Peak memory (GB)</small><b>${fmt(rec.memory_gb)}</b></div></div>`;
+ if(!a){html+=`<p class="muted">Alignment detail for ${sample} is not loaded. Select the sample in the linked explorer to fetch it.</p>`}
+ else if(!a.tools[tool]){html+=`<p class="muted">This method produced no retained alignment blocks for ${sample}.</p>`}
+ else{const t=a.tools[tool],circ=new Set(a.circular_truth_plasmids||[]);
+  const rows=Object.entries(a.truth_plasmids).map(([id,info])=>{
+   const rc=t.plasmid_recovery[id]||{completeness:0};
+   const recs=[...new Set(t.blocks.filter(b=>b.target===id).map(b=>b.record_id))];
+   return `<tr><td>${id}</td><td>${info.length.toLocaleString()} bp</td><td>${circ.has(id)?'yes':'not declared'}</td>
+    <td>${((rc.completeness||0)*100).toFixed(1)}%</td><td>${recs.length}</td></tr>`}).join('');
+  html+=`<h5 style="margin:14px 0 0;font:600 12px Arial,sans-serif">Truth plasmids</h5>
+   <table><thead><tr><th>Plasmid</th><th>Length</th><th>Circular truth</th><th>Completeness</th><th>Records</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const chr=[...new Set(t.blocks.filter(b=>b.molecule_type==='CHROMOSOME').map(b=>b.record_id))];
+  html+=chr.length
+   ?`<p style="margin-top:12px" class="muted"><strong>Chromosomal contamination:</strong> ${(t.chromosome_aligned_bp||0).toLocaleString()} bp across ${chr.length} record(s) — ${chr.join(', ')}. Counted as false positives; not attributable to any truth plasmid.</p>`
+   :'<p style="margin-top:12px" class="muted">No chromosome-aligned records among retained blocks.</p>';
+  html+=`<p class="muted">Retained blocks: ${t.blocks.length}${t.blocks_omitted?`, ${t.blocks_omitted} omitted by the display cap`:''}.</p>`}
+ $('cv-body').innerHTML=html;
+ modal.classList.add('open');$('cv-close').focus();
+ $('cv-open-inline').onclick=()=>{close();
+  const cell=[...document.querySelectorAll('.vq-cell')].find(c=>c.dataset.s===sample&&c.dataset.t===tool);
+  if(cell){cell.click();cell.scrollIntoView({block:'center'})}}}
+function close(){modal.classList.remove('open')}
+$('cv-close').onclick=close;
+modal.addEventListener('click',e=>{if(e.target===modal)close()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))close()});
+$('cv-sort').onchange=draw;$('vq-metric').addEventListener('change',draw);
+new MutationObserver(()=>draw()).observe($('vq-heatmap'),{childList:true});
+document.addEventListener('change',e=>{if(e.target.closest('#vq-filters'))setTimeout(draw,0)});
+draw();})();
+</script>"""
+
+
+def vendor_assets(project_root):
+    """Inline the vendored font and icon assets as base64.
+
+    The report must render identically offline and years later, so it carries
+    its own faces rather than requesting a CDN at view time. A missing vendor
+    directory degrades to system fonts instead of failing the build.
+    """
+    vendor = Path(project_root) / "assets" / "vendor"
+    fonts = vendor / "fonts"
+    inter_css, icon_css = vendor / "inter.css", vendor / "fontawesome-subset.css"
+    if not (inter_css.is_file() and icon_css.is_file()):
+        return ("<style>/* Vendored web fonts absent; falling back to system faces. "
+                "Run assets/vendor setup to restore the packaged appearance. */</style>")
+
+    def data_uri(name):
+        path = fonts / name
+        if not path.is_file():
+            return None
+        return "data:font/woff2;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+    inter = inter_css.read_text(encoding="utf-8")
+    inter_uri = data_uri("inter-variable.woff2")
+    if inter_uri:
+        inter = re.sub(r"url\(fonts/inter-[^)]+\)", f"url({inter_uri})", inter)
+    icons = icon_css.read_text(encoding="utf-8")
+    icon_uri = data_uri("fa-solid-900.woff2")
+    icons = icons.replace("__FA_WOFF2__", icon_uri) if icon_uri else ""
+    return f"<style>\n{inter}\n{icons}\n</style>"
 
 
 def cohort_dashboard_script():
@@ -1094,14 +1296,16 @@ def main():
     insight_notes, insight_tone = interpretation(leaderboard, status_counts)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(leaderboard)
+    vendor_html = vendor_assets(args.project_root)
     visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
                    + record_dotplot_script() + context_visual_script() + linked_selection_script(metadata)
                    + plasmid_summary_script() + structural_and_feature_tracks_script()
-                   + cohort_dashboard_script() + lazy_visualization_script() + explorer_navigation_script()
+                   + cohort_dashboard_script() + canvas_heatmap_script() + lazy_visualization_script() + explorer_navigation_script()
                    + flow_and_clustering_script())
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>PlasBench plasmid benchmark report</title>
+{vendor_html}
 <style>
 :root{{--ink:#17231d;--muted:#627067;--line:#d9e1da;--paper:#f6f8f4;--card:#fff;--green:#0c6b4f;--lime:#dcefdc;--amber:#9a5b00;--red:#a53028;}}
 *{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 28px}} .nav a{{color:var(--green);border:1px solid var(--line);background:#fff;padding:7px 10px;text-decoration:none;font-size:12px;font-weight:bold}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
