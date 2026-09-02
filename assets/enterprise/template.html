@@ -119,9 +119,7 @@
             font-size: 20px;
             font-weight: 700;
             letter-spacing: -0.3px;
-            background: linear-gradient(135deg, #fff 60%, var(--text-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #000;
         }
         .logo .badge {
             font-size: 10px;
@@ -239,8 +237,8 @@
         }
         .filter-group label {
             font-size: 10px;
-            font-weight: 500;
-            color: var(--text-muted);
+            font-weight: 700;
+            color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.3px;
         }
@@ -249,7 +247,8 @@
             background: transparent;
             border: none;
             color: var(--text-primary);
-            font-size: 12px;
+            font-weight: 600;
+            font-size: 12.5px;
             padding: 4px 0;
             font-family: var(--font);
             outline: none;
@@ -267,7 +266,8 @@
 
         .filter-count {
             font-size: 12px;
-            color: var(--text-secondary);
+            font-weight: 600;
+            color: var(--text-primary);
             padding: 4px 14px;
             background: var(--bg-card);
             border-radius: 20px;
@@ -333,7 +333,7 @@
         /* ── Main Grid ── */
         .main-grid {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
             gap: 18px;
             margin-top: 14px;
             flex: 1;
@@ -344,7 +344,19 @@
             .main-grid {
                 grid-template-columns: 1fr;
             }
+            .left-stack {
+                grid-template-rows: auto auto;
+            }
         }
+
+        /* Heatmap over drilldown, each taking half the column height. */
+        .left-stack {
+            display: grid;
+            grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 18px;
+            min-height: 0;
+        }
+        .left-stack > * { min-height: 0; }
 
         .panel {
             background: var(--bg-secondary);
@@ -403,6 +415,10 @@
             position: relative;
             overflow: auto;
             padding: 6px 0 6px 6px;
+        }
+        #heatmapCanvas:focus-visible {
+            outline: 3px solid var(--accent-green);
+            outline-offset: 3px;
         }
 
         .heatmap-wrap canvas {
@@ -671,30 +687,47 @@
         }
 
         /* ── Drilldown Modal ── */
+        /* A heatmap drilldown is an explicit pop-up: it keeps the cohort
+           matrix visible behind the evidence and closes cleanly with Escape. */
+        /* The drilldown occupies the second row of the heatmap column, so contig
+           evidence is visible beside the matrix without opening a pop-up.
+           .expanded promotes the same panel to a full-screen overlay. */
         .modal-overlay {
+            display: flex;
+            position: static;
+            min-height: 0;
+        }
+
+        .modal-overlay.expanded {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(8px);
+            background: rgba(18, 28, 23, 0.62);
+            backdrop-filter: blur(6px);
             z-index: 2000;
-            display: none;
             align-items: center;
             justify-content: center;
             padding: 16px;
         }
-        .modal-overlay.open {
-            display: flex;
-        }
+
+        /* Closing only makes sense once the panel has been expanded. */
+        #closeDrilldownBtn { display: none; }
+        .modal-overlay.expanded #closeDrilldownBtn { display: inline-flex; }
 
         .modal {
-            background: var(--bg-secondary);
+            background: var(--bg-card);
             border-radius: var(--radius);
             border: 1px solid var(--border-color);
-            max-width: 1400px;
             width: 100%;
-            max-height: 94vh;
+            min-height: 0;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-overlay.expanded .modal {
+            max-width: 1400px;
+            max-height: 94vh;
+            background: var(--bg-secondary);
             box-shadow: var(--shadow);
             animation: modalIn 0.25s ease;
         }
@@ -999,7 +1032,7 @@
         }
         .stats-panel .stat-box canvas {
             width: 100%;
-            height: 100px;
+            height: 220px;
             display: block;
         }
 
@@ -1229,6 +1262,7 @@
                     <option value="structuralConcordance">Struct. Concord.</option>
                     <option value="runtime">Runtime (min)</option>
                     <option value="memory">Memory (GB)</option>
+                    <option value="proteinCompleteness">Protein coordinate recovery</option>
                 </select>
             </div>
             <div class="filter-group">
@@ -1240,6 +1274,18 @@
             <div class="filter-group">
                 <label>Tech</label>
                 <select id="techFilter">
+                    <option value="all">All</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Origin</label>
+                <select id="originFilter">
+                    <option value="all">All</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Truth tier</label>
+                <select id="tierFilter">
                     <option value="all">All</option>
                 </select>
             </div>
@@ -1280,11 +1326,17 @@
                 <span class="value" id="totalPlasmids">0</span>
                 <span class="sub" id="recoveredPlasmids">0 recovered</span>
             </div>
+            <div class="stat-card">
+                <span class="label"><i class="fas fa-flask"></i> Named proteins</span>
+                <span class="value" id="totalProteins">—</span>
+                <span class="sub" id="recoveredProteins">not measured</span>
+            </div>
         </div>
 
         <!-- ─── MAIN GRID ─── -->
         <div class="main-grid">
 
+          <div class="left-stack">
             <!-- ─── HEATMAP PANEL ─── -->
             <div class="panel">
                 <div class="panel-header">
@@ -1297,13 +1349,85 @@
                 </div>
                 <div class="panel-body" id="heatmapContainer">
                     <div class="heatmap-wrap" id="heatmapWrap">
-                        <canvas id="heatmapCanvas"></canvas>
+                        <canvas id="heatmapCanvas" tabindex="0" role="application" aria-label="Sample-tool heatmap. Click a cell to select it; use arrow keys after selection to navigate and Enter to open the selected contig drilldown."></canvas>
                         <div class="selected-cell-indicator" id="cellIndicator"></div>
                     </div>
                 </div>
             </div>
+            <!-- CONTIG DRILLDOWN (inline; expandable) -->
+            <div class="modal-overlay" id="drilldownModal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-microscope"></i> Contig Drilldown <span id="drilldownTitle" style="font-weight:400;font-size:13px;color:var(--text-secondary);">— select a plasmid</span></h2>
+                        <div>
+                            <button class="btn btn-sm" id="exportDrilldownBtn"><i class="fas fa-download"></i> Export</button>
+                            <button class="btn btn-sm" id="fitDrilldownBtn"><i class="fas fa-arrows-alt"></i> Fit</button>
+                            <button class="btn btn-sm" id="expandDrilldownBtn" title="Expand to full screen"><i class="fas fa-arrows-alt"></i> <span id="expandLabel">Expand</span></button>
+                            <button class="btn btn-sm" id="closeDrilldownBtn" title="Close drilldown"><i class="fas fa-times"></i> Close</button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Summary stats -->
+                        <div class="drilldown-summary" id="drilldownSummary">
+                            <div class="dd-stat">
+                                <div class="dd-label">Sample</div>
+                                <div class="dd-value" id="ddSample">—</div>
+                                <div class="dd-sub" id="ddSampleMeta">—</div>
+                            </div>
+                            <div class="dd-stat">
+                                <div class="dd-label">Tool</div>
+                                <div class="dd-value" id="ddTool">—</div>
+                                <div class="dd-sub" id="ddToolVersion">—</div>
+                            </div>
+                            <div class="dd-stat">
+                                <div class="dd-label">Metric</div>
+                                <div class="dd-value" id="ddMetric">—</div>
+                                <div class="dd-sub" id="ddMetricDetail">—</div>
+                            </div>
+                            <div class="dd-stat">
+                                <div class="dd-label">Plasmids</div>
+                                <div class="dd-value" id="ddPlasmids">—</div>
+                                <div class="dd-sub" id="ddPlasmidDetail">—</div>
+                            </div>
+                            <div class="dd-stat">
+                                <div class="dd-label">Status</div>
+                                <div class="dd-value" id="ddStatus">—</div>
+                                <div class="dd-sub" id="ddStatusDetail">—</div>
+                            </div>
+                        </div>
 
-            <!-- ─── PLASMID TRACKS PANEL ─── -->
+                        <!-- Toolbar -->
+                        <div class="drilldown-toolbar">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="drilldownSearch" placeholder="Search contigs…" />
+                            </div>
+                            <button class="btn btn-sm" id="ddZoomIn"><i class="fas fa-plus"></i></button>
+                            <button class="btn btn-sm" id="ddZoomOut"><i class="fas fa-minus"></i></button>
+                            <button class="btn btn-sm" id="ddZoomReset"><i class="fas fa-home"></i></button>
+                            <button class="btn btn-sm" id="ddShowBad"><i class="fas fa-exclamation-triangle"></i> Bad regions</button>
+                            <span style="font-size:10px;color:var(--text-muted);margin-left:4px;" id="ddNavInfo">0 contigs</span>
+                        </div>
+
+                        <!-- Contig list -->
+                        <div class="drilldown-contigs" id="drilldownContigs">
+                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;padding:20px;text-align:center;flex-direction:column;gap:8px;">
+                                <i class="fas fa-dna" style="font-size:30px;opacity:0.3;"></i>
+                                <span>Select a plasmid to view <strong>contig-level alignment</strong></span>
+                                <span style="font-size:11px;">Click a plasmid in the recovery panel to drill down</span>
+                            </div>
+                        </div>
+
+                        <div class="explorer-info">
+                            <span id="ddCoords">coords: 0 – 0</span>
+                            <span id="ddStatusInfo">zoom: 1.0x · showing all contigs</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          </div>
+
+            <!-- PLASMID RECOVERY PANEL -->
             <div class="panel">
                 <div class="panel-header">
                     <h2><i class="fas fa-dna"></i> Plasmid Recovery <span class="sub" id="plasmidContext">select a cell</span></h2>
@@ -1328,7 +1452,7 @@
         <!-- ─── STATS PANEL (Box Plot & Dot Plot) ─── -->
         <div class="stats-panel" id="statsPanel" style="display:none;">
             <div class="stat-box">
-                <div class="sb-title"><i class="fas fa-box"></i> Box Plot — Metric Distribution by Tool</div>
+                <div class="sb-title" id="boxPlotTitle"><i class="fas fa-box"></i> Base F1 — Metric Distribution by Tool</div>
                 <canvas id="boxPlotCanvas"></canvas>
                 <div class="sb-stats" id="boxStats">
                     <span>Min: <span class="num" id="boxMin">—</span></span>
@@ -1339,7 +1463,7 @@
                 </div>
             </div>
             <div class="stat-box">
-                <div class="sb-title"><i class="fas fa-circle"></i> Dot Plot — Per-Sample Distribution</div>
+                <div class="sb-title" id="dotPlotTitle"><i class="fas fa-circle"></i> Base F1 — Per-Sample Distribution</div>
                 <canvas id="dotPlotCanvas"></canvas>
                 <div class="sb-stats" id="dotStats">
                     <span>Mean: <span class="num" id="dotMean">—</span></span>
@@ -1361,76 +1485,6 @@
     <!-- ─── TOOLTIP ─── -->
     <div class="heatmap-tooltip" id="heatmapTooltip"></div>
 
-    <!-- ─── DRILLDOWN MODAL ─── -->
-    <div class="modal-overlay" id="drilldownModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-microscope"></i> Contig Drilldown <span id="drilldownTitle" style="font-weight:400;font-size:13px;color:var(--text-secondary);">— select a plasmid</span></h2>
-                <div>
-                    <button class="btn btn-sm" id="exportDrilldownBtn"><i class="fas fa-download"></i> Export</button>
-                    <button class="btn btn-sm" id="fitDrilldownBtn"><i class="fas fa-arrows-alt"></i> Fit</button>
-                    <button class="close-btn" id="closeDrilldownBtn">&times;</button>
-                </div>
-            </div>
-            <div class="modal-body">
-                <!-- Summary stats -->
-                <div class="drilldown-summary" id="drilldownSummary">
-                    <div class="dd-stat">
-                        <div class="dd-label">Sample</div>
-                        <div class="dd-value" id="ddSample">—</div>
-                        <div class="dd-sub" id="ddSampleMeta">—</div>
-                    </div>
-                    <div class="dd-stat">
-                        <div class="dd-label">Tool</div>
-                        <div class="dd-value" id="ddTool">—</div>
-                        <div class="dd-sub" id="ddToolVersion">—</div>
-                    </div>
-                    <div class="dd-stat">
-                        <div class="dd-label">Metric</div>
-                        <div class="dd-value" id="ddMetric">—</div>
-                        <div class="dd-sub" id="ddMetricDetail">—</div>
-                    </div>
-                    <div class="dd-stat">
-                        <div class="dd-label">Plasmids</div>
-                        <div class="dd-value" id="ddPlasmids">—</div>
-                        <div class="dd-sub" id="ddPlasmidDetail">—</div>
-                    </div>
-                    <div class="dd-stat">
-                        <div class="dd-label">Status</div>
-                        <div class="dd-value" id="ddStatus">—</div>
-                        <div class="dd-sub" id="ddStatusDetail">—</div>
-                    </div>
-                </div>
-
-                <!-- Toolbar -->
-                <div class="drilldown-toolbar">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="drilldownSearch" placeholder="Search contigs…" />
-                    </div>
-                    <button class="btn btn-sm" id="ddZoomIn"><i class="fas fa-plus"></i></button>
-                    <button class="btn btn-sm" id="ddZoomOut"><i class="fas fa-minus"></i></button>
-                    <button class="btn btn-sm" id="ddZoomReset"><i class="fas fa-home"></i></button>
-                    <button class="btn btn-sm" id="ddShowBad"><i class="fas fa-exclamation-triangle"></i> Bad regions</button>
-                    <span style="font-size:10px;color:var(--text-muted);margin-left:4px;" id="ddNavInfo">0 contigs</span>
-                </div>
-
-                <!-- Contig list -->
-                <div class="drilldown-contigs" id="drilldownContigs">
-                    <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;padding:20px;text-align:center;flex-direction:column;gap:8px;">
-                        <i class="fas fa-dna" style="font-size:30px;opacity:0.3;"></i>
-                        <span>Select a plasmid to view <strong>contig-level alignment</strong></span>
-                        <span style="font-size:11px;">Click a plasmid in the recovery panel to drill down</span>
-                    </div>
-                </div>
-
-                <div class="explorer-info">
-                    <span id="ddCoords">coords: 0 – 0</span>
-                    <span id="ddStatusInfo">zoom: 1.0x · showing all contigs</span>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script>
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1453,6 +1507,8 @@
         const STATUSES = __PB.statuses;
         const ORGANISMS = __PB.organisms;
         const TECHNOLOGIES = __PB.technologies;
+        const ORIGINS = __PB.origins || [];
+        const TIERS = __PB.tiers || [];
         const REPLICONS = __PB.replicons;
         const AMR_GENES = __PB.amrGenes;
         const RECOVERY_CLASSES = ['complete_concordant', 'complete_discordant', 'near_complete', 'partial',
@@ -1472,6 +1528,8 @@
             sortAsc: true,
             organism: 'all',
             technology: 'all',
+            origin: 'all',
+            tier: 'all',
             status: 'all',
             search: '',
             drilldownZoom: 1,
@@ -1539,6 +1597,12 @@
             if (state.technology !== 'all') {
                 list = list.filter(sid => SAMPLE_META[sid].technology === state.technology);
             }
+            if (state.origin !== 'all') {
+                list = list.filter(sid => SAMPLE_META[sid].origin === state.origin);
+            }
+            if (state.tier !== 'all') {
+                list = list.filter(sid => SAMPLE_META[sid].tier === state.tier);
+            }
             if (state.status !== 'all') {
                 list = list.filter(sid => {
                     const metrics = DATASET[sid].metrics;
@@ -1565,6 +1629,7 @@
             if (key === 'structuralConcordance') return m.structuralConcordance || 0;
             if (key === 'runtime') return m.runtime || 0;
             if (key === 'memory') return m.memory || 0;
+            if (key === 'proteinCompleteness') return m.proteinCompleteness ?? null;
             return 0;
         }
 
@@ -1578,7 +1643,8 @@
                 plasmidsRecovered: 'Plasmids Rec.',
                 structuralConcordance: 'Struct. Concord.',
                 runtime: 'Runtime (min)',
-                memory: 'Memory (GB)'
+                memory: 'Memory (GB)',
+                proteinCompleteness: 'Protein coordinate recovery'
             };
             return map[state.metric] || state.metric;
         }
@@ -1830,13 +1896,19 @@
             let failures = 0,
                 totalRuns = 0;
             let totalPlasmidCount = 0,
-                recoveredCount = 0;
+                recoveredCount = 0,
+                totalProteinCount = 0,
+                projectedProteinCount = 0;
 
             filtered.forEach(sid => {
                 const meta = SAMPLE_META[sid];
                 totalPlasmidCount += meta.plasmids;
                 const plasmids = PLASMID_DATA[sid] || [];
                 recoveredCount += plasmids.filter(p => p.recoveryPct > 10).length;
+                plasmids.forEach(p => {
+                    totalProteinCount += (p.proteins || []).length;
+                    projectedProteinCount += (p.projectedProteins || []).length;
+                });
 
                 visibleTools.forEach(t => {
                     const v = getMetricValue(sid, t.id);
@@ -1861,6 +1933,9 @@
                 '% of runs' : '0%';
             document.getElementById('totalPlasmids').textContent = totalPlasmidCount;
             document.getElementById('recoveredPlasmids').textContent = recoveredCount + ' recovered';
+            document.getElementById('totalProteins').textContent = totalProteinCount || '—';
+            document.getElementById('recoveredProteins').textContent = totalProteinCount ?
+                projectedProteinCount + ' projected to reconstruction' : 'not measured';
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1877,7 +1952,8 @@
             const filtered = getFilteredSamples();
             const visibleTools = TOOLS;
             const W = boxPlotCanvas.parentElement.clientWidth - 28;
-            const H = 100;
+            const H = 220;
+            document.getElementById('boxPlotTitle').innerHTML = '<i class="fas fa-box"></i> ' + getMetricLabel() + ' — Metric Distribution by Tool';
             boxPlotCanvas.width = W * 2;
             boxPlotCanvas.height = H * 2;
             boxPlotCanvas.style.width = W + 'px';
@@ -2001,7 +2077,8 @@
             const filtered = getFilteredSamples();
             const visibleTools = TOOLS;
             const W = dotPlotCanvas.parentElement.clientWidth - 28;
-            const H = 100;
+            const H = 220;
+            document.getElementById('dotPlotTitle').innerHTML = '<i class="fas fa-circle"></i> ' + getMetricLabel() + ' — Per-Sample Distribution';
             dotPlotCanvas.width = W * 2;
             dotPlotCanvas.height = H * 2;
             dotPlotCanvas.style.width = W + 'px';
@@ -2269,6 +2346,8 @@
                     p.amrGenes.map(g => `<span style="font-size:7px;background:var(--bg-input);padding:1px 6px;border-radius:10px;color:var(--text-secondary);">${g}</span>`)
                     .join(' ') :
                     '<span style="font-size:8px;color:var(--text-muted);">—</span>';
+                const proteinNames = (p.proteins || []).slice(0, 6).map(x => x.gene || x.product || 'CDS');
+                const proteinText = proteinNames.length ? proteinNames.join(' · ') : 'not measured';
 
                 const isDrilldownActive = state.selectedPlasmid === p.id && drilldownModal.classList.contains('open');
 
@@ -2297,6 +2376,7 @@
                                 <span><span class="dot" style="background:var(--accent-red);"></span> contam.</span>
                                 <span><span class="dot" style="background:var(--accent-amber);"></span> ambiguous</span>
                                 <span style="margin-left:6px;">AMR: ${amrBadges}</span>
+                                <span style="margin-left:6px;" title="${proteinText}"><i class="fas fa-flask"></i> ${proteinNames.length} proteins</span>
                                 <span style="margin-left:6px;cursor:pointer;color:var(--accent-blue);font-weight:600;" class="drilldown-trigger" data-plasmid="${p.id}"><i class="fas fa-search-plus"></i> drilldown</span>
                             </div>
                         </div>
@@ -2508,8 +2588,17 @@
             if (state.metric !== 'baseF1') params.set('metric', state.metric);
             if (state.organism !== 'all') params.set('organism', state.organism);
             if (state.technology !== 'all') params.set('tech', state.technology);
+            if (state.origin !== 'all') params.set('origin', state.origin);
+            if (state.tier !== 'all') params.set('tier', state.tier);
             const hash = params.toString();
             history.replaceState(null, '', '#' + hash);
+            // Keep the detailed evidence panel below this frame synchronized
+            // with a heatmap selection without exposing any raw sequence data.
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'plasbench-selection',
+                    sample: state.selectedSample, tool: state.selectedTool,
+                    plasmid: state.selectedPlasmid }, '*');
+            }
         }
 
         function loadStateFromUrl() {
@@ -2521,7 +2610,7 @@
             if (params.has('metric')) {
                 const m = params.get('metric');
                 if (['baseF1', 'basePrecision', 'baseRecall', 'completeness', 'purity', 'plasmidsRecovered',
-                        'structuralConcordance', 'runtime', 'memory'
+                        'structuralConcordance', 'runtime', 'memory', 'proteinCompleteness'
                     ].includes(m)) {
                     state.metric = m;
                     document.getElementById('metricSelect').value = m;
@@ -2537,6 +2626,16 @@
                 if (TECHNOLOGIES.includes(t) || t === 'all') { state.technology = t;
                     document.getElementById('techFilter').value = t; }
             }
+            if (params.has('origin')) {
+                const origin = params.get('origin');
+                if (ORIGINS.includes(origin)) { state.origin = origin;
+                    document.getElementById('originFilter').value = origin; }
+            }
+            if (params.has('tier')) {
+                const tier = params.get('tier');
+                if (TIERS.includes(tier)) { state.tier = tier;
+                    document.getElementById('tierFilter').value = tier; }
+            }
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2550,14 +2649,15 @@
             state.selectedSample = cell.sample;
             state.selectedTool = cell.tool.id;
             state.selectedPlasmid = null;
+            canvas.focus();
             renderHeatmap();
             renderPlasmids();
             updateUrl();
             selectionInfo.textContent = `Selected: ${cell.sample} · ${cell.tool.label} · ${getMetricLabel()}: ${cell.value}`;
             tooltip.classList.remove('visible');
             // Close drilldown if open
-            if (drilldownModal.classList.contains('open')) {
-                drilldownModal.classList.remove('open');
+            if (drilldownModal.classList.contains('expanded')) {
+                collapseDrilldown();
             }
         });
 
@@ -2591,6 +2691,16 @@
             renderHeatmap();
             updateUrl();
         });
+        document.getElementById('originFilter').addEventListener('change', function() {
+            state.origin = this.value;
+            renderHeatmap();
+            updateUrl();
+        });
+        document.getElementById('tierFilter').addEventListener('change', function() {
+            state.tier = this.value;
+            renderHeatmap();
+            updateUrl();
+        });
         document.getElementById('statusFilter').addEventListener('change', function() {
             state.status = this.value;
             renderHeatmap();
@@ -2603,10 +2713,14 @@
             document.getElementById('sampleSearch').value = '';
             document.getElementById('organismFilter').value = 'all';
             document.getElementById('techFilter').value = 'all';
+            document.getElementById('originFilter').value = 'all';
+            document.getElementById('tierFilter').value = 'all';
             document.getElementById('statusFilter').value = 'all';
             state.search = '';
             state.organism = 'all';
             state.technology = 'all';
+            state.origin = 'all';
+            state.tier = 'all';
             state.status = 'all';
             renderHeatmap();
             updateUrl();
@@ -2661,7 +2775,7 @@
             selectionInfo.textContent = 'No selection';
             tooltip.classList.remove('visible');
             indicator.style.display = 'none';
-            if (drilldownModal.classList.contains('open')) drilldownModal.classList.remove('open');
+            if (drilldownModal.classList.contains('expanded')) collapseDrilldown();
         });
 
         // Show stats toggle
@@ -2686,13 +2800,28 @@
                 }
             }
         });
+        // Collapse back into the layout; the panel itself is never hidden.
+        document.getElementById('closeDrilldownBtn').addEventListener('click', collapseDrilldown);
 
         // Drilldown modal controls
-        document.getElementById('closeDrilldownBtn').addEventListener('click', function() {
-            drilldownModal.classList.remove('open');
+        function expandDrilldown() {
+            drilldownModal.classList.add('expanded');
+            const label = document.getElementById('expandLabel');
+            if (label) label.textContent = 'Collapse';
+        }
+
+        function collapseDrilldown() {
+            drilldownModal.classList.remove('expanded');
+            const label = document.getElementById('expandLabel');
+            if (label) label.textContent = 'Expand';
+        }
+
+        document.getElementById('expandDrilldownBtn').addEventListener('click', () => {
+            drilldownModal.classList.contains('expanded') ? collapseDrilldown() : expandDrilldown();
         });
+
         drilldownModal.addEventListener('click', function(e) {
-            if (e.target === this) drilldownModal.classList.remove('open');
+            if (e.target === this) drilldownModal.classList.remove('open', 'expanded');
         });
 
         document.getElementById('exportDrilldownBtn').addEventListener('click', function() {
@@ -2777,8 +2906,8 @@
 
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                if (drilldownModal.classList.contains('open')) {
-                    drilldownModal.classList.remove('open');
+                if (drilldownModal.classList.contains('expanded')) {
+                    collapseDrilldown();
                 } else {
                     state.selectedSample = null;
                     state.selectedTool = null;
@@ -2825,7 +2954,7 @@
                         updateUrl();
                         selectionInfo.textContent =
                             `Selected: ${state.selectedSample} · ${TOOLS[newCol].label}`;
-                        if (drilldownModal.classList.contains('open')) drilldownModal.classList.remove('open');
+                        if (drilldownModal.classList.contains('expanded')) collapseDrilldown();
                     }
                 }
             }
@@ -2841,7 +2970,8 @@
 
             // Cohort selects list only values present in this run, so a filter can
             // never offer an organism or technology the cohort does not contain.
-            [['organismFilter', ORGANISMS], ['techFilter', TECHNOLOGIES]].forEach(([id, values]) => {
+            [['organismFilter', ORGANISMS], ['techFilter', TECHNOLOGIES],
+             ['originFilter', ORIGINS], ['tierFilter', TIERS]].forEach(([id, values]) => {
                 const select = document.getElementById(id);
                 if (!select) return;
                 values.filter(v => v && v !== 'not recorded').forEach(v => {

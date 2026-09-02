@@ -68,16 +68,17 @@ def main():
                         "--leaderboard", leaderboard, "--out", out], check=True)
         page = open(out, encoding="utf-8").read()
 
-    # Accessibility: status must not be encoded by colour alone, and the grid
-    # must be reachable without a pointer.
-    for needed in ("vq-glyph", "tabindex", "aria-label", "ArrowDown", "focus-visible"):
+    # The retained canvas matrix exposes an accessible description, receives
+    # keyboard focus, and supports keyboard movement and modal drilldown.
+    for needed in ("tabindex=\"0\"", "aria-label", "ArrowDown", "focus-visible",
+                   "openDrilldown"):
         assert needed in page, f"accessibility affordance missing: {needed}"
     # Selections must be shareable.
     assert "history.replaceState" in page and "URLSearchParams" in page, "URL state missing"
-    # Cohort narrowing and the visible-record count.
-    for needed in ("vq-filters", "vq-reset", "vq-search", "vq-order", "Showing "):
+    # Cohort narrowing and the visible-record count are owned by the retained
+    # dashboard, including every former metadata filter.
+    for needed in ("originFilter", "tierFilter", "sampleSearch", "resetFiltersBtn", "Showing "):
         assert needed in page, f"filter affordance missing: {needed}"
-    assert "Number(c.innerText)" not in page, "row ordering must use source metrics, not decorated cell text"
     assert 'id="vq-filter"' not in page, "legacy duplicate visual filters must not be emitted"
     # Per-plasmid summary and the contamination surfacing that completeness hides.
     for needed in ("vq-summary", "Impure records", "Chromosomal contamination for",
@@ -97,16 +98,16 @@ def main():
                    "coordinate-complete", "not amino-acid identity"):
         assert needed in page, f"protein viewer affordance missing: {needed}"
 
-    # Cohort dashboard: headline cards and distribution plots from measured data.
-    for needed in ("vq-stats", "vq-dist", "Leading method", "Hardest sample",
-                   "Excluded runs", "Mean plasmid recall",
-                   "Structural collinearity", "Runtime (min)", "Peak memory (GB)"):
+    # The embedded cohort dashboard owns summary cards and distribution plots.
+    # The legacy renderer must not add a second copy below it.
+    for needed in ("Best Tool", "Top Sample", "Failures", "Plasmids",
+                   "Protein coordinate recovery", "Runtime (min)", "Memory (GB)"):
         assert needed in page, f"cohort dashboard affordance missing: {needed}"
+    assert 'id="vq-stats"' not in page and 'id="vq-dist"' not in page, \
+        "legacy overview cards and distribution plots must not be emitted"
     # An unmeasured metric must say so rather than plot fabricated zeros.
-    assert "No measured values for this metric" in page, "missing-metric wording absent"
+    assert "not measured" in page, "missing-metric wording absent"
     assert "not counted as zero" in page or "rather than as zero" in page or         "excluded rather than counted as zero" in page, "zero-substitution caveat absent"
-    # Only cohort selects may filter; an ordering control must not hide every row.
-    assert "select[data-k]" in page, "filter loop must be scoped to cohort selects"
     # The programme rename must hold in the shipped page.
     assert "PlasBench plasmid benchmark report" in page, "report title not renamed"
     assert "PlasBench plasmid reconstruction benchmark" in page, "report heading not renamed"
@@ -115,20 +116,25 @@ def main():
     for banner in ("SPREAD plasmid benchmark report", "SPREAD plasmid reconstruction benchmark"):
         assert banner not in page, f"legacy programme branding remains: {banner}"
 
-    # Canvas matrix is an additional view: the semantic table must survive as the
-    # accessible fallback, and the modal must be scoped to the canvas alone.
-    for needed in ("cv-canvas", "cv-modal", "cv-dialog", "cv-sort", "cv-open-inline",
-                   "getContext", "devicePixelRatio"):
-        assert needed in page, f"canvas heatmap affordance missing: {needed}"
-    assert "vq-cell" in page, "the accessible table heatmap must remain alongside the canvas"
-    assert 'aria-modal="true"' in page, "drilldown modal must declare modal semantics"
+    # The enterprise Sample-Tool Heatmap is the single matrix. It retains
+    # filtering, canvas tooltip, clustering, and drilldown; the detailed tracks
+    # now live beneath the same dashboard rather than beside another matrix.
+    for needed in ("Sample–Tool Heatmap", "heatmapCanvas", "heatmapTooltip",
+                   "clusterBtn", "drilldownModal", "getContext"):
+        assert needed in page, f"sample-tool heatmap affordance missing: {needed}"
+    assert "cv-canvas" not in page, "duplicate Sample x method matrix must not be emitted"
+    assert "vq-heatmap" not in page and "vq-cell" not in page, \
+        "legacy Sample x method matrix must not be emitted"
+    assert "cohort-evidence-explorer" in page, "detailed evidence must be nested in the cohort dashboard"
+    assert "href='#enterprise'>Interactive dashboard" in page, \
+        "report navigation must target the consolidated dashboard"
     # Vendored faces: no CDN request may remain, and the fonts must be embedded.
     for banned in ("fonts.googleapis.com", "cdnjs.cloudflare.com", "fonts.gstatic.com"):
         assert banned not in page, f"report still references a CDN: {banned}"
     assert "data:font/woff2;base64," in page, "web fonts are not vendored into the report"
     assert "PlasBenchIcons" in page, "icon face not vendored"
-    # Non-Element keydown targets must not throw.
-    assert "e.target?.matches?.(" in page, "keydown handler must tolerate non-Element targets"
+    # The retained dashboard owns keyboard navigation from a document listener.
+    assert "document.addEventListener('keydown'" in page, "dashboard keyboard navigation missing"
 
     # Adopted enterprise dashboard: present, isolated, and driven by measurements.
     for needed in ("pb-enterprise", "pb-enterprise-doc", "pb-data", "heatmapCanvas",
@@ -143,6 +149,9 @@ def main():
     assert '"simulated":false' in page or '"simulated": false' in page,         "dashboard payload must declare it is not simulated"
     # Helpers the removed generator owned must still be defined for the renderer.
     assert "function clamp(" in page, "clamp helper missing after generator removal"
+    for needed in ("Protein coordinate recovery", "Named proteins", "totalProteins",
+                   "Metric Distribution by Tool", "Per-Sample Distribution"):
+        assert needed in page, f"consolidated dashboard feature missing: {needed}"
 
     # The embedded dashboard matches the surrounding light report and carries no
     # prototype branding or hardcoded cohort figures.
@@ -156,6 +165,17 @@ def main():
     # Heatmap and plasmid panels share a row down to laptop widths.
     assert "@media (max-width: 900px)" in page, "grid must stay two-column above 900px"
     assert "minmax(0, 1fr) minmax(0, 1fr)" in page, "grid tracks must be shrinkable"
+
+    # Layout: 40/60 columns, with the heatmap column split into two equal rows.
+    assert "minmax(0, 2fr) minmax(0, 3fr)" in page, "heatmap/plasmid split must be 40/60"
+    assert "left-stack" in page, "heatmap column must stack heatmap over drilldown"
+    # The drilldown belongs to the layout; only .expanded promotes it to an overlay.
+    assert ".modal-overlay.expanded" in page, "drilldown must have an expanded state"
+    assert "expandDrilldownBtn" in page, "drilldown must offer a full-screen control"
+    assert "collapseDrilldown" in page, "escape and close must collapse, not hide"
+    # Heading is readable on the light surface; the gradient fill was invisible.
+    assert "-webkit-text-fill-color: transparent" not in page,         "gradient text fill is unreadable on the light surface"
+    assert "color: #000;" in page, "dashboard heading must be black"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 
