@@ -216,6 +216,10 @@ def selection_card(sample, results_dir, report_path):
     directory = results_dir / sample / "selected_candidate"
     report_file = directory / "selection_report.json"
     if not report_file.is_file():
+        # Operational, truth-unknown selection may be created before the
+        # nominated reconstruction is available to copy into selected_candidate.
+        report_file = results_dir / sample / "selection_report.json"
+    if not report_file.is_file():
         return "<p class='muted'>No selected reconstruction was created for this sample.</p>"
     try:
         report = json.loads(report_file.read_text(encoding="utf-8"))
@@ -245,8 +249,8 @@ def selection_card(sample, results_dir, report_path):
         f"{agreement.get('status', 'not assessed')} agreement (mean reference-footprint overlap "
         f"{agreement.get('mean_reference_footprint_jaccard', '-')}).")
     structural = report.get("structural_evidence") or {}
-    structural_text = (f"{len(structural.get('items', []))} source-reported structural evidence item(s) available."
-                       if structural.get("status") == "reported_by_source" else "No source-reported replicon, MOB, or closure evidence was supplied.")
+    structural_text = (f"{len(structural.get('items', []))} validated source-evidence item(s), including {len(structural.get('validated_closure_items', []))} supported closure item(s)."
+                       if structural.get("status") == "validated_source_evidence" else "No validated replicon, MOB, or closure evidence was supplied.")
     return """<div class='selection-card {tone}'>
 <div><span class='selection-label'>{status}</span><h3>{sample}: {tool}</h3><p>{score}</p><p><strong>Confidence:</strong> {confidence}</p></div>
 <div class='selection-actions'>{fasta}<br>{report}</div>

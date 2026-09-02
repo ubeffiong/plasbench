@@ -50,6 +50,7 @@ export RUN_PLASMIDSPADES="${RUN_PLASMIDSPADES:-1}"
 # classifier. External prediction TSVs must use gplas2's documented columns.
 export RUN_GPLAS2_MOB="${RUN_GPLAS2_MOB:-0}"
 export RUN_GPLAS2_EXTERNAL="${RUN_GPLAS2_EXTERNAL:-0}"
+export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
 export GPLAS2_EXTERNAL_PREDICTIONS_DIR="${GPLAS2_EXTERNAL_PREDICTIONS_DIR:-}"
 export GPLAS2_MIN_CONTIG_LENGTH="${GPLAS2_MIN_CONTIG_LENGTH:-1000}"
 
@@ -68,6 +69,13 @@ export FASTP_EXTRA="${FASTP_EXTRA:-}"       # extra fastp args if you want them
 # --- Assembly ----------------------------------------------------------------
 # "spades" (default) or "unicycler". Unicycler gives cleaner graphs but is slower.
 export ASSEMBLER="${ASSEMBLER:-spades}"
+
+# --- Native long-read reconstruction (optional stage 7) ---------------------
+# Stage 7 accepts ONT or PacBio reads staged as data/<sample>/long_reads.fastq.gz.
+# Flye assembles the reads, then MOB-Recon classifies plasmid bins from that
+# assembly. This is opt-in so short-read benchmarks remain unchanged.
+export LONG_READS_FILE="${LONG_READS_FILE:-long_reads.fastq.gz}"
+export FLYE_READ_TYPE="${FLYE_READ_TYPE:-nano-hq}"
 
 # --- Mapping (scoring) -------------------------------------------------------
 # minimap2 preset for aligning predicted-plasmid contigs back to the reference.

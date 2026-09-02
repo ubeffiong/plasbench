@@ -13,7 +13,8 @@ case "$PROFILE" in
  core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk);;
  assembly) PKGS=(spades unicycler);;
  reconstruction) PKGS=(mob_suite platon);;
- all) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk spades unicycler mob_suite platon);;
+ long-read) PKGS=(flye mob_suite);;
+ all) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk spades unicycler flye mob_suite platon);;
  *) PKGS=("$PROFILE");;
 esac
 echo "[plasbench] installing into $ENV_NAME: ${PKGS[*]}"
