@@ -208,26 +208,28 @@ def main():
     tool_data, all_blocks = {}, []
     for paf in sorted(sample_dir.glob("*.pred_vs_ref.paf")):
         tool = paf.name.replace(".pred_vs_ref.paf", "")
-        blocks = paf_blocks(paf, truth)
-        retained = sorted(blocks, key=lambda row: (-row["block_length"], row["target"], row["target_start"], row["record_id"]))[:args.max_blocks_per_tool]
+        all_blocks_for_tool = paf_blocks(paf, truth)
+        # The display cap never changes analytical recovery or structural
+        # diagnostics. It only bounds SVG/HTML payload size.
+        retained = sorted(all_blocks_for_tool, key=lambda row: (-row["block_length"], row["target"], row["target_start"], row["record_id"]))[:args.max_blocks_per_tool]
         prediction_path = sample_dir / f"pred_{tool}.plasmid.fasta"
         prediction = read_fasta(prediction_path) if prediction_path.is_file() else {}
         for block in retained:
             alignment = local_alignment(block, reference, prediction, args.max_nucleotide_bp)
             if alignment:
                 block["local_alignment"] = alignment
-        truncated = max(0, len(blocks) - len(retained))
+        truncated = max(0, len(all_blocks_for_tool) - len(retained))
         coverage = defaultdict(list)
-        for block in retained:
+        for block in all_blocks_for_tool:
             if block["molecule_type"] == "PLASMID":
                 coverage[block["target"]].append((block["target_start"], block["target_end"]))
         recovery = {plasmid: {"covered_intervals": merge(coverage[plasmid]),
                                "covered_bp": sum(end - start for start, end in merge(coverage[plasmid])),
                                "completeness": round(sum(end - start for start, end in merge(coverage[plasmid])) / details["length"], 6)}
                     for plasmid, details in plasmids.items()}
-        chromosome_bp = sum(max(0, block["target_end"] - block["target_start"]) for block in retained if block["molecule_type"] == "CHROMOSOME")
+        chromosome_bp = sum(max(0, block["target_end"] - block["target_start"]) for block in all_blocks_for_tool if block["molecule_type"] == "CHROMOSOME")
         tool_data[tool] = {"blocks": retained, "blocks_omitted": truncated, "plasmid_recovery": recovery,
-                           "chromosome_aligned_bp": chromosome_bp, "structural_diagnostics": structural_metrics(retained)}
+                           "chromosome_aligned_bp": chromosome_bp, "structural_diagnostics": structural_metrics(all_blocks_for_tool)}
         tool_data[tool]["bin_assignment_flows"] = bin_assignment_flows(sample_dir, tool)
         all_blocks.extend(retained)
     payload = {"schema_version": "1.0", "sample": args.sample, "coordinate_system": "0-based half-open reference coordinates",

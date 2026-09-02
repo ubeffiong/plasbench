@@ -7,6 +7,7 @@ import datetime as dt
 import html
 import json
 import os
+import shutil
 from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import quote
@@ -43,6 +44,10 @@ def read_tool_versions(path):
 
 def number(value):
     return float(value) if value not in (None, "") else 0.0
+
+
+def optional_number(value):
+    return float(value) if value not in (None, "") else None
 
 
 def esc(value):
@@ -261,29 +266,69 @@ def selection_card(sample, results_dir, report_path):
         report=report_link, reasons=reasons, alternatives=alternatives, agreement=esc(agreement_text), structural=esc(structural_text))
 
 
-def visual_quality_section(scores, status, results_dir):
-    """Return a linked heatmap and reference-coordinate alignment explorer."""
-    visualizations = {}
-    for sample in {row["sample"] for row in scores}:
+INLINE_VISUALIZATION_BUDGET = 6 * 1024 * 1024
+
+
+def stage_visualizations(scores, results_dir, report_path, inline_budget=INLINE_VISUALIZATION_BUDGET):
+    """Inline small visualization payloads; publish large ones as sibling files.
+
+    Every sample's alignment blocks embedded in one page does not survive a real
+    cohort: at ~219 bytes per retained block a 32-sample run reaches tens of
+    megabytes, all parsed before anything renders. Small runs stay a single
+    portable file; larger ones are fetched per sample on selection.
+    """
+    available, inline, total = {}, {}, 0
+    for sample in sorted({row["sample"] for row in scores}):
         path = results_dir / sample / "visualization" / "alignment_blocks.json"
-        if path.is_file():
-            try:
-                visualizations[sample] = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+            payload = json.loads(text)
+        except (OSError, json.JSONDecodeError):
+            continue
+        available[sample] = len(text)
+        total += len(text)
+        inline[sample] = payload
+    if total <= inline_budget:
+        return inline, {}, {"mode": "inline", "bytes": total, "samples": len(inline)}
+    # Publish beside the report so the browser can fetch one sample at a time.
+    out_dir = report_path.parent / "visualization"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    external = {}
+    for sample in available:
+        source = results_dir / sample / "visualization" / "alignment_blocks.json"
+        target = out_dir / f"{sample}.json"
+        try:
+            shutil.copyfile(source, target)
+        except OSError:
+            continue
+        external[sample] = f"visualization/{quote(sample, safe='')}.json"
+    return {}, external, {"mode": "external", "bytes": total, "samples": len(external)}
+
+
+def visual_quality_section(scores, status, results_dir, report_path=None):
+    """Return a linked heatmap and reference-coordinate alignment explorer."""
+    report_path = report_path or (results_dir / "benchmark.report.html")
+    visualizations, external, staging = stage_visualizations(scores, results_dir, report_path)
     state = {(row.get("sample"), row.get("tool")): row.get("status", "scored") for row in status}
     matrix = []
     for row in scores:
         tp, fp = number(row.get("TP_bp")), number(row.get("FP_bp"))
-        base_f1, plasmid_recall = number(row.get("f1")), number(row.get("plasmid_recall"))
-        bin_f1 = number(row["bin_f1"]) if row.get("bin_f1") else base_f1
+        base_f1, plasmid_recall = optional_number(row.get("f1")), optional_number(row.get("plasmid_recall"))
+        bin_f1 = optional_number(row.get("bin_f1"))
         contamination = fp / (tp + fp) if tp + fp else None
-        composite = .45 * base_f1 + .25 * plasmid_recall + .15 * bin_f1 + .15 * (1 - contamination if contamination is not None else 0)
+        components = [(0.45, base_f1), (0.25, plasmid_recall), (0.15, bin_f1),
+                      (0.15, 1 - contamination if contamination is not None else None)]
+        available = [(weight, value) for weight, value in components if value is not None]
+        composite = sum(weight * value for weight, value in available) / sum(weight for weight, _ in available) if available else None
         matrix.append({"sample": row["sample"], "tool": row["tool"], "status": state.get((row["sample"], row["tool"]), "scored"),
                        "f1": number(row.get("f1")), "precision": number(row.get("precision")), "recall": number(row.get("recall")),
                        "plasmid_recall": plasmid_recall, "bin_f1": number(row["bin_f1"]) if row.get("bin_f1") else None,
                        "contamination": contamination, "unmapped": number(row.get("unmapped_pred_bp")), "composite": composite})
-    payload = json.dumps({"matrix": matrix, "visualizations": visualizations}, separators=(",", ":")).replace("<", "\\u003c")
+    payload = json.dumps({"matrix": matrix, "visualizations": visualizations,
+                          "visualization_sources": external, "staging": staging},
+                         separators=(",", ":")).replace("<", "\\u003c")
     return """<section id='visual-quality'><h2>Visual reconstruction quality</h2>
 <p class='lead'>Click a heatmap cell to follow the result from cohort quality to one truth plasmid. The explorer uses retained primary PAF blocks on truth-reference coordinates; it is not a raw nucleotide alignment or an independent structural-validation claim.</p>
 <div class='controls'><label>Metric <select id='vq-metric'><option value='f1'>Base F1</option><option value='precision'>Precision</option><option value='recall'>Recall</option><option value='plasmid_recall'>Plasmid recall</option><option value='bin_f1'>Bin F1</option><option value='contamination'>Chromosome contamination</option><option value='unmapped'>Unmapped predicted bp</option><option value='status'>Execution status</option></select></label><span id='vq-note' class='count'></span></div><div class='panel'><div id='vq-heatmap'></div></div>
@@ -303,14 +348,247 @@ $('vq-metric').onchange=heat;$('vq-sample').onchange=()=>{range=null;setTools();
 def advanced_visual_script():
     """Enhance the base explorer with dot plot, flows, exports, and local bases."""
     return """<script>
-(()=>{const $=id=>document.getElementById(id),data=JSON.parse($('vq-data').textContent),tracks=$('vq-tracks'),detail=$('vq-detail');let composite=document.createElement('option');composite.value='composite';composite.textContent='Exploratory composite quality';$('vq-metric').append(composite);let filter=document.createElement('input'),order=document.createElement('button');filter.id='vq-filter';filter.placeholder='Filter sample or tool';order.type='button';order.textContent='Order samples by best visible metric';$('vq-heatmap').before(filter,order);
+(()=>{const $=id=>document.getElementById(id),data=JSON.parse($('vq-data').textContent),tracks=$('vq-tracks'),detail=$('vq-detail');let composite=document.createElement('option');composite.value='composite';composite.textContent='Exploratory composite quality';$('vq-metric').append(composite);
 const dot=document.createElement('div'),flow=document.createElement('div'),actions=document.createElement('span');dot.id='vq-dotplot';flow.id='vq-flow';tracks.after(dot,flow);actions.innerHTML='<button id="vq-svg" type="button">Download track SVG</button><button id="vq-png" type="button">Download track PNG</button>';$('vq-download').after(actions);
 function current(){let a=data.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t])return null;let lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||a.truth_plasmids[p].length;return {a,p,t,lo,hi,blocks:a.tools[t].blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi)}}
-function renderDot(){let x=current();if(!x){dot.innerHTML='';flow.innerHTML='';return}let l=x.a.truth_plasmids[x.p].length,scale=v=>30+v/l*420;let lines=x.blocks.map(b=>`<line x1="${scale(b.target_start)}" y1="${scale(b.query_start)}" x2="${scale(b.target_end)}" y2="${scale(b.query_end)}" stroke="${b.strand==='-'?'#7f5aa2':'#16805a'}" stroke-width="2"/>`).join('');dot.innerHTML=`<h3>Dot plot: ${x.t} vs ${x.p}</h3><p class="muted">Reference coordinate is horizontal; predicted-record coordinate is vertical. A continuous forward diagonal supports collinearity; this diagnostic does not validate complete structural correctness.</p><svg viewBox="0 0 480 480" width="480" role="img" aria-label="Dot plot"><rect x="30" y="30" width="420" height="420" fill="#f7f8f5" stroke="#849387"/>${lines}<text x="180" y="475" font-size="11">truth plasmid coordinate</text><text x="2" y="20" font-size="11">predicted coordinate</text></svg>`;let f=x.a.tools[x.t].bin_assignment_flows||[];flow.innerHTML=f.length?'<h3>Bin-to-truth assignment flow</h3><p class="muted">Only scored bin assignments are shown; unobserved alternative links are not fabricated.</p><ul>'+f.map(r=>`<li>${r.bin_id||'no bin'} → ${r.true_plasmid||r.status}: ${r.aligned_bp.toLocaleString()} bp (${r.status})</li>`).join('')+'</ul>':''}
-function applyFilter(){let q=filter.value.toLowerCase();document.querySelectorAll('#vq-heatmap tbody tr').forEach(row=>row.hidden=q&&!row.innerText.toLowerCase().includes(q))}filter.oninput=applyFilter;order.onclick=()=>{let key=$('vq-metric').value,body=document.querySelector('#vq-heatmap tbody');[...body.rows].sort((a,b)=>{let score=r=>Math.max(...[...r.querySelectorAll('.vq-cell')].map(c=>Number(c.innerText)).filter(Number.isFinite),-Infinity);return score(b)-score(a)}).forEach(r=>body.append(r))};$('vq-metric').addEventListener('change',()=>setTimeout(applyFilter,0));
+function renderFlow(){let x=current();if(!x){flow.innerHTML='';return}let f=x.a.tools[x.t].bin_assignment_flows||[];flow.innerHTML=f.length?'<h3>Bin-to-truth assignment flow</h3><p class="muted">Only scored bin assignments are shown; unobserved alternative links are not fabricated.</p><ul>'+f.map(r=>`<li>${r.bin_id||'no bin'} → ${r.true_plasmid||r.status}: ${r.aligned_bp.toLocaleString()} bp (${r.status})</li>`).join('')+'</ul>':''}
 function local(e){let x=current();if(!x)return;let b=x.blocks[Number(e.target.dataset.i)];if(!b)return;let a=b.local_alignment;if(!a){detail.textContent='No bounded CIGAR local alignment is available for this block. Re-run stage 5 after the CIGAR-enabled mapper update, or inspect the PAF externally.';return}let marks=[...a.reference].map((c,i)=>c===a.prediction[i]?' ':'^').join('');detail.innerHTML='<strong>Local nucleotide alignment</strong><br><code>Reference  '+a.reference+'<br>           '+marks+'<br>Prediction '+a.prediction+'</code><p class="muted">'+a.meaning+'</p>'}
-document.addEventListener('click',e=>{if(e.target.classList.contains('vq-block')){setTimeout(()=>{local(e);renderDot()},0)}});['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end','vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(renderDot,0)));$('vq-fit').addEventListener('click',()=>setTimeout(renderDot,0));$('vq-in').addEventListener('click',()=>setTimeout(renderDot,0));$('vq-out').addEventListener('click',()=>setTimeout(renderDot,0));
-function download(name,blob){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),0)}$('vq-svg').onclick=()=>{let svg=tracks.querySelector('svg');if(svg)download('plasbench-recovery-tracks.svg',new Blob([svg.outerHTML],{type:'image/svg+xml'}))};$('vq-png').onclick=()=>{let svg=tracks.querySelector('svg');if(!svg)return;let image=new Image(),url=URL.createObjectURL(new Blob([svg.outerHTML],{type:'image/svg+xml'}));image.onload=()=>{let c=document.createElement('canvas');c.width=1100;c.height=svg.viewBox.baseVal.height;c.getContext('2d').drawImage(image,0,0);c.toBlob(b=>download('plasbench-recovery-tracks.png',b));URL.revokeObjectURL(url)};image.src=url};renderDot();})();
+document.addEventListener('click',e=>{if(e.target.classList.contains('vq-block'))setTimeout(()=>local(e),0)});['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end','vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(renderFlow,0)));$('vq-fit').addEventListener('click',()=>setTimeout(renderFlow,0));$('vq-in').addEventListener('click',()=>setTimeout(renderFlow,0));$('vq-out').addEventListener('click',()=>setTimeout(renderFlow,0));
+function download(name,blob){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),0)}$('vq-svg').onclick=()=>{let svg=tracks.querySelector('svg');if(svg)download('plasbench-recovery-tracks.svg',new Blob([svg.outerHTML],{type:'image/svg+xml'}))};$('vq-png').onclick=()=>{let svg=tracks.querySelector('svg');if(!svg)return;let image=new Image(),url=URL.createObjectURL(new Blob([svg.outerHTML],{type:'image/svg+xml'}));image.onload=()=>{let c=document.createElement('canvas');c.width=1100;c.height=svg.viewBox.baseVal.height;c.getContext('2d').drawImage(image,0,0);c.toBlob(b=>download('plasbench-recovery-tracks.png',b));URL.revokeObjectURL(url)};image.src=url};renderFlow();})();
+</script>"""
+
+
+def flow_and_clustering_script():
+    """Interactive alluvial bin-to-truth flow, plus optional row clustering."""
+    return """<style>
+#vq-sankey svg{max-width:100%;height:auto}
+#vq-sankey .lnk{fill-opacity:.45;cursor:pointer}
+#vq-sankey .lnk:hover,#vq-sankey .lnk.on{fill-opacity:.85}
+#vq-sankey .nd{fill:#2f4f45}
+#vq-sankey text{font:11px Arial,sans-serif;fill:#26332d}
+#vq-sankey-detail{font:12px Arial,sans-serif;color:#3b4746;margin-top:6px}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+// ---- clustering ----------------------------------------------------------
+const opt=document.createElement('label');opt.style.font='12px Arial,sans-serif';
+opt.innerHTML=' <input type="checkbox" id="vq-cluster"> Cluster samples by tool-profile similarity';
+$('vq-metric').parentElement.after(opt);
+function profile(sample){const tools=[...new Set(d.matrix.map(x=>x.tool))].sort();
+ return tools.map(t=>{const r=d.matrix.find(x=>x.sample===sample&&x.tool===t);return r&&r.f1!=null?r.f1:0})}
+function cluster(samples){
+ // Average-linkage agglomerative ordering on Euclidean profile distance. The
+ // leaf order is a reading aid; deterministic sort remains the default.
+ let nodes=samples.map(s=>({items:[s],vec:profile(s)}));
+ const dist=(a,b)=>Math.sqrt(a.vec.reduce((s,v,i)=>s+(v-b.vec[i])**2,0));
+ while(nodes.length>1){let best=[0,1],bd=Infinity;
+  for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const v=dist(nodes[i],nodes[j]);if(v<bd){bd=v;best=[i,j]}}
+  const [i,j]=best,a=nodes[i],b=nodes[j];
+  const merged={items:a.items.concat(b.items),vec:a.vec.map((v,k)=>(v*a.items.length+b.vec[k]*b.items.length)/(a.items.length+b.items.length))};
+  nodes=nodes.filter((_,k)=>k!==i&&k!==j);nodes.push(merged)}
+ return nodes[0].items}
+function applyCluster(){const body=$('vq-heatmap').querySelector('tbody');if(!body)return;
+ const trs=[...body.querySelectorAll('tr')];
+ const key=tr=>tr.querySelector('td strong')?.textContent||'';
+ const order=$('vq-cluster').checked?cluster(trs.map(key)):trs.map(key).sort();
+ order.forEach(s=>{const tr=trs.find(t=>key(t)===s);if(tr)body.appendChild(tr)})}
+$('vq-cluster').onchange=applyCluster;
+new MutationObserver(()=>{if($('vq-cluster').checked)applyCluster()}).observe($('vq-heatmap'),{childList:true});
+// ---- alluvial flow -------------------------------------------------------
+const host=document.createElement('div');host.id='vq-sankey';
+const detail=document.createElement('div');detail.id='vq-sankey-detail';
+($('vq-flow')||$('vq-tracks')).after(host);host.after(detail);
+function render(){const a=d.visualizations[$('vq-sample').value],t=$('vq-tool').value;
+ if(!a||!a.tools[t]){host.innerHTML='';detail.textContent='';return}
+ const flows=(a.tools[t].bin_assignment_flows||[]).filter(f=>f.bin_id&&f.true_plasmid&&f.aligned_bp>0);
+ if(!flows.length){host.innerHTML='<h3>Bin-to-truth flow</h3><p class="muted">No scored bin assignments for this method; contig-level classifiers do not declare bins.</p>';detail.textContent='';return}
+ const bins=[...new Set(flows.map(f=>f.bin_id))],truths=[...new Set(flows.map(f=>f.true_plasmid))];
+ const total=flows.reduce((s,f)=>s+f.aligned_bp,0);
+ const H=Math.max(160,Math.max(bins.length,truths.length)*46),W=760,gap=6;
+ const lay=(names,x)=>{let y=20,m={};const tot=names.reduce((s,n)=>s+flows.filter(f=>(x?f.true_plasmid:f.bin_id)===n).reduce((q,f)=>q+f.aligned_bp,0),0)||1;
+  names.forEach(n=>{const bp=flows.filter(f=>(x?f.true_plasmid:f.bin_id)===n).reduce((q,f)=>q+f.aligned_bp,0);
+   const h=Math.max(12,(H-40)*bp/tot-gap);m[n]={y,h,bp,cursor:y};y+=h+gap});return m};
+ const L=lay(bins,0),R=lay(truths,1);
+ let paths='';flows.sort((a2,b2)=>b2.aligned_bp-a2.aligned_bp).forEach((f,i)=>{
+  const l=L[f.bin_id],r=R[f.true_plasmid];const lh=Math.max(2,l.h*f.aligned_bp/l.bp),rh=Math.max(2,r.h*f.aligned_bp/r.bp);
+  const y1=l.cursor,y2=r.cursor;l.cursor+=lh;r.cursor+=rh;
+  paths+=`<path class="lnk" data-i="${i}" fill="${f.status==='matched'?'#16805a':'#9a5a05'}" d="M150 ${y1} C 380 ${y1}, 380 ${y2}, 610 ${y2} L610 ${y2+rh} C 380 ${y2+rh}, 380 ${y1+lh}, 150 ${y1+lh} Z"><title>${f.bin_id} → ${f.true_plasmid}: ${f.aligned_bp.toLocaleString()} bp (${f.status})</title></path>`});
+ const nodes=bins.map(n=>`<rect class="nd" x="140" y="${L[n].y}" width="10" height="${L[n].h}"/><text x="134" y="${L[n].y+12}" text-anchor="end">${n}</text>`).join('')
+  +truths.map(n=>`<rect class="nd" x="610" y="${R[n].y}" width="10" height="${R[n].h}"/><text x="626" y="${R[n].y+12}">${n}</text>`).join('');
+ host.innerHTML=`<h3>Bin-to-truth flow: ${t}</h3><p class="muted">Ribbon width is aligned bases. Left is predicted bins, right is truth plasmids. Amber ribbons are assignments the scorer did not accept as a one-to-one match. Only observed assignments are drawn.</p>`
+  +`<svg viewBox="0 0 ${W} ${H+20}" role="img" aria-label="Bin to truth assignment flow">${paths}${nodes}</svg>`;
+ const splits=truths.filter(n=>new Set(flows.filter(f=>f.true_plasmid===n).map(f=>f.bin_id)).size>1);
+ const merges=bins.filter(n=>new Set(flows.filter(f=>f.bin_id===n).map(f=>f.true_plasmid)).size>1);
+ detail.textContent=`${flows.length} assignment(s), ${total.toLocaleString()} aligned bp. `
+  +(splits.length?`Split across bins: ${splits.join(', ')}. `:'')+(merges.length?`Bins spanning several truth plasmids: ${merges.join(', ')}.`:'')
+  +(!splits.length&&!merges.length?'Every assignment is one-to-one.':'');
+ host.querySelectorAll('.lnk').forEach(p=>p.onclick=()=>{
+  host.querySelectorAll('.lnk').forEach(x=>x.classList.remove('on'));p.classList.add('on');
+  const f=flows[+p.dataset.i];detail.textContent=`${f.bin_id} → ${f.true_plasmid}: ${f.aligned_bp.toLocaleString()} aligned bp, status ${f.status}.`;
+  if([...$('vq-plasmid').options].some(o=>o.value===f.true_plasmid)){$('vq-plasmid').value=f.true_plasmid;$('vq-plasmid').dispatchEvent(new Event('change'))}})}
+['vq-sample','vq-tool'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(render,0)));
+$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));
+render();})();
+</script>"""
+
+
+def explorer_navigation_script():
+    """Search, row management, drag navigation, and event-to-event jumping."""
+    return """<style>
+#vq-nav{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:12px 0}
+#vq-nav .grp{display:flex;gap:6px;align-items:end}
+#vq-rows{display:flex;flex-wrap:wrap;gap:10px;font:12px Arial,sans-serif;margin:8px 0}
+#vq-rows label{display:flex;gap:4px;align-items:center;border:1px solid #d2dad8;padding:3px 7px;background:#fff}
+#vq-rows label.solo{outline:2px solid #12403a}
+#vq-tracks svg{cursor:grab}
+#vq-tracks svg.dragging{cursor:grabbing}
+#vq-hits{font:12px Arial,sans-serif;color:#5f6d6b}
+#vq-hits ul{margin:4px 0 0;padding-left:18px}
+#vq-hits button{font:11px Arial,sans-serif;margin-left:6px}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const nav=document.createElement('div');nav.id='vq-nav';
+nav.innerHTML=`<label>Find <input id="vq-q" type="search" placeholder="gene, contig, or 1200-3400" size="26"></label>`
+ +`<span class="grp"><button id="vq-prev-ev" type="button">\\u2190 Event</button><button id="vq-next-ev" type="button">Event \\u2192</button></span>`
+ +`<span class="grp"><button id="vq-prev-p" type="button">\\u2190 Plasmid</button><button id="vq-next-p" type="button">Plasmid \\u2192</button></span>`
+ +`<span class="grp"><button id="vq-back" type="button">Back</button></span>`;
+$('vq-tracks').before(nav);
+const rows=document.createElement('div');rows.id='vq-rows';nav.after(rows);
+const hits=document.createElement('div');hits.id='vq-hits';rows.after(hits);
+const hidden=new Set();let solo=null,history=[],cursor=null;
+function ctx(){const a=d.visualizations[$('vq-sample').value];const p=$('vq-plasmid').value;
+ return a&&p?{a,p,len:a.truth_plasmids[p]?.length||0}:null}
+function setRange(lo,hi){const c=ctx();if(!c)return;
+ lo=Math.max(0,Math.floor(lo));hi=Math.min(c.len,Math.ceil(hi));if(hi-lo<20)hi=Math.min(c.len,lo+20);
+ history.push([$('vq-start').value,$('vq-end').value]);
+ $('vq-start').value=lo;$('vq-end').value=hi;$('vq-start').dispatchEvent(new Event('change'))}
+// --- row management -------------------------------------------------------
+function renderRows(){const c=ctx();if(!c){rows.innerHTML='';return}
+ const names=Object.keys(c.a.tools);
+ rows.innerHTML='<strong style="font:12px Arial,sans-serif">Tool rows</strong>'+names.map(n=>
+  `<label class="${solo===n?'solo':''}"><input type="checkbox" data-n="${n}" ${hidden.has(n)?'':'checked'}> ${n}`
+  +` <button type="button" data-solo="${n}">${solo===n?'all':'only'}</button></label>`).join('');
+ rows.querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?hidden.delete(i.dataset.n):hidden.add(i.dataset.n);solo=null;apply()});
+ rows.querySelectorAll('button[data-solo]').forEach(b=>b.onclick=()=>{
+  const n=b.dataset.solo;if(solo===n){solo=null;hidden.clear()}else{solo=n;hidden.clear();Object.keys(c.a.tools).forEach(x=>{if(x!==n)hidden.add(x)})}
+  renderRows();apply()})}
+function apply(){
+ // The base view draws one <text> label plus one lane per tool; hide by label.
+ const svg=$('vq-tracks').querySelector('svg');if(!svg)return;
+ svg.querySelectorAll('text').forEach(t=>{if(hidden.has(t.textContent.trim()))t.style.opacity=.25});
+ svg.querySelectorAll('.vq-block').forEach(b=>{b.style.display=hidden.has(b.dataset.n)?'none':''})}
+// --- search ---------------------------------------------------------------
+function search(){const c=ctx();const q=$('vq-q').value.trim();if(!c||!q){hits.innerHTML='';return}
+ const coord=q.match(/^(\\d[\\d,]*)\\s*[-:.]+\\s*(\\d[\\d,]*)$/);
+ if(coord){setRange(+coord[1].replace(/,/g,''),+coord[2].replace(/,/g,''));hits.innerHTML='<em>Jumped to coordinate range.</em>';return}
+ const needle=q.toLowerCase(),found=[];
+ (c.a.amr_features||[]).concat(c.a.context_features||[]).forEach(f=>{
+  if(f.sequence_id===c.p&&String(f.label||'').toLowerCase().includes(needle))
+   found.push({what:(f.feature_type||'AMR')+': '+f.label,lo:f.start,hi:f.end})});
+ Object.entries(c.a.tools).forEach(([n,t])=>t.blocks.forEach(b=>{
+  if(b.target===c.p&&b.record_id.toLowerCase().includes(needle))
+   found.push({what:n+' record '+b.record_id,lo:b.target_start,hi:b.target_end})}));
+ hits.innerHTML=found.length?'<strong>'+found.length+' match(es)</strong><ul>'+found.slice(0,25).map((f,i)=>
+   `<li>${f.what} — ${f.lo.toLocaleString()}\\u2013${f.hi.toLocaleString()}<button type="button" data-i="${i}">go</button></li>`).join('')+'</ul>'
+  :'<em>No gene, feature, or record matched on this plasmid.</em>';
+ hits.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const f=found[+b.dataset.i];
+  const pad=Math.max(50,(f.hi-f.lo));setRange(f.lo-pad,f.hi+pad)})}
+$('vq-q').addEventListener('change',search);
+$('vq-q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();search()}});
+// --- event jumping --------------------------------------------------------
+function events(){const c=ctx();if(!c)return[];const list=[];
+ Object.entries(c.a.tools).forEach(([n,t])=>{if(hidden.has(n))return;
+  const bs=t.blocks.filter(b=>b.target===c.p).sort((x,y)=>x.target_start-y.target_start);
+  bs.forEach((b,i)=>{
+   if(b.strand==='-')list.push({at:b.target_start,why:n+': reverse-orientation block'});
+   // A gap between consecutive blocks on the same reference is a breakpoint.
+   if(i&&b.target_start>bs[i-1].target_end)list.push({at:bs[i-1].target_end,why:n+': breakpoint gap'});
+   const a=b.local_alignment;
+   if(a){let off=0;for(let k=0;k<a.reference.length;k++){if(a.reference[k]!=='-')off++;
+     if(a.reference[k]!==a.prediction[k]){list.push({at:b.target_start+off,why:n+': mismatch or gap'});break}}}})});
+ return list.sort((x,y)=>x.at-y.at)}
+function jump(dir){const c=ctx();if(!c)return;const list=events();if(!list.length){hits.innerHTML='<em>No orientation, breakpoint, or mismatch event on this plasmid.</em>';return}
+ // Walk from the last visited event, not the window midpoint: fitting the whole
+ // plasmid would otherwise skip every event in the left half.
+ const lo=Number($('vq-start').value),hi=Number($('vq-end').value);
+ const from=cursor!=null?cursor:(dir>0?lo-1:hi+1);
+ let next=dir>0?list.find(e=>e.at>from):[...list].reverse().find(e=>e.at<from);
+ if(!next){next=dir>0?list[0]:list[list.length-1];
+  hits.innerHTML='<em>Wrapped to the '+(dir>0?'first':'last')+' event. </em>'}
+ else hits.innerHTML='';
+ cursor=next.at;
+ const span=Math.max(400,hi-lo);
+ setRange(next.at-span/2,next.at+span/2);
+ hits.innerHTML+='<em>'+next.why+' near '+next.at.toLocaleString()+'</em>'}
+$('vq-next-ev').onclick=()=>jump(1);$('vq-prev-ev').onclick=()=>jump(-1);
+function stepPlasmid(dir){const sel=$('vq-plasmid'),i=sel.selectedIndex+dir;
+ if(i>=0&&i<sel.options.length){sel.selectedIndex=i;sel.dispatchEvent(new Event('change'))}}
+$('vq-next-p').onclick=()=>stepPlasmid(1);$('vq-prev-p').onclick=()=>stepPlasmid(-1);
+$('vq-back').onclick=()=>{const prev=history.pop();if(!prev)return;
+ $('vq-start').value=prev[0];$('vq-end').value=prev[1];$('vq-start').dispatchEvent(new Event('change'))};
+// --- drag to pan, drag ruler to select ------------------------------------
+function bindDrag(){const svg=$('vq-tracks').querySelector('svg');if(!svg||svg.dataset.drag)return;svg.dataset.drag='1';
+ const LEFT=180,W=880;let anchor=null;
+ const at=e=>{const r=svg.getBoundingClientRect();const c=ctx();if(!c)return null;
+  const x=(e.clientX-r.left)*(1100/r.width);const lo=Number($('vq-start').value),hi=Number($('vq-end').value);
+  return lo+Math.min(1,Math.max(0,(x-LEFT)/W))*(hi-lo)};
+ svg.addEventListener('pointerdown',e=>{const v=at(e);if(v===null)return;
+  anchor={v,y:e.clientY,ruler:e.offsetY<26,moved:false};svg.setPointerCapture(e.pointerId);svg.classList.add('dragging')});
+ svg.addEventListener('pointermove',e=>{if(!anchor)return;const v=at(e);if(v===null)return;
+  anchor.moved=true;
+  if(!anchor.ruler){const lo=Number($('vq-start').value),hi=Number($('vq-end').value),shift=anchor.v-v;
+   if(Math.abs(shift)>(hi-lo)/200){$('vq-start').value=Math.round(lo+shift);$('vq-end').value=Math.round(hi+shift);
+    $('vq-start').dispatchEvent(new Event('change'));anchor.v=v}}});
+ svg.addEventListener('pointerup',e=>{if(!anchor){return}const v=at(e);svg.classList.remove('dragging');
+  if(anchor.ruler&&anchor.moved&&v!==null&&Math.abs(v-anchor.v)>10)setRange(Math.min(anchor.v,v),Math.max(anchor.v,v));
+  anchor=null});
+ svg.addEventListener('pointercancel',()=>{anchor=null;svg.classList.remove('dragging')})}
+function refresh(){renderRows();apply();bindDrag()}
+['vq-sample','vq-plasmid'].forEach(id=>$(id)?.addEventListener('change',()=>{cursor=null}));
+['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(refresh,0)));
+['vq-fit','vq-in','vq-out'].forEach(id=>$(id)?.addEventListener('click',()=>setTimeout(refresh,0)));
+$('vq-heatmap').addEventListener('click',()=>setTimeout(refresh,0));
+document.addEventListener('keydown',e=>{if(e.target.matches('input,select,textarea'))return;
+ if(e.key==='n'){jump(1)}else if(e.key==='p'){jump(-1)}});
+refresh();})();
+</script>"""
+
+
+def lazy_visualization_script():
+    """Fetch per-sample alignment payloads on demand when they were published.
+
+    Loading every sample up front is what makes a large cohort report unusable,
+    so external mode resolves one sample at a time and caches it. A file:// open
+    cannot fetch siblings, so that failure is reported as an instruction rather
+    than as missing data.
+    """
+    return """<style>
+#vq-loading{font:12px Arial,sans-serif;color:#5f6d6b;margin:6px 0}
+#vq-loading.busy::before{content:'\\u25CF ';color:#c68221}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const sources=d.visualization_sources||{},staging=d.staging||{};
+if(!Object.keys(sources).length)return;                    // inline mode: nothing to do
+const note=document.createElement('div');note.id='vq-loading';$('vq-heatmap').after(note);
+note.textContent=`Alignment detail is published per sample (${staging.samples} file(s), ${(staging.bytes/1048576).toFixed(1)} MB total) and loads on selection.`;
+const cache=new Map();let token=0;
+async function load(sample){
+ if(d.visualizations[sample])return d.visualizations[sample];
+ if(cache.has(sample))return cache.get(sample);
+ const url=sources[sample];if(!url)return null;
+ const mine=++token;note.className='busy';note.textContent=`Loading alignment detail for ${sample}\\u2026`;
+ try{const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);
+  const payload=await r.json();cache.set(sample,payload);d.visualizations[sample]=payload;
+  if(mine===token){note.className='';note.textContent=`Loaded ${sample}. Detail for other samples loads on selection.`}
+  return payload}
+ catch(err){if(mine===token){note.className='';
+   note.innerHTML='Could not load <code>'+url+'</code>. A report opened directly from the file system cannot read sibling files. Serve the report directory instead, for example <code>python -m http.server</code> in the results folder, then reload over http://localhost:8000.'}
+  return null}}
+// Re-dispatch the selection once data has arrived so the existing views redraw.
+async function ensure(){const s=$('vq-sample').value;if(!s||d.visualizations[s])return;
+ const payload=await load(s);if(payload){$('vq-sample').dispatchEvent(new Event('change'))}}
+$('vq-sample').addEventListener('change',()=>{setTimeout(ensure,0)},true);
+$('vq-heatmap').addEventListener('click',()=>setTimeout(ensure,0));
+ensure();})();
 </script>"""
 
 
@@ -349,12 +627,16 @@ const fields=[['organism','Organism'],['sample_origin','Origin'],['truth_technol
 bar.innerHTML=fields.map(([k,label])=>{const vals=[...new Set(Object.values(meta).map(r=>r[k]).filter(Boolean))].sort();
  return `<label>${label} <select data-k="${k}"><option value="">All</option>${vals.map(v=>`<option>${v}</option>`).join('')}</select></label>`}).join('')
  +`<label>Sample search <input id="vq-search" type="search" placeholder="id contains\\u2026"></label>`
+ +`<label>Order <select id="vq-order"><option value="sample">Sample ID</option><option value="best">Best visible metric</option></select></label>`
  +`<button id="vq-reset" type="button">Reset filters</button><span id="vq-count"></span>`;
 heatmap.before(bar);
 function visible(sample){const r=meta[sample]||{};
  for(const sel of bar.querySelectorAll('select')){if(sel.value&&(r[sel.dataset.k]||'')!==sel.value)return false}
  const q=($('vq-search').value||'').trim().toLowerCase();return !q||sample.toLowerCase().includes(q)}
-function decorate(){const rows=[...heatmap.querySelectorAll('tbody tr')];let shown=0;
+function metricValue(sample){const key=$('vq-metric').value,values=d.matrix.filter(r=>r.sample===sample).map(r=>r[key]).filter(v=>typeof v==='number');if(!values.length)return-Infinity;return ['contamination','unmapped'].includes(key)?-Math.min(...values):Math.max(...values)}
+function decorate(){const body=heatmap.querySelector('tbody');let rows=[...body.querySelectorAll('tr')];
+ if($('vq-order').value==='best'){rows.sort((a,b)=>metricValue(b.querySelector('td strong')?.textContent||'')-metricValue(a.querySelector('td strong')?.textContent||''));rows.forEach(row=>body.append(row))}
+ let shown=0;
  rows.forEach(tr=>{const sample=tr.querySelector('td strong')?.textContent||'';const ok=visible(sample);
   tr.classList.toggle('vq-hidden',!ok);if(ok)shown++;
   tr.querySelectorAll('.vq-cell').forEach(td=>{
@@ -474,6 +756,30 @@ def context_visual_script():
     return """<script>
 (()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),host=document.createElement('div');host.id='vq-context';$('vq-dotplot').after(host);
 function render(){let a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t]){host.innerHTML='';return}let features=(a.context_features||[]).filter(f=>f.sequence_id===p),types={};features.forEach(f=>(types[f.feature_type]??=[]).push(f));let html='<h3>Context and circular-truth view</h3>';if(a.circular_truth_plasmids?.includes(p)){let len=a.truth_plasmids[p].length,intervals=a.tools[t].plasmid_recovery[p]?.covered_intervals||[],arc=(s,e)=>{let A=s/len*2*Math.PI-Math.PI/2,B=e/len*2*Math.PI-Math.PI/2,x1=120+80*Math.cos(A),y1=100+80*Math.sin(A),x2=120+80*Math.cos(B),y2=100+80*Math.sin(B),large=B-A>Math.PI?1:0;return `<path d="M${x1} ${y1} A80 80 0 ${large} 1 ${x2} ${y2}" fill="none" stroke="#16805a" stroke-width="14"/>`};html+='<p class="muted">Circular truth plasmid only. Green arcs are recovered reference intervals; this does not claim the predicted output is circular or closed.</p><svg viewBox="0 0 240 200" width="240"><circle cx="120" cy="100" r="80" fill="none" stroke="#e2e8e2" stroke-width="14"/>'+intervals.map(x=>arc(x[0],x[1])).join('')+'<text x="75" y="104" font-size="11">truth circular</text></svg>'}if(features.length){html+='<p><strong>Curated contextual features</strong></p><ul>'+Object.entries(types).map(([k,v])=>`<li>${k}: ${v.map(f=>`${f.label} (${f.start}-${f.end}; ${f.source} ${f.version})`).join(', ')}</li>`).join('')+'</ul>'}else html+='<p class="muted">No versioned replicon, MOB, insertion-sequence, or AMR-context feature table was supplied.</p>';host.innerHTML=html}['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));render()})();
+</script>"""
+
+
+def record_dotplot_script():
+    """Use one predicted-record coordinate system per dot plot."""
+    return """<script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),select=document.createElement('select'),label=document.createElement('label');label.textContent='Predicted record ';label.append(select);$('vq-tool').closest('label').after(label);
+function state(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;return a&&a.tools[t]?{a,p,t}:null}
+function render(){const x=state();if(!x||!x.p){select.innerHTML='';return}const records=[...new Set(x.a.tools[x.t].blocks.filter(b=>b.target===x.p).map(b=>b.record_id))].sort();select.innerHTML=records.map(r=>`<option value="${r}">${r}</option>`).join('');draw()}
+function draw(){const x=state(),record=select.value;if(!x||!record)return;const blocks=x.a.tools[x.t].blocks.filter(b=>b.target===x.p&&b.record_id===record),query=Math.max(...blocks.map(b=>b.query_length),1),truth=x.a.truth_plasmids[x.p].length,sx=v=>30+v/truth*420,sy=v=>450-v/query*420;const lines=blocks.map(b=>`<line x1="${sx(b.target_start)}" y1="${sy(b.query_start)}" x2="${sx(b.target_end)}" y2="${sy(b.query_end)}" stroke="${b.strand==='-'?'#7f5aa2':'#16805a'}" stroke-width="2"/>`).join('');$('vq-dotplot').innerHTML=`<h3>Dot plot: ${record} vs ${x.p}</h3><p class="muted">One predicted-record coordinate system is shown at a time. Forward diagonals support collinearity; reverse diagonals show reverse orientation. This is a diagnostic, not structural validation.</p><svg viewBox="0 0 480 480" width="480" role="img" aria-label="Dot plot"><rect x="30" y="30" width="420" height="420" fill="#f7f8f5" stroke="#849387"/>${lines}<text x="180" y="475" font-size="11">truth plasmid coordinate</text><text x="2" y="20" font-size="11">predicted-record coordinate</text></svg>`}
+['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(draw,0));select.addEventListener('change',draw);$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));render()})();
+</script>"""
+
+
+def structural_and_feature_tracks_script():
+    """Overlay contextual features and expose structural diagnostics in HTML."""
+    return """<script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const host=document.createElement('div');host.id='vq-structural';$('vq-context').after(host);
+const colors={replicon:'#5b7fb6',mob:'#9b59b6',insertion_sequence:'#d06d28',amr_context:'#1f8a70'};
+function current(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t])return null;return {a,p,t,lo:Number($('vq-start').value)||0,hi:Number($('vq-end').value)||a.truth_plasmids[p].length}}
+function overlay(){const x=current();if(!x)return;const svg=$('vq-tracks').querySelector('svg');if(!svg)return;svg.querySelectorAll('[data-context-feature]').forEach(n=>n.remove());const scale=v=>180+(v-x.lo)/(x.hi-x.lo)*880;(x.a.context_features||[]).filter(f=>f.sequence_id===x.p&&f.end>x.lo&&f.start<x.hi).forEach(f=>{const y=17,color=colors[f.feature_type]||'#5f6d6b',left=Math.max(180,scale(f.start)),right=Math.min(1060,scale(f.end));const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('data-context-feature','1');r.setAttribute('x',left);r.setAttribute('y',y);r.setAttribute('width',Math.max(2,right-left));r.setAttribute('height','6');r.setAttribute('fill',color);const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${f.feature_type}: ${f.label} (${f.source} ${f.version})`;r.append(title);svg.append(r)});}
+function render(){const x=current();if(!x){host.innerHTML='';return}const s=x.a.tools[x.t].structural_diagnostics||{};host.innerHTML='<h3>Structural alignment diagnostics</h3><p class="muted">Computed from all retained scoring blocks, not only blocks displayed in the SVG. This is a triage proxy, not a validated misassembly call.</p><div class="panel"><table><thead><tr><th>Concordance proxy</th><th>Breakpoints</th><th>Reverse blocks</th><th>Multi-target records</th><th>Order conflicts</th></tr></thead><tbody><tr><td>'+((s.structural_concordance_proxy??'-'))+'</td><td>'+(s.alignment_breakpoints??'-')+'</td><td>'+(s.reverse_orientation_blocks??'-')+'</td><td>'+(s.multi_truth_target_records??'-')+'</td><td>'+(s.order_conflicts??'-')+'</td></tr></tbody></table></div>';overlay()}
+['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(render,0));$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));render()})();
 </script>"""
 
 
@@ -676,9 +982,11 @@ def main():
     insight_notes, insight_tone = interpretation(leaderboard, status_counts)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(leaderboard)
-    visual_html = (visual_quality_section(scores, status, out.parent) + advanced_visual_script()
-                   + context_visual_script() + linked_selection_script(metadata)
-                   + plasmid_summary_script())
+    visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
+                   + record_dotplot_script() + context_visual_script() + linked_selection_script(metadata)
+                   + plasmid_summary_script() + structural_and_feature_tracks_script()
+                   + lazy_visualization_script() + explorer_navigation_script()
+                   + flow_and_clustering_script())
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>SPREAD plasmid benchmark report</title>

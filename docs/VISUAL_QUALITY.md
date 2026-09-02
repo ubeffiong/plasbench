@@ -10,17 +10,21 @@ untracked browser calculation.
 1. **Sample-by-tool heatmap:** rows are samples and columns are methods. Select
    base F1, precision, recall, plasmid recall, bin F1, chromosome
    contamination, unmapped predicted bases, execution state, or the explicitly
-   exploratory composite quality value. Filter sample/tool text or order rows
-   by their best visible metric. Click a cell to open the corresponding
-   sample/tool context below.
+   exploratory composite quality value. Use one consolidated control bar to
+   filter cohort fields, search sample/tool names, and order rows by sample or
+   the best visible metric. Click a cell to open the corresponding sample/tool
+   context below.
 2. **Per-plasmid recovery tracks:** select a truth plasmid to compare all tools
-   on the same reference coordinate system. The percent at each row is the
-   displayed-block completeness for that plasmid.
+   on the same reference coordinate system. The percent at each row is computed
+   from all primary scoring blocks for that tool/plasmid; the browser cap only
+   limits the number of rectangles drawn.
 3. **Zoomable alignment explorer:** use Fit, zoom buttons, mouse wheel, or
    exact start/end coordinates. Click a coloured block to inspect its retained
    PAF query/reference coordinates, strand, identity, and MAPQ. New stage-5
    runs retain CIGAR operations and offer a bounded local nucleotide view when
-   the selected alignment is small enough to display safely.
+   the selected alignment is small enough to display safely. The linked dot
+   plot deliberately selects one predicted record at a time, preventing
+   unrelated query coordinate systems from being merged into one plot.
 
 The selection is intentionally progressive: cohort comparison, then plasmid
 recovery, then alignment evidence.
@@ -38,6 +42,7 @@ recovery, then alignment evidence.
 | Purple alignment block | Reverse-strand primary alignment to the selected truth plasmid |
 | White track space | Not covered by displayed alignment blocks |
 | Blue triangle | Curated truth AMR feature, when supplied |
+| Blue/purple/orange/green top track | Curated replicon, MOB, insertion-sequence, or AMR-context feature; hover for source and version |
 
 For error metrics, the scale is inverted so less contamination or fewer
 unmapped bases is greener. The tooltip on every heatmap cell gives the sample,
@@ -53,7 +58,9 @@ results/<sample>/visualization/alignment_blocks.json
 
 It includes the truth plasmid inventory, AMR markers, retained primary PAF
 blocks, per-tool per-plasmid covered intervals and completeness, chromosome
-aligned bases, and the number of blocks omitted by the display cap. The default
+aligned bases, structural diagnostics, contextual feature tracks, and the
+number of blocks omitted by the display cap. Coverage and structural values use
+all scoring blocks before the cap is applied. The default
 cap is `VISUALIZATION_MAX_BLOCKS_PER_TOOL=2000`; change it in
 `config/config.sh` only when the browser/report size remains practical.
 
@@ -86,8 +93,10 @@ The optional `Exploratory composite quality` heatmap metric is deliberately
 secondary and does not change rankings or candidate selection. It is:
 
 ```text
-0.45 * base F1 + 0.25 * plasmid recall + 0.15 * (bin F1, or base F1 when N/A)
-+ 0.15 * (1 - chromosome contamination)
+weighted mean of the available components: base F1 (0.45), plasmid recall
+(0.25), bin F1 (0.15), and 1 - chromosome contamination (0.15). Missing
+components are omitted and the remaining weights are re-normalized; a missing
+bin metric is never silently replaced by base F1.
 ```
 
 It makes trade-offs visible but must be read beside its individual components.
