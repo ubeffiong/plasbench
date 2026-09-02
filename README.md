@@ -225,11 +225,15 @@ results/tool_status.tsv              # completed/reused/failed/skipped state and
 results/benchmark.leaderboard.tsv   # per-tool means/medians, ranked by mean F1
 results/benchmark.leaderboard.md    # final Markdown table, including scored/completed/failed counts
 results/benchmark.report.html       # offline dashboard with detailed scores, run health, and file explorer
+results/benchmark.recommendations.tsv # coverage-gated operational method recommendations
+results/<sample>/selected_candidate/ # copied best already-produced candidate + selection_report.json
 ```
 
 Open `results/benchmark.report.html` in a browser for the final detailed report. It includes
 the ranked table, per-sample score drill-down, execution status, scoring definitions, and a
 tree explorer with direct download links for files under `results/`, `logs/`, and `data/`.
+See [operational selection](docs/OPERATIONAL_SELECTION.md) for the strict distinction
+between a benchmark winner, a reusable per-isolate candidate, and validated biology.
 
 The pipeline validates that `config/accessions.tsv` has at least one complete,
 uniquely named sample before starting any data stage; the checked-in sheet is a
@@ -251,6 +255,8 @@ For each sample and tool:
 Overlapping alignments are merged so bases are never double-counted (unit-tested).
 Secondary mappings are excluded so repetitive sequence is assigned from each
 predicted contig's best reference hit rather than counted on multiple replicons.
+An optional all-mappings diagnostic reports predicted bases with both plasmid and
+chromosome placements without changing F1.
 Predicted sequence that doesn't map to the reference at all is reported separately as
 `unmapped_pred_bp` rather than silently punished. Full rationale in `docs/METHODS.md`.
 

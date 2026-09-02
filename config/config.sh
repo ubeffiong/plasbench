@@ -31,6 +31,11 @@ export LOCAL_INPUTS_ONLY="${LOCAL_INPUTS_ONLY:-0}"
 # data/<sample>/truth_amr.tsv it is scored alongside base-level recovery.
 export PLASMID_RECOVERY_THRESHOLD="${PLASMID_RECOVERY_THRESHOLD:-0.90}"
 export AMR_GENE_RECOVERY_THRESHOLD="${AMR_GENE_RECOVERY_THRESHOLD:-0.90}"
+# Operational recommendations are withheld unless a tool has enough independent
+# benchmark evidence. Selection reports still preserve truth-set candidates.
+export RECOMMENDATION_MIN_SAMPLES="${RECOMMENDATION_MIN_SAMPLES:-5}"
+export RECOMMENDATION_MIN_COVERAGE="${RECOMMENDATION_MIN_COVERAGE:-0.80}"
+export ANALYSIS_TRACK="${ANALYSIS_TRACK:-short_read}"
 
 # --- Compute -----------------------------------------------------------------
 export THREADS="${THREADS:-4}"
@@ -67,6 +72,12 @@ export ASSEMBLER="${ASSEMBLER:-spades}"
 # --- Mapping (scoring) -------------------------------------------------------
 # minimap2 preset for aligning predicted-plasmid contigs back to the reference.
 export MINIMAP2_PRESET="${MINIMAP2_PRESET:-asm5}" # asm5 = <5% divergence
+export MIN_ALIGNMENT_LENGTH="${MIN_ALIGNMENT_LENGTH:-200}"
+export MIN_ALIGNMENT_IDENTITY="${MIN_ALIGNMENT_IDENTITY:-0.90}"
+export MIN_ALIGNMENT_MAPQ="${MIN_ALIGNMENT_MAPQ:-20}"
+# A second, all-mappings PAF exposes repeated query sequence that aligns to
+# both plasmid and chromosome. It is a diagnostic and never alters F1.
+export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"
 
 # --- Safety: stop early if the sample sheet is missing -----------------------
 if [[ ! -f "$SAMPLE_SHEET" ]]; then

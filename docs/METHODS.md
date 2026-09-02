@@ -28,6 +28,10 @@ input; long-read reconstruction modes are a future extension.
 The predicted-plasmid FASTA is aligned to the reference with `minimap2 -x asm5` (same
 isolate, so ≤5% divergence). Alignment target intervals are merged per reference sequence,
 so a reference base covered by one or more predicted-plasmid alignments is counted once.
+The primary-only PAF defines TP/FP/FN. When enabled, a separate all-mappings PAF
+records `ambiguously_mapped_pred_bp`: query bases having retained placements on
+both plasmid and chromosome. It is a mapping-ambiguity diagnostic and does not
+alter F1.
 
 ## Base-level confusion matrix (positive class = plasmid)
 Let `C` be the set of reference bases covered by predicted-plasmid alignments.
@@ -54,9 +58,12 @@ sequence-record proxy, not a bin-level precision claim: tools differ in whether
 they output one contig, multiple contigs, or one FASTA per plasmid bin.
 
 For adapters that supply `pred_<tool>.bins.tsv`, PlasBench also performs
-deterministic one-to-one bin matching. Bin precision/recall/F1 use matched bins
-and true plasmids; split events count extra qualifying bins for one true
-plasmid, and merge events count extra qualifying true plasmids for one bin.
+deterministic global one-to-one bin matching using a maximum-weight assignment,
+not a greedy first-match rule. A bin is eligible for a truth plasmid only when
+it reaches the configured completeness and purity thresholds. Bin
+precision/recall/F1 use these assignments; split events count extra qualifying
+bins for one truth plasmid, merge events count extra qualifying truth plasmids
+for one bin, and chromosome-aligned bin bases are reported separately.
 
 ## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,

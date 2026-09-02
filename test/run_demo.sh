@@ -46,6 +46,8 @@ EOF
 
 for t in good leaky shy; do
     make_pred_fasta "$S1/$t.paf" "$S1/$t.fasta"
+    cp "$S1/$t.fasta" "$S1/pred_${t}.plasmid.fasta"
+    cp "$S1/$t.paf" "$S1/${t}.pred_vs_ref.paf"
     python3 "$PY/score_plasmids.py" --truth "$S1/truth.tsv" --paf "$S1/$t.paf" \
         --pred-fasta "$S1/$t.fasta" --sample sample1 --tool "$t" --out "$SCORES"
 done
@@ -72,6 +74,8 @@ q1	500	0	500	+	pC	1000	0	500	500	500	60
 EOF
 for t in good leaky shy; do
     make_pred_fasta "$S2/$t.paf" "$S2/$t.fasta"
+    cp "$S2/$t.fasta" "$S2/pred_${t}.plasmid.fasta"
+    cp "$S2/$t.paf" "$S2/${t}.pred_vs_ref.paf"
     python3 "$PY/score_plasmids.py" --truth "$S2/truth.tsv" --paf "$S2/$t.paf" \
         --pred-fasta "$S2/$t.fasta" --sample sample2 --tool "$t" --out "$SCORES"
 done
@@ -90,13 +94,25 @@ STATUS="$DEMO/tool_status.tsv"
     done
 } > "$STATUS"
 
+SAMPLES="$DEMO/samples.tsv"
+cat > "$SAMPLES" <<'EOF'
+sample_id	organism	truth_technology	sample_origin	read_depth_x
+sample1	Demo bacterium	hybrid	synthetic	80
+sample2	Demo bacterium	hybrid	synthetic	80
+EOF
+
 python3 "$PY/aggregate_results.py" --scores "$SCORES" --tool-status "$STATUS" --out-prefix "$DEMO/benchmark"
+python3 "$PY/select_operational_method.py" --scores "$SCORES" --sample-sheet "$SAMPLES" \
+    --results-dir "$DEMO" --tool-status "$STATUS" --out-prefix "$DEMO/benchmark" \
+    --min-samples 1 --min-coverage 1
 
 python3 "$PY/build_html_report.py" \
     --project-root "$ROOT" \
     --scores "$SCORES" \
     --tool-status "$STATUS" \
     --leaderboard "$DEMO/benchmark.leaderboard.tsv" \
+    --sample-sheet "$SAMPLES" \
+    --recommendations "$DEMO/benchmark.recommendations.tsv" \
     --out "$DEMO/benchmark.report.html"
 
 echo

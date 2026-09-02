@@ -16,6 +16,16 @@ python3 "$HERE/../python/aggregate_results.py" \
     --sample-sheet "$SAMPLE_SHEET" \
     --out-prefix "$RESULTS_DIR/benchmark"
 
+# Retain the highest-quality already reconstructed candidate for every truth
+# sample. This never reruns a tool or fabricates a consensus sequence.
+python3 "$HERE/../python/select_operational_method.py" \
+    --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET" \
+    --results-dir "$RESULTS_DIR" --tool-status "$RESULTS_DIR/tool_status.tsv" \
+    --out-prefix "$RESULTS_DIR/benchmark" \
+    --min-samples "$RECOMMENDATION_MIN_SAMPLES" \
+    --min-coverage "$RECOMMENDATION_MIN_COVERAGE" \
+    --analysis-track "$ANALYSIS_TRACK"
+
 python3 "$HERE/../python/write_manifest.py" \
     --project-root "$PROJECT_ROOT" --sample-sheet "$SAMPLE_SHEET" \
     --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" \
@@ -30,6 +40,7 @@ python3 "$HERE/../python/build_html_report.py" \
     --manifest "$RESULTS_DIR/run_manifest.json" \
     --comparisons "$RESULTS_DIR/benchmark.paired_comparisons.tsv" \
     --score-failures "$RESULTS_DIR/score_failures.tsv" \
+    --recommendations "$RESULTS_DIR/benchmark.recommendations.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."
@@ -39,3 +50,6 @@ log "  Leaderboard (TSV) : $RESULTS_DIR/benchmark.leaderboard.tsv"
 log "  Leaderboard (MD)  : $RESULTS_DIR/benchmark.leaderboard.md"
 log "  HTML dashboard    : $RESULTS_DIR/benchmark.report.html"
 log "  Run manifest      : $RESULTS_DIR/run_manifest.json"
+log "  Recommendations   : $RESULTS_DIR/benchmark.recommendations.tsv"
+log "  Stratified metrics: $RESULTS_DIR/benchmark.stratified.tsv"
+log "  Selected output   : $RESULTS_DIR/<sample>/selected_candidate/"

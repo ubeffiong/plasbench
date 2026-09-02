@@ -111,7 +111,10 @@ def main():
     args = parser.parse_args()
     settings = ("THREADS", "MEMORY_GB", "ASSEMBLER", "MIN_READ_LEN", "MINIMAP2_PRESET",
                 "RUN_MOB_RECON", "RUN_PLATON", "RUN_PLASMIDSPADES", "RUN_GPLAS2_MOB", "RUN_GPLAS2_EXTERNAL",
-                "PLASMID_RECOVERY_THRESHOLD", "AMR_GENE_RECOVERY_THRESHOLD", "PLATON_DB")
+                "PLASMID_RECOVERY_THRESHOLD", "AMR_GENE_RECOVERY_THRESHOLD", "PLATON_DB",
+                "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_MAPQ",
+                "REPORT_MAPPING_AMBIGUITY",
+                "RECOMMENDATION_MIN_SAMPLES", "RECOMMENDATION_MIN_COVERAGE", "ANALYSIS_TRACK")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     truth_tables = {}
@@ -123,6 +126,13 @@ def main():
     for path in Path(args.results_dir).glob("benchmark*"):
         if path.is_file():
             outputs[path.name] = {"sha256": sha256(path), "bytes": path.stat().st_size}
+    selected_candidates = {}
+    for report in Path(args.results_dir).glob("*/selected_candidate/selection_report.json"):
+        sample = report.parents[1].name
+        selected_candidates[sample] = {
+            "selection_report": {"sha256": sha256(report), "bytes": report.stat().st_size},
+            "files": sorted(path.name for path in report.parent.iterdir() if path.is_file()),
+        }
     manifest = {
         "schema_version": "1.0", "tool": "PlasBench", "tool_version": tool_version(),
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -135,7 +145,7 @@ def main():
         "input_checksums": {"sample_sheet": sha256(sample_sheet), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},
         "execution_profiles": status_rows(args.results_dir),
-        "outputs": outputs,
+        "outputs": outputs, "selected_candidates": selected_candidates,
     }
     with open(args.out, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2, sort_keys=True)

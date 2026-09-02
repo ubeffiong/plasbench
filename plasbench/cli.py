@@ -27,6 +27,7 @@ DOC_TOPICS = {
     "workflow": "Workflow",
     "outputs": "Outputs",
     "metrics": "Metric Definitions",
+    "selection": "Operational Selection",
     "console": "Console Messages",
     "troubleshooting": "Troubleshooting",
     "reproducibility": "Reproducibility and Citation",
@@ -101,6 +102,7 @@ def main(argv=None):
                "  plasbench demo\n"
                "  plasbench run --samples samples.tsv --threads 8\n"
                "  plasbench run 3 4 5 6 --platon off --assembler unicycler\n"
+               "  plasbench select-candidates --scores results/scores.tsv --samples config/accessions.tsv --results-dir results --out-prefix results/benchmark\n"
                "  plasbench report --results-dir results",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -144,6 +146,15 @@ def main(argv=None):
                              help="Guide topic to print (default: all).")
     sub.add_parser("concept-note", help="Print the non-technical researcher and donor concept note.")
     report_parser = sub.add_parser("report", help="Regenerate the leaderboard and HTML report from scores.")
+    select_parser = sub.add_parser("select-candidates", help="Create conservative recommendations and copy existing selected candidates.")
+    select_parser.add_argument("--scores", type=Path, required=True)
+    select_parser.add_argument("--samples", type=Path, required=True)
+    select_parser.add_argument("--results-dir", type=Path, required=True)
+    select_parser.add_argument("--out-prefix", type=Path, required=True)
+    select_parser.add_argument("--tool-status", type=Path)
+    select_parser.add_argument("--min-samples", type=int, default=5)
+    select_parser.add_argument("--min-coverage", type=float, default=0.80)
+    select_parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
     ladder_parser = sub.add_parser("depth-ladder", help="Create deterministic local-input depth-ladder cohorts using seqtk.")
     ladder_parser.add_argument("--samples", type=Path, required=True)
     ladder_parser.add_argument("--data-dir", type=Path, required=True)
@@ -244,6 +255,14 @@ def main(argv=None):
         code = run([sys.executable, "python/summarize_depth_ladder.py", "--scores", str(args.scores),
                     "--manifest", str(args.manifest), "--out-prefix", str(args.out_prefix),
                     "--metric", args.metric], root)
+    elif args.command == "select-candidates":
+        command = [sys.executable, "python/select_operational_method.py", "--scores", str(args.scores),
+                   "--sample-sheet", str(args.samples), "--results-dir", str(args.results_dir),
+                   "--out-prefix", str(args.out_prefix), "--min-samples", str(args.min_samples),
+                   "--min-coverage", str(args.min_coverage), "--analysis-track", args.analysis_track]
+        if args.tool_status:
+            command.extend(["--tool-status", str(args.tool_status)])
+        code = run(command, root)
     elif args.command == "docs":
         print_docs(root, args.topic)
         code = 0
