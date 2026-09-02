@@ -75,12 +75,21 @@ def main():
     # Selections must be shareable.
     assert "history.replaceState" in page and "URLSearchParams" in page, "URL state missing"
     # Cohort narrowing and the visible-record count.
-    for needed in ("vq-filters", "vq-reset", "vq-search", "Showing "):
+    for needed in ("vq-filters", "vq-reset", "vq-search", "vq-order", "Showing "):
         assert needed in page, f"filter affordance missing: {needed}"
+    assert "Number(c.innerText)" not in page, "row ordering must use source metrics, not decorated cell text"
+    assert 'id="vq-filter"' not in page, "legacy duplicate visual filters must not be emitted"
     # Per-plasmid summary and the contamination surfacing that completeness hides.
     for needed in ("vq-summary", "Impure records", "Chromosomal contamination for",
                    "not attributable to any truth plasmid", "vq-impure"):
         assert needed in page, f"plasmid summary affordance missing: {needed}"
+    # Dot plots retain one query-coordinate system per selected predicted record,
+    # while diagnostics and curated context are visibly wired into the report.
+    for needed in ("Predicted record", "One predicted-record coordinate system",
+                   "Structural alignment diagnostics", "data-context-feature",
+                   "Concordance proxy"):
+        assert needed in page, f"visual diagnostic affordance missing: {needed}"
+    assert "function renderDot" not in page, "legacy mixed-coordinate dot-plot renderer must not be emitted"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 
