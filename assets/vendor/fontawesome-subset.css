@@ -1,0 +1,38 @@
+/* Font Awesome Free 6.5.0 by @fontawesome, CC BY 4.0. Vendored solid subset:
+   only the glyphs this report renders, so no CDN request is made at view time. */
+@font-face{font-family:'PlasBenchIcons';font-style:normal;font-weight:900;font-display:block;
+  src:url(__FA_WOFF2__) format('woff2')}
+.fa,.fas{font-family:'PlasBenchIcons';font-weight:900;font-style:normal;display:inline-block;
+  text-rendering:auto;-webkit-font-smoothing:antialiased;line-height:1}
+.fa-arrow-up:before{content:"\f062"}
+.fa-arrows-alt:before{content:"\f0b2"}
+.fa-arrows-alt-h:before{content:"\f337"}
+.fa-ban:before{content:"\f05e"}
+.fa-box:before{content:"\f466"}
+.fa-calendar:before{content:"\f133"}
+.fa-chart-bar:before{content:"\f080"}
+.fa-chart-line:before{content:"\f201"}
+.fa-circle:before{content:"\f111"}
+.fa-code-branch:before{content:"\f126"}
+.fa-database:before{content:"\f1c0"}
+.fa-dna:before{content:"\f471"}
+.fa-download:before{content:"\f019"}
+.fa-exclamation-triangle:before{content:"\f071"}
+.fa-flask:before{content:"\f0c3"}
+.fa-hand-pointer:before{content:"\f25a"}
+.fa-home:before{content:"\f015"}
+.fa-keyboard:before{content:"\f11c"}
+.fa-layer-group:before{content:"\f5fd"}
+.fa-microscope:before{content:"\f610"}
+.fa-minus:before{content:"\f068"}
+.fa-plus:before{content:"\2b"}
+.fa-search:before{content:"\f002"}
+.fa-search-plus:before{content:"\f00e"}
+.fa-share-alt:before{content:"\f1e0"}
+.fa-skull:before{content:"\f54c"}
+.fa-sort:before{content:"\f0dc"}
+.fa-sort-amount-down:before{content:"\f160"}
+.fa-tag:before{content:"\f02b"}
+.fa-th:before{content:"\f00a"}
+.fa-times:before{content:"\f00d"}
+.fa-undo:before{content:"\f0e2"}

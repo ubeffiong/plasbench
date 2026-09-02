@@ -109,6 +109,21 @@ def main():
     for banner in ("SPREAD plasmid benchmark report", "SPREAD plasmid reconstruction benchmark"):
         assert banner not in page, f"legacy programme branding remains: {banner}"
 
+    # Canvas matrix is an additional view: the semantic table must survive as the
+    # accessible fallback, and the modal must be scoped to the canvas alone.
+    for needed in ("cv-canvas", "cv-modal", "cv-dialog", "cv-sort", "cv-open-inline",
+                   "getContext", "devicePixelRatio"):
+        assert needed in page, f"canvas heatmap affordance missing: {needed}"
+    assert "vq-cell" in page, "the accessible table heatmap must remain alongside the canvas"
+    assert 'aria-modal="true"' in page, "drilldown modal must declare modal semantics"
+    # Vendored faces: no CDN request may remain, and the fonts must be embedded.
+    for banned in ("fonts.googleapis.com", "cdnjs.cloudflare.com", "fonts.gstatic.com"):
+        assert banned not in page, f"report still references a CDN: {banned}"
+    assert "data:font/woff2;base64," in page, "web fonts are not vendored into the report"
+    assert "PlasBenchIcons" in page, "icon face not vendored"
+    # Non-Element keydown targets must not throw.
+    assert "e.target?.matches?.(" in page, "keydown handler must tolerate non-Element targets"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
