@@ -160,7 +160,8 @@ def contig_rows(payload, tool, plasmid):
     return rows
 
 
-def build(scores, status, leaderboard, metadata, capabilities, versions, visualizations, structural):
+def build(scores, status, leaderboard, metadata, capabilities, versions, visualizations, structural,
+          tool_version="version not recorded"):
     samples = sorted({row["sample"] for row in scores})
     tools = sorted({row["tool"] for row in scores})
     state = {(r.get("sample"), r.get("tool")): r for r in status}
@@ -236,6 +237,7 @@ def build(scores, status, leaderboard, metadata, capabilities, versions, visuali
         "replicons": sorted({p["replicon"] for rows in plasmid_data.values() for p in rows}),
         "amrGenes": sorted({g for rows in plasmid_data.values() for p in rows for g in p["amrGenes"]}),
         "provenance": {"source": "measured PlasBench run", "simulated": False,
+                       "toolVersion": tool_version,
                        "note": "Fields with no measurement are null and render as 'not measured'."},
     }
 

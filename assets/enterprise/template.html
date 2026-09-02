@@ -16,26 +16,29 @@
         }
 
         :root {
-            --bg-primary: #080b11;
-            --bg-secondary: #0e141e;
-            --bg-card: #151e2b;
-            --bg-card-hover: #1f2a3b;
-            --bg-input: #19222f;
-            --bg-tooltip: #0c121c;
-            --border-color: #223040;
-            --border-light: #354a60;
-            --text-primary: #e6edf6;
-            --text-secondary: #8fa2c7;
-            --text-muted: #4a607a;
-            --accent-blue: #4a8cf7;
-            --accent-cyan: #22d3ee;
-            --accent-green: #4ade80;
-            --accent-amber: #fbbf24;
-            --accent-rose: #f472b6;
-            --accent-red: #f87171;
-            --accent-purple: #a78bfa;
-            --accent-orange: #fb923c;
-            --shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+            /* Light surface set: the surrounding PlasBench report is a light
+               document, so the embedded dashboard matches rather than inverting. */
+            --bg-primary: #f3f6f4;
+            --bg-secondary: #e9eeea;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f2f7f3;
+            --bg-input: #ffffff;
+            --bg-tooltip: #14231d;
+            --border-color: #d3ddd6;
+            --border-light: #b4c3ba;
+            --text-primary: #16211c;
+            --text-secondary: #4a5a52;
+            --text-muted: #7b8a83;
+            /* Accents darkened for legibility on light surfaces. */
+            --accent-blue: #1f6fd0;
+            --accent-cyan: #0d7f95;
+            --accent-green: #17805a;
+            --accent-amber: #9a6400;
+            --accent-rose: #b83d78;
+            --accent-red: #b23b30;
+            --accent-purple: #6248bd;
+            --accent-orange: #b5601c;
+            --shadow: 0 10px 34px rgba(22, 33, 28, 0.16);
             --radius: 10px;
             --radius-sm: 6px;
             --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -111,18 +114,6 @@
             gap: 10px;
         }
 
-        .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 16px;
-            color: #fff;
-        }
 
         .logo h1 {
             font-size: 20px;
@@ -342,14 +333,14 @@
         /* ── Main Grid ── */
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: 18px;
             margin-top: 14px;
             flex: 1;
             min-height: 0;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 900px) {
             .main-grid {
                 grid-template-columns: 1fr;
             }
@@ -1205,14 +1196,12 @@
         <header class="header">
             <div class="header-left">
                 <div class="logo">
-                    <div class="logo-icon">PB</div>
-                    <h1>PlasBench <span class="badge">v3.0</span></h1>
+                    <h1>Reconstruction quality explorer</h1>
                 </div>
                 <div class="header-meta">
-                    <span><i class="fas fa-calendar"></i> 2026-09-02</span>
-                    <span><i class="fas fa-database"></i> 132 samples · 6 tools</span>
-                    <span><i class="fas fa-flask"></i> 487 plasmids</span>
-                    <span><i class="fas fa-tag"></i> enterprise</span>
+                    <span><i class="fas fa-calendar"></i> <span id="hdrDate">—</span></span>
+                    <span><i class="fas fa-database"></i> <span id="hdrScope">—</span></span>
+                    <span><i class="fas fa-flask"></i> <span id="hdrPlasmids">—</span></span>
                 </div>
             </div>
             <div class="header-right">
@@ -1362,7 +1351,7 @@
 
         <!-- ─── FOOTER ─── -->
         <div style="display:flex;justify-content:space-between;padding:10px 0 2px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border-color);margin-top:14px;flex-wrap:wrap;gap:6px;">
-            <span><i class="fas fa-code-branch"></i> PlasBench v3.0 · <span id="footerDate">2026-09-02</span></span>
+            <span><i class="fas fa-code-branch"></i> PlasBench <span id="footerVersion">—</span> · <span id="footerDate">—</span></span>
             <span><i class="fas fa-keyboard"></i> ← → ↑ ↓ · Esc clear · Enter drilldown</span>
             <span id="selectionInfo">No selection</span>
         </div>
@@ -1604,17 +1593,17 @@
 
         function getStatusColor(status) {
             const map = {
-                completed: '#4ade80',
-                cached: '#22d3ee',
-                warning: '#fbbf24',
-                failed: '#f87171',
-                skipped: '#5a6f8a',
-                'timed out': '#f87171',
-                'out of memory': '#f472b6',
-                'not applicable': '#5a6f8a',
-                'metric unavailable': '#5a6f8a',
+                completed: '#17805a',
+                cached: '#0d7f95',
+                warning: '#9a6400',
+                failed: '#b23b30',
+                skipped: '#9aa8a0',
+                'timed out': '#b23b30',
+                'out of memory': '#b83d78',
+                'not applicable': '#9aa8a0',
+                'metric unavailable': '#9aa8a0',
             };
-            return map[status] || '#5a6f8a';
+            return map[status] || '#9aa8a0';
         }
 
         function getStatusSymbol(status) {
@@ -1674,7 +1663,7 @@
             canvas.style.height = totalH + 'px';
 
             ctx.clearRect(0, 0, totalW, totalH);
-            ctx.fillStyle = '#080b11';
+            ctx.fillStyle = '#f3f6f4';
             ctx.fillRect(0, 0, totalW, totalH);
 
             // Draw grid
@@ -1691,7 +1680,7 @@
                     let color;
                     if (status === 'failed' || status === 'skipped' || status === 'timed out' || status ===
                         'out of memory') {
-                        color = '#1a212b';
+                        color = '#f2f7f3';
                     } else if (status === 'warning') {
                         color = getMetricColor(val * 0.7, maxVal);
                     } else {
@@ -1700,11 +1689,11 @@
                     ctx.fillStyle = color;
                     ctx.fillRect(x, y, colW, rowH);
 
-                    ctx.strokeStyle = isSelected ? '#4a8cf7' : '#151e2b';
+                    ctx.strokeStyle = isSelected ? '#1f6fd0' : '#ffffff';
                     ctx.lineWidth = isSelected ? 2.5 : 0.5;
                     ctx.strokeRect(x, y, colW, rowH);
 
-                    ctx.fillStyle = '#e6edf6';
+                    ctx.fillStyle = '#16211c';
                     ctx.font = '9px Inter, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -1713,13 +1702,13 @@
                     if (status === 'failed' || status === 'skipped' || status === 'timed out' || status ===
                         'out of memory') {
                         display = getStatusSymbol(status);
-                        ctx.fillStyle = '#5a6f8a';
+                        ctx.fillStyle = '#9aa8a0';
                     } else if (status === 'warning') {
                         display = getStatusSymbol(status);
-                        ctx.fillStyle = '#fbbf24';
+                        ctx.fillStyle = '#9a6400';
                     } else if (status === 'cached') {
                         display = getStatusSymbol(status);
-                        ctx.fillStyle = '#22d3ee';
+                        ctx.fillStyle = '#0d7f95';
                     } else {
                         if (state.metric === 'runtime' || state.metric === 'memory') {
                             display = String(val);
@@ -1733,13 +1722,13 @@
                     ctx.fillText(display, x + colW / 2, y + rowH / 2);
 
                     if (status === 'warning') {
-                        ctx.fillStyle = '#fbbf24';
+                        ctx.fillStyle = '#9a6400';
                         ctx.beginPath();
                         ctx.arc(x + 8, y + 8, 3.5, 0, 2 * Math.PI);
                         ctx.fill();
                     }
                     if (status === 'cached') {
-                        ctx.fillStyle = '#22d3ee';
+                        ctx.fillStyle = '#0d7f95';
                         ctx.beginPath();
                         ctx.arc(x + 8, y + 8, 3.5, 0, 2 * Math.PI);
                         ctx.fill();
@@ -1748,7 +1737,7 @@
             }
 
             // Row labels
-            ctx.fillStyle = '#8fa2c7';
+            ctx.fillStyle = '#4a5a52';
             ctx.font = '9px Inter, sans-serif';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
@@ -1757,7 +1746,7 @@
                 const y = pad.top + r * rowH + rowH / 2;
                 let label = sid;
                 if (label.length > 10) label = label.slice(0, 8) + '…';
-                ctx.fillStyle = (state.selectedSample === sid) ? '#4a8cf7' : '#8fa2c7';
+                ctx.fillStyle = (state.selectedSample === sid) ? '#1f6fd0' : '#4a5a52';
                 ctx.fillText(label, pad.left - 6, y);
             }
 
@@ -1768,17 +1757,17 @@
                 const tool = visibleTools[c];
                 const x = pad.left + c * colW + colW / 2;
                 const y = pad.top - 6;
-                ctx.fillStyle = (state.selectedTool === tool.id) ? '#4a8cf7' : '#8fa2c7';
+                ctx.fillStyle = (state.selectedTool === tool.id) ? '#1f6fd0' : '#4a5a52';
                 ctx.font = '9px Inter, sans-serif';
                 let label = tool.label;
                 if (label.length > 12) label = label.slice(0, 10) + '…';
                 ctx.fillText(label, x, y);
-                ctx.fillStyle = '#4a607a';
+                ctx.fillStyle = '#7b8a83';
                 ctx.font = '7px Inter, sans-serif';
                 ctx.fillText('v' + tool.version, x, y + 12);
             }
 
-            ctx.fillStyle = '#4a607a';
+            ctx.fillStyle = '#7b8a83';
             ctx.font = '8px Inter, sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
@@ -1809,6 +1798,21 @@
 
             // Update stats
             updateStats();
+            const footerVersion = document.getElementById('footerVersion');
+            if (footerVersion) footerVersion.textContent = (__PB.provenance || {}).toolVersion || 'version not recorded';
+            const hdrDate = document.getElementById('hdrDate');
+            if (hdrDate) hdrDate.textContent = new Date().toISOString().slice(0, 10);
+            const hdrScope = document.getElementById('hdrScope');
+            if (hdrScope) hdrScope.textContent =
+                `${SAMPLE_IDS.length} sample${SAMPLE_IDS.length === 1 ? '' : 's'} · ` +
+                `${TOOLS.length} method${TOOLS.length === 1 ? '' : 's'}`;
+            const hdrPlasmids = document.getElementById('hdrPlasmids');
+            if (hdrPlasmids) {
+                const total = SAMPLE_IDS.reduce((sum, sid) => sum + (SAMPLE_META[sid]?.plasmids || 0), 0);
+                hdrPlasmids.textContent = total
+                    ? `${total} truth plasmid${total === 1 ? '' : 's'}`
+                    : 'truth plasmids not loaded';
+            }
             updateStatsBar();
         }
 
@@ -1881,7 +1885,7 @@
             boxCtx.scale(2, 2);
 
             boxCtx.clearRect(0, 0, W, H);
-            boxCtx.fillStyle = '#0e141e';
+            boxCtx.fillStyle = '#e9eeea';
             boxCtx.fillRect(0, 0, W, H);
 
             if (filtered.length === 0) return;
@@ -1917,7 +1921,7 @@
             if (globalMax === -Infinity) globalMax = 1;
             const range = globalMax - globalMin || 1;
 
-            const colors = ['#4a8cf7', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#4ade80'];
+            const colors = ['#1f6fd0', '#0d7f95', '#6248bd', '#b83d78', '#9a6400', '#17805a'];
 
             visibleTools.forEach((t, idx) => {
                 const s = toolStats[t.id];
@@ -1964,7 +1968,7 @@
                 boxCtx.stroke();
 
                 // Label
-                boxCtx.fillStyle = '#4a607a';
+                boxCtx.fillStyle = '#7b8a83';
                 boxCtx.font = '7px Inter, sans-serif';
                 boxCtx.textAlign = 'center';
                 boxCtx.textBaseline = 'top';
@@ -1972,7 +1976,7 @@
                 boxCtx.fillText(label, x, pad.top + plotH + 2);
 
                 // Value display
-                boxCtx.fillStyle = '#8fa2c7';
+                boxCtx.fillStyle = '#4a5a52';
                 boxCtx.font = '6px Inter, sans-serif';
                 boxCtx.textBaseline = 'bottom';
                 boxCtx.fillText((s.median < 1 ? Math.round(s.median * 100) + '%' : s.median.toFixed(1)), x, pad.top - 2);
@@ -2005,7 +2009,7 @@
             dotCtx.scale(2, 2);
 
             dotCtx.clearRect(0, 0, W, H);
-            dotCtx.fillStyle = '#0e141e';
+            dotCtx.fillStyle = '#e9eeea';
             dotCtx.fillRect(0, 0, W, H);
 
             if (filtered.length === 0) return;
@@ -2036,7 +2040,7 @@
             const plotH = H - pad.top - pad.bottom;
 
             // Jittered dot plot
-            const colors = ['#4a8cf7', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#4ade80'];
+            const colors = ['#1f6fd0', '#0d7f95', '#6248bd', '#b83d78', '#9a6400', '#17805a'];
             const dotR = 2.5;
 
             // Group by tool
@@ -2062,7 +2066,7 @@
 
             // Mean line
             const meanY = pad.top + plotH - ((mean - min) / range) * plotH;
-            dotCtx.strokeStyle = '#4ade80';
+            dotCtx.strokeStyle = '#17805a';
             dotCtx.lineWidth = 0.8;
             dotCtx.setLineDash([3, 4]);
             dotCtx.beginPath();
@@ -2072,7 +2076,7 @@
             dotCtx.setLineDash([]);
 
             // Labels
-            dotCtx.fillStyle = '#4a607a';
+            dotCtx.fillStyle = '#7b8a83';
             dotCtx.font = '7px Inter, sans-serif';
             dotCtx.textAlign = 'center';
             dotCtx.textBaseline = 'top';
@@ -2249,7 +2253,7 @@
                         tsegs[2].w = 10; }
                     if (p.recoveryClass.includes('fragmented')) { tsegs.splice(1, 0, { type: 'missing', w: 12 }); }
                     const segHtml = tsegs.map(s => {
-                        const color = segColors[s.type] || '#2a3548';
+                        const color = segColors[s.type] || '#d3ddd6';
                         return `<div class="seg seg-${s.type}" style="width:${s.w}%;background:${color};"></div>`;
                     }).join('');
                     tracksHtml += `
@@ -2890,7 +2894,7 @@
                     renderDotPlot(); }, 200);
             }
 
-            console.log('🧬 PlasBench v3.0 ·', SAMPLE_IDS.length, 'samples,', TOOLS.length, 'tools');
+            console.log('PlasBench dashboard ·', SAMPLE_IDS.length, 'samples,', TOOLS.length, 'methods');
             console.log('📊 Metric:', state.metric);
         }
 

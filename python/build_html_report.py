@@ -626,8 +626,16 @@ def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
             capabilities = {row["tool"]: row for row in csv.DictReader(handle, delimiter="\t")}
     versions = read_tool_versions(results_dir / "run_manifest.json")
 
+    manifest_version = "version not recorded"
+    manifest_path = results_dir / "run_manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest_version = json.loads(manifest_path.read_text(encoding="utf-8")).get(
+                "tool_version", manifest_version)
+        except (OSError, json.JSONDecodeError):
+            pass
     data = enterprise.build(scores, status, leaderboard, metadata, capabilities,
-                            versions, visualizations, structural)
+                            versions, visualizations, structural, manifest_version)
     document = enterprise.render(template, data, vendor_html)
     # The iframe is written from a template script tag rather than srcdoc so the
     # document needs no HTML-entity escaping of its own markup.
@@ -639,7 +647,7 @@ def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
             "results. Values that were never measured render as “not measured” rather than as zero. "
             "It runs in an isolated frame so its own stylesheet cannot restyle this report.</p>"
             "<div class='panel' style='padding:0'><iframe id='pb-enterprise' title='PlasBench interactive cohort dashboard' "
-            "style='width:100%;height:1180px;border:0;display:block'></iframe></div>"
+            "style='width:100%;height:1240px;border:0;display:block'></iframe></div>"
             f"<script id='pb-enterprise-doc' type='text/template'>{encoded}</script>"
             "<script>(()=>{const f=document.getElementById('pb-enterprise');"
             "const raw=document.getElementById('pb-enterprise-doc').textContent;"
