@@ -89,7 +89,13 @@ def main():
                    "Structural alignment diagnostics", "data-context-feature",
                    "Concordance proxy"):
         assert needed in page, f"visual diagnostic affordance missing: {needed}"
-    assert "function renderDot" not in page, "legacy mixed-coordinate dot-plot renderer must not be emitted"
+    # The adopted enterprise iframe has its own unrelated renderer names. Check
+    # the retired mixed-query-coordinate implementation by its old semantics.
+    assert "Reference coordinate is horizontal; predicted-record coordinate is vertical." not in page, \
+        "legacy mixed-coordinate dot-plot renderer must not be emitted"
+    for needed in ("Protein annotations and coordinate recovery", "vq-protein-category",
+                   "coordinate-complete", "not amino-acid identity"):
+        assert needed in page, f"protein viewer affordance missing: {needed}"
 
     # Cohort dashboard: headline cards and distribution plots from measured data.
     for needed in ("vq-stats", "vq-dist", "Leading method", "Hardest sample",
@@ -123,6 +129,20 @@ def main():
     assert "PlasBenchIcons" in page, "icon face not vendored"
     # Non-Element keydown targets must not throw.
     assert "e.target?.matches?.(" in page, "keydown handler must tolerate non-Element targets"
+
+    # Adopted enterprise dashboard: present, isolated, and driven by measurements.
+    for needed in ("pb-enterprise", "pb-enterprise-doc", "pb-data", "heatmapCanvas",
+                   "drilldownModal", "PlasBench · Enterprise Report"):
+        assert needed in page, f"enterprise dashboard affordance missing: {needed}"
+    assert "srcdoc" in page, "dashboard must be isolated in a frame"
+    # Nothing in the adopted view may simulate data. The upstream prototype
+    # generated its dataset, highlighted random mismatches, jittered dot plots
+    # and added noise to sorting; none of that may survive.
+    assert "Math.random" not in page, "the report must not contain any random data generation"
+    assert "generateContigs(" not in page, "contig fabrication fallback must be removed"
+    assert '"simulated":false' in page or '"simulated": false' in page,         "dashboard payload must declare it is not simulated"
+    # Helpers the removed generator owned must still be defined for the renderer.
+    assert "function clamp(" in page, "clamp helper missing after generator removal"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 

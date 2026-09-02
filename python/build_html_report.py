@@ -10,6 +10,7 @@ import html
 import json
 import os
 import shutil
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import quote
@@ -581,6 +582,71 @@ refresh();})();
 </script>"""
 
 
+def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
+                            results_dir, vendor_html):
+    """Embed the vendored enterprise dashboard, driven by measured results.
+
+    The dashboard is rendered inside an isolated iframe. Its stylesheet styles
+    bare `*` and `body`, so inlining it into this page would restyle the whole
+    report; the iframe keeps the adopted look byte-for-byte without leaking.
+    """
+    template = Path(project_root) / "assets" / "enterprise" / "template.html"
+    if not template.is_file():
+        return ""
+    try:
+        import build_enterprise_view as enterprise
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import build_enterprise_view as enterprise
+
+    visualizations = {}
+    for sample in {row["sample"] for row in scores}:
+        path = results_dir / sample / "visualization" / "alignment_blocks.json"
+        if path.is_file():
+            try:
+                visualizations[sample] = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+    structural = {}
+    for sample in {row["sample"] for row in scores}:
+        path = results_dir / sample / "structural_summary.tsv"
+        if not path.is_file():
+            continue
+        try:
+            with path.open(encoding="utf-8", newline="") as handle:
+                for row in csv.DictReader(handle, delimiter="\t"):
+                    value = row.get("collinear_fraction")
+                    structural[(sample, row.get("tool"))] = float(value) if value else None
+        except (OSError, ValueError):
+            continue
+    capabilities = {}
+    registry = Path(project_root) / "config" / "tool_capabilities.tsv"
+    if registry.is_file():
+        with registry.open(encoding="utf-8", newline="") as handle:
+            capabilities = {row["tool"]: row for row in csv.DictReader(handle, delimiter="\t")}
+    versions = read_tool_versions(results_dir / "run_manifest.json")
+
+    data = enterprise.build(scores, status, leaderboard, metadata, capabilities,
+                            versions, visualizations, structural)
+    document = enterprise.render(template, data, vendor_html)
+    # The iframe is written from a template script tag rather than srcdoc so the
+    # document needs no HTML-entity escaping of its own markup.
+    # Escape only what would close the outer template tag; the frame script
+    # restores it before handing the document to srcdoc.
+    encoded = document.replace("</script", "<\\/script")
+    return ("<section id='enterprise'><h2>Interactive cohort dashboard</h2>"
+            "<p class='lead'>The adopted enterprise dashboard, driven entirely by this run's measured "
+            "results. Values that were never measured render as “not measured” rather than as zero. "
+            "It runs in an isolated frame so its own stylesheet cannot restyle this report.</p>"
+            "<div class='panel' style='padding:0'><iframe id='pb-enterprise' title='PlasBench interactive cohort dashboard' "
+            "style='width:100%;height:1180px;border:0;display:block'></iframe></div>"
+            f"<script id='pb-enterprise-doc' type='text/template'>{encoded}</script>"
+            "<script>(()=>{const f=document.getElementById('pb-enterprise');"
+            "const raw=document.getElementById('pb-enterprise-doc').textContent;"
+            "f.srcdoc=raw.split('<\\\\/script').join('</scr'+'ipt');})();</script>"
+            "</section>")
+
+
 def canvas_heatmap_script():
     """A canvas sample-tool matrix with a drilldown modal, beside the table view.
 
@@ -1097,6 +1163,26 @@ function render(){const x=current();if(!x){host.innerHTML='';return}const s=x.a.
 </script>"""
 
 
+def protein_annotation_script():
+    """Render standardized protein labels without overstating functional proof."""
+    return """<style>
+#vq-proteins{margin-top:16px}.vq-protein-controls{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;font:12px Arial,sans-serif}
+#vq-proteins table{min-width:680px}.vq-protein-status{font-weight:bold}.vq-protein-status.complete{color:#087250}.vq-protein-status.partial{color:#9a5b00}.vq-protein-status.missing{color:#a53028}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),host=document.createElement('div');host.id='vq-proteins';($('vq-structural')||$('vq-tracks')).after(host);
+const high=new Set(['amr','replication','mobility','maintenance','mobile_element']),colors={amr:'#2275ad',replication:'#5b7fb6',mobility:'#9b59b6',maintenance:'#16805a',mobile_element:'#d06d28',hypothetical:'#8b9292',other:'#64736a'};
+function state(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t])return null;return {a,p,t,lo:Number($('vq-start').value)||0,hi:Number($('vq-end').value)||a.truth_plasmids[p].length}}
+function label(f){return f.gene||f.product||f.feature_id||'CDS'}
+function status(f,pred){const n=Math.max(0,...pred.filter(x=>x.sequence_id===f.sequence_id&&x.end>f.start&&x.start<f.end).map(x=>x.projection_fraction||0));return n>=.95?'complete':n>=.3?'partial':'missing'}
+function overlay(){const x=state(),svg=$('vq-tracks').querySelector('svg');if(!x||!svg)return;svg.querySelectorAll('[data-protein-feature]').forEach(n=>n.remove());const width=Math.max(1,x.hi-x.lo),scale=v=>180+(v-x.lo)/width*880,truth=(x.a.protein_features||[]).filter(f=>f.sequence_id===x.p&&f.end>x.lo&&f.start<x.hi),pred=(x.a.tools[x.t].protein_features||[]).filter(f=>f.sequence_id===x.p&&f.end>x.lo&&f.start<x.hi),names=Object.keys(x.a.tools),row=names.indexOf(x.t);
+ function arrow(f,y,opacity){const left=Math.max(180,scale(f.start)),right=Math.min(1060,scale(f.end)),tip=Math.min(7,Math.max(2,right-left));const forward=f.strand!=='-';const points=forward?`${left},${y} ${right-tip},${y} ${right},${y+4} ${right-tip},${y+8} ${left},${y+8}`:`${right},${y} ${left+tip},${y} ${left},${y+4} ${left+tip},${y+8} ${right},${y+8}`;const n=document.createElementNS('http://www.w3.org/2000/svg','polygon');n.setAttribute('data-protein-feature','1');n.setAttribute('points',points);n.setAttribute('fill',colors[f.category]||colors.other);n.setAttribute('fill-opacity',opacity);const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${label(f)} | ${f.product||'unlabelled CDS'} | ${f.category||'other'} | ${f.source} ${f.version}`;n.append(title);svg.append(n);if(high.has(f.category)&&right-left>28){const text=document.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('data-protein-feature','1');text.setAttribute('x',left);text.setAttribute('y',y-2);text.setAttribute('font-size','9');text.textContent=label(f);svg.append(text)}}
+ truth.forEach(f=>arrow(f,26,.9));pred.forEach(f=>arrow(f,40+row*38+10,.72));}
+ function render(){const x=state();if(!x)return;const truth=(x.a.protein_features||[]).filter(f=>f.sequence_id===x.p),pred=x.a.tools[x.t].protein_features||[];const categories=[...new Set(truth.map(f=>f.category||'other'))].sort();host.innerHTML='<h3>Protein annotations and coordinate recovery</h3><p class="muted">Names are standardized annotation products. Recovery is projected through nucleotide alignments and is not amino-acid identity, orthology, frameshift, or closure evidence.</p><div class="vq-protein-controls"><label>Category <select id="vq-protein-category"><option value="">All</option>'+categories.map(c=>`<option value="${c}">${c}</option>`).join('')+'</select></label><label>Search <input id="vq-protein-search" type="search" placeholder="gene or product"></label><span>Truth CDS: '+truth.length+' · mapped predicted CDS: '+pred.length+'</span></div><div class="panel"><table><thead><tr><th>Protein</th><th>Product</th><th>Category</th><th>Truth coordinates</th><th>Projected recovery</th><th>Annotation provenance</th></tr></thead><tbody id="vq-protein-body"></tbody></table></div>';
+ const refresh=()=>{const q=($('vq-protein-search').value||'').toLowerCase(),c=$('vq-protein-category').value,shown=truth.filter(f=>(!c||f.category===c)&&(!q||(`${label(f)} ${f.product||''} ${f.dbxref||''}`).toLowerCase().includes(q)));$('vq-protein-body').innerHTML=shown.map(f=>{const s=status(f,pred);return `<tr><td>${label(f)}</td><td>${f.product||'hypothetical protein'}</td><td>${f.category||'other'}</td><td>${f.start}-${f.end} (${f.strand})</td><td><span class="vq-protein-status ${s}">${s==='complete'?'coordinate-complete':s==='partial'?'coordinate-partial':'not projected'}</span></td><td>${f.source} ${f.version} · ${f.confidence}</td></tr>`}).join('')||'<tr><td colspan="6">No protein annotations match this filter. Enable standardized annotation to populate this view.</td></tr>'};$('vq-protein-category').addEventListener('change',refresh);$('vq-protein-search').addEventListener('input',refresh);refresh();overlay()}
+ ['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(render,0));$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));render()})();
+</script>"""
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--project-root", required=True)
@@ -1297,9 +1383,11 @@ def main():
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(leaderboard)
     vendor_html = vendor_assets(args.project_root)
+    enterprise_html = enterprise_view_section(args.project_root, scores, status, leaderboard,
+                                              metadata, out.parent, vendor_html)
     visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
                    + record_dotplot_script() + context_visual_script() + linked_selection_script(metadata)
-                   + plasmid_summary_script() + structural_and_feature_tracks_script()
+                   + plasmid_summary_script() + structural_and_feature_tracks_script() + protein_annotation_script()
                    + cohort_dashboard_script() + canvas_heatmap_script() + lazy_visualization_script() + explorer_navigation_script()
                    + flow_and_clustering_script())
     page = f"""<!doctype html>
@@ -1340,7 +1428,7 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
 </script>
 </body></html>"""
     page = page.replace("<a href='#selected'>", "<a href='#visual-quality'>Visual quality</a><a href='#selected'>")
-    page = page.replace("<section id='scores'>", visual_html + "<section id='scores'>")
+    page = page.replace("<section id='scores'>", enterprise_html + visual_html + "<section id='scores'>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
     print(f"Wrote HTML report: {out}")
