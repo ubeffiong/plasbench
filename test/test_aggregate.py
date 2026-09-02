@@ -59,7 +59,10 @@ def main():
         report = os.path.join(tmp, "benchmark.report.html")
         assert os.path.isfile(report)
         with open(report, encoding="utf-8") as handle:
-            assert "tool_a" in handle.read()
+            page = handle.read()
+            assert "tool_a" in page
+            assert "Selected reconstructions" in page
+            assert "Benchmark-validated candidate" in page
 
         # The direct report builder must preserve optional cohort metadata and
         # manifest-recorded versions for filtering/export, without requiring a
