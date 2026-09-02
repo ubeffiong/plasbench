@@ -478,6 +478,14 @@ results/benchmark.stratified.tsv
     The complete per-tool stratified metric and eligibility table supporting
     those recommendations.
 
+results/benchmark.recommendation_validation.tsv
+    Leave-one-source-study-out release safeguard. It reports when an
+    independent study test is unavailable rather than pretending validation.
+
+results/benchmark.<track>.leaderboard.tsv
+    Separate leaderboard for each declared short-read, long-read, or hybrid
+    analysis track; conclusions from different tracks are not pooled.
+
 results/benchmark.report.html
     Offline interactive final dashboard. It includes filters, sortable tables,
     tool and sample drill-downs, automated descriptive interpretation, metric
@@ -527,6 +535,20 @@ tables as `data/<sample>/truth_amr.tsv` (`sequence_id`, `start`, `end`; 0-based
 half-open intervals) and `data/<sample>/truth_circular.tsv` (`sequence_id`) to
 activate AMR-gene and circular-plasmid recovery metrics. PlasBench validates
 that these entries refer to labelled plasmid reference sequences.
+
+For AMR truth used in recommendations, use the stricter versioned schema:
+`sequence_id`, `start`, `end`, `gene_name`, `gene_id`, `copy_id`, `database`,
+and `database_version`. Validate it before a run with:
+
+```bash
+python python/validate_amr_truth.py --truth data/SAMPLE/truth.tsv \
+  --amr-truth data/SAMPLE/truth_amr.tsv
+```
+
+Optional `pred_<tool>.evidence.tsv` files can carry source-reported replicon,
+MOB, or closure evidence using `record_id`, `evidence_type`, and
+`evidence_value`. They are shown in the selection card but are not treated as
+independent structural proof.
 
 ## Operational Selection
 

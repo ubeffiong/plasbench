@@ -94,6 +94,21 @@ def main():
     ok &= (int(row["unmapped_pred_bp"]) == 100)
     print(f"  unmapped prediction == 100 ? {row['unmapped_pred_bp']} -> {int(row['unmapped_pred_bp'])==100}")
 
+    # Query-coverage filtering rejects small local placements even when they
+    # pass identity, length, and MAPQ thresholds.
+    local_paf = os.path.join(tmp, "local.paf"); local_pred = os.path.join(tmp, "local.fasta")
+    open(local_paf, "w").write("local\t1000\t0\t100\t+\tplasmidA\t2000\t0\t100\t100\t100\t60\n")
+    write_fasta(local_pred, {"local": 1000})
+    query_coverage_out = os.path.join(tmp, "query_coverage.tsv")
+    subprocess.run(
+        [sys.executable, SCORER, "--truth", truth, "--paf", local_paf, "--pred-fasta", local_pred,
+         "--sample", "SYNTH", "--tool", "query-coverage", "--out", query_coverage_out,
+         "--min-alignment-query-coverage", "0.75"], check=True)
+    with open(query_coverage_out) as fh:
+        query_row = dict(zip(fh.readline().strip().split("\t"), fh.readline().strip().split("\t")))
+    ok &= int(query_row["filtered_alignment_count"]) == 1
+    print(f"  query-coverage threshold filters short placements ? {query_row['filtered_alignment_count']} -> {int(query_row['filtered_alignment_count']) == 1}")
+
     # Secondary mappings are a diagnostic only: the primary score remains
     # unchanged, while query bases with plasmid/chromosome alternatives are
     # explicitly surfaced for conservative downstream selection.

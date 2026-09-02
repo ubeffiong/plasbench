@@ -75,6 +75,7 @@ def read_scores(path):
                 "precision": float(f[idx["precision"]]),
                 "recall": float(f[idx["recall"]]),
                 "f1": float(f[idx["f1"]]),
+                "analysis_track": f[idx["analysis_track"]] if "analysis_track" in idx and f[idx["analysis_track"]] else "short_read",
                 # A missing plasmid-level value is not evidence of zero recovery.
                 "plasmid_recall": (
                     float(f[idx["plasmid_recall"]])
@@ -260,6 +261,18 @@ def write_md(summary, path):
                  "chromosomal contamination._\n")
 
 
+def write_track_leaderboards(rows, status_counts, prefix):
+    """Emit one leaderboard per declared input track; never mix track claims."""
+    tracks = defaultdict(list)
+    for row in rows:
+        tracks[row["analysis_track"]].append(row)
+    for track, track_rows in tracks.items():
+        summary = summarise(track_rows, status_counts)
+        track_prefix = f"{prefix}.{track}"
+        write_tsv(summary, track_prefix + ".leaderboard.tsv")
+        write_md(summary, track_prefix + ".leaderboard.md")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -293,6 +306,7 @@ def main():
     summary = summarise(rows, status_counts)
     write_tsv(summary, args.out_prefix + ".leaderboard.tsv")
     write_md(summary, args.out_prefix + ".leaderboard.md")
+    write_track_leaderboards(rows, status_counts, args.out_prefix)
     write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv")
 
     # Print the leaderboard to stdout so it appears in the run log.

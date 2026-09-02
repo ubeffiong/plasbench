@@ -1,4 +1,4 @@
-sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	source_study
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	source_study	gram_group	collection_country
 # ---------------------------------------------------------------------------
 # Fill this in with YOUR matched pairs. One isolate per row.
 #   sample_id          : any short unique name you choose (no spaces)
@@ -18,6 +18,8 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 #   read_depth_x       : optional estimated Illumina depth in fold coverage (for example 80)
 #   source_study       : reviewed publication or collection this isolate comes from.
 #                        Leave blank until reviewed; it decides tier A vs B (see above).
+#   gram_group         : optional curator-supplied Gram-positive or Gram-negative stratum.
+#   collection_country : optional curator-supplied country; separate from broad sample_origin.
 #
 # Lines starting with '#' and blank lines are ignored.
 # A metadata-verified public seed panel is available at cohorts/public-v1.tsv.
@@ -30,5 +32,5 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 # The three rows below are PLACEHOLDERS to show the format. Replace them.
 # (They are commented out so the pipeline does not try to download them.)
 # ---------------------------------------------------------------------------
-# ecoli_01	GCF_000000000.1	SRR0000001	Escherichia coli	hybrid	A	SAMN00000001	PRJNA000001	clinical	85	Smith_2024_uropathogenic_ecoli
-# kpneu_01	GCF_000000000.2	SRR0000002	Klebsiella pneumoniae	long_read	B	SAMN00000002	PRJNA000001	environmental	60	
+# ecoli_01	GCF_000000000.1	SRR0000001	Escherichia coli	hybrid	A	SAMN00000001	PRJNA000001	clinical	85	Smith_2024_uropathogenic_ecoli	Gram-negative	Nigeria
+# kpneu_01	GCF_000000000.2	SRR0000002	Klebsiella pneumoniae	long_read	B	SAMN00000002	PRJNA000001	environmental	60		Gram-negative	Nigeria

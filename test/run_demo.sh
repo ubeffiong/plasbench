@@ -96,14 +96,17 @@ STATUS="$DEMO/tool_status.tsv"
 
 SAMPLES="$DEMO/samples.tsv"
 cat > "$SAMPLES" <<'EOF'
-sample_id	organism	truth_technology	sample_origin	read_depth_x
-sample1	Demo bacterium	hybrid	synthetic	80
-sample2	Demo bacterium	hybrid	synthetic	80
+sample_id	organism	truth_technology	sample_origin	read_depth_x	source_study	gram_group	collection_country
+sample1	Demo bacterium	hybrid	synthetic	80	Demo study A	Gram-negative	Nigeria
+sample2	Demo bacterium	hybrid	synthetic	80	Demo study B	Gram-negative	Nigeria
 EOF
 
 python3 "$PY/aggregate_results.py" --scores "$SCORES" --tool-status "$STATUS" --out-prefix "$DEMO/benchmark"
+python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES" \
+    --out "$DEMO/benchmark.recommendation_validation.tsv" --min-train-samples 1
 python3 "$PY/select_operational_method.py" --scores "$SCORES" --sample-sheet "$SAMPLES" \
     --results-dir "$DEMO" --tool-status "$STATUS" --out-prefix "$DEMO/benchmark" \
+    --recommendation-validation "$DEMO/benchmark.recommendation_validation.tsv" \
     --min-samples 1 --min-coverage 1
 
 python3 "$PY/build_html_report.py" \
@@ -113,6 +116,7 @@ python3 "$PY/build_html_report.py" \
     --leaderboard "$DEMO/benchmark.leaderboard.tsv" \
     --sample-sheet "$SAMPLES" \
     --recommendations "$DEMO/benchmark.recommendations.tsv" \
+    --recommendation-validation "$DEMO/benchmark.recommendation_validation.tsv" \
     --out "$DEMO/benchmark.report.html"
 
 echo

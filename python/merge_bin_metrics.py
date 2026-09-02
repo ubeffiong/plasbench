@@ -8,7 +8,7 @@ from pathlib import Path
 FIELDS = [
     "bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins",
     "missed_plasmids", "split_events", "merge_events", "contaminated_bins",
-    "chromosome_aligned_bp", "bin_total_mapped_bp", "contamination_fraction",
+    "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction",
 ]
 
 
