@@ -144,6 +144,19 @@ def main():
     # Helpers the removed generator owned must still be defined for the renderer.
     assert "function clamp(" in page, "clamp helper missing after generator removal"
 
+    # The embedded dashboard matches the surrounding light report and carries no
+    # prototype branding or hardcoded cohort figures.
+    assert "--bg-primary: #f3f6f4" in page, "dashboard must use the light surface set"
+    assert "#080b11" not in page and "#151e2b" not in page, "dark prototype surfaces remain"
+    assert "logo-icon" not in page, "prototype badge mark must be removed"
+    assert "Reconstruction quality explorer" in page, "dashboard heading not retitled"
+    for stale in ("132 samples", "487 plasmids", "v3.0"):
+        assert stale not in page, f"prototype header figure remains: {stale}"
+    assert "hdrScope" in page and "hdrPlasmids" in page, "header must be run-driven"
+    # Heatmap and plasmid panels share a row down to laptop widths.
+    assert "@media (max-width: 900px)" in page, "grid must stay two-column above 900px"
+    assert "minmax(0, 1fr) minmax(0, 1fr)" in page, "grid tracks must be shrinkable"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
