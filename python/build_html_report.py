@@ -275,10 +275,14 @@ def visual_quality_section(scores, status, results_dir):
     matrix = []
     for row in scores:
         tp, fp = number(row.get("TP_bp")), number(row.get("FP_bp"))
+        base_f1, plasmid_recall = number(row.get("f1")), number(row.get("plasmid_recall"))
+        bin_f1 = number(row["bin_f1"]) if row.get("bin_f1") else base_f1
+        contamination = fp / (tp + fp) if tp + fp else None
+        composite = .45 * base_f1 + .25 * plasmid_recall + .15 * bin_f1 + .15 * (1 - contamination if contamination is not None else 0)
         matrix.append({"sample": row["sample"], "tool": row["tool"], "status": state.get((row["sample"], row["tool"]), "scored"),
                        "f1": number(row.get("f1")), "precision": number(row.get("precision")), "recall": number(row.get("recall")),
-                       "plasmid_recall": number(row.get("plasmid_recall")), "bin_f1": number(row["bin_f1"]) if row.get("bin_f1") else None,
-                       "contamination": fp / (tp + fp) if tp + fp else None, "unmapped": number(row.get("unmapped_pred_bp"))})
+                       "plasmid_recall": plasmid_recall, "bin_f1": number(row["bin_f1"]) if row.get("bin_f1") else None,
+                       "contamination": contamination, "unmapped": number(row.get("unmapped_pred_bp")), "composite": composite})
     payload = json.dumps({"matrix": matrix, "visualizations": visualizations}, separators=(",", ":")).replace("<", "\\u003c")
     return """<section id='visual-quality'><h2>Visual reconstruction quality</h2>
 <p class='lead'>Click a heatmap cell to follow the result from cohort quality to one truth plasmid. The explorer uses retained primary PAF blocks on truth-reference coordinates; it is not a raw nucleotide alignment or an independent structural-validation claim.</p>
@@ -294,6 +298,183 @@ function setTools(){select($('vq-tool'),tools.filter(t=>m.some(r=>r.sample===$('
 function draw(){let s=$('vq-sample').value,t=$('vq-tool').value,p=$('vq-plasmid').value,a=v[s];if(!a||!p){$('vq-tracks').textContent='No visualization data. Re-run stage 5 after retaining PAF scoring alignments.';return}let len=a.truth_plasmids[p].length,[lo,hi]=range||[0,len];lo=Math.max(0,Math.min(lo,len-1));hi=Math.max(lo+1,Math.min(hi,len));range=[lo,hi];$('vq-start').value=Math.floor(lo);$('vq-end').value=Math.ceil(hi);$('vq-download').href=s+'/visualization/alignment_blocks.json';let names=Object.keys(a.tools),scale=x=>180+(x-lo)/(hi-lo)*880,svg=`<svg viewBox="0 0 1100 ${55+names.length*38}"><text x="180" y="15" font-size="12">${p}: ${Math.floor(lo).toLocaleString()}–${Math.ceil(hi).toLocaleString()} / ${len.toLocaleString()} bp</text>`;names.forEach((name,i)=>{let y=40+i*38,z=a.tools[name],rec=z.plasmid_recovery[p]||{},bs=z.blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi);svg+=`<text x="4" y="${y+7}" font-size="12">${name}</text><text x="105" y="${y+7}" font-size="11">${((rec.completeness||0)*100).toFixed(1)}%</text><rect x="180" y="${y-8}" width="880" height="16" fill="#f7f8f5" stroke="#d6ddd5"/>`;bs.forEach((b,i)=>{let x=Math.max(180,scale(b.target_start)),r=Math.min(1060,scale(b.target_end));svg+=`<rect class="vq-block" data-n="${name}" data-i="${i}" x="${x}" y="${y-8}" width="${Math.max(1,r-x)}" height="16" fill="${b.strand==='-'?'#7f5aa2':'#16805a'}"><title>${b.record_id}</title></rect>`})});a.amr_features.filter(f=>f.sequence_id===p&&f.start>=lo&&f.start<=hi).forEach(f=>{let x=scale(f.start);svg+=`<path d="M${x} 25 l5 -9 l5 9z" fill="#2275ad"><title>${f.label}</title></path>`});svg+='</svg>';$('vq-tracks').innerHTML=svg+'<p class="muted">Displayed primary blocks; '+names.map(n=>n+': '+a.tools[n].blocks_omitted+' omitted').join(' · ')+'</p>';document.querySelectorAll('.vq-block').forEach(e=>e.onclick=()=>{let b=a.tools[e.dataset.n].blocks.filter(x=>x.target===p&&x.target_end>lo&&x.target_start<hi)[e.dataset.i];$('vq-detail').textContent=`${e.dataset.n} | ${b.record_id} | query ${b.query_start}-${b.query_end}/${b.query_length} | reference ${b.target_start}-${b.target_end} | ${b.strand} strand | identity ${(100*b.matches/Math.max(1,b.block_length)).toFixed(2)}% | MAPQ ${b.mapq}`})}
 $('vq-metric').onchange=heat;$('vq-sample').onchange=()=>{range=null;setTools();setPlasmids();draw()};$('vq-tool').onchange=draw;$('vq-plasmid').onchange=()=>{range=null;draw()};$('vq-start').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-end').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-fit').onclick=()=>{range=null;draw()};$('vq-in').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])/2;range=[c-z/2,c+z/2];draw()}};$('vq-out').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])*2;range=[c-z/2,c+z/2];draw()}};$('vq-tracks').addEventListener('wheel',e=>{if(!range)return;e.preventDefault();let c=(range[0]+range[1])/2,z=(range[1]-range[0])*(e.deltaY<0?.7:1.4);range=[c-z/2,c+z/2];draw()},{passive:false});select($('vq-sample'),samples);setTools();setPlasmids();heat();draw()})();
 </script></section>""".replace("__PAYLOAD__", payload)
+
+
+def advanced_visual_script():
+    """Enhance the base explorer with dot plot, flows, exports, and local bases."""
+    return """<script>
+(()=>{const $=id=>document.getElementById(id),data=JSON.parse($('vq-data').textContent),tracks=$('vq-tracks'),detail=$('vq-detail');let composite=document.createElement('option');composite.value='composite';composite.textContent='Exploratory composite quality';$('vq-metric').append(composite);let filter=document.createElement('input'),order=document.createElement('button');filter.id='vq-filter';filter.placeholder='Filter sample or tool';order.type='button';order.textContent='Order samples by best visible metric';$('vq-heatmap').before(filter,order);
+const dot=document.createElement('div'),flow=document.createElement('div'),actions=document.createElement('span');dot.id='vq-dotplot';flow.id='vq-flow';tracks.after(dot,flow);actions.innerHTML='<button id="vq-svg" type="button">Download track SVG</button><button id="vq-png" type="button">Download track PNG</button>';$('vq-download').after(actions);
+function current(){let a=data.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t])return null;let lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||a.truth_plasmids[p].length;return {a,p,t,lo,hi,blocks:a.tools[t].blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi)}}
+function renderDot(){let x=current();if(!x){dot.innerHTML='';flow.innerHTML='';return}let l=x.a.truth_plasmids[x.p].length,scale=v=>30+v/l*420;let lines=x.blocks.map(b=>`<line x1="${scale(b.target_start)}" y1="${scale(b.query_start)}" x2="${scale(b.target_end)}" y2="${scale(b.query_end)}" stroke="${b.strand==='-'?'#7f5aa2':'#16805a'}" stroke-width="2"/>`).join('');dot.innerHTML=`<h3>Dot plot: ${x.t} vs ${x.p}</h3><p class="muted">Reference coordinate is horizontal; predicted-record coordinate is vertical. A continuous forward diagonal supports collinearity; this diagnostic does not validate complete structural correctness.</p><svg viewBox="0 0 480 480" width="480" role="img" aria-label="Dot plot"><rect x="30" y="30" width="420" height="420" fill="#f7f8f5" stroke="#849387"/>${lines}<text x="180" y="475" font-size="11">truth plasmid coordinate</text><text x="2" y="20" font-size="11">predicted coordinate</text></svg>`;let f=x.a.tools[x.t].bin_assignment_flows||[];flow.innerHTML=f.length?'<h3>Bin-to-truth assignment flow</h3><p class="muted">Only scored bin assignments are shown; unobserved alternative links are not fabricated.</p><ul>'+f.map(r=>`<li>${r.bin_id||'no bin'} → ${r.true_plasmid||r.status}: ${r.aligned_bp.toLocaleString()} bp (${r.status})</li>`).join('')+'</ul>':''}
+function applyFilter(){let q=filter.value.toLowerCase();document.querySelectorAll('#vq-heatmap tbody tr').forEach(row=>row.hidden=q&&!row.innerText.toLowerCase().includes(q))}filter.oninput=applyFilter;order.onclick=()=>{let key=$('vq-metric').value,body=document.querySelector('#vq-heatmap tbody');[...body.rows].sort((a,b)=>{let score=r=>Math.max(...[...r.querySelectorAll('.vq-cell')].map(c=>Number(c.innerText)).filter(Number.isFinite),-Infinity);return score(b)-score(a)}).forEach(r=>body.append(r))};$('vq-metric').addEventListener('change',()=>setTimeout(applyFilter,0));
+function local(e){let x=current();if(!x)return;let b=x.blocks[Number(e.target.dataset.i)];if(!b)return;let a=b.local_alignment;if(!a){detail.textContent='No bounded CIGAR local alignment is available for this block. Re-run stage 5 after the CIGAR-enabled mapper update, or inspect the PAF externally.';return}let marks=[...a.reference].map((c,i)=>c===a.prediction[i]?' ':'^').join('');detail.innerHTML='<strong>Local nucleotide alignment</strong><br><code>Reference  '+a.reference+'<br>           '+marks+'<br>Prediction '+a.prediction+'</code><p class="muted">'+a.meaning+'</p>'}
+document.addEventListener('click',e=>{if(e.target.classList.contains('vq-block')){setTimeout(()=>{local(e);renderDot()},0)}});['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end','vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(renderDot,0)));$('vq-fit').addEventListener('click',()=>setTimeout(renderDot,0));$('vq-in').addEventListener('click',()=>setTimeout(renderDot,0));$('vq-out').addEventListener('click',()=>setTimeout(renderDot,0));
+function download(name,blob){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),0)}$('vq-svg').onclick=()=>{let svg=tracks.querySelector('svg');if(svg)download('plasbench-recovery-tracks.svg',new Blob([svg.outerHTML],{type:'image/svg+xml'}))};$('vq-png').onclick=()=>{let svg=tracks.querySelector('svg');if(!svg)return;let image=new Image(),url=URL.createObjectURL(new Blob([svg.outerHTML],{type:'image/svg+xml'}));image.onload=()=>{let c=document.createElement('canvas');c.width=1100;c.height=svg.viewBox.baseVal.height;c.getContext('2d').drawImage(image,0,0);c.toBlob(b=>download('plasbench-recovery-tracks.png',b));URL.revokeObjectURL(url)};image.src=url};renderDot();})();
+</script>"""
+
+
+def linked_selection_script(metadata):
+    """Add keyboard access, non-colour status encoding, filters, and URL state.
+
+    The base explorer rebuilds #vq-heatmap wholesale on every metric change, so
+    these enhancements re-apply through a MutationObserver rather than patching
+    that render path.
+    """
+    # Keep the browser payload purpose-limited. In particular, avoid embedding
+    # raw sheet column names or unrelated identifiers in the offline report.
+    filter_metadata = {
+        sample: {key: row.get(key, "") for key in ("organism", "sample_origin", "truth_technology", "truth_quality_tier")}
+        for sample, row in metadata.items()
+    }
+    return """<style>
+.vq-cell{position:relative}
+.vq-cell[tabindex]{cursor:pointer}
+.vq-cell:focus-visible,.vq-block:focus-visible{outline:3px solid #12403a;outline-offset:-2px}
+.vq-cell.vq-selected{box-shadow:inset 0 0 0 3px #12403a}
+.vq-row-hi{background:#eef5ee}
+.vq-glyph{font-family:Arial,sans-serif;font-weight:bold;margin-right:4px}
+.vq-hidden{display:none}
+#vq-filters{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:end}
+#vq-count{font:12px Arial,sans-serif;color:#5f6d6b}
+.vq-warn{background:#fbf2df;border-left:5px solid #c68221;padding:9px 13px;margin:9px 0;font:13px Arial,sans-serif}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),meta=__METADATA__;
+const GLYPH={completed:'\\u25CF',reused:'\\u25D0',scored:'\\u25CF',failed:'\\u2715',skipped:'\\u25CB',unavailable:'\\u2013'};
+const heatmap=$('vq-heatmap');
+// Cohort filters reuse the metadata already rendered in the score table, so the
+// heatmap narrows to the same cohort the rest of the report is describing.
+const bar=document.createElement('div');bar.id='vq-filters';
+const fields=[['organism','Organism'],['sample_origin','Origin'],['truth_technology','Technology'],['truth_quality_tier','Tier']];
+bar.innerHTML=fields.map(([k,label])=>{const vals=[...new Set(Object.values(meta).map(r=>r[k]).filter(Boolean))].sort();
+ return `<label>${label} <select data-k="${k}"><option value="">All</option>${vals.map(v=>`<option>${v}</option>`).join('')}</select></label>`}).join('')
+ +`<label>Sample search <input id="vq-search" type="search" placeholder="id contains\\u2026"></label>`
+ +`<button id="vq-reset" type="button">Reset filters</button><span id="vq-count"></span>`;
+heatmap.before(bar);
+function visible(sample){const r=meta[sample]||{};
+ for(const sel of bar.querySelectorAll('select')){if(sel.value&&(r[sel.dataset.k]||'')!==sel.value)return false}
+ const q=($('vq-search').value||'').trim().toLowerCase();return !q||sample.toLowerCase().includes(q)}
+function decorate(){const rows=[...heatmap.querySelectorAll('tbody tr')];let shown=0;
+ rows.forEach(tr=>{const sample=tr.querySelector('td strong')?.textContent||'';const ok=visible(sample);
+  tr.classList.toggle('vq-hidden',!ok);if(ok)shown++;
+  tr.querySelectorAll('.vq-cell').forEach(td=>{
+   if(!td.hasAttribute('tabindex')){td.setAttribute('tabindex','-1');td.setAttribute('role','gridcell')}
+   const rec=d.matrix.find(x=>x.sample===td.dataset.s&&x.tool===td.dataset.t);
+   const st=rec?rec.status:'unavailable';
+   // Colour alone fails colour-vision deficiency, so every state also carries a
+   // glyph and an accessible label.
+   if(!td.querySelector('.vq-glyph')){const g=document.createElement('span');g.className='vq-glyph';g.textContent=GLYPH[st]||GLYPH.unavailable;td.prepend(g)}
+   td.setAttribute('aria-label',`${td.dataset.s}, ${td.dataset.t}, status ${st}, ${td.textContent.trim()}`)})});
+ const tools=heatmap.querySelectorAll('thead th').length-1;
+ $('vq-count').textContent=`Showing ${shown} of ${rows.length} samples and ${tools} tools`;
+ highlight()}
+function highlight(){const s=$('vq-sample').value,t=$('vq-tool').value;
+ heatmap.querySelectorAll('tbody tr').forEach(tr=>tr.classList.toggle('vq-row-hi',(tr.querySelector('td strong')?.textContent||'')===s));
+ heatmap.querySelectorAll('.vq-cell').forEach(td=>td.classList.toggle('vq-selected',td.dataset.s===s&&td.dataset.t===t))}
+function move(from,dr,dc){const cells=[...heatmap.querySelectorAll('tbody tr:not(.vq-hidden) .vq-cell')];
+ const rows=[...heatmap.querySelectorAll('tbody tr:not(.vq-hidden)')];
+ const r=rows.indexOf(from.closest('tr')),c=[...from.parentElement.querySelectorAll('.vq-cell')].indexOf(from);
+ const tr=rows[r+dr];if(!tr)return;const next=[...tr.querySelectorAll('.vq-cell')][c+dc];
+ if(next){next.focus();next.click()}}
+heatmap.addEventListener('keydown',e=>{const td=e.target.closest?.('.vq-cell');if(!td)return;
+ const k=e.key,map={ArrowDown:[1,0],ArrowUp:[-1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]};
+ if(map[k]){e.preventDefault();move(td,...map[k])}
+ else if(k==='Enter'||k===' '){e.preventDefault();td.click()}
+ else if(k==='Escape'){td.blur()}});
+bar.addEventListener('change',decorate);$('vq-search').addEventListener('input',decorate);
+$('vq-reset').onclick=()=>{bar.querySelectorAll('select').forEach(s=>s.value='');$('vq-search').value='';decorate()};
+new MutationObserver(()=>decorate()).observe(heatmap,{childList:true});
+// URL state makes an exact finding shareable without a server.
+const KEYS=[['sample','vq-sample'],['tool','vq-tool'],['plasmid','vq-plasmid'],['start','vq-start'],['end','vq-end']];
+let restoring=false;
+function writeHash(){if(restoring)return;const p=new URLSearchParams();
+ KEYS.forEach(([k,id])=>{const v=$(id)?.value;if(v)p.set(k,v)});
+ history.replaceState(null,'','#'+p.toString())}
+function readHash(){const p=new URLSearchParams(location.hash.slice(1));if(![...p].length)return;
+ restoring=true;
+ for(const [k,id]of KEYS){const v=p.get(k);if(v==null)continue;const el=$(id);if(!el)continue;
+  el.value=v;el.dispatchEvent(new Event('change'))}
+ restoring=false;highlight()}
+KEYS.forEach(([,id])=>$(id)?.addEventListener('change',()=>setTimeout(writeHash,0)));
+heatmap.addEventListener('click',()=>setTimeout(()=>{writeHash();highlight()},0));
+decorate();readHash();})();
+</script>""".replace("__METADATA__", json.dumps(filter_metadata, separators=(",", ":")).replace("<", "\\u003c"))
+
+
+def plasmid_summary_script():
+    """Add a per-truth-plasmid summary table and surface contamination on tracks.
+
+    The base track view filters blocks to the selected plasmid, so a predicted
+    record that is partly chromosomal renders identically to a clean one. This
+    flags those records instead of leaving the contamination invisible.
+    """
+    return """<style>
+.vq-block.vq-impure{stroke:#a53028;stroke-width:2;stroke-dasharray:3 2}
+#vq-summary table{width:100%;border-collapse:collapse;font:13px Arial,sans-serif}
+#vq-summary th{background:#edf2ec;text-align:left;padding:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em}
+#vq-summary td{border-top:1px solid #d2dad8;padding:7px 8px;white-space:nowrap}
+#vq-summary tr.sel td{background:#eef5ee;font-weight:bold}
+#vq-summary tbody tr{cursor:pointer}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const host=document.createElement('div');host.id='vq-summary';$('vq-tracks').before(host);
+// Thresholds are display bands for triage, not acceptance criteria; they mirror
+// the recovery threshold documented in the scoring method.
+function classify(c,records,impure){if(impure&&c>=.9)return'Complete, contaminated record';
+ if(c>=.99)return'Complete';if(c>=.9)return'Near complete';if(c>=.5)return records>2?'Partial, fragmented':'Partial';
+ if(c>0)return'Minimal';return'Not recovered'}
+function render(){const a=d.visualizations[$('vq-sample').value],t=$('vq-tool').value;
+ if(!a||!a.tools[t]){host.innerHTML='';return}
+ const tool=a.tools[t],circ=new Set(a.circular_truth_plasmids||[]);
+ // A record that also aligns to the chromosome or to another truth plasmid is
+ // evidence of contamination or a merge, even where this plasmid looks complete.
+ const elsewhere={};tool.blocks.forEach(b=>{(elsewhere[b.record_id]??=new Set()).add(b.molecule_type==='CHROMOSOME'?'chromosome':b.target)});
+ const rows=Object.entries(a.truth_plasmids).map(([id,info])=>{
+  const rec=tool.plasmid_recovery[id]||{completeness:0};
+  const records=[...new Set(tool.blocks.filter(b=>b.target===id).map(b=>b.record_id))];
+  const impure=records.filter(r=>[...elsewhere[r]].some(x=>x!==id));
+  return {id,len:info.length,circular:circ.has(id),c:rec.completeness||0,n:records.length,impure};});
+ rows.sort((x,y)=>y.c-x.c);
+ host.innerHTML='<h3>Truth plasmids for '+t+'</h3><p class="muted">One row per truth plasmid. “Impure records” are predicted records that also align to the chromosome or another truth plasmid; completeness alone cannot reveal them. Select a row to load its tracks.</p>'
+  +'<div class="panel"><table><thead><tr><th>Truth plasmid</th><th>Length</th><th>Circular truth</th><th>Completeness</th><th>Contributing records</th><th>Impure records</th><th>Classification</th></tr></thead><tbody>'
+  +rows.map(r=>`<tr data-p="${r.id}" class="${r.id===$('vq-plasmid').value?'sel':''}"><td>${r.id}</td><td>${r.len.toLocaleString()} bp</td><td>${r.circular?'yes':'not declared'}</td><td>${(r.c*100).toFixed(1)}%</td><td>${r.n}</td><td>${r.impure.length||'0'}</td><td>${classify(r.c,r.n,r.impure.length>0)}</td></tr>`).join('')
+  +'</tbody></table></div>';
+ const bad=rows.filter(r=>r.impure.length&&r.c>=.9);
+ if(bad.length)host.insertAdjacentHTML('beforeend','<div class="vq-warn"><strong>High completeness with impure records:</strong> '+bad.map(r=>r.id).join(', ')+'. High recovery does not imply a clean reconstruction.</div>');
+ // Contamination usually arrives as a whole chromosomal record called plasmid,
+ // which no per-plasmid row can show. Report it against the tool instead.
+ const chrRecords=[...new Set(tool.blocks.filter(b=>b.molecule_type==='CHROMOSOME').map(b=>b.record_id))];
+ const chrBp=tool.chromosome_aligned_bp||0;
+ if(chrRecords.length)host.insertAdjacentHTML('beforeend','<div class="vq-warn"><strong>Chromosomal contamination for '+t+':</strong> '
+  +chrBp.toLocaleString()+' bp across '+chrRecords.length+' predicted record(s) — '+chrRecords.join(', ')
+  +'. These are counted as false positives and are not attributable to any truth plasmid, so they do not appear in the rows above.</div>');
+ const mean=rows.length?rows.reduce((s,r)=>s+r.c,0)/rows.length:0;
+ if(!chrRecords.length&&!bad.length&&rows.length)host.insertAdjacentHTML('beforeend',
+  '<p class="muted">No chromosomal or cross-plasmid record contamination among retained blocks (mean completeness '+(mean*100).toFixed(1)+'%).</p>');
+ host.querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{$('vq-plasmid').value=tr.dataset.p;$('vq-plasmid').dispatchEvent(new Event('change'))});
+ markTracks(tool,elsewhere)}
+function markTracks(tool,elsewhere){const p=$('vq-plasmid').value;
+ document.querySelectorAll('#vq-tracks .vq-block').forEach(el=>{
+  const name=el.dataset.n;if(!name||!d.visualizations[$('vq-sample').value]?.tools[name])return;
+  const lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||Infinity;
+  const list=d.visualizations[$('vq-sample').value].tools[name].blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi);
+  const b=list[Number(el.dataset.i)];if(!b)return;
+  const others=[...(elsewhere[b.record_id]||[])].filter(x=>x!==p);
+  if(others.length){el.classList.add('vq-impure');
+   const title=el.querySelector('title');if(title)title.textContent=b.record_id+' — also aligns to '+others.join(', ')}})}
+['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(render,0)));
+['vq-fit','vq-in','vq-out'].forEach(id=>$(id)?.addEventListener('click',()=>setTimeout(render,0)));
+$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));
+render();})();
+</script>"""
+
+
+def context_visual_script():
+    """Render supplied contextual annotations and a truth-scoped circular map."""
+    return """<script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),host=document.createElement('div');host.id='vq-context';$('vq-dotplot').after(host);
+function render(){let a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t]){host.innerHTML='';return}let features=(a.context_features||[]).filter(f=>f.sequence_id===p),types={};features.forEach(f=>(types[f.feature_type]??=[]).push(f));let html='<h3>Context and circular-truth view</h3>';if(a.circular_truth_plasmids?.includes(p)){let len=a.truth_plasmids[p].length,intervals=a.tools[t].plasmid_recovery[p]?.covered_intervals||[],arc=(s,e)=>{let A=s/len*2*Math.PI-Math.PI/2,B=e/len*2*Math.PI-Math.PI/2,x1=120+80*Math.cos(A),y1=100+80*Math.sin(A),x2=120+80*Math.cos(B),y2=100+80*Math.sin(B),large=B-A>Math.PI?1:0;return `<path d="M${x1} ${y1} A80 80 0 ${large} 1 ${x2} ${y2}" fill="none" stroke="#16805a" stroke-width="14"/>`};html+='<p class="muted">Circular truth plasmid only. Green arcs are recovered reference intervals; this does not claim the predicted output is circular or closed.</p><svg viewBox="0 0 240 200" width="240"><circle cx="120" cy="100" r="80" fill="none" stroke="#e2e8e2" stroke-width="14"/>'+intervals.map(x=>arc(x[0],x[1])).join('')+'<text x="75" y="104" font-size="11">truth circular</text></svg>'}if(features.length){html+='<p><strong>Curated contextual features</strong></p><ul>'+Object.entries(types).map(([k,v])=>`<li>${k}: ${v.map(f=>`${f.label} (${f.start}-${f.end}; ${f.source} ${f.version})`).join(', ')}</li>`).join('')+'</ul>'}else html+='<p class="muted">No versioned replicon, MOB, insertion-sequence, or AMR-context feature table was supplied.</p>';host.innerHTML=html}['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));render()})();
+</script>"""
 
 
 def main():
@@ -495,7 +676,9 @@ def main():
     insight_notes, insight_tone = interpretation(leaderboard, status_counts)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(leaderboard)
-    visual_html = visual_quality_section(scores, status, out.parent)
+    visual_html = (visual_quality_section(scores, status, out.parent) + advanced_visual_script()
+                   + context_visual_script() + linked_selection_script(metadata)
+                   + plasmid_summary_script())
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>SPREAD plasmid benchmark report</title>

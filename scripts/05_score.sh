@@ -28,6 +28,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     TRUTH="$SDIR/truth.tsv"
     AMR="$SDIR/truth_amr.tsv"
     CIRCULAR="$SDIR/truth_circular.tsv"
+    FEATURES="$SDIR/truth_features.tsv"
     [[ -s "$REF" && -s "$TRUTH" ]] || { warn "missing reference/truth for $SAMPLE"; continue; }
     log "=== Score $SAMPLE ==="
 
@@ -50,7 +51,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         if [[ -s "$PRED" ]]; then
             # Secondary mappings can make repetitive sequence appear to be claimed on
             # multiple reference replicons. Score each prediction from its best hit.
-            if ! minimap2 --secondary=no -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
+            if ! minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
                 rm -f "$PAF"; warn "minimap2 failed for $SAMPLE/$tool; excluded from scoring"; continue
             fi
             if [[ "$REPORT_MAPPING_AMBIGUITY" == "1" ]]; then
@@ -109,9 +110,9 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     # Keep retained reference-coordinate blocks separate from the aggregate TSV.
     # The HTML explorer consumes this bounded artifact; it never treats it as a
     # nucleotide alignment or structural-validation result.
-    python3 "$HERE/../python/build_visualization_data.py" --truth "$TRUTH" --results-dir "$RESULTS_DIR" \
-        --sample "$SAMPLE" --amr-truth "$AMR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" \
-        --out "$RDIR/visualization/alignment_blocks.json" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
+    python3 "$HERE/../python/build_visualization_data.py" --truth "$TRUTH" --reference "$REF" --results-dir "$RESULTS_DIR" \
+        --sample "$SAMPLE" --amr-truth "$AMR" --feature-truth "$FEATURES" --circular-truth "$CIRCULAR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" --max-nucleotide-bp "$VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP" \
+        --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
         warn "visualization data generation failed for $SAMPLE; scores are retained"
 done < <(read_samples "$SAMPLE_SHEET")
 
