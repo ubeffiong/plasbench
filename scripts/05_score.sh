@@ -110,6 +110,9 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     # Keep retained reference-coordinate blocks separate from the aggregate TSV.
     # The HTML explorer consumes this bounded artifact; it never treats it as a
     # nucleotide alignment or structural-validation result.
+    # Typed structural discordance calls with evidence, alongside the bounded
+    # display payload. These are alignment-derived, not validated misassemblies.
+    python3 "$HERE/../python/call_structural_variants.py" --truth "$TRUTH" --results-dir "$RESULTS_DIR"         --sample "$SAMPLE" --events-out "$RDIR/structural_events.tsv"         --summary-out "$RDIR/structural_summary.tsv"         --json-out "$RDIR/visualization/structural_calls.json"         >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 ||         warn "structural calling failed for $SAMPLE; scores are retained"
     python3 "$HERE/../python/build_visualization_data.py" --truth "$TRUTH" --reference "$REF" --results-dir "$RESULTS_DIR" \
         --sample "$SAMPLE" --amr-truth "$AMR" --feature-truth "$FEATURES" --circular-truth "$CIRCULAR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" --max-nucleotide-bp "$VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP" \
         --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \

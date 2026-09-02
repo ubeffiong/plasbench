@@ -34,6 +34,16 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             python3 "$HERE/../python/measure_depth.py" --truth "$TRUTH" --r1 "$R1" --r2 "$R2" --out "$DEPTH"
         fi
     fi
+    # Derive contextual features from installed annotation callers. A missing
+    # caller yields "not evaluated" for its class rather than a false absence.
+    FEATURES="$SDIR/truth_features.tsv"
+    if [[ "${RUN_REFERENCE_ANNOTATION:-0}" -eq 1 ]]; then
+        if [[ -s "$FEATURES" && "$FEATURES" -nt "$REF" ]]; then
+            log "  reference annotation already present for $SAMPLE"
+        else
+            python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
+        fi
+    fi
 done < <(read_samples "$SAMPLE_SHEET")
 
 log "Stage 2 (truth) complete."
