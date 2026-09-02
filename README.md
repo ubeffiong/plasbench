@@ -283,7 +283,7 @@ Predicted sequence that doesn't map to the reference at all is reported separate
 - Regenerate the explicit lock with `bash env/lock_environment.sh`; do not overwrite it with `conda env export`.
 - Record tool versions per run (add `--version` calls to a manifest — a nice sprint task).
 - Deposit your curated sample sheet + truth tables on **Zenodo** for a citable dataset —
-  this is the actual publishable artifact SPREAD asks for.
+  this is the actual publishable artifact PlasBench asks for.
 
 ## 7. License
 MIT — see `LICENSE`.
