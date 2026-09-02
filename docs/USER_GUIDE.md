@@ -496,6 +496,14 @@ results/benchmark.report.html
     contains the exact visible rows and these metadata columns.
     Its Bin reconstruction diagnostics table links to the record-level
     `<tool>.bin_matches.tsv` evidence for every bin-scored sample/tool pair.
+    The Visual reconstruction quality section adds a metric-switchable
+    sample-by-tool heatmap, linked truth-plasmid recovery tracks, coordinate
+    zoom, block-level PAF inspection, AMR markers, and JSON download.
+
+results/<sample>/visualization/alignment_blocks.json
+    Bounded reference-coordinate primary-alignment blocks and per-plasmid
+    completeness for the offline explorer. This is visual evidence, not a
+    nucleotide multiple alignment or proof of structural closure.
 
 results/<sample>/
     Standardized prediction FASTAs, alignments, tool output, and completion markers.
@@ -511,6 +519,8 @@ logs/
 
 Open the HTML report locally in a browser. Its direct file links are designed
 for a local run directory; Galaxy uses a separately packaged output layout.
+See `docs/VISUAL_QUALITY.md` for interaction details, colour meanings, display
+limits, and interpretation boundaries.
 
 ## Metric Definitions
 
