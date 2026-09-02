@@ -469,6 +469,15 @@ results/benchmark.leaderboard.tsv
 results/benchmark.leaderboard.md
     A portable Markdown rendering of the leaderboard.
 
+results/benchmark.recommendations.tsv
+    Coverage-gated, multi-objective primary-method recommendations overall and
+    by available organism, truth-technology, origin, plasmid-size, and
+    read-depth strata. A small or incompletely covered tool is not promoted.
+
+results/benchmark.stratified.tsv
+    The complete per-tool stratified metric and eligibility table supporting
+    those recommendations.
+
 results/benchmark.report.html
     Offline interactive final dashboard. It includes filters, sortable tables,
     tool and sample drill-downs, automated descriptive interpretation, metric
@@ -481,6 +490,11 @@ results/benchmark.report.html
 
 results/<sample>/
     Standardized prediction FASTAs, alignments, tool output, and completion markers.
+
+results/<sample>/selected_candidate/
+    The best already-produced truth-set candidate FASTA, any available bin/map
+    evidence, and `selection_report.json`. This is copied after scoring and
+    does not rerun reconstruction or fabricate a consensus sequence.
 
 logs/
     Tool and minimap2 logs for diagnosis.
@@ -513,6 +527,30 @@ tables as `data/<sample>/truth_amr.tsv` (`sequence_id`, `start`, `end`; 0-based
 half-open intervals) and `data/<sample>/truth_circular.tsv` (`sequence_id`) to
 activate AMR-gene and circular-plasmid recovery metrics. PlasBench validates
 that these entries refer to labelled plasmid reference sequences.
+
+## Operational Selection
+
+Stage 6 automatically retains the best already-generated candidate for every
+scored sample in `results/<sample>/selected_candidate/`. The choice is a
+transparent, multi-objective prioritisation of F1, plasmid/bin recovery,
+precision/recall, unmapped sequence, ambiguity, contamination, and split/merge
+diagnostics. It is not proof of plasmid closure or biological correctness.
+
+`benchmark.recommendations.tsv` is a separate operational-method suggestion
+that is withheld until a method satisfies `RECOMMENDATION_MIN_SAMPLES` and
+`RECOMMENDATION_MIN_COVERAGE`. It may be rerun without reconstruction:
+
+```bash
+plasbench select-candidates --scores results/scores.tsv \
+  --samples config/accessions.tsv --results-dir results \
+  --tool-status results/tool_status.tsv --out-prefix results/benchmark
+```
+
+For high-consequence calls, structurally complex plasmids, mapping ambiguity,
+or any report marked `requires_confirmation`, use long-read/hybrid or other
+orthogonal confirmation. Circular-truth recovery means a circular reference was
+covered; it does not prove a predicted sequence is circular. Full policy:
+`docs/OPERATIONAL_SELECTION.md`.
 
 ## Console Messages
 

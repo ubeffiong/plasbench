@@ -45,11 +45,21 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         DONE="$RDIR/.${tool}.complete"
         [[ -e "$DONE" ]] || { warn "  ignoring incomplete $tool result for $SAMPLE"; continue; }
         PAF="$RDIR/${tool}.pred_vs_ref.paf"
+        AMBIGUITY_PAF="$RDIR/${tool}.pred_vs_ref.all.paf"
+        AMBIGUITY_ARGS=()
         if [[ -s "$PRED" ]]; then
             # Secondary mappings can make repetitive sequence appear to be claimed on
             # multiple reference replicons. Score each prediction from its best hit.
             if ! minimap2 --secondary=no -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
                 rm -f "$PAF"; warn "minimap2 failed for $SAMPLE/$tool; excluded from scoring"; continue
+            fi
+            if [[ "$REPORT_MAPPING_AMBIGUITY" == "1" ]]; then
+                if minimap2 --secondary=yes -N 20 -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$AMBIGUITY_PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.all.log"; then
+                    AMBIGUITY_ARGS=(--ambiguity-paf "$AMBIGUITY_PAF")
+                else
+                    rm -f "$AMBIGUITY_PAF"
+                    warn "secondary-map diagnostic failed for $SAMPLE/$tool; core score retained"
+                fi
             fi
         else
             : > "$PAF"   # tool predicted nothing -> empty PAF (all FN)
@@ -61,6 +71,10 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         if ! python3 "$HERE/../python/score_plasmids.py" \
             --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
             --plasmid-recovery-threshold "$PLASMID_RECOVERY_THRESHOLD" \
+            --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
+            --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
+            --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
+            "${AMBIGUITY_ARGS[@]}" \
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
             --sample "$SAMPLE" --tool "$tool" --out "$SCORES" \

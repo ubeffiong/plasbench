@@ -108,7 +108,7 @@ def read_fasta_lengths(path):
     return lengths
 
 
-def parse_paf_intervals(path, truth, pred_lengths):
+def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.0, min_mapq=0):
     """
     Parse PAF, keep one row per (query, target alignment), and collect covered
     intervals ON THE TARGET (reference) as 0-based half-open [start, end).
@@ -120,8 +120,9 @@ def parse_paf_intervals(path, truth, pred_lengths):
     covered = defaultdict(list)
     query_covered = defaultdict(list)
 
+    counters = {"alignment_total": 0, "alignment_retained": 0, "filtered_alignment_count": 0}
     if os.path.getsize(path) == 0:
-        return covered, sum(pred_lengths.values())
+        return covered, sum(pred_lengths.values()), counters
 
     with open(path) as fh:
         for line_number, line in enumerate(fh, start=1):
@@ -144,6 +145,9 @@ def parse_paf_intervals(path, truth, pred_lengths):
                 tlen = int(f[6])
                 tstart = int(f[7])
                 tend = int(f[8])
+                matches = int(f[9])
+                block_length = int(f[10])
+                mapq = int(f[11])
             except ValueError as exc:
                 raise ValueError(f"PAF line {line_number} has invalid integer coordinates") from exc
             if qname not in pred_lengths:
@@ -153,6 +157,12 @@ def parse_paf_intervals(path, truth, pred_lengths):
                     f"PAF query length for '{qname}' ({qlen}) disagrees with FASTA "
                     f"({pred_lengths[qname]})"
                 )
+            counters["alignment_total"] += 1
+            identity = matches / block_length if block_length else 0.0
+            if block_length < min_length or identity < min_identity or mapq < min_mapq:
+                counters["filtered_alignment_count"] += 1
+                continue
+            counters["alignment_retained"] += 1
             # Only keep alignments to sequences we actually have truth for.
             if tname in truth:
                 truth_length = truth[tname][1]
@@ -176,7 +186,7 @@ def parse_paf_intervals(path, truth, pred_lengths):
     for qname, length in pred_lengths.items():
         _, mapped_bp = merge_intervals(query_covered.get(qname, []))
         unmapped_pred_bp += max(0, length - min(mapped_bp, length))
-    return covered, unmapped_pred_bp
+    return covered, unmapped_pred_bp, counters
 
 
 def merge_intervals(intervals):
@@ -192,6 +202,55 @@ def merge_intervals(intervals):
             merged.append([s, e])
     total = sum(e - s for s, e in merged)
     return merged, total
+
+
+def overlap_bp(left, right):
+    """Return the number of bases shared by two merged interval lists."""
+    i = j = total = 0
+    while i < len(left) and j < len(right):
+        start, end = max(left[i][0], right[j][0]), min(left[i][1], right[j][1])
+        total += max(0, end - start)
+        if left[i][1] <= right[j][1]:
+            i += 1
+        else:
+            j += 1
+    return total
+
+
+def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_mapq):
+    """Measure query bases with retained plasmid and chromosome alternatives.
+
+    Primary-only mapping is retained for the core score so repetitive sequence
+    cannot inflate claims across multiple replicons. This companion diagnostic
+    uses secondary mappings only to expose bases with conflicting molecular
+    assignments; it never changes TP, FP, or F1.
+    """
+    if not path or not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return 0
+    by_query = defaultdict(lambda: defaultdict(list))
+    with open(path) as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 12:
+                raise ValueError(f"ambiguity PAF line {line_number} has fewer than 12 columns")
+            qname, target = fields[0], fields[5]
+            try:
+                qlen, qstart, qend = int(fields[1]), int(fields[2]), int(fields[3])
+                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
+            except ValueError as exc:
+                raise ValueError(f"ambiguity PAF line {line_number} has invalid coordinates") from exc
+            if qname not in pred_lengths or qlen != pred_lengths[qname] or target not in truth:
+                continue
+            if block_length < min_length or (matches / block_length if block_length else 0.0) < min_identity or mapq < min_mapq:
+                continue
+            qstart, qend = sorted((max(0, min(qstart, qlen)), max(0, min(qend, qlen))))
+            by_query[qname][truth[target][0]].append((qstart, qend))
+    return sum(
+        overlap_bp(merge_intervals(types["PLASMID"])[0], merge_intervals(types["CHROMOSOME"])[0])
+        for types in by_query.values() if types["PLASMID"] and types["CHROMOSOME"]
+    )
 
 
 def score(truth, total_plasmid, covered):
@@ -263,6 +322,7 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--truth", required=True)
     ap.add_argument("--paf", required=True)
+    ap.add_argument("--ambiguity-paf", help="Optional all-mapping PAF used only for ambiguous molecular-assignment diagnostics.")
     ap.add_argument("--pred-fasta", required=True)
     ap.add_argument("--sample", required=True)
     ap.add_argument("--tool", required=True)
@@ -272,12 +332,25 @@ def main():
     ap.add_argument("--amr-genes", help="Optional curated AMR truth TSV (sequence_id, start, end).")
     ap.add_argument("--amr-gene-recovery-threshold", type=float, default=0.90)
     ap.add_argument("--circular-plasmids", help="Optional curated circular-plasmid TSV (sequence_id).")
+    ap.add_argument("--min-alignment-length", type=int, default=1,
+                    help="Minimum PAF block length retained for scoring (default: 1).")
+    ap.add_argument("--min-alignment-identity", type=float, default=0.0,
+                    help="Minimum PAF matches/block-length retained for scoring (default: 0).")
+    ap.add_argument("--min-alignment-mapq", type=int, default=0,
+                    help="Minimum PAF mapping quality retained for scoring (default: 0).")
     args = ap.parse_args()
 
     truth, total_plasmid = read_truth(args.truth)
     try:
         pred_lengths = read_fasta_lengths(args.pred_fasta)
-        covered, unmapped_pred_bp = parse_paf_intervals(args.paf, truth, pred_lengths)
+        if args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1 or args.min_alignment_mapq < 0:
+            raise ValueError("alignment thresholds must be min-length >= 1, identity in [0, 1], and MAPQ >= 0")
+        covered, unmapped_pred_bp, alignment = parse_paf_intervals(
+            args.paf, truth, pred_lengths, args.min_alignment_length,
+            args.min_alignment_identity, args.min_alignment_mapq)
+        ambiguous_bp = ambiguous_query_bp(args.ambiguity_paf, truth, pred_lengths,
+                                          args.min_alignment_length, args.min_alignment_identity,
+                                          args.min_alignment_mapq)
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}")
     tp, fp, fn = score(truth, total_plasmid, covered)
@@ -316,19 +389,24 @@ def main():
 
     header = [
         "sample", "tool", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
-        "unmapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
+        "unmapped_pred_bp", "ambiguously_mapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
         "plasmid_recall", "predicted_record_count", "true_amr_gene_count",
         "recovered_amr_gene_count", "amr_gene_recall", "true_circular_plasmid_count",
-        "recovered_circular_plasmid_count", "circular_plasmid_recall", "precision", "recall", "f1",
+        "recovered_circular_plasmid_count", "circular_truth_plasmid_recovery", "circular_plasmid_recall", "alignment_total",
+        "alignment_retained", "filtered_alignment_count", "precision", "recall", "f1",
     ]
     row = [
         args.sample, args.tool, total_plasmid, tp, fp, fn,
-        unmapped_pred_bp, len(true_plasmids), recovered_plasmids,
+        unmapped_pred_bp, ambiguous_bp, len(true_plasmids), recovered_plasmids,
         f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}", predicted_records,
         len(amr_genes) if args.amr_genes else "", recovered_amr if args.amr_genes else "",
         f"{safe_div(recovered_amr, len(amr_genes)):.4f}" if args.amr_genes else "",
         len(circular_plasmids) if args.circular_plasmids else "", recovered_circular if args.circular_plasmids else "",
         f"{safe_div(recovered_circular, len(circular_plasmids)):.4f}" if args.circular_plasmids else "",
+        # Compatibility alias. New consumers should use the explicitly scoped
+        # circular_truth_plasmid_recovery field, which does not claim closure.
+        f"{safe_div(recovered_circular, len(circular_plasmids)):.4f}" if args.circular_plasmids else "",
+        alignment["alignment_total"], alignment["alignment_retained"], alignment["filtered_alignment_count"],
         f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}",
     ]
 

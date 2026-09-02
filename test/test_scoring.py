@@ -94,6 +94,26 @@ def main():
     ok &= (int(row["unmapped_pred_bp"]) == 100)
     print(f"  unmapped prediction == 100 ? {row['unmapped_pred_bp']} -> {int(row['unmapped_pred_bp'])==100}")
 
+    # Secondary mappings are a diagnostic only: the primary score remains
+    # unchanged, while query bases with plasmid/chromosome alternatives are
+    # explicitly surfaced for conservative downstream selection.
+    ambiguity = os.path.join(tmp, "all_mappings.paf")
+    with open(ambiguity, "w") as fh:
+        fh.write("pred1\t2000\t0\t500\t+\tplasmidA\t2000\t0\t500\t500\t500\t60\n")
+        fh.write("pred1\t2000\t0\t500\t+\tchromosome\t10000\t400\t900\t500\t500\t30\n")
+    ambiguity_out = os.path.join(tmp, "ambiguity.tsv")
+    subprocess.run(
+        [sys.executable, SCORER, "--truth", truth, "--paf", paf, "--ambiguity-paf", ambiguity,
+         "--pred-fasta", pred, "--sample", "SYNTH", "--tool", "ambiguity", "--out", ambiguity_out],
+        check=True,
+    )
+    with open(ambiguity_out) as fh:
+        ambiguity_row = dict(zip(fh.readline().strip().split("\t"), fh.readline().strip().split("\t")))
+    ok &= (int(ambiguity_row["ambiguously_mapped_pred_bp"]) == 500 and ambiguity_row["f1"] == row["f1"])
+    print("  secondary ambiguity is reported without changing F1 ? "
+          f"{ambiguity_row['ambiguously_mapped_pred_bp']} bp -> "
+          f"{int(ambiguity_row['ambiguously_mapped_pred_bp']) == 500 and ambiguity_row['f1'] == row['f1']}")
+
     # Second scenario: overlapping predictions must not double-count.
     paf2 = os.path.join(tmp, "pred2.paf")
     pred2 = os.path.join(tmp, "pred2.fasta")
