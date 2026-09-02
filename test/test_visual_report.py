@@ -91,6 +91,24 @@ def main():
         assert needed in page, f"visual diagnostic affordance missing: {needed}"
     assert "function renderDot" not in page, "legacy mixed-coordinate dot-plot renderer must not be emitted"
 
+    # Cohort dashboard: headline cards and distribution plots from measured data.
+    for needed in ("vq-stats", "vq-dist", "Leading method", "Hardest sample",
+                   "Excluded runs", "Mean plasmid recall",
+                   "Structural collinearity", "Runtime (min)", "Peak memory (GB)"):
+        assert needed in page, f"cohort dashboard affordance missing: {needed}"
+    # An unmeasured metric must say so rather than plot fabricated zeros.
+    assert "No measured values for this metric" in page, "missing-metric wording absent"
+    assert "not counted as zero" in page or "rather than as zero" in page or         "excluded rather than counted as zero" in page, "zero-substitution caveat absent"
+    # Only cohort selects may filter; an ordering control must not hide every row.
+    assert "select[data-k]" in page, "filter loop must be scoped to cohort selects"
+    # The programme rename must hold in the shipped page.
+    assert "PlasBench plasmid benchmark report" in page, "report title not renamed"
+    assert "PlasBench plasmid reconstruction benchmark" in page, "report heading not renamed"
+    # Only the report's own branding is asserted: a user's directory may legitimately
+    # contain "SPREAD" and would surface through the artifact explorer's file paths.
+    for banner in ("SPREAD plasmid benchmark report", "SPREAD plasmid reconstruction benchmark"):
+        assert banner not in page, f"legacy programme branding remains: {banner}"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 

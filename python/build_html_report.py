@@ -312,6 +312,27 @@ def visual_quality_section(scores, status, results_dir, report_path=None):
     report_path = report_path or (results_dir / "benchmark.report.html")
     visualizations, external, staging = stage_visualizations(scores, results_dir, report_path)
     state = {(row.get("sample"), row.get("tool")): row.get("status", "scored") for row in status}
+    # Runtime and peak RSS are recorded in stage 4; collinear_fraction in stage 5.
+    profile = {}
+    for row in status:
+        try:
+            runtime = float(row["runtime_seconds"]) / 60 if row.get("runtime_seconds") else None
+            memory = float(row["peak_rss_kb"]) / (1024 * 1024) if row.get("peak_rss_kb") else None
+        except (TypeError, ValueError):
+            runtime = memory = None
+        profile[(row.get("sample"), row.get("tool"))] = {"runtime_seconds": runtime, "peak_rss_kb": memory}
+    structural = {}
+    for sample in {row["sample"] for row in scores}:
+        path = results_dir / sample / "structural_summary.tsv"
+        if not path.is_file():
+            continue
+        try:
+            with path.open(encoding="utf-8", newline="") as handle:
+                for row in csv.DictReader(handle, delimiter="\t"):
+                    value = row.get("collinear_fraction")
+                    structural[(sample, row.get("tool"))] = float(value) if value else None
+        except (OSError, ValueError):
+            continue
     matrix = []
     for row in scores:
         tp, fp = number(row.get("TP_bp")), number(row.get("FP_bp"))
@@ -325,7 +346,12 @@ def visual_quality_section(scores, status, results_dir, report_path=None):
         matrix.append({"sample": row["sample"], "tool": row["tool"], "status": state.get((row["sample"], row["tool"]), "scored"),
                        "f1": number(row.get("f1")), "precision": number(row.get("precision")), "recall": number(row.get("recall")),
                        "plasmid_recall": plasmid_recall, "bin_f1": number(row["bin_f1"]) if row.get("bin_f1") else None,
-                       "contamination": contamination, "unmapped": number(row.get("unmapped_pred_bp")), "composite": composite})
+                       "contamination": contamination, "unmapped": number(row.get("unmapped_pred_bp")), "composite": composite,
+                       # Execution cost and structural concordance are already measured;
+                       # surfacing them as heatmap metrics needs no new computation.
+                       "runtime_min": (profile.get((row["sample"], row["tool"]), {}).get("runtime_seconds") or None),
+                       "memory_gb": (profile.get((row["sample"], row["tool"]), {}).get("peak_rss_kb") or None),
+                       "collinear": structural.get((row["sample"], row["tool"]))})
     payload = json.dumps({"matrix": matrix, "visualizations": visualizations,
                           "visualization_sources": external, "staging": staging},
                          separators=(",", ":")).replace("<", "\\u003c")
@@ -553,6 +579,91 @@ refresh();})();
 </script>"""
 
 
+def cohort_dashboard_script():
+    """Headline stat cards, per-tool distribution plots, and cost metrics.
+
+    Every value is derived from the score, status, and structural tables the run
+    already produced. Nothing here is simulated: a metric with no measurement
+    renders as 'not measured' rather than as a number.
+    """
+    return """<style>
+#vq-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:14px 0}
+#vq-stats .card{background:#fff;border:1px solid #d2dad8;border-top:3px solid #16805a;padding:13px 15px}
+#vq-stats .card small{display:block;color:#5f6d6b;text-transform:uppercase;font:600 10px/1.4 Arial,sans-serif;letter-spacing:.08em}
+#vq-stats .card strong{display:block;font:700 22px/1.15 Arial,sans-serif;margin-top:5px;font-variant-numeric:tabular-nums}
+#vq-stats .card span{display:block;color:#5f6d6b;font:12px Arial,sans-serif;margin-top:2px}
+#vq-stats .card.warn{border-top-color:#c68221}
+#vq-dist{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin:14px 0}
+#vq-dist .box{background:#fff;border:1px solid #d2dad8;padding:14px}
+#vq-dist h4{margin:0 0 8px;font:600 13px Arial,sans-serif}
+#vq-dist table{width:100%;border-collapse:collapse;font:12px Arial,sans-serif}
+#vq-dist td{padding:2px 4px;border:0}
+#vq-dist td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),m=d.matrix;
+const sel=$('vq-metric');
+// Metrics the run already measures but never exposed for comparison.
+[['collinear','Structural collinearity'],['runtime_min','Runtime (min)'],['memory_gb','Peak memory (GB)']]
+ .forEach(([v,label])=>{if(![...sel.options].some(o=>o.value===v)){const o=document.createElement('option');o.value=v;o.textContent=label;sel.append(o)}});
+const stats=document.createElement('div');stats.id='vq-stats';
+const dist=document.createElement('div');dist.id='vq-dist';
+$('vq-heatmap').before(stats);$('vq-heatmap').after(dist);
+const num=v=>typeof v==='number'&&isFinite(v);
+function quantile(sorted,q){if(!sorted.length)return null;const i=(sorted.length-1)*q,lo=Math.floor(i),hi=Math.ceil(i);
+ return lo===hi?sorted[lo]:sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo)}
+function visibleSamples(){const rows=[...document.querySelectorAll('#vq-heatmap tbody tr:not(.vq-hidden)')];
+ return new Set(rows.map(tr=>tr.querySelector('td strong')?.textContent||''))}
+function cards(){const vis=visibleSamples(),rows=m.filter(r=>vis.has(r.sample));
+ const byTool={};rows.forEach(r=>{if(num(r.f1))(byTool[r.tool]??=[]).push(r.f1)});
+ const means=Object.entries(byTool).map(([t,v])=>[t,v.reduce((a,b)=>a+b,0)/v.length]).sort((a,b)=>b[1]-a[1]);
+ const bySample={};rows.forEach(r=>{if(num(r.f1))(bySample[r.sample]??=[]).push(r.f1)});
+ const hardest=Object.entries(bySample).map(([s,v])=>[s,v.reduce((a,b)=>a+b,0)/v.length]).sort((a,b)=>a[1]-b[1]);
+ const bad=rows.filter(r=>r.status==='failed'||r.status==='skipped').length;
+ const recovered=rows.reduce((s,r)=>s+(num(r.plasmid_recall)?r.plasmid_recall:0),0);
+ const scored=rows.filter(r=>num(r.plasmid_recall)).length;
+ const card=(label,value,sub,warn)=>`<div class="card${warn?' warn':''}"><small>${label}</small><strong>${value}</strong><span>${sub}</span></div>`;
+ stats.innerHTML=
+  card('Leading method',means.length?means[0][0]:'\\u2013',means.length?'mean F1 '+means[0][1].toFixed(3)+' over '+byTool[means[0][0]].length+' scored':'no scored rows')
+ +card('Hardest sample',hardest.length?hardest[0][0]:'\\u2013',hardest.length?'mean F1 '+hardest[0][1].toFixed(3)+' across methods':'no scored rows')
+ +card('Excluded runs',bad,bad?'failed or skipped, not scored as zero':'every run contributed a score',bad>0)
+ +card('Mean plasmid recall',scored?(recovered/scored).toFixed(3):'not measured',scored?'per-replicon, equal weight':'no plasmid-recall rows');}
+function plot(){const vis=visibleSamples(),key=sel.value;
+ const byTool={};m.filter(r=>vis.has(r.sample)).forEach(r=>{const v=r[key];if(num(v))(byTool[r.tool]??=[]).push(v)});
+ const tools=Object.keys(byTool).sort();
+ if(!tools.length){dist.innerHTML='<div class="box"><h4>Distribution</h4><p class="muted">No measured values for this metric. Failed, skipped, and not-applicable results are excluded rather than counted as zero.</p></div>';return}
+ const label=sel.options[sel.selectedIndex].textContent;
+ const all=tools.flatMap(t=>byTool[t]),lo=Math.min(...all),hi=Math.max(...all),span=(hi-lo)||1;
+ const W=420,rowH=30,H=tools.length*rowH+34,x=v=>40+(v-lo)/span*(W-70);
+ // Box plot: five-number summary per method.
+ let box=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribution of ${label} by method">`;
+ tools.forEach((t,i)=>{const s=[...byTool[t]].sort((a,b)=>a-b),y=18+i*rowH;
+  const q1=quantile(s,.25),q2=quantile(s,.5),q3=quantile(s,.75);
+  box+=`<text x="0" y="${y+4}" font-size="10">${t.slice(0,12)}</text>`
+   +`<line x1="${x(s[0])}" y1="${y}" x2="${x(s[s.length-1])}" y2="${y}" stroke="#849387"/>`
+   +`<rect x="${x(q1)}" y="${y-7}" width="${Math.max(1,x(q3)-x(q1))}" height="14" fill="#dcefdc" stroke="#16805a"/>`
+   +`<line x1="${x(q2)}" y1="${y-7}" x2="${x(q2)}" y2="${y+7}" stroke="#0c4a37" stroke-width="2"/>`
+   +`<title>${t}: min ${s[0].toFixed(3)}, Q1 ${q1.toFixed(3)}, median ${q2.toFixed(3)}, Q3 ${q3.toFixed(3)}, max ${s[s.length-1].toFixed(3)}, n=${s.length}</title>`});
+ box+=`<text x="40" y="${H-4}" font-size="10">${lo.toFixed(2)}</text><text x="${W-40}" y="${H-4}" font-size="10">${hi.toFixed(2)}</text></svg>`;
+ // Strip plot: every observation, so small n is visible rather than implied.
+ let strip=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Individual ${label} observations by method">`;
+ tools.forEach((t,i)=>{const y=18+i*rowH;
+  strip+=`<text x="0" y="${y+4}" font-size="10">${t.slice(0,12)}</text><line x1="40" y1="${y}" x2="${W-30}" y2="${y}" stroke="#e2e8e2"/>`
+   +byTool[t].map((v,j)=>`<circle cx="${x(v)}" cy="${y+((j%3)-1)*3}" r="3" fill="#16805a" fill-opacity=".55"><title>${t}: ${v.toFixed(4)}</title></circle>`).join('')});
+ strip+='</svg>';
+ const rowsHtml=tools.map(t=>{const s=[...byTool[t]].sort((a,b)=>a-b);
+  const mean=s.reduce((a,b)=>a+b,0)/s.length;
+  const sd=Math.sqrt(s.reduce((a,b)=>a+(b-mean)**2,0)/(s.length>1?s.length-1:1));
+  return `<tr><td>${t}</td><td>n=${s.length} · median ${quantile(s,.5).toFixed(3)} · mean ${mean.toFixed(3)} · sd ${s.length>1?sd.toFixed(3):'\\u2013'}</td></tr>`}).join('');
+ dist.innerHTML=`<div class="box"><h4>${label}: spread by method</h4>${box}<p class="muted" style="font:11px Arial,sans-serif">Box spans the interquartile range; the heavy line is the median. Whiskers are the observed minimum and maximum, not a confidence claim.</p></div>`
+  +`<div class="box"><h4>${label}: every observation</h4>${strip}<table>${rowsHtml}</table><p class="muted" style="font:11px Arial,sans-serif">One mark per scored sample. Standard deviation is omitted below two observations.</p></div>`}
+function refresh(){cards();plot()}
+sel.addEventListener('change',refresh);
+new MutationObserver(refresh).observe($('vq-heatmap'),{childList:true});
+document.addEventListener('change',e=>{if(e.target.closest('#vq-filters'))setTimeout(refresh,0)});
+refresh();})();
+</script>"""
+
+
 def lazy_visualization_script():
     """Fetch per-sample alignment payloads on demand when they were published.
 
@@ -631,7 +742,8 @@ bar.innerHTML=fields.map(([k,label])=>{const vals=[...new Set(Object.values(meta
  +`<button id="vq-reset" type="button">Reset filters</button><span id="vq-count"></span>`;
 heatmap.before(bar);
 function visible(sample){const r=meta[sample]||{};
- for(const sel of bar.querySelectorAll('select')){if(sel.value&&(r[sel.dataset.k]||'')!==sel.value)return false}
+ // Only cohort selects filter; controls such as the order select declare no data-k.
+ for(const sel of bar.querySelectorAll('select[data-k]')){if(sel.value&&(r[sel.dataset.k]||'')!==sel.value)return false}
  const q=($('vq-search').value||'').trim().toLowerCase();return !q||sample.toLowerCase().includes(q)}
 function metricValue(sample){const key=$('vq-metric').value,values=d.matrix.filter(r=>r.sample===sample).map(r=>r[key]).filter(v=>typeof v==='number');if(!values.length)return-Infinity;return ['contamination','unmapped'].includes(key)?-Math.min(...values):Math.max(...values)}
 function decorate(){const body=heatmap.querySelector('tbody');let rows=[...body.querySelectorAll('tr')];
@@ -985,16 +1097,16 @@ def main():
     visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
                    + record_dotplot_script() + context_visual_script() + linked_selection_script(metadata)
                    + plasmid_summary_script() + structural_and_feature_tracks_script()
-                   + lazy_visualization_script() + explorer_navigation_script()
+                   + cohort_dashboard_script() + lazy_visualization_script() + explorer_navigation_script()
                    + flow_and_clustering_script())
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>SPREAD plasmid benchmark report</title>
+<title>PlasBench plasmid benchmark report</title>
 <style>
 :root{{--ink:#17231d;--muted:#627067;--line:#d9e1da;--paper:#f6f8f4;--card:#fff;--green:#0c6b4f;--lime:#dcefdc;--amber:#9a5b00;--red:#a53028;}}
 *{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 28px}} .nav a{{color:var(--green);border:1px solid var(--line);background:#fff;padding:7px 10px;text-decoration:none;font-size:12px;font-weight:bold}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
 </style></head><body>
-<header><h1>SPREAD plasmid reconstruction benchmark</h1><p>Detailed run report · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
+<header><h1>PlasBench plasmid reconstruction benchmark</h1><p>Detailed run report · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
 <main><nav><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
 <div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: mean F1</small><strong>{best_f1}</strong><small>{best_value} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
