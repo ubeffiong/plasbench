@@ -89,6 +89,13 @@ export MIN_ALIGNMENT_QUERY_COVERAGE="${MIN_ALIGNMENT_QUERY_COVERAGE:-0.20}"
 export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"
 # Largest primary alignment blocks retained per tool in the offline explorer.
 # This prevents a fragmented assembly from making the report unresponsive.
+# Call installed annotation tools (mob_typer/abricate/amrfinder/isescan) to
+# derive replicon, MOB, AMR, and IS features instead of hand-curated tables.
+# Absent callers are recorded as "not evaluated", never as absent features.
+export RUN_REFERENCE_ANNOTATION="${RUN_REFERENCE_ANNOTATION:-1}"
+export ANNOTATION_AMR_DB="${ANNOTATION_AMR_DB:-ncbi}"
+export ANNOTATION_REPLICON_DB="${ANNOTATION_REPLICON_DB:-plasmidfinder}"
+
 export VISUALIZATION_MAX_BLOCKS_PER_TOOL="${VISUALIZATION_MAX_BLOCKS_PER_TOOL:-2000}"
 # Largest aligned block rendered as base-level text in the local viewer.
 export VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP="${VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP:-2000}"
