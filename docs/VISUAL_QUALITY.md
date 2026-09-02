@@ -9,14 +9,18 @@ untracked browser calculation.
 
 1. **Sample-by-tool heatmap:** rows are samples and columns are methods. Select
    base F1, precision, recall, plasmid recall, bin F1, chromosome
-   contamination, unmapped predicted bases, or execution state. Click a cell
-   to open the corresponding sample/tool context below.
+   contamination, unmapped predicted bases, execution state, or the explicitly
+   exploratory composite quality value. Filter sample/tool text or order rows
+   by their best visible metric. Click a cell to open the corresponding
+   sample/tool context below.
 2. **Per-plasmid recovery tracks:** select a truth plasmid to compare all tools
    on the same reference coordinate system. The percent at each row is the
    displayed-block completeness for that plasmid.
 3. **Zoomable alignment explorer:** use Fit, zoom buttons, mouse wheel, or
    exact start/end coordinates. Click a coloured block to inspect its retained
-   PAF query/reference coordinates, strand, identity, and MAPQ.
+   PAF query/reference coordinates, strand, identity, and MAPQ. New stage-5
+   runs retain CIGAR operations and offer a bounded local nucleotide view when
+   the selected alignment is small enough to display safely.
 
 The selection is intentionally progressive: cohort comparison, then plasmid
 recovery, then alignment evidence.
@@ -55,6 +59,39 @@ cap is `VISUALIZATION_MAX_BLOCKS_PER_TOOL=2000`; change it in
 
 Download the exact artifact from the visual explorer for audit or use in a
 separate plotting workflow.
+
+`structural_metrics.tsv` sits beside the JSON and reports alignment breakpoint,
+orientation, multi-target-record, and ordering diagnostics plus a conservative
+structural-concordance proxy. It is a diagnostic, not a validated structural
+correctness score.
+
+## Optional Context And Circular Truth
+
+Provide `data/<sample>/truth_features.tsv` to show curator-supplied replicon,
+MOB, insertion-sequence, and AMR-context features. Its required fields are:
+
+```text
+sequence_id  start  end  feature_type  label  source  version
+```
+
+Features without a source and version are not accepted for display. When
+`truth_circular.tsv` marks a reference plasmid as circular, the explorer shows
+a circular **truth comparison** map of recovered intervals. It never states
+that a prediction is circular or closed unless separate validated closure
+evidence supports that claim.
+
+## Composite Quality
+
+The optional `Exploratory composite quality` heatmap metric is deliberately
+secondary and does not change rankings or candidate selection. It is:
+
+```text
+0.45 * base F1 + 0.25 * plasmid recall + 0.15 * (bin F1, or base F1 when N/A)
++ 0.15 * (1 - chromosome contamination)
+```
+
+It makes trade-offs visible but must be read beside its individual components.
+Runtime, memory, closure, and AMR context are not silently folded into it.
 
 ## Interpretation Boundaries
 
