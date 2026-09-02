@@ -1,0 +1,2923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlasBench · Enterprise Report</title>
+
+    __PB_FONTS__
+
+    <style>
+        /* ── Reset & Base ── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #080b11;
+            --bg-secondary: #0e141e;
+            --bg-card: #151e2b;
+            --bg-card-hover: #1f2a3b;
+            --bg-input: #19222f;
+            --bg-tooltip: #0c121c;
+            --border-color: #223040;
+            --border-light: #354a60;
+            --text-primary: #e6edf6;
+            --text-secondary: #8fa2c7;
+            --text-muted: #4a607a;
+            --accent-blue: #4a8cf7;
+            --accent-cyan: #22d3ee;
+            --accent-green: #4ade80;
+            --accent-amber: #fbbf24;
+            --accent-rose: #f472b6;
+            --accent-red: #f87171;
+            --accent-purple: #a78bfa;
+            --accent-orange: #fb923c;
+            --shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+            --radius: 10px;
+            --radius-sm: 6px;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --transition: 0.2s ease;
+        }
+
+        html {
+            font-size: 13px;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        ::selection {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* ── Layout ── */
+        .app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 14px 20px 20px;
+            width: 100%;
+        }
+
+        /* ── Header ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0 14px;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .logo h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #fff 60%, var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .logo .badge {
+            font-size: 10px;
+            font-weight: 600;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            padding: 2px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            -webkit-text-fill-color: var(--text-secondary);
+            margin-left: 4px;
+        }
+
+        .header-meta {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+        .header-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .header-meta i {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: var(--font);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+            border-color: var(--border-light);
+        }
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #3a7cdd;
+            border-color: #3a7cdd;
+            color: #fff;
+        }
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 11px;
+        }
+        .btn-icon {
+            padding: 5px 8px;
+            font-size: 13px;
+        }
+        .btn-success {
+            background: var(--accent-green);
+            border-color: var(--accent-green);
+            color: #0b0e14;
+        }
+        .btn-success:hover {
+            background: #3acf70;
+            border-color: #3acf70;
+        }
+        .btn-danger {
+            background: var(--accent-red);
+            border-color: var(--accent-red);
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #e06060;
+            border-color: #e06060;
+        }
+
+        /* ── Filter Bar ── */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0 10px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--bg-card);
+            padding: 3px 10px 3px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+        .filter-group label {
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .filter-group select,
+        .filter-group input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 12px;
+            padding: 4px 0;
+            font-family: var(--font);
+            outline: none;
+            min-width: 70px;
+        }
+        .filter-group select option {
+            background: var(--bg-secondary);
+        }
+        .filter-group input {
+            min-width: 100px;
+        }
+        .filter-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 14px;
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        .filter-count strong {
+            color: var(--text-primary);
+        }
+
+        /* ── Stats Bar ── */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            padding: 14px 0 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        .stat-card .label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .stat-card .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-top: 2px;
+        }
+        .stat-card .sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .stat-card .trend {
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 3px;
+        }
+        .stat-card .trend.up {
+            color: var(--accent-green);
+        }
+        .stat-card .trend.down {
+            color: var(--accent-red);
+        }
+        .stat-card .trend.neutral {
+            color: var(--text-muted);
+        }
+
+        /* ── Main Grid ── */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-top: 14px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 380px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .panel-header h2 {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .panel-header h2 i {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .panel-header .sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-left: 4px;
+        }
+        .panel-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .panel-body {
+            flex: 1;
+            padding: 0;
+            overflow: hidden;
+            position: relative;
+            min-height: 280px;
+        }
+
+        /* ── Heatmap ── */
+        .heatmap-wrap {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: auto;
+            padding: 6px 0 6px 6px;
+        }
+
+        .heatmap-wrap canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            cursor: pointer;
+        }
+
+        .heatmap-tooltip {
+            position: fixed;
+            background: var(--bg-tooltip);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            max-width: 360px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            box-shadow: var(--shadow);
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.15s;
+            line-height: 1.6;
+        }
+        .heatmap-tooltip.visible {
+            opacity: 1;
+        }
+        .heatmap-tooltip strong {
+            color: var(--text-primary);
+        }
+        .heatmap-tooltip .tt-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .heatmap-tooltip .tt-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .heatmap-tooltip .tt-label {
+            color: var(--text-muted);
+        }
+        .heatmap-tooltip .tt-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .heatmap-tooltip .tt-divider {
+            border-top: 1px solid var(--border-color);
+            margin: 5px 0;
+        }
+
+        /* ── Plasmid Tracks ── */
+        .plasmid-tracks-wrap {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            padding: 6px 10px 10px;
+            position: relative;
+        }
+
+        .plasmid-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: 13px;
+            text-align: center;
+            padding: 40px;
+        }
+        .plasmid-empty i {
+            font-size: 36px;
+            margin-bottom: 14px;
+            opacity: 0.4;
+        }
+        .plasmid-empty strong {
+            color: var(--text-secondary);
+        }
+
+        .plasmid-item {
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            margin-bottom: 8px;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+        .plasmid-item:hover {
+            border-color: var(--border-light);
+        }
+        .plasmid-item.selected {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 1.5px var(--accent-blue);
+        }
+        .plasmid-item.drilldown-active {
+            border-color: var(--accent-amber);
+            box-shadow: 0 0 0 1.5px var(--accent-amber);
+        }
+
+        .plasmid-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 12px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .plasmid-header .name {
+            font-weight: 600;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .plasmid-header .name .badge {
+            font-size: 9px;
+            font-weight: 500;
+            padding: 1px 8px;
+            border-radius: 12px;
+            background: var(--bg-input);
+            color: var(--text-secondary);
+        }
+        .plasmid-header .stats {
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+        .plasmid-header .stats span {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .plasmid-header .stats .num {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .tag {
+            font-size: 8px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .tag-complete {
+            background: rgba(74, 222, 128, 0.15);
+            color: var(--accent-green);
+        }
+        .tag-partial {
+            background: rgba(251, 191, 36, 0.15);
+            color: var(--accent-amber);
+        }
+        .tag-fragmented {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--accent-red);
+        }
+        .tag-contam {
+            background: rgba(244, 114, 182, 0.15);
+            color: var(--accent-rose);
+        }
+        .tag-notrec {
+            background: rgba(90, 111, 138, 0.2);
+            color: var(--text-muted);
+        }
+        .tag-ambiguous {
+            background: rgba(167, 139, 250, 0.15);
+            color: var(--accent-purple);
+        }
+
+        .plasmid-tracks {
+            padding: 5px 12px 10px;
+            position: relative;
+        }
+
+        .track-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 2px 0;
+            font-size: 10px;
+        }
+        .track-row .track-label {
+            width: 72px;
+            flex-shrink: 0;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-align: right;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+        }
+        .track-row .track-label .tool-name {
+            color: var(--text-secondary);
+            font-weight: 400;
+            text-transform: none;
+        }
+        .track-bar {
+            flex: 1;
+            height: 14px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+            min-height: 14px;
+        }
+        .track-bar .seg {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+        .track-bar .seg-correct {
+            background: var(--accent-green);
+        }
+        .track-bar .seg-missing {
+            background: var(--bg-input);
+            border: 1px dashed var(--border-light);
+        }
+        .track-bar .seg-inverted {
+            background: var(--accent-rose);
+        }
+        .track-bar .seg-contam {
+            background: var(--accent-red);
+        }
+        .track-bar .seg-ambiguous {
+            background: var(--accent-amber);
+        }
+        .track-bar .seg-duplicated {
+            background: var(--accent-purple);
+        }
+        .track-bar .seg-lowid {
+            background: var(--accent-cyan);
+            opacity: 0.6;
+        }
+        .track-bar .seg-bad {
+            background: var(--accent-orange);
+            opacity: 0.8;
+        }
+
+        .track-legend {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 3px 0 0 80px;
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+        .track-legend span {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .track-legend .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        /* ── Drilldown Modal ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            max-width: 1400px;
+            width: 100%;
+            max-height: 94vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow);
+            animation: modalIn 0.25s ease;
+        }
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.97) translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+            border-radius: var(--radius) var(--radius) 0 0;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .modal-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .modal-header .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 22px;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+        }
+        .modal-header .close-btn:hover {
+            background: var(--bg-input);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow: hidden;
+            padding: 14px 18px 16px;
+            display: flex;
+            flex-direction: column;
+            min-height: 450px;
+        }
+
+        /* Drilldown content */
+        .drilldown-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 12px;
+        }
+        .drilldown-summary .dd-stat {
+            background: var(--bg-card);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+        .drilldown-summary .dd-stat .dd-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.3px;
+        }
+        .drilldown-summary .dd-stat .dd-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .drilldown-summary .dd-stat .dd-sub {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+        .drilldown-summary .dd-stat .dd-badge {
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--bg-input);
+            color: var(--text-secondary);
+            display: inline-block;
+            margin-top: 2px;
+        }
+
+        .drilldown-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+        .drilldown-toolbar .btn {
+            font-size: 10px;
+        }
+        .drilldown-toolbar .search-box {
+            display: flex;
+            align-items: center;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            padding: 0 10px;
+            gap: 5px;
+        }
+        .drilldown-toolbar .search-box input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            padding: 4px 0;
+            font-size: 11px;
+            font-family: var(--font);
+            outline: none;
+            width: 120px;
+        }
+        .drilldown-toolbar .search-box i {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .drilldown-contigs {
+            flex: 1;
+            overflow: auto;
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            padding: 6px 0;
+            min-height: 200px;
+        }
+
+        .contig-row {
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid var(--border-color);
+            padding: 6px 12px;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .contig-row:hover {
+            background: var(--bg-card);
+        }
+        .contig-row .contig-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .contig-row .contig-header .cname {
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .contig-row .contig-header .cname .cstatus {
+            font-size: 9px;
+            font-weight: 400;
+            padding: 1px 8px;
+            border-radius: 10px;
+            background: var(--bg-input);
+        }
+        .contig-row .contig-header .cstats {
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+        .contig-row .contig-header .cstats span {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .contig-row .contig-header .cstats .num {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .contig-row .contig-bar {
+            margin-top: 4px;
+            height: 18px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+        .contig-row .contig-bar .cseg {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+        .contig-row .contig-bar .cseg-good {
+            background: var(--accent-green);
+        }
+        .contig-row .contig-bar .cseg-mid {
+            background: var(--accent-amber);
+        }
+        .contig-row .contig-bar .cseg-bad {
+            background: var(--accent-red);
+        }
+        .contig-row .contig-bar .cseg-missing {
+            background: var(--bg-input);
+            border: 1px dashed var(--border-light);
+        }
+        .contig-row .contig-bar .cseg-inverted {
+            background: var(--accent-rose);
+        }
+        .contig-row .contig-bar .cseg-contam {
+            background: var(--accent-orange);
+        }
+
+        .contig-row .contig-detail {
+            display: none;
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .contig-row .contig-detail.open {
+            display: block;
+        }
+        .contig-row .contig-detail .seq-match {
+            color: var(--accent-green);
+        }
+        .contig-row .contig-detail .seq-mismatch {
+            color: var(--accent-red);
+            background: rgba(248, 113, 113, 0.15);
+        }
+        .contig-row .contig-detail .seq-gap {
+            color: var(--text-muted);
+            background: rgba(90, 111, 138, 0.15);
+        }
+        .contig-row .contig-detail .seq-insert {
+            color: var(--accent-amber);
+            background: rgba(251, 191, 36, 0.1);
+        }
+        .contig-row .contig-detail .seq-inv {
+            color: var(--accent-rose);
+            background: rgba(244, 114, 182, 0.1);
+        }
+        .contig-row .contig-detail .seq-label {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 10px;
+            display: block;
+            margin-top: 4px;
+        }
+
+        /* ── Stats / Box Plot Panel ── */
+        .stats-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 10px 14px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            margin-top: 14px;
+        }
+        @media (max-width: 700px) {
+            .stats-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stats-panel .stat-box {
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+        }
+        .stats-panel .stat-box .sb-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .stats-panel .stat-box canvas {
+            width: 100%;
+            height: 100px;
+            display: block;
+        }
+
+        .stats-panel .stat-box .sb-stats {
+            display: flex;
+            gap: 14px;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .stats-panel .stat-box .sb-stats span {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .stats-panel .stat-box .sb-stats .num {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* ── Selection highlight ── */
+        .selected-cell-indicator {
+            position: absolute;
+            border: 2px solid var(--accent-blue);
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 10;
+            box-shadow: 0 0 14px rgba(74, 140, 247, 0.3);
+            display: none;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 700px) {
+            .app {
+                padding: 8px 10px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .header-meta {
+                font-size: 10px;
+                gap: 8px;
+            }
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-group {
+                width: 100%;
+            }
+            .filter-group select,
+            .filter-group input {
+                flex: 1;
+                min-width: 0;
+            }
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .plasmid-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .track-row .track-label {
+                width: 50px;
+                font-size: 7px;
+            }
+            .track-legend {
+                padding-left: 58px;
+            }
+            .modal {
+                max-height: 96vh;
+                margin: 6px;
+            }
+            .modal-body {
+                padding: 10px;
+            }
+            .drilldown-toolbar {
+                gap: 5px;
+            }
+            .drilldown-toolbar .search-box input {
+                width: 80px;
+            }
+            .stats-panel {
+                grid-template-columns: 1fr;
+            }
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* ── Utilities ── */
+        .text-ellipsis {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .flex-1 {
+            flex: 1;
+        }
+        .gap-4 {
+            gap: 4px;
+        }
+        .mt-8 {
+            margin-top: 8px;
+        }
+        .mb-8 {
+            margin-bottom: 8px;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-right: 3px;
+        }
+        .status-dot.completed {
+            background: var(--accent-green);
+        }
+        .status-dot.warning {
+            background: var(--accent-amber);
+        }
+        .status-dot.failed {
+            background: var(--accent-red);
+        }
+        .status-dot.skipped {
+            background: var(--text-muted);
+        }
+        .status-dot.cached {
+            background: var(--accent-cyan);
+        }
+
+        /* Loading shimmer */
+        .shimmer {
+            background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% {
+                background-position: -200% 0;
+            }
+            100% {
+                background-position: 200% 0;
+            }
+        }
+
+        /* Badge pills */
+        .pill {
+            font-size: 9px;
+            padding: 1px 8px;
+            border-radius: 10px;
+            background: var(--bg-input);
+            color: var(--text-secondary);
+            display: inline-block;
+        }
+        .pill-good {
+            background: rgba(74, 222, 128, 0.15);
+            color: var(--accent-green);
+        }
+        .pill-warn {
+            background: rgba(251, 191, 36, 0.15);
+            color: var(--accent-amber);
+        }
+        .pill-bad {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--accent-red);
+        }
+
+        /* Explorer info */
+        .explorer-info {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 8px;
+            font-size: 10px;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .explorer-info .coords {
+            font-family: monospace;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+<script id="pb-data" type="application/json">__PB_DATA__</script>
+
+    <div class="app" id="app">
+
+        <!-- ─── HEADER ─── -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-icon">PB</div>
+                    <h1>PlasBench <span class="badge">v3.0</span></h1>
+                </div>
+                <div class="header-meta">
+                    <span><i class="fas fa-calendar"></i> 2026-09-02</span>
+                    <span><i class="fas fa-database"></i> 132 samples · 6 tools</span>
+                    <span><i class="fas fa-flask"></i> 487 plasmids</span>
+                    <span><i class="fas fa-tag"></i> enterprise</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-sm" title="Export report"><i class="fas fa-download"></i> Export</button>
+                <button class="btn btn-sm" title="Share"><i class="fas fa-share-alt"></i></button>
+                <button class="btn btn-sm btn-primary" id="resetSelectionBtn"><i class="fas fa-undo"></i> Reset</button>
+            </div>
+        </header>
+
+        <!-- ─── FILTER BAR ─── -->
+        <div class="filter-bar" id="filterBar">
+            <div class="filter-group">
+                <label><i class="fas fa-search"></i></label>
+                <input type="text" id="sampleSearch" placeholder="Sample ID…" />
+            </div>
+            <div class="filter-group">
+                <label>Metric</label>
+                <select id="metricSelect">
+                    <option value="baseF1">Base F1</option>
+                    <option value="basePrecision">Base Precision</option>
+                    <option value="baseRecall">Base Recall</option>
+                    <option value="completeness">Completeness</option>
+                    <option value="purity">Purity</option>
+                    <option value="plasmidsRecovered">Plasmids Rec.</option>
+                    <option value="structuralConcordance">Struct. Concord.</option>
+                    <option value="runtime">Runtime (min)</option>
+                    <option value="memory">Memory (GB)</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Organism</label>
+                <select id="organismFilter">
+                    <option value="all">All</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Tech</label>
+                <select id="techFilter">
+                    <option value="all">All</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="statusFilter">
+                    <option value="all">All</option>
+                    <option value="completed">Completed</option>
+                    <option value="warning">With warnings</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="filter-count" id="filterCount">
+                Showing <strong id="visibleCount">0</strong> of <span id="totalCount">0</span> samples
+            </div>
+            <button class="btn btn-sm" id="resetFiltersBtn"><i class="fas fa-times"></i> Reset</button>
+        </div>
+
+        <!-- ─── STATS BAR ─── -->
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-card">
+                <span class="label"><i class="fas fa-chart-line"></i> Best Tool</span>
+                <span class="value" id="bestTool">—</span>
+                <span class="sub" id="bestToolScore">—</span>
+            </div>
+            <div class="stat-card">
+                <span class="label"><i class="fas fa-arrow-up"></i> Top Sample</span>
+                <span class="value" id="topSample">—</span>
+                <span class="sub" id="topSampleScore">—</span>
+            </div>
+            <div class="stat-card">
+                <span class="label"><i class="fas fa-exclamation-triangle"></i> Failures</span>
+                <span class="value" id="failureCount">0</span>
+                <span class="sub" id="failureRate">0% of runs</span>
+            </div>
+            <div class="stat-card">
+                <span class="label"><i class="fas fa-dna"></i> Plasmids</span>
+                <span class="value" id="totalPlasmids">0</span>
+                <span class="sub" id="recoveredPlasmids">0 recovered</span>
+            </div>
+        </div>
+
+        <!-- ─── MAIN GRID ─── -->
+        <div class="main-grid">
+
+            <!-- ─── HEATMAP PANEL ─── -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-th"></i> Sample–Tool Heatmap <span class="sub" id="heatmapSub">base F1</span></h2>
+                    <div class="panel-actions">
+                        <button class="btn btn-sm btn-icon" id="sortByScoreBtn" title="Sort by metric"><i class="fas fa-sort-amount-down"></i></button>
+                        <button class="btn btn-sm btn-icon" id="clusterBtn" title="Cluster"><i class="fas fa-layer-group"></i></button>
+                        <button class="btn btn-sm btn-icon" id="showStatsBtn" title="Toggle stats"><i class="fas fa-chart-bar"></i></button>
+                    </div>
+                </div>
+                <div class="panel-body" id="heatmapContainer">
+                    <div class="heatmap-wrap" id="heatmapWrap">
+                        <canvas id="heatmapCanvas"></canvas>
+                        <div class="selected-cell-indicator" id="cellIndicator"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── PLASMID TRACKS PANEL ─── -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-dna"></i> Plasmid Recovery <span class="sub" id="plasmidContext">select a cell</span></h2>
+                    <div class="panel-actions">
+                        <button class="btn btn-sm" id="openDrilldownBtn" disabled><i class="fas fa-search-plus"></i> Drilldown</button>
+                        <button class="btn btn-sm btn-icon" id="sortPlasmidsBtn" title="Sort"><i class="fas fa-sort"></i></button>
+                    </div>
+                </div>
+                <div class="panel-body" id="plasmidContainer">
+                    <div class="plasmid-tracks-wrap" id="plasmidTracksWrap">
+                        <div class="plasmid-empty" id="plasmidEmpty">
+                            <i class="fas fa-hand-pointer"></i>
+                            <div>Click a heatmap cell to view<br /><strong>plasmid-level recovery</strong></div>
+                        </div>
+                        <div id="plasmidList"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ─── STATS PANEL (Box Plot & Dot Plot) ─── -->
+        <div class="stats-panel" id="statsPanel" style="display:none;">
+            <div class="stat-box">
+                <div class="sb-title"><i class="fas fa-box"></i> Box Plot — Metric Distribution by Tool</div>
+                <canvas id="boxPlotCanvas"></canvas>
+                <div class="sb-stats" id="boxStats">
+                    <span>Min: <span class="num" id="boxMin">—</span></span>
+                    <span>Q1: <span class="num" id="boxQ1">—</span></span>
+                    <span>Median: <span class="num" id="boxMedian">—</span></span>
+                    <span>Q3: <span class="num" id="boxQ3">—</span></span>
+                    <span>Max: <span class="num" id="boxMax">—</span></span>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="sb-title"><i class="fas fa-circle"></i> Dot Plot — Per-Sample Distribution</div>
+                <canvas id="dotPlotCanvas"></canvas>
+                <div class="sb-stats" id="dotStats">
+                    <span>Mean: <span class="num" id="dotMean">—</span></span>
+                    <span>Std dev: <span class="num" id="dotStd">—</span></span>
+                    <span>N: <span class="num" id="dotN">—</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── FOOTER ─── -->
+        <div style="display:flex;justify-content:space-between;padding:10px 0 2px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border-color);margin-top:14px;flex-wrap:wrap;gap:6px;">
+            <span><i class="fas fa-code-branch"></i> PlasBench v3.0 · <span id="footerDate">2026-09-02</span></span>
+            <span><i class="fas fa-keyboard"></i> ← → ↑ ↓ · Esc clear · Enter drilldown</span>
+            <span id="selectionInfo">No selection</span>
+        </div>
+
+    </div>
+
+    <!-- ─── TOOLTIP ─── -->
+    <div class="heatmap-tooltip" id="heatmapTooltip"></div>
+
+    <!-- ─── DRILLDOWN MODAL ─── -->
+    <div class="modal-overlay" id="drilldownModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-microscope"></i> Contig Drilldown <span id="drilldownTitle" style="font-weight:400;font-size:13px;color:var(--text-secondary);">— select a plasmid</span></h2>
+                <div>
+                    <button class="btn btn-sm" id="exportDrilldownBtn"><i class="fas fa-download"></i> Export</button>
+                    <button class="btn btn-sm" id="fitDrilldownBtn"><i class="fas fa-arrows-alt"></i> Fit</button>
+                    <button class="close-btn" id="closeDrilldownBtn">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <!-- Summary stats -->
+                <div class="drilldown-summary" id="drilldownSummary">
+                    <div class="dd-stat">
+                        <div class="dd-label">Sample</div>
+                        <div class="dd-value" id="ddSample">—</div>
+                        <div class="dd-sub" id="ddSampleMeta">—</div>
+                    </div>
+                    <div class="dd-stat">
+                        <div class="dd-label">Tool</div>
+                        <div class="dd-value" id="ddTool">—</div>
+                        <div class="dd-sub" id="ddToolVersion">—</div>
+                    </div>
+                    <div class="dd-stat">
+                        <div class="dd-label">Metric</div>
+                        <div class="dd-value" id="ddMetric">—</div>
+                        <div class="dd-sub" id="ddMetricDetail">—</div>
+                    </div>
+                    <div class="dd-stat">
+                        <div class="dd-label">Plasmids</div>
+                        <div class="dd-value" id="ddPlasmids">—</div>
+                        <div class="dd-sub" id="ddPlasmidDetail">—</div>
+                    </div>
+                    <div class="dd-stat">
+                        <div class="dd-label">Status</div>
+                        <div class="dd-value" id="ddStatus">—</div>
+                        <div class="dd-sub" id="ddStatusDetail">—</div>
+                    </div>
+                </div>
+
+                <!-- Toolbar -->
+                <div class="drilldown-toolbar">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="drilldownSearch" placeholder="Search contigs…" />
+                    </div>
+                    <button class="btn btn-sm" id="ddZoomIn"><i class="fas fa-plus"></i></button>
+                    <button class="btn btn-sm" id="ddZoomOut"><i class="fas fa-minus"></i></button>
+                    <button class="btn btn-sm" id="ddZoomReset"><i class="fas fa-home"></i></button>
+                    <button class="btn btn-sm" id="ddShowBad"><i class="fas fa-exclamation-triangle"></i> Bad regions</button>
+                    <span style="font-size:10px;color:var(--text-muted);margin-left:4px;" id="ddNavInfo">0 contigs</span>
+                </div>
+
+                <!-- Contig list -->
+                <div class="drilldown-contigs" id="drilldownContigs">
+                    <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;padding:20px;text-align:center;flex-direction:column;gap:8px;">
+                        <i class="fas fa-dna" style="font-size:30px;opacity:0.3;"></i>
+                        <span>Select a plasmid to view <strong>contig-level alignment</strong></span>
+                        <span style="font-size:11px;">Click a plasmid in the recovery panel to drill down</span>
+                    </div>
+                </div>
+
+                <div class="explorer-info">
+                    <span id="ddCoords">coords: 0 – 0</span>
+                    <span id="ddStatusInfo">zoom: 1.0x · showing all contigs</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  MOCK DATA GENERATOR (enhanced)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // ---------------------------------------------------------------------------
+        // PlasBench injects measured results here. The upstream prototype generated
+        // this block from a pseudo-random generator; nothing here is simulated.
+        // ---------------------------------------------------------------------------
+        function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+        const __PB = JSON.parse(document.getElementById('pb-data').textContent);
+        const TOOLS = __PB.tools;
+        const SAMPLE_IDS = __PB.sampleIds;
+        const SAMPLE_META = __PB.sampleMeta;
+        const DATASET = __PB.dataset;
+        const PLASMID_DATA = __PB.plasmidData;
+        window._CONTIG_DATA = __PB.contigData;
+        const STATUSES = __PB.statuses;
+        const ORGANISMS = __PB.organisms;
+        const TECHNOLOGIES = __PB.technologies;
+        const REPLICONS = __PB.replicons;
+        const AMR_GENES = __PB.amrGenes;
+        const RECOVERY_CLASSES = ['complete_concordant', 'complete_discordant', 'near_complete', 'partial',
+            'fragmented', 'merged', 'chromosomal_contam', 'not_recovered', 'ambiguous'];
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  APPLICATION STATE
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        const state = {
+            metric: 'baseF1',
+            selectedSample: null,
+            selectedTool: null,
+            selectedPlasmid: null,
+            samples: SAMPLE_IDS,
+            sortBy: 'sample',
+            sortAsc: true,
+            organism: 'all',
+            technology: 'all',
+            status: 'all',
+            search: '',
+            drilldownZoom: 1,
+            drilldownPan: 0,
+            showBadOnly: false,
+            statsVisible: false,
+        };
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  DOM REFS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        const canvas = document.getElementById('heatmapCanvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('heatmapTooltip');
+        const indicator = document.getElementById('cellIndicator');
+        const plasmidList = document.getElementById('plasmidList');
+        const plasmidEmpty = document.getElementById('plasmidEmpty');
+        const plasmidContext = document.getElementById('plasmidContext');
+        const openDrilldownBtn = document.getElementById('openDrilldownBtn');
+        const visibleCount = document.getElementById('visibleCount');
+        const totalCount = document.getElementById('totalCount');
+        const selectionInfo = document.getElementById('selectionInfo');
+        const heatmapSub = document.getElementById('heatmapSub');
+
+        // Drilldown
+        const drilldownModal = document.getElementById('drilldownModal');
+        const drilldownContigs = document.getElementById('drilldownContigs');
+        const drilldownTitle = document.getElementById('drilldownTitle');
+        const ddSample = document.getElementById('ddSample');
+        const ddSampleMeta = document.getElementById('ddSampleMeta');
+        const ddTool = document.getElementById('ddTool');
+        const ddToolVersion = document.getElementById('ddToolVersion');
+        const ddMetric = document.getElementById('ddMetric');
+        const ddMetricDetail = document.getElementById('ddMetricDetail');
+        const ddPlasmids = document.getElementById('ddPlasmids');
+        const ddPlasmidDetail = document.getElementById('ddPlasmidDetail');
+        const ddStatus = document.getElementById('ddStatus');
+        const ddStatusDetail = document.getElementById('ddStatusDetail');
+        const ddCoords = document.getElementById('ddCoords');
+        const ddStatusInfo = document.getElementById('ddStatusInfo');
+        const ddNavInfo = document.getElementById('ddNavInfo');
+        const drilldownSearch = document.getElementById('drilldownSearch');
+
+        // Stats
+        const statsPanel = document.getElementById('statsPanel');
+        const boxPlotCanvas = document.getElementById('boxPlotCanvas');
+        const dotPlotCanvas = document.getElementById('dotPlotCanvas');
+        const boxCtx = boxPlotCanvas.getContext('2d');
+        const dotCtx = dotPlotCanvas.getContext('2d');
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  HELPERS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function getFilteredSamples() {
+            let list = state.samples.slice();
+            if (state.search) {
+                const q = state.search.toLowerCase();
+                list = list.filter(sid => sid.toLowerCase().includes(q));
+            }
+            if (state.organism !== 'all') {
+                list = list.filter(sid => SAMPLE_META[sid].organism === state.organism);
+            }
+            if (state.technology !== 'all') {
+                list = list.filter(sid => SAMPLE_META[sid].technology === state.technology);
+            }
+            if (state.status !== 'all') {
+                list = list.filter(sid => {
+                    const metrics = DATASET[sid].metrics;
+                    const statuses = Object.values(metrics).map(m => m.status);
+                    if (state.status === 'completed') return statuses.every(s => s === 'completed' || s === 'cached');
+                    if (state.status === 'warning') return statuses.some(s => s === 'warning');
+                    if (state.status === 'failed') return statuses.some(s => s === 'failed' || s === 'skipped');
+                    return true;
+                });
+            }
+            return list;
+        }
+
+        function getMetricValue(sid, toolId) {
+            const m = DATASET[sid]?.metrics?.[toolId];
+            if (!m) return 0;
+            const key = state.metric;
+            if (key === 'baseF1') return m.baseF1 || 0;
+            if (key === 'basePrecision') return m.basePrecision || 0;
+            if (key === 'baseRecall') return m.baseRecall || 0;
+            if (key === 'completeness') return m.completeness || 0;
+            if (key === 'purity') return m.purity || 0;
+            if (key === 'plasmidsRecovered') return m.plasmidsRecovered || 0;
+            if (key === 'structuralConcordance') return m.structuralConcordance || 0;
+            if (key === 'runtime') return m.runtime || 0;
+            if (key === 'memory') return m.memory || 0;
+            return 0;
+        }
+
+        function getMetricLabel() {
+            const map = {
+                baseF1: 'Base F1',
+                basePrecision: 'Precision',
+                baseRecall: 'Recall',
+                completeness: 'Completeness',
+                purity: 'Purity',
+                plasmidsRecovered: 'Plasmids Rec.',
+                structuralConcordance: 'Struct. Concord.',
+                runtime: 'Runtime (min)',
+                memory: 'Memory (GB)'
+            };
+            return map[state.metric] || state.metric;
+        }
+
+        function getMetricColor(val, maxVal) {
+            const norm = maxVal > 0 ? clamp(val / maxVal, 0, 1) : 0;
+            const r = Math.round(40 + 200 * (1 - norm));
+            const g = Math.round(40 + 180 * norm);
+            const b = Math.round(60 + 120 * (1 - norm * 0.7));
+            return `rgb(${Math.min(r,255)},${Math.min(g,255)},${Math.min(b,255)})`;
+        }
+
+        function getStatusColor(status) {
+            const map = {
+                completed: '#4ade80',
+                cached: '#22d3ee',
+                warning: '#fbbf24',
+                failed: '#f87171',
+                skipped: '#5a6f8a',
+                'timed out': '#f87171',
+                'out of memory': '#f472b6',
+                'not applicable': '#5a6f8a',
+                'metric unavailable': '#5a6f8a',
+            };
+            return map[status] || '#5a6f8a';
+        }
+
+        function getStatusSymbol(status) {
+            const map = {
+                completed: '✓',
+                cached: '⟳',
+                warning: '⚠',
+                failed: '✗',
+                skipped: '⊘',
+                'timed out': '⌛',
+                'out of memory': '!',
+                'not applicable': '–',
+                'metric unavailable': '?',
+            };
+            return map[status] || '•';
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  HEATMAP RENDERER
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function renderHeatmap() {
+            const filtered = getFilteredSamples();
+            const visibleTools = TOOLS;
+
+            totalCount.textContent = state.samples.length;
+            visibleCount.textContent = filtered.length;
+            heatmapSub.textContent = getMetricLabel();
+
+            if (filtered.length === 0 || visibleTools.length === 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                updateStats();
+                return;
+            }
+
+            let maxVal = 0;
+            filtered.forEach(sid => {
+                visibleTools.forEach(t => {
+                    const v = getMetricValue(sid, t.id);
+                    if (v > maxVal) maxVal = v;
+                });
+            });
+            if (maxVal === 0) maxVal = 1;
+
+            const pad = { top: 30, right: 18, bottom: 55, left: 110 };
+            const rowH = 26;
+            const colW = 64;
+            const rows = filtered.length;
+            const cols = visibleTools.length;
+
+            const totalW = pad.left + cols * colW + pad.right;
+            const totalH = pad.top + rows * rowH + pad.bottom;
+
+            canvas.width = totalW;
+            canvas.height = totalH;
+            canvas.style.width = totalW + 'px';
+            canvas.style.height = totalH + 'px';
+
+            ctx.clearRect(0, 0, totalW, totalH);
+            ctx.fillStyle = '#080b11';
+            ctx.fillRect(0, 0, totalW, totalH);
+
+            // Draw grid
+            for (let r = 0; r < rows; r++) {
+                const sid = filtered[r];
+                const y = pad.top + r * rowH;
+                for (let c = 0; c < cols; c++) {
+                    const tool = visibleTools[c];
+                    const x = pad.left + c * colW;
+                    const val = getMetricValue(sid, tool.id);
+                    const status = DATASET[sid]?.metrics?.[tool.id]?.status || 'completed';
+                    const isSelected = (state.selectedSample === sid && state.selectedTool === tool.id);
+
+                    let color;
+                    if (status === 'failed' || status === 'skipped' || status === 'timed out' || status ===
+                        'out of memory') {
+                        color = '#1a212b';
+                    } else if (status === 'warning') {
+                        color = getMetricColor(val * 0.7, maxVal);
+                    } else {
+                        color = getMetricColor(val, maxVal);
+                    }
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x, y, colW, rowH);
+
+                    ctx.strokeStyle = isSelected ? '#4a8cf7' : '#151e2b';
+                    ctx.lineWidth = isSelected ? 2.5 : 0.5;
+                    ctx.strokeRect(x, y, colW, rowH);
+
+                    ctx.fillStyle = '#e6edf6';
+                    ctx.font = '9px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    let display = '';
+                    if (status === 'failed' || status === 'skipped' || status === 'timed out' || status ===
+                        'out of memory') {
+                        display = getStatusSymbol(status);
+                        ctx.fillStyle = '#5a6f8a';
+                    } else if (status === 'warning') {
+                        display = getStatusSymbol(status);
+                        ctx.fillStyle = '#fbbf24';
+                    } else if (status === 'cached') {
+                        display = getStatusSymbol(status);
+                        ctx.fillStyle = '#22d3ee';
+                    } else {
+                        if (state.metric === 'runtime' || state.metric === 'memory') {
+                            display = String(val);
+                        } else if (state.metric === 'plasmidsRecovered') {
+                            display = String(Math.round(val));
+                        } else {
+                            display = Math.round(val * 100) + '%';
+                        }
+                    }
+                    if (display.length > 6) display = display.slice(0, 5) + '…';
+                    ctx.fillText(display, x + colW / 2, y + rowH / 2);
+
+                    if (status === 'warning') {
+                        ctx.fillStyle = '#fbbf24';
+                        ctx.beginPath();
+                        ctx.arc(x + 8, y + 8, 3.5, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                    if (status === 'cached') {
+                        ctx.fillStyle = '#22d3ee';
+                        ctx.beginPath();
+                        ctx.arc(x + 8, y + 8, 3.5, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Row labels
+            ctx.fillStyle = '#8fa2c7';
+            ctx.font = '9px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let r = 0; r < rows; r++) {
+                const sid = filtered[r];
+                const y = pad.top + r * rowH + rowH / 2;
+                let label = sid;
+                if (label.length > 10) label = label.slice(0, 8) + '…';
+                ctx.fillStyle = (state.selectedSample === sid) ? '#4a8cf7' : '#8fa2c7';
+                ctx.fillText(label, pad.left - 6, y);
+            }
+
+            // Column headers
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            for (let c = 0; c < cols; c++) {
+                const tool = visibleTools[c];
+                const x = pad.left + c * colW + colW / 2;
+                const y = pad.top - 6;
+                ctx.fillStyle = (state.selectedTool === tool.id) ? '#4a8cf7' : '#8fa2c7';
+                ctx.font = '9px Inter, sans-serif';
+                let label = tool.label;
+                if (label.length > 12) label = label.slice(0, 10) + '…';
+                ctx.fillText(label, x, y);
+                ctx.fillStyle = '#4a607a';
+                ctx.font = '7px Inter, sans-serif';
+                ctx.fillText('v' + tool.version, x, y + 12);
+            }
+
+            ctx.fillStyle = '#4a607a';
+            ctx.font = '8px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText('Metric: ' + getMetricLabel(), 4, 2);
+
+            if (state.selectedSample && state.selectedTool) {
+                const rowIdx = filtered.indexOf(state.selectedSample);
+                const colIdx = visibleTools.findIndex(t => t.id === state.selectedTool);
+                if (rowIdx >= 0 && colIdx >= 0) {
+                    const x = pad.left + colIdx * colW;
+                    const y = pad.top + rowIdx * rowH;
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    indicator.style.display = 'block';
+                    indicator.style.left = (canvas.offsetLeft + x / scaleX) + 'px';
+                    indicator.style.top = (canvas.offsetTop + y / scaleY) + 'px';
+                    indicator.style.width = (colW / scaleX) + 'px';
+                    indicator.style.height = (rowH / scaleY) + 'px';
+                } else {
+                    indicator.style.display = 'none';
+                }
+            } else {
+                indicator.style.display = 'none';
+            }
+
+            canvas._cellData = { filtered, visibleTools, pad, rowH, colW, rows, cols, totalW, totalH };
+
+            // Update stats
+            updateStats();
+            updateStatsBar();
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  STATS BAR
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function updateStatsBar() {
+            const filtered = getFilteredSamples();
+            const visibleTools = TOOLS;
+            let bestToolId = '',
+                bestScore = -1,
+                topSampleId = '',
+                topScore = -1;
+            let failures = 0,
+                totalRuns = 0;
+            let totalPlasmidCount = 0,
+                recoveredCount = 0;
+
+            filtered.forEach(sid => {
+                const meta = SAMPLE_META[sid];
+                totalPlasmidCount += meta.plasmids;
+                const plasmids = PLASMID_DATA[sid] || [];
+                recoveredCount += plasmids.filter(p => p.recoveryPct > 10).length;
+
+                visibleTools.forEach(t => {
+                    const v = getMetricValue(sid, t.id);
+                    const status = DATASET[sid]?.metrics?.[t.id]?.status || '';
+                    totalRuns++;
+                    if (status === 'failed' || status === 'skipped' || status === 'timed out') failures++;
+                    if (v > bestScore) { bestScore = v;
+                        bestToolId = t.id; }
+                    if (v > topScore) { topScore = v;
+                        topSampleId = sid; }
+                });
+            });
+
+            document.getElementById('bestTool').textContent = TOOLS.find(t => t.id === bestToolId)?.label || '—';
+            document.getElementById('bestToolScore').textContent = bestScore > 0 ? getMetricLabel() + ': ' + (bestScore < 1 ?
+                Math.round(bestScore * 100) + '%' : bestScore) : '—';
+            document.getElementById('topSample').textContent = topSampleId || '—';
+            document.getElementById('topSampleScore').textContent = topScore > 0 ? getMetricLabel() + ': ' + (topScore < 1 ?
+                Math.round(topScore * 100) + '%' : topScore) : '—';
+            document.getElementById('failureCount').textContent = failures;
+            document.getElementById('failureRate').textContent = totalRuns > 0 ? Math.round(failures / totalRuns * 100) +
+                '% of runs' : '0%';
+            document.getElementById('totalPlasmids').textContent = totalPlasmidCount;
+            document.getElementById('recoveredPlasmids').textContent = recoveredCount + ' recovered';
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  BOX PLOT & DOT PLOT
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function updateStats() {
+            if (!state.statsVisible) return;
+            renderBoxPlot();
+            renderDotPlot();
+        }
+
+        function renderBoxPlot() {
+            const filtered = getFilteredSamples();
+            const visibleTools = TOOLS;
+            const W = boxPlotCanvas.parentElement.clientWidth - 28;
+            const H = 100;
+            boxPlotCanvas.width = W * 2;
+            boxPlotCanvas.height = H * 2;
+            boxPlotCanvas.style.width = W + 'px';
+            boxPlotCanvas.style.height = H + 'px';
+            boxCtx.scale(2, 2);
+
+            boxCtx.clearRect(0, 0, W, H);
+            boxCtx.fillStyle = '#0e141e';
+            boxCtx.fillRect(0, 0, W, H);
+
+            if (filtered.length === 0) return;
+
+            // Compute stats per tool
+            const toolStats = {};
+            visibleTools.forEach(t => {
+                const vals = filtered.map(sid => getMetricValue(sid, t.id)).filter(v => v > 0 || v === 0);
+                if (vals.length === 0) { toolStats[t.id] = null; return; }
+                const sorted = [...vals].sort((a, b) => a - b);
+                const q1 = sorted[Math.floor(sorted.length * 0.25)];
+                const median = sorted[Math.floor(sorted.length * 0.5)];
+                const q3 = sorted[Math.floor(sorted.length * 0.75)];
+                const min = sorted[0];
+                const max = sorted[sorted.length - 1];
+                const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+                toolStats[t.id] = { q1, median, q3, min, max, mean, vals };
+            });
+
+            const pad = { top: 8, bottom: 18, left: 32, right: 10 };
+            const plotW = W - pad.left - pad.right;
+            const plotH = H - pad.top - pad.bottom;
+            const toolWidth = Math.min(plotW / visibleTools.length * 0.6, 40);
+
+            // Find global min/max
+            let globalMin = Infinity,
+                globalMax = -Infinity;
+            visibleTools.forEach(t => {
+                const s = toolStats[t.id];
+                if (s) { if (s.min < globalMin) globalMin = s.min; if (s.max > globalMax) globalMax = s.max; }
+            });
+            if (globalMin === Infinity) globalMin = 0;
+            if (globalMax === -Infinity) globalMax = 1;
+            const range = globalMax - globalMin || 1;
+
+            const colors = ['#4a8cf7', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#4ade80'];
+
+            visibleTools.forEach((t, idx) => {
+                const s = toolStats[t.id];
+                if (!s) return;
+                const x = pad.left + idx * (plotW / visibleTools.length) + (plotW / visibleTools.length) / 2;
+                const scale = (v) => pad.top + plotH - ((v - globalMin) / range) * plotH;
+
+                // Box
+                const boxX = x - toolWidth / 2;
+                const boxY = scale(s.q3);
+                const boxH = scale(s.q1) - scale(s.q3);
+                boxCtx.fillStyle = colors[idx % colors.length] + '30';
+                boxCtx.fillRect(boxX, boxY, toolWidth, boxH);
+                boxCtx.strokeStyle = colors[idx % colors.length];
+                boxCtx.lineWidth = 0.8;
+                boxCtx.strokeRect(boxX, boxY, toolWidth, boxH);
+
+                // Median line
+                const medY = scale(s.median);
+                boxCtx.strokeStyle = colors[idx % colors.length];
+                boxCtx.lineWidth = 1.5;
+                boxCtx.beginPath();
+                boxCtx.moveTo(boxX, medY);
+                boxCtx.lineTo(boxX + toolWidth, medY);
+                boxCtx.stroke();
+
+                // Whiskers
+                boxCtx.strokeStyle = colors[idx % colors.length] + '80';
+                boxCtx.lineWidth = 0.6;
+                const minY = scale(s.min);
+                const maxY = scale(s.max);
+                boxCtx.beginPath();
+                boxCtx.moveTo(x, minY);
+                boxCtx.lineTo(x, boxY);
+                boxCtx.moveTo(x, boxY + boxH);
+                boxCtx.lineTo(x, maxY);
+                boxCtx.stroke();
+                // Caps
+                boxCtx.beginPath();
+                boxCtx.moveTo(x - 3, minY);
+                boxCtx.lineTo(x + 3, minY);
+                boxCtx.moveTo(x - 3, maxY);
+                boxCtx.lineTo(x + 3, maxY);
+                boxCtx.stroke();
+
+                // Label
+                boxCtx.fillStyle = '#4a607a';
+                boxCtx.font = '7px Inter, sans-serif';
+                boxCtx.textAlign = 'center';
+                boxCtx.textBaseline = 'top';
+                const label = t.label.length > 8 ? t.label.slice(0, 6) + '…' : t.label;
+                boxCtx.fillText(label, x, pad.top + plotH + 2);
+
+                // Value display
+                boxCtx.fillStyle = '#8fa2c7';
+                boxCtx.font = '6px Inter, sans-serif';
+                boxCtx.textBaseline = 'bottom';
+                boxCtx.fillText((s.median < 1 ? Math.round(s.median * 100) + '%' : s.median.toFixed(1)), x, pad.top - 2);
+            });
+
+            // Update stats text
+            const firstTool = visibleTools[0];
+            const s = toolStats[firstTool?.id];
+            if (s) {
+                document.getElementById('boxMin').textContent = s.min < 1 ? Math.round(s.min * 100) + '%' : s.min.toFixed(
+                1);
+                document.getElementById('boxQ1').textContent = s.q1 < 1 ? Math.round(s.q1 * 100) + '%' : s.q1.toFixed(1);
+                document.getElementById('boxMedian').textContent = s.median < 1 ? Math.round(s.median * 100) + '%' : s
+                    .median.toFixed(1);
+                document.getElementById('boxQ3').textContent = s.q3 < 1 ? Math.round(s.q3 * 100) + '%' : s.q3.toFixed(1);
+                document.getElementById('boxMax').textContent = s.max < 1 ? Math.round(s.max * 100) + '%' : s.max.toFixed(
+                1);
+            }
+        }
+
+        function renderDotPlot() {
+            const filtered = getFilteredSamples();
+            const visibleTools = TOOLS;
+            const W = dotPlotCanvas.parentElement.clientWidth - 28;
+            const H = 100;
+            dotPlotCanvas.width = W * 2;
+            dotPlotCanvas.height = H * 2;
+            dotPlotCanvas.style.width = W + 'px';
+            dotPlotCanvas.style.height = H + 'px';
+            dotCtx.scale(2, 2);
+
+            dotCtx.clearRect(0, 0, W, H);
+            dotCtx.fillStyle = '#0e141e';
+            dotCtx.fillRect(0, 0, W, H);
+
+            if (filtered.length === 0) return;
+
+            // Gather all values for the selected metric
+            let allVals = [];
+            filtered.forEach(sid => {
+                visibleTools.forEach(t => {
+                    const v = getMetricValue(sid, t.id);
+                    if (v > 0 || v === 0) allVals.push(v);
+                });
+            });
+
+            if (allVals.length === 0) return;
+
+            const sorted = [...allVals].sort((a, b) => a - b);
+            const min = sorted[0],
+                max = sorted[sorted.length - 1];
+            const range = max - min || 1;
+            const mean = allVals.reduce((a, b) => a + b, 0) / allVals.length;
+
+            // Compute std dev
+            const variance = allVals.reduce((a, b) => a + (b - mean) ** 2, 0) / allVals.length;
+            const std = Math.sqrt(variance);
+
+            const pad = { top: 8, bottom: 18, left: 28, right: 8 };
+            const plotW = W - pad.left - pad.right;
+            const plotH = H - pad.top - pad.bottom;
+
+            // Jittered dot plot
+            const colors = ['#4a8cf7', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#4ade80'];
+            const dotR = 2.5;
+
+            // Group by tool
+            visibleTools.forEach((t, idx) => {
+                const vals = filtered.map(sid => getMetricValue(sid, t.id)).filter(v => v > 0 || v === 0);
+                const xPos = pad.left + idx * (plotW / visibleTools.length) + (plotW / visibleTools.length) / 2;
+                const jitterSpread = Math.min(12, (plotW / visibleTools.length) * 0.35);
+
+                vals.forEach((v, i) => {
+                    const y = pad.top + plotH - ((v - min) / range) * plotH;
+                    // Deterministic spread: the same run must draw identically twice.
+                    const jitter = vals.length > 1 ? ((i / (vals.length - 1)) - 0.5) * jitterSpread : 0;
+                    const x = xPos + jitter;
+                    dotCtx.beginPath();
+                    dotCtx.arc(x, y, dotR, 0, 2 * Math.PI);
+                    dotCtx.fillStyle = colors[idx % colors.length] + '60';
+                    dotCtx.fill();
+                    dotCtx.strokeStyle = colors[idx % colors.length] + '80';
+                    dotCtx.lineWidth = 0.3;
+                    dotCtx.stroke();
+                });
+            });
+
+            // Mean line
+            const meanY = pad.top + plotH - ((mean - min) / range) * plotH;
+            dotCtx.strokeStyle = '#4ade80';
+            dotCtx.lineWidth = 0.8;
+            dotCtx.setLineDash([3, 4]);
+            dotCtx.beginPath();
+            dotCtx.moveTo(pad.left, meanY);
+            dotCtx.lineTo(pad.left + plotW, meanY);
+            dotCtx.stroke();
+            dotCtx.setLineDash([]);
+
+            // Labels
+            dotCtx.fillStyle = '#4a607a';
+            dotCtx.font = '7px Inter, sans-serif';
+            dotCtx.textAlign = 'center';
+            dotCtx.textBaseline = 'top';
+            visibleTools.forEach((t, idx) => {
+                const x = pad.left + idx * (plotW / visibleTools.length) + (plotW / visibleTools.length) / 2;
+                const label = t.label.length > 8 ? t.label.slice(0, 6) + '…' : t.label;
+                dotCtx.fillText(label, x, pad.top + plotH + 2);
+            });
+
+            document.getElementById('dotMean').textContent = mean < 1 ? Math.round(mean * 100) + '%' : mean.toFixed(1);
+            document.getElementById('dotStd').textContent = std < 1 ? Math.round(std * 100) + '%' : std.toFixed(2);
+            document.getElementById('dotN').textContent = allVals.length;
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  HEATMAP INTERACTION
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function getCellFromPoint(px, py) {
+            const data = canvas._cellData;
+            if (!data) return null;
+            const { filtered, visibleTools, pad, rowH, colW, rows, cols } = data;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (px - rect.left) * scaleX;
+            const y = (py - rect.top) * scaleY;
+
+            if (x < pad.left || x > pad.left + cols * colW) return null;
+            if (y < pad.top || y > pad.top + rows * rowH) return null;
+
+            const col = Math.floor((x - pad.left) / colW);
+            const row = Math.floor((y - pad.top) / rowH);
+            if (row >= rows || col >= cols) return null;
+
+            return {
+                sample: filtered[row],
+                tool: visibleTools[col],
+                row,
+                col,
+                value: getMetricValue(filtered[row], visibleTools[col].id),
+            };
+        }
+
+        function showTooltip(e, cell) {
+            if (!cell) {
+                tooltip.classList.remove('visible');
+                return;
+            }
+            const sid = cell.sample;
+            const tool = cell.tool;
+            const m = DATASET[sid]?.metrics?.[tool.id];
+            const meta = SAMPLE_META[sid];
+            if (!m) { tooltip.classList.remove('visible'); return; }
+
+            const status = m.status || 'completed';
+            const statusLabel = status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+
+            let html = `
+                <div class="tt-title">${sid} · ${tool.label}</div>
+                <div class="tt-row"><span class="tt-label">Base F1</span><span class="tt-value">${m.baseF1 || 0}</span></div>
+                <div class="tt-row"><span class="tt-label">Precision</span><span class="tt-value">${Math.round((m.basePrecision||0)*100)}%</span></div>
+                <div class="tt-row"><span class="tt-label">Recall</span><span class="tt-value">${Math.round((m.baseRecall||0)*100)}%</span></div>
+                <div class="tt-row"><span class="tt-label">Completeness</span><span class="tt-value">${Math.round((m.completeness||0)*100)}%</span></div>
+                <div class="tt-row"><span class="tt-label">Purity</span><span class="tt-value">${Math.round((m.purity||0)*100)}%</span></div>
+                <div class="tt-divider"></div>
+                <div class="tt-row"><span class="tt-label">Plasmids rec.</span><span class="tt-value">${m.plasmidsRecovered || 0}/${meta.plasmids}</span></div>
+                <div class="tt-row"><span class="tt-label">Runtime</span><span class="tt-value">${m.runtime || 0} min</span></div>
+                <div class="tt-row"><span class="tt-label">Memory</span><span class="tt-value">${m.memory || 0} GB</span></div>
+                <div class="tt-row"><span class="tt-label">Status</span><span class="tt-value"><span class="status-dot ${status}"></span>${statusLabel}</span></div>
+                <div class="tt-row"><span class="tt-label">Organism</span><span class="tt-value">${meta.organism}</span></div>
+                <div class="tt-row"><span class="tt-label">Technology</span><span class="tt-value">${meta.technology}</span></div>
+            `;
+            tooltip.innerHTML = html;
+            tooltip.classList.add('visible');
+
+            const rect = canvas.getBoundingClientRect();
+            let left = e.clientX + 14;
+            let top = e.clientY - 10;
+            if (left + 380 > window.innerWidth) left = e.clientX - 390;
+            if (top + 360 > window.innerHeight) top = window.innerHeight - 370;
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  PLASMID TRACKS RENDERER
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function renderPlasmids() {
+            const sid = state.selectedSample;
+            const toolId = state.selectedTool;
+
+            if (!sid || !toolId) {
+                plasmidList.innerHTML = '';
+                plasmidEmpty.style.display = 'flex';
+                plasmidContext.textContent = 'select a cell';
+                openDrilldownBtn.disabled = true;
+                return;
+            }
+
+            const plasmids = PLASMID_DATA[sid] || [];
+            if (plasmids.length === 0) {
+                plasmidList.innerHTML =
+                    '<div class="plasmid-empty" style="padding:20px"><i class="fas fa-ban"></i> No plasmid data</div>';
+                plasmidEmpty.style.display = 'none';
+                plasmidContext.textContent = sid + ' · ' + (TOOLS.find(t => t.id === toolId)?.label || '');
+                openDrilldownBtn.disabled = true;
+                return;
+            }
+
+            plasmidEmpty.style.display = 'none';
+            const tool = TOOLS.find(t => t.id === toolId);
+            plasmidContext.textContent = sid + ' · ' + (tool?.label || toolId);
+            openDrilldownBtn.disabled = false;
+
+            const sorted = [...plasmids].sort((a, b) => b.recoveryPct - a.recoveryPct);
+
+            let html = '';
+            sorted.forEach((p, idx) => {
+                const isSelected = state.selectedPlasmid === p.id;
+                const cls = p.recoveryClass;
+                let tagClass = 'tag-partial',
+                    tagLabel = 'Partial';
+                if (cls === 'complete_concordant') { tagClass = 'tag-complete';
+                    tagLabel = 'Complete ✓'; } else if (cls === 'complete_discordant') { tagClass = 'tag-complete';
+                    tagLabel = 'Complete ⚠'; } else if (cls === 'near_complete') { tagClass = 'tag-complete';
+                    tagLabel = 'Near complete'; } else if (cls === 'partial') { tagClass = 'tag-partial';
+                    tagLabel = 'Partial'; } else if (cls === 'fragmented') { tagClass = 'tag-fragmented';
+                    tagLabel = 'Fragmented'; } else if (cls === 'merged') { tagClass = 'tag-contam';
+                    tagLabel = 'Merged'; } else if (cls === 'chromosomal_contam') { tagClass = 'tag-contam';
+                    tagLabel = 'Chrom. contam.'; } else if (cls === 'not_recovered') { tagClass = 'tag-notrec';
+                    tagLabel = 'Not rec.'; } else { tagClass = 'tag-ambiguous';
+                    tagLabel = 'Ambiguous'; }
+
+                const segs = [
+                    { type: 'correct', w: p.recoveryPct * 0.7 },
+                    { type: 'missing', w: 100 - p.recoveryPct * 0.7 - 8 },
+                    { type: 'ambiguous', w: 8 },
+                ];
+                if (p.recoveryClass.includes('fragmented')) {
+                    segs.splice(1, 0, { type: 'missing', w: 18 });
+                    segs.splice(3, 0, { type: 'inverted', w: 8 });
+                }
+                if (p.recoveryClass.includes('discordant')) {
+                    segs.splice(2, 0, { type: 'inverted', w: 10 });
+                }
+                if (p.recoveryClass.includes('contam')) {
+                    segs.splice(2, 0, { type: 'contam', w: 12 });
+                }
+
+                const segColors = {
+                    correct: 'var(--accent-green)',
+                    missing: 'var(--bg-input)',
+                    inverted: 'var(--accent-rose)',
+                    contam: 'var(--accent-red)',
+                    ambiguous: 'var(--accent-amber)',
+                    duplicated: 'var(--accent-purple)',
+                    lowid: 'var(--accent-cyan)',
+                };
+
+                let tracksHtml = '';
+                const displayTools = TOOLS.slice(0, 4);
+                displayTools.forEach(t => {
+                    const toolMetrics = DATASET[sid]?.metrics?.[t.id];
+                    const recov = toolMetrics ? Math.round((toolMetrics.completeness || 0) * 100) : 0;
+                    const tsegs = [
+                        { type: 'correct', w: Math.min(recov * 0.8, 82) },
+                        { type: 'missing', w: Math.max(100 - recov * 0.8 - 6, 0) },
+                        { type: 'ambiguous', w: 6 },
+                    ];
+                    if (recov < 30) { tsegs[0].w = recov * 0.5;
+                        tsegs[1].w = 100 - recov * 0.5 - 10;
+                        tsegs[2].w = 10; }
+                    if (p.recoveryClass.includes('fragmented')) { tsegs.splice(1, 0, { type: 'missing', w: 12 }); }
+                    const segHtml = tsegs.map(s => {
+                        const color = segColors[s.type] || '#2a3548';
+                        return `<div class="seg seg-${s.type}" style="width:${s.w}%;background:${color};"></div>`;
+                    }).join('');
+                    tracksHtml += `
+                        <div class="track-row">
+                            <div class="track-label"><span class="tool-name">${t.label}</span></div>
+                            <div class="track-bar">${segHtml}</div>
+                            <span style="font-size:8px;color:var(--text-muted);width:30px;text-align:right;flex-shrink:0;">${recov}%</span>
+                        </div>
+                    `;
+                });
+
+                const amrBadges = p.amrGenes.length > 0 ?
+                    p.amrGenes.map(g => `<span style="font-size:7px;background:var(--bg-input);padding:1px 6px;border-radius:10px;color:var(--text-secondary);">${g}</span>`)
+                    .join(' ') :
+                    '<span style="font-size:8px;color:var(--text-muted);">—</span>';
+
+                const isDrilldownActive = state.selectedPlasmid === p.id && drilldownModal.classList.contains('open');
+
+                html += `
+                    <div class="plasmid-item ${isSelected ? 'selected' : ''} ${isDrilldownActive ? 'drilldown-active' : ''}" data-plasmid="${p.id}" data-idx="${idx}">
+                        <div class="plasmid-header" data-plasmid="${p.id}">
+                            <div class="name">
+                                ${p.id}
+                                <span class="badge">${p.length.toLocaleString()} bp</span>
+                                ${p.circular ? '<span style="font-size:9px;color:var(--accent-cyan);"><i class="fas fa-circle"></i> circ</span>' : ''}
+                                <span class="tag ${tagClass}">${tagLabel}</span>
+                            </div>
+                            <div class="stats">
+                                <span>Rec <span class="num">${p.recoveryPct}%</span></span>
+                                <span>Purity <span class="num">${p.purityPct}%</span></span>
+                                <span>Struct <span class="num">${Math.round(p.structuralConcordance*100)}%</span></span>
+                                <span>${p.replicon}</span>
+                            </div>
+                        </div>
+                        <div class="plasmid-tracks">
+                            ${tracksHtml}
+                            <div class="track-legend">
+                                <span><span class="dot" style="background:var(--accent-green);"></span> correct</span>
+                                <span><span class="dot" style="background:var(--bg-input);border:1px dashed var(--border-light);"></span> missing</span>
+                                <span><span class="dot" style="background:var(--accent-rose);"></span> inverted</span>
+                                <span><span class="dot" style="background:var(--accent-red);"></span> contam.</span>
+                                <span><span class="dot" style="background:var(--accent-amber);"></span> ambiguous</span>
+                                <span style="margin-left:6px;">AMR: ${amrBadges}</span>
+                                <span style="margin-left:6px;cursor:pointer;color:var(--accent-blue);font-weight:600;" class="drilldown-trigger" data-plasmid="${p.id}"><i class="fas fa-search-plus"></i> drilldown</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            plasmidList.innerHTML = html;
+
+            // Click on plasmid header
+            document.querySelectorAll('.plasmid-header').forEach(el => {
+                el.addEventListener('click', function(e) {
+                    const pid = this.dataset.plasmid;
+                    if (state.selectedPlasmid === pid) {
+                        state.selectedPlasmid = null;
+                    } else {
+                        state.selectedPlasmid = pid;
+                    }
+                    renderPlasmids();
+                    updateUrl();
+                });
+            });
+
+            // Click on drilldown trigger
+            document.querySelectorAll('.drilldown-trigger').forEach(el => {
+                el.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const pid = this.dataset.plasmid;
+                    state.selectedPlasmid = pid;
+                    renderPlasmids();
+                    openDrilldown(state.selectedSample, state.selectedTool, pid);
+                });
+            });
+
+            // If a plasmid is selected and drilldown is open, update it
+            if (state.selectedPlasmid && drilldownModal.classList.contains('open')) {
+                openDrilldown(state.selectedSample, state.selectedTool, state.selectedPlasmid);
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  DRILLDOWN MODAL
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function openDrilldown(sampleId, toolId, plasmidId) {
+            const plasmids = PLASMID_DATA[sampleId] || [];
+            const plasmid = plasmids.find(p => p.id === plasmidId);
+            if (!plasmid) {
+                drilldownModal.classList.remove('open');
+                return;
+            }
+
+            const tool = TOOLS.find(t => t.id === toolId);
+            const metrics = DATASET[sampleId]?.metrics?.[toolId];
+            const meta = SAMPLE_META[sampleId];
+
+            drilldownModal.classList.add('open');
+
+            // Header
+            drilldownTitle.textContent = plasmidId + ' · ' + tool?.label || toolId;
+
+            // Summary
+            ddSample.textContent = sampleId;
+            ddSampleMeta.textContent = meta?.organism + ' · ' + meta?.technology;
+            ddTool.textContent = tool?.label || toolId;
+            ddToolVersion.textContent = 'v' + (tool?.version || '—');
+            const metricVal = metrics ? getMetricValue(sampleId, toolId) : 0;
+            ddMetric.textContent = metricVal < 1 ? Math.round(metricVal * 100) + '%' : metricVal;
+            ddMetricDetail.textContent = getMetricLabel() + ' · ' + (metrics?.status || '—');
+            ddPlasmids.textContent = plasmids.length;
+            ddPlasmidDetail.textContent = plasmid.recoveryPct + '% recovered · ' + plasmid.replicon;
+            const status = metrics?.status || 'completed';
+            ddStatus.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            ddStatusDetail.textContent = status === 'completed' ? '✅ No issues' : status === 'warning' ? '⚠️ With warnings' :
+                '❌ Failed';
+
+            // Get contig data
+            const key = sampleId + '|' + toolId + '|' + plasmidId;
+            // Absent measurements stay absent: the prototype synthesised contigs
+            // here, which would present invented alignments as results.
+            const contigs = window._CONTIG_DATA?.[key] || [];
+
+            // Render contigs
+            renderDrilldownContigs(contigs, plasmid);
+
+            ddNavInfo.textContent = contigs.length + ' contigs';
+            ddCoords.textContent = 'plasmid: ' + plasmid.length.toLocaleString() + ' bp';
+            ddStatusInfo.textContent = 'zoom: 1.0x · ' + contigs.length + ' contigs';
+
+            // Store for interactions
+            drilldownModal._contigs = contigs;
+            drilldownModal._plasmid = plasmid;
+            drilldownModal._sampleId = sampleId;
+            drilldownModal._toolId = toolId;
+        }
+
+        function renderDrilldownContigs(contigs, plasmid) {
+            const container = drilldownContigs;
+            if (!contigs || contigs.length === 0) {
+                container.innerHTML =
+                    `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;padding:20px;text-align:center;flex-direction:column;gap:8px;">
+                        <i class="fas fa-ban" style="font-size:24px;opacity:0.3;"></i>
+                        <span>No contig data available</span>
+                    </div>`;
+                return;
+            }
+
+            const search = drilldownSearch.value.toLowerCase();
+            let filtered = contigs;
+            if (search) {
+                filtered = contigs.filter(c => c.id.toLowerCase().includes(search) || String(c.length).includes(search));
+            }
+            if (state.showBadOnly) {
+                filtered = filtered.filter(c => c.status === 'warning' || c.hasInversion || c.hasContam || c.identity < 90);
+            }
+
+            let html = '';
+            filtered.forEach((c, idx) => {
+                const isBad = c.status === 'warning' || c.hasInversion || c.hasContam || c.identity < 90;
+                const statusLabel = isBad ? '⚠️ warning' : '✅ good';
+                const statusClass = isBad ? 'pill-warn' : 'pill-good';
+
+                // Build segment bars
+                const segs = c.segments || [];
+                const totalLen = c.length;
+                const segHtml = segs.map(s => {
+                    const pct = (s.len / totalLen) * 100;
+                    let cls = 'cseg-good';
+                    if (s.type === 'bad' || s.type === 'contam') cls = 'cseg-bad';
+                    else if (s.type === 'mid' || s.type === 'inverted') cls = 'cseg-mid';
+                    else if (s.type === 'missing') cls = 'cseg-missing';
+                    else if (s.type === 'inverted') cls = 'cseg-inverted';
+                    else if (s.type === 'contam') cls = 'cseg-contam';
+                    return `<div class="cseg ${cls}" style="width:${Math.max(pct,0.5)}%;"></div>`;
+                }).join('');
+
+                // Sequence detail (simplified)
+                const seq = c.sequence || '';
+                const seqDisplay = seq.length > 200 ? seq.slice(0, 200) + '…' : seq;
+                // Mismatch columns come from the CIGAR-derived local alignment. When
+                // no alignment was retained the bases are shown unmarked rather than
+                // decorated with invented differences.
+                const mismatchSet = new Set(c.mismatchOffsets || []);
+                const seqHtml = seqDisplay.split('').map((b, i) => {
+                    if (mismatchSet.has(i)) return `<span class="seq-mismatch">${b}</span>`;
+                    return b;
+                }).join('');
+
+                html += `
+                    <div class="contig-row" data-contig="${c.id}" data-idx="${idx}">
+                        <div class="contig-header">
+                            <div class="cname">
+                                ${c.id}
+                                <span class="cstatus ${statusClass}">${statusLabel}</span>
+                                ${c.hasInversion ? '<span class="pill pill-warn"><i class="fas fa-arrows-alt-h"></i> inv</span>' : ''}
+                                ${c.hasContam ? '<span class="pill pill-bad"><i class="fas fa-skull"></i> contam</span>' : ''}
+                            </div>
+                            <div class="cstats">
+                                <span>Len <span class="num">${c.length.toLocaleString()}</span></span>
+                                <span>Rec <span class="num">${c.recovery}%</span></span>
+                                <span>Identity <span class="num">${c.identity}%</span></span>
+                                <span>Gaps <span class="num">${c.gaps}</span></span>
+                                <span>MM <span class="num">${c.mismatches}</span></span>
+                            </div>
+                        </div>
+                        <div class="contig-bar">${segHtml}</div>
+                        <div class="contig-detail" id="cdetail_${idx}">
+                            <span class="seq-label">Reference:   ${seqHtml}</span>
+                            <span class="seq-label" style="margin-top:2px;">Predicted:   ${seqHtml}</span>
+                            <span class="seq-label" style="margin-top:2px;color:var(--text-muted);font-size:9px;">
+                                <span class="seq-match">█</span> match <span class="seq-mismatch">█</span> mismatch 
+                                <span class="seq-gap">█</span> gap <span class="seq-insert">█</span> insert
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Click to toggle detail
+            document.querySelectorAll('.contig-row').forEach(el => {
+                el.addEventListener('click', function() {
+                    const detail = this.querySelector('.contig-detail');
+                    if (detail) {
+                        detail.classList.toggle('open');
+                    }
+                });
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML =
+                    `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;padding:20px;text-align:center;flex-direction:column;gap:8px;">
+                        <i class="fas fa-search" style="font-size:24px;opacity:0.3;"></i>
+                        <span>No contigs match your filters</span>
+                    </div>`;
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  URL STATE
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function updateUrl() {
+            const params = new URLSearchParams();
+            if (state.selectedSample) params.set('sample', state.selectedSample);
+            if (state.selectedTool) params.set('tool', state.selectedTool);
+            if (state.selectedPlasmid) params.set('plasmid', state.selectedPlasmid);
+            if (state.metric !== 'baseF1') params.set('metric', state.metric);
+            if (state.organism !== 'all') params.set('organism', state.organism);
+            if (state.technology !== 'all') params.set('tech', state.technology);
+            const hash = params.toString();
+            history.replaceState(null, '', '#' + hash);
+        }
+
+        function loadStateFromUrl() {
+            const hash = window.location.hash.slice(1);
+            const params = new URLSearchParams(hash);
+            if (params.has('sample')) state.selectedSample = params.get('sample');
+            if (params.has('tool')) state.selectedTool = params.get('tool');
+            if (params.has('plasmid')) state.selectedPlasmid = params.get('plasmid');
+            if (params.has('metric')) {
+                const m = params.get('metric');
+                if (['baseF1', 'basePrecision', 'baseRecall', 'completeness', 'purity', 'plasmidsRecovered',
+                        'structuralConcordance', 'runtime', 'memory'
+                    ].includes(m)) {
+                    state.metric = m;
+                    document.getElementById('metricSelect').value = m;
+                }
+            }
+            if (params.has('organism')) {
+                const o = params.get('organism');
+                if (ORGANISMS.includes(o)) { state.organism = o;
+                    document.getElementById('organismFilter').value = o; }
+            }
+            if (params.has('tech')) {
+                const t = params.get('tech');
+                if (TECHNOLOGIES.includes(t) || t === 'all') { state.technology = t;
+                    document.getElementById('techFilter').value = t; }
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  EVENT BINDING
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // Heatmap click
+        canvas.addEventListener('click', function(e) {
+            const cell = getCellFromPoint(e.clientX, e.clientY);
+            if (!cell) return;
+            state.selectedSample = cell.sample;
+            state.selectedTool = cell.tool.id;
+            state.selectedPlasmid = null;
+            renderHeatmap();
+            renderPlasmids();
+            updateUrl();
+            selectionInfo.textContent = `Selected: ${cell.sample} · ${cell.tool.label} · ${getMetricLabel()}: ${cell.value}`;
+            tooltip.classList.remove('visible');
+            // Close drilldown if open
+            if (drilldownModal.classList.contains('open')) {
+                drilldownModal.classList.remove('open');
+            }
+        });
+
+        // Heatmap hover
+        canvas.addEventListener('mousemove', function(e) {
+            const cell = getCellFromPoint(e.clientX, e.clientY);
+            if (cell) { showTooltip(e, cell);
+                canvas.style.cursor = 'pointer'; } else { tooltip.classList.remove('visible');
+                canvas.style.cursor = 'default'; }
+        });
+        canvas.addEventListener('mouseleave', function() { tooltip.classList.remove('visible'); });
+
+        // Metric selector
+        document.getElementById('metricSelect').addEventListener('change', function() {
+            state.metric = this.value;
+            heatmapSub.textContent = getMetricLabel();
+            renderHeatmap();
+            updateUrl();
+            if (state.statsVisible) { renderBoxPlot();
+                renderDotPlot(); }
+        });
+
+        // Filters
+        document.getElementById('organismFilter').addEventListener('change', function() {
+            state.organism = this.value;
+            renderHeatmap();
+            updateUrl();
+        });
+        document.getElementById('techFilter').addEventListener('change', function() {
+            state.technology = this.value;
+            renderHeatmap();
+            updateUrl();
+        });
+        document.getElementById('statusFilter').addEventListener('change', function() {
+            state.status = this.value;
+            renderHeatmap();
+        });
+        document.getElementById('sampleSearch').addEventListener('input', function() {
+            state.search = this.value;
+            renderHeatmap();
+        });
+        document.getElementById('resetFiltersBtn').addEventListener('click', function() {
+            document.getElementById('sampleSearch').value = '';
+            document.getElementById('organismFilter').value = 'all';
+            document.getElementById('techFilter').value = 'all';
+            document.getElementById('statusFilter').value = 'all';
+            state.search = '';
+            state.organism = 'all';
+            state.technology = 'all';
+            state.status = 'all';
+            renderHeatmap();
+            updateUrl();
+        });
+
+        // Sort button
+        document.getElementById('sortByScoreBtn').addEventListener('click', function() {
+            state.sortAsc = !state.sortAsc;
+            const filtered = getFilteredSamples();
+            const toolId = state.selectedTool || TOOLS[0].id;
+            filtered.sort((a, b) => {
+                const va = getMetricValue(a, toolId);
+                const vb = getMetricValue(b, toolId);
+                return state.sortAsc ? va - vb : vb - va;
+            });
+            state.samples = filtered;
+            renderHeatmap();
+        });
+
+        // Cluster button (toggle)
+        let clusterMode = false;
+        document.getElementById('clusterBtn').addEventListener('click', function() {
+            clusterMode = !clusterMode;
+            if (clusterMode) {
+                // Simple clustering: sort by tool agreement (simulated)
+                const filtered = getFilteredSamples();
+                const toolId = state.selectedTool || TOOLS[0].id;
+                // Group by measured similarity for the selected method, breaking ties
+                // on sample id so the order is stable between renders.
+                filtered.sort((a, b) => {
+                    const va = getMetricValue(a, toolId);
+                    const vb = getMetricValue(b, toolId);
+                    return (va - vb) || a.localeCompare(b);
+                });
+                state.samples = filtered;
+                this.style.borderColor = 'var(--accent-blue)';
+            } else {
+                state.samples = SAMPLE_IDS.slice();
+                this.style.borderColor = '';
+            }
+            renderHeatmap();
+        });
+
+        // Reset selection
+        document.getElementById('resetSelectionBtn').addEventListener('click', function() {
+            state.selectedSample = null;
+            state.selectedTool = null;
+            state.selectedPlasmid = null;
+            renderHeatmap();
+            renderPlasmids();
+            updateUrl();
+            selectionInfo.textContent = 'No selection';
+            tooltip.classList.remove('visible');
+            indicator.style.display = 'none';
+            if (drilldownModal.classList.contains('open')) drilldownModal.classList.remove('open');
+        });
+
+        // Show stats toggle
+        document.getElementById('showStatsBtn').addEventListener('click', function() {
+            state.statsVisible = !state.statsVisible;
+            statsPanel.style.display = state.statsVisible ? 'grid' : 'none';
+            if (state.statsVisible) {
+                setTimeout(() => { renderBoxPlot();
+                    renderDotPlot(); }, 100);
+            }
+        });
+
+        // Open drilldown
+        document.getElementById('openDrilldownBtn').addEventListener('click', function() {
+            if (state.selectedSample && state.selectedTool) {
+                const plasmids = PLASMID_DATA[state.selectedSample] || [];
+                const pid = state.selectedPlasmid || (plasmids.length > 0 ? plasmids[0].id : null);
+                if (pid) {
+                    state.selectedPlasmid = pid;
+                    renderPlasmids();
+                    openDrilldown(state.selectedSample, state.selectedTool, pid);
+                }
+            }
+        });
+
+        // Drilldown modal controls
+        document.getElementById('closeDrilldownBtn').addEventListener('click', function() {
+            drilldownModal.classList.remove('open');
+        });
+        drilldownModal.addEventListener('click', function(e) {
+            if (e.target === this) drilldownModal.classList.remove('open');
+        });
+
+        document.getElementById('exportDrilldownBtn').addEventListener('click', function() {
+            const contigs = drilldownModal._contigs || [];
+            const data = contigs.map(c => ({
+                id: c.id,
+                length: c.length,
+                recovery: c.recovery,
+                identity: c.identity,
+                hasInversion: c.hasInversion,
+                hasContam: c.hasContam,
+                gaps: c.gaps,
+                mismatches: c.mismatches,
+                status: c.status,
+            }));
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.download = 'contig-data.json';
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        });
+
+        document.getElementById('fitDrilldownBtn').addEventListener('click', function() {
+            state.drilldownZoom = 1;
+            state.drilldownPan = 0;
+            // Re-render contigs with zoom
+            const contigs = drilldownModal._contigs || [];
+            const plasmid = drilldownModal._plasmid;
+            if (contigs.length > 0) renderDrilldownContigs(contigs, plasmid);
+        });
+
+        document.getElementById('ddZoomIn').addEventListener('click', function() {
+            state.drilldownZoom = Math.min(3, (state.drilldownZoom || 1) * 1.25);
+            const contigs = drilldownModal._contigs || [];
+            const plasmid = drilldownModal._plasmid;
+            if (contigs.length > 0) renderDrilldownContigs(contigs, plasmid);
+            ddStatusInfo.textContent = 'zoom: ' + state.drilldownZoom.toFixed(1) + 'x';
+        });
+
+        document.getElementById('ddZoomOut').addEventListener('click', function() {
+            state.drilldownZoom = Math.max(0.4, (state.drilldownZoom || 1) / 1.25);
+            const contigs = drilldownModal._contigs || [];
+            const plasmid = drilldownModal._plasmid;
+            if (contigs.length > 0) renderDrilldownContigs(contigs, plasmid);
+            ddStatusInfo.textContent = 'zoom: ' + state.drilldownZoom.toFixed(1) + 'x';
+        });
+
+        document.getElementById('ddZoomReset').addEventListener('click', function() {
+            state.drilldownZoom = 1;
+            state.drilldownPan = 0;
+            const contigs = drilldownModal._contigs || [];
+            const plasmid = drilldownModal._plasmid;
+            if (contigs.length > 0) renderDrilldownContigs(contigs, plasmid);
+            ddStatusInfo.textContent = 'zoom: 1.0x';
+        });
+
+        document.getElementById('ddShowBad').addEventListener('click', function() {
+            state.showBadOnly = !state.showBadOnly;
+            this.style.borderColor = state.showBadOnly ? 'var(--accent-amber)' : '';
+            const contigs = drilldownModal._contigs || [];
+            const plasmid = drilldownModal._plasmid;
+            if (contigs.length > 0) renderDrilldownContigs(contigs, plasmid);
+        });
+
+        drilldownSearch.addEventListener('input', function() {
+            const contigs = drilldownModal._contigs || [];
+            const plasmid = drilldownModal._plasmid;
+            if (contigs.length > 0) renderDrilldownContigs(contigs, plasmid);
+        });
+
+        // Sort plasmids button
+        document.getElementById('sortPlasmidsBtn').addEventListener('click', function() {
+            if (!state.selectedSample) return;
+            const plasmids = PLASMID_DATA[state.selectedSample] || [];
+            plasmids.sort((a, b) => b.recoveryPct - a.recoveryPct);
+            renderPlasmids();
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  KEYBOARD SHORTCUTS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                if (drilldownModal.classList.contains('open')) {
+                    drilldownModal.classList.remove('open');
+                } else {
+                    state.selectedSample = null;
+                    state.selectedTool = null;
+                    state.selectedPlasmid = null;
+                    renderHeatmap();
+                    renderPlasmids();
+                    updateUrl();
+                    selectionInfo.textContent = 'No selection';
+                    tooltip.classList.remove('visible');
+                    indicator.style.display = 'none';
+                }
+                return;
+            }
+            if (e.key === 'Enter' && state.selectedSample && state.selectedTool && !drilldownModal.classList.contains(
+                    'open')) {
+                const plasmids = PLASMID_DATA[state.selectedSample] || [];
+                const pid = state.selectedPlasmid || (plasmids.length > 0 ? plasmids[0].id : null);
+                if (pid) {
+                    state.selectedPlasmid = pid;
+                    renderPlasmids();
+                    openDrilldown(state.selectedSample, state.selectedTool, pid);
+                }
+                return;
+            }
+            // Heatmap navigation
+            if (!drilldownModal.classList.contains('open') && state.selectedSample && state.selectedTool) {
+                const filtered = getFilteredSamples();
+                const rowIdx = filtered.indexOf(state.selectedSample);
+                const colIdx = TOOLS.findIndex(t => t.id === state.selectedTool);
+                if (rowIdx >= 0 && colIdx >= 0) {
+                    let newRow = rowIdx,
+                        newCol = colIdx;
+                    if (e.key === 'ArrowUp') newRow = Math.max(0, rowIdx - 1);
+                    if (e.key === 'ArrowDown') newRow = Math.min(filtered.length - 1, rowIdx + 1);
+                    if (e.key === 'ArrowLeft') newCol = Math.max(0, colIdx - 1);
+                    if (e.key === 'ArrowRight') newCol = Math.min(TOOLS.length - 1, colIdx + 1);
+                    if (newRow !== rowIdx || newCol !== colIdx) {
+                        e.preventDefault();
+                        state.selectedSample = filtered[newRow];
+                        state.selectedTool = TOOLS[newCol].id;
+                        state.selectedPlasmid = null;
+                        renderHeatmap();
+                        renderPlasmids();
+                        updateUrl();
+                        selectionInfo.textContent =
+                            `Selected: ${state.selectedSample} · ${TOOLS[newCol].label}`;
+                        if (drilldownModal.classList.contains('open')) drilldownModal.classList.remove('open');
+                    }
+                }
+            }
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  INIT
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function init() {
+            heatmapSub.textContent = getMetricLabel();
+            document.getElementById('footerDate').textContent = new Date().toISOString().slice(0, 10);
+
+            // Cohort selects list only values present in this run, so a filter can
+            // never offer an organism or technology the cohort does not contain.
+            [['organismFilter', ORGANISMS], ['techFilter', TECHNOLOGIES]].forEach(([id, values]) => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                values.filter(v => v && v !== 'not recorded').forEach(v => {
+                    const option = document.createElement('option');
+                    option.value = v; option.textContent = v; select.append(option);
+                });
+            });
+
+            loadStateFromUrl();
+            renderHeatmap();
+            renderPlasmids();
+            // Upstream only refreshed the stats bar from filter handlers, so a first
+            // load showed placeholders. Populate it from the measured data on init.
+            updateStatsBar();
+            renderBoxPlot();
+            renderDotPlot();
+
+            if (state.selectedSample && state.selectedTool) {
+                const tool = TOOLS.find(t => t.id === state.selectedTool);
+                selectionInfo.textContent =
+                    `Selected: ${state.selectedSample} · ${tool?.label || state.selectedTool} · ${getMetricLabel()}`;
+            }
+
+            // If URL has plasmid, open drilldown
+            if (state.selectedSample && state.selectedTool && state.selectedPlasmid) {
+                setTimeout(() => {
+                    openDrilldown(state.selectedSample, state.selectedTool, state.selectedPlasmid);
+                }, 500);
+            }
+
+            // Window resize
+            let resizeTimer;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    renderHeatmap();
+                    if (state.statsVisible) { renderBoxPlot();
+                        renderDotPlot(); }
+                    if (drilldownModal.classList.contains('open')) {
+                        const contigs = drilldownModal._contigs || [];
+                        const plasmid = drilldownModal._plasmid;
+                        if (contigs.length > 0) renderDrilldownContigs(contigs, plasmid);
+                    }
+                }, 300);
+            });
+
+            // Initial stats render if visible
+            if (state.statsVisible) {
+                setTimeout(() => { renderBoxPlot();
+                    renderDotPlot(); }, 200);
+            }
+
+            console.log('🧬 PlasBench v3.0 ·', SAMPLE_IDS.length, 'samples,', TOOLS.length, 'tools');
+            console.log('📊 Metric:', state.metric);
+        }
+
+        // Override renderHeatmap to also update stats
+        const origRenderHeatmap = renderHeatmap;
+        renderHeatmap = function() {
+            origRenderHeatmap();
+            if (state.selectedSample && state.selectedTool) {
+                renderPlasmids();
+            }
+            if (state.statsVisible) {
+                setTimeout(() => { renderBoxPlot();
+                    renderDotPlot(); }, 50);
+            }
+        };
+
+        // Metric change also updates stats
+        document.getElementById('metricSelect').addEventListener('change', function() {
+            if (state.statsVisible) {
+                setTimeout(() => { renderBoxPlot();
+                    renderDotPlot(); }, 100);
+            }
+        });
+
+        init();
+        console.log('✅ PlasBench dashboard initialized');
+    </script>
+
+</body>
+</html>
