@@ -16,11 +16,18 @@ python3 "$HERE/../python/aggregate_results.py" \
     --sample-sheet "$SAMPLE_SHEET" \
     --out-prefix "$RESULTS_DIR/benchmark"
 
+python3 "$HERE/../python/validate_recommendations.py" \
+    --scores "$SCORES" --samples "$SAMPLE_SHEET" \
+    --min-train-samples "$RECOMMENDATION_MIN_SAMPLES" \
+    --out "$RESULTS_DIR/benchmark.recommendation_validation.tsv"
+
 # Retain the highest-quality already reconstructed candidate for every truth
-# sample. This never reruns a tool or fabricates a consensus sequence.
+# sample. Public operational recommendations are gated by the study holdout
+# validation above; this never reruns a tool or fabricates a consensus sequence.
 python3 "$HERE/../python/select_operational_method.py" \
     --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET" \
     --results-dir "$RESULTS_DIR" --tool-status "$RESULTS_DIR/tool_status.tsv" \
+    --recommendation-validation "$RESULTS_DIR/benchmark.recommendation_validation.tsv" \
     --out-prefix "$RESULTS_DIR/benchmark" \
     --min-samples "$RECOMMENDATION_MIN_SAMPLES" \
     --min-coverage "$RECOMMENDATION_MIN_COVERAGE" \
@@ -41,6 +48,7 @@ python3 "$HERE/../python/build_html_report.py" \
     --comparisons "$RESULTS_DIR/benchmark.paired_comparisons.tsv" \
     --score-failures "$RESULTS_DIR/score_failures.tsv" \
     --recommendations "$RESULTS_DIR/benchmark.recommendations.tsv" \
+    --recommendation-validation "$RESULTS_DIR/benchmark.recommendation_validation.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."
@@ -48,8 +56,10 @@ log "  Per-sample scores : $SCORES"
 log "  Tool status       : $RESULTS_DIR/tool_status.tsv"
 log "  Leaderboard (TSV) : $RESULTS_DIR/benchmark.leaderboard.tsv"
 log "  Leaderboard (MD)  : $RESULTS_DIR/benchmark.leaderboard.md"
+log "  Track leaderboard : $RESULTS_DIR/benchmark.<short_read|long_read|hybrid>.leaderboard.tsv"
 log "  HTML dashboard    : $RESULTS_DIR/benchmark.report.html"
 log "  Run manifest      : $RESULTS_DIR/run_manifest.json"
 log "  Recommendations   : $RESULTS_DIR/benchmark.recommendations.tsv"
 log "  Stratified metrics: $RESULTS_DIR/benchmark.stratified.tsv"
+log "  Study holdout test : $RESULTS_DIR/benchmark.recommendation_validation.tsv"
 log "  Selected output   : $RESULTS_DIR/<sample>/selected_candidate/"

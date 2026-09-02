@@ -65,7 +65,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             : > "$PAF"   # tool predicted nothing -> empty PAF (all FN)
         fi
         AMR_ARGS=()
-        [[ -s "$AMR" ]] && AMR_ARGS=(--amr-genes "$AMR" --amr-gene-recovery-threshold "$AMR_GENE_RECOVERY_THRESHOLD")
+        if [[ -s "$AMR" ]]; then
+            if ! python3 "$HERE/../python/validate_amr_truth.py" --amr-truth "$AMR" --truth "$TRUTH" >> "$LOG_DIR/${SAMPLE}.${tool}.score.log" 2>&1; then
+                warn "curated AMR truth failed validation for $SAMPLE; AMR recovery omitted"
+            else
+                AMR_ARGS=(--amr-genes "$AMR" --amr-gene-recovery-threshold "$AMR_GENE_RECOVERY_THRESHOLD")
+            fi
+        fi
         CIRCULAR_ARGS=()
         [[ -s "$CIRCULAR" ]] && CIRCULAR_ARGS=(--circular-plasmids "$CIRCULAR")
         if ! python3 "$HERE/../python/score_plasmids.py" \
@@ -74,6 +80,8 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
             --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
             --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
+            --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
+            --analysis-track "$ANALYSIS_TRACK" \
             "${AMBIGUITY_ARGS[@]}" \
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
@@ -85,7 +93,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         fi
         BINS="$RDIR/pred_${tool}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$tool"; then
-            if ! python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
+            if ! python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" \
                 --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
                 --summary "$RDIR/${tool}.bin_summary.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
                 warn "bin scoring failed for $SAMPLE/$tool; retaining base-level score"

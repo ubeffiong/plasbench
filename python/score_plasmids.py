@@ -108,7 +108,8 @@ def read_fasta_lengths(path):
     return lengths
 
 
-def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.0, min_mapq=0):
+def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.0, min_mapq=0,
+                        min_query_coverage=0.0):
     """
     Parse PAF, keep one row per (query, target alignment), and collect covered
     intervals ON THE TARGET (reference) as 0-based half-open [start, end).
@@ -122,7 +123,7 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
 
     counters = {"alignment_total": 0, "alignment_retained": 0, "filtered_alignment_count": 0}
     if os.path.getsize(path) == 0:
-        return covered, sum(pred_lengths.values()), counters
+        return covered, sum(pred_lengths.values()), 0, counters
 
     with open(path) as fh:
         for line_number, line in enumerate(fh, start=1):
@@ -159,7 +160,9 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
                 )
             counters["alignment_total"] += 1
             identity = matches / block_length if block_length else 0.0
-            if block_length < min_length or identity < min_identity or mapq < min_mapq:
+            query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
+            if (block_length < min_length or identity < min_identity or mapq < min_mapq
+                    or query_coverage < min_query_coverage):
                 counters["filtered_alignment_count"] += 1
                 continue
             counters["alignment_retained"] += 1
@@ -182,11 +185,13 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
                 qend = max(0, min(qend, qlen))
                 query_covered[qname].append((qstart, qend))
 
-    unmapped_pred_bp = 0
+    unmapped_pred_bp = mapped_pred_bp = 0
     for qname, length in pred_lengths.items():
         _, mapped_bp = merge_intervals(query_covered.get(qname, []))
-        unmapped_pred_bp += max(0, length - min(mapped_bp, length))
-    return covered, unmapped_pred_bp, counters
+        mapped_bp = min(mapped_bp, length)
+        mapped_pred_bp += mapped_bp
+        unmapped_pred_bp += max(0, length - mapped_bp)
+    return covered, unmapped_pred_bp, mapped_pred_bp, counters
 
 
 def merge_intervals(intervals):
@@ -217,7 +222,7 @@ def overlap_bp(left, right):
     return total
 
 
-def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_mapq):
+def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_mapq, min_query_coverage):
     """Measure query bases with retained plasmid and chromosome alternatives.
 
     Primary-only mapping is retained for the core score so repetitive sequence
@@ -243,7 +248,9 @@ def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_
                 raise ValueError(f"ambiguity PAF line {line_number} has invalid coordinates") from exc
             if qname not in pred_lengths or qlen != pred_lengths[qname] or target not in truth:
                 continue
-            if block_length < min_length or (matches / block_length if block_length else 0.0) < min_identity or mapq < min_mapq:
+            query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
+            if (block_length < min_length or (matches / block_length if block_length else 0.0) < min_identity
+                    or mapq < min_mapq or query_coverage < min_query_coverage):
                 continue
             qstart, qend = sorted((max(0, min(qstart, qlen)), max(0, min(qend, qlen))))
             by_query[qname][truth[target][0]].append((qstart, qend))
@@ -338,19 +345,23 @@ def main():
                     help="Minimum PAF matches/block-length retained for scoring (default: 0).")
     ap.add_argument("--min-alignment-mapq", type=int, default=0,
                     help="Minimum PAF mapping quality retained for scoring (default: 0).")
+    ap.add_argument("--min-alignment-query-coverage", type=float, default=0.0,
+                    help="Minimum fraction of a predicted record covered by an individual PAF alignment (default: 0).")
+    ap.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
     args = ap.parse_args()
 
     truth, total_plasmid = read_truth(args.truth)
     try:
         pred_lengths = read_fasta_lengths(args.pred_fasta)
-        if args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1 or args.min_alignment_mapq < 0:
-            raise ValueError("alignment thresholds must be min-length >= 1, identity in [0, 1], and MAPQ >= 0")
-        covered, unmapped_pred_bp, alignment = parse_paf_intervals(
+        if (args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1
+                or args.min_alignment_mapq < 0 or not 0 <= args.min_alignment_query_coverage <= 1):
+            raise ValueError("alignment thresholds must be min-length >= 1, identity/query coverage in [0, 1], and MAPQ >= 0")
+        covered, unmapped_pred_bp, mapped_pred_bp, alignment = parse_paf_intervals(
             args.paf, truth, pred_lengths, args.min_alignment_length,
-            args.min_alignment_identity, args.min_alignment_mapq)
+            args.min_alignment_identity, args.min_alignment_mapq, args.min_alignment_query_coverage)
         ambiguous_bp = ambiguous_query_bp(args.ambiguity_paf, truth, pred_lengths,
                                           args.min_alignment_length, args.min_alignment_identity,
-                                          args.min_alignment_mapq)
+                                          args.min_alignment_mapq, args.min_alignment_query_coverage)
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}")
     tp, fp, fn = score(truth, total_plasmid, covered)
@@ -388,16 +399,16 @@ def main():
     f1 = safe_div(2 * precision * recall, precision + recall)
 
     header = [
-        "sample", "tool", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
-        "unmapped_pred_bp", "ambiguously_mapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
+        "sample", "tool", "analysis_track", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
+        "mapped_pred_bp", "unambiguously_mapped_pred_bp", "unmapped_pred_bp", "ambiguously_mapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
         "plasmid_recall", "predicted_record_count", "true_amr_gene_count",
         "recovered_amr_gene_count", "amr_gene_recall", "true_circular_plasmid_count",
         "recovered_circular_plasmid_count", "circular_truth_plasmid_recovery", "circular_plasmid_recall", "alignment_total",
         "alignment_retained", "filtered_alignment_count", "precision", "recall", "f1",
     ]
     row = [
-        args.sample, args.tool, total_plasmid, tp, fp, fn,
-        unmapped_pred_bp, ambiguous_bp, len(true_plasmids), recovered_plasmids,
+        args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
+        mapped_pred_bp, max(0, mapped_pred_bp - ambiguous_bp), unmapped_pred_bp, ambiguous_bp, len(true_plasmids), recovered_plasmids,
         f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}", predicted_records,
         len(amr_genes) if args.amr_genes else "", recovered_amr if args.amr_genes else "",
         f"{safe_div(recovered_amr, len(amr_genes)):.4f}" if args.amr_genes else "",

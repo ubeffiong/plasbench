@@ -49,6 +49,7 @@ def main():
         assert row["n_completed"] == "0"
         assert row["n_failed"] == "0"
         assert row["n_skipped"] == "0"
+        assert os.path.isfile(prefix + ".short_read.leaderboard.tsv")
 
         # A report can be rebuilt from a shared results directory even when
         # the original sample sheet and stage-4 status file are unavailable.

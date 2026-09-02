@@ -36,6 +36,46 @@ def read_bins(path):
     return membership
 
 
+def overlap(left, right):
+    """Return shared bases between two merged query-coordinate interval lists."""
+    i = j = total = 0
+    while i < len(left) and j < len(right):
+        total += max(0, min(left[i][1], right[j][1]) - max(left[i][0], right[j][0]))
+        if left[i][1] <= right[j][1]: i += 1
+        else: j += 1
+    return total
+
+
+def bin_ambiguity(path, membership, plasmids, chromosomes):
+    """Return secondary-map plasmid/chromosome ambiguity bp per predicted bin."""
+    if not path:
+        return {}
+    by_query = defaultdict(lambda: defaultdict(list))
+    with open(path, encoding="utf-8") as handle:
+        for raw in handle:
+            fields = raw.rstrip("\n").split("\t")
+            if len(fields) < 12 or fields[0] not in membership: continue
+            try: start, stop = sorted((int(fields[2]), int(fields[3])))
+            except ValueError: continue
+            target = fields[5]
+            if target in plasmids: by_query[fields[0]]["PLASMID"].append((start, stop))
+            elif target in chromosomes: by_query[fields[0]]["CHROMOSOME"].append((start, stop))
+    by_bin = defaultdict(int)
+    for query, types in by_query.items():
+        if types["PLASMID"] and types["CHROMOSOME"]:
+            by_bin[membership[query]] += overlap(merge_intervals(types["PLASMID"]), merge_intervals(types["CHROMOSOME"]))
+    return by_bin
+
+
+def merge_intervals(intervals):
+    ordered = sorted(intervals)
+    merged = []
+    for start, stop in ordered:
+        if merged and start <= merged[-1][1]: merged[-1][1] = max(merged[-1][1], stop)
+        else: merged.append([start, stop])
+    return merged
+
+
 def maximum_weight(edges, bins_list, plasmids_list):
     """Return a maximum-weight one-to-one assignment using Hungarian O(n^3)."""
     n = max(len(bins_list), len(plasmids_list))
@@ -83,6 +123,7 @@ def main():
     parser.add_argument("--threshold", type=float, default=.9, help="minimum truth-plasmid completeness")
     parser.add_argument("--min-bin-purity", type=float, default=.9, help="minimum plasmid bp / mapped bin bp")
     parser.add_argument("--split-threshold", type=float, default=.1)
+    parser.add_argument("--ambiguity-paf", help="Optional all-mapping PAF for repeat-associated bin ambiguity.")
     args = parser.parse_args()
     if not 0 < args.threshold <= 1 or not 0 < args.min_bin_purity <= 1:
         raise SystemExit("ERROR: matching thresholds must be in (0, 1].")
@@ -103,6 +144,7 @@ def main():
     for (bin_id, _), bp in overlaps.items(): plasmid_bp[bin_id] += bp
     chromosome_bp = {bin_id: merge(value) for bin_id, value in chromosome_intervals.items()}
     all_bins = set(membership.values())
+    ambiguity_bp = bin_ambiguity(args.ambiguity_paf, membership, plasmids, chromosomes)
     total_mapped = {bin_id: plasmid_bp[bin_id] + chromosome_bp.get(bin_id, 0) for bin_id in all_bins}
     purity = {bin_id: plasmid_bp[bin_id] / total_mapped[bin_id] if total_mapped[bin_id] else 0.0 for bin_id in all_bins}
     edges = {(bin_id, plasmid): bp for (bin_id, plasmid), bp in overlaps.items() if bp / plasmids[plasmid] >= args.threshold and purity[bin_id] >= args.min_bin_purity}
@@ -116,18 +158,18 @@ def main():
     merges = sum(len(value) - 1 for value in merged.values() if len(value) > 1)
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t")
-        writer.writerow(["bin_id", "true_plasmid", "aligned_bp", "truth_completeness", "bin_purity", "chromosome_aligned_bp", "contamination_fraction", "match_status"])
+        writer.writerow(["bin_id", "true_plasmid", "aligned_bp", "truth_completeness", "bin_purity", "chromosome_aligned_bp", "repeat_ambiguity_bp", "contamination_fraction", "match_status"])
         for bin_id, plasmid, bp in matched:
-            writer.writerow([bin_id, plasmid, bp, f"{bp / plasmids[plasmid]:.4f}", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "matched"])
-        for bin_id in sorted(all_bins - used_bins): writer.writerow([bin_id, "", 0, "", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "unmatched_bin"])
-        for plasmid in sorted(set(plasmids) - used_plasmids): writer.writerow(["", plasmid, 0, "", "", "", "", "missed_plasmid"])
+            writer.writerow([bin_id, plasmid, bp, f"{bp / plasmids[plasmid]:.4f}", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "matched"])
+        for bin_id in sorted(all_bins - used_bins): writer.writerow([bin_id, "", 0, "", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "unmatched_bin"])
+        for plasmid in sorted(set(plasmids) - used_plasmids): writer.writerow(["", plasmid, 0, "", "", "", "", "", "missed_plasmid"])
     precision = len(matched) / len(all_bins) if all_bins else 0.0; recall = len(matched) / len(plasmids) if plasmids else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     total_bp, chromosome_total = sum(total_mapped.values()), sum(chromosome_bp.values())
     with open(args.summary, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t")
-        writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "bin_total_mapped_bp", "contamination_fraction"])
-        writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}"])
+        writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction"])
+        writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}"])
     print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)}")
 
 

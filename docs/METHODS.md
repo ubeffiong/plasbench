@@ -33,6 +33,12 @@ records `ambiguously_mapped_pred_bp`: query bases having retained placements on
 both plasmid and chromosome. It is a mapping-ambiguity diagnostic and does not
 alter F1.
 
+Retained alignments must meet configured length, identity, MAPQ, and per-record
+query-coverage thresholds. The score table separates mapped predicted bases
+into unambiguous, plasmid/chromosome-ambiguous, and unmapped categories. These
+categories support interpretation but do not silently change the TP/FP/FN
+definition.
+
 ## Base-level confusion matrix (positive class = plasmid)
 Let `C` be the set of reference bases covered by predicted-plasmid alignments.
 - **TP** = |{plasmid reference bases} ∩ C|
@@ -64,6 +70,20 @@ it reaches the configured completeness and purity thresholds. Bin
 precision/recall/F1 use these assignments; split events count extra qualifying
 bins for one truth plasmid, merge events count extra qualifying truth plasmids
 for one bin, and chromosome-aligned bin bases are reported separately.
+The same all-mapping diagnostic records repeat-associated ambiguity per bin.
+
+## Structural and AMR evidence
+
+`circular_truth_plasmid_recovery` only says a circular *reference* plasmid was
+covered. PlasBench does not infer closure from that fact. A source may supply
+`pred_<tool>.evidence.tsv` with `record_id`, `evidence_type`, and
+`evidence_value` for replicon, MOB, or independently supported closure evidence;
+it is copied and displayed as source-reported evidence, not upgraded to proof.
+
+AMR recovery runs only after `truth_amr.tsv` passes
+`python/validate_amr_truth.py`. Curators must supply plasmid coordinates,
+normalized gene and database identifiers, unique gene-copy identifiers, and a
+database version. This preserves AMR context as independent truth evidence.
 
 ## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,
@@ -93,3 +113,14 @@ not formal claims of clinical or statistical superiority.
 All randomness-free. Regenerate the explicit lock with `bash env/lock_environment.sh` and record tool versions per run. The
 scoring scripts depend only on the Python standard library, so they are stable across
 environments.
+
+## Recommendation validation and tracks
+
+Stage 6 writes `benchmark.recommendation_validation.tsv`, a leave-one-study-out
+check that selects a simple training-only method ranking and evaluates it on
+each held-out `source_study`. It withholds an assessment when cohort diversity
+or training sample size is inadequate. It is descriptive release evidence, not
+external clinical validation. Track-specific leaderboard files are emitted as
+`benchmark.short_read.leaderboard.tsv`, `benchmark.long_read.leaderboard.tsv`,
+and `benchmark.hybrid.leaderboard.tsv`; methods from different tracks must not
+be pooled into one operational conclusion.
