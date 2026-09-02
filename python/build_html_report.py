@@ -261,6 +261,41 @@ def selection_card(sample, results_dir, report_path):
         report=report_link, reasons=reasons, alternatives=alternatives, agreement=esc(agreement_text), structural=esc(structural_text))
 
 
+def visual_quality_section(scores, status, results_dir):
+    """Return a linked heatmap and reference-coordinate alignment explorer."""
+    visualizations = {}
+    for sample in {row["sample"] for row in scores}:
+        path = results_dir / sample / "visualization" / "alignment_blocks.json"
+        if path.is_file():
+            try:
+                visualizations[sample] = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+    state = {(row.get("sample"), row.get("tool")): row.get("status", "scored") for row in status}
+    matrix = []
+    for row in scores:
+        tp, fp = number(row.get("TP_bp")), number(row.get("FP_bp"))
+        matrix.append({"sample": row["sample"], "tool": row["tool"], "status": state.get((row["sample"], row["tool"]), "scored"),
+                       "f1": number(row.get("f1")), "precision": number(row.get("precision")), "recall": number(row.get("recall")),
+                       "plasmid_recall": number(row.get("plasmid_recall")), "bin_f1": number(row["bin_f1"]) if row.get("bin_f1") else None,
+                       "contamination": fp / (tp + fp) if tp + fp else None, "unmapped": number(row.get("unmapped_pred_bp"))})
+    payload = json.dumps({"matrix": matrix, "visualizations": visualizations}, separators=(",", ":")).replace("<", "\\u003c")
+    return """<section id='visual-quality'><h2>Visual reconstruction quality</h2>
+<p class='lead'>Click a heatmap cell to follow the result from cohort quality to one truth plasmid. The explorer uses retained primary PAF blocks on truth-reference coordinates; it is not a raw nucleotide alignment or an independent structural-validation claim.</p>
+<div class='controls'><label>Metric <select id='vq-metric'><option value='f1'>Base F1</option><option value='precision'>Precision</option><option value='recall'>Recall</option><option value='plasmid_recall'>Plasmid recall</option><option value='bin_f1'>Bin F1</option><option value='contamination'>Chromosome contamination</option><option value='unmapped'>Unmapped predicted bp</option><option value='status'>Execution status</option></select></label><span id='vq-note' class='count'></span></div><div class='panel'><div id='vq-heatmap'></div></div>
+<div class='controls'><label>Sample <select id='vq-sample'></select></label><label>Tool <select id='vq-tool'></select></label><label>Truth plasmid <select id='vq-plasmid'></select></label><button id='vq-fit' type='button'>Fit</button><button id='vq-in' type='button'>Zoom in</button><button id='vq-out' type='button'>Zoom out</button><label>Start <input id='vq-start' type='number' min='0'></label><label>End <input id='vq-end' type='number' min='1'></label><a id='vq-download' class='download-button' download>Download JSON</a></div>
+<div class='panel'><div id='vq-tracks' class='muted'>Choose a sample with visualization data.</div><div id='vq-detail' class='insight neutral'>Click a coloured block to inspect its alignment evidence. Mouse-wheel over tracks zooms the selected reference interval.</div></div>
+<details class='sample'><summary><strong>Legend and limits</strong><span>how to interpret this view</span></summary><div class='method'><p><strong>Heatmap:</strong> green means higher recovery for F1, precision, recall, plasmid recall, and bin F1. For contamination and unmapped bases, green means lower. Grey is unavailable; failed and skipped states are not turned into zero.</p><p><strong>Tracks:</strong> green blocks align in the forward orientation; purple blocks align in reverse. White is not recovered by the displayed blocks. Blue triangles mark curated AMR features. The JSON records omitted blocks when a display cap applies.</p><p><strong>AliView-like drill-down:</strong> use zoom, coordinates, and block clicks to investigate a region. Whole-plasmid base letters are deliberately not rendered because they are slow and misleading without a region-specific multiple alignment.</p></div></details>
+<script id='vq-data' type='application/json'>__PAYLOAD__</script><script>
+(()=>{const d=JSON.parse(document.getElementById('vq-data').textContent),m=d.matrix,v=d.visualizations,$=id=>document.getElementById(id),samples=[...new Set(m.map(x=>x.sample))].sort(),tools=[...new Set(m.map(x=>x.tool))].sort();let range=null;
+const select=(e,items)=>e.innerHTML=items.map(x=>`<option value="${x}">${x}</option>`).join(''), fmt=(x,k)=>x==null?'–':k==='status'?x:k==='unmapped'?Math.round(x).toLocaleString():x.toFixed(3), colour=(x,k)=>{if(x==null)return '#d9ddda';if(k==='status')return x==='failed'?'#bd4b42':x==='skipped'?'#8a6d3b':x==='reused'?'#4c769d':'#16805a';let a=x;if(k==='contamination'||k==='unmapped'){let z=m.map(r=>r[k]).filter(y=>y!=null),top=Math.max(...z,1);a=1-Math.min(1,x/top)}return a>=.9?'#087250':a>=.7?'#78a85c':a>=.4?'#d18b2a':'#bd4b42'};
+function heat(){let k=$('vq-metric').value,t='<table class="sortable"><thead><tr><th>Sample</th>'+tools.map(x=>`<th>${x}</th>`).join('')+'</tr></thead><tbody>';samples.forEach(s=>{t+='<tr><td><strong>'+s+'</strong></td>';tools.forEach(q=>{let r=m.find(x=>x.sample===s&&x.tool===q),x=r?(k==='status'?r.status:r[k]):null;t+=`<td class="vq-cell" data-s="${s}" data-t="${q}" title="${s} | ${q} | ${k}: ${fmt(x,k)}" style="background:${colour(x,k)}">${fmt(x,k)}</td>`});t+='</tr>'});$('vq-heatmap').innerHTML=t+'</tbody></table>';$('vq-note').textContent='Click a cell for per-plasmid tracks.';document.querySelectorAll('.vq-cell').forEach(e=>e.onclick=()=>{$('vq-sample').value=e.dataset.s;setTools();$('vq-tool').value=e.dataset.t;setPlasmids();draw()})}
+function setTools(){select($('vq-tool'),tools.filter(t=>m.some(r=>r.sample===$('vq-sample').value&&r.tool===t)))}function setPlasmids(){let a=v[$('vq-sample').value];select($('vq-plasmid'),a?Object.keys(a.truth_plasmids).sort():[])}
+function draw(){let s=$('vq-sample').value,t=$('vq-tool').value,p=$('vq-plasmid').value,a=v[s];if(!a||!p){$('vq-tracks').textContent='No visualization data. Re-run stage 5 after retaining PAF scoring alignments.';return}let len=a.truth_plasmids[p].length,[lo,hi]=range||[0,len];lo=Math.max(0,Math.min(lo,len-1));hi=Math.max(lo+1,Math.min(hi,len));range=[lo,hi];$('vq-start').value=Math.floor(lo);$('vq-end').value=Math.ceil(hi);$('vq-download').href=s+'/visualization/alignment_blocks.json';let names=Object.keys(a.tools),scale=x=>180+(x-lo)/(hi-lo)*880,svg=`<svg viewBox="0 0 1100 ${55+names.length*38}"><text x="180" y="15" font-size="12">${p}: ${Math.floor(lo).toLocaleString()}–${Math.ceil(hi).toLocaleString()} / ${len.toLocaleString()} bp</text>`;names.forEach((name,i)=>{let y=40+i*38,z=a.tools[name],rec=z.plasmid_recovery[p]||{},bs=z.blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi);svg+=`<text x="4" y="${y+7}" font-size="12">${name}</text><text x="105" y="${y+7}" font-size="11">${((rec.completeness||0)*100).toFixed(1)}%</text><rect x="180" y="${y-8}" width="880" height="16" fill="#f7f8f5" stroke="#d6ddd5"/>`;bs.forEach((b,i)=>{let x=Math.max(180,scale(b.target_start)),r=Math.min(1060,scale(b.target_end));svg+=`<rect class="vq-block" data-n="${name}" data-i="${i}" x="${x}" y="${y-8}" width="${Math.max(1,r-x)}" height="16" fill="${b.strand==='-'?'#7f5aa2':'#16805a'}"><title>${b.record_id}</title></rect>`})});a.amr_features.filter(f=>f.sequence_id===p&&f.start>=lo&&f.start<=hi).forEach(f=>{let x=scale(f.start);svg+=`<path d="M${x} 25 l5 -9 l5 9z" fill="#2275ad"><title>${f.label}</title></path>`});svg+='</svg>';$('vq-tracks').innerHTML=svg+'<p class="muted">Displayed primary blocks; '+names.map(n=>n+': '+a.tools[n].blocks_omitted+' omitted').join(' · ')+'</p>';document.querySelectorAll('.vq-block').forEach(e=>e.onclick=()=>{let b=a.tools[e.dataset.n].blocks.filter(x=>x.target===p&&x.target_end>lo&&x.target_start<hi)[e.dataset.i];$('vq-detail').textContent=`${e.dataset.n} | ${b.record_id} | query ${b.query_start}-${b.query_end}/${b.query_length} | reference ${b.target_start}-${b.target_end} | ${b.strand} strand | identity ${(100*b.matches/Math.max(1,b.block_length)).toFixed(2)}% | MAPQ ${b.mapq}`})}
+$('vq-metric').onchange=heat;$('vq-sample').onchange=()=>{range=null;setTools();setPlasmids();draw()};$('vq-tool').onchange=draw;$('vq-plasmid').onchange=()=>{range=null;draw()};$('vq-start').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-end').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-fit').onclick=()=>{range=null;draw()};$('vq-in').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])/2;range=[c-z/2,c+z/2];draw()}};$('vq-out').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])*2;range=[c-z/2,c+z/2];draw()}};$('vq-tracks').addEventListener('wheel',e=>{if(!range)return;e.preventDefault();let c=(range[0]+range[1])/2,z=(range[1]-range[0])*(e.deltaY<0?.7:1.4);range=[c-z/2,c+z/2];draw()},{passive:false});select($('vq-sample'),samples);setTools();setPlasmids();heat();draw()})();
+</script></section>""".replace("__PAYLOAD__", payload)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--project-root", required=True)
@@ -460,6 +495,7 @@ def main():
     insight_notes, insight_tone = interpretation(leaderboard, status_counts)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(leaderboard)
+    visual_html = visual_quality_section(scores, status, out.parent)
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>SPREAD plasmid benchmark report</title>
@@ -496,6 +532,8 @@ const statusFilter=document.getElementById('status-filter');function filterStatu
 document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEventListener('click',()=>{{const table=head.closest('table'),body=table.tBodies[0],rows=Array.from(body.rows),ascending=head.dataset.order!=='asc';rows.sort((a,b)=>{{const av=a.cells[index]?.innerText.trim()||'',bv=b.cells[index]?.innerText.trim()||'',an=Number(av.replace(/[^0-9.-]/g,'')),bn=Number(bv.replace(/[^0-9.-]/g,''));const result=Number.isNaN(an)||Number.isNaN(bn)?av.localeCompare(bv):an-bn;return ascending?result:-result;}});rows.forEach(row=>body.appendChild(row));table.querySelectorAll('th').forEach(h=>delete h.dataset.order);head.dataset.order=ascending?'asc':'desc';}}));
 </script>
 </body></html>"""
+    page = page.replace("<a href='#selected'>", "<a href='#visual-quality'>Visual quality</a><a href='#selected'>")
+    page = page.replace("<section id='scores'>", visual_html + "<section id='scores'>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
     print(f"Wrote HTML report: {out}")

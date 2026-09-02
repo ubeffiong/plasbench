@@ -106,6 +106,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             log "  $tool: bin diagnostics not applicable to declared method class"
         fi
     done
+    # Keep retained reference-coordinate blocks separate from the aggregate TSV.
+    # The HTML explorer consumes this bounded artifact; it never treats it as a
+    # nucleotide alignment or structural-validation result.
+    python3 "$HERE/../python/build_visualization_data.py" --truth "$TRUTH" --results-dir "$RESULTS_DIR" \
+        --sample "$SAMPLE" --amr-truth "$AMR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" \
+        --out "$RDIR/visualization/alignment_blocks.json" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
+        warn "visualization data generation failed for $SAMPLE; scores are retained"
 done < <(read_samples "$SAMPLE_SHEET")
 
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"

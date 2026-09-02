@@ -87,6 +87,9 @@ export MIN_ALIGNMENT_QUERY_COVERAGE="${MIN_ALIGNMENT_QUERY_COVERAGE:-0.20}"
 # A second, all-mappings PAF exposes repeated query sequence that aligns to
 # both plasmid and chromosome. It is a diagnostic and never alters F1.
 export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"
+# Largest primary alignment blocks retained per tool in the offline explorer.
+# This prevents a fragmented assembly from making the report unresponsive.
+export VISUALIZATION_MAX_BLOCKS_PER_TOOL="${VISUALIZATION_MAX_BLOCKS_PER_TOOL:-2000}"
 
 # --- Safety: stop early if the sample sheet is missing -----------------------
 if [[ ! -f "$SAMPLE_SHEET" ]]; then

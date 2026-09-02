@@ -225,7 +225,8 @@ results/scores.tsv                  # one row per (sample, tool): TP/FP/FN, prec
 results/tool_status.tsv              # completed/reused/failed/skipped state and failure locations
 results/benchmark.leaderboard.tsv   # per-tool means/medians, ranked by mean F1
 results/benchmark.leaderboard.md    # final Markdown table, including scored/completed/failed counts
-results/benchmark.report.html       # offline dashboard with detailed scores, run health, and file explorer
+results/benchmark.report.html       # offline dashboard, including linked heatmap and alignment explorer
+results/<sample>/visualization/alignment_blocks.json # bounded PAF evidence for recovery tracks
 results/benchmark.recommendations.tsv # coverage-gated operational method recommendations
 results/<sample>/selected_candidate/ # copied best already-produced candidate + selection_report.json
 ```
@@ -233,6 +234,8 @@ results/<sample>/selected_candidate/ # copied best already-produced candidate + 
 Open `results/benchmark.report.html` in a browser for the final detailed report. It includes
 the ranked table, per-sample score drill-down, execution status, scoring definitions, and a
 tree explorer with direct download links for files under `results/`, `logs/`, and `data/`.
+The visual-quality explorer links a sample-by-tool heatmap to zoomable
+per-plasmid recovery tracks; see [visual quality](docs/VISUAL_QUALITY.md).
 See [operational selection](docs/OPERATIONAL_SELECTION.md) for the strict distinction
 between a benchmark winner, a reusable per-isolate candidate, and validated biology.
 
