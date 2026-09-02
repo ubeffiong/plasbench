@@ -11,7 +11,7 @@ from . import __version__
 
 
 STAGE_HELP = """stage numbers: 0=setup, 1=download, 2=truth, 3=assemble,
-4=reconstruct, 5=score, 6=aggregate and HTML report."""
+4=reconstruct, 5=score, 6=aggregate and HTML report, 7=optional long-read reconstruction."""
 
 DOC_TOPICS = {
     "overview": "What PlasBench Is",
@@ -28,6 +28,7 @@ DOC_TOPICS = {
     "outputs": "Outputs",
     "metrics": "Metric Definitions",
     "selection": "Operational Selection",
+    "long-reads": "Long-Read Reconstruction",
     "console": "Console Messages",
     "troubleshooting": "Troubleshooting",
     "reproducibility": "Reproducibility and Citation",
@@ -139,7 +140,7 @@ def main(argv=None):
     review_parser.add_argument("--max-per-bioproject", type=int, default=3)
     review_parser.add_argument("--max-per-organism", type=int, default=8)
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -155,6 +156,14 @@ def main(argv=None):
     select_parser.add_argument("--min-samples", type=int, default=5)
     select_parser.add_argument("--min-coverage", type=float, default=0.80)
     select_parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
+    unknown_parser = sub.add_parser("select-unknown", help="Choose an evidence-gated benchmark method for an unlabelled operational sample.")
+    unknown_parser.add_argument("--recommendations", type=Path, required=True, help="benchmark.recommendations.tsv from a validated benchmark.")
+    unknown_parser.add_argument("--sample-id", required=True)
+    unknown_parser.add_argument("--results-dir", type=Path, required=True)
+    unknown_parser.add_argument("--out", type=Path, help="Selection JSON path; defaults to results/<sample>/selection_report.json.")
+    unknown_parser.add_argument("--organism", default="", help="Scientific name, used to select an organism-specific recommendation.")
+    unknown_parser.add_argument("--gram-group", default="", help="Gram group, used if no organism-specific recommendation exists.")
+    unknown_parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
     ladder_parser = sub.add_parser("depth-ladder", help="Create deterministic local-input depth-ladder cohorts using seqtk.")
     ladder_parser.add_argument("--samples", type=Path, required=True)
     ladder_parser.add_argument("--data-dir", type=Path, required=True)
@@ -167,7 +176,7 @@ def main(argv=None):
     depth_report_parser.add_argument("--out-prefix", type=Path, required=True)
     depth_report_parser.add_argument("--metric", choices=("precision", "recall", "f1", "plasmid_recall"), default="f1")
     run_parser = sub.add_parser("run", help="Run the full benchmark or selected stages.")
-    run_parser.add_argument("stages", nargs="*", choices=[str(i) for i in range(7)],
+    run_parser.add_argument("stages", nargs="*", choices=[str(i) for i in range(8)],
                             help=f"Optional {STAGE_HELP}")
 
     def add_run_options(command_parser):
@@ -181,12 +190,16 @@ def main(argv=None):
                             help="Directory containing <sample>.tsv external gplas2 classifier files.")
         inputs.add_argument("--local-inputs", action="store_true",
                             help="Use pre-staged data/<sample>/ inputs only; never download from NCBI or SRA.")
+        inputs.add_argument("--long-reads-file", help="Long-read filename within each sample directory (default: long_reads.fastq.gz).")
+        inputs.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"),
+                            help="Label score and report rows for a separate read-technology track.")
         resources = command_parser.add_argument_group("resources and assembly")
         resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
         resources.add_argument("--assembler", choices=("spades", "unicycler"), help="Short-read assembler.")
         resources.add_argument("--min-read-len", type=int, help="Discard reads shorter than this after fastp.")
         resources.add_argument("--minimap2-preset", help="minimap2 assembly preset (default: asm5).")
+        resources.add_argument("--flye-read-type", choices=("nano-raw", "nano-hq", "pacbio-raw", "pacbio-hifi"), help="Flye technology for optional stage 7.")
         tools = command_parser.add_argument_group("tools")
         for option, destination, label in (
             ("--mob-recon", "mob_recon", "Enable or disable MOB-suite reconstruction."),
@@ -194,6 +207,7 @@ def main(argv=None):
             ("--plasmidspades", "plasmidspades", "Enable or disable plasmidSPAdes."),
             ("--gplas2-mob", "gplas2_mob", "Enable or disable gplas seeded by MOB-recon membership."),
             ("--gplas2-external", "gplas2_external", "Enable or disable gplas with external classifier TSVs."),
+            ("--flye-mob-recon", "flye_mob_recon", "Enable or disable optional Flye plus MOB-Recon long-read reconstruction."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
         tools.add_argument("--force-rerun-tools", action="store_true",
@@ -263,6 +277,14 @@ def main(argv=None):
         if args.tool_status:
             command.extend(["--tool-status", str(args.tool_status)])
         code = run(command, root)
+    elif args.command == "select-unknown":
+        command = [sys.executable, "python/select_unknown_sample.py", "--recommendations", str(args.recommendations),
+                   "--sample-id", args.sample_id, "--results-dir", str(args.results_dir),
+                   "--organism", args.organism, "--gram-group", args.gram_group,
+                   "--analysis-track", args.analysis_track]
+        if args.out:
+            command.extend(["--out", str(args.out)])
+        code = run(command, root)
     elif args.command == "docs":
         print_docs(root, args.topic)
         code = 0
@@ -282,6 +304,10 @@ def main(argv=None):
                 env[variable] = str(value.resolve())
         if args.local_inputs:
             env["LOCAL_INPUTS_ONLY"] = "1"
+        if args.long_reads_file:
+            env["LONG_READS_FILE"] = args.long_reads_file
+        if args.analysis_track:
+            env["ANALYSIS_TRACK"] = args.analysis_track
         positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN"}
         for argument, variable in positive_options.items():
             value = getattr(args, argument)
@@ -289,13 +315,14 @@ def main(argv=None):
                 if value < 1:
                     parser.error(f"--{argument.replace('_', '-')} must be positive")
                 env[variable] = str(value)
-        for argument, variable in (("assembler", "ASSEMBLER"), ("minimap2_preset", "MINIMAP2_PRESET")):
+        for argument, variable in (("assembler", "ASSEMBLER"), ("minimap2_preset", "MINIMAP2_PRESET"), ("flye_read_type", "FLYE_READ_TYPE")):
             value = getattr(args, argument)
             if value:
                 env[variable] = value
         for argument, variable in (("mob_recon", "RUN_MOB_RECON"), ("platon", "RUN_PLATON"),
                                    ("plasmidspades", "RUN_PLASMIDSPADES"),
-                                   ("gplas2_mob", "RUN_GPLAS2_MOB"), ("gplas2_external", "RUN_GPLAS2_EXTERNAL")):
+                                   ("gplas2_mob", "RUN_GPLAS2_MOB"), ("gplas2_external", "RUN_GPLAS2_EXTERNAL"),
+                                   ("flye_mob_recon", "RUN_FLYE_MOB_RECON")):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"

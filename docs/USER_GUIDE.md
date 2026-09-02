@@ -311,6 +311,7 @@ micromamba, mamba, or conda and installs into `plasbench` by default:
 plasbench install-tools core
 plasbench install-tools assembly
 plasbench install-tools reconstruction
+plasbench install-tools long-read
 plasbench install-tools all
 plasbench install-tools --env myenv mob_suite
 ```
@@ -609,6 +610,42 @@ WSL or Bash issue on Windows
 ```
 
 ## Reproducibility and Citation
+
+## Long-Read Reconstruction
+
+PlasBench can optionally run native ONT or PacBio FASTQ reconstruction through
+Flye followed by MOB-Recon. Install the profile, stage one file per sample as
+`data/<sample>/long_reads.fastq.gz`, then run stage 7 followed by scoring and
+aggregation under a separate long-read track:
+
+```bash
+plasbench install-tools long-read
+plasbench run 7 --flye-mob-recon on --flye-read-type nano-hq
+plasbench run 5 6 --analysis-track long_read
+```
+
+Use `nano-raw`, `nano-hq`, `pacbio-raw`, or `pacbio-hifi` to match the source
+reads. Flye assembly is not itself called a plasmid reconstruction: MOB-Recon
+must complete successfully before PlasBench emits a predicted-plasmid FASTA.
+The long-read track is reported separately and cannot be mixed with short-read
+or hybrid conclusions. A native hybrid FASTQ adapter remains out of scope.
+
+For source-backed structural evidence, optionally supply
+`results/<sample>/pred_<tool>.evidence.tsv` with the columns `record_id`,
+`evidence_type`, `evidence_value`, `evidence_source`, and `evidence_version`.
+Closure rows also need a positive `supporting_reads` value and a `long_read`,
+`hybrid_assembly`, or `assembly_graph` source. PlasBench validates the table
+before displaying it; it never infers closure from a FASTA record alone.
+
+For an unlabelled operational sample, use only a completed, independently
+validated benchmark recommendation. The command copies an existing nominated
+prediction when present but always marks the report confirmation-required:
+
+```bash
+plasbench select-unknown --recommendations results/benchmark.recommendations.tsv \
+  --sample-id new_isolate --results-dir results \
+  --organism "Klebsiella pneumoniae" --gram-group Gram_negative
+```
 
 Record the PlasBench version, command line, `config/config.sh`, input sample
 sheet, tool versions, database versions, and final report alongside published

@@ -50,6 +50,7 @@ python -m pip install --no-deps . # installs the `plasbench` terminal command
 plasbench install-tools core           # download, QC, and scoring tools
 plasbench install-tools assembly       # SPAdes and Unicycler
 plasbench install-tools reconstruction # MOB-suite and Platon
+plasbench install-tools long-read      # Flye and MOB-suite for ONT/PacBio inputs
 plasbench install-tools all            # all standard profiles
 
 # 3. Confirm the scoring/report engine works. No downloads or bio-tools needed.

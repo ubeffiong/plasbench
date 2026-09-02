@@ -260,18 +260,18 @@ def cross_tool_agreement(results_dir, sample, selected_tool, candidates):
 
 
 def structural_evidence(results_dir, sample, tool):
-    """Read optional curator/tool evidence without treating it as independently validated."""
+    """Read only evidence that passed the strict provenance validator."""
     path = Path(results_dir) / sample / f"pred_{tool}.evidence.tsv"
+    validation = Path(results_dir) / sample / f"{tool}.structural_evidence.validation.json"
     if not tool or not path.is_file():
         return {"status": "not_supplied", "items": []}
     try:
-        rows = read_tsv(path)
-    except (OSError, csv.Error):
-        return {"status": "unreadable", "items": []}
-    required = {"record_id", "evidence_type", "evidence_value"}
-    if not rows or not required.issubset(rows[0]):
-        return {"status": "invalid_schema", "items": []}
-    return {"status": "reported_by_source", "items": [{key: row.get(key, "") for key in required} for row in rows]}
+        payload = json.loads(validation.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"status": "not_validated", "items": []}
+    if payload.get("status") != "validated":
+        return {"status": "invalid", "items": [], "errors": payload.get("errors", [])}
+    return {"status": "validated_source_evidence", "items": payload.get("items", []), "validated_closure_items": payload.get("validated_closure_items", []), "meaning": payload.get("meaning", "")}
 
 
 def copy_candidate(results_dir, sample, tool, destination):
@@ -286,6 +286,7 @@ def copy_candidate(results_dir, sample, tool, destination):
         f"{tool}.bin_summary.tsv": "candidate.bin_summary.tsv",
         f"{tool}.bin_matches.tsv": "candidate.bin_matches.tsv",
         f"pred_{tool}.evidence.tsv": "candidate.evidence.tsv",
+        f"{tool}.structural_evidence.validation.json": "candidate.structural_evidence.validation.json",
     }
     for name, output_name in mapping.items():
         path = source_dir / name

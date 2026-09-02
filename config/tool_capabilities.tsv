@@ -4,3 +4,4 @@ platon	classification	no	assembly	Classifies individual assembly contigs.
 plasmidspades	reassembly	no	paired_reads	Reassembles plasmid-enriched contigs; contigs are not bins.
 gplas2_mob	binning	yes	assembly_graph	Graph binning seeded from validated MOB membership.
 gplas2_external	binning	yes	assembly_graph	Graph binning with externally validated classifier labels.
+flye_mob_recon	binning	yes	long_reads	Flye long-read assembly followed by MOB-Recon plasmid bins.

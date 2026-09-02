@@ -8,6 +8,7 @@
 #
 # Stages:
 #   0 setup    1 download   2 truth   3 assemble   4 run_tools   5 score   6 aggregate
+#   7 long_read_reconstruct (optional Flye + MOB-Recon adapter)
 # =============================================================================
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,6 +26,7 @@ declare -A SCRIPT=(
     [4]="04_run_tools.sh"
     [5]="05_score.sh"
     [6]="06_aggregate.sh"
+    [7]="07_long_read_reconstruct.sh"
 )
 
 log "############ PlasBench ############"
@@ -32,7 +34,7 @@ log "Running stages: ${STAGES[*]}"
 for s in "${STAGES[@]}"; do
     # Stages 1-5 operate on individual samples. Aggregation/reporting can be
     # rerun from an existing scores.tsv, even after the original sheet moved.
-    [[ "$s" =~ ^[1-5]$ ]] && { validate_sample_sheet "$SAMPLE_SHEET"; break; }
+    [[ "$s" =~ ^[1-5]$|^7$ ]] && { validate_sample_sheet "$SAMPLE_SHEET"; break; }
 done
 for s in "${STAGES[@]}"; do
     scr="${SCRIPT[$s]:-}"

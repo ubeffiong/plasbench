@@ -8,6 +8,16 @@ need python3
 
 SCORES="$RESULTS_DIR/scores.tsv"
 [[ -s "$SCORES" ]] || die "no scores found at $SCORES; run 05_score.sh first"
+# Optional structural evidence is accepted only after record, provenance, and
+# closure-support validation. Invalid evidence remains on disk for audit but is
+# excluded from selection reports.
+while IFS= read -r -d '' evidence; do
+    pred="${evidence%.evidence.tsv}.plasmid.fasta"
+    validation="${evidence%.evidence.tsv}.structural_evidence.validation.json"
+    if ! python3 "$HERE/../python/validate_structural_evidence.py" --evidence "$evidence" --pred-fasta "$pred" --out "$validation"; then
+        warn "structural evidence rejected: $evidence (selection reports will not use it)"
+    fi
+done < <(find "$RESULTS_DIR" -type f -name 'pred_*.evidence.tsv' -print0)
 # Correlated-sample detection lives in aggregate_results.py, which reads the
 # score rows themselves rather than looking for a file beside the sample sheet.
 python3 "$HERE/../python/aggregate_results.py" \
