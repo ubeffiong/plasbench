@@ -1535,6 +1535,9 @@
 
         const __PB = JSON.parse(document.getElementById('pb-data').textContent);
         const TOOLS = __PB.tools;
+        // Script-scoped bindings are not window properties, and the
+        // explain wiring at the foot of the document has to reach this.
+        window.TOOLS = TOOLS;
         const SAMPLE_IDS = __PB.sampleIds;
         const SAMPLE_META = __PB.sampleMeta;
         const DATASET = __PB.dataset;
@@ -3179,6 +3182,39 @@
         document.documentElement.dataset.cvd = m.pbPalette === 'cvd' ? '1' : '';
         window.dispatchEvent(new Event('resize'));
     });
+    </script>
+
+    <script>
+    // The distribution charts explain themselves through the report's one
+    // explain panel rather than opening a popup of their own.
+    (function () {
+        function columnAt(canvas, event) {
+            const rect = canvas.getBoundingClientRect();
+            const fraction = (event.clientX - rect.left) / Math.max(1, rect.width);
+            const tools = (window.TOOLS || []);
+            if (!tools.length) return null;
+            const index = Math.min(tools.length - 1, Math.max(0, Math.floor(fraction * tools.length)));
+            return tools[index];
+        }
+        ['boxPlotCanvas', 'dotPlotCanvas'].forEach(function (id) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            canvas.style.cursor = 'pointer';
+            canvas.title = 'Click a column for how to read this chart.';
+            canvas.addEventListener('click', function (event) {
+                const tool = columnAt(canvas, event);
+                const label = document.getElementById(
+                    id === 'boxPlotCanvas' ? 'boxPlotTitle' : 'dotPlotTitle');
+                try {
+                    parent.postMessage({
+                        pbExplain: true, kind: 'distribution',
+                        title: (label ? label.textContent.trim() : 'Distribution'),
+                        fact: tool ? ('Column: ' + (tool.label || tool.id)) : '',
+                    }, '*');
+                } catch (err) { /* no parent to tell */ }
+            });
+        });
+    })();
     </script>
 </body>
 </html>

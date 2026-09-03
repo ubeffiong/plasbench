@@ -457,6 +457,7 @@ __PB_FONTS__
                     <label class="sel-wrap"><span>Plasmid</span><select id="explorerPlasmid"></select></label>
                     <label class="sel-wrap"><span>Tool</span><select id="explorerTool"></select></label>
                     <label class="sel-wrap"><span>Predicted record</span><select id="explorerRecord"></select></label>
+                    <label class="sel-wrap"><span>Overlay with</span><select id="explorerOverlay"></select></label>
                     <span class="badge-pill" id="sampleBadge">—</span>
                     <span class="badge-pill primary" id="toolBadge">—</span>
                     <span class="badge-pill" id="plasmidBadge">—</span>
@@ -744,6 +745,9 @@ __PB_FONTS__
             // to compare, and focusing is the deliberate act.
             tool: null,
             record: null,
+            // The second method of an overlay. Set only with sel.tool, because
+            // an overlay is a comparison of two named methods.
+            overlay: null,
         };
 
         function sampleData() { return PB.samples.find(s => s.id === sel.sample) || PB.samples[0] || null; }
@@ -753,8 +757,45 @@ __PB_FONTS__
         function toolTracks() {
             const tracks = allToolTracks();
             if (!sel.tool) return tracks;
-            const one = tracks.filter(t => t.id === sel.tool);
-            return one.length ? one : tracks;
+            const wanted = sel.overlay ? [sel.tool, sel.overlay] : [sel.tool];
+            const some = tracks.filter(t => wanted.indexOf(t.id) !== -1);
+            return some.length ? some : tracks;
+        }
+        function overlayPair() {
+            if (!sel.tool || !sel.overlay) return null;
+            const tracks = allToolTracks();
+            const a = tracks.find(t => t.id === sel.tool);
+            const b = tracks.find(t => t.id === sel.overlay);
+            return (a && b) ? [a, b] : null;
+        }
+
+        // Where the two methods disagree: one covers a reference base with
+        // recovered sequence and the other does not, or they recovered it with
+        // different measured outcomes. This is the point of an overlay -- the
+        // agreement is easy to see, the divergence is what has to be found.
+        const RECOVERED = ['good', 'low_identity', 'inverted', 'duplicated'];
+        function divergence(a, b, length) {
+            const edges = new Set([0, length]);
+            [a, b].forEach(track => track.segments.forEach(s => {
+                edges.add(Math.max(0, s.start)); edges.add(Math.min(length, s.end));
+            }));
+            const cuts = [...edges].sort((x, y) => x - y);
+            const kindAt = (track, at) => {
+                const hit = track.segments.find(s => s.start <= at && at < s.end);
+                return hit ? hit.type : 'missing';
+            };
+            const spans = [];
+            for (let i = 0; i < cuts.length - 1; i++) {
+                const from = cuts[i], to = cuts[i + 1];
+                if (to <= from) continue;
+                const at = from + (to - from) / 2;
+                const ka = kindAt(a, at), kb = kindAt(b, at);
+                const ra = RECOVERED.indexOf(ka) !== -1, rb = RECOVERED.indexOf(kb) !== -1;
+                if (ka === kb) continue;
+                spans.push({ start: from, end: to, a: ka, b: kb,
+                             only: ra && !rb ? 'a' : rb && !ra ? 'b' : null });
+            }
+            return spans;
         }
         function recordsForFocus() {
             const ids = new Set();
@@ -928,7 +969,9 @@ __PB_FONTS__
             // Bounded at both ends: one method must not become a giant band, and
             // a large cohort must not shrink below a readable row.
             const rowGap = state.density;
-            const rowCount = (state.pinReference ? 1 : 0) + tools.length +
+            const overlaid = sel.tool && sel.overlay ? 1 : 0;
+            const rowCount = (state.pinReference ? 1 : 0) +
+                             (overlaid ? 1 : tools.length) +
                              (state.mode === 'A' && state.showLabels ? 1 : 0);
             const available = plotH - 34;
             const fitted = Math.floor(available / Math.max(1, rowCount)) - rowGap;
@@ -1008,6 +1051,72 @@ __PB_FONTS__
                 ctx.textBaseline = 'middle';
                 ctx.fillText('Contigs', pad.left - 10, refY + trackH / 2);
                 yOffset += trackH + rowGap;
+            }
+
+            // ── Overlay: two methods in one band ──
+            const pair = overlayPair();
+            if (pair) {
+                const [top, bottom] = pair;
+                const bandY = yOffset;
+                const half = Math.max(9, (trackH - 12) / 2);
+                const stripY = bandY + half + 2;
+                const stripH = 8;
+
+                const colourFor = seg => {
+                    const colors = { good: '#17805a', correct: '#17805a', missing: '#eef2ef',
+                        inverted: '#b03a80', chromosomal: '#b3261e', wrong_plasmid: '#d97706',
+                        contam: '#b3261e', ambiguous: '#a35c05', duplicated: '#6d43c4',
+                        low_identity: '#0e7490', unsupported_join: '#7c3aed' };
+                    return colors[seg.type] || '#d3ddd6';
+                };
+                const drawHalf = (track, atY) => {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(pad.left, atY, plotW, half);
+                    track.segments.filter(s => (s.end - s.start) >= state.minAlignLen)
+                        .forEach(seg => {
+                            const x1 = scale(seg.start), x2 = scale(seg.end);
+                            ctx.fillStyle = colourFor(seg);
+                            ctx.fillRect(x1, atY + 1, Math.max(1, x2 - x1), half - 2);
+                        });
+                };
+                drawHalf(top, bandY);
+                drawHalf(bottom, stripY + stripH);
+
+                // Divergence, between the two halves it belongs to.
+                ctx.fillStyle = '#f2f6f3';
+                ctx.fillRect(pad.left, stripY, plotW, stripH);
+                const spans = divergence(top, bottom, totalLen);
+                canvas._divergence = spans;
+                spans.forEach(span => {
+                    const x1 = scale(span.start), x2 = scale(span.end);
+                    // Orange where only the upper method recovered it, blue where
+                    // only the lower did: two hues that stay apart for colour
+                    // vision deficiency, unlike the green/red pair.
+                    ctx.fillStyle = span.only === 'a' ? '#b25309'
+                        : span.only === 'b' ? '#2563c9' : '#7b8a83';
+                    ctx.fillRect(x1, stripY, Math.max(1, x2 - x1), stripH);
+                });
+
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#16211c';
+                ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
+                ctx.fillText(top.label, pad.left - 10, bandY + half / 2);
+                ctx.fillText(bottom.label, pad.left - 10, stripY + stripH + half / 2);
+                ctx.fillStyle = '#7b8a83';
+                ctx.font = '10px Inter, sans-serif';
+                ctx.fillText('differs', pad.left - 10, stripY + stripH / 2);
+
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#4a5a52';
+                ctx.font = '10px Inter, sans-serif';
+                const onlyA = spans.filter(s => s.only === 'a').length;
+                const onlyB = spans.filter(s => s.only === 'b').length;
+                ctx.fillText(spans.length + ' differing intervals',
+                    pad.left + plotW + 6, stripY + stripH / 2);
+                yOffset += trackH + trackGap;
+                // The overlay replaces the per-method rows for this pair.
+                tools.length = 0;
             }
 
             // Tool tracks
@@ -1951,8 +2060,14 @@ __PB_FONTS__
             setText('eventCounter', 'Found: ' + ev.mismatches.length + ' mismatches, ' + ev.gaps.length +
                 ' gaps, ' + ev.inversions.length + ' inversions, ' + ev.breakpoints.length + ' breakpoints');
             setText('rowOrderInfo', 'Order: ' + (state.rowOrder.length ? state.rowOrder.join(', ') : 'none'));
-            const lead = TOOL_TRACKS[0];
-            setText('statusToolInfo', lead
+            const pairNow = overlayPair();
+            if (pairNow) {
+                setText('statusToolInfo', pairNow[0].label + ' over ' + pairNow[1].label +
+                    ' \u00b7 the strip between them marks every interval where the two differ');
+                setText('toolBadge', pairNow[0].label + ' vs ' + pairNow[1].label);
+            }
+            const lead = pairNow ? null : TOOL_TRACKS[0];
+            if (!pairNow) setText('statusToolInfo', lead
                 ? lead.label + ' ' + lead.version +
                   ' · identity: ' + (lead.identity === null ? NM : lead.identity + '%') +
                   ' · mapQ: ' + (lead.mapQ === null ? NM : lead.mapQ) +
@@ -1972,7 +2087,12 @@ __PB_FONTS__
                 const i = plasmidList().findIndex(p => p.id === next.plasmid);
                 if (i >= 0 && i !== sel.plasmidIdx) { sel.plasmidIdx = i; sel.record = null; }
             }
-            if (next.tool !== undefined) { sel.tool = next.tool || null; sel.record = null; }
+            if (next.tool !== undefined) {
+                sel.tool = next.tool || null; sel.record = null;
+                if (!sel.tool) sel.overlay = null;
+                if (sel.overlay === sel.tool) sel.overlay = null;
+            }
+            if (next.overlay !== undefined) { sel.overlay = next.overlay || null; }
             if (next.record !== undefined) { sel.record = next.record || null; }
             rebind();
             state.minAlignLen = 0;
@@ -1996,12 +2116,27 @@ __PB_FONTS__
         // The method and record pickers list what this plasmid actually has.
         const toolSelect = document.getElementById('explorerTool');
         const recordSelect = document.getElementById('explorerRecord');
+        const overlaySelect = document.getElementById('explorerOverlay');
         function fillFocus() {
             if (toolSelect) {
                 const ids = allToolTracks().map(t => t.id);
                 toolSelect.innerHTML = '<option value="">All methods (' + ids.length + ')</option>' +
                     ids.map(id => '<option value="' + id + '">' + id + '</option>').join('');
                 toolSelect.value = sel.tool || '';
+            }
+            if (overlaySelect) {
+                // An overlay compares two named methods, so it needs one chosen
+                // first; with every method shown there is nothing to overlay on.
+                const others = allToolTracks().map(t => t.id).filter(id => id !== sel.tool);
+                overlaySelect.disabled = !sel.tool;
+                overlaySelect.title = sel.tool
+                    ? 'Draw a second method in the same row as ' + sel.tool +
+                      ', with the intervals where the two disagree marked between them.'
+                    : 'Choose a single method under Tool first; an overlay compares two named methods.';
+                overlaySelect.innerHTML = '<option value="">' +
+                    (sel.tool ? 'No overlay' : 'Pick a Tool first') + '</option>' +
+                    (sel.tool ? others.map(id => '<option value="' + id + '">' + id + '</option>').join('') : '');
+                overlaySelect.value = sel.overlay || '';
             }
             if (recordSelect) {
                 const ids = recordsForFocus();
@@ -2014,6 +2149,8 @@ __PB_FONTS__
             () => applySelection({ tool: toolSelect.value }));
         if (recordSelect) recordSelect.addEventListener('change',
             () => applySelection({ record: recordSelect.value }));
+        if (overlaySelect) overlaySelect.addEventListener('change',
+            () => applySelection({ overlay: overlaySelect.value }));
         window.addEventListener('message', function(e) {
             const m = e.data;
             if (m && m.pbExplorer === 'select') applySelection(m);

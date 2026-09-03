@@ -427,6 +427,31 @@ def main():
     assert "@media print" in page, "there is no printable form"
     assert ".pb-tab[hidden]{display:block!important}" in page,         "printing must expand every tab, or six of seven panes are lost"
 
+    # Click-to-explain: one panel every chart speaks into, giving the reading
+    # rather than repeating the fact the mark already carries.
+    for needed in ("pb-explain", "window.pbExplain", "READINGS",
+                   "vq-agree rect.agr", "vq-sankey path.lnk",
+                   "vq-dotplot line.dpl", "vq-summary tbody tr"):
+        assert needed in page, f"explain wiring missing: {needed}"
+    for reading in ("shared support, not evidence of correctness",
+                    "assembled into one unit", "not structural validation",
+                    "Impure records"):
+        assert reading in page, f"chart reading missing: {reading}"
+    # SVG elements have no click() method, so keyboard activation dispatches.
+    assert "dispatchEvent(new MouseEvent('click',{bubbles:true}))" in page,         "keyboard activation must dispatch, since SVG marks have no click()"
+    # The embedded dashboard uses the same panel rather than its own popup.
+    assert "pbExplain: true" in page, "the embedded charts do not use the shared panel"
+
+    # Two methods on one band, with the intervals where they disagree.
+    for needed in ("explorerOverlay", "overlayPair", "function divergence",
+                   "differing intervals", "'differs'"):
+        assert needed in explorer_doc, f"overlay affordance missing: {needed}"
+    assert "sel.overlay" in explorer_doc, "the overlay has no state"
+    # An overlay compares two named methods, so it needs one chosen first.
+    assert "Pick a Tool first" in explorer_doc,         "the overlay must say it needs a single method chosen first"
+    # The divergence hues avoid the green/red pair the palette toggle exists for.
+    assert "'#b25309'" in explorer_doc and "'#2563c9'" in explorer_doc,         "divergence must not be drawn in the green/red pair"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 

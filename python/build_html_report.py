@@ -464,6 +464,131 @@ document.getElementById('pb-print').addEventListener('click',function(){
 </script>"""
 
 
+def explain_script():
+    """Click any chart mark and be told what it means, not just what it says.
+
+    The marks already carried their facts in a <title>: a band knows it is
+    "4/5 methods", a ribbon knows it is "6,000 bp". What none of them carried
+    was the reading -- whether four of five agreeing is reassuring, what a
+    ribbon that splits implies downstream. This adds that second half, from one
+    panel every chart shares rather than a bespoke popup per chart.
+    """
+    return """<style>
+#pb-explain{position:fixed;right:18px;bottom:18px;width:380px;max-width:calc(100vw - 36px);
+  max-height:62vh;overflow:auto;background:#fff;border:1px solid var(--line);
+  border-left:5px solid var(--green);box-shadow:0 10px 34px rgba(22,33,28,.24);
+  padding:16px 18px;z-index:70;display:none;font-size:14px}
+#pb-explain.on{display:block}
+#pb-explain h4{margin:0 0 4px;font:600 15px Arial,sans-serif}
+#pb-explain .fact{margin:0 0 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;
+  background:#f2f6f3;padding:8px 10px;border-radius:4px;word-break:break-word}
+#pb-explain p{margin:0 0 10px;font-size:13.5px;line-height:1.55}
+#pb-explain .close{position:absolute;top:10px;right:12px;border:0;background:none;
+  font-size:20px;line-height:1;cursor:pointer;color:var(--muted)}
+#pb-explain .close:hover{color:var(--ink)}
+#pb-explain .hintline{margin:0;font-size:12px;color:var(--muted)}
+.pb-clickable{cursor:pointer}
+@media print{#pb-explain{display:none!important}}
+</style><script>
+(()=>{
+const panel=document.createElement('aside');panel.id='pb-explain';
+panel.setAttribute('role','status');panel.setAttribute('aria-live','polite');
+panel.innerHTML='<button type="button" class="close" aria-label="Close explanation">&times;</button>'
+ +'<h4 id="pb-explain-title"></h4><p class="fact" id="pb-explain-fact"></p>'
+ +'<div id="pb-explain-body"></div>'
+ +'<p class="hintline">Click another mark to explain it, or press Escape to close.</p>';
+document.body.append(panel);
+panel.querySelector('.close').addEventListener('click',()=>panel.classList.remove('on'));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')panel.classList.remove('on')});
+
+function explain(title,fact,paragraphs){
+ document.getElementById('pb-explain-title').textContent=title;
+ document.getElementById('pb-explain-fact').textContent=fact||'';
+ document.getElementById('pb-explain-fact').style.display=fact?'block':'none';
+ document.getElementById('pb-explain-body').innerHTML=paragraphs.map(p=>'<p>'+p+'</p>').join('');
+ panel.classList.add('on');
+ panel.scrollTop=0;
+}
+window.pbExplain=explain;
+
+// The reading for each kind of mark. The fact comes from the mark itself; this
+// is the part a reader cannot get from the picture.
+const READINGS={
+ agreement:[
+  'This band is a stretch of the reference and the number of methods whose alignments cover it.',
+  'Agreement is <strong>shared support, not evidence of correctness</strong>. Methods built on similar assumptions fail in similar ways, so a region every method covers can still be wrong, and a region only one method covers is not necessarily an error.',
+  'Bands where support drops are the ones worth opening in the tracks above: either the region is genuinely hard, or one method is claiming something the others do not.'],
+ flow:[
+  'This ribbon is one predicted bin and the truth plasmid it was matched to, with the aligned bases between them.',
+  'One truth plasmid reached by several ribbons is a <strong>split</strong>: the sequence was found but never assembled into one unit. One ribbon reaching several truth plasmids is a <strong>merge</strong>: two replicons fused into a single answer.',
+  'Both can occur at high completeness, which is why a base-level score alone cannot tell you whether the reconstruction is usable.'],
+ dotplot:[
+  'Each line is one alignment block, drawn against the reference on the horizontal axis and the predicted record\u2019s own coordinates on the vertical.',
+  'A single forward diagonal means the record follows the reference in order and orientation. Parallel offset diagonals mean the same sequence appears more than once. A <strong>reverse</strong> diagonal, drawn in purple, means the block aligns backwards.',
+  'This is a diagnostic drawn from alignment blocks. It is not structural validation: nothing here is checked against a closed genome.'],
+ plasmid:[
+  'This row is one truth plasmid and how much of it the selected method recovered.',
+  '<strong>Impure records</strong> are predicted records that also align to the chromosome or to another truth plasmid. Completeness alone cannot reveal them, which is why they are counted separately.',
+  'Selecting the row loads its tracks above, where the recovered and missing intervals are drawn in reference coordinates.'],
+ distribution:[
+  'Each column is one method. The box spans the interquartile range, the heavy line is the median, the whiskers reach the extremes, and every sample is drawn behind them.',
+  'A tight box means the method behaves consistently across isolates. A wide box, or a median far from the mean, means performance depends on the sample -- which matters more than the average for deciding whether to trust it on a new isolate.',
+  'Failed and skipped runs are excluded rather than plotted as zero, so a short column can mean few completed runs, not poor scores. The count under each column says how many.']
+};
+
+function reading(kind,extra){
+ const base=(READINGS[kind]||['No reading is available for this mark.']).slice();
+ if(extra)base.unshift(extra);
+ return base;
+}
+
+// One delegated listener: the marks are redrawn constantly by their own
+// fragments, so binding to the container outlives every redraw.
+function factOf(el){
+ const t=el.querySelector('title');
+ return t?t.textContent.trim():(el.getAttribute('aria-label')||'').trim();
+}
+document.addEventListener('click',function(e){
+ const agree=e.target.closest('#vq-agree rect.agr');
+ if(agree){explain('Method agreement band',factOf(agree),reading('agreement'));return}
+ const link=e.target.closest('#vq-sankey path.lnk');
+ if(link){explain('Bin-to-truth ribbon',factOf(link),reading('flow'));return}
+ const seg=e.target.closest('#vq-dotplot line.dpl');
+ if(seg){explain('Alignment block',factOf(seg),reading('dotplot'));return}
+ const row=e.target.closest('#vq-summary tbody tr');
+ if(row){const cells=[...row.cells].map(c=>c.textContent.trim());
+  explain('Truth plasmid '+(cells[0]||''),cells.join('  \u00b7  '),reading('plasmid'));return}
+});
+
+// Marks that can be explained should look like it.
+function markClickable(){
+ document.querySelectorAll('#vq-agree rect.agr,#vq-sankey path.lnk,#vq-dotplot line.dpl,#vq-summary tbody tr')
+  .forEach(el=>{if(!el.classList.contains('pb-clickable')){el.classList.add('pb-clickable');
+   if(!el.getAttribute('tabindex'))el.setAttribute('tabindex','0')}});
+}
+markClickable();
+if(window.MutationObserver){let queued=false;
+ new MutationObserver(()=>{if(queued)return;queued=true;
+  requestAnimationFrame(()=>{queued=false;markClickable()})})
+ .observe(document.body,{childList:true,subtree:true})}
+document.addEventListener('keydown',function(e){
+ if(e.key!=='Enter'&&e.key!==' ')return;
+ const el=document.activeElement;
+ // SVG elements have no click() method, so the event is dispatched instead.
+ if(el&&el.classList&&el.classList.contains('pb-clickable')){e.preventDefault();
+  el.dispatchEvent(new MouseEvent('click',{bubbles:true}))}
+});
+
+// The embedded dashboards speak into the same panel rather than opening their own.
+window.addEventListener('message',function(e){
+ const m=e.data;
+ if(!m||m.pbExplain!==true)return;
+ explain(m.title||'Chart',m.fact||'',reading(m.kind,m.extra));
+});
+})();
+</script>"""
+
+
 def read_tool_versions(path):
     """Map report tool labels to versions recorded at the time of the run.
 
@@ -1728,7 +1853,7 @@ def record_dotplot_script():
 (()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),select=document.createElement('select'),label=document.createElement('label');label.textContent='Predicted record ';label.append(select);$('vq-tool').closest('label').after(label);
 function state(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;return a&&a.tools[t]?{a,p,t}:null}
 function render(){const x=state();if(!x||!x.p){select.innerHTML='';return}const records=[...new Set(x.a.tools[x.t].blocks.filter(b=>b.target===x.p).map(b=>b.record_id))].sort();select.innerHTML=records.map(r=>`<option value="${r}">${r}</option>`).join('');draw()}
-function draw(){const x=state(),record=select.value;if(!x||!record)return;const blocks=x.a.tools[x.t].blocks.filter(b=>b.target===x.p&&b.record_id===record),query=Math.max(...blocks.map(b=>b.query_length),1),truth=x.a.truth_plasmids[x.p].length,sx=v=>30+v/truth*420,sy=v=>450-v/query*420;const lines=blocks.map(b=>`<line x1="${sx(b.target_start)}" y1="${sy(b.query_start)}" x2="${sx(b.target_end)}" y2="${sy(b.query_end)}" stroke="${b.strand==='-'?'#7f5aa2':'#16805a'}" stroke-width="2"/>`).join('');$('vq-dotplot').innerHTML=`<h3>Dot plot: ${record} vs ${x.p}</h3><p class="muted">One predicted-record coordinate system is shown at a time. Forward diagonals support collinearity; reverse diagonals show reverse orientation. This is a diagnostic, not structural validation.</p><svg viewBox="0 0 480 480" width="480" role="img" aria-label="Dot plot"><rect x="30" y="30" width="420" height="420" fill="#f7f8f5" stroke="#849387"/>${lines}<text x="180" y="475" font-size="11">truth plasmid coordinate</text><text x="2" y="20" font-size="11">predicted-record coordinate</text></svg>`}
+function draw(){const x=state(),record=select.value;if(!x||!record)return;const blocks=x.a.tools[x.t].blocks.filter(b=>b.target===x.p&&b.record_id===record).map((b,i)=>Object.assign({__i:i},b)),query=Math.max(...blocks.map(b=>b.query_length),1),truth=x.a.truth_plasmids[x.p].length,sx=v=>30+v/truth*420,sy=v=>450-v/query*420;const lines=blocks.map(b=>`<line class="dpl" data-i="${b.__i}" x1="${sx(b.target_start)}" y1="${sy(b.query_start)}" x2="${sx(b.target_end)}" y2="${sy(b.query_end)}" stroke="${b.strand==='-'?'#7f5aa2':'#16805a'}" stroke-width="3" style="cursor:pointer"><title>${b.record_id} ${b.target_start.toLocaleString()}–${b.target_end.toLocaleString()} on ${b.target}, ${b.strand==='-'?'reverse':'forward'} strand, ${(100*b.matches/Math.max(1,b.block_length)).toFixed(1)}% identity, mapQ ${b.mapq}</title></line>`).join('');$('vq-dotplot').innerHTML=`<h3>Dot plot: ${record} vs ${x.p}</h3><p class="muted">One predicted-record coordinate system is shown at a time. Forward diagonals support collinearity; reverse diagonals show reverse orientation. This is a diagnostic, not structural validation.</p><svg viewBox="0 0 480 480" width="480" role="img" aria-label="Dot plot"><rect x="30" y="30" width="420" height="420" fill="#f7f8f5" stroke="#849387"/>${lines}<text x="180" y="475" font-size="11">truth plasmid coordinate</text><text x="2" y="20" font-size="11">predicted-record coordinate</text></svg>`}
 ['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(draw,0)));select.addEventListener('change',draw);render()})();
 </script>"""
 
@@ -1980,6 +2105,7 @@ def main():
                    + explorer_chrome_script()
                    + glossary_script()
                    + accessibility_script()
+                   + explain_script()
                    + lazy_visualization_script())
     explorer_html = evidence_explorer_section(args.project_root, scores, out.parent,
                                               vendor_html, visual_html)
