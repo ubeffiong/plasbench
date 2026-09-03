@@ -164,11 +164,13 @@ def main():
     assert "hdrScope" in page and "hdrPlasmids" in page, "header must be run-driven"
     # Heatmap and plasmid panels share a row down to laptop widths.
     assert "@media (max-width: 900px)" in page, "grid must stay two-column above 900px"
-    assert "minmax(0, 1fr) minmax(0, 1fr)" in page, "grid tracks must be shrinkable"
 
     # Layout: 40/60 columns, with the heatmap column split into two equal rows.
     assert "minmax(0, 2fr) minmax(0, 3fr)" in page, "heatmap/plasmid split must be 40/60"
-    assert "left-stack" in page, "heatmap column must stack heatmap over drilldown"
+    # Row one is matrix beside plasmid recovery at equal height; the drilldown
+    # spans the full width beneath, so contig evidence gets the horizontal room.
+    assert "grid-column: 1 / -1" in page, "drilldown must span both columns"
+    assert "left-stack" not in page, "the stacked left column has been replaced by explicit placement"
     # The drilldown belongs to the layout; only .expanded promotes it to an overlay.
     assert ".modal-overlay.expanded" in page, "drilldown must have an expanded state"
     assert "expandDrilldownBtn" in page, "drilldown must offer a full-screen control"
@@ -195,6 +197,13 @@ def main():
     for needed in ("seg-duplicated", "unsupported_join", "wrong_plasmid",
                    "complete_discordant", "chromosomal_contam"):
         assert needed in page, f"vocabulary term missing: {needed}"
+
+    # Explorer chrome: titled cards with collapse, full-screen expand, and one
+    # toolbar driving zoom, track height and density.
+    for needed in ("vq-shell", "vq-toolbar", "vq-card", "vq-scrim",
+                   "vq-expand-all", "vq-collapse-all", "vq-stretch", "vq-density",
+                   "Truth plasmids", "Alignment tracks", "aria-expanded"):
+        assert needed in page, f"explorer chrome affordance missing: {needed}"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 

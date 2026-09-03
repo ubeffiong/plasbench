@@ -10,8 +10,9 @@ drilldown rather than leaving them in their empty states.
 Deterministic by construction -- no randomness anywhere -- so two runs produce
 byte-identical inputs and any change in the report is a change in the code.
 
-Nothing here is a biological claim. The organism names label cohort filters;
-the sequences are homopolymer padding of the right length.
+Nothing here is a biological claim. The organism names label cohort filters.
+Long records are padding; the short per-method record carries a deterministic
+edited sequence with a CIGAR, so the drilldown has real nucleotides to show.
 """
 
 import argparse
@@ -63,10 +64,48 @@ BINNERS = {"mob_like", "gplas_like"}
 FAILS = {("abauma_b", "weak_like")}
 
 
-def block(record, qlen, qstart, qend, strand, target, tlen, tstart, tend, identity=1.0, mapq=60):
+# A fixed 4-base cycle stepped by a position-dependent stride: deterministic,
+# reproducible, and clearly synthetic. Not a biological sequence.
+def dna(length, seed=0):
+    bases = "ACGT"
+    return "".join(bases[(index * 7 + seed * 13 + index // 11) % 4] for index in range(length))
+
+
+def edited(segment, seed):
+    """Apply a fixed edit pattern, returning the query and its CIGAR.
+
+    One substitution every 97 bases and a single 3-base deletion, so the
+    drilldown shows genuine mismatch and gap columns rather than a clean run.
+    """
+    bases = "ACGT"
+    out, cigar, run = [], [], 0
+    cut = len(segment) // 2
+    for index, base in enumerate(segment):
+        if index in (cut, cut + 1, cut + 2):
+            if run:
+                cigar.append(f"{run}M"); run = 0
+            continue                      # deleted from the query
+        if index and index % 97 == 0:
+            # Offset by 1..3 so the base always changes: +4 would be a no-op.
+            out.append(bases[(bases.index(base) + 1 + seed % 3) % 4])
+        else:
+            out.append(base)
+        run += 1
+        if index == cut - 1:
+            cigar.append(f"{run}M"); cigar.append("3D"); run = 0
+    if run:
+        cigar.append(f"{run}M")
+    return "".join(out), "".join(cigar)
+
+
+def block(record, qlen, qstart, qend, strand, target, tlen, tstart, tend, identity=1.0,
+          mapq=60, cigar=None):
     span = tend - tstart
-    return [record, qlen, qstart, qend, strand, target, tlen, tstart, tend,
-            int(span * identity), span, mapq]
+    row = [record, qlen, qstart, qend, strand, target, tlen, tstart, tend,
+           int(span * identity), span, mapq]
+    if cigar:
+        row.append("cg:Z:" + cigar)
+    return row
 
 
 def predictions(sample, tool, chrom_len, plasmids):
@@ -83,11 +122,9 @@ def predictions(sample, tool, chrom_len, plasmids):
     elif tool == "platon_like":
         # Contig classifier: good, but leaves the smallest plasmid uncovered and
         # drags in a chromosomal contig -> false positives without a bin story.
-        # Its largest plasmid is recovered in two pieces with a genuine query gap,
-        # so the uncovered middle is missing reference rather than a false join.
-        # One record, two blocks, with a gap on the query as well as the reference:
-        # the prediction stops, so the uncovered middle is missing reference rather
-        # than an adjacency the record wrongly asserts.
+        # Its largest plasmid comes back as one record in two blocks with a gap on
+        # the query as well as the reference: the prediction stops, so the uncovered
+        # middle is missing reference rather than an adjacency it wrongly asserts.
         head = int(length * 0.55)
         tail_start = int(length * 0.68)
         tail_len = length - tail_start
@@ -140,6 +177,16 @@ def predictions(sample, tool, chrom_len, plasmids):
         if len(plasmids) > 1:
             other, olen, _ = plasmids[1]
             rows.append(block("wk_amb", 5_000, 3_000, 4_000, "+", other, olen, 0, 1_000))
+
+    # Every method also emits one short, CIGAR-bearing record on the smallest
+    # plasmid. build_visualization_data only derives a nucleotide alignment for
+    # blocks under its bp cap, so without this the drilldown has no sequence.
+    target, tlen, _ = plasmids[-1]
+    window = min(1_200, tlen)
+    seed = TOOLS.index(tool)
+    query, cigar = edited(dna(window, seed=0), seed)
+    rows.append(block(f"{tool.split('_')[0]}_zoom", len(query), 0, len(query), "+",
+                      target, tlen, 0, window, identity=0.98, cigar=cigar))
     return rows
 
 
@@ -170,6 +217,15 @@ def main():
         chrom_len, plasmids = TRUTH[sample]
         sdir = root / sample
         sdir.mkdir(parents=True, exist_ok=True)
+
+        # Reference FASTA: the nucleotide view aligns the predicted record
+        # against this, so without it the drilldown has nothing to compare to.
+        with (sdir / "reference.fna").open("w", encoding="utf-8") as handle:
+            for pname, plen, _ in plasmids:
+                handle.write(f">{pname}\n")
+                sequence = dna(plen, seed=0)
+                for start in range(0, plen, 60):
+                    handle.write(sequence[start:start + 60] + "\n")
 
         write_tsv(sdir / "truth.tsv", ["sequence_id", "molecule_type", "length"],
                   [[f"chr_{sample}", "CHROMOSOME", chrom_len]]
@@ -204,11 +260,20 @@ def main():
                 lengths.setdefault(row[0], row[1])
             # Records are written at their declared length: the scorer checks the
             # PAF query length against the FASTA and rejects any disagreement.
+            zoom_record = f"{tool.split('_')[0]}_zoom"
+            zoom_target, zoom_tlen, _ = plasmids[-1]
             with (sdir / f"pred_{tool}.plasmid.fasta").open("w", encoding="utf-8") as handle:
                 for record, qlen in lengths.items():
+                    # The short record carries real edited sequence so its CIGAR
+                    # reconstructs against the reference; the rest is padding.
+                    if record == zoom_record:
+                        sequence = edited(dna(min(1_200, zoom_tlen), seed=0),
+                                          TOOLS.index(tool))[0]
+                    else:
+                        sequence = "A" * qlen
                     handle.write(f">{record}\n")
-                    for start in range(0, qlen, 60):
-                        handle.write("A" * min(60, qlen - start) + "\n")
+                    for start in range(0, len(sequence), 60):
+                        handle.write(sequence[start:start + 60] + "\n")
             if tool in BINNERS:
                 # One bin per contig for the strong binner; the splitter puts two
                 # contigs in one bin so a merge edge appears in the flow.

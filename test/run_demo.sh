@@ -72,7 +72,7 @@ while IFS=$'\t' read -r SAMPLE _; do
     [[ -s "$CIRCULAR" ]] && VIZ_ARGS+=(--circular-truth "$CIRCULAR")
     [[ -s "$FEATURES" ]] && VIZ_ARGS+=(--feature-truth "$FEATURES")
     python3 "$PY/build_visualization_data.py" --truth "$TRUTH" --results-dir "$DEMO" \
-        --sample "$SAMPLE" "${VIZ_ARGS[@]}" \
+        --sample "$SAMPLE" --reference "$SDIR/reference.fna" "${VIZ_ARGS[@]}" \
         --out "$SDIR/visualization/alignment_blocks.json" >/dev/null
 done < "$SAMPLES"
 
