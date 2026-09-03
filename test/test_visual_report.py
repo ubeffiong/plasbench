@@ -398,8 +398,9 @@ def main():
     for needed in ("#17805a", "#b3261e", "#a35c05", "#2563c9"):
         assert needed in explorer_doc, f"status palette colour missing: {needed}"
 
-    # The notes on how to read these panels open with the section.
-    assert "legend.open=true" in page,         "the legend must be open when a sample and method are already selected"
+    # The "Legend and limits" block was removed: the glossary defines every
+    # term where it is used, and both keys explain the colours in place.
+    assert "Legend and limits" not in page,         "the retired legend-and-limits block must not return"
 
     # One glossary, rendered into the keys section and attached to every
     # occurrence of the term. A definition only on a reference page is not an
@@ -525,6 +526,16 @@ def main():
         assert key in page, f"agreement pointer keyboard step missing: {key}"
     # The reading is the point: a count alone does not say which method differs.
     assert "The methods disagree here" in page,         "the pointer must interpret disagreement, not just count it"
+
+    # The sidebar key lists the same nine types as the key under the tracks.
+    # Both are one control with two placements, rendered from one function and
+    # sharing one state, so they cannot disagree about what is shown.
+    assert "segmentLegend" in explorer_doc, "the sidebar key is not wired to the filter"
+    assert "function renderSegmentKey" in explorer_doc,         "both keys must render from one function"
+    assert '<span><span class="swatch" style="background:#17805a;"></span> Good</span>'         not in explorer_doc, "the sidebar key must not be inert spans again"
+    # A filter by type implies the type vocabulary, whatever the bars are
+    # coloured by, so the inline key shows the toggles either way.
+    assert "state.colorMode === 'event' || state.segmentFilter" in explorer_doc,         "the inline key must show type toggles while a type filter is on"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 
