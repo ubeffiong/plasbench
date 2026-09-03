@@ -226,7 +226,7 @@ def main():
     for needed in ("pb-explorer", "pb-explorer-doc", "explorerSample", "explorerPlasmid",
                    "splitMergeCanvas", "mainCanvas", "jumpMismatch", "jumpGap",
                    "jumpInversion", "jumpBreakpoint", "categoryChips", "colorMode",
-                   "minAlignLen", "pinReference", "collapseContigs", "syncZoom",
+                   "minAlignLen", "pinReference", "collapseContigs",
                    "modeToggle", "detailsOverlay", "exportModal"):
         assert needed in page, f"explorer affordance missing: {needed}"
     assert "pbExplorer" in page, "report-to-explorer selection link missing"
@@ -257,6 +257,35 @@ def main():
     small = sorted({int(m) for m in re.findall(r"font-size: ?(\d+)px", explorer_doc)
                     if int(m) < 11})
     assert not small, f"explorer type scale still has unreadable sizes: {small}px"
+
+    # No inert controls. Every display option must be read by the renderer, not
+    # merely stored: "Show gaps" and "Show mismatches" shipped as checkboxes
+    # that set state nothing ever consulted, and the two Synchronization boxes
+    # had no listener at all.
+    for option in ("showGaps", "showMismatches", "minAlignLen",
+                   "collapseContigs", "pinReference", "colorMode"):
+        uses = explorer_doc.count("state." + option)
+        assert uses >= 3, (
+            f"display option {option} is set but never read by the renderer "
+            f"({uses} references); wire it or remove the control")
+    assert "syncZoom" not in explorer_doc and "syncPan" not in explorer_doc, (
+        "the Synchronization controls do nothing -- every track shares one "
+        "coordinate system -- and must not be reinstated")
+
+    # The length filter has to span the data. A 10-200 bp range over kilobase
+    # alignment blocks filtered nothing and looked broken.
+    assert "syncMinAlignRange" in explorer_doc, "length filter range is not data-driven"
+    assert "segments shown" in explorer_doc, "length filter does not report what it hides"
+    assert 'id="minAlignLen" min="10" max="200"' not in explorer_doc,         "the fixed 10-200 bp filter range must not come back"
+
+    # Contig records from every method land on one row, so they must be packed
+    # into lanes; drawn on top of each other the labels were unreadable.
+    for needed in ("laneEnds", "laneCount", "laneH"):
+        assert needed in explorer_doc, f"contig lane packing missing: {needed}"
+
+    # The sidebar is a scrolling flex column. Without this its panels are
+    # shrinkable, and the split/merge map collapsed to an 18px sliver.
+    assert explorer_doc.count("flex: 0 0 auto") >= 2,         "sidebar panels must keep their natural height in the flex column"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 

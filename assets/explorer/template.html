@@ -160,6 +160,7 @@ __PB_FONTS__
             border-radius: var(--radius-sm);
             padding: 10px 12px;
             border: 1px solid var(--border-color);
+            flex: 0 0 auto;
         }
         .sidebar-section .section-title {
             font-size: 12px; font-weight: 600; text-transform: uppercase;
@@ -238,7 +239,7 @@ __PB_FONTS__
             border-radius: var(--radius-sm);
             border: 1px solid var(--border-color);
             padding: 8px 12px;
-            overflow: hidden;
+            flex: 0 0 auto;
         }
         .split-merge-panel .sm-title {
             font-size: 12px; font-weight: 600;
@@ -570,8 +571,8 @@ __PB_FONTS__
                     </div>
                     <div style="margin-top:4px;">
                         <label style="font-size:14px;color:var(--text-muted);">Min alignment length:</label>
-                        <input type="range" id="minAlignLen" min="10" max="200" value="50" style="width:100%;accent-color:var(--accent-blue);background:var(--bg-input);height:4px;border-radius:4px;" />
-                        <span style="font-size:14px;color:var(--text-muted);" id="minAlignLabel">50 bp</span>
+                        <input type="range" id="minAlignLen" min="0" max="100" value="0" style="width:100%;accent-color:var(--accent-green);background:var(--bg-input);height:6px;border-radius:4px;" />
+                        <span style="font-size:12px;color:var(--text-muted);" id="minAlignLabel">&#8212;</span>
                     </div>
                 </div>
 
@@ -584,19 +585,6 @@ __PB_FONTS__
                         <span><span style="display:inline-block;width:8px;height:8px;background:#fbbf24;border-radius:2px;"></span> Split (1→2)</span>
                         <span><span style="display:inline-block;width:8px;height:8px;background:#f472b6;border-radius:2px;"></span> Merge (2→1)</span>
                         <span><span style="display:inline-block;width:8px;height:8px;background:#f87171;border-radius:2px;"></span> Complex</span>
-                    </div>
-                </div>
-
-                <!-- Synchronization -->
-                <div class="sidebar-section">
-                    <div class="section-title"><i class="fas fa-link"></i> Synchronization</div>
-                    <div class="toggle-row">
-                        <input type="checkbox" id="syncZoom" checked />
-                        <label for="syncZoom">Sync zoom across tools</label>
-                    </div>
-                    <div class="toggle-row">
-                        <input type="checkbox" id="syncPan" checked />
-                        <label for="syncPan">Sync pan across tools</label>
                     </div>
                 </div>
 
@@ -772,11 +760,9 @@ __PB_FONTS__
             showMismatches: true,
             showInterpretations: true,
             colorMode: 'identity',
-            minAlignLen: 50,
+            minAlignLen: 0,
             pinReference: true,
             collapseContigs: false,
-            syncZoom: true,
-            syncPan: true,
             rowOrder: TOOL_TRACKS.map(t => t.id),
             currentPlasmidIdx: 0,
             plasmids: plasmidList(),
@@ -904,21 +890,42 @@ __PB_FONTS__
                 ctx.fillRect(pad.left, refY, plotW, trackH);
                 const allContigs = tools.flatMap(t => t.contigs || []);
                 const mergedContigs = state.collapseContigs ? mergeContigs(allContigs) : allContigs;
-                mergedContigs.forEach(c => {
-                    const x1 = scale(c.start);
-                    const x2 = scale(c.end);
+
+                // Every method contributes records to this one row, so they
+                // overlap. Pack them into lanes: drawing them on top of each
+                // other made the labels unreadable and hid the record count.
+                const laneEnds = [];
+                const placed = mergedContigs
+                    .slice()
+                    .sort((a, b) => a.start - b.start || b.end - a.end)
+                    .map(c => {
+                        const x1 = scale(c.start);
+                        const x2 = scale(c.end);
+                        let lane = laneEnds.findIndex(end => x1 >= end + 3);
+                        if (lane === -1) { lane = laneEnds.length; laneEnds.push(0); }
+                        laneEnds[lane] = x2;
+                        return { c, x1, x2, lane };
+                    });
+                const laneCount = Math.max(1, laneEnds.length);
+                const laneH = Math.max(6, (trackH - 4) / laneCount);
+                placed.forEach(({ c, x1, x2, lane }) => {
                     const w = Math.max(2, x2 - x1);
+                    const y = refY + 2 + lane * laneH;
                     ctx.fillStyle = c.status === 'good' ? 'rgba(23,128,90,0.35)' : 'rgba(163,92,5,0.35)';
-                    ctx.fillRect(x1, refY + 2, w, trackH - 4);
+                    ctx.fillRect(x1, y, w, laneH - 1);
                     ctx.strokeStyle = c.status === 'good' ? '#17805a' : '#a35c05';
                     ctx.lineWidth = 0.75;
-                    ctx.strokeRect(x1, refY + 2, w, trackH - 4);
-                    if (w > 48 && !state.collapseContigs) {
-                        ctx.fillStyle = '#16211c';
+                    ctx.strokeRect(x1, y, w, laneH - 1);
+                    // Label only where the box can hold the text without
+                    // spilling into its neighbour.
+                    if (!state.collapseContigs && laneH >= 13) {
                         ctx.font = '10px Inter, sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(c.id, x1 + w / 2, refY + trackH / 2);
+                        if (ctx.measureText(c.id).width + 8 < w) {
+                            ctx.fillStyle = '#16211c';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(c.id, x1 + w / 2, y + laneH / 2);
+                        }
                     }
                 });
                 ctx.fillStyle = '#4a5a52';
@@ -935,7 +942,12 @@ __PB_FONTS__
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(pad.left, y, plotW, trackH);
 
-                const segs = tool.segments.filter(s => (s.end - s.start) >= state.minAlignLen);
+                const GAP_TYPES = ['missing', 'unsupported_join'];
+                const segs = tool.segments.filter(s => {
+                    if ((s.end - s.start) < state.minAlignLen) return false;
+                    if (!state.showGaps && GAP_TYPES.indexOf(s.type) !== -1) return false;
+                    return true;
+                });
 
                 segs.forEach(seg => {
                     const x1 = scale(seg.start);
@@ -972,7 +984,7 @@ __PB_FONTS__
                         ctx.setLineDash([]);
                     }
 
-                    if (w > 46 && seg.identity && seg.identity > 0 && trackH >= 22) {
+                    if (state.showMismatches && w > 46 && seg.identity && seg.identity > 0 && trackH >= 22) {
                         ctx.fillStyle = '#ffffff';
                         ctx.font = '600 10px Inter, sans-serif';
                         ctx.textAlign = 'center';
@@ -1117,10 +1129,12 @@ __PB_FONTS__
                 const isMatch = refBase === predBase;
                 const isGap = predBase === '-';
 
+                // With mismatches hidden, divergent bases are still drawn --
+                // they are the sequence -- but they stop being flagged.
                 let color = '#7b8a83';
-                if (isGap) color = '#b9c7be';
-                else if (isMatch) color = '#4ade80';
-                else color = '#f87171';
+                if (isGap) color = state.showGaps ? '#b3261e' : '#b9c7be';
+                else if (isMatch || !state.showMismatches) color = '#17805a';
+                else color = '#b3261e';
 
                 if (x + baseWidth > pad.left + plotW) break;
                 ctx.fillStyle = color;
@@ -1142,18 +1156,30 @@ __PB_FONTS__
         function renderSplitMerge() {
             const data = SPLIT_MERGE_DATA;
             const W = splitMergeCanvas.parentElement.clientWidth - 24;
-            const H = 80;
+            // Height follows the number of rows: a fixed 80px squeezed every
+            // truth plasmid and predicted bin into a few unreadable pixels.
+            const rows = Math.max(1, data.truth.length, data.predicted.length);
+            const H = Math.max(96, rows * 24 + 26);
             splitMergeCanvas.width = W * 2;
             splitMergeCanvas.height = H * 2;
             splitMergeCanvas.style.width = W + 'px';
             splitMergeCanvas.style.height = H + 'px';
+            smCtx.setTransform(1, 0, 0, 1, 0, 0);
             smCtx.scale(2, 2);
 
             smCtx.clearRect(0, 0, W, H);
             smCtx.fillStyle = '#f4f7f5';
             smCtx.fillRect(0, 0, W, H);
 
-            const pad = { top: 10, bottom: 10, left: 104, right: 104 };
+            // Gutters are measured from the widest label and capped, so the
+            // links always keep a usable share of a narrow sidebar.
+            smCtx.font = '11px Inter, sans-serif';
+            const widest = list => list.reduce(
+                (max, item) => Math.max(max, smCtx.measureText(item.id).width), 24);
+            const gutter = side => Math.min(Math.round(W * 0.3), Math.ceil(side) + 14);
+            const pad = { top: 13, bottom: 13,
+                          left: gutter(widest(data.truth)),
+                          right: gutter(widest(data.predicted)) };
             const plotW = W - pad.left - pad.right;
             const plotH = H - pad.top - pad.bottom;
 
@@ -1410,9 +1436,34 @@ __PB_FONTS__
             state.colorMode = this.value;
             render();
         });
+        // The slider shipped with a 10-200 bp range. Plasmid alignment blocks are
+        // kilobases, so every position filtered nothing and the control looked
+        // broken. Its range is taken from the segments actually on screen.
+        function syncMinAlignRange() {
+            const slider = document.getElementById('minAlignLen');
+            const lengths = TOOL_TRACKS.flatMap(t => t.segments.map(s => s.end - s.start));
+            const longest = lengths.length ? Math.max(...lengths) : 200;
+            const step = Math.max(1, Math.round(longest / 100));
+            slider.min = 0;
+            slider.max = Math.max(step, Math.ceil(longest / step) * step);
+            slider.step = step;
+            if (state.minAlignLen > Number(slider.max)) state.minAlignLen = 0;
+            slider.value = state.minAlignLen;
+            reportMinAlign();
+        }
+
+        function reportMinAlign() {
+            const total = TOOL_TRACKS.reduce((n, t) => n + t.segments.length, 0);
+            const shown = TOOL_TRACKS.reduce((n, t) => n +
+                t.segments.filter(s => (s.end - s.start) >= state.minAlignLen).length, 0);
+            document.getElementById('minAlignLabel').textContent =
+                '≥ ' + state.minAlignLen.toLocaleString() + ' bp · ' +
+                shown + ' of ' + total + ' segments shown';
+        }
+
         document.getElementById('minAlignLen').addEventListener('input', function() {
-            state.minAlignLen = parseInt(this.value);
-            document.getElementById('minAlignLabel').textContent = state.minAlignLen + ' bp';
+            state.minAlignLen = parseInt(this.value, 10);
+            reportMinAlign();
             render();
         });
 
@@ -1677,10 +1728,12 @@ __PB_FONTS__
                 if (i >= 0) sel.plasmidIdx = i;
             }
             rebind();
+            state.minAlignLen = 0;
             state.selectedSegment = null;
             state.selectedProtein = null;
             state.eventIndex = { mismatch: 0, gap: 0, inversion: 0, breakpoint: 0 };
             zoomReset();
+            syncMinAlignRange();
             refreshChrome();
             render();
             renderSplitMerge();
@@ -1710,6 +1763,8 @@ __PB_FONTS__
 
         rebind();
         fillPlasmids();
+        state.minAlignLen = 0;
+        syncMinAlignRange();
         refreshChrome();
         render();
 
