@@ -220,6 +220,25 @@ def main():
     assert 'id="statsPanel" style="display:none;"' not in page,         "distribution plots must not start hidden"
     assert "statsVisible: true" in page, "distribution plots must default to visible"
 
+    # The adopted evidence explorer: its own chrome, controls and sub-views,
+    # rendered in an isolated frame and driven by this report's selection.
+    for needed in ("pb-explorer", "pb-explorer-doc", "explorerSample", "explorerPlasmid",
+                   "splitMergeCanvas", "mainCanvas", "jumpMismatch", "jumpGap",
+                   "jumpInversion", "jumpBreakpoint", "categoryChips", "colorMode",
+                   "minAlignLen", "pinReference", "collapseContigs", "syncZoom",
+                   "modeToggle", "detailsOverlay", "exportModal"):
+        assert needed in page, f"explorer affordance missing: {needed}"
+    assert "pbExplorer" in page, "report-to-explorer selection link missing"
+    # The design shipped a dark application palette; the report is a light page.
+    assert "--bg-primary: #f4f7f5" in page, "explorer must use the report's light ground"
+    assert "--bg-primary: #080b11" not in page, "dark palette leaked into the report"
+    # Nine measured segment types, not the design's six.
+    for needed in ("low_identity", "unsupported_join", "wrong_plasmid", "chromosomal"):
+        assert needed in page, f"explorer segment vocabulary incomplete: {needed}"
+    # Unmeasured fields must say so.
+    assert "read depth is not computed by projection scoring" in page,         "the unmeasured coverage field is not explained"
+    assert "not measured" in page
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 

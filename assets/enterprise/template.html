@@ -1058,7 +1058,7 @@
         }
         .stats-panel .stat-box canvas {
             width: 100%;
-            height: 220px;
+            height: 360px;
             display: block;
         }
 
@@ -1990,7 +1990,7 @@
             const filtered = getFilteredSamples();
             const visibleTools = TOOLS;
             const W = boxPlotCanvas.parentElement.clientWidth - 28;
-            const H = 220;
+            const H = 360;
             document.getElementById('boxPlotTitle').innerHTML = '<i class="fas fa-box"></i> ' + getMetricLabel() + ' — Metric Distribution by Tool';
             boxPlotCanvas.width = W * 2;
             boxPlotCanvas.height = H * 2;
@@ -2115,7 +2115,7 @@
             const filtered = getFilteredSamples();
             const visibleTools = TOOLS;
             const W = dotPlotCanvas.parentElement.clientWidth - 28;
-            const H = 220;
+            const H = 360;
             document.getElementById('dotPlotTitle').innerHTML = '<i class="fas fa-circle"></i> ' + getMetricLabel() + ' — Per-Sample Distribution';
             dotPlotCanvas.width = W * 2;
             dotPlotCanvas.height = H * 2;

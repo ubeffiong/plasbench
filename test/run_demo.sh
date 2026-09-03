@@ -43,6 +43,7 @@ while IFS=$'\t' read -r SAMPLE _; do
     AMR="$SDIR/truth_amr.tsv"
     CIRCULAR="$SDIR/truth_circular.tsv"
     FEATURES="$SDIR/truth_features.tsv"
+    PROTEINS="$SDIR/truth_proteins.tsv"
 
     shopt -s nullglob
     for PAF in "$SDIR"/*.pred_vs_ref.paf; do
@@ -71,6 +72,7 @@ while IFS=$'\t' read -r SAMPLE _; do
     [[ -s "$AMR" ]] && VIZ_ARGS+=(--amr-truth "$AMR")
     [[ -s "$CIRCULAR" ]] && VIZ_ARGS+=(--circular-truth "$CIRCULAR")
     [[ -s "$FEATURES" ]] && VIZ_ARGS+=(--feature-truth "$FEATURES")
+    [[ -s "$PROTEINS" ]] && VIZ_ARGS+=(--protein-truth "$PROTEINS")
     python3 "$PY/build_visualization_data.py" --truth "$TRUTH" --results-dir "$DEMO" \
         --sample "$SAMPLE" --reference "$SDIR/reference.fna" "${VIZ_ARGS[@]}" \
         --out "$SDIR/visualization/alignment_blocks.json" >/dev/null

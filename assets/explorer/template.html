@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlasBench · Reconstruction Evidence Explorer (Consolidated)</title>
+__PB_FONTS__
+    <style>
+        /* ── Reset & Base ── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        :root {
+            --bg-primary: #f4f7f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-card-hover: #eef4f0;
+            --bg-input: #f0f4f1;
+            --bg-tooltip: #16211c;
+            --border-color: #d3ddd6;
+            --border-light: #b9c7be;
+            --text-primary: #16211c;
+            --text-secondary: #4a5a52;
+            --text-muted: #7b8a83;
+            --accent-blue: #2563c9;
+            --accent-cyan: #0e7490;
+            --accent-green: #17805a;
+            --accent-amber: #a35c05;
+            --accent-rose: #b03a80;
+            --accent-red: #b3261e;
+            --accent-purple: #6d43c4;
+            --accent-orange: #b25309;
+            --shadow: 0 1px 3px rgba(22,33,28,.08), 0 12px 32px -18px rgba(22,33,28,.35);
+            --radius: 10px;
+            --radius-sm: 6px;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            --transition: 0.2s ease;
+        }
+        html { font-size: 13px; scroll-behavior: smooth; }
+        .unmeasured { color: var(--text-muted); font-style: italic; }
+        .detail-row small { color: var(--text-muted); font-size: 9px; }
+        .sel-wrap { display: inline-flex; align-items: center; gap: 5px; }
+        .sel-wrap > span { font-size: 10px; font-weight: 600; letter-spacing: .06em;
+            text-transform: uppercase; color: var(--text-muted); }
+        .sel-wrap select { background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm); color: var(--text-primary); padding: 3px 8px;
+            font-size: 11px; font-family: var(--font); outline: none; }
+        .sel-wrap select:focus-visible { outline: 2px solid var(--accent-green); outline-offset: 1px; }
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+        ::selection { background: var(--accent-blue); color: #fff; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        .app {
+            max-width: 1800px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+        }
+
+        /* ── Header ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .header-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .logo h1 {
+            font-size: 18px; font-weight: 700;
+            /* The design filled this from a white gradient, which is invisible
+               on a light ground. Solid ink instead. */
+            color: var(--text-primary);
+        }
+        .logo .badge {
+            font-size: 10px; font-weight: 600;
+            background: var(--bg-card); color: var(--text-secondary);
+            padding: 2px 10px; border-radius: 20px;
+            border: 1px solid var(--border-color);
+            margin-left: 4px;
+        }
+        .badge-pill {
+            font-size: 10px; font-weight: 500;
+            background: var(--bg-input); color: var(--text-secondary);
+            padding: 2px 12px; border-radius: 20px;
+            border: 1px solid var(--border-color);
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .badge-pill .highlight { color: var(--accent-cyan); }
+        .badge-pill.primary { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+        .header-meta {
+            display: flex; align-items: center; gap: 16px;
+            font-size: 11px; color: var(--text-secondary); flex-wrap: wrap;
+        }
+        .header-meta span { display: flex; align-items: center; gap: 4px; }
+        .header-right { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            background: var(--bg-card); color: var(--text-secondary);
+            font-size: 11px; font-weight: 500; cursor: pointer;
+            transition: var(--transition); font-family: var(--font);
+            white-space: nowrap;
+        }
+        .btn:hover { background: var(--bg-card-hover); color: var(--text-primary); border-color: var(--border-light); }
+        .btn-primary { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+        .btn-primary:hover { background: #3a7cdd; border-color: #3a7cdd; color: #fff; }
+        .btn-sm { padding: 4px 10px; font-size: 10px; }
+        .btn-icon { padding: 4px 7px; font-size: 12px; }
+        .btn-success { background: var(--accent-green); border-color: var(--accent-green); color: #ffffff; }
+        .btn-success:hover { background: #3acf70; border-color: #3acf70; }
+
+        /* ── Main Layout ── */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 14px;
+            flex: 1;
+            min-height: 0;
+        }
+        @media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            padding: 16px 18px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 90vh;
+        }
+        .sidebar-section {
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+        }
+        .sidebar-section .section-title {
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.4px; color: var(--text-muted);
+            margin-bottom: 6px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .section-title .count {
+            font-weight: 400; font-size: 9px;
+            background: var(--bg-input); padding: 0 6px; border-radius: 8px;
+            color: var(--text-secondary);
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3px 10px;
+            font-size: 11px;
+        }
+        .info-grid .label { color: var(--text-muted); }
+        .info-grid .value { color: var(--text-primary); font-weight: 500; text-align: right; }
+        .info-grid .value .pill {
+            font-size: 9px; padding: 0 6px; border-radius: 8px;
+            background: var(--bg-input); color: var(--text-secondary);
+        }
+
+        .control-group {
+            display: flex; flex-wrap: wrap; gap: 4px;
+        }
+        .control-group .btn { font-size: 10px; padding: 3px 8px; }
+
+        .search-box {
+            display: flex; align-items: center;
+            background: var(--bg-input); border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            padding: 0 8px; gap: 4px;
+            flex: 1; min-width: 70px;
+        }
+        .search-box input {
+            background: transparent; border: none;
+            color: var(--text-primary); padding: 4px 0;
+            font-size: 11px; font-family: var(--font); outline: none;
+            width: 100%;
+        }
+        .search-box input::placeholder { color: var(--text-muted); }
+        .search-box i { color: var(--text-muted); font-size: 11px; }
+
+        .filter-chips {
+            display: flex; flex-wrap: wrap; gap: 3px;
+        }
+        .chip {
+            font-size: 9px; padding: 1px 8px; border-radius: 10px;
+            background: var(--bg-input); color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            cursor: pointer; transition: var(--transition);
+        }
+        .chip:hover { background: var(--bg-card-hover); }
+        .chip.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+        .chip.badge-warn { background: rgba(251,191,36,0.15); color: var(--accent-amber); }
+        .chip.badge-good { background: rgba(74,222,128,0.15); color: var(--accent-green); }
+
+        .toggle-row {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 10px; color: var(--text-secondary);
+            padding: 2px 0;
+        }
+        .toggle-row input[type="checkbox"] {
+            accent-color: var(--accent-blue);
+            width: 14px; height: 14px; cursor: pointer;
+        }
+        .toggle-row label { cursor: pointer; }
+
+        /* ── Split/Merge Panel ── */
+        .split-merge-panel {
+            margin-top: 4px;
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            overflow: hidden;
+        }
+        .split-merge-panel .sm-title {
+            font-size: 10px; font-weight: 600;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.3px; margin-bottom: 4px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .split-merge-panel canvas {
+            width: 100%; height: 80px;
+            display: block; border-radius: 4px;
+            background: var(--bg-primary);
+        }
+
+        /* ── Legend ── */
+        .legend-row {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            font-size: 9px; color: var(--text-secondary);
+        }
+        .legend-row .swatch {
+            display: inline-block; width: 12px; height: 12px;
+            border-radius: 2px; vertical-align: middle;
+        }
+        .protein-tag {
+            display: inline-block; font-size: 8px;
+            padding: 1px 6px; border-radius: 6px; margin-right: 2px;
+            color: #fff;
+        }
+
+        /* ── Viewport ── */
+        .viewport {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            overflow: hidden; min-height: 500px;
+        }
+        .viewport-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 16px; background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap; gap: 6px;
+        }
+        .viewport-toolbar .left {
+            display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        }
+        .viewport-toolbar .right {
+            display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        }
+        .viewport-toolbar .context {
+            font-size: 11px; color: var(--text-secondary); font-weight: 500;
+        }
+        .viewport-toolbar .context .highlight { color: var(--accent-cyan); }
+
+        .viewport-canvas-wrap {
+            flex: 1; position: relative; overflow: hidden;
+            background: var(--bg-primary); min-height: 400px;
+        }
+        .viewport-canvas-wrap canvas {
+            display: block; width: 100%; height: 100%;
+            cursor: grab;
+        }
+        .viewport-canvas-wrap canvas:active { cursor: grabbing; }
+
+        .viewport-status {
+            display: flex; justify-content: space-between;
+            padding: 4px 16px; background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            font-size: 10px; color: var(--text-muted);
+            flex-wrap: wrap; gap: 4px;
+        }
+        .viewport-status .coords { font-family: monospace; color: var(--text-secondary); }
+
+        /* ── Details Overlay ── */
+        .details-overlay {
+            position: absolute; bottom: 12px; right: 12px;
+            width: 340px; max-height: 50%;
+            background: rgba(21,30,43,0.96);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            box-shadow: var(--shadow);
+            overflow-y: auto; font-size: 12px;
+            display: none; z-index: 10;
+            backdrop-filter: blur(6px);
+        }
+        .details-overlay.visible { display: block; }
+        .details-overlay .close-details {
+            float: right; background: none; border: none;
+            color: var(--text-muted); cursor: pointer; font-size: 16px;
+        }
+        .details-overlay .close-details:hover { color: var(--text-primary); }
+        .details-overlay .detail-title {
+            font-weight: 600; font-size: 13px;
+            color: var(--text-primary); margin-bottom: 4px;
+        }
+        .details-overlay .detail-row {
+            display: flex; justify-content: space-between;
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(34,48,64,0.5);
+        }
+        .details-overlay .detail-row .label { color: var(--text-muted); }
+        .details-overlay .detail-row .value { color: var(--text-secondary); font-weight: 500; }
+        .details-overlay .detail-row .value .tag {
+            font-size: 9px; padding: 0 6px; border-radius: 8px;
+            background: var(--bg-input);
+        }
+        .details-overlay .interpretation {
+            margin-top: 6px; padding: 6px 10px;
+            border-radius: var(--radius-sm); font-size: 11px;
+            background: rgba(251,191,36,0.08);
+            border-left: 3px solid var(--accent-amber);
+            color: var(--text-secondary);
+        }
+        .details-overlay .interpretation .strong { color: var(--text-primary); font-weight: 600; }
+
+        /* ── Export Modal ── */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+            z-index: 2000; display: none;
+            align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            max-width: 500px; width: 100%; max-height: 80vh;
+            display: flex; flex-direction: column;
+            box-shadow: var(--shadow);
+            animation: modalIn 0.2s ease;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.97) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+        .modal-header h2 { font-size: 15px; font-weight: 600; }
+        .modal-header .close-btn {
+            background: none; border: none;
+            color: var(--text-muted); font-size: 20px;
+            cursor: pointer; padding: 0 6px;
+        }
+        .modal-header .close-btn:hover { color: var(--text-primary); }
+        .modal-body { padding: 16px 20px; overflow-y: auto; }
+        .modal-body .export-option {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            margin-bottom: 6px; cursor: pointer;
+            transition: var(--transition);
+        }
+        .modal-body .export-option:hover {
+            background: var(--bg-card-hover); border-color: var(--border-light);
+        }
+        .modal-body .export-option .name { font-weight: 500; color: var(--text-primary); }
+        .modal-body .export-option .desc { font-size: 10px; color: var(--text-muted); }
+        .modal-body .export-option .icon { color: var(--text-secondary); font-size: 14px; }
+
+        /* ── Utilities ── */
+        .flex-wrap { flex-wrap: wrap; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .gap-4 { gap: 4px; }
+        .mt-4 { margin-top: 4px; }
+        .mb-4 { margin-bottom: 4px; }
+        .text-muted { color: var(--text-muted); }
+        .text-secondary { color: var(--text-secondary); }
+
+        /* ── Responsive ── */
+        @media (max-width: 700px) {
+            body { padding: 8px; }
+            .header { flex-direction: column; align-items: stretch; }
+            .header-meta { font-size: 10px; gap: 8px; }
+            .main-grid { grid-template-columns: 1fr; }
+            .sidebar { max-height: 300px; }
+            .details-overlay { width: calc(100% - 24px); right: 12px; bottom: 12px; }
+            .modal { max-width: 100%; margin: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app">
+
+        <!-- ─── HEADER ─── -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <h1>Reconstruction evidence explorer</h1>
+                </div>
+                <div class="header-meta">
+                    <label class="sel-wrap"><span>Sample</span><select id="explorerSample"></select></label>
+                    <label class="sel-wrap"><span>Plasmid</span><select id="explorerPlasmid"></select></label>
+                    <span class="badge-pill" id="sampleBadge">—</span>
+                    <span class="badge-pill primary" id="toolBadge">—</span>
+                    <span class="badge-pill" id="plasmidBadge">—</span>
+                    <span id="headerLen">—</span>
+                    <span id="headerProt">—</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-sm" id="exportModalBtn"><i class="fas fa-file-export"></i> Export</button>
+                <button class="btn btn-sm btn-primary" id="resetViewBtn"><i class="fas fa-home"></i> Reset</button>
+            </div>
+        </header>
+
+        <!-- ─── MAIN ─── -->
+        <div class="main-grid">
+
+            <!-- ─── SIDEBAR ─── -->
+            <div class="sidebar" id="sidebar">
+
+                <!-- Plasmid Info -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-info-circle"></i> Plasmid Overview</div>
+                    <div class="info-grid">
+                        <span class="label">Length</span><span class="value" id="plasmidLen">—</span>
+                        <span class="label">Circular</span><span class="value" id="plasmidCirc">—</span>
+                        <span class="label">Replicon</span><span class="value" id="plasmidRep">—</span>
+                        <span class="label">Recovery</span><span class="value" id="plasmidRec">—</span>
+                        <span class="label">Purity</span><span class="value" id="plasmidPur">—</span>
+                        <span class="label">Proteins</span><span class="value" id="plasmidProt">—</span>
+                    </div>
+                </div>
+
+                <!-- Structural Navigation -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-arrow-right"></i> Structural Navigation</div>
+                    <div class="control-group">
+                        <button class="btn btn-sm" id="jumpMismatch"><i class="fas fa-times-circle"></i> Mismatch</button>
+                        <button class="btn btn-sm" id="jumpGap"><i class="fas fa-minus-circle"></i> Gap</button>
+                        <button class="btn btn-sm" id="jumpInversion"><i class="fas fa-arrows-alt-h"></i> Inversion</button>
+                        <button class="btn btn-sm" id="jumpBreakpoint"><i class="fas fa-cut"></i> Breakpoint</button>
+                    </div>
+                    <div style="margin-top:4px;font-size:10px;color:var(--text-muted);">
+                        <span id="eventCounter">—</span>
+                    </div>
+                </div>
+
+                <!-- Navigation & Zoom -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-arrows-alt-h"></i> Navigation</div>
+                    <div class="control-group">
+                        <button class="btn btn-sm" id="zoomInBtn"><i class="fas fa-plus"></i></button>
+                        <button class="btn btn-sm" id="zoomOutBtn"><i class="fas fa-minus"></i></button>
+                        <button class="btn btn-sm" id="zoomResetBtn"><i class="fas fa-undo"></i> 1x</button>
+                        <button class="btn btn-sm" id="prevPlasmidBtn"><i class="fas fa-chevron-left"></i></button>
+                        <button class="btn btn-sm" id="nextPlasmidBtn"><i class="fas fa-chevron-right"></i></button>
+                        <span style="font-size:10px;color:var(--text-muted);margin-left:2px;" id="navInfo">—</span>
+                    </div>
+                    <div style="margin-top:4px;">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchInput" placeholder="Search gene, coordinate, ID…" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Protein Filters -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-filter"></i> Protein Filters</div>
+                    <div class="filter-chips" id="categoryChips">
+                        <span class="chip active" data-cat="all">All</span>
+                        <span class="chip" data-cat="AMR">AMR</span>
+                        <span class="chip" data-cat="Replication">Replication</span>
+                        <span class="chip" data-cat="Conjugation">Conjugation</span>
+                        <span class="chip" data-cat="Maintenance">Maintenance</span>
+                        <span class="chip" data-cat="Transposase">Transposase</span>
+                        <span class="chip" data-cat="Hypothetical">Hypothetical</span>
+                        <span class="chip" data-cat="Other">Other</span>
+                    </div>
+                    <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">
+                        <button class="btn btn-sm" id="toggleBadBtn"><i class="fas fa-exclamation-triangle"></i> Bad Regions</button>
+                        <button class="btn btn-sm" id="toggleProteinLabels"><i class="fas fa-tag"></i> Labels</button>
+                    </div>
+                </div>
+
+                <!-- Row Management -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-layer-group"></i> Row Management</div>
+                    <div class="toggle-row">
+                        <input type="checkbox" id="pinReference" checked />
+                        <label for="pinReference">Pin reference row</label>
+                    </div>
+                    <div class="toggle-row">
+                        <input type="checkbox" id="collapseContigs" />
+                        <label for="collapseContigs">Collapse contigs into one row</label>
+                    </div>
+                    <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">
+                        <button class="btn btn-sm" id="reorderTools"><i class="fas fa-sort"></i> Reorder tools</button>
+                        <button class="btn btn-sm" id="resetRows"><i class="fas fa-undo"></i> Reset rows</button>
+                    </div>
+                    <div style="margin-top:4px;font-size:10px;color:var(--text-secondary);">
+                        <span id="rowOrderInfo">Order: —</span>
+                    </div>
+                </div>
+
+                <!-- Display Options -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-sliders-h"></i> Display Options</div>
+                    <div class="toggle-row">
+                        <input type="checkbox" id="showGaps" checked />
+                        <label for="showGaps">Show gaps</label>
+                    </div>
+                    <div class="toggle-row">
+                        <input type="checkbox" id="showMismatches" checked />
+                        <label for="showMismatches">Show mismatches</label>
+                    </div>
+                    <div class="toggle-row">
+                        <input type="checkbox" id="showInterpretations" checked />
+                        <label for="showInterpretations">Show interpretations</label>
+                    </div>
+                    <div style="margin-top:4px;">
+                        <label style="font-size:10px;color:var(--text-muted);">Color by:</label>
+                        <select id="colorMode" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:2px 8px;font-size:10px;font-family:var(--font);outline:none;width:100%;margin-top:2px;">
+                            <option value="identity">Identity</option>
+                            <option value="event">Event type</option>
+                            <option value="source">Source sequence</option>
+                        </select>
+                    </div>
+                    <div style="margin-top:4px;">
+                        <label style="font-size:10px;color:var(--text-muted);">Min alignment length:</label>
+                        <input type="range" id="minAlignLen" min="10" max="200" value="50" style="width:100%;accent-color:var(--accent-blue);background:var(--bg-input);height:4px;border-radius:4px;" />
+                        <span style="font-size:9px;color:var(--text-muted);" id="minAlignLabel">50 bp</span>
+                    </div>
+                </div>
+
+                <!-- Split/Merge Diagram -->
+                <div class="split-merge-panel">
+                    <div class="sm-title"><i class="fas fa-code-branch"></i> Split / Merge Map</div>
+                    <canvas id="splitMergeCanvas"></canvas>
+                    <div style="font-size:9px;color:var(--text-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;">
+                        <span><span style="display:inline-block;width:8px;height:8px;background:#4ade80;border-radius:2px;"></span> 1:1</span>
+                        <span><span style="display:inline-block;width:8px;height:8px;background:#fbbf24;border-radius:2px;"></span> Split (1→2)</span>
+                        <span><span style="display:inline-block;width:8px;height:8px;background:#f472b6;border-radius:2px;"></span> Merge (2→1)</span>
+                        <span><span style="display:inline-block;width:8px;height:8px;background:#f87171;border-radius:2px;"></span> Complex</span>
+                    </div>
+                </div>
+
+                <!-- Synchronization -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-link"></i> Synchronization</div>
+                    <div class="toggle-row">
+                        <input type="checkbox" id="syncZoom" checked />
+                        <label for="syncZoom">Sync zoom across tools</label>
+                    </div>
+                    <div class="toggle-row">
+                        <input type="checkbox" id="syncPan" checked />
+                        <label for="syncPan">Sync pan across tools</label>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="sidebar-section">
+                    <div class="section-title"><i class="fas fa-palette"></i> Legend</div>
+                    <div class="legend-row">
+                        <span><span class="swatch" style="background:#17805a;"></span> Good</span>
+                        <span><span class="swatch" style="background:var(--bg-input);border:1px dashed var(--border-light);"></span> Missing</span>
+                        <span><span class="swatch" style="background:#b03a80;"></span> Inverted</span>
+                        <span><span class="swatch" style="background:#b3261e;"></span> Chromosomal</span>
+                        <span><span class="swatch" style="background:#d97706;"></span> Wrong plasmid</span>
+                        <span><span class="swatch" style="background:#a35c05;"></span> Ambiguous</span>
+                        <span><span class="swatch" style="background:#6d43c4;"></span> Duplicated</span>
+                        <span><span class="swatch" style="background:#0e7490;"></span> Low identity</span>
+                        <span><span class="swatch" style="background:#7c3aed;"></span> Unsupported join</span>
+                    </div>
+                    <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;font-size:8px;color:var(--text-muted);">
+                        <span class="protein-tag" style="background:#f87171;">AMR</span>
+                        <span class="protein-tag" style="background:#4a8cf7;">Replication</span>
+                        <span class="protein-tag" style="background:#a78bfa;">Conjugation</span>
+                        <span class="protein-tag" style="background:#22d3ee;">Maintenance</span>
+                        <span class="protein-tag" style="background:#fb923c;">Transposase</span>
+                        <span class="protein-tag" style="background:#4a607a;">Hypothetical</span>
+                        <span class="protein-tag" style="background:#6b7280;">Other</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ─── VIEWPORT ─── -->
+            <div class="viewport">
+
+                <!-- Toolbar -->
+                <div class="viewport-toolbar">
+                    <div class="left">
+                        <span class="context" id="viewContext"><i class="fas fa-map-pin"></i> <span class="highlight">—</span></span>
+                        <span style="font-size:10px;color:var(--text-muted);">|</span>
+                        <button class="btn btn-sm" id="zoomInBtn2"><i class="fas fa-plus"></i></button>
+                        <button class="btn btn-sm" id="zoomOutBtn2"><i class="fas fa-minus"></i></button>
+                        <button class="btn btn-sm" id="zoomResetBtn2">1x</button>
+                        <span style="font-size:10px;color:var(--text-muted);" id="zoomLevelDisplay">1.0x</span>
+                        <span style="font-size:10px;color:var(--text-muted);">|</span>
+                        <button class="btn btn-sm" id="modeToggle"><i class="fas fa-align-left"></i> Mode A</button>
+                    </div>
+                    <div class="right">
+                        <button class="btn btn-sm" id="prevPlasmidBtn2"><i class="fas fa-chevron-left"></i></button>
+                        <button class="btn btn-sm" id="nextPlasmidBtn2"><i class="fas fa-chevron-right"></i></button>
+                        <span style="font-size:10px;color:var(--text-muted);" id="plasmidNav">—</span>
+                        <button class="btn btn-sm" id="fitViewBtn"><i class="fas fa-arrows-alt"></i> Fit</button>
+                    </div>
+                </div>
+
+                <!-- Canvas -->
+                <div class="viewport-canvas-wrap" id="viewportWrap">
+                    <canvas id="mainCanvas"></canvas>
+                    <!-- Details Overlay -->
+                    <div class="details-overlay" id="detailsOverlay">
+                        <button class="close-details" id="closeDetailsBtn">&times;</button>
+                        <div class="detail-title" id="detailTitle">Alignment Block</div>
+                        <div id="detailContent"></div>
+                        <div class="interpretation" id="detailInterpretation"></div>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="viewport-status">
+                    <span class="coords" id="statusCoords">coords: —</span>
+                    <span id="statusInfo">Zoom: 1.0x · Mode: Alignment-block</span>
+                    <span id="statusToolInfo">—</span>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ─── EXPORT MODAL ─── -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-export"></i> Export</h2>
+                <button class="close-btn" id="closeExportModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="export-option" data-format="tsv">
+                    <div><span class="name">TSV</span><span class="desc"> — Tab-separated alignment data</span></div>
+                    <span class="icon"><i class="fas fa-table"></i></span>
+                </div>
+                <div class="export-option" data-format="json">
+                    <div><span class="name">JSON</span><span class="desc"> — Full structured metadata</span></div>
+                    <span class="icon"><i class="fas fa-code"></i></span>
+                </div>
+                <div class="export-option" data-format="bed">
+                    <div><span class="name">BED</span><span class="desc"> — Browser Extensible Data</span></div>
+                    <span class="icon"><i class="fas fa-map"></i></span>
+                </div>
+                <div class="export-option" data-format="fasta">
+                    <div><span class="name">FASTA</span><span class="desc"> — Selected region sequence</span></div>
+                    <span class="icon"><i class="fas fa-dna"></i></span>
+                </div>
+                <div class="export-option" data-format="png">
+                    <div><span class="name">PNG</span><span class="desc"> — Viewport screenshot</span></div>
+                    <span class="icon"><i class="fas fa-image"></i></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  1. MEASURED DATA (injected by build_explorer_view.py)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //
+        //  Every field below is derived from the benchmark run: alignment
+        //  blocks (spans, strand, identity, mapping quality), the structural
+        //  caller, bin-to-truth matching, and reference annotation. Fields the
+        //  pipeline does not measure are null, and the UI shows "not measured"
+        //  rather than substituting a zero.
+
+        const PB = __PB_EXPLORER__;
+
+        // Current selection. The report drives these through postMessage.
+        const sel = {
+            sample: PB.samples[0] ? PB.samples[0].id : null,
+            plasmidIdx: 0,
+        };
+
+        function sampleData() { return PB.samples.find(s => s.id === sel.sample) || PB.samples[0] || null; }
+        function plasmidList() { const s = sampleData(); return s ? s.plasmids : []; }
+        function currentPlasmid() { const l = plasmidList(); return l[Math.min(sel.plasmidIdx, l.length - 1)] || null; }
+        function toolTracks() { const pl = currentPlasmid(); return pl ? pl.tools : []; }
+
+        // The renderer below was written against three globals. Keep the names
+        // and make them views onto the current selection.
+        let PLASMID = currentPlasmid();
+        let TOOL_TRACKS = toolTracks();
+        let STRUCTURAL_EVENTS = (PLASMID && PLASMID.events) || { mismatches: [], gaps: [], inversions: [], breakpoints: [] };
+        let SPLIT_MERGE_DATA = (sampleData() && sampleData().split_merge) || { truth: [], predicted: [], links: [] };
+        let REF_LENGTH = PLASMID ? PLASMID.length : 0;
+        let REF_SEQUENCE = (PLASMID && PLASMID.sequence) || '';
+
+        function rebind() {
+            PLASMID = currentPlasmid();
+            TOOL_TRACKS = toolTracks();
+            STRUCTURAL_EVENTS = (PLASMID && PLASMID.events) || { mismatches: [], gaps: [], inversions: [], breakpoints: [] };
+            SPLIT_MERGE_DATA = (sampleData() && sampleData().split_merge) || { truth: [], predicted: [], links: [] };
+            REF_LENGTH = PLASMID ? PLASMID.length : 0;
+            REF_SEQUENCE = (PLASMID && PLASMID.sequence) || '';
+            if (typeof state !== 'undefined') {
+                state.plasmids = plasmidList();
+                state.currentPlasmidIdx = sel.plasmidIdx;
+                state.rowOrder = TOOL_TRACKS.map(t => t.id);
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  2. STATE
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        const state = {
+            zoom: 1.0,
+            pan: 0,
+            mode: 'A', // 'A' = alignment-block, 'B' = nucleotide
+            selectedSegment: null,
+            selectedProtein: null,
+            showLabels: true,
+            showBadOnly: false,
+            categoryFilter: 'all',
+            searchTerm: '',
+            showGaps: true,
+            showMismatches: true,
+            showInterpretations: true,
+            colorMode: 'identity',
+            minAlignLen: 50,
+            pinReference: true,
+            collapseContigs: false,
+            syncZoom: true,
+            syncPan: true,
+            rowOrder: TOOL_TRACKS.map(t => t.id),
+            currentPlasmidIdx: 0,
+            plasmids: plasmidList(),
+            eventIndex: { mismatch: 0, gap: 0, inversion: 0, breakpoint: 0 },
+        };
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  3. DOM REFS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const viewportWrap = document.getElementById('viewportWrap');
+        const detailsOverlay = document.getElementById('detailsOverlay');
+        const detailTitle = document.getElementById('detailTitle');
+        const detailContent = document.getElementById('detailContent');
+        const detailInterpretation = document.getElementById('detailInterpretation');
+        const splitMergeCanvas = document.getElementById('splitMergeCanvas');
+        const smCtx = splitMergeCanvas.getContext('2d');
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  4. RENDERER
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function mergeContigs(contigs) {
+            if (!contigs || contigs.length === 0) return [];
+            const sorted = [...contigs].sort((a, b) => a.start - b.start);
+            const merged = [];
+            let current = { ...sorted[0] };
+            for (let i = 1; i < sorted.length; i++) {
+                if (sorted[i].start <= current.end) {
+                    current.end = Math.max(current.end, sorted[i].end);
+                    current.status = current.status === 'good' && sorted[i].status === 'good' ? 'good' : 'warning';
+                } else {
+                    merged.push({ ...current });
+                    current = { ...sorted[i] };
+                }
+            }
+            merged.push(current);
+            return merged;
+        }
+
+        function render() {
+            const rect = viewportWrap.getBoundingClientRect();
+            const W = rect.width - 2;
+            const H = rect.height - 2;
+            canvas.width = W * 2;
+            canvas.height = H * 2;
+            canvas.style.width = W + 'px';
+            canvas.style.height = H + 'px';
+            ctx.scale(2, 2);
+
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = '#f4f7f5';
+            ctx.fillRect(0, 0, W, H);
+
+            const plasmid = state.plasmids[state.currentPlasmidIdx];
+            const totalLen = plasmid.length;
+            const pad = { top: 36, bottom: 24, left: 90, right: 16 };
+            const plotW = W - pad.left - pad.right;
+            const plotH = H - pad.top - pad.bottom;
+
+            const zoom = state.zoom;
+            const pan = state.pan;
+            const viewLen = totalLen / zoom;
+            const viewStart = pan * totalLen;
+            const viewEnd = viewStart + viewLen;
+            const scale = (pos) => pad.left + ((pos - viewStart) / viewLen) * plotW;
+
+            // ── Reference Ruler ──
+            const rulerY = pad.top;
+            ctx.fillStyle = '#e8eeea';
+            ctx.fillRect(pad.left, rulerY, plotW, 20);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(pad.left + 2, rulerY + 2, plotW - 4, 16);
+
+            ctx.fillStyle = '#7b8a83';
+            ctx.font = '7px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let i = 0; i <= 20; i++) {
+                const pos = (i / 20) * totalLen;
+                if (pos < viewStart || pos > viewEnd) continue;
+                const x = scale(pos);
+                ctx.fillRect(x, rulerY + 20, 1, 5);
+                ctx.fillText((pos / 1000).toFixed(0) + 'kb', x, rulerY + 26);
+            }
+
+            // ── Tool Tracks ──
+            const tools = state.rowOrder.map(id => TOOL_TRACKS.find(t => t.id === id)).filter(Boolean);
+            const trackH = state.mode === 'A' ? 20 : 32;
+            const trackGap = 4;
+            let yOffset = pad.top + 28;
+
+            // Reference / Contig track
+            if (state.pinReference) {
+                const refY = yOffset;
+                ctx.fillStyle = '#e8eeea';
+                ctx.fillRect(pad.left, refY, plotW, 18);
+                const allContigs = tools.flatMap(t => t.contigs || []);
+                const mergedContigs = state.collapseContigs ? mergeContigs(allContigs) : allContigs;
+                mergedContigs.forEach(c => {
+                    const x1 = scale(c.start);
+                    const x2 = scale(c.end);
+                    const w = Math.max(2, x2 - x1);
+                    ctx.fillStyle = c.status === 'good' ? 'rgba(74,222,128,0.4)' : 'rgba(251,191,36,0.4)';
+                    ctx.fillRect(x1, refY + 2, w, 14);
+                    ctx.strokeStyle = c.status === 'good' ? '#4ade80' : '#fbbf24';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(x1, refY + 2, w, 14);
+                    if (w > 30 && !state.collapseContigs) {
+                        ctx.fillStyle = '#4a5a52';
+                        ctx.font = '6px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(c.id, x1 + w / 2, refY + 9);
+                    }
+                });
+                ctx.fillStyle = '#7b8a83';
+                ctx.font = '7px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('Contigs', pad.left - 6, refY + 16);
+                yOffset += 22;
+            }
+
+            // Tool tracks
+            tools.forEach((tool, idx) => {
+                const y = yOffset + idx * (trackH + trackGap);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(pad.left, y, plotW, trackH);
+
+                const segs = tool.segments.filter(s => (s.end - s.start) >= state.minAlignLen);
+
+                segs.forEach(seg => {
+                    const x1 = scale(seg.start);
+                    const x2 = scale(seg.end);
+                    const w = Math.max(1, x2 - x1);
+
+                    let color;
+                    if (state.colorMode === 'identity') {
+                        const id = (seg.identity || 0) / 100;
+                        const r = Math.round(40 + 215 * (1 - id));
+                        const g = Math.round(40 + 180 * id);
+                        const b = Math.round(60 + 120 * (1 - id * 0.7));
+                        color = `rgb(${Math.min(r,255)},${Math.min(g,255)},${Math.min(b,255)})`;
+                    } else if (state.colorMode === 'event') {
+                        // PlasBench's nine measured segment types, not the six
+                        // the design shipped with.
+                        const colors = { good: '#17805a', correct: '#17805a', missing: '#eef2ef',
+                            inverted: '#b03a80', chromosomal: '#b3261e', wrong_plasmid: '#d97706',
+                            contam: '#b3261e', ambiguous: '#a35c05', duplicated: '#6d43c4',
+                            low_identity: '#0e7490', unsupported_join: '#7c3aed' };
+                        color = colors[seg.type] || '#d3ddd6';
+                    } else {
+                        color = tool.color + '80';
+                    }
+
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x1, y + 1, w, trackH - 2);
+
+                    if (seg.type === 'missing') {
+                        ctx.strokeStyle = '#b9c7be';
+                        ctx.lineWidth = 0.5;
+                        ctx.setLineDash([2, 4]);
+                        ctx.strokeRect(x1, y + 1, w, trackH - 2);
+                        ctx.setLineDash([]);
+                    }
+
+                    if (w > 40 && seg.identity && seg.identity > 0) {
+                        ctx.fillStyle = '#16211c';
+                        ctx.font = '6px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(Math.round(seg.identity) + '%', x1 + w / 2, y + trackH / 2);
+                    }
+
+                    seg._x1 = x1;
+                    seg._x2 = x2;
+                    seg._y1 = y + 1;
+                    seg._y2 = y + trackH - 2;
+                    seg._tool = tool;
+                    seg._toolId = tool.id;
+                });
+
+                ctx.fillStyle = '#4a5a52';
+                ctx.font = '7px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(tool.label + ' ' + tool.version, pad.left - 6, y + trackH / 2);
+
+                const avgMapQ = Math.round(segs.reduce((sum, s) => sum + (s.mapQ || 0), 0) / Math.max(1, segs.length));
+                if (avgMapQ > 0) {
+                    ctx.fillStyle = avgMapQ > 40 ? '#4ade80' : avgMapQ > 20 ? '#fbbf24' : '#f87171';
+                    ctx.font = '6px Inter, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText('MQ: ' + avgMapQ, pad.left + plotW + 4, y + 2);
+                }
+            });
+
+            // ── Proteins (reference) ──
+            const protY = yOffset + tools.length * (trackH + trackGap) + 6;
+            if (state.mode === 'A' && state.showLabels) {
+                ctx.fillStyle = '#e8eeea';
+                ctx.fillRect(pad.left, protY, plotW, 22);
+                const filteredProts = plasmid.proteins.filter(p => {
+                    if (state.categoryFilter !== 'all' && p.category !== state.categoryFilter) return false;
+                    if (state.showBadOnly && p.status === 'Complete') return false;
+                    return true;
+                });
+                filteredProts.forEach(p => {
+                    const x1 = scale(p.start);
+                    const x2 = scale(p.end);
+                    const w = Math.max(3, x2 - x1);
+                    const catColors = { AMR: '#f87171', Replication: '#4a8cf7', Conjugation: '#a78bfa',
+                        Maintenance: '#22d3ee', Transposase: '#fb923c', Hypothetical: '#4a607a',
+                        Other: '#6b7280' };
+                    ctx.fillStyle = catColors[p.category] || '#6b7280';
+                    ctx.fillRect(x1, protY + 2, w, 18);
+                    if (p.strand === '+') {
+                        ctx.beginPath();
+                        ctx.moveTo(x2 - 2, protY + 2);
+                        ctx.lineTo(x2 + 4, protY + 11);
+                        ctx.lineTo(x2 - 2, protY + 20);
+                        ctx.fill();
+                    } else {
+                        ctx.beginPath();
+                        ctx.moveTo(x1 + 2, protY + 2);
+                        ctx.lineTo(x1 - 4, protY + 11);
+                        ctx.lineTo(x1 + 2, protY + 20);
+                        ctx.fill();
+                    }
+                    if (w > 30 && state.showLabels) {
+                        ctx.fillStyle = '#fff';
+                        ctx.font = '6px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(p.name, x1 + w / 2, protY + 11);
+                    }
+                    p._x1 = x1;
+                    p._x2 = x2;
+                    p._y1 = protY + 2;
+                    p._y2 = protY + 20;
+                });
+                ctx.fillStyle = '#7b8a83';
+                ctx.font = '7px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('Proteins', pad.left - 6, protY + 20);
+            }
+
+            // ── Nucleotide view (Mode B) ──
+            if (state.mode === 'B' && zoom > 2.5) {
+                renderNucleotideView(ctx, plasmid, tools, pad, plotW, viewStart, viewLen, scale, yOffset, trackH, trackGap,
+                    protY);
+            }
+
+            // ── Status ──
+            document.getElementById('statusCoords').textContent =
+                `coords: ${Math.round(viewStart)} – ${Math.round(viewEnd)} bp`;
+            document.getElementById('statusInfo').textContent =
+                `Zoom: ${zoom.toFixed(1)}x · Mode: ${state.mode === 'A' ? 'Alignment-block' : 'Nucleotide'}`;
+            document.getElementById('zoomLevelDisplay').textContent = zoom.toFixed(1) + 'x';
+
+            canvas._segments = tools.flatMap(t => t.segments.map(s => ({ ...s, toolId: t.id, tool: t })));
+            canvas._proteins = plasmid.proteins;
+            canvas._plasmid = plasmid;
+            canvas._tools = tools;
+
+            renderSplitMerge();
+        }
+
+        // ── Nucleotide View (Mode B) ──
+        function renderNucleotideView(ctx, plasmid, tools, pad, plotW, viewStart, viewLen, scale, yOffset, trackH, trackGap,
+            protY) {
+            const activeTool = tools[0];
+            const refSeq = plasmid.sequence;
+            const predSeq = activeTool.predictedSequence || refSeq;
+
+            const startPos = Math.max(0, Math.floor(viewStart));
+            const endPos = Math.min(plasmid.length, Math.ceil(viewEnd));
+            if (startPos >= endPos) return;
+
+            const baseWidth = Math.min(12, plotW / (endPos - startPos) * 2);
+            if (baseWidth < 1) return;
+
+            const y = protY + 28;
+            ctx.fillStyle = '#e8eeea';
+            ctx.fillRect(pad.left, y, plotW, 28);
+
+            let x = pad.left;
+            for (let i = startPos; i < endPos; i++) {
+                const refBase = refSeq[i] || 'N';
+                const predBase = predSeq[i] || 'N';
+                const isMatch = refBase === predBase;
+                const isGap = predBase === '-';
+
+                let color = '#7b8a83';
+                if (isGap) color = '#b9c7be';
+                else if (isMatch) color = '#4ade80';
+                else color = '#f87171';
+
+                if (x + baseWidth > pad.left + plotW) break;
+                ctx.fillStyle = color;
+                ctx.font = `${Math.min(baseWidth, 10)}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(predBase, x + baseWidth / 2, y + 14);
+                x += baseWidth;
+            }
+
+            ctx.fillStyle = '#7b8a83';
+            ctx.font = '7px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('Nucleotide view (ref: ' + activeTool.label + ')', pad.left, y - 2);
+        }
+
+        // ── Split/Merge Diagram ──
+        function renderSplitMerge() {
+            const data = SPLIT_MERGE_DATA;
+            const W = splitMergeCanvas.parentElement.clientWidth - 24;
+            const H = 80;
+            splitMergeCanvas.width = W * 2;
+            splitMergeCanvas.height = H * 2;
+            splitMergeCanvas.style.width = W + 'px';
+            splitMergeCanvas.style.height = H + 'px';
+            smCtx.scale(2, 2);
+
+            smCtx.clearRect(0, 0, W, H);
+            smCtx.fillStyle = '#f4f7f5';
+            smCtx.fillRect(0, 0, W, H);
+
+            const pad = { top: 10, bottom: 10, left: 80, right: 80 };
+            const plotW = W - pad.left - pad.right;
+            const plotH = H - pad.top - pad.bottom;
+
+            const truthX = pad.left;
+            const truthY = pad.top;
+            const truthH = plotH / data.truth.length;
+            data.truth.forEach((t, i) => {
+                const y = truthY + i * truthH;
+                smCtx.fillStyle = '#4a8cf7';
+                smCtx.fillRect(truthX, y, 6, truthH - 2);
+                smCtx.fillStyle = '#4a5a52';
+                smCtx.font = '7px Inter, sans-serif';
+                smCtx.textAlign = 'right';
+                smCtx.textBaseline = 'middle';
+                smCtx.fillText(t.id, truthX - 4, y + truthH / 2);
+            });
+
+            const predX = W - pad.right;
+            const predY = pad.top;
+            const predH = plotH / data.predicted.length;
+            data.predicted.forEach((p, i) => {
+                const y = predY + i * predH;
+                smCtx.fillStyle = '#f472b6';
+                smCtx.fillRect(predX - 6, y, 6, predH - 2);
+                smCtx.fillStyle = '#4a5a52';
+                smCtx.font = '7px Inter, sans-serif';
+                smCtx.textAlign = 'left';
+                smCtx.textBaseline = 'middle';
+                smCtx.fillText(p.id, predX + 4, y + predH / 2);
+            });
+
+            data.links.forEach(link => {
+                const truthIdx = data.truth.findIndex(t => t.id === link.truth);
+                const predIdx = data.predicted.findIndex(p => p.id === link.pred);
+                if (truthIdx < 0 || predIdx < 0) return;
+                const y1 = truthY + truthIdx * truthH + truthH / 2;
+                const y2 = predY + predIdx * predH + predH / 2;
+                const x1 = truthX + 6;
+                const x2 = predX - 6;
+                const color = link.type === '1:1' ? '#4ade80' : link.type === 'split' ? '#fbbf24' : link.type ===
+                    'merge' ? '#f472b6' : '#f87171';
+                smCtx.strokeStyle = color;
+                smCtx.lineWidth = 1 + link.weight * 2;
+                smCtx.globalAlpha = 0.6;
+                smCtx.beginPath();
+                smCtx.moveTo(x1, y1);
+                smCtx.quadraticCurveTo((x1 + x2) / 2, (y1 + y2) / 2, x2, y2);
+                smCtx.stroke();
+                smCtx.globalAlpha = 1;
+            });
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  5. INTERACTIONS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width / 2;
+            const scaleY = canvas.height / rect.height / 2;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            const segments = canvas._segments || [];
+            for (let seg of segments) {
+                if (x >= seg._x1 && x <= seg._x2 && y >= seg._y1 && y <= seg._y2) {
+                    state.selectedSegment = seg;
+                    showSegmentDetails(seg);
+                    return;
+                }
+            }
+
+            const proteins = canvas._proteins || [];
+            for (let p of proteins) {
+                if (x >= p._x1 && x <= p._x2 && y >= p._y1 && y <= p._y2) {
+                    state.selectedProtein = p;
+                    showProteinDetails(p);
+                    return;
+                }
+            }
+
+            state.selectedSegment = null;
+            state.selectedProtein = null;
+            detailsOverlay.classList.remove('visible');
+            render();
+        });
+
+        function showSegmentDetails(seg) {
+            detailsOverlay.classList.add('visible');
+            detailTitle.textContent = seg._tool.label + ' · ' + seg.start + ' – ' + seg.end;
+            // A value that was never measured is reported as such. Rendering it
+            // as 0 would state a measurement the run never made.
+            const show = (v, suffix) => (v === null || v === undefined)
+                ? '<span class="unmeasured">not measured</span>' : v + (suffix || '');
+            const tool = seg._tool;
+            detailContent.innerHTML = `
+                <div class="detail-row"><span class="label">Type</span><span class="value">${seg.type}</span></div>
+                <div class="detail-row"><span class="label">Predicted record</span><span class="value">${seg.record || '—'}</span></div>
+                <div class="detail-row"><span class="label">Identity</span><span class="value">${show(seg.identity, '%')}</span></div>
+                <div class="detail-row"><span class="label">Mapping quality</span><span class="value">${show(tool.mapQ)} <small>(method mean)</small></span></div>
+                <div class="detail-row"><span class="label">Read coverage</span><span class="value">${show(seg.coverage)}</span></div>
+                <div class="detail-row"><span class="label">Method</span><span class="value">${tool.label} ${tool.version}</span></div>
+                <div class="detail-row"><span class="label">Reference span</span><span class="value">${seg.start.toLocaleString()} – ${seg.end.toLocaleString()} (${(seg.end - seg.start).toLocaleString()} bp)</span></div>
+                <div class="detail-row"><span class="label">Method identity</span><span class="value">${show(tool.identity, '%')} <small>(this plasmid)</small></span></div>
+            `;
+
+            let interpretation = '';
+            if (seg.type === 'inverted') {
+                interpretation = '⚠️ Inverted region: sequence orientation is reversed relative to the reference. This may indicate a misassembly or a true biological inversion.';
+            } else if (seg.type === 'chromosomal') {
+                interpretation = '🧬 Chromosomal contamination: this record also aligns to the chromosome, so the interval is not plasmid-specific evidence.';
+            } else if (seg.type === 'wrong_plasmid') {
+                interpretation = '🧬 Cross-plasmid record: this record also aligns to a different truth plasmid in the same sample.';
+            } else if (seg.type === 'low_identity') {
+                interpretation = '⚠️ Low identity: the alignment is below 90% identity across this interval.';
+            } else if (seg.type === 'unsupported_join') {
+                interpretation = '✂️ Unsupported join: the predicted record runs straight across a reference interval it does not align to, asserting an adjacency the reference does not support.';
+            } else if (seg.type === 'contam') {
+                interpretation = '🧬 Contamination detected: sequence does not match the reference plasmid. Likely from another plasmid or the chromosome.';
+            } else if (seg.type === 'missing') {
+                interpretation = '❌ Missing region: no sequence recovered for this interval.';
+            } else if (seg.type === 'duplicated') {
+                interpretation = '🔄 Duplicated region: sequence appears more than once in the assembly.';
+            } else if (seg.type === 'ambiguous') {
+                interpretation = '❓ Ambiguous alignment: sequence could not be confidently mapped.';
+            } else if (seg.identity < 90) {
+                interpretation = '⚠️ Low identity: sequence diverges significantly from the reference.';
+            } else {
+                interpretation = '✅ Good recovery: sequence aligns well with the reference.';
+            }
+            if (state.showInterpretations) {
+                detailInterpretation.textContent = '🔍 ' + interpretation;
+                detailInterpretation.style.display = 'block';
+            } else {
+                detailInterpretation.style.display = 'none';
+            }
+            render();
+        }
+
+        function showProteinDetails(p) {
+            detailsOverlay.classList.add('visible');
+            detailTitle.textContent = p.name;
+            detailContent.innerHTML = `
+                <div class="detail-row"><span class="label">Product</span><span class="value">${p.product}</span></div>
+                <div class="detail-row"><span class="label">Category</span><span class="value">${p.category}</span></div>
+                <div class="detail-row"><span class="label">Coordinates</span><span class="value">${p.start} – ${p.end}</span></div>
+                <div class="detail-row"><span class="label">Strand</span><span class="value">${p.strand}</span></div>
+                <div class="detail-row"><span class="label">Status</span><span class="value">${p.status}</span></div>
+                <div class="detail-row"><span class="label">Length</span><span class="value">${p.length} bp</span></div>
+            `;
+            detailInterpretation.textContent = '🔍 Protein recovered with status: ' + p.status;
+            detailInterpretation.style.display = 'block';
+            render();
+        }
+
+        document.getElementById('closeDetailsBtn').addEventListener('click', function() {
+            detailsOverlay.classList.remove('visible');
+            state.selectedSegment = null;
+            state.selectedProtein = null;
+            render();
+        });
+
+        // ── Structural Navigation ──
+        function jumpToEvent(type) {
+            const events = STRUCTURAL_EVENTS[type + 's'] || STRUCTURAL_EVENTS[type] || [];
+            if (events.length === 0) return;
+            const idx = state.eventIndex[type] || 0;
+            const event = events[idx % events.length];
+            state.eventIndex[type] = (idx + 1) % events.length;
+
+            const pos = event.pos || event.start || 0;
+            const totalLen = PLASMID.length;
+            // At 1x the whole plasmid is in view and panning is clamped to zero,
+            // so a jump would move nothing. Zoom in far enough to make the
+            // event visible before centring on it.
+            if (state.zoom < 2) {
+                const target = Math.max(2000, Math.round(totalLen / 10));
+                state.zoom = clamp(totalLen / target, 2, 10);
+            }
+            const viewLen = totalLen / state.zoom;
+            state.pan = clamp((pos - viewLen / 2) / totalLen, 0, 1 - 1 / state.zoom);
+            render();
+            const span = event.end && event.end > event.start
+                ? ` · ${(event.end - event.start).toLocaleString()} bp` : '';
+            document.getElementById('eventCounter').textContent =
+                `Jumped to ${Math.round(pos).toLocaleString()} bp${span}: ${event.desc}` +
+                (event.validated ? '' : ' (alignment-derived, not validated)');
+        }
+
+        document.getElementById('jumpMismatch').addEventListener('click', () => jumpToEvent('mismatch'));
+        document.getElementById('jumpGap').addEventListener('click', () => jumpToEvent('gap'));
+        document.getElementById('jumpInversion').addEventListener('click', () => jumpToEvent('inversion'));
+        document.getElementById('jumpBreakpoint').addEventListener('click', () => jumpToEvent('breakpoint'));
+
+        // ── Row Management ──
+        document.getElementById('pinReference').addEventListener('change', function() {
+            state.pinReference = this.checked;
+            render();
+        });
+        document.getElementById('collapseContigs').addEventListener('change', function() {
+            state.collapseContigs = this.checked;
+            render();
+        });
+
+        // Rotate the methods actually present for this plasmid, rather than a
+        // fixed list of names from the design's sample data.
+        document.getElementById('reorderTools').addEventListener('click', function() {
+            if (state.rowOrder.length > 1) state.rowOrder.push(state.rowOrder.shift());
+            document.getElementById('rowOrderInfo').textContent = 'Order: ' + state.rowOrder.join(', ');
+            render();
+        });
+        document.getElementById('resetRows').addEventListener('click', function() {
+            state.rowOrder = TOOL_TRACKS.map(t => t.id);
+            document.getElementById('rowOrderInfo').textContent = 'Order: ' + state.rowOrder.join(', ');
+            render();
+        });
+
+        // ── Protein Filters ──
+        document.querySelectorAll('#categoryChips .chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                document.querySelectorAll('#categoryChips .chip').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                state.categoryFilter = this.dataset.cat;
+                render();
+            });
+        });
+
+        document.getElementById('toggleBadBtn').addEventListener('click', function() {
+            state.showBadOnly = !state.showBadOnly;
+            this.style.borderColor = state.showBadOnly ? 'var(--accent-amber)' : '';
+            render();
+        });
+
+        document.getElementById('toggleProteinLabels').addEventListener('click', function() {
+            state.showLabels = !state.showLabels;
+            this.style.borderColor = state.showLabels ? 'var(--accent-blue)' : '';
+            render();
+        });
+
+        // ── Display Options ──
+        document.getElementById('showGaps').addEventListener('change', function() {
+            state.showGaps = this.checked;
+            render();
+        });
+        document.getElementById('showMismatches').addEventListener('change', function() {
+            state.showMismatches = this.checked;
+            render();
+        });
+        document.getElementById('showInterpretations').addEventListener('change', function() {
+            state.showInterpretations = this.checked;
+            render();
+        });
+        document.getElementById('colorMode').addEventListener('change', function() {
+            state.colorMode = this.value;
+            render();
+        });
+        document.getElementById('minAlignLen').addEventListener('input', function() {
+            state.minAlignLen = parseInt(this.value);
+            document.getElementById('minAlignLabel').textContent = state.minAlignLen + ' bp';
+            render();
+        });
+
+        // ── Search ──
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const term = this.value.toLowerCase();
+            if (term) {
+                const matches = state.plasmid.proteins.filter(p =>
+                    p.name.toLowerCase().includes(term) || p.product.toLowerCase().includes(term));
+                if (matches.length > 0) {
+                    state.selectedProtein = matches[0];
+                    showProteinDetails(matches[0]);
+                } else {
+                    state.selectedProtein = null;
+                    detailsOverlay.classList.remove('visible');
+                }
+            } else {
+                state.selectedProtein = null;
+                detailsOverlay.classList.remove('visible');
+            }
+            render();
+        });
+
+        // ── Zoom / Pan ──
+        function zoomIn() { state.zoom = Math.min(10, state.zoom * 1.3);
+            render(); }
+
+        function zoomOut() { state.zoom = Math.max(0.3, state.zoom / 1.3);
+            render(); }
+
+        function zoomReset() { state.zoom = 1;
+            state.pan = 0;
+            render(); }
+
+        document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
+        document.getElementById('zoomInBtn2').addEventListener('click', zoomIn);
+        document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
+        document.getElementById('zoomOutBtn2').addEventListener('click', zoomOut);
+        document.getElementById('zoomResetBtn').addEventListener('click', zoomReset);
+        document.getElementById('zoomResetBtn2').addEventListener('click', zoomReset);
+        document.getElementById('resetViewBtn').addEventListener('click', function() {
+            state.zoom = 1;
+            state.pan = 0;
+            state.selectedSegment = null;
+            state.selectedProtein = null;
+            detailsOverlay.classList.remove('visible');
+            render();
+        });
+        document.getElementById('fitViewBtn').addEventListener('click', function() {
+            state.zoom = 1;
+            state.pan = 0;
+            render();
+        });
+
+        // ── Mode Toggle ──
+        document.getElementById('modeToggle').addEventListener('click', function() {
+            state.mode = state.mode === 'A' ? 'B' : 'A';
+            this.innerHTML = state.mode === 'A' ? '<i class="fas fa-align-left"></i> Mode A' :
+                '<i class="fas fa-align-justify"></i> Mode B';
+            render();
+        });
+
+        // ── Previous/Next Plasmid ──
+        function stepPlasmid(delta) {
+            const list = plasmidList();
+            if (!list.length) return;
+            sel.plasmidIdx = (sel.plasmidIdx + delta + list.length) % list.length;
+            applySelection({ plasmid: list[sel.plasmidIdx].id });
+        }
+        function prevPlasmid() { stepPlasmid(-1); }
+        function nextPlasmid() { stepPlasmid(1); }
+
+        document.getElementById('prevPlasmidBtn').addEventListener('click', prevPlasmid);
+        document.getElementById('prevPlasmidBtn2').addEventListener('click', prevPlasmid);
+        document.getElementById('nextPlasmidBtn').addEventListener('click', nextPlasmid);
+        document.getElementById('nextPlasmidBtn2').addEventListener('click', nextPlasmid);
+
+        // ── Export ──
+        document.getElementById('exportModalBtn').addEventListener('click', function() {
+            document.getElementById('exportModal').classList.add('open');
+        });
+        document.getElementById('closeExportModal').addEventListener('click', function() {
+            document.getElementById('exportModal').classList.remove('open');
+        });
+
+        function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+        function exportData(format) {
+            const plasmid = state.plasmids[state.currentPlasmidIdx];
+            const tools = state.rowOrder.map(id => TOOL_TRACKS.find(t => t.id === id)).filter(Boolean);
+            const activeTool = tools[0];
+            const seg = state.selectedSegment || activeTool.segments[0];
+            const start = seg ? seg.start : 0;
+            const end = seg ? seg.end : plasmid.length;
+
+            let content = '';
+            let filename = 'export';
+            let mimeType = 'text/plain';
+
+            switch (format) {
+                case 'tsv':
+                    // An unmeasured field is written as NA, never as 0.
+                    const na = v => (v === null || v === undefined) ? 'NA' : v;
+                    content = 'sample\tplasmid\ttool\trecord\tstart\tend\ttype\tidentity\tmethod_mapq\tread_coverage\n';
+                    tools.forEach(t => {
+                        t.segments.forEach(s => {
+                            if (s.start >= start && s.end <= end) {
+                                content += `${sel.sample}\t${plasmid.id}\t${t.id}\t${na(s.record)}\t` +
+                                    `${s.start}\t${s.end}\t${s.type}\t${na(s.identity)}\t` +
+                                    `${na(t.mapQ)}\t${na(s.coverage)}\n`;
+                            }
+                        });
+                    });
+                    filename = 'alignment_data.tsv';
+                    mimeType = 'text/tab-separated-values';
+                    break;
+                case 'json':
+                    // render() annotates each segment with a back-reference to
+                    // its tool for hit testing, which makes the object graph
+                    // circular. Serialise the measured fields only.
+                    const plain = s => Object.fromEntries(
+                        Object.entries(s).filter(([k]) => !k.startsWith('_')));
+                    content = JSON.stringify({
+                        sample: sel.sample,
+                        plasmid: plasmid.id,
+                        plasmidLength: plasmid.length,
+                        region: { start: start, end: end },
+                        coverageNote: PB.unmeasured.coverage,
+                        tools: tools.map(t => ({
+                            id: t.id,
+                            version: t.version,
+                            identity: t.identity,
+                            mapQ: t.mapQ,
+                            coverage: t.coverage,
+                            resolvedBases: t.resolvedBases,
+                            segments: t.segments.filter(s => s.start >= start && s.end <= end).map(plain)
+                        })),
+                        proteins: plasmid.proteins.filter(p => p.start >= start && p.end <= end),
+                        events: plasmid.events,
+                    }, null, 2);
+                    filename = 'alignment_data.json';
+                    mimeType = 'application/json';
+                    break;
+                case 'bed':
+                    content = 'track name="PlasBench"\n';
+                    tools.forEach(t => {
+                        t.segments.forEach(s => {
+                            if (s.start >= start && s.end <= end) {
+                                content +=
+                                    `${plasmid.id}\t${s.start}\t${s.end}\t${t.id}_${s.type}\t${Math.round(s.identity||0)}\t+\n`;
+                            }
+                        });
+                    });
+                    filename = 'alignment_data.bed';
+                    mimeType = 'text/plain';
+                    break;
+                case 'fasta':
+                    const refSeq = plasmid.sequence.slice(start, end);
+                    const predSeq = activeTool.predictedSequence ? activeTool.predictedSequence.slice(start,
+                        end) : refSeq;
+                    content =
+                        `>ref_${plasmid.id}_${start}-${end}\n${refSeq}\n>${activeTool.id}_${start}-${end}\n${predSeq}\n`;
+                    filename = 'sequence_data.fasta';
+                    mimeType = 'text/plain';
+                    break;
+                case 'png':
+                    const link = document.createElement('a');
+                    link.download = 'explorer_view.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    return;
+                default:
+                    return;
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }
+
+        document.querySelectorAll('.export-option').forEach(el => {
+            el.addEventListener('click', function() {
+                const format = this.dataset.format;
+                exportData(format);
+                document.getElementById('exportModal').classList.remove('open');
+            });
+        });
+
+        // ── Keyboard shortcuts (from redesign) ──
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                if (detailsOverlay.classList.contains('visible')) {
+                    detailsOverlay.classList.remove('visible');
+                    state.selectedSegment = null;
+                    state.selectedProtein = null;
+                    render();
+                }
+                if (document.getElementById('exportModal').classList.contains('open')) {
+                    document.getElementById('exportModal').classList.remove('open');
+                }
+            }
+            if (e.key === 'ArrowLeft') { e.preventDefault();
+                prevPlasmid(); }
+            if (e.key === 'ArrowRight') { e.preventDefault();
+                nextPlasmid(); }
+            if (e.key === '+' || e.key === '=') { e.preventDefault();
+                zoomIn(); }
+            if (e.key === '-') { e.preventDefault();
+                zoomOut(); }
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  6. INIT
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // Header, sidebar and badges are re-read on every selection change,
+        // not written once at load: the report drives sample and plasmid.
+        const NM = 'not measured';
+        function pct(v) { return v === null || v === undefined ? NM : Math.round(v * 1000) / 10 + '%'; }
+        function setText(id, value) { const e = document.getElementById(id); if (e) e.textContent = value; }
+
+        function refreshChrome() {
+            const s = sampleData(), pl = currentPlasmid();
+            if (!s || !pl) return;
+            setText('plasmidLen', pl.length.toLocaleString() + ' bp');
+            setText('plasmidCirc', pl.circular === null ? NM : (pl.circular ? 'Yes' : 'No'));
+            setText('plasmidRep', pl.replicon || NM);
+            setText('plasmidRec', pct(pl.recovery));
+            setText('plasmidPur', pct(pl.purity));
+            setText('plasmidProt', String(pl.proteins.length));
+            setText('sampleBadge', s.id);
+            setText('plasmidBadge', pl.id);
+            setText('toolBadge', (TOOL_TRACKS[0] || {}).label || '—');
+            setText('headerLen', pl.length.toLocaleString() + ' bp');
+            setText('headerProt', pl.proteins.length + ' proteins');
+            const n = plasmidList().length;
+            setText('plasmidNav', (sel.plasmidIdx + 1) + ' / ' + n);
+            setText('navInfo', (sel.plasmidIdx + 1) + ' / ' + n);
+            const ev = STRUCTURAL_EVENTS;
+            setText('eventCounter', 'Found: ' + ev.mismatches.length + ' mismatches, ' + ev.gaps.length +
+                ' gaps, ' + ev.inversions.length + ' inversions, ' + ev.breakpoints.length + ' breakpoints');
+            setText('rowOrderInfo', 'Order: ' + (state.rowOrder.length ? state.rowOrder.join(', ') : 'none'));
+            const lead = TOOL_TRACKS[0];
+            setText('statusToolInfo', lead
+                ? lead.label + ' ' + lead.version +
+                  ' · identity: ' + (lead.identity === null ? NM : lead.identity + '%') +
+                  ' · mapQ: ' + (lead.mapQ === null ? NM : lead.mapQ) +
+                  ' · nucleotides resolved: ' + lead.resolvedBases.toLocaleString() + ' bp'
+                : NM);
+            const ctxLabel = document.getElementById('viewContext');
+            if (ctxLabel) ctxLabel.innerHTML = '<i class="fas fa-map-pin"></i> <span class="highlight">' +
+                pl.id + '</span> · ' + s.id;
+        }
+
+        // Selection changes arrive from the report's own sample/plasmid controls.
+        function applySelection(next) {
+            if (next.sample && PB.samples.some(s => s.id === next.sample)) { sel.sample = next.sample; sel.plasmidIdx = 0; }
+            if (next.plasmid) {
+                const i = plasmidList().findIndex(p => p.id === next.plasmid);
+                if (i >= 0) sel.plasmidIdx = i;
+            }
+            rebind();
+            state.selectedSegment = null;
+            state.selectedProtein = null;
+            state.eventIndex = { mismatch: 0, gap: 0, inversion: 0, breakpoint: 0 };
+            zoomReset();
+            refreshChrome();
+            render();
+            renderSplitMerge();
+        }
+        window.addEventListener('message', function(e) {
+            const m = e.data;
+            if (m && m.pbExplorer === 'select') applySelection(m);
+        });
+
+        const sampleSelect = document.getElementById('explorerSample');
+        if (sampleSelect) {
+            sampleSelect.innerHTML = PB.samples.map(s => '<option value="' + s.id + '">' + s.id + '</option>').join('');
+            sampleSelect.value = sel.sample;
+            sampleSelect.addEventListener('change', () => applySelection({ sample: sampleSelect.value }));
+        }
+        const plasmidSelect = document.getElementById('explorerPlasmid');
+        function fillPlasmids() {
+            if (!plasmidSelect) return;
+            plasmidSelect.innerHTML = plasmidList().map(p => '<option value="' + p.id + '">' + p.id + '</option>').join('');
+            const cur = currentPlasmid();
+            if (cur) plasmidSelect.value = cur.id;
+        }
+        if (plasmidSelect) plasmidSelect.addEventListener('change', () => applySelection({ plasmid: plasmidSelect.value }));
+
+        const _applySelection = applySelection;
+        applySelection = function (next) { _applySelection(next); fillPlasmids(); };
+
+        rebind();
+        fillPlasmids();
+        refreshChrome();
+        render();
+
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(render, 200);
+        });
+
+        console.log('✅ Reconstruction Evidence Explorer (Consolidated) initialized with all features.');
+    </script>
+
+</body>
+</html>
