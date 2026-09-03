@@ -28,21 +28,33 @@ def read_sample_metadata(path):
 
 
 def read_tool_versions(path):
-    """Map report tool labels to versions recorded at the time of the run."""
+    """Map report tool labels to versions recorded at the time of the run.
+
+    Two sources, in order. The executable map covers the adapters that ship
+    here, whose report label differs from the command they invoke. A run may
+    also record ``method_versions`` keyed by report label, which is the only
+    way a method outside that fixed list -- a new adapter, or a synthetic
+    method -- can report a version at all; it wins where both are present.
+    """
     if not path or not Path(path).is_file():
         return {}
     try:
-        tools = json.loads(Path(path).read_text(encoding="utf-8")).get("tools", {})
+        manifest = json.loads(Path(path).read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
+    tools = manifest.get("tools", {}) or {}
     executable = {
         "mob_recon": "mob_recon", "platon": "platon",
         "plasmidspades": "plasmidspades.py", "gplas": "gplas",
         "gplas2_external": "gplas", "gplas2_mob": "gplas",
     }
-    return {label: details.get("version", "unreported")
-            for label, name in executable.items()
-            if (details := tools.get(name, {})).get("available")}
+    versions = {label: details.get("version", "unreported")
+                for label, name in executable.items()
+                if (details := tools.get(name, {})).get("available")}
+    declared = manifest.get("method_versions", {}) or {}
+    if isinstance(declared, dict):
+        versions.update({str(label): str(value) for label, value in declared.items() if value})
+    return versions
 
 
 def number(value):

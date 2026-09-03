@@ -17,6 +17,8 @@ edited sequence with a CIGAR, so the drilldown has real nucleotides to show.
 
 import argparse
 import csv
+import json
+import sys
 from pathlib import Path
 
 
@@ -236,6 +238,51 @@ def write_tsv(path, header, rows):
         writer.writerows(rows)
 
 
+# Versions for the synthetic methods. A real run records these from the
+# installed executables; the demo installs nothing, so it declares them under
+# ``method_versions``, which the report reads by report label. Without this the
+# explorer and dashboard have no version to show and say "not recorded".
+METHOD_VERSIONS = {
+    "mob_like": "0.0-synthetic",
+    "platon_like": "0.0-synthetic",
+    "spades_like": "0.0-synthetic",
+    "gplas_like": "0.0-synthetic",
+    "weak_like": "0.0-synthetic",
+}
+
+
+def write_manifest(root):
+    """A run manifest for the demo, labelled as synthetic throughout.
+
+    It carries the same shape a real run writes so the report exercises the
+    same code path, but every value states that nothing was installed and
+    nothing was executed.
+    """
+    # The cohort is fabricated, but the software that produced it is not: record
+    # the real checkout version, resolved by the same helper stage 6 uses.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+    from write_manifest import tool_version
+
+    manifest = {
+        "schema_version": "1",
+        "tool_version": tool_version(),
+        "synthetic": True,
+        "meaning": ("Fabricated by test/demo_dataset.py. No reconstruction tool was "
+                    "installed or executed, and no sequence here is biological."),
+        "method_versions": dict(METHOD_VERSIONS),
+        # No executable was probed, so nothing is reported as available.
+        "tools": {name: {"available": False} for name in
+                  ("mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2")},
+        "samples": [{"sample_id": sample, "organism": organism, "study": study,
+                     "depth": depth, "technology": technology, "country": country}
+                    for sample, organism, study, depth, technology, country in SAMPLES],
+        "settings": {"source": "test/demo_dataset.py"},
+    }
+    path = Path(root) / "run_manifest.json"
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out-dir", required=True, type=Path)
@@ -337,6 +384,7 @@ def main():
                            str(40 + index * 25 + depth // 10), str(1_200_000 + index * 480_000)])
 
     write_tsv(root / "tool_status.tsv", status[0], status[1:])
+    write_manifest(root)
     print(f"Wrote synthetic cohort: {len(SAMPLES)} samples x {len(TOOLS)} methods "
           f"({sum(len(v[1]) for v in TRUTH.values())} truth plasmids) under {root}")
 
