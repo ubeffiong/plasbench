@@ -48,7 +48,7 @@ def tool_catalogue(tools, capabilities, versions):
     return catalogue
 
 
-def plasmid_rows(payload, tool):
+def plasmid_rows(payload, tool, collinear=None):
     """Per-truth-plasmid recovery for one method, from retained alignment blocks."""
     if not payload or tool not in payload.get("tools", {}):
         return []
@@ -88,7 +88,6 @@ def plasmid_rows(payload, tool):
         chromosome_records = [r for r, t_ in elsewhere.items() if "chromosome" in t_]
         cross_plasmid = [r for r, t_ in elsewhere.items() if (t_ - {plasmid, "chromosome"})]
         ambiguous_records = [r for r, t_ in elsewhere.items() if len(t_) > 2]
-        collinear = (data.get("structural_diagnostics") or {}).get("collinear_fraction")
         rows.append({
             "id": plasmid,
             "length": info.get("length", 0),
@@ -189,23 +188,31 @@ def contig_rows(payload, tool, plasmid):
         # Segment track: one block per alignment, plus the uncovered spans between.
         segments, cursor, seen_spans = [], items[0]["target_start"], []
         others = elsewhere[record] - {plasmid}
+        previous = None
         for block in items:
             if block["target_start"] > cursor:
+                # A reference gap is "missing" when the prediction also stops, and an
+                # unsupported join when the predicted record runs straight across it:
+                # the record asserts adjacency the reference does not support.
+                contiguous_query = (previous is not None
+                                    and abs(block["query_start"] - previous["query_end"]) <= 50)
                 segments.append({"start": cursor, "end": block["target_start"],
-                                 "type": "missing", "len": block["target_start"] - cursor})
+                                 "type": "unsupported_join" if contiguous_query else "missing",
+                                 "len": block["target_start"] - cursor})
             span = (block["target_start"], block["target_end"])
             identity = block["matches"] / block["block_length"] if block["block_length"] else 1.0
-            # Order matters: the most specific evidence wins the segment label.
+            # Most specific evidence first. "ambiguous" must precede "wrong_plasmid":
+            # a record reaching several other targets cannot be assigned to one.
             if any(s[0] < span[1] and span[0] < s[1] for s in seen_spans):
                 kind = "duplicated"
             elif block["strand"] == "-":
                 kind = "inverted"
+            elif len(others) > 1:
+                kind = "ambiguous"
             elif "chromosome" in others:
                 kind = "chromosomal"
             elif others:
                 kind = "wrong_plasmid"
-            elif len(others) > 1:
-                kind = "ambiguous"
             elif identity < 0.90:
                 kind = "low_identity"
             else:
@@ -214,11 +221,8 @@ def contig_rows(payload, tool, plasmid):
             segments.append({"start": block["target_start"], "end": block["target_end"],
                              "type": kind, "len": block["target_end"] - block["target_start"],
                              "identity": round(identity * 100, 2)})
-            # A join between blocks the reference does not support is its own event.
-            if cursor and block["target_start"] > cursor + 1000:
-                segments.append({"start": cursor, "end": block["target_start"],
-                                 "type": "unsupported_join", "len": block["target_start"] - cursor})
             cursor = max(cursor, block["target_end"])
+            previous = block
         rows.append({
             "id": record,
             "length": items[0]["query_length"],
@@ -306,7 +310,9 @@ def build(scores, status, leaderboard, metadata, capabilities, versions, visuali
             if f1 is not None and f1 > best_score:
                 best, best_score = tool, f1
         reference_tool = best or (tools[0] if tools else None)
-        plasmid_data[sample] = plasmid_rows(payload, reference_tool) if reference_tool else []
+        plasmid_data[sample] = (plasmid_rows(payload, reference_tool,
+                                            structural.get((sample, reference_tool)))
+                                if reference_tool else [])
         for tool in tools:
             for plasmid in (payload or {}).get("truth_plasmids", {}):
                 rows = contig_rows(payload, tool, plasmid)
