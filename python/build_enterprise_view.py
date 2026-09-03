@@ -200,7 +200,10 @@ def contig_rows(payload, tool, plasmid):
                                  "type": "unsupported_join" if contiguous_query else "missing",
                                  "len": block["target_start"] - cursor})
             span = (block["target_start"], block["target_end"])
-            identity = block["matches"] / block["block_length"] if block["block_length"] else 1.0
+            # Named apart from the record-level percentage above: reusing that
+            # name overwrote it, and every record then reported its last block's
+            # identity fraction as if it were the record's percentage.
+            block_identity = block["matches"] / block["block_length"] if block["block_length"] else 1.0
             # Most specific evidence first. "ambiguous" must precede "wrong_plasmid":
             # a record reaching several other targets cannot be assigned to one.
             if any(s[0] < span[1] and span[0] < s[1] for s in seen_spans):
@@ -213,14 +216,14 @@ def contig_rows(payload, tool, plasmid):
                 kind = "chromosomal"
             elif others:
                 kind = "wrong_plasmid"
-            elif identity < 0.90:
+            elif block_identity < 0.90:
                 kind = "low_identity"
             else:
                 kind = "good"
             seen_spans.append(span)
             segments.append({"start": block["target_start"], "end": block["target_end"],
                              "type": kind, "len": block["target_end"] - block["target_start"],
-                             "identity": round(identity * 100, 2)})
+                             "identity": round(block_identity * 100, 2)})
             cursor = max(cursor, block["target_end"])
             previous = block
         rows.append({
