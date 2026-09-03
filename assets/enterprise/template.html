@@ -2019,10 +2019,14 @@
                 toolStats[t.id] = { q1, median, q3, min, max, mean, vals };
             });
 
-            const pad = { top: 8, bottom: 18, left: 32, right: 10 };
+            // The box was drawn 40px wide with 6px labels in a 360px panel, so
+            // most of the space carried no information. Wider boxes, a real
+            // axis and readable labels, all inside the same height.
+            const pad = { top: 26, bottom: 38, left: 50, right: 16 };
             const plotW = W - pad.left - pad.right;
             const plotH = H - pad.top - pad.bottom;
-            const toolWidth = Math.min(plotW / visibleTools.length * 0.6, 40);
+            const slot = plotW / Math.max(1, visibleTools.length);
+            const toolWidth = Math.min(slot * 0.62, 76);
 
             // Find global min/max
             let globalMin = Infinity,
@@ -2036,35 +2040,65 @@
             const range = globalMax - globalMin || 1;
 
             const colors = ['#1f6fd0', '#0d7f95', '#6248bd', '#b83d78', '#9a6400', '#17805a'];
+            const scaleY = (v) => pad.top + plotH - ((v - globalMin) / range) * plotH;
+
+            // Gridlines and a labelled axis: without them a box is a shape, not
+            // a measurement you can read a value off.
+            boxCtx.font = '11px Inter, sans-serif';
+            boxCtx.textAlign = 'right';
+            boxCtx.textBaseline = 'middle';
+            for (let i = 0; i <= 4; i++) {
+                const value = globalMin + (i / 4) * range;
+                const y = scaleY(value);
+                boxCtx.strokeStyle = i === 0 ? '#c3cec7' : '#dfe7e2';
+                boxCtx.lineWidth = 1;
+                boxCtx.beginPath();
+                boxCtx.moveTo(pad.left, y);
+                boxCtx.lineTo(pad.left + plotW, y);
+                boxCtx.stroke();
+                boxCtx.fillStyle = '#5d6b63';
+                boxCtx.fillText(value < 1.001 ? value.toFixed(2) : value.toFixed(0), pad.left - 8, y);
+            }
 
             visibleTools.forEach((t, idx) => {
                 const s = toolStats[t.id];
                 if (!s) return;
-                const x = pad.left + idx * (plotW / visibleTools.length) + (plotW / visibleTools.length) / 2;
-                const scale = (v) => pad.top + plotH - ((v - globalMin) / range) * plotH;
+                const x = pad.left + idx * slot + slot / 2;
+                const scale = scaleY;
+
+                // Every sample behind the summary, so a box built from three
+                // points cannot look like a box built from thirty.
+                s.vals.forEach((v, i) => {
+                    const spread = Math.min(toolWidth * 0.8, 30);
+                    const at = s.vals.length > 1 ? ((i / (s.vals.length - 1)) - 0.5) * spread : 0;
+                    boxCtx.beginPath();
+                    boxCtx.arc(x + at, scale(v), 2.6, 0, 2 * Math.PI);
+                    boxCtx.fillStyle = colors[idx % colors.length] + '55';
+                    boxCtx.fill();
+                });
 
                 // Box
                 const boxX = x - toolWidth / 2;
                 const boxY = scale(s.q3);
                 const boxH = scale(s.q1) - scale(s.q3);
-                boxCtx.fillStyle = colors[idx % colors.length] + '30';
+                boxCtx.fillStyle = colors[idx % colors.length] + '28';
                 boxCtx.fillRect(boxX, boxY, toolWidth, boxH);
                 boxCtx.strokeStyle = colors[idx % colors.length];
-                boxCtx.lineWidth = 0.8;
+                boxCtx.lineWidth = 1.6;
                 boxCtx.strokeRect(boxX, boxY, toolWidth, boxH);
 
                 // Median line
                 const medY = scale(s.median);
                 boxCtx.strokeStyle = colors[idx % colors.length];
-                boxCtx.lineWidth = 1.5;
+                boxCtx.lineWidth = 3.5;
                 boxCtx.beginPath();
                 boxCtx.moveTo(boxX, medY);
                 boxCtx.lineTo(boxX + toolWidth, medY);
                 boxCtx.stroke();
 
                 // Whiskers
-                boxCtx.strokeStyle = colors[idx % colors.length] + '80';
-                boxCtx.lineWidth = 0.6;
+                boxCtx.strokeStyle = colors[idx % colors.length] + 'aa';
+                boxCtx.lineWidth = 1.4;
                 const minY = scale(s.min);
                 const maxY = scale(s.max);
                 boxCtx.beginPath();
@@ -2074,26 +2108,31 @@
                 boxCtx.lineTo(x, maxY);
                 boxCtx.stroke();
                 // Caps
+                const cap = Math.max(8, toolWidth * 0.28);
                 boxCtx.beginPath();
-                boxCtx.moveTo(x - 3, minY);
-                boxCtx.lineTo(x + 3, minY);
-                boxCtx.moveTo(x - 3, maxY);
-                boxCtx.lineTo(x + 3, maxY);
+                boxCtx.moveTo(x - cap, minY);
+                boxCtx.lineTo(x + cap, minY);
+                boxCtx.moveTo(x - cap, maxY);
+                boxCtx.lineTo(x + cap, maxY);
                 boxCtx.stroke();
 
                 // Label
-                boxCtx.fillStyle = '#7b8a83';
-                boxCtx.font = '7px Inter, sans-serif';
+                boxCtx.fillStyle = '#16211c';
+                boxCtx.font = '600 12px Inter, sans-serif';
                 boxCtx.textAlign = 'center';
                 boxCtx.textBaseline = 'top';
-                const label = t.label.length > 8 ? t.label.slice(0, 6) + '…' : t.label;
-                boxCtx.fillText(label, x, pad.top + plotH + 2);
+                const room = Math.floor(slot / 7.2);
+                const label = t.label.length > room ? t.label.slice(0, Math.max(3, room - 1)) + '…' : t.label;
+                boxCtx.fillText(label, x, pad.top + plotH + 8);
+                boxCtx.fillStyle = '#7b8a83';
+                boxCtx.font = '10px Inter, sans-serif';
+                boxCtx.fillText('n=' + s.vals.length, x, pad.top + plotH + 23);
 
-                // Value display
-                boxCtx.fillStyle = '#4a5a52';
-                boxCtx.font = '6px Inter, sans-serif';
+                // Median, stated rather than left to be read off the axis.
+                boxCtx.fillStyle = '#16211c';
+                boxCtx.font = '600 12px Inter, sans-serif';
                 boxCtx.textBaseline = 'bottom';
-                boxCtx.fillText((s.median < 1 ? Math.round(s.median * 100) + '%' : s.median.toFixed(1)), x, pad.top - 2);
+                boxCtx.fillText((s.median < 1 ? Math.round(s.median * 100) + '%' : s.median.toFixed(1)), x, pad.top - 6);
             });
 
             // Update stats text
@@ -2150,19 +2189,36 @@
             const variance = allVals.reduce((a, b) => a + (b - mean) ** 2, 0) / allVals.length;
             const std = Math.sqrt(variance);
 
-            const pad = { top: 8, bottom: 18, left: 28, right: 8 };
+            const pad = { top: 26, bottom: 38, left: 50, right: 16 };
             const plotW = W - pad.left - pad.right;
             const plotH = H - pad.top - pad.bottom;
 
             // Jittered dot plot
             const colors = ['#1f6fd0', '#0d7f95', '#6248bd', '#b83d78', '#9a6400', '#17805a'];
-            const dotR = 2.5;
+            const dotR = 5;
+
+            // Gridlines and a labelled axis, matching the box plot beside it.
+            dotCtx.font = '11px Inter, sans-serif';
+            dotCtx.textAlign = 'right';
+            dotCtx.textBaseline = 'middle';
+            for (let i = 0; i <= 4; i++) {
+                const value = min + (i / 4) * range;
+                const y = pad.top + plotH - ((value - min) / range) * plotH;
+                dotCtx.strokeStyle = i === 0 ? '#c3cec7' : '#dfe7e2';
+                dotCtx.lineWidth = 1;
+                dotCtx.beginPath();
+                dotCtx.moveTo(pad.left, y);
+                dotCtx.lineTo(pad.left + plotW, y);
+                dotCtx.stroke();
+                dotCtx.fillStyle = '#5d6b63';
+                dotCtx.fillText(value < 1.001 ? value.toFixed(2) : value.toFixed(0), pad.left - 8, y);
+            }
 
             // Group by tool
             visibleTools.forEach((t, idx) => {
                 const vals = filtered.map(sid => getMetricValue(sid, t.id)).filter(v => v > 0 || v === 0);
                 const xPos = pad.left + idx * (plotW / visibleTools.length) + (plotW / visibleTools.length) / 2;
-                const jitterSpread = Math.min(12, (plotW / visibleTools.length) * 0.35);
+                const jitterSpread = Math.min(34, (plotW / visibleTools.length) * 0.45);
 
                 vals.forEach((v, i) => {
                     const y = pad.top + plotH - ((v - min) / range) * plotH;
@@ -2171,12 +2227,24 @@
                     const x = xPos + jitter;
                     dotCtx.beginPath();
                     dotCtx.arc(x, y, dotR, 0, 2 * Math.PI);
-                    dotCtx.fillStyle = colors[idx % colors.length] + '60';
+                    dotCtx.fillStyle = colors[idx % colors.length] + '66';
                     dotCtx.fill();
-                    dotCtx.strokeStyle = colors[idx % colors.length] + '80';
-                    dotCtx.lineWidth = 0.3;
+                    dotCtx.strokeStyle = colors[idx % colors.length];
+                    dotCtx.lineWidth = 1.1;
                     dotCtx.stroke();
                 });
+
+                // Name the column, as the box plot does.
+                dotCtx.fillStyle = '#16211c';
+                dotCtx.font = '600 12px Inter, sans-serif';
+                dotCtx.textAlign = 'center';
+                dotCtx.textBaseline = 'top';
+                const room = Math.floor((plotW / visibleTools.length) / 7.2);
+                const name = t.label.length > room ? t.label.slice(0, Math.max(3, room - 1)) + '…' : t.label;
+                dotCtx.fillText(name, xPos, pad.top + plotH + 8);
+                dotCtx.fillStyle = '#7b8a83';
+                dotCtx.font = '10px Inter, sans-serif';
+                dotCtx.fillText('n=' + vals.length, xPos, pad.top + plotH + 23);
             });
 
             // Mean line
