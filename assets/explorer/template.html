@@ -42,11 +42,12 @@ __PB_FONTS__
         .unmeasured { color: var(--text-muted); font-style: italic; }
         .detail-row small { color: var(--text-muted); font-size: 12px; }
         .sel-wrap { display: inline-flex; align-items: center; gap: 5px; }
-        .sel-wrap > span { font-size: 12px; font-weight: 600; letter-spacing: .06em;
+        .sel-wrap { gap: 4px; }
+        .sel-wrap > span { font-size: 10px; font-weight: 600; letter-spacing: .05em;
             text-transform: uppercase; color: var(--text-muted); }
         .sel-wrap select { background: var(--bg-secondary); border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm); color: var(--text-primary); padding: 3px 8px;
-            font-size: 13px; font-family: var(--font); outline: none; }
+            border-radius: var(--radius-sm); color: var(--text-primary); padding: 2px 6px;
+            font-size: 11px; font-family: var(--font); outline: none; max-width: 150px; }
         .sel-wrap select:focus-visible { outline: 2px solid var(--accent-green); outline-offset: 1px; }
         .slider-wrap { display: inline-flex; align-items: center; gap: 6px; }
         .slider-wrap > span { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
@@ -83,16 +84,16 @@ __PB_FONTS__
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 12px 20px;
+            padding: 8px 14px;
             background: var(--bg-secondary);
             border-radius: var(--radius);
             border: 1px solid var(--border-color);
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
         }
-        .header-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .header-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .logo h1 {
-            font-size: 20px; font-weight: 700;
+            font-size: 15px; font-weight: 700;
             /* The design filled this from a white gradient, which is invisible
                on a light ground. Solid ink instead. */
             color: var(--text-primary);
@@ -105,9 +106,9 @@ __PB_FONTS__
             margin-left: 4px;
         }
         .badge-pill {
-            font-size: 12px; font-weight: 500;
+            font-size: 10px; font-weight: 500;
             background: var(--bg-input); color: var(--text-secondary);
-            padding: 2px 12px; border-radius: 20px;
+            padding: 1px 8px; border-radius: 20px;
             border: 1px solid var(--border-color);
             display: inline-flex; align-items: center; gap: 4px;
         }
@@ -115,11 +116,13 @@ __PB_FONTS__
         .badge-pill.primary { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
 
         .header-meta {
-            display: flex; align-items: center; gap: 16px;
-            font-size: 13px; color: var(--text-secondary); flex-wrap: wrap;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 11px; color: var(--text-secondary); flex-wrap: wrap;
         }
         .header-meta span { display: flex; align-items: center; gap: 4px; }
-        .header-right { display: flex; gap: 8px; flex-wrap: wrap; }
+        .header-right { display: flex; gap: 6px; flex-wrap: wrap; }
+        .header .btn { font-size: 11px; padding: 3px 9px; }
+        .header .btn-sm { font-size: 11px; padding: 3px 8px; }
 
         .btn {
             display: inline-flex; align-items: center; gap: 6px;

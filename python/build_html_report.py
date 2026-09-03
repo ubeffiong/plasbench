@@ -656,18 +656,22 @@ if(controls)context.append(controls);
 shell.append(context);
 
 const tabbar=document.createElement('div');tabbar.id='pb-tabs';
-tabbar.setAttribute('role','tablist');shell.append(tabbar);
+tabbar.setAttribute('role','tablist');
+tabbar.setAttribute('aria-label','Analyses that share the explorer selection');
+shell.append(tabbar);
 const scrim=document.createElement('div');scrim.id='pb-scrim';document.body.append(scrim);
 
 function makeCard(id,title,hint){const el=$(id);if(!el)return null;
  const card=document.createElement('section');card.className='pb-card';
  card.innerHTML='<header><div><h4>'+title+'</h4><span class="sub">'+hint+'</span></div>'
-  +'<button type="button" class="pb-expand">Expand</button></header><div class="pb-body"></div>';
+  +'<button type="button" class="pb-expand" aria-expanded="false">Expand</button>'
+  +'</header><div class="pb-body"></div>';
  card.querySelector('.pb-body').append(el);
  const button=card.querySelector('.pb-expand');
  button.addEventListener('click',()=>{const on=card.classList.toggle('expanded');
   scrim.classList.toggle('on',on);button.textContent=on?'Close':'Expand';
-  window.dispatchEvent(new Event('resize'))});
+  button.setAttribute('aria-expanded',String(on));
+  requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))});
  return card}
 
 const panes=[];
@@ -677,21 +681,28 @@ TABS.forEach((entry,index)=>{
  if(!cards.length)return;
  const pane=document.createElement('div');pane.className='pb-tab';pane.id='pb-tab-'+key;
  pane.setAttribute('role','tabpanel');
+ // A panel has to name the tab that controls it, and vice versa, or a screen
+ // reader announces seven unlabelled regions.
+ pane.setAttribute('aria-labelledby','pb-tabbtn-'+key);
+ pane.tabIndex=0;
  const grid=document.createElement('div');grid.className='pb-grid';
  cards.forEach(c=>grid.append(c));pane.append(grid);shell.append(pane);
  const button=document.createElement('button');button.type='button';
  button.setAttribute('role','tab');button.id='pb-tabbtn-'+key;
  button.innerHTML=title+(cards.length>1?' <span class="count">'+cards.length+'</span>':'');
+ button.setAttribute('aria-controls','pb-tab-'+key);
  button.addEventListener('click',()=>select(key));
  tabbar.append(button);
  panes.push({key,pane,button})});
 
 function select(key){panes.forEach(p=>{const on=p.key===key;
  p.pane.hidden=!on;p.button.setAttribute('aria-selected',String(on));
- if(on)p.button.setAttribute('tabindex','0');else p.button.setAttribute('tabindex','-1')});
- // Panels that draw to a sized canvas or measure their box need a nudge when
- // they become visible, because they were laid out at zero width.
- window.dispatchEvent(new Event('resize'))}
+ // Roving tabindex: one stop for the whole strip, arrows move within it.
+ p.button.setAttribute('tabindex',on?'0':'-1')});
+ // A pane is laid out at zero width while hidden. Every panel here draws into
+ // a viewBox SVG and rescales on its own, but any panel that measures its box
+ // at draw time would need telling -- after layout has settled, not before.
+ requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))}
 if(panes.length)select(panes[0].key);
 
 tabbar.addEventListener('keydown',e=>{
@@ -705,8 +716,10 @@ tabbar.addEventListener('keydown',e=>{
  if(next){e.preventDefault();next.focus();next.click()}});
 
 scrim.addEventListener('click',()=>{shell.querySelectorAll('.pb-card.expanded').forEach(c=>{
- c.classList.remove('expanded');const b=c.querySelector('.pb-expand');if(b)b.textContent='Expand'});
- scrim.classList.remove('on');window.dispatchEvent(new Event('resize'))});
+ c.classList.remove('expanded');const b=c.querySelector('.pb-expand');
+ if(b){b.textContent='Expand';b.setAttribute('aria-expanded','false')}});
+ scrim.classList.remove('on');
+ requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&scrim.classList.contains('on'))scrim.click()});
 
 // Replaced by the adopted explorer above: kept as anchors, not drawn twice.
