@@ -199,12 +199,22 @@ def main():
                    "complete_discordant", "chromosomal_contam"):
         assert needed in page, f"vocabulary term missing: {needed}"
 
-    # Explorer chrome: titled cards with collapse, full-screen expand, and one
-    # toolbar driving zoom, track height and density.
-    for needed in ("vq-shell", "vq-toolbar", "vq-card", "vq-scrim",
-                   "vq-expand-all", "vq-collapse-all", "vq-stretch", "vq-density",
-                   "Truth plasmids", "Method agreement", "aria-expanded"):
-        assert needed in page, f"explorer chrome affordance missing: {needed}"
+    # The analysis panels are presented as the adopted tabbed dashboard: a
+    # context bar carrying the shared selection, a tab per analysis, and cards
+    # that can be opened full screen.
+    for needed in ("pb-analyses", "pb-context", "pb-tabs", "pb-card", "pb-scrim",
+                   "pb-body", "pb-grid", "tablist", "tabpanel", "aria-selected", "Truth plasmids", "Method agreement",
+                   "Bin assignment", "Proteins and structure"):
+        assert needed in page, f"analyses dashboard affordance missing: {needed}"
+    # Tabs are keyboard operable, which a plain click handler would not give.
+    for needed in ("ArrowRight", "ArrowLeft", "'Home'", "'End'"):
+        assert needed in page, f"tab keyboard navigation missing: {needed}"
+    # A hidden pane is laid out at zero width, so panels that size to their box
+    # must be told when they become visible.
+    assert "new Event('resize')" in page,         "tab switching must nudge panels that measure their own box"
+    # The accordion it replaced must not linger alongside it.
+    for gone in ("vq-shell", "vq-toolbar", "vq-expand-all", "vq-collapse-all"):
+        assert gone not in page, f"replaced accordion chrome remains: {gone}"
 
     # The selected block reports the evidence measured from the alignment
     # record. Only the nucleotide view needs a CIGAR, so a block without one

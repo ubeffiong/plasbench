@@ -564,108 +564,151 @@ renderAgreement();renderComparison();})();
 
 
 def explorer_chrome_script():
-    """Give the evidence explorer panel chrome: collapse, expand, zoom, stretch.
+    """Present the analysis panels as the adopted tabbed dashboard.
 
-    The explorer grew as a flat stack of unlabelled panels emitted by several
-    independent fragments. This wraps each one in a titled card without moving
-    it out of the DOM position its fragment re-renders into, and adds a single
-    toolbar for the controls those panels share.
+    The panels are emitted by several independent fragments and used to stack
+    flat, then as one long accordion. This groups them into tabs and cards
+    without moving any of them out of the element its fragment re-renders into,
+    and turns the shared selection row into a context bar.
+
+    The adopted design ships a dark palette and sample data. Only its structure
+    and proportions are taken: the colours are the report's, and every value on
+    screen still comes from the panel that measured it.
     """
     return """<style>
-#vq-shell{--pad:16px;margin:18px 0}
-#vq-toolbar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:10px;align-items:center;
-  background:#f3f6f4;border:1px solid #d3ddd6;border-radius:8px;padding:9px 13px;margin-bottom:14px;
-  font:13px Arial,sans-serif;box-shadow:0 1px 3px rgba(22,33,28,.06)}
-#vq-toolbar .grp{display:flex;gap:5px;align-items:center}
-#vq-toolbar .sep{width:1px;height:22px;background:#d3ddd6}
-#vq-toolbar label{color:#4a5a52;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
-#vq-toolbar button{font:12px Arial,sans-serif;padding:5px 10px;border:1px solid #c3cec7;background:#fff;
-  border-radius:5px;cursor:pointer;color:#16211c;transition:background .15s,border-color .15s}
-#vq-toolbar button:hover{background:#eaf2ec;border-color:#17805a}
-#vq-toolbar button:focus-visible{outline:2px solid #12403a;outline-offset:2px}
-#vq-toolbar input[type=range]{width:120px;accent-color:#17805a}
-.vq-card{background:#fff;border:1px solid #d3ddd6;border-radius:8px;margin-bottom:14px;overflow:hidden;
-  box-shadow:0 1px 3px rgba(22,33,28,.05)}
-.vq-card>header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f7faf8;
-  border-bottom:1px solid #e3e9e8;cursor:pointer;user-select:none}
-.vq-card>header:focus-visible{outline:2px solid #12403a;outline-offset:-2px}
-.vq-card>header h3{margin:0;font:600 13px Arial,sans-serif;color:#16211c;flex:none}
-.vq-card>header .hint{font:11px Arial,sans-serif;color:#7b8a83;flex:1}
-.vq-card>header .chev{transition:transform .18s;color:#4a5a52;font-size:10px}
-.vq-card.collapsed>header .chev{transform:rotate(-90deg)}
-.vq-card.collapsed>.vq-body{display:none}
-.vq-card>header button{font:11px Arial,sans-serif;padding:3px 9px;border:1px solid #c3cec7;background:#fff;
-  border-radius:4px;cursor:pointer;color:#16211c}
-.vq-card>header button:hover{background:#eaf2ec;border-color:#17805a}
-.vq-body{padding:var(--pad);overflow:auto}
-.vq-card.expanded{position:fixed;inset:16px;z-index:60;margin:0;display:flex;flex-direction:column;
-  box-shadow:0 24px 60px rgba(22,33,28,.35)}
-.vq-card.expanded>.vq-body{flex:1;min-height:0}
-#vq-scrim{position:fixed;inset:0;background:rgba(18,28,23,.5);z-index:55;display:none}
-#vq-scrim.on{display:block}
-#vq-tracks svg,#vq-agree svg,#vq-sankey svg{width:100%;height:auto}
-.vq-kv{border-collapse:collapse;margin:8px 0 14px;font:13px Arial,sans-serif;width:100%;max-width:620px}
-.vq-kv th{text-align:left;font-weight:600;color:#4a5a52;padding:5px 14px 5px 0;white-space:nowrap;
-  vertical-align:top;width:1%;border-bottom:1px solid #eef2f0}
-.vq-kv td{padding:5px 0;color:#16211c;border-bottom:1px solid #eef2f0;font-variant-numeric:tabular-nums}
-#vq-detail code{display:block;white-space:pre;overflow-x:auto;background:#f5f8f6;border:1px solid #e3e9e8;
-  border-radius:5px;padding:10px 12px;margin:6px 0;font:12px/1.5 'IBM Plex Mono',ui-monospace,Menlo,monospace}
-@media (prefers-reduced-motion:reduce){.vq-card>header .chev{transition:none}}
+#pb-analyses{--pb-line:#d3ddd6;--pb-soft:#eef2ef;--pb-ink:#16211c;--pb-dim:#5d6b63;
+  --pb-green:#17805a;--pb-amber:#a35c05;--pb-red:#b3261e;--pb-blue:#2563c9;
+  font:13px/1.5 Arial,sans-serif;color:var(--pb-ink);margin:16px 0}
+#pb-context{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 16px;
+  background:#fff;border:1px solid var(--pb-line);border-radius:10px;margin-bottom:12px}
+#pb-context .controls{display:contents;margin:0}
+#pb-context label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--pb-dim)}
+#pb-context select,#pb-context input{padding:5px 8px;border:1px solid var(--pb-line);
+  border-radius:6px;background:#fff;font:12px Arial,sans-serif;color:var(--pb-ink)}
+#pb-context select:focus-visible,#pb-context input:focus-visible{outline:2px solid var(--pb-green);outline-offset:1px}
+#pb-context button,#pb-context .download-button{font:12px Arial,sans-serif;padding:5px 11px;
+  border:1px solid var(--pb-line);background:#fff;border-radius:6px;cursor:pointer;color:var(--pb-ink);
+  text-decoration:none;white-space:nowrap}
+#pb-context button:hover,#pb-context .download-button:hover{background:var(--pb-soft);border-color:var(--pb-green)}
+#pb-context .download-button{background:var(--pb-green);color:#fff!important;border-color:var(--pb-green);font-weight:600}
+#pb-tabs{display:flex;gap:3px;padding:4px;background:#fff;border:1px solid var(--pb-line);
+  border-radius:10px;overflow-x:auto;margin-bottom:12px}
+#pb-tabs button{flex:0 0 auto;padding:8px 16px;border:0;background:transparent;color:var(--pb-dim);
+  font:600 12px Arial,sans-serif;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px;
+  white-space:nowrap;transition:background .15s,color .15s}
+#pb-tabs button:hover{background:var(--pb-soft);color:var(--pb-ink)}
+#pb-tabs button[aria-selected="true"]{background:var(--pb-green);color:#fff}
+#pb-tabs button:focus-visible{outline:2px solid var(--pb-ink);outline-offset:-2px}
+#pb-tabs .count{font:600 10px Arial,sans-serif;background:var(--pb-soft);color:var(--pb-dim);
+  padding:1px 7px;border-radius:10px}
+#pb-tabs button[aria-selected="true"] .count{background:rgba(255,255,255,.24);color:#fff}
+.pb-tab[hidden]{display:none}
+.pb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;align-items:start}
+.pb-card{background:#fff;border:1px solid var(--pb-line);border-radius:10px;overflow:hidden;
+  display:flex;flex-direction:column;min-width:0}
+.pb-card>header{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 16px;background:#f7faf8;border-bottom:1px solid var(--pb-line)}
+.pb-card>header h4{margin:0;font:600 13px Arial,sans-serif;color:var(--pb-ink)}
+.pb-card>header .sub{font:12px Arial,sans-serif;color:var(--pb-dim)}
+.pb-card>header button{font:11px Arial,sans-serif;padding:3px 9px;border:1px solid var(--pb-line);
+  background:#fff;border-radius:5px;cursor:pointer;color:var(--pb-ink)}
+.pb-card>header button:hover{background:var(--pb-soft);border-color:var(--pb-green)}
+.pb-body{padding:14px 16px;overflow:auto;min-width:0}
+.pb-card.expanded{position:fixed;inset:16px;z-index:60;margin:0}
+.pb-card.expanded .pb-body{max-height:calc(100vh - 96px)}
+#pb-scrim{position:fixed;inset:0;background:rgba(18,28,23,.5);z-index:55;display:none}
+#pb-scrim.on{display:block}
+#pb-analyses table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:0}
+#pb-analyses th{text-align:left;font:600 10.5px Arial,sans-serif;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--pb-dim);padding:7px 9px;border-bottom:1px solid var(--pb-line);
+  background:var(--pb-soft);white-space:nowrap}
+#pb-analyses td{padding:7px 9px;border-bottom:1px solid #eef2ef;color:var(--pb-ink)}
+#pb-analyses tbody tr:hover td{background:#f5faf6}
+#pb-analyses h3,#pb-analyses h4:not(.pb-card>header h4){font:600 13px Arial,sans-serif;margin:0 0 8px}
+#pb-analyses p{margin:0 0 10px;color:var(--pb-dim);font-size:12.5px}
+#pb-analyses svg{max-width:100%;height:auto}
+@media (max-width:760px){.pb-grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){#pb-tabs button{transition:none}}
 </style><script>
 (()=>{const $=id=>document.getElementById(id);
 if(!$('vq-tracks'))return;
-// One card per panel. Panels are moved into a card body but keep their ids, so
-// the fragments that own them go on re-rendering into the same element.
-// The alignment tracks, selected block and search moved into the adopted
-// explorer above. Their elements remain in the document because the panels
-// below anchor and bind to them, but they are not carded a second time.
-const PANELS=[['vq-summary','Truth plasmids','one row per truth plasmid for the selected method'],
- ['vq-agree','Method agreement','how many methods support each reference interval'],
- ['vq-sankey','Bin-to-truth flow','which predicted bin carries which truth plasmid'],
- ['vq-flow','Bin assignments','scored bin membership'],
- ['vq-compare','Method comparison','baseline against comparator on shared samples'],
- ['vq-dotplot','Dot plot','reference against predicted-record coordinates'],
- ['vq-context','Context and circular view','curated features and circular truth'],
- ['vq-proteins','Protein recovery','coordinate recovery of named coding sequences'],
- ['vq-structural','Structural diagnostics','alignment-derived discordance']];
-const shell=document.createElement('div');shell.id='vq-shell';
-const first=$('vq-summary')||$('vq-agree')||$('vq-tracks');
-first.parentElement.insertBefore(shell,first);
-const bar=document.createElement('div');bar.id='vq-toolbar';
-bar.innerHTML='<span class="grp"><label>View</label>'
- +'<button id="vq-expand-all" type="button">Expand all</button>'
- +'<button id="vq-collapse-all" type="button">Collapse all</button></span>'
- +'<span class="sep"></span>'
- +'<span class="grp"><label>Zoom</label>'
- +'<button id="vq-tb-out" type="button" title="Zoom out">\u2212</button>'
- +'<button id="vq-tb-in" type="button" title="Zoom in">+</button>'
- +'<button id="vq-tb-fit" type="button" title="Fit the whole plasmid">Fit</button></span>'
- +'<span class="sep"></span>'
- +'<span class="grp"><label for="vq-stretch">Track height</label>'
- +'<input id="vq-stretch" type="range" min="140" max="760" step="20" value="340"></span>'
- +'<span class="sep"></span>'
- +'<span class="grp"><label for="vq-density">Density</label>'
- +'<input id="vq-density" type="range" min="6" max="28" step="2" value="16" title="Padding inside each card"></span>'
- +'<span class="grp" style="margin-left:auto;color:#7b8a83;font-size:11px">Select a card title to collapse it</span>';
-shell.append(bar);
-const scrim=document.createElement('div');scrim.id='vq-scrim';document.body.append(scrim);
-function card(id,title,hint){const el=$(id);if(!el)return null;
- const box=document.createElement('section');box.className='vq-card';
- box.innerHTML='<header tabindex="0" role="button" aria-expanded="true">'
-  +'<span class="chev">\u25BC</span><h3>'+title+'</h3><span class="hint">'+hint+'</span>'
-  +'<button type="button" class="exp">Expand</button></header><div class="vq-body"></div>';
- shell.append(box);
- box.querySelector('.vq-body').append(el);
- const head=box.querySelector('header'),btn=box.querySelector('.exp');
- function toggle(){const collapsed=box.classList.toggle('collapsed');
-  head.setAttribute('aria-expanded',String(!collapsed))}
- head.addEventListener('click',e=>{if(e.target!==btn)toggle()});
- head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}});
- btn.addEventListener('click',()=>{const on=box.classList.toggle('expanded');
-  scrim.classList.toggle('on',on);btn.textContent=on?'Close':'Expand';
-  if(on)box.scrollIntoView({block:'nearest'})});
- return box}
-const cards=PANELS.map(entry=>card(entry[0],entry[1],entry[2])).filter(Boolean);
+// Tab, title, hint, and the panels it owns. A panel with no data still gets its
+// card: an empty analysis is a finding, not a reason to hide the heading.
+const TABS=[
+ ['recovery','Plasmid recovery',[['vq-summary','Truth plasmids','one row per truth plasmid for the selected method']]],
+ ['agreement','Method agreement',[['vq-agree','Method agreement','how many methods support each reference interval']]],
+ ['comparison','Method comparison',[['vq-compare','Method comparison','baseline against comparator on shared samples']]],
+ ['dotplot','Dot plot',[['vq-dotplot','Dot plot','reference against predicted-record coordinates']]],
+ ['context','Context and circular',[['vq-context','Context and circular view','curated features and circular truth']]],
+ ['bins','Bin assignment',[['vq-sankey','Bin-to-truth flow','which predicted bin carries which truth plasmid'],
+                           ['vq-flow','Bin assignments','scored bin membership']]],
+ ['features','Proteins and structure',[['vq-proteins','Protein recovery','coordinate recovery of named coding sequences'],
+                                       ['vq-structural','Structural diagnostics','alignment-derived discordance']]]];
+
+const shell=document.createElement('div');shell.id='pb-analyses';
+const anchor=$('vq-summary')||$('vq-agree')||$('vq-tracks');
+anchor.parentElement.insertBefore(shell,anchor);
+
+// The shared selection row becomes the context bar, still the same controls.
+const context=document.createElement('div');context.id='pb-context';
+const controls=document.querySelector('#cohort-evidence-explorer .controls');
+if(controls)context.append(controls);
+shell.append(context);
+
+const tabbar=document.createElement('div');tabbar.id='pb-tabs';
+tabbar.setAttribute('role','tablist');shell.append(tabbar);
+const scrim=document.createElement('div');scrim.id='pb-scrim';document.body.append(scrim);
+
+function makeCard(id,title,hint){const el=$(id);if(!el)return null;
+ const card=document.createElement('section');card.className='pb-card';
+ card.innerHTML='<header><div><h4>'+title+'</h4><span class="sub">'+hint+'</span></div>'
+  +'<button type="button" class="pb-expand">Expand</button></header><div class="pb-body"></div>';
+ card.querySelector('.pb-body').append(el);
+ const button=card.querySelector('.pb-expand');
+ button.addEventListener('click',()=>{const on=card.classList.toggle('expanded');
+  scrim.classList.toggle('on',on);button.textContent=on?'Close':'Expand';
+  window.dispatchEvent(new Event('resize'))});
+ return card}
+
+const panes=[];
+TABS.forEach((entry,index)=>{
+ const [key,title,members]=entry;
+ const cards=members.map(m=>makeCard(m[0],m[1],m[2])).filter(Boolean);
+ if(!cards.length)return;
+ const pane=document.createElement('div');pane.className='pb-tab';pane.id='pb-tab-'+key;
+ pane.setAttribute('role','tabpanel');
+ const grid=document.createElement('div');grid.className='pb-grid';
+ cards.forEach(c=>grid.append(c));pane.append(grid);shell.append(pane);
+ const button=document.createElement('button');button.type='button';
+ button.setAttribute('role','tab');button.id='pb-tabbtn-'+key;
+ button.innerHTML=title+(cards.length>1?' <span class="count">'+cards.length+'</span>':'');
+ button.addEventListener('click',()=>select(key));
+ tabbar.append(button);
+ panes.push({key,pane,button})});
+
+function select(key){panes.forEach(p=>{const on=p.key===key;
+ p.pane.hidden=!on;p.button.setAttribute('aria-selected',String(on));
+ if(on)p.button.setAttribute('tabindex','0');else p.button.setAttribute('tabindex','-1')});
+ // Panels that draw to a sized canvas or measure their box need a nudge when
+ // they become visible, because they were laid out at zero width.
+ window.dispatchEvent(new Event('resize'))}
+if(panes.length)select(panes[0].key);
+
+tabbar.addEventListener('keydown',e=>{
+ const order=panes.map(p=>p.button);const at=order.indexOf(document.activeElement);
+ if(at<0)return;
+ let next=null;
+ if(e.key==='ArrowRight')next=order[(at+1)%order.length];
+ if(e.key==='ArrowLeft')next=order[(at-1+order.length)%order.length];
+ if(e.key==='Home')next=order[0];
+ if(e.key==='End')next=order[order.length-1];
+ if(next){e.preventDefault();next.focus();next.click()}});
+
+scrim.addEventListener('click',()=>{shell.querySelectorAll('.pb-card.expanded').forEach(c=>{
+ c.classList.remove('expanded');const b=c.querySelector('.pb-expand');if(b)b.textContent='Expand'});
+ scrim.classList.remove('on');window.dispatchEvent(new Event('resize'))});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&scrim.classList.contains('on'))scrim.click()});
+
 // Replaced by the adopted explorer above: kept as anchors, not drawn twice.
 // A [hidden] attribute loses to the display rules on these, so hide by style.
 ['vq-tracks','vq-detail'].forEach(id=>{const e=$(id);if(e)e.style.display='none'});
@@ -674,27 +717,11 @@ const cards=PANELS.map(entry=>card(entry[0],entry[1],entry[2])).filter(Boolean);
 ['vq-q','vq-bed','vq-prev-ev','vq-next-ev','vq-prev-p','vq-next-p'].forEach(id=>{
  const e=$(id);if(!e)return;const owner=e.closest('label')||e;owner.style.display='none'});
 const nav=$('vq-nav');
-if(nav&&$('vq-back')){nav.style.margin='0 0 12px';
- const tag=document.createElement('span');tag.className='hint';
- tag.style.cssText='font:11px Arial,sans-serif;color:#7b8a83;margin-right:8px';
+if(nav&&$('vq-back')){context.append(nav);nav.style.marginLeft='auto';
+ const tag=document.createElement('span');
+ tag.style.cssText='font:11px Arial,sans-serif;color:#5d6b63;margin-right:6px';
  tag.textContent='Selection history';nav.prepend(tag)}
 else if(nav){nav.style.display='none'}
-scrim.addEventListener('click',()=>{cards.forEach(c=>{c.classList.remove('expanded');
- const b=c.querySelector('.exp');if(b)b.textContent='Expand'});scrim.classList.remove('on')});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&scrim.classList.contains('on'))scrim.click()});
-$('vq-expand-all').onclick=()=>cards.forEach(c=>{c.classList.remove('collapsed');
- c.querySelector('header').setAttribute('aria-expanded','true')});
-$('vq-collapse-all').onclick=()=>cards.forEach(c=>{c.classList.add('collapsed');
- c.querySelector('header').setAttribute('aria-expanded','false')});
-// The toolbar drives the explorer's own controls rather than duplicating them.
-$('vq-tb-in').onclick=()=>$('vq-in')&&$('vq-in').click();
-$('vq-tb-out').onclick=()=>$('vq-out')&&$('vq-out').click();
-$('vq-tb-fit').onclick=()=>$('vq-fit')&&$('vq-fit').click();
-// Stretch: taller tracks when several methods are shown, shorter when comparing.
-$('vq-stretch').addEventListener('input',e=>{shell.querySelectorAll('.vq-body').forEach(b=>{
- b.style.maxHeight=e.target.value+'px';b.style.overflowY='auto'})});
-$('vq-stretch').dispatchEvent(new Event('input'));
-$('vq-density').addEventListener('input',e=>{shell.style.setProperty('--pad',e.target.value+'px')});
 })();
 </script>"""
 
