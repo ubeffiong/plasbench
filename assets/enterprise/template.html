@@ -1781,9 +1781,9 @@
             });
             if (maxVal === 0) maxVal = 1;
 
-            const pad = { top: 30, right: 18, bottom: 55, left: 110 };
-            const rowH = 26;
-            const colW = 64;
+            const pad = { top: 40, right: 18, bottom: 58, left: 132 };
+            const rowH = 30;
+            const colW = 78;
             const rows = filtered.length;
             const cols = visibleTools.length;
 
@@ -1870,17 +1870,18 @@
             }
 
             // Row labels
-            ctx.fillStyle = '#4a5a52';
-            ctx.font = '9px Inter, sans-serif';
+            ctx.font = '12px Inter, sans-serif';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
             for (let r = 0; r < rows; r++) {
                 const sid = filtered[r];
                 const y = pad.top + r * rowH + rowH / 2;
                 let label = sid;
-                if (label.length > 10) label = label.slice(0, 8) + '…';
-                ctx.fillStyle = (state.selectedSample === sid) ? '#1f6fd0' : '#4a5a52';
-                ctx.fillText(label, pad.left - 6, y);
+                if (label.length > 15) label = label.slice(0, 13) + '…';
+                const chosen = state.selectedSample === sid;
+                ctx.font = (chosen ? '600 12px' : '12px') + ' Inter, sans-serif';
+                ctx.fillStyle = chosen ? '#1f6fd0' : '#3d4b44';
+                ctx.fillText(label, pad.left - 9, y);
             }
 
             // Column headers
@@ -1890,21 +1891,22 @@
                 const tool = visibleTools[c];
                 const x = pad.left + c * colW + colW / 2;
                 const y = pad.top - 6;
-                ctx.fillStyle = (state.selectedTool === tool.id) ? '#1f6fd0' : '#4a5a52';
-                ctx.font = '9px Inter, sans-serif';
+                const chosen = state.selectedTool === tool.id;
+                ctx.fillStyle = chosen ? '#1f6fd0' : '#3d4b44';
+                ctx.font = (chosen ? '700 12px' : '600 12px') + ' Inter, sans-serif';
                 let label = tool.label;
-                if (label.length > 12) label = label.slice(0, 10) + '…';
+                if (label.length > 13) label = label.slice(0, 11) + '…';
                 ctx.fillText(label, x, y);
                 ctx.fillStyle = '#7b8a83';
-                ctx.font = '7px Inter, sans-serif';
-                ctx.fillText('v' + tool.version, x, y + 12);
+                ctx.font = '10px Inter, sans-serif';
+                ctx.fillText('v' + tool.version, x, y + 14);
             }
 
-            ctx.fillStyle = '#7b8a83';
-            ctx.font = '8px Inter, sans-serif';
+            ctx.fillStyle = '#3d4b44';
+            ctx.font = '600 12px Inter, sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText('Metric: ' + getMetricLabel(), 4, 2);
+            ctx.fillText('Metric: ' + getMetricLabel(), 6, 6);
 
             if (state.selectedSample && state.selectedTool) {
                 const rowIdx = filtered.indexOf(state.selectedSample);
