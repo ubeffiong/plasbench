@@ -530,6 +530,14 @@ results/benchmark.report.html
     contains the exact visible rows and these metadata columns.
     Its Bin reconstruction diagnostics table links to the record-level
     `<tool>.bin_matches.tsv` evidence for every bin-scored sample/tool pair.
+    The Reconstruction evidence explorer opens one truth plasmid at a time with
+    alignment tracks, structural navigation (mismatch, gap, inversion,
+    breakpoint), a split/merge map, protein category filters, a nucleotide view
+    where a CIGAR-bounded alignment exists, and TSV/JSON/BED/FASTA/PNG export.
+    It follows the sample and plasmid selected in the report. Read coverage is
+    never computed by projection scoring, so it reads "not measured" and exports
+    as `NA` rather than 0; every structural call is alignment-derived and
+    labelled unvalidated.
     The Visual reconstruction quality section adds a metric-switchable
     sample-by-tool heatmap, linked truth-plasmid recovery tracks, coordinate
     zoom, block-level PAF inspection, AMR markers, and JSON download.

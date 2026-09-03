@@ -820,6 +820,73 @@ refresh();})();
 </script>"""
 
 
+def evidence_explorer_section(project_root, scores, results_dir, vendor_html):
+    """Embed the vendored reconstruction evidence explorer.
+
+    Like the cohort dashboard, the design ships as a whole document that styles
+    bare ``*`` and ``body``, so it runs in an isolated frame. Selection changes
+    in this report are forwarded to it by postMessage.
+    """
+    template = Path(project_root) / "assets" / "explorer" / "template.html"
+    if not template.is_file():
+        return ""
+    try:
+        import build_explorer_view as explorer
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import build_explorer_view as explorer
+
+    visualizations, structural = {}, {}
+    for sample in {row["sample"] for row in scores}:
+        path = results_dir / sample / "visualization" / "alignment_blocks.json"
+        if path.is_file():
+            try:
+                visualizations[sample] = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+        calls = results_dir / sample / "visualization" / "structural_calls.json"
+        if calls.is_file():
+            try:
+                structural[sample] = json.loads(calls.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                pass
+    if not visualizations:
+        return ""
+
+    versions = read_tool_versions(results_dir / "run_manifest.json")
+    data = explorer.build(visualizations, structural, versions)
+    if not data["samples"]:
+        return ""
+    document = explorer.render(template, data, vendor_html)
+    encoded = document.replace("</script", "<\\/script")
+    # The report's own sample and plasmid controls drive the frame, so one
+    # selection is followed everywhere instead of being re-picked inside it.
+    return ("<div id='pb-explorer-view'><h3>Reconstruction evidence explorer</h3>"
+            "<p class='lead'>Alignment blocks, structural calls, bin relationships and reference "
+            "annotation for one truth plasmid at a time. Identity, mapping quality and every span are "
+            "measured from this run. Read depth is not computed by projection scoring, so per-segment "
+            "coverage reads “not measured” rather than zero, and the nucleotide view resolves only "
+            "where a CIGAR-bounded local alignment exists.</p>"
+            "<div class='panel' style='padding:0'><iframe id='pb-explorer' "
+            "title='PlasBench reconstruction evidence explorer' "
+            "style='width:100%;height:1180px;border:0;display:block'></iframe></div>"
+            f"<script id='pb-explorer-doc' type='text/template'>{encoded}</script>"
+            "<script>(()=>{const f=document.getElementById('pb-explorer');"
+            "const raw=document.getElementById('pb-explorer-doc').textContent;"
+            "f.srcdoc=raw.split('<\\\\/script').join('</scr'+'ipt');"
+            "const push=()=>{const s=document.getElementById('vq-sample'),"
+            "p=document.getElementById('vq-plasmid');if(!f.contentWindow)return;"
+            "f.contentWindow.postMessage({pbExplorer:'select',"
+            "sample:s?s.value:null,plasmid:p?p.value:null},'*')};"
+            # The explorer is emitted above the controls it follows, so the
+            # listener is delegated rather than bound to elements that do not
+            # exist yet when this runs.
+            "document.addEventListener('change',e=>{"
+            "if(e.target&&(e.target.id==='vq-sample'||e.target.id==='vq-plasmid'))"
+            "setTimeout(push,60)},true);"
+            "f.addEventListener('load',()=>setTimeout(push,150));})();</script></div>")
+
+
 def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
                             results_dir, vendor_html, evidence_html=""):
     """Embed the vendored enterprise dashboard, driven by measured results.
@@ -1289,8 +1356,10 @@ def main():
                    + agreement_and_comparison_script()
                    + explorer_chrome_script()
                    + lazy_visualization_script())
+    explorer_html = evidence_explorer_section(args.project_root, scores, out.parent, vendor_html)
     enterprise_html = enterprise_view_section(args.project_root, scores, status, leaderboard,
-                                              metadata, out.parent, vendor_html, visual_html)
+                                              metadata, out.parent, vendor_html,
+                                              explorer_html + visual_html)
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>PlasBench plasmid benchmark report</title>

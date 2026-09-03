@@ -50,11 +50,46 @@ AMR = {
 
 # Replicon / mobility context, as an annotation caller would emit it.
 FEATURES = {
-    "pA": [(0, 1_100, "replicon", "IncFIB"), (30_000, 31_400, "mob", "MOBF")],
-    "pC": [(0, 980, "replicon", "IncI1")],
-    "pE": [(0, 1_240, "replicon", "IncFII"), (70_000, 71_200, "mob", "MOBH")],
+    "pA": [(0, 1_100, "replicon", "IncFIB"), (30_000, 31_400, "mob", "MOBF"),
+           (52_000, 53_100, "insertion_sequence", "ISEcp1")],
+    "pC": [(0, 980, "replicon", "IncI1"), (20_000, 21_050, "mob", "MOBP")],
+    "pE": [(0, 1_240, "replicon", "IncFII"), (70_000, 71_200, "mob", "MOBH"),
+           (120_000, 121_150, "insertion_sequence", "IS26")],
     "pH": [(0, 1_050, "replicon", "IncA/C")],
-    "pI": [(0, 900, "replicon", "ColE1")],
+    "pI": [(0, 900, "replicon", "ColE1"), (9_000, 10_050, "mob", "MOBQ"),
+           (20_000, 21_100, "insertion_sequence", "IS903")],
+    "pJ": [(0, 820, "replicon", "ColRNAI")],
+}
+
+# Coding sequences, as a reference annotation caller would emit them. The
+# category vocabulary is the one the explorer filters on, so every category is
+# represented somewhere in the cohort.
+PROTEINS = {
+    "pA": [(2_000, 3_200, "+", "repE", "replication initiation protein", "replicon"),
+           (12_400, 13_277, "+", "blaCTX-M-15", "class A beta-lactamase", "amr"),
+           (22_000, 23_600, "-", "traI", "conjugative relaxase", "conjugation"),
+           (38_000, 38_900, "+", "parA", "plasmid partitioning protein", "partition"),
+           (52_000, 53_100, "-", "tnpA", "IS3 family transposase", "transposase"),
+           (66_000, 66_700, "+", "orf_pA_1", "hypothetical protein", "unknown")],
+    "pB": [(500, 1_400, "+", "mobA", "relaxase MobA", "mob"),
+           (3_000, 3_800, "-", "orf_pB_1", "hypothetical protein", "unknown")],
+    "pC": [(1_200, 2_300, "+", "repZ", "replication protein", "replicon"),
+           (8_200, 9_013, "+", "blaKPC-2", "class A carbapenemase", "amr"),
+           (30_000, 31_500, "-", "traJ", "conjugal transfer protein", "conjugation")],
+    "pE": [(2_000, 3_150, "+", "repA", "replication initiation protein", "replicon"),
+           (61_000, 61_813, "+", "blaNDM-1", "metallo-beta-lactamase", "amr"),
+           (85_000, 86_400, "-", "virB4", "type IV secretion ATPase", "conjugation"),
+           (120_000, 121_150, "+", "tnpA", "IS26 transposase", "transposase"),
+           (140_000, 140_950, "+", "parB", "partition protein B", "partition")],
+    "pI": [(1_000, 2_050, "+", "repC", "replication initiation protein", "replicon"),
+           (3_100, 3_726, "+", "tetA", "tetracycline efflux pump", "amr"),
+           (9_000, 10_050, "-", "mobC", "mobilization protein C", "mob"),
+           (14_000, 15_100, "+", "higA", "antitoxin HigA", "toxin_antitoxin"),
+           (20_000, 21_100, "-", "tnpA", "IS903 transposase", "transposase"),
+           (23_000, 23_800, "+", "orf_pI_1", "hypothetical protein", "unknown")],
+    "pJ": [(200, 1_100, "+", "repB", "replication protein B", "replicon"),
+           (2_400, 3_300, "-", "orf_pJ_1", "hypothetical protein", "unknown"),
+           (4_500, 5_400, "+", "pemK", "toxin PemK", "toxin_antitoxin")],
 }
 
 TOOLS = ["mob_like", "platon_like", "spades_like", "gplas_like", "weak_like"]
@@ -150,8 +185,12 @@ def predictions(sample, tool, chrom_len, plasmids):
         # Cover most of the remaining reference so completeness stays high while the
         # rearrangements above keep collinearity low: a complete but discordant
         # reconstruction, which completeness alone would report as a clean win.
-        rows.append(block("spa_fill", length // 2, 0, length // 2, "+", name, length,
-                          half + 3_000, half + 3_000 + length // 2, identity=0.95))
+        # Clamp to the reference end: a target span running past the reference
+        # length is not a valid PAF row, and it drives completeness above 1.
+        fill_start = half + 3_000
+        fill_end = min(length, fill_start + length // 2)
+        rows.append(block("spa_fill", fill_end - fill_start, 0, fill_end - fill_start, "+",
+                          name, length, fill_start, fill_end, identity=0.95))
         for index, (pname, plen, _) in enumerate(plasmids[1:], start=1):
             rows.append(block(f"spa_small{index}", plen, 0, plen, "+", pname, plen, 0, plen, identity=0.86))
 
@@ -243,6 +282,18 @@ def main():
             write_tsv(sdir / "truth_features.tsv",
                       ["sequence_id", "start", "end", "feature_type", "label", "source", "version"],
                       features)
+
+        # Coding sequences in the normalized protein schema the visualization
+        # builder reads, so the explorer's protein track and category filters
+        # have real spans to work on.
+        proteins = [[name, start, end, strand, f"{name}_{start}", gene, product, category,
+                     "demo_annotator", "0.0-synthetic", "synthetic"]
+                    for name, _, _ in plasmids
+                    for start, end, strand, gene, product, category in PROTEINS.get(name, [])]
+        if proteins:
+            write_tsv(sdir / "truth_proteins.tsv",
+                      ["sequence_id", "start", "end", "strand", "feature_id", "gene", "product",
+                       "category", "source", "version", "confidence"], proteins)
 
         for index, tool in enumerate(TOOLS):
             failed = (sample, tool) in FAILS
