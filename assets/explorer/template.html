@@ -91,6 +91,15 @@ __PB_FONTS__
         .track-legend b { font-weight: 600; color: var(--text-muted); font-size: 11px;
             text-transform: uppercase; letter-spacing: .05em; margin-right: 2px; }
         .track-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .track-legend button { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+            font: inherit; color: inherit; background: transparent; border: 1px solid transparent;
+            border-radius: 20px; padding: 2px 8px; cursor: pointer; }
+        .track-legend button:hover { background: var(--bg-card-hover); border-color: var(--border-color); }
+        .track-legend button:focus-visible { outline: 2px solid var(--accent-green); outline-offset: 1px; }
+        .track-legend button[aria-pressed="true"] { background: var(--accent-green); color: #fff;
+            border-color: var(--accent-green); }
+        .track-legend button.dimmed { opacity: .45; }
+        .track-legend .clear { margin-left: auto; font-size: 11px; text-decoration: underline; }
         .track-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
         .jc { font-style: normal; font-weight: 700; font-size: 10px; background: var(--bg-input);
             color: var(--text-secondary); border-radius: 9px; padding: 0 6px; margin-left: 5px; }
@@ -870,6 +879,9 @@ __PB_FONTS__
             panY: 0,
             density: 6,
             highlight: null,
+            // null means every type. A set means only those, so the reader can
+            // ask "where are the inversions" and see nothing else.
+            segmentFilter: null,
             contentH: 0,
             viewH: 0,
             mode: 'A', // 'A' = alignment-block, 'B' = nucleotide
@@ -1198,9 +1210,11 @@ __PB_FONTS__
                         color = tool.color + '80';
                     }
 
-                    // A focused record keeps the others visible but quiet, so
-                    // the reader can still see what it sits among.
-                    const dim = sel.record && seg.record && seg.record !== sel.record;
+                    // A focused record, or a legend filter, keeps the others
+                    // visible but quiet: the reader still sees what it sits among.
+                    const filtered = state.segmentFilter && !state.segmentFilter.has(seg.type);
+                    const dim = filtered ||
+                        (sel.record && seg.record && seg.record !== sel.record);
                     ctx.globalAlpha = dim ? 0.18 : 1;
                     ctx.fillStyle = color;
                     ctx.fillRect(x1, y + 1, w, trackH - 2);
@@ -1776,6 +1790,9 @@ __PB_FONTS__
                 document.querySelectorAll('#categoryChips .chip').forEach(c => c.classList.remove('active'));
                 this.classList.add('active');
                 state.categoryFilter = this.dataset.cat;
+                // The legend shows the same filter, so it must not disagree
+                // with the chips about what is on screen.
+                if (typeof renderTrackLegend === 'function') renderTrackLegend();
                 render();
             });
         });
@@ -2376,11 +2393,38 @@ __PB_FONTS__
         const CATEGORY_KEY = [
             ['AMR', '#b3261e'], ['Replication', '#2563c9'], ['Conjugation', '#6d43c4'],
             ['Maintenance', '#0e7490'], ['Transposase', '#b25309'], ['Hypothetical', '#5d6b63']];
+        // The type a swatch names is the type it filters to. A key that only
+        // explains leaves the reader scanning; one that selects answers the
+        // question the key raised.
+        const SEGMENT_KIND = {
+            'Good': 'good', 'Missing': 'missing', 'Inverted': 'inverted',
+            'Chromosomal': 'chromosomal', 'Wrong plasmid': 'wrong_plasmid',
+            'Ambiguous': 'ambiguous', 'Duplicated': 'duplicated',
+            'Low identity': 'low_identity', 'Unsupported join': 'unsupported_join' };
+
+        function toggleSegmentType(kind) {
+            const chosen = state.segmentFilter ? new Set(state.segmentFilter) : new Set();
+            if (chosen.has(kind)) chosen.delete(kind); else chosen.add(kind);
+            state.segmentFilter = chosen.size ? chosen : null;
+            renderTrackLegend();
+            render();
+        }
+
         function renderTrackLegend() {
             const host = document.getElementById('trackLegend');
             if (!host) return;
-            const swatch = pair => '<span title="' + pair[0] + '"><i style="background:' + pair[1] +
-                (pair[1] === '#eef2ef' ? ';border:1px dashed #b9c7be' : '') + '"></i>' + pair[0] + '</span>';
+            const swatch = pair => {
+                const kind = SEGMENT_KIND[pair[0]];
+                const dot = '<i style="background:' + pair[1] +
+                    (pair[1] === '#eef2ef' ? ';border:1px dashed #b9c7be' : '') + '"></i>';
+                if (!kind) return '<span title="' + pair[0] + '">' + dot + pair[0] + '</span>';
+                const on = !!(state.segmentFilter && state.segmentFilter.has(kind));
+                const off = state.segmentFilter && !on;
+                return '<button type="button" data-kind="' + kind + '" aria-pressed="' + on + '"' +
+                    (off ? ' class="dimmed"' : '') +
+                    ' title="Show only ' + pair[0].toLowerCase() + ' segments. Click again to clear.">' +
+                    dot + pair[0] + '</button>';
+            };
             // In identity mode the bars are a gradient, so naming event colours
             // there would be a key to something not on screen.
             const segments = state.colorMode === 'event'
@@ -2388,7 +2432,51 @@ __PB_FONTS__
                 : '<b>Segments</b><span>coloured by ' +
                   (state.colorMode === 'identity' ? 'alignment identity, dark is higher' : 'source method') +
                   ' \u2014 switch Colour by to Event type for the measured vocabulary</span>';
-            host.innerHTML = segments + '<b>Annotation</b>' + CATEGORY_KEY.map(swatch).join('');
+            const category = pair => {
+                const on = state.categoryFilter === pair[0];
+                return '<button type="button" data-category="' + pair[0] + '" aria-pressed="' + on + '"' +
+                    ' title="Show only ' + pair[0] + ' features on the annotation row.">' +
+                    '<i style="background:' + pair[1] + '"></i>' + pair[0] + '</button>';
+            };
+            const clearing = (state.segmentFilter || state.categoryFilter !== 'all')
+                ? '<button type="button" class="clear" id="legendClear" ' +
+                  'title="Show every segment type and every annotation category again.">Clear filters</button>'
+                : '';
+            host.innerHTML = segments + '<b>Annotation</b>' +
+                CATEGORY_KEY.map(category).join('') + clearing;
+        }
+
+        // One delegated listener: the legend is rebuilt on every change.
+        document.addEventListener('click', function (event) {
+            const host = document.getElementById('trackLegend');
+            if (!host || !host.contains(event.target)) return;
+            const clear = event.target.closest('#legendClear');
+            if (clear) {
+                state.segmentFilter = null;
+                state.categoryFilter = 'all';
+                syncCategoryChips();
+                renderTrackLegend();
+                render();
+                return;
+            }
+            const kind = event.target.closest('[data-kind]');
+            if (kind) { toggleSegmentType(kind.dataset.kind); return; }
+            const cat = event.target.closest('[data-category]');
+            if (cat) {
+                // The sidebar chips are the same filter, so they move together
+                // rather than disagreeing about what is shown.
+                state.categoryFilter = state.categoryFilter === cat.dataset.category
+                    ? 'all' : cat.dataset.category;
+                syncCategoryChips();
+                renderTrackLegend();
+                render();
+            }
+        });
+
+        function syncCategoryChips() {
+            document.querySelectorAll('#categoryChips .chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.cat === state.categoryFilter);
+            });
         }
         renderTrackLegend();
         const colorModeSelect = document.getElementById('colorMode');

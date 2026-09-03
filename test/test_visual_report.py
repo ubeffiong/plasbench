@@ -505,6 +505,27 @@ def main():
     assert "if (sel.overlay && !sel.tool)" in explorer_doc,         "choosing an overlay alone must select a first method rather than do nothing"
     assert "canvas._segments = overlayBoxes" in explorer_doc,         "overlay halves must register hit boxes, or nothing in them can be hovered"
 
+    # The legend selects as well as explains: a key that only names colours
+    # leaves the reader scanning for the one it named.
+    for needed in ("segmentFilter", "SEGMENT_KIND", "toggleSegmentType",
+                   "legendClear", "syncCategoryChips", "aria-pressed"):
+        assert needed in explorer_doc, f"legend filter affordance missing: {needed}"
+    # The sidebar chips are the same filter and must not disagree with it.
+    assert "if (typeof renderTrackLegend === 'function') renderTrackLegend();" in explorer_doc,         "the category chips must keep the legend in step"
+    # Filtering hides nothing outright: the rest stays visible but quiet.
+    assert "state.segmentFilter && !state.segmentFilter.has(seg.type)" in explorer_doc,         "a legend filter must dim the other types rather than remove them"
+
+    # A pointer that can be dragged along the agreement track and says what is
+    # under it, including which methods do not cover that position.
+    for needed in ("agr-pointer", "agr-readout", "function supportAt",
+                   "pointerdown", "getScreenCTM", "no cover"):
+        assert needed in page, f"agreement pointer affordance missing: {needed}"
+    assert "role','slider'" in page.replace('"', "'"),         "the pointer must expose itself as a slider"
+    for key in ("ArrowLeft", "ArrowRight", "'Home'", "'End'"):
+        assert key in page, f"agreement pointer keyboard step missing: {key}"
+    # The reading is the point: a count alone does not say which method differs.
+    assert "The methods disagree here" in page,         "the pointer must interpret disagreement, not just count it"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
