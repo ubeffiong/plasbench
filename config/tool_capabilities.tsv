@@ -5,3 +5,8 @@ plasmidspades	reassembly	no	paired_reads	Reassembles plasmid-enriched contigs; c
 gplas2_mob	binning	yes	assembly_graph	Graph binning seeded from validated MOB membership.
 gplas2_external	binning	yes	assembly_graph	Graph binning with externally validated classifier labels.
 flye_mob_recon	binning	yes	long_reads	Flye long-read assembly followed by MOB-Recon plasmid bins.
+mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.
+platon_like	classification	no	assembly	Demo contig classifier; declares no bins.
+spades_like	reassembly	no	paired_reads	Demo re-assembler; contigs are not bins.
+gplas_like	binning	yes	assembly_graph	Demo graph binner that splits and merges.
+weak_like	classification	no	assembly	Demo weak classifier; partial, ambiguous output.
