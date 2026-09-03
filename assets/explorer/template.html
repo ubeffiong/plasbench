@@ -100,6 +100,16 @@ __PB_FONTS__
             border-color: var(--accent-green); }
         .track-legend button.dimmed { opacity: .45; }
         .track-legend .clear { margin-left: auto; font-size: 11px; text-decoration: underline; }
+        .legend-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0 0; line-height: 1.45; }
+        .legend-row button { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+            font: inherit; color: inherit; background: transparent; border: 1px solid transparent;
+            border-radius: 20px; padding: 2px 7px; cursor: pointer; }
+        .legend-row button:hover { background: var(--bg-card-hover); border-color: var(--border-color); }
+        .legend-row button:focus-visible { outline: 2px solid var(--accent-green); outline-offset: 1px; }
+        .legend-row button[aria-pressed="true"] { background: var(--accent-green); color: #fff;
+            border-color: var(--accent-green); }
+        .legend-row button.dimmed { opacity: .45; }
+        .legend-row button .swatch { flex: none; }
         .track-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
         .jc { font-style: normal; font-weight: 700; font-size: 10px; background: var(--bg-input);
             color: var(--text-secondary); border-radius: 9px; padding: 0 6px; margin-left: 5px; }
@@ -637,17 +647,9 @@ __PB_FONTS__
                 <!-- Legend -->
                 <div class="sidebar-section">
                     <div class="section-title"><i class="fas fa-palette"></i> Legend</div>
-                    <div class="legend-row">
-                        <span><span class="swatch" style="background:#17805a;"></span> Good</span>
-                        <span><span class="swatch" style="background:var(--bg-input);border:1px dashed var(--border-light);"></span> Missing</span>
-                        <span><span class="swatch" style="background:#b03a80;"></span> Inverted</span>
-                        <span><span class="swatch" style="background:#b3261e;"></span> Chromosomal</span>
-                        <span><span class="swatch" style="background:#d97706;"></span> Wrong plasmid</span>
-                        <span><span class="swatch" style="background:#a35c05;"></span> Ambiguous</span>
-                        <span><span class="swatch" style="background:#6d43c4;"></span> Duplicated</span>
-                        <span><span class="swatch" style="background:#0e7490;"></span> Low identity</span>
-                        <span><span class="swatch" style="background:#7c3aed;"></span> Unsupported join</span>
-                    </div>
+                    <div class="legend-row" id="segmentLegend"></div>
+                    <p class="legend-hint">Select a type to keep it and quiet the rest. Several
+                        can be combined.</p>
                     <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;font-size:13px;color:var(--text-muted);">
                         <span class="protein-tag" style="background:#b3261e;">AMR</span>
                         <span class="protein-tag" style="background:#2563c9;">Replication</span>
@@ -2410,7 +2412,24 @@ __PB_FONTS__
             render();
         }
 
+        function renderSegmentKey() {
+            const host = document.getElementById('segmentLegend');
+            if (!host) return;
+            host.innerHTML = SEGMENT_KEY.map(pair => {
+                const kind = SEGMENT_KIND[pair[0]];
+                const on = !!(state.segmentFilter && state.segmentFilter.has(kind));
+                const off = state.segmentFilter && !on;
+                const swatch = '<span class="swatch" style="background:' + pair[1] +
+                    (pair[1] === '#eef2ef' ? ';border:1px dashed var(--border-light)' : '') + '"></span>';
+                return '<button type="button" data-kind="' + kind + '" aria-pressed="' + on + '"' +
+                    (off ? ' class="dimmed"' : '') +
+                    ' title="Show only ' + pair[0].toLowerCase() +
+                    ' segments. Click again to clear.">' + swatch + ' ' + pair[0] + '</button>';
+            }).join('');
+        }
+
         function renderTrackLegend() {
+            renderSegmentKey();
             const host = document.getElementById('trackLegend');
             if (!host) return;
             const swatch = pair => {
@@ -2427,7 +2446,10 @@ __PB_FONTS__
             };
             // In identity mode the bars are a gradient, so naming event colours
             // there would be a key to something not on screen.
-            const segments = state.colorMode === 'event'
+            // With a type filter on, the inline key shows the type toggles even
+            // when the bars are coloured by something else: otherwise the
+            // sidebar is filtering by a vocabulary this key denies exists.
+            const segments = (state.colorMode === 'event' || state.segmentFilter)
                 ? '<b>Segments</b>' + SEGMENT_KEY.map(swatch).join('')
                 : '<b>Segments</b><span>coloured by ' +
                   (state.colorMode === 'identity' ? 'alignment identity, dark is higher' : 'source method') +
@@ -2448,8 +2470,11 @@ __PB_FONTS__
 
         // One delegated listener: the legend is rebuilt on every change.
         document.addEventListener('click', function (event) {
-            const host = document.getElementById('trackLegend');
-            if (!host || !host.contains(event.target)) return;
+            const inline = document.getElementById('trackLegend');
+            const sidebar = document.getElementById('segmentLegend');
+            const inKey = (inline && inline.contains(event.target)) ||
+                          (sidebar && sidebar.contains(event.target));
+            if (!inKey) return;
             const clear = event.target.closest('#legendClear');
             if (clear) {
                 state.segmentFilter = null;

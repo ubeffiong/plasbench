@@ -1151,7 +1151,7 @@ structural diagnostics. They use retained primary PAF blocks on truth-reference 
 them is a raw nucleotide alignment or an independent structural-validation claim.</p>
 <div class='controls'><label>Sample <select id='vq-sample'></select></label><label>Tool <select id='vq-tool'></select></label><label>Truth plasmid <select id='vq-plasmid'></select></label><button id='vq-fit' type='button'>Fit</button><button id='vq-in' type='button'>Zoom in</button><button id='vq-out' type='button'>Zoom out</button><label>Start <input id='vq-start' type='number' min='0'></label><label>End <input id='vq-end' type='number' min='1'></label><a id='vq-download' class='download-button' download>Download JSON</a></div>
 <div class='panel' id='vq-anchor'><div id='vq-tracks' class='muted'>Choose a sample with visualization data.</div><div id='vq-detail' class='insight neutral'></div></div>
-<details class='sample'><summary><strong>Legend and limits</strong><span>how to interpret this dashboard evidence</span></summary><div class='method'><p><strong>Sample-Tool Heatmap:</strong> the dashboard canvas is the single cohort matrix. Its metric selector, filters, tooltip, clustering, keyboard navigation, drilldown modal, and exports apply there. Grey is unavailable; failed and skipped states are never converted to zero.</p><p><strong>Tracks:</strong> green blocks align in the forward orientation; purple blocks align in reverse. White is not recovered by the displayed blocks. Blue triangles mark curated AMR features. The JSON records omitted blocks when a display cap applies.</p><p><strong>AliView-like drill-down:</strong> use zoom, coordinates, and block clicks to investigate a region. Whole-plasmid base letters are deliberately not rendered because they are slow and misleading without a region-specific multiple alignment.</p></div></details>
+
 <script id='vq-data' type='application/json'>__PAYLOAD__</script><script>
 (()=>{const d=JSON.parse(document.getElementById('vq-data').textContent),m=d.matrix,v=d.visualizations,$=id=>document.getElementById(id),samples=[...new Set(m.map(x=>x.sample))].sort(),tools=[...new Set(m.map(x=>x.tool))].sort();let range=null;
 const select=(e,items)=>e.innerHTML=items.map(x=>`<option value="${x}">${x}</option>`).join('');
@@ -1537,11 +1537,6 @@ panes.forEach(p=>{if(TAB_HELP[p.key]){p.button.title=TAB_HELP[p.key];p.pane.titl
 shell.querySelectorAll('.pb-expand').forEach(b=>{b.title='Open this panel full screen.'});
 
 
-// The reader arrived here with a sample and a method already chosen, so the
-// notes that explain how to read these panels start open rather than hidden.
-const legend=document.querySelector('#cohort-evidence-explorer details.sample');
-if(legend&&$('vq-sample')&&$('vq-sample').value&&$('vq-tool')&&$('vq-tool').value){
- legend.open=true;shell.append(legend)}
 
 tabbar.addEventListener('keydown',e=>{
  const order=panes.map(p=>p.button);const at=order.indexOf(document.activeElement);
