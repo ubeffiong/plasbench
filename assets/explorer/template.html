@@ -38,6 +38,12 @@ __PB_FONTS__
             --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             --transition: 0.2s ease;
         }
+
+        /* Blue against orange, for deuteranopia and protanopia. Colour is a
+           second channel here: every cell prints its value. */
+        :root[data-cvd="1"] { --accent-green: #0b62a4; --accent-red: #8a4500;
+            --accent-amber: #a85a00; --accent-blue: #0b62a4; --accent-rose: #7a3c00;
+            --accent-purple: #3f4d8a; --accent-cyan: #2b7fa8; --accent-orange: #c07000; }
         html { font-size: 15px; scroll-behavior: smooth; }
         .unmeasured { color: var(--text-muted); font-style: italic; }
         .detail-row small { color: var(--text-muted); font-size: 12px; }
@@ -2149,5 +2155,15 @@ __PB_FONTS__
         console.log('✅ Reconstruction Evidence Explorer (Consolidated) initialized with all features.');
     </script>
 
+
+    <script>
+    // The report tells its frames which palette to use.
+    window.addEventListener('message', function (e) {
+        const m = e.data;
+        if (!m || !m.pbPalette) return;
+        document.documentElement.dataset.cvd = m.pbPalette === 'cvd' ? '1' : '';
+        window.dispatchEvent(new Event('resize'));
+    });
+    </script>
 </body>
 </html>

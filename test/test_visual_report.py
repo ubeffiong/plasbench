@@ -402,6 +402,31 @@ def main():
     # The notes on how to read these panels open with the section.
     assert "legend.open=true" in page,         "the legend must be open when a sample and method are already selected"
 
+    # One glossary, rendered into the keys section and attached to every
+    # occurrence of the term. A definition only on a reference page is not an
+    # explanation: the reader meets the term in a column header.
+    assert "pb-glossary" in page, "the glossary payload is not emitted"
+    for term in ("Base F1", "Structural concordance", "Split", "Merge",
+                 "Chromosomal contamination", "Purity"):
+        assert term in page, f"glossary term missing: {term}"
+    assert page.count("Why it matters") >= 18,         "every term must say why it matters, not only what it measures"
+    assert "class='term-card'" in page or 'class="term-card"' in page,         "the keys section must render from the glossary"
+
+    # Summary first: headline numbers, a graded report card, and where to look.
+    assert page.index("<section id='summary'>") < page.index("<section id='metadata'>"),         "the summary must come first"
+    for needed in ("sum-stat", "Report card", "grade-a", "Start here", "findings",
+                   "Base F1 (40%)", "plasmid recall (25%)"):
+        assert needed in page, f"summary affordance missing: {needed}"
+    # The grade is an opinion, so its rule and its parts are both on screen.
+    assert "not an acceptance threshold" in page, "the grade must not read as a verdict"
+    assert "reweighted, never counted as zero" in page or "never counted as zero" in page,         "an unmeasured grade component must not be scored as zero"
+
+    # Colour is never the only channel, and the palette can be swapped.
+    for needed in ("pb-cvd", 'data-cvd="1"', "pb-print", "pbPalette"):
+        assert needed in page, f"accessibility affordance missing: {needed}"
+    assert "@media print" in page, "there is no printable form"
+    assert ".pb-tab[hidden]{display:block!important}" in page,         "printing must expand every tab, or six of seven panes are lost"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
