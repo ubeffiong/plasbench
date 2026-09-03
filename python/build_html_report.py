@@ -646,6 +646,149 @@ else setup();
 </script>"""
 
 
+def agreement_pointer_script():
+    """Put a draggable pointer on the agreement track.
+
+    The sweep shows how many methods cover each interval, but reading a
+    particular coordinate off it means eyeballing a band against a ruler. The
+    pointer is dragged along the track and reports the position it is on: which
+    interval, how many methods cover it, which ones by name, and what that
+    means. Naming them is the part the picture cannot do -- "4 of 5" does not
+    say which one disagrees.
+    """
+    return """<style>
+#agr-pointer{cursor:ew-resize}
+#agr-pointer line{stroke:#16211c;stroke-width:1.5}
+#agr-pointer polygon{fill:#16211c}
+#vq-agree svg{cursor:crosshair;touch-action:none}
+#agr-readout{margin-top:10px;font:13px Arial,sans-serif;line-height:1.55;color:#3d4b44;
+  background:#f7faf8;border:1px solid #d3ddd6;border-left:4px solid #17805a;
+  border-radius:5px;padding:10px 13px}
+#agr-readout b{color:#16211c}
+#agr-readout .who{display:block;margin-top:5px;font-size:12.5px}
+#agr-readout .who i{font-style:normal;display:inline-block;padding:1px 8px;margin:2px 4px 0 0;
+  border-radius:10px;font-size:11.5px}
+#agr-readout .yes{background:#dcefdc;color:#07573e}
+#agr-readout .no{background:#f2e4e2;color:#8c2018}
+#agr-readout .note{display:block;margin-top:6px;font-size:12px;color:#5d6b63}
+</style><script>
+(()=>{const $=id=>document.getElementById(id);
+if(!$('vq-data'))return;
+const data=JSON.parse($('vq-data').textContent);
+
+function context(){const a=data.visualizations[($('vq-sample')||{}).value];
+ const p=($('vq-plasmid')||{}).value;
+ return (a&&p&&a.truth_plasmids&&a.truth_plasmids[p])?{a,p}:null}
+
+// Which methods actually cover a reference position. The band knows the count;
+// only the blocks know the names, and the name is what the reader needs.
+function supportAt(bp){const x=context();if(!x)return null;
+ const out=[];
+ Object.keys(x.a.tools).sort().forEach(tool=>{
+  const covered=x.a.tools[tool].blocks.some(b=>
+   b.target===x.p&&b.target_start<=bp&&bp<b.target_end);
+  out.push({tool,covered})});
+ return out}
+
+function build(){
+ const host=$('vq-agree');if(!host)return;
+ const svg=host.querySelector('svg');if(!svg)return;
+ if(svg.dataset.pointer)return;
+ const bands=[...svg.querySelectorAll('rect.agr')];if(!bands.length)return;
+ svg.dataset.pointer='1';
+
+ const left=Math.min(...bands.map(b=>+b.getAttribute('x')));
+ const right=Math.max(...bands.map(b=>+b.getAttribute('x')+ +b.getAttribute('width')));
+ const top=Math.min(...bands.map(b=>+b.getAttribute('y')));
+ const height=Math.max(...bands.map(b=>+b.getAttribute('height')));
+
+ const ns='http://www.w3.org/2000/svg';
+ const group=document.createElementNS(ns,'g');
+ group.setAttribute('id','agr-pointer');
+ group.setAttribute('role','slider');
+ group.setAttribute('tabindex','0');
+ group.setAttribute('aria-label','Position on the agreement track');
+ const line=document.createElementNS(ns,'line');
+ line.setAttribute('y1',top-2);line.setAttribute('y2',top+height+2);
+ const head=document.createElementNS(ns,'polygon');
+ group.append(line,head);svg.append(group);
+
+ let at=left;
+ function place(x){
+  at=Math.max(left,Math.min(right,x));
+  line.setAttribute('x1',at);line.setAttribute('x2',at);
+  head.setAttribute('points',
+   (at-5)+','+(top-10)+' '+(at+5)+','+(top-10)+' '+at+','+(top-2));
+  report()}
+
+ function toUser(event){
+  const point=svg.createSVGPoint();
+  point.x=event.clientX;point.y=event.clientY;
+  const ctm=svg.getScreenCTM();
+  return ctm?point.matrixTransform(ctm.inverse()).x:left}
+
+ function bandAt(x){
+  return bands.find(b=>{const bx=+b.getAttribute('x');
+   return x>=bx&&x<=bx+ +b.getAttribute('width')})||null}
+
+ function report(){
+  const box=$('agr-readout');if(!box)return;
+  const x=context();if(!x){box.textContent='No plasmid is selected.';return}
+  const length=x.a.truth_plasmids[x.p].length;
+  const bp=Math.round((at-left)/Math.max(1,right-left)*length);
+  const band=bandAt(at);
+  const title=band?(band.querySelector('title')||{}).textContent||'':'';
+  const support=supportAt(bp)||[];
+  const yes=support.filter(s=>s.covered),no=support.filter(s=>!s.covered);
+  const chips=support.map(s=>'<i class="'+(s.covered?'yes':'no')+'">'+s.tool+
+   (s.covered?'':' \u2014 no cover')+'</i>').join('');
+  let meaning;
+  if(!support.length)meaning='No method has retained blocks on this plasmid.';
+  else if(no.length===0)meaning='Every method covers this position. Shared support is not '
+   +'evidence of correctness -- methods with similar assumptions fail in similar ways -- but '
+   +'nothing here singles one of them out.';
+  else if(yes.length===0)meaning='No method covers this position. A region every method '
+   +'misses is more likely to be hard to assemble than to be a fault of any one of them.';
+  else meaning='The methods disagree here, which is the interesting case: '+
+   no.map(s=>s.tool).join(', ')+(no.length===1?' has':' have')+' no aligned block over this '
+   +'position while '+yes.length+' other'+(yes.length===1?'':'s')+' do. Open the tracks above '
+   +'at this coordinate to see whether it is missing, inverted, or assigned elsewhere.';
+  box.innerHTML='<b>'+bp.toLocaleString()+' bp</b> on '+x.p+' \u00b7 <b>'+yes.length+' of '+
+   support.length+'</b> methods cover it'+(title?' \u00b7 band '+title:'')+
+   '<span class="who">'+chips+'</span>'+
+   '<span class="note">'+meaning+'</span>'}
+
+ let dragging=false;
+ const move=e=>{if(!dragging)return;e.preventDefault();place(toUser(e))};
+ svg.addEventListener('pointerdown',e=>{dragging=true;
+  if(svg.setPointerCapture)try{svg.setPointerCapture(e.pointerId)}catch(err){}
+  place(toUser(e))});
+ svg.addEventListener('pointermove',move);
+ svg.addEventListener('pointerup',()=>{dragging=false});
+ svg.addEventListener('pointerleave',()=>{dragging=false});
+ group.addEventListener('keydown',e=>{
+  const step=(right-left)/100*(e.shiftKey?10:1);
+  if(e.key==='ArrowLeft'){e.preventDefault();place(at-step)}
+  if(e.key==='ArrowRight'){e.preventDefault();place(at+step)}
+  if(e.key==='Home'){e.preventDefault();place(left)}
+  if(e.key==='End'){e.preventDefault();place(right)}});
+
+ let box=$('agr-readout');
+ if(!box){box=document.createElement('div');box.id='agr-readout';
+  box.setAttribute('aria-live','polite');host.append(box)}
+ place(left+(right-left)/2)}
+
+build();
+// The panel is redrawn whenever the selection changes, taking the pointer with
+// it, so it is rebuilt rather than bound once.
+if(window.MutationObserver){let queued=false;
+ new MutationObserver(()=>{if(queued)return;queued=true;
+  requestAnimationFrame(()=>{queued=false;build()})})
+ .observe(document.body,{childList:true,subtree:true})}
+})();
+</script>"""
+
+
 def read_tool_versions(path):
     """Map report tool labels to versions recorded at the time of the run.
 
@@ -2172,6 +2315,7 @@ def main():
                    + accessibility_script()
                    + explain_script()
                    + section_nav_script()
+                   + agreement_pointer_script()
                    + lazy_visualization_script())
     explorer_html = evidence_explorer_section(args.project_root, scores, out.parent,
                                               vendor_html, visual_html)
