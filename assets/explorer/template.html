@@ -237,10 +237,8 @@ __PB_FONTS__
             background: var(--bg-card);
             border-top: 1px solid var(--border-color);
             padding: 10px 16px 12px;
-            flex: 1 1 auto; min-height: 130px;
-            display: flex; flex-direction: column;
+            flex: 0 0 auto;
         }
-        .split-merge-panel canvas { flex: 1 1 auto; min-height: 0; }
         .split-merge-panel .sm-title {
             font-size: 12px; font-weight: 600;
             color: var(--text-muted); text-transform: uppercase;
@@ -293,8 +291,8 @@ __PB_FONTS__
         .viewport-toolbar .context .highlight { color: var(--accent-cyan); }
 
         .viewport-canvas-wrap {
-            flex: 0 0 auto; position: relative; overflow: hidden;
-            background: var(--bg-primary); min-height: 240px;
+            flex: 1 1 auto; position: relative; overflow: hidden;
+            background: var(--bg-primary); min-height: 300px;
         }
         .viewport-canvas-wrap canvas {
             display: block; width: 100%; height: 100%;
@@ -802,18 +800,10 @@ __PB_FONTS__
         }
 
         function render() {
-            // Rows have a preferred height and the plot is sized to hold them,
-            // rather than the rows being stretched to fill a fixed box. The
-            // space that used to sit empty under the last row now goes to the
-            // split/merge graph below.
-            const rowsNeeded = (state.pinReference ? 1 : 0) +
-                state.rowOrder.length + (state.mode === 'A' && state.showLabels ? 1 : 0);
-            const preferredRow = state.mode === 'A' ? 34 : 58;
-            const chrome = 40 + 34 + 28;
-            const wanted = chrome + rowsNeeded * (preferredRow + 6);
-            const ceiling = Math.max(240, window.innerHeight - 320);
-            viewportWrap.style.height = Math.min(wanted, ceiling) + 'px';
-
+            // Rows fill the height the graph below does not need, within a
+            // preferred band: tall enough to read, not so tall that a single
+            // method becomes a slab.
+            const preferredRow = state.mode === 'A' ? 96 : 128;
             const rect = viewportWrap.getBoundingClientRect();
             const W = rect.width - 2;
             const H = rect.height - 2;
@@ -1167,12 +1157,9 @@ __PB_FONTS__
             // Height follows the number of rows: a fixed 80px squeezed every
             // truth plasmid and predicted bin into a few unreadable pixels.
             const rows = Math.max(1, data.truth.length, data.predicted.length);
-            // Enough for every row, and more when the column has room to give.
-            const panel = splitMergeCanvas.parentElement;
-            const spare = panel.clientHeight -
-                [...panel.children].reduce((sum, el) =>
-                    sum + (el === splitMergeCanvas ? 0 : el.getBoundingClientRect().height), 0) - 8;
-            const H = Math.max(96, rows * 24 + 26, Math.min(spare, rows * 60 + 26));
+            // Sized to its own rows and no further: the surplus column height
+            // belongs to the alignment tracks, not to this summary.
+            const H = clamp(rows * 30 + 30, 110, 260);
             splitMergeCanvas.width = W * 2;
             splitMergeCanvas.height = H * 2;
             splitMergeCanvas.style.width = W + 'px';

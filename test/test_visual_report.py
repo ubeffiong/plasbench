@@ -302,9 +302,11 @@ def main():
     # The overlay was still dark: an rgba literal the palette pass did not reach.
     assert "rgba(21,30,43" not in explorer_doc, "dark tooltip ground remains"
 
-    # Rows have a preferred height and the plot is sized to hold them.
+    # The tracks take the surplus column height and the graph sizes to its own
+    # rows: the graph had been absorbing the space, leaving the evidence thin.
     assert "preferredRow" in explorer_doc, "row height is not preference-driven"
-    assert "viewportWrap.style.height" in explorer_doc,         "the plot must be sized to its rows rather than stretched"
+    assert "clamp(rows * 30 + 30, 110, 260)" in explorer_doc,         "the split/merge graph must size to its rows, not absorb the column"
+    assert "flex: 1 1 auto; position: relative" in explorer_doc,         "the plot must take the height the graph does not need"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 
