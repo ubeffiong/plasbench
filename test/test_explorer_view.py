@@ -157,6 +157,19 @@ def main():
     assert {l["type"] for l in relations["links"]} == {"1:1"}, \
         "one bin per method is not a split; the count must be per method"
 
+    # Record identity is the record's own percentage. A per-block fraction once
+    # shadowed it inside the segment loop, so every record reported its last
+    # block's fraction -- 1.0 -- and the interface showed "1%".
+    from build_enterprise_view import contig_rows
+    records = {r["id"]: r for r in contig_rows(payload(), "toolx", "pA")}
+    assert records, "no contig rows were produced"
+    for name, record in records.items():
+        assert record["identity"] is None or 1.5 < record["identity"] <= 100.0, (
+            f"record {name} identity {record['identity']} is not a percentage; "
+            "a per-block fraction has shadowed it again")
+    assert abs(records["r1"]["identity"] - 100.0) < 0.01,         "a fully matching record must report 100% identity"
+    assert abs(records["r2"]["identity"] - 95.0) < 0.01,         "record identity must be matches over block length across its blocks"
+
     print("ALL EXPLORER VIEW TESTS PASSED "
           f"({len(track['segments'])} segments, {sum(len(v) for v in events.values())} events)")
 

@@ -743,6 +743,10 @@ __PB_FONTS__
         const state = {
             zoom: 1.0,
             pan: 0,
+            zoomY: 1.0,
+            panY: 0,
+            contentH: 0,
+            viewH: 0,
             mode: 'A', // 'A' = alignment-block, 'B' = nucleotide
             selectedSegment: null,
             selectedProtein: null,
@@ -833,6 +837,9 @@ __PB_FONTS__
 
             const zoom = state.zoom;
             const pan = state.pan;
+            // Rows are laid out below the ruler and scrolled as a group, so the
+            // reference stays put while the methods move under it.
+            const rowTop = pad.top + 34;
             const viewLen = totalLen / zoom;
             const viewStart = pan * totalLen;
             const viewEnd = viewStart + viewLen;
@@ -875,18 +882,34 @@ __PB_FONTS__
                              (state.mode === 'A' && state.showLabels ? 1 : 0);
             const available = plotH - 34;
             const fitted = Math.floor(available / Math.max(1, rowCount)) - rowGap;
-            const trackH = state.mode === 'A'
+            // Vertical zoom scales the rows; when they outgrow the plot the
+            // group scrolls instead of being squeezed.
+            const baseRow = state.mode === 'A'
                 ? clamp(fitted, 20, preferredRow)
                 : clamp(fitted, 28, preferredRow);
+            const trackH = Math.max(8, Math.round(baseRow * state.zoomY));
             const trackGap = rowGap;
-            let yOffset = pad.top + 34;
+            const rowsHeight = rowCount * (trackH + rowGap);
+            const viewH = H - rowTop - pad.bottom;
+            state.contentH = rowsHeight;
+            state.viewH = viewH;
+            state.panY = clamp(state.panY, 0, Math.max(0, rowsHeight - viewH));
+            let yOffset = rowTop - state.panY;
+
+            // Rows are clipped to their own band so a scrolled row cannot draw
+            // over the ruler or the status area.
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, rowTop - 1, W, viewH + 1);
+            ctx.clip();
 
             // Reference / Contig track
             if (state.pinReference) {
                 const refY = yOffset;
                 ctx.fillStyle = '#e8eeea';
                 ctx.fillRect(pad.left, refY, plotW, trackH);
-                const allContigs = tools.flatMap(t => t.contigs || []);
+                const allContigs = tools.flatMap(t => (t.contigs || []).map(
+                    c => Object.assign({}, c, { tool: t.id, version: t.version })));
                 const mergedContigs = state.collapseContigs ? mergeContigs(allContigs) : allContigs;
 
                 // Every method contributes records to this one row, so they
@@ -906,6 +929,7 @@ __PB_FONTS__
                     });
                 const laneCount = Math.max(1, laneEnds.length);
                 const laneH = Math.max(6, (trackH - 4) / laneCount);
+                canvas._contigs = [];
                 placed.forEach(({ c, x1, x2, lane }) => {
                     const w = Math.max(2, x2 - x1);
                     const y = refY + 2 + lane * laneH;
@@ -925,6 +949,8 @@ __PB_FONTS__
                             ctx.fillText(c.id, x1 + w / 2, y + laneH / 2);
                         }
                     }
+                    canvas._contigs.push(Object.assign({}, c,
+                        { _x1: x1, _x2: x2, _y1: y, _y2: y + laneH - 1 }));
                 });
                 ctx.fillStyle = '#4a5a52';
                 ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
@@ -1085,6 +1111,34 @@ __PB_FONTS__
             if (state.mode === 'B' && zoom > 2.5) {
                 renderNucleotideView(ctx, plasmid, tools, pad, plotW, viewStart, viewLen, scale, yOffset, trackH, trackGap,
                     protY);
+            }
+
+            ctx.restore();   // end of the scrolled row band
+
+            // Both axes are navigable, so both report how much is off screen
+            // and where in it you are.
+            const bar = 8;
+            if (rowsHeight > viewH) {
+                const thumb = Math.max(26, viewH * viewH / rowsHeight);
+                const at = (viewH - thumb) * (state.panY / Math.max(1, rowsHeight - viewH));
+                ctx.fillStyle = '#e3e9e8';
+                ctx.fillRect(W - bar - 2, rowTop, bar, viewH);
+                ctx.fillStyle = '#9fb0a6';
+                ctx.fillRect(W - bar - 2, rowTop + at, bar, thumb);
+                canvas._vbar = { x: W - bar - 2, y: rowTop, w: bar, h: viewH, thumb: thumb };
+            } else {
+                canvas._vbar = null;
+            }
+            if (zoom > 1) {
+                const thumb = Math.max(26, plotW / zoom);
+                const at = (plotW - thumb) * (pan / Math.max(1e-6, 1 - 1 / zoom));
+                ctx.fillStyle = '#e3e9e8';
+                ctx.fillRect(pad.left, H - bar - 2, plotW, bar);
+                ctx.fillStyle = '#9fb0a6';
+                ctx.fillRect(pad.left + at, H - bar - 2, thumb, bar);
+                canvas._hbar = { x: pad.left, y: H - bar - 2, w: plotW, h: bar, thumb: thumb };
+            } else {
+                canvas._hbar = null;
             }
 
             // ── Status ──
@@ -1254,7 +1308,33 @@ __PB_FONTS__
                     return { kind: 'protein', item: p };
                 }
             }
+            for (const c of (canvas._contigs || [])) {
+                if (x >= c._x1 && x <= c._x2 && y >= c._y1 && y <= c._y2) {
+                    return { kind: 'contig', item: c };
+                }
+            }
             return null;
+        }
+
+        // Most records in the contig row are too narrow to carry a label, so
+        // the row is only readable if hovering one says what it is.
+        function showContigDetails(c) {
+            detailTitle.textContent = c.id;
+            const show = (v, suffix) => (v === null || v === undefined)
+                ? '<span class="unmeasured">not measured</span>' : v + (suffix || '');
+            detailContent.innerHTML = `
+                <div class="detail-row"><span class="label">Method</span><span class="value">${c.tool || '—'} ${c.version || ''}</span></div>
+                <div class="detail-row"><span class="label">Reference span</span><span class="value">${c.start.toLocaleString()} – ${c.end.toLocaleString()}</span></div>
+                <div class="detail-row"><span class="label">Aligned length</span><span class="value">${(c.end - c.start).toLocaleString()} bp</span></div>
+                <div class="detail-row"><span class="label">Identity</span><span class="value">${show(c.identity, '%')}</span></div>
+                <div class="detail-row"><span class="label">Alignment blocks</span><span class="value">${show(c.blocks)}</span></div>
+                <div class="detail-row"><span class="label">Mismatch columns</span><span class="value">${show(c.mismatches)}</span></div>
+                <div class="detail-row"><span class="label">Status</span><span class="value">${c.status}</span></div>
+            `;
+            detailInterpretation.textContent = c.status === 'good'
+                ? 'Predicted record aligning forward to this plasmid, with no cross-target evidence.'
+                : 'This record carries reverse-strand or cross-target alignment; its method row has the segment breakdown.';
+            detailInterpretation.style.display = state.showInterpretations ? 'block' : 'none';
         }
 
         function placeTip(e) {
@@ -1283,7 +1363,8 @@ __PB_FONTS__
             if (hit.item !== hovered) {
                 hovered = hit.item;
                 if (hit.kind === 'segment') showSegmentDetails(hit.item);
-                else showProteinDetails(hit.item);
+                else if (hit.kind === 'protein') showProteinDetails(hit.item);
+                else showContigDetails(hit.item);
             }
             detailsOverlay.classList.add('visible');
             placeTip(e);
@@ -1522,15 +1603,73 @@ __PB_FONTS__
         });
 
         // ── Zoom / Pan ──
-        function zoomIn() { state.zoom = Math.min(10, state.zoom * 1.3);
-            render(); }
+        // Zoom applies to both axes: horizontally it narrows the reference
+        // interval, vertically it grows the rows so a dense cohort can be
+        // opened up and scrolled rather than squeezed.
+        function zoomBy(factor) {
+            state.zoom = clamp(state.zoom * factor, 0.3, 40);
+            state.zoomY = clamp(state.zoomY * factor, 0.4, 6);
+            state.pan = clamp(state.pan, 0, Math.max(0, 1 - 1 / state.zoom));
+            render();
+        }
+        function zoomIn() { zoomBy(1.3); }
+        function zoomOut() { zoomBy(1 / 1.3); }
 
-        function zoomOut() { state.zoom = Math.max(0.3, state.zoom / 1.3);
-            render(); }
-
-        function zoomReset() { state.zoom = 1;
+        function zoomReset() {
+            state.zoom = 1;
             state.pan = 0;
-            render(); }
+            state.zoomY = 1;
+            state.panY = 0;
+            render();
+        }
+
+        function panBy(dxFraction, dyPixels) {
+            state.pan = clamp(state.pan + dxFraction, 0, Math.max(0, 1 - 1 / state.zoom));
+            state.panY = clamp(state.panY + dyPixels, 0,
+                Math.max(0, state.contentH - state.viewH));
+            render();
+        }
+
+        // Drag moves the view in both directions at once.
+        let dragFrom = null;
+        canvas.addEventListener('mousedown', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            dragFrom = { x: e.clientX, y: e.clientY, pan: state.pan, panY: state.panY,
+                         width: rect.width };
+            canvas.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mouseup', function() {
+            dragFrom = null;
+            canvas.style.cursor = 'grab';
+        });
+        canvas.addEventListener('mousemove', function(e) {
+            if (!dragFrom) return;
+            // A drag of one viewport width moves the view by one viewport, which
+            // is 1/zoom of the plasmid.
+            const dx = (e.clientX - dragFrom.x) / Math.max(1, dragFrom.width);
+            state.pan = clamp(dragFrom.pan - dx / state.zoom,
+                              0, Math.max(0, 1 - 1 / state.zoom));
+            state.panY = clamp(dragFrom.panY - (e.clientY - dragFrom.y), 0,
+                               Math.max(0, state.contentH - state.viewH));
+            detailsOverlay.classList.remove('visible');
+            render();
+        });
+
+        // Wheel scrolls vertically, shift scrolls horizontally, ctrl zooms --
+        // the conventions a reader already has from other viewers.
+        canvas.addEventListener('wheel', function(e) {
+            e.preventDefault();
+            if (e.ctrlKey || e.metaKey) {
+                zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15);
+                return;
+            }
+            if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                const step = (e.deltaX || e.deltaY) / 900 / state.zoom;
+                panBy(step, 0);
+                return;
+            }
+            panBy(0, e.deltaY);
+        }, { passive: false });
 
         document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
         document.getElementById('zoomInBtn2').addEventListener('click', zoomIn);

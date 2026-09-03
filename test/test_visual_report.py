@@ -308,6 +308,21 @@ def main():
     assert "clamp(rows * 30 + 30, 110, 260)" in explorer_doc,         "the split/merge graph must size to its rows, not absorb the column"
     assert "flex: 1 1 auto; position: relative" in explorer_doc,         "the plot must take the height the graph does not need"
 
+    # Navigation works on both axes. The design shipped with horizontal zoom
+    # only, no wheel handler and no drag: the reference interval could be
+    # narrowed but the rows could not be scrolled or scaled at all.
+    for needed in ("zoomY", "panY", "zoomBy", "panBy", "dragFrom",
+                   "mousedown", "wheel", "contentH", "viewH"):
+        assert needed in explorer_doc, f"two-axis navigation missing: {needed}"
+    assert "canvas._vbar" in explorer_doc and "canvas._hbar" in explorer_doc,         "each scrollable axis must show how much is off screen"
+    assert "state.zoomY = clamp" in explorer_doc or "zoomY: clamp" in explorer_doc         or "state.zoomY * factor" in explorer_doc, "zoom must act on the vertical axis too"
+
+    # Contig records are mostly too narrow to label, so hovering one has to
+    # report it.
+    assert "showContigDetails" in explorer_doc, "contig tooltip missing"
+    assert "canvas._contigs" in explorer_doc, "contig hit boxes are not recorded"
+    assert "kind: 'contig'" in explorer_doc, "contigs are not hit-tested"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
