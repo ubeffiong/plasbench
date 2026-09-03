@@ -38,15 +38,15 @@ __PB_FONTS__
             --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             --transition: 0.2s ease;
         }
-        html { font-size: 13px; scroll-behavior: smooth; }
+        html { font-size: 15px; scroll-behavior: smooth; }
         .unmeasured { color: var(--text-muted); font-style: italic; }
-        .detail-row small { color: var(--text-muted); font-size: 9px; }
+        .detail-row small { color: var(--text-muted); font-size: 12px; }
         .sel-wrap { display: inline-flex; align-items: center; gap: 5px; }
-        .sel-wrap > span { font-size: 10px; font-weight: 600; letter-spacing: .06em;
+        .sel-wrap > span { font-size: 12px; font-weight: 600; letter-spacing: .06em;
             text-transform: uppercase; color: var(--text-muted); }
         .sel-wrap select { background: var(--bg-secondary); border: 1px solid var(--border-color);
             border-radius: var(--radius-sm); color: var(--text-primary); padding: 3px 8px;
-            font-size: 11px; font-family: var(--font); outline: none; }
+            font-size: 13px; font-family: var(--font); outline: none; }
         .sel-wrap select:focus-visible { outline: 2px solid var(--accent-green); outline-offset: 1px; }
         body {
             font-family: var(--font);
@@ -87,20 +87,20 @@ __PB_FONTS__
         }
         .header-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
         .logo h1 {
-            font-size: 18px; font-weight: 700;
+            font-size: 20px; font-weight: 700;
             /* The design filled this from a white gradient, which is invisible
                on a light ground. Solid ink instead. */
             color: var(--text-primary);
         }
         .logo .badge {
-            font-size: 10px; font-weight: 600;
+            font-size: 12px; font-weight: 600;
             background: var(--bg-card); color: var(--text-secondary);
             padding: 2px 10px; border-radius: 20px;
             border: 1px solid var(--border-color);
             margin-left: 4px;
         }
         .badge-pill {
-            font-size: 10px; font-weight: 500;
+            font-size: 12px; font-weight: 500;
             background: var(--bg-input); color: var(--text-secondary);
             padding: 2px 12px; border-radius: 20px;
             border: 1px solid var(--border-color);
@@ -111,7 +111,7 @@ __PB_FONTS__
 
         .header-meta {
             display: flex; align-items: center; gap: 16px;
-            font-size: 11px; color: var(--text-secondary); flex-wrap: wrap;
+            font-size: 13px; color: var(--text-secondary); flex-wrap: wrap;
         }
         .header-meta span { display: flex; align-items: center; gap: 4px; }
         .header-right { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -121,15 +121,15 @@ __PB_FONTS__
             padding: 6px 14px; border-radius: var(--radius-sm);
             border: 1px solid var(--border-color);
             background: var(--bg-card); color: var(--text-secondary);
-            font-size: 11px; font-weight: 500; cursor: pointer;
+            font-size: 13px; font-weight: 500; cursor: pointer;
             transition: var(--transition); font-family: var(--font);
             white-space: nowrap;
         }
         .btn:hover { background: var(--bg-card-hover); color: var(--text-primary); border-color: var(--border-light); }
         .btn-primary { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
         .btn-primary:hover { background: #3a7cdd; border-color: #3a7cdd; color: #fff; }
-        .btn-sm { padding: 4px 10px; font-size: 10px; }
-        .btn-icon { padding: 4px 7px; font-size: 12px; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-icon { padding: 4px 7px; font-size: 14px; }
         .btn-success { background: var(--accent-green); border-color: var(--accent-green); color: #ffffff; }
         .btn-success:hover { background: #3acf70; border-color: #3acf70; }
 
@@ -162,13 +162,13 @@ __PB_FONTS__
             border: 1px solid var(--border-color);
         }
         .sidebar-section .section-title {
-            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            font-size: 12px; font-weight: 600; text-transform: uppercase;
             letter-spacing: 0.4px; color: var(--text-muted);
             margin-bottom: 6px;
             display: flex; align-items: center; gap: 6px;
         }
         .section-title .count {
-            font-weight: 400; font-size: 9px;
+            font-weight: 400; font-size: 12px;
             background: var(--bg-input); padding: 0 6px; border-radius: 8px;
             color: var(--text-secondary);
         }
@@ -176,19 +176,19 @@ __PB_FONTS__
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 3px 10px;
-            font-size: 11px;
+            font-size: 13px;
         }
         .info-grid .label { color: var(--text-muted); }
         .info-grid .value { color: var(--text-primary); font-weight: 500; text-align: right; }
         .info-grid .value .pill {
-            font-size: 9px; padding: 0 6px; border-radius: 8px;
+            font-size: 12px; padding: 0 6px; border-radius: 8px;
             background: var(--bg-input); color: var(--text-secondary);
         }
 
         .control-group {
             display: flex; flex-wrap: wrap; gap: 4px;
         }
-        .control-group .btn { font-size: 10px; padding: 3px 8px; }
+        .control-group .btn { font-size: 12px; padding: 3px 8px; }
 
         .search-box {
             display: flex; align-items: center;
@@ -200,17 +200,17 @@ __PB_FONTS__
         .search-box input {
             background: transparent; border: none;
             color: var(--text-primary); padding: 4px 0;
-            font-size: 11px; font-family: var(--font); outline: none;
+            font-size: 13px; font-family: var(--font); outline: none;
             width: 100%;
         }
         .search-box input::placeholder { color: var(--text-muted); }
-        .search-box i { color: var(--text-muted); font-size: 11px; }
+        .search-box i { color: var(--text-muted); font-size: 13px; }
 
         .filter-chips {
             display: flex; flex-wrap: wrap; gap: 3px;
         }
         .chip {
-            font-size: 9px; padding: 1px 8px; border-radius: 10px;
+            font-size: 12px; padding: 1px 8px; border-radius: 10px;
             background: var(--bg-input); color: var(--text-secondary);
             border: 1px solid var(--border-color);
             cursor: pointer; transition: var(--transition);
@@ -222,7 +222,7 @@ __PB_FONTS__
 
         .toggle-row {
             display: flex; align-items: center; gap: 8px;
-            font-size: 10px; color: var(--text-secondary);
+            font-size: 12px; color: var(--text-secondary);
             padding: 2px 0;
         }
         .toggle-row input[type="checkbox"] {
@@ -241,7 +241,7 @@ __PB_FONTS__
             overflow: hidden;
         }
         .split-merge-panel .sm-title {
-            font-size: 10px; font-weight: 600;
+            font-size: 12px; font-weight: 600;
             color: var(--text-muted); text-transform: uppercase;
             letter-spacing: 0.3px; margin-bottom: 4px;
             display: flex; align-items: center; gap: 6px;
@@ -255,15 +255,15 @@ __PB_FONTS__
         /* ── Legend ── */
         .legend-row {
             display: flex; flex-wrap: wrap; gap: 6px;
-            font-size: 9px; color: var(--text-secondary);
+            font-size: 12px; color: var(--text-secondary);
         }
         .legend-row .swatch {
             display: inline-block; width: 12px; height: 12px;
             border-radius: 2px; vertical-align: middle;
         }
         .protein-tag {
-            display: inline-block; font-size: 8px;
-            padding: 1px 6px; border-radius: 6px; margin-right: 2px;
+            display: inline-block; font-size: 12px;
+            padding: 2px 8px; border-radius: 6px; margin-right: 2px;
             color: #fff;
         }
 
@@ -288,7 +288,7 @@ __PB_FONTS__
             display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
         }
         .viewport-toolbar .context {
-            font-size: 11px; color: var(--text-secondary); font-weight: 500;
+            font-size: 13px; color: var(--text-secondary); font-weight: 500;
         }
         .viewport-toolbar .context .highlight { color: var(--accent-cyan); }
 
@@ -306,7 +306,7 @@ __PB_FONTS__
             display: flex; justify-content: space-between;
             padding: 4px 16px; background: var(--bg-card);
             border-top: 1px solid var(--border-color);
-            font-size: 10px; color: var(--text-muted);
+            font-size: 12px; color: var(--text-muted);
             flex-wrap: wrap; gap: 4px;
         }
         .viewport-status .coords { font-family: monospace; color: var(--text-secondary); }
@@ -320,18 +320,18 @@ __PB_FONTS__
             border-radius: var(--radius-sm);
             padding: 12px 16px;
             box-shadow: var(--shadow);
-            overflow-y: auto; font-size: 12px;
+            overflow-y: auto; font-size: 14px;
             display: none; z-index: 10;
             backdrop-filter: blur(6px);
         }
         .details-overlay.visible { display: block; }
         .details-overlay .close-details {
             float: right; background: none; border: none;
-            color: var(--text-muted); cursor: pointer; font-size: 16px;
+            color: var(--text-muted); cursor: pointer; font-size: 18px;
         }
         .details-overlay .close-details:hover { color: var(--text-primary); }
         .details-overlay .detail-title {
-            font-weight: 600; font-size: 13px;
+            font-weight: 600; font-size: 15px;
             color: var(--text-primary); margin-bottom: 4px;
         }
         .details-overlay .detail-row {
@@ -342,12 +342,12 @@ __PB_FONTS__
         .details-overlay .detail-row .label { color: var(--text-muted); }
         .details-overlay .detail-row .value { color: var(--text-secondary); font-weight: 500; }
         .details-overlay .detail-row .value .tag {
-            font-size: 9px; padding: 0 6px; border-radius: 8px;
+            font-size: 12px; padding: 0 6px; border-radius: 8px;
             background: var(--bg-input);
         }
         .details-overlay .interpretation {
             margin-top: 6px; padding: 6px 10px;
-            border-radius: var(--radius-sm); font-size: 11px;
+            border-radius: var(--radius-sm); font-size: 13px;
             background: rgba(251,191,36,0.08);
             border-left: 3px solid var(--accent-amber);
             color: var(--text-secondary);
@@ -383,10 +383,10 @@ __PB_FONTS__
             background: var(--bg-card);
             border-radius: var(--radius) var(--radius) 0 0;
         }
-        .modal-header h2 { font-size: 15px; font-weight: 600; }
+        .modal-header h2 { font-size: 17px; font-weight: 600; }
         .modal-header .close-btn {
             background: none; border: none;
-            color: var(--text-muted); font-size: 20px;
+            color: var(--text-muted); font-size: 22px;
             cursor: pointer; padding: 0 6px;
         }
         .modal-header .close-btn:hover { color: var(--text-primary); }
@@ -403,8 +403,8 @@ __PB_FONTS__
             background: var(--bg-card-hover); border-color: var(--border-light);
         }
         .modal-body .export-option .name { font-weight: 500; color: var(--text-primary); }
-        .modal-body .export-option .desc { font-size: 10px; color: var(--text-muted); }
-        .modal-body .export-option .icon { color: var(--text-secondary); font-size: 14px; }
+        .modal-body .export-option .desc { font-size: 12px; color: var(--text-muted); }
+        .modal-body .export-option .icon { color: var(--text-secondary); font-size: 16px; }
 
         /* ── Utilities ── */
         .flex-wrap { flex-wrap: wrap; }
@@ -420,7 +420,7 @@ __PB_FONTS__
         @media (max-width: 700px) {
             body { padding: 8px; }
             .header { flex-direction: column; align-items: stretch; }
-            .header-meta { font-size: 10px; gap: 8px; }
+            .header-meta { font-size: 12px; gap: 8px; }
             .main-grid { grid-template-columns: 1fr; }
             .sidebar { max-height: 300px; }
             .details-overlay { width: calc(100% - 24px); right: 12px; bottom: 12px; }
@@ -482,7 +482,7 @@ __PB_FONTS__
                         <button class="btn btn-sm" id="jumpInversion"><i class="fas fa-arrows-alt-h"></i> Inversion</button>
                         <button class="btn btn-sm" id="jumpBreakpoint"><i class="fas fa-cut"></i> Breakpoint</button>
                     </div>
-                    <div style="margin-top:4px;font-size:10px;color:var(--text-muted);">
+                    <div style="margin-top:4px;font-size:14px;color:var(--text-muted);">
                         <span id="eventCounter">—</span>
                     </div>
                 </div>
@@ -496,7 +496,7 @@ __PB_FONTS__
                         <button class="btn btn-sm" id="zoomResetBtn"><i class="fas fa-undo"></i> 1x</button>
                         <button class="btn btn-sm" id="prevPlasmidBtn"><i class="fas fa-chevron-left"></i></button>
                         <button class="btn btn-sm" id="nextPlasmidBtn"><i class="fas fa-chevron-right"></i></button>
-                        <span style="font-size:10px;color:var(--text-muted);margin-left:2px;" id="navInfo">—</span>
+                        <span style="font-size:14px;color:var(--text-muted);margin-left:2px;" id="navInfo">—</span>
                     </div>
                     <div style="margin-top:4px;">
                         <div class="search-box">
@@ -540,7 +540,7 @@ __PB_FONTS__
                         <button class="btn btn-sm" id="reorderTools"><i class="fas fa-sort"></i> Reorder tools</button>
                         <button class="btn btn-sm" id="resetRows"><i class="fas fa-undo"></i> Reset rows</button>
                     </div>
-                    <div style="margin-top:4px;font-size:10px;color:var(--text-secondary);">
+                    <div style="margin-top:4px;font-size:14px;color:var(--text-secondary);">
                         <span id="rowOrderInfo">Order: —</span>
                     </div>
                 </div>
@@ -561,17 +561,17 @@ __PB_FONTS__
                         <label for="showInterpretations">Show interpretations</label>
                     </div>
                     <div style="margin-top:4px;">
-                        <label style="font-size:10px;color:var(--text-muted);">Color by:</label>
-                        <select id="colorMode" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:2px 8px;font-size:10px;font-family:var(--font);outline:none;width:100%;margin-top:2px;">
+                        <label style="font-size:14px;color:var(--text-muted);">Color by:</label>
+                        <select id="colorMode" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:2px 8px;font-size:14px;font-family:var(--font);outline:none;width:100%;margin-top:2px;">
                             <option value="identity">Identity</option>
                             <option value="event">Event type</option>
                             <option value="source">Source sequence</option>
                         </select>
                     </div>
                     <div style="margin-top:4px;">
-                        <label style="font-size:10px;color:var(--text-muted);">Min alignment length:</label>
+                        <label style="font-size:14px;color:var(--text-muted);">Min alignment length:</label>
                         <input type="range" id="minAlignLen" min="10" max="200" value="50" style="width:100%;accent-color:var(--accent-blue);background:var(--bg-input);height:4px;border-radius:4px;" />
-                        <span style="font-size:9px;color:var(--text-muted);" id="minAlignLabel">50 bp</span>
+                        <span style="font-size:14px;color:var(--text-muted);" id="minAlignLabel">50 bp</span>
                     </div>
                 </div>
 
@@ -579,7 +579,7 @@ __PB_FONTS__
                 <div class="split-merge-panel">
                     <div class="sm-title"><i class="fas fa-code-branch"></i> Split / Merge Map</div>
                     <canvas id="splitMergeCanvas"></canvas>
-                    <div style="font-size:9px;color:var(--text-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <div style="font-size:14px;color:var(--text-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;">
                         <span><span style="display:inline-block;width:8px;height:8px;background:#4ade80;border-radius:2px;"></span> 1:1</span>
                         <span><span style="display:inline-block;width:8px;height:8px;background:#fbbf24;border-radius:2px;"></span> Split (1→2)</span>
                         <span><span style="display:inline-block;width:8px;height:8px;background:#f472b6;border-radius:2px;"></span> Merge (2→1)</span>
@@ -614,7 +614,7 @@ __PB_FONTS__
                         <span><span class="swatch" style="background:#0e7490;"></span> Low identity</span>
                         <span><span class="swatch" style="background:#7c3aed;"></span> Unsupported join</span>
                     </div>
-                    <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;font-size:8px;color:var(--text-muted);">
+                    <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;font-size:13px;color:var(--text-muted);">
                         <span class="protein-tag" style="background:#f87171;">AMR</span>
                         <span class="protein-tag" style="background:#4a8cf7;">Replication</span>
                         <span class="protein-tag" style="background:#a78bfa;">Conjugation</span>
@@ -634,18 +634,18 @@ __PB_FONTS__
                 <div class="viewport-toolbar">
                     <div class="left">
                         <span class="context" id="viewContext"><i class="fas fa-map-pin"></i> <span class="highlight">—</span></span>
-                        <span style="font-size:10px;color:var(--text-muted);">|</span>
+                        <span style="font-size:14px;color:var(--text-muted);">|</span>
                         <button class="btn btn-sm" id="zoomInBtn2"><i class="fas fa-plus"></i></button>
                         <button class="btn btn-sm" id="zoomOutBtn2"><i class="fas fa-minus"></i></button>
                         <button class="btn btn-sm" id="zoomResetBtn2">1x</button>
-                        <span style="font-size:10px;color:var(--text-muted);" id="zoomLevelDisplay">1.0x</span>
-                        <span style="font-size:10px;color:var(--text-muted);">|</span>
+                        <span style="font-size:14px;color:var(--text-muted);" id="zoomLevelDisplay">1.0x</span>
+                        <span style="font-size:14px;color:var(--text-muted);">|</span>
                         <button class="btn btn-sm" id="modeToggle"><i class="fas fa-align-left"></i> Mode A</button>
                     </div>
                     <div class="right">
                         <button class="btn btn-sm" id="prevPlasmidBtn2"><i class="fas fa-chevron-left"></i></button>
                         <button class="btn btn-sm" id="nextPlasmidBtn2"><i class="fas fa-chevron-right"></i></button>
-                        <span style="font-size:10px;color:var(--text-muted);" id="plasmidNav">—</span>
+                        <span style="font-size:14px;color:var(--text-muted);" id="plasmidNav">—</span>
                         <button class="btn btn-sm" id="fitViewBtn"><i class="fas fa-arrows-alt"></i> Fit</button>
                     </div>
                 </div>
@@ -835,7 +835,15 @@ __PB_FONTS__
 
             const plasmid = state.plasmids[state.currentPlasmidIdx];
             const totalLen = plasmid.length;
-            const pad = { top: 36, bottom: 24, left: 90, right: 16 };
+            // The gutter has to fit the longest method name at the label size,
+            // otherwise rows are drawn but unreadable and the view looks like it
+            // holds one method.
+            const rowFont = 12;
+            ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
+            const widestLabel = (state.rowOrder || []).reduce(
+                (max, id) => Math.max(max, ctx.measureText(id).width), 60);
+            const pad = { top: 40, bottom: 28,
+                          left: Math.min(210, Math.ceil(widestLabel) + 26), right: 54 };
             const plotW = W - pad.left - pad.right;
             const plotH = H - pad.top - pad.bottom;
 
@@ -849,58 +857,76 @@ __PB_FONTS__
             // ── Reference Ruler ──
             const rulerY = pad.top;
             ctx.fillStyle = '#e8eeea';
-            ctx.fillRect(pad.left, rulerY, plotW, 20);
-            ctx.fillStyle = '#4ade80';
-            ctx.fillRect(pad.left + 2, rulerY + 2, plotW - 4, 16);
+            ctx.fillRect(pad.left, rulerY, plotW, 18);
+            ctx.fillStyle = '#17805a';
+            ctx.fillRect(pad.left + 2, rulerY + 2, plotW - 4, 14);
 
+            ctx.fillStyle = '#4a5a52';
+            ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(plasmid.id, pad.left - 10, rulerY + 9);
+
+            // Fewer ticks at a readable size beats twenty unreadable ones.
             ctx.fillStyle = '#7b8a83';
-            ctx.font = '7px Inter, sans-serif';
+            ctx.font = '10px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            for (let i = 0; i <= 20; i++) {
-                const pos = (i / 20) * totalLen;
-                if (pos < viewStart || pos > viewEnd) continue;
+            const tickCount = plotW > 700 ? 10 : plotW > 420 ? 6 : 4;
+            for (let i = 0; i <= tickCount; i++) {
+                const pos = viewStart + (i / tickCount) * viewLen;
                 const x = scale(pos);
-                ctx.fillRect(x, rulerY + 20, 1, 5);
-                ctx.fillText((pos / 1000).toFixed(0) + 'kb', x, rulerY + 26);
+                ctx.fillRect(x, rulerY + 18, 1, 5);
+                ctx.fillText((pos / 1000).toFixed(pos < 10000 ? 1 : 0) + ' kb', x, rulerY + 24);
             }
 
             // ── Tool Tracks ──
             const tools = state.rowOrder.map(id => TOOL_TRACKS.find(t => t.id === id)).filter(Boolean);
-            const trackH = state.mode === 'A' ? 20 : 32;
-            const trackGap = 4;
-            let yOffset = pad.top + 28;
+            // Rows share the height that is actually available instead of a
+            // fixed 20px, so every method is legible and the container is used.
+            // Bounded at both ends: one method must not become a giant band, and
+            // a large cohort must not shrink below a readable row.
+            const rowGap = 6;
+            const rowCount = (state.pinReference ? 1 : 0) + tools.length +
+                             (state.mode === 'A' && state.showLabels ? 1 : 0);
+            const available = plotH - 34;
+            const fitted = Math.floor(available / Math.max(1, rowCount)) - rowGap;
+            const trackH = state.mode === 'A'
+                ? clamp(fitted, 26, 88)
+                : clamp(fitted, 34, 112);
+            const trackGap = rowGap;
+            let yOffset = pad.top + 34;
 
             // Reference / Contig track
             if (state.pinReference) {
                 const refY = yOffset;
                 ctx.fillStyle = '#e8eeea';
-                ctx.fillRect(pad.left, refY, plotW, 18);
+                ctx.fillRect(pad.left, refY, plotW, trackH);
                 const allContigs = tools.flatMap(t => t.contigs || []);
                 const mergedContigs = state.collapseContigs ? mergeContigs(allContigs) : allContigs;
                 mergedContigs.forEach(c => {
                     const x1 = scale(c.start);
                     const x2 = scale(c.end);
                     const w = Math.max(2, x2 - x1);
-                    ctx.fillStyle = c.status === 'good' ? 'rgba(74,222,128,0.4)' : 'rgba(251,191,36,0.4)';
-                    ctx.fillRect(x1, refY + 2, w, 14);
-                    ctx.strokeStyle = c.status === 'good' ? '#4ade80' : '#fbbf24';
-                    ctx.lineWidth = 0.5;
-                    ctx.strokeRect(x1, refY + 2, w, 14);
-                    if (w > 30 && !state.collapseContigs) {
-                        ctx.fillStyle = '#4a5a52';
-                        ctx.font = '6px Inter, sans-serif';
+                    ctx.fillStyle = c.status === 'good' ? 'rgba(23,128,90,0.35)' : 'rgba(163,92,5,0.35)';
+                    ctx.fillRect(x1, refY + 2, w, trackH - 4);
+                    ctx.strokeStyle = c.status === 'good' ? '#17805a' : '#a35c05';
+                    ctx.lineWidth = 0.75;
+                    ctx.strokeRect(x1, refY + 2, w, trackH - 4);
+                    if (w > 48 && !state.collapseContigs) {
+                        ctx.fillStyle = '#16211c';
+                        ctx.font = '10px Inter, sans-serif';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText(c.id, x1 + w / 2, refY + 9);
+                        ctx.fillText(c.id, x1 + w / 2, refY + trackH / 2);
                     }
                 });
-                ctx.fillStyle = '#7b8a83';
-                ctx.font = '7px Inter, sans-serif';
+                ctx.fillStyle = '#4a5a52';
+                ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
                 ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText('Contigs', pad.left - 6, refY + 16);
-                yOffset += 22;
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Contigs', pad.left - 10, refY + trackH / 2);
+                yOffset += trackH + rowGap;
             }
 
             // Tool tracks
@@ -946,9 +972,9 @@ __PB_FONTS__
                         ctx.setLineDash([]);
                     }
 
-                    if (w > 40 && seg.identity && seg.identity > 0) {
-                        ctx.fillStyle = '#16211c';
-                        ctx.font = '6px Inter, sans-serif';
+                    if (w > 46 && seg.identity && seg.identity > 0 && trackH >= 22) {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '600 10px Inter, sans-serif';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(Math.round(seg.identity) + '%', x1 + w / 2, y + trackH / 2);
@@ -962,27 +988,45 @@ __PB_FONTS__
                     seg._toolId = tool.id;
                 });
 
-                ctx.fillStyle = '#4a5a52';
-                ctx.font = '7px Inter, sans-serif';
+                // The method name is the row's identity, so it is set at the
+                // label size. The version goes underneath, smaller, and only
+                // when the row is tall enough to carry a second line.
+                ctx.fillStyle = '#16211c';
+                ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
                 ctx.textAlign = 'right';
+                const twoLine = trackH >= 34;
                 ctx.textBaseline = 'middle';
-                ctx.fillText(tool.label + ' ' + tool.version, pad.left - 6, y + trackH / 2);
+                ctx.fillText(tool.label, pad.left - 10, y + (twoLine ? trackH / 2 - 7 : trackH / 2));
+                if (twoLine) {
+                    ctx.fillStyle = '#7b8a83';
+                    ctx.font = '10px Inter, sans-serif';
+                    ctx.fillText(tool.version, pad.left - 10, y + trackH / 2 + 8);
+                }
 
-                const avgMapQ = Math.round(segs.reduce((sum, s) => sum + (s.mapQ || 0), 0) / Math.max(1, segs.length));
-                if (avgMapQ > 0) {
-                    ctx.fillStyle = avgMapQ > 40 ? '#4ade80' : avgMapQ > 20 ? '#fbbf24' : '#f87171';
-                    ctx.font = '6px Inter, sans-serif';
+                // Mapping quality is measured per block, so it is reported from
+                // the track rather than recomputed from segments, which do not
+                // carry it.
+                if (tool.mapQ !== null && tool.mapQ !== undefined) {
+                    const mq = tool.mapQ;
+                    ctx.fillStyle = mq > 40 ? '#17805a' : mq > 20 ? '#a35c05' : '#b3261e';
+                    ctx.font = '600 10px Inter, sans-serif';
                     ctx.textAlign = 'left';
-                    ctx.textBaseline = 'top';
-                    ctx.fillText('MQ: ' + avgMapQ, pad.left + plotW + 4, y + 2);
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('MQ ' + mq, pad.left + plotW + 6, y + trackH / 2);
                 }
             });
 
             // ── Proteins (reference) ──
-            const protY = yOffset + tools.length * (trackH + trackGap) + 6;
+            const protY = yOffset + tools.length * (trackH + trackGap) + rowGap;
+            const protH = trackH;
             if (state.mode === 'A' && state.showLabels) {
                 ctx.fillStyle = '#e8eeea';
-                ctx.fillRect(pad.left, protY, plotW, 22);
+                ctx.fillRect(pad.left, protY, plotW, protH);
+                ctx.fillStyle = '#4a5a52';
+                ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Annotation', pad.left - 10, protY + protH / 2);
                 const filteredProts = plasmid.proteins.filter(p => {
                     if (state.categoryFilter !== 'all' && p.category !== state.categoryFilter) return false;
                     if (state.showBadOnly && p.status === 'Complete') return false;
@@ -995,38 +1039,36 @@ __PB_FONTS__
                     const catColors = { AMR: '#f87171', Replication: '#4a8cf7', Conjugation: '#a78bfa',
                         Maintenance: '#22d3ee', Transposase: '#fb923c', Hypothetical: '#4a607a',
                         Other: '#6b7280' };
+                    const mid = protY + protH / 2;
                     ctx.fillStyle = catColors[p.category] || '#6b7280';
-                    ctx.fillRect(x1, protY + 2, w, 18);
+                    ctx.fillRect(x1, protY + 2, w, protH - 4);
                     if (p.strand === '+') {
                         ctx.beginPath();
                         ctx.moveTo(x2 - 2, protY + 2);
-                        ctx.lineTo(x2 + 4, protY + 11);
-                        ctx.lineTo(x2 - 2, protY + 20);
+                        ctx.lineTo(x2 + 6, mid);
+                        ctx.lineTo(x2 - 2, protY + protH - 2);
                         ctx.fill();
                     } else {
                         ctx.beginPath();
                         ctx.moveTo(x1 + 2, protY + 2);
-                        ctx.lineTo(x1 - 4, protY + 11);
-                        ctx.lineTo(x1 + 2, protY + 20);
+                        ctx.lineTo(x1 - 6, mid);
+                        ctx.lineTo(x1 + 2, protY + protH - 2);
                         ctx.fill();
                     }
-                    if (w > 30 && state.showLabels) {
+                    if (w > 44 && state.showLabels) {
                         ctx.fillStyle = '#fff';
-                        ctx.font = '6px Inter, sans-serif';
+                        ctx.font = '600 10px Inter, sans-serif';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText(p.name, x1 + w / 2, protY + 11);
+                        ctx.fillText(p.name, x1 + w / 2, mid);
                     }
+                    // The hit box has to follow the drawn glyph, or clicks land
+                    // on nothing once the row height changes.
                     p._x1 = x1;
                     p._x2 = x2;
                     p._y1 = protY + 2;
-                    p._y2 = protY + 20;
+                    p._y2 = protY + protH - 2;
                 });
-                ctx.fillStyle = '#7b8a83';
-                ctx.font = '7px Inter, sans-serif';
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText('Proteins', pad.left - 6, protY + 20);
             }
 
             // ── Nucleotide view (Mode B) ──
@@ -1090,7 +1132,7 @@ __PB_FONTS__
             }
 
             ctx.fillStyle = '#7b8a83';
-            ctx.font = '7px Inter, sans-serif';
+            ctx.font = '600 11px Inter, sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'bottom';
             ctx.fillText('Nucleotide view (ref: ' + activeTool.label + ')', pad.left, y - 2);
@@ -1111,7 +1153,7 @@ __PB_FONTS__
             smCtx.fillStyle = '#f4f7f5';
             smCtx.fillRect(0, 0, W, H);
 
-            const pad = { top: 10, bottom: 10, left: 80, right: 80 };
+            const pad = { top: 10, bottom: 10, left: 104, right: 104 };
             const plotW = W - pad.left - pad.right;
             const plotH = H - pad.top - pad.bottom;
 
@@ -1123,7 +1165,7 @@ __PB_FONTS__
                 smCtx.fillStyle = '#4a8cf7';
                 smCtx.fillRect(truthX, y, 6, truthH - 2);
                 smCtx.fillStyle = '#4a5a52';
-                smCtx.font = '7px Inter, sans-serif';
+                smCtx.font = '11px Inter, sans-serif';
                 smCtx.textAlign = 'right';
                 smCtx.textBaseline = 'middle';
                 smCtx.fillText(t.id, truthX - 4, y + truthH / 2);
@@ -1137,7 +1179,7 @@ __PB_FONTS__
                 smCtx.fillStyle = '#f472b6';
                 smCtx.fillRect(predX - 6, y, 6, predH - 2);
                 smCtx.fillStyle = '#4a5a52';
-                smCtx.font = '7px Inter, sans-serif';
+                smCtx.font = '11px Inter, sans-serif';
                 smCtx.textAlign = 'left';
                 smCtx.textBaseline = 'middle';
                 smCtx.fillText(p.id, predX + 4, y + predH / 2);
