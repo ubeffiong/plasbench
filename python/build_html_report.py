@@ -912,7 +912,20 @@ def evidence_explorer_section(project_root, scores, results_dir, vendor_html, pa
             "document.addEventListener('change',e=>{"
             "if(e.target&&(e.target.id==='vq-sample'||e.target.id==='vq-plasmid'))"
             "setTimeout(push,60)},true);"
-            "f.addEventListener('load',()=>setTimeout(push,150));})();</script>"
+            "f.addEventListener('load',()=>setTimeout(push,150));"
+            # Focus chosen inside the frame drives the panels below it, so one
+            # method or record is followed everywhere rather than re-picked.
+            "window.addEventListener('message',e=>{const m=e.data;"
+            "if(!m||!m.pbExplorerSelected)return;"
+            "const set=(id,v)=>{const el=document.getElementById(id);"
+            "if(!el||!v||el.value===v)return;el.value=v;"
+            "el.dispatchEvent(new Event('change',{bubbles:true}))};"
+            "set('vq-sample',m.sample);set('vq-plasmid',m.plasmid);set('vq-tool',m.tool);"
+            "if(m.record){const r=[...document.querySelectorAll('#pb-explorer-view select')]"
+            ".find(s=>!s.id&&[...s.options].some(o=>o.value===m.record));"
+            "if(r&&r.value!==m.record){r.value=m.record;"
+            "r.dispatchEvent(new Event('change',{bubbles:true}))}}});"
+            "})();</script>"
             + panels_html + "</div>")
 
 

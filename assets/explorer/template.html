@@ -48,6 +48,11 @@ __PB_FONTS__
             border-radius: var(--radius-sm); color: var(--text-primary); padding: 3px 8px;
             font-size: 13px; font-family: var(--font); outline: none; }
         .sel-wrap select:focus-visible { outline: 2px solid var(--accent-green); outline-offset: 1px; }
+        .slider-wrap { display: inline-flex; align-items: center; gap: 6px; }
+        .slider-wrap > span { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .slider-wrap input[type=range] { width: 92px; accent-color: var(--accent-green); }
+        .slider-wrap em { font-style: normal; font-size: 11px; color: var(--text-secondary);
+            font-variant-numeric: tabular-nums; min-width: 40px; }
         body {
             font-family: var(--font);
             background: var(--bg-primary);
@@ -434,6 +439,8 @@ __PB_FONTS__
                 <div class="header-meta">
                     <label class="sel-wrap"><span>Sample</span><select id="explorerSample"></select></label>
                     <label class="sel-wrap"><span>Plasmid</span><select id="explorerPlasmid"></select></label>
+                    <label class="sel-wrap"><span>Tool</span><select id="explorerTool"></select></label>
+                    <label class="sel-wrap"><span>Predicted record</span><select id="explorerRecord"></select></label>
                     <span class="badge-pill" id="sampleBadge">—</span>
                     <span class="badge-pill primary" id="toolBadge">—</span>
                     <span class="badge-pill" id="plasmidBadge">—</span>
@@ -609,6 +616,13 @@ __PB_FONTS__
                         <span style="font-size:14px;color:var(--text-muted);" id="zoomLevelDisplay">1.0x</span>
                         <span style="font-size:14px;color:var(--text-muted);">|</span>
                         <button class="btn btn-sm" id="modeToggle"><i class="fas fa-align-left"></i> Mode A</button>
+                        <span style="font-size:12px;color:var(--text-muted);">|</span>
+                        <label class="slider-wrap"><span>Track height</span>
+                            <input type="range" id="trackHeight" min="40" max="260" step="10" value="100">
+                            <em id="trackHeightValue">100%</em></label>
+                        <label class="slider-wrap"><span>Density</span>
+                            <input type="range" id="rowDensity" min="0" max="24" step="2" value="6">
+                            <em id="rowDensityValue">6 px</em></label>
                     </div>
                     <div class="right">
                         <button class="btn btn-sm" id="prevPlasmidBtn2"><i class="fas fa-chevron-left"></i></button>
@@ -706,12 +720,27 @@ __PB_FONTS__
         const sel = {
             sample: PB.samples[0] ? PB.samples[0].id : null,
             plasmidIdx: 0,
+            // null means every method / every record: the explorer's default is
+            // to compare, and focusing is the deliberate act.
+            tool: null,
+            record: null,
         };
 
         function sampleData() { return PB.samples.find(s => s.id === sel.sample) || PB.samples[0] || null; }
         function plasmidList() { const s = sampleData(); return s ? s.plasmids : []; }
         function currentPlasmid() { const l = plasmidList(); return l[Math.min(sel.plasmidIdx, l.length - 1)] || null; }
-        function toolTracks() { const pl = currentPlasmid(); return pl ? pl.tools : []; }
+        function allToolTracks() { const pl = currentPlasmid(); return pl ? pl.tools : []; }
+        function toolTracks() {
+            const tracks = allToolTracks();
+            if (!sel.tool) return tracks;
+            const one = tracks.filter(t => t.id === sel.tool);
+            return one.length ? one : tracks;
+        }
+        function recordsForFocus() {
+            const ids = new Set();
+            toolTracks().forEach(t => (t.contigs || []).forEach(c => ids.add(c.id)));
+            return [...ids].sort();
+        }
 
         // The renderer below was written against three globals. Keep the names
         // and make them views onto the current selection.
@@ -745,6 +774,7 @@ __PB_FONTS__
             pan: 0,
             zoomY: 1.0,
             panY: 0,
+            density: 6,
             contentH: 0,
             viewH: 0,
             mode: 'A', // 'A' = alignment-block, 'B' = nucleotide
@@ -877,7 +907,7 @@ __PB_FONTS__
             // fixed 20px, so every method is legible and the container is used.
             // Bounded at both ends: one method must not become a giant band, and
             // a large cohort must not shrink below a readable row.
-            const rowGap = 6;
+            const rowGap = state.density;
             const rowCount = (state.pinReference ? 1 : 0) + tools.length +
                              (state.mode === 'A' && state.showLabels ? 1 : 0);
             const available = plotH - 34;
@@ -997,8 +1027,13 @@ __PB_FONTS__
                         color = tool.color + '80';
                     }
 
+                    // A focused record keeps the others visible but quiet, so
+                    // the reader can still see what it sits among.
+                    const dim = sel.record && seg.record && seg.record !== sel.record;
+                    ctx.globalAlpha = dim ? 0.18 : 1;
                     ctx.fillStyle = color;
                     ctx.fillRect(x1, y + 1, w, trackH - 2);
+                    ctx.globalAlpha = 1;
 
                     if (seg.type === 'missing') {
                         ctx.strokeStyle = '#b9c7be';
@@ -1606,10 +1641,18 @@ __PB_FONTS__
         // Zoom applies to both axes: horizontally it narrows the reference
         // interval, vertically it grows the rows so a dense cohort can be
         // opened up and scrolled rather than squeezed.
+        function syncTrackHeightSlider() {
+            const slider = document.getElementById('trackHeight');
+            if (!slider) return;
+            const percent = Math.round(clamp(state.zoomY * 100, Number(slider.min), Number(slider.max)));
+            slider.value = percent;
+            document.getElementById('trackHeightValue').textContent = percent + '%';
+        }
         function zoomBy(factor) {
             state.zoom = clamp(state.zoom * factor, 0.3, 40);
             state.zoomY = clamp(state.zoomY * factor, 0.4, 6);
             state.pan = clamp(state.pan, 0, Math.max(0, 1 - 1 / state.zoom));
+            syncTrackHeightSlider();
             render();
         }
         function zoomIn() { zoomBy(1.3); }
@@ -1620,6 +1663,7 @@ __PB_FONTS__
             state.pan = 0;
             state.zoomY = 1;
             state.panY = 0;
+            syncTrackHeightSlider();
             render();
         }
 
@@ -1871,7 +1915,11 @@ __PB_FONTS__
             setText('plasmidProt', String(pl.proteins.length));
             setText('sampleBadge', s.id);
             setText('plasmidBadge', pl.id);
-            setText('toolBadge', (TOOL_TRACKS[0] || {}).label || '—');
+            // The badge names what is in focus, which is every method until
+            // one is picked.
+            setText('toolBadge', sel.tool
+                ? sel.tool
+                : 'all methods (' + allToolTracks().length + ')');
             setText('headerLen', pl.length.toLocaleString() + ' bp');
             setText('headerProt', pl.proteins.length + ' proteins');
             const n = plasmidList().length;
@@ -1895,11 +1943,15 @@ __PB_FONTS__
 
         // Selection changes arrive from the report's own sample/plasmid controls.
         function applySelection(next) {
-            if (next.sample && PB.samples.some(s => s.id === next.sample)) { sel.sample = next.sample; sel.plasmidIdx = 0; }
+            if (next.sample && PB.samples.some(s => s.id === next.sample)) {
+                sel.sample = next.sample; sel.plasmidIdx = 0; sel.tool = null; sel.record = null;
+            }
             if (next.plasmid) {
                 const i = plasmidList().findIndex(p => p.id === next.plasmid);
-                if (i >= 0) sel.plasmidIdx = i;
+                if (i >= 0 && i !== sel.plasmidIdx) { sel.plasmidIdx = i; sel.record = null; }
             }
+            if (next.tool !== undefined) { sel.tool = next.tool || null; sel.record = null; }
+            if (next.record !== undefined) { sel.record = next.record || null; }
             rebind();
             state.minAlignLen = 0;
             state.selectedSegment = null;
@@ -1907,10 +1959,39 @@ __PB_FONTS__
             state.eventIndex = { mismatch: 0, gap: 0, inversion: 0, breakpoint: 0 };
             zoomReset();
             syncMinAlignRange();
+            fillFocus();
             refreshChrome();
             render();
             renderSplitMerge();
+            // The panels below this frame follow the same selection.
+            try {
+                parent.postMessage({ pbExplorerSelected: true, sample: sel.sample,
+                    plasmid: (currentPlasmid() || {}).id || null,
+                    tool: sel.tool, record: sel.record }, '*');
+            } catch (err) { /* no parent to tell */ }
         }
+
+        // The method and record pickers list what this plasmid actually has.
+        const toolSelect = document.getElementById('explorerTool');
+        const recordSelect = document.getElementById('explorerRecord');
+        function fillFocus() {
+            if (toolSelect) {
+                const ids = allToolTracks().map(t => t.id);
+                toolSelect.innerHTML = '<option value="">All methods (' + ids.length + ')</option>' +
+                    ids.map(id => '<option value="' + id + '">' + id + '</option>').join('');
+                toolSelect.value = sel.tool || '';
+            }
+            if (recordSelect) {
+                const ids = recordsForFocus();
+                recordSelect.innerHTML = '<option value="">All records (' + ids.length + ')</option>' +
+                    ids.map(id => '<option value="' + id + '">' + id + '</option>').join('');
+                recordSelect.value = sel.record || '';
+            }
+        }
+        if (toolSelect) toolSelect.addEventListener('change',
+            () => applySelection({ tool: toolSelect.value }));
+        if (recordSelect) recordSelect.addEventListener('change',
+            () => applySelection({ record: recordSelect.value }));
         window.addEventListener('message', function(e) {
             const m = e.data;
             if (m && m.pbExplorer === 'select') applySelection(m);
@@ -1934,8 +2015,28 @@ __PB_FONTS__
         const _applySelection = applySelection;
         applySelection = function (next) { _applySelection(next); fillPlasmids(); };
 
+        const trackHeight = document.getElementById('trackHeight');
+        const rowDensity = document.getElementById('rowDensity');
+        if (trackHeight) {
+            trackHeight.addEventListener('input', function () {
+                // The slider is the vertical zoom the buttons also drive, so
+                // both stay in step instead of fighting each other.
+                state.zoomY = Number(this.value) / 100;
+                document.getElementById('trackHeightValue').textContent = this.value + '%';
+                render();
+            });
+        }
+        if (rowDensity) {
+            rowDensity.addEventListener('input', function () {
+                state.density = Number(this.value);
+                document.getElementById('rowDensityValue').textContent = this.value + ' px';
+                render();
+            });
+        }
+
         rebind();
         fillPlasmids();
+        fillFocus();
         state.minAlignLen = 0;
         syncMinAlignRange();
         refreshChrome();
