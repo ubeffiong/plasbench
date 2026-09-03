@@ -1,0 +1,31 @@
+scope	group	tool	eligible	recommendation	reason	n_scored	coverage	mean_f1	mean_precision	mean_recall	mean_plasmid_recall	mean_bin_f1	failure_rate	median_runtime_seconds	median_peak_rss_kb	decision_score
+organism	Demo bacterium	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+organism	Demo bacterium	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+organism	Demo bacterium	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744
+gram_group	Gram-negative	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+gram_group	Gram-negative	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+gram_group	Gram-negative	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744
+truth_technology	hybrid	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+truth_technology	hybrid	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+truth_technology	hybrid	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744
+sample_origin	synthetic	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+sample_origin	synthetic	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+sample_origin	synthetic	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744
+collection_country	Nigeria	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+collection_country	Nigeria	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+collection_country	Nigeria	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744
+plasmid_size_band	small	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+plasmid_size_band	small	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+plasmid_size_band	small	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744
+plasmid_count_band	few	good	true	primary	coverage-gated multi-objective recommendation	1	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+plasmid_count_band	few	leaky	true	none	insufficient coverage or not the highest eligible decision score	1	1.0000	0.9459	0.8974	1.0000	1.0000		0.0000			0.9023
+plasmid_count_band	few	shy	true	none	insufficient coverage or not the highest eligible decision score	1	1.0000	0.7273	1.0000	0.5714	0.5000		0.0000			0.6816
+plasmid_count_band	single	good	true	primary	coverage-gated multi-objective recommendation	1	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+plasmid_count_band	single	leaky	true	none	insufficient coverage or not the highest eligible decision score	1	1.0000	0.9091	0.8333	1.0000	1.0000		0.0000			0.8674
+plasmid_count_band	single	shy	true	none	insufficient coverage or not the highest eligible decision score	1	1.0000	0.6667	1.0000	0.5000	0.6667		0.0000			0.6550
+read_depth_band	high	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+read_depth_band	high	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+read_depth_band	high	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744
+amr_status	AMR not annotated	good	true	primary	coverage-gated multi-objective recommendation	2	1.0000	1.0000	1.0000	1.0000	1.0000		0.0000			0.9500
+amr_status	AMR not annotated	leaky	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.9275	0.8654	1.0000	1.0000		0.0000			0.8865
+amr_status	AMR not annotated	shy	true	none	insufficient coverage or not the highest eligible decision score	2	1.0000	0.6970	1.0000	0.5357	0.5985		0.0000			0.6744

@@ -1,0 +1,3 @@
+sample_id	organism	truth_technology	sample_origin	read_depth_x	source_study	gram_group	collection_country
+sample1	Demo bacterium	hybrid	synthetic	80	Demo study A	Gram-negative	Nigeria
+sample2	Demo bacterium	hybrid	synthetic	80	Demo study B	Gram-negative	Nigeria

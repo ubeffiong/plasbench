@@ -221,12 +221,16 @@ def performance_chart(leaderboard):
 
 def selection_card(sample, results_dir, report_path):
     """Render a plain-language view of a machine-readable selection report."""
-    directory = results_dir / sample / "selected_candidate"
-    report_file = directory / "selection_report.json"
-    if not report_file.is_file():
-        # Operational, truth-unknown selection may be created before the
-        # nominated reconstruction is available to copy into selected_candidate.
-        report_file = results_dir / sample / "selection_report.json"
+    # Candidates live in one collection directory, each file carrying its sample
+    # id; the older per-sample location is still read so existing runs open.
+    directory = results_dir / "selected_candidates" / sample
+    report_file = directory / f"{sample}.selection_report.json"
+    for fallback in (directory / "selection_report.json",
+                     results_dir / sample / "selected_candidate" / "selection_report.json",
+                     results_dir / sample / "selection_report.json"):
+        if report_file.is_file():
+            break
+        report_file = fallback
     if not report_file.is_file():
         return "<p class='muted'>No selected reconstruction was created for this sample.</p>"
     try:
@@ -379,7 +383,23 @@ def advanced_visual_script():
 const dot=document.createElement('div'),flow=document.createElement('div'),actions=document.createElement('span');dot.id='vq-dotplot';flow.id='vq-flow';tracks.after(dot,flow);actions.innerHTML='<button id="vq-svg" type="button">Download track SVG</button><button id="vq-png" type="button">Download track PNG</button>';$('vq-download').after(actions);
 function current(){let a=data.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t])return null;let lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||a.truth_plasmids[p].length;return {a,p,t,lo,hi,blocks:a.tools[t].blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi)}}
 function renderFlow(){let x=current();if(!x){flow.innerHTML='';return}let f=x.a.tools[x.t].bin_assignment_flows||[];flow.innerHTML=f.length?'<h3>Bin-to-truth assignment flow</h3><p class="muted">Only scored bin assignments are shown; unobserved alternative links are not fabricated.</p><ul>'+f.map(r=>`<li>${r.bin_id||'no bin'} → ${r.true_plasmid||r.status}: ${r.aligned_bp.toLocaleString()} bp (${r.status})</li>`).join('')+'</ul>':''}
-function local(e){let x=current();if(!x)return;let b=x.blocks[Number(e.target.dataset.i)];if(!b)return;let a=b.local_alignment;if(!a){detail.textContent='No bounded CIGAR local alignment is available for this block. Re-run stage 5 after the CIGAR-enabled mapper update, or inspect the PAF externally.';return}let marks=[...a.reference].map((c,i)=>c===a.prediction[i]?' ':'^').join('');detail.innerHTML='<strong>Local nucleotide alignment</strong><br><code>Reference  '+a.reference+'<br>           '+marks+'<br>Prediction '+a.prediction+'</code><p class="muted">'+a.meaning+'</p>'}
+function local(e){let x=current();if(!x)return;let b=x.blocks[Number(e.target.dataset.i)];if(!b)return;const n=v=>Number(v).toLocaleString();
+// Every block carries measured alignment evidence. Only the nucleotide view
+// needs a CIGAR, so a block without one still has something to report.
+let pct=b.block_length?100*b.matches/b.block_length:0;
+let rows=[['Predicted record',b.record_id],
+ ['Truth reference',b.target+' ('+String(b.molecule_type||'unknown').toLowerCase()+')'],
+ ['Reference span',n(b.target_start)+'–'+n(b.target_end)+'  ('+n(b.target_end-b.target_start)+' bp)'],
+ ['Record span',n(b.query_start)+'–'+n(b.query_end)+' of '+n(b.query_length)+' bp'],
+ ['Orientation',b.strand==='-'?'reverse (−)':'forward (+)'],
+ ['Identity',pct.toFixed(1)+'%  ('+n(b.matches)+'/'+n(b.block_length)+' matching bases)'],
+ ['Mapping quality',String(b.mapq)]];
+let html='<strong>Selected alignment block</strong><table class="vq-kv">'+rows.map(r=>'<tr><th>'+r[0]+'</th><td>'+r[1]+'</td></tr>').join('')+'</table>';
+let a=b.local_alignment;
+if(a){let marks=[...a.reference].map((c,i)=>c===a.prediction[i]?' ':'^').join('');
+ html+='<strong>Local nucleotide alignment</strong><code>Reference  '+a.reference+'<br>           '+marks+'<br>Prediction '+a.prediction+'</code><p class="muted">'+a.meaning+'</p>'}
+else{html+='<p class="muted">No nucleotide view for this block: it carries no <code>cg:Z:</code> CIGAR tag, or it is longer than the display cap. The evidence above is measured from the alignment record itself.</p>'}
+detail.innerHTML=html}
 document.addEventListener('click',e=>{if(e.target.classList.contains('vq-block'))setTimeout(()=>local(e),0)});['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end','vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(renderFlow,0)));$('vq-fit').addEventListener('click',()=>setTimeout(renderFlow,0));$('vq-in').addEventListener('click',()=>setTimeout(renderFlow,0));$('vq-out').addEventListener('click',()=>setTimeout(renderFlow,0));
 function download(name,blob){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),0)}$('vq-svg').onclick=()=>{let svg=tracks.querySelector('svg');if(svg)download('plasbench-recovery-tracks.svg',new Blob([svg.outerHTML],{type:'image/svg+xml'}))};$('vq-png').onclick=()=>{let svg=tracks.querySelector('svg');if(!svg)return;let image=new Image(),url=URL.createObjectURL(new Blob([svg.outerHTML],{type:'image/svg+xml'}));image.onload=()=>{let c=document.createElement('canvas');c.width=1100;c.height=svg.viewBox.baseVal.height;c.getContext('2d').drawImage(image,0,0);c.toBlob(b=>download('plasbench-recovery-tracks.png',b));URL.revokeObjectURL(url)};image.src=url};renderFlow();})();
 </script>"""
@@ -569,6 +589,12 @@ def explorer_chrome_script():
 #vq-scrim{position:fixed;inset:0;background:rgba(18,28,23,.5);z-index:55;display:none}
 #vq-scrim.on{display:block}
 #vq-tracks svg,#vq-agree svg,#vq-sankey svg{width:100%;height:auto}
+.vq-kv{border-collapse:collapse;margin:8px 0 14px;font:13px Arial,sans-serif;width:100%;max-width:620px}
+.vq-kv th{text-align:left;font-weight:600;color:#4a5a52;padding:5px 14px 5px 0;white-space:nowrap;
+  vertical-align:top;width:1%;border-bottom:1px solid #eef2f0}
+.vq-kv td{padding:5px 0;color:#16211c;border-bottom:1px solid #eef2f0;font-variant-numeric:tabular-nums}
+#vq-detail code{display:block;white-space:pre;overflow-x:auto;background:#f5f8f6;border:1px solid #e3e9e8;
+  border-radius:5px;padding:10px 12px;margin:6px 0;font:12px/1.5 'IBM Plex Mono',ui-monospace,Menlo,monospace}
 @media (prefers-reduced-motion:reduce){.vq-card>header .chev{transition:none}}
 </style><script>
 (()=>{const $=id=>document.getElementById(id);
@@ -1199,7 +1225,9 @@ def main():
                 fp=int(number(row["FP_bp"])), unmapped=int(number(row["unmapped_pred_bp"])),
             ) for row in rows
         ) or "<tr><td colspan='6'>No completed tool was scored for this sample.</td></tr>"
-        selection = out.parent / sample / "selected_candidate" / "selection_report.json"
+        selection = out.parent / "selected_candidates" / sample / f"{sample}.selection_report.json"
+        if not selection.is_file():
+            selection = out.parent / sample / "selected_candidate" / "selection_report.json"
         selection_link = (f" <a href='{relative_link(selection, out)}' download>Download selected-candidate report</a>"
                           if selection.is_file() else "")
         selection_cards.append(selection_card(sample, out.parent, out))

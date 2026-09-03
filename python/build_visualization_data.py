@@ -161,6 +161,57 @@ def read_features(path, truth):
         return features
 
 
+def read_proteins(path, truth=None):
+    """Read normalized CDS annotations; filter truth annotations to plasmids."""
+    if not path or not path.is_file():
+        return []
+    required = {"sequence_id", "start", "end", "strand", "feature_id", "gene", "product", "category", "source", "version", "confidence"}
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        if not required.issubset(reader.fieldnames or []):
+            return []
+        rows = []
+        for row in reader:
+            try:
+                start, end = int(row["start"]), int(row["end"])
+            except (TypeError, ValueError):
+                continue
+            sequence = row["sequence_id"]
+            if truth and (sequence not in truth or truth[sequence]["molecule_type"] != "PLASMID"):
+                continue
+            if end > start:
+                rows.append({key: row.get(key, "") for key in reader.fieldnames})
+                rows[-1]["start"], rows[-1]["end"] = start, end
+        return rows
+
+
+def project_predicted_proteins(features, blocks):
+    """Project annotated predicted CDS locations to truth coordinates via PAF.
+
+    This is coordinate evidence for the viewer, not an amino-acid orthology call.
+    A CDS may produce several fragments when a reconstructed contig is split.
+    """
+    projected = []
+    for feature in features:
+        for block in blocks:
+            if block["molecule_type"] != "PLASMID" or feature["sequence_id"] != block["record_id"]:
+                continue
+            left, right = max(feature["start"], block["query_start"]), min(feature["end"], block["query_end"])
+            if right <= left:
+                continue
+            if block["strand"] == "+":
+                start = block["target_start"] + left - block["query_start"]
+                end = block["target_start"] + right - block["query_start"]
+            else:
+                start = block["target_end"] - (right - block["query_start"])
+                end = block["target_end"] - (left - block["query_start"])
+            projected.append({**feature, "record_id": feature["sequence_id"], "sequence_id": block["target"],
+                              "start": max(block["target_start"], start), "end": min(block["target_end"], end),
+                              "projection_fraction": round((right - left) / max(1, feature["end"] - feature["start"]), 6),
+                              "projection_strand": block["strand"]})
+    return projected
+
+
 def read_circular(path, truth):
     if not path or not path.is_file():
         return []
@@ -195,6 +246,7 @@ def main():
     parser.add_argument("--sample", required=True)
     parser.add_argument("--amr-truth", type=Path)
     parser.add_argument("--feature-truth", type=Path, help="Optional curated feature TSV with source/version provenance.")
+    parser.add_argument("--protein-truth", type=Path, help="Optional normalized truth protein TSV.")
     parser.add_argument("--circular-truth", type=Path)
     parser.add_argument("--max-blocks-per-tool", type=int, default=2000)
     parser.add_argument("--max-nucleotide-bp", type=int, default=2000)
@@ -228,15 +280,18 @@ def main():
                                "completeness": round(sum(end - start for start, end in merge(coverage[plasmid])) / details["length"], 6)}
                     for plasmid, details in plasmids.items()}
         chromosome_bp = sum(max(0, block["target_end"] - block["target_start"]) for block in all_blocks_for_tool if block["molecule_type"] == "CHROMOSOME")
+        proteins = read_proteins(sample_dir / f"{tool}.proteins.tsv")
         tool_data[tool] = {"blocks": retained, "blocks_omitted": truncated, "plasmid_recovery": recovery,
-                           "chromosome_aligned_bp": chromosome_bp, "structural_diagnostics": structural_metrics(all_blocks_for_tool)}
+                           "chromosome_aligned_bp": chromosome_bp, "structural_diagnostics": structural_metrics(all_blocks_for_tool),
+                           "protein_features": project_predicted_proteins(proteins, all_blocks_for_tool)}
         tool_data[tool]["bin_assignment_flows"] = bin_assignment_flows(sample_dir, tool)
         all_blocks.extend(retained)
     payload = {"schema_version": "1.0", "sample": args.sample, "coordinate_system": "0-based half-open reference coordinates",
                "display_limit": {"max_blocks_per_tool": args.max_blocks_per_tool,
                                  "meaning": "Only the largest primary alignment blocks are displayed when the cap is exceeded."},
                "truth_plasmids": plasmids, "circular_truth_plasmids": read_circular(args.circular_truth, truth),
-               "amr_features": read_amr(args.amr_truth, truth), "context_features": read_features(args.feature_truth, truth), "tools": tool_data}
+               "amr_features": read_amr(args.amr_truth, truth), "context_features": read_features(args.feature_truth, truth),
+               "protein_features": read_proteins(args.protein_truth, truth), "tools": tool_data}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, separators=(",", ":")) + "\n", encoding="utf-8")
     if args.structural_out:

@@ -205,6 +205,21 @@ def main():
                    "Truth plasmids", "Alignment tracks", "aria-expanded"):
         assert needed in page, f"explorer chrome affordance missing: {needed}"
 
+    # The selected block reports the evidence measured from the alignment
+    # record. Only the nucleotide view needs a CIGAR, so a block without one
+    # must still show its spans, orientation, identity and mapping quality.
+    for needed in ("Selected alignment block", "vq-kv", "Mapping quality",
+                   "matching bases", "Orientation"):
+        assert needed in page, f"selected-block evidence missing: {needed}"
+    assert "No bounded CIGAR local alignment is available" not in page,         "a missing CIGAR must not replace the block's measured evidence"
+
+    # Distribution plots are part of the default view, not hidden behind a toggle.
+    for needed in ("boxPlotCanvas", "dotPlotCanvas", "Metric Distribution by Tool",
+                   "Per-Sample Distribution"):
+        assert needed in page, f"distribution plot missing: {needed}"
+    assert 'id="statsPanel" style="display:none;"' not in page,         "distribution plots must not start hidden"
+    assert "statsVisible: true" in page, "distribution plots must default to visible"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 

@@ -8,7 +8,7 @@ This module deliberately separates two claims:
   that may be applied to an unknown isolate, but never claims its output is
   biologically confirmed.
 
-It copies an already-produced tool FASTA into ``selected_candidate``. No tool
+It copies an already-produced tool FASTA into ``selected_candidates/<sample>``. No tool
 is rerun and no synthetic consensus sequence is fabricated.
 """
 
@@ -274,19 +274,31 @@ def structural_evidence(results_dir, sample, tool):
     return {"status": "validated_source_evidence", "items": payload.get("items", []), "validated_closure_items": payload.get("validated_closure_items", []), "meaning": payload.get("meaning", "")}
 
 
+def candidate_dir(results_dir, sample):
+    """Collect every sample's selected candidate under one directory.
+
+    Gathering the chosen reconstructions is a routine step -- handing them to a
+    collaborator, loading them into a viewer -- and each file previously carried
+    the same name, so collecting them silently overwrote all but one.
+    """
+    return Path(results_dir) / "selected_candidates" / sample
+
+
 def copy_candidate(results_dir, sample, tool, destination):
     source_dir = Path(results_dir) / sample
     destination.mkdir(parents=True, exist_ok=True)
     copied = []
+    # Every copied file carries the sample id, so the files stay identifiable
+    # once they are moved out of the directory that named them.
     mapping = {
-        f"pred_{tool}.plasmid.fasta": "candidate.plasmid.fasta",
-        f"pred_{tool}.bins.tsv": "candidate.bins.tsv",
-        f"{tool}.pred_vs_ref.paf": "candidate.pred_vs_ref.paf",
-        f"{tool}.pred_vs_ref.all.paf": "candidate.pred_vs_ref.all.paf",
-        f"{tool}.bin_summary.tsv": "candidate.bin_summary.tsv",
-        f"{tool}.bin_matches.tsv": "candidate.bin_matches.tsv",
-        f"pred_{tool}.evidence.tsv": "candidate.evidence.tsv",
-        f"{tool}.structural_evidence.validation.json": "candidate.structural_evidence.validation.json",
+        f"pred_{tool}.plasmid.fasta": f"{sample}.candidate.plasmid.fasta",
+        f"pred_{tool}.bins.tsv": f"{sample}.candidate.bins.tsv",
+        f"{tool}.pred_vs_ref.paf": f"{sample}.candidate.pred_vs_ref.paf",
+        f"{tool}.pred_vs_ref.all.paf": f"{sample}.candidate.pred_vs_ref.all.paf",
+        f"{tool}.bin_summary.tsv": f"{sample}.candidate.bin_summary.tsv",
+        f"{tool}.bin_matches.tsv": f"{sample}.candidate.bin_matches.tsv",
+        f"pred_{tool}.evidence.tsv": f"{sample}.candidate.evidence.tsv",
+        f"{tool}.structural_evidence.validation.json": f"{sample}.candidate.structural_evidence.validation.json",
     }
     for name, output_name in mapping.items():
         path = source_dir / name
@@ -365,10 +377,10 @@ def main():
             "confidence_tier": "high" if selected and not reasons else "requires_confirmation",
             "rejected_candidates": [{"tool": row["tool"], "reason": "lower truth-set candidate quality"} for row in candidates if not selected or row["tool"] != selected["tool"]],
         }
-        destination = Path(args.results_dir) / sample / "selected_candidate"
+        destination = candidate_dir(args.results_dir, sample)
         report["copied_files"] = copy_candidate(args.results_dir, sample, selected_tool, destination) if selected_tool else []
         destination.mkdir(parents=True, exist_ok=True)
-        (destination / "selection_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (destination / f"{sample}.selection_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Wrote {recommendations_path}, {stratified_path}, and selection reports for {len(metadata)} sample(s).")
 
 

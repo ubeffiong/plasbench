@@ -1,0 +1,7 @@
+sample	tool	analysis_track	true_plasmid_bp	TP_bp	FP_bp	FN_bp	mapped_pred_bp	unambiguously_mapped_pred_bp	unmapped_pred_bp	ambiguously_mapped_pred_bp	true_plasmid_count	recovered_plasmid_count	plasmid_recall	predicted_record_count	true_amr_gene_count	recovered_amr_gene_count	amr_gene_recall	true_circular_plasmid_count	recovered_circular_plasmid_count	circular_truth_plasmid_recovery	circular_plasmid_recall	alignment_total	alignment_retained	filtered_alignment_count	precision	recall	f1
+sample1	good	short_read	3500	3500	0	0	3500	3500	0	0	2	2	1.0000	2								2	2	0	1.0000	1.0000	1.0000
+sample1	leaky	short_read	3500	3500	400	0	3900	3900	0	0	2	2	1.0000	3								3	3	0	0.8974	1.0000	0.9459
+sample1	shy	short_read	3500	2000	0	1500	2000	2000	0	0	2	1	0.5000	1								1	1	0	1.0000	0.5714	0.7273
+sample2	good	short_read	1000	1000	0	0	1000	1000	0	0	1	1	1.0000	1								1	1	0	1.0000	1.0000	1.0000
+sample2	leaky	short_read	1000	1000	200	0	1200	1200	0	0	1	1	1.0000	2								2	2	0	0.8333	1.0000	0.9091
+sample2	shy	short_read	1000	500	0	500	500	500	0	0	1	0	0.0000	1								1	1	0	1.0000	0.5000	0.6667

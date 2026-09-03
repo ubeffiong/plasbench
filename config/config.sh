@@ -96,6 +96,18 @@ export RUN_REFERENCE_ANNOTATION="${RUN_REFERENCE_ANNOTATION:-1}"
 export ANNOTATION_AMR_DB="${ANNOTATION_AMR_DB:-ncbi}"
 export ANNOTATION_REPLICON_DB="${ANNOTATION_REPLICON_DB:-plasmidfinder}"
 
+# Optional standardized CDS/product annotation for truth and every predicted
+# plasmid FASTA. FASTA alone has no protein names. Bakta is preferred; Prokka
+# is a compatible fallback. Annotation failure never changes DNA-level scores.
+export RUN_PROTEIN_ANNOTATION="${RUN_PROTEIN_ANNOTATION:-0}"
+export PROTEIN_ANNOTATION_ENGINE="${PROTEIN_ANNOTATION_ENGINE:-bakta}"
+export PROTEIN_ANNOTATION_THREADS="${PROTEIN_ANNOTATION_THREADS:-$THREADS}"
+export PROTEIN_ANNOTATION_MIN_BP="${PROTEIN_ANNOTATION_MIN_BP:-90}"
+# Optional pinned Bakta database directory. Its identity is recorded in the
+# annotation provenance and cache key; leave empty only when Bakta has a
+# configured default database.
+export PROTEIN_ANNOTATION_DATABASE="${PROTEIN_ANNOTATION_DATABASE:-}"
+
 export VISUALIZATION_MAX_BLOCKS_PER_TOOL="${VISUALIZATION_MAX_BLOCKS_PER_TOOL:-2000}"
 # Largest aligned block rendered as base-level text in the local viewer.
 export VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP="${VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP:-2000}"

@@ -1,0 +1,4 @@
+rank	tool	n_samples	n_completed	n_failed	n_skipped	mean_precision	mean_recall	mean_plasmid_recall	n_bin_scored	mean_bin_f1	mean_f1	f1_ci_low	f1_ci_high	median_f1
+1	good	2	2	0	0	1.0000	1.0000	1.0000	0		1.0000			1.0000
+2	leaky	2	2	0	0	0.8654	1.0000	1.0000	0		0.9275			0.9275
+3	shy	2	2	0	0	1.0000	0.5357	0.2500	0		0.6970			0.6970

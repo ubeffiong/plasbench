@@ -30,12 +30,18 @@ def main():
         subprocess.run([sys.executable, SCRIPT, "--scores", scores, "--sample-sheet", samples,
                         "--results-dir", results, "--out-prefix", os.path.join(results, "benchmark"),
                         "--min-samples", "1", "--min-coverage", "1"], check=True)
-        report_path = os.path.join(results, "s1", "selected_candidate", "selection_report.json")
+        # Candidates live in one collection directory and every file carries the
+        # sample id, so a whole cohort can be gathered without name collisions.
+        candidates = os.path.join(results, "selected_candidates", "s1")
+        report_path = os.path.join(candidates, "s1.selection_report.json")
         report = json.load(open(report_path))
         assert report["selected_tool"] == "tool_a"
         assert report["selection_type"] == "truth_set_best_candidate"
-        assert report["copied_files"] == ["candidate.plasmid.fasta"]
-        assert os.path.isfile(os.path.join(results, "s1", "selected_candidate", "candidate.plasmid.fasta"))
+        assert report["copied_files"] == ["s1.candidate.plasmid.fasta"]
+        assert os.path.isfile(os.path.join(candidates, "s1.candidate.plasmid.fasta"))
+        assert not os.path.exists(os.path.join(results, "s1", "selected_candidate")),             "candidates must no longer be written beside the per-sample outputs"
+        for name in os.listdir(candidates):
+            assert name.startswith("s1."), f"candidate file does not carry its sample id: {name}"
         recommendation = list(csv.DictReader(open(os.path.join(results, "benchmark.recommendations.tsv")), delimiter="\t"))
         assert any(row["scope"] == "overall" and row["tool"] == "tool_a" and row["recommendation"] == "primary" for row in recommendation)
         assert os.path.isfile(os.path.join(results, "benchmark.stratified.tsv"))

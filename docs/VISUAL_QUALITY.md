@@ -116,3 +116,19 @@ Use the visual panels together with bin purity, split/merge diagnostics,
 structural-evidence records, and confirmation requirements in each selection
 report. No single visual or score is a universal definition of the best
 biological reconstruction.
+
+## Optional Protein Labels
+
+When `RUN_PROTEIN_ANNOTATION=1`, PlasBench normalizes Bakta or Prokka CDS calls
+for both the truth reference and every predicted plasmid FASTA. The explorer
+then supplies a searchable protein table and directional feature arrows for
+AMR, replication, mobility, maintenance, mobile-element, hypothetical, and
+other CDS annotations. Labels use the gene symbol where available, otherwise
+the product name; source, version, and confidence remain visible in the table.
+
+Predicted CDS features are placed on truth coordinates through retained
+nucleotide alignments. `coordinate-complete`, `coordinate-partial`, and `not
+projected` describe that mapping evidence only. They must not be read as
+amino-acid identity, orthology, intact reading frame, correct protein function,
+or plasmid closure. Those claims require separately versioned protein-alignment
+and structural evidence.
