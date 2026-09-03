@@ -338,6 +338,21 @@ def main():
     assert "'vq-q','vq-bed','vq-prev-ev'" in page,         "duplicated navigation controls must be hidden"
     assert "vq-back" in page, "selection history is not duplicated and must survive"
 
+    # The explorer picks its own method and record, and shapes its own rows.
+    # These lived only in the outer control row, which meant the explorer could
+    # not focus a method at all.
+    for needed in ("explorerTool", "explorerRecord", "trackHeight", "rowDensity",
+                   "trackHeightValue", "rowDensityValue"):
+        assert needed in explorer_doc, f"explorer control missing: {needed}"
+    # Focus is a filter over the measured tracks, not a separate data path.
+    assert "allToolTracks" in explorer_doc and "recordsForFocus" in explorer_doc,         "method and record focus must derive from the tracks actually present"
+    assert "state.density" in explorer_doc, "density must drive the row gap"
+    assert "const rowGap = state.density;" in explorer_doc,         "the row gap must be the density control, not a constant"
+    assert "syncTrackHeightSlider" in explorer_doc,         "zooming must move the track-height slider, or the two disagree"
+    # Focus chosen in the frame reaches the panels below it.
+    assert "pbExplorerSelected" in page, "the explorer's focus is not sent to the report"
+    assert "set('vq-tool',m.tool)" in page, "the shared tool selection does not follow"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
