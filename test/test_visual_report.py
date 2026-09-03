@@ -6,6 +6,7 @@ build_visualization_data -> build_html_report path directly.
 """
 
 import csv
+import re
 import os
 import subprocess
 import sys
@@ -238,6 +239,24 @@ def main():
     # Unmeasured fields must say so.
     assert "read depth is not computed by projection scoring" in page,         "the unmeasured coverage field is not explained"
     assert "not measured" in page
+
+    # Every method gets its own labelled row, sized to the space available.
+    # The design used a fixed 20px track and a 7px label: with five methods the
+    # rows were drawn but unreadable, so the view looked like it held one.
+    assert "const trackH = state.mode === 'A' ? 20 : 32;" not in page,         "fixed track height must not come back; rows have to fit the container"
+    for needed in ("const rowGap", "const rowCount", "clamp(fitted",
+                   "state.rowOrder.map(id => TOOL_TRACKS.find"):
+        assert needed in page, f"adaptive row layout missing: {needed}"
+    # Scope the type checks to the explorer document: the report embeds two
+    # vendored designs and only this one was rescaled.
+    start = page.index("id='pb-explorer-doc'")
+    explorer_doc = page[start:page.index("</script>", start)]
+    # Canvas labels are drawn in JS and cannot inherit the CSS scale.
+    assert "'7px Inter" not in explorer_doc and "'6px Inter" not in explorer_doc,         "explorer canvas labels must not be drawn at 6-7px"
+    # No CSS declaration below 11px anywhere in the explorer.
+    small = sorted({int(m) for m in re.findall(r"font-size: ?(\d+)px", explorer_doc)
+                    if int(m) < 11})
+    assert not small, f"explorer type scale still has unreadable sizes: {small}px"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 
