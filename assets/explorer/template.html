@@ -1030,7 +1030,16 @@ __PB_FONTS__
                 : clamp(fitted, 28, preferredRow);
             const trackH = Math.max(8, Math.round(baseRow * state.zoomY));
             const trackGap = rowGap;
-            const rowsHeight = rowCount * (trackH + rowGap);
+            // The contig row is sized from its own lane count, so the total has
+            // to allow for it rather than assume every row is trackH.
+            let contigRowH = trackH;
+            const contigLanes = state.pinReference
+                ? Math.max(1, tools.reduce((n, t) => n + ((t.contigs || []).length), 0))
+                : 0;
+            const contigWant = contigLanes ? Math.min(contigLanes * 15 + 4,
+                Math.round((H - rowTop - pad.bottom) * 0.78)) : 0;
+            const rowsHeight = rowCount * (trackH + rowGap) +
+                Math.max(0, contigWant - trackH);
             const viewH = H - rowTop - pad.bottom;
             state.contentH = rowsHeight;
             state.viewH = viewH;
@@ -1047,8 +1056,6 @@ __PB_FONTS__
             // Reference / Contig track
             if (state.pinReference) {
                 const refY = yOffset;
-                ctx.fillStyle = '#e8eeea';
-                ctx.fillRect(pad.left, refY, plotW, trackH);
                 const allContigs = tools.flatMap(t => (t.contigs || []).map(
                     c => Object.assign({}, c, { tool: t.id, version: t.version })));
                 const mergedContigs = state.collapseContigs ? mergeContigs(allContigs) : allContigs;
@@ -1069,7 +1076,14 @@ __PB_FONTS__
                         return { c, x1, x2, lane };
                     });
                 const laneCount = Math.max(1, laneEnds.length);
-                const laneH = Math.max(6, (trackH - 4) / laneCount);
+                // A lane needs about 15px to carry its record id. The row grows
+                // to give every lane that, within a ceiling, rather than
+                // shrinking lanes until the labels vanish.
+                const wantH = laneCount * 15 + 4;
+                contigRowH = Math.max(trackH, Math.min(wantH, Math.round(viewH * 0.78)));
+                const laneH = Math.max(6, (contigRowH - 4) / laneCount);
+                ctx.fillStyle = '#e8eeea';
+                ctx.fillRect(pad.left, refY, plotW, contigRowH);
                 canvas._contigs = [];
                 placed.forEach(({ c, x1, x2, lane }) => {
                     const w = Math.max(2, x2 - x1);
@@ -1081,8 +1095,10 @@ __PB_FONTS__
                     ctx.strokeRect(x1, y, w, laneH - 1);
                     // Label only where the box can hold the text without
                     // spilling into its neighbour.
-                    if (!state.collapseContigs && laneH >= 13) {
-                        ctx.font = '10px Inter, sans-serif';
+                    if (!state.collapseContigs && laneH >= 10) {
+                        // The label shrinks with the lane rather than vanishing:
+                        // an unlabelled record row cannot be read at all.
+                        ctx.font = (laneH >= 14 ? '10px' : '9px') + ' Inter, sans-serif';
                         if (ctx.measureText(c.id).width + 8 < w) {
                             ctx.fillStyle = '#16211c';
                             ctx.textAlign = 'center';
@@ -1097,8 +1113,11 @@ __PB_FONTS__
                 ctx.font = '600 ' + rowFont + 'px Inter, sans-serif';
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('Contigs', pad.left - 10, refY + trackH / 2);
-                yOffset += trackH + rowGap;
+                ctx.fillText('Contigs', pad.left - 10, refY + contigRowH / 2);
+                ctx.font = '10px Inter, sans-serif';
+                ctx.fillStyle = '#7b8a83';
+                ctx.fillText(allContigs.length + ' records', pad.left - 10, refY + contigRowH / 2 + 14);
+                yOffset += contigRowH + rowGap;
             }
 
             // ── Overlay: two methods in one band ──
@@ -1710,7 +1729,12 @@ __PB_FONTS__
 
         // ── Structural Navigation ──
         function jumpToEvent(type) {
-            const events = STRUCTURAL_EVENTS[type + 's'] || STRUCTURAL_EVENTS[type] || [];
+            // Naming the list by appending 's' works for gaps, inversions and
+            // breakpoints and fails for mismatches, so the button reported a
+            // count it could never step through. The keys are named.
+            const EVENT_KEY = { mismatch: 'mismatches', gap: 'gaps',
+                                inversion: 'inversions', breakpoint: 'breakpoints' };
+            const events = STRUCTURAL_EVENTS[EVENT_KEY[type]] || [];
             if (events.length === 0) return;
             const idx = state.eventIndex[type] || 0;
             const event = events[idx % events.length];
