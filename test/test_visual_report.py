@@ -537,6 +537,18 @@ def main():
     # coloured by, so the inline key shows the toggles either way.
     assert "state.colorMode === 'event' || state.segmentFilter" in explorer_doc,         "the inline key must show type toggles while a type filter is on"
 
+    # The event lists are named, not built by appending an "s": that worked for
+    # gaps, inversions and breakpoints and silently failed for mismatches, so
+    # the button reported a count it could never step through.
+    assert "const EVENT_KEY = { mismatch: 'mismatches'" in explorer_doc,         "structural jump lists must be looked up by name, not by concatenation"
+    assert "STRUCTURAL_EVENTS[type + 's']" not in explorer_doc,         "the concatenated event key must not return"
+
+    # Every method's records share the contig row, so its height follows the
+    # lane count. Holding it to one method row squeezed ten lanes into five
+    # pixels each and the record labels stopped drawing.
+    assert "contigRowH" in explorer_doc, "the contig row does not size to its lanes"
+    assert "laneH >= 10" in explorer_doc,         "a short lane must still carry its record id, at a smaller size"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
