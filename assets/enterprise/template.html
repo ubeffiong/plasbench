@@ -686,6 +686,26 @@
             display: inline-block;
         }
 
+        /* Segment types carry a texture as well as a hue: nine categories cannot
+           be told apart by colour alone. */
+        .seg-inverted { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.22) 0 3px, transparent 3px 6px); }
+        .seg-duplicated { background-image: repeating-linear-gradient(-45deg, rgba(0,0,0,.22) 0 3px, transparent 3px 6px); }
+        .seg-chromosomal { background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.30) 0 2px, transparent 2px 5px); }
+        .seg-wrong_plasmid { background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.18) 0 4px, transparent 4px 8px); }
+        .seg-ambiguous { background-image: radial-gradient(rgba(0,0,0,.28) 1px, transparent 1px); background-size: 5px 5px; }
+        .seg-low_identity { background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 2px, transparent 2px 4px); }
+        .seg-unsupported_join { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.35) 0 1px, transparent 1px 4px); }
+        .seg-missing { border: 1px dashed var(--border-light); }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
         /* ── Drilldown Modal ── */
         /* A heatmap drilldown is an explicit pop-up: it keeps the cohort
            matrix visible behind the evidence and closes cleanly with Escape. */
@@ -1263,6 +1283,12 @@
                     <option value="runtime">Runtime (min)</option>
                     <option value="memory">Memory (GB)</option>
                     <option value="proteinCompleteness">Protein coordinate recovery</option>
+                    <option value="contamination">Chromosome contamination</option>
+                    <option value="unmapped">Unmapped predicted bp</option>
+                    <option value="splitEvents">Split events</option>
+                    <option value="mergeEvents">Merge events</option>
+                    <option value="amrRecall">AMR genes recovered</option>
+                    <option value="repliconRecall">Replicons recovered</option>
                 </select>
             </div>
             <div class="filter-group">
@@ -1630,6 +1656,14 @@
             if (key === 'runtime') return m.runtime || 0;
             if (key === 'memory') return m.memory || 0;
             if (key === 'proteinCompleteness') return m.proteinCompleteness ?? null;
+            // Measured but previously unexposed. Null means not measured, which the
+            // renderer shows as such rather than as a zero score.
+            if (key === 'contamination') return m.contamination ?? null;
+            if (key === 'unmapped') return m.unmapped ?? null;
+            if (key === 'splitEvents') return m.splitEvents ?? null;
+            if (key === 'mergeEvents') return m.mergeEvents ?? null;
+            if (key === 'amrRecall') return m.amrRecall ?? null;
+            if (key === 'repliconRecall') return m.repliconRecall ?? null;
             return 0;
         }
 
@@ -2306,13 +2340,18 @@
                 }
 
                 const segColors = {
+                    good: 'var(--accent-green)',
                     correct: 'var(--accent-green)',
                     missing: 'var(--bg-input)',
                     inverted: 'var(--accent-rose)',
+                    chromosomal: 'var(--accent-red)',
                     contam: 'var(--accent-red)',
+                    wrong_plasmid: 'var(--accent-orange)',
                     ambiguous: 'var(--accent-amber)',
                     duplicated: 'var(--accent-purple)',
+                    low_identity: 'var(--accent-cyan)',
                     lowid: 'var(--accent-cyan)',
+                    unsupported_join: 'var(--accent-blue)',
                 };
 
                 let tracksHtml = '';
