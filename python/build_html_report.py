@@ -528,6 +528,123 @@ renderAgreement();renderComparison();})();
 </script>"""
 
 
+def explorer_chrome_script():
+    """Give the evidence explorer panel chrome: collapse, expand, zoom, stretch.
+
+    The explorer grew as a flat stack of unlabelled panels emitted by several
+    independent fragments. This wraps each one in a titled card without moving
+    it out of the DOM position its fragment re-renders into, and adds a single
+    toolbar for the controls those panels share.
+    """
+    return """<style>
+#vq-shell{--pad:16px;margin:18px 0}
+#vq-toolbar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  background:#f3f6f4;border:1px solid #d3ddd6;border-radius:8px;padding:9px 13px;margin-bottom:14px;
+  font:13px Arial,sans-serif;box-shadow:0 1px 3px rgba(22,33,28,.06)}
+#vq-toolbar .grp{display:flex;gap:5px;align-items:center}
+#vq-toolbar .sep{width:1px;height:22px;background:#d3ddd6}
+#vq-toolbar label{color:#4a5a52;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+#vq-toolbar button{font:12px Arial,sans-serif;padding:5px 10px;border:1px solid #c3cec7;background:#fff;
+  border-radius:5px;cursor:pointer;color:#16211c;transition:background .15s,border-color .15s}
+#vq-toolbar button:hover{background:#eaf2ec;border-color:#17805a}
+#vq-toolbar button:focus-visible{outline:2px solid #12403a;outline-offset:2px}
+#vq-toolbar input[type=range]{width:120px;accent-color:#17805a}
+.vq-card{background:#fff;border:1px solid #d3ddd6;border-radius:8px;margin-bottom:14px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(22,33,28,.05)}
+.vq-card>header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f7faf8;
+  border-bottom:1px solid #e3e9e8;cursor:pointer;user-select:none}
+.vq-card>header:focus-visible{outline:2px solid #12403a;outline-offset:-2px}
+.vq-card>header h3{margin:0;font:600 13px Arial,sans-serif;color:#16211c;flex:none}
+.vq-card>header .hint{font:11px Arial,sans-serif;color:#7b8a83;flex:1}
+.vq-card>header .chev{transition:transform .18s;color:#4a5a52;font-size:10px}
+.vq-card.collapsed>header .chev{transform:rotate(-90deg)}
+.vq-card.collapsed>.vq-body{display:none}
+.vq-card>header button{font:11px Arial,sans-serif;padding:3px 9px;border:1px solid #c3cec7;background:#fff;
+  border-radius:4px;cursor:pointer;color:#16211c}
+.vq-card>header button:hover{background:#eaf2ec;border-color:#17805a}
+.vq-body{padding:var(--pad);overflow:auto}
+.vq-card.expanded{position:fixed;inset:16px;z-index:60;margin:0;display:flex;flex-direction:column;
+  box-shadow:0 24px 60px rgba(22,33,28,.35)}
+.vq-card.expanded>.vq-body{flex:1;min-height:0}
+#vq-scrim{position:fixed;inset:0;background:rgba(18,28,23,.5);z-index:55;display:none}
+#vq-scrim.on{display:block}
+#vq-tracks svg,#vq-agree svg,#vq-sankey svg{width:100%;height:auto}
+@media (prefers-reduced-motion:reduce){.vq-card>header .chev{transition:none}}
+</style><script>
+(()=>{const $=id=>document.getElementById(id);
+if(!$('vq-tracks'))return;
+// One card per panel. Panels are moved into a card body but keep their ids, so
+// the fragments that own them go on re-rendering into the same element.
+const PANELS=[['vq-summary','Truth plasmids','one row per truth plasmid for the selected method'],
+ ['vq-nav','Navigation and search','find a gene, coordinate range or contig id'],
+ ['vq-tracks','Alignment tracks','predicted records on truth-reference coordinates'],
+ ['vq-detail','Selected block','alignment evidence for the block you clicked'],
+ ['vq-agree','Method agreement','how many methods support each reference interval'],
+ ['vq-sankey','Bin-to-truth flow','which predicted bin carries which truth plasmid'],
+ ['vq-flow','Bin assignments','scored bin membership'],
+ ['vq-compare','Method comparison','baseline against comparator on shared samples'],
+ ['vq-dotplot','Dot plot','reference against predicted-record coordinates'],
+ ['vq-context','Context and circular view','curated features and circular truth'],
+ ['vq-proteins','Protein recovery','coordinate recovery of named coding sequences'],
+ ['vq-structural','Structural diagnostics','alignment-derived discordance']];
+const shell=document.createElement('div');shell.id='vq-shell';
+const first=$('vq-summary')||$('vq-nav')||$('vq-tracks');
+first.parentElement.insertBefore(shell,first);
+const bar=document.createElement('div');bar.id='vq-toolbar';
+bar.innerHTML='<span class="grp"><label>View</label>'
+ +'<button id="vq-expand-all" type="button">Expand all</button>'
+ +'<button id="vq-collapse-all" type="button">Collapse all</button></span>'
+ +'<span class="sep"></span>'
+ +'<span class="grp"><label>Zoom</label>'
+ +'<button id="vq-tb-out" type="button" title="Zoom out">\u2212</button>'
+ +'<button id="vq-tb-in" type="button" title="Zoom in">+</button>'
+ +'<button id="vq-tb-fit" type="button" title="Fit the whole plasmid">Fit</button></span>'
+ +'<span class="sep"></span>'
+ +'<span class="grp"><label for="vq-stretch">Track height</label>'
+ +'<input id="vq-stretch" type="range" min="140" max="760" step="20" value="340"></span>'
+ +'<span class="sep"></span>'
+ +'<span class="grp"><label for="vq-density">Density</label>'
+ +'<input id="vq-density" type="range" min="6" max="28" step="2" value="16" title="Padding inside each card"></span>'
+ +'<span class="grp" style="margin-left:auto;color:#7b8a83;font-size:11px">Select a card title to collapse it</span>';
+shell.append(bar);
+const scrim=document.createElement('div');scrim.id='vq-scrim';document.body.append(scrim);
+function card(id,title,hint){const el=$(id);if(!el)return null;
+ const box=document.createElement('section');box.className='vq-card';
+ box.innerHTML='<header tabindex="0" role="button" aria-expanded="true">'
+  +'<span class="chev">\u25BC</span><h3>'+title+'</h3><span class="hint">'+hint+'</span>'
+  +'<button type="button" class="exp">Expand</button></header><div class="vq-body"></div>';
+ shell.append(box);
+ box.querySelector('.vq-body').append(el);
+ const head=box.querySelector('header'),btn=box.querySelector('.exp');
+ function toggle(){const collapsed=box.classList.toggle('collapsed');
+  head.setAttribute('aria-expanded',String(!collapsed))}
+ head.addEventListener('click',e=>{if(e.target!==btn)toggle()});
+ head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}});
+ btn.addEventListener('click',()=>{const on=box.classList.toggle('expanded');
+  scrim.classList.toggle('on',on);btn.textContent=on?'Close':'Expand';
+  if(on)box.scrollIntoView({block:'nearest'})});
+ return box}
+const cards=PANELS.map(entry=>card(entry[0],entry[1],entry[2])).filter(Boolean);
+scrim.addEventListener('click',()=>{cards.forEach(c=>{c.classList.remove('expanded');
+ const b=c.querySelector('.exp');if(b)b.textContent='Expand'});scrim.classList.remove('on')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&scrim.classList.contains('on'))scrim.click()});
+$('vq-expand-all').onclick=()=>cards.forEach(c=>{c.classList.remove('collapsed');
+ c.querySelector('header').setAttribute('aria-expanded','true')});
+$('vq-collapse-all').onclick=()=>cards.forEach(c=>{c.classList.add('collapsed');
+ c.querySelector('header').setAttribute('aria-expanded','false')});
+// The toolbar drives the explorer's own controls rather than duplicating them.
+$('vq-tb-in').onclick=()=>$('vq-in')&&$('vq-in').click();
+$('vq-tb-out').onclick=()=>$('vq-out')&&$('vq-out').click();
+$('vq-tb-fit').onclick=()=>$('vq-fit')&&$('vq-fit').click();
+// Stretch: taller tracks when several methods are shown, shorter when comparing.
+$('vq-stretch').addEventListener('input',e=>{const tracks=$('vq-tracks');
+ if(tracks){tracks.style.maxHeight=e.target.value+'px';tracks.style.overflowY='auto'}});
+$('vq-stretch').dispatchEvent(new Event('input'));
+$('vq-density').addEventListener('input',e=>{shell.style.setProperty('--pad',e.target.value+'px')});
+})();
+</script>"""
+
+
 def explorer_navigation_script():
     """Search, row management, drag navigation, and event-to-event jumping."""
     return """<style>
@@ -1142,6 +1259,7 @@ def main():
                    + plasmid_summary_script() + structural_and_feature_tracks_script() + protein_annotation_script()
                    + bin_flow_script() + explorer_navigation_script()
                    + agreement_and_comparison_script()
+                   + explorer_chrome_script()
                    + lazy_visualization_script())
     enterprise_html = enterprise_view_section(args.project_root, scores, status, leaderboard,
                                               metadata, out.parent, vendor_html, visual_html)
