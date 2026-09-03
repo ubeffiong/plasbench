@@ -27,6 +27,443 @@ def read_sample_metadata(path):
     return {row["sample_id"]: row for row in read_tsv(path) if row.get("sample_id")}
 
 
+# One definition per term, used in three places: the keys section renders from
+# it, every occurrence of the term in the report is annotated from it, and the
+# guided findings quote it. Adding a term here makes it explained everywhere.
+#
+# "what" is the measurement. "why" is the reason a reader should care, which is
+# the half a label can never carry and the half that was missing.
+GLOSSARY = {
+    "Base F1": {
+        "what": "Harmonic mean of base-level precision and recall, 0 to 1.",
+        "why": "It is a single number for two different failures -- claiming "
+               "sequence that is not plasmid, and missing sequence that is. A "
+               "method can score well on either alone; F1 only rises when both "
+               "hold. It is not a measure of structural correctness.",
+    },
+    "Base precision": {
+        "what": "TP / (TP + FP) over reference bases.",
+        "why": "How much of what the method called plasmid really is plasmid. "
+               "Low precision means chromosome sequence in the answer.",
+    },
+    "Base recall": {
+        "what": "TP / (TP + FN) over reference bases. Also called completeness.",
+        "why": "How much of the true plasmid was recovered. Low recall means "
+               "the plasmid is there but the method did not find it.",
+    },
+    "Completeness": {
+        "what": "Fraction of one truth plasmid's bases covered by the prediction.",
+        "why": "Recall stated per plasmid rather than per sample, so a large "
+               "recovered plasmid cannot hide a small missed one.",
+    },
+    "Purity": {
+        "what": "Fraction of a predicted bin's aligned bases that belong to its "
+                "matched truth plasmid.",
+        "why": "A bin can be complete and still be wrong, if it also carries "
+               "chromosome or a second plasmid. Measured per bin, not per plasmid.",
+    },
+    "Plasmid recall": {
+        "what": "Fraction of truth plasmids recovered above the configured "
+                "completeness threshold.",
+        "why": "Counts plasmids, not bases, so recovering one large replicon "
+               "does not compensate for missing three small ones.",
+    },
+    "Structural concordance": {
+        "what": "Collinear aligned bases over all aligned bases, from the "
+                "alignment blocks alone.",
+        "why": "A reconstruction can contain every correct base in the wrong "
+               "order. This is the only number here that notices, and it is a "
+               "diagnostic proxy: it is not validated against a closed genome.",
+    },
+    "Split": {
+        "what": "One truth plasmid represented by more than one predicted bin "
+                "from the same method.",
+        "why": "The sequence was found but not assembled into one unit, so a "
+               "high completeness can still mean an unusable reconstruction.",
+    },
+    "Merge": {
+        "what": "One predicted bin carrying high-completeness evidence for more "
+                "than one truth plasmid.",
+        "why": "Two replicons fused into one answer. Downstream this reads as a "
+               "single plasmid that never existed.",
+    },
+    "Chromosomal contamination": {
+        "what": "Chromosome-reference bases covered by a predicted-plasmid "
+                "alignment, as a fraction of all truth-mapped bases.",
+        "why": "The most consequential error for AMR work: a resistance gene "
+               "called plasmid-borne when it is chromosomal changes the "
+               "conclusion about transmissibility.",
+    },
+    "Unmapped predicted bp": {
+        "what": "Predicted bases with no alignment to any labelled reference.",
+        "why": "Reported on its own rather than counted as a false positive, "
+               "because the reference cannot say whether it is wrong or absent "
+               "from the truth set.",
+    },
+    "TP bp": {"what": "Plasmid-reference bases covered by a predicted-plasmid alignment.",
+              "why": "The numerator of both precision and recall."},
+    "FP bp": {"what": "Chromosome-reference bases covered by a predicted-plasmid alignment.",
+              "why": "Chromosomal contamination, counted in bases."},
+    "FN bp": {"what": "True plasmid-reference bases no predicted alignment covers.",
+              "why": "Sequence the method missed."},
+    "AMR recovery": {
+        "what": "Fraction of curated AMR genes recovered above the configured threshold.",
+        "why": "Only available when curated AMR truth was supplied; otherwise it "
+               "reads as unavailable rather than zero.",
+    },
+    "Circular truth recovery": {
+        "what": "Fraction of circular reference plasmids recovered above the threshold.",
+        "why": "It does not establish that the predicted sequence is closed. "
+               "Nothing in this report does.",
+    },
+    "Collinear fraction": {
+        "what": "Aligned bases that keep reference order and orientation, over "
+                "all aligned bases.",
+        "why": "The quantity behind structural concordance.",
+    },
+    "Bin F1": {
+        "what": "Harmonic mean of bin precision and bin recall, over predicted bins.",
+        "why": "Base F1 asks whether the right bases were called. Bin F1 asks "
+               "whether they were grouped into the right plasmids.",
+    },
+}
+
+# Terms whose label in the interface differs from the glossary key.
+GLOSSARY_ALIASES = {
+    "F1": "Base F1", "Mean F1": "Base F1", "Median F1": "Base F1",
+    "Precision": "Base precision", "Mean precision": "Base precision",
+    "Recall": "Base recall", "Mean base recall": "Base recall",
+    "Struct. Concord.": "Structural concordance",
+    "Split events": "Split", "Merge events": "Merge",
+    "Contamination fraction": "Chromosomal contamination",
+    "Mean plasmid recall": "Plasmid recall",
+}
+
+
+def glossary_tooltip(term):
+    """The full explanation, for a title attribute."""
+    entry = GLOSSARY.get(term)
+    if not entry:
+        return ""
+    return f"{term}. {entry['what']} Why it matters: {entry['why']}"
+
+
+def glossary_section():
+    """Render the keys section from the single glossary."""
+    rows = "".join(
+        f"<div class='term-card'><h3>{esc(term)}</h3>"
+        f"<p class='what'>{esc(entry['what'])}</p>"
+        f"<p class='why'><strong>Why it matters.</strong> {esc(entry['why'])}</p></div>"
+        for term, entry in GLOSSARY.items())
+    return rows
+
+
+# Grade bands. Stated here rather than buried in the renderer, because a grade
+# is an opinion and the reader is entitled to see the rule that produced it.
+GRADE_BANDS = ((0.90, "A"), (0.80, "B"), (0.65, "C"), (0.45, "D"))
+
+# What the grade is made of, and how much each part counts. Every component is
+# measured; none is a proxy for another. Weights sum to 1.
+GRADE_COMPONENTS = (
+    ("mean_f1", 0.40, "Base F1", False),
+    ("mean_plasmid_recall", 0.25, "Plasmid recall", False),
+    ("contamination", 0.20, "Chromosomal contamination", True),
+    ("completion", 0.15, "Runs completed", False),
+)
+
+
+def grade_for(value):
+    for threshold, letter in GRADE_BANDS:
+        if value >= threshold:
+            return letter
+    return "E"
+
+
+def report_cards(leaderboard, scores):
+    """A grade per method, from measured metrics only.
+
+    Deliberately not a verdict: it compresses four measurements a reader would
+    otherwise have to weigh by hand, and every component is shown beside it so
+    the compression can be undone.
+    """
+    contamination = defaultdict(list)
+    for row in scores:
+        true_bp = optional_number(row.get("true_plasmid_bp")) or 0
+        false_bp = optional_number(row.get("FP_bp")) or 0
+        total = true_bp + false_bp
+        if total:
+            contamination[row["tool"]].append(false_bp / total)
+
+    cards = []
+    for row in leaderboard:
+        tool = row["tool"]
+        scored = number(row.get("n_samples")) or 0
+        completed = number(row.get("n_completed")) or 0
+        dirt = contamination.get(tool, [])
+        parts = {
+            "mean_f1": optional_number(row.get("mean_f1")),
+            "mean_plasmid_recall": optional_number(row.get("mean_plasmid_recall")),
+            "contamination": (sum(dirt) / len(dirt)) if dirt else None,
+            "completion": (completed / scored) if scored else None,
+        }
+        # A component that was never measured is dropped and the remaining
+        # weights are renormalised, rather than counted as a zero.
+        total_weight, running = 0.0, 0.0
+        for key, weight, _label, invert in GRADE_COMPONENTS:
+            value = parts[key]
+            if value is None:
+                continue
+            running += weight * ((1 - value) if invert else value)
+            total_weight += weight
+        composite = (running / total_weight) if total_weight else None
+        cards.append({
+            "tool": tool,
+            "grade": grade_for(composite) if composite is not None else "-",
+            "composite": composite,
+            "parts": parts,
+            "measured": total_weight,
+        })
+    return cards
+
+
+def guided_findings(leaderboard, cards, scores, status_counts):
+    """Findings a reader should look at, each pointing at where to look.
+
+    The report already interprets its own tables; this turns those readings
+    into somewhere to click, because a finding the reader cannot act on is
+    just more text.
+    """
+    findings = []
+    if not leaderboard:
+        return findings
+
+    best = leaderboard[0]
+    best_f1 = optional_number(best.get("mean_f1"))
+    if best_f1 is not None:
+        low = optional_number(best.get("f1_ci_low"))
+        high = optional_number(best.get("f1_ci_high"))
+        spread = (f" Its 95% interval spans {low:.3f} to {high:.3f}"
+                  if low is not None and high is not None else "")
+        second = optional_number(leaderboard[1].get("mean_f1")) if len(leaderboard) > 1 else None
+        margin = (f", {best_f1 - second:+.3f} ahead of {esc(leaderboard[1]['tool'])}"
+                  if second is not None else "")
+        findings.append({
+            "tone": "good", "label": "Highest Base F1",
+            "text": f"{esc(best['tool'])} leads on mean Base F1 at {best_f1:.3f}{margin}."
+                    f"{spread}. A lead on few samples is not evidence of superiority: "
+                    "the paired comparison section carries the interval and permutation evidence.",
+            "target": "#statistics", "action": "See the paired evidence",
+        })
+
+    dirty = [c for c in cards if (c["parts"]["contamination"] or 0) > 0.05]
+    if dirty:
+        worst = max(dirty, key=lambda c: c["parts"]["contamination"])
+        findings.append({
+            "tone": "caution", "label": "Chromosomal contamination",
+            "text": f"{esc(worst['tool'])} carries {worst['parts']['contamination'] * 100:.1f}% "
+                    "chromosome sequence among its truth-mapped bases. For AMR work this is the "
+                    "error that changes the conclusion, because a chromosomal gene reported as "
+                    "plasmid-borne reads as transmissible.",
+            "target": "#scores", "action": "Open the score table",
+        })
+
+    missed = [row for row in leaderboard
+              if (optional_number(row.get("mean_plasmid_recall")) or 1) < 0.9
+              and (optional_number(row.get("mean_f1")) or 0) > 0.8]
+    if missed:
+        row = missed[0]
+        findings.append({
+            "tone": "caution", "label": "High F1, missed plasmids",
+            "text": f"{esc(row['tool'])} scores {optional_number(row['mean_f1']):.3f} on Base F1 but "
+                    f"recovers only {optional_number(row['mean_plasmid_recall']):.0%} of truth "
+                    "plasmids. Base F1 counts bases, so one large recovered replicon can mask "
+                    "several small missed ones.",
+            "target": "#pb-explorer-view", "action": "Inspect the tracks",
+        })
+
+    failed = status_counts.get("failed", 0)
+    if failed:
+        findings.append({
+            "tone": "caution", "label": "Runs that did not complete",
+            "text": f"{failed} run(s) failed and are excluded from every mean rather than "
+                    "counted as zero. A method that fails often can still rank well on the "
+                    "runs it finished.",
+            "target": "#health", "action": "Open execution health",
+        })
+    return findings
+
+
+def summary_section(leaderboard, cards, findings, scores, status_counts, metadata):
+    """The headline numbers, the grades, and what to look at first."""
+    if not leaderboard:
+        return ""
+    samples = len({row["sample"] for row in scores})
+    plasmids = sum(number(row.get("true_plasmid_count")) or 0
+                   for row in scores if row["tool"] == leaderboard[0]["tool"])
+    best = leaderboard[0]
+
+    stats = [
+        ("Methods compared", str(len(leaderboard)), "Tools with at least one scored run."),
+        ("Isolates", str(samples), "Samples with a truth set and at least one scored method."),
+        ("Truth plasmids", str(int(plasmids)), "Reference plasmids the methods were measured against."),
+        ("Leading method", esc(best["tool"]),
+         f"Highest mean Base F1 ({optional_number(best.get('mean_f1')) or 0:.3f})."),
+        ("Runs not completed", str(status_counts.get("failed", 0) + status_counts.get("skipped", 0)),
+         "Excluded from every mean rather than scored as zero."),
+    ]
+    stat_html = "".join(
+        f"<div class='sum-stat' title='{esc(hint)}'><small>{esc(label)}</small>"
+        f"<strong>{value}</strong></div>" for label, value, hint in stats)
+
+    grade_html = "".join(
+        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
+        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
+            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
+            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
+            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
+                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
+            contam=("not measured" if c["parts"]["contamination"] is None
+                    else f"{c['parts']['contamination']:.1%}"),
+            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
+        for c in cards) if False else "".join(
+        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
+        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
+            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
+            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
+            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
+                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
+            contam=("not measured" if c["parts"]["contamination"] is None
+                    else f"{c['parts']['contamination']:.1%}"),
+            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
+        for c in cards)
+
+    find_html = "".join(
+        f"<li class='finding {f['tone']}'><span class='flabel'>{esc(f['label'])}</span>"
+        f"<p>{f['text']}</p><a href='{f['target']}' class='goto'>{esc(f['action'])} &rarr;</a></li>"
+        for f in findings) or "<li class='finding'><p>No finding stood out from these tables.</p></li>"
+
+    return (
+        "<section id='summary'><h2>Summary</h2>"
+        "<p class='lead'>The headline numbers, a grade per method, and what to look at first. "
+        "Every figure here is repeated in full further down; this is the entry point, not a "
+        "second source.</p>"
+        f"<div class='sum-stats'>{stat_html}</div>"
+        "<h3>Report card</h3>"
+        "<p class='lead'>A reading aid, not an acceptance threshold. The grade is a weighted "
+        "composite of Base F1 (40%), plasmid recall (25%), freedom from chromosomal "
+        "contamination (20%) and completed runs (15%); A &ge;0.90, B &ge;0.80, C &ge;0.65, "
+        "D &ge;0.45. A component that was not measured is dropped and the rest reweighted, "
+        "never counted as zero. The components are shown so the grade can be taken apart.</p>"
+        "<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Grade</th>"
+        "<th>Base F1</th><th>Plasmid recall</th><th>Chromosomal contamination</th>"
+        f"<th>Runs completed</th></tr></thead><tbody>{grade_html}</tbody></table></div>"
+        "<h3>Start here</h3>"
+        f"<ul class='findings'>{find_html}</ul>"
+        "</section>")
+
+
+def accessibility_script():
+    """A colour-blind safe palette and a print form, both opt-in.
+
+    Green against red is the least distinguishable pair for the commonest forms
+    of colour vision deficiency, and it is the pair this report leans on. The
+    safe palette swaps it for blue against orange, which separates under
+    deuteranopia and protanopia and still reads as good against bad.
+
+    Colour is never the only channel here -- heatmap cells print their value,
+    grades print a letter, segments carry a label -- so the switch changes hue
+    only, and nothing depends on it.
+    """
+    return """<style>
+#pb-prefs{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 18px;
+  font:13px Arial,sans-serif}
+#pb-prefs button{font:13px Arial,sans-serif;padding:7px 13px;border:1px solid var(--line);
+  background:#fff;border-radius:6px;cursor:pointer;color:var(--ink)}
+#pb-prefs button:hover{background:#eef4ef;border-color:var(--green)}
+#pb-prefs button[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green)}
+#pb-prefs .note{color:var(--muted);font-size:12.5px}
+/* Blue against orange: separable for deuteranopia and protanopia. */
+:root[data-cvd="1"]{--green:#0b62a4;--lime:#d8e7f3;--amber:#a85a00;--red:#8a4500}
+:root[data-cvd="1"] .score.high{color:#0b62a4}
+:root[data-cvd="1"] .score.medium{color:#a85a00}
+:root[data-cvd="1"] .score.low{color:#7a3c00}
+:root[data-cvd="1"] .f1-bar i{background:#0b62a4}
+:root[data-cvd="1"] .f1-bar.medium i{background:#c07000}
+:root[data-cvd="1"] .f1-bar.low i{background:#7a3c00}
+:root[data-cvd="1"] .grade-a{background:#dbe9f5;color:#08436f;border-color:#0b62a4}
+:root[data-cvd="1"] .grade-b{background:#e6eef6;color:#0b4d7d;border-color:#3f87bd}
+:root[data-cvd="1"] .grade-c{background:#f7e8d5;color:#7a3c00;border-color:#a85a00}
+:root[data-cvd="1"] .grade-d{background:#f2ddc4;color:#63300a;border-color:#8a4500}
+:root[data-cvd="1"] .grade-e{background:#e8d6c4;color:#4a2408;border-color:#63300a}
+:root[data-cvd="1"] .completed,:root[data-cvd="1"] .reused{background:#dbe9f5;color:#08436f}
+:root[data-cvd="1"] .failed{background:#f2ddc4;color:#63300a}
+:root[data-cvd="1"] .skipped{background:#f7e8d5;color:#7a3c00}
+:root[data-cvd="1"] .finding.good{border-left-color:#0b62a4}
+:root[data-cvd="1"] .finding.caution{border-left-color:#a85a00}
+@media print{
+  #pb-prefs,.nav,.controls,#pb-tabs{display:none!important}
+  body{background:#fff}
+  header{background:#fff!important;color:#000!important;border-bottom:2px solid #000}
+  header p{color:#333!important}
+  main{max-width:none;padding:0}
+  section{break-inside:avoid-page;page-break-inside:avoid;margin:0 0 18px}
+  h2{break-after:avoid-page;page-break-after:avoid}
+  .panel,.chart-card,.term-card,.sum-stat,.finding{border:1px solid #999!important;box-shadow:none!important}
+  table{font-size:10pt} th{background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Every pane of a tabbed group prints, or the export loses six of seven. */
+  .pb-tab[hidden]{display:block!important}
+  .pb-tab{break-before:page;page-break-before:always}
+  details{display:block} details>summary{font-weight:bold}
+  details:not([open])>*:not(summary){display:block!important}
+  iframe{break-inside:avoid;page-break-inside:avoid}
+  a[href^="#"]::after{content:""}
+  .muted,.lead{color:#333!important}
+}
+</style><script>
+(()=>{const root=document.documentElement;
+const bar=document.createElement('div');bar.id='pb-prefs';
+bar.innerHTML='<button type="button" id="pb-cvd" aria-pressed="false" '
+ +'title="Swap the green/red status palette for blue/orange, which stays separable with '
+ +'deuteranopia or protanopia. Every value is also printed as text, so nothing depends on colour.">'
+ +'Colour-blind safe palette</button>'
+ +'<button type="button" id="pb-print" title="Open the print dialogue. Every tab, every collapsed '
+ +'section and every table is expanded first, so the printed copy carries what the screen hides.">'
+ +'Print / save as PDF</button>'
+ +'<span class="note">Colour is never the only channel: cells print their value, grades print a letter.</span>';
+const main=document.querySelector('main');
+const first=main.querySelector('section');
+if(first)main.insertBefore(bar,first);
+
+function tellFrames(on){document.querySelectorAll('iframe').forEach(f=>{
+ try{f.contentWindow.postMessage({pbPalette:on?'cvd':'default'},'*')}catch(e){}})}
+
+function setCvd(on){root.dataset.cvd=on?'1':'';
+ const b=document.getElementById('pb-cvd');b.setAttribute('aria-pressed',String(on));
+ try{localStorage.setItem('pb-cvd',on?'1':'0')}catch(e){}
+ tellFrames(on)}
+
+document.getElementById('pb-cvd').addEventListener('click',function(){
+ setCvd(root.dataset.cvd!=='1')});
+let saved=null;try{saved=localStorage.getItem('pb-cvd')}catch(e){}
+if(saved==='1')setCvd(true);
+// A frame that loads after the preference was restored still has to hear it.
+document.querySelectorAll('iframe').forEach(f=>f.addEventListener('load',
+ ()=>setTimeout(()=>tellFrames(root.dataset.cvd==='1'),150)));
+
+document.getElementById('pb-print').addEventListener('click',function(){
+ // Print CSS can reveal a hidden pane, but a canvas drawn at zero width stays
+ // blank, so the panes are shown and given a frame to lay out and redraw.
+ document.querySelectorAll('.pb-tab[hidden]').forEach(p=>{p.dataset.wasHidden='1';p.hidden=false});
+ document.querySelectorAll('details:not([open])').forEach(d=>{d.dataset.wasShut='1';d.open=true});
+ window.dispatchEvent(new Event('resize'));
+ setTimeout(()=>{window.print();
+  document.querySelectorAll('.pb-tab[data-was-hidden]').forEach(p=>{p.hidden=true;delete p.dataset.wasHidden});
+  document.querySelectorAll('details[data-was-shut]').forEach(d=>{d.open=false;delete d.dataset.wasShut});
+  window.dispatchEvent(new Event('resize'))},400)});
+})();
+</script>"""
+
+
 def read_tool_versions(path):
     """Map report tool labels to versions recorded at the time of the run.
 
@@ -956,6 +1393,38 @@ refresh();})();
 </script>"""
 
 
+def glossary_script():
+    """Attach the glossary to every occurrence of a term in the report.
+
+    A definition on a reference page at the foot of the document is not an
+    explanation: the reader meets the term in a column header. This marks each
+    occurrence with the definition and the reason it matters, so hovering a
+    header answers the question where it is asked.
+    """
+    entries = {term: glossary_tooltip(term) for term in GLOSSARY}
+    for alias, term in GLOSSARY_ALIASES.items():
+        entries[alias] = glossary_tooltip(term)
+    payload = json.dumps(entries, separators=(",", ":")).replace("<", "\\u003c")
+    return ("<style>.term{border-bottom:1px dotted var(--muted);cursor:help}"
+            "th .term{border-bottom-color:#8a9a90}</style>"
+            f"<script id='pb-glossary' type='application/json'>{payload}</script><script>"
+            "(()=>{const G=JSON.parse(document.getElementById('pb-glossary').textContent);"
+            "const keys=Object.keys(G).sort((a,b)=>b.length-a.length);"
+            "const norm=s=>s.replace(/\\s+/g,' ').trim().replace(/[:\u2014-]$/,'').trim();"
+            "function mark(el){const t=norm(el.textContent);"
+            "for(const k of keys){if(t===k||t.toLowerCase()===k.toLowerCase()){"
+            "el.title=G[k];if(!el.querySelector('.term'))"
+            "el.innerHTML='<span class=\"term\">'+el.innerHTML+'</span>';return true}}return false}"
+            "function sweep(root){root.querySelectorAll('th,.metric small,label,option,.stat-lab')"
+            ".forEach(el=>{if(el.dataset.termed)return;el.dataset.termed='1';mark(el)})}"
+            "sweep(document);"
+            "if(window.MutationObserver){let queued=false;"
+            "new MutationObserver(()=>{if(queued)return;queued=true;"
+            "requestAnimationFrame(()=>{queued=false;sweep(document)})})"
+            ".observe(document.body,{childList:true,subtree:true})}"
+            "})();</script>")
+
+
 def evidence_explorer_section(project_root, scores, results_dir, vendor_html, panels_html=""):
     """Embed the vendored reconstruction evidence explorer.
 
@@ -1496,8 +1965,12 @@ def main():
     best_value = esc(best["tool"]) if best else "No scored tool"
     best_f1 = esc(best["mean_f1"]) if best else "-"
     insight_notes, insight_tone = interpretation(leaderboard, status_counts)
+    cards = report_cards(leaderboard, scores)
+    findings = guided_findings(leaderboard, cards, scores, status_counts)
+    summary_html = summary_section(leaderboard, cards, findings, scores, status_counts, metadata)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(leaderboard)
+    glossary_cards = glossary_section()
     vendor_html = vendor_assets(args.project_root)
     visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
                    + record_dotplot_script() + context_visual_script() + evidence_selection_script()
@@ -1505,6 +1978,8 @@ def main():
                    + bin_flow_script() + explorer_navigation_script()
                    + agreement_and_comparison_script()
                    + explorer_chrome_script()
+                   + glossary_script()
+                   + accessibility_script()
                    + lazy_visualization_script())
     explorer_html = evidence_explorer_section(args.project_root, scores, out.parent,
                                               vendor_html, visual_html)
@@ -1516,11 +1991,12 @@ def main():
 {vendor_html}
 <style>
 :root{{--ink:#17231d;--muted:#627067;--line:#d9e1da;--paper:#f6f8f4;--card:#fff;--green:#0c6b4f;--lime:#dcefdc;--amber:#9a5b00;--red:#a53028;}}
-*{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 28px}} .nav a{{color:var(--green);border:1px solid var(--line);background:#fff;padding:7px 10px;text-decoration:none;font-size:12px;font-weight:bold}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
+*{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 28px}} .nav a{{color:var(--green);border:1px solid var(--line);background:#fff;padding:7px 10px;text-decoration:none;font-size:12px;font-weight:bold}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}}  .sum-stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0 26px}} .sum-stat{{background:#fff;border:1px solid var(--line);border-top:4px solid var(--green);padding:14px 16px}} .sum-stat small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.08em}} .sum-stat strong{{display:block;font-size:24px;margin-top:5px;line-height:1.15}} .grade{{display:inline-block;min-width:30px;text-align:center;font-weight:bold;font-size:15px;padding:3px 9px;border-radius:5px;font-family:Arial,sans-serif}} .grade-a{{background:#dcefdc;color:#07573e;border:2px solid #17805a}} .grade-b{{background:#e4eef8;color:#17457e;border:2px solid #2563c9}} .grade-c{{background:#f6ead1;color:#765000;border:2px solid #a35c05}} .grade-d{{background:#f7ddda;color:#8c2018;border:2px solid #b3261e}} .grade-e{{background:#efe3e1;color:#5f1a14;border:2px solid #7a1b14}} .findings{{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:10px}} .finding{{background:#fff;border:1px solid var(--line);border-left:5px solid var(--muted);padding:14px 18px}} .finding.good{{border-left-color:var(--green)}} .finding.caution{{border-left-color:var(--amber)}} .finding .flabel{{font:bold 11px Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}} .finding p{{margin:5px 0 8px;font-size:14px}} .finding .goto{{font:bold 13px Arial,sans-serif;color:var(--green);text-decoration:none}} .finding .goto:hover{{text-decoration:underline}} .term-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}} .term-card{{background:#fff;border:1px solid var(--line);border-left:4px solid var(--green);padding:14px 16px}} .term-card h3{{margin:0 0 6px;font-size:15px}} .term-card .what{{margin:0 0 8px;font-size:13.5px}} .term-card .why{{margin:0;font-size:13px;color:var(--muted)}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
 </style></head><body>
 <header><h1>PlasBench plasmid reconstruction benchmark</h1><p>Detailed run report · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
 <main><nav><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
 <div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: mean F1</small><strong>{best_f1}</strong><small>{best_value} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
+{summary_html}
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
 <section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. Where at least five shared samples exist, the statistics section adds paired confidence intervals and permutation evidence with Holm adjustment.</p><ul>{insight_html}</ul></div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
@@ -1534,7 +2010,7 @@ def main():
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed or unavailable tool is excluded from F1 aggregation. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
 <section id='samples'><h2>Sample drill-down</h2><p class='lead'>Open a sample to compare every completed tool side-by-side.</p>{''.join(sample_sections) or "<p class='muted'>No samples were found.</p>"}</section>
-<section id='keys'><h2>Keys, legend, and metric definitions</h2><div class='legend'><span><i style='background:#087250'></i>High F1: ≥0.90</span><span><i style='background:#c68221'></i>Medium F1: 0.70–0.89</span><span><i style='background:#bd4b42'></i>Low F1: &lt;0.70</span><span><i style='background:#2c7a62'></i>Precision chart bar</span><span><i style='background:#d18b2a'></i>Recall chart bar</span></div><div class='method'><p><strong>TP (true positive) bp:</strong> plasmid-reference bases covered by a predicted-plasmid alignment.</p><p><strong>FP (false positive) bp:</strong> chromosome-reference bases covered by a predicted-plasmid alignment; this is chromosomal contamination.</p><p><strong>FN (false negative) bp:</strong> true plasmid-reference bases not covered by a predicted-plasmid alignment.</p><p><strong>Precision:</strong> TP / (TP + FP). Higher means less chromosome sequence among the claimed plasmid sequence.</p><p><strong>Recall / completeness:</strong> TP / (TP + FN). Higher means more of the true plasmid sequence was recovered.</p><p><strong>AMR recovery:</strong> fraction of supplied curated AMR genes recovered above the configured threshold.</p><p><strong>Circular-truth recovery:</strong> fraction of circular reference plasmids recovered above the configured threshold. It does not establish circularity or closure of a predicted sequence.</p><p><strong>F1:</strong> harmonic mean of precision and recall, from 0 (worst) to 1 (best). The color bands are visual aids, not acceptance thresholds.</p><p><strong>Unmapped predicted bp:</strong> predicted-plasmid bases with no alignment to any labelled reference sequence. They are reported separately, not added to FP.</p><p><strong>Scored / completed / failed / skipped:</strong> scored is the number contributing to the metric; completed and reused are valid tool results; failed and skipped are exposed for coverage transparency.</p></div></section>
+<section id='keys'><h2>Keys, legend, and metric definitions</h2><p class='lead'>Every term the report uses, what it measures, and why it matters. The same text appears as a tooltip wherever the term is used, so this page is a reference rather than the only place an explanation exists.</p><div class='legend'><span><i style='background:#087250'></i>High F1: &ge;0.90</span><span><i style='background:#c68221'></i>Medium F1: 0.70&ndash;0.89</span><span><i style='background:#bd4b42'></i>Low F1: &lt;0.70</span><span class='muted'>Bands are visual aids, not acceptance thresholds.</span></div><div class='term-grid'>{glossary_cards}</div></section>
 <section id='files'><h2>Artifact explorer</h2><p class='lead'>All files created or consumed by this project are listed below. Select a filename to open or download it; directory branches can be expanded independently.</p>{''.join(explorers)}</section>
 <section id='method'><h2>Scoring method and interpretation</h2><div class='method'><p><strong>Truth:</strong> sequences in each complete reference assembly are labelled plasmid or chromosome from the NCBI sequence report.</p><p><strong>Prediction:</strong> each tool’s standardized predicted-plasmid FASTA is aligned to the reference using minimap2.</p><p><strong>Metrics:</strong> covered plasmid reference bases are TP; covered chromosome reference bases are FP; uncovered plasmid bases are FN. Precision measures contamination control; recall measures plasmid completeness; F1 balances both.</p><p><strong>Run integrity:</strong> failed tool execution, failed adaptation, and mapping failure do not become zero-score observations. They appear in execution health and reduce the completed/scored counts shown in the leaderboard.</p></div></section>
 <footer>Inputs: <a href='scores.tsv'>scores.tsv</a>, <a href='tool_status.tsv'>tool_status.tsv</a>, <a href='benchmark.leaderboard.tsv'>benchmark.leaderboard.tsv</a>. Report location: {esc(out.name)}.</footer></main>
