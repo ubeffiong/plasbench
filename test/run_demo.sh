@@ -105,6 +105,7 @@ python3 "$PY/build_html_report.py" \
     --sample-sheet "$SAMPLES" \
     --recommendations "$DEMO/benchmark.recommendations.tsv" \
     --recommendation-validation "$DEMO/benchmark.recommendation_validation.tsv" \
+    --manifest "$DEMO/run_manifest.json" \
     --out "$DEMO/benchmark.report.html"
 
 echo
