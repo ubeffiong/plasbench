@@ -177,6 +177,25 @@ def main():
     assert "-webkit-text-fill-color: transparent" not in page,         "gradient text fill is unreadable on the light surface"
     assert "color: #000;" in page, "dashboard heading must be black"
 
+    # Capabilities restored after the consolidation regression.
+    for needed in ("vq-nav", "vq-q", "vq-rows", "pointerdown", "vq-next-ev", "vq-sankey"):
+        assert needed in page, f"restored explorer capability missing: {needed}"
+    # Per-region agreement is a support count, never a correctness claim.
+    for needed in ("vq-agree", "Method agreement across",
+                   "Agreement is shared support, not evidence of correctness"):
+        assert needed in page, f"tool agreement affordance missing: {needed}"
+    # Baseline versus comparator, with the small-n caveat attached.
+    for needed in ("vq-base", "vq-comp", "is not evidence of superiority"):
+        assert needed in page, f"method comparison affordance missing: {needed}"
+    # Accessibility and interoperability gaps closed.
+    assert "prefers-reduced-motion" in page, "reduced-motion support missing"
+    assert "vq-bed" in page, "BED export missing"
+    assert "Arrow keys pan" in page, "tracks must be keyboard reachable"
+    # Full segment and recovery vocabularies.
+    for needed in ("seg-duplicated", "unsupported_join", "wrong_plasmid",
+                   "complete_discordant", "chromosomal_contam"):
+        assert needed in page, f"vocabulary term missing: {needed}"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 

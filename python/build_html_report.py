@@ -358,26 +358,24 @@ def visual_quality_section(scores, status, results_dir, report_path=None):
     payload = json.dumps({"matrix": matrix, "visualizations": visualizations,
                           "visualization_sources": external, "staging": staging},
                          separators=(",", ":")).replace("<", "\\u003c")
-    return """<section id='visual-quality'><h2>Visual reconstruction quality</h2>
-<p class='lead'>Click a heatmap cell to follow the result from cohort quality to one truth plasmid. The explorer uses retained primary PAF blocks on truth-reference coordinates; it is not a raw nucleotide alignment or an independent structural-validation claim.</p>
-<div class='controls'><label>Metric <select id='vq-metric'><option value='f1'>Base F1</option><option value='precision'>Precision</option><option value='recall'>Recall</option><option value='plasmid_recall'>Plasmid recall</option><option value='bin_f1'>Bin F1</option><option value='contamination'>Chromosome contamination</option><option value='unmapped'>Unmapped predicted bp</option><option value='status'>Execution status</option></select></label><span id='vq-note' class='count'></span></div><div class='panel'><div id='vq-heatmap'></div></div>
+    return """<div id='cohort-evidence-explorer'><h3>Reconstruction evidence explorer</h3>
+<p class='lead'>This detailed evidence panel is part of the interactive cohort dashboard. Select a sample and method here to follow a dashboard finding to one truth plasmid. It uses retained primary PAF blocks on truth-reference coordinates; it is not a raw nucleotide alignment or an independent structural-validation claim.</p>
 <div class='controls'><label>Sample <select id='vq-sample'></select></label><label>Tool <select id='vq-tool'></select></label><label>Truth plasmid <select id='vq-plasmid'></select></label><button id='vq-fit' type='button'>Fit</button><button id='vq-in' type='button'>Zoom in</button><button id='vq-out' type='button'>Zoom out</button><label>Start <input id='vq-start' type='number' min='0'></label><label>End <input id='vq-end' type='number' min='1'></label><a id='vq-download' class='download-button' download>Download JSON</a></div>
 <div class='panel'><div id='vq-tracks' class='muted'>Choose a sample with visualization data.</div><div id='vq-detail' class='insight neutral'>Click a coloured block to inspect its alignment evidence. Mouse-wheel over tracks zooms the selected reference interval.</div></div>
-<details class='sample'><summary><strong>Legend and limits</strong><span>how to interpret this view</span></summary><div class='method'><p><strong>Heatmap:</strong> green means higher recovery for F1, precision, recall, plasmid recall, and bin F1. For contamination and unmapped bases, green means lower. Grey is unavailable; failed and skipped states are not turned into zero.</p><p><strong>Tracks:</strong> green blocks align in the forward orientation; purple blocks align in reverse. White is not recovered by the displayed blocks. Blue triangles mark curated AMR features. The JSON records omitted blocks when a display cap applies.</p><p><strong>AliView-like drill-down:</strong> use zoom, coordinates, and block clicks to investigate a region. Whole-plasmid base letters are deliberately not rendered because they are slow and misleading without a region-specific multiple alignment.</p></div></details>
+<details class='sample'><summary><strong>Legend and limits</strong><span>how to interpret this dashboard evidence</span></summary><div class='method'><p><strong>Sample-Tool Heatmap:</strong> the dashboard canvas is the single cohort matrix. Its metric selector, filters, tooltip, clustering, keyboard navigation, drilldown modal, and exports apply there. Grey is unavailable; failed and skipped states are never converted to zero.</p><p><strong>Tracks:</strong> green blocks align in the forward orientation; purple blocks align in reverse. White is not recovered by the displayed blocks. Blue triangles mark curated AMR features. The JSON records omitted blocks when a display cap applies.</p><p><strong>AliView-like drill-down:</strong> use zoom, coordinates, and block clicks to investigate a region. Whole-plasmid base letters are deliberately not rendered because they are slow and misleading without a region-specific multiple alignment.</p></div></details>
 <script id='vq-data' type='application/json'>__PAYLOAD__</script><script>
 (()=>{const d=JSON.parse(document.getElementById('vq-data').textContent),m=d.matrix,v=d.visualizations,$=id=>document.getElementById(id),samples=[...new Set(m.map(x=>x.sample))].sort(),tools=[...new Set(m.map(x=>x.tool))].sort();let range=null;
-const select=(e,items)=>e.innerHTML=items.map(x=>`<option value="${x}">${x}</option>`).join(''), fmt=(x,k)=>x==null?'–':k==='status'?x:k==='unmapped'?Math.round(x).toLocaleString():x.toFixed(3), colour=(x,k)=>{if(x==null)return '#d9ddda';if(k==='status')return x==='failed'?'#bd4b42':x==='skipped'?'#8a6d3b':x==='reused'?'#4c769d':'#16805a';let a=x;if(k==='contamination'||k==='unmapped'){let z=m.map(r=>r[k]).filter(y=>y!=null),top=Math.max(...z,1);a=1-Math.min(1,x/top)}return a>=.9?'#087250':a>=.7?'#78a85c':a>=.4?'#d18b2a':'#bd4b42'};
-function heat(){let k=$('vq-metric').value,t='<table class="sortable"><thead><tr><th>Sample</th>'+tools.map(x=>`<th>${x}</th>`).join('')+'</tr></thead><tbody>';samples.forEach(s=>{t+='<tr><td><strong>'+s+'</strong></td>';tools.forEach(q=>{let r=m.find(x=>x.sample===s&&x.tool===q),x=r?(k==='status'?r.status:r[k]):null;t+=`<td class="vq-cell" data-s="${s}" data-t="${q}" title="${s} | ${q} | ${k}: ${fmt(x,k)}" style="background:${colour(x,k)}">${fmt(x,k)}</td>`});t+='</tr>'});$('vq-heatmap').innerHTML=t+'</tbody></table>';$('vq-note').textContent='Click a cell for per-plasmid tracks.';document.querySelectorAll('.vq-cell').forEach(e=>e.onclick=()=>{$('vq-sample').value=e.dataset.s;setTools();$('vq-tool').value=e.dataset.t;setPlasmids();draw()})}
+const select=(e,items)=>e.innerHTML=items.map(x=>`<option value="${x}">${x}</option>`).join('');
 function setTools(){select($('vq-tool'),tools.filter(t=>m.some(r=>r.sample===$('vq-sample').value&&r.tool===t)))}function setPlasmids(){let a=v[$('vq-sample').value];select($('vq-plasmid'),a?Object.keys(a.truth_plasmids).sort():[])}
 function draw(){let s=$('vq-sample').value,t=$('vq-tool').value,p=$('vq-plasmid').value,a=v[s];if(!a||!p){$('vq-tracks').textContent='No visualization data. Re-run stage 5 after retaining PAF scoring alignments.';return}let len=a.truth_plasmids[p].length,[lo,hi]=range||[0,len];lo=Math.max(0,Math.min(lo,len-1));hi=Math.max(lo+1,Math.min(hi,len));range=[lo,hi];$('vq-start').value=Math.floor(lo);$('vq-end').value=Math.ceil(hi);$('vq-download').href=s+'/visualization/alignment_blocks.json';let names=Object.keys(a.tools),scale=x=>180+(x-lo)/(hi-lo)*880,svg=`<svg viewBox="0 0 1100 ${55+names.length*38}"><text x="180" y="15" font-size="12">${p}: ${Math.floor(lo).toLocaleString()}–${Math.ceil(hi).toLocaleString()} / ${len.toLocaleString()} bp</text>`;names.forEach((name,i)=>{let y=40+i*38,z=a.tools[name],rec=z.plasmid_recovery[p]||{},bs=z.blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi);svg+=`<text x="4" y="${y+7}" font-size="12">${name}</text><text x="105" y="${y+7}" font-size="11">${((rec.completeness||0)*100).toFixed(1)}%</text><rect x="180" y="${y-8}" width="880" height="16" fill="#f7f8f5" stroke="#d6ddd5"/>`;bs.forEach((b,i)=>{let x=Math.max(180,scale(b.target_start)),r=Math.min(1060,scale(b.target_end));svg+=`<rect class="vq-block" data-n="${name}" data-i="${i}" x="${x}" y="${y-8}" width="${Math.max(1,r-x)}" height="16" fill="${b.strand==='-'?'#7f5aa2':'#16805a'}"><title>${b.record_id}</title></rect>`})});a.amr_features.filter(f=>f.sequence_id===p&&f.start>=lo&&f.start<=hi).forEach(f=>{let x=scale(f.start);svg+=`<path d="M${x} 25 l5 -9 l5 9z" fill="#2275ad"><title>${f.label}</title></path>`});svg+='</svg>';$('vq-tracks').innerHTML=svg+'<p class="muted">Displayed primary blocks; '+names.map(n=>n+': '+a.tools[n].blocks_omitted+' omitted').join(' · ')+'</p>';document.querySelectorAll('.vq-block').forEach(e=>e.onclick=()=>{let b=a.tools[e.dataset.n].blocks.filter(x=>x.target===p&&x.target_end>lo&&x.target_start<hi)[e.dataset.i];$('vq-detail').textContent=`${e.dataset.n} | ${b.record_id} | query ${b.query_start}-${b.query_end}/${b.query_length} | reference ${b.target_start}-${b.target_end} | ${b.strand} strand | identity ${(100*b.matches/Math.max(1,b.block_length)).toFixed(2)}% | MAPQ ${b.mapq}`})}
-$('vq-metric').onchange=heat;$('vq-sample').onchange=()=>{range=null;setTools();setPlasmids();draw()};$('vq-tool').onchange=draw;$('vq-plasmid').onchange=()=>{range=null;draw()};$('vq-start').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-end').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-fit').onclick=()=>{range=null;draw()};$('vq-in').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])/2;range=[c-z/2,c+z/2];draw()}};$('vq-out').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])*2;range=[c-z/2,c+z/2];draw()}};$('vq-tracks').addEventListener('wheel',e=>{if(!range)return;e.preventDefault();let c=(range[0]+range[1])/2,z=(range[1]-range[0])*(e.deltaY<0?.7:1.4);range=[c-z/2,c+z/2];draw()},{passive:false});select($('vq-sample'),samples);setTools();setPlasmids();heat();draw()})();
-</script></section>""".replace("__PAYLOAD__", payload)
+$('vq-sample').onchange=()=>{range=null;setTools();setPlasmids();draw()};$('vq-tool').onchange=draw;$('vq-plasmid').onchange=()=>{range=null;draw()};$('vq-start').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-end').onchange=()=>{range=[+$('vq-start').value,+$('vq-end').value];draw()};$('vq-fit').onclick=()=>{range=null;draw()};$('vq-in').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])/2;range=[c-z/2,c+z/2];draw()}};$('vq-out').onclick=()=>{if(range){let c=(range[0]+range[1])/2,z=(range[1]-range[0])*2;range=[c-z/2,c+z/2];draw()}};$('vq-tracks').addEventListener('wheel',e=>{if(!range)return;e.preventDefault();let c=(range[0]+range[1])/2,z=(range[1]-range[0])*(e.deltaY<0?.7:1.4);range=[c-z/2,c+z/2];draw()},{passive:false});select($('vq-sample'),samples);setTools();setPlasmids();draw()})();
+</script></div>""".replace("__PAYLOAD__", payload)
 
 
 def advanced_visual_script():
     """Enhance the base explorer with dot plot, flows, exports, and local bases."""
     return """<script>
-(()=>{const $=id=>document.getElementById(id),data=JSON.parse($('vq-data').textContent),tracks=$('vq-tracks'),detail=$('vq-detail');let composite=document.createElement('option');composite.value='composite';composite.textContent='Exploratory composite quality';$('vq-metric').append(composite);
+(()=>{const $=id=>document.getElementById(id),data=JSON.parse($('vq-data').textContent),tracks=$('vq-tracks'),detail=$('vq-detail');
 const dot=document.createElement('div'),flow=document.createElement('div'),actions=document.createElement('span');dot.id='vq-dotplot';flow.id='vq-flow';tracks.after(dot,flow);actions.innerHTML='<button id="vq-svg" type="button">Download track SVG</button><button id="vq-png" type="button">Download track PNG</button>';$('vq-download').after(actions);
 function current(){let a=data.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t])return null;let lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||a.truth_plasmids[p].length;return {a,p,t,lo,hi,blocks:a.tools[t].blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi)}}
 function renderFlow(){let x=current();if(!x){flow.innerHTML='';return}let f=x.a.tools[x.t].bin_assignment_flows||[];flow.innerHTML=f.length?'<h3>Bin-to-truth assignment flow</h3><p class="muted">Only scored bin assignments are shown; unobserved alternative links are not fabricated.</p><ul>'+f.map(r=>`<li>${r.bin_id||'no bin'} → ${r.true_plasmid||r.status}: ${r.aligned_bp.toLocaleString()} bp (${r.status})</li>`).join('')+'</ul>':''}
@@ -387,8 +385,23 @@ function download(name,blob){let a=document.createElement('a');a.href=URL.create
 </script>"""
 
 
-def flow_and_clustering_script():
-    """Interactive alluvial bin-to-truth flow, plus optional row clustering."""
+def evidence_selection_script():
+    """Keep evidence-explorer deep links after retiring its duplicate matrix."""
+    return """<script>
+(()=>{const $=id=>document.getElementById(id),keys=[['sample','vq-sample'],['tool','vq-tool'],['plasmid','vq-plasmid'],['start','vq-start'],['end','vq-end']];let restoring=false;
+function write(){if(restoring)return;const params=new URLSearchParams();keys.forEach(([key,id])=>{const value=$(id)?.value;if(value)params.set(key,value)});history.replaceState(null,'','#'+params.toString())}
+function read(){const params=new URLSearchParams(location.hash.slice(1));if(![...params].length)return;restoring=true;for(const [key,id]of keys){const value=params.get(key),element=$(id);if(value!=null&&element){element.value=value;element.dispatchEvent(new Event('change'))}}restoring=false}
+window.addEventListener('message',event=>{if(event.source!==$('pb-enterprise')?.contentWindow)return;const value=event.data;if(!value||value.type!=='plasbench-selection'||!value.sample)return;const sample=$('vq-sample');sample.value=value.sample;sample.dispatchEvent(new Event('change'));const tool=$('vq-tool');if(value.tool&&[...tool.options].some(option=>option.value===value.tool)){tool.value=value.tool;tool.dispatchEvent(new Event('change'))}const plasmid=$('vq-plasmid');if(value.plasmid&&[...plasmid.options].some(option=>option.value===value.plasmid)){plasmid.value=value.plasmid;plasmid.dispatchEvent(new Event('change'))}});
+keys.forEach(([,id])=>$(id)?.addEventListener('change',()=>setTimeout(write,0)));read();})();
+</script>"""
+
+
+def bin_flow_script():
+    """Interactive alluvial bin-to-truth flow.
+
+    Clustering moved to the dashboard's own control; this keeps the flow, which
+    is the only rendering of bin_assignment_flows in the report.
+    """
     return """<style>
 #vq-sankey svg{max-width:100%;height:auto}
 #vq-sankey .lnk{fill-opacity:.45;cursor:pointer}
@@ -398,31 +411,7 @@ def flow_and_clustering_script():
 #vq-sankey-detail{font:12px Arial,sans-serif;color:#3b4746;margin-top:6px}
 </style><script>
 (()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
-// ---- clustering ----------------------------------------------------------
-const opt=document.createElement('label');opt.style.font='12px Arial,sans-serif';
-opt.innerHTML=' <input type="checkbox" id="vq-cluster"> Cluster samples by tool-profile similarity';
-$('vq-metric').parentElement.after(opt);
-function profile(sample){const tools=[...new Set(d.matrix.map(x=>x.tool))].sort();
- return tools.map(t=>{const r=d.matrix.find(x=>x.sample===sample&&x.tool===t);return r&&r.f1!=null?r.f1:0})}
-function cluster(samples){
- // Average-linkage agglomerative ordering on Euclidean profile distance. The
- // leaf order is a reading aid; deterministic sort remains the default.
- let nodes=samples.map(s=>({items:[s],vec:profile(s)}));
- const dist=(a,b)=>Math.sqrt(a.vec.reduce((s,v,i)=>s+(v-b.vec[i])**2,0));
- while(nodes.length>1){let best=[0,1],bd=Infinity;
-  for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const v=dist(nodes[i],nodes[j]);if(v<bd){bd=v;best=[i,j]}}
-  const [i,j]=best,a=nodes[i],b=nodes[j];
-  const merged={items:a.items.concat(b.items),vec:a.vec.map((v,k)=>(v*a.items.length+b.vec[k]*b.items.length)/(a.items.length+b.items.length))};
-  nodes=nodes.filter((_,k)=>k!==i&&k!==j);nodes.push(merged)}
- return nodes[0].items}
-function applyCluster(){const body=$('vq-heatmap').querySelector('tbody');if(!body)return;
- const trs=[...body.querySelectorAll('tr')];
- const key=tr=>tr.querySelector('td strong')?.textContent||'';
- const order=$('vq-cluster').checked?cluster(trs.map(key)):trs.map(key).sort();
- order.forEach(s=>{const tr=trs.find(t=>key(t)===s);if(tr)body.appendChild(tr)})}
-$('vq-cluster').onchange=applyCluster;
-new MutationObserver(()=>{if($('vq-cluster').checked)applyCluster()}).observe($('vq-heatmap'),{childList:true});
-// ---- alluvial flow -------------------------------------------------------
+// ---- alluvial flow ----
 const host=document.createElement('div');host.id='vq-sankey';
 const detail=document.createElement('div');detail.id='vq-sankey-detail';
 ($('vq-flow')||$('vq-tracks')).after(host);host.after(detail);
@@ -455,8 +444,87 @@ function render(){const a=d.visualizations[$('vq-sample').value],t=$('vq-tool').
   const f=flows[+p.dataset.i];detail.textContent=`${f.bin_id} → ${f.true_plasmid}: ${f.aligned_bp.toLocaleString()} aligned bp, status ${f.status}.`;
   if([...$('vq-plasmid').options].some(o=>o.value===f.true_plasmid)){$('vq-plasmid').value=f.true_plasmid;$('vq-plasmid').dispatchEvent(new Event('change'))}})}
 ['vq-sample','vq-tool'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(render,0)));
-$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));
 render();})();
+</script>"""
+
+
+def agreement_and_comparison_script():
+    """Per-region tool agreement, and a baseline-versus-comparator view.
+
+    Agreement counts how many methods cover each reference interval. It is a
+    support count, not a correctness claim: methods sharing a bias agree with
+    each other and with nothing else, which the caption states plainly.
+    """
+    return """<style>
+#vq-agree{margin:14px 0}
+#vq-agree svg{max-width:100%;height:auto}
+#vq-agree .lgd{display:flex;gap:14px;flex-wrap:wrap;font:11px Arial,sans-serif;color:#5f6d6b;margin-top:6px}
+#vq-agree .lgd i{display:inline-block;width:12px;height:12px;margin-right:5px;vertical-align:-2px}
+#vq-compare{margin:14px 0}
+#vq-compare table{width:100%;border-collapse:collapse;font:12.5px Arial,sans-serif}
+#vq-compare th{background:#edf2ec;text-align:left;padding:7px;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+#vq-compare td{border-top:1px solid #e3e9e8;padding:6px 8px;font-variant-numeric:tabular-nums}
+#vq-compare .up{color:#17805a;font-weight:600}
+#vq-compare .down{color:#b23b30;font-weight:600}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const agree=document.createElement('div');agree.id='vq-agree';
+const comp=document.createElement('div');comp.id='vq-compare';
+($('vq-summary')||$('vq-tracks')).before(agree);($('vq-tracks')).after(comp);
+function ctx(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value;
+ return a&&p&&a.truth_plasmids[p]?{a,p,len:a.truth_plasmids[p].length}:null}
+function renderAgreement(){const c=ctx();if(!c){agree.innerHTML='';return}
+ const names=Object.keys(c.a.tools),M=names.length;
+ // Sweep the interval endpoints so every change in support becomes a boundary.
+ const cuts=new Set([0,c.len]);
+ names.forEach(n=>c.a.tools[n].blocks.filter(b=>b.target===c.p).forEach(b=>{
+  cuts.add(Math.max(0,b.target_start));cuts.add(Math.min(c.len,b.target_end))}));
+ const edges=[...cuts].sort((x,y)=>x-y);
+ const bands=[];
+ for(let i=0;i<edges.length-1;i++){const s=edges[i],e=edges[i+1];if(e<=s)continue;
+  const mid=(s+e)/2;
+  const supporters=names.filter(n=>c.a.tools[n].blocks.some(b=>b.target===c.p&&b.target_start<=mid&&b.target_end>=mid));
+  bands.push({s,e,n:supporters.length,who:supporters})}
+ if(!bands.length){agree.innerHTML='';return}
+ const W=1100,L=180,PW=880,x=v=>L+v/c.len*PW;
+ const shade=n=>n===0?'#eef1ee':['#dbeadf','#a9d3ba','#6fb894','#2f9068','#12664a'][Math.min(4,Math.max(0,Math.round((n/M)*4)))];
+ const rects=bands.map((b,i)=>`<rect class="agr" data-i="${i}" x="${x(b.s).toFixed(1)}" y="16" width="${Math.max(1,x(b.e)-x(b.s)).toFixed(1)}" height="18" fill="${shade(b.n)}"><title>${b.s.toLocaleString()}-${b.e.toLocaleString()}: ${b.n}/${M} methods</title></rect>`).join('');
+ const covered=bands.filter(b=>b.n===M).reduce((s,b)=>s+(b.e-b.s),0);
+ agree.innerHTML=`<h3 style="font:600 13px Arial,sans-serif;margin:0 0 6px">Method agreement across ${c.p}</h3>`
+  +`<svg viewBox="0 0 ${W} 44" role="img" aria-label="Number of methods covering each reference interval"><text x="4" y="29" font-size="12">${M} methods</text>${rects}</svg>`
+  +`<div class="lgd"><span><i style="background:${shade(0)}"></i>0 of ${M}</span><span><i style="background:${shade(M)}"></i>${M} of ${M}</span>`
+  +`<span>${(covered/c.len*100).toFixed(1)}% of the plasmid is supported by every method</span></div>`
+  +`<p class="muted" style="font:11px Arial,sans-serif;margin:6px 0 0">Agreement is shared support, not evidence of correctness: methods can share a bias. Select a band to list the supporting methods.</p>`
+  +`<div id="vq-agree-detail" class="muted" style="font:12px Arial,sans-serif"></div>`;
+ agree.querySelectorAll('.agr').forEach(r=>r.onclick=()=>{const b=bands[+r.dataset.i];
+  $('vq-agree-detail').textContent=`${b.s.toLocaleString()}-${b.e.toLocaleString()}: ${b.n}/${M} — ${b.who.join(', ')||'no method covers this interval'}`})}
+function renderComparison(){const tools=[...new Set(d.matrix.map(r=>r.tool))].sort();
+ if(tools.length<2){comp.innerHTML='';return}
+ if(!$('vq-base')){comp.innerHTML=`<h3 style="font:600 13px Arial,sans-serif;margin:0 0 6px">Method comparison</h3>`
+  +`<div style="display:flex;gap:10px;flex-wrap:wrap;font:12px Arial,sans-serif;margin-bottom:8px">`
+  +`<label>Baseline <select id="vq-base">${tools.map(t=>`<option>${t}</option>`).join('')}</select></label>`
+  +`<label>Comparator <select id="vq-comp">${tools.map((t,i)=>`<option${i===1?' selected':''}>${t}</option>`).join('')}</select></label></div>`
+  +`<div id="vq-compare-body"></div>`;
+  $('vq-base').onchange=renderComparison;$('vq-comp').onchange=renderComparison}
+ const a=$('vq-base').value,b=$('vq-comp').value;
+ const rows=[];[...new Set(d.matrix.map(r=>r.sample))].sort().forEach(s=>{
+  const ra=d.matrix.find(r=>r.sample===s&&r.tool===a),rb=d.matrix.find(r=>r.sample===s&&r.tool===b);
+  if(!ra||!rb||ra.f1==null||rb.f1==null)return;
+  rows.push({s,a:ra,b:rb,d:rb.f1-ra.f1})});
+ if(!rows.length){$('vq-compare-body').innerHTML='<p class="muted">No sample has a scored result for both methods.</p>';return}
+ const mean=rows.reduce((x,r)=>x+r.d,0)/rows.length;
+ const fmt=v=>v==null?'not measured':v.toFixed(3);
+ const dcell=v=>`<span class="${v>0?'up':v<0?'down':''}">${v>0?'+':''}${v.toFixed(3)}</span>`;
+ $('vq-compare-body').innerHTML=`<table><thead><tr><th>Sample</th><th>${a} F1</th><th>${b} F1</th><th>&Delta; F1</th><th>&Delta; contamination</th><th>&Delta; runtime (min)</th></tr></thead><tbody>`
+  +rows.map(r=>`<tr><td>${r.s}</td><td>${fmt(r.a.f1)}</td><td>${fmt(r.b.f1)}</td><td>${dcell(r.d)}</td>`
+   +`<td>${r.a.contamination==null||r.b.contamination==null?'not measured':dcell(r.b.contamination-r.a.contamination)}</td>`
+   +`<td>${r.a.runtime_min==null||r.b.runtime_min==null?'not measured':dcell(r.b.runtime_min-r.a.runtime_min)}</td></tr>`).join('')
+  +`</tbody></table><p class="muted" style="font:11px Arial,sans-serif;margin:6px 0 0">`
+  +`${b} minus ${a} on ${rows.length} shared sample(s); mean &Delta; F1 ${mean>0?'+':''}${mean.toFixed(3)}. `
+  +`Wins ${rows.filter(r=>r.d>0).length} / ties ${rows.filter(r=>r.d===0).length} / losses ${rows.filter(r=>r.d<0).length}. `
+  +`A difference on few samples is not evidence of superiority; see the paired comparison table for interval and permutation evidence.</p>`}
+['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(renderAgreement,0)));
+renderAgreement();renderComparison();})();
 </script>"""
 
 
@@ -477,6 +545,7 @@ def explorer_navigation_script():
 (()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
 const nav=document.createElement('div');nav.id='vq-nav';
 nav.innerHTML=`<label>Find <input id="vq-q" type="search" placeholder="gene, contig, or 1200-3400" size="26"></label>`
+ +`<span class="grp"><button id="vq-bed" type="button" title="Download the visible interval as BED">Export BED</button></span>`
  +`<span class="grp"><button id="vq-prev-ev" type="button">\\u2190 Event</button><button id="vq-next-ev" type="button">Event \\u2192</button></span>`
  +`<span class="grp"><button id="vq-prev-p" type="button">\\u2190 Plasmid</button><button id="vq-next-p" type="button">Plasmid \\u2192</button></span>`
  +`<span class="grp"><button id="vq-back" type="button">Back</button></span>`;
@@ -575,15 +644,41 @@ function refresh(){renderRows();apply();bindDrag()}
 ['vq-sample','vq-plasmid'].forEach(id=>$(id)?.addEventListener('change',()=>{cursor=null}));
 ['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(refresh,0)));
 ['vq-fit','vq-in','vq-out'].forEach(id=>$(id)?.addEventListener('click',()=>setTimeout(refresh,0)));
-$('vq-heatmap').addEventListener('click',()=>setTimeout(refresh,0));
 document.addEventListener('keydown',e=>{if(e.target?.matches?.('input,select,textarea'))return;
  if(e.key==='n'){jump(1)}else if(e.key==='p'){jump(-1)}});
+// BED of the visible window. Reference coordinates are already 0-based
+// half-open, which is exactly what BED expects, so nothing is converted.
+$('vq-bed').onclick=()=>{const c=ctx();if(!c)return;
+ const lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||c.len;
+ const lines=['track name="PlasBench '+c.p+'" description="visible predicted blocks"'];
+ Object.entries(c.a.tools).forEach(([n,t])=>{if(hidden.has(n))return;
+  t.blocks.filter(b=>b.target===c.p&&b.target_end>lo&&b.target_start<hi).forEach(b=>{
+   lines.push([c.p,Math.max(lo,b.target_start),Math.min(hi,b.target_end),
+               n+':'+b.record_id,b.mapq,b.strand].join('\\t'))})});
+ const blob=new Blob([lines.join('\\n')+'\\n'],{type:'text/plain'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+ a.download=c.p+'_'+Math.round(lo)+'-'+Math.round(hi)+'.bed';a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),0)};
+// Keyboard reach for the tracks, not only the matrix.
+const tk=$('vq-tracks');
+tk.setAttribute('tabindex','0');tk.setAttribute('role','group');
+tk.setAttribute('aria-label','Predicted alignment tracks. Arrow keys pan, plus and minus zoom, Home fits the plasmid, n and p step between events.');
+tk.addEventListener('keydown',e=>{const c=ctx();if(!c)return;
+ const lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||c.len,span=hi-lo;
+ const K={ArrowLeft:()=>setRange(lo-span*0.25,hi-span*0.25),
+          ArrowRight:()=>setRange(lo+span*0.25,hi+span*0.25),
+          '+':()=>setRange(lo+span*0.25,hi-span*0.25),
+          '=':()=>setRange(lo+span*0.25,hi-span*0.25),
+          '-':()=>setRange(lo-span*0.5,hi+span*0.5),
+          Home:()=>$('vq-fit').click(),
+          n:()=>jump(1),p:()=>jump(-1)};
+ if(K[e.key]){e.preventDefault();K[e.key]()}});
 refresh();})();
 </script>"""
 
 
 def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
-                            results_dir, vendor_html):
+                            results_dir, vendor_html, evidence_html=""):
     """Embed the vendored enterprise dashboard, driven by measured results.
 
     The dashboard is rendered inside an isolated iframe. Its stylesheet styles
@@ -652,177 +747,7 @@ def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
             "<script>(()=>{const f=document.getElementById('pb-enterprise');"
             "const raw=document.getElementById('pb-enterprise-doc').textContent;"
             "f.srcdoc=raw.split('<\\\\/script').join('</scr'+'ipt');})();</script>"
-            "</section>")
-
-
-def canvas_heatmap_script():
-    """A canvas sample-tool matrix with a drilldown modal, beside the table view.
-
-    This is an additional visual, not a replacement: the semantic table remains
-    the keyboard-navigable, screen-reader-readable view and the accessible
-    fallback. The canvas scales to cohorts where a DOM cell per observation
-    stops being viable, and carries the modal drilldown. The modal is scoped to
-    this view alone so the linked inline panels keep their selection.
-    """
-    return """<style>
-#cv-panel{background:#fff;border:1px solid #d2dad8;margin:16px 0;padding:0 0 14px}
-#cv-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
-  padding:12px 15px;border-bottom:1px solid #e3e9e8;background:#f4f7f4}
-#cv-head h3{margin:0;font:600 14px Arial,sans-serif}
-#cv-head .right{display:flex;gap:8px;align-items:center;font:12px Arial,sans-serif}
-#cv-wrap{position:relative;overflow:auto;padding:12px 15px}
-#cv-canvas{display:block;cursor:pointer}
-#cv-tip{position:absolute;pointer-events:none;background:#0c121c;color:#e6edf6;padding:8px 10px;
-  border-radius:4px;font:11px/1.5 Arial,sans-serif;opacity:0;transition:opacity .12s;max-width:280px;z-index:5}
-#cv-legend{display:flex;gap:14px;flex-wrap:wrap;font:11px Arial,sans-serif;color:#5f6d6b;padding:0 15px}
-#cv-legend i{display:inline-block;width:12px;height:12px;margin-right:5px;vertical-align:-2px}
-#cv-modal{position:fixed;inset:0;background:rgba(12,18,28,.62);display:none;z-index:60;
-  align-items:center;justify-content:center;padding:20px}
-#cv-modal.open{display:flex}
-#cv-dialog{background:#fff;max-width:900px;width:100%;max-height:88vh;overflow:auto;border-radius:6px;
-  box-shadow:0 20px 60px rgba(0,0,0,.35)}
-#cv-dialog header{display:flex;justify-content:space-between;align-items:center;gap:12px;
-  padding:14px 18px;border-bottom:1px solid #e3e9e8;position:sticky;top:0;background:#fff}
-#cv-dialog h4{margin:0;font:600 15px Arial,sans-serif}
-#cv-dialog .body{padding:16px 18px}
-#cv-dialog table{width:100%;border-collapse:collapse;font:12px Arial,sans-serif;margin-top:8px}
-#cv-dialog th{background:#edf2ec;text-align:left;padding:7px;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
-#cv-dialog td{border-top:1px solid #e3e9e8;padding:6px 7px}
-#cv-dialog .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
-#cv-dialog .kv div{background:#f4f7f4;padding:9px 11px}
-#cv-dialog .kv small{display:block;color:#5f6d6b;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
-#cv-dialog .kv b{font:600 15px Arial,sans-serif;font-variant-numeric:tabular-nums}
-</style><script>
-(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),m=d.matrix;
-const host=document.createElement('section');host.id='cv-panel';
-host.innerHTML=`<div id="cv-head"><h3><i class="fa fa-th"></i> Sample \\u00d7 method matrix</h3>
- <span class="right"><label>Sort <select id="cv-sort"><option value="sample">Sample ID</option><option value="score">Best score</option><option value="spread">Method disagreement</option></select></label>
- <span id="cv-note"></span></span></div>
- <div id="cv-wrap"><canvas id="cv-canvas"></canvas><div id="cv-tip"></div></div>
- <div id="cv-legend"></div>`;
-$('vq-heatmap').parentElement.after(host);
-const modal=document.createElement('div');modal.id='cv-modal';
-modal.innerHTML=`<div id="cv-dialog" role="dialog" aria-modal="true" aria-labelledby="cv-title">
- <header><h4 id="cv-title"></h4><span><button class="btn" id="cv-open-inline" type="button">Open in linked explorer</button>
- <button class="btn" id="cv-close" type="button"><i class="fa fa-times"></i> Close</button></span></header>
- <div class="body" id="cv-body"></div></div>`;
-document.body.append(modal);
-const canvas=$('cv-canvas'),ctx=canvas.getContext('2d'),tip=$('cv-tip');
-const tools=[...new Set(m.map(x=>x.tool))].sort();
-const LABEL=120,CELL=34,HEAD=26,PAD=2;
-let cells=[],hover=null;
-function metricKey(){return $('vq-metric').value}
-function value(r){const k=metricKey();return k==='status'?null:r[k]}
-function lowerIsBetter(){return ['contamination','unmapped','runtime_min','memory_gb'].includes(metricKey())}
-function norm(v,lo,hi){if(!isFinite(v))return null;if(hi===lo)return .5;
- const t=(v-lo)/(hi-lo);return lowerIsBetter()?1-t:t}
-function colour(t,status){
- if(status==='failed')return '#f0d6d2';if(status==='skipped')return '#f4e6cd';
- if(t===null)return '#e6eae6';
- // Single-hue ramp: lightness carries magnitude, so it survives greyscale print.
- const stops=[[233,243,235],[178,220,196],[104,186,151],[42,140,106],[12,80,60]];
- const x=Math.max(0,Math.min(1,t))*(stops.length-1),i=Math.floor(x),f=x-i;
- const a=stops[i],b=stops[Math.min(stops.length-1,i+1)];
- return `rgb(${a.map((v,k)=>Math.round(v+(b[k]-v)*f)).join(',')})`}
-function visibleSamples(){const rows=[...document.querySelectorAll('#vq-heatmap tbody tr:not(.vq-hidden)')];
- const names=rows.map(tr=>tr.querySelector('td strong')?.textContent||'').filter(Boolean);
- return names.length?names:[...new Set(m.map(x=>x.sample))].sort()}
-function order(samples){const mode=$('cv-sort').value;
- const score=s=>{const v=m.filter(r=>r.sample===s).map(value).filter(x=>typeof x==='number'&&isFinite(x));
-  return v.length?v.reduce((a,b)=>a+b,0)/v.length:-Infinity};
- const spread=s=>{const v=m.filter(r=>r.sample===s).map(value).filter(x=>typeof x==='number'&&isFinite(x));
-  return v.length>1?Math.max(...v)-Math.min(...v):-Infinity};
- if(mode==='score')return [...samples].sort((a,b)=>score(b)-score(a));
- if(mode==='spread')return [...samples].sort((a,b)=>spread(b)-spread(a));
- return [...samples].sort()}
-function draw(){
- const samples=order(visibleSamples());
- const values=m.map(value).filter(v=>typeof v==='number'&&isFinite(v));
- const lo=values.length?Math.min(...values):0,hi=values.length?Math.max(...values):1;
- const W=LABEL+tools.length*CELL+10,H=HEAD+samples.length*CELL+6;
- const dpr=window.devicePixelRatio||1;
- canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
- ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
- ctx.font='11px Arial,sans-serif';ctx.textBaseline='middle';
- ctx.fillStyle='#3b4746';
- tools.forEach((t,c)=>{ctx.save();ctx.translate(LABEL+c*CELL+CELL/2,HEAD-8);ctx.rotate(-Math.PI/4);
-  ctx.textAlign='left';ctx.fillText(t.slice(0,16),0,0);ctx.restore()});
- cells=[];
- samples.forEach((s,r)=>{const y=HEAD+r*CELL;
-  ctx.fillStyle='#3b4746';ctx.textAlign='right';ctx.fillText(s.slice(0,18),LABEL-10,y+CELL/2);
-  tools.forEach((t,c)=>{const x=LABEL+c*CELL,rec=m.find(z=>z.sample===s&&z.tool===t);
-   const v=rec?value(rec):null,st=rec?rec.status:'unavailable';
-   ctx.fillStyle=colour(rec?norm(v,lo,hi):null,st);
-   ctx.fillRect(x+PAD,y+PAD,CELL-PAD*2,CELL-PAD*2);
-   if(hover&&hover.s===s&&hover.t===t){ctx.strokeStyle='#12403a';ctx.lineWidth=2;
-    ctx.strokeRect(x+PAD,y+PAD,CELL-PAD*2,CELL-PAD*2)}
-   // Status is never encoded by colour alone.
-   if(st==='failed'||st==='skipped'){ctx.fillStyle='#7a3b33';ctx.textAlign='center';
-    ctx.fillText(st==='failed'?'\\u2715':'\\u25CB',x+CELL/2,y+CELL/2)}
-   cells.push({x:x+PAD,y:y+PAD,w:CELL-PAD*2,h:CELL-PAD*2,s,t,rec})})});
- $('cv-note').textContent=`${samples.length} sample(s) \\u00d7 ${tools.length} method(s)`;
- const label=$('vq-metric').options[$('vq-metric').selectedIndex].textContent;
- $('cv-legend').innerHTML=`<span><i style="background:${colour(0)}"></i>${lowerIsBetter()?'worse':'lower'} ${label}</span>`
-  +`<span><i style="background:${colour(1)}"></i>${lowerIsBetter()?'better':'higher'} ${label}</span>`
-  +`<span><i style="background:#f0d6d2"></i>\\u2715 failed</span><span><i style="background:#f4e6cd"></i>\\u25CB skipped</span>`
-  +`<span><i style="background:#e6eae6"></i>not applicable</span>`
-  +(values.length?`<span>range ${lo.toFixed(3)} \\u2013 ${hi.toFixed(3)}</span>`:'<span>no measured values</span>')}
-function at(e){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
- return cells.find(c=>x>=c.x&&x<=c.x+c.w&&y>=c.y&&y<=c.y+c.h)||null}
-canvas.addEventListener('mousemove',e=>{const c=at(e);hover=c?{s:c.s,t:c.t}:null;draw();
- if(!c){tip.style.opacity=0;return}
- const r=c.rec||{},fmt=v=>typeof v==='number'&&isFinite(v)?v.toFixed(4):'not measured';
- tip.innerHTML=`<strong>${c.s} \\u00b7 ${c.t}</strong><br>status ${r.status||'unavailable'}<br>`
-  +`F1 ${fmt(r.f1)} \\u00b7 precision ${fmt(r.precision)} \\u00b7 recall ${fmt(r.recall)}<br>`
-  +`plasmid recall ${fmt(r.plasmid_recall)} \\u00b7 contamination ${fmt(r.contamination)}<br>`
-  +`runtime ${fmt(r.runtime_min)} min \\u00b7 peak ${fmt(r.memory_gb)} GB<br><em>click for detail</em>`;
- const wrap=$('cv-wrap').getBoundingClientRect();
- tip.style.left=Math.min(e.clientX-wrap.left+14,wrap.width-290)+'px';
- tip.style.top=(e.clientY-wrap.top+14)+'px';tip.style.opacity=1});
-canvas.addEventListener('mouseleave',()=>{hover=null;tip.style.opacity=0;draw()});
-canvas.addEventListener('click',e=>{const c=at(e);if(c)openModal(c.s,c.t)});
-function openModal(sample,tool){
- const rec=m.find(z=>z.sample===sample&&z.tool===tool)||{};
- const a=d.visualizations[sample];
- const fmt=v=>typeof v==='number'&&isFinite(v)?v.toFixed(4):'not measured';
- $('cv-title').textContent=`${sample} \\u00b7 ${tool}`;
- let html=`<div class="kv"><div><small>Base F1</small><b>${fmt(rec.f1)}</b></div>
-  <div><small>Precision</small><b>${fmt(rec.precision)}</b></div>
-  <div><small>Recall</small><b>${fmt(rec.recall)}</b></div>
-  <div><small>Plasmid recall</small><b>${fmt(rec.plasmid_recall)}</b></div>
-  <div><small>Contamination</small><b>${fmt(rec.contamination)}</b></div>
-  <div><small>Status</small><b>${rec.status||'unavailable'}</b></div>
-  <div><small>Runtime (min)</small><b>${fmt(rec.runtime_min)}</b></div>
-  <div><small>Peak memory (GB)</small><b>${fmt(rec.memory_gb)}</b></div></div>`;
- if(!a){html+=`<p class="muted">Alignment detail for ${sample} is not loaded. Select the sample in the linked explorer to fetch it.</p>`}
- else if(!a.tools[tool]){html+=`<p class="muted">This method produced no retained alignment blocks for ${sample}.</p>`}
- else{const t=a.tools[tool],circ=new Set(a.circular_truth_plasmids||[]);
-  const rows=Object.entries(a.truth_plasmids).map(([id,info])=>{
-   const rc=t.plasmid_recovery[id]||{completeness:0};
-   const recs=[...new Set(t.blocks.filter(b=>b.target===id).map(b=>b.record_id))];
-   return `<tr><td>${id}</td><td>${info.length.toLocaleString()} bp</td><td>${circ.has(id)?'yes':'not declared'}</td>
-    <td>${((rc.completeness||0)*100).toFixed(1)}%</td><td>${recs.length}</td></tr>`}).join('');
-  html+=`<h5 style="margin:14px 0 0;font:600 12px Arial,sans-serif">Truth plasmids</h5>
-   <table><thead><tr><th>Plasmid</th><th>Length</th><th>Circular truth</th><th>Completeness</th><th>Records</th></tr></thead><tbody>${rows}</tbody></table>`;
-  const chr=[...new Set(t.blocks.filter(b=>b.molecule_type==='CHROMOSOME').map(b=>b.record_id))];
-  html+=chr.length
-   ?`<p style="margin-top:12px" class="muted"><strong>Chromosomal contamination:</strong> ${(t.chromosome_aligned_bp||0).toLocaleString()} bp across ${chr.length} record(s) — ${chr.join(', ')}. Counted as false positives; not attributable to any truth plasmid.</p>`
-   :'<p style="margin-top:12px" class="muted">No chromosome-aligned records among retained blocks.</p>';
-  html+=`<p class="muted">Retained blocks: ${t.blocks.length}${t.blocks_omitted?`, ${t.blocks_omitted} omitted by the display cap`:''}.</p>`}
- $('cv-body').innerHTML=html;
- modal.classList.add('open');$('cv-close').focus();
- $('cv-open-inline').onclick=()=>{close();
-  const cell=[...document.querySelectorAll('.vq-cell')].find(c=>c.dataset.s===sample&&c.dataset.t===tool);
-  if(cell){cell.click();cell.scrollIntoView({block:'center'})}}}
-function close(){modal.classList.remove('open')}
-$('cv-close').onclick=close;
-modal.addEventListener('click',e=>{if(e.target===modal)close()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))close()});
-$('cv-sort').onchange=draw;$('vq-metric').addEventListener('change',draw);
-new MutationObserver(()=>draw()).observe($('vq-heatmap'),{childList:true});
-document.addEventListener('change',e=>{if(e.target.closest('#vq-filters'))setTimeout(draw,0)});
-draw();})();
-</script>"""
+            + evidence_html + "</section>")
 
 
 def vendor_assets(project_root):
@@ -855,91 +780,6 @@ def vendor_assets(project_root):
     return f"<style>\n{inter}\n{icons}\n</style>"
 
 
-def cohort_dashboard_script():
-    """Headline stat cards, per-tool distribution plots, and cost metrics.
-
-    Every value is derived from the score, status, and structural tables the run
-    already produced. Nothing here is simulated: a metric with no measurement
-    renders as 'not measured' rather than as a number.
-    """
-    return """<style>
-#vq-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:14px 0}
-#vq-stats .card{background:#fff;border:1px solid #d2dad8;border-top:3px solid #16805a;padding:13px 15px}
-#vq-stats .card small{display:block;color:#5f6d6b;text-transform:uppercase;font:600 10px/1.4 Arial,sans-serif;letter-spacing:.08em}
-#vq-stats .card strong{display:block;font:700 22px/1.15 Arial,sans-serif;margin-top:5px;font-variant-numeric:tabular-nums}
-#vq-stats .card span{display:block;color:#5f6d6b;font:12px Arial,sans-serif;margin-top:2px}
-#vq-stats .card.warn{border-top-color:#c68221}
-#vq-dist{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin:14px 0}
-#vq-dist .box{background:#fff;border:1px solid #d2dad8;padding:14px}
-#vq-dist h4{margin:0 0 8px;font:600 13px Arial,sans-serif}
-#vq-dist table{width:100%;border-collapse:collapse;font:12px Arial,sans-serif}
-#vq-dist td{padding:2px 4px;border:0}
-#vq-dist td:last-child{text-align:right;font-variant-numeric:tabular-nums}
-</style><script>
-(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),m=d.matrix;
-const sel=$('vq-metric');
-// Metrics the run already measures but never exposed for comparison.
-[['collinear','Structural collinearity'],['runtime_min','Runtime (min)'],['memory_gb','Peak memory (GB)']]
- .forEach(([v,label])=>{if(![...sel.options].some(o=>o.value===v)){const o=document.createElement('option');o.value=v;o.textContent=label;sel.append(o)}});
-const stats=document.createElement('div');stats.id='vq-stats';
-const dist=document.createElement('div');dist.id='vq-dist';
-$('vq-heatmap').before(stats);$('vq-heatmap').after(dist);
-const num=v=>typeof v==='number'&&isFinite(v);
-function quantile(sorted,q){if(!sorted.length)return null;const i=(sorted.length-1)*q,lo=Math.floor(i),hi=Math.ceil(i);
- return lo===hi?sorted[lo]:sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo)}
-function visibleSamples(){const rows=[...document.querySelectorAll('#vq-heatmap tbody tr:not(.vq-hidden)')];
- return new Set(rows.map(tr=>tr.querySelector('td strong')?.textContent||''))}
-function cards(){const vis=visibleSamples(),rows=m.filter(r=>vis.has(r.sample));
- const byTool={};rows.forEach(r=>{if(num(r.f1))(byTool[r.tool]??=[]).push(r.f1)});
- const means=Object.entries(byTool).map(([t,v])=>[t,v.reduce((a,b)=>a+b,0)/v.length]).sort((a,b)=>b[1]-a[1]);
- const bySample={};rows.forEach(r=>{if(num(r.f1))(bySample[r.sample]??=[]).push(r.f1)});
- const hardest=Object.entries(bySample).map(([s,v])=>[s,v.reduce((a,b)=>a+b,0)/v.length]).sort((a,b)=>a[1]-b[1]);
- const bad=rows.filter(r=>r.status==='failed'||r.status==='skipped').length;
- const recovered=rows.reduce((s,r)=>s+(num(r.plasmid_recall)?r.plasmid_recall:0),0);
- const scored=rows.filter(r=>num(r.plasmid_recall)).length;
- const card=(label,value,sub,warn)=>`<div class="card${warn?' warn':''}"><small>${label}</small><strong>${value}</strong><span>${sub}</span></div>`;
- stats.innerHTML=
-  card('Leading method',means.length?means[0][0]:'\\u2013',means.length?'mean F1 '+means[0][1].toFixed(3)+' over '+byTool[means[0][0]].length+' scored':'no scored rows')
- +card('Hardest sample',hardest.length?hardest[0][0]:'\\u2013',hardest.length?'mean F1 '+hardest[0][1].toFixed(3)+' across methods':'no scored rows')
- +card('Excluded runs',bad,bad?'failed or skipped, not scored as zero':'every run contributed a score',bad>0)
- +card('Mean plasmid recall',scored?(recovered/scored).toFixed(3):'not measured',scored?'per-replicon, equal weight':'no plasmid-recall rows');}
-function plot(){const vis=visibleSamples(),key=sel.value;
- const byTool={};m.filter(r=>vis.has(r.sample)).forEach(r=>{const v=r[key];if(num(v))(byTool[r.tool]??=[]).push(v)});
- const tools=Object.keys(byTool).sort();
- if(!tools.length){dist.innerHTML='<div class="box"><h4>Distribution</h4><p class="muted">No measured values for this metric. Failed, skipped, and not-applicable results are excluded rather than counted as zero.</p></div>';return}
- const label=sel.options[sel.selectedIndex].textContent;
- const all=tools.flatMap(t=>byTool[t]),lo=Math.min(...all),hi=Math.max(...all),span=(hi-lo)||1;
- const W=420,rowH=30,H=tools.length*rowH+34,x=v=>40+(v-lo)/span*(W-70);
- // Box plot: five-number summary per method.
- let box=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribution of ${label} by method">`;
- tools.forEach((t,i)=>{const s=[...byTool[t]].sort((a,b)=>a-b),y=18+i*rowH;
-  const q1=quantile(s,.25),q2=quantile(s,.5),q3=quantile(s,.75);
-  box+=`<text x="0" y="${y+4}" font-size="10">${t.slice(0,12)}</text>`
-   +`<line x1="${x(s[0])}" y1="${y}" x2="${x(s[s.length-1])}" y2="${y}" stroke="#849387"/>`
-   +`<rect x="${x(q1)}" y="${y-7}" width="${Math.max(1,x(q3)-x(q1))}" height="14" fill="#dcefdc" stroke="#16805a"/>`
-   +`<line x1="${x(q2)}" y1="${y-7}" x2="${x(q2)}" y2="${y+7}" stroke="#0c4a37" stroke-width="2"/>`
-   +`<title>${t}: min ${s[0].toFixed(3)}, Q1 ${q1.toFixed(3)}, median ${q2.toFixed(3)}, Q3 ${q3.toFixed(3)}, max ${s[s.length-1].toFixed(3)}, n=${s.length}</title>`});
- box+=`<text x="40" y="${H-4}" font-size="10">${lo.toFixed(2)}</text><text x="${W-40}" y="${H-4}" font-size="10">${hi.toFixed(2)}</text></svg>`;
- // Strip plot: every observation, so small n is visible rather than implied.
- let strip=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Individual ${label} observations by method">`;
- tools.forEach((t,i)=>{const y=18+i*rowH;
-  strip+=`<text x="0" y="${y+4}" font-size="10">${t.slice(0,12)}</text><line x1="40" y1="${y}" x2="${W-30}" y2="${y}" stroke="#e2e8e2"/>`
-   +byTool[t].map((v,j)=>`<circle cx="${x(v)}" cy="${y+((j%3)-1)*3}" r="3" fill="#16805a" fill-opacity=".55"><title>${t}: ${v.toFixed(4)}</title></circle>`).join('')});
- strip+='</svg>';
- const rowsHtml=tools.map(t=>{const s=[...byTool[t]].sort((a,b)=>a-b);
-  const mean=s.reduce((a,b)=>a+b,0)/s.length;
-  const sd=Math.sqrt(s.reduce((a,b)=>a+(b-mean)**2,0)/(s.length>1?s.length-1:1));
-  return `<tr><td>${t}</td><td>n=${s.length} · median ${quantile(s,.5).toFixed(3)} · mean ${mean.toFixed(3)} · sd ${s.length>1?sd.toFixed(3):'\\u2013'}</td></tr>`}).join('');
- dist.innerHTML=`<div class="box"><h4>${label}: spread by method</h4>${box}<p class="muted" style="font:11px Arial,sans-serif">Box spans the interquartile range; the heavy line is the median. Whiskers are the observed minimum and maximum, not a confidence claim.</p></div>`
-  +`<div class="box"><h4>${label}: every observation</h4>${strip}<table>${rowsHtml}</table><p class="muted" style="font:11px Arial,sans-serif">One mark per scored sample. Standard deviation is omitted below two observations.</p></div>`}
-function refresh(){cards();plot()}
-sel.addEventListener('change',refresh);
-new MutationObserver(refresh).observe($('vq-heatmap'),{childList:true});
-document.addEventListener('change',e=>{if(e.target.closest('#vq-filters'))setTimeout(refresh,0)});
-refresh();})();
-</script>"""
-
-
 def lazy_visualization_script():
     """Fetch per-sample alignment payloads on demand when they were published.
 
@@ -955,7 +795,7 @@ def lazy_visualization_script():
 (()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
 const sources=d.visualization_sources||{},staging=d.staging||{};
 if(!Object.keys(sources).length)return;                    // inline mode: nothing to do
-const note=document.createElement('div');note.id='vq-loading';$('vq-heatmap').after(note);
+const note=document.createElement('div');note.id='vq-loading';$('vq-tracks').before(note);
 note.textContent=`Alignment detail is published per sample (${staging.samples} file(s), ${(staging.bytes/1048576).toFixed(1)} MB total) and loads on selection.`;
 const cache=new Map();let token=0;
 async function load(sample){
@@ -974,101 +814,8 @@ async function load(sample){
 async function ensure(){const s=$('vq-sample').value;if(!s||d.visualizations[s])return;
  const payload=await load(s);if(payload){$('vq-sample').dispatchEvent(new Event('change'))}}
 $('vq-sample').addEventListener('change',()=>{setTimeout(ensure,0)},true);
-$('vq-heatmap').addEventListener('click',()=>setTimeout(ensure,0));
 ensure();})();
 </script>"""
-
-
-def linked_selection_script(metadata):
-    """Add keyboard access, non-colour status encoding, filters, and URL state.
-
-    The base explorer rebuilds #vq-heatmap wholesale on every metric change, so
-    these enhancements re-apply through a MutationObserver rather than patching
-    that render path.
-    """
-    # Keep the browser payload purpose-limited. In particular, avoid embedding
-    # raw sheet column names or unrelated identifiers in the offline report.
-    filter_metadata = {
-        sample: {key: row.get(key, "") for key in ("organism", "sample_origin", "truth_technology", "truth_quality_tier")}
-        for sample, row in metadata.items()
-    }
-    return """<style>
-.vq-cell{position:relative}
-.vq-cell[tabindex]{cursor:pointer}
-.vq-cell:focus-visible,.vq-block:focus-visible{outline:3px solid #12403a;outline-offset:-2px}
-.vq-cell.vq-selected{box-shadow:inset 0 0 0 3px #12403a}
-.vq-row-hi{background:#eef5ee}
-.vq-glyph{font-family:Arial,sans-serif;font-weight:bold;margin-right:4px}
-.vq-hidden{display:none}
-#vq-filters{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:end}
-#vq-count{font:12px Arial,sans-serif;color:#5f6d6b}
-.vq-warn{background:#fbf2df;border-left:5px solid #c68221;padding:9px 13px;margin:9px 0;font:13px Arial,sans-serif}
-</style><script>
-(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent),meta=__METADATA__;
-const GLYPH={completed:'\\u25CF',reused:'\\u25D0',scored:'\\u25CF',failed:'\\u2715',skipped:'\\u25CB',unavailable:'\\u2013'};
-const heatmap=$('vq-heatmap');
-// Cohort filters reuse the metadata already rendered in the score table, so the
-// heatmap narrows to the same cohort the rest of the report is describing.
-const bar=document.createElement('div');bar.id='vq-filters';
-const fields=[['organism','Organism'],['sample_origin','Origin'],['truth_technology','Technology'],['truth_quality_tier','Tier']];
-bar.innerHTML=fields.map(([k,label])=>{const vals=[...new Set(Object.values(meta).map(r=>r[k]).filter(Boolean))].sort();
- return `<label>${label} <select data-k="${k}"><option value="">All</option>${vals.map(v=>`<option>${v}</option>`).join('')}</select></label>`}).join('')
- +`<label>Sample search <input id="vq-search" type="search" placeholder="id contains\\u2026"></label>`
- +`<label>Order <select id="vq-order"><option value="sample">Sample ID</option><option value="best">Best visible metric</option></select></label>`
- +`<button id="vq-reset" type="button">Reset filters</button><span id="vq-count"></span>`;
-heatmap.before(bar);
-function visible(sample){const r=meta[sample]||{};
- // Only cohort selects filter; controls such as the order select declare no data-k.
- for(const sel of bar.querySelectorAll('select[data-k]')){if(sel.value&&(r[sel.dataset.k]||'')!==sel.value)return false}
- const q=($('vq-search').value||'').trim().toLowerCase();return !q||sample.toLowerCase().includes(q)}
-function metricValue(sample){const key=$('vq-metric').value,values=d.matrix.filter(r=>r.sample===sample).map(r=>r[key]).filter(v=>typeof v==='number');if(!values.length)return-Infinity;return ['contamination','unmapped'].includes(key)?-Math.min(...values):Math.max(...values)}
-function decorate(){const body=heatmap.querySelector('tbody');let rows=[...body.querySelectorAll('tr')];
- if($('vq-order').value==='best'){rows.sort((a,b)=>metricValue(b.querySelector('td strong')?.textContent||'')-metricValue(a.querySelector('td strong')?.textContent||''));rows.forEach(row=>body.append(row))}
- let shown=0;
- rows.forEach(tr=>{const sample=tr.querySelector('td strong')?.textContent||'';const ok=visible(sample);
-  tr.classList.toggle('vq-hidden',!ok);if(ok)shown++;
-  tr.querySelectorAll('.vq-cell').forEach(td=>{
-   if(!td.hasAttribute('tabindex')){td.setAttribute('tabindex','-1');td.setAttribute('role','gridcell')}
-   const rec=d.matrix.find(x=>x.sample===td.dataset.s&&x.tool===td.dataset.t);
-   const st=rec?rec.status:'unavailable';
-   // Colour alone fails colour-vision deficiency, so every state also carries a
-   // glyph and an accessible label.
-   if(!td.querySelector('.vq-glyph')){const g=document.createElement('span');g.className='vq-glyph';g.textContent=GLYPH[st]||GLYPH.unavailable;td.prepend(g)}
-   td.setAttribute('aria-label',`${td.dataset.s}, ${td.dataset.t}, status ${st}, ${td.textContent.trim()}`)})});
- const tools=heatmap.querySelectorAll('thead th').length-1;
- $('vq-count').textContent=`Showing ${shown} of ${rows.length} samples and ${tools} tools`;
- highlight()}
-function highlight(){const s=$('vq-sample').value,t=$('vq-tool').value;
- heatmap.querySelectorAll('tbody tr').forEach(tr=>tr.classList.toggle('vq-row-hi',(tr.querySelector('td strong')?.textContent||'')===s));
- heatmap.querySelectorAll('.vq-cell').forEach(td=>td.classList.toggle('vq-selected',td.dataset.s===s&&td.dataset.t===t))}
-function move(from,dr,dc){const cells=[...heatmap.querySelectorAll('tbody tr:not(.vq-hidden) .vq-cell')];
- const rows=[...heatmap.querySelectorAll('tbody tr:not(.vq-hidden)')];
- const r=rows.indexOf(from.closest('tr')),c=[...from.parentElement.querySelectorAll('.vq-cell')].indexOf(from);
- const tr=rows[r+dr];if(!tr)return;const next=[...tr.querySelectorAll('.vq-cell')][c+dc];
- if(next){next.focus();next.click()}}
-heatmap.addEventListener('keydown',e=>{const td=e.target.closest?.('.vq-cell');if(!td)return;
- const k=e.key,map={ArrowDown:[1,0],ArrowUp:[-1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]};
- if(map[k]){e.preventDefault();move(td,...map[k])}
- else if(k==='Enter'||k===' '){e.preventDefault();td.click()}
- else if(k==='Escape'){td.blur()}});
-bar.addEventListener('change',decorate);$('vq-search').addEventListener('input',decorate);
-$('vq-reset').onclick=()=>{bar.querySelectorAll('select').forEach(s=>s.value='');$('vq-search').value='';decorate()};
-new MutationObserver(()=>decorate()).observe(heatmap,{childList:true});
-// URL state makes an exact finding shareable without a server.
-const KEYS=[['sample','vq-sample'],['tool','vq-tool'],['plasmid','vq-plasmid'],['start','vq-start'],['end','vq-end']];
-let restoring=false;
-function writeHash(){if(restoring)return;const p=new URLSearchParams();
- KEYS.forEach(([k,id])=>{const v=$(id)?.value;if(v)p.set(k,v)});
- history.replaceState(null,'','#'+p.toString())}
-function readHash(){const p=new URLSearchParams(location.hash.slice(1));if(![...p].length)return;
- restoring=true;
- for(const [k,id]of KEYS){const v=p.get(k);if(v==null)continue;const el=$(id);if(!el)continue;
-  el.value=v;el.dispatchEvent(new Event('change'))}
- restoring=false;highlight()}
-KEYS.forEach(([,id])=>$(id)?.addEventListener('change',()=>setTimeout(writeHash,0)));
-heatmap.addEventListener('click',()=>setTimeout(()=>{writeHash();highlight()},0));
-decorate();readHash();})();
-</script>""".replace("__METADATA__", json.dumps(filter_metadata, separators=(",", ":")).replace("<", "\\u003c"))
 
 
 def plasmid_summary_script():
@@ -1134,7 +881,6 @@ function markTracks(tool,elsewhere){const p=$('vq-plasmid').value;
    const title=el.querySelector('title');if(title)title.textContent=b.record_id+' — also aligns to '+others.join(', ')}})}
 ['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(render,0)));
 ['vq-fit','vq-in','vq-out'].forEach(id=>$(id)?.addEventListener('click',()=>setTimeout(render,0)));
-$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));
 render();})();
 </script>"""
 
@@ -1154,7 +900,7 @@ def record_dotplot_script():
 function state(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;return a&&a.tools[t]?{a,p,t}:null}
 function render(){const x=state();if(!x||!x.p){select.innerHTML='';return}const records=[...new Set(x.a.tools[x.t].blocks.filter(b=>b.target===x.p).map(b=>b.record_id))].sort();select.innerHTML=records.map(r=>`<option value="${r}">${r}</option>`).join('');draw()}
 function draw(){const x=state(),record=select.value;if(!x||!record)return;const blocks=x.a.tools[x.t].blocks.filter(b=>b.target===x.p&&b.record_id===record),query=Math.max(...blocks.map(b=>b.query_length),1),truth=x.a.truth_plasmids[x.p].length,sx=v=>30+v/truth*420,sy=v=>450-v/query*420;const lines=blocks.map(b=>`<line x1="${sx(b.target_start)}" y1="${sy(b.query_start)}" x2="${sx(b.target_end)}" y2="${sy(b.query_end)}" stroke="${b.strand==='-'?'#7f5aa2':'#16805a'}" stroke-width="2"/>`).join('');$('vq-dotplot').innerHTML=`<h3>Dot plot: ${record} vs ${x.p}</h3><p class="muted">One predicted-record coordinate system is shown at a time. Forward diagonals support collinearity; reverse diagonals show reverse orientation. This is a diagnostic, not structural validation.</p><svg viewBox="0 0 480 480" width="480" role="img" aria-label="Dot plot"><rect x="30" y="30" width="420" height="420" fill="#f7f8f5" stroke="#849387"/>${lines}<text x="180" y="475" font-size="11">truth plasmid coordinate</text><text x="2" y="20" font-size="11">predicted-record coordinate</text></svg>`}
-['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(draw,0));select.addEventListener('change',draw);$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));render()})();
+['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(draw,0));select.addEventListener('change',draw);render()})();
 </script>"""
 
 
@@ -1167,7 +913,7 @@ const colors={replicon:'#5b7fb6',mob:'#9b59b6',insertion_sequence:'#d06d28',amr_
 function current(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value,t=$('vq-tool').value;if(!a||!p||!a.tools[t])return null;return {a,p,t,lo:Number($('vq-start').value)||0,hi:Number($('vq-end').value)||a.truth_plasmids[p].length}}
 function overlay(){const x=current();if(!x)return;const svg=$('vq-tracks').querySelector('svg');if(!svg)return;svg.querySelectorAll('[data-context-feature]').forEach(n=>n.remove());const scale=v=>180+(v-x.lo)/(x.hi-x.lo)*880;(x.a.context_features||[]).filter(f=>f.sequence_id===x.p&&f.end>x.lo&&f.start<x.hi).forEach(f=>{const y=17,color=colors[f.feature_type]||'#5f6d6b',left=Math.max(180,scale(f.start)),right=Math.min(1060,scale(f.end));const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('data-context-feature','1');r.setAttribute('x',left);r.setAttribute('y',y);r.setAttribute('width',Math.max(2,right-left));r.setAttribute('height','6');r.setAttribute('fill',color);const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${f.feature_type}: ${f.label} (${f.source} ${f.version})`;r.append(title);svg.append(r)});}
 function render(){const x=current();if(!x){host.innerHTML='';return}const s=x.a.tools[x.t].structural_diagnostics||{};host.innerHTML='<h3>Structural alignment diagnostics</h3><p class="muted">Computed from all retained scoring blocks, not only blocks displayed in the SVG. This is a triage proxy, not a validated misassembly call.</p><div class="panel"><table><thead><tr><th>Concordance proxy</th><th>Breakpoints</th><th>Reverse blocks</th><th>Multi-target records</th><th>Order conflicts</th></tr></thead><tbody><tr><td>'+((s.structural_concordance_proxy??'-'))+'</td><td>'+(s.alignment_breakpoints??'-')+'</td><td>'+(s.reverse_orientation_blocks??'-')+'</td><td>'+(s.multi_truth_target_records??'-')+'</td><td>'+(s.order_conflicts??'-')+'</td></tr></tbody></table></div>';overlay()}
-['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(render,0));$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));render()})();
+['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(render,0));render()})();
 </script>"""
 
 
@@ -1187,7 +933,7 @@ function overlay(){const x=state(),svg=$('vq-tracks').querySelector('svg');if(!x
  truth.forEach(f=>arrow(f,26,.9));pred.forEach(f=>arrow(f,40+row*38+10,.72));}
  function render(){const x=state();if(!x)return;const truth=(x.a.protein_features||[]).filter(f=>f.sequence_id===x.p),pred=x.a.tools[x.t].protein_features||[];const categories=[...new Set(truth.map(f=>f.category||'other'))].sort();host.innerHTML='<h3>Protein annotations and coordinate recovery</h3><p class="muted">Names are standardized annotation products. Recovery is projected through nucleotide alignments and is not amino-acid identity, orthology, frameshift, or closure evidence.</p><div class="vq-protein-controls"><label>Category <select id="vq-protein-category"><option value="">All</option>'+categories.map(c=>`<option value="${c}">${c}</option>`).join('')+'</select></label><label>Search <input id="vq-protein-search" type="search" placeholder="gene or product"></label><span>Truth CDS: '+truth.length+' · mapped predicted CDS: '+pred.length+'</span></div><div class="panel"><table><thead><tr><th>Protein</th><th>Product</th><th>Category</th><th>Truth coordinates</th><th>Projected recovery</th><th>Annotation provenance</th></tr></thead><tbody id="vq-protein-body"></tbody></table></div>';
  const refresh=()=>{const q=($('vq-protein-search').value||'').toLowerCase(),c=$('vq-protein-category').value,shown=truth.filter(f=>(!c||f.category===c)&&(!q||(`${label(f)} ${f.product||''} ${f.dbxref||''}`).toLowerCase().includes(q)));$('vq-protein-body').innerHTML=shown.map(f=>{const s=status(f,pred);return `<tr><td>${label(f)}</td><td>${f.product||'hypothetical protein'}</td><td>${f.category||'other'}</td><td>${f.start}-${f.end} (${f.strand})</td><td><span class="vq-protein-status ${s}">${s==='complete'?'coordinate-complete':s==='partial'?'coordinate-partial':'not projected'}</span></td><td>${f.source} ${f.version} · ${f.confidence}</td></tr>`}).join('')||'<tr><td colspan="6">No protein annotations match this filter. Enable standardized annotation to populate this view.</td></tr>'};$('vq-protein-category').addEventListener('change',refresh);$('vq-protein-search').addEventListener('input',refresh);refresh();overlay()}
- ['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(render,0));$('vq-heatmap').addEventListener('click',()=>setTimeout(render,0));render()})();
+ ['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id).addEventListener('change',()=>setTimeout(render,0)));['vq-fit','vq-in','vq-out'].forEach(id=>$(id).addEventListener('click',()=>setTimeout(render,0));render()})();
 </script>"""
 
 
@@ -1391,13 +1137,14 @@ def main():
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(leaderboard)
     vendor_html = vendor_assets(args.project_root)
-    enterprise_html = enterprise_view_section(args.project_root, scores, status, leaderboard,
-                                              metadata, out.parent, vendor_html)
     visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
-                   + record_dotplot_script() + context_visual_script() + linked_selection_script(metadata)
+                   + record_dotplot_script() + context_visual_script() + evidence_selection_script()
                    + plasmid_summary_script() + structural_and_feature_tracks_script() + protein_annotation_script()
-                   + cohort_dashboard_script() + canvas_heatmap_script() + lazy_visualization_script() + explorer_navigation_script()
-                   + flow_and_clustering_script())
+                   + bin_flow_script() + explorer_navigation_script()
+                   + agreement_and_comparison_script()
+                   + lazy_visualization_script())
+    enterprise_html = enterprise_view_section(args.project_root, scores, status, leaderboard,
+                                              metadata, out.parent, vendor_html, visual_html)
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>PlasBench plasmid benchmark report</title>
@@ -1435,8 +1182,8 @@ const statusFilter=document.getElementById('status-filter');function filterStatu
 document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEventListener('click',()=>{{const table=head.closest('table'),body=table.tBodies[0],rows=Array.from(body.rows),ascending=head.dataset.order!=='asc';rows.sort((a,b)=>{{const av=a.cells[index]?.innerText.trim()||'',bv=b.cells[index]?.innerText.trim()||'',an=Number(av.replace(/[^0-9.-]/g,'')),bn=Number(bv.replace(/[^0-9.-]/g,''));const result=Number.isNaN(an)||Number.isNaN(bn)?av.localeCompare(bv):an-bn;return ascending?result:-result;}});rows.forEach(row=>body.appendChild(row));table.querySelectorAll('th').forEach(h=>delete h.dataset.order);head.dataset.order=ascending?'asc':'desc';}}));
 </script>
 </body></html>"""
-    page = page.replace("<a href='#selected'>", "<a href='#visual-quality'>Visual quality</a><a href='#selected'>")
-    page = page.replace("<section id='scores'>", enterprise_html + visual_html + "<section id='scores'>")
+    page = page.replace("<a href='#selected'>", "<a href='#enterprise'>Interactive dashboard</a><a href='#selected'>")
+    page = page.replace("<section id='scores'>", enterprise_html + "<section id='scores'>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
     print(f"Wrote HTML report: {out}")

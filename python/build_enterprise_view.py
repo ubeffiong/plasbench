@@ -61,6 +61,10 @@ def plasmid_rows(payload, tool):
     for feature in (payload.get("context_features") or []):
         if feature.get("feature_type") == "replicon":
             replicons.setdefault(feature["sequence_id"], feature.get("label", ""))
+    truth_proteins = defaultdict(list)
+    for feature in (payload.get("protein_features") or []):
+        truth_proteins[feature.get("sequence_id")].append(feature)
+    predicted_proteins = data.get("protein_features") or []
 
     rows = []
     for plasmid, info in payload.get("truth_plasmids", {}).items():
@@ -73,32 +77,84 @@ def plasmid_rows(payload, tool):
         on_target = sum(b["target_end"] - b["target_start"] for b in supporting if b["target"] == plasmid)
         total = sum(b["target_end"] - b["target_start"] for b in supporting)
         purity = (on_target / total) if total else None
+        # Records supporting this plasmid that also land elsewhere: a merge when
+        # they reach another truth plasmid, contamination when they reach the
+        # chromosome, ambiguity when the same span maps more than one way.
+        elsewhere = {}
+        for block in data["blocks"]:
+            if block["record_id"] in set(records):
+                elsewhere.setdefault(block["record_id"], set()).add(
+                    "chromosome" if block["molecule_type"] == "CHROMOSOME" else block["target"])
+        chromosome_records = [r for r, t_ in elsewhere.items() if "chromosome" in t_]
+        cross_plasmid = [r for r, t_ in elsewhere.items() if (t_ - {plasmid, "chromosome"})]
+        ambiguous_records = [r for r, t_ in elsewhere.items() if len(t_) > 2]
+        collinear = (data.get("structural_diagnostics") or {}).get("collinear_fraction")
         rows.append({
             "id": plasmid,
             "length": info.get("length", 0),
             "circular": plasmid in circular,
             "replicon": replicons.get(plasmid) or "not evaluated",
             "amrGenes": features.get(plasmid, []),
+            "proteins": truth_proteins.get(plasmid, []),
+            "projectedProteins": [p for p in predicted_proteins if p.get("sequence_id") == plasmid],
             "recoveryPct": round(completeness * 100, 2),
             "purityPct": round(purity * 100, 2) if purity is not None else None,
             "structuralConcordance": None,
-            "recoveryClass": classify(completeness, len(records)),
+            "recoveryClass": classify(
+                completeness, len(records), purity=purity,
+                merged=bool(cross_plasmid), chromosomal=bool(chromosome_records),
+                collinear=collinear, ambiguous=bool(ambiguous_records)),
             "bestTool": tool,
             "contigs": len(records),
         })
     return sorted(rows, key=lambda r: -r["recoveryPct"])
 
 
-def classify(completeness, records):
-    if completeness >= 0.99:
-        return "complete_concordant"
+def classify(completeness, records, purity=None, merged=False, chromosomal=False,
+             collinear=None, ambiguous=False):
+    """Assign one of the nine documented recovery classes.
+
+    Thresholds are display bands for triage, not acceptance criteria. Purity,
+    merge and contamination evidence outrank completeness: a plasmid can be
+    fully covered and still be reconstructed wrongly, which a completeness-only
+    label would hide.
+    """
+    if ambiguous:
+        return "ambiguous"
+    if chromosomal:
+        return "chromosomal_contam"
+    if merged:
+        return "merged"
     if completeness >= 0.90:
+        # Structural disagreement matters most where coverage looks complete.
+        if collinear is not None and collinear < 0.75:
+            return "complete_discordant"
+        if completeness >= 0.99:
+            return "complete_concordant"
         return "near_complete"
     if completeness >= 0.5:
         return "fragmented" if records > 2 else "partial"
     if completeness > 0:
         return "partial"
     return "not_recovered"
+
+
+def protein_completeness(payload, tool):
+    """Coordinate-complete named CDS fraction, or None when unmeasured."""
+    if not payload or tool not in payload.get("tools", {}):
+        return None
+    truth = payload.get("protein_features") or []
+    predicted = payload["tools"][tool].get("protein_features") or []
+    if not truth or not predicted:
+        return None
+    complete = 0
+    for feature in truth:
+        projections = [p.get("projection_fraction", 0) for p in predicted
+                       if p.get("sequence_id") == feature.get("sequence_id")
+                       and p.get("end", 0) > feature.get("start", 0)
+                       and p.get("start", 0) < feature.get("end", 0)]
+        complete += bool(projections and max(projections) >= 0.95)
+    return complete / len(truth)
 
 
 def contig_rows(payload, tool, plasmid):
@@ -131,14 +187,37 @@ def contig_rows(payload, tool, plasmid):
             offsets = [i for i, (a, b) in enumerate(zip(reference, sequence)) if a != b]
             mismatches = len(offsets)
         # Segment track: one block per alignment, plus the uncovered spans between.
-        segments, cursor = [], items[0]["target_start"]
+        segments, cursor, seen_spans = [], items[0]["target_start"], []
+        others = elsewhere[record] - {plasmid}
         for block in items:
             if block["target_start"] > cursor:
                 segments.append({"start": cursor, "end": block["target_start"],
                                  "type": "missing", "len": block["target_start"] - cursor})
-            kind = "inverted" if block["strand"] == "-" else "good"
+            span = (block["target_start"], block["target_end"])
+            identity = block["matches"] / block["block_length"] if block["block_length"] else 1.0
+            # Order matters: the most specific evidence wins the segment label.
+            if any(s[0] < span[1] and span[0] < s[1] for s in seen_spans):
+                kind = "duplicated"
+            elif block["strand"] == "-":
+                kind = "inverted"
+            elif "chromosome" in others:
+                kind = "chromosomal"
+            elif others:
+                kind = "wrong_plasmid"
+            elif len(others) > 1:
+                kind = "ambiguous"
+            elif identity < 0.90:
+                kind = "low_identity"
+            else:
+                kind = "good"
+            seen_spans.append(span)
             segments.append({"start": block["target_start"], "end": block["target_end"],
-                             "type": kind, "len": block["target_end"] - block["target_start"]})
+                             "type": kind, "len": block["target_end"] - block["target_start"],
+                             "identity": round(identity * 100, 2)})
+            # A join between blocks the reference does not support is its own event.
+            if cursor and block["target_start"] > cursor + 1000:
+                segments.append({"start": cursor, "end": block["target_start"],
+                                 "type": "unsupported_join", "len": block["target_start"] - cursor})
             cursor = max(cursor, block["target_end"])
         rows.append({
             "id": record,
@@ -182,6 +261,7 @@ def build(scores, status, leaderboard, metadata, capabilities, versions, visuali
                 "circular": bool((payload or {}).get("circular_truth_plasmids")),
                 "amrPresent": bool((payload or {}).get("amr_features")),
                 "cohort": meta_row.get("bioproject") or "not recorded",
+                "origin": meta_row.get("sample_origin") or "not recorded",
                 "tier": meta_row.get("truth_quality_tier") or "",
             },
             "metrics": {},
@@ -213,6 +293,15 @@ def build(scores, status, leaderboard, metadata, capabilities, versions, visuali
                 "runtime": number(profile.get("runtime_seconds"), 1 / 60),
                 "memory": number(profile.get("peak_rss_kb"), 1 / (1024 * 1024)),
                 "status": profile.get("status", "scored"),
+                "proteinCompleteness": protein_completeness(payload, tool),
+                # Already produced by scoring and bin diagnostics; surfaced so the
+                # matrix can rank on contamination and fragmentation, not only F1.
+                "contamination": (fp / (tp + fp)) if (tp + fp) else None,
+                "unmapped": number(row.get("unmapped_pred_bp")),
+                "splitEvents": number(row.get("split_events")),
+                "mergeEvents": number(row.get("merge_events")),
+                "amrRecall": number(row.get("amr_gene_recall")),
+                "repliconRecall": number(row.get("replicon_recall")),
             }
             if f1 is not None and f1 > best_score:
                 best, best_score = tool, f1
@@ -234,6 +323,8 @@ def build(scores, status, leaderboard, metadata, capabilities, versions, visuali
         "statuses": STATUSES,
         "organisms": sorted({dataset[s]["meta"]["organism"] for s in samples}),
         "technologies": sorted({dataset[s]["meta"]["technology"] for s in samples}),
+        "origins": sorted({dataset[s]["meta"]["origin"] for s in samples}),
+        "tiers": sorted({dataset[s]["meta"]["tier"] for s in samples}),
         "replicons": sorted({p["replicon"] for rows in plasmid_data.values() for p in rows}),
         "amrGenes": sorted({g for rows in plasmid_data.values() for p in rows for g in p["amrGenes"]}),
         "provenance": {"source": "measured PlasBench run", "simulated": False,
