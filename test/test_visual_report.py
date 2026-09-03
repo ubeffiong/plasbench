@@ -209,9 +209,18 @@ def main():
     # Tabs are keyboard operable, which a plain click handler would not give.
     for needed in ("ArrowRight", "ArrowLeft", "'Home'", "'End'"):
         assert needed in page, f"tab keyboard navigation missing: {needed}"
-    # A hidden pane is laid out at zero width, so panels that size to their box
-    # must be told when they become visible.
-    assert "new Event('resize')" in page,         "tab switching must nudge panels that measure their own box"
+    # A hidden pane is laid out at zero width, so a panel that measures its box
+    # at draw time has to be told once the pane is visible -- after layout has
+    # settled, which a synchronous dispatch inside the click handler is not.
+    assert "requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))" in page,         "the reveal nudge must run after layout, not during the click"
+
+    # Tabs and panels must name each other, or a reader announces seven
+    # unlabelled regions, and the strip needs one tab stop rather than seven.
+    for needed in ("aria-controls", "aria-labelledby", "aria-label",
+                   "tabindex',on?'0':'-1'"):
+        assert needed in page, f"tab accessibility wiring missing: {needed}"
+    # The expand control reports its own state.
+    assert 'aria-expanded="false"' in page and "aria-expanded',String(on)" in page,         "the card expand control does not report its state"
     # The accordion it replaced must not linger alongside it.
     for gone in ("vq-shell", "vq-toolbar", "vq-expand-all", "vq-collapse-all"):
         assert gone not in page, f"replaced accordion chrome remains: {gone}"
@@ -263,10 +272,14 @@ def main():
     explorer_doc = page[start:page.index("</script>", start)]
     # Canvas labels are drawn in JS and cannot inherit the CSS scale.
     assert "'7px Inter" not in explorer_doc and "'6px Inter" not in explorer_doc,         "explorer canvas labels must not be drawn at 6-7px"
-    # No CSS declaration below 11px anywhere in the explorer.
-    small = sorted({int(m) for m in re.findall(r"font-size: ?(\d+)px", explorer_doc)
-                    if int(m) < 11})
-    assert not small, f"explorer type scale still has unreadable sizes: {small}px"
+    # A floor on the explorer's type. 10px is reserved for the uppercase micro
+    # labels above a picker, which are read together with the value beneath
+    # them; body text and data never go below 11px.
+    sizes = [int(m) for m in re.findall(r"font-size: ?(\d+)px", explorer_doc)]
+    assert sizes, "no font sizes found; the extraction is wrong"
+    small = sorted({s for s in sizes if s < 10})
+    assert not small, f"explorer type scale has unreadable sizes: {small}px"
+    assert sizes.count(10) <= 3,         "10px is for picker micro-labels only; it has spread into the interface"
 
     # No inert controls. Every display option must be read by the renderer, not
     # merely stored: "Show gaps" and "Show mismatches" shipped as checkboxes
