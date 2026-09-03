@@ -1,0 +1,4 @@
+tool_a	tool_b	paired_samples	mean_f1_difference	difference_ci_low	difference_ci_high	permutation_p_value	permutation_p_value_holm	wins_a	ties	wins_b
+good	leaky	2	0.0725					2	0	0
+good	shy	2	0.3030					2	0	0
+leaky	shy	2	0.2305					2	0	0

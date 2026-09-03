@@ -1,0 +1,3 @@
+held_out_study	held_out_samples	selected_method_from_training	training_samples	held_out_mean_f1	status	note
+Demo study A	1	good	1	1.0000	assessed	Training-only mean-F1 selector evaluated on the held-out study; interpret descriptively.
+Demo study B	1	good	1	1.0000	assessed	Training-only mean-F1 selector evaluated on the held-out study; interpret descriptively.

@@ -29,6 +29,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     AMR="$SDIR/truth_amr.tsv"
     CIRCULAR="$SDIR/truth_circular.tsv"
     FEATURES="$SDIR/truth_features.tsv"
+    TRUTH_PROTEINS="$SDIR/truth_proteins.tsv"
     [[ -s "$REF" && -s "$TRUTH" ]] || { warn "missing reference/truth for $SAMPLE"; continue; }
     log "=== Score $SAMPLE ==="
 
@@ -40,11 +41,32 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         continue
     fi
 
+    if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
+        CACHE="$RESULTS_DIR/.protein_annotation_cache"
+        PROTEIN_DB_ARGS=()
+        [[ -n "${PROTEIN_ANNOTATION_DATABASE:-}" ]] && PROTEIN_DB_ARGS=(--database "$PROTEIN_ANNOTATION_DATABASE")
+        if [[ ! -s "$TRUTH_PROTEINS" || "$TRUTH_PROTEINS" -ot "$REF" ]]; then
+            python3 "$HERE/../python/annotate_proteins.py" --fasta "$REF" --out "$TRUTH_PROTEINS" \
+                --provenance "$SDIR/truth_proteins.provenance.json" --engine "$PROTEIN_ANNOTATION_ENGINE" \
+                --cache-dir "$CACHE" --threads "$PROTEIN_ANNOTATION_THREADS" --minimum-bp "$PROTEIN_ANNOTATION_MIN_BP" "${PROTEIN_DB_ARGS[@]}" \
+                >> "$LOG_DIR/${SAMPLE}.protein_annotation.log" 2>&1 || warn "truth protein annotation failed for $SAMPLE"
+        fi
+    fi
+
     for PRED in "${preds[@]}"; do
         base=$(basename "$PRED")
         tool="${base#pred_}"; tool="${tool%.plasmid.fasta}"
         DONE="$RDIR/.${tool}.complete"
         [[ -e "$DONE" ]] || { warn "  ignoring incomplete $tool result for $SAMPLE"; continue; }
+        if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
+            PROTEINS="$RDIR/${tool}.proteins.tsv"
+            if [[ ! -s "$PROTEINS" || "$PROTEINS" -ot "$PRED" ]]; then
+                python3 "$HERE/../python/annotate_proteins.py" --fasta "$PRED" --out "$PROTEINS" \
+                    --provenance "$RDIR/${tool}.proteins.provenance.json" --engine "$PROTEIN_ANNOTATION_ENGINE" \
+                    --cache-dir "$CACHE" --threads "$PROTEIN_ANNOTATION_THREADS" --minimum-bp "$PROTEIN_ANNOTATION_MIN_BP" "${PROTEIN_DB_ARGS[@]}" \
+                    >> "$LOG_DIR/${SAMPLE}.${tool}.protein_annotation.log" 2>&1 || warn "protein annotation failed for $SAMPLE/$tool"
+            fi
+        fi
         PAF="$RDIR/${tool}.pred_vs_ref.paf"
         AMBIGUITY_PAF="$RDIR/${tool}.pred_vs_ref.all.paf"
         AMBIGUITY_ARGS=()
@@ -114,7 +136,11 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     # display payload. These are alignment-derived, not validated misassemblies.
     python3 "$HERE/../python/call_structural_variants.py" --truth "$TRUTH" --results-dir "$RESULTS_DIR"         --sample "$SAMPLE" --events-out "$RDIR/structural_events.tsv"         --summary-out "$RDIR/structural_summary.tsv"         --json-out "$RDIR/visualization/structural_calls.json"         >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 ||         warn "structural calling failed for $SAMPLE; scores are retained"
     python3 "$HERE/../python/build_visualization_data.py" --truth "$TRUTH" --reference "$REF" --results-dir "$RESULTS_DIR" \
-        --sample "$SAMPLE" --amr-truth "$AMR" --feature-truth "$FEATURES" --circular-truth "$CIRCULAR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" --max-nucleotide-bp "$VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP" \
+        --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
+        warn "visualization data generation failed for $SAMPLE; scores are retained"
+        --sample "$SAMPLE" --amr-truth "$AMR" --feature-truth "$FEATURES" --protein-truth "$TRUTH_PROTEINS" --circular-truth "$CIRCULAR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" --max-nucleotide-bp "$VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP" \
+        --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
+        warn "visualization data generation failed for $SAMPLE; scores are retained"
         --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
         warn "visualization data generation failed for $SAMPLE; scores are retained"
 done < <(read_samples "$SAMPLE_SHEET")

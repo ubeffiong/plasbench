@@ -312,6 +312,8 @@ plasbench install-tools core
 plasbench install-tools assembly
 plasbench install-tools reconstruction
 plasbench install-tools long-read
+plasbench install-tools annotation
+plasbench install-tools annotation-prokka
 plasbench install-tools all
 plasbench install-tools --env myenv mob_suite
 ```
@@ -323,6 +325,38 @@ gplas with deterministic MOB-recon membership from the same assembly graph and
 writes a provenance JSON; these seed values are hard labels, not calibrated
 probabilities. `RUN_GPLAS2_EXTERNAL=1` accepts a validated external classifier
 TSV instead. Run `plasbench install-tools --help` for the exact syntax.
+
+### Optional Protein Names And Functional Tracks
+
+Raw FASTA contains nucleotide bases, not protein names. To add standardized
+protein labels to the interactive report, install Bakta (recommended) and set
+the following before `plasbench run`:
+
+```bash
+plasbench install-tools annotation
+export RUN_PROTEIN_ANNOTATION=1
+export PROTEIN_ANNOTATION_ENGINE=bakta
+# Set this when Bakta has no configured default database.
+export PROTEIN_ANNOTATION_DATABASE=/path/to/versioned/bakta_db
+```
+
+PlasBench then annotates the reference and every standardized predicted-plasmid
+FASTA using one engine, caches results by normalized sequence checksum, and
+records annotation provenance. The viewer displays gene/product names,
+functional categories, coordinates, and projected nucleotide-coordinate
+recovery. This projection is useful for locating named genes such as `blaCTX-M`,
+`repA`, or `traI`, but is **not** protein identity, orthology, frameshift, or
+closure validation. Missing Bakta/Prokka is reported as `not evaluated`; it
+does not change DNA-level scores or mean F1.
+
+For reproducible cached Bakta annotations, provide
+`PROTEIN_ANNOTATION_DATABASE`; an implicit/default Bakta database is allowed
+for exploration but is intentionally not reused from the persistent cache.
+
+Use `PROTEIN_ANNOTATION_ENGINE=prokka` only as a compatible fallback. Do not
+mix engines in one headline comparison. Online BLASTx remains appropriate for
+manual investigation of a small number of sequences, not automated benchmark
+annotation, because database state and results are not reproducibly pinned.
 
 Run `plasbench --help` for the concise command list and `plasbench run --help`
 for all run options.
@@ -508,10 +542,12 @@ results/<sample>/visualization/alignment_blocks.json
 results/<sample>/
     Standardized prediction FASTAs, alignments, tool output, and completion markers.
 
-results/<sample>/selected_candidate/
+results/selected_candidates/<sample>/
     The best already-produced truth-set candidate FASTA, any available bin/map
-    evidence, and `selection_report.json`. This is copied after scoring and
-    does not rerun reconstruction or fabricate a consensus sequence.
+    evidence, and `<sample>.selection_report.json`. Every file is prefixed with
+    the sample id so candidates stay identifiable once gathered together. This
+    is copied after scoring and does not rerun reconstruction or fabricate a
+    consensus sequence.
 
 logs/
     Tool and minimap2 logs for diagnosis.
@@ -564,7 +600,7 @@ independent structural proof.
 ## Operational Selection
 
 Stage 6 automatically retains the best already-generated candidate for every
-scored sample in `results/<sample>/selected_candidate/`. The choice is a
+scored sample in `results/selected_candidates/<sample>/`. The choice is a
 transparent, multi-objective prioritisation of F1, plasmid/bin recovery,
 precision/recall, unmapped sequence, ambiguity, contamination, and split/merge
 diagnostics. It is not proof of plasmid closure or biological correctness.

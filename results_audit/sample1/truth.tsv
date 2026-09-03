@@ -1,0 +1,4 @@
+sequence_id	molecule_type	length
+chr1	CHROMOSOME	8000
+pA	PLASMID	2000
+pB	PLASMID	1500

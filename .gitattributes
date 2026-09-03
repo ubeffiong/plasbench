@@ -1,2 +1,5 @@
 # Cohort TSVs may end with intentional empty optional fields represented by tabs.
 *.tsv -whitespace
+
+# Pipeline entry points must remain executable in Linux, WSL, Docker, and CI.
+*.sh text eol=lf

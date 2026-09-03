@@ -1,0 +1,7 @@
+sample	tool	status	prediction_fasta	reason
+sample1	good	completed		
+sample1	leaky	completed		
+sample1	shy	completed		
+sample2	good	completed		
+sample2	leaky	completed		
+sample2	shy	completed		

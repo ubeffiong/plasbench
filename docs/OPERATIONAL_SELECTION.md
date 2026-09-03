@@ -9,8 +9,10 @@ PlasBench makes two deliberately different outputs after stage 6:
    first row is structurally correct for every isolate.
 2. **Reusable per-isolate candidate.** For each sample, PlasBench copies the
    highest-quality *already generated* standardised prediction to
-   `results/<sample>/selected_candidate/`. This avoids a second reconstruction
+   `results/selected_candidates/<sample>/`. This avoids a second reconstruction
    run and retains the exact source FASTA, bins, maps, and selection rationale.
+   Every candidate file is prefixed with its sample id, so the whole cohort's
+   candidates can be gathered into one directory without name collisions.
 
 No consensus sequence is fabricated and no external tool is rerun. The copied
 sequence remains a computational candidate, not a confirmed plasmid sequence.
@@ -20,15 +22,15 @@ sequence remains a computational candidate, not a confirmed plasmid sequence.
 ```text
 results/benchmark.recommendations.tsv
 results/benchmark.stratified.tsv
-results/<sample>/selected_candidate/candidate.plasmid.fasta
-results/<sample>/selected_candidate/candidate.bins.tsv          # when emitted
-results/<sample>/selected_candidate/candidate.pred_vs_ref.paf   # truth-set runs
-results/<sample>/selected_candidate/candidate.pred_vs_ref.all.paf # ambiguity diagnostic, when enabled
-results/<sample>/selected_candidate/candidate.bin_matches.tsv   # binning tools
-results/<sample>/selected_candidate/selection_report.json
+results/selected_candidates/<sample>/<sample>.candidate.plasmid.fasta
+results/selected_candidates/<sample>/<sample>.candidate.bins.tsv          # when emitted
+results/selected_candidates/<sample>/<sample>.candidate.pred_vs_ref.paf   # truth-set runs
+results/selected_candidates/<sample>/<sample>.candidate.pred_vs_ref.all.paf # ambiguity diagnostic, when enabled
+results/selected_candidates/<sample>/<sample>.candidate.bin_matches.tsv   # binning tools
+results/selected_candidates/<sample>/<sample>.selection_report.json
 ```
 
-`selection_report.json` identifies the selected tool, metrics available for the
+`<sample>.selection_report.json` identifies the selected tool, metrics available for the
 truth-set sample, operational recommendation, copied files, rejected tool
 candidates, and reasons long-read confirmation is required. For an unknown
 sample without truth, the report records an `operational_method_recommendation`

@@ -1,0 +1,92 @@
+{
+  "analysis_track": "short_read",
+  "candidate_metrics": {
+    "FN_bp": "0",
+    "FP_bp": "0",
+    "TP_bp": "1000",
+    "alignment_retained": "1",
+    "alignment_total": "1",
+    "ambiguously_mapped_pred_bp": "0",
+    "amr_gene_recall": "",
+    "amr_status": "AMR not annotated",
+    "analysis_track": "short_read",
+    "circular_plasmid_recall": "",
+    "circular_truth_plasmid_recovery": "",
+    "collection_country": "Nigeria",
+    "f1": "1.0000",
+    "filtered_alignment_count": "0",
+    "fragmentation_excess_records": 0.0,
+    "gram_group": "Gram-negative",
+    "mapped_pred_bp": "1000",
+    "organism": "Demo bacterium",
+    "plasmid_count_band": "single",
+    "plasmid_recall": "1.0000",
+    "plasmid_size_band": "small",
+    "precision": "1.0000",
+    "predicted_record_count": "1",
+    "read_depth_band": "high",
+    "recall": "1.0000",
+    "recovered_amr_gene_count": "",
+    "recovered_circular_plasmid_count": "",
+    "recovered_plasmid_count": "1",
+    "sample": "sample2",
+    "sample_origin": "synthetic",
+    "tool": "good",
+    "true_amr_gene_count": "",
+    "true_circular_plasmid_count": "",
+    "true_plasmid_bp": "1000",
+    "true_plasmid_count": "1",
+    "truth_technology": "hybrid",
+    "unambiguously_mapped_pred_bp": "1000",
+    "unmapped_pred_bp": "0"
+  },
+  "circularity_reconstruction": "not assessed; circular truth recovery is not evidence that the prediction is closed",
+  "confidence_tier": "high",
+  "copied_files": [
+    "candidate.plasmid.fasta",
+    "candidate.pred_vs_ref.paf"
+  ],
+  "cross_tool_agreement": {
+    "compared_tools": [
+      {
+        "reference_footprint_jaccard": 0.8333,
+        "tool": "leaky"
+      },
+      {
+        "reference_footprint_jaccard": 0.5,
+        "tool": "shy"
+      }
+    ],
+    "mean_reference_footprint_jaccard": 0.6667,
+    "meaning": "Agreement is reference-footprint overlap, not proof of structural identity.",
+    "status": "moderate"
+  },
+  "ensemble": {
+    "generated": false,
+    "reason": "PlasBench does not fabricate a consensus reconstruction without validated structural rules.",
+    "requested": false
+  },
+  "long_read_confirmation_reasons": [],
+  "operational_recommendation": "good",
+  "operational_recommendation_validation": "assessed",
+  "rejected_candidates": [
+    {
+      "reason": "lower truth-set candidate quality",
+      "tool": "leaky"
+    },
+    {
+      "reason": "lower truth-set candidate quality",
+      "tool": "shy"
+    }
+  ],
+  "sample_id": "sample2",
+  "schema_version": "1.0",
+  "selected_tool": "good",
+  "selection_criteria": "multi-objective score: F1, plasmid/bin recovery, precision/recall, and penalties for unmapped sequence, split/merge, and contamination",
+  "selection_type": "truth_set_best_candidate",
+  "structural_evidence": {
+    "items": [],
+    "status": "not_supplied"
+  },
+  "truth_available": true
+}
