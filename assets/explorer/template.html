@@ -234,13 +234,13 @@ __PB_FONTS__
 
         /* ── Split/Merge Panel ── */
         .split-merge-panel {
-            margin-top: 4px;
             background: var(--bg-card);
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border-color);
-            padding: 8px 12px;
-            flex: 0 0 auto;
+            border-top: 1px solid var(--border-color);
+            padding: 10px 16px 12px;
+            flex: 1 1 auto; min-height: 130px;
+            display: flex; flex-direction: column;
         }
+        .split-merge-panel canvas { flex: 1 1 auto; min-height: 0; }
         .split-merge-panel .sm-title {
             font-size: 12px; font-weight: 600;
             color: var(--text-muted); text-transform: uppercase;
@@ -248,8 +248,7 @@ __PB_FONTS__
             display: flex; align-items: center; gap: 6px;
         }
         .split-merge-panel canvas {
-            width: 100%; height: 80px;
-            display: block; border-radius: 4px;
+            width: 100%; display: block; border-radius: 4px;
             background: var(--bg-primary);
         }
 
@@ -294,8 +293,8 @@ __PB_FONTS__
         .viewport-toolbar .context .highlight { color: var(--accent-cyan); }
 
         .viewport-canvas-wrap {
-            flex: 1; position: relative; overflow: hidden;
-            background: var(--bg-primary); min-height: 400px;
+            flex: 0 0 auto; position: relative; overflow: hidden;
+            background: var(--bg-primary); min-height: 240px;
         }
         .viewport-canvas-wrap canvas {
             display: block; width: 100%; height: 100%;
@@ -314,31 +313,26 @@ __PB_FONTS__
 
         /* ── Details Overlay ── */
         .details-overlay {
-            position: absolute; bottom: 12px; right: 12px;
-            width: 340px; max-height: 50%;
-            background: rgba(21,30,43,0.96);
-            border: 1px solid var(--border-color);
+            position: fixed; left: 0; top: 0;
+            width: 330px; max-height: 60vh;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
             border-radius: var(--radius-sm);
-            padding: 12px 16px;
-            box-shadow: var(--shadow);
-            overflow-y: auto; font-size: 14px;
-            display: none; z-index: 10;
-            backdrop-filter: blur(6px);
+            padding: 10px 14px;
+            box-shadow: 0 8px 28px rgba(22,33,28,.22);
+            overflow: hidden; font-size: 13px;
+            display: none; z-index: 40;
+            pointer-events: none;
         }
         .details-overlay.visible { display: block; }
-        .details-overlay .close-details {
-            float: right; background: none; border: none;
-            color: var(--text-muted); cursor: pointer; font-size: 18px;
-        }
-        .details-overlay .close-details:hover { color: var(--text-primary); }
         .details-overlay .detail-title {
             font-weight: 600; font-size: 15px;
             color: var(--text-primary); margin-bottom: 4px;
         }
         .details-overlay .detail-row {
-            display: flex; justify-content: space-between;
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(34,48,64,0.5);
+            display: flex; justify-content: space-between; gap: 14px;
+            padding: 3px 0;
+            border-bottom: 1px solid var(--border-color);
         }
         .details-overlay .detail-row .label { color: var(--text-muted); }
         .details-overlay .detail-row .value { color: var(--text-secondary); font-weight: 500; }
@@ -576,18 +570,6 @@ __PB_FONTS__
                     </div>
                 </div>
 
-                <!-- Split/Merge Diagram -->
-                <div class="split-merge-panel">
-                    <div class="sm-title"><i class="fas fa-code-branch"></i> Split / Merge Map</div>
-                    <canvas id="splitMergeCanvas"></canvas>
-                    <div style="font-size:14px;color:var(--text-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;">
-                        <span><span style="display:inline-block;width:8px;height:8px;background:#4ade80;border-radius:2px;"></span> 1:1</span>
-                        <span><span style="display:inline-block;width:8px;height:8px;background:#fbbf24;border-radius:2px;"></span> Split (1→2)</span>
-                        <span><span style="display:inline-block;width:8px;height:8px;background:#f472b6;border-radius:2px;"></span> Merge (2→1)</span>
-                        <span><span style="display:inline-block;width:8px;height:8px;background:#f87171;border-radius:2px;"></span> Complex</span>
-                    </div>
-                </div>
-
                 <!-- Legend -->
                 <div class="sidebar-section">
                     <div class="section-title"><i class="fas fa-palette"></i> Legend</div>
@@ -643,10 +625,24 @@ __PB_FONTS__
                     <canvas id="mainCanvas"></canvas>
                     <!-- Details Overlay -->
                     <div class="details-overlay" id="detailsOverlay">
-                        <button class="close-details" id="closeDetailsBtn">&times;</button>
                         <div class="detail-title" id="detailTitle">Alignment Block</div>
                         <div id="detailContent"></div>
                         <div class="interpretation" id="detailInterpretation"></div>
+                    </div>
+                </div>
+
+                <!-- Split / Merge Map: a graph of this sample's evidence, so it
+                     sits with the tracks rather than among the sidebar controls. -->
+                <div class="split-merge-panel">
+                    <div class="sm-title"><i class="fas fa-code-branch"></i> Split / Merge Map
+                        <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);">
+                            truth plasmids to predicted bins, measured by bin scoring</span></div>
+                    <canvas id="splitMergeCanvas"></canvas>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;">
+                        <span><span style="display:inline-block;width:9px;height:9px;background:#17805a;border-radius:2px;"></span> 1:1</span>
+                        <span><span style="display:inline-block;width:9px;height:9px;background:#a35c05;border-radius:2px;"></span> Split (1&#8594;2)</span>
+                        <span><span style="display:inline-block;width:9px;height:9px;background:#b03a80;border-radius:2px;"></span> Merge (2&#8594;1)</span>
+                        <span><span style="display:inline-block;width:9px;height:9px;background:#b3261e;border-radius:2px;"></span> Complex</span>
                     </div>
                 </div>
 
@@ -806,6 +802,18 @@ __PB_FONTS__
         }
 
         function render() {
+            // Rows have a preferred height and the plot is sized to hold them,
+            // rather than the rows being stretched to fill a fixed box. The
+            // space that used to sit empty under the last row now goes to the
+            // split/merge graph below.
+            const rowsNeeded = (state.pinReference ? 1 : 0) +
+                state.rowOrder.length + (state.mode === 'A' && state.showLabels ? 1 : 0);
+            const preferredRow = state.mode === 'A' ? 34 : 58;
+            const chrome = 40 + 34 + 28;
+            const wanted = chrome + rowsNeeded * (preferredRow + 6);
+            const ceiling = Math.max(240, window.innerHeight - 320);
+            viewportWrap.style.height = Math.min(wanted, ceiling) + 'px';
+
             const rect = viewportWrap.getBoundingClientRect();
             const W = rect.width - 2;
             const H = rect.height - 2;
@@ -878,8 +886,8 @@ __PB_FONTS__
             const available = plotH - 34;
             const fitted = Math.floor(available / Math.max(1, rowCount)) - rowGap;
             const trackH = state.mode === 'A'
-                ? clamp(fitted, 26, 88)
-                : clamp(fitted, 34, 112);
+                ? clamp(fitted, 20, preferredRow)
+                : clamp(fitted, 28, preferredRow);
             const trackGap = rowGap;
             let yOffset = pad.top + 34;
 
@@ -1159,7 +1167,12 @@ __PB_FONTS__
             // Height follows the number of rows: a fixed 80px squeezed every
             // truth plasmid and predicted bin into a few unreadable pixels.
             const rows = Math.max(1, data.truth.length, data.predicted.length);
-            const H = Math.max(96, rows * 24 + 26);
+            // Enough for every row, and more when the column has room to give.
+            const panel = splitMergeCanvas.parentElement;
+            const spare = panel.clientHeight -
+                [...panel.children].reduce((sum, el) =>
+                    sum + (el === splitMergeCanvas ? 0 : el.getBoundingClientRect().height), 0) - 8;
+            const H = Math.max(96, rows * 24 + 26, Math.min(spare, rows * 60 + 26));
             splitMergeCanvas.width = W * 2;
             splitMergeCanvas.height = H * 2;
             splitMergeCanvas.style.width = W + 'px';
@@ -1236,34 +1249,70 @@ __PB_FONTS__
         //  5. INTERACTIONS
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        canvas.addEventListener('click', function(e) {
+        // What is under the pointer is reported on hover. A panel you have to
+        // open and then dismiss is the wrong shape for "what is this block?".
+        function hitTest(e) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width / 2;
             const scaleY = canvas.height / rect.height / 2;
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
-
-            const segments = canvas._segments || [];
-            for (let seg of segments) {
+            for (const seg of (canvas._segments || [])) {
                 if (x >= seg._x1 && x <= seg._x2 && y >= seg._y1 && y <= seg._y2) {
-                    state.selectedSegment = seg;
-                    showSegmentDetails(seg);
-                    return;
+                    return { kind: 'segment', item: seg };
                 }
             }
-
-            const proteins = canvas._proteins || [];
-            for (let p of proteins) {
+            for (const p of (canvas._proteins || [])) {
                 if (x >= p._x1 && x <= p._x2 && y >= p._y1 && y <= p._y2) {
-                    state.selectedProtein = p;
-                    showProteinDetails(p);
-                    return;
+                    return { kind: 'protein', item: p };
                 }
             }
+            return null;
+        }
 
-            state.selectedSegment = null;
-            state.selectedProtein = null;
+        function placeTip(e) {
+            // Flip the tooltip around the cursor rather than let it leave the
+            // window on the right or bottom edge.
+            const box = detailsOverlay.getBoundingClientRect();
+            const margin = 14;
+            let left = e.clientX + margin;
+            let top = e.clientY + margin;
+            if (left + box.width > window.innerWidth - 8) left = e.clientX - box.width - margin;
+            if (top + box.height > window.innerHeight - 8) top = e.clientY - box.height - margin;
+            detailsOverlay.style.left = Math.max(8, left) + 'px';
+            detailsOverlay.style.top = Math.max(8, top) + 'px';
+        }
+
+        let hovered = null;
+        canvas.addEventListener('mousemove', function(e) {
+            const hit = hitTest(e);
+            if (!hit) {
+                hovered = null;
+                detailsOverlay.classList.remove('visible');
+                canvas.style.cursor = 'grab';
+                return;
+            }
+            canvas.style.cursor = 'pointer';
+            if (hit.item !== hovered) {
+                hovered = hit.item;
+                if (hit.kind === 'segment') showSegmentDetails(hit.item);
+                else showProteinDetails(hit.item);
+            }
+            detailsOverlay.classList.add('visible');
+            placeTip(e);
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            hovered = null;
             detailsOverlay.classList.remove('visible');
+        });
+
+        // Clicking still selects -- the selection drives the export region and
+        // the highlight -- it just no longer opens anything.
+        canvas.addEventListener('click', function(e) {
+            const hit = hitTest(e);
+            state.selectedSegment = hit && hit.kind === 'segment' ? hit.item : null;
+            state.selectedProtein = hit && hit.kind === 'protein' ? hit.item : null;
             render();
         });
 
@@ -1316,7 +1365,6 @@ __PB_FONTS__
             } else {
                 detailInterpretation.style.display = 'none';
             }
-            render();
         }
 
         function showProteinDetails(p) {
@@ -1330,17 +1378,16 @@ __PB_FONTS__
                 <div class="detail-row"><span class="label">Status</span><span class="value">${p.status}</span></div>
                 <div class="detail-row"><span class="label">Length</span><span class="value">${p.length} bp</span></div>
             `;
-            detailInterpretation.textContent = '🔍 Protein recovered with status: ' + p.status;
-            detailInterpretation.style.display = 'block';
-            render();
+            // Coordinate recovery, per method, since a feature can be complete
+            // for one reconstruction and missing from another.
+            const byTool = p.statusByTool || {};
+            const perTool = Object.keys(byTool).sort()
+                .map(id => id + ': ' + byTool[id]).join(' · ');
+            detailInterpretation.textContent = '🔍 Coordinate recovery — ' +
+                (perTool || p.status) + '. This is span coverage, not amino-acid identity.';
+            detailInterpretation.style.display = state.showInterpretations ? 'block' : 'none';
         }
 
-        document.getElementById('closeDetailsBtn').addEventListener('click', function() {
-            detailsOverlay.classList.remove('visible');
-            state.selectedSegment = null;
-            state.selectedProtein = null;
-            render();
-        });
 
         // ── Structural Navigation ──
         function jumpToEvent(type) {

@@ -287,6 +287,25 @@ def main():
     # shrinkable, and the split/merge map collapsed to an 18px sliver.
     assert explorer_doc.count("flex: 0 0 auto") >= 2,         "sidebar panels must keep their natural height in the flex column"
 
+    # The split/merge map is a graph of this sample's evidence, so it belongs
+    # in the viewport column with the tracks, not among the sidebar controls.
+    sidebar_start = explorer_doc.index('class="sidebar"')
+    sidebar_end = explorer_doc.index('class="viewport"')
+    assert "splitMergeCanvas" not in explorer_doc[sidebar_start:sidebar_end],         "the split/merge graph must not sit among the sidebar controls"
+    assert "splitMergeCanvas" in explorer_doc[sidebar_end:],         "the split/merge graph must sit in the viewport column"
+
+    # Block and feature detail is a hover tooltip, not a panel to dismiss.
+    for needed in ("mousemove", "mouseleave", "placeTip", "hitTest"):
+        assert needed in explorer_doc, f"hover tooltip missing: {needed}"
+    assert "closeDetailsBtn" not in explorer_doc,         "a tooltip has nothing to close; the dismiss button must not return"
+    assert "pointer-events: none" in explorer_doc,         "the tooltip must not intercept the pointer it follows"
+    # The overlay was still dark: an rgba literal the palette pass did not reach.
+    assert "rgba(21,30,43" not in explorer_doc, "dark tooltip ground remains"
+
+    # Rows have a preferred height and the plot is sized to hold them.
+    assert "preferredRow" in explorer_doc, "row height is not preference-driven"
+    assert "viewportWrap.style.height" in explorer_doc,         "the plot must be sized to its rows rather than stretched"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 
