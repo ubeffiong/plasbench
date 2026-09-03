@@ -203,7 +203,7 @@ def main():
     # toolbar driving zoom, track height and density.
     for needed in ("vq-shell", "vq-toolbar", "vq-card", "vq-scrim",
                    "vq-expand-all", "vq-collapse-all", "vq-stretch", "vq-density",
-                   "Truth plasmids", "Alignment tracks", "aria-expanded"):
+                   "Truth plasmids", "Method agreement", "aria-expanded"):
         assert needed in page, f"explorer chrome affordance missing: {needed}"
 
     # The selected block reports the evidence measured from the alignment
@@ -322,6 +322,21 @@ def main():
     assert "showContigDetails" in explorer_doc, "contig tooltip missing"
     assert "canvas._contigs" in explorer_doc, "contig hit boxes are not recorded"
     assert "kind: 'contig'" in explorer_doc, "contigs are not hit-tested"
+
+    # One explorer, not two. The adopted design and the analysis panels that
+    # share its selection live in a single container under a single heading.
+    assert page.count("<h3>Reconstruction evidence explorer</h3>") == 1,         "the evidence explorer heading must appear exactly once"
+    start = page.index("id='pb-explorer-view'")
+    end = page.index("<section id='scores'>")
+    container = page[start:end]
+    assert "id='cohort-evidence-explorer'" in container,         "the analysis panels must sit inside the explorer container"
+    for panel in ("vq-summary", "vq-agree", "vq-sankey", "vq-flow", "vq-compare",
+                  "vq-dotplot", "vq-context"):
+        assert panel in container, f"panel lost in the merge: {panel}"
+    # The three the adopted explorer replaced stay as anchors but are not drawn.
+    assert "['vq-tracks','vq-detail'].forEach" in page,         "the replaced track and detail panels must be hidden, not deleted"
+    assert "'vq-q','vq-bed','vq-prev-ev'" in page,         "duplicated navigation controls must be hidden"
+    assert "vq-back" in page, "selection history is not duplicated and must survive"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 
