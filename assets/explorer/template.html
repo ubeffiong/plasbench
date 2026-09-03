@@ -45,6 +45,31 @@ __PB_FONTS__
             --accent-amber: #a85a00; --accent-blue: #0b62a4; --accent-rose: #7a3c00;
             --accent-purple: #3f4d8a; --accent-cyan: #2b7fa8; --accent-orange: #c07000; }
         html { font-size: 15px; scroll-behavior: smooth; }
+        /* The vendored icon subset does not carry these, so they rendered as
+           nothing at all -- including three of the four structural-navigation
+           buttons and both plasmid pagers. An ordinary character in the system
+           font needs no download and always draws. */
+        .fas.fa-align-justify::before, .fa.fa-align-justify::before { content: "≣"; font-family: inherit; font-weight: 600; }
+        .fas.fa-align-left::before, .fa.fa-align-left::before { content: "≡"; font-family: inherit; font-weight: 600; }
+        .fas.fa-arrow-right::before, .fa.fa-arrow-right::before { content: "→"; font-family: inherit; font-weight: 600; }
+        .fas.fa-arrows-alt-h::before, .fa.fa-arrows-alt-h::before { content: "↔"; font-family: inherit; font-weight: 600; }
+        .fas.fa-chevron-left::before, .fa.fa-chevron-left::before { content: "‹"; font-family: inherit; font-weight: 600; }
+        .fas.fa-chevron-right::before, .fa.fa-chevron-right::before { content: "›"; font-family: inherit; font-weight: 600; }
+        .fas.fa-code::before, .fa.fa-code::before { content: "‹›"; font-family: inherit; font-weight: 600; }
+        .fas.fa-cut::before, .fa.fa-cut::before { content: "✂"; font-family: inherit; font-weight: 600; }
+        .fas.fa-file-export::before, .fa.fa-file-export::before { content: "⇩"; font-family: inherit; font-weight: 600; }
+        .fas.fa-filter::before, .fa.fa-filter::before { content: "▼"; font-family: inherit; font-weight: 600; }
+        .fas.fa-image::before, .fa.fa-image::before { content: "▣"; font-family: inherit; font-weight: 600; }
+        .fas.fa-info-circle::before, .fa.fa-info-circle::before { content: "ℹ"; font-family: inherit; font-weight: 600; }
+        .fas.fa-map::before, .fa.fa-map::before { content: "▦"; font-family: inherit; font-weight: 600; }
+        .fas.fa-map-pin::before, .fa.fa-map-pin::before { content: "◉"; font-family: inherit; font-weight: 600; }
+        .fas.fa-minus-circle::before, .fa.fa-minus-circle::before { content: "—"; font-family: inherit; font-weight: 600; }
+        .fas.fa-palette::before, .fa.fa-palette::before { content: "◐"; font-family: inherit; font-weight: 600; }
+        .fas.fa-sliders-h::before, .fa.fa-sliders-h::before { content: "⚙"; font-family: inherit; font-weight: 600; }
+        .fas.fa-table::before, .fa.fa-table::before { content: "▤"; font-family: inherit; font-weight: 600; }
+        .fas.fa-times-circle::before, .fa.fa-times-circle::before { content: "✖"; font-family: inherit; font-weight: 600; }
+        .btn i, .section-title i, .sm-title i { font-style: normal; }
+
         .unmeasured { color: var(--text-muted); font-style: italic; }
         .detail-row small { color: var(--text-muted); font-size: 12px; }
         .sel-wrap { display: inline-flex; align-items: center; gap: 5px; }
@@ -67,6 +92,17 @@ __PB_FONTS__
             text-transform: uppercase; letter-spacing: .05em; margin-right: 2px; }
         .track-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
         .track-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+        .nav-intro { font-size: 12px; color: var(--text-muted); margin: 0 0 8px; line-height: 1.5; }
+        .jc { font-style: normal; font-weight: 700; font-size: 10px; background: var(--bg-input);
+            color: var(--text-secondary); border-radius: 9px; padding: 0 6px; margin-left: 5px; }
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
+        .btn:disabled .jc { background: transparent; }
+        .jump-readout { margin-top: 8px; font-size: 12px; line-height: 1.55;
+            color: var(--text-secondary); background: var(--bg-card); border-radius: var(--radius-sm);
+            border-left: 3px solid var(--border-light); padding: 9px 11px; }
+        .jump-readout.on { border-left-color: var(--accent-green); }
+        .jump-readout b { color: var(--text-primary); }
+        .jump-readout .where { display: block; margin-top: 4px; font-size: 11px; color: var(--text-muted); }
         body {
             font-family: var(--font);
             background: var(--bg-primary);
@@ -488,39 +524,40 @@ __PB_FONTS__
                         <span class="label">Purity</span><span class="value" id="plasmidPur">—</span>
                         <span class="label">Proteins</span><span class="value" id="plasmidProt">—</span>
                     </div>
+                    <div class="search-box" style="margin-top:10px;">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchInput"
+                            placeholder="Find a gene, contig id, or 1200-3400" />
+                    </div>
                 </div>
 
                 <!-- Structural Navigation -->
                 <div class="sidebar-section">
                     <div class="section-title"><i class="fas fa-arrow-right"></i> Structural Navigation</div>
+                    <p class="nav-intro">Each button moves the view to the next place a method
+                        departs from the reference, and says what it found there. The tracks below
+                        scroll to it and the interval is outlined.</p>
                     <div class="control-group">
-                        <button class="btn btn-sm" id="jumpMismatch"><i class="fas fa-times-circle"></i> Mismatch</button>
-                        <button class="btn btn-sm" id="jumpGap"><i class="fas fa-minus-circle"></i> Gap</button>
-                        <button class="btn btn-sm" id="jumpInversion"><i class="fas fa-arrows-alt-h"></i> Inversion</button>
-                        <button class="btn btn-sm" id="jumpBreakpoint"><i class="fas fa-cut"></i> Breakpoint</button>
+                        <button class="btn btn-sm" id="jumpMismatch"><i class="fas fa-times-circle"></i>
+                            Mismatched base <em class="jc" id="jcMismatch">0</em></button>
+                        <button class="btn btn-sm" id="jumpGap"><i class="fas fa-minus-circle"></i>
+                            Missing region <em class="jc" id="jcGap">0</em></button>
+                        <button class="btn btn-sm" id="jumpInversion"><i class="fas fa-arrows-alt-h"></i>
+                            Reversed region <em class="jc" id="jcInversion">0</em></button>
+                        <button class="btn btn-sm" id="jumpBreakpoint"><i class="fas fa-cut"></i>
+                            Junction <em class="jc" id="jcBreakpoint">0</em></button>
                     </div>
-                    <div style="margin-top:4px;font-size:14px;color:var(--text-muted);">
-                        <span id="eventCounter">—</span>
-                    </div>
+                    <div class="jump-readout" id="eventCounter">Nothing selected yet. Choose one above.</div>
                 </div>
 
-                <!-- Navigation & Zoom -->
-                <div class="sidebar-section">
-                    <div class="section-title"><i class="fas fa-arrows-alt-h"></i> Navigation</div>
-                    <div class="control-group">
-                        <button class="btn btn-sm" id="zoomInBtn"><i class="fas fa-plus"></i></button>
-                        <button class="btn btn-sm" id="zoomOutBtn"><i class="fas fa-minus"></i></button>
-                        <button class="btn btn-sm" id="zoomResetBtn"><i class="fas fa-undo"></i> 1x</button>
-                        <button class="btn btn-sm" id="prevPlasmidBtn"><i class="fas fa-chevron-left"></i></button>
-                        <button class="btn btn-sm" id="nextPlasmidBtn"><i class="fas fa-chevron-right"></i></button>
-                        <span style="font-size:14px;color:var(--text-muted);margin-left:2px;" id="navInfo">—</span>
-                    </div>
-                    <div style="margin-top:4px;">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="searchInput" placeholder="Search gene, coordinate, ID…" />
-                        </div>
-                    </div>
+                <div class="sidebar-section" hidden>
+                    <!-- The zoom and plasmid controls that stood here are the same
+                         ones in the viewport toolbar; the search moved up to the
+                         plasmid it searches. The ids stay so nothing that binds
+                         to them breaks, hidden rather than removed. -->
+                    <span hidden><button id="zoomInBtn"></button><button id="zoomOutBtn"></button>
+                        <button id="zoomResetBtn"></button><button id="prevPlasmidBtn"></button>
+                        <button id="nextPlasmidBtn"></button><span id="navInfo"></span></span>
                 </div>
 
                 <!-- Protein Filters -->
@@ -836,6 +873,7 @@ __PB_FONTS__
             zoomY: 1.0,
             panY: 0,
             density: 6,
+            highlight: null,
             contentH: 0,
             viewH: 0,
             mode: 'A', // 'A' = alignment-block, 'B' = nucleotide
@@ -1054,6 +1092,7 @@ __PB_FONTS__
             }
 
             // ── Overlay: two methods in one band ──
+            let overlayBoxes = null;
             const pair = overlayPair();
             if (pair) {
                 const [top, bottom] = pair;
@@ -1069,7 +1108,7 @@ __PB_FONTS__
                         low_identity: '#0e7490', unsupported_join: '#7c3aed' };
                     return colors[seg.type] || '#d3ddd6';
                 };
-                const drawHalf = (track, atY) => {
+                const drawHalf = (track, atY, boxes) => {
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(pad.left, atY, plotW, half);
                     track.segments.filter(s => (s.end - s.start) >= state.minAlignLen)
@@ -1077,10 +1116,17 @@ __PB_FONTS__
                             const x1 = scale(seg.start), x2 = scale(seg.end);
                             ctx.fillStyle = colourFor(seg);
                             ctx.fillRect(x1, atY + 1, Math.max(1, x2 - x1), half - 2);
+                            // Hit boxes, so the halves stay hoverable and
+                            // clickable exactly as the ordinary rows are.
+                            boxes.push(Object.assign({}, seg, {
+                                _x1: x1, _x2: x2, _y1: atY + 1, _y2: atY + half - 1,
+                                _tool: track, _toolId: track.id }));
                         });
                 };
-                drawHalf(top, bandY);
-                drawHalf(bottom, stripY + stripH);
+                const boxes = [];
+                drawHalf(top, bandY, boxes);
+                drawHalf(bottom, stripY + stripH, boxes);
+                overlayBoxes = boxes;
 
                 // Divergence, between the two halves it belongs to.
                 ctx.fillStyle = '#f2f6f3';
@@ -1278,6 +1324,29 @@ __PB_FONTS__
                     protY);
             }
 
+            // The interval a structural jump landed on, outlined over the rows
+            // so the reader can see what the button actually did.
+            if (state.highlight) {
+                const h = state.highlight;
+                const hx1 = scale(h.start), hx2 = scale(h.end);
+                const w = Math.max(3, hx2 - hx1);
+                ctx.save();
+                ctx.fillStyle = 'rgba(37,99,201,.10)';
+                ctx.fillRect(hx1, rowTop, w, viewH);
+                ctx.strokeStyle = '#2563c9';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 3]);
+                ctx.strokeRect(hx1, rowTop + 1, w, viewH - 2);
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#2563c9';
+                ctx.fillRect(hx1, rowTop, w, 3);
+                ctx.font = '600 10px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(h.kind, hx1 + 4, rowTop + 6);
+                ctx.restore();
+            }
+
             ctx.restore();   // end of the scrolled row band
 
             // Both axes are navigable, so both report how much is off screen
@@ -1313,7 +1382,11 @@ __PB_FONTS__
                 `Zoom: ${zoom.toFixed(1)}x · Mode: ${state.mode === 'A' ? 'Alignment-block' : 'Nucleotide'}`;
             document.getElementById('zoomLevelDisplay').textContent = zoom.toFixed(1) + 'x';
 
-            canvas._segments = tools.flatMap(t => t.segments.map(s => ({ ...s, toolId: t.id, tool: t })));
+            // In overlay mode the per-method rows are skipped, so the hit boxes
+            // come from the two halves instead. Without this the overlay drew
+            // correctly but nothing in it could be hovered or clicked.
+            canvas._segments = overlayBoxes
+                || tools.flatMap(t => t.segments.map(s => ({ ...s, toolId: t.id, tool: t })));
             canvas._proteins = plasmid.proteins;
             canvas._plasmid = plasmid;
             canvas._tools = tools;
@@ -1632,6 +1705,11 @@ __PB_FONTS__
             state.eventIndex[type] = (idx + 1) % events.length;
 
             const pos = event.pos || event.start || 0;
+            // Outline the interval on the tracks, so the jump is visibly the
+            // cause of what moved rather than an unexplained scroll.
+            state.highlight = { start: event.start !== undefined ? event.start : pos,
+                                end: event.end !== undefined ? event.end : pos + 1,
+                                kind: type };
             const totalLen = PLASMID.length;
             // At 1x the whole plasmid is in view and panning is clamped to zero,
             // so a jump would move nothing. Zoom in far enough to make the
@@ -1643,11 +1721,29 @@ __PB_FONTS__
             const viewLen = totalLen / state.zoom;
             state.pan = clamp((pos - viewLen / 2) / totalLen, 0, 1 - 1 / state.zoom);
             render();
-            const span = event.end && event.end > event.start
-                ? ` · ${(event.end - event.start).toLocaleString()} bp` : '';
-            document.getElementById('eventCounter').textContent =
-                `Jumped to ${Math.round(pos).toLocaleString()} bp${span}: ${event.desc}` +
-                (event.validated ? '' : ' (alignment-derived, not validated)');
+            // What the reader needs is not "jumped to 8,333" but which method is
+            // responsible, what it did there, and what to look at now.
+            const MEANING = {
+                mismatch: 'A base in the prediction differs from the reference here. Switch to Mode B to see the two sequences drawn base by base.',
+                gap: 'This stretch of the reference has no aligned sequence from that method: it recovered the plasmid either side, but not here.',
+                inversion: 'The method aligned this stretch backwards. The bases are present, but their orientation disagrees with the reference.',
+                breakpoint: 'A predicted record leaves this plasmid here, continuing onto the chromosome or onto another plasmid. That is what a chimeric record looks like.'
+            };
+            const NAME = { mismatch: 'Mismatched base', gap: 'Missing region',
+                           inversion: 'Reversed region', breakpoint: 'Junction' };
+            const width = (event.end && event.end > event.start)
+                ? (event.end - event.start).toLocaleString() + ' bp' : 'single position';
+            const readout = document.getElementById('eventCounter');
+            readout.classList.add('on');
+            readout.innerHTML =
+                '<b>' + NAME[type] + ' ' + (idx + 1) + ' of ' + events.length + '</b> in <b>' +
+                (event.tool || 'this method') + '</b> at ' + Math.round(pos).toLocaleString() +
+                ' bp (' + width + ').' +
+                '<span class="where">' + MEANING[type] + '</span>' +
+                '<span class="where">Outlined on the <b>' + (event.tool || 'method') +
+                '</b> row below. ' + (event.desc || '') +
+                (event.validated ? '' : ' Alignment-derived; not validated against a closed genome.') +
+                '</span>';
         }
 
         document.getElementById('jumpMismatch').addEventListener('click', () => jumpToEvent('mismatch'));
@@ -1790,6 +1886,9 @@ __PB_FONTS__
         function zoomOut() { zoomBy(1 / 1.3); }
 
         function zoomReset() {
+            state.highlight = null;
+            const readout = document.getElementById('eventCounter');
+            if (readout) readout.classList.remove('on');
             state.zoom = 1;
             state.pan = 0;
             state.zoomY = 1;
@@ -2057,8 +2156,27 @@ __PB_FONTS__
             setText('plasmidNav', (sel.plasmidIdx + 1) + ' / ' + n);
             setText('navInfo', (sel.plasmidIdx + 1) + ' / ' + n);
             const ev = STRUCTURAL_EVENTS;
-            setText('eventCounter', 'Found: ' + ev.mismatches.length + ' mismatches, ' + ev.gaps.length +
-                ' gaps, ' + ev.inversions.length + ' inversions, ' + ev.breakpoints.length + ' breakpoints');
+            const counts = { Mismatch: ev.mismatches.length, Gap: ev.gaps.length,
+                             Inversion: ev.inversions.length, Breakpoint: ev.breakpoints.length };
+            Object.keys(counts).forEach(kind => {
+                setText('jc' + kind, String(counts[kind]));
+                const button = document.getElementById('jump' + kind);
+                // A button that cannot go anywhere should say so rather than
+                // appear to do nothing when pressed.
+                if (button) {
+                    button.disabled = counts[kind] === 0;
+                    button.title = counts[kind]
+                        ? 'Move to the next of ' + counts[kind] + ' on this plasmid.'
+                        : 'None found on this plasmid for the methods shown.';
+                }
+            });
+            const readout = document.getElementById('eventCounter');
+            if (readout && !readout.classList.contains('on')) {
+                const total = Object.values(counts).reduce((a, b) => a + b, 0);
+                readout.textContent = total
+                    ? total + ' departures from the reference on this plasmid. Choose a kind above to step through them.'
+                    : 'No structural departures were found on this plasmid for the methods shown.';
+            }
             setText('rowOrderInfo', 'Order: ' + (state.rowOrder.length ? state.rowOrder.join(', ') : 'none'));
             const pairNow = overlayPair();
             if (pairNow) {
@@ -2092,12 +2210,21 @@ __PB_FONTS__
                 if (!sel.tool) sel.overlay = null;
                 if (sel.overlay === sel.tool) sel.overlay = null;
             }
-            if (next.overlay !== undefined) { sel.overlay = next.overlay || null; }
+            if (next.overlay !== undefined) {
+                sel.overlay = next.overlay || null;
+                // An overlay needs a first method. Choosing one here rather than
+                // refusing keeps the control from looking inert.
+                if (sel.overlay && !sel.tool) {
+                    const first = allToolTracks().map(t => t.id).find(id => id !== sel.overlay);
+                    if (first) sel.tool = first;
+                }
+            }
             if (next.record !== undefined) { sel.record = next.record || null; }
             rebind();
             state.minAlignLen = 0;
             state.selectedSegment = null;
             state.selectedProtein = null;
+            state.highlight = null;
             state.eventIndex = { mismatch: 0, gap: 0, inversion: 0, breakpoint: 0 };
             zoomReset();
             syncMinAlignRange();
@@ -2125,17 +2252,13 @@ __PB_FONTS__
                 toolSelect.value = sel.tool || '';
             }
             if (overlaySelect) {
-                // An overlay compares two named methods, so it needs one chosen
-                // first; with every method shown there is nothing to overlay on.
                 const others = allToolTracks().map(t => t.id).filter(id => id !== sel.tool);
-                overlaySelect.disabled = !sel.tool;
-                overlaySelect.title = sel.tool
-                    ? 'Draw a second method in the same row as ' + sel.tool +
-                      ', with the intervals where the two disagree marked between them.'
-                    : 'Choose a single method under Tool first; an overlay compares two named methods.';
-                overlaySelect.innerHTML = '<option value="">' +
-                    (sel.tool ? 'No overlay' : 'Pick a Tool first') + '</option>' +
-                    (sel.tool ? others.map(id => '<option value="' + id + '">' + id + '</option>').join('') : '');
+                overlaySelect.disabled = others.length === 0;
+                overlaySelect.title = 'Draw a second method in the same row as the first, with a '
+                    + 'strip between them marking every interval where the two disagree. '
+                    + 'Picking one here selects a first method if none is chosen yet.';
+                overlaySelect.innerHTML = '<option value="">No overlay</option>' +
+                    others.map(id => '<option value="' + id + '">vs ' + id + '</option>').join('');
                 overlaySelect.value = sel.overlay || '';
             }
             if (recordSelect) {

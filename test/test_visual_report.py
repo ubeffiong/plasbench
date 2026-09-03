@@ -446,8 +446,9 @@ def main():
                    "differing intervals", "'differs'"):
         assert needed in explorer_doc, f"overlay affordance missing: {needed}"
     assert "sel.overlay" in explorer_doc, "the overlay has no state"
-    # An overlay compares two named methods, so it needs one chosen first.
-    assert "Pick a Tool first" in explorer_doc,         "the overlay must say it needs a single method chosen first"
+    # The overlay no longer refuses to act until a Tool is chosen: gating it
+    # that way made a working control read as broken.
+    assert "Pick a Tool first" not in explorer_doc,         "the overlay must not gate itself behind another control"
     # The divergence hues avoid the green/red pair the palette toggle exists for.
     assert "'#b25309'" in explorer_doc and "'#2563c9'" in explorer_doc,         "divergence must not be drawn in the green/red pair"
 
@@ -478,6 +479,31 @@ def main():
     # Sentence case, with the colon the programme name takes.
     assert "<title>PlasBench: Plasmid reconstruction benchmark</title>" in page
     assert "<h1>PlasBench: Plasmid reconstruction benchmark</h1>" in page
+
+    # Every icon class the explorer uses must be able to draw. Eighteen had no
+    # glyph in the vendored subset and rendered as nothing at all, including
+    # three of the four structural-navigation buttons and both plasmid pagers.
+    used = set(re.findall(r"fa-[a-z-]+", explorer_doc))
+    subset = open(os.path.join(ROOT, "assets", "vendor", "fontawesome-subset.css"),
+                  encoding="utf-8").read()
+    for name in sorted(used):
+        drawable = (name in subset) or (f".fas.{name}::before" in explorer_doc)
+        assert drawable, f"icon {name} has no glyph and no fallback; it renders as nothing"
+
+    # A structural jump has to say what it found and where, and mark it.
+    for needed in ("state.highlight", "MEANING", "jcMismatch", "jump-readout",
+                   "departures from the reference"):
+        assert needed in explorer_doc, f"structural navigation affordance missing: {needed}"
+    assert "button.disabled = counts[kind] === 0" in explorer_doc,         "a jump button with nothing to find must not look active"
+
+    # The search belongs with the plasmid it searches, and the navigation card
+    # only restated the viewport toolbar.
+    assert explorer_doc.index('id="searchInput"') < explorer_doc.index('id="categoryChips"'),         "the search must sit in the plasmid overview, above the filters"
+    assert '<i class="fas fa-arrows-alt-h"></i> Navigation' not in explorer_doc,         "the duplicated navigation card must not return"
+
+    # The overlay is pickable on its own and its halves are hoverable.
+    assert "if (sel.overlay && !sel.tool)" in explorer_doc,         "choosing an overlay alone must select a first method rather than do nothing"
+    assert "canvas._segments = overlayBoxes" in explorer_doc,         "overlay halves must register hit boxes, or nothing in them can be hovered"
 
     print("ALL VISUAL REPORT TESTS PASSED")
 
