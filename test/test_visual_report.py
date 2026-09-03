@@ -110,8 +110,7 @@ def main():
     assert "not measured" in page, "missing-metric wording absent"
     assert "not counted as zero" in page or "rather than as zero" in page or         "excluded rather than counted as zero" in page, "zero-substitution caveat absent"
     # The programme rename must hold in the shipped page.
-    assert "PlasBench plasmid benchmark report" in page, "report title not renamed"
-    assert "PlasBench plasmid reconstruction benchmark" in page, "report heading not renamed"
+    assert "PlasBench: Plasmid reconstruction benchmark" in page, "report title not renamed"
     # Only the report's own branding is asserted: a user's directory may legitimately
     # contain "SPREAD" and would surface through the artifact explorer's file paths.
     for banner in ("SPREAD plasmid benchmark report", "SPREAD plasmid reconstruction benchmark"):
@@ -451,6 +450,34 @@ def main():
     assert "Pick a Tool first" in explorer_doc,         "the overlay must say it needs a single method chosen first"
     # The divergence hues avoid the green/red pair the palette toggle exists for.
     assert "'#b25309'" in explorer_doc and "'#2563c9'" in explorer_doc,         "divergence must not be drawn in the green/red pair"
+
+    # The candidate link is resolved from the file list the selection report
+    # actually wrote. A filename convention went stale once and the link died.
+    builder = open(os.path.join(ROOT, "python", "build_html_report.py"),
+                   encoding="utf-8").read()
+    assert 'report.get("copied_files")' in builder, (
+        "the candidate FASTA must be resolved from the file list the selection "
+        "report actually wrote; a filename convention went stale once and the "
+        "download link silently died")
+
+    # Section navigation is a real tab bar, in document order, covering every
+    # section. The stylesheet targeted .nav while the markup emitted a bare
+    # <nav>, so none of it applied.
+    assert "<nav class='nav'" in page, "the navigation carries no class, so it is unstyled"
+    nav_start = page.index("<nav class='nav'")
+    nav_html = page[nav_start:page.index("</nav>", nav_start)]
+    nav_ids = re.findall(r"href='#([a-z-]+)'", nav_html)
+    section_ids = re.findall(r"<section id='([a-z-]+)'", page)
+    assert nav_ids == section_ids, (
+        "the navigation must list every section in document order; "
+        f"nav={nav_ids} sections={section_ids}")
+    assert "aria-current" in page, "the bar never says which section you are in"
+    # The tracker is emitted inside a section, so it must wait for the rest.
+    assert "DOMContentLoaded" in page,         "section tracking must be built after the document is parsed, not mid-page"
+
+    # Sentence case, with the colon the programme name takes.
+    assert "<title>PlasBench: Plasmid reconstruction benchmark</title>" in page
+    assert "<h1>PlasBench: Plasmid reconstruction benchmark</h1>" in page
 
     print("ALL VISUAL REPORT TESTS PASSED")
 

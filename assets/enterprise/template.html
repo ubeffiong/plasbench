@@ -1696,12 +1696,32 @@
             return map[state.metric] || state.metric;
         }
 
+        // A sequential ramp, not a red-to-green blend. The blend passed through
+        // muddy mid-tones -- which is what made the matrix look washed out -- and
+        // carried the value in hue alone, the one channel red/green colour vision
+        // deficiency removes. Lightness now falls monotonically with the value, so
+        // the matrix reads in greyscale and under any deficiency.
+        const HEAT_STOPS = {
+            default: [[234, 245, 238], [166, 216, 189], [ 92, 176, 138], [ 32, 126,  92], [  8,  77,  55]],
+            cvd:     [[232, 240, 248], [172, 203, 230], [ 96, 152, 200], [ 34,  98, 158], [  8,  56, 106]],
+        };
         function getMetricColor(val, maxVal) {
             const norm = maxVal > 0 ? clamp(val / maxVal, 0, 1) : 0;
-            const r = Math.round(40 + 200 * (1 - norm));
-            const g = Math.round(40 + 180 * norm);
-            const b = Math.round(60 + 120 * (1 - norm * 0.7));
-            return `rgb(${Math.min(r,255)},${Math.min(g,255)},${Math.min(b,255)})`;
+            const stops = HEAT_STOPS[document.documentElement.dataset.cvd === '1' ? 'cvd' : 'default'];
+            const at = norm * (stops.length - 1);
+            const low = Math.floor(at), high = Math.min(stops.length - 1, low + 1);
+            const mix = at - low;
+            const channel = i => Math.round(stops[low][i] + (stops[high][i] - stops[low][i]) * mix);
+            return `rgb(${channel(0)},${channel(1)},${channel(2)})`;
+        }
+
+        // Text has to survive the whole ramp, so it follows the cell's luminance
+        // rather than being a fixed ink that disappears at one end.
+        function inkFor(color) {
+            const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(color);
+            if (!m) return '#16211c';
+            const luminance = (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255;
+            return luminance > 0.55 ? '#0d1a14' : '#ffffff';
         }
 
         function getStatusColor(status) {
@@ -1806,8 +1826,8 @@
                     ctx.lineWidth = isSelected ? 2.5 : 0.5;
                     ctx.strokeRect(x, y, colW, rowH);
 
-                    ctx.fillStyle = '#16211c';
-                    ctx.font = '9px Inter, sans-serif';
+                    ctx.fillStyle = inkFor(color);
+                    ctx.font = '600 10px Inter, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
 
