@@ -376,6 +376,32 @@ def main():
     assert "pbExplorerSelected" in page, "the explorer's focus is not sent to the report"
     assert "set('vq-tool',m.tool)" in page, "the shared tool selection does not follow"
 
+    # Every control explains itself, and controls built later by other
+    # fragments are described when they appear rather than raced with a timer.
+    for needed in ("const HELP", "function describe()", "MutationObserver",
+                   "'vq-base'", "'vq-protein-category'", "TAB_HELP"):
+        assert needed in page, f"control help missing: {needed}"
+    for needed in ("explorerTool:", "trackHeight:", "rowDensity:", "jumpInversion:",
+                   "plasmidPur:"):
+        assert needed in explorer_doc, f"explorer control help missing: {needed}"
+
+    # The colour key sits with the tracks, not only in the sidebar.
+    for needed in ("trackLegend", "SEGMENT_KEY", "CATEGORY_KEY", "renderTrackLegend"):
+        assert needed in explorer_doc, f"inline track legend missing: {needed}"
+    # It has to follow the colour mode: naming event colours while the bars are
+    # an identity gradient would key something that is not on screen.
+    assert "state.colorMode === 'event'" in explorer_doc,         "the legend must follow the colour mode"
+
+    # One status palette. The design's bright accents must not leak back in.
+    for stray in ("#4ade80", "#f87171", "#fbbf24", "#4a8cf7", "#22d3ee",
+                  "#a78bfa", "#f472b6", "#fb923c"):
+        assert stray not in explorer_doc, f"off-palette colour in the explorer: {stray}"
+    for needed in ("#17805a", "#b3261e", "#a35c05", "#2563c9"):
+        assert needed in explorer_doc, f"status palette colour missing: {needed}"
+
+    # The notes on how to read these panels open with the section.
+    assert "legend.open=true" in page,         "the legend must be open when a sample and method are already selected"
+
     print("ALL VISUAL REPORT TESTS PASSED")
 
 

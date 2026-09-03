@@ -54,6 +54,13 @@ __PB_FONTS__
         .slider-wrap input[type=range] { width: 92px; accent-color: var(--accent-green); }
         .slider-wrap em { font-style: normal; font-size: 11px; color: var(--text-secondary);
             font-variant-numeric: tabular-nums; min-width: 40px; }
+        .track-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center;
+            padding: 6px 16px; background: var(--bg-card); border-top: 1px solid var(--border-color);
+            font-size: 11px; color: var(--text-secondary); max-height: 52px; overflow-y: auto; }
+        .track-legend b { font-weight: 600; color: var(--text-muted); font-size: 11px;
+            text-transform: uppercase; letter-spacing: .05em; margin-right: 2px; }
+        .track-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .track-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
         body {
             font-family: var(--font);
             background: var(--bg-primary);
@@ -593,11 +600,11 @@ __PB_FONTS__
                         <span><span class="swatch" style="background:#7c3aed;"></span> Unsupported join</span>
                     </div>
                     <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;font-size:13px;color:var(--text-muted);">
-                        <span class="protein-tag" style="background:#f87171;">AMR</span>
-                        <span class="protein-tag" style="background:#4a8cf7;">Replication</span>
-                        <span class="protein-tag" style="background:#a78bfa;">Conjugation</span>
-                        <span class="protein-tag" style="background:#22d3ee;">Maintenance</span>
-                        <span class="protein-tag" style="background:#fb923c;">Transposase</span>
+                        <span class="protein-tag" style="background:#b3261e;">AMR</span>
+                        <span class="protein-tag" style="background:#2563c9;">Replication</span>
+                        <span class="protein-tag" style="background:#6d43c4;">Conjugation</span>
+                        <span class="protein-tag" style="background:#0e7490;">Maintenance</span>
+                        <span class="protein-tag" style="background:#b25309;">Transposase</span>
                         <span class="protein-tag" style="background:#4a607a;">Hypothetical</span>
                         <span class="protein-tag" style="background:#6b7280;">Other</span>
                     </div>
@@ -660,6 +667,10 @@ __PB_FONTS__
                         <span><span style="display:inline-block;width:9px;height:9px;background:#b3261e;border-radius:2px;"></span> Complex</span>
                     </div>
                 </div>
+
+                <!-- The key belongs next to the marks it explains, not only in
+                     the sidebar the reader has to scroll back to. -->
+                <div class="track-legend" id="trackLegend" aria-label="Segment colour key"></div>
 
                 <!-- Status -->
                 <div class="viewport-status">
@@ -1110,9 +1121,10 @@ __PB_FONTS__
                     const x1 = scale(p.start);
                     const x2 = scale(p.end);
                     const w = Math.max(3, x2 - x1);
-                    const catColors = { AMR: '#f87171', Replication: '#4a8cf7', Conjugation: '#a78bfa',
-                        Maintenance: '#22d3ee', Transposase: '#fb923c', Hypothetical: '#4a607a',
-                        Other: '#6b7280' };
+                    // Same hues as the legend below the tracks and the sidebar tags.
+                    const catColors = { AMR: '#b3261e', Replication: '#2563c9', Conjugation: '#6d43c4',
+                        Maintenance: '#0e7490', Transposase: '#b25309', Hypothetical: '#5d6b63',
+                        Other: '#7b8a83' };
                     const mid = protY + protH / 2;
                     ctx.fillStyle = catColors[p.category] || '#6b7280';
                     ctx.fillRect(x1, protY + 2, w, protH - 4);
@@ -1280,7 +1292,7 @@ __PB_FONTS__
             const truthH = plotH / data.truth.length;
             data.truth.forEach((t, i) => {
                 const y = truthY + i * truthH;
-                smCtx.fillStyle = '#4a8cf7';
+                smCtx.fillStyle = '#2563c9';
                 smCtx.fillRect(truthX, y, 6, truthH - 2);
                 smCtx.fillStyle = '#4a5a52';
                 smCtx.font = '11px Inter, sans-serif';
@@ -1294,7 +1306,7 @@ __PB_FONTS__
             const predH = plotH / data.predicted.length;
             data.predicted.forEach((p, i) => {
                 const y = predY + i * predH;
-                smCtx.fillStyle = '#f472b6';
+                smCtx.fillStyle = '#b03a80';
                 smCtx.fillRect(predX - 6, y, 6, predH - 2);
                 smCtx.fillStyle = '#4a5a52';
                 smCtx.font = '11px Inter, sans-serif';
@@ -1311,8 +1323,9 @@ __PB_FONTS__
                 const y2 = predY + predIdx * predH + predH / 2;
                 const x1 = truthX + 6;
                 const x2 = predX - 6;
-                const color = link.type === '1:1' ? '#4ade80' : link.type === 'split' ? '#fbbf24' : link.type ===
-                    'merge' ? '#f472b6' : '#f87171';
+                // These four must match the legend printed under the map.
+                const color = link.type === '1:1' ? '#17805a' : link.type === 'split' ? '#a35c05'
+                    : link.type === 'merge' ? '#b03a80' : '#b3261e';
                 smCtx.strokeStyle = color;
                 smCtx.lineWidth = 1 + link.weight * 2;
                 smCtx.globalAlpha = 0.6;
@@ -2036,6 +2049,88 @@ __PB_FONTS__
                 render();
             });
         }
+
+        // Every control says what it does. A benchmark interface is read by
+        // people who did not build it, and a control whose effect is not
+        // obvious is a control that will be mistrusted or ignored.
+        const HELP = {
+            explorerSample: 'Choose the isolate to inspect. Changes every panel on this page.',
+            explorerPlasmid: 'Choose which truth plasmid of this isolate to draw the tracks against.',
+            explorerTool: 'Show one reconstruction method alone, or all of them side by side.',
+            explorerRecord: 'Highlight one predicted record; the others stay visible but dimmed.',
+            trackHeight: 'Vertical zoom: how tall each method row is drawn. Same control as the +/- buttons.',
+            rowDensity: 'Space between rows. Raise it to separate crowded methods, lower it to fit more on screen.',
+            minAlignLen: 'Hide alignment segments shorter than this. The label says how many remain.',
+            colorMode: 'What the segment colour means: alignment identity, the measured event type, or which method drew it.',
+            searchInput: 'Find a gene name, a contig id, or a coordinate range such as 1200-3400.',
+            jumpMismatch: 'Jump to the next base mismatch. Available only where a CIGAR-bounded alignment exists.',
+            jumpGap: 'Jump to the next reference interval this method did not recover.',
+            jumpInversion: 'Jump to the next reverse-strand alignment. Alignment-derived, not a validated inversion.',
+            jumpBreakpoint: 'Jump to the next junction where a record leaves this plasmid.',
+            zoomInBtn: 'Zoom in on both axes.', zoomInBtn2: 'Zoom in on both axes.',
+            zoomOutBtn: 'Zoom out on both axes.', zoomOutBtn2: 'Zoom out on both axes.',
+            zoomResetBtn: 'Back to the whole plasmid at default row height.',
+            zoomResetBtn2: 'Back to the whole plasmid at default row height.',
+            fitViewBtn: 'Fit the whole plasmid in view.',
+            modeToggle: 'Mode A draws alignment blocks. Mode B draws individual bases, where a CIGAR is available and you are zoomed in far enough.',
+            prevPlasmidBtn: 'Previous truth plasmid in this isolate.',
+            nextPlasmidBtn: 'Next truth plasmid in this isolate.',
+            prevPlasmidBtn2: 'Previous truth plasmid in this isolate.',
+            nextPlasmidBtn2: 'Next truth plasmid in this isolate.',
+            pinReference: 'Keep the contig row pinned above the method rows.',
+            collapseContigs: 'Merge every method\u2019s records into one row instead of stacked lanes.',
+            reorderTools: 'Rotate the method rows, to put two of them next to each other.',
+            resetRows: 'Restore the original method order.',
+            showGaps: 'Draw the intervals this method did not recover. Turn off to see only what it did.',
+            showMismatches: 'Flag divergence: identity labels on blocks, and mismatched bases in the nucleotide view.',
+            showInterpretations: 'Include the plain-language reading at the foot of each tooltip.',
+            toggleBadBtn: 'Show only features that are not completely recovered.',
+            toggleProteinLabels: 'Draw feature names on the annotation row.',
+            exportModalBtn: 'Export the visible region as TSV, JSON, BED, FASTA or PNG.',
+            resetViewBtn: 'Clear zoom, pan, focus and selection.',
+            plasmidLen: 'Length of the truth plasmid, from the truth table.',
+            plasmidCirc: 'Whether the truth plasmid was declared circular. Not a claim about the prediction.',
+            plasmidRep: 'Replicon type from the curated annotation, when one was supplied.',
+            plasmidRec: 'Best completeness any method reached on this plasmid: recovered reference bases over plasmid length.',
+            plasmidPur: 'Purity is measured per predicted bin, not per truth plasmid, so it has no value at this scope.',
+            plasmidProt: 'Number of annotated features on this plasmid.',
+            eventCounter: 'Structural events available to jump to. All are alignment-derived and unvalidated.',
+            statusCoords: 'Reference interval currently in view.',
+            statusToolInfo: 'The leading method row: version, identity, mean mapping quality, and how many bases have nucleotide-level evidence.'
+        };
+        Object.keys(HELP).forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.title = HELP[id];
+            const label = el.closest('label');
+            if (label) label.title = HELP[id];
+        });
+
+        // The colour key, rendered beside the tracks it explains.
+        const SEGMENT_KEY = [
+            ['Good', '#17805a'], ['Missing', '#eef2ef'], ['Inverted', '#b03a80'],
+            ['Chromosomal', '#b3261e'], ['Wrong plasmid', '#d97706'], ['Ambiguous', '#a35c05'],
+            ['Duplicated', '#6d43c4'], ['Low identity', '#0e7490'], ['Unsupported join', '#7c3aed']];
+        const CATEGORY_KEY = [
+            ['AMR', '#b3261e'], ['Replication', '#2563c9'], ['Conjugation', '#6d43c4'],
+            ['Maintenance', '#0e7490'], ['Transposase', '#b25309'], ['Hypothetical', '#5d6b63']];
+        function renderTrackLegend() {
+            const host = document.getElementById('trackLegend');
+            if (!host) return;
+            const swatch = pair => '<span title="' + pair[0] + '"><i style="background:' + pair[1] +
+                (pair[1] === '#eef2ef' ? ';border:1px dashed #b9c7be' : '') + '"></i>' + pair[0] + '</span>';
+            // In identity mode the bars are a gradient, so naming event colours
+            // there would be a key to something not on screen.
+            const segments = state.colorMode === 'event'
+                ? '<b>Segments</b>' + SEGMENT_KEY.map(swatch).join('')
+                : '<b>Segments</b><span>coloured by ' +
+                  (state.colorMode === 'identity' ? 'alignment identity, dark is higher' : 'source method') +
+                  ' \u2014 switch Colour by to Event type for the measured vocabulary</span>';
+            host.innerHTML = segments + '<b>Annotation</b>' + CATEGORY_KEY.map(swatch).join('');
+        }
+        renderTrackLegend();
+        const colorModeSelect = document.getElementById('colorMode');
+        if (colorModeSelect) colorModeSelect.addEventListener('change', renderTrackLegend);
 
         rebind();
         fillPlasmids();

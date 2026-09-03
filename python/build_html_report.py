@@ -576,30 +576,32 @@ def explorer_chrome_script():
     screen still comes from the panel that measured it.
     """
     return """<style>
+/* One status palette, shared with the explorer above and the dashboard
+   below it: green recovered, red wrong, amber uncertain, blue context. */
 #pb-analyses{--pb-line:#d3ddd6;--pb-soft:#eef2ef;--pb-ink:#16211c;--pb-dim:#5d6b63;
   --pb-green:#17805a;--pb-amber:#a35c05;--pb-red:#b3261e;--pb-blue:#2563c9;
-  font:13px/1.5 Arial,sans-serif;color:var(--pb-ink);margin:16px 0}
+  font:14px/1.55 Arial,sans-serif;color:var(--pb-ink);margin:16px 0}
 #pb-context{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 16px;
   background:#fff;border:1px solid var(--pb-line);border-radius:10px;margin-bottom:12px}
 #pb-context .controls{display:contents;margin:0}
-#pb-context label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--pb-dim)}
+#pb-context label{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--pb-dim)}
 #pb-context select,#pb-context input{padding:5px 8px;border:1px solid var(--pb-line);
-  border-radius:6px;background:#fff;font:12px Arial,sans-serif;color:var(--pb-ink)}
+  border-radius:6px;background:#fff;font:13px Arial,sans-serif;color:var(--pb-ink)}
 #pb-context select:focus-visible,#pb-context input:focus-visible{outline:2px solid var(--pb-green);outline-offset:1px}
-#pb-context button,#pb-context .download-button{font:12px Arial,sans-serif;padding:5px 11px;
+#pb-context button,#pb-context .download-button{font:13px Arial,sans-serif;padding:6px 12px;
   border:1px solid var(--pb-line);background:#fff;border-radius:6px;cursor:pointer;color:var(--pb-ink);
   text-decoration:none;white-space:nowrap}
 #pb-context button:hover,#pb-context .download-button:hover{background:var(--pb-soft);border-color:var(--pb-green)}
 #pb-context .download-button{background:var(--pb-green);color:#fff!important;border-color:var(--pb-green);font-weight:600}
 #pb-tabs{display:flex;gap:3px;padding:4px;background:#fff;border:1px solid var(--pb-line);
   border-radius:10px;overflow-x:auto;margin-bottom:12px}
-#pb-tabs button{flex:0 0 auto;padding:8px 16px;border:0;background:transparent;color:var(--pb-dim);
-  font:600 12px Arial,sans-serif;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px;
+#pb-tabs button{flex:0 0 auto;padding:9px 17px;border:0;background:transparent;color:var(--pb-dim);
+  font:600 13.5px Arial,sans-serif;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px;
   white-space:nowrap;transition:background .15s,color .15s}
 #pb-tabs button:hover{background:var(--pb-soft);color:var(--pb-ink)}
 #pb-tabs button[aria-selected="true"]{background:var(--pb-green);color:#fff}
 #pb-tabs button:focus-visible{outline:2px solid var(--pb-ink);outline-offset:-2px}
-#pb-tabs .count{font:600 10px Arial,sans-serif;background:var(--pb-soft);color:var(--pb-dim);
+#pb-tabs .count{font:600 11px Arial,sans-serif;background:var(--pb-soft);color:var(--pb-dim);
   padding:1px 7px;border-radius:10px}
 #pb-tabs button[aria-selected="true"] .count{background:rgba(255,255,255,.24);color:#fff}
 .pb-tab[hidden]{display:none}
@@ -608,9 +610,9 @@ def explorer_chrome_script():
   display:flex;flex-direction:column;min-width:0}
 .pb-card>header{display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:10px 16px;background:#f7faf8;border-bottom:1px solid var(--pb-line)}
-.pb-card>header h4{margin:0;font:600 13px Arial,sans-serif;color:var(--pb-ink)}
-.pb-card>header .sub{font:12px Arial,sans-serif;color:var(--pb-dim)}
-.pb-card>header button{font:11px Arial,sans-serif;padding:3px 9px;border:1px solid var(--pb-line);
+.pb-card>header h4{margin:0;font:600 14.5px Arial,sans-serif;color:var(--pb-ink)}
+.pb-card>header .sub{font:12.5px Arial,sans-serif;color:var(--pb-dim)}
+.pb-card>header button{font:12px Arial,sans-serif;padding:4px 10px;border:1px solid var(--pb-line);
   background:#fff;border-radius:5px;cursor:pointer;color:var(--pb-ink)}
 .pb-card>header button:hover{background:var(--pb-soft);border-color:var(--pb-green)}
 .pb-body{padding:14px 16px;overflow:auto;min-width:0}
@@ -618,14 +620,14 @@ def explorer_chrome_script():
 .pb-card.expanded .pb-body{max-height:calc(100vh - 96px)}
 #pb-scrim{position:fixed;inset:0;background:rgba(18,28,23,.5);z-index:55;display:none}
 #pb-scrim.on{display:block}
-#pb-analyses table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:0}
-#pb-analyses th{text-align:left;font:600 10.5px Arial,sans-serif;letter-spacing:.06em;
+#pb-analyses table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:0}
+#pb-analyses th{text-align:left;font:600 11.5px Arial,sans-serif;letter-spacing:.06em;
   text-transform:uppercase;color:var(--pb-dim);padding:7px 9px;border-bottom:1px solid var(--pb-line);
   background:var(--pb-soft);white-space:nowrap}
 #pb-analyses td{padding:7px 9px;border-bottom:1px solid #eef2ef;color:var(--pb-ink)}
 #pb-analyses tbody tr:hover td{background:#f5faf6}
-#pb-analyses h3,#pb-analyses h4:not(.pb-card>header h4){font:600 13px Arial,sans-serif;margin:0 0 8px}
-#pb-analyses p{margin:0 0 10px;color:var(--pb-dim);font-size:12.5px}
+#pb-analyses h3,#pb-analyses h4:not(.pb-card>header h4){font:600 14px Arial,sans-serif;margin:0 0 8px}
+#pb-analyses p{margin:0 0 10px;color:var(--pb-dim);font-size:13.5px}
 #pb-analyses svg{max-width:100%;height:auto}
 @media (max-width:760px){.pb-grid{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){#pb-tabs button{transition:none}}
@@ -704,6 +706,72 @@ function select(key){panes.forEach(p=>{const on=p.key===key;
  // at draw time would need telling -- after layout has settled, not before.
  requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))}
 if(panes.length)select(panes[0].key);
+
+// Every control explains itself. These are read by people who did not build
+// the pipeline, and a control whose effect is unclear will be mistrusted.
+const HELP={
+ 'vq-sample':'Isolate to analyse. Drives the explorer above and every panel here.',
+ 'vq-tool':'Reconstruction method whose output these panels describe.',
+ 'vq-plasmid':'Truth plasmid these panels are measured against.',
+ 'vq-start':'Left edge of the reference interval to restrict the panels to.',
+ 'vq-end':'Right edge of the reference interval to restrict the panels to.',
+ 'vq-fit':'Show the whole plasmid again.',
+ 'vq-in':'Narrow the reference interval.',
+ 'vq-out':'Widen the reference interval.',
+ 'vq-download':'Download the full visualization payload for this sample as JSON.',
+ 'vq-svg':'Download the current track drawing as SVG.',
+ 'vq-png':'Download the current track drawing as PNG.',
+ 'vq-back':'Return to the previous selection.',
+ 'vq-base':'Baseline method. The comparison reports comparator minus baseline.',
+ 'vq-comp':'Comparator method, measured against the baseline on the samples both completed.',
+ 'vq-protein-category':'Limit the table to one annotation category.',
+ 'vq-protein-search':'Find a coding sequence by gene name or product.'};
+function describe(){
+ Object.keys(HELP).forEach(id=>{const el=$(id);if(!el)return;el.title=HELP[id];
+  const label=el.closest('label');if(label)label.title=HELP[id]});
+ // Some controls are built by other fragments after this runs and carry no id,
+ // so they are described by what they sit next to rather than by name.
+ const scope=document.getElementById('pb-explorer-view')||shell;
+ scope.querySelectorAll('label').forEach(label=>{
+  const text=(label.textContent||'').trim();
+  const control=label.querySelector('select,input,button');
+  if(!control||control.title)return;
+  if(text.startsWith('Predicted record'))
+   control.title=label.title='Which predicted record to plot against the reference. One coordinate system at a time.';
+  else if(/ only$/.test(text)&&control.type==='checkbox')
+   control.title=label.title='Include this method in the comparison.';
+ });
+ scope.querySelectorAll('button').forEach(b=>{
+  if(b.title)return;
+  if(b.textContent.trim()==='only')b.title='Show this method alone, hiding the others from the comparison.';
+ });
+}
+describe();
+// The panels rebuild their own controls whenever the selection changes, and
+// some are built after this script runs. Watching the container describes them
+// whenever they appear, instead of racing them with a timer.
+if(window.MutationObserver){let queued=false;
+ new MutationObserver(()=>{if(queued)return;queued=true;
+  requestAnimationFrame(()=>{queued=false;describe()})})
+ .observe(document.getElementById('pb-explorer-view')||shell,{childList:true,subtree:true})}
+
+const TAB_HELP={
+ recovery:'Per truth plasmid: how much of it this method recovered, from how many records, and whether any of those records also align elsewhere.',
+ agreement:'How many methods independently support each reference interval. Shared support is not proof of correctness.',
+ comparison:'One method minus another on the samples both completed.',
+ dotplot:'Reference coordinate against one predicted record\u2019s own coordinate. Forward diagonals support collinearity.',
+ context:'Curated features on the reference, and the circular truth view.',
+ bins:'Which predicted bin carries which truth plasmid, and the scored membership behind it.',
+ features:'Coordinate recovery of named coding sequences, and alignment-derived structural discordance.'};
+panes.forEach(p=>{if(TAB_HELP[p.key]){p.button.title=TAB_HELP[p.key];p.pane.title=''}});
+shell.querySelectorAll('.pb-expand').forEach(b=>{b.title='Open this panel full screen.'});
+
+
+// The reader arrived here with a sample and a method already chosen, so the
+// notes that explain how to read these panels start open rather than hidden.
+const legend=document.querySelector('#cohort-evidence-explorer details.sample');
+if(legend&&$('vq-sample')&&$('vq-sample').value&&$('vq-tool')&&$('vq-tool').value){
+ legend.open=true;shell.append(legend)}
 
 tabbar.addEventListener('keydown',e=>{
  const order=panes.map(p=>p.button);const at=order.indexOf(document.activeElement);
