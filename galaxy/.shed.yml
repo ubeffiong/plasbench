@@ -1,0 +1,20 @@
+name: plasbench
+owner: ubeffiong
+description: Benchmark plasmid-reconstruction tools against complete-reference truth.
+long_description: |
+  PlasBench measures how well plasmid-reconstruction tools recover plasmids from
+  short-read data, using complete long-read or hybrid assemblies as ground truth.
+  Every tool is reduced to one predicted-plasmid FASTA and projected back onto the
+  reference, so classifiers and re-assemblers are directly comparable. The suite
+  covers the three steps a Galaxy workflow needs: align a prediction to the
+  reference, score it against labelled truth, and aggregate per-sample scores into
+  a ranked leaderboard.
+homepage_url: https://github.com/ubeffiong/plasbench
+remote_repository_url: https://github.com/ubeffiong/plasbench/tree/main/galaxy
+type: unrestricted
+categories:
+  - Sequence Analysis
+  - Assembly
+auto_tool_repositories:
+  name_template: "{{ tool_id }}"
+  description_template: "{{ tool_name }}: {{ tool_description }}"

@@ -1,46 +1,123 @@
-<tool id="plasbench_score" name="PlasBench score predictions" version="0.1.0" profile="23.0">
-    <description>score predicted plasmid sequences against labelled reference alignments</description>
-    <requirements>
-        <container type="docker">quay.io/YOUR_QUAY_NAMESPACE/plasbench:0.1.0</container>
-    </requirements>
+<tool id="plasbench_score" name="PlasBench score" version="@TOOL_VERSION@+galaxy@VERSION_SUFFIX@" profile="@PROFILE@">
+    <description>predicted plasmids against a labelled complete reference</description>
+    <macros>
+        <import>macros.xml</import>
+    </macros>
+    <expand macro="requirements" />
     <command detect_errors="exit_code"><![CDATA[
-python /opt/plasbench/python/score_plasmids.py
-  --truth '$truth'
-  --paf '$paf'
-  --pred-fasta '$prediction'
-  --sample '$sample_name'
-  --tool '$tool_name'
-  --out '$scores'
+plasbench-score
+    --truth '$truth'
+    --paf '$paf'
+    --pred-fasta '$prediction'
+    --sample '$sample_name'
+    --tool '$tool_name'
+    --analysis-track '$analysis_track'
+    --plasmid-recovery-threshold '$plasmid_recovery_threshold'
+    @ALIGNMENT_FILTER_ARGS@
+#if $ambiguity_paf
+    --ambiguity-paf '$ambiguity_paf'
+#end if
+    --out '$scores'
     ]]></command>
     <inputs>
-        <param name="truth" type="data" format="tabular" label="Reference truth labels" help="TSV with sequence_id, molecule_type, length." />
-        <param name="paf" type="data" format="tabular" label="Prediction-to-reference PAF alignment" />
-        <param name="prediction" type="data" format="fasta" label="Predicted-plasmid FASTA" />
-        <param name="sample_name" type="text" label="Sample identifier" />
-        <param name="tool_name" type="text" label="Tool identifier" />
+        <param name="truth" type="data" format="tabular" label="Reference truth labels"
+               help="TSV produced by the PlasBench truth step: one row per reference sequence, labelled plasmid or chromosome. Ground truth must come from the reference, never from a tool being scored." />
+        <param name="paf" type="data" format="tabular,paf" label="Prediction-to-reference alignment (PAF)"
+               help="Output of the PlasBench align tool, or any minimap2 PAF of the predicted-plasmid FASTA against the same reference." />
+        <param name="prediction" type="data" format="fasta" label="Predicted-plasmid FASTA"
+               help="The sequence one tool considers plasmid, as a single FASTA." />
+        <param name="ambiguity_paf" type="data" format="tabular,paf" optional="true"
+               label="All-mappings PAF (optional)"
+               help="A second PAF retaining secondary alignments. Used only to report repeated sequence that maps to both plasmid and chromosome; it never changes F1." />
+        <param name="sample_name" type="text" value="sample" label="Sample identifier">
+            <validator type="empty_field" />
+            <validator type="regex" message="Use letters, digits, dot, dash or underscore only.">^[A-Za-z0-9._-]+$</validator>
+        </param>
+        <param name="tool_name" type="text" value="tool" label="Tool identifier"
+               help="Which reconstruction tool produced this prediction, e.g. mob_recon.">
+            <validator type="empty_field" />
+            <validator type="regex" message="Use letters, digits, dot, dash or underscore only.">^[A-Za-z0-9._-]+$</validator>
+        </param>
+        <param argument="--analysis-track" type="select" label="Analysis track">
+            <option value="short_read" selected="true">Short read</option>
+            <option value="long_read">Long read</option>
+            <option value="hybrid">Hybrid</option>
+        </param>
+        <param argument="--plasmid-recovery-threshold" type="float"
+               value="0.90" min="0" max="1" label="Plasmid recovery threshold"
+               help="Fraction of a truth plasmid that must be recovered for it to count as recovered." />
+        <section name="filters" title="Alignment filters" expanded="false">
+            <expand macro="alignment_filters" />
+        </section>
     </inputs>
     <outputs>
-        <data name="scores" format="tabular" label="PlasBench scores on ${on_string}" />
+        <data name="scores" format="tabular" label="${tool.name} on ${on_string}: ${tool_name} scores" />
     </outputs>
     <tests>
-        <test>
+        <!-- Defaults. -->
+        <test expect_num_outputs="1">
             <param name="truth" value="truth.tsv" />
             <param name="paf" value="prediction.paf" />
             <param name="prediction" value="prediction.fasta" />
             <param name="sample_name" value="synthetic" />
             <param name="tool_name" value="demo" />
-            <output name="scores"><assert_contents><has_text text="synthetic" /><has_text text="demo" /></assert_contents></output>
+            <output name="scores">
+                <assert_contents>
+                    <has_text text="synthetic" />
+                    <has_text text="demo" />
+                    <has_text text="precision" />
+                    <has_text text="plasmid_recall" />
+                </assert_contents>
+            </output>
+        </test>
+        <!-- Non-default threshold and filters still produce a scored row. -->
+        <test expect_num_outputs="1">
+            <param name="truth" value="truth.tsv" />
+            <param name="paf" value="prediction.paf" />
+            <param name="prediction" value="prediction.fasta" />
+            <param name="sample_name" value="synthetic" />
+            <param name="tool_name" value="strict" />
+            <param name="plasmid_recovery_threshold" value="0.99" />
+            <section name="filters">
+                <param name="min_alignment_length" value="100" />
+                <param name="min_alignment_identity" value="0.95" />
+            </section>
+            <output name="scores">
+                <assert_contents>
+                    <has_text text="strict" />
+                </assert_contents>
+            </output>
         </test>
     </tests>
     <help><![CDATA[
-**PlasBench score predictions** computes base-level precision, recall/completeness,
-and F1 for one predicted-plasmid FASTA against a labelled complete reference.
+**What it does**
 
-Use this wrapper after aligning the predicted FASTA to the reference with minimap2.
-The complete Galaxy workflow will combine this wrapper with assembly, prediction,
-alignment, aggregation, and report-generation tools.
+Scores one predicted-plasmid FASTA against a complete reference whose sequences
+are already labelled plasmid or chromosome.
+
+Every predicted base is projected onto the reference through the PAF alignment,
+giving a base-level confusion matrix with the plasmid class as positive:
+true positives are true plasmid bases claimed, false positives are chromosomal
+bases wrongly claimed, false negatives are plasmid bases missed. Overlapping
+alignments are merged so no base is counted twice. Predicted sequence that does
+not align at all is reported separately rather than punished as contamination,
+since it cannot be attributed to either origin.
+
+Because every tool is reduced to the same representation — one FASTA of what it
+calls plasmid — classifiers and re-assemblers become directly comparable.
+
+**Inputs**
+
+Truth labels and a PAF of the prediction against the *same* reference. Produce
+the PAF with the **PlasBench align** tool so the alignment filters match.
+
+**Output**
+
+One tabular row per sample and tool: TP/FP/FN bases, precision, recall, F1,
+plasmid-level recovery and alignment diagnostics. Concatenate rows from several
+runs and feed them to **PlasBench aggregate** for a leaderboard.
+
+@METRIC_HELP@
     ]]></help>
-    <citations>
-        <citation type="bibtex">@article{{li2021minimap2, title={{New strategies for sequence alignment with minimap2}}, author={{Li, Heng}}, journal={{Bioinformatics}}, year={{2021}}}}</citation>
-    </citations>
+    <expand macro="citations" />
 </tool>

@@ -21,6 +21,11 @@ dependencies = []
 
 [project.scripts]
 plasbench = "plasbench.cli:main"
+# Per-step entry points. Galaxy (and CWL/Nextflow/Snakemake) call one step at a
+# time and may only invoke a command on PATH, never an absolute path inside a
+# container image -- see plasbench/tools.py.
+plasbench-score = "plasbench.tools:score_main"
+plasbench-aggregate = "plasbench.tools:aggregate_main"
 
 [project.urls]
 Homepage = "https://github.com/ubeffiong/plasbench"

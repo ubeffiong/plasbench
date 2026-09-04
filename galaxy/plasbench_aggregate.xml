@@ -1,0 +1,84 @@
+<tool id="plasbench_aggregate" name="PlasBench aggregate" version="@TOOL_VERSION@+galaxy@VERSION_SUFFIX@" profile="@PROFILE@">
+    <description>per-sample scores into a ranked tool leaderboard</description>
+    <macros>
+        <import>macros.xml</import>
+    </macros>
+    <expand macro="requirements" />
+    <command detect_errors="exit_code"><![CDATA[
+## aggregate_results.py writes <prefix>.leaderboard.tsv and friends, so give it
+## a private working directory and collect the pieces Galaxy exposes.
+mkdir -p out &&
+plasbench-aggregate
+    --scores '$scores'
+#if $tool_status
+    --tool-status '$tool_status'
+#end if
+    --out-prefix out/benchmark
+&&
+cp out/benchmark.leaderboard.tsv '$leaderboard'
+#if $emit_markdown
+&& cp out/benchmark.leaderboard.md '$leaderboard_md'
+#end if
+    ]]></command>
+    <inputs>
+        <param name="scores" type="data" format="tabular" label="Combined scores table"
+               help="Rows from PlasBench score, concatenated across every sample and tool. One header row, then one row per sample/tool pair." />
+        <param name="tool_status" type="data" format="tabular" optional="true"
+               label="Tool status table (optional)"
+               help="Records which tool runs completed, were reused, skipped or failed. Supplying it lets the leaderboard distinguish a tool that scored badly from one that never ran." />
+        <param name="emit_markdown" type="boolean" checked="false"
+               label="Also output the Markdown leaderboard"
+               help="A formatted table for pasting into a report or slide." />
+    </inputs>
+    <outputs>
+        <data name="leaderboard" format="tabular" label="${tool.name} on ${on_string}: leaderboard" />
+        <data name="leaderboard_md" format="txt" label="${tool.name} on ${on_string}: leaderboard (Markdown)">
+            <filter>emit_markdown</filter>
+        </data>
+    </outputs>
+    <tests>
+        <test expect_num_outputs="1">
+            <param name="scores" value="scores.tsv" />
+            <output name="leaderboard">
+                <assert_contents>
+                    <has_text text="mob_recon" />
+                    <has_text text="f1" />
+                </assert_contents>
+            </output>
+        </test>
+        <test expect_num_outputs="2">
+            <param name="scores" value="scores.tsv" />
+            <param name="emit_markdown" value="true" />
+            <output name="leaderboard_md">
+                <assert_contents>
+                    <has_text text="leaderboard" />
+                </assert_contents>
+            </output>
+        </test>
+    </tests>
+    <help><![CDATA[
+**What it does**
+
+Turns per-sample, per-tool score rows into a ranked leaderboard: mean and median
+F1, precision, base-level recall and plasmid-level recall for each tool, with
+bootstrap confidence intervals.
+
+Stratified breakdowns (by organism, country, plasmid size, depth and AMR
+carriage) need the curated cohort sheet and are produced by the command-line
+pipeline rather than this wrapper.
+
+**Read the intervals, not just the ranking.** With few samples the intervals
+overlap heavily, and two tools whose means look different may not be
+distinguishable at all. The leaderboard reports that rather than hiding it.
+
+**Inputs**
+
+Concatenate the tabular outputs of **PlasBench score** across every sample and
+tool — keeping a single header row — and supply the result here. The optional
+tool-status table lets the leaderboard separate "scored badly" from "never ran",
+which matters when a tool fails on some samples.
+
+@METRIC_HELP@
+    ]]></help>
+    <expand macro="citations" />
+</tool>

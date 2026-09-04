@@ -1,0 +1,65 @@
+{% set name = "plasbench" %}
+{% set version = "0.1.3" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://github.com/ubeffiong/plasbench/archive/refs/tags/v{{ version }}.tar.gz
+  sha256: REPLACE_WITH_GITHUB_SOURCE_TARBALL_SHA256
+
+build:
+  noarch: generic
+  number: 0
+  script: bash ${RECIPE_DIR}/build.sh
+  run_exports:
+    - {{ pin_subpackage(name, max_pin="x.x") }}
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=68
+  run:
+    - python >=3.9
+    - bash
+    # The pipeline shells out to these; a Galaxy job resolves the whole set
+    # from this single requirement.
+    - minimap2 >=2.24
+    - unzip
+
+test:
+  commands:
+    # The CLI itself.
+    - plasbench --version
+    # The per-step entry points a workflow manager calls, and proof that each
+    # can locate the pipeline files installed under $PREFIX/share/plasbench.
+    - plasbench-score --help
+    - plasbench-aggregate --help
+    - test -f $PREFIX/share/plasbench/python/score_plasmids.py
+    - test -f $PREFIX/share/plasbench/scripts/run_all.sh
+  imports:
+    - plasbench
+    - plasbench.tools
+
+about:
+  home: https://github.com/ubeffiong/plasbench
+  license: MIT
+  license_file: LICENSE
+  summary: Benchmark plasmid-reconstruction tools against complete-reference truth.
+  description: |
+    PlasBench measures how well plasmid-reconstruction tools recover plasmids
+    from short-read data, using complete long-read or hybrid assemblies as
+    ground truth. Each tool's prediction is projected back onto the reference to
+    give base-level precision, recall and F1 alongside plasmid-level recovery,
+    so that base-level accuracy cannot be mistaken for the number of intact
+    plasmids actually returned.
+  dev_url: https://github.com/ubeffiong/plasbench
+  doc_url: https://github.com/ubeffiong/plasbench#readme
+
+extra:
+  recipe-maintainers:
+    - ubeffiong
+  identifiers:
+    - biotools:plasbench
