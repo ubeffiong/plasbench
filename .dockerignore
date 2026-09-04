@@ -11,3 +11,7 @@ results_demo
 tmp
 __pycache__
 *.pyc
+build
+*.egg-info
+.pytest_cache
+results_audit

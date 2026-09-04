@@ -10,7 +10,7 @@ mkdir -p "$DATA_DIR" "$RESULTS_DIR" "$LOG_DIR" "$TMP_DIR"
 
 log "Checking core dependencies..."
 CORE_OK=1
-for c in datasets prefetch fasterq-dump fastp minimap2 python3; do
+for c in datasets prefetch fasterq-dump fastp minimap2 python3 unzip; do
     if have "$c"; then
         log "  [ok]   $c"
     else
