@@ -2,11 +2,12 @@
 # Regression for scripts/00_setup.sh's interactive dependency check: it must
 # still just pass cleanly when everything is present, must correctly detect
 # and offer to fix each class of gap (a missing conda-family manager, a
-# missing tool that an install-tools profile provides, a missing database),
-# must never prompt when nothing is fixable (an unfixable gap like gplas),
-# and must never auto-proceed without consent. Runs fully offline with fake
-# tool binaries on PATH; the REAL env/*.sh orchestration scripts run
-# unmodified so this also exercises their real argument-passing.
+# missing tool that an install-tools profile provides -- including gplas,
+# needed only for the optional gplas2_mob/gplas2_external modes -- a missing
+# database), must never prompt when nothing is fixable, and must never
+# auto-proceed without consent. Runs fully offline with fake tool binaries on
+# PATH; the REAL env/*.sh orchestration scripts run unmodified so this also
+# exercises their real argument-passing.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -63,17 +64,30 @@ fi
 grep -q "Skipped" "$TMP/run.log" || { echo "FAIL: expected a Skipped message" >&2; cat "$TMP/run.log" >&2; exit 1; }
 echo "declining consent never touches conda -> PASS"
 
-# --- an unfixable-only gap (gplas) must be reported without ever prompting. ---
+# --- missing gplas (needed only when a gplas2_* mode is enabled), conda
+# present, --yes: offers and actually invokes install-tools gplas, which
+# actually invokes conda. gplas is otherwise not needed, so bin_full (which
+# lacks it) plus a logging conda is enough to isolate this one gap. ---
+mkdir -p "$TMP/bin_gplas"
+for t in datasets prefetch fasterq-dump fastp minimap2 spades.py plasmidspades.py mob_recon platon; do
+    printf '#!/usr/bin/env bash\ntrue\n' > "$TMP/bin_gplas/$t"; chmod +x "$TMP/bin_gplas/$t"
+done
+cat > "$TMP/bin_gplas/conda" <<EOF
+#!/usr/bin/env bash
+echo "conda \$*" >> "$TMP/conda_calls.log"
+true
+EOF
+chmod +x "$TMP/bin_gplas/conda"
+
 : > "$TMP/conda_calls.log"
-if PATH="$TMP/bin_full:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+if PATH="$TMP/bin_gplas:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
     RUN_GPLAS2_MOB=1 bash "$ROOT/scripts/00_setup.sh" --yes > "$TMP/run.log" 2>&1; then
-    echo "FAIL: an unresolved gplas gap should still exit non-zero" >&2; cat "$TMP/run.log" >&2; exit 1
+    echo "FAIL: this run should exit non-zero (a freshly-attempted install is never a passing check)" >&2
+    cat "$TMP/run.log" >&2; exit 1
 fi
-grep -q "not part of any install-tools profile" "$TMP/run.log" || { echo "FAIL: expected the gplas unfixable note" >&2; cat "$TMP/run.log" >&2; exit 1; }
-grep -q "The following can be installed automatically" "$TMP/run.log" && {
-    echo "FAIL: an unfixable-only gap must not offer an install prompt" >&2; cat "$TMP/run.log" >&2; exit 1; }
-[[ ! -s "$TMP/conda_calls.log" ]] || { echo "FAIL: an unfixable-only gap must never touch conda" >&2; exit 1; }
-echo "an unfixable-only gap (gplas) is reported with no install prompt offered -> PASS"
+grep -q "install-tools profile: gplas" "$TMP/run.log" || { echo "FAIL: gplas profile not offered" >&2; cat "$TMP/run.log" >&2; exit 1; }
+grep -q "gplas" "$TMP/conda_calls.log" || { echo "FAIL: install_tools.sh did not actually ask conda to install gplas" >&2; cat "$TMP/conda_calls.log" >&2; exit 1; }
+echo "missing gplas (RUN_GPLAS2_MOB=1) + --yes triggers install-tools -> conda end to end -> PASS"
 
 # --- MOB-suite database: offered and actually invoked once mob_recon/mob_init exist. ---
 mkdir -p "$TMP/bin_mobdb"

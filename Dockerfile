@@ -45,6 +45,49 @@ USER $MAMBA_USER
 # to persist the ~1 GB download across containers instead of refetching it
 # every run.
 
+# gplas2 (optional fourth benchmark tool) is distributed from GitLab, not
+# bioconda: bioconda's `gplas` is 0.6.1 and lacks the -P/--prediction external
+# classifier flag that scripts/04_run_tools.sh invokes. Its environment pins
+# ~200 packages to 2019 builds (R 3.5.1, Python 3.7.3, snakemake 5.5.4) that
+# cannot coexist with the main lock, so -- like MOB-suite -- it gets its own
+# environment, exposed on PATH through a thin shim. Every `conda:` directive in
+# its snakefiles is commented out, so it runs entirely inside this environment
+# and creates none at run time. The commit is pinned so the image is reproducible.
+ARG GPLAS2_COMMIT=00cf37bec5e44b05ee30c8a4c99e987abbbb4c4f
+USER root
+RUN /opt/conda/envs/plasbench/bin/curl -sSL --retry 8 --retry-all-errors --retry-delay 5 \
+      -o /tmp/gplas2.tar.gz \
+      "https://gitlab.com/mmb-umcu/gplas2/-/archive/$GPLAS2_COMMIT/gplas2-$GPLAS2_COMMIT.tar.gz" \
+ && mkdir -p /opt/gplas2 \
+ && tar -xzf /tmp/gplas2.tar.gz -C /opt/gplas2 --strip-components=1 \
+ && rm -f /tmp/gplas2.tar.gz \
+ && chown -R $MAMBA_USER:$MAMBA_USER /opt/gplas2
+USER $MAMBA_USER
+# Several of the pinned 2019 builds come from Anaconda's pkgs/r channel, which
+# is slow enough here to trip libmamba's low-speed cutoff mid-transaction. The
+# package cache persists across attempts inside this layer, so each retry
+# resumes rather than restarting the 379MB download.
+RUN for attempt in 1 2 3 4 5; do \
+      MAMBA_REMOTE_MAX_RETRIES=10 MAMBA_REMOTE_BACKOFF_FACTOR=3 \
+        micromamba create -y -n gplas2 --file /opt/gplas2/envs/gplas.yaml && break; \
+      echo "gplas2 environment attempt $attempt failed; retrying"; sleep 20; \
+    done; \
+    test -x /opt/conda/envs/gplas2/bin/Rscript \
+ && micromamba clean --all --yes
+# setuptools_scm derives the version from git metadata, which a tarball has not
+# got; pin it explicitly so the install does not depend on clone history.
+RUN SETUPTOOLS_SCM_PRETEND_VERSION=1.1.2 \
+    micromamba run -n gplas2 python -m pip install --no-deps -e /opt/gplas2
+USER root
+# gplas shells out to snakemake and Rscript, so its shim must put its own
+# environment on PATH -- exactly the MOB-suite lesson.
+RUN { echo '#!/bin/sh'; \
+      echo 'PATH=/opt/conda/envs/gplas2/bin:$PATH'; \
+      echo 'export PATH'; \
+      echo 'exec /opt/conda/envs/gplas2/bin/gplas "$@"'; } > /opt/plasbench-bin/gplas \
+ && chmod 0755 /opt/plasbench-bin/gplas
+USER $MAMBA_USER
+
 WORKDIR /opt/plasbench
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /opt/plasbench
 RUN micromamba run -n plasbench python -m pip install --no-deps .

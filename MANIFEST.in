@@ -1,0 +1,26 @@
+# The runnable pipeline lives outside the `plasbench` Python package: the CLI is
+# a thin wrapper that drives scripts/, python/ and adapters/. Without these the
+# source distribution installs a command with nothing to run, which is why
+# users were previously told to clone the repository. Keep this in step with
+# `make dist`.
+include LICENSE NOTICE TRADEMARKS.md CITATION.cff .zenodo.json
+include README.md INSTALL.md Makefile
+recursive-include scripts *.sh
+recursive-include python *.py
+recursive-include adapters *.sh *.md
+recursive-include config *.sh *.tsv
+recursive-include env *.sh *.yml *.txt
+recursive-include cohorts *.tsv *.json *.md
+recursive-include assets *.html *.css *.woff2 *.md
+recursive-include docs *.md
+recursive-include test *.py *.sh
+recursive-include recipes *
+recursive-include galaxy *
+prune data
+prune results
+prune results_demo
+prune results_audit
+prune logs
+prune tmp
+prune build
+global-exclude *.pyc __pycache__/*
