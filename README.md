@@ -28,140 +28,46 @@ For each isolate the pipeline:
 
 ---
 
-## 0. Get PlasBench
+## 0. Which route do I take?
 
-Three ways in. **Most users want Option A or B and never need the source code.**
-
-| You are… | Use | What you need installed |
+| You are… | Go to | You need |
 |---|---|---|
-| a lab running the benchmark | **A — release archive** | conda (or Miniforge) |
-| a lab that would rather not install anything | **B — container** | Docker only |
-| modifying, extending or citing exact source | **C — source checkout** | git + conda |
+| a laboratory that wants to run the benchmark | **[Section 3 — step by step](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** | a Linux machine, or Windows with WSL2 |
+| someone who would rather install nothing | [Container](#container) below | Docker only |
+| modifying PlasBench, or citing exact source | [Source checkout](#source-checkout) below | git and conda |
 
----
+**If you are not sure, use [Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard).**
+It writes out every command, from a machine with nothing installed to a finished
+leaderboard, and assumes no prior experience with conda or bioinformatics tooling.
 
-### Option A — Download the release archive (recommended)
-
-A complete terminal walkthrough, from a machine with nothing installed to a finished
-benchmark. Copy each block in turn.
-
-> **Which terminal?**
-> **Linux or macOS** — open Terminal and continue.
-> **Windows** — install WSL2 first: open PowerShell **as administrator**, run
-> `wsl --install`, reboot, then open the **Ubuntu** app. Every command below goes in that
-> Linux shell, **not** in PowerShell or CMD.
-
-#### Step 1 — Get conda, once *(optional)*
-
-**You can skip this entirely.** If no conda is found, `./install.sh` in Step 3 detects that
-and offers to install Miniforge for you. Do it here only if you would rather install conda
-yourself first, or if `install.sh` reports that conda landed but is not yet on your `PATH`
-(open a new terminal and re-run it in that case).
-
-Skip this if `conda --version` already answers.
-
-```bash
-curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-bash Miniforge3-$(uname)-$(uname -m).sh -b
-~/miniforge3/bin/conda init bash
-exec bash
-```
-
-*Expected:* `conda --version` now prints a version. Miniforge is the recommended
-distribution; it defaults to conda-forge and carries no commercial licensing conditions.
-
-#### Step 2 — Download PlasBench
+The short version of that route is:
 
 ```bash
 curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.6/plasbench-0.1.6.tar.gz
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.6/plasbench-0.1.6.tar.gz.sha256
-sha256sum -c plasbench-0.1.6.tar.gz.sha256      # must print: OK
-```
-
-*Expected:* `plasbench-0.1.6.tar.gz: OK`.
-
-**The `-f` matters.** Without it, `curl` treats a missing release as success and writes
-GitHub's short "Not Found" page *into* the file, leaving you with a 9-byte
-`plasbench-0.1.6.tar.gz` and the confusing error
-`sha256sum: no properly formatted checksum lines found`. With `-f`, curl fails loudly and
-writes nothing. If you see `curl: (22) The requested URL returned error: 404`, the release
-has not been published yet — see the note at the end of this section.
-
-If the checksum does not match, delete the file and download it again — do not install it.
-Sanity check: the archive is roughly 700 KB. If `ls -l` shows a handful of bytes, you
-downloaded an error page, not PlasBench.
-
-#### Step 3 — Install
-
-```bash
 tar -xzf plasbench-0.1.6.tar.gz
 cd plasbench-0.1.6
 ./install.sh --tools
-```
-
-*Arguments:* `--tools` also installs the bioinformatics tools (SPAdes, MOB-suite, Platon,
-minimap2 …). Drop it for just the environment and the `plasbench` command; add `--yes` to
-skip prompts; `--help` lists options.
-*Time:* 10–40 minutes, mostly downloading and solving the environment.
-*If it stops immediately* saying no conda was found, you skipped Step 1.
-
-#### Step 4 — Check it works, offline
-
-Do this before downloading any data. It needs no network.
-
-```bash
 conda activate plasbench
 plasbench test
-plasbench demo
 ```
 
-*Expected:* `test` ends with `ALL PLASBENCH TESTS PASSED`; `demo` prints a small
-leaderboard and writes `results_demo/benchmark.report.html`. If either fails, fix the
-installation before going further — nothing downstream will be meaningful.
-
-#### Step 5 — Run a benchmark
-
-```bash
-plasbench run --cohort public-v2
-```
-
-*Expected:* the stages run in order (download → truth → assemble → tools → score →
-aggregate), and the interactive report lands at **`results/benchmark.report.html`**.
-*Time:* roughly 30–60 minutes per isolate; run a real cohort overnight.
-
-Before a large run, set an NCBI API key ([Step 5 of the manual](#step-5--give-ncbi-your-credentials-recommended))
-and check your disk and memory against [§3.0](#30-before-you-start--what-you-need).
+…but there are databases and an NCBI key to set up as well, so follow Section 3 rather
+than only these six lines.
 
 ---
 
-> **If those download URLs do not resolve,** no release has been published yet. Until one
-> is, either ask the maintainer for the `plasbench-<version>.tar.gz` archive and start at
-> Step 3, or use [Option C](#option-c--source-checkout-contributors).
->
-> **Maintainers — to publish a release.** Build the archive with `make dist` (it writes
-> `dist/plasbench-<version>.tar.gz` and a matching `.sha256`), then either attach both
-> files to a GitHub Release:
->
-> ```bash
-> gh release create v0.1.6 dist/plasbench-0.1.6.tar.gz dist/plasbench-0.1.6.tar.gz.sha256 \
->   --title "PlasBench 0.1.6" --notes "First public release"
-> ```
->
-> …or push the `v0.1.6` tag, which triggers `.github/workflows/release.yml` to publish the
-> PyPI distribution and the GHCR container image. PyPI trusted publishing must be
-> configured first — see [`docs/RELEASING.md`](docs/RELEASING.md).
-
-
-### Option B — Container (nothing to install but Docker)
+### Container
 
 The image carries every tool and the MOB-suite database already built in.
 
 ```bash
-# Published image:
 docker pull ghcr.io/ubeffiong/plasbench:latest
 docker run --rm ghcr.io/ubeffiong/plasbench:latest plasbench demo
+```
 
-# Or build it yourself from the release archive or a checkout:
+Or build it yourself from a release archive or a checkout:
+
+```bash
 docker build -t plasbench:local .
 docker run --rm plasbench:local plasbench demo
 ```
@@ -183,30 +89,29 @@ docker run --rm \
   --samples /work/config/accessions.tsv
 ```
 
-**Databases are not bundled.** Mount a Platon database at `/work/data/db/platon/db`, or
-set `RUN_PLATON=0`. MOB-suite's database *is* baked into the image; if you build your own
-image without it, mob_recon downloads ~1 GB on first use. Mount a persistent volume over
-its default directory so it is not re-fetched on every run:
+**The Platon database is not bundled.** Mount one at `/work/data/db/platon/db`
+(see [step 7a](#step-7--install-the-two-reference-databases) for how to obtain it), or
+set `RUN_PLATON=0`. MOB-suite's database *is* baked into the published image; if you
+build your own image without it, mob_recon downloads ~450 MB on first use, so mount a
+persistent volume over its default directory to avoid re-fetching it on every run:
 
 ```bash
 -v plasbench-mobsuite-db:/opt/conda/envs/mobsuite/lib/python3.10/site-packages/mob_suite/databases
 ```
 
-…or set `RUN_MOB_RECON=0`.
-
-For a provenance-bearing run, use `scripts/docker_run.sh` in place of plain `docker run`
-(with the same mounts): it records the immutable image digest into `run_manifest.json`.
+For a run that records the image digest into `run_manifest.json`, use
+`scripts/docker_run.sh` in place of plain `docker run`, with the same mounts.
 
 ---
 
-### Option C — Source checkout (contributors)
+### Source checkout
 
 Use this only if you intend to modify PlasBench or cite an exact source state.
 
 ```bash
 git clone https://github.com/ubeffiong/plasbench.git
 cd plasbench
-bash env/bootstrap_conda.sh      # installs a conda manager if you have none (asks first)
+bash env/bootstrap_conda.sh      # installs a conda manager if you have none
 bash env/setup_conda.sh          # creates the 'plasbench' environment
 conda activate plasbench
 python -m pip install --no-deps .
@@ -214,17 +119,21 @@ plasbench check --yes            # installs any missing tool or database
 plasbench test && plasbench demo
 ```
 
+`make dist` rebuilds the release archive into `dist/`.
+
 ---
 
-### Where to go next
+### Where else to look
 
-**[Section 3 is the full step-by-step manual](#3-user-manual--from-download-to-leaderboard)**
-— resources, NCBI downloads, every stage's inputs and outputs, and how to read the
-leaderboard honestly. `plasbench --help` and `plasbench run --help` list every option;
-`plasbench docs --topic outputs` and `plasbench docs --topic troubleshooting` print the
-same guide in the terminal. For a non-technical overview for partners and funders, see
-[`docs/CONCEPT_NOTE.md`](docs/CONCEPT_NOTE.md) or run `plasbench concept-note`.
-
+- **[Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** — every
+  command, from a bare machine to a leaderboard, with what to do when a step fails.
+- **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
+  building cohort studies, and every option available.
+- `plasbench --help`, `plasbench run --help` — the full option list.
+- `plasbench docs --topic outputs`, `plasbench docs --topic troubleshooting` — the same
+  guide in the terminal.
+- [`docs/CONCEPT_NOTE.md`](docs/CONCEPT_NOTE.md) or `plasbench concept-note` — a
+  non-technical overview for partners and funders.
 
 ---
 
@@ -292,437 +201,451 @@ plasbench/
 
 ---
 
-## 3. User manual — from download to leaderboard
+## 3. Step by step: from a new machine to your first leaderboard
 
-This is the complete path a new user walks: obtain PlasBench, install it, prove it works
-offline, fetch data from NCBI, run the benchmark, and read the result. Every step lists
-what you give it, what it produces, roughly what it costs, and what to do next.
+**Every command on this page is complete. Copy and paste it exactly as written.**
+Nothing here is a placeholder, and you never have to go and look something up
+elsewhere. Each step says what you should see when it works, and what to do when it
+does not.
 
-All timings below were **measured** on a 7-isolate African cohort using 6 CPU threads and
-a 7 GB assembly cap. Treat them as order-of-magnitude guidance; your hardware and the
-depth of your runs will move them.
+Work through the steps in order. Steps 1–9 are done once per machine. Step 10 onwards
+is what you repeat for each study.
 
-### 3.0 Before you start — what you need
+### What the machine needs
 
-| Resource | Minimum | Comfortable | Why |
+| | Minimum | Comfortable | Why |
 |---|---|---|---|
-| CPU | 4 threads | 8–16 threads | Assembly and BLAST dominate; tools also run in parallel |
-| RAM | 8 GB | 16–32 GB | SPAdes scales with **read count**, not genome size. A ~250x bacterial isolate needed **7.8 GB** for k-mer counting alone and failed under an 7 GB cap |
-| Disk | 30 GB | 60–100 GB | ~630 MB per isolate (reads + reference + assembly), plus ~2.7 GB Platon database and a 3.2 GB container image |
-| OS | Linux or WSL2 (Ubuntu) | — | On Windows, run inside WSL2 or use Docker. Do **not** run the shell stages from PowerShell |
-| Network | required for stages 0–1 | — | Reference assemblies, SRA reads and tool databases are downloaded; scoring itself is offline |
+| CPU | 4 cores | 8–16 cores | Assembly and BLAST dominate the run |
+| RAM | 8 GB | 16–32 GB | SPAdes scales with **read count**. A 250× isolate needed **7.8 GB** for k-mer counting alone and failed under a 7 GB cap |
+| Free disk | 30 GB | 60–100 GB | ~630 MB per isolate, plus 2.9 GB MOB-suite and 2.7 GB Platon databases |
+| Internet | required for steps 3, 7, 8, 10 | | Scoring itself is offline |
 
-**Time.** For 7 isolates on 6 threads: download ~2–25 min per isolate (SRA-dependent),
-assembly ~9–28 min per isolate, then per isolate mob_recon ~1.7 min, Platon ~4.2 min,
-plasmidSPAdes ~12.3 min. Scoring and aggregation for the whole cohort take under a
-minute. Budget roughly **30–60 minutes per isolate** end to end, and run it overnight for
-a real cohort.
-
-> The pipeline is **idempotent**: every stage skips work that is already complete. A run
-> interrupted by a reboot resumes exactly where it stopped — during development this run
-> survived a full host restart and reused all 17 finished tool results.
+**Time.** Steps 1–9 take 1–3 hours, mostly downloading. After that, budget roughly
+30–60 minutes per isolate. A 10-isolate cohort is an overnight job.
 
 ---
 
-### Step 1 — Get PlasBench
+### Step 1 — Open the right terminal
 
-Pick **one** of three routes.
+**On Linux or macOS:** open Terminal. Nothing else to do; go to step 2.
 
-**Route A — release tarball (recommended if you just want to run it).** No git, no source
-browsing.
+**On Windows:** you need WSL2. PlasBench does not run in PowerShell or CMD.
+
+Open **PowerShell as Administrator** (right-click the Start button → *Terminal
+(Admin)*) and run:
+
+```powershell
+wsl --install
+```
+
+Restart the computer when it asks. After restarting, open the **Ubuntu** app from the
+Start menu. It will ask you to create a username and password the first time — this is
+a Linux account inside Windows, unrelated to your Windows password.
+
+Check you are in the right place:
 
 ```bash
-# Download plasbench-<version>.tar.gz and its .sha256 from the Releases page, then:
-sha256sum -c plasbench-0.1.6.tar.gz.sha256     # must print: OK
+uname -s
+```
+
+It must print `Linux`. If it prints anything else you are still in PowerShell — open
+the Ubuntu app instead.
+
+**Every remaining command in this document goes in that Linux shell.**
+
+---
+
+### Step 2 — Install conda
+
+First check whether you already have it:
+
+```bash
+conda --version
+```
+
+If that prints a version number (for example `conda 26.5.3`), skip to step 3.
+
+If it says `command not found`, install Miniforge:
+
+```bash
+cd ~
+curl -fL -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash "Miniforge3-$(uname)-$(uname -m).sh" -b
+~/miniforge3/bin/conda init bash
+exec bash
+```
+
+That downloads about 120 MB. The last line restarts your shell, so your prompt will
+change to start with `(base)`.
+
+Confirm it worked:
+
+```bash
+conda --version
+```
+
+This must now print a version number before you continue.
+
+---
+
+### Step 3 — Download PlasBench
+
+```bash
+cd ~
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.6/plasbench-0.1.6.tar.gz
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.6/plasbench-0.1.6.tar.gz.sha256
+sha256sum -c plasbench-0.1.6.tar.gz.sha256
+```
+
+The last command must print exactly:
+
+```
+plasbench-0.1.6.tar.gz: OK
+```
+
+If instead you see `curl: (22) ... 404`, the version number in the URL is wrong — check
+<https://github.com/ubeffiong/plasbench/releases> for the current one and substitute it
+in all three commands.
+
+If you see `sha256sum: ... no properly formatted checksum lines found`, the download
+failed and left an error page in place of the file. Delete both files and run the three
+commands again:
+
+```bash
+rm -f plasbench-0.1.6.tar.gz plasbench-0.1.6.tar.gz.sha256
+```
+
+Now unpack it:
+
+```bash
 tar -xzf plasbench-0.1.6.tar.gz
-cd plasbench-0.1.6
+cd ~/plasbench-0.1.6
 ```
-
-*Input:* the release archive. *Output:* a complete, runnable directory (~700 KB) holding
-the pipeline, the shipped cohorts and `install.sh`. *Next:* Step 2, Route A.
-
-**Route B — container (fewest moving parts).** Needs only Docker; no conda, no compilers.
-
-```bash
-docker pull ghcr.io/ubeffiong/plasbench:latest
-docker run --rm ghcr.io/ubeffiong/plasbench:latest plasbench demo
-```
-
-*Output:* the offline demo leaderboard, proving the image works. *Next:* Step 3, then run
-with bind mounts as shown in §0. *Note:* the image is ~3.2 GB and already contains every
-tool plus the MOB-suite database; you still mount a Platon database (Step 4).
-
-**Route C — git clone (contributors).** Use this if you intend to modify or cite exact
-source state.
-
-```bash
-git clone https://github.com/ubeffiong/plasbench.git
-cd plasbench
-```
-
-*Maintainers:* `make dist` regenerates the Route A tarball and its checksum into `dist/`.
 
 ---
 
-### Step 2 — Install
-
-**Route A/C — one command.**
+### Step 4 — Install PlasBench and the bioinformatics tools
 
 ```bash
-./install.sh              # creates the conda env and installs the `plasbench` command
-./install.sh --tools      # the same, plus every tool the RUN_* flags in config/config.sh need
+./install.sh --tools
 ```
 
-*Arguments:* `--tools` also installs the bioinformatics tools; `--yes` skips prompts;
-`--help` prints usage. *Requires:* conda, mamba or micromamba on `PATH` — the installer
-stops with instructions (Miniforge, or use the container) if none is found, rather than
-half-installing. *Output:* a conda environment named `plasbench` and the `plasbench`
-executable. *Time:* 5–20 minutes, mostly environment solving.
+This is the long step: **30–90 minutes**, downloading roughly 1 GB of tools. It prints
+numbered phases so you can tell waiting from stuck:
 
-**Route B — nothing to install.** The image is the installation.
+```
+[plasbench-install] ===== step 2/4: conda environment 'plasbench' =====
+[plasbench-install] ===== step 3/4: the plasbench command =====
+[plasbench-install] ===== step 4/4: bioinformatics tools and databases =====
+```
 
-**Verify, whichever route:**
+Long silent pauses during step 2/4 are normal — conda is solving dependencies.
+
+**Do not press Ctrl+C.** Interrupting this can leave a half-built environment. If it
+does get interrupted, delete the environment and start step 4 again:
 
 ```bash
-conda activate plasbench      # not needed for Docker
+conda env remove -n plasbench -y
+./install.sh --tools
+```
+
+---
+
+### Step 5 — Activate the environment
+
+```bash
+conda activate plasbench
 plasbench --version
 ```
 
-*Expected:* a version string. If `plasbench: command not found`, you did not activate the
-environment. *Next:* Step 3.
+You should see your prompt change to start with `(plasbench)`, and the version print:
+
+```
+plasbench 0.1.6
+```
+
+**You must run `conda activate plasbench` in every new terminal window** before using
+PlasBench. If `plasbench` ever says `command not found`, this is almost always why.
 
 ---
 
-### Step 3 — Prove the engine works, offline
+### Step 6 — Check it works, before downloading any data
 
-Do this **before** downloading anything. It needs no network and no bioinformatics tools,
-and it isolates "is PlasBench broken?" from "is my data or tool install broken?".
+These two commands need no internet and no databases. Run them now, because if they
+fail, nothing later will be meaningful.
 
 ```bash
-plasbench test      # full regression suite over scoring, aggregation and reporting
-plasbench demo      # synthetic end-to-end run: score -> aggregate -> leaderboard -> HTML
+plasbench test
 ```
 
-*Expected output:* `test` ends with `ALL PLASBENCH TESTS PASSED`. `demo` writes a small
-leaderboard plus `results_demo/benchmark.report.html` and ranks three synthetic
-predictors of known behaviour — a deliberately accurate one, a contaminating one and an
-over-conservative one — so you can see the metric separate precision loss from recall
-loss before trusting it on real data.
+Must end with:
 
-*If this fails,* stop and fix the installation; nothing downstream will be meaningful.
-*Next:* Step 4.
+```
+ALL PLASBENCH TESTS PASSED
+```
+
+```bash
+plasbench demo
+```
+
+This runs a complete synthetic benchmark and writes a report. It ranks three fake tools
+of known behaviour — one accurate, one that over-claims, one that under-claims — so you
+can see the scoring separate those before trusting it on real data.
 
 ---
 
-### Step 4 — Install the tools and their databases
+### Step 7 — Install the two reference databases
 
-The benchmark itself is small; the tools and their reference databases are not.
+PlasBench needs a database for Platon and one for MOB-suite. Together they are about
+5.6 GB on disk. Do both.
+
+#### 7a — Platon database
 
 ```bash
-plasbench install-tools core            # download, QC and scoring utilities
-plasbench install-tools assembly        # SPAdes and Unicycler
-plasbench install-tools reconstruction  # MOB-suite and Platon
-plasbench install-tools all             # everything the enabled RUN_* flags need
+mkdir -p ~/plasbench-0.1.6/data/db/platon
+cd ~/plasbench-0.1.6/data/db/platon
+curl -fL -C - --retry 10 --retry-all-errors -o db.tar.gz https://zenodo.org/records/4066768/files/db.tar.gz
 ```
 
-Then the **databases**, which are not bundled:
+That is a 1.69 GB download. **`-C -` means it resumes**: if it stops partway, run the
+exact same `curl` command again and it continues from where it stopped rather than
+starting over.
+
+Check you got the whole file before unpacking it:
 
 ```bash
-bash env/download_mobsuite_db.sh        # ~450 MB; checks first, skips if present
-bash env/download_bakta_db.sh           # optional, for protein annotation
-bash env/download_platon_db.sh          # prints instructions -- see below
+ls -l db.tar.gz
 ```
 
-Each of these **checks before it downloads**. If the database is already installed the
-script says so and exits; re-downloading is opt-in:
+The size must be **1690687855**. If it is smaller, run the `curl` command again.
+
+Then unpack:
 
 ```bash
-bash env/download_mobsuite_db.sh --force   # confirms before overwriting
+tar -xzf db.tar.gz
+rm -f db.tar.gz
+ls ~/plasbench-0.1.6/data/db/platon/db | wc -l
 ```
 
-A database is only counted as present when the files the tool actually reads are there,
-so a tree left behind by an interrupted download is reported as **incomplete** rather than
-mistaken for a working install.
+The last command should print **31**.
 
-> **`mob_init` cannot resume.** MOB-suite's own downloader re-fetches the whole ~450 MB
-> from zero on every attempt. On a link that drops mid-transfer it may never complete --
-> which is why the presence check above matters, and why the escape hatch below exists.
-
-**If the download will not complete: copy a prebuilt database.** Every file in these
-databases is plain data -- FASTA, BLAST and DIAMOND indexes, HMM profiles, a mash sketch,
-a SQLite taxonomy -- with no absolute paths, so a directory built on one machine can be
-copied to another:
+#### 7b — MOB-suite database
 
 ```bash
-# MOB-suite: lives inside the installed package, so it survives project moves
+cd ~/plasbench-0.1.6
+bash env/download_mobsuite_db.sh
+```
+
+Answer `y` when it asks. This downloads about 450 MB and then spends roughly 10 minutes
+building indexes and a taxonomy database. The taxonomy step prints counters rather than
+a percentage and can sit still for minutes — that is normal, not a hang.
+
+If it is already installed, the script tells you so and does nothing:
+
+```
+[ok]   MOB-suite DB already present at /home/you/miniforge3/envs/plasbench/lib/python3.11/site-packages/mob_suite/databases
+```
+
+**If this download keeps failing**, see step 7c. Do not keep retrying it: MOB-suite's
+downloader cannot resume, so every attempt restarts from zero.
+
+#### 7c — If a database download will not complete
+
+On a slow or unreliable connection the MOB-suite download may never finish. Both
+databases are ordinary data files with no absolute paths inside them, so a copy from
+another machine works. If a colleague has a working PlasBench install, ask them for the
+two directories and copy them in.
+
+Find where the MOB-suite database belongs on **your** machine — this command prints the
+exact path, you do not need to work it out:
+
+```bash
+conda activate plasbench
+python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))'
+```
+
+Copy their `databases` directory into the path it printed, then copy their Platon `db`
+directory into `~/plasbench-0.1.6/data/db/platon/db`. Confirm both:
+
+```bash
 MOB_DB="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))')"
-cp -r /path/to/prebuilt/mobsuite_db/* "$MOB_DB/"
-
-# Platon: path is project-relative, or point PLATON_DB anywhere you like
-mkdir -p data/db/platon/db && cp -r /path/to/prebuilt/platon_db/* data/db/platon/db/
+ls "$MOB_DB" | wc -l                                    # expect 31
+ls ~/plasbench-0.1.6/data/db/platon/db | wc -l          # expect 31
 ```
-
-Then confirm with `plasbench check`, which reports both as `[ok]` and stops offering to
-install them.
-
-`download_platon_db.sh` does **not** download by itself: Platon's Zenodo release is
-periodically re-versioned, so the script refuses to pin a stale URL and instead prints the
-current instructions. Fetch the live `db.tar.gz` link from
-<https://github.com/oschwengers/platon> and either unpack it manually to `$PLATON_DB`, or
-re-run with the URL supplied:
-
-```bash
-PLATON_DB_URL=<current_url> bash env/download_platon_db.sh
-```
-
-Budget ~1.7 GB of download and ~2.7 GB on disk. MOB-suite's database is already baked
-into the container image.
-
-> **gplas2 is optional, off by default, and needs care.** `plasbench install-tools gplas`
-> installs bioconda's `gplas`, which is version **0.6.1** -- the older snakemake tool. The
-> pipeline invokes `gplas -i <graph> -P <classifier>`, and the `-P/--prediction` flag
-> exists only in **gplas2**, distributed from GitLab
-> (<https://gitlab.com/mmb-umcu/gplas2>), not bioconda. Installing the bioconda package
-> alone makes every `gplas2_mob` run **fail** rather than be cleanly skipped. Install
-> gplas2 from its own repository, confirm `gplas --help` lists `-P`, and only then set
-> `RUN_GPLAS2_MOB=1`.
->
-> **gplas2 also requires `ASSEMBLER=unicycler`.** With the default SPAdes assembler the
-> contigs are named `NODE_1_length_..._cov_...` while the GFA segments are bare numeric
-> ids (`15`, `19`, ...), so the MOB labels cannot be mapped onto graph nodes and every
-> `gplas2_mob` run fails with *"MOB plasmid FASTA identifiers do not match graph nodes"*.
-> Unicycler emits matching identifiers in `assembly.fasta` and `assembly.gfa`. Because
-> switching assembler changes the input for **every** tool, a cohort benchmarked with
-> gplas2 must be assembled with Unicycler throughout — you cannot mix a SPAdes-based
-> result for three tools with a Unicycler-based result for the fourth and still compare
-> them. Note too that gplas2's environment pins ~200 packages to 2019
-> builds, some served from Anaconda's `defaults` channel -- check that against your
-> institution's licence position before depending on it.
-
-**Confirm everything resolves before spending hours on data:**
-
-```bash
-plasbench check           # report what is missing
-plasbench check --yes     # report AND install what is missing, without prompting
-```
-
-*Expected output:* an `[ok]` line for every required tool and for the Platon database,
-ending in `Core dependency check PASSED.` This preflight is cheap and catches the common
-failure — an enabled tool that was never installed. *Next:* Step 5.
 
 ---
 
-### Step 5 — Give NCBI your credentials (recommended)
+### Step 8 — Give NCBI your email and API key
 
-Stages 1 and the cohort tools query NCBI. Without an API key you are limited to ~3
-requests/second; with one, ~10/second, and large cohort validations stop tripping rate
-limits.
+PlasBench downloads reference genomes and sequencing reads from NCBI. Without a key you
+are limited to about 3 requests per second and large cohorts hit rate limits.
 
-1. Create a free NCBI account, then **Account settings → API Key Management** and
-   generate a key.
-2. Put it in a local, git-ignored file at the repository root:
+1. Create a free account at <https://account.ncbi.nlm.nih.gov/>
+2. Sign in, click your username (top right), choose **Account settings**
+3. Scroll to **API Key Management** and click to create a key
+4. Copy the key
+
+Now write it into a file PlasBench reads. Replace the two values with your own, but keep
+everything else exactly as shown:
 
 ```bash
+cd ~/plasbench-0.1.6
 cat > .ncbi.env <<'EOF'
-NCBI_API_KEY=your_key_here
-NCBI_EMAIL=you@example.org
+NCBI_API_KEY=paste_your_key_here
+NCBI_EMAIL=your.email@example.org
 EOF
+chmod 600 .ncbi.env
 ```
 
-`NCBI_EMAIL` is the contact address E-utilities asks callers to supply. Never commit this
-file; `.gitignore` and the release tarball both exclude it. Pass it to a container with
-`--env-file .ncbi.env`. *Next:* Step 6.
-
----
-
-### Step 6 — Choose your input
-
-**Option 1 — run a cohort that ships with PlasBench** (fastest honest start). Verify it first,
-then select it by name at run time with `--cohort`:
+Check it saved:
 
 ```bash
-plasbench validate-cohort --samples cohorts/public-v2.tsv \
-  --verify-lock cohorts/public-v2.lock.json
-plasbench run --cohort public-v2          # same as --samples cohorts/public-v2.tsv
+cat .ncbi.env
 ```
 
-*Expected:* `COHORT VALIDATION PASSED`. The lock file carries the NCBI evidence and the
-sheet's SHA-256, so you are re-verifying a published panel rather than trusting it.
+This file is ignored by Git and is never included in a release archive. Do not share it.
 
-**Option 2 — build your own sheet.** Edit `config/accessions.tsv`, one isolate per row.
-Required columns: `sample_id`, `assembly_accession`, `sra_run`, `organism`,
-`truth_technology`, `truth_quality_tier`, `biosample`, `bioproject`. Optional but
-valuable for stratification: `sample_origin`, `read_depth_x`, `source_study`,
-`gram_group`, `collection_country`.
+---
 
-**What makes a row admissible is not a matter of taste** — see
-[Appendix A](#appendix-a--selection-criteria-what-makes-a-sequence-eligible) for the nine
-NCBI evidence checks and [Appendix B](#appendix-b--cohort-criteria-what-makes-a-set-of-sequences-a-cohort)
-for the cohort-level rules. Verify before running:
+### Step 9 — Confirm the whole installation
 
 ```bash
-plasbench validate-cohort --samples config/accessions.tsv --online \
-  --write-lock config/accessions.lock.json
+cd ~/plasbench-0.1.6
+plasbench check
 ```
 
-*Expected:* `COHORT VALIDATION PASSED: N samples (NCBI-linked pair verified)`, plus a lock
-file. Any row that fails is reported with the specific reason.
+Every line should read `[ok]`, ending with:
 
-**Option 3 — let PlasBench find candidates for you:**
+```
+Core dependency check PASSED.
+```
+
+If it offers to install something you have already installed, answer **`N`** and tell us
+— that means the check is not finding it where you put it.
+
+**Your installation is now complete.** Everything above is done once per machine.
+
+---
+
+### Step 10 — Run your first benchmark
+
+Start with `public-v1`: 10 isolates, the smallest shipped cohort. First confirm the
+cohort has not been altered:
 
 ```bash
-plasbench discover-cohort ...     # search NCBI for matched assembly/paired-Illumina pairs
-plasbench curate-cohort ...       # screen candidates -> accepted.tsv + rejected.tsv
-plasbench review-candidates ...   # build a balanced, non-release shortlist
+cd ~/plasbench-0.1.6
+plasbench validate-cohort --samples cohorts/public-v1.tsv --verify-lock cohorts/public-v1.lock.json
 ```
 
-`curate-cohort` writes a `rejected.tsv` recording *why* each candidate was excluded — the
-audit trail a released cohort needs. *Next:* Step 7.
+Expect:
 
----
+```
+COHORT LOCK VERIFIED: 10 evidence record(s)
+COHORT VALIDATION PASSED: 10 samples (schema verified)
+```
 
-### Step 7 — Configure the run
-
-Either edit `config/config.sh` or pass flags to `plasbench run` (flags win).
-
-| Setting | Flag | Default | Guidance |
-|---|---|---|---|
-| CPU threads | `--threads` | 4 | Set to your core count |
-| Assembly memory cap (GB) | `--memory-gb` | 16 | Must exceed SPAdes' need or the assembly fails; high-depth isolates want 8–16 GB |
-| Samples in parallel | `--parallel-samples` | 1 | Raise cautiously — each concurrent assembly needs its own memory budget |
-| Tools in parallel | `--parallel-tools` | — | Cheaper to raise than parallel samples |
-| Assembler | `--assembler` | `spades` | `unicycler` gives cleaner assembly graphs, which gplas2 modes need, but is slower |
-| Tool toggles | `--mob-recon`, `--platon`, `--plasmidspades`, `--gplas2-mob`, `--gplas2-external` | on/on/on/off/off | Turn off anything you have not installed |
-| Sample sheet | `--samples` | `config/accessions.tsv` | Point at a shipped cohort to use one |
-| Output locations | `--data-dir`, `--results-dir`, `--log-dir` | `data/`, `results/`, `logs/` | Put `data/` on a fast disk with room |
-
-*Next:* Step 8.
-
----
-
-### Step 8 — Run the benchmark
+Now run it. Set `--threads` to your core count and `--memory-gb` to a little under your
+RAM:
 
 ```bash
-plasbench run                                   # all stages, config defaults
-plasbench run --samples cohorts/public-v2.tsv --threads 8 --memory-gb 16
-plasbench run 5 6                               # re-score and re-aggregate only
-plasbench run --cohort public-v2 --write-script run_public_v2.sh   # emit commands, run nothing
+plasbench run --cohort public-v1 --threads 4 --memory-gb 7
 ```
 
-`--write-script` is the dry run: it writes out the exact commands the run would execute,
-so you can read, edit or submit them to a scheduler instead of running them immediately.
+**This takes several hours** — roughly 30–60 minutes per isolate. It downloads about
+6 GB. You can stop it with Ctrl+C and start it again later with the same command:
+finished work is reused, so it picks up where it left off.
 
-Stages are numbered and can be run individually. What each does:
-
-| Stage | Name | Input | Output | Cost (6 threads) |
-|---|---|---|---|---|
-| **0** | setup | `config/config.sh` | `[ok]` lines per tool and database | seconds |
-| **1** | download | sample sheet, network, NCBI key | `reference.fna`, `sequence_report.jsonl`, `<run>_1/2.fastq.gz` per sample | 2–25 min/isolate |
-| **2** | truth | reference + sequence report | `truth.tsv` — every reference sequence labelled plasmid or chromosome | seconds |
-| **3** | assemble | reads | `contigs.fasta`, `assembly_graph.gfa`, `assembly_status.tsv` | 9–28 min/isolate |
-| **4** | reconstruct | contigs (+ graph) | `pred_<tool>.plasmid.fasta`, `pred_<tool>.bins.tsv`, `tool_status.tsv` | 2–13 min per tool per isolate |
-| **5** | score | predictions + truth | `scores.tsv`, `*.pred_vs_ref.paf`, per-sample visualisation data | seconds |
-| **6** | aggregate | scores | leaderboard, stratified tables, paired tests, `benchmark.report.html` | seconds |
-| **7** | long-read *(optional)* | `long_reads.fastq.gz` | Flye assembly + MOB-recon bins | varies |
-
-**Stage 2 is the one to watch.** It prints, per sample, how many sequences it labelled and
-how many were *defaulted* — for example `3 plasmid, 1 chromosome sequences (0 defaulted)`.
-Defaulted sequences are ones the report could not resolve, which fall back conservatively
-to "chromosome". **A non-zero count means your truth-set is quietly biased**; investigate
-before trusting recall.
-
-**Failures do not stop the run.** A sample whose assembly fails is recorded in
-`results/assembly_status.tsv` as `failed` and stage 4 marks its tools `skipped`; a tool
-that fails is recorded in `results/tool_status.tsv` and excluded from scoring. The run
-aborts only if *no* sample assembles. Check both files before reading the leaderboard.
-
-*Next:* Step 9.
-
----
-
-### Step 9 — Read the results
-
-```
-results/
-├── benchmark.leaderboard.md / .tsv        ranked tools, the headline result
-├── benchmark.report.html                  interactive report — start here
-├── scores.tsv                             per sample x tool confusion matrix and metrics
-├── benchmark.stratified.tsv               per organism, country, plasmid size, depth, AMR
-├── benchmark.paired_comparisons.tsv       Holm-corrected paired permutation tests
-├── benchmark.recommendations.tsv          operational advice, or why it was withheld
-├── benchmark.recommendation_validation.tsv  leave-one-study-out check
-├── assembly_status.tsv / tool_status.tsv  what ran, what was reused, skipped or failed
-├── run_manifest.json                      tool versions and image digest for provenance
-└── <sample>/                              predictions, alignments, bin matches per tool
-```
-
-**How to read the leaderboard honestly.**
-
-- **Mean F1** ranks tools on *plasmid bases* recovered. It is the headline, not the whole
-  story.
-- **Plasmid recall** is the fraction of *individual plasmids* recovered to the
-  `PLASMID_RECOVERY_THRESHOLD` (default 0.90). In practice this runs far below base-level
-  recall: in the reference pilot the leading tools recovered ~84% and ~75% of plasmid
-  bases but only **46% of intact plasmids**, and one isolate scored F1 0.910 while
-  recovering *none* of its single plasmid at threshold. If your question is "do I have
-  this whole resistance plasmid?", **plasmid recall is the number that answers it.**
-- **95% CI and the paired tests** tell you whether a gap is real. Two tools whose interval
-  overlaps and whose Holm-corrected p is near 1.0 are not distinguishable at your sample
-  size, however different their means look.
-- **Stratified rows marked ineligible** (below `RECOMMENDATION_MIN_SAMPLES`, default 5)
-  are signals to investigate, not findings.
-- **A withheld recommendation is a working safety gate, not an error.** PlasBench refuses
-  to issue operational advice without leave-one-study-out validation, which needs at least
-  two independent `source_study` groups.
-
-*Next:* Step 10, or stop here if a leaderboard was all you needed.
-
----
-
-### Step 10 — Put the benchmark to work
-
-A leaderboard is evidence; these turn it into practice.
+To leave it running after closing your terminal:
 
 ```bash
-# Conservative, evidence-gated recommendations from a completed run
-plasbench select-candidates --scores results/scores.tsv \
-  --samples config/accessions.tsv --results-dir results --out-prefix results/benchmark
-
-# Choose a method for a NEW, unlabelled sample using only benchmarked evidence
-plasbench select-unknown --sample new_isolate_01
-
-# Reconstruct plasmids for one operational sample with the selected method only
-plasbench reconstruct --sample new_isolate_01 --sra SRR12345678
-
-# How does recovery decay with sequencing depth?
-plasbench depth-ladder --samples config/accessions.tsv --depths 20,40,60,80
-plasbench depth-report
-
-# Regenerate the leaderboard and HTML report without re-running anything
-plasbench report --results-dir results
+nohup plasbench run --cohort public-v1 --threads 4 --memory-gb 7 > ~/plasbench-run.log 2>&1 &
 ```
 
-`reconstruct` is the operational endpoint: it runs **one** method — the one your own
-benchmark selected — rather than every tool, which is what a surveillance laboratory
-actually wants day to day.
+Then watch progress with:
+
+```bash
+tail -f ~/plasbench-run.log
+```
+
+Press Ctrl+C to stop watching — that stops the *watching*, not the run.
+
+The run works through seven stages, printed as it goes:
+
+```
+>>>>> STAGE 0 : 00_setup.sh        checks tools
+>>>>> STAGE 1 : 01_download.sh     downloads genomes and reads from NCBI
+>>>>> STAGE 2 : 02_truth.sh        labels each reference sequence plasmid or chromosome
+>>>>> STAGE 3 : 03_assemble.sh     assembles the short reads
+>>>>> STAGE 4 : 04_run_tools.sh    runs each plasmid tool
+>>>>> STAGE 5 : 05_score.sh        scores each tool against the truth
+>>>>> STAGE 6 : 06_aggregate.sh    builds the leaderboard
+```
+
+It finishes with `############ DONE ############`.
+
+**Watch stage 2.** It prints a line per isolate like
+`3 plasmid, 1 chromosome sequences (0 defaulted)`. The number in brackets must be
+**0**. Anything else means a reference sequence could not be classified and was assumed
+to be chromosome, which quietly inflates the scores.
 
 ---
 
-### Troubleshooting
+### Step 11 — Look at the results
 
-| Symptom | Cause | Fix |
+```bash
+cd ~/plasbench-0.1.6
+cat results/benchmark.leaderboard.md
+```
+
+That is the ranking. To open the full interactive report, from **Windows** run:
+
+```bash
+explorer.exe "$(wslpath -w results/benchmark.report.html)"
+```
+
+On Linux with a desktop, use `xdg-open results/benchmark.report.html`.
+
+Check nothing failed silently:
+
+```bash
+cut -f1,2,3 results/tool_status.tsv
+cat results/assembly_status.tsv
+```
+
+Every tool should say `completed` or `reused`. `failed` or `skipped` means that tool
+produced no result for that isolate and was left out of the scoring.
+
+**How to read the leaderboard.** `mean_f1` ranks tools on plasmid *bases* recovered.
+`mean_plasmid_recall` is the fraction of *whole plasmids* recovered. These are very
+different numbers and the second is usually far lower. If your question is "do I have
+this entire resistance plasmid?", read `mean_plasmid_recall`. Also read the confidence
+interval: two tools whose intervals overlap are not distinguishable at this sample size,
+however different their averages look.
+
+---
+
+### Step 12 — When something goes wrong
+
+| What you see | What it means | What to do |
 |---|---|---|
-| `datasets: command not found` | environment not activated | `conda activate plasbench` |
-| `unzip: command not found` in stage 1 | incomplete environment | reinstall the environment; `plasbench check` now tests for it |
-| SPAdes fails, log says *"needs approx N GB"* | read depth exceeds your memory cap | raise `--memory-gb`, lower `--parallel-samples`, or subsample the reads and record that you did |
-| A tool row says `skipped — command unavailable` | enabled but not installed | `plasbench install-tools all`, or turn it off |
-| `truth.tsv` reports defaulted sequences | sequence report could not classify a sequence | inspect that reference before trusting recall |
-| Recommendations all withheld | fewer than two independent `source_study` groups | expand the cohort across studies; the leaderboard is still valid |
-| Downloads stall or time out | slow or rate-limited connection | set an NCBI API key (Step 5); stages resume where they stopped |
-| Container cannot see your files | missing bind mounts | mount `config/`, `data/`, `logs/`, `results/` and the Platon database as shown in §0 |
+| `plasbench: command not found` | Environment not active | `conda activate plasbench` |
+| `conda: command not found` | Step 2 not done, or shell not restarted | Run step 2, then `exec bash` |
+| `sha256sum: no properly formatted checksum lines found` | Download returned an error page | `rm` both files, redo step 3 |
+| `curl: (22) ... 404` | Wrong version in the URL | Check the Releases page for the current version |
+| `set: pipefail: invalid option name` | Archive from before v0.1.3 | Download v0.1.6 (step 3) |
+| `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.3 | Download v0.1.6 |
+| SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
+| `[MISS] Platon DB not found` | Step 7a incomplete | Redo step 7a; the `curl` resumes |
+| `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
+| `0 defaulted` is not 0 in stage 2 | A reference sequence was not classified | Inspect that reference before trusting recall |
+| Download stops partway, repeatedly | Connection drops on large transfers | Step 7c — copy the databases from another machine |
 
+To see what PlasBench is doing in more detail, every stage writes a log:
 
----
+```bash
+ls ~/plasbench-0.1.6/logs/
+```
+
 
 ### Appendix A — Selection criteria: what makes a sequence eligible
 
@@ -885,7 +808,7 @@ candidates, **not** a cohort — nothing is accepted yet.
 #### Screen candidates strictly
 
 ```bash
-plasbench curate-cohort --candidates candidates/candidates.tsv --out-dir curated/
+plasbench curate-cohort --candidates candidates/accepted.tsv --out-dir curated/
 ```
 
 Applies every rule in Appendix A and writes two files:
@@ -906,8 +829,14 @@ plasbench review-candidates --candidates curated/accepted.tsv --out-dir shortlis
 
 Caps how much of the panel any single BioProject or organism can occupy. Without this a
 search returns whatever a few large depositors happened to submit, and a leaderboard then
-measures those studies rather than the tools. This produces an **additive, non-release**
-shortlist for you to review — not a finished cohort.
+measures those studies rather than the tools. It writes three files into `shortlist/`:
+
+- `balanced_shortlist.pending_review.tsv` — the capped shortlist, for you to review
+- `candidates.enriched.tsv` — every candidate with the metadata used to balance them
+- `study_dependence.tsv` — how many candidates each BioProject contributed
+
+This is an **additive, non-release** shortlist, not a finished cohort. Copy the rows you
+want into `cohorts/my-cohort.tsv` yourself, then validate and lock it below.
 
 #### Validate and lock
 
@@ -951,7 +880,7 @@ Manipulations worth knowing:
 | Work offline from pre-staged reads | `--local-inputs` |
 | Benchmark long-read or hybrid input | `--analysis-track long_read` (or `hybrid`) |
 | Put outputs somewhere else | `--data-dir`, `--results-dir`, `--log-dir` |
-| Use a Platon database elsewhere | `--platon-db /path/to/db` |
+| Use a Platon database elsewhere | `--platon-db ~/plasbench-0.1.6/data/db/platon/db` |
 | Run more samples at once | `--parallel-samples N` — each concurrent assembly needs its own memory budget |
 | Run more tools at once | `--parallel-tools N` — cheaper to raise than parallel samples |
 | Inspect before committing | `--write-script run.sh`, then read or edit it |
