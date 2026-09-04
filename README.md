@@ -41,12 +41,19 @@ not PowerShell.
 git clone https://github.com/ubeffiong/plasbench.git
 cd plasbench
 
-# 2. Create the reproducible bioinformatics environment (once).
+# 2. No conda/mamba/micromamba yet? Check and install it (asks first; --yes skips the prompt).
+bash env/bootstrap_conda.sh
+
+# 3. Create the reproducible bioinformatics environment (once).
 bash env/setup_conda.sh          # creates the 'plasbench' conda env
 conda activate plasbench
 python -m pip install --no-deps . # installs the `plasbench` terminal command
 
-# Next: choose and install the tool group you need into the same environment.
+# 4. Install every tool and database that config/config.sh's RUN_* flags call
+# for, in one step (asks first for each; --yes installs without asking).
+plasbench check --yes
+
+# Or install one tool group at a time instead of step 4:
 plasbench install-tools core           # download, QC, and scoring tools
 plasbench install-tools assembly       # SPAdes and Unicycler
 plasbench install-tools reconstruction # MOB-suite and Platon
@@ -54,15 +61,15 @@ plasbench install-tools long-read      # Flye and MOB-suite for ONT/PacBio input
 plasbench install-tools annotation     # Bakta protein annotation (optional)
 plasbench install-tools annotation-prokka # Prokka fallback (optional)
 plasbench install-tools all            # all standard profiles
+bash env/download_platon_db.sh         # needs a URL you provide (see the script's own instructions)
+bash env/download_mobsuite_db.sh       # fully automatic
+bash env/download_bakta_db.sh          # fully automatic (defaults to the smaller "light" database)
 
-# 3. Confirm the scoring/report engine works. No downloads or bio-tools needed.
+# 5. Confirm the scoring/report engine works. No downloads or bio-tools needed.
 plasbench test
 plasbench demo
 
-# 4. Install the Platon database if Platon is enabled in config/config.sh.
-bash env/download_platon_db.sh   # one-time Platon database download
-
-# 5. Add matched complete-assembly and Illumina accessions to config/accessions.tsv,
+# 6. Add matched complete-assembly and Illumina accessions to config/accessions.tsv,
 # then run the full benchmark.
 plasbench run
 ```

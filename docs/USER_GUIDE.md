@@ -185,9 +185,24 @@ Install the Platon database only when Platon is enabled:
 bash env/download_platon_db.sh
 ```
 
-`plasbench check` reports missing tools without changing data. A real run needs
-NCBI Datasets, SRA Toolkit, fastp, minimap2, SPAdes/plasmidSPAdes, MOB-suite,
-Platon, and the Platon database when their corresponding tools are enabled.
+`plasbench check` reports every missing tool and database (only those actually
+switched on in `config/config.sh`) -- NCBI Datasets, SRA Toolkit, fastp,
+minimap2, SPAdes/plasmidSPAdes, MOB-suite, Platon, Flye, Bakta/Prokka, and the
+Platon/MOB-suite/Bakta databases -- and, for every gap an `install-tools`
+profile or database script can fix, offers to install it right there:
+
+```bash
+plasbench check           # asks before installing anything
+plasbench check --yes     # installs every fixable gap without asking (CI/scripted use)
+```
+
+A gap it cannot fix automatically (gplas, which installs outside conda; the
+base Python/unzip packages, which come from `env/setup_conda.sh` itself) is
+reported with a pointer instead. Since a freshly installed tool is not on
+this shell's `PATH` until you `conda activate plasbench` again (or open a new
+shell after a conda bootstrap), `plasbench check` always exits non-zero after
+attempting a fix and asks you to re-run it to confirm -- it never assumes an
+install it just started actually finished.
 
 ### Docker
 
@@ -371,8 +386,13 @@ plasbench test
     synthetic end-to-end adapter check) -- no downloads or bioinformatics
     executables needed.
 
-plasbench check
-    Run the dependency preflight only (stage 0).
+plasbench check [--yes]
+    Dependency preflight (stage 0): reports every missing tool/database and
+    offers to install what it can (conda itself, install-tools profiles,
+    the Platon/MOB-suite/Bakta databases). --yes skips the confirmation.
+
+plasbench install-conda [--yes] [--prefix DIR]
+    Check for conda/mamba/micromamba; offer to install Miniforge if none is found.
 
 plasbench validate-cohort --samples PATH [--online]
     Validate cohort schema. With --online, verify complete plasmid-containing
