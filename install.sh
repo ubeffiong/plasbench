@@ -30,24 +30,41 @@ done
 
 say() { printf '[plasbench-install] %s\n' "$*"; }
 
-# 1. A conda-family manager is the one thing this cannot install for you
-#    portably; env/setup_conda.sh reports precisely what is missing.
-if ! command -v conda >/dev/null 2>&1 && ! command -v mamba >/dev/null 2>&1 \
-   && ! command -v micromamba >/dev/null 2>&1; then
-    cat >&2 <<'EOF'
-ERROR: no conda/mamba/micromamba found on PATH.
+# 1. A conda-family manager. env/bootstrap_conda.sh detects one and, if none is
+#    present, offers to install Miniforge -- so a user does not have to install
+#    conda separately before running this script.
+if ! command -v conda >/dev/null 2>&1 && ! command -v mamba >/dev/null 2>&1    && ! command -v micromamba >/dev/null 2>&1; then
+    say "no conda/mamba/micromamba found; bootstrapping one ..."
+    bash env/bootstrap_conda.sh $ASSUME_YES || {
+        cat >&2 <<'EOF'
+ERROR: no conda-family package manager is available.
 
-PlasBench's tools (SPAdes, MOB-suite, Platon, minimap2) are conda packages, so a
-conda-family manager is required. Miniforge is the recommended one:
+PlasBench's tools (SPAdes, MOB-suite, Platon, minimap2) are conda packages, so
+one is required. Install Miniforge yourself and re-run this script:
 
     https://github.com/conda-forge/miniforge#install
 
-Install it, open a new shell, and run this script again. If you would rather not
-install conda at all, use the container instead -- it needs nothing but Docker:
+Or skip conda entirely and use the container, which needs only Docker:
 
     docker run --rm ghcr.io/ubeffiong/plasbench:latest plasbench demo
 EOF
-    exit 1
+        exit 1
+    }
+    # bootstrap_conda.sh installs into $HOME/miniforge3 by default; pick it up
+    # in this shell so the rest of the script can use it without a re-login.
+    for candidate in "$HOME/miniforge3" "$HOME/miniconda3" "$HOME/mambaforge"; do
+        if [[ -x "$candidate/bin/conda" ]]; then
+            # shellcheck disable=SC1091
+            . "$candidate/etc/profile.d/conda.sh"
+            export PATH="$candidate/bin:$PATH"
+            break
+        fi
+    done
+    command -v conda >/dev/null 2>&1 || command -v micromamba >/dev/null 2>&1 || {
+        say "conda was installed but is not on PATH in this shell."
+        say "Open a new terminal (or run: exec bash) and re-run ./install.sh"
+        exit 1
+    }
 fi
 
 # 2. Reproducible environment.
