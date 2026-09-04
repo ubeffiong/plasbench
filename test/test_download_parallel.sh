@@ -41,6 +41,7 @@ run_stage() {
     PATH="$TMP/bin:$PATH" \
         DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
         SAMPLE_SHEET="$TMP/sheet.tsv" REQUIRE_CURATED_METADATA=0 LOCAL_INPUTS_ONLY=0 \
+        DOWNLOAD_CONFIRM=0 \
         "$@" bash "$ROOT/scripts/01_download.sh" > "$TMP/stage.log" 2>&1
 }
 now_ms() { date +%s%N | cut -c1-13; }
