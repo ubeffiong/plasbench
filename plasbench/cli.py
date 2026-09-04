@@ -104,6 +104,7 @@ def main(argv=None):
                "  plasbench run --samples samples.tsv --threads 8\n"
                "  plasbench run 3 4 5 6 --platon off --assembler unicycler\n"
                "  plasbench select-candidates --scores results/scores.tsv --samples config/accessions.tsv --results-dir results --out-prefix results/benchmark\n"
+               "  plasbench reconstruct --sample new_isolate_01 --sra SRR12345678\n"
                "  plasbench report --results-dir results",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -140,7 +141,7 @@ def main(argv=None):
     review_parser.add_argument("--max-per-bioproject", type=int, default=3)
     review_parser.add_argument("--max-per-organism", type=int, default=8)
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -164,6 +165,24 @@ def main(argv=None):
     unknown_parser.add_argument("--organism", default="", help="Scientific name, used to select an organism-specific recommendation.")
     unknown_parser.add_argument("--gram-group", default="", help="Gram group, used if no organism-specific recommendation exists.")
     unknown_parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
+    reconstruct_parser = sub.add_parser(
+        "reconstruct",
+        help="Reconstruct plasmids for ONE new operational sample using only the selected method, "
+             "not every benchmarked tool.",
+    )
+    reconstruct_parser.add_argument("--sample", required=True, help="New sample id (letters, digits, dot, dash, underscore only).")
+    reconstruct_parser.add_argument("--sra", required=True, help="SRA run accession for this sample's Illumina reads.")
+    reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external"),
+                                    help="Run exactly this tool, skipping the benchmark recommendation lookup.")
+    reconstruct_parser.add_argument("--recommendations", type=Path,
+                                    help="benchmark.recommendations.tsv to consult when --tool is omitted "
+                                         "(default: <results-dir>/benchmark.recommendations.tsv).")
+    reconstruct_parser.add_argument("--organism", default="", help="Scientific name, used to match an organism-specific recommendation.")
+    reconstruct_parser.add_argument("--gram-group", default="", help="Gram group, used if no organism-specific recommendation exists.")
+    reconstruct_parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
+    reconstruct_parser.add_argument("--data-dir", type=Path, help="Directory for downloaded reads and assembly (default: config value).")
+    reconstruct_parser.add_argument("--results-dir", type=Path, help="Directory for predictions and the selection report (default: config value).")
+    reconstruct_parser.add_argument("--log-dir", type=Path, help="Directory for tool logs (default: config value).")
     ladder_parser = sub.add_parser("depth-ladder", help="Create deterministic local-input depth-ladder cohorts using seqtk.")
     ladder_parser.add_argument("--samples", type=Path, required=True)
     ladder_parser.add_argument("--data-dir", type=Path, required=True)
@@ -285,6 +304,21 @@ def main(argv=None):
         if args.out:
             command.extend(["--out", str(args.out)])
         code = run(command, root)
+    elif args.command == "reconstruct":
+        command = [bash_command(), "scripts/08_operational_reconstruct.sh",
+                   "--sample", args.sample, "--sra", args.sra,
+                   "--organism", args.organism, "--gram-group", args.gram_group,
+                   "--analysis-track", args.analysis_track]
+        if args.tool:
+            command.extend(["--tool", args.tool])
+        if args.recommendations:
+            command.extend(["--recommendations", str(args.recommendations)])
+        env = {}
+        for argument, variable in (("data_dir", "DATA_DIR"), ("results_dir", "RESULTS_DIR"), ("log_dir", "LOG_DIR")):
+            value = getattr(args, argument)
+            if value:
+                env[variable] = str(value.resolve())
+        code = run(command, root, env)
     elif args.command == "docs":
         print_docs(root, args.topic)
         code = 0

@@ -23,8 +23,11 @@ This reduces classification tools (Platon, mob_recon) and re-assembly tools
 projected onto the reference.
 
 Predicted-plasmid bases that do not map to the reference at all are reported
-separately as `unmapped_pred_bp` (likely mis-assembly / contamination) and are
-NOT counted as FP, to keep the core metric defensible.
+separately as `unmapped_pred_bp` (likely mis-assembly / contamination); bases
+that DO map, but only to a reference sequence absent from --truth (e.g. a
+contig the sequence report never classified), are reported separately again
+as `off_truth_pred_bp`. Neither is counted as FP, to keep the core metric
+defensible.
 
 Inputs
 ------
@@ -116,14 +119,23 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
 
     Returns:
       covered: dict target_id -> list of (start, end)
-      unmapped_pred_bp: predicted query bases not aligned to a truth reference
+      unmapped_pred_bp: predicted query bases with NO retained alignment at all
+      off_truth_pred_bp: predicted query bases whose only retained alignment(s)
+          land on a reference sequence absent from --truth. These are not
+          scorable either way (not FP: never in truth; not TP/FN: not
+          plasmid) and are reported separately from unmapped_pred_bp, since a
+          record aligning outside the truth set is a different failure mode
+          from one that does not align at all (e.g. a reference contig the
+          sequence report never classified).
+      mapped_pred_bp: predicted query bases aligned to a truth-labelled target
     """
     covered = defaultdict(list)
     query_covered = defaultdict(list)
+    query_off_truth = defaultdict(list)
 
     counters = {"alignment_total": 0, "alignment_retained": 0, "filtered_alignment_count": 0}
     if os.path.getsize(path) == 0:
-        return covered, sum(pred_lengths.values()), 0, counters
+        return covered, sum(pred_lengths.values()), 0, 0, counters
 
     with open(path) as fh:
         for line_number, line in enumerate(fh, start=1):
@@ -184,14 +196,23 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
                 qstart = max(0, min(qstart, qlen))
                 qend = max(0, min(qend, qlen))
                 query_covered[qname].append((qstart, qend))
+            else:
+                if qend < qstart:
+                    qstart, qend = qend, qstart
+                qstart = max(0, min(qstart, qlen))
+                qend = max(0, min(qend, qlen))
+                query_off_truth[qname].append((qstart, qend))
 
-    unmapped_pred_bp = mapped_pred_bp = 0
+    unmapped_pred_bp = mapped_pred_bp = off_truth_pred_bp = 0
     for qname, length in pred_lengths.items():
         _, mapped_bp = merge_intervals(query_covered.get(qname, []))
         mapped_bp = min(mapped_bp, length)
         mapped_pred_bp += mapped_bp
-        unmapped_pred_bp += max(0, length - mapped_bp)
-    return covered, unmapped_pred_bp, mapped_pred_bp, counters
+        _, any_bp = merge_intervals(query_covered.get(qname, []) + query_off_truth.get(qname, []))
+        any_bp = min(any_bp, length)
+        off_truth_pred_bp += max(0, any_bp - mapped_bp)
+        unmapped_pred_bp += max(0, length - any_bp)
+    return covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, counters
 
 
 def merge_intervals(intervals):
@@ -356,7 +377,7 @@ def main():
         if (args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1
                 or args.min_alignment_mapq < 0 or not 0 <= args.min_alignment_query_coverage <= 1):
             raise ValueError("alignment thresholds must be min-length >= 1, identity/query coverage in [0, 1], and MAPQ >= 0")
-        covered, unmapped_pred_bp, mapped_pred_bp, alignment = parse_paf_intervals(
+        covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, alignment = parse_paf_intervals(
             args.paf, truth, pred_lengths, args.min_alignment_length,
             args.min_alignment_identity, args.min_alignment_mapq, args.min_alignment_query_coverage)
         ambiguous_bp = ambiguous_query_bp(args.ambiguity_paf, truth, pred_lengths,
@@ -372,7 +393,7 @@ def main():
     recovered_plasmids = 0
     for seq_id in true_plasmids:
         _, covered_bp = merge_intervals(covered.get(seq_id, []))
-        if covered_bp / truth[seq_id][1] >= args.plasmid_recovery_threshold:
+        if safe_div(covered_bp, truth[seq_id][1]) >= args.plasmid_recovery_threshold:
             recovered_plasmids += 1
     predicted_records = len(pred_lengths)
     try:
@@ -391,7 +412,7 @@ def main():
         raise SystemExit(f"ERROR: {exc}")
     recovered_circular = sum(
         1 for seq_id in circular_plasmids
-        if merge_intervals(covered.get(seq_id, []))[1] / truth[seq_id][1] >= args.plasmid_recovery_threshold
+        if safe_div(merge_intervals(covered.get(seq_id, []))[1], truth[seq_id][1]) >= args.plasmid_recovery_threshold
     )
 
     precision = safe_div(tp, tp + fp)
@@ -400,7 +421,7 @@ def main():
 
     header = [
         "sample", "tool", "analysis_track", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
-        "mapped_pred_bp", "unambiguously_mapped_pred_bp", "unmapped_pred_bp", "ambiguously_mapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
+        "mapped_pred_bp", "unambiguously_mapped_pred_bp", "unmapped_pred_bp", "off_truth_pred_bp", "ambiguously_mapped_pred_bp", "true_plasmid_count", "recovered_plasmid_count",
         "plasmid_recall", "predicted_record_count", "true_amr_gene_count",
         "recovered_amr_gene_count", "amr_gene_recall", "true_circular_plasmid_count",
         "recovered_circular_plasmid_count", "circular_truth_plasmid_recovery", "circular_plasmid_recall", "alignment_total",
@@ -408,7 +429,7 @@ def main():
     ]
     row = [
         args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
-        mapped_pred_bp, max(0, mapped_pred_bp - ambiguous_bp), unmapped_pred_bp, ambiguous_bp, len(true_plasmids), recovered_plasmids,
+        mapped_pred_bp, max(0, mapped_pred_bp - ambiguous_bp), unmapped_pred_bp, off_truth_pred_bp, ambiguous_bp, len(true_plasmids), recovered_plasmids,
         f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}", predicted_records,
         len(amr_genes) if args.amr_genes else "", recovered_amr if args.amr_genes else "",
         f"{safe_div(recovered_amr, len(amr_genes)):.4f}" if args.amr_genes else "",

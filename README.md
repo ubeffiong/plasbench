@@ -121,6 +121,13 @@ If Platon is enabled, mount its versioned database at
 `/work/data/db/platon/db`, or disable Platon with `RUN_PLATON=0`. The container
 does not bundle this large database.
 
+Likewise, the MOB-suite database is not bundled: mob_recon and mob_typer
+download it automatically (~1 GB) into their default directory the first time
+either tool actually runs. To avoid re-downloading it on every container run,
+mount a persistent volume over that default directory, e.g. add
+`-v plasbench-mobsuite-db:/opt/conda/envs/mobsuite/lib/python3.10/site-packages/mob_suite/databases`
+to the `docker run` command above, or disable the tool with `RUN_MOB_RECON=0`.
+
 ---
 
 ## 1. What you need
@@ -240,6 +247,10 @@ The visual-quality explorer links a sample-by-tool heatmap to zoomable
 per-plasmid recovery tracks; see [visual quality](docs/VISUAL_QUALITY.md).
 See [operational selection](docs/OPERATIONAL_SELECTION.md) for the strict distinction
 between a benchmark winner, a reusable per-isolate candidate, and validated biology.
+Benchmarking is meant to run every enabled tool; a genuinely new sample with no
+truth reference is not — `plasbench reconstruct` runs only the one method the
+benchmark recommends (or an explicit `--tool` override), instead of every
+benchmarked tool, and never repeats a reconstruction the benchmark already has.
 
 The pipeline validates that `config/accessions.tsv` has at least one complete,
 uniquely named sample before starting any data stage; the checked-in sheet is a
@@ -264,7 +275,9 @@ predicted contig's best reference hit rather than counted on multiple replicons.
 An optional all-mappings diagnostic reports predicted bases with both plasmid and
 chromosome placements without changing F1.
 Predicted sequence that doesn't map to the reference at all is reported separately as
-`unmapped_pred_bp` rather than silently punished. Full rationale in `docs/METHODS.md`.
+`unmapped_pred_bp` rather than silently punished; sequence that maps only to a reference
+contig absent from truth is reported separately again as `off_truth_pred_bp`. Full
+rationale in `docs/METHODS.md`.
 
 ---
 

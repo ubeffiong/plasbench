@@ -98,6 +98,39 @@ plasbench select-candidates \
   --out-prefix results/benchmark
 ```
 
+## Reconstructing a new, truth-unknown sample
+
+A sample outside the benchmark cohort -- one arriving for real operational
+use, with no complete-reference truth to score it against -- does not need
+every benchmarked tool run against it; running the full stage-4 tool set
+turns a single-method reconstruction into an N-method one for no evidential
+benefit, since there is no truth to compare the extra tools against anyway.
+`plasbench reconstruct` runs only ONE method: the evidence-gated
+`benchmark.recommendations.tsv` choice for the sample's organism or Gram
+group (falling back to the overall recommendation), or an explicit
+`--tool` override.
+
+```bash
+plasbench reconstruct --sample new_isolate_01 --sra SRR12345678 \
+  --organism "Klebsiella pneumoniae" --gram-group Gram_negative
+```
+
+Internally this builds a one-row, truth-less sample sheet for just that
+sample and runs stage 1 (reads only -- no reference/sequence-report
+download), stage 3 (QC and assembly, unchanged), then stage 4 with
+`ONLY_TOOL` set to the chosen tool, which overrides every `RUN_*` flag for
+that one invocation. It never touches, rebuilds, or rescans any other
+sample's sheet or results, so an already-benchmarked sample's reconstruction
+is never repeated by this path. The recommendation lookup itself is also
+available stand-alone once a prediction already exists (for example, one
+produced by a bespoke pipeline outside PlasBench):
+
+```bash
+plasbench select-unknown --recommendations results/benchmark.recommendations.tsv \
+  --sample-id new_isolate_01 --results-dir results \
+  --organism "Klebsiella pneumoniae" --gram-group Gram_negative
+```
+
 Open `results/benchmark.report.html` and use **Operational method
 recommendations**, **Sample drill-down**, and the artifact explorer to inspect
 or download each retained candidate.

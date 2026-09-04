@@ -34,6 +34,26 @@ is_complete() {
     [[ -e "$1" && -f "$2" && "${FORCE_RERUN_TOOLS:-0}" -ne 1 ]]
 }
 
+# When ONLY_TOOL is unset (the default), behaves exactly like the plain
+# `[[ "${!flag_var:-0}" -eq 1 ]]` check every tool block used before: nothing
+# about a normal benchmark run changes. When ONLY_TOOL is set (an operational
+# reconstruction run), it overrides every RUN_* flag and restricts execution
+# to that one named tool, independent of whatever RUN_* flags happen to be
+# configured -- except gplas2_mob, which cannot run without MOB-recon's
+# membership output as its classifier seed, so requesting it also enables
+# mob_recon as a silent prerequisite.
+tool_enabled() {
+    local flag_var="$1" tool_name="$2"
+    if [[ -n "${ONLY_TOOL:-}" ]]; then
+        case "$tool_name" in
+            mob_recon) [[ "$ONLY_TOOL" == "mob_recon" || "$ONLY_TOOL" == "gplas2_mob" ]] ;;
+            *) [[ "$ONLY_TOOL" == "$tool_name" ]] ;;
+        esac
+    else
+        [[ "${!flag_var:-0}" -eq 1 ]]
+    fi
+}
+
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     # A skipped/reused entry must never inherit an RSS value from another tool.
@@ -44,17 +64,17 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     T1="$SDIR/${SRA}_1.trim.fastq.gz"; T2="$SDIR/${SRA}_2.trim.fastq.gz"
     if [[ ! -s "$CONTIGS" ]]; then
         warn "no contigs for $SAMPLE; run 03_assemble.sh"
-        [[ "${RUN_MOB_RECON:-0}" -eq 1 ]] && record_status "$SAMPLE" "mob_recon" "skipped" "" "assembly contigs unavailable"
-        [[ "${RUN_PLATON:-0}" -eq 1 ]] && record_status "$SAMPLE" "platon" "skipped" "" "assembly contigs unavailable"
-        [[ "${RUN_PLASMIDSPADES:-0}" -eq 1 ]] && record_status "$SAMPLE" "plasmidspades" "skipped" "" "assembly contigs unavailable"
-        [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]] && record_status "$SAMPLE" "gplas2_mob" "skipped" "" "assembly contigs unavailable"
-        [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]] && record_status "$SAMPLE" "gplas2_external" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_MOB_RECON mob_recon && record_status "$SAMPLE" "mob_recon" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_PLATON platon && record_status "$SAMPLE" "platon" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_PLASMIDSPADES plasmidspades && record_status "$SAMPLE" "plasmidspades" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_GPLAS2_MOB gplas2_mob && record_status "$SAMPLE" "gplas2_mob" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_GPLAS2_EXTERNAL gplas2_external && record_status "$SAMPLE" "gplas2_external" "skipped" "" "assembly contigs unavailable"
         continue
     fi
     log "=== Run tools on $SAMPLE ==="
 
     # -------- mob_recon --------
-    if [[ "${RUN_MOB_RECON:-0}" -eq 1 ]] && have mob_recon; then
+    if tool_enabled RUN_MOB_RECON mob_recon && have mob_recon; then
         TOOL="mob_recon"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
         if is_complete "$DONE" "$PRED"; then
             log "  mob_recon: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
@@ -69,13 +89,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
                 rm -f "$PRED" "$DONE"; warn "mob_recon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
-    elif [[ "${RUN_MOB_RECON:-0}" -eq 1 ]]; then
+    elif tool_enabled RUN_MOB_RECON mob_recon; then
         warn "mob_recon is enabled but not installed; skipped for $SAMPLE"
         record_status "$SAMPLE" "mob_recon" "skipped" "" "command unavailable"
     fi
 
     # -------- gplas2 seeded by MOB-recon membership --------
-    if [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]] && have gplas; then
+    if tool_enabled RUN_GPLAS2_MOB gplas2_mob && have gplas; then
         TOOL="gplas2_mob"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
         GRAPH="$SDIR/assembly_graph.gfa"; MOB_OUT="$RDIR/mob_recon"
         CLASSIFIER="$OUT/${SAMPLE}.mob_classifier.tsv"; PROVENANCE="$OUT/${SAMPLE}.mob_classifier.provenance.json"
@@ -97,13 +117,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
                 rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
-    elif [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]]; then
+    elif tool_enabled RUN_GPLAS2_MOB gplas2_mob; then
         warn "gplas2_mob is enabled but gplas is not installed; skipped for $SAMPLE"
         record_status "$SAMPLE" "gplas2_mob" "skipped" "" "command unavailable"
     fi
 
     # -------- Platon --------
-    if [[ "${RUN_PLATON:-0}" -eq 1 ]] && have platon; then
+    if tool_enabled RUN_PLATON platon && have platon; then
         TOOL="platon"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
         if is_complete "$DONE" "$PRED"; then
             log "  platon: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
@@ -118,13 +138,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
                 rm -f "$PRED" "$DONE"; warn "platon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
-    elif [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
+    elif tool_enabled RUN_PLATON platon; then
         warn "platon is enabled but not installed; skipped for $SAMPLE"
         record_status "$SAMPLE" "platon" "skipped" "" "command unavailable"
     fi
 
     # -------- plasmidSPAdes --------
-    if [[ "${RUN_PLASMIDSPADES:-0}" -eq 1 ]] && have plasmidspades.py; then
+    if tool_enabled RUN_PLASMIDSPADES plasmidspades && have plasmidspades.py; then
         TOOL="plasmidspades"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
         if is_complete "$DONE" "$PRED"; then
             log "  plasmidSPAdes: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
@@ -139,13 +159,13 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
                 rm -f "$PRED" "$DONE"; warn "plasmidSPAdes failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
-    elif [[ "${RUN_PLASMIDSPADES:-0}" -eq 1 ]]; then
+    elif tool_enabled RUN_PLASMIDSPADES plasmidspades; then
         warn "plasmidSPAdes is enabled but not installed; skipped for $SAMPLE"
         record_status "$SAMPLE" "plasmidspades" "skipped" "" "command unavailable"
     fi
 
     # -------- gplas2 external classifier mode --------
-    if [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]] && have gplas; then
+    if tool_enabled RUN_GPLAS2_EXTERNAL gplas2_external && have gplas; then
         TOOL="gplas2_external"; OUT="$RDIR/$TOOL"; PRED="$RDIR/pred_${TOOL}.plasmid.fasta"; DONE="$RDIR/.${TOOL}.complete"
         GRAPH="$SDIR/assembly_graph.gfa"
         CLASSIFIER="${GPLAS2_EXTERNAL_PREDICTIONS_DIR:-}/$SAMPLE.tsv"
@@ -166,7 +186,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
                 rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
         fi
-    elif [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]]; then
+    elif tool_enabled RUN_GPLAS2_EXTERNAL gplas2_external; then
         warn "gplas2_external is enabled but gplas is not installed; skipped for $SAMPLE"
         record_status "$SAMPLE" "gplas2_external" "skipped" "" "command unavailable"
     fi

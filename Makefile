@@ -13,7 +13,7 @@ help:
 	@echo "  make clean      - remove demo/tmp/pycache (keeps data & results)"
 
 demo:      ; bash test/run_demo.sh
-test:      ; python3 test/test_scoring.py
+test:      ; bash test/run_tests.sh
 setup:     ; bash env/setup_conda.sh
 db:        ; bash env/download_platon_db.sh
 check:     ; bash scripts/run_all.sh 0

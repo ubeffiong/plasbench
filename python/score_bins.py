@@ -46,7 +46,8 @@ def overlap(left, right):
     return total
 
 
-def bin_ambiguity(path, membership, plasmids, chromosomes):
+def bin_ambiguity(path, membership, plasmids, chromosomes, min_length=1, min_identity=0.0,
+                   min_mapq=0, min_query_coverage=0.0):
     """Return secondary-map plasmid/chromosome ambiguity bp per predicted bin."""
     if not path:
         return {}
@@ -55,8 +56,15 @@ def bin_ambiguity(path, membership, plasmids, chromosomes):
         for raw in handle:
             fields = raw.rstrip("\n").split("\t")
             if len(fields) < 12 or fields[0] not in membership: continue
-            try: start, stop = sorted((int(fields[2]), int(fields[3])))
+            try:
+                qlen = int(fields[1])
+                start, stop = sorted((int(fields[2]), int(fields[3])))
+                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
             except ValueError: continue
+            identity = matches / block_length if block_length else 0.0
+            query_coverage = abs(stop - start) / qlen if qlen else 0.0
+            if (block_length < min_length or identity < min_identity or mapq < min_mapq
+                    or query_coverage < min_query_coverage): continue
             target = fields[5]
             if target in plasmids: by_query[fields[0]]["PLASMID"].append((start, stop))
             elif target in chromosomes: by_query[fields[0]]["CHROMOSOME"].append((start, stop))
@@ -65,6 +73,10 @@ def bin_ambiguity(path, membership, plasmids, chromosomes):
         if types["PLASMID"] and types["CHROMOSOME"]:
             by_bin[membership[query]] += overlap(merge_intervals(types["PLASMID"]), merge_intervals(types["CHROMOSOME"]))
     return by_bin
+
+
+def safe_div(a, b):
+    return a / b if b else 0.0
 
 
 def merge_intervals(intervals):
@@ -124,18 +136,41 @@ def main():
     parser.add_argument("--min-bin-purity", type=float, default=.9, help="minimum plasmid bp / mapped bin bp")
     parser.add_argument("--split-threshold", type=float, default=.1)
     parser.add_argument("--ambiguity-paf", help="Optional all-mapping PAF for repeat-associated bin ambiguity.")
+    parser.add_argument("--min-alignment-length", type=int, default=1,
+                        help="Minimum PAF block length retained for bin scoring (default: 1).")
+    parser.add_argument("--min-alignment-identity", type=float, default=0.0,
+                        help="Minimum PAF matches/block-length retained for bin scoring (default: 0).")
+    parser.add_argument("--min-alignment-mapq", type=int, default=0,
+                        help="Minimum PAF mapping quality retained for bin scoring (default: 0).")
+    parser.add_argument("--min-alignment-query-coverage", type=float, default=0.0,
+                        help="Minimum fraction of a predicted record covered by an individual PAF alignment (default: 0).")
     args = parser.parse_args()
     if not 0 < args.threshold <= 1 or not 0 < args.min_bin_purity <= 1:
         raise SystemExit("ERROR: matching thresholds must be in (0, 1].")
+    if (args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1
+            or args.min_alignment_mapq < 0 or not 0 <= args.min_alignment_query_coverage <= 1):
+        raise SystemExit("ERROR: alignment thresholds must be min-length >= 1, "
+                          "identity/query coverage in [0, 1], and MAPQ >= 0")
     plasmids, chromosomes = read_truth(args.truth)
     membership = read_bins(args.bins)
     plasmid_intervals, chromosome_intervals = defaultdict(list), defaultdict(list)
+    # Applies the same alignment-quality gate as score_plasmids.py (base-level
+    # scoring), so a short, low-identity, or low-MAPQ placement that the base
+    # score discards cannot still count toward bin completeness/purity.
     with open(args.paf, encoding="utf-8") as handle:
         for raw in handle:
             fields = raw.rstrip("\n").split("\t")
             if len(fields) < 12 or fields[0] not in membership: continue
-            try: start, stop = int(fields[7]), int(fields[8])
+            try:
+                qlen, qstart, qend = int(fields[1]), int(fields[2]), int(fields[3])
+                start, stop = int(fields[7]), int(fields[8])
+                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
             except ValueError: continue
+            identity = matches / block_length if block_length else 0.0
+            query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
+            if (block_length < args.min_alignment_length or identity < args.min_alignment_identity
+                    or mapq < args.min_alignment_mapq or query_coverage < args.min_alignment_query_coverage):
+                continue
             target, bin_id = fields[5], membership[fields[0]]
             if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
             elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
@@ -144,15 +179,17 @@ def main():
     for (bin_id, _), bp in overlaps.items(): plasmid_bp[bin_id] += bp
     chromosome_bp = {bin_id: merge(value) for bin_id, value in chromosome_intervals.items()}
     all_bins = set(membership.values())
-    ambiguity_bp = bin_ambiguity(args.ambiguity_paf, membership, plasmids, chromosomes)
+    ambiguity_bp = bin_ambiguity(args.ambiguity_paf, membership, plasmids, chromosomes,
+                                 args.min_alignment_length, args.min_alignment_identity,
+                                 args.min_alignment_mapq, args.min_alignment_query_coverage)
     total_mapped = {bin_id: plasmid_bp[bin_id] + chromosome_bp.get(bin_id, 0) for bin_id in all_bins}
     purity = {bin_id: plasmid_bp[bin_id] / total_mapped[bin_id] if total_mapped[bin_id] else 0.0 for bin_id in all_bins}
-    edges = {(bin_id, plasmid): bp for (bin_id, plasmid), bp in overlaps.items() if bp / plasmids[plasmid] >= args.threshold and purity[bin_id] >= args.min_bin_purity}
+    edges = {(bin_id, plasmid): bp for (bin_id, plasmid), bp in overlaps.items() if safe_div(bp, plasmids[plasmid]) >= args.threshold and purity[bin_id] >= args.min_bin_purity}
     matched = maximum_weight(edges, sorted(all_bins), sorted(plasmids))
     used_bins, used_plasmids = {item[0] for item in matched}, {item[1] for item in matched}
     fragments, merged = defaultdict(set), defaultdict(set)
     for (bin_id, plasmid), bp in overlaps.items():
-        if bp / plasmids[plasmid] >= args.split_threshold:
+        if safe_div(bp, plasmids[plasmid]) >= args.split_threshold:
             fragments[plasmid].add(bin_id); merged[bin_id].add(plasmid)
     splits = sum(len(value) - 1 for value in fragments.values() if len(value) > 1)
     merges = sum(len(value) - 1 for value in merged.values() if len(value) > 1)
@@ -160,7 +197,7 @@ def main():
         writer = csv.writer(handle, delimiter="\t")
         writer.writerow(["bin_id", "true_plasmid", "aligned_bp", "truth_completeness", "bin_purity", "chromosome_aligned_bp", "repeat_ambiguity_bp", "contamination_fraction", "match_status"])
         for bin_id, plasmid, bp in matched:
-            writer.writerow([bin_id, plasmid, bp, f"{bp / plasmids[plasmid]:.4f}", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "matched"])
+            writer.writerow([bin_id, plasmid, bp, f"{safe_div(bp, plasmids[plasmid]):.4f}", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "matched"])
         for bin_id in sorted(all_bins - used_bins): writer.writerow([bin_id, "", 0, "", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "unmatched_bin"])
         for plasmid in sorted(set(plasmids) - used_plasmids): writer.writerow(["", plasmid, 0, "", "", "", "", "", "missed_plasmid"])
     precision = len(matched) / len(all_bins) if all_bins else 0.0; recall = len(matched) / len(plasmids) if plasmids else 0.0

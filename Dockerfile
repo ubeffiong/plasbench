@@ -1,5 +1,9 @@
-# PlasBench runtime image. The Platon database is intentionally not embedded:
-# mount a versioned database directory or run the supplied database setup once.
+# PlasBench runtime image. The Platon and MOB-suite databases are intentionally
+# not embedded: each is fetched once at first real use (mount a versioned
+# database directory, or a volume over the default location, to persist it
+# across containers) rather than baked in at build time. Baking a live,
+# unpinned, unchecksummed network fetch into the image would make builds
+# non-reproducible and fail the whole build on any network hiccup.
 FROM mambaorg/micromamba@sha256:e3797091302382ea841498bc93a7b0a50f7c1448333d5e946d2d1608d0c5f43d
 
 ARG VCS_REF=unknown
@@ -33,16 +37,13 @@ RUN mkdir -p /opt/plasbench-bin \
       chmod 0755 "/opt/plasbench-bin/$cmd"; \
     done
 USER $MAMBA_USER
-# Bake the MOB-suite reference database so benchmark runs need no network.
-RUN for attempt in 1 2 3 4 5; do \
-      /opt/plasbench-bin/mob_init && exit 0; \
-      echo "mob_init attempt $attempt failed; retrying"; sleep 15; \
-    done; exit 1
-
-# Stage 1 unpacks the NCBI datasets archive with unzip, which the solved lock
-# does not provide; without it every download aborts with "unzip: command not found".
-RUN micromamba install -y -n plasbench -c conda-forge unzip \
-    && micromamba clean --all --yes
+# The MOB-suite database is NOT baked in here: mob_recon and mob_typer both
+# download it automatically into their default directory on first real
+# invocation if it is missing (matching the Platon database's runtime-fetch
+# model above). Run `mob_init` once and bind-mount its default directory
+# (/opt/conda/envs/mobsuite/lib/python3.10/site-packages/mob_suite/databases)
+# to persist the ~1 GB download across containers instead of refetching it
+# every run.
 
 WORKDIR /opt/plasbench
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /opt/plasbench

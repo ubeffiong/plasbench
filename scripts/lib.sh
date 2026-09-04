@@ -14,6 +14,13 @@ need() {
 # Check a command exists; warn + return 1 if not (for optional tools).
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# Reject a sample_id that could act as a path-traversal payload once it is
+# used to build a directory name (results/<sample>/, data/<sample>/, etc).
+# Mirrors the pattern enforced on sample-sheet rows in validate_sample_sheet.
+valid_sample_id() {
+    [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+}
+
 # Iterate real rows of the sample sheet (skip blank lines, comments, header).
 # Prints: sample_id <TAB> assembly_accession <TAB> sra_run
 read_samples() {
@@ -42,12 +49,16 @@ validate_sample_sheet() {
             print "ERROR: invalid sample-sheet row " NR "; expected sample_id, assembly_accession, sra_run" > "/dev/stderr"
             bad=1; next
         }
+        $1 !~ /^[A-Za-z0-9][A-Za-z0-9._-]*$/ {
+            print "ERROR: unsafe sample_id \047" $1 "\047 in row " NR "; use only letters, digits, dot, dash, underscore (it becomes a directory name)" > "/dev/stderr"
+            bad=1; next
+        }
         curated && (NF < 8 || $4 == "" || $5 == "" || $6 !~ /^[ABC]$/ || $7 == "" || $8 == "") {
             print "ERROR: uncurated sample-sheet row " NR "; require organism, truth_technology, truth_quality_tier (A/B/C), biosample, bioproject" > "/dev/stderr"
             bad=1; next
         }
         seen_sample[$1]++ {
-            print "ERROR: duplicate sample_id '" $1 "' in sample sheet" > "/dev/stderr"
+            print "ERROR: duplicate sample_id \047" $1 "\047 in sample sheet" > "/dev/stderr"
             bad=1; next
         }
         {count++}

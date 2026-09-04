@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Regression: select_unknown_sample.py must actually select a benchmark
+recommendation for a truth-unknown operational sample.
+
+It previously filtered on a "state" column and read a "primary_tool" field
+that select_operational_method.py's recommendations.tsv never wrote, so it
+always reported "no evidence-gated recommendation matched" even when one
+existed. This builds a real recommendations.tsv with the actual writer, the
+way an operational run would encounter it, rather than a hand-typed fixture,
+so a future column rename in either script is caught here too.
+"""
+import csv
+import os
+import subprocess
+import sys
+import tempfile
+
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SELECT_METHOD = os.path.join(ROOT, "python", "select_operational_method.py")
+SELECT_UNKNOWN = os.path.join(ROOT, "python", "select_unknown_sample.py")
+
+
+def main():
+    with tempfile.TemporaryDirectory(prefix="operational_selection_") as tmp:
+        samples = os.path.join(tmp, "samples.tsv")
+        scores = os.path.join(tmp, "scores.tsv")
+        results = os.path.join(tmp, "results")
+
+        # Five truth-set samples give mob_recon a clean win with full
+        # coverage, clearing the default RECOMMENDATION_MIN_SAMPLES=5 /
+        # RECOMMENDATION_MIN_COVERAGE=0.80 gates so it becomes the eligible
+        # "primary" overall recommendation.
+        with open(samples, "w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["sample_id", "organism"], delimiter="\t")
+            writer.writeheader()
+            for i in range(5):
+                writer.writerow({"sample_id": f"s{i}", "organism": "Example bacterium"})
+
+        fields = ["sample", "tool", "true_plasmid_bp", "unmapped_pred_bp", "plasmid_recall",
+                  "bin_f1", "precision", "recall", "f1", "split_events", "merge_events",
+                  "contamination_fraction"]
+        with open(scores, "w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
+            writer.writeheader()
+            for i in range(5):
+                os.makedirs(os.path.join(results, f"s{i}"), exist_ok=True)
+                writer.writerow({"sample": f"s{i}", "tool": "mob_recon", "true_plasmid_bp": "10000",
+                                 "unmapped_pred_bp": "0", "plasmid_recall": "1", "bin_f1": "1",
+                                 "precision": "1", "recall": "1", "f1": "1", "split_events": "0",
+                                 "merge_events": "0", "contamination_fraction": "0"})
+                writer.writerow({"sample": f"s{i}", "tool": "platon", "true_plasmid_bp": "10000",
+                                 "unmapped_pred_bp": "500", "plasmid_recall": "0.7", "bin_f1": "",
+                                 "precision": "0.7", "recall": "0.7", "f1": "0.7", "split_events": "0",
+                                 "merge_events": "0", "contamination_fraction": "0.1"})
+
+        subprocess.run([sys.executable, SELECT_METHOD, "--scores", scores, "--sample-sheet", samples,
+                        "--results-dir", results, "--out-prefix", os.path.join(results, "benchmark"),
+                        "--min-samples", "5", "--min-coverage", "0.80"], check=True)
+        recommendations = os.path.join(results, "benchmark.recommendations.tsv")
+
+        rows = list(csv.DictReader(open(recommendations), delimiter="\t"))
+        assert any(row["scope"] == "overall" and row["tool"] == "mob_recon" and row["recommendation"] == "primary"
+                   for row in rows), "fixture did not produce an eligible overall recommendation to select"
+
+        # --tool-only: usable before any reconstruction has run, no
+        # --sample-id/--results-dir needed.
+        tool_only = subprocess.run([sys.executable, SELECT_UNKNOWN, "--recommendations", recommendations,
+                                    "--tool-only"], capture_output=True, text=True, check=True)
+        assert tool_only.stdout.strip() == "mob_recon", f"expected mob_recon, got {tool_only.stdout!r}"
+
+        # A brand-new operational sample, no prediction FASTA yet: the
+        # recommendation must still be identified (this is exactly what was
+        # broken), even though there is nothing to copy yet.
+        os.makedirs(os.path.join(results, "newsample"))
+        report_path = os.path.join(results, "newsample", "selection_report.json")
+        subprocess.run([sys.executable, SELECT_UNKNOWN, "--recommendations", recommendations,
+                        "--sample-id", "newsample", "--results-dir", results], check=True)
+        import json
+        report = json.load(open(report_path))
+        assert report["selected_tool"] == "mob_recon", report
+        assert "selected_candidate_fasta" not in report
+        assert "run the nominated tool first" in report["selection_reason"]
+
+        # Once the recommended tool has actually produced its prediction, the
+        # candidate must be copied for reuse.
+        open(os.path.join(results, "newsample", "pred_mob_recon.plasmid.fasta"), "w").write(">c\nACGT\n")
+        subprocess.run([sys.executable, SELECT_UNKNOWN, "--recommendations", recommendations,
+                        "--sample-id", "newsample", "--results-dir", results], check=True)
+        report = json.load(open(report_path))
+        assert report["selected_tool"] == "mob_recon"
+        assert report["selected_candidate_fasta"] == "selected_candidate/candidate.plasmid.fasta"
+        assert os.path.isfile(os.path.join(results, "newsample", "selected_candidate", "candidate.plasmid.fasta"))
+
+        print("ALL OPERATIONAL SELECTION TESTS PASSED")
+
+
+if __name__ == "__main__":
+    main()

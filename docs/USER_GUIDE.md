@@ -367,7 +367,9 @@ plasbench demo
     no downloads or bioinformatics executables.
 
 plasbench test
-    Unit-test the scoring implementation on small hand-built examples.
+    Run the complete offline regression suite (all unit tests plus the
+    synthetic end-to-end adapter check) -- no downloads or bioinformatics
+    executables needed.
 
 plasbench check
     Run the dependency preflight only (stage 0).
@@ -382,6 +384,12 @@ plasbench run [STAGE ...] [OPTIONS]
 
 plasbench report [OPTIONS]
     Rebuild stage 6 outputs from an existing scores.tsv and tool_status.tsv.
+
+plasbench reconstruct --sample ID --sra RUN [--tool TOOL] [OPTIONS]
+    Reconstruct plasmids for one new, truth-unknown operational sample using
+    only ONE method -- the benchmark's evidence-gated recommendation, or an
+    explicit --tool override -- instead of every benchmarked tool. See
+    "Operational Selection" below.
 
 plasbench docs [--topic TOPIC]
     Print this guide or one named section to the terminal.
@@ -628,6 +636,41 @@ or any report marked `requires_confirmation`, use long-read/hybrid or other
 orthogonal confirmation. Circular-truth recovery means a circular reference was
 covered; it does not prove a predicted sequence is circular. Full policy:
 `docs/OPERATIONAL_SELECTION.md`.
+
+### Two execution modes: benchmarking versus a new sample
+
+PlasBench's stage 4 running every enabled tool is the actual benchmark
+experiment: it is how the leaderboard and `benchmark.recommendations.tsv`
+above get produced, and every sample already scored in that cohort keeps its
+reconstructions in `results/<sample>/pred_<tool>.plasmid.fasta` -- rerunning
+`plasbench run` reuses them (stage 4 skips a tool once its `.complete` marker
+and prediction exist; `select-candidates`/`select-unknown` only ever copy an
+already-produced prediction) rather than reconstructing the same sample again.
+
+A genuinely new sample -- one with no complete-reference truth, arriving after
+the benchmark already picked a method -- does not need every tool run against
+it. `plasbench reconstruct` downloads its reads, assembles them, and runs only
+ONE reconstruction tool: the benchmark's evidence-gated recommendation for the
+sample's organism/Gram group (or overall, if neither has one), or an explicit
+override:
+
+```bash
+# Let the benchmark recommendation decide which single tool to run.
+plasbench reconstruct --sample new_isolate_01 --sra SRR12345678 \
+  --organism "Klebsiella pneumoniae" --gram-group Gram_negative
+
+# Or force a specific tool, bypassing the recommendation lookup entirely.
+plasbench reconstruct --sample new_isolate_01 --sra SRR12345678 --tool mob_recon
+```
+
+This writes `results/new_isolate_01/pred_<tool>.plasmid.fasta` and
+`results/new_isolate_01/selected_candidate/candidate.plasmid.fasta`, plus a
+`selection_report.json` recording whether the tool came from the benchmark
+recommendation or an explicit override -- always with `truth_available: false`
+and `confidence_tier: confirmation_required`, since there is no reference to
+score this sample against. Reserve `plasbench run` with every tool enabled for
+building or extending the benchmark cohort itself, not for routine operational
+samples.
 
 ## Console Messages
 
