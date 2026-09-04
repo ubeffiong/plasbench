@@ -114,10 +114,21 @@ if [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
     fi
 fi
 if [[ "${RUN_MOB_RECON:-0}" -eq 1 || "${RUN_GPLAS2_MOB:-0}" -eq 1 ]] && have mob_init; then
-    # mob_init's database lives inside the installed package with no fixed,
-    # externally-predictable path to check for -- mob_init itself is the
-    # authoritative, idempotent check (see env/download_mobsuite_db.sh).
-    NEED_MOBSUITE_DB=1
+    # mob_init is NOT idempotent: it re-downloads ~450MB unconditionally, with
+    # no resume. So check for the database here rather than letting mob_init
+    # "check" by downloading it again. The path is inside the installed
+    # mob_suite package -- not fixed across machines, but derivable.
+    MOBSUITE_DB_DIR="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))' 2>/dev/null || true)"
+    MOBSUITE_DB_OK=1
+    for f in status.txt ncbi_plasmid_full_seqs.fas ncbi_plasmid_full_seqs.fas.msh repetitive.dna.fas; do
+        [[ -n "$MOBSUITE_DB_DIR" && -s "$MOBSUITE_DB_DIR/$f" ]] || MOBSUITE_DB_OK=0
+    done
+    if [[ "$MOBSUITE_DB_OK" -eq 1 ]]; then
+        log "  [ok]   MOB-suite DB at $MOBSUITE_DB_DIR"
+    else
+        warn "  [MISS] MOB-suite DB not found${MOBSUITE_DB_DIR:+ at $MOBSUITE_DB_DIR}"
+        NEED_MOBSUITE_DB=1; CORE_OK=0
+    fi
 fi
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 && "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
     if [[ -n "${PROTEIN_ANNOTATION_DATABASE:-}" && -s "$PROTEIN_ANNOTATION_DATABASE/version.json" ]]; then
