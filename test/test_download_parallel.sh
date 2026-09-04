@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Regression: MAX_PARALLEL_SAMPLES=1 (default) must keep stage 1's fail-fast
-# behavior (one sample's download failure aborts the whole stage before
-# later samples are even attempted). MAX_PARALLEL_SAMPLES>1 must actually
-# overlap downloads, and must still report every failure clearly rather than
-# losing one silently -- concurrency changing "stop at the first failure"
-# into "collect every failure" is an accepted, documented tradeoff of
-# opting into it, not a silent regression.
+# Regression: one sample's download failure must NOT abort stage 1. A single
+# transient SRA error would otherwise discard hours of successful downloads in
+# a large cohort, which is exactly what happened on a 32-sample run. The
+# contract now matches stage 3 (see test_assemble_parallel.sh): record the
+# failure, carry on with the remaining samples, and abort only when NOTHING
+# downloaded, since only then is there nothing to benchmark.
+# MAX_PARALLEL_SAMPLES>1 must additionally overlap downloads for real.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -14,16 +14,16 @@ trap 'rm -rf "$TMP"' EXIT
 
 DELAY=0.4
 mkdir -p "$TMP/bin"
-# FAIL_SRA (an env var) names one SRA run whose prefetch should fail; every
-# other run succeeds after sleeping, so timing and fail-fast can both be
-# tested with the same fake binary.
+# FAIL_SRA (an env var) names one SRA run whose prefetch should fail;
+# FAIL_ALL=1 fails every run regardless. Every other run succeeds after
+# sleeping, so timing and failure handling share one fake binary.
 cat > "$TMP/bin/prefetch" <<EOF
 #!/usr/bin/env bash
 sleep $DELAY
 outdir="" run=""
 while [[ \$# -gt 0 ]]; do case "\$1" in -O) outdir="\$2"; shift 2;; *) run="\$1"; shift;; esac; done
 echo "\$run" >> "$TMP/prefetch_calls.log"
-if [[ "\$run" == "\${FAIL_SRA:-__none__}" ]]; then echo "simulated prefetch failure" >&2; exit 1; fi
+if [[ "\${FAIL_ALL:-0}" == "1" || "\$run" == "\${FAIL_SRA:-__none__}" ]]; then echo "simulated prefetch failure" >&2; exit 1; fi
 mkdir -p "\$outdir/\$run"; touch "\$outdir/\$run/\$run.sra"
 EOF
 cat > "$TMP/bin/fasterq-dump" <<EOF
@@ -48,17 +48,38 @@ now_ms() { date +%s%N | cut -c1-13; }
 mkdir -p "$TMP/data" "$TMP/logs"
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\ns2\tNA\tSRR2\ns3\tNA\tSRR3\n' > "$TMP/sheet.tsv"
 
-# --- default (MAX_PARALLEL_SAMPLES=1): a failure must abort before later
-# samples are even attempted -- fail-fast, exactly like before parallelism. ---
+# --- default (MAX_PARALLEL_SAMPLES=1): one failed sample must not abort the
+# stage, and its siblings must still be downloaded. ---
 : > "$TMP/prefetch_calls.log"
-if run_stage env FAIL_SRA=SRR1 MAX_PARALLEL_SAMPLES=1; then
-    echo "FAIL: stage should have exited non-zero on a download failure" >&2; cat "$TMP/stage.log" >&2; exit 1
-fi
-called="$(cat "$TMP/prefetch_calls.log" | tr '\n' ' ')"
-[[ "$called" == "SRR1 " ]] || {
-    echo "FAIL: default mode should stop after the first failure, prefetch was called for: $called" >&2
+run_stage env FAIL_SRA=SRR1 MAX_PARALLEL_SAMPLES=1 || {
+    echo "FAIL: one failed sample among others should not abort the stage" >&2
     cat "$TMP/stage.log" >&2; exit 1; }
-echo "MAX_PARALLEL_SAMPLES=1 (default) still fails fast, stopping before later samples -> PASS"
+# A failing fetch is retried before the sample is given up on, so the call log
+# holds repeats. Collapse them to check the order samples were attempted in,
+# and separately check the retry actually happened.
+called="$(uniq "$TMP/prefetch_calls.log" | tr '\n' ' ')"
+[[ "$called" == "SRR1 SRR2 SRR3 " ]] || {
+    echo "FAIL: siblings of a failed sample should still be attempted, order was: $called" >&2
+    cat "$TMP/stage.log" >&2; exit 1; }
+attempts="$(grep -c '^SRR1$' "$TMP/prefetch_calls.log")"
+[[ "$attempts" -ge 2 ]] || {
+    echo "FAIL: a failing fetch should be retried, SRR1 was attempted $attempts time(s)" >&2
+    cat "$TMP/stage.log" >&2; exit 1; }
+awk -F'\t' '$1=="s1" && $2=="failed"' "$TMP/results/download_status.tsv" | grep -q . || {
+    echo "FAIL: s1 should be recorded as failed in download_status.tsv" >&2
+    cat "$TMP/results/download_status.tsv" >&2; exit 1; }
+[[ -s "$TMP/data/s2/SRR2_1.fastq.gz" && -s "$TMP/data/s3/SRR3_1.fastq.gz" ]] || {
+    echo "FAIL: sibling samples should still have downloaded reads" >&2; exit 1; }
+echo "MAX_PARALLEL_SAMPLES=1 (default) tolerates one failed download and still fetches its siblings -> PASS"
+
+# --- every sample failing is the one case that does abort the stage ---
+rm -rf "$TMP/data" "$TMP/results"; mkdir -p "$TMP/data"
+if run_stage env FAIL_ALL=1 MAX_PARALLEL_SAMPLES=1; then
+    echo "FAIL: stage should abort when no sample downloaded at all" >&2; cat "$TMP/stage.log" >&2; exit 1
+fi
+grep -qi "no sample downloaded successfully" "$TMP/stage.log" || {
+    echo "FAIL: expected a clear nothing-to-benchmark error" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+echo "stage aborts only when every download fails -> PASS"
 
 # --- parallel (MAX_PARALLEL_SAMPLES=3): overlap must be real, and a failure
 # in one sample must not silently swallow the others or the overall failure. ---
@@ -87,10 +108,12 @@ echo "MAX_PARALLEL_SAMPLES=3 overlaps independent downloads (${parallel_ms}ms vs
 # must still exit non-zero and name the failed sample.
 rm -rf "$TMP/data"; mkdir -p "$TMP/data"
 : > "$TMP/prefetch_calls.log"
-if run_stage env FAIL_SRA=SRR2 MAX_PARALLEL_SAMPLES=3; then
-    echo "FAIL: stage should exit non-zero when one sample's download fails" >&2; cat "$TMP/stage.log" >&2; exit 1
-fi
+run_stage env FAIL_SRA=SRR2 MAX_PARALLEL_SAMPLES=3 || {
+    echo "FAIL: one failed sample should not abort a concurrent stage either" >&2
+    cat "$TMP/stage.log" >&2; exit 1; }
 grep -q "s2" "$TMP/stage.log" || { echo "FAIL: failure report did not name the failed sample (s2)" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+awk -F'\t' '$1=="s2" && $2=="failed"' "$TMP/results/download_status.tsv" | grep -q . || {
+    echo "FAIL: s2 should be recorded as failed in download_status.tsv" >&2; exit 1; }
 [[ -s "$TMP/data/s1/SRR1_1.fastq.gz" ]] || { echo "FAIL: sibling sample s1 should still have completed under concurrency" >&2; exit 1; }
 [[ -s "$TMP/data/s3/SRR3_1.fastq.gz" ]] || { echo "FAIL: sibling sample s3 should still have completed under concurrency" >&2; exit 1; }
 [[ ! -e "$TMP/data/s2/SRR2_1.fastq.gz" ]] || { echo "FAIL: failed sample s2 should not have produced reads" >&2; exit 1; }
