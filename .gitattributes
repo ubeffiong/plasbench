@@ -10,3 +10,9 @@
 
 # Pipeline entry points must remain executable in Linux, WSL, Docker, and CI.
 *.sh text eol=lf
+
+# The audit report is committed evidence for developers, not something every
+# user should download; keep it out of `git archive` release tarballs.
+results_audit/ export-ignore
+results_demo/ export-ignore
+.github/ export-ignore
