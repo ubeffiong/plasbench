@@ -228,6 +228,28 @@ prediction FASTA and completion marker exist; set `FORCE_RERUN_TOOLS=1` to rerun
 after changing their version or settings. Failed tools are recorded and excluded from
 scoring rather than being treated as a zero-score prediction.
 
+By default every stage processes one sample at a time, and stage 4 runs one
+reconstruction tool at a time per sample — this is the safest setting, and what you get
+with no configuration at all. Raise `MAX_PARALLEL_SAMPLES` (stages 1, 3, 4, 5) and
+`MAX_PARALLEL_TOOLS` (independent tools within one sample in stage 4 — mob_recon,
+platon, plasmidspades, and gplas2_external all run from the same assembly with no
+dependency on each other; gplas2_mob still always waits for that sample's own
+mob_recon) to cut wall-clock time on a multi-core machine:
+```bash
+plasbench run --parallel-samples 2 --parallel-tools 2
+```
+Downloads are network-bound and usually tolerate the highest concurrency; assembly
+(SPAdes/Unicycler) is memory-hungry and should be raised the most conservatively — a
+preflight check warns (never blocks) when the requested concurrency's total CPU
+threads or memory would exceed what the host actually has. Tune each tool's own
+thread count independently once several run at once (`MOB_RECON_THREADS`,
+`PLATON_THREADS`, `PLASMIDSPADES_THREADS`, `GPLAS_THREADS`, each defaulting to
+`THREADS`), so N concurrent tools don't each request every core. At
+`MAX_PARALLEL_SAMPLES=1` (the default), a sample's download or assembly failure still
+aborts the run immediately, exactly as before parallelism existed; above 1, a failure
+no longer stops sibling samples already in flight — that is what concurrency means —
+but every failure is still collected and reported, and the run still exits non-zero.
+
 ### Step 6 — Read the results
 ```
 results/scores.tsv                  # one row per (sample, tool): TP/FP/FN, precision, recall, F1

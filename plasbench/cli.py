@@ -215,6 +215,14 @@ def main(argv=None):
         resources = command_parser.add_argument_group("resources and assembly")
         resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
+        resources.add_argument("--parallel-samples", type=int,
+                               help="Samples to download/assemble/reconstruct/score concurrently "
+                                    "(default: config value, normally 1 = sequential).")
+        resources.add_argument("--parallel-tools", type=int,
+                               help="Independent reconstruction tools to run concurrently per sample in "
+                                    "stage 4 -- mob_recon, platon, plasmidspades, gplas2_external; "
+                                    "gplas2_mob still always waits for mob_recon (default: config value, "
+                                    "normally 1 = sequential).")
         resources.add_argument("--assembler", choices=("spades", "unicycler"), help="Short-read assembler.")
         resources.add_argument("--min-read-len", type=int, help="Discard reads shorter than this after fastp.")
         resources.add_argument("--minimap2-preset", help="minimap2 assembly preset (default: asm5).")
@@ -342,7 +350,8 @@ def main(argv=None):
             env["LONG_READS_FILE"] = args.long_reads_file
         if args.analysis_track:
             env["ANALYSIS_TRACK"] = args.analysis_track
-        positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN"}
+        positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN",
+                            "parallel_samples": "MAX_PARALLEL_SAMPLES", "parallel_tools": "MAX_PARALLEL_TOOLS"}
         for argument, variable in positive_options.items():
             value = getattr(args, argument)
             if value is not None:

@@ -21,6 +21,89 @@ valid_sample_id() {
     [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
 }
 
+# --- parallel job pool --------------------------------------------------
+# Block until fewer than MAX background jobs of this shell are running, then
+# return so the caller can start one more with `&`. MAX=1 (every stage's
+# default) waits for every previously started job to finish before letting a
+# new one start, which is exactly sequential execution -- so callers do not
+# need to special-case the non-parallel default; they always background and
+# always gate through this function.
+job_slot_wait() {
+    local max="$1"
+    while [[ "$(jobs -rp | wc -l)" -ge "$max" ]]; do
+        wait -n 2>/dev/null || break
+    done
+}
+
+# Advisory only: warn (never block) when a chosen concurrency level would ask
+# for more CPU threads, or more memory, than the host actually has. Runs once
+# per stage invocation. Detects cores via `nproc` and available memory via
+# /proc/meminfo, both Linux-only; silently skipped on any other platform
+# (e.g. this reports nothing useful on macOS/WSL without /proc, and that is
+# fine -- it is a courtesy check, not a scheduler).
+warn_resource_oversubscription() {
+    local label="$1" parallel_jobs="$2" threads_per_job="$3" memory_gb_per_job="${4:-0}"
+    have nproc || return 0
+    local cores wanted_threads
+    cores="$(nproc)"
+    wanted_threads=$(( parallel_jobs * threads_per_job ))
+    if [[ "$wanted_threads" -gt "$cores" ]]; then
+        warn "$label: $parallel_jobs concurrent job(s) x $threads_per_job thread(s) each = $wanted_threads threads requested, but only $cores CPU core(s) detected. Oversubscription can be SLOWER than running fewer jobs at once (context switching, cache thrashing) -- consider lowering the parallel-job count or the per-job thread count."
+    fi
+    if [[ "$memory_gb_per_job" -gt 0 && -r /proc/meminfo ]]; then
+        local available_kb available_gb wanted_gb
+        available_kb="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
+        if [[ -n "$available_kb" ]]; then
+            available_gb=$(( available_kb / 1024 / 1024 ))
+            wanted_gb=$(( parallel_jobs * memory_gb_per_job ))
+            if [[ "$wanted_gb" -gt "$available_gb" ]]; then
+                warn "$label: $parallel_jobs concurrent job(s) x ${memory_gb_per_job}GB each = ${wanted_gb}GB requested, but only ~${available_gb}GB is currently available. Running out of memory mid-job (e.g. SPAdes) can be far slower than fewer concurrent jobs, or force the OS to swap -- consider lowering the parallel-job count."
+            fi
+        fi
+    fi
+}
+
+# --- shard-then-merge for shared output files ----------------------------
+# Every stage that can now run several samples/tools concurrently writes its
+# per-unit output rows to a private file under this directory instead of
+# appending directly to the stage's one shared TSV -- concurrent appends from
+# separate processes are not safe to assume atomic across every code path
+# that writes them (a `csv.DictWriter` header check, in particular, races).
+# merge_shards then rebuilds the shared file, once, after every job in the
+# stage has finished, in the caller-supplied deterministic order -- so the
+# merged file's row order matches today's sequential output exactly, whatever
+# order the parallel jobs actually completed in.
+shard_dir() {
+    local stage_name="$1"
+    printf '%s/.shards.%s' "${TMP_DIR:-/tmp}" "$stage_name"
+}
+
+reset_shard_dir() {
+    local dir; dir="$(shard_dir "$1")"
+    rm -rf "$dir"; mkdir -p "$dir"
+}
+
+# merge_shards STAGE_NAME OUT_FILE HEADER SHARD_FILE...
+# Writes HEADER once, then the content of every existing shard file, in the
+# order given. A shard that a job never created (skipped/never reached) is
+# simply absent from OUT_FILE, matching what a direct sequential append would
+# have produced for that same skip.
+merge_shards() {
+    local out="$1" header="$2"; shift 2
+    printf '%s\n' "$header" > "$out"
+    local shard
+    for shard in "$@"; do
+        [[ -s "$shard" ]] && cat "$shard" >> "$out"
+    done
+    # A shard that a job never wrote (a skipped/never-reached unit) makes the
+    # loop's last `[[ ]]` false. Under `set -e`, when a bare `test && cmd` is
+    # the LAST command a function runs, the false test's own exit status
+    # becomes the function's -- which then aborts the calling script. This
+    # trailing `true` keeps the function's exit status 0 regardless of how
+    # the loop's last iteration came out.
+    true
+}
+
 # Iterate real rows of the sample sheet (skip blank lines, comments, header).
 # Prints: sample_id <TAB> assembly_accession <TAB> sra_run
 read_samples() {
