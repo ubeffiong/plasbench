@@ -30,11 +30,28 @@ done
 
 say() { printf '[plasbench-install] %s\n' "$*"; }
 
+# Long steps are silent for many minutes -- conda solving, a 450MB database
+# download -- and silence reads as a hang. Announce each phase, how many there
+# are, and what "slow" means for it, so a user can tell waiting from stuck.
+TOTAL_STEPS=4
+STEP_START=0
+step() {
+    STEP_START=$(date +%s)
+    printf '\n[plasbench-install] ===== step %s/%s: %s =====\n' "$1" "$TOTAL_STEPS" "$2"
+    [[ -n "${3:-}" ]] && printf '[plasbench-install] %s\n' "$3"
+    printf '[plasbench-install] started %s\n' "$(date +%H:%M:%S)"
+    return 0
+}
+step_done() {
+    local elapsed=$(( $(date +%s) - STEP_START ))
+    printf '[plasbench-install] done in %dm %02ds\n' $((elapsed / 60)) $((elapsed % 60))
+}
+
 # 1. A conda-family manager. env/bootstrap_conda.sh detects one and, if none is
 #    present, offers to install Miniforge -- so a user does not have to install
 #    conda separately before running this script.
 if ! command -v conda >/dev/null 2>&1 && ! command -v mamba >/dev/null 2>&1    && ! command -v micromamba >/dev/null 2>&1; then
-    say "no conda/mamba/micromamba found; bootstrapping one ..."
+    step 1 "conda-family package manager" "downloading and installing Miniforge (~120 MB)"
     bash env/bootstrap_conda.sh $ASSUME_YES || {
         cat >&2 <<'EOF'
 ERROR: no conda-family package manager is available.
@@ -68,25 +85,33 @@ EOF
 fi
 
 # 2. Reproducible environment.
-say "creating the 'plasbench' conda environment (this is the slow step) ..."
+step 2 "conda environment 'plasbench'"      "solving and downloading packages. Typically 5-20 minutes; conda prints its own progress below, and long pauses while it solves are normal."
 bash env/setup_conda.sh
+step_done
 
 # 3. The CLI itself. --no-deps because every dependency is a conda package.
-say "installing the plasbench command ..."
+step 3 "the plasbench command" "quick -- a few seconds."
 if command -v conda >/dev/null 2>&1; then
     conda run -n plasbench python -m pip install --no-deps .
 else
     micromamba run -n plasbench python -m pip install --no-deps .
 fi
 
+step_done
+
 # 4. Optional: the bioinformatics tools themselves.
 if [[ "$WITH_TOOLS" -eq 1 ]]; then
-    say "installing the tools the RUN_* flags in config/config.sh call for ..."
+    step 4 "bioinformatics tools and databases"          "the long one: SPAdes, Unicycler, MOB-suite, Platon and friends, then MOB-suite builds a 450 MB reference database from Zenodo. Expect 30-90 minutes on a slow link. The database download shows a percentage; the taxonomy build afterwards prints counters rather than a percentage and can sit for several minutes -- that is normal, not a hang."
     if command -v conda >/dev/null 2>&1; then
         conda run -n plasbench plasbench install-tools all $ASSUME_YES
     else
         micromamba run -n plasbench plasbench install-tools all $ASSUME_YES
     fi
+    step_done
+else
+    printf '
+[plasbench-install] step 4/%s: bioinformatics tools SKIPPED (re-run with --tools)
+' "$TOTAL_STEPS"
 fi
 
 cat <<EOF

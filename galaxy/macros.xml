@@ -1,0 +1,71 @@
+<macros>
+    <!-- The version of the wrapped software. Bump this when PlasBench is
+         released; bump @VERSION_SUFFIX@ instead when only the wrapper changes,
+         which is the Galaxy convention (0.1.3+galaxy0, 0.1.3+galaxy1, ...). -->
+    <token name="@TOOL_VERSION@">0.1.3</token>
+    <token name="@VERSION_SUFFIX@">0</token>
+    <token name="@PROFILE@">23.0</token>
+
+    <!-- One conda package supplies the CLI, the per-step entry points and the
+         pipeline scripts under $PREFIX/share/plasbench. Galaxy resolves it
+         through bioconda; no absolute container path is involved. -->
+    <xml name="requirements">
+        <requirements>
+            <requirement type="package" version="@TOOL_VERSION@">plasbench</requirement>
+            <yield/>
+        </requirements>
+    </xml>
+
+    <xml name="citations">
+        <citations>
+            <citation type="bibtex">@misc{plasbench,
+    title  = {PlasBench: a reproducible benchmark for plasmid reconstruction from short reads},
+    author = {Effiong, Ubokobong},
+    year   = {2026},
+    note   = {International Research Center of Excellence, Institute of Human Virology Nigeria},
+    url    = {https://github.com/ubeffiong/plasbench}
+}</citation>
+            <yield/>
+        </citations>
+    </xml>
+
+    <xml name="minimap2_citation">
+        <citation type="doi">10.1093/bioinformatics/bty191</citation>
+    </xml>
+
+    <!-- Alignment filters, shared by the align and score steps so a workflow
+         cannot silently apply one set when mapping and another when scoring. -->
+    <xml name="alignment_filters">
+        <param argument="--min-alignment-length" type="integer" value="200" min="0"
+               label="Minimum alignment length (bp)"
+               help="Shorter alignments are discarded before scoring." />
+        <param argument="--min-alignment-identity" type="float" value="0.90" min="0" max="1"
+               label="Minimum alignment identity"
+               help="Fraction, not percent. 0.90 keeps alignments at or above 90% identity." />
+        <param argument="--min-alignment-mapq" type="integer" value="20" min="0"
+               label="Minimum mapping quality" />
+        <param argument="--min-alignment-query-coverage" type="float" value="0.20" min="0" max="1"
+               label="Minimum query coverage"
+               help="Fraction of the predicted contig that must align to be counted." />
+    </xml>
+
+    <token name="@ALIGNMENT_FILTER_ARGS@"><![CDATA[
+        --min-alignment-length '$filters.min_alignment_length'
+        --min-alignment-identity '$filters.min_alignment_identity'
+        --min-alignment-mapq '$filters.min_alignment_mapq'
+        --min-alignment-query-coverage '$filters.min_alignment_query_coverage'
+    ]]></token>
+
+    <token name="@METRIC_HELP@"><![CDATA[
+**How to read the numbers**
+
+*precision* is 1 − chromosomal contamination; *recall* is the fraction of true
+plasmid **bases** recovered; *plasmid recall* is the fraction of individual
+plasmids recovered to the completeness threshold.
+
+Base-level recall and plasmid recall are not interchangeable, and the gap
+between them is the point of the metric: a tool can recover most plasmid bases
+while returning few intact plasmids. If your question is "is this whole
+resistance plasmid present?", read plasmid recall.
+    ]]></token>
+</macros>

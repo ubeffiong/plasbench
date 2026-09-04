@@ -1,0 +1,102 @@
+<tool id="plasbench_align" name="PlasBench align" version="@TOOL_VERSION@+galaxy@VERSION_SUFFIX@" profile="@PROFILE@">
+    <description>predicted plasmids to a complete reference with minimap2</description>
+    <macros>
+        <import>macros.xml</import>
+    </macros>
+    <expand macro="requirements">
+        <requirement type="package" version="2.28">minimap2</requirement>
+    </expand>
+    <command detect_errors="exit_code"><![CDATA[
+minimap2
+    --secondary=no
+    -c
+    -x '$preset'
+    -t "\${GALAXY_SLOTS:-1}"
+    '$reference'
+    '$prediction'
+    > '$paf'
+#if $ambiguity
+&&
+minimap2
+    -c
+    -x '$preset'
+    -t "\${GALAXY_SLOTS:-1}"
+    '$reference'
+    '$prediction'
+    > '$ambiguity_paf'
+#end if
+    ]]></command>
+    <inputs>
+        <param name="reference" type="data" format="fasta" label="Complete reference assembly"
+               help="The long-read or hybrid assembly used as ground truth. Must be the same reference the truth labels describe." />
+        <param name="prediction" type="data" format="fasta" label="Predicted-plasmid FASTA"
+               help="The sequence one reconstruction tool considers plasmid." />
+        <param argument="-x" name="preset" type="select" label="minimap2 preset">
+            <option value="asm5" selected="true">asm5 — assembly to reference, up to ~5% divergence</option>
+            <option value="asm10">asm10 — up to ~10% divergence</option>
+            <option value="asm20">asm20 — up to ~20% divergence</option>
+        </param>
+        <param name="ambiguity" type="boolean" checked="false" label="Also emit an all-mappings PAF"
+               help="Retains secondary alignments in a second file. PlasBench score uses it only to report repeated sequence mapping to both plasmid and chromosome; it never changes F1." />
+    </inputs>
+    <outputs>
+        <data name="paf" format="tabular" label="${tool.name} on ${on_string}: primary PAF" />
+        <data name="ambiguity_paf" format="tabular" label="${tool.name} on ${on_string}: all-mappings PAF">
+            <filter>ambiguity</filter>
+        </data>
+    </outputs>
+    <tests>
+        <test expect_num_outputs="1">
+            <param name="reference" value="reference.fasta" />
+            <param name="prediction" value="align_prediction.fasta" />
+            <output name="paf">
+                <assert_contents>
+                    <has_n_lines n="1" />
+                    <has_text text="prediction_plasmid1" />
+                    <has_text text="plasmid1" />
+                </assert_contents>
+            </output>
+        </test>
+        <test expect_num_outputs="2">
+            <param name="reference" value="reference.fasta" />
+            <param name="prediction" value="align_prediction.fasta" />
+            <param name="ambiguity" value="true" />
+            <output name="paf">
+                <assert_contents>
+                    <has_text text="prediction_plasmid1" />
+                </assert_contents>
+            </output>
+            <output name="ambiguity_paf">
+                <assert_contents>
+                    <has_text text="prediction_plasmid1" />
+                </assert_contents>
+            </output>
+        </test>
+    </tests>
+    <help><![CDATA[
+**What it does**
+
+Aligns a predicted-plasmid FASTA to the complete reference with minimap2 and
+emits the PAF that **PlasBench score** consumes.
+
+This is a deliberately thin wrapper: it fixes the invocation the PlasBench
+pipeline itself uses (``--secondary=no -c -x asm5``) so that a Galaxy workflow
+and a command-line run project predictions onto the reference the same way. If
+the alignment step differs, the scores are not comparable.
+
+**Why two PAFs?**
+
+The primary PAF drops secondary alignments and is what scoring uses. The
+optional all-mappings PAF keeps them, and lets scoring report how much predicted
+sequence is repetitive enough to map to both plasmid and chromosome. That figure
+is a diagnostic only — it never alters precision, recall or F1.
+
+**Next step**
+
+Feed the PAF, the same predicted FASTA, and the truth labels to
+**PlasBench score**.
+    ]]></help>
+    <expand macro="citations">
+        <expand macro="minimap2_citation" />
+    </expand>
+</tool>

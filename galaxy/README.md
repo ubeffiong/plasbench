@@ -1,17 +1,47 @@
 # PlasBench for Galaxy
 
-`plasbench_score.xml` is the first Galaxy wrapper. It exposes the stable scoring
-engine as a standalone tool with explicit FASTA, PAF, and truth-table inputs.
+Three wrappers covering the steps a Galaxy workflow needs:
 
-Before publishing to the Galaxy Tool Shed:
+| Tool | Does | Produces |
+|---|---|---|
+| `plasbench_align` | minimap2 a predicted-plasmid FASTA onto the complete reference | PAF |
+| `plasbench_score` | score that prediction against labelled truth | per-sample/tool scores |
+| `plasbench_aggregate` | combine score rows across samples and tools | ranked leaderboard |
 
-1. publish a versioned PlasBench container to Quay or GHCR and replace
-   `YOUR_QUAY_NAMESPACE` in the wrapper;
-2. add the complete assembly/prediction/alignment/aggregation/report wrappers;
-3. create a Galaxy workflow accepting paired-read and reference collections;
-4. run `planemo lint galaxy/plasbench_score.xml` and `planemo test galaxy/plasbench_score.xml`;
-5. copy `.shed.yml.example` to `.shed.yml`, set the Tool Shed owner and GitHub org,
-   then publish with a Tool Shed account.
+Chain them: **align → score → aggregate**. `macros.xml` holds the shared version
+tokens, the conda requirement and the alignment-filter parameters, so the align
+and score steps cannot drift apart on filtering.
 
-The public workflow should use preloaded, versioned MOB-suite and Platon databases;
-jobs must not download databases at runtime.
+## Dependencies
+
+Every tool declares a single conda requirement:
+
+```xml
+<requirement type="package" version="@TOOL_VERSION@">plasbench</requirement>
+```
+
+The conda package installs the CLI, the per-step entry points
+(`plasbench-score`, `plasbench-aggregate`) and the pipeline scripts under
+`$PREFIX/share/plasbench`. `plasbench/tools.py` locates them at run time, so the
+wrappers call a command on `PATH` rather than an absolute path inside a
+container image. The recipe is in [`../recipes/bioconda`](../recipes/bioconda).
+
+## Deliberately out of scope
+
+Stages that download from NCBI, assemble reads, or run for hours are **not**
+wrapped. Galaxy jobs should not fetch reference data at run time, and an
+opaque multi-hour tool is a poor fit for a workflow system. Use the command-line
+pipeline for those, and Galaxy for the scoring and comparison steps.
+
+Stratified breakdowns need the curated cohort sheet and stay on the command line.
+
+## Before publishing to the Tool Shed
+
+1. Publish the bioconda package so `plasbench` resolves as a conda requirement.
+2. `planemo lint galaxy/*.xml` — currently clean.
+3. `planemo test galaxy/*.xml` — requires conda dependency resolution, so run it
+   after step 1.
+4. `planemo shed_init`/`shed_update` against `.shed.yml` (owner already set).
+
+A public workflow should use preloaded, versioned MOB-suite and Platon
+databases; jobs must not download databases at run time.

@@ -1,8 +1,0 @@
-name: plasbench
-owner: YOUR_GALAXY_TOOLSHED_USERNAME
-description: PlasBench wrappers for plasmid-reconstruction benchmarking.
-long_description: Galaxy wrappers for scoring, aggregation, and reporting PlasBench results.
-categories:
-  - Sequence Analysis
-remote_repository_url: https://github.com/YOUR_GITHUB_ORG/plasbench
-type: unrestricted
