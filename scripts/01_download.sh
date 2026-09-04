@@ -34,6 +34,36 @@ record_download() {
     printf '%s\t%s\t%s\n' "$1" "$2" "$3" > "$STATUS_SHARDS/$1.tsv"
 }
 
+# Show what this run is about to fetch, and get consent, before fetching it.
+# A cohort download is tens of gigabytes and hours long; a user should see the
+# number first rather than learn it from a full disk. Skipped when there is
+# nothing to download, when stdin is not a terminal (CI, nohup, a container),
+# or when DOWNLOAD_CONFIRM=0.
+confirm_download() {
+    local estimate reply
+    estimate="$(python3 "$HERE/../python/estimate_download.py" \
+                    --samples "$SAMPLE_SHEET" --data-dir "$DATA_DIR" 2>/dev/null || true)"
+    [[ -z "$estimate" ]] && return 0
+    printf '%s\n' "$estimate"
+    case "$estimate" in
+        *"nothing to fetch"*|*"nothing to download"*) return 0 ;;
+    esac
+    if [[ "${DOWNLOAD_CONFIRM:-1}" -ne 1 ]]; then
+        log "DOWNLOAD_CONFIRM=0; proceeding without asking."
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        log "Not an interactive terminal; proceeding with the download."
+        return 0
+    fi
+    reply=""
+    read -r -p "Download these files now? [y/N] " reply || true
+    case "$reply" in
+        y|Y|yes|YES|Yes) return 0 ;;
+        *) die "Download declined. Nothing was fetched." ;;
+    esac
+}
+
 download_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
     local SDIR="$DATA_DIR/$SAMPLE"
@@ -147,6 +177,8 @@ download_sample() {
 
     record_download "$SAMPLE" "ok" ""
 }
+
+confirm_download
 
 declare -A PIDS
 while IFS=$'\t' read -r SAMPLE ASM SRA; do

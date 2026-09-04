@@ -65,6 +65,7 @@ case "$PROFILE" in
  assembly) PKGS=(spades unicycler);;
  reconstruction) PKGS=(mob_suite platon);;
  long-read) PKGS=(flye mob_suite);;
+ plassembler) PKGS=(plassembler);;
  annotation) PKGS=(bakta);;
  annotation-prokka) PKGS=(prokka);;
  gplas)

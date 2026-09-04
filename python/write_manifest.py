@@ -15,7 +15,8 @@ from pathlib import Path
 
 
 TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycler",
-         "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3")
+         "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3",
+         "plassembler", "flye")
 
 
 def tool_version():

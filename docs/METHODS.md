@@ -130,3 +130,43 @@ external clinical validation. Track-specific leaderboard files are emitted as
 `benchmark.short_read.leaderboard.tsv`, `benchmark.long_read.leaderboard.tsv`,
 and `benchmark.hybrid.leaderboard.tsv`; methods from different tracks must not
 be pooled into one operational conclusion.
+
+## Hybrid tools and the circularity constraint
+
+Plassembler assembles plasmids from long reads plus short reads. That creates a
+problem the short-read tools never had.
+
+PlasBench's truth labels come from a complete long-read or hybrid assembly. If a
+hybrid tool is given the same long reads that produced that assembly, it is being
+scored against its own input: it would look near-perfect for reasons that say
+nothing about the tool. A short-read tool has no such exposure, because its input
+is genuinely independent of the truth.
+
+The pipeline therefore refuses by default. A sample is eligible for Plassembler
+only when the cohort declares independence explicitly, in a
+`truth_independent_of_long_reads` column set to `yes`. Anything else -- absent
+column, empty value, `no` -- is recorded as
+`circular truth: truth_technology=<X> derives from the supplied long reads` and
+skipped. `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH=1` overrides this globally and stamps
+every affected row in `tool_status.tsv`, so a compromised result can never be
+mistaken later for an independent one.
+
+Three ways to build an eligible cohort, in descending order of how well they
+withstand review:
+
+1. **Independent truth.** The reference comes from a source other than the long
+   reads fed to the tool -- a closed reference from a different platform, or a
+   curated complete genome. Cleanest, and hardest to source.
+2. **Held-out long reads.** Split the long-read set: part builds the truth
+   assembly, the remainder feeds the tool. Defensible, and the split must be
+   stated.
+3. **Simulated data**, where ground truth is known by construction. Needs its own
+   quality tier, since it cannot be verified against NCBI the way tiers A and B
+   are.
+
+Hybrid results are never ranked against short-read results. Aggregation writes
+one leaderboard per analysis track and does not mix track claims, so
+`benchmark.hybrid.leaderboard.tsv` answers "what do long reads add?" while
+`benchmark.short_read.leaderboard.tsv` answers "what can short reads alone
+recover?" -- the same metric, on the same isolates, with the inputs kept
+separate.

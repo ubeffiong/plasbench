@@ -76,6 +76,23 @@ export RUN_PLASMIDSPADES="${RUN_PLASMIDSPADES:-1}"
 export RUN_GPLAS2_MOB="${RUN_GPLAS2_MOB:-0}"
 export RUN_GPLAS2_EXTERNAL="${RUN_GPLAS2_EXTERNAL:-0}"
 export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
+
+# Plassembler assembles plasmids from HYBRID input: the short reads stage 1
+# already downloads, plus long reads staged as data/<sample>/$LONG_READS_FILE.
+# Off by default. It is scored on its own track (ANALYSIS_TRACK=hybrid) and is
+# never ranked against short-read-only tools -- see docs/METHODS.md.
+export RUN_PLASSEMBLER="${RUN_PLASSEMBLER:-0}"
+export PLASSEMBLER_DB="${PLASSEMBLER_DB:-$DATA_DIR/db/plassembler}"
+# Passed to plassembler -c: contigs at least this long are treated as
+# chromosome. Must be smaller than the smallest chromosome in the cohort.
+export PLASSEMBLER_CHROMOSOME_LENGTH="${PLASSEMBLER_CHROMOSOME_LENGTH:-1000000}"
+# CIRCULARITY GUARD. A cohort whose truth assembly was built from the same long
+# reads Plassembler is given would score the tool against its own input. Stage 7
+# therefore skips such samples unless the cohort declares independence in a
+# truth_independent_of_long_reads column. Setting this to 1 overrides that for
+# every sample; the override is recorded in tool_status.tsv so a result can
+# never silently look independent when it was not.
+export PLASSEMBLER_ALLOW_CIRCULAR_TRUTH="${PLASSEMBLER_ALLOW_CIRCULAR_TRUTH:-0}"
 export GPLAS2_EXTERNAL_PREDICTIONS_DIR="${GPLAS2_EXTERNAL_PREDICTIONS_DIR:-}"
 export GPLAS2_MIN_CONTIG_LENGTH="${GPLAS2_MIN_CONTIG_LENGTH:-1000}"
 
