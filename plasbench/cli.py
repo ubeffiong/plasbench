@@ -126,6 +126,9 @@ def print_concept_note(root):
     print(note.read_text(encoding="utf-8"), end="")
 
 
+VALID_STAGES = frozenset(str(i) for i in range(8))
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="plasbench",
@@ -261,7 +264,13 @@ def main(argv=None):
                "with bash, instead of running them now.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    run_parser.add_argument("stages", nargs="*", choices=[str(i) for i in range(8)],
+    # `choices` is deliberately NOT used here. With nargs="*", argparse on
+    # Python <= 3.12 validates the empty default against choices and rejects a
+    # bare `plasbench run` with "invalid choice: []". Python 3.13+ fixed that,
+    # so the bug only appears for users whose environment is older -- including
+    # the Python 3.11 that env/environment.yml currently solves to. Validate
+    # the values ourselves instead, which behaves the same on every version.
+    run_parser.add_argument("stages", nargs="*", metavar="{0,1,2,3,4,5,6,7}",
                             help=f"Optional {STAGE_HELP}")
 
     def add_run_options(command_parser):
@@ -315,6 +324,14 @@ def main(argv=None):
     add_run_options(report_parser)
 
     args = parser.parse_args(argv)
+
+    # See the note on the "stages" argument above: validated here rather than
+    # via argparse's own `choices`.
+    invalid_stages = [s for s in getattr(args, "stages", []) or [] if s not in VALID_STAGES]
+    if invalid_stages:
+        parser.error("argument stages: invalid choice: {} (choose from {})".format(
+            ", ".join(repr(s) for s in invalid_stages),
+            ", ".join(repr(s) for s in sorted(VALID_STAGES))))
     root = args.project_root
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
