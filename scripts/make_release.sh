@@ -26,12 +26,10 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/$PKG"
 
-# Prefer `git archive`: it exports the COMMITTED tree with .gitattributes
-# line-ending normalisation applied. Tarring the working tree instead is how a
-# Windows checkout shipped test/run_tests.sh with CRLF, which made `plasbench
-# test` die with "set: pipefail: invalid option name" on Linux. Fall back to the
-# working tree only when this is not a git checkout -- for example when
-# rebuilding from an already-unpacked release archive.
+# Prefer `git archive`: it exports the COMMITTED tree, honouring the
+# export-ignore attributes that keep audit output and CI config out of a user
+# download. Fall back to the working tree only when this is not a git checkout,
+# for example when rebuilding from an already-unpacked release archive.
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
     echo "[make_release] exporting committed tree via git archive"
     git -C "$ROOT" archive --format=tar HEAD | (cd "$STAGE/$PKG" && tar -xf -)
@@ -56,21 +54,37 @@ else
         . | (cd "$STAGE/$PKG" && tar -xf -)
 fi
 
-# Refuse to ship CRLF in the file types where it actually breaks something,
-# rather than silently repairing it: a CR makes a shell script die on Linux
-# ("set: pipefail: invalid option name"), and changes the SHA-256 that
-# `validate-cohort --verify-lock` checks for a cohort TSV. CRLF in .md/.py is
-# harmless and widespread here, so it is deliberately not policed. If this
-# fires, fix it in .gitattributes plus `git add --renormalize .`, not here.
-CR="$(printf '')"
-OFFENDERS="$(find "$STAGE/$PKG" -type f \( -name '*.sh' -o -name '*.tsv' -o -name '*.json' \)              -exec grep -l -- "$CR" {} + 2>/dev/null || true)"
-if [[ -n "$OFFENDERS" ]]; then
-    echo "[make_release] ERROR: CRLF found in files that must be LF:" >&2
-    printf '    %s
-' $OFFENDERS >&2
-    echo "[make_release] fix with: git add --renormalize . && git commit" >&2
+# Normalise line endings, then assert. A CR makes a shell script die on Linux
+# with "set: pipefail: invalid option name", and changes the SHA-256 that
+# `validate-cohort --verify-lock` checks for a cohort TSV. `git archive` run on
+# Windows emits CRLF for text files regardless of .gitattributes eol=lf, so the
+# build has to normalise rather than merely refuse -- otherwise no release could
+# ever be cut from a Windows checkout. CRLF in .md/.py is harmless and is left
+# alone deliberately.
+normalise_line_endings() {
+    find "$STAGE/$PKG" -type f \
+        \( -name '*.sh' -o -name '*.tsv' -o -name '*.json' \) -print0 |
+    while IFS= read -r -d '' file; do
+        tr -d '\015' < "$file" > "$file.norm" && mv "$file.norm" "$file"
+    done
+}
+
+find_cr_offenders() {
+    local cr
+    cr="$(printf '\015')"
+    find "$STAGE/$PKG" -type f \
+        \( -name '*.sh' -o -name '*.tsv' -o -name '*.json' \) \
+        -exec grep -l -- "$cr" {} + 2>/dev/null || true
+}
+
+normalise_line_endings
+offenders="$(find_cr_offenders)"
+if [[ -n "$offenders" ]]; then
+    echo "[make_release] ERROR: CRLF survived normalisation in:" >&2
+    echo "$offenders" | sed 's/^/    /' >&2
     exit 1
 fi
+echo "[make_release] line endings verified: no CR in .sh, .tsv or .json"
 
 chmod +x "$STAGE/$PKG/install.sh" 2>/dev/null || true
 find "$STAGE/$PKG/scripts" "$STAGE/$PKG/adapters" "$STAGE/$PKG/env" \
