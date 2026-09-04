@@ -23,5 +23,6 @@ dependencies:
   - python>=3.9            # scoring scripts use the stdlib only
   - pip                    # install the PlasBench command-line wrapper
   - pigz                   # faster (de)compression
+  - unzip                  # unpack the NCBI datasets archive in stage 1
 # NOTE: the Python scoring scripts deliberately use ONLY the standard library,
 # so they run even outside this env (any python3 >= 3.7).
