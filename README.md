@@ -428,10 +428,42 @@ plasbench install-tools all             # everything the enabled RUN_* flags nee
 Then the **databases**, which are not bundled:
 
 ```bash
-bash env/download_mobsuite_db.sh        # fully automatic, ~450 MB
+bash env/download_mobsuite_db.sh        # ~450 MB; checks first, skips if present
 bash env/download_bakta_db.sh           # optional, for protein annotation
 bash env/download_platon_db.sh          # prints instructions -- see below
 ```
+
+Each of these **checks before it downloads**. If the database is already installed the
+script says so and exits; re-downloading is opt-in:
+
+```bash
+bash env/download_mobsuite_db.sh --force   # confirms before overwriting
+```
+
+A database is only counted as present when the files the tool actually reads are there,
+so a tree left behind by an interrupted download is reported as **incomplete** rather than
+mistaken for a working install.
+
+> **`mob_init` cannot resume.** MOB-suite's own downloader re-fetches the whole ~450 MB
+> from zero on every attempt. On a link that drops mid-transfer it may never complete --
+> which is why the presence check above matters, and why the escape hatch below exists.
+
+**If the download will not complete: copy a prebuilt database.** Every file in these
+databases is plain data -- FASTA, BLAST and DIAMOND indexes, HMM profiles, a mash sketch,
+a SQLite taxonomy -- with no absolute paths, so a directory built on one machine can be
+copied to another:
+
+```bash
+# MOB-suite: lives inside the installed package, so it survives project moves
+MOB_DB="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))')"
+cp -r /path/to/prebuilt/mobsuite_db/* "$MOB_DB/"
+
+# Platon: path is project-relative, or point PLATON_DB anywhere you like
+mkdir -p data/db/platon/db && cp -r /path/to/prebuilt/platon_db/* data/db/platon/db/
+```
+
+Then confirm with `plasbench check`, which reports both as `[ok]` and stops offering to
+install them.
 
 `download_platon_db.sh` does **not** download by itself: Platon's Zenodo release is
 periodically re-versioned, so the script refuses to pin a stale URL and instead prints the
@@ -788,7 +820,271 @@ ties them together all travel with the release. See `cohorts/README.md` and
 `docs/COHORTS.md` for the curation workflow, and `docs/FINDING_DATA.md` for how to find
 matched pairs in the first place.
 
-## 4. How scoring works (short version)
+## 4. Cohort studies — every manipulation, end to end
+
+A *cohort* is the panel of isolates a benchmark is measured on. Everything about the
+credibility of a leaderboard traces back to it: which isolates, on what evidence, spread
+across which strata, and pinned so someone else can re-verify it. This section covers the
+whole lifecycle — discover, screen, balance, validate, lock, run, stratify, extend — and
+the manipulations available at each stage.
+
+The rules a row and a set must satisfy are in
+[Appendix A](#appendix-a--selection-criteria-what-makes-a-sequence-eligible) and
+[Appendix B](#appendix-b--cohort-criteria-what-makes-a-set-of-sequences-a-cohort). This
+section is the *how*.
+
+---
+
+### 4.1 Run a cohort that ships with PlasBench
+
+The fastest honest start. Verify it against its lock, then run it by name:
+
+```bash
+plasbench validate-cohort --samples cohorts/public-v2.tsv \
+                          --verify-lock cohorts/public-v2.lock.json
+plasbench run --cohort public-v2
+```
+
+`--cohort NAME` is shorthand for `--samples cohorts/NAME.tsv`. Shipped panels:
+
+| Cohort | Isolates | Character |
+|---|---:|---|
+| `public-v1` | 10 | Tier-A seed panel: clinical *E. coli* and *Salmonella*, reviewed studies |
+| `public-v2` | 32 | Adds African isolates (Egypt, Nigeria, South Africa, Tanzania, Kenya) across five species and both Gram groups |
+
+`--verify-lock` re-checks the sheet's SHA-256 and the stored NCBI evidence, so you are
+re-verifying a published panel rather than trusting it. A mismatch is a hard failure.
+
+---
+
+### 4.2 Build a cohort of your own
+
+Four commands, in the order you would normally use them.
+
+#### Discover candidates from NCBI
+
+```bash
+plasbench discover-cohort \
+    --organism "Klebsiella pneumoniae" \
+    --organism "Escherichia coli" \
+    --country Nigeria \
+    --max-assemblies 200 \
+    --out-dir candidates/
+```
+
+| Option | Effect |
+|---|---|
+| `--organism` | Scientific name; **repeat** for each taxon |
+| `--country` | Require the deposited BioSample `geo_loc_name` to contain this string |
+| `--max-assemblies` | Cap the NCBI search, so a broad query cannot run away |
+| `--email`, `--api-key` | Sent to E-utilities; default to `NCBI_EMAIL`/`NCBI_API_KEY` |
+
+Searches for complete assemblies with a matched paired-Illumina run. The output is
+candidates, **not** a cohort — nothing is accepted yet.
+
+#### Screen candidates strictly
+
+```bash
+plasbench curate-cohort --candidates candidates/candidates.tsv --out-dir curated/
+```
+
+Applies every rule in Appendix A and writes two files:
+
+- `curated/accepted.tsv` — rows that passed, in cohort schema, tier already derived
+- `curated/rejected.tsv` — every rejected row **with its reason**
+
+The rejected table is the curation audit trail. Keep it: it is the evidence that a
+released cohort was screened rather than assembled by hand.
+
+#### Balance the shortlist
+
+```bash
+plasbench review-candidates --candidates curated/accepted.tsv --out-dir shortlist/ \
+    --max-per-bioproject 3 \
+    --max-per-organism 8
+```
+
+Caps how much of the panel any single BioProject or organism can occupy. Without this a
+search returns whatever a few large depositors happened to submit, and a leaderboard then
+measures those studies rather than the tools. This produces an **additive, non-release**
+shortlist for you to review — not a finished cohort.
+
+#### Validate and lock
+
+```bash
+plasbench validate-cohort --samples cohorts/my-cohort.tsv --online \
+                          --write-lock cohorts/my-cohort.lock.json
+```
+
+| Option | Effect |
+|---|---|
+| *(none)* | Schema only: columns, accession formats, allowed tier and technology values |
+| `--online` | Also verify against NCBI: assembly level, plasmid replicons, long-read evidence, BioSample/BioProject linkage, Illumina, paired |
+| `--write-lock` | Record the retrieved evidence plus the sheet's SHA-256 (requires `--online`) |
+| `--verify-lock` | Re-check an existing lock; fails if the sheet changed |
+| `--email`, `--api-key` | E-utilities contact and key |
+
+> **Generate the lock on the platform you release from.** The lock pins the SHA-256 of the
+> sheet's bytes. A sheet checked out with CRLF line endings hashes differently from the LF
+> copy Git stores, so a lock written on Windows fails on Linux with *"sample-sheet checksum
+> differs from verification lock"*. `.gitattributes` forces LF for `*.tsv` and `*.json`
+> precisely to keep this stable.
+
+---
+
+### 4.3 Run the study
+
+```bash
+plasbench run --cohort my-cohort                      # everything
+plasbench run --cohort my-cohort --threads 8 --memory-gb 16
+plasbench run 5 6 --cohort my-cohort                  # re-score and re-aggregate only
+plasbench run --cohort my-cohort --write-script run.sh   # emit commands, run nothing
+```
+
+Manipulations worth knowing:
+
+| Goal | How |
+|---|---|
+| Compare a different tool set | `--mob-recon on --platon on --plasmidspades off` |
+| Change the assembler for everyone | `--assembler unicycler` (required for gplas2 modes) |
+| Re-run one tool after upgrading it | `--force-rerun-tools` |
+| Work offline from pre-staged reads | `--local-inputs` |
+| Benchmark long-read or hybrid input | `--analysis-track long_read` (or `hybrid`) |
+| Put outputs somewhere else | `--data-dir`, `--results-dir`, `--log-dir` |
+| Use a Platon database elsewhere | `--platon-db /path/to/db` |
+| Run more samples at once | `--parallel-samples N` — each concurrent assembly needs its own memory budget |
+| Run more tools at once | `--parallel-tools N` — cheaper to raise than parallel samples |
+| Inspect before committing | `--write-script run.sh`, then read or edit it |
+
+Stages are numbered `0`–`7`; pass the ones you want. Re-running is safe: completed work is
+reused, and a sample that fails is recorded and skipped rather than aborting the cohort.
+
+---
+
+### 4.4 Read the study, including the strata
+
+Beyond `benchmark.leaderboard.tsv`:
+
+```
+benchmark.stratified.tsv            per-stratum leaderboards
+benchmark.paired_comparisons.tsv    Holm-corrected paired permutation tests
+benchmark.recommendations.tsv       operational advice, or the reason it was withheld
+benchmark.recommendation_validation.tsv   leave-one-study-out check
+```
+
+Stratification axes, all derived from the cohort sheet — which is why the optional columns
+are worth filling in:
+
+| Axis | Column |
+|---|---|
+| organism | `organism` |
+| Gram group | `gram_group` |
+| collection country | `collection_country` |
+| sample origin | `sample_origin` |
+| truth technology | `truth_technology` |
+| plasmid size band | derived from the truth labels |
+| plasmid count band | derived from the truth labels |
+| read-depth band | `read_depth_x` |
+| AMR carriage | derived from annotation |
+
+A stratum below `RECOMMENDATION_MIN_SAMPLES` (default 5) is reported but marked
+**ineligible** — a signal to investigate, not a finding.
+
+Regenerate the leaderboard and HTML report from existing scores without re-running
+anything:
+
+```bash
+plasbench report --results-dir results
+```
+
+---
+
+### 4.5 Recommendations, and why they are usually withheld
+
+```bash
+plasbench select-candidates --scores results/scores.tsv \
+                            --samples cohorts/my-cohort.tsv \
+                            --results-dir results \
+                            --out-prefix results/benchmark \
+                            --tool-status results/tool_status.tsv \
+                            --min-samples 5 \
+                            --min-coverage 0.80 \
+                            --analysis-track short_read
+```
+
+A ranking is a measurement; a recommendation is advice, and advice has to generalise.
+PlasBench withholds one unless leave-one-study-out validation can run, which needs at
+least **two independent `source_study` groups**. A single-study cohort still produces a
+valid leaderboard, and `benchmark.recommendations.tsv` will say
+`independent-study validation unavailable` rather than guessing.
+
+`--min-samples` and `--min-coverage` loosen or tighten the evidence gate. Loosening them
+for a small cohort is a choice you should be able to defend in a methods section.
+
+---
+
+### 4.6 Apply the study to a new isolate
+
+```bash
+# Which method does the benchmark support for this kind of sample?
+plasbench select-unknown --sample-id new_isolate_01 \
+                         --organism "Klebsiella pneumoniae" \
+                         --gram-group Gram-negative \
+                         --recommendations results/benchmark.recommendations.tsv
+
+# Reconstruct with that one method -- not every benchmarked tool
+plasbench reconstruct --sample new_isolate_01 --sra SRR12345678 \
+                      --recommendations results/benchmark.recommendations.tsv
+```
+
+`reconstruct` is the operational endpoint: a surveillance laboratory wants one method,
+chosen on evidence, not a bake-off on every sample. Override the choice with
+`--tool mob_recon` when you need to.
+
+---
+
+### 4.7 Depth-sweep: how far can you cut sequencing?
+
+```bash
+plasbench depth-ladder --samples cohorts/my-cohort.tsv \
+                       --data-dir data --out-dir depth/ \
+                       --depths 20,40,60,80,120 --seed 42
+plasbench run --samples depth/depth_ladder.samples.tsv --local-inputs
+plasbench depth-report --scores results/scores.tsv \
+                       --manifest depth/depth_ladder.manifest.tsv \
+                       --out-prefix results/depth --metric plasmid_recall
+```
+
+Deterministic subsampling (fixed `--seed`) to each target depth, then the same benchmark
+at every level. `--metric` chooses what the SVG plots — `plasmid_recall` is usually the
+one that matters, since it answers "how deep must I sequence to recover whole plasmids?"
+rather than "how deep to recover most plasmid bases?".
+
+Aggregation knows subsamples of one isolate are correlated and does not treat them as
+independent evidence.
+
+---
+
+### 4.8 Extending and releasing a cohort
+
+Adding an isolate is one row plus re-validation:
+
+```bash
+# append the row, then:
+plasbench validate-cohort --samples cohorts/my-cohort.tsv --online \
+                          --write-lock cohorts/my-cohort.lock.json
+plasbench run --cohort my-cohort        # only the new isolate is processed
+```
+
+Everything already computed is reused, so growing a cohort costs only the new isolates.
+
+To release one, ship `cohorts/<name>.tsv` and `<name>.lock.json` together, and cite the
+version used. Anyone can then re-verify the panel, the evidence behind it, and the
+checksum tying them together with a single `--verify-lock`.
+
+---
+
+## 5. How scoring works (short version)
 
 For each sample and tool:
 - `minimap2 --secondary=no -x asm5 reference.fna pred_<tool>.plasmid.fasta > <tool>.paf`
@@ -811,7 +1107,7 @@ rationale in `docs/METHODS.md`.
 
 ---
 
-## 5. Extending it (good hackathon sprints)
+## 6. Extending it (good hackathon sprints)
 
 - **Add a tool**: write a one-file adapter in `adapters/` that emits a predicted-plasmid
   FASTA, add a block in `scripts/04_run_tools.sh`, add a `RUN_*` flag. Scoring is automatic.
@@ -823,12 +1119,12 @@ rationale in `docs/METHODS.md`.
 
 ---
 
-## 6. Reproducibility notes
+## 7. Reproducibility notes
 
 - Regenerate the explicit lock with `bash env/lock_environment.sh`; do not overwrite it with `conda env export`.
 - Record tool versions per run (add `--version` calls to a manifest — a nice sprint task).
 - Deposit your curated sample sheet + truth tables on **Zenodo** for a citable dataset —
   this is the actual publishable artifact PlasBench asks for.
 
-## 7. License
+## 8. License
 MIT — see `LICENSE`.
