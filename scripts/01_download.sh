@@ -41,6 +41,11 @@ record_download() {
 # or when DOWNLOAD_CONFIRM=0.
 confirm_download() {
     local estimate reply
+    # Asked not to confirm? Then do not spend time computing an estimate for a
+    # prompt that will never be shown.
+    if [[ "${DOWNLOAD_CONFIRM:-1}" -ne 1 ]]; then
+        return 0
+    fi
     estimate="$(python3 "$HERE/../python/estimate_download.py" \
                     --samples "$SAMPLE_SHEET" --data-dir "$DATA_DIR" 2>/dev/null || true)"
     [[ -z "$estimate" ]] && return 0
@@ -48,10 +53,6 @@ confirm_download() {
     case "$estimate" in
         *"nothing to fetch"*|*"nothing to download"*) return 0 ;;
     esac
-    if [[ "${DOWNLOAD_CONFIRM:-1}" -ne 1 ]]; then
-        log "DOWNLOAD_CONFIRM=0; proceeding without asking."
-        return 0
-    fi
     if [[ ! -t 0 ]]; then
         log "Not an interactive terminal; proceeding with the download."
         return 0
