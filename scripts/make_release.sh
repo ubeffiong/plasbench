@@ -56,15 +56,18 @@ else
         . | (cd "$STAGE/$PKG" && tar -xf -)
 fi
 
-# Refuse to ship CRLF rather than silently repairing it. A CR breaks a shell
-# script on Linux, and breaks the SHA-256 that `validate-cohort --verify-lock`
-# checks for a cohort TSV. If this fires, the fix belongs in .gitattributes
-# plus `git add --renormalize .`, not in the release build.
-CR="$(printf '\r')"
-OFFENDERS="$(grep -rlI -- "$CR" "$STAGE/$PKG" 2>/dev/null || true)"
+# Refuse to ship CRLF in the file types where it actually breaks something,
+# rather than silently repairing it: a CR makes a shell script die on Linux
+# ("set: pipefail: invalid option name"), and changes the SHA-256 that
+# `validate-cohort --verify-lock` checks for a cohort TSV. CRLF in .md/.py is
+# harmless and widespread here, so it is deliberately not policed. If this
+# fires, fix it in .gitattributes plus `git add --renormalize .`, not here.
+CR="$(printf '')"
+OFFENDERS="$(find "$STAGE/$PKG" -type f \( -name '*.sh' -o -name '*.tsv' -o -name '*.json' \)              -exec grep -l -- "$CR" {} + 2>/dev/null || true)"
 if [[ -n "$OFFENDERS" ]]; then
-    echo "[make_release] ERROR: CRLF line endings found in files that must be LF:" >&2
-    printf '    %s\n' $OFFENDERS >&2
+    echo "[make_release] ERROR: CRLF found in files that must be LF:" >&2
+    printf '    %s
+' $OFFENDERS >&2
     echo "[make_release] fix with: git add --renormalize . && git commit" >&2
     exit 1
 fi
