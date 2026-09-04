@@ -22,6 +22,7 @@ declare -A NEEDED_PROFILES=()      # install-tools profile -> 1, for every gap i
 UNFIXABLE=()                       # human-readable notes for gaps install-tools cannot fix
 NEED_CONDA=0
 NEED_PLATON_DB=0
+NEED_PLASSEMBLER_DB=0
 NEED_MOBSUITE_DB=0
 NEED_BAKTA_DB=0
 
@@ -85,6 +86,16 @@ log "Checking optional plasmid reconstruction tools (only those switched on in c
 if [[ "${RUN_MOB_RECON:-0}" -eq 1 ]]; then
     have mob_recon && log "  [ok]   mob_recon" || { warn "  [MISS] mob_recon (RUN_MOB_RECON=1)"; NEEDED_PROFILES["reconstruction"]=1; }
 fi
+if [[ "${RUN_PLASSEMBLER:-0}" -eq 1 ]]; then
+    check_tool plassembler plassembler
+    if compgen -G "$PLASSEMBLER_DB/*.msh" > /dev/null 2>&1; then
+        log "  [ok]   Plassembler DB at $PLASSEMBLER_DB"
+    else
+        warn "  [MISS] Plassembler DB not found at $PLASSEMBLER_DB"
+        NEED_PLASSEMBLER_DB=1; CORE_OK=0
+    fi
+fi
+
 if [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
     have platon && log "  [ok]   platon" || { warn "  [MISS] platon (RUN_PLATON=1)"; NEEDED_PROFILES["reconstruction"]=1; }
 fi
@@ -144,7 +155,7 @@ fi
 
 NOTHING_MISSING=0
 [[ "$CORE_OK" -eq 1 && ${#NEEDED_PROFILES[@]} -eq 0 && "$NEED_PLATON_DB" -eq 0 \
-    && "$NEED_MOBSUITE_DB" -eq 0 && "$NEED_BAKTA_DB" -eq 0 ]] && NOTHING_MISSING=1
+    && "$NEED_MOBSUITE_DB" -eq 0 && "$NEED_BAKTA_DB" -eq 0 && "$NEED_PLASSEMBLER_DB" -eq 0 ]] && NOTHING_MISSING=1
 
 echo
 if [[ "$NOTHING_MISSING" -eq 1 ]]; then
@@ -154,7 +165,7 @@ fi
 
 warn "Some dependencies are missing."
 FIXABLE=0
-[[ "$NEED_CONDA" -eq 1 || ${#NEEDED_PROFILES[@]} -gt 0 || "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 || "$NEED_BAKTA_DB" -eq 1 ]] && FIXABLE=1
+[[ "$NEED_CONDA" -eq 1 || ${#NEEDED_PROFILES[@]} -gt 0 || "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 || "$NEED_BAKTA_DB" -eq 1 || "$NEED_PLASSEMBLER_DB" -eq 1 ]] && FIXABLE=1
 
 if [[ "$FIXABLE" -eq 0 ]]; then
     for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && warn "  $note"; done
@@ -168,6 +179,7 @@ for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $pr
 [[ "$NEED_PLATON_DB" -eq 1 ]] && echo "  - the Platon database (needs a URL you provide; see prompt below)"
 [[ "$NEED_MOBSUITE_DB" -eq 1 ]] && echo "  - the MOB-suite database"
 [[ "$NEED_BAKTA_DB" -eq 1 ]] && echo "  - the Bakta database"
+[[ "$NEED_PLASSEMBLER_DB" -eq 1 ]] && echo "  - the Plassembler database"
 for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && echo "  (not automatic) $note"; done
 echo
 
@@ -202,6 +214,9 @@ if [[ "$NEED_MOBSUITE_DB" -eq 1 ]]; then
 fi
 if [[ "$NEED_BAKTA_DB" -eq 1 ]]; then
     bash "$HERE/../env/download_bakta_db.sh" "${YES_FLAG[@]}" || warn "Bakta database step did not complete; see output above"
+fi
+if [[ "$NEED_PLASSEMBLER_DB" -eq 1 ]]; then
+    bash "$HERE/../env/download_plassembler_db.sh" "${YES_FLAG[@]}" || warn "Plassembler database step did not complete; see output above"
 fi
 
 echo

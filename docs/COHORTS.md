@@ -155,3 +155,18 @@ bash run_public_v1.sh
 Because the v2 additions are study-clustered (22 rows across 11 BioProjects),
 run them through `review-candidates` with per-BioProject caps before treating
 them as independent observations.
+
+## truth_independent_of_long_reads (optional)
+
+Only consulted by hybrid tools, currently Plassembler. Set it to `yes` when a
+sample's long reads are NOT the reads its truth assembly was built from.
+
+PlasBench's truth labels come from a complete long-read or hybrid assembly. A
+hybrid tool handed those same long reads is scored against its own input, so a
+sample is skipped unless this column says otherwise -- see the circularity
+section of docs/METHODS.md. An absent column, an empty value, or `no` all mean
+"assume circular, skip". This is deliberately the safe default: a benchmark that
+silently scores a tool on its own input is worse than one that omits it.
+
+Short-read tools ignore this column entirely; their inputs are already
+independent of the truth.

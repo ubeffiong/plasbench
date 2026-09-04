@@ -180,3 +180,19 @@ retry_network() {
         n=$((n + 1))
     done
 }
+
+# sample_column SHEET SAMPLE_ID COLUMN_NAME
+# Print one metadata field for one sample, or nothing when the sheet has no
+# such column. read_samples() deliberately yields only the three columns every
+# stage needs; this is for the optional curation fields (truth_technology,
+# gram_group, and the long-read independence declaration Plassembler needs).
+sample_column() {
+    local sheet="$1" sample="$2" column="$3"
+    [[ -f "$sheet" ]] || return 0
+    awk -F'\t' -v want="$sample" -v col="$column" '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        !seen { for (i = 1; i <= NF; i++) if ($i == col) c = i; seen = 1; next }
+        c && $1 == want { print $c; exit }
+    ' "$sheet"
+}

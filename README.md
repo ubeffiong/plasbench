@@ -43,9 +43,9 @@ leaderboard, and assumes no prior experience with conda or bioinformatics toolin
 The short version of that route is:
 
 ```bash
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.7/plasbench-0.1.7.tar.gz
-tar -xzf plasbench-0.1.7.tar.gz
-cd plasbench-0.1.7
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.8/plasbench-0.1.8.tar.gz
+tar -xzf plasbench-0.1.8.tar.gz
+cd plasbench-0.1.8
 ./install.sh --tools
 conda activate plasbench
 plasbench test
@@ -292,15 +292,15 @@ This must now print a version number before you continue.
 
 ```bash
 cd ~
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.7/plasbench-0.1.7.tar.gz
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.7/plasbench-0.1.7.tar.gz.sha256
-sha256sum -c plasbench-0.1.7.tar.gz.sha256
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.8/plasbench-0.1.8.tar.gz
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.8/plasbench-0.1.8.tar.gz.sha256
+sha256sum -c plasbench-0.1.8.tar.gz.sha256
 ```
 
 The last command must print exactly:
 
 ```
-plasbench-0.1.7.tar.gz: OK
+plasbench-0.1.8.tar.gz: OK
 ```
 
 If instead you see `curl: (22) ... 404`, the version number in the URL is wrong — check
@@ -312,14 +312,14 @@ failed and left an error page in place of the file. Delete both files and run th
 commands again:
 
 ```bash
-rm -f plasbench-0.1.7.tar.gz plasbench-0.1.7.tar.gz.sha256
+rm -f plasbench-0.1.8.tar.gz plasbench-0.1.8.tar.gz.sha256
 ```
 
 Now unpack it:
 
 ```bash
-tar -xzf plasbench-0.1.7.tar.gz
-cd ~/plasbench-0.1.7
+tar -xzf plasbench-0.1.8.tar.gz
+cd ~/plasbench-0.1.8
 ```
 
 ---
@@ -361,7 +361,7 @@ plasbench --version
 You should see your prompt change to start with `(plasbench)`, and the version print:
 
 ```
-plasbench 0.1.7
+plasbench 0.1.8
 ```
 
 **You must run `conda activate plasbench` in every new terminal window** before using
@@ -402,8 +402,8 @@ PlasBench needs a database for Platon and one for MOB-suite. Together they are a
 #### 7a — Platon database
 
 ```bash
-mkdir -p ~/plasbench-0.1.7/data/db/platon
-cd ~/plasbench-0.1.7/data/db/platon
+mkdir -p ~/plasbench-0.1.8/data/db/platon
+cd ~/plasbench-0.1.8/data/db/platon
 curl -fL -C - --retry 10 --retry-all-errors -o db.tar.gz https://zenodo.org/records/4066768/files/db.tar.gz
 ```
 
@@ -424,7 +424,7 @@ Then unpack:
 ```bash
 tar -xzf db.tar.gz
 rm -f db.tar.gz
-ls ~/plasbench-0.1.7/data/db/platon/db | wc -l
+ls ~/plasbench-0.1.8/data/db/platon/db | wc -l
 ```
 
 The last command should print **31**.
@@ -432,7 +432,7 @@ The last command should print **31**.
 #### 7b — MOB-suite database
 
 ```bash
-cd ~/plasbench-0.1.7
+cd ~/plasbench-0.1.8
 bash env/download_mobsuite_db.sh
 ```
 
@@ -465,12 +465,12 @@ python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.absp
 ```
 
 Copy their `databases` directory into the path it printed, then copy their Platon `db`
-directory into `~/plasbench-0.1.7/data/db/platon/db`. Confirm both:
+directory into `~/plasbench-0.1.8/data/db/platon/db`. Confirm both:
 
 ```bash
 MOB_DB="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))')"
 ls "$MOB_DB" | wc -l                                    # expect 31
-ls ~/plasbench-0.1.7/data/db/platon/db | wc -l          # expect 31
+ls ~/plasbench-0.1.8/data/db/platon/db | wc -l          # expect 31
 ```
 
 ---
@@ -489,7 +489,7 @@ Now write it into a file PlasBench reads. Replace the two values with your own, 
 everything else exactly as shown:
 
 ```bash
-cd ~/plasbench-0.1.7
+cd ~/plasbench-0.1.8
 cat > .ncbi.env <<'EOF'
 NCBI_API_KEY=paste_your_key_here
 NCBI_EMAIL=your.email@example.org
@@ -510,7 +510,7 @@ This file is ignored by Git and is never included in a release archive. Do not s
 ### Step 9 — Confirm the whole installation
 
 ```bash
-cd ~/plasbench-0.1.7
+cd ~/plasbench-0.1.8
 plasbench check
 ```
 
@@ -533,7 +533,7 @@ Start with `public-v1`: 10 isolates, the smallest shipped cohort. First confirm 
 cohort has not been altered:
 
 ```bash
-cd ~/plasbench-0.1.7
+cd ~/plasbench-0.1.8
 plasbench validate-cohort --samples cohorts/public-v1.tsv --verify-lock cohorts/public-v1.lock.json
 ```
 
@@ -550,6 +550,22 @@ RAM:
 ```bash
 plasbench run --cohort public-v1 --threads 4 --memory-gb 7
 ```
+
+Before anything is downloaded it shows you what it is about to fetch, and waits:
+
+```
+About to download from NCBI:
+  reference assemblies :   10  ~115.4 MB
+  Illumina read sets   :   10  ~3.5 GB  (2.8 GB - 3.8 GB)
+  ESTIMATED TOTAL      :       ~3.6 GB
+Download these files now? [y/N]
+```
+
+Answer `y` to continue. Samples already on disk are excluded from that total, so
+re-running shows only what is still missing. There is no prompt when the run is not
+attached to a terminal (under `nohup`, in CI, in a container) or when you set
+`DOWNLOAD_CONFIRM=0`. Budget roughly three times the download size on disk, for
+assemblies, trimmed reads and tool output.
 
 **This takes several hours** — roughly 30–60 minutes per isolate. It downloads about
 6 GB. You can stop it with Ctrl+C and start it again later with the same command:
@@ -593,7 +609,7 @@ to be chromosome, which quietly inflates the scores.
 ### Step 11 — Look at the results
 
 ```bash
-cd ~/plasbench-0.1.7
+cd ~/plasbench-0.1.8
 cat results/benchmark.leaderboard.md
 ```
 
@@ -632,8 +648,8 @@ however different their averages look.
 | `conda: command not found` | Step 2 not done, or shell not restarted | Run step 2, then `exec bash` |
 | `sha256sum: no properly formatted checksum lines found` | Download returned an error page | `rm` both files, redo step 3 |
 | `curl: (22) ... 404` | Wrong version in the URL | Check the Releases page for the current version |
-| `set: pipefail: invalid option name` | Archive from before v0.1.3 | Download v0.1.7 (step 3) |
-| `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.3 | Download v0.1.7 |
+| `set: pipefail: invalid option name` | Archive from before v0.1.3 | Download v0.1.8 (step 3) |
+| `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.3 | Download v0.1.8 |
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
 | `[MISS] Platon DB not found` | Step 7a incomplete | Redo step 7a; the `curl` resumes |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
@@ -643,7 +659,7 @@ however different their averages look.
 To see what PlasBench is doing in more detail, every stage writes a log:
 
 ```bash
-ls ~/plasbench-0.1.7/logs/
+ls ~/plasbench-0.1.8/logs/
 ```
 
 
@@ -880,7 +896,7 @@ Manipulations worth knowing:
 | Work offline from pre-staged reads | `--local-inputs` |
 | Benchmark long-read or hybrid input | `--analysis-track long_read` (or `hybrid`) |
 | Put outputs somewhere else | `--data-dir`, `--results-dir`, `--log-dir` |
-| Use a Platon database elsewhere | `--platon-db ~/plasbench-0.1.7/data/db/platon/db` |
+| Use a Platon database elsewhere | `--platon-db ~/plasbench-0.1.8/data/db/platon/db` |
 | Run more samples at once | `--parallel-samples N` — each concurrent assembly needs its own memory budget |
 | Run more tools at once | `--parallel-tools N` — cheaper to raise than parallel samples |
 | Inspect before committing | `--write-script run.sh`, then read or edit it |
@@ -1010,6 +1026,62 @@ Everything already computed is reused, so growing a cohort costs only the new is
 To release one, ship `cohorts/<name>.tsv` and `<name>.lock.json` together, and cite the
 version used. Anyone can then re-verify the panel, the evidence behind it, and the
 checksum tying them together with a single `--verify-lock`.
+
+---
+
+
+### 4.9 Hybrid tools: Plassembler, and the circularity constraint
+
+Plassembler assembles plasmids from **long reads plus short reads**. It is off by
+default, and it needs one thing the short-read tools do not: a cohort where the
+long reads are not the reads the truth came from.
+
+**Install it:**
+
+```bash
+plasbench install-tools plassembler
+bash env/download_plassembler_db.sh
+```
+
+**Stage the long reads** for each sample, as `data/<sample>/long_reads.fastq.gz`.
+Stage 1 already downloaded the short reads.
+
+**Run it, then score it on its own track:**
+
+```bash
+plasbench run 7 --cohort my-cohort --plassembler on
+plasbench run 5 6 --cohort my-cohort --analysis-track hybrid
+```
+
+That produces `results/benchmark.hybrid.leaderboard.tsv`. Aggregation writes one
+leaderboard per track and never mixes them, so a hybrid tool is never ranked
+against a short-read-only tool. Nothing about `plasbench run --cohort public-v2`
+changes: the short-read benchmark is exactly what it was.
+
+**The constraint.** PlasBench's truth labels come from a complete long-read or
+hybrid assembly. Give a hybrid tool the same long reads that produced that
+assembly and you are scoring it against its own input: it will look near-perfect
+for reasons that say nothing about the tool. Short-read tools have no such
+exposure, which is why this never came up before.
+
+So a sample is only eligible when the cohort says so explicitly:
+
+```
+sample_id  assembly_accession  sra_run  ...  truth_independent_of_long_reads
+s1         GCF_...             SRR...   ...  yes
+```
+
+Anything else — column absent, value empty, `no` — is skipped and recorded as
+`circular truth: truth_technology=<X> derives from the supplied long reads`.
+
+`PLASSEMBLER_ALLOW_CIRCULAR_TRUTH=1` overrides that for every sample and stamps
+each affected row in `tool_status.tsv`, so a compromised result cannot later be
+mistaken for an independent one. Use it for exploration, not for a published
+number.
+
+Building an eligible cohort is a real piece of work, not a flag. See
+[`docs/METHODS.md`](docs/METHODS.md) for the three approaches — independent truth,
+held-out long reads, or simulated data — and what each costs you in review.
 
 ---
 

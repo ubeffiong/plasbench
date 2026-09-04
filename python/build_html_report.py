@@ -816,6 +816,7 @@ def read_tool_versions(path):
         "mob_recon": "mob_recon", "platon": "platon",
         "plasmidspades": "plasmidspades.py", "gplas": "gplas",
         "gplas2_external": "gplas", "gplas2_mob": "gplas",
+        "plassembler": "plassembler", "flye_mob_recon": "flye",
     }
     versions = {label: details.get("version", "unreported")
                 for label, name in executable.items()

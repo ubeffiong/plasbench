@@ -195,7 +195,7 @@ def main(argv=None):
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, plassembler, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -315,6 +315,7 @@ def main(argv=None):
             ("--gplas2-mob", "gplas2_mob", "Enable or disable gplas seeded by MOB-recon membership."),
             ("--gplas2-external", "gplas2_external", "Enable or disable gplas with external classifier TSVs."),
             ("--flye-mob-recon", "flye_mob_recon", "Enable or disable optional Flye plus MOB-Recon long-read reconstruction."),
+            ("--plassembler", "plassembler", "Enable or disable optional Plassembler hybrid (long+short) plasmid assembly."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
         tools.add_argument("--force-rerun-tools", action="store_true",
@@ -477,7 +478,8 @@ def main(argv=None):
         for argument, variable in (("mob_recon", "RUN_MOB_RECON"), ("platon", "RUN_PLATON"),
                                    ("plasmidspades", "RUN_PLASMIDSPADES"),
                                    ("gplas2_mob", "RUN_GPLAS2_MOB"), ("gplas2_external", "RUN_GPLAS2_EXTERNAL"),
-                                   ("flye_mob_recon", "RUN_FLYE_MOB_RECON")):
+                                   ("flye_mob_recon", "RUN_FLYE_MOB_RECON"),
+                                   ("plassembler", "RUN_PLASSEMBLER")):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"

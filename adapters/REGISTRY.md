@@ -36,3 +36,19 @@ the core benchmark to unstable third-party command-line interfaces. Enable
 an assembly graph, and successful `mob_recon`; it writes its evidence under
 `results/<sample>/gplas2_mob/`. External mode reads
 `$GPLAS2_EXTERNAL_PREDICTIONS_DIR/<sample>.tsv`.
+
+## adapt_plassembler.sh
+
+`plassembler run` writes `<prefix>_plasmids.fasta`, one contig per assembled
+plasmid. Unlike a contig classifier the output is already plasmid-level, so each
+record becomes its own bin. Headers carry copy-number fields
+(`>1 len=2000 copy_number_short_read=2.5`); the first whitespace-delimited token
+is taken as the sequence id.
+
+Plassembler deliberately writes an EMPTY `_plasmids.fasta` when it finds no
+plasmids, so that workflow managers see a file either way. That is a real
+prediction -- "this isolate has no plasmids" -- and the adapter succeeds on it,
+emitting an empty prediction to be scored as such. Treating it as a failure would
+drop the isolate from the denominator and flatter the tool.
+
+    adapt_plassembler.sh <plassembler_out_dir> <unused_base_asm> <out_fasta>
