@@ -7,4 +7,8 @@ done
 bash "$HERE/test_gplas_adapter.sh"
 bash "$HERE/test_only_tool_gating.sh"
 bash "$HERE/test_operational_reconstruct.sh"
+bash "$HERE/test_parallel_execution.sh"
+bash "$HERE/test_download_parallel.sh"
+bash "$HERE/test_assemble_parallel.sh"
+bash "$HERE/test_score_parallel.sh"
 echo "ALL PLASBENCH TESTS PASSED"

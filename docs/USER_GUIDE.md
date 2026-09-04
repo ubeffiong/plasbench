@@ -429,12 +429,40 @@ plasbench --project-root /path/to/plasbench demo
 ### Resources and assembly
 
 ```text
---threads INTEGER       CPU threads per tool. Default: 4.
---memory-gb INTEGER     plasmidSPAdes memory limit in GB. Default: 16.
+--threads INTEGER          CPU threads per tool. Default: 4.
+--memory-gb INTEGER        plasmidSPAdes memory limit in GB. Default: 16.
+--parallel-samples INTEGER Samples to download/assemble/reconstruct/score concurrently.
+                           Default: 1 (sequential, the safe starting point).
+--parallel-tools INTEGER   Independent stage-4 tools to run concurrently per sample
+                           (mob_recon, platon, plasmidspades, gplas2_external;
+                           gplas2_mob still always waits for that sample's mob_recon).
+                           Default: 1 (sequential).
 --assembler NAME        spades or unicycler. Default: spades.
 --min-read-len INTEGER  Minimum retained read length after fastp. Default: 50.
 --minimap2-preset NAME  Assembly alignment preset. Default: asm5.
 ```
+
+Every stage still behaves exactly as before at the defaults (1, 1): one sample, one
+tool, at a time, and a failure aborts the run immediately. Raising either only changes
+wall-clock time, never the science -- the same tools run with the same inputs and
+produce the same scores, just overlapped. Stage 4's `THREADS` is shared by every tool
+unless you set `MOB_RECON_THREADS`, `PLATON_THREADS`, `PLASMIDSPADES_THREADS`, or
+`GPLAS_THREADS` individually (each defaults to `THREADS`); once several tools run at
+once, giving each of them the full thread count oversubscribes the CPU and can make
+the run slower, not faster. A preflight warning fires (but never blocks) when the
+requested concurrency's total threads or memory clearly exceeds the host.
+
+Downloads (stage 1) are network-bound and usually tolerate the most concurrency;
+assembly (stage 3, SPAdes/Unicycler) is memory-hungry and should be raised the most
+conservatively; scoring (stage 5) is lightweight and cheap to parallelize. Start
+conservatively (`--parallel-samples 2`), watch `results/tool_status.tsv` for
+`runtime_seconds`/`peak_rss_kb`, and raise it only after confirming the host has
+headroom -- back off if it starts swapping.
+
+Above `--parallel-samples 1`, one sample's download or assembly failure no longer
+aborts sibling samples already in flight (concurrency means work already started
+keeps going), but every failure is still collected, named in the log, and the run
+still exits non-zero -- nothing fails silently.
 
 ### Tool selection
 

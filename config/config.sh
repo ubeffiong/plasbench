@@ -41,6 +41,25 @@ export ANALYSIS_TRACK="${ANALYSIS_TRACK:-short_read}"
 export THREADS="${THREADS:-4}"
 export MEMORY_GB="${MEMORY_GB:-16}"           # SPAdes memory cap (GB)
 
+# --- Parallelism ---------------------------------------------------------
+# Every default below (1) is exactly today's fully sequential behavior: one
+# sample at a time, one tool at a time. Raise them only after checking your
+# machine's core/RAM budget below can actually support it -- e.g. 2 parallel
+# samples x 2 parallel tools x THREADS=4 wants 16 CPU threads at once.
+export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 1, 3, 4, 5
+export MAX_PARALLEL_TOOLS="${MAX_PARALLEL_TOOLS:-1}"       # independent tools within one sample, stage 4
+# Per-tool thread counts. Each defaults to $THREADS (today's behavior: every
+# tool gets the same value); set these independently once you run tools
+# concurrently, so N concurrent tools don't each ask for all of $THREADS.
+export MOB_RECON_THREADS="${MOB_RECON_THREADS:-$THREADS}"
+export PLATON_THREADS="${PLATON_THREADS:-$THREADS}"
+export PLASMIDSPADES_THREADS="${PLASMIDSPADES_THREADS:-$THREADS}"
+export GPLAS_THREADS="${GPLAS_THREADS:-$THREADS}"          # gplas itself is single-threaded; governs its classifier-prep step
+# Per-tool memory estimates (GB), used only for the oversubscription warning
+# in lib.sh's warn_resource_oversubscription -- advisory, never enforced.
+export PLASMIDSPADES_MEMORY_GB="${PLASMIDSPADES_MEMORY_GB:-$MEMORY_GB}"
+export ASSEMBLY_MEMORY_GB="${ASSEMBLY_MEMORY_GB:-$MEMORY_GB}"  # stage 3 (SPAdes/Unicycler)
+
 # --- Which tools to benchmark (1 = on, 0 = off) ------------------------------
 # Turn tools off if you have not installed them yet.
 export RUN_MOB_RECON="${RUN_MOB_RECON:-1}"
