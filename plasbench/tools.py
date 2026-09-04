@@ -15,6 +15,8 @@ Resolution order for the pipeline root, first hit wins:
 3. ``<sys.prefix>/share/plasbench`` -- the same location when the environment is
    active but ``CONDA_PREFIX`` is unset, e.g. under a Galaxy job runner.
 4. The repository checkout containing this file -- the developer case.
+5. The current working directory -- an unpacked release archive that has been
+   pip-installed, where the package is in site-packages but the pipeline is not.
 
 Each wrapper execs the underlying script with the current interpreter, so
 arguments, exit codes and stderr pass straight through and nothing needs to be
@@ -46,8 +48,14 @@ def _candidates():
 
     yield Path(sys.prefix) / "share" / "plasbench", "sys.prefix"
 
-    # plasbench/tools.py -> plasbench/ -> repository root
+    # plasbench/tools.py -> plasbench/ -> repository root. This is the case
+    # where PlasBench is run straight from a checkout without installing.
     yield Path(__file__).resolve().parent.parent, "source checkout"
+
+    # Finally the working directory: after `pip install .` inside an unpacked
+    # release archive, the package lives in site-packages while the pipeline is
+    # still in the directory the user is standing in.
+    yield Path.cwd(), "current directory"
 
 
 def pipeline_root() -> Path:
