@@ -68,13 +68,23 @@ distribution; it defaults to conda-forge and carries no commercial licensing con
 #### Step 2 — Download PlasBench
 
 ```bash
-curl -L -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.1/plasbench-0.1.1.tar.gz
-curl -L -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.1/plasbench-0.1.1.tar.gz.sha256
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.1/plasbench-0.1.1.tar.gz
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.1/plasbench-0.1.1.tar.gz.sha256
 sha256sum -c plasbench-0.1.1.tar.gz.sha256      # must print: OK
 ```
 
-*Expected:* `plasbench-0.1.1.tar.gz: OK`. If the checksum does not match, delete the file
-and download it again — do not install it.
+*Expected:* `plasbench-0.1.1.tar.gz: OK`.
+
+**The `-f` matters.** Without it, `curl` treats a missing release as success and writes
+GitHub's short "Not Found" page *into* the file, leaving you with a 9-byte
+`plasbench-0.1.1.tar.gz` and the confusing error
+`sha256sum: no properly formatted checksum lines found`. With `-f`, curl fails loudly and
+writes nothing. If you see `curl: (22) The requested URL returned error: 404`, the release
+has not been published yet — see the note at the end of this section.
+
+If the checksum does not match, delete the file and download it again — do not install it.
+Sanity check: the archive is roughly 700 KB. If `ls -l` shows a handful of bytes, you
+downloaded an error page, not PlasBench.
 
 #### Step 3 — Install
 
