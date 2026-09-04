@@ -3,14 +3,19 @@
 #   (a) the COMPLETE reference assembly + its sequence report (ground truth)
 #   (b) the matched Illumina reads from SRA
 #
+# A sample whose download fails is RECORDED and SKIPPED, not fatal: one
+# transient SRA error must not discard hours of successful downloads in a
+# 32-sample cohort. Failures land in results/download_status.tsv; stage 3
+# skips a sample with no reads and stage 4 records its tools as skipped --
+# the same contract those stages already follow. This stage aborts only if NO
+# sample downloaded at all, since then there is nothing to benchmark.
+#
+# Every fetch is retried (config/config.sh: NETWORK_RETRIES) before a sample is
+# given up on.
+#
 # Parallelism (config/config.sh: MAX_PARALLEL_SAMPLES): downloads are network-
 # bound, not CPU-bound, so this is usually the safest stage to raise well
-# above the reconstruction-stage concurrency. At the default of 1, samples
-# run one at a time exactly as before, and a download failure aborts the
-# whole stage immediately (matching today's fail-fast behavior). Above 1,
-# samples download concurrently; a failure no longer aborts sibling downloads
-# already in flight (that is what concurrency means), but it is still
-# collected and reported, and the stage still exits non-zero overall.
+# above the reconstruction-stage concurrency.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
@@ -18,6 +23,16 @@ source "$HERE/lib.sh"
 
 [[ -f "$SAMPLE_SHEET" ]] || die "sample sheet not found: $SAMPLE_SHEET"
 warn_resource_oversubscription "stage 1 (download)" "$MAX_PARALLEL_SAMPLES" "$THREADS"
+
+STATUS="$RESULTS_DIR/download_status.tsv"
+mkdir -p "$RESULTS_DIR" "$LOG_DIR"
+reset_shard_dir "download"
+STATUS_SHARDS="$(shard_dir "download")"
+
+# One shard file per sample, so concurrent jobs never contend for one file.
+record_download() {
+    printf '%s\t%s\t%s\n' "$1" "$2" "$3" > "$STATUS_SHARDS/$1.tsv"
+}
 
 download_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
@@ -67,18 +82,30 @@ download_sample() {
     else
         log "  downloading assembly $ASM ..."
         local ZIP="$SDIR/ncbi.zip"
-        datasets download genome accession "$ASM" \
-            --include genome,seq-report,gff3 \
-            --filename "$ZIP" 2> "$LOG_DIR/${SAMPLE}.datasets.log" \
-            || die "datasets download failed for $ASM (see $LOG_DIR/${SAMPLE}.datasets.log)"
+        if ! retry_network "datasets download for $ASM" \
+                datasets download genome accession "$ASM" \
+                --include genome,seq-report,gff3 \
+                --filename "$ZIP" 2> "$LOG_DIR/${SAMPLE}.datasets.log"; then
+            warn "reference download failed for $SAMPLE; skipping this sample"
+            record_download "$SAMPLE" "failed" "datasets download failed for $ASM; see $LOG_DIR/${SAMPLE}.datasets.log"
+            return 0
+        fi
         rm -rf "$SDIR/ncbi"; mkdir -p "$SDIR/ncbi"
         unzip -o -q "$ZIP" -d "$SDIR/ncbi"
         # locate the genomic FASTA and the sequence report inside the bundle
         local FNA SR
         FNA=$(find "$SDIR/ncbi" -name '*_genomic.fna' -o -name '*.fna' | head -n1)
         SR=$(find "$SDIR/ncbi" -name 'sequence_report.jsonl' | head -n1)
-        [[ -s "$FNA" ]] || die "no genomic FASTA found in bundle for $ASM"
-        [[ -s "$SR"  ]] || die "no sequence_report.jsonl found for $ASM (was --include seq-report used?)"
+        if [[ ! -s "$FNA" ]]; then
+            warn "no genomic FASTA in the bundle for $ASM; skipping $SAMPLE"
+            record_download "$SAMPLE" "failed" "no genomic FASTA in bundle for $ASM"
+            return 0
+        fi
+        if [[ ! -s "$SR" ]]; then
+            warn "no sequence_report.jsonl for $ASM; skipping $SAMPLE (truth labels need it)"
+            record_download "$SAMPLE" "failed" "no sequence_report.jsonl for $ASM"
+            return 0
+        fi
         cp "$FNA" "$REF"
         cp "$SR" "$REPORT"
         rm -f "$ZIP"
@@ -90,21 +117,35 @@ download_sample() {
         log "  reads already present, skipping download"
     else
         log "  prefetching $SRA ..."
-        prefetch -O "$SDIR" "$SRA" > "$LOG_DIR/${SAMPLE}.prefetch.log" 2>&1 \
-            || die "prefetch failed for $SRA"
+        if ! retry_network "prefetch $SRA" \
+                prefetch -O "$SDIR" "$SRA" > "$LOG_DIR/${SAMPLE}.prefetch.log" 2>&1; then
+            warn "prefetch failed for $SAMPLE ($SRA); skipping this sample"
+            record_download "$SAMPLE" "failed" "prefetch failed for $SRA; see $LOG_DIR/${SAMPLE}.prefetch.log"
+            return 0
+        fi
         log "  extracting FASTQ (fasterq-dump) ..."
-        fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" \
-            "$SDIR/$SRA/$SRA.sra" > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1 \
-            || fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" "$SRA" \
-               > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1 \
-            || die "fasterq-dump failed for $SRA"
+        if ! fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" \
+                "$SDIR/$SRA/$SRA.sra" > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1 \
+             && ! retry_network "fasterq-dump $SRA" \
+                    fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" "$SRA" \
+                    > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1; then
+            warn "fasterq-dump failed for $SAMPLE ($SRA); skipping this sample"
+            record_download "$SAMPLE" "failed" "fasterq-dump failed for $SRA; see $LOG_DIR/${SAMPLE}.fasterq.log"
+            return 0
+        fi
         # compress
         [[ -f "$SDIR/${SRA}_1.fastq" ]] && pigz -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || true
         [[ -f "$SDIR/${SRA}_2.fastq" ]] && pigz -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || true
         rm -rf "$SDIR/$SRA"   # remove .sra cache dir
-        [[ -s "$R1" && -s "$R2" ]] || die "expected paired FASTQ not produced for $SRA (single-end run? edit pipeline)"
+        if [[ ! -s "$R1" || ! -s "$R2" ]]; then
+            warn "paired FASTQ not produced for $SRA (single-end run?); skipping $SAMPLE"
+            record_download "$SAMPLE" "failed" "paired FASTQ not produced for $SRA (single-end run?)"
+            return 0
+        fi
         log "  reads -> $R1 , $R2"
     fi
+
+    record_download "$SAMPLE" "ok" ""
 }
 
 declare -A PIDS
@@ -122,13 +163,33 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
 done < <(read_samples "$SAMPLE_SHEET")
 
 if [[ "$MAX_PARALLEL_SAMPLES" -gt 1 ]]; then
-    failed=()
     for sample in "${!PIDS[@]}"; do
-        wait "${PIDS[$sample]}" || failed+=("$sample")
+        wait "${PIDS[$sample]}" || true
     done
-    if [[ ${#failed[@]} -gt 0 ]]; then
-        die "download failed for: ${failed[*]} (see logs/<sample>.*.log for each)"
-    fi
 fi
 
-log "Stage 1 (download) complete."
+# Assemble the status table in sample-sheet order, so its rows read the same
+# however the parallel jobs happened to interleave.
+shards=()
+while IFS=$'\t' read -r SAMPLE _ _; do
+    [[ -z "${SAMPLE:-}" ]] && continue
+    shards+=("$STATUS_SHARDS/$SAMPLE.tsv")
+done < <(read_samples "$SAMPLE_SHEET")
+merge_shards "$STATUS" "$(printf 'sample\tstatus\treason')" "${shards[@]}"
+
+DOWNLOADED=$(awk -F'\t' 'NR>1 && $2=="ok"' "$STATUS" | wc -l)
+FAILED=$(awk -F'\t' 'NR>1 && $2=="failed"' "$STATUS" | wc -l)
+
+if [[ "$FAILED" -gt 0 ]]; then
+    warn "$FAILED sample(s) could not be downloaded and will be skipped:"
+    awk -F'\t' 'NR>1 && $2=="failed" {printf "    %s: %s\n", $1, $3}' "$STATUS" >&2
+    warn "Recorded in $STATUS. Re-running this stage retries only the failed samples."
+fi
+
+# Nothing downloaded at all means there is nothing to benchmark -- that, and
+# only that, is fatal.
+if [[ "$DOWNLOADED" -eq 0 ]]; then
+    die "no sample downloaded successfully; see $STATUS and logs/<sample>.*.log"
+fi
+
+log "Stage 1 (download) complete: $DOWNLOADED ok, $FAILED failed."

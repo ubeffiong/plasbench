@@ -38,6 +38,12 @@ export RECOMMENDATION_MIN_COVERAGE="${RECOMMENDATION_MIN_COVERAGE:-0.80}"
 export ANALYSIS_TRACK="${ANALYSIS_TRACK:-short_read}"
 
 # --- Compute -----------------------------------------------------------------
+# --- Network resilience ------------------------------------------------------
+# NCBI transfers fail transiently, and more often on a slow link. Stage 1
+# retries each fetch this many times before recording the sample as failed.
+export NETWORK_RETRIES="${NETWORK_RETRIES:-3}"
+export NETWORK_RETRY_DELAY_SECONDS="${NETWORK_RETRY_DELAY_SECONDS:-15}"
+
 export THREADS="${THREADS:-4}"
 export MEMORY_GB="${MEMORY_GB:-16}"           # SPAdes memory cap (GB)
 

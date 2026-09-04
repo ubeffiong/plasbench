@@ -154,3 +154,29 @@ validate_sample_sheet() {
         }
     ' curated="${REQUIRE_CURATED_METADATA:-1}" "$sheet" || die "fix sample-sheet errors in $sheet"
 }
+
+# retry_network DESCRIPTION -- COMMAND...
+# Run a network command, retrying with linear backoff. NCBI's SRA and datasets
+# endpoints fail transiently, and on a slow or lossy link they fail often. A
+# single dropped transfer should not end a multi-hour cohort download, so every
+# fetch goes through here. Attempts and delay are configurable via
+# NETWORK_RETRIES and NETWORK_RETRY_DELAY_SECONDS.
+retry_network() {
+    local what="$1"; shift
+    local attempts="${NETWORK_RETRIES:-3}"
+    local delay="${NETWORK_RETRY_DELAY_SECONDS:-15}"
+    local n=1
+    while true; do
+        if "$@"; then
+            [[ "$n" -gt 1 ]] && log "  $what succeeded on attempt $n/$attempts"
+            return 0
+        fi
+        if [[ "$n" -ge "$attempts" ]]; then
+            warn "  $what failed after $n attempt(s)"
+            return 1
+        fi
+        warn "  $what failed (attempt $n/$attempts); retrying in $((delay * n))s"
+        sleep $((delay * n))
+        n=$((n + 1))
+    done
+}
