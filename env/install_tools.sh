@@ -7,7 +7,12 @@ ENV_NAME="plasbench"; PROFILE="core"
 if command -v micromamba >/dev/null 2>&1; then SOLVER=(micromamba install -y -n "$ENV_NAME" -c conda-forge -c bioconda); CREATE=(micromamba create -y -n "$ENV_NAME")
 elif command -v mamba >/dev/null 2>&1; then SOLVER=(mamba install -y -n "$ENV_NAME" -c conda-forge -c bioconda); CREATE=(mamba create -y -n "$ENV_NAME")
 elif command -v conda >/dev/null 2>&1; then SOLVER=(conda install -y -n "$ENV_NAME" -c conda-forge -c bioconda); CREATE=(conda create -y -n "$ENV_NAME")
-else echo "ERROR: install micromamba, mamba, or conda first." >&2; exit 1; fi
+else
+    echo "ERROR: install micromamba, mamba, or conda first:" >&2
+    echo "    bash env/bootstrap_conda.sh      # detects, offers to install it for you" >&2
+    echo "  (or plasbench install-conda, or see INSTALL.md for a manual install)" >&2
+    exit 1
+fi
 case "$PROFILE" in
  locked) LOCK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/environment.lock.yml"; grep -q '^@EXPLICIT$' "$LOCK" || { echo "ERROR: $LOCK is not a Conda @EXPLICIT lock. Regenerate with: bash env/lock_environment.sh" >&2; exit 2; }; "${CREATE[@]}" $(awk '!/^(@|#|$)/ {print}' "$LOCK"); exit;;
  core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk);;

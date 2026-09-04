@@ -9,7 +9,9 @@ if command -v mamba >/dev/null 2>&1; then
 elif command -v conda >/dev/null 2>&1; then
     SOLVER=conda
 else
-    echo "ERROR: neither mamba nor conda found. Install Miniforge first (see INSTALL.md)." >&2
+    echo "ERROR: neither mamba nor conda found. Install Miniforge first:" >&2
+    echo "    bash env/bootstrap_conda.sh      # detects, offers to install it for you" >&2
+    echo "  (or plasbench install-conda, or see INSTALL.md for a manual install)" >&2
     exit 1
 fi
 

@@ -7,11 +7,24 @@ the standard library, so they run even without the conda env — but the bio-too
 
 ## 1. Install Miniforge (conda/mamba)
 
-If you don't already have conda:
+If you don't already have conda, let PlasBench check and offer to install it for you:
 
 ```bash
-wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-bash Miniforge3-$(uname)-$(uname -m).sh -b -p "$HOME/miniforge3"
+bash env/bootstrap_conda.sh          # or: plasbench install-conda, once pip-installed
+```
+
+It detects an existing `conda`/`mamba`/`micromamba` and does nothing if one is found;
+otherwise it downloads the correct Miniforge installer for your platform, verifies its
+published SHA-256 checksum, and asks for confirmation before installing (pass `--yes`
+to skip the prompt for scripted/CI use, or `--prefix DIR` to change the install
+location from the default `$HOME/miniforge3`).
+
+To install manually instead:
+
+```bash
+os="$(uname -s)"; [ "$os" = Darwin ] && os=MacOSX   # asset names use MacOSX, not Darwin
+wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-${os}-$(uname -m).sh"
+bash "Miniforge3-${os}-$(uname -m).sh" -b -p "$HOME/miniforge3"
 source "$HOME/miniforge3/etc/profile.d/conda.sh"
 conda config --set channel_priority strict
 ```

@@ -98,6 +98,7 @@ def main(argv=None):
         prog="plasbench",
         description="PlasBench: benchmark plasmid-reconstruction tools against complete references.",
         epilog="Examples:\n"
+               "  plasbench install-conda\n"
                "  plasbench install-tools core\n"
                "  plasbench install-tools all\n"
                "  plasbench demo\n"
@@ -114,7 +115,12 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
-    sub.add_parser("check", help="Check configured runtime dependencies.")
+    check_parser = sub.add_parser(
+        "check",
+        help="Check configured runtime dependencies (tools and databases); offers to install what's missing.",
+    )
+    check_parser.add_argument("--yes", action="store_true",
+                              help="Install missing tools/databases without an interactive confirmation prompt.")
     cohort_parser = sub.add_parser("validate-cohort", help="Validate a cohort schema or verify its NCBI-linked pairs.")
     cohort_parser.add_argument("--samples", type=Path, required=True, help="Cohort TSV to validate.")
     cohort_parser.add_argument("--online", action="store_true", help="Verify NCBI assembly/SRA linkage and library metadata.")
@@ -140,6 +146,12 @@ def main(argv=None):
     review_parser.add_argument("--out-dir", type=Path, required=True)
     review_parser.add_argument("--max-per-bioproject", type=int, default=3)
     review_parser.add_argument("--max-per-organism", type=int, default=8)
+    conda_parser = sub.add_parser(
+        "install-conda",
+        help="Check for conda/mamba/micromamba; offer to install Miniforge if none is found.",
+    )
+    conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
+    conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
     install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
@@ -250,7 +262,10 @@ def main(argv=None):
     elif args.command == "test":
         code = run([bash_command(), "test/run_tests.sh"], root)
     elif args.command == "check":
-        code = run([bash_command(), "scripts/run_all.sh", "0"], root)
+        command = [bash_command(), "scripts/00_setup.sh"]
+        if args.yes:
+            command.append("--yes")
+        code = run(command, root)
     elif args.command == "validate-cohort":
         command = [sys.executable, "python/validate_cohort.py", "--samples", str(args.samples)]
         if args.online:
@@ -286,6 +301,13 @@ def main(argv=None):
         code = run(command, root)
     elif args.command == "review-candidates":
         code = run([sys.executable, "python/review_candidate_cohort.py", "--candidates", str(args.candidates), "--out-dir", str(args.out_dir), "--max-per-bioproject", str(args.max_per_bioproject), "--max-per-organism", str(args.max_per_organism)], root)
+    elif args.command == "install-conda":
+        command = [bash_command(), "env/bootstrap_conda.sh"]
+        if args.yes:
+            command.append("--yes")
+        if args.prefix:
+            command.extend(["--prefix", str(args.prefix)])
+        code = run(command, root)
     elif args.command == "install-tools":
         code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.profile], root)
     elif args.command == "depth-ladder":
