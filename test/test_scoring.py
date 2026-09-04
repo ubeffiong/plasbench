@@ -185,6 +185,33 @@ def main():
     ok &= (int(r4["TP_bp"]) == 150)
     print(f"  out-of-bounds PAF is clipped to 150 bp ? {r4['TP_bp']} -> {int(r4['TP_bp'])==150}")
 
+    # A record aligning to a target absent from truth.tsv (e.g. a reference
+    # contig the sequence report never classified) is a different failure mode
+    # from one that does not align at all, and must not be folded into
+    # unmapped_pred_bp -- it has its own off_truth_pred_bp counter, and must
+    # not move TP/FP either, since truth has no label for that target.
+    paf5 = os.path.join(tmp, "off_truth.paf")
+    pred5 = os.path.join(tmp, "off_truth.fasta")
+    out5 = os.path.join(tmp, "scores5.tsv")
+    with open(paf5, "w") as fh:
+        # untruthed_contig aligns to "plasmidC", which truth.tsv never labels.
+        fh.write("pred1\t2000\t0\t2000\t+\tplasmidA\t2000\t0\t2000\t2000\t2000\t60\n")
+        fh.write("untruthed\t400\t0\t400\t+\tplasmidC\t5000\t0\t400\t400\t400\t60\n")
+    write_fasta(pred5, {"pred1": 2000, "untruthed": 400, "unmapped": 100})
+    subprocess.run(
+        [sys.executable, SCORER, "--truth", truth, "--paf", paf5, "--pred-fasta", pred5,
+         "--sample", "SYNTH", "--tool", "off-truth", "--out", out5],
+        check=True,
+    )
+    with open(out5) as fh:
+        r5 = dict(zip(fh.readline().strip().split("\t"), fh.readline().strip().split("\t")))
+    ok &= (int(r5["off_truth_pred_bp"]) == 400 and int(r5["unmapped_pred_bp"]) == 100
+           and int(r5["TP_bp"]) == 2000 and int(r5["FP_bp"]) == 0)
+    print(f"  off-truth alignment counted separately from unmapped ? "
+          f"off_truth={r5['off_truth_pred_bp']} unmapped={r5['unmapped_pred_bp']} "
+          f"TP={r5['TP_bp']} FP={r5['FP_bp']} -> "
+          f"{int(r5['off_truth_pred_bp'])==400 and int(r5['unmapped_pred_bp'])==100 and int(r5['TP_bp'])==2000 and int(r5['FP_bp'])==0}")
+
     # Invalid PAFs must fail with a concise scorer error rather than an index
     # exception that leaves a user guessing which input needs repair.
     malformed = os.path.join(tmp, "malformed.paf")

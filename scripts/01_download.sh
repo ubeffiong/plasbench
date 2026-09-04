@@ -18,26 +18,41 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     REPORT="$SDIR/sequence_report.jsonl"
     R1="$SDIR/${SRA}_1.fastq.gz"
     R2="$SDIR/${SRA}_2.fastq.gz"
+    # An operational sample with no known truth reference leaves this column
+    # blank (or "NA"): it has reads to reconstruct from but no complete
+    # assembly to score against, so skip the reference/sequence-report half
+    # of this stage entirely and fetch reads only.
+    HAS_REFERENCE=1
+    [[ -z "$ASM" || "$ASM" == "NA" ]] && HAS_REFERENCE=0
+
     if [[ "$LOCAL_INPUTS_ONLY" == "1" ]]; then
         missing=()
-        [[ -s "$REF" ]] || missing+=("$REF")
-        [[ -s "$REPORT" || -s "$SDIR/truth.tsv" ]] || missing+=("$REPORT or $SDIR/truth.tsv")
+        if [[ "$HAS_REFERENCE" -eq 1 ]]; then
+            [[ -s "$REF" ]] || missing+=("$REF")
+            [[ -s "$REPORT" || -s "$SDIR/truth.tsv" ]] || missing+=("$REPORT or $SDIR/truth.tsv")
+        fi
         [[ -s "$R1" ]] || missing+=("$R1")
         [[ -s "$R2" ]] || missing+=("$R2")
         if [[ ${#missing[@]} -gt 0 ]]; then
             die "local-inputs mode is missing for $SAMPLE: ${missing[*]}"
         fi
-        log "  local reference, truth/report, and paired reads verified; download skipped"
+        if [[ "$HAS_REFERENCE" -eq 1 ]]; then
+            log "  local reference, truth/report, and paired reads verified; download skipped"
+        else
+            log "  local paired reads verified (no accession: reference/truth skipped); download skipped"
+        fi
         continue
     fi
 
     # Download clients are only required when this sample actually needs them.
-    need datasets
+    [[ "$HAS_REFERENCE" -eq 1 ]] && need datasets
     need prefetch
     need fasterq-dump
 
     # ---- (a) reference assembly + sequence report ----
-    if [[ -s "$REF" && -s "$REPORT" ]]; then
+    if [[ "$HAS_REFERENCE" -eq 0 ]]; then
+        log "  no assembly_accession given; skipping reference download (operational sample)"
+    elif [[ -s "$REF" && -s "$REPORT" ]]; then
         log "  reference already present, skipping download"
     else
         log "  downloading assembly $ASM ..."

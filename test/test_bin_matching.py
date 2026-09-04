@@ -15,7 +15,7 @@ def paf(query, target):
     return f"{query}\t100\t0\t100\t+\t{target}\t100\t0\t100\t100\t100\t60\n"
 
 
-def run(alignments, memberships):
+def run(alignments, memberships, extra_args=()):
     with tempfile.TemporaryDirectory() as directory:
         truth = os.path.join(directory, "truth.tsv")
         with open(truth, "w") as handle:
@@ -32,6 +32,7 @@ def run(alignments, memberships):
         subprocess.run([
             sys.executable, SCRIPT, "--truth", truth, "--paf", paf_path,
             "--bins", bins_path, "--out", out, "--summary", summary_path,
+            *extra_args,
         ], check=True)
         summary = next(csv.DictReader(open(summary_path), delimiter="\t"))
         matches = list(csv.DictReader(open(out), delimiter="\t"))
@@ -79,6 +80,18 @@ def main():
     unmatched, unmatched_matches = run(paf("a", "p1"), "bin_id\tsequence_id\nA\ta\nB\tunmapped\n")
     assert unmatched["unmatched_bins"] == "1"
     assert any(row["bin_id"] == "B" and row["match_status"] == "unmatched_bin" for row in unmatched_matches)
+
+    # A low-MAPQ placement that base-level scoring would discard must not
+    # still count toward bin completeness: with no thresholds it matches;
+    # with the same alignment-quality gate score_plasmids.py uses, it must
+    # not (the low-MAPQ contig contributes no aligned bp to any plasmid).
+    low_mapq_alignment = "a\t100\t0\t100\t+\tp1\t100\t0\t100\t100\t100\t5\n"
+    lenient, _ = run(low_mapq_alignment, "bin_id\tsequence_id\nA\ta\n")
+    assert lenient["matched_bins"] == "1"
+    strict, strict_matches = run(low_mapq_alignment, "bin_id\tsequence_id\nA\ta\n",
+                                 extra_args=["--min-alignment-mapq", "20"])
+    assert strict["matched_bins"] == "0" and strict["unmatched_bins"] == "1"
+    assert all(row["aligned_bp"] in ("0", "") for row in strict_matches if row["bin_id"] == "A")
     print("ALL BIN MATCHING TESTS PASSED")
 
 

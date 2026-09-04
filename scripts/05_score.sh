@@ -118,6 +118,10 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         if [[ -s "$BINS" ]] && binning_capable "$tool"; then
             if ! python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" \
                 --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
+                --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
+                --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
+                --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
+                --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
                 --summary "$RDIR/${tool}.bin_summary.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
                 warn "bin scoring failed for $SAMPLE/$tool; retaining base-level score"
                 printf '%s\t%s\tbin_score\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$SCORE_FAILURES"
@@ -136,11 +140,7 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     # display payload. These are alignment-derived, not validated misassemblies.
     python3 "$HERE/../python/call_structural_variants.py" --truth "$TRUTH" --results-dir "$RESULTS_DIR"         --sample "$SAMPLE" --events-out "$RDIR/structural_events.tsv"         --summary-out "$RDIR/structural_summary.tsv"         --json-out "$RDIR/visualization/structural_calls.json"         >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 ||         warn "structural calling failed for $SAMPLE; scores are retained"
     python3 "$HERE/../python/build_visualization_data.py" --truth "$TRUTH" --reference "$REF" --results-dir "$RESULTS_DIR" \
-        --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
-        warn "visualization data generation failed for $SAMPLE; scores are retained"
         --sample "$SAMPLE" --amr-truth "$AMR" --feature-truth "$FEATURES" --protein-truth "$TRUTH_PROTEINS" --circular-truth "$CIRCULAR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" --max-nucleotide-bp "$VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP" \
-        --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
-        warn "visualization data generation failed for $SAMPLE; scores are retained"
         --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
         warn "visualization data generation failed for $SAMPLE; scores are retained"
 done < <(read_samples "$SAMPLE_SHEET")

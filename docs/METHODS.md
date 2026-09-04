@@ -55,6 +55,12 @@ Predicted sequence that does not align to the reference at all is reported as
 chromosome or plasmid origin (it usually reflects mis-assembly or contamination). Reporting
 it separately keeps the core precision metric conservative and interpretable.
 
+Predicted sequence that *does* align, but only to a reference sequence absent from
+`truth.tsv` (for example a contig the NCBI sequence report never classified), is a
+different failure mode and is reported separately again as `off_truth_pred_bp`. It is
+also excluded from FP for the same reason: it cannot be attributed to a chromosome or
+plasmid origin, since truth has no label for that target at all.
+
 ## Plasmid-level recovery
 In addition to base-level F1, PlasBench reports the number of true plasmid
 replicons and the number recovered to at least the configured fraction of their
