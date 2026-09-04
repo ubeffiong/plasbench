@@ -15,7 +15,8 @@ dependencies:
   # --- plasmid reconstruction tools under test ---
   - mob_suite              # mob_recon
   - platon                 # contig-level plasmid classification
-  # gplas is installed separately (see INSTALL.md) — it is nextflow/R based
+  # gplas is off by default (RUN_GPLAS2_MOB/RUN_GPLAS2_EXTERNAL); install it
+  # separately with: plasbench install-tools gplas (see INSTALL.md)
   # --- scoring / mapping ---
   - minimap2               # align predicted plasmids back to the reference
   - samtools               # convenience (sorting/indexing if you extend)

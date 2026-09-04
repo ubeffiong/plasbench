@@ -12,3 +12,7 @@ __pycache__/
 build/
 *.egg-info/
 !config/accessions.tsv
+
+# Release archives are build output, produced by `make dist` and attached to
+# GitHub Releases; they are not committed.
+dist/

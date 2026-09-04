@@ -133,11 +133,23 @@ Promote one to tier A by reviewing its publication, recording it in
 `source_study`, and re-running `--online --write-lock`.
 
 ```bash
-plasbench run --samples cohorts/public-v1.tsv    # reproducible headline results
-plasbench run --samples cohorts/public-v2.tsv    # broader coverage
+plasbench run --cohort public-v1    # reproducible headline results
+plasbench run --cohort public-v2    # broader coverage
 
 plasbench validate-cohort --samples cohorts/public-v2.tsv \
   --verify-lock cohorts/public-v2.lock.json
+```
+
+`--cohort NAME` is shorthand for `--samples cohorts/NAME.tsv` and accepts
+either panel above (or one you add under `cohorts/`); it is equivalent to the
+explicit `--samples` form otherwise. Add `--write-script FILE` to either
+command to see and edit the exact commands PlasBench would run instead of
+running them immediately:
+
+```bash
+plasbench run --cohort public-v1 --write-script run_public_v1.sh
+# review or edit run_public_v1.sh, then:
+bash run_public_v1.sh
 ```
 
 Because the v2 additions are study-clustered (22 rows across 11 BioProjects),

@@ -21,7 +21,8 @@ case "$PROFILE" in
  long-read) PKGS=(flye mob_suite);;
  annotation) PKGS=(bakta);;
  annotation-prokka) PKGS=(prokka);;
- all) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk spades unicycler flye mob_suite platon bakta);;
+ gplas) PKGS=(gplas);;
+ all) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk spades unicycler flye mob_suite platon bakta gplas);;
  *) PKGS=("$PROFILE");;
 esac
 echo "[plasbench] installing into $ENV_NAME: ${PKGS[*]}"

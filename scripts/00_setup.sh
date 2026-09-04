@@ -89,10 +89,10 @@ if [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
     have platon && log "  [ok]   platon" || { warn "  [MISS] platon (RUN_PLATON=1)"; NEEDED_PROFILES["reconstruction"]=1; }
 fi
 if [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]]; then
-    have gplas && log "  [ok]   gplas (gplas2_mob)" || { warn "  [MISS] gplas (RUN_GPLAS2_MOB=1)"; UNFIXABLE+=("gplas: install separately (see INSTALL.md); not part of any install-tools profile"); CORE_OK=0; }
+    have gplas && log "  [ok]   gplas (gplas2_mob)" || { warn "  [MISS] gplas (RUN_GPLAS2_MOB=1)"; NEEDED_PROFILES["gplas"]=1; }
 fi
 if [[ "${RUN_GPLAS2_EXTERNAL:-0}" -eq 1 ]]; then
-    have gplas && log "  [ok]   gplas (gplas2_external)" || { warn "  [MISS] gplas (RUN_GPLAS2_EXTERNAL=1)"; UNFIXABLE+=("gplas: install separately (see INSTALL.md); not part of any install-tools profile"); CORE_OK=0; }
+    have gplas && log "  [ok]   gplas (gplas2_external)" || { warn "  [MISS] gplas (RUN_GPLAS2_EXTERNAL=1)"; NEEDED_PROFILES["gplas"]=1; }
 fi
 if [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]]; then
     check_tool flye long-read

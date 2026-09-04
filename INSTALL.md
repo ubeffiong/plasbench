@@ -71,17 +71,19 @@ populate the cache, or set `--database_directory` in `scripts/04_run_tools.sh`.
 
 ## 4. gplas2 modes (optional)
 
-Install gplas according to its current documentation. PlasBench uses it only
-through explicit classifier-backed modes, so it remains off by default:
+PlasBench uses it only through explicit classifier-backed modes, so it remains
+off by default. Install it the same way as any other optional tool:
 
 ```bash
-# install gplas per its README
+plasbench install-tools gplas
 # then enable RUN_GPLAS2_MOB=1 or RUN_GPLAS2_EXTERNAL=1 in config/config.sh
 ```
 `gplas2_mob` uses deterministic MOB-recon membership from the same assembly
 graph. `gplas2_external` requires one validated `<sample>.tsv` classifier table
 per graph. Both need an **assembly graph**; set `ASSEMBLER=unicycler` for the
-cleanest graphs.
+cleanest graphs. `bash scripts/00_setup.sh` (or `plasbench check`) detects a
+missing `gplas` binary whenever either mode is enabled and offers to install
+it for you, the same as it does for mob_recon or Platon.
 
 ---
 

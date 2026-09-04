@@ -81,13 +81,23 @@ plasbench validate-cohort --samples cohorts/public-v2.tsv --online \
 ## Running a panel
 
 ```bash
-plasbench run --samples cohorts/public-v1.tsv    # reproducible headline results
-plasbench run --samples cohorts/public-v2.tsv    # broader coverage
+plasbench run --cohort public-v1    # reproducible headline results
+plasbench run --cohort public-v2    # broader coverage
 ```
 
-The pipeline downloads source assemblies and reads on demand into the configured
-`data/` directory. Raw inputs are not committed: they are large and already
-publicly hosted by NCBI.
+`--cohort NAME` is shorthand for `--samples cohorts/NAME.tsv`; the explicit
+`--samples cohorts/public-v1.tsv` form still works identically. The pipeline
+downloads source assemblies and reads on demand into the configured `data/`
+directory. Raw inputs are not committed: they are large and already publicly
+hosted by NCBI.
+
+To see (or edit) the exact commands PlasBench would run instead of running
+them immediately, add `--write-script`:
+
+```bash
+plasbench run --cohort public-v1 --write-script run_public_v1.sh
+bash run_public_v1.sh   # after reviewing or editing it
+```
 
 ## Sources
 

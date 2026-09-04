@@ -196,9 +196,9 @@ plasbench check           # asks before installing anything
 plasbench check --yes     # installs every fixable gap without asking (CI/scripted use)
 ```
 
-A gap it cannot fix automatically (gplas, which installs outside conda; the
-base Python/unzip packages, which come from `env/setup_conda.sh` itself) is
-reported with a pointer instead. Since a freshly installed tool is not on
+A gap it cannot fix automatically (the base Python/unzip packages, which come
+from `env/setup_conda.sh` itself) is reported with a pointer instead. Since a
+freshly installed tool is not on
 this shell's `PATH` until you `conda activate plasbench` again (or open a new
 shell after a conda bootstrap), `plasbench check` always exits non-zero after
 attempting a fix and asks you to re-run it to confirm -- it never assumes an
@@ -329,13 +329,14 @@ plasbench install-tools reconstruction
 plasbench install-tools long-read
 plasbench install-tools annotation
 plasbench install-tools annotation-prokka
+plasbench install-tools gplas
 plasbench install-tools all
 plasbench install-tools --env myenv mob_suite
 ```
 
 `core` installs NCBI download, QC, and minimap2 tools; `assembly` installs
-SPAdes/Unicycler; `reconstruction` installs MOB-suite/Platon. Install `gplas`
-separately with its documented dependencies. `RUN_GPLAS2_MOB=1` then seeds
+SPAdes/Unicycler; `reconstruction` installs MOB-suite/Platon; `gplas` installs
+gplas. `RUN_GPLAS2_MOB=1` then seeds
 gplas with deterministic MOB-recon membership from the same assembly graph and
 writes a provenance JSON; these seed values are hard labels, not calibrated
 probabilities. `RUN_GPLAS2_EXTERNAL=1` accepts a validated external classifier
@@ -427,6 +428,7 @@ Examples:
 
 ```bash
 plasbench run --samples my_samples.tsv --threads 8
+plasbench run --cohort public-v1 --threads 8
 plasbench run 3 4 5 6 --platon off --assembler unicycler
 plasbench report --results-dir results
 plasbench --project-root /path/to/plasbench demo
@@ -438,6 +440,11 @@ plasbench --project-root /path/to/plasbench demo
 
 ```text
 --samples PATH          Sample-sheet TSV; default: config/accessions.tsv.
+--cohort NAME           Shorthand for --samples cohorts/NAME.tsv (e.g. --cohort
+                       public-v1); mutually exclusive with --samples.
+--write-script FILE     Write the exact resolved commands to FILE instead of
+                       running them, so you can review or edit them before
+                       running it yourself with bash.
 --data-dir PATH         Downloaded references, reads, and assemblies.
 --results-dir PATH      Predictions, score tables, leaderboards, and HTML report.
 --log-dir PATH          Per-stage, per-tool, and mapping logs.

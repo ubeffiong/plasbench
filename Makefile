@@ -1,5 +1,5 @@
 # Convenience wrapper. `make help` to list targets.
-.PHONY: help demo test setup db check run download truth assemble tools score aggregate clean
+.PHONY: help demo test setup db check run download truth assemble tools score aggregate dist clean
 
 help:
 	@echo "Targets:"
@@ -24,6 +24,8 @@ assemble:  ; bash scripts/run_all.sh 3
 tools:     ; bash scripts/run_all.sh 4
 score:     ; bash scripts/run_all.sh 5
 aggregate: ; bash scripts/run_all.sh 6
+
+dist:      ; bash scripts/make_release.sh
 
 clean:
 	rm -rf results_demo tmp
