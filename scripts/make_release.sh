@@ -26,25 +26,48 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/$PKG"
 
-# Ship the working tree minus everything a user must not receive: git history,
-# downloaded data, run outputs, build residue and local credentials.
-tar -cf - \
-    --exclude=./.git \
-    --exclude=./.github \
-    --exclude=./.pytest_cache \
-    --exclude=./data \
-    --exclude=./results \
-    --exclude=./results_demo \
-    --exclude=./results_audit \
-    --exclude=./logs \
-    --exclude=./tmp \
-    --exclude=./build \
-    --exclude=./dist \
-    --exclude=./plasbench.egg-info \
-    --exclude=./.ncbi.env \
-    --exclude='*.pyc' \
-    --exclude=__pycache__ \
-    . | (cd "$STAGE/$PKG" && tar -xf -)
+# Prefer `git archive`: it exports the COMMITTED tree with .gitattributes
+# line-ending normalisation applied. Tarring the working tree instead is how a
+# Windows checkout shipped test/run_tests.sh with CRLF, which made `plasbench
+# test` die with "set: pipefail: invalid option name" on Linux. Fall back to the
+# working tree only when this is not a git checkout -- for example when
+# rebuilding from an already-unpacked release archive.
+if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "[make_release] exporting committed tree via git archive"
+    git -C "$ROOT" archive --format=tar HEAD | (cd "$STAGE/$PKG" && tar -xf -)
+else
+    echo "[make_release] not a git checkout; packaging the working tree"
+    tar -cf - \
+        --exclude=./.git \
+        --exclude=./.github \
+        --exclude=./.pytest_cache \
+        --exclude=./data \
+        --exclude=./results \
+        --exclude=./results_demo \
+        --exclude=./results_audit \
+        --exclude=./logs \
+        --exclude=./tmp \
+        --exclude=./build \
+        --exclude=./dist \
+        --exclude=./plasbench.egg-info \
+        --exclude=./.ncbi.env \
+        --exclude='*.pyc' \
+        --exclude=__pycache__ \
+        . | (cd "$STAGE/$PKG" && tar -xf -)
+fi
+
+# Refuse to ship CRLF rather than silently repairing it. A CR breaks a shell
+# script on Linux, and breaks the SHA-256 that `validate-cohort --verify-lock`
+# checks for a cohort TSV. If this fires, the fix belongs in .gitattributes
+# plus `git add --renormalize .`, not in the release build.
+CR="$(printf '\r')"
+OFFENDERS="$(grep -rlI -- "$CR" "$STAGE/$PKG" 2>/dev/null || true)"
+if [[ -n "$OFFENDERS" ]]; then
+    echo "[make_release] ERROR: CRLF line endings found in files that must be LF:" >&2
+    printf '    %s\n' $OFFENDERS >&2
+    echo "[make_release] fix with: git add --renormalize . && git commit" >&2
+    exit 1
+fi
 
 chmod +x "$STAGE/$PKG/install.sh" 2>/dev/null || true
 find "$STAGE/$PKG/scripts" "$STAGE/$PKG/adapters" "$STAGE/$PKG/env" \

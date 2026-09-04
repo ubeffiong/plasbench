@@ -51,7 +51,12 @@ benchmark. Copy each block in turn.
 > `wsl --install`, reboot, then open the **Ubuntu** app. Every command below goes in that
 > Linux shell, **not** in PowerShell or CMD.
 
-#### Step 1 — Get conda, once
+#### Step 1 — Get conda, once *(optional)*
+
+**You can skip this entirely.** If no conda is found, `./install.sh` in Step 3 detects that
+and offers to install Miniforge for you. Do it here only if you would rather install conda
+yourself first, or if `install.sh` reports that conda landed but is not yet on your `PATH`
+(open a new terminal and re-run it in that case).
 
 Skip this if `conda --version` already answers.
 
@@ -68,16 +73,16 @@ distribution; it defaults to conda-forge and carries no commercial licensing con
 #### Step 2 — Download PlasBench
 
 ```bash
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.2/plasbench-0.1.2.tar.gz
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.2/plasbench-0.1.2.tar.gz.sha256
-sha256sum -c plasbench-0.1.2.tar.gz.sha256      # must print: OK
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.3/plasbench-0.1.3.tar.gz
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.1.3/plasbench-0.1.3.tar.gz.sha256
+sha256sum -c plasbench-0.1.3.tar.gz.sha256      # must print: OK
 ```
 
-*Expected:* `plasbench-0.1.2.tar.gz: OK`.
+*Expected:* `plasbench-0.1.3.tar.gz: OK`.
 
 **The `-f` matters.** Without it, `curl` treats a missing release as success and writes
 GitHub's short "Not Found" page *into* the file, leaving you with a 9-byte
-`plasbench-0.1.2.tar.gz` and the confusing error
+`plasbench-0.1.3.tar.gz` and the confusing error
 `sha256sum: no properly formatted checksum lines found`. With `-f`, curl fails loudly and
 writes nothing. If you see `curl: (22) The requested URL returned error: 404`, the release
 has not been published yet — see the note at the end of this section.
@@ -89,8 +94,8 @@ downloaded an error page, not PlasBench.
 #### Step 3 — Install
 
 ```bash
-tar -xzf plasbench-0.1.2.tar.gz
-cd plasbench-0.1.2
+tar -xzf plasbench-0.1.3.tar.gz
+cd plasbench-0.1.3
 ./install.sh --tools
 ```
 
@@ -138,11 +143,11 @@ and check your disk and memory against [§3.0](#30-before-you-start--what-you-ne
 > files to a GitHub Release:
 >
 > ```bash
-> gh release create v0.1.2 dist/plasbench-0.1.2.tar.gz dist/plasbench-0.1.2.tar.gz.sha256 \
->   --title "PlasBench 0.1.2" --notes "First public release"
+> gh release create v0.1.3 dist/plasbench-0.1.3.tar.gz dist/plasbench-0.1.3.tar.gz.sha256 \
+>   --title "PlasBench 0.1.3" --notes "First public release"
 > ```
 >
-> …or push the `v0.1.2` tag, which triggers `.github/workflows/release.yml` to publish the
+> …or push the `v0.1.3` tag, which triggers `.github/workflows/release.yml` to publish the
 > PyPI distribution and the GHCR container image. PyPI trusted publishing must be
 > configured first — see [`docs/RELEASING.md`](docs/RELEASING.md).
 
@@ -328,9 +333,9 @@ browsing.
 
 ```bash
 # Download plasbench-<version>.tar.gz and its .sha256 from the Releases page, then:
-sha256sum -c plasbench-0.1.2.tar.gz.sha256     # must print: OK
-tar -xzf plasbench-0.1.2.tar.gz
-cd plasbench-0.1.2
+sha256sum -c plasbench-0.1.3.tar.gz.sha256     # must print: OK
+tar -xzf plasbench-0.1.3.tar.gz
+cd plasbench-0.1.3
 ```
 
 *Input:* the release archive. *Output:* a complete, runnable directory (~700 KB) holding
