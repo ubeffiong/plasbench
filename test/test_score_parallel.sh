@@ -6,6 +6,12 @@
 # sample's job actually finished first. Uses the REAL score_plasmids.py (this
 # is a timing/merge-correctness test, not a scoring-correctness one -- that
 # is test_scoring.py's job) with a fake minimap2 so it runs offline.
+#
+# Overlap is asserted from the stub aligner's own START/END log, not from
+# elapsed wall-clock time. On a loaded machine a genuinely parallel run can
+# take as long as a sequential one, so a stopwatch measures the machine
+# rather than the code, and the test fails for reasons that are not defects.
+# Counting how many aligners were alive at once answers the actual question.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -19,10 +25,6 @@ cat > "$TMP/bin/minimap2" <<EOF
 echo "START \$$" >> "$TMP/align_events.log"
 sleep $DELAY
 echo "END \$$" >> "$TMP/align_events.log"
-printf 'q1\t100\t0\t100\t+\tplasmidA\t100\t0\t100\t100\t100\t60\n'
-EOF
-#!/usr/bin/env bash
-sleep $DELAY
 printf 'q1\t100\t0\t100\t+\tplasmidA\t100\t0\t100\t100\t100\t60\n'
 EOF
 chmod +x "$TMP/bin/minimap2"
@@ -43,29 +45,42 @@ run_stage() {
         SAMPLE_SHEET="$TMP/sheet.tsv" REQUIRE_CURATED_METADATA=0 RUN_PROTEIN_ANNOTATION=0 \
         "$@" bash "$ROOT/scripts/05_score.sh" > "$TMP/stage.log" 2>&1
 }
-now_ms() { date +%s%N | cut -c1-13; }
+
+# Highest number of aligner processes alive simultaneously, from the stub's log.
+peak_concurrent() {
+    awk '$1 == "START" { n++; if (n > max) max = n }
+         $1 == "END"   { n-- }
+         END           { print max + 0 }' "$TMP/align_events.log"
+}
 
 mkdir -p "$TMP/logs"
 setup_sample s1 toolx; setup_sample s2 toolx; setup_sample s3 toolx
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR\ns2\tNA\tSRR\ns3\tNA\tSRR\n' > "$TMP/sheet.tsv"
 
-start=$(now_ms)
+: > "$TMP/align_events.log"
 run_stage env MAX_PARALLEL_SAMPLES=1 || { echo "FAIL: sequential baseline should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
-end=$(now_ms)
-sequential_ms=$(( end - start ))
+sequential_peak="$(peak_concurrent)"
 sequential_scores="$(cat "$TMP/results/scores.tsv")"
+
+[[ "$sequential_peak" -ge 1 ]] || {
+    echo "FAIL: the stub aligner never ran, so this test proves nothing" >&2
+    cat "$TMP/stage.log" >&2; exit 1; }
+[[ "$sequential_peak" -eq 1 ]] || {
+    echo "FAIL: MAX_PARALLEL_SAMPLES=1 ran $sequential_peak aligners at once; it must serialise" >&2
+    exit 1; }
+echo "MAX_PARALLEL_SAMPLES=1 serialises scoring (peak 1 concurrent aligner) -> PASS"
 
 rm -f "$TMP/results/scores.tsv" "$TMP/results/score_failures.tsv"
 
-start=$(now_ms)
+: > "$TMP/align_events.log"
 run_stage env MAX_PARALLEL_SAMPLES=3 || { echo "FAIL: parallel run should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
-end=$(now_ms)
-parallel_ms=$(( end - start ))
+parallel_peak="$(peak_concurrent)"
 
-[[ "$parallel_ms" -lt "$(( sequential_ms * 3 / 4 ))" ]] || {
-    echo "FAIL: MAX_PARALLEL_SAMPLES=3 (${parallel_ms}ms) was not clearly faster than sequential (${sequential_ms}ms)" >&2
+[[ "$parallel_peak" -ge 2 ]] || {
+    echo "FAIL: MAX_PARALLEL_SAMPLES=3 never had two aligners running at once (peak $parallel_peak)" >&2
+    cat "$TMP/align_events.log" >&2
     exit 1; }
-echo "MAX_PARALLEL_SAMPLES=3 overlaps independent scoring (${parallel_ms}ms vs ${sequential_ms}ms sequential) -> PASS"
+echo "MAX_PARALLEL_SAMPLES=3 overlaps independent scoring (peak $parallel_peak concurrent aligners) -> PASS"
 
 header_count="$(grep -c '^sample	tool	' "$TMP/results/scores.tsv" || true)"
 [[ "$header_count" -eq 1 ]] || { echo "FAIL: scores.tsv has $header_count header rows, expected exactly 1" >&2; cat "$TMP/results/scores.tsv" >&2; exit 1; }
