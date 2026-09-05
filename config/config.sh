@@ -36,6 +36,15 @@ export AMR_GENE_RECOVERY_THRESHOLD="${AMR_GENE_RECOVERY_THRESHOLD:-0.90}"
 export RECOMMENDATION_MIN_SAMPLES="${RECOMMENDATION_MIN_SAMPLES:-5}"
 export RECOMMENDATION_MIN_COVERAGE="${RECOMMENDATION_MIN_COVERAGE:-0.80}"
 export ANALYSIS_TRACK="${ANALYSIS_TRACK:-short_read}"
+# Optional filter for stage 5: when set, score only tools whose
+# config/tool_capabilities.tsv analysis_track matches this value. Leave empty
+# (default) to score every enabled tool under its own correctly-declared
+# track in one run -- each tool's track comes from the registry, not this
+# variable. NOTE: stage 5 rebuilds scores.tsv from scratch every run, so
+# setting a filter means tools OUTSIDE it get no row at all this run, not
+# merely "left unchanged" -- if you need a complete scores.tsv across every
+# track, run stage 5 once with this unset rather than once per track.
+export ANALYSIS_TRACK_FILTER="${ANALYSIS_TRACK_FILTER:-}"
 
 # --- Compute -----------------------------------------------------------------
 # --- Network resilience ------------------------------------------------------
@@ -111,6 +120,13 @@ export RUN_PLASMIDSPADES="${RUN_PLASMIDSPADES:-1}"
 export RUN_GPLAS2_MOB="${RUN_GPLAS2_MOB:-0}"
 export RUN_GPLAS2_EXTERNAL="${RUN_GPLAS2_EXTERNAL:-0}"
 export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
+# CIRCULARITY GUARD (see scripts/lib.sh: long_read_truth_eligible). Off by
+# default: a sample without a declared truth_independent_of_long_reads=yes is
+# skipped for flye_mob_recon rather than scored against its own input. Setting
+# this to 1 overrides that for every sample; the override is recorded in
+# tool_status.tsv so a result can never silently look independent when it was
+# not -- same policy as PLASSEMBLER_ALLOW_CIRCULAR_TRUTH below.
+export FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH="${FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH:-0}"
 
 # Plassembler assembles plasmids from HYBRID input: the short reads stage 1
 # already downloads, plus long reads staged as data/<sample>/$LONG_READS_FILE.
@@ -130,6 +146,23 @@ export PLASSEMBLER_CHROMOSOME_LENGTH="${PLASSEMBLER_CHROMOSOME_LENGTH:-1000000}"
 export PLASSEMBLER_ALLOW_CIRCULAR_TRUTH="${PLASSEMBLER_ALLOW_CIRCULAR_TRUTH:-0}"
 export GPLAS2_EXTERNAL_PREDICTIONS_DIR="${GPLAS2_EXTERNAL_PREDICTIONS_DIR:-}"
 export GPLAS2_MIN_CONTIG_LENGTH="${GPLAS2_MIN_CONTIG_LENGTH:-1000}"
+
+# Hybracter (long-only and/or hybrid modes). Each mode is its own opt-in tool:
+# a user may want one, the other, or both, since long-only vs hybrid recovery
+# differs materially on ONT data. Off by default. Both modes reuse
+# PLASSEMBLER_DB above (Hybracter's own Plassembler step needs the same PLSDB
+# database) rather than a second copy of the same ~500MB database.
+export RUN_HYBRACTER_LONG="${RUN_HYBRACTER_LONG:-0}"
+export RUN_HYBRACTER_HYBRID="${RUN_HYBRACTER_HYBRID:-0}"
+export HYBRACTER_THREADS="${HYBRACTER_THREADS:-$THREADS}"
+# Passed to hybracter's --chromosome_size (minimum contig length treated as
+# chromosome, before plasmid recovery runs on the rest). Must be smaller than
+# the smallest chromosome in the cohort. Mirrors PLASSEMBLER_CHROMOSOME_LENGTH.
+export HYBRACTER_CHROMOSOME_LENGTH="${HYBRACTER_CHROMOSOME_LENGTH:-1000000}"
+# CIRCULARITY GUARD overrides, one per mode (see scripts/lib.sh:
+# long_read_truth_eligible) -- same policy as PLASSEMBLER_ALLOW_CIRCULAR_TRUTH.
+export HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH="${HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH:-0}"
+export HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH="${HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH:-0}"
 
 # Reuse a completed tool result by default. Set FORCE_RERUN_TOOLS=1 to discard
 # completed per-tool output and run it again (for example after a tool upgrade).

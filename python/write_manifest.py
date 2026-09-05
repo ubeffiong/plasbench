@@ -16,7 +16,7 @@ from pathlib import Path
 
 TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycler",
          "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3",
-         "plassembler", "flye")
+         "plassembler", "flye", "hybracter", "trycycler")
 
 
 def tool_version():
@@ -115,7 +115,14 @@ def main():
                 "PLASMID_RECOVERY_THRESHOLD", "AMR_GENE_RECOVERY_THRESHOLD", "PLATON_DB",
                 "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_MAPQ", "MIN_ALIGNMENT_QUERY_COVERAGE",
                 "REPORT_MAPPING_AMBIGUITY",
-                "RECOMMENDATION_MIN_SAMPLES", "RECOMMENDATION_MIN_COVERAGE", "ANALYSIS_TRACK")
+                "RECOMMENDATION_MIN_SAMPLES", "RECOMMENDATION_MIN_COVERAGE", "ANALYSIS_TRACK", "ANALYSIS_TRACK_FILTER",
+                # Long-read/hybrid track (previously missing from this allow-list
+                # despite being real config knobs -- a reproducibility gap).
+                "RUN_FLYE_MOB_RECON", "FLYE_READ_TYPE", "FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH",
+                "RUN_PLASSEMBLER", "PLASSEMBLER_DB", "PLASSEMBLER_CHROMOSOME_LENGTH", "PLASSEMBLER_ALLOW_CIRCULAR_TRUTH",
+                "LONG_READS_FILE",
+                "RUN_HYBRACTER_LONG", "RUN_HYBRACTER_HYBRID", "HYBRACTER_CHROMOSOME_LENGTH",
+                "HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH", "HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     truth_tables = {}

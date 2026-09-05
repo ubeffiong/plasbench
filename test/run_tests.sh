@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for test in test_scoring.py test_make_truth.py test_bin_matching.py test_merge_bin_metrics.py test_amr_truth.py test_recommendation_validation.py test_gplas_classifier_validation.py test_mob_to_gplas_classifier.py test_cohort_validation.py test_aggregate.py test_report_composition.py test_recovery_vocabulary.py test_explorer_view.py test_tool_versions.py test_report_javascript.py test_visual_report.py test_structural_and_annotation.py test_protein_annotation.py test_depth_ladder.py test_container_hygiene.py test_selection.py test_visualization_data.py test_operational_selection.py test_download_estimate.py test_local_inputs.py; do
+for test in test_scoring.py test_make_truth.py test_bin_matching.py test_merge_bin_metrics.py test_amr_truth.py test_recommendation_validation.py test_gplas_classifier_validation.py test_mob_to_gplas_classifier.py test_cohort_validation.py test_aggregate.py test_report_composition.py test_recovery_vocabulary.py test_explorer_view.py test_tool_versions.py test_report_javascript.py test_visual_report.py test_structural_and_annotation.py test_protein_annotation.py test_depth_ladder.py test_container_hygiene.py test_selection.py test_visualization_data.py test_operational_selection.py test_download_estimate.py test_local_inputs.py test_tool_capabilities_registry.py test_discover_long_read_hint.py; do
     python3 "$HERE/$test"
 done
 bash "$HERE/test_gplas_adapter.sh"
@@ -11,9 +11,13 @@ bash "$HERE/test_parallel_execution.sh"
 bash "$HERE/test_download_parallel.sh"
 bash "$HERE/test_assemble_parallel.sh"
 bash "$HERE/test_score_parallel.sh"
+bash "$HERE/test_score_analysis_track.sh"
+bash "$HERE/test_run_all_default_stages.sh"
 bash "$HERE/test_bootstrap_conda.sh"
 bash "$HERE/test_setup_interactive.sh"
 bash "$HERE/test_database_installers.sh"
 bash "$HERE/test_plassembler.sh"
+bash "$HERE/test_flye_mob_recon_circularity.sh"
+bash "$HERE/test_long_read_truth_eligible.sh"
 bash "$HERE/test_cohort_and_write_script.sh"
 echo "ALL PLASBENCH TESTS PASSED"

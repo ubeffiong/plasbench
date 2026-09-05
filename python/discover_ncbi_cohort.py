@@ -19,10 +19,12 @@ from curate_cohort import OUT_COLUMNS, safe_id, write_rows
 from validate_cohort import assembly_metadata, fetch, ncbi_json, request_interval
 
 
-def runinfo_for_biosample(biosample, email, api_key):
-    """Return all deposited SRA run-info rows linked to one BioSample."""
+def runinfo_for_biosample(biosample, email, api_key, platform_term="ILLUMINA[Platform]"):
+    """Return all deposited SRA run-info rows linked to one BioSample matching
+    the given platform term (default Illumina; pass a long-read platform term
+    to instead list ONT/PacBio runs)."""
     result = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi", {
-        "db": "sra", "term": f"{biosample}[BioSample] AND ILLUMINA[Platform]", "retmax": 100,
+        "db": "sra", "term": f"{biosample}[BioSample] AND {platform_term}", "retmax": 100,
     }, email, api_key)
     ids = result["esearchresult"].get("idlist", [])
     if not ids:
@@ -36,6 +38,24 @@ def runinfo_for_biosample(biosample, email, api_key):
     runinfo = fetch(request, 60, 4, "NCBI run-info request",
                     parse=lambda payload: payload.decode("utf-8", "replace"))
     return list(csv.DictReader(runinfo.splitlines()))
+
+
+def long_read_runs_for_biosample(biosample, email, api_key):
+    """Return every ONT/PacBio SRA run deposited for one BioSample.
+
+    This is an informational hint only, surfaced so a curator reviewing a
+    candidate notices when more than one long-read run exists for its
+    BioSample -- one may have built the truth assembly while another is held
+    out, which is exactly the kind of pair docs/FINDING_DATA.md's long-read
+    track needs. NCBI metadata cannot say which run (if any) is independent;
+    only a curator checking the source publication can, so this never sets
+    truth_independent_of_long_reads itself -- see scripts/lib.sh:
+    long_read_truth_eligible for where that declaration is actually consumed.
+    """
+    return runinfo_for_biosample(
+        biosample, email, api_key,
+        platform_term="(OXFORD_NANOPORE[Platform] OR PACBIO_SMRT[Platform])",
+    )
 
 
 def main():
@@ -98,6 +118,14 @@ def main():
                 # deepest paired run and retain alternates for curator review.
                 paired.sort(key=lambda row: int(row.get("bases") or 0), reverse=True)
                 selected, alternates = paired[0], ",".join(row["Run"] for row in paired[1:])
+                # Informational only: surfaces a possible independent-long-read
+                # pair for the long-read/hybrid track (docs/FINDING_DATA.md).
+                # Never populated for a normal single-run BioSample, since one
+                # run is the expected, uninteresting case -- only worth a
+                # curator's attention when there is a genuine choice.
+                long_read_runs = long_read_runs_for_biosample(assembly["biosample"], args.email, args.api_key)
+                extra_long_read_runs = (",".join(run["Run"] for run in long_read_runs)
+                                        if len(long_read_runs) > 1 else "")
                 accepted.append({
                         "sample_id": safe_id(f"{assembly['organism']}_{accession.split('_')[1].split('.')[0]}", len(accepted) + 1),
                         "assembly_accession": accession, "sra_run": selected["Run"], "organism": assembly["organism"],
@@ -107,6 +135,7 @@ def main():
                         "biosample": assembly["biosample"], "bioproject": selected["BioProject"], "sample_origin": origin_evidence,
                         "read_depth_x": "", "assembly_plasmid_count": "", "source_study": "NCBI_discovery_pending_publication_review",
                         "alternate_paired_runs": alternates,
+                        "candidate_extra_long_read_runs": extra_long_read_runs,
                     })
             except Exception as exc:
                 rejected.append({"assembly_accession": locals().get("accession", "unknown"), "organism_query": organism,

@@ -131,25 +131,31 @@ external clinical validation. Track-specific leaderboard files are emitted as
 and `benchmark.hybrid.leaderboard.tsv`; methods from different tracks must not
 be pooled into one operational conclusion.
 
-## Hybrid tools and the circularity constraint
+## Long-read and hybrid tools and the circularity constraint
 
-Plassembler assembles plasmids from long reads plus short reads. That creates a
-problem the short-read tools never had.
+Flye+MOB-Recon and Plassembler assemble plasmids from long reads (plus, for
+Plassembler, short reads too). That creates a problem the short-read tools
+never had.
 
-PlasBench's truth labels come from a complete long-read or hybrid assembly. If a
-hybrid tool is given the same long reads that produced that assembly, it is being
-scored against its own input: it would look near-perfect for reasons that say
-nothing about the tool. A short-read tool has no such exposure, because its input
-is genuinely independent of the truth.
+PlasBench's truth labels come from a complete long-read or hybrid assembly. If
+a long-read or hybrid tool is given the same long reads that produced that
+assembly, it is being scored against its own input: it would look near-perfect
+for reasons that say nothing about the tool. A short-read tool has no such
+exposure, because its input is genuinely independent of the truth.
 
-The pipeline therefore refuses by default. A sample is eligible for Plassembler
-only when the cohort declares independence explicitly, in a
-`truth_independent_of_long_reads` column set to `yes`. Anything else -- absent
-column, empty value, `no` -- is recorded as
-`circular truth: truth_technology=<X> derives from the supplied long reads` and
-skipped. `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH=1` overrides this globally and stamps
-every affected row in `tool_status.tsv`, so a compromised result can never be
-mistaken later for an independent one.
+The pipeline therefore refuses by default. This is a declared, per-tool
+property in `config/tool_capabilities.tsv`
+(`requires_independent_long_read_truth=yes`), not something hardcoded to one
+tool -- every long-read/hybrid tool gets it automatically. A sample is
+eligible for such a tool only when the cohort declares independence
+explicitly, in a `truth_independent_of_long_reads` column set to `yes`.
+Anything else -- absent column, empty value, `no` -- is recorded as
+`circular truth: truth_technology=<X> derives from the supplied long reads`
+and skipped. Each affected tool has its own override variable
+(`FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH=1`, `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH=1`)
+that overrides this globally and stamps every affected row in
+`tool_status.tsv`, so a compromised result can never be mistaken later for an
+independent one.
 
 Three ways to build an eligible cohort, in descending order of how well they
 withstand review:

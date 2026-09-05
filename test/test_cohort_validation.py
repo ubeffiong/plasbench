@@ -53,6 +53,28 @@ def main():
         assert result.returncode != 0 and "read_depth_x must be numeric" in result.stderr
     finally:
         os.unlink(invalid)
+
+    # truth_independent_of_long_reads is optional (absent/empty means "assume
+    # circular" -- see scripts/lib.sh: long_read_truth_eligible), but a typo'd
+    # value must still be caught rather than silently mean "circular".
+    with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8") as handle:
+        handle.write("sample_id\tassembly_accession\tsra_run\torganism\ttruth_technology\ttruth_quality_tier\tbiosample\tbioproject\ttruth_independent_of_long_reads\n")
+        handle.write("bad\tGCF_000000000.1\tSRR0000001\tExample\thybrid\tA\tSAMN1\tPRJNA1\tmaybe\n")
+        invalid = handle.name
+    try:
+        result = subprocess.run([sys.executable, VALIDATOR, "--samples", invalid], text=True, capture_output=True)
+        assert result.returncode != 0 and "truth_independent_of_long_reads must be" in result.stderr
+    finally:
+        os.unlink(invalid)
+    # A recognized value (any case) passes cleanly.
+    with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8") as handle:
+        handle.write("sample_id\tassembly_accession\tsra_run\torganism\ttruth_technology\ttruth_quality_tier\tbiosample\tbioproject\ttruth_independent_of_long_reads\n")
+        handle.write("ok\tGCF_000000000.1\tSRR0000001\tExample\thybrid\tA\tSAMN1\tPRJNA1\tYES\n")
+        valid = handle.name
+    try:
+        subprocess.run([sys.executable, VALIDATOR, "--samples", valid], check=True)
+    finally:
+        os.unlink(valid)
     # The quality tier grades curation confidence, so B must stay reachable for
     # rows whose evidence verifies but whose source study is still unreviewed.
     sys.path.insert(0, os.path.join(ROOT, "python"))

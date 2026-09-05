@@ -1,13 +1,15 @@
-tool	method_class	binning_capable	primary_input	description
-mob_recon	binning	yes	assembly	Groups contigs into MOB plasmid reconstructions.
-platon	classification	no	assembly	Classifies individual assembly contigs.
-plasmidspades	reassembly	no	paired_reads	Reassembles plasmid-enriched contigs; contigs are not bins.
-gplas2_mob	binning	yes	assembly_graph	Graph binning seeded from validated MOB membership.
-gplas2_external	binning	yes	assembly_graph	Graph binning with externally validated classifier labels.
-flye_mob_recon	binning	yes	long_reads	Flye long-read assembly followed by MOB-Recon plasmid bins.
-plassembler	reassembly	yes	hybrid_reads	Hybrid long+short plasmid assembly; each output contig is one plasmid.
-mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.
-platon_like	classification	no	assembly	Demo contig classifier; declares no bins.
-spades_like	reassembly	no	paired_reads	Demo re-assembler; contigs are not bins.
-gplas_like	binning	yes	assembly_graph	Demo graph binner that splits and merges.
-weak_like	classification	no	assembly	Demo weak classifier; partial, ambiguous output.
+tool	method_class	binning_capable	primary_input	description	analysis_track	requires_independent_long_read_truth
+mob_recon	binning	yes	assembly	Groups contigs into MOB plasmid reconstructions.	short_read	no
+platon	classification	no	assembly	Classifies individual assembly contigs.	short_read	no
+plasmidspades	reassembly	no	paired_reads	Reassembles plasmid-enriched contigs; contigs are not bins.	short_read	no
+gplas2_mob	binning	yes	assembly_graph	Graph binning seeded from validated MOB membership.	short_read	no
+gplas2_external	binning	yes	assembly_graph	Graph binning with externally validated classifier labels.	short_read	no
+flye_mob_recon	binning	yes	long_reads	Flye long-read assembly followed by MOB-Recon plasmid bins.	long_read	yes
+plassembler	reassembly	yes	hybrid_reads	Hybrid long+short plasmid assembly; each output contig is one plasmid.	hybrid	yes
+hybracter_long	reassembly	yes	long_reads	Hybracter long-read-only assembly with Plassembler-based plasmid recovery.	long_read	yes
+hybracter_hybrid	reassembly	yes	hybrid_reads	Hybracter hybrid assembly with Plassembler-based plasmid recovery.	hybrid	yes
+mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.	short_read	no
+platon_like	classification	no	assembly	Demo contig classifier; declares no bins.	short_read	no
+spades_like	reassembly	no	paired_reads	Demo re-assembler; contigs are not bins.	short_read	no
+gplas_like	binning	yes	assembly_graph	Demo graph binner that splits and merges.	short_read	no
+weak_like	classification	no	assembly	Demo weak classifier; partial, ambiguous output.	short_read	no

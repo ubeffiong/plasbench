@@ -199,6 +199,16 @@ def schema_errors(rows, fields):
             if depth and float(depth) <= 0: errors.append(f"row {number}: read_depth_x must be greater than zero when supplied")
         except ValueError:
             errors.append(f"row {number}: read_depth_x must be numeric when supplied")
+        # Optional; only consulted by long-read/hybrid tools' circularity guard
+        # (scripts/lib.sh: long_read_truth_eligible). Absent/empty means
+        # "assume circular" by design, so this only catches a typo'd value --
+        # never require the column itself.
+        independence = (row.get("truth_independent_of_long_reads") or "").strip().lower()
+        if independence and independence not in ("yes", "true", "1", "no", "false", "0"):
+            errors.append(
+                f"row {number}: truth_independent_of_long_reads must be yes/true/1/no/false/0 when supplied, "
+                f"got {row['truth_independent_of_long_reads']!r}"
+            )
     return errors
 
 

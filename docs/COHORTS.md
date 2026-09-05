@@ -158,15 +158,22 @@ them as independent observations.
 
 ## truth_independent_of_long_reads (optional)
 
-Only consulted by hybrid tools, currently Plassembler. Set it to `yes` when a
-sample's long reads are NOT the reads its truth assembly was built from.
+Consulted by every long-read and hybrid tool -- any tool whose
+`config/tool_capabilities.tsv` row declares
+`requires_independent_long_read_truth=yes` (today: Flye+MOB-Recon,
+Plassembler). Set it to `yes` when a sample's long reads are NOT the reads its
+truth assembly was built from.
 
 PlasBench's truth labels come from a complete long-read or hybrid assembly. A
-hybrid tool handed those same long reads is scored against its own input, so a
-sample is skipped unless this column says otherwise -- see the circularity
-section of docs/METHODS.md. An absent column, an empty value, or `no` all mean
-"assume circular, skip". This is deliberately the safe default: a benchmark that
-silently scores a tool on its own input is worse than one that omits it.
+long-read or hybrid tool handed those same long reads is scored against its
+own input, so a sample is skipped unless this column says otherwise -- see the
+circularity section of docs/METHODS.md. An absent column, an empty value, or
+`no` all mean "assume circular, skip". This is deliberately the safe default: a
+benchmark that silently scores a tool on its own input is worse than one that
+omits it. Each affected tool also has its own global override variable
+(`FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH`, `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH`,
+...) for when you accept the compromise anyway; using it stays visible in
+`tool_status.tsv`'s recorded reason.
 
 Short-read tools ignore this column entirely; their inputs are already
 independent of the truth.
