@@ -20,6 +20,12 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 #                        Leave blank until reviewed; it decides tier A vs B (see above).
 #   gram_group         : optional curator-supplied Gram-positive or Gram-negative stratum.
 #   collection_country : optional curator-supplied country; separate from broad sample_origin.
+#   truth_independent_of_long_reads : optional, yes/no. Only consulted by long-read/hybrid
+#                        tools (Flye+MOB-Recon, Plassembler); short-read tools ignore it.
+#                        Set yes only when this sample's long reads are NOT the reads its
+#                        truth assembly was built from -- see docs/COHORTS.md and
+#                        docs/METHODS.md's circularity section. Absent/empty/no means
+#                        "assume circular", and such a tool is skipped for this sample.
 #
 # Lines starting with '#' and blank lines are ignored.
 # A metadata-verified public seed panel is available at cohorts/public-v1.tsv.

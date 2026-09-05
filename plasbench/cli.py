@@ -306,7 +306,9 @@ def main(argv=None):
                             help="Use pre-staged data/<sample>/ inputs only; never download from NCBI or SRA.")
         inputs.add_argument("--long-reads-file", help="Long-read filename within each sample directory (default: long_reads.fastq.gz).")
         inputs.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"),
-                            help="Label score and report rows for a separate read-technology track.")
+                            help="Score only tools declared under this track this run (each tool's own "
+                                 "track is still stamped correctly regardless); leave unset to score "
+                                 "every enabled tool under its own correct track in one run.")
         resources = command_parser.add_argument_group("resources and assembly")
         resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
@@ -492,7 +494,7 @@ def main(argv=None):
         if args.long_reads_file:
             env["LONG_READS_FILE"] = args.long_reads_file
         if args.analysis_track:
-            env["ANALYSIS_TRACK"] = args.analysis_track
+            env["ANALYSIS_TRACK_FILTER"] = args.analysis_track
         positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN",
                             "parallel_samples": "MAX_PARALLEL_SAMPLES", "parallel_tools": "MAX_PARALLEL_TOOLS"}
         for argument, variable in positive_options.items():

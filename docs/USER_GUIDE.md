@@ -767,14 +767,21 @@ WSL or Bash issue on Windows
 
 PlasBench can optionally run native ONT or PacBio FASTQ reconstruction through
 Flye followed by MOB-Recon. Install the profile, stage one file per sample as
-`data/<sample>/long_reads.fastq.gz`, then run stage 7 followed by scoring and
-aggregation under a separate long-read track:
+`data/<sample>/long_reads.fastq.gz`, enable the tool, and run the pipeline
+normally -- stage 7 is part of the default stage list (it no-ops harmlessly
+for any sample with no long-read file staged), and each tool is scored under
+its own track from `config/tool_capabilities.tsv` in the same pass as every
+short-read tool, so no separate scoring invocation is needed:
 
 ```bash
 plasbench install-tools long-read
-plasbench run 7 --flye-mob-recon on --flye-read-type nano-hq
-plasbench run 5 6 --analysis-track long_read
+plasbench run --flye-mob-recon on --flye-read-type nano-hq
 ```
+
+`--analysis-track TRACK` restricts a `run`/`report` invocation to scoring
+only tools declared under that track (each tool's own track is still stamped
+correctly regardless) -- useful for a single-track study like the depth
+ladder, not needed for a normal mixed short/long-read run.
 
 Use `nano-raw`, `nano-hq`, `pacbio-raw`, or `pacbio-hifi` to match the source
 reads. Flye assembly is not itself called a plasmid reconstruction: MOB-Recon

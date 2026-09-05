@@ -20,7 +20,8 @@ from validate_cohort import (assembly_metadata, derive_truth_quality_tier,
 
 OUT_COLUMNS = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_technology",
                "truth_quality_tier", "biosample", "bioproject", "sample_origin", "read_depth_x",
-               "assembly_plasmid_count", "source_study", "alternate_paired_runs")
+               "assembly_plasmid_count", "source_study", "alternate_paired_runs",
+               "candidate_extra_long_read_runs")
 
 
 def read_rows(path):

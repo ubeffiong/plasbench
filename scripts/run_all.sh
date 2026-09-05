@@ -16,7 +16,15 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 
 STAGES=("$@")
-[[ ${#STAGES[@]} -eq 0 ]] && STAGES=(0 1 2 3 4 5 6)
+# Stage 7 (optional long-read/hybrid reconstruction) is included in the
+# default run, positioned BEFORE scoring/aggregation (not after) so its
+# predictions are scored and aggregated in this same pass rather than
+# requiring a separate follow-up invocation. Its own top-of-script guard
+# already no-ops when no RUN_FLYE_MOB_RECON/RUN_PLASSEMBLER-family flag is
+# on, so including it here never forces a tool to run -- it only means the
+# long-read/hybrid track no longer needs a separate, manually-remembered
+# invocation once you *have* opted into one.
+[[ ${#STAGES[@]} -eq 0 ]] && STAGES=(0 1 2 3 4 7 5 6)
 
 declare -A SCRIPT=(
     [0]="00_setup.sh"

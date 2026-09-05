@@ -894,7 +894,7 @@ Manipulations worth knowing:
 | Change the assembler for everyone | `--assembler unicycler` (required for gplas2 modes) |
 | Re-run one tool after upgrading it | `--force-rerun-tools` |
 | Work offline from pre-staged reads | `--local-inputs` |
-| Benchmark long-read or hybrid input | `--analysis-track long_read` (or `hybrid`) |
+| Restrict scoring to one track only | `--analysis-track long_read` (or `hybrid`); not needed for a normal mixed run |
 | Put outputs somewhere else | `--data-dir`, `--results-dir`, `--log-dir` |
 | Use a Platon database elsewhere | `--platon-db ~/plasbench-0.1.9/data/db/platon/db` |
 | Run more samples at once | `--parallel-samples N` — each concurrent assembly needs its own memory budget |
@@ -1046,17 +1046,19 @@ bash env/download_plassembler_db.sh
 **Stage the long reads** for each sample, as `data/<sample>/long_reads.fastq.gz`.
 Stage 1 already downloaded the short reads.
 
-**Run it, then score it on its own track:**
+**Run it** -- stage 7 is part of the default stage list, so one invocation
+scores it alongside every short-read tool in the same pass:
 
 ```bash
-plasbench run 7 --cohort my-cohort --plassembler on
-plasbench run 5 6 --cohort my-cohort --analysis-track hybrid
+plasbench run --cohort my-cohort --plassembler on
 ```
 
-That produces `results/benchmark.hybrid.leaderboard.tsv`. Aggregation writes one
-leaderboard per track and never mixes them, so a hybrid tool is never ranked
-against a short-read-only tool. Nothing about `plasbench run --cohort public-v2`
-changes: the short-read benchmark is exactly what it was.
+That produces `results/benchmark.hybrid.leaderboard.tsv` (each tool's track
+comes from `config/tool_capabilities.tsv`, never a flag you have to remember
+to pass). Aggregation writes one leaderboard per track and never mixes them,
+so a hybrid tool is never ranked against a short-read-only tool. Nothing
+about `plasbench run --cohort public-v2` changes: the short-read benchmark is
+exactly what it was.
 
 **The constraint.** PlasBench's truth labels come from a complete long-read or
 hybrid assembly. Give a hybrid tool the same long reads that produced that

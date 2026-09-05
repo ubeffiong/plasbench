@@ -185,7 +185,8 @@ retry_network() {
 # Print one metadata field for one sample, or nothing when the sheet has no
 # such column. read_samples() deliberately yields only the three columns every
 # stage needs; this is for the optional curation fields (truth_technology,
-# gram_group, and the long-read independence declaration Plassembler needs).
+# gram_group, and the truth_independent_of_long_reads declaration the
+# long-read/hybrid circularity guard below needs).
 sample_column() {
     local sheet="$1" sample="$2" column="$3"
     [[ -f "$sheet" ]] || return 0
@@ -195,6 +196,52 @@ sample_column() {
         !seen { for (i = 1; i <= NF; i++) if ($i == col) c = i; seen = 1; next }
         c && $1 == want { print $c; exit }
     ' "$sheet"
+}
+
+# long_read_truth_eligible TOOL SAMPLE
+# Prints the eligibility reason on stdout; returns 0 if the sample is
+# eligible for TOOL, 1 otherwise. Generalizes what used to be a single
+# Plassembler-only check: any tool config/tool_capabilities.tsv declares
+# requires_independent_long_read_truth=yes must clear this before it runs,
+# since scoring it against a truth assembly built from the very same long
+# reads it is handed would score the tool against its own input (see
+# docs/METHODS.md's circularity section). A tool the registry does not
+# require this for (short-read tools, or a tool missing from the registry)
+# is always eligible.
+#
+# Eligibility, in order:
+#   1. The sample sheet declares truth_independent_of_long_reads=yes/true/1
+#      (case-insensitive) for this sample -> eligible ("independent").
+#   2. The tool's own override variable, <TOOL_UPPERCASE>_ALLOW_CIRCULAR_TRUTH,
+#      is 1 -> eligible ("override"). Bash indirect expansion means every
+#      tool gets this override for free with no changes needed here; e.g.
+#      "plassembler" reads $PLASSEMBLER_ALLOW_CIRCULAR_TRUTH, unchanged from
+#      before this function existed.
+#   3. Otherwise -> ineligible; prints the sample's truth_technology (or
+#      "unknown") as the reason, for the caller to fold into its own
+#      tool_status.tsv message.
+long_read_truth_eligible() {
+    local tool="$1" sample="$2"
+    local registry="$PROJECT_ROOT/config/tool_capabilities.tsv"
+    if ! python3 "$PROJECT_ROOT/python/tool_capabilities.py" --registry "$registry" \
+            --tool "$tool" --requires-independent-long-read-truth >/dev/null 2>&1; then
+        printf 'not-applicable'
+        return 0
+    fi
+    local declared truth override_var override_value
+    declared="$(sample_column "$SAMPLE_SHEET" "$sample" truth_independent_of_long_reads)"
+    case "$(printf '%s' "${declared:-}" | tr '[:upper:]' '[:lower:]')" in
+        yes|true|1) printf 'independent'; return 0 ;;
+    esac
+    override_var="$(printf '%s' "$tool" | tr '[:lower:]' '[:upper:]')_ALLOW_CIRCULAR_TRUTH"
+    override_value="${!override_var:-0}"
+    if [[ "$override_value" -eq 1 ]]; then
+        printf 'override'
+        return 0
+    fi
+    truth="$(sample_column "$SAMPLE_SHEET" "$sample" truth_technology)"
+    printf '%s' "${truth:-unknown}"
+    return 1
 }
 
 # mobsuite_db_dir -- print where the MOB-suite that will actually run keeps its

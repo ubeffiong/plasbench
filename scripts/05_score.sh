@@ -35,6 +35,15 @@ binning_capable() {
     python3 "$HERE/../python/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$1" --binning-capable >/dev/null
 }
 
+# Each tool's own declared track (config/tool_capabilities.tsv), not one value
+# blanket-applied to every tool in this run -- see the module header comment
+# in scripts/07_long_read_reconstruct.sh for why that used to be unsafe: a
+# single global --analysis-track re-stamped every already-scored tool's rows
+# on each stage-5 rebuild, not just the tool it was intended for.
+tool_analysis_track() {
+    python3 "$HERE/../python/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$1" --analysis-track 2>/dev/null
+}
+
 score_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
     local SDIR="$DATA_DIR/$SAMPLE"
@@ -79,6 +88,16 @@ score_sample() {
         tool="${base#pred_}"; tool="${tool%.plasmid.fasta}"
         DONE="$RDIR/.${tool}.complete"
         [[ -e "$DONE" ]] || { warn "  ignoring incomplete $tool result for $SAMPLE"; continue; }
+        local TOOL_TRACK
+        TOOL_TRACK="$(tool_analysis_track "$tool" || true)"
+        if [[ -z "$TOOL_TRACK" ]]; then
+            warn "  $tool: no analysis_track declared in $CAPABILITIES; scoring under \$ANALYSIS_TRACK=$ANALYSIS_TRACK"
+            TOOL_TRACK="$ANALYSIS_TRACK"
+        fi
+        if [[ -n "${ANALYSIS_TRACK_FILTER:-}" && "$TOOL_TRACK" != "$ANALYSIS_TRACK_FILTER" ]]; then
+            log "  $tool: excluded from this run (analysis_track=$TOOL_TRACK, filter=$ANALYSIS_TRACK_FILTER)"
+            continue
+        fi
         if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
             local PROTEINS="$RDIR/${tool}.proteins.tsv"
             if [[ ! -s "$PROTEINS" || "$PROTEINS" -ot "$PRED" ]]; then
@@ -125,7 +144,7 @@ score_sample() {
             --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
             --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
             --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
-            --analysis-track "$ANALYSIS_TRACK" \
+            --analysis-track "$TOOL_TRACK" \
             "${AMBIGUITY_ARGS[@]}" \
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
