@@ -179,6 +179,17 @@ download_sample() {
     record_download "$SAMPLE" "ok" ""
 }
 
+# In local-inputs mode the staged files ARE the experiment, so check them all
+# up front. Existence alone is a weak test: a FASTQ that is not really gzipped,
+# reads that do not pair, a reference with duplicate ids, or a missing truth
+# table each fail hours later or, worse, not at all.
+if [[ "$LOCAL_INPUTS_ONLY" == "1" ]]; then
+    if ! python3 "$HERE/../python/validate_local_inputs.py" \
+            --samples "$SAMPLE_SHEET" --data-dir "$DATA_DIR"; then
+        die "local inputs are not usable; nothing was run"
+    fi
+fi
+
 confirm_download
 
 declare -A PIDS

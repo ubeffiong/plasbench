@@ -196,3 +196,33 @@ sample_column() {
         c && $1 == want { print $c; exit }
     ' "$sheet"
 }
+
+# mobsuite_db_dir -- print where the MOB-suite that will actually run keeps its
+# databases, or nothing if it cannot be located.
+#
+# Order matters. `import mob_suite` from this interpreter can find a DIFFERENT
+# installation from the one mob_recon executes: the container ships a pinned
+# mob_suite in its own environment behind a PATH shim, because its pandas cannot
+# co-exist with the main lock, while an unused copy may still sit in the main
+# environment. The database that matters is the one the running tool reads, so
+# resolve mob_recon first and only fall back to the import.
+mobsuite_db_dir() {
+    local exe target env_root candidate found
+    exe="$(command -v mob_recon 2>/dev/null || true)"
+    if [[ -n "$exe" ]]; then
+        # A shim names the real interpreter path inside it; follow that.
+        target="$(grep -o "/[^\"]*/bin/mob_recon" "$exe" 2>/dev/null | head -1 || true)"
+        [[ -n "$target" ]] && exe="$target"
+        if env_root="$(cd "$(dirname "$exe")/.." 2>/dev/null && pwd)"; then
+            for candidate in "$env_root"/lib/python*/site-packages/mob_suite/databases; do
+                [[ -s "$candidate/status.txt" ]] && { printf %s "$candidate"; return 0; }
+            done
+            for candidate in "$env_root"/lib/python*/site-packages/mob_suite/databases; do
+                [[ -d "$candidate" ]] && { printf %s "$candidate"; return 0; }
+            done
+        fi
+    fi
+    found="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))' 2>/dev/null || true)"
+    [[ -n "$found" && -d "$found" ]] && printf %s "$found"
+    return 0
+}

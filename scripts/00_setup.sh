@@ -129,7 +129,7 @@ if [[ "${RUN_MOB_RECON:-0}" -eq 1 || "${RUN_GPLAS2_MOB:-0}" -eq 1 ]] && have mob
     # no resume. So check for the database here rather than letting mob_init
     # "check" by downloading it again. The path is inside the installed
     # mob_suite package -- not fixed across machines, but derivable.
-    MOBSUITE_DB_DIR="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))' 2>/dev/null || true)"
+    MOBSUITE_DB_DIR="$(mobsuite_db_dir)"
     MOBSUITE_DB_OK=1
     for f in status.txt ncbi_plasmid_full_seqs.fas ncbi_plasmid_full_seqs.fas.msh repetitive.dna.fas; do
         [[ -n "$MOBSUITE_DB_DIR" && -s "$MOBSUITE_DB_DIR/$f" ]] || MOBSUITE_DB_OK=0

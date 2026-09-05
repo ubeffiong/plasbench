@@ -16,3 +16,6 @@ build/
 # Release archives are build output, produced by `make dist` and attached to
 # GitHub Releases; they are not committed.
 dist/
+
+# Local assistant/session state; not part of the project.
+.claude/
