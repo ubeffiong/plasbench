@@ -64,7 +64,12 @@ case "$PROFILE" in
  core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk unzip);;
  assembly) PKGS=(spades unicycler);;
  reconstruction) PKGS=(mob_suite platon);;
- long-read) PKGS=(flye mob_suite);;
+ # filtlong is not needed to RUN flye_mob_recon -- it is what
+ # `plasbench read-quality-ladder` filters long reads with, the long-read
+ # analog of the depth ladder's seqtk (which ships in 'core' for the same
+ # reason). Bundled here so a user who has set themselves up for long reads
+ # already has it, rather than discovering a missing binary later.
+ long-read) PKGS=(flye mob_suite filtlong);;
  plassembler) PKGS=(plassembler);;
  hybracter) PKGS=(hybracter);;
  trycycler) PKGS=(trycycler flye medaka);;

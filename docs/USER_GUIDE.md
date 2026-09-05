@@ -323,9 +323,10 @@ recovery is at least as sensitive to read length and quality (R9 vs R10
 chemistry) as to depth, and deserves the same rigor before a long-read
 leaderboard is trusted. Uses `filtlong` to apply absolute length/quality
 thresholds ("rungs") -- a deterministic filter, not a random subsample, so
-there is no `--seed`. Install it with `plasbench install-tools filtlong`
-(a direct conda-forge/bioconda package install; `filtlong` is not tied to any
-one reconstruction tool, so it is not bundled into another profile).
+there is no `--seed`. `filtlong` ships in the `long-read` profile
+(`plasbench install-tools long-read`), so anyone already set up for the
+long-read track has it; installing it alone also works
+(`plasbench install-tools filtlong`).
 
 ```bash
 plasbench read-quality-ladder --samples cohorts/public-v1.tsv --data-dir data \

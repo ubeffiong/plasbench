@@ -1111,7 +1111,7 @@ subsamples reads at random, which changes how many reads you have, not how good
 they are. The read-quality ladder filters instead, with `filtlong`.
 
 ```bash
-plasbench install-tools filtlong
+plasbench install-tools long-read      # brings flye + filtlong, if you have not already
 
 plasbench read-quality-ladder --samples cohorts/my-cohort.tsv \
                               --data-dir data --out-dir read-quality/ \
