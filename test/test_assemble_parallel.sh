@@ -3,6 +3,12 @@
 # as stage 1's download, applied to stage 3's assembly. Also checks the
 # oversubscription advisory fires (never blocks) when the configured
 # concurrency clearly exceeds the host, using a fake `nproc`.
+#
+# Overlap is asserted from the stub assembler's own START/END log, not from
+# elapsed wall-clock time. On a loaded machine a genuinely parallel run can
+# take as long as a sequential one, so a stopwatch measures the machine
+# rather than the code, and the test fails for reasons that are not defects.
+# Counting how many assemblies were in flight at once answers the real question.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -21,13 +27,15 @@ EOF
 # FAIL_ALL=1 fails every sample regardless of FAIL_SAMPLE.
 cat > "$TMP/bin/spades.py" <<EOF
 #!/usr/bin/env bash
-sleep $DELAY
 outdir=""
 while [[ \$# -gt 0 ]]; do case "\$1" in -o) outdir="\$2"; shift 2;; *) shift;; esac; done
 sample="\$(basename "\$(dirname "\$outdir")")"
+echo "START \$sample" >> "$TMP/assemble_events.log"
+sleep $DELAY
 echo "\$sample" >> "$TMP/spades_calls.log"
-if [[ "\${FAIL_ALL:-0}" == "1" || "\$sample" == "\${FAIL_SAMPLE:-__none__}" ]]; then echo "simulated SPAdes failure" >&2; exit 1; fi
+if [[ "\${FAIL_ALL:-0}" == "1" || "\$sample" == "\${FAIL_SAMPLE:-__none__}" ]]; then echo "END \$sample" >> "$TMP/assemble_events.log"; echo "simulated SPAdes failure" >&2; exit 1; fi
 mkdir -p "\$outdir"; printf '>contig1\nACGTACGTACGT\n' > "\$outdir/contigs.fasta"
+echo "END \$sample" >> "$TMP/assemble_events.log"
 EOF
 chmod +x "$TMP/bin/fastp" "$TMP/bin/spades.py"
 
@@ -43,7 +51,12 @@ run_stage() {
         SAMPLE_SHEET="$TMP/sheet.tsv" REQUIRE_CURATED_METADATA=0 \
         "$@" bash "$ROOT/scripts/03_assemble.sh" > "$TMP/stage.log" 2>&1
 }
-now_ms() { date +%s%N | cut -c1-13; }
+# Highest number of assemblies in flight simultaneously, from the stub's log.
+peak_concurrent() {
+    awk '$1 == "START" { n++; if (n > max) max = n }
+         $1 == "END"   { n-- }
+         END           { print max + 0 }' "$TMP/assemble_events.log"
+}
 
 mkdir -p "$TMP/logs" "$TMP/results" "$TMP/tmp"  # stage 0 normally creates these
 setup_sample s1; setup_sample s2; setup_sample s3
@@ -77,22 +90,28 @@ for s in s1 s2 s3; do rm -f "$TMP/data/$s/SRR_1.trim.fastq.gz" "$TMP/data/$s/SRR
 for s in s1 s2 s3; do rm -f "$TMP/data/$s/${s}_1.trim.fastq.gz" "$TMP/data/$s/SRR_1.trim.fastq.gz" "$TMP/data/$s/SRR_2.trim.fastq.gz" "$TMP/data/$s/contigs.fasta"; rm -rf "$TMP/data/$s/assembly"; done
 
 # --- parallel overlap: three samples must assemble concurrently. ---
-start=$(now_ms)
+: > "$TMP/assemble_events.log"
 run_stage env MAX_PARALLEL_SAMPLES=1 || { echo "FAIL: sequential baseline should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
-end=$(now_ms)
-sequential_ms=$(( end - start ))
+sequential_peak="$(peak_concurrent)"
+[[ "$sequential_peak" -ge 1 ]] || {
+    echo "FAIL: the stub assembler never ran, so this test proves nothing" >&2
+    cat "$TMP/stage.log" >&2; exit 1; }
+[[ "$sequential_peak" -eq 1 ]] || {
+    echo "FAIL: MAX_PARALLEL_SAMPLES=1 had $sequential_peak assemblies in flight; it must serialise" >&2
+    exit 1; }
+echo "MAX_PARALLEL_SAMPLES=1 serialises assembly (peak 1 concurrent assembly) -> PASS"
 
 for s in s1 s2 s3; do rm -f "$TMP/data/$s/SRR_1.trim.fastq.gz" "$TMP/data/$s/SRR_2.trim.fastq.gz" "$TMP/data/$s/contigs.fasta"; rm -rf "$TMP/data/$s/assembly"; done
 
-start=$(now_ms)
+: > "$TMP/assemble_events.log"
 run_stage env MAX_PARALLEL_SAMPLES=3 || { echo "FAIL: parallel run should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
-end=$(now_ms)
-parallel_ms=$(( end - start ))
+parallel_peak="$(peak_concurrent)"
 for s in s1 s2 s3; do [[ -s "$TMP/data/$s/contigs.fasta" ]] || { echo "FAIL: sample $s missing contigs" >&2; exit 1; }; done
-[[ "$parallel_ms" -lt "$(( sequential_ms * 3 / 4 ))" ]] || {
-    echo "FAIL: MAX_PARALLEL_SAMPLES=3 (${parallel_ms}ms) was not clearly faster than sequential (${sequential_ms}ms)" >&2
+[[ "$parallel_peak" -ge 2 ]] || {
+    echo "FAIL: MAX_PARALLEL_SAMPLES=3 never had two assemblies in flight at once (peak $parallel_peak)" >&2
+    cat "$TMP/assemble_events.log" >&2
     exit 1; }
-echo "MAX_PARALLEL_SAMPLES=3 overlaps independent assemblies (${parallel_ms}ms vs ${sequential_ms}ms sequential) -> PASS"
+echo "MAX_PARALLEL_SAMPLES=3 overlaps independent assemblies (peak $parallel_peak concurrent assemblies) -> PASS"
 
 for s in s1 s2 s3; do rm -f "$TMP/data/$s/SRR_1.trim.fastq.gz" "$TMP/data/$s/SRR_2.trim.fastq.gz" "$TMP/data/$s/contigs.fasta"; rm -rf "$TMP/data/$s/assembly"; done
 

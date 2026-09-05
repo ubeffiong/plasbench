@@ -97,10 +97,17 @@ if [[ "${RUN_MOB_RECON:-0}" -eq 1 ]]; then
 fi
 if [[ "${RUN_PLASSEMBLER:-0}" -eq 1 ]]; then
     check_tool plassembler plassembler
+fi
+if [[ "${RUN_HYBRACTER_LONG:-0}" -eq 1 || "${RUN_HYBRACTER_HYBRID:-0}" -eq 1 ]]; then
+    check_tool hybracter hybracter
+fi
+# Shared by Plassembler and both Hybracter modes -- one database, checked once
+# regardless of which of the three tools actually enabled it.
+if [[ "${RUN_PLASSEMBLER:-0}" -eq 1 || "${RUN_HYBRACTER_LONG:-0}" -eq 1 || "${RUN_HYBRACTER_HYBRID:-0}" -eq 1 ]]; then
     if compgen -G "$PLASSEMBLER_DB/*.msh" > /dev/null 2>&1; then
-        log "  [ok]   Plassembler DB at $PLASSEMBLER_DB"
+        log "  [ok]   Plassembler/Hybracter DB at $PLASSEMBLER_DB"
     else
-        warn "  [MISS] Plassembler DB not found at $PLASSEMBLER_DB"
+        warn "  [MISS] Plassembler/Hybracter DB not found at $PLASSEMBLER_DB"
         NEED_PLASSEMBLER_DB=1; CORE_OK=0
     fi
 fi
