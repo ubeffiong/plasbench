@@ -84,24 +84,36 @@ echo "stage aborts only when every download fails -> PASS"
 
 # --- parallel (MAX_PARALLEL_SAMPLES=3): overlap must be real, and a failure
 # in one sample must not silently swallow the others or the overall failure. ---
-rm -rf "$TMP/data"; mkdir -p "$TMP/data"
-: > "$TMP/prefetch_calls.log"
-start=$(now_ms)
-if run_stage env MAX_PARALLEL_SAMPLES=1; then :; else echo "FAIL: sequential baseline (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; fi
-end=$(now_ms)
-sequential_ms=$(( end - start ))
+# Wall-clock comparison, so it is measured up to three times: on a loaded
+# machine one sample of a 3-4 second run is not reliable evidence either way.
+# The claim under test is that concurrency really overlaps the work, not that
+# it does so by an exact margin.
+speedup_seen=0
+for attempt in 1 2 3; do
+    rm -rf "$TMP/data"; mkdir -p "$TMP/data"
+    : > "$TMP/prefetch_calls.log"
+    start=$(now_ms)
+    run_stage env MAX_PARALLEL_SAMPLES=1 || { echo "FAIL: sequential baseline (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+    end=$(now_ms); sequential_ms=$(( end - start ))
 
-rm -rf "$TMP/data"; mkdir -p "$TMP/data"
-start=$(now_ms)
-if run_stage env MAX_PARALLEL_SAMPLES=3; then :; else echo "FAIL: parallel run (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; fi
-end=$(now_ms)
-parallel_ms=$(( end - start ))
-for s in s1 s2 s3; do
-    [[ -s "$TMP/data/$s/SRR${s#s}_1.fastq.gz" ]] || { echo "FAIL: sample $s missing downloaded reads" >&2; exit 1; }
+    rm -rf "$TMP/data"; mkdir -p "$TMP/data"
+    start=$(now_ms)
+    run_stage env MAX_PARALLEL_SAMPLES=3 || { echo "FAIL: parallel run (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+    end=$(now_ms); parallel_ms=$(( end - start ))
+
+    for s in s1 s2 s3; do
+        [[ -s "$TMP/data/$s/SRR${s#s}_1.fastq.gz" ]] || { echo "FAIL: sample $s missing downloaded reads" >&2; exit 1; }
+    done
+
+    if [[ "$parallel_ms" -lt "$(( sequential_ms * 3 / 4 ))" ]]; then
+        speedup_seen=1; break
+    fi
+    echo "  attempt $attempt: ${parallel_ms}ms vs ${sequential_ms}ms sequential -- retrying" >&2
 done
-[[ "$parallel_ms" -lt "$(( sequential_ms * 3 / 4 ))" ]] || {
-    echo "FAIL: MAX_PARALLEL_SAMPLES=3 (${parallel_ms}ms) was not clearly faster than sequential (${sequential_ms}ms)" >&2
-    exit 1; }
+[[ "$speedup_seen" -eq 1 ]] || {
+    echo "FAIL: MAX_PARALLEL_SAMPLES=3 (${parallel_ms}ms) was not clearly faster than sequential (${sequential_ms}ms) in 3 attempts" >&2
+    exit 1
+}
 echo "MAX_PARALLEL_SAMPLES=3 overlaps independent downloads (${parallel_ms}ms vs ${sequential_ms}ms sequential) -> PASS"
 
 # Now with one sample deliberately failing: the other two must still finish

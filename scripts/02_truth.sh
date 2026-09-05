@@ -24,6 +24,14 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         python3 "$HERE/../python/make_truth.py" --report "$REPORT" --fasta "$REF" --out "$TRUTH" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2)
         log "  truth -> $TRUTH"
     fi
+    # Validate however the table arrived. A hand-written one is retained as-is,
+    # and every way it can be wrong is silent: an id absent from the reference
+    # scores as an unrecovered plasmid, a reference sequence absent from the
+    # table lets contamination go uncounted, and an unrecognised molecule_type
+    # (including an unedited REVIEW) is scored as CHROMOSOME.
+    if ! python3 "$HERE/../python/validate_truth_table.py"             --truth "$TRUTH" --reference "$REF" --sample "$SAMPLE"; then
+        die "truth table for $SAMPLE is not usable; fix it and re-run (nothing was scored)"
+    fi
     R1="$SDIR/${SRA}_1.fastq.gz"; R2="$SDIR/${SRA}_2.fastq.gz"
     # Coverage measurement decompresses both FASTQs, so keep stage 2 resumable:
     # recompute only when the reads or truth table are newer than the result.

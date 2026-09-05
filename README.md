@@ -1085,7 +1085,451 @@ held-out long reads, or simulated data — and what each costs you in review.
 
 ---
 
-## 5. How scoring works (short version)
+## 5. Running PlasBench on your own FASTQ files
+
+Everything so far downloads isolates from NCBI. This section is for benchmarking
+**your own sequencing data**. Every command is complete; copy it as written.
+
+### 5.1 Two modes — pick one first
+
+**Benchmarking** scores tools, so it needs a known answer. FASTQ alone is not
+enough: PlasBench has to be told which sequences really are plasmids, or there is
+nothing to be right or wrong about. Per isolate you supply **four** files.
+
+**Operational reconstruction** just recovers plasmids from a new isolate and
+scores nothing. That needs only the two FASTQ files — see
+[§5.9](#59-operational-mode-reconstruct-without-scoring).
+
+| File | What it is |
+|---|---|
+| `<prefix>_1.fastq.gz` | your forward reads |
+| `<prefix>_2.fastq.gz` | your reverse reads |
+| `reference.fna` | the **complete** assembly of that same isolate — the ground truth |
+| `truth.tsv` | which sequences in it are plasmid and which are chromosome |
+
+Reads must be **paired and gzipped**. Single-end input is rejected. `<prefix>` is
+any name you choose.
+
+---
+
+### 5.2 The easy way: `plasbench init-local`
+
+One command puts the files where they belong, writes the truth table, and adds
+the sample-sheet row:
+
+```bash
+conda activate plasbench
+cd ~/plasbench-0.1.8
+
+plasbench init-local \
+    --sample my_isolate \
+    --reads-1 /path/to/your_R1.fastq.gz \
+    --reads-2 /path/to/your_R2.fastq.gz \
+    --reference /path/to/your_assembly.fasta
+```
+
+It prints what it did:
+
+```
+reads      -> data/my_isolate/my_isolate_1.fastq.gz , my_isolate_2.fastq.gz
+reference  -> data/my_isolate/reference.fna
+truth      -> data/my_isolate/truth.tsv (3 sequence(s), 1 needing review)
+created config/local.tsv with one row
+```
+
+**Molecule types are filled in from your FASTA headers where they say so.** A
+header reading `... chromosome, complete genome` becomes `CHROMOSOME`; one reading
+`... plasmid pABC, complete sequence` becomes `PLASMID`. Anything else is written
+as `REVIEW` and you are told:
+
+```
+ACTION REQUIRED: 1 sequence(s) in data/my_isolate/truth.tsv say REVIEW.
+Their FASTA headers did not state whether they are plasmid or chromosome, and
+PlasBench will not guess -- that is the ground truth every score depends on.
+```
+
+That refusal is deliberate. Guessing from length would be easy and wrong: small
+chromosomal contigs and large plasmids overlap, and a wrong label does not cause
+an error, it silently changes every number in the leaderboard.
+
+Open the file and replace each `REVIEW`:
+
+```bash
+nano data/my_isolate/truth.tsv
+```
+
+Useful options:
+
+| Option | Use |
+|---|---|
+| `--prefix NAME` | Read filename prefix (default: the sample id) |
+| `--link symlink` | Link instead of copying — no second copy of large FASTQ files |
+| `--sequence-report FILE` | Supply NCBI's `sequence_report.jsonl` and no truth table is written by hand at all |
+| `--samples PATH` | Sheet to create or append to (default `config/local.tsv`) |
+| `--data-dir PATH` | Where sample directories live (default `data`) |
+| `--force` | Overwrite an existing `truth.tsv` |
+
+Run it once per isolate; rows accumulate in the same sheet.
+
+---
+
+### 5.3 Or do it by hand
+
+**Make the folders.** `my_isolate` becomes a directory name, so use letters,
+digits, dot, dash, underscore only:
+
+```bash
+cd ~/plasbench-0.1.8
+mkdir -p data/my_isolate config
+```
+
+**Copy the files in.** The `_1`/`_2` suffixes and the name `reference.fna` are
+required exactly as written:
+
+```bash
+cp /path/to/your_R1.fastq.gz    data/my_isolate/myreads_1.fastq.gz
+cp /path/to/your_R2.fastq.gz    data/my_isolate/myreads_2.fastq.gz
+cp /path/to/your_assembly.fasta data/my_isolate/reference.fna
+```
+
+**List your sequence names:**
+
+```bash
+grep '^>' data/my_isolate/reference.fna
+```
+
+**Write the truth table** using exactly those names:
+
+```bash
+cat > data/my_isolate/truth.tsv <<'EOF'
+sequence_id	molecule_type	length
+chr1	CHROMOSOME	5012345
+pA	PLASMID	91234
+EOF
+```
+
+Three **tab**-separated columns. `sequence_id` is the first word of the FASTA
+header, without `>`, and is case-sensitive. Only `PLASMID` and `CHROMOSOME` are
+recognised.
+
+If your assembly came from NCBI, drop its `sequence_report.jsonl` into the sample
+directory instead and skip this step entirely — PlasBench builds the table itself.
+
+**Write the sample sheet:**
+
+```bash
+cat > config/local.tsv <<'EOF'
+sample_id	assembly_accession	sra_run
+my_isolate	LOCAL	myreads
+EOF
+```
+
+`sample_id` is your folder name. `assembly_accession` can be anything non-empty
+(`LOCAL`) because nothing is downloaded. `sra_run` is your read prefix **without**
+`_1.fastq.gz`.
+
+---
+
+### 5.4 Everything is checked before the run starts
+
+`plasbench run --local-inputs` validates all of it up front and stops if anything
+is wrong — nothing is downloaded, assembled or scored until the inputs are sound.
+It checks, per isolate:
+
+- both read files exist, are non-empty, and are **really** gzipped (a `.gz` name
+  is not proof), and are not the same file twice
+- `reference.fna` exists, is non-empty, has FASTA records, and has no duplicate
+  sequence ids
+- a truth table or `sequence_report.jsonl` exists
+- every truth id exists in the reference, every reference sequence appears in the
+  truth table, molecule types are `PLASMID` or `CHROMOSOME`, and no `REVIEW`
+  placeholder remains
+
+Failures name the file, say what is wrong, and give the command that fixes it:
+
+```
+LOCAL INPUTS NOT USABLE -- 2 problem(s) found before anything was run:
+
+  - [my_isolate] myreads_1.fastq.gz is not gzipped, despite the .gz name.
+      Compress it:  gzip -c myreads_1.fastq.gz > myreads_1.fastq.gz.tmp && mv ...
+  - [my_isolate] no truth.tsv and no sequence_report.jsonl
+      PlasBench needs to know which of these sequences are plasmids:
+        NZ_CP01.1
+        NZ_CP02.1
+      Generate a template you then edit:
+      plasbench init-local --sample my_isolate ... --force
+```
+
+### 5.5 Checking by hand, before you run
+
+Every mistake in a truth table is silent. A mistyped id becomes a plasmid no tool
+recovered; an omitted sequence lets chromosomal contamination go uncounted; an
+unrecognised label is scored as chromosome. None of them raise an error on their
+own — they just change the result.
+
+Check it in a second:
+
+```bash
+python3 python/validate_truth_table.py \
+    --truth data/my_isolate/truth.tsv \
+    --reference data/my_isolate/reference.fna \
+    --check-lengths
+```
+
+```
+truth table verified: 3 sequence(s), 2 plasmid, 1 chromosome
+```
+
+`plasbench run` performs this check itself in stage 2 and refuses to continue if
+it fails, so a bad table costs you seconds rather than a night of compute.
+
+---
+
+### 5.6 Run it
+
+```bash
+conda activate plasbench
+cd ~/plasbench-0.1.8
+
+REQUIRE_CURATED_METADATA=0 plasbench run \
+    --samples config/local.tsv \
+    --local-inputs \
+    --threads 4 \
+    --memory-gb 7
+```
+
+**`REQUIRE_CURATED_METADATA=0` is not optional.** By default a sheet must carry
+eight columns including `biosample` and `bioproject`, which you will not have for
+an in-house isolate. Without it you get `uncurated sample-sheet row 2` and nothing
+runs.
+
+**`--local-inputs` means never contact NCBI.** A missing file becomes an error
+naming the exact path, instead of an attempted download.
+
+Set `--memory-gb` to a little under your available RAM, and `--threads` to your
+core count.
+
+---
+
+### 5.7 Results
+
+```bash
+cat results/benchmark.leaderboard.md
+cut -f1,2,3 results/tool_status.tsv
+```
+
+Check that stage 2 reported `(0 defaulted)` for each isolate. A non-zero count
+means a reference sequence was not classified and was assumed to be chromosome.
+
+---
+
+### 5.8 More isolates
+
+Once per isolate:
+
+```bash
+plasbench init-local --sample isolate_two \
+    --reads-1 /path/to/two_R1.fastq.gz \
+    --reads-2 /path/to/two_R2.fastq.gz \
+    --reference /path/to/two_assembly.fasta
+```
+
+Or by hand — one directory and one sheet row each:
+
+```
+data/isolate_two/reads2_1.fastq.gz
+data/isolate_two/reads2_2.fastq.gz
+data/isolate_two/reference.fna
+data/isolate_two/truth.tsv
+```
+
+```
+isolate_two	LOCAL	reads2
+```
+
+A leaderboard over few isolates has wide confidence intervals. Read
+[§3, step 11](#step-11--look-at-the-results) on interpreting them before drawing
+conclusions from two or three samples.
+
+---
+
+### 5.9 Operational mode: reconstruct without scoring
+
+To recover plasmids from a new isolate with no ground truth, leave
+`assembly_accession` empty. The pipeline skips the reference and truth entirely
+and you supply only the two FASTQ files:
+
+```
+sample_id	assembly_accession	sra_run
+new_isolate		newreads
+```
+
+Better still, use the dedicated command, which runs only the method your own
+benchmark selected rather than every tool:
+
+```bash
+plasbench reconstruct --sample new_isolate --sra SRR12345678
+```
+
+---
+
+### 5.10 Mixing your isolates with a public cohort
+
+Keep them in separate sheets and run them separately. A cohort sheet carries
+curation metadata and a verification lock; a local sheet does not, and
+`REQUIRE_CURATED_METADATA=0` would switch that checking off for the public rows
+too. Two runs into two `--results-dir` directories keeps both honest.
+
+---
+
+## 6. Contributing
+
+Contributions are welcome — bug reports, cohort additions, new tool adapters,
+documentation fixes. This section says how, and what happens to your
+contribution once you send it.
+
+**Maintainer:** [@ubeffiong](https://github.com/ubeffiong). All pull requests are
+reviewed and merged by the maintainer; `main` is protected and cannot be pushed
+to directly.
+
+---
+
+### 6.1 Reporting a problem
+
+Open an issue: <https://github.com/ubeffiong/plasbench/issues>
+
+A benchmark result depends on the machine it ran on, so please include:
+
+```bash
+plasbench --version
+conda list --export | grep -E "spades|mob_suite|platon|minimap2"
+uname -a && free -g | head -2
+```
+
+…plus what you ran, what happened, and what you expected. If a stage failed,
+`logs/<sample>.<stage>.log` holds the tool's own output and is usually the
+fastest route to the cause.
+
+**For a wrong or surprising *score*, include the cohort and the truth table.**
+A score that looks wrong is far more often a truth-table problem than a scoring
+bug, and `results/scores.tsv` plus `data/<sample>/truth.tsv` let that be settled
+in minutes.
+
+---
+
+### 6.2 Suggesting a change before writing it
+
+For anything larger than a fix, open an issue first and describe the change. That
+is not a formality — a new tool adapter or cohort has design consequences
+(analysis tracks, circularity, evidence tiers) that are much cheaper to discuss
+before the code exists than after.
+
+Particularly worth discussing first:
+
+- a new benchmarked tool, especially one that is not short-read-only
+- changes to the scoring metric or to what counts as ground truth
+- new cohorts, or changes to an existing cohort's composition
+- anything that changes an existing leaderboard number
+
+---
+
+### 6.3 Sending a pull request
+
+```bash
+# 1. Fork on GitHub, then clone your fork
+git clone https://github.com/<your-username>/plasbench.git
+cd plasbench
+
+# 2. Branch
+git checkout -b fix-truth-table-parsing
+
+# 3. Set up the environment
+./install.sh --tools
+conda activate plasbench
+
+# 4. Make your change, then run the full suite
+bash test/run_tests.sh
+
+# 5. Commit and push
+git commit -am "fix(truth): reject a sequence id that is not in the reference"
+git push origin fix-truth-table-parsing
+
+# 6. Open the pull request against ubeffiong/plasbench, branch main
+```
+
+**The test suite must pass.** It runs entirely offline, needs no bioinformatics
+tools for most modules, and takes a few minutes:
+
+```
+ALL PLASBENCH TESTS PASSED
+```
+
+**New behaviour needs a test.** Look at `test/` for the pattern: each file drives
+a real script with stubbed binaries and asserts on observable output. The tests
+that matter most are the ones covering things that fail *silently* — a wrong
+truth label, a skipped sample, a tool that produced no output — because those
+change results without raising an error.
+
+**Line endings matter.** `.gitattributes` forces LF for `*.sh`, `*.tsv` and
+`*.json`. A shell script committed with CRLF fails on Linux with
+`set: pipefail: invalid option name`, and a cohort TSV with CRLF breaks the
+SHA-256 its lock pins.
+
+---
+
+### 6.4 What the review will look at
+
+- **Does it change any existing leaderboard number?** If so, say which and why in
+  the PR description. That is not disqualifying, but it must be deliberate and
+  explained.
+- **Does it fail loudly?** A change that makes a bad input produce a wrong number
+  instead of an error will be sent back, however convenient the behaviour.
+- **Is ground truth still independent of the tools being scored?** Nothing may
+  derive a truth label from the output of a tool under evaluation.
+- **Does the test suite still pass, and is the new behaviour tested?**
+- **Does the documentation match?** If you change a command's arguments or
+  outputs, update the README section that documents it.
+
+---
+
+### 6.5 Contributing a cohort
+
+Cohorts carry a higher bar than code, because every leaderboard built on one
+inherits its problems. See
+[§4.2](#42-build-a-cohort-of-your-own) for the tooling and
+[Appendix A](#appendix-a--selection-criteria-what-makes-a-sequence-eligible) /
+[Appendix B](#appendix-b--cohort-criteria-what-makes-a-set-of-sequences-a-cohort)
+for the rules. A cohort PR should include:
+
+- the sheet (`cohorts/<name>.tsv`) and its lock (`cohorts/<name>.lock.json`),
+  generated with `--online --write-lock` on a **Linux** checkout so the lock pins
+  the LF checksum
+- the `rejected.tsv` from `curate-cohort`, so the screening is auditable
+- a note on study independence: how many distinct `source_study` groups it spans,
+  since leave-one-study-out validation needs at least two
+
+---
+
+### 6.6 Code of conduct
+
+Be straightforward and civil. Disagreement about methods is the point of a
+benchmark; personal remarks are not. The maintainer may close or lock any thread
+that stops being about the work.
+
+---
+
+### 6.7 Licence and attribution
+
+PlasBench is MIT licensed. By contributing you agree your contribution is
+released under the same licence.
+
+Contributors are credited in the commit history. If your contribution is
+substantial and you would like to be listed in `CITATION.cff` for academic
+credit, say so in the pull request.
+
+---
+
+## 7. How scoring works (short version)
 
 For each sample and tool:
 - `minimap2 --secondary=no -x asm5 reference.fna pred_<tool>.plasmid.fasta > <tool>.paf`
@@ -1108,7 +1552,7 @@ rationale in `docs/METHODS.md`.
 
 ---
 
-## 6. Extending it (good hackathon sprints)
+## 8. Extending it (good hackathon sprints)
 
 - **Add a tool**: write a one-file adapter in `adapters/` that emits a predicted-plasmid
   FASTA, add a block in `scripts/04_run_tools.sh`, add a `RUN_*` flag. Scoring is automatic.
@@ -1120,12 +1564,12 @@ rationale in `docs/METHODS.md`.
 
 ---
 
-## 7. Reproducibility notes
+## 9. Reproducibility notes
 
 - Regenerate the explicit lock with `bash env/lock_environment.sh`; do not overwrite it with `conda env export`.
 - Record tool versions per run (add `--version` calls to a manifest — a nice sprint task).
 - Deposit your curated sample sheet + truth tables on **Zenodo** for a citable dataset —
   this is the actual publishable artifact PlasBench asks for.
 
-## 8. License
+## 10. License
 MIT — see `LICENSE`.

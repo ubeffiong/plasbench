@@ -163,6 +163,21 @@ def main(argv=None):
     )
     check_parser.add_argument("--yes", action="store_true",
                               help="Install missing tools/databases without an interactive confirmation prompt.")
+    local_parser = sub.add_parser("init-local",
+                                  help="Set up one of your own isolates: file layout, truth-table template, sheet row.")
+    local_parser.add_argument("--sample", required=True, help="Sample id; becomes the directory name.")
+    local_parser.add_argument("--reads-1", required=True, help="Forward reads (gzipped FASTQ).")
+    local_parser.add_argument("--reads-2", required=True, help="Reverse reads (gzipped FASTQ).")
+    local_parser.add_argument("--reference", help="Complete assembly FASTA for this isolate (the ground truth).")
+    local_parser.add_argument("--sequence-report", help="NCBI sequence_report.jsonl, if you have one.")
+    local_parser.add_argument("--data-dir", default="data", help="Where sample directories live (default: data).")
+    local_parser.add_argument("--samples", default="config/local.tsv", help="Sample sheet to create or append to.")
+    local_parser.add_argument("--prefix", help="Read filename prefix (default: the sample id).")
+    local_parser.add_argument("--accession", default="LOCAL", help="assembly_accession column value.")
+    local_parser.add_argument("--link", choices=("copy", "symlink", "hardlink"), default="copy",
+                              help="How to place the input files (default: copy).")
+    local_parser.add_argument("--force", action="store_true", help="Overwrite an existing truth.tsv.")
+
     cohort_parser = sub.add_parser("validate-cohort", help="Validate a cohort schema or verify its NCBI-linked pairs.")
     cohort_parser.add_argument("--samples", type=Path, required=True, help="Cohort TSV to validate.")
     cohort_parser.add_argument("--online", action="store_true", help="Verify NCBI assembly/SRA linkage and library metadata.")
@@ -343,6 +358,21 @@ def main(argv=None):
         if args.yes:
             command.append("--yes")
         code = run(command, root)
+    elif args.command == "init-local":
+        command = [sys.executable, "python/init_local_sample.py",
+                   "--sample", args.sample, "--reads-1", args.reads_1, "--reads-2", args.reads_2,
+                   "--data-dir", args.data_dir, "--samples", args.samples,
+                   "--accession", args.accession, "--link", args.link]
+        if args.reference:
+            command.extend(["--reference", args.reference])
+        if args.sequence_report:
+            command.extend(["--sequence-report", args.sequence_report])
+        if args.prefix:
+            command.extend(["--prefix", args.prefix])
+        if args.force:
+            command.append("--force")
+        code = run(command, root)
+
     elif args.command == "validate-cohort":
         command = [sys.executable, "python/validate_cohort.py", "--samples", str(args.samples)]
         if args.online:

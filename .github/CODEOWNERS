@@ -1,0 +1,6 @@
+# Every file in this repository requires review by the owner before merge.
+#
+# Combined with branch protection on main (require_code_owner_reviews), this
+# means a pull request cannot be merged on anyone else's approval, including a
+# collaborator with write access.
+*       @ubeffiong
