@@ -19,10 +19,12 @@ mkdir -p "$TMP/bin"
 # sleeping, so timing and failure handling share one fake binary.
 cat > "$TMP/bin/prefetch" <<EOF
 #!/usr/bin/env bash
-sleep $DELAY
 outdir="" run=""
 while [[ \$# -gt 0 ]]; do case "\$1" in -O) outdir="\$2"; shift 2;; *) run="\$1"; shift;; esac; done
+echo "START \$run" >> "$TMP/prefetch_events.log"
+sleep $DELAY
 echo "\$run" >> "$TMP/prefetch_calls.log"
+echo "END \$run" >> "$TMP/prefetch_events.log"
 if [[ "\${FAIL_ALL:-0}" == "1" || "\$run" == "\${FAIL_SRA:-__none__}" ]]; then echo "simulated prefetch failure" >&2; exit 1; fi
 mkdir -p "\$outdir/\$run"; touch "\$outdir/\$run/\$run.sra"
 EOF
@@ -84,37 +86,36 @@ echo "stage aborts only when every download fails -> PASS"
 
 # --- parallel (MAX_PARALLEL_SAMPLES=3): overlap must be real, and a failure
 # in one sample must not silently swallow the others or the overall failure. ---
-# Wall-clock comparison, so it is measured up to three times: on a loaded
-# machine one sample of a 3-4 second run is not reliable evidence either way.
-# The claim under test is that concurrency really overlaps the work, not that
-# it does so by an exact margin.
-speedup_seen=0
-for attempt in 1 2 3; do
-    rm -rf "$TMP/data"; mkdir -p "$TMP/data"
-    : > "$TMP/prefetch_calls.log"
-    start=$(now_ms)
-    run_stage env MAX_PARALLEL_SAMPLES=1 || { echo "FAIL: sequential baseline (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
-    end=$(now_ms); sequential_ms=$(( end - start ))
+# Concurrency is asserted by observing OVERLAP, not by comparing wall-clock
+# times. On a loaded or single-core machine three concurrent jobs can finish
+# no faster -- or slower -- than three sequential ones, which says nothing
+# about whether the stage actually ran them together. The stub marks the window
+# each fetch occupies, so overlap is read directly: run three samples
+# concurrently and every fetch should have STARTed before the first one ENDed.
+rm -rf "$TMP/data"; mkdir -p "$TMP/data"
+: > "$TMP/prefetch_calls.log"; : > "$TMP/prefetch_events.log"
+run_stage env MAX_PARALLEL_SAMPLES=1 || { echo "FAIL: sequential baseline (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+sequential_events="$(tr "
+" " " < "$TMP/prefetch_events.log")"
+case "$sequential_events" in
+    "START SRR1 END SRR1 START SRR2 END SRR2 START SRR3 END SRR3 ") ;;
+    *) echo "FAIL: MAX_PARALLEL_SAMPLES=1 should fetch strictly one at a time, saw: $sequential_events" >&2; exit 1 ;;
+esac
 
-    rm -rf "$TMP/data"; mkdir -p "$TMP/data"
-    start=$(now_ms)
-    run_stage env MAX_PARALLEL_SAMPLES=3 || { echo "FAIL: parallel run (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
-    end=$(now_ms); parallel_ms=$(( end - start ))
-
-    for s in s1 s2 s3; do
-        [[ -s "$TMP/data/$s/SRR${s#s}_1.fastq.gz" ]] || { echo "FAIL: sample $s missing downloaded reads" >&2; exit 1; }
-    done
-
-    if [[ "$parallel_ms" -lt "$(( sequential_ms * 3 / 4 ))" ]]; then
-        speedup_seen=1; break
-    fi
-    echo "  attempt $attempt: ${parallel_ms}ms vs ${sequential_ms}ms sequential -- retrying" >&2
+rm -rf "$TMP/data"; mkdir -p "$TMP/data"
+: > "$TMP/prefetch_calls.log"; : > "$TMP/prefetch_events.log"
+run_stage env MAX_PARALLEL_SAMPLES=3 || { echo "FAIL: parallel run (no failures) should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+for s in s1 s2 s3; do
+    [[ -s "$TMP/data/$s/SRR${s#s}_1.fastq.gz" ]] || { echo "FAIL: sample $s missing downloaded reads" >&2; exit 1; }
 done
-[[ "$speedup_seen" -eq 1 ]] || {
-    echo "FAIL: MAX_PARALLEL_SAMPLES=3 (${parallel_ms}ms) was not clearly faster than sequential (${sequential_ms}ms) in 3 attempts" >&2
-    exit 1
+# How many fetches were open at once?
+peak_concurrent=$(awk '$1=="START"{n++; if (n>max) max=n} $1=="END"{n--} END{print max+0}' "$TMP/prefetch_events.log")
+[[ "$peak_concurrent" -ge 2 ]] || {
+    echo "FAIL: MAX_PARALLEL_SAMPLES=3 never had more than $peak_concurrent fetch in flight;" >&2
+    echo "      the downloads were not actually overlapped." >&2
+    cat "$TMP/prefetch_events.log" >&2; exit 1
 }
-echo "MAX_PARALLEL_SAMPLES=3 overlaps independent downloads (${parallel_ms}ms vs ${sequential_ms}ms sequential) -> PASS"
+echo "MAX_PARALLEL_SAMPLES=3 overlaps independent downloads (peak ${peak_concurrent} in flight; sequential never exceeds 1) -> PASS"
 
 # Now with one sample deliberately failing: the other two must still finish
 # (concurrency means their downloads were already in flight), and the stage
