@@ -376,6 +376,19 @@ bash env/download_plasme_db.sh
 plasbench run --plasme on
 ```
 
+plASgraph2 (GNN classifier over the assembly graph) follows the same
+contract too, scored from its own per-node `plasmid_score` column -- it
+needs the same `assembly_graph.gfa` gplas2 uses (set `ASSEMBLER=unicycler`
+for the cleanest graphs), and its output has no separate hard-call FASTA of
+its own: PlasBench derives the hard call from its `label == "plasmid"` rows.
+It is not installable via `plasbench install-tools plasgraph2` (no bioconda
+package exists, and its pretrained model ships inside its own git checkout);
+see `INSTALL.md` section 6 for the manual git-clone setup.
+
+```bash
+plasbench run --plasgraph2 on --plasgraph2-model-dir /path/to/plASgraph2/model/ESKAPEE_model
+```
+
 Per sample/tool, this writes `<tool>.pr_curve.tsv` (`threshold, precision,
 recall, tp_bp, fp_bp, fn_bp`) and `<tool>.pr_summary.tsv` (`pr_auc,
 pr_n_thresholds`) under `results/<sample>/`; `mean_pr_auc`/`n_pr_scored`
@@ -574,6 +587,7 @@ still exits non-zero -- nothing fails silently.
 --trycycler-mob-recon on|off Optional Trycycler consensus long-read assembly plus MOB-Recon. Default: off.
 --genomad on|off         Optional geNomad ML classification (assembly contigs). Default: off.
 --plasme on|off          Optional PLASMe ML classification (assembly contigs). Default: off.
+--plasgraph2 on|off      Optional plASgraph2 GNN classification (assembly graph). Default: off.
 --force-rerun-tools      Delete completed tool outputs and run them again.
 ```
 

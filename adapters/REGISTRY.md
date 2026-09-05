@@ -19,6 +19,7 @@ rather than assigning an artificial zero score.
 | trycycler_mob_recon | binning | applicable | long reads | `adapt_mob_recon.sh` | optional |
 | geNomad | ml_classification | not applicable | short-read assembly | `adapt_genomad.sh` | optional |
 | PLASMe | ml_classification | not applicable | short-read assembly | `adapt_plasme.sh` | optional |
+| plASgraph2 | ml_classification | not applicable | assembly graph | `adapt_plasgraph2.sh` | optional |
 
 The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
 computes bin metrics for declared binning methods; the report labels all other
@@ -113,6 +114,33 @@ after manual setup, the same convention this project already documents for
 gplas2 (see INSTALL.md).
 
     adapt_plasme.sh <plasme_out_dir> <base_assembly_fasta> <out_fasta>
+
+## adapt_plasgraph2.sh (ML classifier, see adapters/SCORES.md)
+
+`plASgraph2_classify.py gfa <graph.gfa.gz> <model_dir> <output.csv>` writes a
+single CSV, one row per contig above the tool's own 100bp length cutoff:
+`sample,contig,length,plasmid_score,chrom_score,label` (label in {plasmid,
+chromosome, ambiguous, unlabeled}). Unlike geNomad/PLASMe, plASgraph2 writes
+no separate hard-call FASTA of its own -- the CSV is the only output -- so
+this adapter derives the hard call itself (`label == "plasmid"` rows,
+sequences extracted from the base assembly FASTA by contig id) rather than
+taking a tool-written FASTA unchanged. Every scored row is the candidates
+universe the PR-curve sweep needs. plASgraph2 needs the same
+`assembly_graph.gfa` gplas2 uses (gzipped first, since plASgraph2's own
+examples only ever show a `.gfa.gz` input); `scripts/04_run_tools.sh`'s
+`run_plasgraph2()` handles that gzip step before invoking the classifier.
+
+plASgraph2 is a per-node classifier: it emits no bins/clusters/connected-
+components output of its own, so -- like Platon/geNomad/PLASMe -- bins.tsv is
+written header-only; `binning_capable=no` is what actually decides "not
+applicable", not this adapter.
+
+plASgraph2 itself is distributed as a git checkout (not a bioconda package)
+with its own dependency set (TensorFlow, Spektral) and its pretrained model
+shipped inside the checkout -- `PLASGRAPH2_MODEL_DIR` must point at it (e.g.
+the checkout's `model/ESKAPEE_model/`) after manual setup; see INSTALL.md.
+
+    adapt_plasgraph2.sh <plasgraph2_output_csv> <base_assembly_fasta> <out_fasta>
 
 ## trycycler_mob_recon (no new adapter)
 

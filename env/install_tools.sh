@@ -89,6 +89,28 @@ NOTE: PLASMe is distributed as a git checkout with its own conda environment
 EOF
     exit 1
     ;;
+ plasgraph2)
+    # plASgraph2 is a git checkout with its own dependency set (TensorFlow,
+    # Spektral), not a bioconda package -- same treatment as plasme above:
+    # clear manual instructions, exit rather than a doomed install attempt.
+    cat >&2 <<'EOF'
+NOTE: plASgraph2 is distributed as a git checkout, not a conda/bioconda
+      package -- this profile cannot install it automatically. Install it
+      manually:
+          git clone https://github.com/cchauve/plASgraph2.git
+          cd plASgraph2
+          conda create -n plasgraph2 python=3.8
+          conda activate plasgraph2 && pip install -r requirements.txt
+      then make src/plASgraph2_classify.py executable and available as
+      `plASgraph2_classify.py` on PATH (e.g. symlink it into the plasgraph2
+      conda env's bin/ directory) -- the same manual-PATH step this project
+      already documents for gplas2/PLASMe. The pretrained model ships inside
+      the checkout at model/ESKAPEE_model/ -- point PLASGRAPH2_MODEL_DIR at
+      it (or your own trained model directory). No separate database
+      download is needed. See INSTALL.md for the full walkthrough.
+EOF
+    exit 1
+    ;;
  annotation) PKGS=(bakta);;
  annotation-prokka) PKGS=(prokka);;
  gplas)

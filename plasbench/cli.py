@@ -210,7 +210,7 @@ def main(argv=None):
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -241,7 +241,7 @@ def main(argv=None):
     )
     reconstruct_parser.add_argument("--sample", required=True, help="New sample id (letters, digits, dot, dash, underscore only).")
     reconstruct_parser.add_argument("--sra", required=True, help="SRA run accession for this sample's Illumina reads.")
-    reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external", "genomad", "plasme"),
+    reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external", "genomad", "plasme", "plasgraph2"),
                                     help="Run exactly this tool, skipping the benchmark recommendation lookup.")
     reconstruct_parser.add_argument("--recommendations", type=Path,
                                     help="benchmark.recommendations.tsv to consult when --tool is omitted "
@@ -313,6 +313,7 @@ def main(argv=None):
         inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
         inputs.add_argument("--genomad-db", type=Path, help="Path to the installed geNomad database directory (containing genomad_db/).")
         inputs.add_argument("--plasme-db", type=Path, help="Path to the installed PLASMe database directory.")
+        inputs.add_argument("--plasgraph2-model-dir", type=Path, help="Path to plASgraph2's pretrained model directory (e.g. its cloned repo's model/ESKAPEE_model/).")
         inputs.add_argument("--gplas2-external-predictions-dir", type=Path,
                             help="Directory containing <sample>.tsv external gplas2 classifier files.")
         inputs.add_argument("--local-inputs", action="store_true",
@@ -355,6 +356,7 @@ def main(argv=None):
             ("--trycycler-mob-recon", "trycycler_mob_recon", "Enable or disable optional Trycycler consensus long-read assembly plus MOB-Recon."),
             ("--genomad", "genomad", "Enable or disable optional geNomad ML classification."),
             ("--plasme", "plasme", "Enable or disable optional PLASMe alignment+transformer classification."),
+            ("--plasgraph2", "plasgraph2", "Enable or disable optional plASgraph2 GNN classification (assembly graph)."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
         tools.add_argument("--force-rerun-tools", action="store_true",
@@ -508,6 +510,7 @@ def main(argv=None):
         path_options = {
             "samples": "SAMPLE_SHEET", "data_dir": "DATA_DIR", "results_dir": "RESULTS_DIR",
             "log_dir": "LOG_DIR", "platon_db": "PLATON_DB", "genomad_db": "GENOMAD_DB", "plasme_db": "PLASME_DB",
+            "plasgraph2_model_dir": "PLASGRAPH2_MODEL_DIR",
             "gplas2_external_predictions_dir": "GPLAS2_EXTERNAL_PREDICTIONS_DIR",
         }
         for argument, variable in path_options.items():
@@ -547,7 +550,8 @@ def main(argv=None):
                                    ("hybracter_hybrid", "RUN_HYBRACTER_HYBRID"),
                                    ("trycycler_mob_recon", "RUN_TRYCYCLER_MOB_RECON"),
                                    ("genomad", "RUN_GENOMAD"),
-                                   ("plasme", "RUN_PLASME")):
+                                   ("plasme", "RUN_PLASME"),
+                                   ("plasgraph2", "RUN_PLASGRAPH2")):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"

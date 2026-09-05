@@ -149,6 +149,23 @@ if [[ "${RUN_PLASME:-0}" -eq 1 ]]; then
         NEED_PLASME_DB=1; CORE_OK=0
     fi
 fi
+if [[ "${RUN_PLASGRAPH2:-0}" -eq 1 ]]; then
+    check_tool plASgraph2_classify.py plasgraph2
+    # No database to download -- the pretrained model ships inside the git
+    # checkout itself, so this is a manual PLASGRAPH2_MODEL_DIR path check,
+    # not a NEED_*_DB/downloader pair like the other tools above.
+    if [[ -z "${PLASGRAPH2_MODEL_DIR:-}" ]]; then
+        warn "  [MISS] PLASGRAPH2_MODEL_DIR is not set"
+        UNFIXABLE+=("PLASGRAPH2_MODEL_DIR: point it at plASgraph2's model/ESKAPEE_model/ (or your own trained model) after cloning; see INSTALL.md")
+        CORE_OK=0
+    elif [[ ! -d "$PLASGRAPH2_MODEL_DIR" ]]; then
+        warn "  [MISS] PLASGRAPH2_MODEL_DIR does not exist: $PLASGRAPH2_MODEL_DIR"
+        UNFIXABLE+=("PLASGRAPH2_MODEL_DIR does not exist: $PLASGRAPH2_MODEL_DIR")
+        CORE_OK=0
+    else
+        log "  [ok]   plASgraph2 model dir at $PLASGRAPH2_MODEL_DIR"
+    fi
+fi
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
     if [[ "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
         check_tool bakta annotation
