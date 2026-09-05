@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # One-time download of the Plassembler database (PLSDB mash sketch, ~500MB).
 #
+# Serves THREE tools, not just Plassembler: hybracter_long and hybracter_hybrid
+# reuse this same database (Hybracter runs Plassembler internally for plasmid
+# recovery), so run this once and all three are covered. PLASSEMBLER_DB is the
+# single path they all read.
+#
 # Follows the same contract as the other database installers here: check first,
 # do nothing when it is already present, and make re-downloading opt-in with
 # --force. plassembler's own downloader has no skip-if-present.
@@ -19,12 +24,12 @@ for arg in "$@"; do
     case "$arg" in
         -y|--yes) ASSUME_YES=1 ;;
         -f|--force) FORCE=1 ;;
-        -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "unknown argument: $arg (usage: download_plassembler_db.sh [-y|--yes] [-f|--force])" ;;
     esac
 done
 
-have plassembler || die "plassembler not found; install it first: plasbench install-tools plassembler"
+have plassembler || die "plassembler not found, and it is what fetches this database (Hybracter reuses it rather than shipping its own downloader); install it first: plasbench install-tools plassembler"
 
 # Present means the files plassembler actually reads are there, not merely that
 # the directory exists: an interrupted download leaves a partial tree, and a
@@ -37,7 +42,7 @@ database_present() {
 }
 
 if database_present "$PLASSEMBLER_DB"; then
-    log "  [ok]   Plassembler DB already present at $PLASSEMBLER_DB"
+    log "  [ok]   Plassembler/Hybracter DB already present at $PLASSEMBLER_DB"
     if [[ "$FORCE" -ne 1 ]]; then
         log "Nothing to do. Re-download and overwrite it with:"
         log "    bash env/download_plassembler_db.sh --force"
@@ -50,13 +55,14 @@ if database_present "$PLASSEMBLER_DB"; then
         case "$REPLY" in y|Y|yes|YES|Yes) : ;; *) log "Kept the existing database."; exit 0 ;; esac
     fi
 else
-    [[ -d "$PLASSEMBLER_DB" ]] && warn "Plassembler DB at $PLASSEMBLER_DB is incomplete; re-downloading."
-    log "Plassembler's database (PLSDB sketch, ~500MB) will be downloaded to:"
+    [[ -d "$PLASSEMBLER_DB" ]] && warn "Plassembler/Hybracter DB at $PLASSEMBLER_DB is incomplete; re-downloading."
+    log "The Plassembler database (PLSDB sketch, ~500MB) will be downloaded to:"
     log "    $PLASSEMBLER_DB"
+    log "It also serves hybracter_long and hybracter_hybrid -- one copy covers all three."
     echo
     if [[ "$ASSUME_YES" -ne 1 ]]; then
         REPLY=""
-        read -r -p "Download the Plassembler database now? [y/N] " REPLY || true
+        read -r -p "Download the Plassembler/Hybracter database now? [y/N] " REPLY || true
         case "$REPLY" in
             y|Y|yes|YES|Yes) : ;;
             *) log "Skipped. Re-run with --yes to skip this prompt."; exit 1 ;;
@@ -68,4 +74,4 @@ mkdir -p "$PLASSEMBLER_DB"
 log "Running plassembler download ..."
 plassembler download -d "$PLASSEMBLER_DB" || die "plassembler download failed; check network access and see its output above"
 database_present "$PLASSEMBLER_DB" || die "plassembler download reported success but $PLASSEMBLER_DB has no .msh sketch"
-log "Plassembler database ready at $PLASSEMBLER_DB"
+log "Plassembler/Hybracter database ready at $PLASSEMBLER_DB"

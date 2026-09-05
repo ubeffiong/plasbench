@@ -133,9 +133,10 @@ be pooled into one operational conclusion.
 
 ## Long-read and hybrid tools and the circularity constraint
 
-Flye+MOB-Recon and Plassembler assemble plasmids from long reads (plus, for
-Plassembler, short reads too). That creates a problem the short-read tools
-never had.
+Five tools assemble plasmids from long reads: Flye+MOB-Recon, Hybracter
+(long-only mode) and Trycycler+MOB-Recon on the long-read track, and
+Plassembler and Hybracter (hybrid mode), which add short reads on top. That
+creates a problem the short-read tools never had.
 
 PlasBench's truth labels come from a complete long-read or hybrid assembly. If
 a long-read or hybrid tool is given the same long reads that produced that
@@ -151,11 +152,16 @@ eligible for such a tool only when the cohort declares independence
 explicitly, in a `truth_independent_of_long_reads` column set to `yes`.
 Anything else -- absent column, empty value, `no` -- is recorded as
 `circular truth: truth_technology=<X> derives from the supplied long reads`
-and skipped. Each affected tool has its own override variable
-(`FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH=1`, `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH=1`)
-that overrides this globally and stamps every affected row in
-`tool_status.tsv`, so a compromised result can never be mistaken later for an
-independent one.
+and skipped. Each affected tool has its own override variable, named
+`<TOOL>_ALLOW_CIRCULAR_TRUTH` after the tool's registry name
+(`FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH=1`, `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH=1`,
+`HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH=1`,
+`HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH=1`,
+`TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH=1`). It overrides this globally and
+stamps every affected row in `tool_status.tsv`, so a compromised result can
+never be mistaken later for an independent one. A new long-read tool inherits
+both the guard and its own override variable from its registry row alone; see
+docs/COHORTS.md for the curator-facing version of this table.
 
 Three ways to build an eligible cohort, in descending order of how well they
 withstand review:

@@ -160,9 +160,34 @@ them as independent observations.
 
 Consulted by every long-read and hybrid tool -- any tool whose
 `config/tool_capabilities.tsv` row declares
-`requires_independent_long_read_truth=yes` (today: Flye+MOB-Recon,
-Plassembler). Set it to `yes` when a sample's long reads are NOT the reads its
-truth assembly was built from.
+`requires_independent_long_read_truth=yes`. Today that is all five of them:
+
+| Tool | Track | Override variable |
+|---|---|---|
+| `flye_mob_recon` | long_read | `FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH` |
+| `plassembler` | hybrid | `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH` |
+| `hybracter_long` | long_read | `HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH` |
+| `hybracter_hybrid` | hybrid | `HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH` |
+| `trycycler_mob_recon` | long_read | `TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH` |
+
+The registry is the authority, not this table: to check any tool, run
+
+```bash
+python3 python/tool_capabilities.py --registry config/tool_capabilities.tsv \
+    --tool hybracter_long --requires-independent-long-read-truth
+```
+
+which exits 0 if the guard applies to it and 1 if it does not.
+
+Set the column to `yes` when a sample's long reads are NOT the reads its truth
+assembly was built from.
+
+**If you are building a cohort for any tool in that table, you almost
+certainly need this column.** Leaving it out is not neutral -- every sample is
+skipped, and a run that looks like it succeeded produces an empty leaderboard
+for that tool. The skip is recorded per sample in `results/tool_status.tsv`
+with a `circular truth:` reason, so check there first if a long-read tool
+scored nothing.
 
 PlasBench's truth labels come from a complete long-read or hybrid assembly. A
 long-read or hybrid tool handed those same long reads is scored against its
@@ -170,10 +195,9 @@ own input, so a sample is skipped unless this column says otherwise -- see the
 circularity section of docs/METHODS.md. An absent column, an empty value, or
 `no` all mean "assume circular, skip". This is deliberately the safe default: a
 benchmark that silently scores a tool on its own input is worse than one that
-omits it. Each affected tool also has its own global override variable
-(`FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH`, `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH`,
-...) for when you accept the compromise anyway; using it stays visible in
-`tool_status.tsv`'s recorded reason.
+omits it. Each affected tool also has its own global override variable (the
+right-hand column of the table above) for when you accept the compromise
+anyway; using it stays visible in `tool_status.tsv`'s recorded reason.
 
 Short-read tools ignore this column entirely; their inputs are already
 independent of the truth.
