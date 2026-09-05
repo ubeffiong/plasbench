@@ -133,6 +133,15 @@ GLOSSARY = {
         "why": "Base F1 asks whether the right bases were called. Bin F1 asks "
                "whether they were grouped into the right plasmids.",
     },
+    "PR-AUC": {
+        "what": "Area under the precision-recall curve, swept across every "
+                "distinct probability threshold an ML classifier emits.",
+        "why": "F1 fixes the tool's own default threshold. PR-AUC asks how good "
+               "the tool's underlying ranking is across every threshold, "
+               "showing whether a different cutoff would change its apparent "
+               "performance. Only available for tools that expose a per-record "
+               "probability (adapters/SCORES.md); absent, not zero, otherwise.",
+    },
 }
 
 # Terms whose label in the interface differs from the glossary key.
@@ -144,6 +153,7 @@ GLOSSARY_ALIASES = {
     "Split events": "Split", "Merge events": "Merge",
     "Contamination fraction": "Chromosomal contamination",
     "Mean plasmid recall": "Plasmid recall",
+    "Mean PR-AUC": "PR-AUC",
 }
 
 
@@ -999,6 +1009,57 @@ def performance_chart(leaderboard):
             parts.append(f"<rect x='{label_width}' y='{bar_y}' width='{chart_width * value:.1f}' height='6' fill='{color}'><title>{esc(row['tool'])} {label}: {value:.3f}</title></rect>")
     legend = "".join(f"<span><i style='background:{color}'></i>{label}</span>" for label, color in colors)
     return "<div class='chart-legend'>" + legend + "</div>" + "".join(parts) + "</svg>"
+
+
+def read_pr_curve(results_dir, sample, tool):
+    """Per (sample, tool) PR-curve points written by scripts/05_score.sh
+    (adapters/SCORES.md); absent for every tool with no probability output."""
+    path = results_dir / sample / f"{tool}.pr_curve.tsv"
+    if not path.is_file():
+        return []
+    return read_tsv(path)
+
+
+def pr_curve_chart(points, pr_auc=None):
+    """Inline precision-vs-recall curve for one sample/tool.
+
+    Unlike every other chart here (a bar spanning 0-1 on a single axis), this
+    is a genuine 2-axis XY plot: each swept probability threshold is one point
+    at (recall, precision), connected in recall order.
+    """
+    if not points:
+        return "<p class='muted'>No PR-curve data.</p>"
+    width, height, pad = 220, 220, 30
+    plot = width - pad - 12
+
+    def sx(recall):
+        return pad + number(recall) * plot
+
+    def sy(precision):
+        return pad + (1 - number(precision)) * plot
+
+    ordered = sorted(points, key=lambda p: number(p["recall"]))
+    coords = " ".join(f"{sx(p['recall']):.1f},{sy(p['precision']):.1f}" for p in ordered)
+    dots = "".join(
+        f"<circle cx='{sx(p['recall']):.1f}' cy='{sy(p['precision']):.1f}' r='2.5' fill='#174b3a'>"
+        f"<title>threshold {esc(p['threshold'])}: precision {number(p['precision']):.3f}, recall {number(p['recall']):.3f}</title>"
+        "</circle>"
+        for p in ordered
+    )
+    auc_text = f"PR-AUC {number(pr_auc):.3f}" if pr_auc not in (None, "") else "PR-AUC not available"
+    return (
+        f"<svg class='pr-chart' viewBox='0 0 {width} {height}' role='img' "
+        f"aria-label='Precision-recall curve, {esc(auc_text)}'>"
+        f"<rect x='{pad}' y='{pad}' width='{plot}' height='{plot}' fill='none' stroke='#d9e1da'/>"
+        f"<text x='{pad}' y='{pad + plot + 14}' class='axis'>0</text>"
+        f"<text x='{pad + plot - 20}' y='{pad + plot + 14}' class='axis'>1.0 recall</text>"
+        f"<text x='0' y='{pad + 4}' class='axis'>1.0</text>"
+        f"<text x='0' y='{pad + plot}' class='axis'>0 prec.</text>"
+        f"<polyline points='{coords}' fill='none' stroke='#174b3a' stroke-width='2'/>"
+        f"{dots}"
+        f"<text x='{pad}' y='{pad - 10}' class='pr-auc-label'>{esc(auc_text)}</text>"
+        "</svg>"
+    )
 
 
 def selection_card(sample, results_dir, report_path):
@@ -2151,18 +2212,19 @@ def main():
 
     leaderboard_rows = "".join(
         "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
-        "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{bin_f1}</td>"
+        "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{bin_f1}</td><td>{pr_auc}</td>"
         "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span></td></tr>".format(
             rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
             scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
             failed=esc(row.get("n_failed", "0")), skipped=esc(row.get("n_skipped", "0")),
             precision=esc(row["mean_precision"]), recall=esc(row["mean_recall"]),
             plasmid_recall=esc(row.get("mean_plasmid_recall") or "not annotated"),
-            bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"), f1=esc(row["mean_f1"]),
+            bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"),
+            pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row["mean_f1"]),
             f1_width=max(0, min(100, round(number(row["mean_f1"]) * 100))),
             band=score_band(number(row["mean_f1"])),
         ) for row in leaderboard
-    ) or "<tr><td colspan='11'>No scored tools yet.</td></tr>"
+    ) or "<tr><td colspan='12'>No scored tools yet.</td></tr>"
 
     score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
     score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
@@ -2245,22 +2307,32 @@ def main():
     for sample in samples:
         rows = score_by_sample.get(sample, [])
         body = "".join(
-            "<tr><td>{tool}</td><td>{p}</td><td>{r}</td><td><strong>{f1}</strong></td><td>{fp:,}</td><td>{unmapped:,}</td></tr>".format(
+            "<tr><td>{tool}</td><td>{p}</td><td>{r}</td><td><strong>{f1}</strong></td><td>{fp:,}</td><td>{unmapped:,}</td><td>{pr_auc}</td></tr>".format(
                 tool=esc(row["tool"]), p=esc(row["precision"]), r=esc(row["recall"]), f1=esc(row["f1"]),
                 fp=int(number(row["FP_bp"])), unmapped=int(number(row["unmapped_pred_bp"])),
+                pr_auc=esc(row.get("pr_auc") or "-"),
             ) for row in rows
-        ) or "<tr><td colspan='6'>No completed tool was scored for this sample.</td></tr>"
+        ) or "<tr><td colspan='7'>No completed tool was scored for this sample.</td></tr>"
         selection = out.parent / "selected_candidates" / sample / f"{sample}.selection_report.json"
         if not selection.is_file():
             selection = out.parent / sample / "selected_candidate" / "selection_report.json"
         selection_link = (f" <a href='{relative_link(selection, out)}' download>Download selected-candidate report</a>"
                           if selection.is_file() else "")
         selection_cards.append(selection_card(sample, out.parent, out))
+        # PR-curve charts: only for tools that exposed a per-record probability
+        # (adapters/SCORES.md) and were actually scored for this sample.
+        pr_cards = "".join(
+            "<div class='chart-card pr-chart-card'><h3>{tool}</h3>{chart}</div>".format(
+                tool=esc(row["tool"]),
+                chart=pr_curve_chart(read_pr_curve(out.parent, sample, row["tool"]), row.get("pr_auc")),
+            ) for row in rows if row.get("pr_auc")
+        )
+        pr_section = f"<div class='pr-chart-grid'>{pr_cards}</div>" if pr_cards else ""
         sample_sections.append(
             "<details class='sample'><summary><strong>{}</strong><span>{} scored tool(s)</span></summary>"
-            "<p class='lead'>{} </p><table><thead><tr><th>Tool</th><th>Precision</th><th>Recall</th><th>F1</th><th>Chromosome FP bp</th><th>Unmapped bp</th>"
-            "</tr></thead><tbody>{}</tbody></table></details>".format(
-                esc(sample), len(rows), selection_link or "No selected-candidate report was produced.", body)
+            "<p class='lead'>{} </p><table><thead><tr><th>Tool</th><th>Precision</th><th>Recall</th><th>F1</th><th>Chromosome FP bp</th><th>Unmapped bp</th><th>PR-AUC</th>"
+            "</tr></thead><tbody>{}</tbody></table>{}</details>".format(
+                esc(sample), len(rows), selection_link or "No selected-candidate report was produced.", body, pr_section)
         )
 
     tool_sections = []
@@ -2333,7 +2405,7 @@ def main():
 {vendor_html}
 <style>
 :root{{--ink:#17231d;--muted:#627067;--line:#d9e1da;--paper:#f6f8f4;--card:#fff;--green:#0c6b4f;--lime:#dcefdc;--amber:#9a5b00;--red:#a53028;}}
-*{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;gap:6px;margin:0 0 26px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow-x:auto;position:sticky;top:0;z-index:30;box-shadow:0 1px 3px rgba(21,36,28,.07);scrollbar-width:thin}} .nav a{{flex:0 0 auto;color:var(--muted);border:0;background:transparent;padding:8px 14px;text-decoration:none;font:600 13px Arial,sans-serif;border-radius:7px;white-space:nowrap;transition:background .15s,color .15s}} .nav a:hover{{background:#eef4ef;color:var(--ink)}} .nav a:focus-visible{{outline:2px solid var(--ink);outline-offset:-2px}} .nav a[aria-current='true']{{background:var(--green);color:#fff}} @media(prefers-reduced-motion:reduce){{.nav a{{transition:none}}}} section{{scroll-margin-top:64px}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}}  .sum-stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0 26px}} .sum-stat{{background:#fff;border:1px solid var(--line);border-top:4px solid var(--green);padding:14px 16px}} .sum-stat small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.08em}} .sum-stat strong{{display:block;font-size:24px;margin-top:5px;line-height:1.15}} .grade{{display:inline-block;min-width:30px;text-align:center;font-weight:bold;font-size:15px;padding:3px 9px;border-radius:5px;font-family:Arial,sans-serif}} .grade-a{{background:#dcefdc;color:#07573e;border:2px solid #17805a}} .grade-b{{background:#e4eef8;color:#17457e;border:2px solid #2563c9}} .grade-c{{background:#f6ead1;color:#765000;border:2px solid #a35c05}} .grade-d{{background:#f7ddda;color:#8c2018;border:2px solid #b3261e}} .grade-e{{background:#efe3e1;color:#5f1a14;border:2px solid #7a1b14}} .findings{{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:10px}} .finding{{background:#fff;border:1px solid var(--line);border-left:5px solid var(--muted);padding:14px 18px}} .finding.good{{border-left-color:var(--green)}} .finding.caution{{border-left-color:var(--amber)}} .finding .flabel{{font:bold 11px Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}} .finding p{{margin:5px 0 8px;font-size:14px}} .finding .goto{{font:bold 13px Arial,sans-serif;color:var(--green);text-decoration:none}} .finding .goto:hover{{text-decoration:underline}} .term-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}} .term-card{{background:#fff;border:1px solid var(--line);border-left:4px solid var(--green);padding:14px 16px}} .term-card h3{{margin:0 0 6px;font-size:15px}} .term-card .what{{margin:0 0 8px;font-size:13.5px}} .term-card .why{{margin:0;font-size:13px;color:var(--muted)}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
+*{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;gap:6px;margin:0 0 26px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow-x:auto;position:sticky;top:0;z-index:30;box-shadow:0 1px 3px rgba(21,36,28,.07);scrollbar-width:thin}} .nav a{{flex:0 0 auto;color:var(--muted);border:0;background:transparent;padding:8px 14px;text-decoration:none;font:600 13px Arial,sans-serif;border-radius:7px;white-space:nowrap;transition:background .15s,color .15s}} .nav a:hover{{background:#eef4ef;color:var(--ink)}} .nav a:focus-visible{{outline:2px solid var(--ink);outline-offset:-2px}} .nav a[aria-current='true']{{background:var(--green);color:#fff}} @media(prefers-reduced-motion:reduce){{.nav a{{transition:none}}}} section{{scroll-margin-top:64px}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .pr-chart-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 0 14px}} .pr-chart-card{{padding:10px}} .pr-chart-card h3{{margin:0 0 6px;font-size:13px}} .pr-chart{{display:block;width:100%;max-width:240px;height:auto}} .pr-chart .axis{{font:10px Arial,sans-serif;fill:#536158}} .pr-chart .pr-auc-label{{font:bold 11px Arial,sans-serif;fill:#174b3a}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}}  .sum-stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0 26px}} .sum-stat{{background:#fff;border:1px solid var(--line);border-top:4px solid var(--green);padding:14px 16px}} .sum-stat small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.08em}} .sum-stat strong{{display:block;font-size:24px;margin-top:5px;line-height:1.15}} .grade{{display:inline-block;min-width:30px;text-align:center;font-weight:bold;font-size:15px;padding:3px 9px;border-radius:5px;font-family:Arial,sans-serif}} .grade-a{{background:#dcefdc;color:#07573e;border:2px solid #17805a}} .grade-b{{background:#e4eef8;color:#17457e;border:2px solid #2563c9}} .grade-c{{background:#f6ead1;color:#765000;border:2px solid #a35c05}} .grade-d{{background:#f7ddda;color:#8c2018;border:2px solid #b3261e}} .grade-e{{background:#efe3e1;color:#5f1a14;border:2px solid #7a1b14}} .findings{{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:10px}} .finding{{background:#fff;border:1px solid var(--line);border-left:5px solid var(--muted);padding:14px 18px}} .finding.good{{border-left-color:var(--green)}} .finding.caution{{border-left-color:var(--amber)}} .finding .flabel{{font:bold 11px Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}} .finding p{{margin:5px 0 8px;font-size:14px}} .finding .goto{{font:bold 13px Arial,sans-serif;color:var(--green);text-decoration:none}} .finding .goto:hover{{text-decoration:underline}} .term-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}} .term-card{{background:#fff;border:1px solid var(--line);border-left:4px solid var(--green);padding:14px 16px}} .term-card h3{{margin:0 0 6px;font-size:15px}} .term-card .what{{margin:0 0 8px;font-size:13.5px}} .term-card .why{{margin:0;font-size:13px;color:var(--muted)}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
 </style></head><body>
 <script>window.pbEsc=s=>String(s==null?'':s).replace(/[&<>\\u0022\\u0027]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','\\u0022':'&quot;','\\u0027':'&#39;'}}[c]));</script>
 <header><h1>PlasBench: Plasmid reconstruction benchmark</h1><p>Detailed run report · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
@@ -2343,7 +2415,7 @@ def main():
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
 <section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. Where at least five shared samples exist, the statistics section adds paired confidence intervals and permutation evidence with Holm adjustment.</p><ul>{insight_html}</ul></div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
-<section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Select a column heading to sort.</p><div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th><th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th><th>Mean plasmid recall</th><th>Mean bin F1</th><th>Mean F1</th></tr></thead><tbody>{leaderboard_rows}</tbody></table></div></section>
+<section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p><div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th><th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th><th>Mean plasmid recall</th><th>Mean bin F1</th><th>Mean PR-AUC</th><th>Mean F1</th></tr></thead><tbody>{leaderboard_rows}</tbody></table></div></section>
 <section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p><div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
 <section id='validation'><h2>Leave-one-study-out validation</h2><p class='lead'>For each source study, the method is selected using all other studies and then evaluated only on the held-out study. A withheld result means the cohort does not yet have enough independent study evidence; it is not a failed method.</p><div class='panel'><table class='sortable'><thead><tr><th>Held-out study</th><th>Held-out samples</th><th>Training-selected method</th><th>Training samples</th><th>Held-out mean F1</th><th>Status</th><th>Interpretation</th></tr></thead><tbody>{validation_rows}</tbody></table></div></section>
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
