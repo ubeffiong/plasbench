@@ -499,6 +499,10 @@ still exits non-zero -- nothing fails silently.
 --plasmidspades on|off   Enable or disable plasmidSPAdes. Default: on.
 --gplas2-mob on|off      Run gplas with same-graph MOB-recon hard-label seeds.
 --gplas2-external on|off Run gplas with validated external classifier TSVs.
+--flye-mob-recon on|off  Optional long-read reconstruction (Flye + MOB-Recon). Default: off.
+--plassembler on|off     Optional hybrid (long+short) Plassembler assembly. Default: off.
+--hybracter-long on|off  Optional long-read-only Hybracter assembly. Default: off.
+--hybracter-hybrid on|off Optional hybrid (long+short) Hybracter assembly. Default: off.
 --force-rerun-tools      Delete completed tool outputs and run them again.
 ```
 
@@ -506,6 +510,14 @@ The CLI options override `config/config.sh` for that invocation only. Edit the
 config file when you want a persistent local default. `--gplas2-mob on`
 requires gplas, a successful MOB-recon result, and an assembly graph. It fails
 safely if MOB and graph contig identifiers do not agree.
+
+The four long-read/hybrid options (`--flye-mob-recon`, `--plassembler`,
+`--hybracter-long`, `--hybracter-hybrid`) are independent of each other and of
+every short-read tool -- enable any combination you want, and each is scored
+under its own analysis track (see [Long-Read Reconstruction](#long-read-reconstruction)).
+Each is also subject to the circularity guard: a sample is skipped unless its
+long reads are declared independent of its truth assembly, or the tool's own
+`*_ALLOW_CIRCULAR_TRUTH` override is set (see `docs/COHORTS.md`).
 
 ## Workflow
 
@@ -787,7 +799,27 @@ Use `nano-raw`, `nano-hq`, `pacbio-raw`, or `pacbio-hifi` to match the source
 reads. Flye assembly is not itself called a plasmid reconstruction: MOB-Recon
 must complete successfully before PlasBench emits a predicted-plasmid FASTA.
 The long-read track is reported separately and cannot be mixed with short-read
-or hybrid conclusions. A native hybrid FASTQ adapter remains out of scope.
+or hybrid conclusions.
+
+For hybrid (long+short) input, two independent tools are available --
+Plassembler and Hybracter's hybrid mode -- and for long-read-only input,
+Hybracter's long mode is a second path alongside Flye+MOB-Recon, since
+assembler choice materially affects plasmid completeness on ONT data:
+
+```bash
+plasbench install-tools plassembler   # Plassembler + shared PLSDB database
+bash env/download_plassembler_db.sh
+plasbench run --plassembler on              # hybrid
+plasbench install-tools hybracter
+plasbench run --hybracter-hybrid on         # hybrid, via Hybracter instead
+plasbench run --hybracter-long on           # long-read-only, via Hybracter instead of Flye+MOB-Recon
+```
+
+Hybracter's two modes are independently selectable -- enabling one never runs
+the other -- and both reuse the same Plassembler database rather than a second
+copy of it. All four long-read/hybrid tools (`flye_mob_recon`, `plassembler`,
+`hybracter_long`, `hybracter_hybrid`) are subject to the same circularity
+guard (`docs/COHORTS.md`: `truth_independent_of_long_reads`).
 
 For source-backed structural evidence, optionally supply
 `results/<sample>/pred_<tool>.evidence.tsv` with the columns `record_id`,

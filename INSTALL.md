@@ -87,7 +87,30 @@ it for you, the same as it does for mob_recon or Platon.
 
 ---
 
-## 5. Lock your versions (for reproducibility)
+## 5. Long-read/hybrid reconstruction (optional)
+
+Four tools are available for native long-read (ONT/PacBio) or hybrid
+(long+short) reconstruction, all off by default and independently selectable:
+
+```bash
+plasbench install-tools long-read      # Flye + MOB-suite
+plasbench install-tools plassembler    # Plassembler
+bash env/download_plassembler_db.sh
+plasbench install-tools hybracter      # Hybracter (both modes; reuses the Plassembler database above)
+# then enable any combination of:
+#   RUN_FLYE_MOB_RECON=1, RUN_PLASSEMBLER=1, RUN_HYBRACTER_LONG=1, RUN_HYBRACTER_HYBRID=1
+# in config/config.sh, or the equivalent --flye-mob-recon/--plassembler/
+# --hybracter-long/--hybracter-hybrid CLI flags.
+```
+Stage the long-read FASTQ per sample as `data/<sample>/long_reads.fastq.gz`.
+Every one of these tools is subject to the circularity guard (see
+`docs/COHORTS.md`'s `truth_independent_of_long_reads` column): a sample is
+skipped unless its long reads are declared independent of its truth assembly,
+or the tool's own override variable is set.
+
+---
+
+## 6. Lock your versions (for reproducibility)
 
 After a successful install:
 ```bash

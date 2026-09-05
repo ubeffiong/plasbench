@@ -66,6 +66,7 @@ case "$PROFILE" in
  reconstruction) PKGS=(mob_suite platon);;
  long-read) PKGS=(flye mob_suite);;
  plassembler) PKGS=(plassembler);;
+ hybracter) PKGS=(hybracter);;
  annotation) PKGS=(bakta);;
  annotation-prokka) PKGS=(prokka);;
  gplas)
