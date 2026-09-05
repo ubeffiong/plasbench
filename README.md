@@ -1095,9 +1095,145 @@ long reads, multi-run BioProjects) and [`docs/METHODS.md`](docs/METHODS.md)
 for what each costs you in review.
 
 Long-read plasmid recovery is at least as sensitive to read length and
-quality (R9 vs R10 chemistry) as to depth -- see the read-quality ladder in
-`docs/USER_GUIDE.md`'s Commands section, the long-read analog to the
-depth-sweep in [4.7](#47-depth-sweep-how-far-can-you-cut-sequencing) above.
+quality (R9 vs R10 chemistry) as to depth. To measure that, use the
+read-quality ladder in [4.10](#410-read-lengthquality-sweep-the-long-read-analog-of-the-depth-ladder)
+below — the long-read analog of the depth sweep in
+[4.7](#47-depth-sweep-how-far-can-you-cut-sequencing).
+
+---
+
+### 4.10 Read-length/quality sweep: the long-read analog of the depth ladder
+
+On ONT data, plasmid recovery is at least as sensitive to **read length and
+quality** (R9 vs R10 chemistry) as it is to depth. The depth ladder in
+[4.7](#47-depth-sweep-how-far-can-you-cut-sequencing) cannot answer that: it
+subsamples reads at random, which changes how many reads you have, not how good
+they are. The read-quality ladder filters instead, with `filtlong`.
+
+```bash
+plasbench install-tools filtlong
+
+plasbench read-quality-ladder --samples cohorts/my-cohort.tsv \
+                              --data-dir data --out-dir read-quality/ \
+                              --rungs 1000:8,5000:10,20000:15
+
+plasbench run --samples read-quality/read_quality_ladder.samples.tsv \
+              --data-dir read-quality/data --results-dir read-quality/results \
+              --local-inputs --flye-mob-recon on
+
+plasbench read-quality-report --scores read-quality/results/scores.tsv \
+                              --manifest read-quality/read_quality_ladder.manifest.tsv \
+                              --out-prefix read-quality/results/read_quality \
+                              --metric plasmid_recall
+```
+
+**`--rungs` is a list of `MIN_LENGTH:MIN_MEAN_Q` pairs, one derived cohort per
+rung.** They are *combined* cutoffs, not two independent axes — `5000:10` means
+"reads at least 5 kb long **and** of mean quality at least 10". The default
+`1000:8,5000:10,20000:15` is a rough "raw ONT / R9-typical / R10-typical"
+progression. Pick your own rungs to match the chemistries you are deciding
+between.
+
+There is no `--seed` here, and that is not an omission: `filtlong` applies
+absolute thresholds rather than sampling, so every rung is already
+deterministic. That is the one real difference from the depth ladder, which
+needs a seed because it samples.
+
+**A strict rung can legitimately filter out everything.** Rather than hand you
+a cohort that scores zero for a reason that has nothing to do with the tool,
+the ladder stops with an error naming the sample and the rung that emptied it,
+so you can loosen that rung or drop that sample. The floor is one surviving
+read by default; to demand a realistic minimum, call the script directly, which
+also exposes the `filtlong` binary path:
+
+```bash
+python3 python/make_read_quality_ladder.py --samples cohorts/my-cohort.tsv \
+        --data-dir data --out-dir read-quality/ --rungs 5000:10,20000:15 \
+        --min-retained-reads 500
+```
+
+This ladder is for the long-read and hybrid tools (`flye_mob_recon`,
+`plassembler`, `hybracter_long`, `hybracter_hybrid`, `trycycler_mob_recon`) —
+run it with those switched on, as above. Running it against the short-read
+tools measures nothing, since they never read the long-read file the ladder
+filters. Everything in [4.9](#49-long-read-and-hybrid-tools-and-the-circularity-constraint)
+still applies: the derived cohort inherits its parent's
+`truth_independent_of_long_reads`, so if the parent was ineligible every rung
+is skipped too.
+
+Like the depth ladder, aggregation knows the rungs of one isolate are
+correlated and does not count them as independent evidence.
+
+---
+
+### 4.11 ML classifiers, and reading a precision–recall curve
+
+Three machine-learning tools sit alongside the classical short-read ones, all
+off by default and independently switchable:
+
+| Tool | What it is | Input |
+|---|---|---|
+| `genomad` | Gene-based neural classifier | assembly contigs |
+| `plasme` | Alignment + transformer hybrid | assembly contigs |
+| `plasgraph2` | Graph neural network over assembly-graph nodes | assembly graph |
+
+**geNomad installs from bioconda; the other two do not** — PLASMe and plASgraph2
+are git checkouts with their own environments, so `plasbench install-tools`
+prints the exact commands instead of attempting an install that would fail:
+
+```bash
+plasbench install-tools genomad; bash env/download_genomad_db.sh
+plasbench run --cohort my-cohort --genomad on
+
+plasbench install-tools plasme          # prints the git clone + conda steps
+bash env/download_plasme_db.sh          # ~12.4 GB
+plasbench run --cohort my-cohort --plasme on
+
+plasbench install-tools plasgraph2      # prints the git clone + pip steps
+plasbench run --cohort my-cohort --plasgraph2 on \
+              --plasgraph2-model-dir /path/to/plASgraph2/model/ESKAPEE_model
+```
+
+All three are short-read-track tools, so they appear in
+`benchmark.short_read.leaderboard.tsv` next to MOB-Recon and Platon and are
+ranked on the same `mean_f1`. All three are contig **classifiers**, not
+binners: they say "this contig is plasmid", never "these three contigs are one
+plasmid". The report labels their bin diagnostics *not applicable* rather than
+inventing a bin score — see [`adapters/REGISTRY.md`](adapters/REGISTRY.md).
+
+**What is genuinely new: PR-AUC.** A classical tool gives one hard answer. An
+ML tool scores *every* contig it looked at and then applies a threshold, so it
+has a whole curve of possible answers, and the single F1 you see is just the
+one point its default threshold happens to land on. Where a tool exposes those
+per-contig probabilities, PlasBench sweeps every one of them as a threshold and
+reports the area under the resulting precision–recall curve:
+
+```bash
+cut -f1,2,3,4,5 results/scores.tsv | head    # per sample+tool, now incl. pr_auc
+grep pr_auc results/benchmark.leaderboard.tsv
+```
+
+- `mean_pr_auc` and `n_pr_scored` appear in the leaderboard, and the HTML report
+  draws the curve itself on each per-sample view.
+- Tools without probabilities show **`not probability-scored`**, not a zero.
+  Nothing is penalised for being a hard-call tool.
+- **Ranking is still `mean_f1`.** PR-AUC is a supplementary column, because it
+  only exists for some tools and comparing it against tools that have none
+  would not be a like-for-like ranking.
+
+Read it as *"how good could this tool be if I tuned its threshold?"* against
+F1's *"how good is it out of the box?"*. A tool with mediocre F1 but high PR-AUC
+is one whose default threshold is wrong for your data, not one that cannot find
+your plasmids — and that is an actionable difference.
+
+The mechanism is an adapter contract, documented in
+[`adapters/SCORES.md`](adapters/SCORES.md): an adapter may additionally write
+`pred_<tool>.candidates.fasta` (every contig the tool scored, not just the ones
+it called plasmid) and `pred_<tool>.scores.tsv` (`record_id`, `probability`).
+When both exist, the curve is computed; when they do not, the tool is scored
+exactly as before. `pred_<tool>.plasmid.fasta` keeps its meaning — the tool's
+actual hard call — so adding a curve never moves the F1 that was already
+there.
 
 ---
 
@@ -1565,6 +1701,17 @@ Predicted sequence that doesn't map to the reference at all is reported separate
 `unmapped_pred_bp` rather than silently punished; sequence that maps only to a reference
 contig absent from truth is reported separately again as `off_truth_pred_bp`. Full
 rationale in `docs/METHODS.md`.
+
+Each tool is scored under **its own** analysis track, read from
+`config/tool_capabilities.tsv` — so one run can score short-read, long-read and
+hybrid tools together, and aggregation still writes one leaderboard per track
+without ever mixing them.
+
+A tool that also publishes a per-contig probability gets one extra, optional
+metric on top of the above: `pr_auc`, the area under its precision–recall curve
+swept across every threshold. It never replaces F1 and never changes it — see
+[4.11](#411-ml-classifiers-and-reading-a-precisionrecall-curve) and
+[`adapters/SCORES.md`](adapters/SCORES.md).
 
 ---
 

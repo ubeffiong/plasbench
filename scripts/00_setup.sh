@@ -240,7 +240,7 @@ for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $pr
 [[ "$NEED_PLATON_DB" -eq 1 ]] && echo "  - the Platon database (needs a URL you provide; see prompt below)"
 [[ "$NEED_MOBSUITE_DB" -eq 1 ]] && echo "  - the MOB-suite database"
 [[ "$NEED_BAKTA_DB" -eq 1 ]] && echo "  - the Bakta database"
-[[ "$NEED_PLASSEMBLER_DB" -eq 1 ]] && echo "  - the Plassembler database"
+[[ "$NEED_PLASSEMBLER_DB" -eq 1 ]] && echo "  - the Plassembler database (also used by both Hybracter modes)"
 [[ "$NEED_GENOMAD_DB" -eq 1 ]] && echo "  - the geNomad database"
 [[ "$NEED_PLASME_DB" -eq 1 ]] && echo "  - the PLASMe database (~12.4 GB)"
 for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && echo "  (not automatic) $note"; done
