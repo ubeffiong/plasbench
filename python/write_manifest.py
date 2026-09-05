@@ -127,7 +127,8 @@ def main():
                 "RUN_TRYCYCLER_MOB_RECON", "TRYCYCLER_ASSEMBLY_COUNT", "TRYCYCLER_READ_TYPE",
                 "TRYCYCLER_MEDAKA_POLISH", "TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH",
                 "RUN_GENOMAD", "GENOMAD_DB", "RUN_PLASME", "PLASME_DB", "PLASME_PROBABILITY",
-                "RUN_PLASGRAPH2", "PLASGRAPH2_MODEL_DIR", "PLASGRAPH2_CPU_ONLY")
+                "PLASME_VERSION", "PLASME_CHECKOUT_DIR",
+                "RUN_PLASGRAPH2", "PLASGRAPH2_MODEL_DIR", "PLASGRAPH2_CPU_ONLY", "PLASGRAPH2_VERSION")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     truth_tables = {}
@@ -156,11 +157,16 @@ def main():
         "databases": {"platon": directory_identity(os.environ.get("PLATON_DB", "")),
                       "genomad": directory_identity(os.environ.get("GENOMAD_DB", "")),
                       "plasme": directory_identity(os.environ.get("PLASME_DB", ""))},
-        # Not a downloaded database -- plASgraph2's pretrained model ships
-        # inside its git checkout. directory_identity() (filename+size+mtime
-        # hash, not content hash) still cheaply identifies which checkout/
-        # model produced a run, without re-hashing model weights every time.
-        "models": {"plasgraph2": directory_identity(os.environ.get("PLASGRAPH2_MODEL_DIR", ""))},
+        # Not downloaded databases -- plASgraph2's pretrained model and
+        # PLASMe's code both ship inside their own git checkouts.
+        # directory_identity() (filename+size+mtime hash, not content hash)
+        # still cheaply identifies which checkout/model produced a run,
+        # without re-hashing model weights every time. PLASME_CHECKOUT_DIR is
+        # optional -- unlike PLASGRAPH2_MODEL_DIR, nothing else in the
+        # pipeline requires the PLASMe checkout's path, so this entry is only
+        # ever populated if the user chooses to record it.
+        "models": {"plasgraph2": directory_identity(os.environ.get("PLASGRAPH2_MODEL_DIR", "")),
+                   "plasme": directory_identity(os.environ.get("PLASME_CHECKOUT_DIR", ""))},
         "settings": {key: os.environ.get(key) for key in settings},
         "input_checksums": {"sample_sheet": sha256(sample_sheet), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},

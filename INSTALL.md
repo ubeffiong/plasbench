@@ -146,6 +146,9 @@ cd PLASMe && conda env create -f plasme.yaml
 # already documents for gplas2 below
 bash env/download_plasme_db.sh   # ~12.4 GB, via PLASMe's own PLASMe_db.py
 # then enable RUN_PLASME=1 in config/config.sh, or --plasme on
+# optionally also set PLASME_VERSION=<git tag/commit> and
+# PLASME_CHECKOUT_DIR=/path/to/your/PLASMe/clone -- both purely
+# informational, recorded in run_manifest.json for readability/provenance
 ```
 
 plASgraph2 (a GNN classifier over the assembly graph) is the same idea again,
@@ -164,6 +167,8 @@ conda activate plasgraph2 && pip install -r requirements.txt
 # at model/ESKAPEE_model/ -- no separate database download is needed.
 # then enable RUN_PLASGRAPH2=1 and PLASGRAPH2_MODEL_DIR=/path/to/plASgraph2/model/ESKAPEE_model
 # in config/config.sh, or: plasbench run --plasgraph2 on --plasgraph2-model-dir ...
+# optionally also set PLASGRAPH2_VERSION=<git tag/commit> -- purely
+# informational, recorded in run_manifest.json for readability
 ```
 
 ---

@@ -762,9 +762,13 @@ python python/validate_amr_truth.py --truth data/SAMPLE/truth.tsv \
 ```
 
 Optional `pred_<tool>.evidence.tsv` files can carry source-reported replicon,
-MOB, or closure evidence using `record_id`, `evidence_type`, and
-`evidence_value`. They are shown in the selection card but are not treated as
-independent structural proof.
+MOB, closure, or `ml_probability` evidence using `record_id`, `evidence_type`,
+and `evidence_value`. They are shown in the selection card but are not
+treated as independent structural proof. `ml_probability` is purely
+informational -- a tool's own stated confidence, shown to a human choosing an
+operational method -- and is unrelated to the PR-curve/PR-AUC mechanism
+above (`adapters/SCORES.md`), which scores leaderboard rows directly and
+never reads this file.
 
 ## Operational Selection
 

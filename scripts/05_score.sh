@@ -141,9 +141,20 @@ score_sample() {
         # wrote both a wider candidates universe and a per-record probability
         # for it. A mapping failure here only warns and omits the curve; it
         # never affects the point-estimate score below.
+        #
+        # Always clear any pr_curve/pr_summary from a PRIOR run first: unlike
+        # $PAF above (rebuilt via truncating `>` redirection every pass) and
+        # scores.tsv (fully rebuilt at the end of this script), these two
+        # files are only written when score_plasmids.py is actually given
+        # --pr-curve-out/--pr-summary-out this pass. Skipping that (no
+        # candidates/scores this run, or the candidate-PAF mapping below
+        # fails) must mean "no curve for this pass" -- not a stale one from a
+        # previous successful pass silently re-merged as if it were fresh by
+        # merge_pr_metrics.py's unconditional glob.
         local PRSCORE_ARGS=()
         local CANDIDATES="$RDIR/pred_${tool}.candidates.fasta"
         local PRED_SCORES="$RDIR/pred_${tool}.scores.tsv"
+        rm -f "$RDIR/${tool}.pr_curve.tsv" "$RDIR/${tool}.pr_summary.tsv"
         if [[ -s "$CANDIDATES" && -s "$PRED_SCORES" ]]; then
             local CAND_PAF="$RDIR/${tool}.candidates_vs_ref.paf"
             if minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$CANDIDATES" \

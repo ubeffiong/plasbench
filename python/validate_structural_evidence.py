@@ -4,7 +4,7 @@ import argparse, csv, json
 from pathlib import Path
 
 REQUIRED = {"record_id", "evidence_type", "evidence_value", "evidence_source", "evidence_version"}
-ALLOWED = {"closure", "replicon", "mob", "amr_context"}
+ALLOWED = {"closure", "replicon", "mob", "amr_context", "ml_probability"}
 CLOSURE_SOURCES = {"long_read", "hybrid_assembly", "assembly_graph"}
 
 def fasta_ids(path):

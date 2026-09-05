@@ -133,6 +133,13 @@ export RUN_GENOMAD="${RUN_GENOMAD:-0}"
 export RUN_PLASME="${RUN_PLASME:-0}"
 export PLASME_THREADS="${PLASME_THREADS:-$THREADS}"
 export PLASME_PROBABILITY="${PLASME_PROBABILITY:-0.5}"
+# Purely informational (like PLASGRAPH2_VERSION below): the git checkout has
+# no version command to query. PLASME_VERSION records the git tag/commit for
+# readability; PLASME_CHECKOUT_DIR (optional) points at the actual clone so
+# write_manifest.py can additionally record its content-hash identity
+# (directory_identity()) for provenance, the same treatment plASgraph2 gets.
+export PLASME_VERSION="${PLASME_VERSION:-}"
+export PLASME_CHECKOUT_DIR="${PLASME_CHECKOUT_DIR:-}"
 # plASgraph2: a GNN per-node classifier over the assembly graph (needs the
 # same assembly_graph.gfa gplas2 uses -- set ASSEMBLER=unicycler for the
 # cleanest graphs). Off by default. Like geNomad/PLASMe, exposes a per-node
@@ -144,6 +151,12 @@ export PLASME_PROBABILITY="${PLASME_PROBABILITY:-0.5}"
 # inside that checkout, so PLASGRAPH2_MODEL_DIR must point at it.
 export RUN_PLASGRAPH2="${RUN_PLASGRAPH2:-0}"
 export PLASGRAPH2_MODEL_DIR="${PLASGRAPH2_MODEL_DIR:-}"
+# Purely informational (like a database, the checkout has no version command
+# to query): record the git tag/commit of the plASgraph2 checkout you cloned,
+# for readability in run_manifest.json alongside PLASGRAPH2_MODEL_DIR's own
+# content hash (directory_identity(), which identifies the actual state used
+# regardless of whether this string is kept in sync).
+export PLASGRAPH2_VERSION="${PLASGRAPH2_VERSION:-}"
 # Forces CPU-only execution (CUDA_VISIBLE_DEVICES="") for deterministic,
 # GPU-independent runs. Set to 0 to let plASgraph2/TensorFlow use a GPU if
 # one is available and configured.
