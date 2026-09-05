@@ -105,6 +105,7 @@ export MOB_RECON_THREADS="${MOB_RECON_THREADS:-$THREADS}"
 export PLATON_THREADS="${PLATON_THREADS:-$THREADS}"
 export PLASMIDSPADES_THREADS="${PLASMIDSPADES_THREADS:-$THREADS}"
 export GPLAS_THREADS="${GPLAS_THREADS:-$THREADS}"          # gplas itself is single-threaded; governs its classifier-prep step
+export GENOMAD_THREADS="${GENOMAD_THREADS:-$THREADS}"
 # Per-tool memory estimates (GB), used only for the oversubscription warning
 # in lib.sh's warn_resource_oversubscription -- advisory, never enforced.
 export PLASMIDSPADES_MEMORY_GB="${PLASMIDSPADES_MEMORY_GB:-$MEMORY_GB}"
@@ -119,6 +120,19 @@ export RUN_PLASMIDSPADES="${RUN_PLASMIDSPADES:-1}"
 # classifier. External prediction TSVs must use gplas2's documented columns.
 export RUN_GPLAS2_MOB="${RUN_GPLAS2_MOB:-0}"
 export RUN_GPLAS2_EXTERNAL="${RUN_GPLAS2_EXTERNAL:-0}"
+# ML/graph-based classifier, off by default. Exposes a per-contig
+# plasmid_score, so it is also scored with an optional PR-curve/PR-AUC sweep
+# alongside its own hard call -- see adapters/SCORES.md.
+export RUN_GENOMAD="${RUN_GENOMAD:-0}"
+# Alignment+transformer classifier, off by default. Like geNomad, exposes a
+# per-contig score (its own "score" column) and is PR-curve/PR-AUC scored.
+# Distributed as a git checkout with its own conda env, not a bioconda
+# package (see env/install_tools.sh's plasme case) -- PLASMe.py itself is
+# expected on PATH after manual setup, the same convention this project
+# already uses for gplas2.
+export RUN_PLASME="${RUN_PLASME:-0}"
+export PLASME_THREADS="${PLASME_THREADS:-$THREADS}"
+export PLASME_PROBABILITY="${PLASME_PROBABILITY:-0.5}"
 export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
 # CIRCULARITY GUARD (see scripts/lib.sh: long_read_truth_eligible). Off by
 # default: a sample without a declared truth_independent_of_long_reads=yes is
@@ -163,6 +177,19 @@ export HYBRACTER_CHROMOSOME_LENGTH="${HYBRACTER_CHROMOSOME_LENGTH:-1000000}"
 # long_read_truth_eligible) -- same policy as PLASSEMBLER_ALLOW_CIRCULAR_TRUTH.
 export HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH="${HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH:-0}"
 export HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH="${HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH:-0}"
+# Trycycler -> MOB-Recon: a second long-read-only assembly path alongside
+# flye_mob_recon, since assembler choice materially affects plasmid
+# completeness on ONT data. Off by default. TRYCYCLER_READ_TYPE is defined
+# further below, alongside FLYE_READ_TYPE, since it defaults from it.
+export RUN_TRYCYCLER_MOB_RECON="${RUN_TRYCYCLER_MOB_RECON:-0}"
+export TRYCYCLER_THREADS="${TRYCYCLER_THREADS:-$THREADS}"
+# How many independent long-read assemblies to reconcile. Trycycler's own
+# guidance: >=3 minimum, 8-12 for full robustness. Kept modest by default,
+# since this multiplies assembly time by roughly this many Flye runs.
+export TRYCYCLER_ASSEMBLY_COUNT="${TRYCYCLER_ASSEMBLY_COUNT:-4}"
+# Off by default: adds a Medaka polishing pass after Trycycler consensus.
+export TRYCYCLER_MEDAKA_POLISH="${TRYCYCLER_MEDAKA_POLISH:-0}"
+export TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH="${TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH:-0}"
 
 # Reuse a completed tool result by default. Set FORCE_RERUN_TOOLS=1 to discard
 # completed per-tool output and run it again (for example after a tool upgrade).
@@ -171,6 +198,8 @@ export FORCE_RERUN_TOOLS="${FORCE_RERUN_TOOLS:-0}"
 # --- Tool databases (set after INSTALL step) ---------------------------------
 # Platon needs its DB downloaded once; point to it here.
 export PLATON_DB="${PLATON_DB:-$DATA_DIR/db/platon/db}"
+export GENOMAD_DB="${GENOMAD_DB:-$DATA_DIR/db/genomad}"
+export PLASME_DB="${PLASME_DB:-$DATA_DIR/db/plasme}"
 
 # --- Read handling -----------------------------------------------------------
 export MIN_READ_LEN="${MIN_READ_LEN:-50}"   # fastp: discard shorter reads
@@ -186,6 +215,9 @@ export ASSEMBLER="${ASSEMBLER:-spades}"
 # assembly. This is opt-in so short-read benchmarks remain unchanged.
 export LONG_READS_FILE="${LONG_READS_FILE:-long_reads.fastq.gz}"
 export FLYE_READ_TYPE="${FLYE_READ_TYPE:-nano-hq}"
+# Trycycler's own Flye assemblies default to the same read type as
+# flye_mob_recon's, since both feed the same instrument's reads to Flye.
+export TRYCYCLER_READ_TYPE="${TRYCYCLER_READ_TYPE:-$FLYE_READ_TYPE}"
 
 # --- Mapping (scoring) -------------------------------------------------------
 # minimap2 preset for aligning predicted-plasmid contigs back to the reference.

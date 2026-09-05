@@ -210,7 +210,7 @@ def main(argv=None):
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -241,7 +241,7 @@ def main(argv=None):
     )
     reconstruct_parser.add_argument("--sample", required=True, help="New sample id (letters, digits, dot, dash, underscore only).")
     reconstruct_parser.add_argument("--sra", required=True, help="SRA run accession for this sample's Illumina reads.")
-    reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external"),
+    reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external", "genomad", "plasme"),
                                     help="Run exactly this tool, skipping the benchmark recommendation lookup.")
     reconstruct_parser.add_argument("--recommendations", type=Path,
                                     help="benchmark.recommendations.tsv to consult when --tool is omitted "
@@ -263,6 +263,17 @@ def main(argv=None):
     depth_report_parser.add_argument("--manifest", type=Path, required=True)
     depth_report_parser.add_argument("--out-prefix", type=Path, required=True)
     depth_report_parser.add_argument("--metric", choices=("precision", "recall", "f1", "plasmid_recall"), default="f1")
+    rq_ladder_parser = sub.add_parser("read-quality-ladder", help="Create deterministic local-input read-quality-ladder cohorts using filtlong.")
+    rq_ladder_parser.add_argument("--samples", type=Path, required=True)
+    rq_ladder_parser.add_argument("--data-dir", type=Path, required=True)
+    rq_ladder_parser.add_argument("--out-dir", type=Path, required=True)
+    rq_ladder_parser.add_argument("--rungs", default="1000:8,5000:10,20000:15",
+                                  help="Comma-separated MIN_LENGTH:MIN_MEAN_Q pairs.")
+    rq_report_parser = sub.add_parser("read-quality-report", help="Summarize a completed read-quality-ladder benchmark and create an SVG plot.")
+    rq_report_parser.add_argument("--scores", type=Path, required=True)
+    rq_report_parser.add_argument("--manifest", type=Path, required=True)
+    rq_report_parser.add_argument("--out-prefix", type=Path, required=True)
+    rq_report_parser.add_argument("--metric", choices=("precision", "recall", "f1", "plasmid_recall"), default="f1")
     run_parser = sub.add_parser(
         "run",
         help="Run the full benchmark or selected stages.",
@@ -300,6 +311,8 @@ def main(argv=None):
         inputs.add_argument("--results-dir", type=Path, help="Directory for predictions, scores, and reports.")
         inputs.add_argument("--log-dir", type=Path, help="Directory for tool and mapping logs.")
         inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
+        inputs.add_argument("--genomad-db", type=Path, help="Path to the installed geNomad database directory (containing genomad_db/).")
+        inputs.add_argument("--plasme-db", type=Path, help="Path to the installed PLASMe database directory.")
         inputs.add_argument("--gplas2-external-predictions-dir", type=Path,
                             help="Directory containing <sample>.tsv external gplas2 classifier files.")
         inputs.add_argument("--local-inputs", action="store_true",
@@ -324,6 +337,10 @@ def main(argv=None):
         resources.add_argument("--min-read-len", type=int, help="Discard reads shorter than this after fastp.")
         resources.add_argument("--minimap2-preset", help="minimap2 assembly preset (default: asm5).")
         resources.add_argument("--flye-read-type", choices=("nano-raw", "nano-hq", "pacbio-raw", "pacbio-hifi"), help="Flye technology for optional stage 7.")
+        resources.add_argument("--trycycler-assembly-count", type=int,
+                               help="Independent Flye assemblies Trycycler reconciles per sample "
+                                    "(default: config value, normally 4). Higher is more robust but "
+                                    "multiplies stage-7 runtime for trycycler_mob_recon proportionally.")
         tools = command_parser.add_argument_group("tools")
         for option, destination, label in (
             ("--mob-recon", "mob_recon", "Enable or disable MOB-suite reconstruction."),
@@ -335,6 +352,9 @@ def main(argv=None):
             ("--plassembler", "plassembler", "Enable or disable optional Plassembler hybrid (long+short) plasmid assembly."),
             ("--hybracter-long", "hybracter_long", "Enable or disable optional Hybracter long-read-only assembly with plasmid recovery."),
             ("--hybracter-hybrid", "hybracter_hybrid", "Enable or disable optional Hybracter hybrid (long+short) assembly with plasmid recovery."),
+            ("--trycycler-mob-recon", "trycycler_mob_recon", "Enable or disable optional Trycycler consensus long-read assembly plus MOB-Recon."),
+            ("--genomad", "genomad", "Enable or disable optional geNomad ML classification."),
+            ("--plasme", "plasme", "Enable or disable optional PLASMe alignment+transformer classification."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
         tools.add_argument("--force-rerun-tools", action="store_true",
@@ -429,6 +449,14 @@ def main(argv=None):
         code = run([sys.executable, "python/summarize_depth_ladder.py", "--scores", str(args.scores),
                     "--manifest", str(args.manifest), "--out-prefix", str(args.out_prefix),
                     "--metric", args.metric], root)
+    elif args.command == "read-quality-ladder":
+        code = run([sys.executable, "python/make_read_quality_ladder.py", "--samples", str(args.samples),
+                    "--data-dir", str(args.data_dir), "--out-dir", str(args.out_dir),
+                    "--rungs", args.rungs], root)
+    elif args.command == "read-quality-report":
+        code = run([sys.executable, "python/summarize_read_quality_ladder.py", "--scores", str(args.scores),
+                    "--manifest", str(args.manifest), "--out-prefix", str(args.out_prefix),
+                    "--metric", args.metric], root)
     elif args.command == "select-candidates":
         command = [sys.executable, "python/select_operational_method.py", "--scores", str(args.scores),
                    "--sample-sheet", str(args.samples), "--results-dir", str(args.results_dir),
@@ -479,7 +507,7 @@ def main(argv=None):
         env = {}
         path_options = {
             "samples": "SAMPLE_SHEET", "data_dir": "DATA_DIR", "results_dir": "RESULTS_DIR",
-            "log_dir": "LOG_DIR", "platon_db": "PLATON_DB",
+            "log_dir": "LOG_DIR", "platon_db": "PLATON_DB", "genomad_db": "GENOMAD_DB", "plasme_db": "PLASME_DB",
             "gplas2_external_predictions_dir": "GPLAS2_EXTERNAL_PREDICTIONS_DIR",
         }
         for argument, variable in path_options.items():
@@ -498,7 +526,8 @@ def main(argv=None):
         if args.analysis_track:
             env["ANALYSIS_TRACK_FILTER"] = args.analysis_track
         positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN",
-                            "parallel_samples": "MAX_PARALLEL_SAMPLES", "parallel_tools": "MAX_PARALLEL_TOOLS"}
+                            "parallel_samples": "MAX_PARALLEL_SAMPLES", "parallel_tools": "MAX_PARALLEL_TOOLS",
+                            "trycycler_assembly_count": "TRYCYCLER_ASSEMBLY_COUNT"}
         for argument, variable in positive_options.items():
             value = getattr(args, argument)
             if value is not None:
@@ -515,7 +544,10 @@ def main(argv=None):
                                    ("flye_mob_recon", "RUN_FLYE_MOB_RECON"),
                                    ("plassembler", "RUN_PLASSEMBLER"),
                                    ("hybracter_long", "RUN_HYBRACTER_LONG"),
-                                   ("hybracter_hybrid", "RUN_HYBRACTER_HYBRID")):
+                                   ("hybracter_hybrid", "RUN_HYBRACTER_HYBRID"),
+                                   ("trycycler_mob_recon", "RUN_TRYCYCLER_MOB_RECON"),
+                                   ("genomad", "RUN_GENOMAD"),
+                                   ("plasme", "RUN_PLASME")):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"

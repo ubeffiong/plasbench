@@ -67,6 +67,28 @@ case "$PROFILE" in
  long-read) PKGS=(flye mob_suite);;
  plassembler) PKGS=(plassembler);;
  hybracter) PKGS=(hybracter);;
+ trycycler) PKGS=(trycycler flye medaka);;
+ genomad) PKGS=(genomad);;
+ plasme)
+    # PLASMe is distributed as a git checkout with its own conda env file,
+    # not a bioconda package -- there is no package for this profile to
+    # install, so give clear manual instructions instead (same idea as the
+    # gplas case above, but there is no installable-but-wrong fallback
+    # package here, so this exits rather than attempting a doomed install).
+    cat >&2 <<'EOF'
+NOTE: PLASMe is distributed as a git checkout with its own conda environment
+      file, not a conda/bioconda package -- this profile cannot install it
+      automatically. Install it manually:
+          git clone https://github.com/HubertTang/PLASMe.git
+          cd PLASMe && conda env create -f plasme.yaml
+      then make PLASMe.py executable and available as `PLASMe.py` on PATH
+      (e.g. symlink it into the plasme conda env's bin/ directory) -- the
+      same manual-PATH step this project already documents for gplas2.
+      Download its database once with: bash env/download_plasme_db.sh
+      See INSTALL.md for the full walkthrough.
+EOF
+    exit 1
+    ;;
  annotation) PKGS=(bakta);;
  annotation-prokka) PKGS=(prokka);;
  gplas)

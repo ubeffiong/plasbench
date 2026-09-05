@@ -16,6 +16,9 @@ rather than assigning an artificial zero score.
 | plassembler | reassembly | applicable | long + short reads (hybrid) | `adapt_plassembler.sh` | optional |
 | hybracter_long | reassembly | applicable | long reads | `adapt_hybracter.sh` | optional |
 | hybracter_hybrid | reassembly | applicable | long + short reads (hybrid) | `adapt_hybracter.sh` | optional |
+| trycycler_mob_recon | binning | applicable | long reads | `adapt_mob_recon.sh` | optional |
+| geNomad | ml_classification | not applicable | short-read assembly | `adapt_genomad.sh` | optional |
+| PLASMe | ml_classification | not applicable | short-read assembly | `adapt_plasme.sh` | optional |
 
 The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
 computes bin metrics for declared binning methods; the report labels all other
@@ -70,3 +73,54 @@ depending on assembly completeness), so this adapter searches recursively for
 valid "no plasmids" prediction, scored as such, same as Plassembler.
 
     adapt_hybracter.sh <hybracter_out_dir> <unused_base_asm> <out_fasta>
+
+## adapt_genomad.sh (ML classifier, see adapters/SCORES.md)
+
+`genomad end-to-end` writes `<prefix>_summary/<prefix>_plasmid.fna` (the
+tool's own hard call, taken unchanged) and
+`<prefix>_aggregated_classification/<prefix>_aggregated_classification.tsv`
+(one row per INPUT contig -- not just the hard call -- with a `plasmid_score`
+column). The adapter takes the hard call as-is, and additionally emits
+`pred_genomad.candidates.fasta` + `pred_genomad.scores.tsv` (the wider
+candidates universe, extracted from the base assembly FASTA by matching
+`seq_name` in the aggregated classification table) so stage 5 can sweep a
+PR-curve alongside the point estimate. geNomad is a per-contig classifier
+with no grouping output, so `bins.tsv` is always header-only (matching
+`adapt_platon.sh`'s convention) -- `binning_capable=no` in
+`config/tool_capabilities.tsv` is what actually decides "not applicable",
+not the adapter.
+
+    adapt_genomad.sh <genomad_out_dir> <base_assembly_fasta> <out_fasta>
+
+## adapt_plasme.sh (ML classifier, see adapters/SCORES.md)
+
+`PLASMe.py INPUT_CONTIG OUTPUT_PLASMIDS` writes an explicit output FASTA
+(the tool's own hard call, per its `-p/--probability` threshold) and a
+sibling `OUTPUT_PLASMIDS_report.csv` (`contig, length, reference, order,
+evidence, score, amb_region`) covering every contig PLASMe's alignment+
+transformer pipeline scored, not just the ones passing the threshold --
+PLASMe's own docs describe this `score` column as meant for exactly this
+kind of PR-curve sweep. `scripts/04_run_tools.sh`'s `run_plasme()` invokes
+PLASMe with a fixed, adapter-known output filename
+(`plasme_output.fasta`) inside its own per-tool directory so this adapter
+can find both files reliably. Like Platon and geNomad, PLASMe is a
+per-contig classifier with no grouping output, so `bins.tsv` is always
+header-only.
+
+PLASMe itself is distributed as a git checkout with its own conda
+environment, not a bioconda package -- `PLASMe.py` is expected on PATH
+after manual setup, the same convention this project already documents for
+gplas2 (see INSTALL.md).
+
+    adapt_plasme.sh <plasme_out_dir> <base_assembly_fasta> <out_fasta>
+
+## trycycler_mob_recon (no new adapter)
+
+Trycycler is a reconciler, not an assembler: `scripts/07_long_read_reconstruct.sh`
+runs several independent Flye assemblies, reconciles them into one consensus
+FASTA per replicon, concatenates the surviving clusters' consensus sequences
+into one assembly FASTA, then runs `mob_recon` on that assembly exactly as
+`flye_mob_recon` does on Flye's own single assembly -- so it reuses
+`adapt_mob_recon.sh` completely unchanged. A cluster that fails to reconcile
+is dropped rather than failing the whole sample; see `docs/USER_GUIDE.md`'s
+Long-Read Reconstruction section for the exact policy.

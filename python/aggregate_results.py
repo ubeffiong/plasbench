@@ -83,6 +83,10 @@ def read_scores(path):
                     else None
                 ),
                 "bin_f1": float(f[idx["bin_f1"]]) if "bin_f1" in idx and f[idx["bin_f1"]] else None,
+                # Only defined for tools whose adapter exposed a per-record
+                # probability (adapters/SCORES.md); gracefully absent, never 0,
+                # for every other tool -- see merge_pr_metrics.py.
+                "pr_auc": float(f[idx["pr_auc"]]) if "pr_auc" in idx and f[idx["pr_auc"]] else None,
             })
     return rows
 
@@ -112,7 +116,7 @@ def read_status(path):
 
 
 def summarise(rows, status_counts):
-    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "n": 0})
+    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "n": 0})
     for r in rows:
         t = by_tool[r["tool"]]
         t["precision"].append(r["precision"])
@@ -121,6 +125,7 @@ def summarise(rows, status_counts):
         if r["plasmid_recall"] is not None:
             t["plasmid_recall"].append(r["plasmid_recall"])
         if r["bin_f1"] is not None: t["bin_f1"].append(r["bin_f1"])
+        if r["pr_auc"] is not None: t["pr_auc"].append(r["pr_auc"])
         t["n"] += 1
 
     summary = []
@@ -138,6 +143,11 @@ def summarise(rows, status_counts):
             "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]) if d["plasmid_recall"] else None,
             "mean_bin_f1": statistics.mean(d["bin_f1"]) if d["bin_f1"] else None,
             "n_bin_scored": len(d["bin_f1"]),
+            # Supplementary, never a ranking replacement: only defined for
+            # tools that expose a probability (adapters/SCORES.md); ranking
+            # below stays on mean_f1 so every tool remains comparable.
+            "mean_pr_auc": statistics.mean(d["pr_auc"]) if d["pr_auc"] else None,
+            "n_pr_scored": len(d["pr_auc"]),
             "n_completed": status_counts[tool]["completed"] + status_counts[tool]["reused"],
             "n_failed": status_counts[tool]["failed"],
             "n_skipped": status_counts[tool]["skipped"],
@@ -224,7 +234,8 @@ def write_comparisons(rows, path):
 
 def write_tsv(summary, path):
     cols = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
-            "mean_recall", "mean_plasmid_recall", "n_bin_scored", "mean_bin_f1", "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1"]
+            "mean_recall", "mean_plasmid_recall", "n_bin_scored", "mean_bin_f1", "n_pr_scored", "mean_pr_auc",
+            "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -233,6 +244,7 @@ def write_tsv(summary, path):
                 f"{s['mean_precision']:.4f}", f"{s['mean_recall']:.4f}",
                 f"{s['mean_plasmid_recall']:.4f}" if s["mean_plasmid_recall"] is not None else "",
                 s['n_bin_scored'], f"{s['mean_bin_f1']:.4f}" if s['mean_bin_f1'] is not None else "",
+                s['n_pr_scored'], f"{s['mean_pr_auc']:.4f}" if s['mean_pr_auc'] is not None else "",
                 f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}" if s["f1_ci_low"] is not None else "",
                 f"{s['f1_ci_high']:.4f}" if s["f1_ci_high"] is not None else "", f"{s['median_f1']:.4f}",
             ]) + "\n")

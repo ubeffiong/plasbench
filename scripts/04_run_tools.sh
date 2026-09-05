@@ -204,6 +204,53 @@ run_gplas2_external() {
     fi
 }
 
+run_genomad() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    if tool_enabled RUN_GENOMAD genomad && have genomad; then
+        local TOOL="genomad" OUT="$RDIR/genomad" PRED="$RDIR/pred_genomad.plasmid.fasta" DONE="$RDIR/.genomad.complete"
+        if is_complete "$DONE" "$PRED"; then
+            log "  genomad: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        else
+            rm -rf "$OUT" "$PRED" "$DONE"
+            log "  genomad ($SAMPLE) ..."
+            local START; START=$(profile_start)
+            if profile_exec genomad end-to-end --threads "$GENOMAD_THREADS" "$CONTIGS" "$OUT" "$GENOMAD_DB/genomad_db" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_genomad.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "genomad failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+        fi
+    elif tool_enabled RUN_GENOMAD genomad; then
+        warn "genomad is enabled but not installed; skipped for $SAMPLE"
+        record_status "$SAMPLE" "genomad" "skipped" "" "command unavailable"
+    fi
+}
+
+run_plasme() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    if tool_enabled RUN_PLASME plasme && have PLASMe.py; then
+        local TOOL="plasme" OUT="$RDIR/plasme" PRED="$RDIR/pred_plasme.plasmid.fasta" DONE="$RDIR/.plasme.complete"
+        if is_complete "$DONE" "$PRED"; then
+            log "  plasme: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        else
+            rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT"
+            log "  plasme ($SAMPLE) ..."
+            local START; START=$(profile_start)
+            if profile_exec PLASMe.py "$CONTIGS" "$OUT/plasme_output.fasta" -d "$PLASME_DB" \
+                    -p "$PLASME_PROBABILITY" -t "$PLASME_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_plasme.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "plasme failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+        fi
+    elif tool_enabled RUN_PLASME plasme; then
+        warn "plasme is enabled but PLASMe.py is not installed (or not on PATH); skipped for $SAMPLE"
+        record_status "$SAMPLE" "plasme" "skipped" "" "command unavailable"
+    fi
+}
+
 # One sample's whole tool set. mob_recon, platon, plasmidspades, and
 # gplas2_external are independent given the same assembly, so they are
 # always launched through the same MAX_PARALLEL_TOOLS-gated job pool
@@ -225,6 +272,8 @@ process_sample() {
         tool_enabled RUN_PLASMIDSPADES plasmidspades && record_status "$SAMPLE" "plasmidspades" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_GPLAS2_MOB gplas2_mob && record_status "$SAMPLE" "gplas2_mob" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_GPLAS2_EXTERNAL gplas2_external && record_status "$SAMPLE" "gplas2_external" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_GENOMAD genomad && record_status "$SAMPLE" "genomad" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_PLASME plasme && record_status "$SAMPLE" "plasme" "skipped" "" "assembly contigs unavailable"
         return 0
     fi
     log "=== Run tools on $SAMPLE ==="
@@ -234,6 +283,8 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_platon "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmidspades "$SAMPLE" "$RDIR" "$CONTIGS" "$T1" "$T2" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_gplas2_external "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_genomad "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasme "$SAMPLE" "$RDIR" "$CONTIGS" &
 
     # gplas2_mob's classifier seed comes straight from mob_recon's own output
     # directory, so it must not start until that finished (successfully or
@@ -260,7 +311,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

@@ -89,7 +89,7 @@ it for you, the same as it does for mob_recon or Platon.
 
 ## 5. Long-read/hybrid reconstruction (optional)
 
-Four tools are available for native long-read (ONT/PacBio) or hybrid
+Five tools are available for native long-read (ONT/PacBio) or hybrid
 (long+short) reconstruction, all off by default and independently selectable:
 
 ```bash
@@ -97,11 +97,18 @@ plasbench install-tools long-read      # Flye + MOB-suite
 plasbench install-tools plassembler    # Plassembler
 bash env/download_plassembler_db.sh
 plasbench install-tools hybracter      # Hybracter (both modes; reuses the Plassembler database above)
+plasbench install-tools trycycler      # Trycycler + Flye (+ Medaka, for optional polishing)
 # then enable any combination of:
-#   RUN_FLYE_MOB_RECON=1, RUN_PLASSEMBLER=1, RUN_HYBRACTER_LONG=1, RUN_HYBRACTER_HYBRID=1
+#   RUN_FLYE_MOB_RECON=1, RUN_PLASSEMBLER=1, RUN_HYBRACTER_LONG=1,
+#   RUN_HYBRACTER_HYBRID=1, RUN_TRYCYCLER_MOB_RECON=1
 # in config/config.sh, or the equivalent --flye-mob-recon/--plassembler/
-# --hybracter-long/--hybracter-hybrid CLI flags.
+# --hybracter-long/--hybracter-hybrid/--trycycler-mob-recon CLI flags.
 ```
+`trycycler_mob_recon` is a second long-read-only assembly path alongside
+`flye_mob_recon`, since assembler choice materially affects plasmid
+completeness on ONT data -- it reconciles several independent Flye assemblies
+of the same reads into one consensus before handing it to MOB-Recon, so it is
+substantially slower (roughly `TRYCYCLER_ASSEMBLY_COUNT`x a single Flye run).
 Stage the long-read FASTQ per sample as `data/<sample>/long_reads.fastq.gz`.
 Every one of these tools is subject to the circularity guard (see
 `docs/COHORTS.md`'s `truth_independent_of_long_reads` column): a sample is
@@ -110,7 +117,40 @@ or the tool's own override variable is set.
 
 ---
 
-## 6. Lock your versions (for reproducibility)
+## 6. ML/graph-based classifiers (optional)
+
+geNomad is a gene-based neural classifier for plasmid detection on assembly
+contigs, off by default:
+
+```bash
+plasbench install-tools genomad
+bash env/download_genomad_db.sh
+# then enable RUN_GENOMAD=1 in config/config.sh, or --genomad on
+```
+Unlike the classical tools, geNomad exposes a per-contig `plasmid_score`, so
+it is scored with an optional precision-recall-curve/AUC sweep alongside its
+own hard call -- see `adapters/SCORES.md` for the mechanism and
+`docs/USER_GUIDE.md`'s Commands section for the leaderboard's `mean_pr_auc`
+column.
+
+PLASMe (alignment+transformer classifier) is the same idea, but it is
+distributed as a git checkout with its own conda environment rather than a
+conda/bioconda package, so `plasbench install-tools plasme` cannot install it
+automatically -- it prints these manual steps instead:
+
+```bash
+git clone https://github.com/HubertTang/PLASMe.git
+cd PLASMe && conda env create -f plasme.yaml
+# make PLASMe.py executable and put it on PATH (e.g. symlink it into the
+# plasme conda env's bin/ directory) -- the same manual step this project
+# already documents for gplas2 below
+bash env/download_plasme_db.sh   # ~12.4 GB, via PLASMe's own PLASMe_db.py
+# then enable RUN_PLASME=1 in config/config.sh, or --plasme on
+```
+
+---
+
+## 7. Lock your versions (for reproducibility)
 
 After a successful install:
 ```bash

@@ -25,6 +25,8 @@ NEED_PLATON_DB=0
 NEED_PLASSEMBLER_DB=0
 NEED_MOBSUITE_DB=0
 NEED_BAKTA_DB=0
+NEED_GENOMAD_DB=0
+NEED_PLASME_DB=0
 
 for candidate in micromamba mamba conda; do
     have "$candidate" && { CONDA_TOOL="$candidate"; break; }
@@ -124,6 +126,29 @@ fi
 if [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]]; then
     check_tool flye long-read
 fi
+if [[ "${RUN_TRYCYCLER_MOB_RECON:-0}" -eq 1 ]]; then
+    check_tool trycycler trycycler
+    check_tool flye trycycler
+    [[ "${TRYCYCLER_MEDAKA_POLISH:-0}" -eq 1 ]] && check_tool medaka_consensus trycycler
+fi
+if [[ "${RUN_GENOMAD:-0}" -eq 1 ]]; then
+    check_tool genomad genomad
+    if [[ -d "$GENOMAD_DB/genomad_db" ]] && [[ -n "$(ls -A "$GENOMAD_DB/genomad_db" 2>/dev/null)" ]]; then
+        log "  [ok]   geNomad DB at $GENOMAD_DB/genomad_db"
+    else
+        warn "  [MISS] geNomad DB not found at $GENOMAD_DB/genomad_db"
+        NEED_GENOMAD_DB=1; CORE_OK=0
+    fi
+fi
+if [[ "${RUN_PLASME:-0}" -eq 1 ]]; then
+    check_tool PLASMe.py plasme
+    if [[ -d "$PLASME_DB" ]] && [[ -n "$(ls -A "$PLASME_DB" 2>/dev/null)" ]]; then
+        log "  [ok]   PLASMe DB at $PLASME_DB"
+    else
+        warn "  [MISS] PLASMe DB not found at $PLASME_DB"
+        NEED_PLASME_DB=1; CORE_OK=0
+    fi
+fi
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
     if [[ "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
         check_tool bakta annotation
@@ -140,7 +165,7 @@ if [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
         NEED_PLATON_DB=1; CORE_OK=0
     fi
 fi
-if [[ "${RUN_MOB_RECON:-0}" -eq 1 || "${RUN_GPLAS2_MOB:-0}" -eq 1 ]] && have mob_init; then
+if [[ "${RUN_MOB_RECON:-0}" -eq 1 || "${RUN_GPLAS2_MOB:-0}" -eq 1 || "${RUN_TRYCYCLER_MOB_RECON:-0}" -eq 1 ]] && have mob_init; then
     # mob_init is NOT idempotent: it re-downloads ~450MB unconditionally, with
     # no resume. So check for the database here rather than letting mob_init
     # "check" by downloading it again. The path is inside the installed
@@ -171,7 +196,8 @@ fi
 
 NOTHING_MISSING=0
 [[ "$CORE_OK" -eq 1 && ${#NEEDED_PROFILES[@]} -eq 0 && "$NEED_PLATON_DB" -eq 0 \
-    && "$NEED_MOBSUITE_DB" -eq 0 && "$NEED_BAKTA_DB" -eq 0 && "$NEED_PLASSEMBLER_DB" -eq 0 ]] && NOTHING_MISSING=1
+    && "$NEED_MOBSUITE_DB" -eq 0 && "$NEED_BAKTA_DB" -eq 0 && "$NEED_PLASSEMBLER_DB" -eq 0 \
+    && "$NEED_GENOMAD_DB" -eq 0 && "$NEED_PLASME_DB" -eq 0 ]] && NOTHING_MISSING=1
 
 echo
 if [[ "$NOTHING_MISSING" -eq 1 ]]; then
@@ -181,7 +207,9 @@ fi
 
 warn "Some dependencies are missing."
 FIXABLE=0
-[[ "$NEED_CONDA" -eq 1 || ${#NEEDED_PROFILES[@]} -gt 0 || "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 || "$NEED_BAKTA_DB" -eq 1 || "$NEED_PLASSEMBLER_DB" -eq 1 ]] && FIXABLE=1
+[[ "$NEED_CONDA" -eq 1 || ${#NEEDED_PROFILES[@]} -gt 0 || "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 \
+    || "$NEED_BAKTA_DB" -eq 1 || "$NEED_PLASSEMBLER_DB" -eq 1 || "$NEED_GENOMAD_DB" -eq 1 \
+    || "$NEED_PLASME_DB" -eq 1 ]] && FIXABLE=1
 
 if [[ "$FIXABLE" -eq 0 ]]; then
     for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && warn "  $note"; done
@@ -196,6 +224,8 @@ for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $pr
 [[ "$NEED_MOBSUITE_DB" -eq 1 ]] && echo "  - the MOB-suite database"
 [[ "$NEED_BAKTA_DB" -eq 1 ]] && echo "  - the Bakta database"
 [[ "$NEED_PLASSEMBLER_DB" -eq 1 ]] && echo "  - the Plassembler database"
+[[ "$NEED_GENOMAD_DB" -eq 1 ]] && echo "  - the geNomad database"
+[[ "$NEED_PLASME_DB" -eq 1 ]] && echo "  - the PLASMe database (~12.4 GB)"
 for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && echo "  (not automatic) $note"; done
 echo
 
@@ -233,6 +263,12 @@ if [[ "$NEED_BAKTA_DB" -eq 1 ]]; then
 fi
 if [[ "$NEED_PLASSEMBLER_DB" -eq 1 ]]; then
     bash "$HERE/../env/download_plassembler_db.sh" "${YES_FLAG[@]}" || warn "Plassembler database step did not complete; see output above"
+fi
+if [[ "$NEED_GENOMAD_DB" -eq 1 ]]; then
+    bash "$HERE/../env/download_genomad_db.sh" "${YES_FLAG[@]}" || warn "geNomad database step did not complete; see output above"
+fi
+if [[ "$NEED_PLASME_DB" -eq 1 ]]; then
+    bash "$HERE/../env/download_plasme_db.sh" "${YES_FLAG[@]}" || warn "PLASMe database step did not complete; see output above"
 fi
 
 echo

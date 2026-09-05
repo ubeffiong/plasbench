@@ -316,6 +316,74 @@ depth, and seed. It never overwrites the original reads or cohort. Do not run a
 headline leaderboard on a depth-ladder sheet: subsamples share parent genomes;
 PlasBench blocks this and `depth-report` is the valid analysis path.
 
+### Read-quality ladder
+
+The long-read/hybrid track's analog to the depth ladder: long-read plasmid
+recovery is at least as sensitive to read length and quality (R9 vs R10
+chemistry) as to depth, and deserves the same rigor before a long-read
+leaderboard is trusted. Uses `filtlong` to apply absolute length/quality
+thresholds ("rungs") -- a deterministic filter, not a random subsample, so
+there is no `--seed`. Install it with `plasbench install-tools filtlong`
+(a direct conda-forge/bioconda package install; `filtlong` is not tied to any
+one reconstruction tool, so it is not bundled into another profile).
+
+```bash
+plasbench read-quality-ladder --samples cohorts/public-v1.tsv --data-dir data \
+  --out-dir read-quality-ladder --rungs 1000:8,5000:10,20000:15
+plasbench run --samples read-quality-ladder/read_quality_ladder.samples.tsv \
+  --data-dir read-quality-ladder/data --results-dir read-quality-ladder/results \
+  --local-inputs --flye-mob-recon on
+
+plasbench read-quality-report --scores read-quality-ladder/results/scores.tsv \
+  --manifest read-quality-ladder/read_quality_ladder.manifest.tsv \
+  --out-prefix read-quality-ladder/results/read_quality_ladder
+```
+
+Each rung is `MIN_LENGTH:MIN_MEAN_Q` (minimum read length in bp, minimum mean
+Phred quality); reads failing either threshold are dropped. This ladder
+targets the long-read/hybrid tools (`flye_mob_recon`, `plassembler`,
+`hybracter_long`, `hybracter_hybrid`, `trycycler_mob_recon`) -- run it with
+one or more of those enabled, not the short-read tools. Same correlated-sample
+protection as the depth ladder: the generated sheet's `parent_sample_id`
+column makes PlasBench refuse a headline leaderboard on it, directing you to
+`read-quality-report` instead.
+
+### ML/graph-based classifiers and the PR-curve
+
+Unlike the classical tools (Platon, mob_recon, ...), which are scored as one
+hard-inclusion point, an ML classifier that exposes a per-contig probability
+(geNomad's `plasmid_score`, and any future tool following the same contract)
+is additionally scored with a precision-recall-curve sweep across every
+distinct probability value it emits, since threshold choice materially
+changes an ML tool's apparent performance in a way it never does for a
+classical tool. This is entirely additive: a tool with no probability output
+is scored exactly as it always has been.
+
+```bash
+plasbench install-tools genomad
+bash env/download_genomad_db.sh
+plasbench run --genomad on
+```
+
+PLASMe (alignment+transformer classifier) follows the same contract from a
+different score source -- its `_report.csv`'s `score` column covers every
+contig it aligned, not just the ones passing its own hard-call threshold.
+It is not installable via `plasbench install-tools plasme` (no bioconda
+package exists); see `INSTALL.md` section 6 for the manual git-clone setup.
+
+```bash
+bash env/download_plasme_db.sh
+plasbench run --plasme on
+```
+
+Per sample/tool, this writes `<tool>.pr_curve.tsv` (`threshold, precision,
+recall, tp_bp, fp_bp, fn_bp`) and `<tool>.pr_summary.tsv` (`pr_auc,
+pr_n_thresholds`) under `results/<sample>/`; `mean_pr_auc`/`n_pr_scored`
+appear as supplementary leaderboard columns in
+`benchmark.leaderboard.tsv` -- never a ranking replacement, and gracefully
+absent (not zero) for every tool that doesn't expose a probability. See
+`adapters/SCORES.md` for the full adapter contract behind this.
+
 ### Install dependency tools
 
 After installing the lightweight PlasBench command, install only the optional
@@ -503,6 +571,9 @@ still exits non-zero -- nothing fails silently.
 --plassembler on|off     Optional hybrid (long+short) Plassembler assembly. Default: off.
 --hybracter-long on|off  Optional long-read-only Hybracter assembly. Default: off.
 --hybracter-hybrid on|off Optional hybrid (long+short) Hybracter assembly. Default: off.
+--trycycler-mob-recon on|off Optional Trycycler consensus long-read assembly plus MOB-Recon. Default: off.
+--genomad on|off         Optional geNomad ML classification (assembly contigs). Default: off.
+--plasme on|off          Optional PLASMe ML classification (assembly contigs). Default: off.
 --force-rerun-tools      Delete completed tool outputs and run them again.
 ```
 
@@ -511,12 +582,13 @@ config file when you want a persistent local default. `--gplas2-mob on`
 requires gplas, a successful MOB-recon result, and an assembly graph. It fails
 safely if MOB and graph contig identifiers do not agree.
 
-The four long-read/hybrid options (`--flye-mob-recon`, `--plassembler`,
-`--hybracter-long`, `--hybracter-hybrid`) are independent of each other and of
-every short-read tool -- enable any combination you want, and each is scored
-under its own analysis track (see [Long-Read Reconstruction](#long-read-reconstruction)).
-Each is also subject to the circularity guard: a sample is skipped unless its
-long reads are declared independent of its truth assembly, or the tool's own
+The five long-read/hybrid options (`--flye-mob-recon`, `--plassembler`,
+`--hybracter-long`, `--hybracter-hybrid`, `--trycycler-mob-recon`) are
+independent of each other and of every short-read tool -- enable any
+combination you want, and each is scored under its own analysis track (see
+[Long-Read Reconstruction](#long-read-reconstruction)). Each is also subject
+to the circularity guard: a sample is skipped unless its long reads are
+declared independent of its truth assembly, or the tool's own
 `*_ALLOW_CIRCULAR_TRUTH` override is set (see `docs/COHORTS.md`).
 
 ## Workflow
@@ -817,9 +889,27 @@ plasbench run --hybracter-long on           # long-read-only, via Hybracter inst
 
 Hybracter's two modes are independently selectable -- enabling one never runs
 the other -- and both reuse the same Plassembler database rather than a second
-copy of it. All four long-read/hybrid tools (`flye_mob_recon`, `plassembler`,
-`hybracter_long`, `hybracter_hybrid`) are subject to the same circularity
-guard (`docs/COHORTS.md`: `truth_independent_of_long_reads`).
+copy of it.
+
+For long-read-only input, Trycycler+MOB-Recon is a third path alongside
+Flye+MOB-Recon and Hybracter's long mode: it reconciles several independent
+Flye assemblies of the same reads into one consensus per replicon before
+handing the result to MOB-Recon, which makes it substantially slower (roughly
+`TRYCYCLER_ASSEMBLY_COUNT`x a single Flye run) but more robust to a single
+misassembled replicon:
+
+```bash
+plasbench install-tools trycycler
+plasbench run --trycycler-mob-recon on --trycycler-assembly-count 4
+```
+A single cluster that fails to reconcile is dropped and the sample still
+completes on whichever clusters survive (recorded in `tool_status.tsv`'s
+reason as e.g. "dropped 1 of 4 cluster(s)"); only a sample where every cluster
+fails to reconcile is recorded as failed.
+
+All five long-read/hybrid tools (`flye_mob_recon`, `plassembler`,
+`hybracter_long`, `hybracter_hybrid`, `trycycler_mob_recon`) are subject to
+the same circularity guard (`docs/COHORTS.md`: `truth_independent_of_long_reads`).
 
 For source-backed structural evidence, optionally supply
 `results/<sample>/pred_<tool>.evidence.tsv` with the columns `record_id`,
