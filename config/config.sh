@@ -219,6 +219,43 @@ export TRYCYCLER_ASSEMBLY_COUNT="${TRYCYCLER_ASSEMBLY_COUNT:-4}"
 export TRYCYCLER_MEDAKA_POLISH="${TRYCYCLER_MEDAKA_POLISH:-0}"
 export TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH="${TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH:-0}"
 
+# --- Cohort QC anomaly flagging (advisory-only, never blocks or excludes) ---
+# Stats are computed fresh from each downloaded reference.fna at stage 2
+# (python/compute_assembly_stats.py), then compared across the whole cohort
+# at stage 6 (python/flag_cohort_outliers.py) via robust (median/MAD)
+# z-scores. Unlike every optional tool above, this is cheap, stdlib-only, and
+# strictly advisory, so it defaults ON rather than off; set to 0 to disable.
+export COHORT_QC_FLAGS_ENABLED="${COHORT_QC_FLAGS_ENABLED:-1}"
+# Below this many samples with stats, outlier detection is withheld rather
+# than computed on too little data to be meaningful (same "withhold, don't
+# guess" policy as recommendation_validation.tsv's leave-one-study-out gate).
+export COHORT_QC_MIN_COHORT_SIZE="${COHORT_QC_MIN_COHORT_SIZE:-8}"
+# Modified (Iglewicz-Hoaglin) z-score magnitude beyond which a value is
+# flagged. 3.5 is the commonly-cited threshold for this statistic.
+export COHORT_QC_ZSCORE_THRESHOLD="${COHORT_QC_ZSCORE_THRESHOLD:-3.5}"
+
+# --- Decision-support recommendation model (descriptive, not a scoring change) ---
+# A hand-rolled, pure-stdlib ridge regression predicting a tool's F1/
+# plasmid_recall directly from an isolate's own continuous features
+# (read_depth_x, true_plasmid_bp, true_plasmid_count) instead of a discrete
+# stratum mean. Off by default: unlike Part 1's QC flagging, this does real
+# cross-validated fitting work, and is only ever used when its own
+# leave-one-study-out gate (below) actually passes -- otherwise
+# select_operational_method.py/select_unknown_sample.py behave exactly as if
+# this were never enabled. See docs/USER_GUIDE.md for the full caveat.
+export RUN_RECOMMENDATION_MODEL="${RUN_RECOMMENDATION_MODEL:-0}"
+# At least this many distinct source_study groups are required for
+# leave-one-study-out to mean anything for a fitted model (higher than
+# validate_recommendations.py's own 2-study minimum, since a multi-parameter
+# fit benefits from more folds than a plain mean-selector does).
+export RECOMMENDATION_MODEL_MIN_STUDIES="${RECOMMENDATION_MODEL_MIN_STUDIES:-3}"
+export RECOMMENDATION_MODEL_MIN_SAMPLES="${RECOMMENDATION_MODEL_MIN_SAMPLES:-20}"
+# The model's LOSO mean-absolute-error must beat the fixed-weight baseline's
+# (the training studies' own per-tool mean, evaluated under the identical
+# folds) by at least this relative fraction, for every target -- never
+# "ready" on a technicality that is actually worse than just using the mean.
+export RECOMMENDATION_MODEL_MIN_IMPROVEMENT="${RECOMMENDATION_MODEL_MIN_IMPROVEMENT:-0.05}"
+
 # Reuse a completed tool result by default. Set FORCE_RERUN_TOOLS=1 to discard
 # completed per-tool output and run it again (for example after a tool upgrade).
 export FORCE_RERUN_TOOLS="${FORCE_RERUN_TOOLS:-0}"

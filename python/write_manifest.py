@@ -87,6 +87,21 @@ def status_rows(results_dir):
         return list(csv.DictReader(handle, delimiter="\t"))
 
 
+def recommendation_model_status(results_dir):
+    """Provenance for the decision-support recommendation model: was one fit
+    for this run, and did it clear its own leave-one-study-out gate. Read
+    straight from fit_recommendation_model.py's own JSON rather than
+    recomputed -- this is not a database, just a small status readout."""
+    path = Path(results_dir) / "benchmark.recommendation_model.json"
+    if not path.is_file():
+        return {"available": False}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"available": False}
+    return {"available": True, "model_ready": bool(payload.get("model_ready")), "reason": payload.get("reason", "")}
+
+
 def directory_identity(path):
     """Identify a database without hashing multi-gigabyte contents on every run."""
     if not path:
@@ -128,7 +143,10 @@ def main():
                 "TRYCYCLER_MEDAKA_POLISH", "TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH",
                 "RUN_GENOMAD", "GENOMAD_DB", "RUN_PLASME", "PLASME_DB", "PLASME_PROBABILITY",
                 "PLASME_VERSION", "PLASME_CHECKOUT_DIR",
-                "RUN_PLASGRAPH2", "PLASGRAPH2_MODEL_DIR", "PLASGRAPH2_CPU_ONLY", "PLASGRAPH2_VERSION")
+                "RUN_PLASGRAPH2", "PLASGRAPH2_MODEL_DIR", "PLASGRAPH2_CPU_ONLY", "PLASGRAPH2_VERSION",
+                "COHORT_QC_FLAGS_ENABLED", "COHORT_QC_MIN_COHORT_SIZE", "COHORT_QC_ZSCORE_THRESHOLD",
+                "RUN_RECOMMENDATION_MODEL", "RECOMMENDATION_MODEL_MIN_STUDIES",
+                "RECOMMENDATION_MODEL_MIN_SAMPLES", "RECOMMENDATION_MODEL_MIN_IMPROVEMENT")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     truth_tables = {}
@@ -166,7 +184,8 @@ def main():
         # pipeline requires the PLASMe checkout's path, so this entry is only
         # ever populated if the user chooses to record it.
         "models": {"plasgraph2": directory_identity(os.environ.get("PLASGRAPH2_MODEL_DIR", "")),
-                   "plasme": directory_identity(os.environ.get("PLASME_CHECKOUT_DIR", ""))},
+                   "plasme": directory_identity(os.environ.get("PLASME_CHECKOUT_DIR", "")),
+                   "recommendation": recommendation_model_status(args.results_dir)},
         "settings": {key: os.environ.get(key) for key in settings},
         "input_checksums": {"sample_sheet": sha256(sample_sheet), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},

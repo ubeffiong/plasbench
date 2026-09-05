@@ -20,9 +20,15 @@ Each tool emits a set of sequences it considers plasmid. A thin per-tool adapter
 - classification tools (Platon, mob_recon) → the contigs/bins they labelled plasmid;
 - re-assembly tools (plasmidSPAdes, gplas) → their reconstructed plasmid contigs.
 
-The present workflow consumes paired short-read FASTQs, usually Illumina. Long
-reads are used to establish the complete reference, not as a native prediction
-input; long-read reconstruction modes are a future extension.
+The default workflow consumes paired short-read FASTQs, usually Illumina, and
+long reads establish the complete reference. Long reads are ALSO a native
+prediction input for the tools that take them: `flye_mob_recon`,
+`hybracter_long` and `trycycler_mob_recon` (long reads alone), and
+`plassembler` and `hybracter_hybrid` (long + short). Each is off by default.
+Where a tool sits is a declared registry property (`analysis_track` in
+`config/tool_capabilities.tsv`), so every score is stamped with the track it
+was earned on and leaderboards are written per track, never pooled -- see
+"Recommendation validation and tracks" below and the circularity section.
 
 ## Projection onto the reference
 The predicted-plasmid FASTA is aligned to the reference with `minimap2 -x asm5` (same
@@ -130,6 +136,15 @@ external clinical validation. Track-specific leaderboard files are emitted as
 `benchmark.short_read.leaderboard.tsv`, `benchmark.long_read.leaderboard.tsv`,
 and `benchmark.hybrid.leaderboard.tsv`; methods from different tracks must not
 be pooled into one operational conclusion.
+
+Optionally (`RUN_RECOMMENDATION_MODEL=1`, off by default), a hand-rolled
+ridge regression replaces the recommendation formula's F1/plasmid-recall
+terms with predictions from an isolate's own continuous features, fit and
+gated by the identical leave-one-study-out folds above -- never used unless
+it demonstrably beats the plain per-tool mean under those folds. This is a
+descriptive recommendation, not a scoring change, and is not validated
+beyond the cohorts it was fit on. See `docs/USER_GUIDE.md`'s "Decision-support
+recommendation model" section.
 
 ## Long-read and hybrid tools and the circularity constraint
 

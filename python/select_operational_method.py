@@ -21,6 +21,8 @@ import shutil
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from recommendation_model import decision_score, load_model
+
 
 NUMERIC = ("precision", "recall", "f1", "plasmid_recall", "bin_f1", "unmapped_pred_bp",
            "true_plasmid_bp", "split_events", "merge_events", "contaminated_bins",
@@ -84,22 +86,36 @@ def annotate(row, metadata):
     result["gram_group"] = sample.get("gram_group") or "not_recorded"
     result["plasmid_size_band"] = band(number(row, "true_plasmid_bp"), (10_000, 100_000), ("small", "medium", "large"))
     result["plasmid_count_band"] = band(number(row, "true_plasmid_count"), (2, 5), ("single", "few", "many"))
-    result["read_depth_band"] = band(number(sample, "read_depth_x"), (30, 80), ("low", "moderate", "high"))
+    result["read_depth_x"] = number(sample, "read_depth_x")
+    result["read_depth_band"] = band(result["read_depth_x"], (30, 80), ("low", "moderate", "high"))
     result["amr_status"] = "AMR annotated" if number(row, "true_amr_gene_count", 0) > 0 else "AMR not annotated"
     result["fragmentation_excess_records"] = max(0.0, number(row, "predicted_record_count", 0.0) - number(row, "recovered_plasmid_count", 0.0))
     return result
 
 
-def tool_quality(rows, statuses, total_samples):
-    """Multi-objective descriptive score, only used after eligibility checks."""
+def tool_quality(rows, statuses, total_samples, model=None):
+    """Multi-objective descriptive score, only used after eligibility checks.
+
+    model (optional): a ready RecommendationModel (recommendation_model.py).
+    When given, f1/plasmid_recall become the model's own prediction for each
+    row's own features, averaged over the stratum's rows -- interpolation
+    from continuous isolate features, instead of a raw observed-value mean.
+    Every other component (precision, recall, bin_score, failure_rate,
+    penalties) is unchanged; the model was only asked to predict those two.
+    """
     by_tool = defaultdict(list)
     for row in rows:
         by_tool[row["tool"]].append(row)
     output = {}
     for tool, values in by_tool.items():
         mean = lambda key, fallback=0.0: sum(number(row, key, fallback) or fallback for row in values) / len(values)
-        f1, precision, recall = mean("f1"), mean("precision"), mean("recall")
-        plasmid = mean("plasmid_recall", f1)
+        if model is not None:
+            f1 = sum(model.predict("f1", row) for row in values) / len(values)
+            plasmid = sum(model.predict("plasmid_recall", row) for row in values) / len(values)
+        else:
+            f1 = mean("f1")
+            plasmid = mean("plasmid_recall", f1)
+        precision, recall = mean("precision"), mean("recall")
         bin_values = [number(row, "bin_f1") for row in values if number(row, "bin_f1") is not None]
         bin_score = sum(bin_values) / len(bin_values) if bin_values else None
         profile = statuses[tool]
@@ -116,16 +132,14 @@ def tool_quality(rows, statuses, total_samples):
         resource_penalty = 0.0
         if runtime is not None: resource_penalty += .02 * min(1.0, math.log1p(runtime) / math.log1p(3600))
         if memory is not None: resource_penalty += .01 * min(1.0, memory / (16 * 1024 * 1024))
-        # Resource terms are deliberately small; scientific recovery is primary.
-        quality = (.45 * f1 + .13 * precision + .13 * recall + .18 * plasmid
-                   + .06 * (bin_score if bin_score is not None else 1 - failure_rate)
-                   - .03 * failure_rate - structural_penalty - resource_penalty)
+        quality = decision_score(f1, precision, recall, plasmid, bin_score, failure_rate,
+                                 structural_penalty, resource_penalty)
         output[tool] = {
             "tool": tool, "n_scored": len(values), "coverage": len({row["sample"] for row in values}) / total_samples if total_samples else 0.0,
             "mean_f1": f1, "mean_precision": precision, "mean_recall": recall,
             "mean_plasmid_recall": plasmid, "mean_bin_f1": bin_score,
             "failure_rate": failure_rate, "median_runtime_seconds": runtime,
-            "median_peak_rss_kb": memory, "decision_score": quality,
+            "median_peak_rss_kb": memory, "decision_score": quality, "model_used": model is not None,
         }
     return output
 
@@ -134,7 +148,7 @@ def eligible(summary, min_samples, min_coverage):
     return summary["n_scored"] >= min_samples and summary["coverage"] >= min_coverage
 
 
-def write_recommendations(rows, statuses, total_samples, out_path, min_samples, min_coverage, validation_ready=True):
+def write_recommendations(rows, statuses, total_samples, out_path, min_samples, min_coverage, validation_ready=True, model=None):
     scopes = [("overall", "all", rows)]
     for field in ("organism", "gram_group", "truth_technology", "sample_origin", "collection_country",
                   "plasmid_size_band", "plasmid_count_band", "read_depth_band", "amr_status"):
@@ -147,20 +161,27 @@ def write_recommendations(rows, statuses, total_samples, out_path, min_samples, 
                "median_runtime_seconds", "median_peak_rss_kb", "decision_score"]
     recommendations, written = {}, []
     for scope, group, group_rows in scopes:
-        summaries = tool_quality(group_rows, statuses, total_samples if scope == "overall" else len({row["sample"] for row in group_rows}))
+        summaries = tool_quality(group_rows, statuses, total_samples if scope == "overall" else len({row["sample"] for row in group_rows}), model=model)
         candidates = [item for item in summaries.values() if eligible(item, min_samples, min_coverage)] if validation_ready else []
         winner = max(candidates, key=lambda item: (item["decision_score"], item["mean_f1"], item["tool"])) if candidates else None
         recommendations[(scope, group)] = winner["tool"] if winner else None
         for item in sorted(summaries.values(), key=lambda value: (-value["decision_score"], value["tool"])):
             item = dict(item)
+            reason = ("coverage-gated multi-objective recommendation" if winner and item["tool"] == winner["tool"]
+                      else "independent-study validation unavailable" if not validation_ready
+                      else "insufficient coverage or not the highest eligible decision score")
+            if item.get("model_used"):
+                reason += " (model-fitted)"
             item.update({"scope": scope, "group": group, "eligible": str(eligible(item, min_samples, min_coverage)).lower(),
                          "recommendation": "primary" if winner and item["tool"] == winner["tool"] else "none",
-                         "reason": ("coverage-gated multi-objective recommendation" if winner and item["tool"] == winner["tool"]
-                                    else "independent-study validation unavailable" if not validation_ready
-                                    else "insufficient coverage or not the highest eligible decision score")})
+                         "reason": reason})
             written.append(item)
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns, delimiter="\t")
+        # extrasaction='ignore': tool_quality()'s summary dict also carries an
+        # internal-only 'model_used' flag (consumed above for the reason
+        # text), which must never become a new column -- output schema stays
+        # identical whether or not the recommendation model is in use.
+        writer = csv.DictWriter(handle, fieldnames=columns, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         for row in written:
             row["mean_bin_f1"] = "" if row["mean_bin_f1"] is None else f"{row['mean_bin_f1']:.4f}"
@@ -316,6 +337,7 @@ def main():
     parser.add_argument("--out-prefix", required=True)
     parser.add_argument("--tool-status")
     parser.add_argument("--recommendation-validation", help="Optional leave-one-study-out validation TSV; gates public operational recommendations.")
+    parser.add_argument("--recommendation-model", help="Optional fitted recommendation-model JSON (fit_recommendation_model.py). Used only when model_ready is true; otherwise behaves exactly as if omitted.")
     parser.add_argument("--min-samples", type=int, default=5)
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
@@ -335,10 +357,14 @@ def main():
     statuses = status_profiles(args.tool_status)
     validation_rows = read_tsv(args.recommendation_validation) if args.recommendation_validation and Path(args.recommendation_validation).is_file() else []
     validation_ready = not args.recommendation_validation or bool(validation_rows) and all(row.get("status") == "assessed" for row in validation_rows)
+    model = None
+    if args.recommendation_model:
+        model, model_ready, _ = load_model(args.recommendation_model)
+        model = model if model_ready else None
     out_prefix = Path(args.out_prefix)
     recommendations_path = out_prefix.with_name(out_prefix.name + ".recommendations.tsv")
     recommendations, recommendation_rows = write_recommendations(
-        rows, statuses, len(metadata), recommendations_path, args.min_samples, args.min_coverage, validation_ready)
+        rows, statuses, len(metadata), recommendations_path, args.min_samples, args.min_coverage, validation_ready, model=model)
     stratified_path = out_prefix.with_name(out_prefix.name + ".stratified.tsv")
     with open(stratified_path, "w", newline="", encoding="utf-8") as handle:
         columns = ["scope", "group", "tool", "eligible", "recommendation", "reason", "n_scored", "coverage",

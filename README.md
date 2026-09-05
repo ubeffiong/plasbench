@@ -1,13 +1,29 @@
 # PlasBench
 
 A reproducible, Ubuntu-first pipeline that **benchmarks how well plasmid-reconstruction
-tools recover plasmids from short reads**, using complete (long-read) assemblies as
-ground truth.
+tools recover plasmids**, using complete (long-read) assemblies as ground truth.
 
-**Read support:** the current reconstruction workflow consumes paired-end short-read
-FASTQ files (`*_1.fastq.gz`, `*_2.fastq.gz`), normally Illumina. Long-read data
-(ONT/PacBio) is supported as evidence for the completed reference truth assembly,
-not as a native long-read FASTQ reconstruction input in this release.
+**Read support:** the default workflow consumes paired-end short-read FASTQ files
+(`*_1.fastq.gz`, `*_2.fastq.gz`), normally Illumina, and that is what a plain
+`plasbench run` benchmarks. Long reads (ONT/PacBio) serve two distinct roles:
+
+- **As ground truth** — the complete reference assembly every tool is scored
+  against is itself long-read or hybrid. This is true on every run.
+- **As a reconstruction input**, for tools that take long reads natively:
+  `flye_mob_recon`, `hybracter_long` and `trycycler_mob_recon` (long reads
+  alone), and `plassembler` and `hybracter_hybrid` (long + short). Each is
+  off by default and switched on individually — see
+  [§4.9](#49-long-read-and-hybrid-tools-and-the-circularity-constraint).
+
+Those two roles cannot be filled by the same reads: a tool handed the reads its
+own truth was built from is scored against its own input. PlasBench refuses that
+by default, which is why the long-read track needs a cohort declaring
+independence rather than just a flag. §4.9 covers it in full.
+
+Results are never pooled across these input tracks. Aggregation writes one
+leaderboard per track — short-read, long-read and hybrid — and the HTML report
+ranks within each, so a tool given long reads is never ranked against one given
+only short reads.
 
 For each isolate the pipeline:
 
@@ -1542,7 +1558,28 @@ contribution once you send it.
 
 **Maintainer:** [@ubeffiong](https://github.com/ubeffiong). All pull requests are
 reviewed and merged by the maintainer; `main` is protected and cannot be pushed
-to directly.
+to directly, and `CODEOWNERS` requires that review even from a collaborator who
+has write access.
+
+**One reviewer is a known constraint, stated plainly rather than left for you to
+discover.** Review is deliberately centralised while the benchmark's claims are
+still being established — a change that quietly moves a leaderboard number is
+worse than a slow merge. The cost is real: if the maintainer is unavailable,
+nothing merges, and that matters more as the surface grows (this project now
+carries adapters for a dozen tools across three analysis tracks and two scoring
+axes). Two things follow for you as a contributor:
+
+- **Expect review to take time, and design for it.** Small, self-contained pull
+  requests with a test move faster than large ones. [§6.2](#62-suggesting-a-change-before-writing-it)
+  exists so you do not write a large change before that conversation happens.
+- **The test suite is the safety net that does not depend on a person.** It
+  runs offline in a few minutes and every regression it catches is one that does
+  not need a reviewer to notice. If you are adding behaviour, the test matters
+  as much as the code.
+
+Additional maintainers will be added as the project's contributor base grows;
+if you are using PlasBench seriously and want to help carry that, open an issue
+saying so.
 
 ---
 

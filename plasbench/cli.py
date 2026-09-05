@@ -243,6 +243,11 @@ def main(argv=None):
     reconstruct_parser.add_argument("--sra", required=True, help="SRA run accession for this sample's Illumina reads.")
     reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external", "genomad", "plasme", "plasgraph2"),
                                     help="Run exactly this tool, skipping the benchmark recommendation lookup.")
+    reconstruct_parser.add_argument("--recommendation-model", type=Path,
+                                    help="Optional fitted recommendation-model JSON (default: <results-dir>/benchmark.recommendation_model.json "
+                                         "when RUN_RECOMMENDATION_MODEL=1). Used only if model_ready is true.")
+    reconstruct_parser.add_argument("--read-depth-x", type=float,
+                                    help="This isolate's own read depth, if known, for live model prediction (see --recommendation-model).")
     reconstruct_parser.add_argument("--recommendations", type=Path,
                                     help="benchmark.recommendations.tsv to consult when --tool is omitted "
                                          "(default: <results-dir>/benchmark.recommendations.tsv).")
@@ -484,6 +489,10 @@ def main(argv=None):
             command.extend(["--tool", args.tool])
         if args.recommendations:
             command.extend(["--recommendations", str(args.recommendations)])
+        if args.recommendation_model:
+            command.extend(["--recommendation-model", str(args.recommendation_model)])
+        if args.read_depth_x is not None:
+            command.extend(["--read-depth-x", str(args.read_depth_x)])
         env = {}
         for argument, variable in (("data_dir", "DATA_DIR"), ("results_dir", "RESULTS_DIR"), ("log_dir", "LOG_DIR")):
             value = getattr(args, argument)
