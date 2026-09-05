@@ -4,7 +4,7 @@
 
 PlasBench is a reproducible bioinformatics benchmark for answering a practical
 question: **which plasmid-reconstruction method performs best for a given set
-of bacterial short-read samples?**
+of bacterial samples?**
 
 Different tools report plasmids in different ways. Some classify assembled
 contigs as plasmid or chromosome, while others assemble a separate set of
@@ -12,10 +12,14 @@ putative plasmid sequences. PlasBench makes their output comparable by mapping
 every predicted-plasmid FASTA back to a complete reference assembly and scoring
 the same reference bases for every tool.
 
-The current benchmark can compare MOB-suite `mob_recon`, Platon,
-plasmidSPAdes, and optional classifier-backed gplas2 modes. It is designed for bacterial isolates
-with matched Illumina reads and a complete long-read or hybrid reference from
-the same isolate.
+The benchmark compares, on the short-read track, MOB-suite `mob_recon`,
+Platon, plasmidSPAdes, optional classifier-backed gplas2 modes, and the ML
+classifiers geNomad, PLASMe and plASgraph2; and, on the long-read and hybrid
+tracks, `flye_mob_recon`, `hybracter_long`, `trycycler_mob_recon`,
+`plassembler` and `hybracter_hybrid`. Everything beyond the short-read core is
+off by default and switched on per tool. Every isolate needs a complete
+long-read or hybrid reference from the same isolate; the long-read track
+additionally needs reads independent of that reference (see COHORTS.md).
 
 Run this guide from a source checkout with `plasbench docs`, or print one
 section with `plasbench docs --topic <name>`.
@@ -236,12 +240,15 @@ and an empty sheet before starting a data stage.
 
 ### Read and reference formats
 
-PlasBench reconstructs plasmids from **paired short-read FASTQ** input. Expected
-local filenames are `<sra_run>_1.fastq.gz` and `<sra_run>_2.fastq.gz`; uncompressed
+PlasBench's default input is **paired short-read FASTQ**. Expected local
+filenames are `<sra_run>_1.fastq.gz` and `<sra_run>_2.fastq.gz`; uncompressed
 `.fastq` files should be compressed before running. The reference is a completed
-FASTA (`reference.fna`) generated using long reads or hybrid sequencing. ONT/PacBio
-FASTQs are not a native reconstruction input in the current version; their role is
-to establish an independent complete reference. Online cohort validation obtains
+FASTA (`reference.fna`) generated using long reads or hybrid sequencing.
+ONT/PacBio FASTQs serve that reference role on every run, and are additionally a
+native reconstruction input for the long-read and hybrid tools when staged as
+`data/<sample>/long_reads.fastq.gz` -- those tools are off by default, and a
+sample is only eligible for them when the cohort declares its truth independent
+of those reads. Online cohort validation obtains
 `sequencing_tech` and `assembly_method` from NCBI Datasets v2 and rejects truth
 assemblies without explicit long-read evidence.
 
@@ -315,6 +322,28 @@ The generated manifest records the parent isolate, sampling fraction, target
 depth, and seed. It never overwrites the original reads or cohort. Do not run a
 headline leaderboard on a depth-ladder sheet: subsamples share parent genomes;
 PlasBench blocks this and `depth-report` is the valid analysis path.
+
+### Cohort QC anomaly flagging
+
+Complements `plasbench validate-cohort`'s rule-based checks (missing fields,
+mismatched accessions, unlinked BioSample/BioProject -- specific, nameable
+violations) with a statistical layer for isolates that pass every rule but
+are numerically unusual relative to the rest of the accepted cohort: an
+assembly whose N50, contig count, GC%, or plasmid count is a robust outlier.
+Stats are computed fresh from each sample's downloaded `reference.fna` at
+stage 2 (`data/<sample>/assembly_stats.tsv`), then compared cohort-wide at
+stage 6 using robust (median/MAD) modified z-scores -- not mean/stdev, which
+breaks down on the small, skew-prone cohorts this benchmark typically has.
+
+This is **advisory only and on by default** (unlike every optional tool
+above): it never blocks, excludes, or rejects a sample -- an outlier isolate
+might be the most scientifically interesting one in the cohort, not a bad
+one. Below `COHORT_QC_MIN_COHORT_SIZE` samples (default 8), detection is
+withheld rather than computed on too little data to be meaningful, the same
+"withhold, don't guess" policy `benchmark.recommendation_validation.tsv`
+already uses. Results land in `results/benchmark.cohort_qc_flags.tsv` and a
+"Cohort QC flags" section of the HTML report. Disable entirely with
+`COHORT_QC_FLAGS_ENABLED=0` in `config/config.sh`.
 
 ### Read-quality ladder
 
@@ -829,6 +858,54 @@ and `confidence_tier: confirmation_required`, since there is no reference to
 score this sample against. Reserve `plasbench run` with every tool enabled for
 building or extending the benchmark cohort itself, not for routine operational
 samples.
+
+### Decision-support recommendation model (optional, off by default)
+
+`benchmark.recommendations.tsv` above ranks tools using a fixed, hand-picked
+multi-objective weighting of each stratum's *mean* F1/precision/recall/
+plasmid recovery. Enabling `RUN_RECOMMENDATION_MODEL=1` replaces those two
+mean-based terms (F1 and plasmid recall only -- every other term is
+unchanged) with a small, hand-rolled (pure Python, no new dependency) ridge
+regression predicting them directly from an isolate's own continuous
+features (read depth, plasmid size, plasmid count) instead of a coarse
+stratum bucket:
+
+```bash
+plasbench run --samples config/accessions.tsv  # RUN_RECOMMENDATION_MODEL=1 in config/config.sh
+```
+
+This is a **descriptive recommendation, not a scoring change, and not
+validated beyond the cohorts it was fit on** -- the identical caveat this
+project already applies to `operational_method_recommendation` and
+`truth_set_best_candidate` elsewhere in this guide. It is fit and leave-
+one-study-out validated fresh every run (`benchmark.recommendation_model.json`),
+using the *same* per-study folds `benchmark.recommendation_validation.tsv`
+already uses, and is only ever used when it demonstrably beats the plain
+per-tool mean under those folds (`RECOMMENDATION_MODEL_MIN_STUDIES`,
+`RECOMMENDATION_MODEL_MIN_SAMPLES`, `RECOMMENDATION_MODEL_MIN_IMPROVEMENT` in
+`config/config.sh`) -- never "ready" on a technicality that is actually
+worse than the mean. When it isn't ready, every downstream script behaves
+exactly as if this feature did not exist; when it is, `reason` fields in
+`benchmark.recommendations.tsv` and `.stratified.tsv` gain a `(model-fitted)`
+tag so the provenance of any given number is always visible -- no new
+columns, same schema either way.
+
+The model is also used for `plasbench reconstruct`'s live per-isolate
+recommendation (a genuinely new isolate has its own exact read depth/
+organism/Gram group *before* any tool has run on it, so predicting directly
+from those features is more informative than a discrete stratum lookup):
+
+```bash
+plasbench reconstruct --sample new_isolate_01 --sra SRR12345678 \
+  --organism "Klebsiella pneumoniae" --gram-group Gram_negative \
+  --read-depth-x 62
+```
+
+`--recommendation-model` defaults to `<results-dir>/benchmark.recommendation_model.json`
+when `RUN_RECOMMENDATION_MODEL=1`; omit `--read-depth-x` and it is imputed
+with the training-set mean. Only tools already eligible in
+`benchmark.recommendations.tsv`'s `overall` scope are ever considered --
+the model never live-recommends a tool nobody validated.
 
 ## Console Messages
 

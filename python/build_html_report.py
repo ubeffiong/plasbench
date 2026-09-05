@@ -28,6 +28,35 @@ def read_tsv(path):
         return list(csv.DictReader(fh, delimiter="\t"))
 
 
+ANALYSIS_TRACKS = ("short_read", "long_read", "hybrid")
+
+
+def read_track_leaderboards(leaderboard_path):
+    """Read the per-track leaderboards aggregation writes beside the pooled one.
+
+    aggregate_results.py emits <prefix>.leaderboard.tsv (every tool, pooled)
+    AND <prefix>.<track>.leaderboard.tsv per declared track, precisely so track
+    claims are never mixed. Ranking a long-read tool against a short-read one
+    compares different inputs on the same isolates, which is exactly the
+    comparison docs/METHODS.md says must not be made -- so the report ranks
+    within each track and never pools. Returns {} when the per-track files are
+    absent (an older results directory), and the caller falls back to the
+    pooled file it was given.
+    """
+    path = Path(leaderboard_path)
+    if not path.name.endswith(".leaderboard.tsv"):
+        return {}
+    prefix = path.name[: -len(".leaderboard.tsv")]
+    found = {}
+    for track in ANALYSIS_TRACKS:
+        candidate = path.with_name(f"{prefix}.{track}.leaderboard.tsv")
+        if candidate.is_file():
+            rows = read_tsv(candidate)
+            if rows:
+                found[track] = rows
+    return found
+
+
 def read_sample_metadata(path):
     if not path or not Path(path).is_file():
         return {}
@@ -2178,6 +2207,7 @@ def main():
     ap.add_argument("--score-failures", help="Optional score failure TSV from stage 5.")
     ap.add_argument("--recommendations", help="Optional coverage-gated operational recommendation TSV.")
     ap.add_argument("--recommendation-validation", help="Optional leave-one-study-out recommendation validation TSV.")
+    ap.add_argument("--cohort-qc-flags", help="Optional advisory cohort outlier-flagging TSV (flag_cohort_outliers.py).")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -2186,12 +2216,17 @@ def main():
     scores = read_tsv(args.scores)
     status = read_tsv(args.tool_status) if Path(args.tool_status).is_file() else []
     leaderboard = read_tsv(args.leaderboard)
+    # Rank WITHIN each analysis track, never across them. The pooled file is
+    # kept only as a fallback for a results directory written before per-track
+    # leaderboards existed.
+    track_leaderboards = read_track_leaderboards(args.leaderboard)
     metadata = read_sample_metadata(args.sample_sheet)
     tool_versions = read_tool_versions(args.manifest)
     comparisons = read_tsv(args.comparisons) if args.comparisons and Path(args.comparisons).is_file() else []
     score_failures = read_tsv(args.score_failures) if args.score_failures and Path(args.score_failures).is_file() else []
     recommendations = read_tsv(args.recommendations) if args.recommendations and Path(args.recommendations).is_file() else []
     recommendation_validation = read_tsv(args.recommendation_validation) if args.recommendation_validation and Path(args.recommendation_validation).is_file() else []
+    cohort_qc_flags = read_tsv(args.cohort_qc_flags) if args.cohort_qc_flags and Path(args.cohort_qc_flags).is_file() else []
     generated = dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
     tools = sorted({row["tool"] for row in scores} | {row["tool"] for row in status})
@@ -2201,30 +2236,80 @@ def main():
     tiers = sorted({row.get("truth_quality_tier") or "" for row in metadata.values()} - {""})
     origins = sorted({row.get("sample_origin") or "" for row in metadata.values()} - {""})
     versions = sorted(set(tool_versions.values()))
-    tracks = sorted({row.get("analysis_track") or "short_read" for row in scores})
+    track_counts = Counter(row.get("analysis_track") or "short_read" for row in scores)
+    tracks = sorted(track_counts)
+    if not track_leaderboards:
+        track_leaderboards = {(tracks[0] if tracks else "short_read"): leaderboard}
+    # Every headline claim ("leading method", the summary cards, the metric
+    # chart) is made about ONE track -- the one carrying most of this run's
+    # observations -- and says so, rather than silently topping a mixed table.
+    headline_track = (track_counts.most_common(1)[0][0] if track_counts
+                      else next(iter(track_leaderboards)))
+    headline_leaderboard = track_leaderboards.get(headline_track) or leaderboard
+    multi_track = len(track_leaderboards) > 1
     status_counts = Counter(row["status"] for row in status)
-    best = leaderboard[0] if leaderboard else None
+    best = headline_leaderboard[0] if headline_leaderboard else None
     score_by_sample = defaultdict(list)
     score_by_tool = defaultdict(list)
     for row in scores:
         score_by_sample[row["sample"]].append(row)
         score_by_tool[row["tool"]].append(row)
 
-    leaderboard_rows = "".join(
-        "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
-        "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{bin_f1}</td><td>{pr_auc}</td>"
-        "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span></td></tr>".format(
-            rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
-            scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
-            failed=esc(row.get("n_failed", "0")), skipped=esc(row.get("n_skipped", "0")),
-            precision=esc(row["mean_precision"]), recall=esc(row["mean_recall"]),
-            plasmid_recall=esc(row.get("mean_plasmid_recall") or "not annotated"),
-            bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"),
-            pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row["mean_f1"]),
-            f1_width=max(0, min(100, round(number(row["mean_f1"]) * 100))),
-            band=score_band(number(row["mean_f1"])),
-        ) for row in leaderboard
-    ) or "<tr><td colspan='12'>No scored tools yet.</td></tr>"
+    def leaderboard_row_html(row):
+        return (
+            "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
+            "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{bin_f1}</td><td>{pr_auc}</td>"
+            "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span></td></tr>".format(
+                rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
+                scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
+                failed=esc(row.get("n_failed", "0")), skipped=esc(row.get("n_skipped", "0")),
+                precision=esc(row["mean_precision"]), recall=esc(row["mean_recall"]),
+                plasmid_recall=esc(row.get("mean_plasmid_recall") or "not annotated"),
+                bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"),
+                pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row["mean_f1"]),
+                f1_width=max(0, min(100, round(number(row["mean_f1"]) * 100))),
+                band=score_band(number(row["mean_f1"])),
+            )
+        )
+
+    TRACK_LABELS = {"short_read": "Short-read track",
+                    "long_read": "Long-read track",
+                    "hybrid": "Hybrid (long + short) track"}
+    TRACK_BLURBS = {
+        "short_read": "Tools reconstructing from a short-read assembly or its graph.",
+        "long_read": "Tools reconstructing from long reads alone.",
+        "hybrid": "Tools given long reads plus short reads.",
+    }
+
+    def leaderboard_table(rows):
+        body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='12'>No scored tools yet.</td></tr>"
+        return ("<div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th>"
+                "<th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th>"
+                "<th>Mean plasmid recall</th><th>Mean bin F1</th><th>Mean PR-AUC</th><th>Mean F1</th></tr></thead>"
+                f"<tbody>{body}</tbody></table></div>")
+
+    # One ranking per track. Pooling them would rank a tool given long reads
+    # against one given only short reads on the same isolates -- different
+    # inputs, so not the same question.
+    ordered_tracks = [track for track in ANALYSIS_TRACKS if track in track_leaderboards]
+    ordered_tracks += [track for track in sorted(track_leaderboards) if track not in ordered_tracks]
+    if len(ordered_tracks) > 1:
+        leaderboard_panels = (
+            "<p class='lead'>This run scored "
+            + esc(str(len(ordered_tracks))) + " analysis tracks. Each is ranked separately and they are "
+            "never pooled: a tool handed long reads and a tool handed only short reads are answering "
+            "different questions on the same isolates, so a single combined ranking would not be a "
+            "like-for-like comparison. Compare within a table, not across them.</p>"
+        ) + "".join(
+            f"<h3>{esc(TRACK_LABELS.get(track, track))}</h3>"
+            f"<p class='muted'>{esc(TRACK_BLURBS.get(track, ''))} "
+            f"Full table: <a href='benchmark.{esc(track)}.leaderboard.tsv'>benchmark.{esc(track)}.leaderboard.tsv</a></p>"
+            + leaderboard_table(track_leaderboards[track])
+            for track in ordered_tracks
+        )
+    else:
+        leaderboard_panels = leaderboard_table(
+            track_leaderboards.get(ordered_tracks[0], leaderboard) if ordered_tracks else leaderboard)
 
     score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
     score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
@@ -2252,6 +2337,30 @@ def main():
             )
         )
     bin_diagnostics_html = "".join(bin_rows) or "<tr><td colspan='14'>No tool supplied validated bin membership in this run.</td></tr>"
+
+    # Cohort QC flags (advisory only): only flagged rows shown by default,
+    # the full advisory table (including every non-flagged value and any
+    # withholding/MAD==0 note rows) stays downloadable from the file explorer.
+    cohort_qc_flagged = [row for row in cohort_qc_flags if row.get("flagged") == "true"]
+    cohort_qc_rows = "".join(
+        "<tr><td>{sample}</td><td>{field}</td><td>{value}</td><td>{median}</td><td>{mad}</td><td>{z}</td><td>{note}</td></tr>".format(
+            sample=esc(row["sample_id"]), field=esc(row["field"]), value=esc(row["value"]),
+            median=esc(row["cohort_median"]), mad=esc(row["cohort_mad"]), z=esc(row["modified_z_score"]),
+            note=esc(row["note"]),
+        ) for row in cohort_qc_flagged
+    )
+    if not cohort_qc_flags:
+        cohort_qc_html = "<tr><td colspan='7'>No cohort QC flags file was available for this run.</td></tr>"
+    elif not cohort_qc_flagged:
+        withheld = next((row for row in cohort_qc_flags if row.get("note", "").startswith("cohort has")), None)
+        cohort_qc_html = ("<tr><td colspan='7'>{}</td></tr>".format(esc(withheld["note"])) if withheld
+                          else "<tr><td colspan='7'>No robust outliers were flagged in this cohort.</td></tr>")
+    else:
+        cohort_qc_html = cohort_qc_rows
+    cohort_qc_download = ""
+    if args.cohort_qc_flags and Path(args.cohort_qc_flags).is_file():
+        cohort_qc_download = " <a href='{}' download>Download the full advisory table</a> (every unflagged value included).".format(
+            relative_link(Path(args.cohort_qc_flags), out))
 
     recommendation_rows = "".join(
         "<tr><td>{scope}</td><td>{group}</td><td>{tool}</td><td>{state}</td><td>{n}</td><td>{coverage}</td>"
@@ -2375,12 +2484,16 @@ def main():
 
     best_value = esc(best["tool"]) if best else "No scored tool"
     best_f1 = esc(best["mean_f1"]) if best else "-"
-    insight_notes, insight_tone = interpretation(leaderboard, status_counts)
-    cards = report_cards(leaderboard, scores)
-    findings = guided_findings(leaderboard, cards, scores, status_counts)
-    summary_html = summary_section(leaderboard, cards, findings, scores, status_counts, metadata)
+    # With more than one track scored, this headline is about ONE of them --
+    # say which, rather than letting it read as an overall winner.
+    best_scope = (f" · {esc(TRACK_LABELS.get(headline_track, headline_track))}"
+                  if best and multi_track else "")
+    insight_notes, insight_tone = interpretation(headline_leaderboard, status_counts)
+    cards = report_cards(headline_leaderboard, scores)
+    findings = guided_findings(headline_leaderboard, cards, scores, status_counts)
+    summary_html = summary_section(headline_leaderboard, cards, findings, scores, status_counts, metadata)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
-    chart_html = performance_chart(leaderboard)
+    chart_html = performance_chart(headline_leaderboard)
     glossary_cards = glossary_section()
     vendor_html = vendor_assets(args.project_root)
     visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
@@ -2409,19 +2522,20 @@ def main():
 </style></head><body>
 <script>window.pbEsc=s=>String(s==null?'':s).replace(/[&<>\\u0022\\u0027]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','\\u0022':'&quot;','\\u0027':'&#39;'}}[c]));</script>
 <header><h1>PlasBench: Plasmid reconstruction benchmark</h1><p>Detailed run report · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
-<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
-<div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: mean F1</small><strong>{best_f1}</strong><small>{best_value} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
+<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
+<div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: mean F1</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 {summary_html}
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
 <section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. Where at least five shared samples exist, the statistics section adds paired confidence intervals and permutation evidence with Holm adjustment.</p><ul>{insight_html}</ul></div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
-<section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p><div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th><th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th><th>Mean plasmid recall</th><th>Mean bin F1</th><th>Mean PR-AUC</th><th>Mean F1</th></tr></thead><tbody>{leaderboard_rows}</tbody></table></div></section>
+<section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p>{leaderboard_panels}</section>
 <section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p><div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
 <section id='validation'><h2>Leave-one-study-out validation</h2><p class='lead'>For each source study, the method is selected using all other studies and then evaluated only on the held-out study. A withheld result means the cohort does not yet have enough independent study evidence; it is not a failed method.</p><div class='panel'><table class='sortable'><thead><tr><th>Held-out study</th><th>Held-out samples</th><th>Training-selected method</th><th>Training samples</th><th>Held-out mean F1</th><th>Status</th><th>Interpretation</th></tr></thead><tbody>{validation_rows}</tbody></table></div></section>
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
 <section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. Circular-truth recovery is not evidence that a predicted sequence is closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{''.join(f"<option>{esc(t)}</option>" for t in tools)}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Circular truth recovery</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 <section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values require at least five pairs. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool A</th><th>Tool B</th><th>Pairs</th><th>Mean F1 difference</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th><th>A wins / ties / B wins</th></tr></thead><tbody>{comparison_rows}</tbody></table></div><p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
+<section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed or unavailable tool is excluded from F1 aggregation. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
 <section id='samples'><h2>Sample drill-down</h2><p class='lead'>Open a sample to compare every completed tool side-by-side.</p>{''.join(sample_sections) or "<p class='muted'>No samples were found.</p>"}</section>

@@ -15,6 +15,9 @@
 #   08_operational_reconstruct.sh --sample ID --sra SRA_RUN
 #       [--tool TOOL]                  explicit override; skips recommendation lookup
 #       [--recommendations PATH]       default: $RESULTS_DIR/benchmark.recommendations.tsv
+#       [--recommendation-model PATH]  default: $RESULTS_DIR/benchmark.recommendation_model.json
+#                                      when RUN_RECOMMENDATION_MODEL=1; used only if model_ready
+#       [--read-depth-x N]             this isolate's own depth, if known, for live model prediction
 #       [--organism NAME] [--gram-group GROUP]
 #       [--analysis-track short_read|long_read|hybrid]
 set -euo pipefail
@@ -22,13 +25,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 
-SAMPLE="" SRA="" TOOL="" RECOMMENDATIONS="" ORGANISM="" GRAM_GROUP="" TRACK="short_read"
+SAMPLE="" SRA="" TOOL="" RECOMMENDATIONS="" RECOMMENDATION_MODEL="" READ_DEPTH_X="" ORGANISM="" GRAM_GROUP="" TRACK="short_read"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --sample) SAMPLE="$2"; shift 2 ;;
         --sra) SRA="$2"; shift 2 ;;
         --tool) TOOL="$2"; shift 2 ;;
         --recommendations) RECOMMENDATIONS="$2"; shift 2 ;;
+        --recommendation-model) RECOMMENDATION_MODEL="$2"; shift 2 ;;
+        --read-depth-x) READ_DEPTH_X="$2"; shift 2 ;;
         --organism) ORGANISM="$2"; shift 2 ;;
         --gram-group) GRAM_GROUP="$2"; shift 2 ;;
         --analysis-track) TRACK="$2"; shift 2 ;;
@@ -39,6 +44,11 @@ done
 [[ -n "$SRA" ]] || die "--sra is required"
 valid_sample_id "$SAMPLE" || die "unsafe --sample '$SAMPLE'; use only letters, digits, dot, dash, underscore"
 RECOMMENDATIONS="${RECOMMENDATIONS:-$RESULTS_DIR/benchmark.recommendations.tsv}"
+if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
+    RECOMMENDATION_MODEL="${RECOMMENDATION_MODEL:-$RESULTS_DIR/benchmark.recommendation_model.json}"
+fi
+MODEL_ARGS=(); [[ -n "$RECOMMENDATION_MODEL" ]] && MODEL_ARGS=(--recommendation-model "$RECOMMENDATION_MODEL")
+[[ -n "$READ_DEPTH_X" ]] && MODEL_ARGS+=(--read-depth-x "$READ_DEPTH_X")
 # This can be the very first command run against a fresh DATA_DIR/RESULTS_DIR/
 # LOG_DIR (e.g. a new deployment that never ran stage 0), so create them here
 # instead of assuming stage 0 already has.
@@ -55,7 +65,7 @@ else
     [[ -s "$RECOMMENDATIONS" ]] || die "no --tool given and no recommendations file at $RECOMMENDATIONS; run the benchmark first, or pass --tool explicitly"
     log "No --tool given; asking the benchmark recommendation for organism='$ORGANISM' gram-group='$GRAM_GROUP' ..."
     if ! TOOL="$(python3 "$HERE/../python/select_unknown_sample.py" --recommendations "$RECOMMENDATIONS" \
-            --tool-only --organism "$ORGANISM" --gram-group "$GRAM_GROUP")"; then
+            --tool-only --organism "$ORGANISM" --gram-group "$GRAM_GROUP" "${MODEL_ARGS[@]}")"; then
         die "no evidence-gated recommendation matched this sample's metadata in $RECOMMENDATIONS; pass --tool explicitly"
     fi
     log "Benchmark recommends: $TOOL"
@@ -82,7 +92,7 @@ if [[ "$TOOL_SOURCE" == "recommended" ]]; then
     # prediction it just produced, and write the standard report.
     python3 "$HERE/../python/select_unknown_sample.py" --recommendations "$RECOMMENDATIONS" \
         --sample-id "$SAMPLE" --results-dir "$RESULTS_DIR" --organism "$ORGANISM" \
-        --gram-group "$GRAM_GROUP" --analysis-track "$TRACK"
+        --gram-group "$GRAM_GROUP" --analysis-track "$TRACK" "${MODEL_ARGS[@]}"
 else
     # An explicit --tool override may not match whatever the benchmark would
     # have recommended (or no recommendations file may exist at all yet), so

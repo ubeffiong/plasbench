@@ -32,6 +32,15 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     if ! python3 "$HERE/../python/validate_truth_table.py"             --truth "$TRUTH" --reference "$REF" --sample "$SAMPLE"; then
         die "truth table for $SAMPLE is not usable; fix it and re-run (nothing was scored)"
     fi
+    # Cohort QC anomaly flagging (advisory-only, see flag_cohort_outliers.sh's
+    # invocation at stage 6): stats computed fresh from the actually-downloaded
+    # reference, not sourced from NCBI's self-reported assembly metadata.
+    STATS="$SDIR/assembly_stats.tsv"
+    if [[ -s "$STATS" && "$STATS" -nt "$REF" && "$STATS" -nt "$TRUTH" ]]; then
+        log "  assembly stats already computed for $SAMPLE"
+    else
+        python3 "$HERE/../python/compute_assembly_stats.py" --fasta "$REF" --truth "$TRUTH" --sample-id "$SAMPLE" --out "$STATS" 2>> "$LOG_DIR/${SAMPLE}.truth.log"
+    fi
     R1="$SDIR/${SRA}_1.fastq.gz"; R2="$SDIR/${SRA}_2.fastq.gz"
     # Coverage measurement decompresses both FASTQs, so keep stage 2 resumable:
     # recompute only when the reads or truth table are newer than the result.

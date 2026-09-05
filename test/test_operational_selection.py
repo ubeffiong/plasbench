@@ -10,7 +10,9 @@ way an operational run would encounter it, rather than a hand-typed fixture,
 so a future column rename in either script is caught here too.
 """
 import csv
+import json
 import os
+import random
 import subprocess
 import sys
 import tempfile
@@ -19,6 +21,90 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SELECT_METHOD = os.path.join(ROOT, "python", "select_operational_method.py")
 SELECT_UNKNOWN = os.path.join(ROOT, "python", "select_unknown_sample.py")
+FIT_MODEL = os.path.join(ROOT, "python", "fit_recommendation_model.py")
+
+
+def test_recommendation_model_integration():
+    """§2.2: model disabled -> exactly today's stratum-mean behavior (the
+    default, already exercised by every scenario above with no
+    --recommendation-model flag); model enabled + ready -> mean_f1 comes from
+    the model's own per-row prediction (not the raw mean) and the reason
+    field carries the "(model-fitted)" provenance tag, with the exact same
+    output schema either way."""
+    with tempfile.TemporaryDirectory(prefix="operational_selection_model_") as tmp:
+        rng = random.Random(42)
+        samples_path = os.path.join(tmp, "samples.tsv")
+        scores_path = os.path.join(tmp, "scores.tsv")
+        results = os.path.join(tmp, "results")
+
+        sample_rows, score_rows = [], []
+        sid = 0
+        for study in range(5):
+            for _ in range(6):
+                sid += 1
+                sample = f"s{sid}"
+                depth = 10 + sid * 3
+                f1 = min(0.99, max(0.01, 0.5 + 0.01 * depth + rng.uniform(-0.01, 0.01)))
+                sample_rows.append({"sample_id": sample, "organism": "Example bacterium",
+                                    "read_depth_x": str(depth), "source_study": f"study{study}"})
+                score_rows.append({"sample": sample, "tool": "mob_recon", "true_plasmid_bp": "10000",
+                                   "unmapped_pred_bp": "0", "plasmid_recall": f"{f1:.4f}", "bin_f1": "",
+                                   "precision": f"{f1:.4f}", "recall": f"{f1:.4f}", "f1": f"{f1:.4f}",
+                                   "split_events": "0", "merge_events": "0", "contamination_fraction": "0"})
+                os.makedirs(os.path.join(results, sample), exist_ok=True)
+
+        with open(samples_path, "w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["sample_id", "organism", "read_depth_x", "source_study"], delimiter="\t")
+            writer.writeheader()
+            writer.writerows(sample_rows)
+        fields = ["sample", "tool", "true_plasmid_bp", "unmapped_pred_bp", "plasmid_recall", "bin_f1",
+                  "precision", "recall", "f1", "split_events", "merge_events", "contamination_fraction"]
+        with open(scores_path, "w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
+            writer.writeheader()
+            writer.writerows(score_rows)
+
+        model_path = os.path.join(results, "benchmark.recommendation_model.json")
+        subprocess.run([sys.executable, FIT_MODEL, "--scores", scores_path, "--sample-sheet", samples_path,
+                        "--out", model_path, "--min-studies", "3", "--min-training-samples", "20",
+                        "--min-relative-improvement", "0.05"], check=True, capture_output=True, text=True)
+        model_payload = json.load(open(model_path))
+        assert model_payload["model_ready"] is True, model_payload["reason"]
+
+        def run_select(out_prefix, recommendation_model=None):
+            args = [sys.executable, SELECT_METHOD, "--scores", scores_path, "--sample-sheet", samples_path,
+                    "--results-dir", results, "--out-prefix", out_prefix, "--min-samples", "20", "--min-coverage", "0.80"]
+            if recommendation_model:
+                args += ["--recommendation-model", recommendation_model]
+            subprocess.run(args, check=True, capture_output=True, text=True)
+            return list(csv.DictReader(open(out_prefix + ".recommendations.tsv"), delimiter="\t"))
+
+        disabled_rows = run_select(os.path.join(tmp, "disabled"))
+        enabled_rows = run_select(os.path.join(tmp, "enabled"), recommendation_model=model_path)
+
+        disabled_row = next(row for row in disabled_rows if row["scope"] == "overall")
+        enabled_row = next(row for row in enabled_rows if row["scope"] == "overall")
+
+        # Same schema either way.
+        assert list(disabled_row.keys()) == list(enabled_row.keys()), "recommendation-model must never change the output schema"
+        assert "model_used" not in disabled_row and "model_used" not in enabled_row, \
+            "the internal model_used flag must never leak into the written TSV"
+
+        assert "(model-fitted)" not in disabled_row["reason"], disabled_row["reason"]
+        assert "(model-fitted)" in enabled_row["reason"], enabled_row["reason"]
+
+        # "overall" contains every training row, and OLS/ridge's own math
+        # guarantees the model's predicted mean over its OWN full training
+        # set nearly matches the raw mean there -- that isn't where the
+        # accuracy gain shows up. It shows up in a genuine SUBSET stratum
+        # (here, the high-read_depth_band isolates), where the model
+        # (fit on ALL rows, including the low/moderate ones) extrapolates
+        # differently than that subset's own raw mean.
+        disabled_high = next(row for row in disabled_rows if row["scope"] == "read_depth_band" and row["group"] == "high")
+        enabled_high = next(row for row in enabled_rows if row["scope"] == "read_depth_band" and row["group"] == "high")
+        assert disabled_high["mean_f1"] != enabled_high["mean_f1"], \
+            "expected the model's per-row predictions to differ from the raw stratum mean for a real subgroup"
+        print("model disabled -> unchanged reason/schema; model enabled -> '(model-fitted)' reason, differing mean_f1 for a real stratum -> PASS")
 
 
 def main():
@@ -93,6 +179,8 @@ def main():
         assert os.path.isfile(os.path.join(results, "newsample", "selected_candidate", "candidate.plasmid.fasta"))
 
         print("ALL OPERATIONAL SELECTION TESTS PASSED")
+
+    test_recommendation_model_integration()
 
 
 if __name__ == "__main__":

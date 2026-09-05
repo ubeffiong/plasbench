@@ -11,6 +11,8 @@ import csv
 import statistics
 from collections import defaultdict
 
+from study_groups import group_samples_by_study
+
 
 def rows(path):
     with open(path, newline="", encoding="utf-8") as handle:
@@ -26,10 +28,7 @@ def main():
     args = parser.parse_args()
     metadata = {row["sample_id"]: row for row in rows(args.samples) if row.get("sample_id")}
     scores = rows(args.scores)
-    studies = defaultdict(set)
-    for row in scores:
-        study = (metadata.get(row["sample"], {}).get("source_study") or "").strip()
-        if study: studies[study].add(row["sample"])
+    studies = group_samples_by_study(scores, metadata)
     fields = ["held_out_study", "held_out_samples", "selected_method_from_training", "training_samples",
               "held_out_mean_f1", "status", "note"]
     output = []

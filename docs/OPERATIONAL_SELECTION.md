@@ -78,11 +78,11 @@ F1.
 
 AMR recovery is enabled only when a curator supplies a versioned, coordinate
 validated `data/<sample>/truth_amr.tsv`. It must not be inferred from a generic
-AMR database scan of the same prediction being evaluated. The current release
-is a paired short-read reconstruction benchmark; long-read and hybrid values in
-the selection schema identify analysis scope but are not native ONT/PacBio FASTQ
-reconstruction modes. Do not compare those tracks until adapters and a
-pre-specified truth policy have been validated.
+AMR database scan of the same prediction being evaluated. The long-read and hybrid values in the selection schema now correspond to
+real, adapter-backed reconstruction modes, each scored on its own track and
+gated by the independent-truth requirement. Scores from different tracks are
+still not comparable to one another: aggregation writes one leaderboard per
+track and this selection path operates within a single declared track.
 
 ## Stand-alone command
 
