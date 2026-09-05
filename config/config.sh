@@ -44,8 +44,43 @@ export ANALYSIS_TRACK="${ANALYSIS_TRACK:-short_read}"
 export NETWORK_RETRIES="${NETWORK_RETRIES:-3}"
 export NETWORK_RETRY_DELAY_SECONDS="${NETWORK_RETRY_DELAY_SECONDS:-15}"
 
-export THREADS="${THREADS:-4}"
-export MEMORY_GB="${MEMORY_GB:-16}"           # SPAdes memory cap (GB)
+# Defaults are derived from the machine, not fixed. One fixed number is wrong at
+# both ends: 16GB told SPAdes it had four times the RAM on a 4GB box, turning
+# 12-minute assemblies into two-hour ones as it swapped, while leaving three
+# quarters of a 64GB box unused. Detection is advisory -- an explicit THREADS or
+# MEMORY_GB (or --threads/--memory-gb) always wins, with no upper limit imposed.
+plasbench_detect_cores() {
+    if command -v nproc >/dev/null 2>&1; then nproc
+    elif [[ -r /proc/cpuinfo ]]; then grep -c '^processor' /proc/cpuinfo
+    elif command -v sysctl >/dev/null 2>&1; then sysctl -n hw.ncpu 2>/dev/null || echo 4
+    else echo 4; fi
+}
+
+# Available memory, not total: what another process already holds is not ours
+# to promise SPAdes.
+plasbench_detect_memory_gb() {
+    local kb="" bytes=""
+    if [[ -r /proc/meminfo ]]; then
+        kb="$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo)"
+        [[ -z "$kb" ]] && kb="$(awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo)"
+    elif command -v sysctl >/dev/null 2>&1; then
+        bytes="$(sysctl -n hw.memsize 2>/dev/null || true)"
+        [[ -n "$bytes" ]] && kb=$(( bytes / 1024 ))
+    fi
+    [[ -z "$kb" || "$kb" -le 0 ]] && { echo 8; return; }
+    echo $(( kb / 1024 / 1024 ))
+}
+
+export THREADS="${THREADS:-$(plasbench_detect_cores)}"
+
+# Keep headroom: the OS, the other tools in the stage, and SPAdes overshooting
+# its own budget all need room. 80% of what is actually available, never below
+# 2GB (SPAdes fails outright under that) and never silently capped above.
+PLASBENCH_AVAILABLE_GB="$(plasbench_detect_memory_gb)"
+PLASBENCH_DEFAULT_MEMORY_GB=$(( PLASBENCH_AVAILABLE_GB * 80 / 100 ))
+[[ "$PLASBENCH_DEFAULT_MEMORY_GB" -lt 2 ]] && PLASBENCH_DEFAULT_MEMORY_GB=2
+export PLASBENCH_AVAILABLE_GB
+export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memory budget (GB)
 
 # --- Parallelism ---------------------------------------------------------
 # Every default below (1) is exactly today's fully sequential behavior: one

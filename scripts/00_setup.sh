@@ -62,6 +62,15 @@ check_tool() {
     return 0
 }
 
+# Say what was detected and what will be used, so a user can see at a glance
+# whether the assembler is about to be promised memory the machine does not
+# have -- the failure that turns a 12-minute assembly into a two-hour one.
+log "Resources: ${THREADS} thread(s), ${MEMORY_GB}GB assembler budget (detected ${PLASBENCH_AVAILABLE_GB:-?}GB available)"
+if [[ -n "${PLASBENCH_AVAILABLE_GB:-}" && "$MEMORY_GB" -gt "$PLASBENCH_AVAILABLE_GB" ]]; then
+    warn "  MEMORY_GB=${MEMORY_GB} exceeds the ${PLASBENCH_AVAILABLE_GB}GB currently available."
+    warn "  The assembler will be told it has memory the machine cannot give it, and may swap"
+    warn "  rather than fail -- which is far slower. Lower it with --memory-gb, or free memory."
+fi
 log "Checking core dependencies..."
 check_tool datasets core
 check_tool prefetch core

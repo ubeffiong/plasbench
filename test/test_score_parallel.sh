@@ -16,6 +16,12 @@ DELAY=0.4
 mkdir -p "$TMP/bin"
 cat > "$TMP/bin/minimap2" <<EOF
 #!/usr/bin/env bash
+echo "START \$$" >> "$TMP/align_events.log"
+sleep $DELAY
+echo "END \$$" >> "$TMP/align_events.log"
+printf 'q1\t100\t0\t100\t+\tplasmidA\t100\t0\t100\t100\t100\t60\n'
+EOF
+#!/usr/bin/env bash
 sleep $DELAY
 printf 'q1\t100\t0\t100\t+\tplasmidA\t100\t0\t100\t100\t100\t60\n'
 EOF
