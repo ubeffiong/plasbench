@@ -128,14 +128,22 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
           from one that does not align at all (e.g. a reference contig the
           sequence report never classified).
       mapped_pred_bp: predicted query bases aligned to a truth-labelled target
+      covered_by_query: dict target_id -> list of (query_id, start, end), the
+          same retained truth-labelled alignments as `covered` but additionally
+          tagged with which predicted record each interval came from. Unused by
+          the point-estimate score() below; it exists so a PR-curve sweep (see
+          filter_covered_by_qname/sweep_thresholds) can recompute coverage for
+          an arbitrary subset of records without re-parsing the PAF or
+          duplicating this function's alignment-filtering logic.
     """
     covered = defaultdict(list)
+    covered_by_query = defaultdict(list)
     query_covered = defaultdict(list)
     query_off_truth = defaultdict(list)
 
     counters = {"alignment_total": 0, "alignment_retained": 0, "filtered_alignment_count": 0}
     if os.path.getsize(path) == 0:
-        return covered, sum(pred_lengths.values()), 0, 0, counters
+        return covered, sum(pred_lengths.values()), 0, 0, counters, covered_by_query
 
     with open(path) as fh:
         for line_number, line in enumerate(fh, start=1):
@@ -191,6 +199,7 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
                 tstart = max(0, min(tstart, truth_length))
                 tend = max(0, min(tend, truth_length))
                 covered[tname].append((tstart, tend))
+                covered_by_query[tname].append((qname, tstart, tend))
                 if qend < qstart:
                     qstart, qend = qend, qstart
                 qstart = max(0, min(qstart, qlen))
@@ -212,7 +221,7 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
         any_bp = min(any_bp, length)
         off_truth_pred_bp += max(0, any_bp - mapped_bp)
         unmapped_pred_bp += max(0, length - any_bp)
-    return covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, counters
+    return covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, counters, covered_by_query
 
 
 def merge_intervals(intervals):
@@ -303,6 +312,90 @@ def safe_div(a, b):
     return a / b if b else 0.0
 
 
+def read_pred_scores(path, candidate_ids):
+    """Read the SCORES.md contract: a TSV of record_id, probability (extra
+    columns tolerated). record_id must exactly match candidate_ids (the
+    record ids in --pred-candidates-fasta) -- not --pred-fasta's, since the
+    whole point of this file is to cover the wider candidate universe the
+    tool's hard call is a subset of (see adapters/SCORES.md)."""
+    probabilities = {}
+    with open(path) as handle:
+        header = handle.readline().rstrip("\n").split("\t")
+        required = {"record_id", "probability"}
+        if not required.issubset(header):
+            raise ValueError("pred-scores TSV must contain record_id, probability")
+        indices = {name: header.index(name) for name in required}
+        for line_number, line in enumerate(handle, start=2):
+            if not line.strip():
+                continue
+            fields = line.rstrip("\n").split("\t")
+            record_id = fields[indices["record_id"]]
+            if record_id in probabilities:
+                raise ValueError(f"pred-scores line {line_number}: duplicate record_id {record_id!r}")
+            try:
+                probability = float(fields[indices["probability"]])
+            except ValueError as exc:
+                raise ValueError(f"pred-scores line {line_number}: probability must be numeric") from exc
+            if not 0.0 <= probability <= 1.0:
+                raise ValueError(f"pred-scores line {line_number}: probability must be in [0, 1], got {probability}")
+            probabilities[record_id] = probability
+    missing = candidate_ids - probabilities.keys()
+    extra = probabilities.keys() - candidate_ids
+    if missing or extra:
+        raise ValueError(
+            "pred-scores record_id set does not match --pred-candidates-fasta: "
+            f"missing={sorted(missing)} extra={sorted(extra)}"
+        )
+    return probabilities
+
+
+def filter_covered_by_qname(covered_by_query, included_qnames):
+    """Reshape covered_by_query (target -> [(qname, start, end)]) into a plain
+    covered dict (target -> [(start, end)]) restricted to included_qnames, so
+    the existing score() can be reused unchanged for an arbitrary subset of
+    predicted records."""
+    covered = defaultdict(list)
+    for tname, entries in covered_by_query.items():
+        for qname, start, end in entries:
+            if qname in included_qnames:
+                covered[tname].append((start, end))
+    return covered
+
+
+def sweep_thresholds(covered_by_query, probabilities, truth, total_plasmid):
+    """Compute one (precision, recall) point per distinct probability value,
+    high-to-low, plus the empty-inclusion endpoint every threshold above the
+    maximum probability shares. That endpoint is defined as precision=1.0,
+    recall=0.0 -- the standard precision_recall_curve convention -- rather
+    than safe_div's 0/0 -> 0.0 fallback, which would spuriously depress the
+    trapezoidal AUC by inserting a low-precision point at zero recall.
+
+    Recall is guaranteed non-decreasing across the sweep (the included set
+    only grows as the threshold falls, and merge_intervals-based coverage
+    cannot shrink as more intervals are added), so the returned points are
+    already ordered by recall ascending -- trapezoidal_auc still re-sorts
+    defensively rather than relying on that.
+    """
+    thresholds = sorted(set(probabilities.values()), reverse=True)
+    points = [{"threshold": "inf", "precision": 1.0, "recall": 0.0,
+               "tp_bp": 0, "fp_bp": 0, "fn_bp": total_plasmid}]
+    for threshold in thresholds:
+        included = {qname for qname, probability in probabilities.items() if probability >= threshold}
+        covered_subset = filter_covered_by_qname(covered_by_query, included)
+        tp, fp, fn = score(truth, total_plasmid, covered_subset)
+        points.append({"threshold": threshold, "precision": safe_div(tp, tp + fp),
+                       "recall": safe_div(tp, tp + fn), "tp_bp": tp, "fp_bp": fp, "fn_bp": fn})
+    return points
+
+
+def trapezoidal_auc(points):
+    ordered = sorted(points, key=lambda point: point["recall"])
+    auc = 0.0
+    for previous, current in zip(ordered, ordered[1:]):
+        auc += (current["recall"] - previous["recall"]) * (previous["precision"] + current["precision"]) / 2
+    return auc
+
+
 def read_amr_genes(path, truth):
     """Read curated 0-based half-open AMR intervals: sequence_id, start, end."""
     if not path:
@@ -369,6 +462,16 @@ def main():
     ap.add_argument("--min-alignment-query-coverage", type=float, default=0.0,
                     help="Minimum fraction of a predicted record covered by an individual PAF alignment (default: 0).")
     ap.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
+    ap.add_argument("--pred-scores", help="Optional adapters/SCORES.md-format TSV (record_id, probability) "
+                                          "covering every record in --pred-candidates-fasta; enables a PR-curve "
+                                          "sweep alongside the point-estimate score above. Omitting this (and "
+                                          "the two options below) reproduces today's exact single-point behavior.")
+    ap.add_argument("--pred-candidates-fasta", help="Every contig/node the tool scored (superset of --pred-fasta's "
+                                                     "records); required together with --pred-scores.")
+    ap.add_argument("--pred-candidates-paf", help="minimap2 PAF of --pred-candidates-fasta against the reference "
+                                                   "(mapped the same way as --paf); required together with --pred-scores.")
+    ap.add_argument("--pr-curve-out", help="Write the swept (threshold, precision, recall) points here.")
+    ap.add_argument("--pr-summary-out", help="Write a one-row (pr_auc, pr_n_thresholds) summary here.")
     args = ap.parse_args()
 
     truth, total_plasmid = read_truth(args.truth)
@@ -377,7 +480,7 @@ def main():
         if (args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1
                 or args.min_alignment_mapq < 0 or not 0 <= args.min_alignment_query_coverage <= 1):
             raise ValueError("alignment thresholds must be min-length >= 1, identity/query coverage in [0, 1], and MAPQ >= 0")
-        covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, alignment = parse_paf_intervals(
+        covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, alignment, _ = parse_paf_intervals(
             args.paf, truth, pred_lengths, args.min_alignment_length,
             args.min_alignment_identity, args.min_alignment_mapq, args.min_alignment_query_coverage)
         ambiguous_bp = ambiguous_query_bp(args.ambiguity_paf, truth, pred_lengths,
@@ -386,6 +489,41 @@ def main():
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}")
     tp, fp, fn = score(truth, total_plasmid, covered)
+
+    # Optional PR-curve sweep. Entirely additive: omitting --pred-scores (and
+    # the two options it requires) touches none of the point-estimate code
+    # above or the header/row below, reproducing today's exact output. A
+    # missing companion flag is a caller-contract bug (05_score.sh always
+    # passes all three or none), so that stays a hard failure; a malformed
+    # scores/candidates FILE is instead treated as an adapter data-quality
+    # problem -- warn and skip the curve rather than losing this tool's
+    # otherwise-valid point-estimate score below over an optional extra.
+    if args.pred_scores:
+        if not (args.pred_candidates_fasta and args.pred_candidates_paf):
+            raise SystemExit("ERROR: --pred-scores requires --pred-candidates-fasta and --pred-candidates-paf")
+        try:
+            candidate_lengths = read_fasta_lengths(args.pred_candidates_fasta)
+            probabilities = read_pred_scores(args.pred_scores, set(candidate_lengths))
+            _, _, _, _, _, candidates_covered_by_query = parse_paf_intervals(
+                args.pred_candidates_paf, truth, candidate_lengths, args.min_alignment_length,
+                args.min_alignment_identity, args.min_alignment_mapq, args.min_alignment_query_coverage)
+        except ValueError as exc:
+            sys.stderr.write(f"WARNING: PR-curve sweep skipped for {args.sample}/{args.tool}: {exc}\n")
+        else:
+            points = sweep_thresholds(candidates_covered_by_query, probabilities, truth, total_plasmid)
+            pr_auc = trapezoidal_auc(points)
+            if args.pr_curve_out:
+                with open(args.pr_curve_out, "w") as handle:
+                    handle.write("threshold\tprecision\trecall\ttp_bp\tfp_bp\tfn_bp\n")
+                    for point in sorted(points, key=lambda p: p["recall"]):
+                        handle.write(
+                            f"{point['threshold']}\t{point['precision']:.4f}\t{point['recall']:.4f}\t"
+                            f"{point['tp_bp']}\t{point['fp_bp']}\t{point['fn_bp']}\n"
+                        )
+            if args.pr_summary_out:
+                with open(args.pr_summary_out, "w") as handle:
+                    handle.write("pr_auc\tpr_n_thresholds\n")
+                    handle.write(f"{pr_auc:.6f}\t{len(points) - 1}\n")
 
     if not 0 < args.plasmid_recovery_threshold <= 1:
         raise SystemExit("ERROR: --plasmid-recovery-threshold must be in (0, 1].")

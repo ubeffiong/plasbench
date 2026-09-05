@@ -1030,41 +1030,45 @@ checksum tying them together with a single `--verify-lock`.
 ---
 
 
-### 4.9 Hybrid tools: Plassembler, and the circularity constraint
+### 4.9 Long-read and hybrid tools, and the circularity constraint
 
-Plassembler assembles plasmids from **long reads plus short reads**. It is off by
-default, and it needs one thing the short-read tools do not: a cohort where the
-long reads are not the reads the truth came from.
+Five tools reconstruct from **long reads**, optionally plus short reads, and
+none is on by default: `flye_mob_recon` and `trycycler_mob_recon`
+(long-read-only; two independent assembler paths, since assembler choice
+materially affects plasmid completeness on ONT data), `plassembler` and
+`hybracter_hybrid` (hybrid: long + short reads), and `hybracter_long`
+(long-read-only, Hybracter's own assembler). All five need one thing the
+short-read tools do not: a cohort where the long reads are not the reads the
+truth came from.
 
-**Install it:**
-
-```bash
-plasbench install-tools plassembler
-bash env/download_plassembler_db.sh
-```
-
-**Stage the long reads** for each sample, as `data/<sample>/long_reads.fastq.gz`.
-Stage 1 already downloaded the short reads.
-
-**Run it** -- stage 7 is part of the default stage list, so one invocation
-scores it alongside every short-read tool in the same pass:
+**Install and run any combination:**
 
 ```bash
-plasbench run --cohort my-cohort --plassembler on
+plasbench install-tools long-read      # flye_mob_recon
+plasbench install-tools trycycler      # trycycler_mob_recon
+plasbench install-tools plassembler; bash env/download_plassembler_db.sh   # plassembler
+plasbench install-tools hybracter      # hybracter_long, hybracter_hybrid (reuses the Plassembler DB)
+
+# Stage the long reads for each sample as data/<sample>/long_reads.fastq.gz
+# (stage 1 already downloaded the short reads), then run any combination:
+plasbench run --cohort my-cohort --plassembler on --hybracter-long on
 ```
 
-That produces `results/benchmark.hybrid.leaderboard.tsv` (each tool's track
-comes from `config/tool_capabilities.tsv`, never a flag you have to remember
-to pass). Aggregation writes one leaderboard per track and never mixes them,
-so a hybrid tool is never ranked against a short-read-only tool. Nothing
-about `plasbench run --cohort public-v2` changes: the short-read benchmark is
-exactly what it was.
+That produces `results/benchmark.long_read.leaderboard.tsv` and/or
+`.hybrid.leaderboard.tsv` (each tool's track comes from
+`config/tool_capabilities.tsv`, never a flag you have to remember to pass).
+Stage 7 is part of the default stage list, so one invocation scores every
+enabled tool -- long-read, hybrid, and short-read -- in the same pass, and
+aggregation writes one leaderboard per track and never mixes them, so a
+long-read or hybrid tool is never ranked against a short-read-only one.
+Nothing about `plasbench run --cohort public-v2` changes if you enable none
+of these: the short-read benchmark is exactly what it was.
 
 **The constraint.** PlasBench's truth labels come from a complete long-read or
-hybrid assembly. Give a hybrid tool the same long reads that produced that
-assembly and you are scoring it against its own input: it will look near-perfect
-for reasons that say nothing about the tool. Short-read tools have no such
-exposure, which is why this never came up before.
+hybrid assembly. Give one of these tools the same long reads that produced
+that assembly and you are scoring it against its own input: it will look
+near-perfect for reasons that say nothing about the tool. Short-read tools
+have no such exposure, which is why this never came up for them.
 
 So a sample is only eligible when the cohort says so explicitly:
 
@@ -1076,14 +1080,24 @@ s1         GCF_...             SRR...   ...  yes
 Anything else — column absent, value empty, `no` — is skipped and recorded as
 `circular truth: truth_technology=<X> derives from the supplied long reads`.
 
-`PLASSEMBLER_ALLOW_CIRCULAR_TRUTH=1` overrides that for every sample and stamps
-each affected row in `tool_status.tsv`, so a compromised result cannot later be
-mistaken for an independent one. Use it for exploration, not for a published
-number.
+Each tool has its own override variable
+(`FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH`, `PLASSEMBLER_ALLOW_CIRCULAR_TRUTH`,
+`HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH`, `HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH`,
+`TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH`) that overrides this for every
+sample and stamps each affected row in `tool_status.tsv`, so a compromised
+result cannot later be mistaken for an independent one. Use it for
+exploration, not for a published number.
 
 Building an eligible cohort is a real piece of work, not a flag. See
-[`docs/METHODS.md`](docs/METHODS.md) for the three approaches — independent truth,
-held-out long reads, or simulated data — and what each costs you in review.
+[`docs/FINDING_DATA.md`](docs/FINDING_DATA.md) for concrete sourcing patterns
+(orthogonal-technology truth, optical-mapping-confirmed assemblies, held-out
+long reads, multi-run BioProjects) and [`docs/METHODS.md`](docs/METHODS.md)
+for what each costs you in review.
+
+Long-read plasmid recovery is at least as sensitive to read length and
+quality (R9 vs R10 chemistry) as to depth -- see the read-quality ladder in
+`docs/USER_GUIDE.md`'s Commands section, the long-read analog to the
+depth-sweep in [4.7](#47-depth-sweep-how-far-can-you-cut-sequencing) above.
 
 ---
 

@@ -137,6 +137,25 @@ score_sample() {
         fi
         local CIRCULAR_ARGS=()
         [[ -s "$CIRCULAR" ]] && CIRCULAR_ARGS=(--circular-plasmids "$CIRCULAR")
+        # Optional PR-curve sweep (adapters/SCORES.md): only when the adapter
+        # wrote both a wider candidates universe and a per-record probability
+        # for it. A mapping failure here only warns and omits the curve; it
+        # never affects the point-estimate score below.
+        local PRSCORE_ARGS=()
+        local CANDIDATES="$RDIR/pred_${tool}.candidates.fasta"
+        local PRED_SCORES="$RDIR/pred_${tool}.scores.tsv"
+        if [[ -s "$CANDIDATES" && -s "$PRED_SCORES" ]]; then
+            local CAND_PAF="$RDIR/${tool}.candidates_vs_ref.paf"
+            if minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$CANDIDATES" \
+                    > "$CAND_PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.candidates.minimap2.log"; then
+                PRSCORE_ARGS=(--pred-scores "$PRED_SCORES" --pred-candidates-fasta "$CANDIDATES" \
+                              --pred-candidates-paf "$CAND_PAF" \
+                              --pr-curve-out "$RDIR/${tool}.pr_curve.tsv" \
+                              --pr-summary-out "$RDIR/${tool}.pr_summary.tsv")
+            else
+                warn "candidate-set mapping failed for $SAMPLE/$tool; PR curve omitted, point score retained"
+            fi
+        fi
         if ! python3 "$HERE/../python/score_plasmids.py" \
             --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
             --plasmid-recovery-threshold "$PLASMID_RECOVERY_THRESHOLD" \
@@ -148,6 +167,7 @@ score_sample() {
             "${AMBIGUITY_ARGS[@]}" \
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
+            "${PRSCORE_ARGS[@]}" \
             --sample "$SAMPLE" --tool "$tool" --out "$SCORE_SHARD" \
             2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
             warn "scoring failed for $SAMPLE/$tool; excluded from aggregation"
@@ -223,5 +243,6 @@ merge_shards "$SCORE_FAILURES" "$(printf 'sample\ttool\tstage\treason')" "${fail
 rm -rf "$SCORE_SHARDS" "$FAILURE_SHARDS"
 
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
+[[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_pr_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
 
 log "Stage 5 (score) complete. Combined scores: $SCORES"

@@ -71,4 +71,76 @@ grep -q -- "--type full" "$TMP/bakta_calls.log" || { echo "FAIL: --full should r
 [[ -s "$TMP/data/custom/db/version.json" ]] || { echo "FAIL: --output should control the destination directory" >&2; exit 1; }
 echo "download_bakta_db.sh --full and --output are honored -> PASS"
 
+# --- geNomad ---
+mkdir -p "$TMP/bin_genomad"
+cat > "$TMP/bin_genomad/genomad" <<EOF
+#!/usr/bin/env bash
+echo "genomad \$*" >> "$TMP/genomad_calls.log"
+if [[ "\$1" == "download-database" ]]; then
+    mkdir -p "\$2/genomad_db"
+    printf 'marker' > "\$2/genomad_db/version.txt"
+fi
+EOF
+chmod +x "$TMP/bin_genomad/genomad"
+
+if PATH="/usr/bin:/bin" bash "$ROOT/env/download_genomad_db.sh" --yes 2>"$TMP/err.log"; then
+    echo "FAIL: missing genomad should be refused" >&2; exit 1
+fi
+grep -qi "genomad not found" "$TMP/err.log" || { echo "FAIL: expected a clear genomad-missing error" >&2; cat "$TMP/err.log" >&2; exit 1; }
+echo "download_genomad_db.sh refuses cleanly when genomad is missing -> PASS"
+
+: > "$TMP/genomad_calls.log"
+DATA_DIR="$TMP/data" PATH="$TMP/bin_genomad:$PATH" bash "$ROOT/env/download_genomad_db.sh" --yes
+[[ -s "$TMP/genomad_calls.log" ]] || { echo "FAIL: --yes should have run genomad download-database" >&2; exit 1; }
+[[ -s "$TMP/data/db/genomad/genomad_db/version.txt" ]] || { echo "FAIL: expected a populated genomad_db directory" >&2; exit 1; }
+echo "download_genomad_db.sh --yes actually runs genomad download-database -> PASS"
+
+: > "$TMP/genomad_calls.log"
+DATA_DIR="$TMP/data" PATH="$TMP/bin_genomad:$PATH" bash "$ROOT/env/download_genomad_db.sh" --yes
+[[ ! -s "$TMP/genomad_calls.log" ]] || { echo "FAIL: an already-present database must not be re-downloaded" >&2; cat "$TMP/genomad_calls.log" >&2; exit 1; }
+echo "download_genomad_db.sh does not re-download an already-present database -> PASS"
+
+: > "$TMP/genomad_calls.log"
+if PATH="$TMP/bin_genomad:$PATH" bash "$ROOT/env/download_genomad_db.sh" --output "$TMP/data/genomad_custom" < /dev/null; then
+    echo "FAIL: declining should exit non-zero" >&2; exit 1
+fi
+[[ ! -s "$TMP/genomad_calls.log" ]] || { echo "FAIL: declining must not run genomad" >&2; exit 1; }
+echo "download_genomad_db.sh declines cleanly without running genomad -> PASS"
+
+# --- PLASMe ---
+mkdir -p "$TMP/bin_plasme"
+cat > "$TMP/bin_plasme/PLASMe_db.py" <<EOF
+#!/usr/bin/env bash
+echo "PLASMe_db.py \$*" >> "$TMP/plasme_calls.log"
+out=""
+while [[ \$# -gt 0 ]]; do case "\$1" in --database) out="\$2"; shift 2;; *) shift;; esac; done
+mkdir -p "\$out"
+printf 'marker' > "\$out/db.marker"
+EOF
+chmod +x "$TMP/bin_plasme/PLASMe_db.py"
+
+if PATH="/usr/bin:/bin" bash "$ROOT/env/download_plasme_db.sh" --yes 2>"$TMP/err.log"; then
+    echo "FAIL: missing PLASMe_db.py should be refused" >&2; exit 1
+fi
+grep -qi "PLASMe_db.py not found" "$TMP/err.log" || { echo "FAIL: expected a clear PLASMe_db.py-missing error" >&2; cat "$TMP/err.log" >&2; exit 1; }
+echo "download_plasme_db.sh refuses cleanly when PLASMe_db.py is missing -> PASS"
+
+: > "$TMP/plasme_calls.log"
+DATA_DIR="$TMP/data" PATH="$TMP/bin_plasme:$PATH" bash "$ROOT/env/download_plasme_db.sh" --yes
+[[ -s "$TMP/plasme_calls.log" ]] || { echo "FAIL: --yes should have run PLASMe_db.py" >&2; exit 1; }
+[[ -s "$TMP/data/db/plasme/db.marker" ]] || { echo "FAIL: expected a populated plasme database directory" >&2; exit 1; }
+echo "download_plasme_db.sh --yes actually runs PLASMe_db.py -> PASS"
+
+: > "$TMP/plasme_calls.log"
+DATA_DIR="$TMP/data" PATH="$TMP/bin_plasme:$PATH" bash "$ROOT/env/download_plasme_db.sh" --yes
+[[ ! -s "$TMP/plasme_calls.log" ]] || { echo "FAIL: an already-present database must not be re-downloaded" >&2; cat "$TMP/plasme_calls.log" >&2; exit 1; }
+echo "download_plasme_db.sh does not re-download an already-present database -> PASS"
+
+: > "$TMP/plasme_calls.log"
+if PATH="$TMP/bin_plasme:$PATH" bash "$ROOT/env/download_plasme_db.sh" --output "$TMP/data/plasme_custom" < /dev/null; then
+    echo "FAIL: declining should exit non-zero" >&2; exit 1
+fi
+[[ ! -s "$TMP/plasme_calls.log" ]] || { echo "FAIL: declining must not run PLASMe_db.py" >&2; exit 1; }
+echo "download_plasme_db.sh declines cleanly without running PLASMe_db.py -> PASS"
+
 echo "ALL DATABASE INSTALLER TESTS PASSED"

@@ -16,7 +16,7 @@ from pathlib import Path
 
 TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycler",
          "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3",
-         "plassembler", "flye", "hybracter", "trycycler")
+         "plassembler", "flye", "hybracter", "trycycler", "genomad", "PLASMe.py")
 
 
 def tool_version():
@@ -122,7 +122,10 @@ def main():
                 "RUN_PLASSEMBLER", "PLASSEMBLER_DB", "PLASSEMBLER_CHROMOSOME_LENGTH", "PLASSEMBLER_ALLOW_CIRCULAR_TRUTH",
                 "LONG_READS_FILE",
                 "RUN_HYBRACTER_LONG", "RUN_HYBRACTER_HYBRID", "HYBRACTER_CHROMOSOME_LENGTH",
-                "HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH", "HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH")
+                "HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH", "HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH",
+                "RUN_TRYCYCLER_MOB_RECON", "TRYCYCLER_ASSEMBLY_COUNT", "TRYCYCLER_READ_TYPE",
+                "TRYCYCLER_MEDAKA_POLISH", "TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH",
+                "RUN_GENOMAD", "GENOMAD_DB", "RUN_PLASME", "PLASME_DB", "PLASME_PROBABILITY")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     truth_tables = {}
@@ -148,7 +151,9 @@ def main():
         "platform": {"python": sys.version, "system": platform.platform()},
         "container": {"image": os.environ.get("CONTAINER_IMAGE"),
                       "image_digest": os.environ.get("CONTAINER_IMAGE_DIGEST")},
-        "databases": {"platon": directory_identity(os.environ.get("PLATON_DB", ""))},
+        "databases": {"platon": directory_identity(os.environ.get("PLATON_DB", "")),
+                      "genomad": directory_identity(os.environ.get("GENOMAD_DB", "")),
+                      "plasme": directory_identity(os.environ.get("PLASME_DB", ""))},
         "settings": {key: os.environ.get(key) for key in settings},
         "input_checksums": {"sample_sheet": sha256(sample_sheet), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},

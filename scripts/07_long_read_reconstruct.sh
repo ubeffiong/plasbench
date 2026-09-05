@@ -12,8 +12,12 @@
 #   hybracter_hybrid (RUN_HYBRACTER_HYBRID) -- hybrid, via `hybracter
 #       hybrid-single`. Score with ANALYSIS_TRACK=hybrid. Independent of
 #       hybracter_long: enabling one never runs the other.
+#   trycycler_mob_recon (RUN_TRYCYCLER_MOB_RECON) -- long-read only, via
+#       Trycycler reconciling several independent Flye assemblies into one
+#       consensus, then MOB-Recon. A second assembler path alongside
+#       flye_mob_recon. Score with ANALYSIS_TRACK=long_read.
 #
-# All four are off by default, and none is ever ranked against a short-read-only
+# All five are off by default, and none is ever ranked against a short-read-only
 # tool: aggregation writes one leaderboard per analysis track and never mixes
 # track claims (python/aggregate_results.py: write_track_leaderboards).
 set -euo pipefail
@@ -22,8 +26,9 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 
 if [[ "${RUN_FLYE_MOB_RECON:-0}" -ne 1 && "${RUN_PLASSEMBLER:-0}" -ne 1 \
-      && "${RUN_HYBRACTER_LONG:-0}" -ne 1 && "${RUN_HYBRACTER_HYBRID:-0}" -ne 1 ]]; then
-    log "Stage 7 disabled (RUN_FLYE_MOB_RECON=0, RUN_PLASSEMBLER=0, RUN_HYBRACTER_LONG=0, RUN_HYBRACTER_HYBRID=0)."
+      && "${RUN_HYBRACTER_LONG:-0}" -ne 1 && "${RUN_HYBRACTER_HYBRID:-0}" -ne 1 \
+      && "${RUN_TRYCYCLER_MOB_RECON:-0}" -ne 1 ]]; then
+    log "Stage 7 disabled (RUN_FLYE_MOB_RECON=0, RUN_PLASSEMBLER=0, RUN_HYBRACTER_LONG=0, RUN_HYBRACTER_HYBRID=0, RUN_TRYCYCLER_MOB_RECON=0)."
     exit 0
 fi
 if [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]]; then
@@ -33,6 +38,13 @@ if [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]]; then
 fi
 [[ "${RUN_PLASSEMBLER:-0}" -eq 1 ]] && need plassembler
 [[ "${RUN_HYBRACTER_LONG:-0}" -eq 1 || "${RUN_HYBRACTER_HYBRID:-0}" -eq 1 ]] && need hybracter
+if [[ "${RUN_TRYCYCLER_MOB_RECON:-0}" -eq 1 ]]; then
+    case "$TRYCYCLER_READ_TYPE" in nano-raw|nano-hq|pacbio-raw|pacbio-hifi) ;; *) die "invalid TRYCYCLER_READ_TYPE: $TRYCYCLER_READ_TYPE";; esac
+    need trycycler
+    need flye
+    need mob_recon
+    [[ "${TRYCYCLER_MEDAKA_POLISH:-0}" -eq 1 ]] && need medaka_consensus
+fi
 true
 ADAPT="$HERE/../adapters/adapt_mob_recon.sh"
 STATUS="$RESULTS_DIR/tool_status.tsv"
@@ -247,12 +259,167 @@ run_hybracter_for_sample() {
     fi
 }
 
+# --- Trycycler -> MOB-Recon (long-read only; a second path alongside
+# Flye+MOB-Recon, since assembler choice materially affects plasmid
+# completeness on ONT data) -------------------------------------------------
+#
+# CIRCULARITY. See long_read_truth_eligible in scripts/lib.sh -- same policy
+# as every other tool in this stage.
+#
+# Trycycler is a RECONCILER, not an assembler: it takes several INDEPENDENT
+# Flye assemblies of the same reads and merges them into one consensus
+# assembly, which is then handed to MOB-Recon exactly like Flye's own single
+# assembly is in for_sample() above (same adapter, same final step).
+#
+# A single cluster failing reconciliation, MSA, or consensus is a common,
+# expected outcome on real ONT data (usually a small or repetitive replicon)
+# -- per policy, that cluster is DROPPED and the sample still completes on
+# whichever clusters survive, with the drop recorded in the status reason.
+# Only a failure that leaves NOTHING to build a consensus assembly from (no
+# clusters at all, or none survive) fails the whole sample, same as every
+# other step here (subsampling, initial clustering, partitioning, MOB-Recon).
+run_trycycler_mob_recon_for_sample() {
+    local sample="$1"
+    local tool="trycycler_mob_recon"
+    local rdir="$RESULTS_DIR/$sample" reads="$DATA_DIR/$sample/$LONG_READS_FILE"
+    local work_dir="$rdir/$tool" pred="$rdir/pred_$tool.plasmid.fasta" done_file="$rdir/.$tool.complete"
+    mkdir -p "$rdir"
+
+    local eligibility
+    if ! eligibility="$(long_read_truth_eligible "$tool" "$sample")"; then
+        warn "  $tool: skipping $sample -- its truth assembly derives from these long reads (truth_technology=$eligibility)"
+        warn "         Declare truth_independent_of_long_reads=yes for this sample, or set"
+        warn "         TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH=1 to score it anyway (recorded in tool_status.tsv)."
+        printf '%s\t%s\tskipped\t\tcircular truth: truth_technology=%s derives from the supplied long reads\t\t\n' \
+            "$sample" "$tool" "$eligibility" >> "$STATUS"
+        return
+    fi
+    if [[ ! -s "$reads" ]]; then
+        warn "  $tool: no long reads for $sample at $reads; skipped"
+        printf '%s\t%s\tskipped\t\tlong-read FASTQ unavailable\t\t\n' "$sample" "$tool" >> "$STATUS"; return
+    fi
+    if [[ -e "$done_file" && -s "$pred" && "${FORCE_RERUN_TOOLS:-0}" -ne 1 ]]; then
+        log "  $tool: reusing completed result for $sample"
+        printf '%s\t%s\treused\t%s\tcompleted result reused\t\t\n' "$sample" "$tool" "$pred" >> "$STATUS"; return
+    fi
+
+    rm -rf "$work_dir" "$pred" "$done_file"; mkdir -p "$work_dir"
+    local start rss="$LOG_DIR/$sample.$tool.rss"; start=$(date +%s); rm -f "$rss"
+    local runlog="$LOG_DIR/$sample.$tool.log"; : > "$runlog"
+    local note="Trycycler consensus ($TRYCYCLER_ASSEMBLY_COUNT independent assemblies) plus MOB-Recon"
+    [[ "$eligibility" == "override" ]] && note="$note; TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH=1 -- truth may derive from these long reads"
+
+    fail_sample() {
+        rm -f "$pred" "$done_file"
+        warn "$tool failed for $sample: $1; see $runlog"
+        printf '%s\t%s\tfailed\t\t%s\t%s\t%s\n' "$sample" "$tool" "see log: $1" \
+            "$(( $(date +%s) - start ))" "$(tr -d '[:space:]' < "$rss" 2>/dev/null || true)" >> "$STATUS"
+    }
+
+    log "  $tool: subsampling $sample into $TRYCYCLER_ASSEMBLY_COUNT independent read set(s) ..."
+    if ! profile_run "$rss" trycycler subsample --reads "$reads" --out_dir "$work_dir/subsampled" \
+            --count "$TRYCYCLER_ASSEMBLY_COUNT" --threads "$TRYCYCLER_THREADS" >> "$runlog" 2>&1; then
+        fail_sample "subsampling"; return
+    fi
+    shopt -s nullglob
+    local subfiles=("$work_dir"/subsampled/sample_*.fastq*)
+    shopt -u nullglob
+    if [[ "${#subfiles[@]}" -eq 0 ]]; then
+        fail_sample "no subsampled read sets produced"; return
+    fi
+
+    # Assemble each subsample independently with Flye, then rename into
+    # Trycycler's expected flat assemblies/<name>.fasta+.gfa layout.
+    mkdir -p "$work_dir/assemblies"
+    local subfile base
+    for subfile in "${subfiles[@]}"; do
+        base="$(basename "$subfile")"; base="${base%.gz}"; base="${base%.*}"
+        log "  $tool: Flye ($TRYCYCLER_READ_TYPE) for $sample/$base ..."
+        if ! profile_run "$rss" flye "--$TRYCYCLER_READ_TYPE" "$subfile" --out-dir "$work_dir/flye_$base" \
+                --threads "$TRYCYCLER_THREADS" >> "$runlog" 2>&1; then
+            fail_sample "independent assembly $base"; return
+        fi
+        cp "$work_dir/flye_$base/assembly.fasta" "$work_dir/assemblies/$base.fasta"
+        [[ -f "$work_dir/flye_$base/assembly_graph.gfa" ]] && cp "$work_dir/flye_$base/assembly_graph.gfa" "$work_dir/assemblies/$base.gfa"
+    done
+
+    if ! profile_run "$rss" trycycler cluster --assemblies "$work_dir"/assemblies/*.fasta --reads "$reads" \
+            --out_dir "$work_dir/cluster" --threads "$TRYCYCLER_THREADS" >> "$runlog" 2>&1; then
+        fail_sample "clustering"; return
+    fi
+    shopt -s nullglob
+    local all_clusters=("$work_dir"/cluster/cluster_*)
+    shopt -u nullglob
+    if [[ "${#all_clusters[@]}" -eq 0 ]]; then
+        fail_sample "clustering produced no clusters"; return
+    fi
+
+    # Per-cluster reconcile + MSA. A cluster failing either step is DROPPED,
+    # not a sample failure -- see the function header comment.
+    local survivors=() dropped=() cdir
+    for cdir in "${all_clusters[@]}"; do
+        if profile_run "$rss" trycycler reconcile --reads "$reads" --cluster_dir "$cdir" >> "$runlog" 2>&1 && \
+           profile_run "$rss" trycycler msa --cluster_dir "$cdir" >> "$runlog" 2>&1; then
+            survivors+=("$cdir")
+        else
+            dropped+=("$(basename "$cdir")")
+            warn "  $tool: $(basename "$cdir") did not reconcile for $sample; dropped, continuing with the rest"
+        fi
+    done
+    if [[ "${#survivors[@]}" -eq 0 ]]; then
+        fail_sample "no cluster reconciled"; return
+    fi
+
+    if ! profile_run "$rss" trycycler partition --reads "$reads" --cluster_dirs "${survivors[@]}" >> "$runlog" 2>&1; then
+        fail_sample "read partitioning"; return
+    fi
+
+    # Per-cluster consensus (+ optional Medaka polish). Same drop-not-fail
+    # policy as reconcile/MSA above.
+    local consensus_files=() final
+    for cdir in "${survivors[@]}"; do
+        if ! profile_run "$rss" trycycler consensus --cluster_dir "$cdir" >> "$runlog" 2>&1; then
+            dropped+=("$(basename "$cdir") (consensus)")
+            warn "  $tool: $(basename "$cdir") failed at consensus for $sample; dropped, continuing with the rest"
+            continue
+        fi
+        final="$cdir/7_final_consensus.fasta"
+        if [[ "${TRYCYCLER_MEDAKA_POLISH:-0}" -eq 1 ]]; then
+            if profile_run "$rss" medaka_consensus -i "$cdir/4_reads.fastq" -d "$final" \
+                    -o "$cdir/medaka" -t "$TRYCYCLER_THREADS" >> "$runlog" 2>&1 \
+                    && [[ -s "$cdir/medaka/consensus.fasta" ]]; then
+                final="$cdir/medaka/consensus.fasta"
+            else
+                warn "  $tool: Medaka polish failed for $(basename "$cdir")/$sample; keeping the unpolished consensus"
+            fi
+        fi
+        [[ -s "$final" ]] && consensus_files+=("$final")
+    done
+    if [[ "${#consensus_files[@]}" -eq 0 ]]; then
+        fail_sample "no cluster reached consensus"; return
+    fi
+
+    local combined="$work_dir/consensus_assembly.fasta"
+    cat "${consensus_files[@]}" > "$combined"
+    local mob_dir="$work_dir/mob_recon"
+    if profile_run "$rss" mob_recon --infile "$combined" --outdir "$mob_dir" --num_threads "$TRYCYCLER_THREADS" --force >> "$runlog" 2>&1 && \
+       bash "$HERE/../adapters/adapt_mob_recon.sh" "$mob_dir" "$combined" "$pred" >> "$runlog" 2>&1; then
+        touch "$done_file"
+        [[ "${#dropped[@]}" -gt 0 ]] && note="$note; dropped ${#dropped[@]} of ${#all_clusters[@]} cluster(s): ${dropped[*]}"
+        printf '%s\t%s\tcompleted\t%s\t%s\t%s\t%s\n' "$sample" "$tool" "$pred" "$note" \
+            "$(( $(date +%s) - start ))" "$(tr -d '[:space:]' < "$rss" 2>/dev/null || true)" >> "$STATUS"
+    else
+        fail_sample "MOB-Recon on the consensus assembly"
+    fi
+}
+
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]] && for_sample "$SAMPLE"
     [[ "${RUN_PLASSEMBLER:-0}" -eq 1 ]] && run_plassembler_for_sample "$SAMPLE"
     [[ "${RUN_HYBRACTER_LONG:-0}" -eq 1 ]] && run_hybracter_for_sample long "$SAMPLE"
     [[ "${RUN_HYBRACTER_HYBRID:-0}" -eq 1 ]] && run_hybracter_for_sample hybrid "$SAMPLE"
+    [[ "${RUN_TRYCYCLER_MOB_RECON:-0}" -eq 1 ]] && run_trycycler_mob_recon_for_sample "$SAMPLE"
     true
 done < <(read_samples "$SAMPLE_SHEET")
 

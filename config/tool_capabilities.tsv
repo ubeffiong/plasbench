@@ -8,6 +8,9 @@ flye_mob_recon	binning	yes	long_reads	Flye long-read assembly followed by MOB-Re
 plassembler	reassembly	yes	hybrid_reads	Hybrid long+short plasmid assembly; each output contig is one plasmid.	hybrid	yes
 hybracter_long	reassembly	yes	long_reads	Hybracter long-read-only assembly with Plassembler-based plasmid recovery.	long_read	yes
 hybracter_hybrid	reassembly	yes	hybrid_reads	Hybracter hybrid assembly with Plassembler-based plasmid recovery.	hybrid	yes
+trycycler_mob_recon	binning	yes	long_reads	Trycycler consensus long-read assembly followed by MOB-Recon plasmid bins.	long_read	yes
+genomad	ml_classification	no	assembly	Gene-based neural classifier for plasmid/virus detection on assembly contigs.	short_read	no
+plasme	ml_classification	no	assembly	Alignment+transformer hybrid classifier for plasmid contigs (short-read assemblies in this delivery).	short_read	no
 mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.	short_read	no
 platon_like	classification	no	assembly	Demo contig classifier; declares no bins.	short_read	no
 spades_like	reassembly	no	paired_reads	Demo re-assembler; contigs are not bins.	short_read	no
