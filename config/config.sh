@@ -133,6 +133,21 @@ export RUN_GENOMAD="${RUN_GENOMAD:-0}"
 export RUN_PLASME="${RUN_PLASME:-0}"
 export PLASME_THREADS="${PLASME_THREADS:-$THREADS}"
 export PLASME_PROBABILITY="${PLASME_PROBABILITY:-0.5}"
+# plASgraph2: a GNN per-node classifier over the assembly graph (needs the
+# same assembly_graph.gfa gplas2 uses -- set ASSEMBLER=unicycler for the
+# cleanest graphs). Off by default. Like geNomad/PLASMe, exposes a per-node
+# plasmid_score and is PR-curve/PR-AUC scored; unlike them it produces no
+# derived multi-contig grouping in its own output, so binning_capable=no
+# (config/tool_capabilities.tsv). Distributed as a git checkout with its own
+# conda env (TensorFlow/Spektral), not a bioconda package -- see
+# env/install_tools.sh's plasgraph2 case -- and the pretrained model ships
+# inside that checkout, so PLASGRAPH2_MODEL_DIR must point at it.
+export RUN_PLASGRAPH2="${RUN_PLASGRAPH2:-0}"
+export PLASGRAPH2_MODEL_DIR="${PLASGRAPH2_MODEL_DIR:-}"
+# Forces CPU-only execution (CUDA_VISIBLE_DEVICES="") for deterministic,
+# GPU-independent runs. Set to 0 to let plASgraph2/TensorFlow use a GPU if
+# one is available and configured.
+export PLASGRAPH2_CPU_ONLY="${PLASGRAPH2_CPU_ONLY:-1}"
 export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
 # CIRCULARITY GUARD (see scripts/lib.sh: long_read_truth_eligible). Off by
 # default: a sample without a declared truth_independent_of_long_reads=yes is

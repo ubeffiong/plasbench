@@ -251,6 +251,41 @@ run_plasme() {
     fi
 }
 
+run_plasgraph2() {
+    local SAMPLE="$1" SDIR="$2" RDIR="$3" CONTIGS="$4"
+    if tool_enabled RUN_PLASGRAPH2 plasgraph2 && have plASgraph2_classify.py; then
+        local TOOL="plasgraph2" OUT="$RDIR/plasgraph2" PRED="$RDIR/pred_plasgraph2.plasmid.fasta" DONE="$RDIR/.plasgraph2.complete"
+        local GRAPH="$SDIR/assembly_graph.gfa"
+        if is_complete "$DONE" "$PRED"; then
+            log "  $TOOL: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif [[ ! -s "$GRAPH" ]]; then
+            warn "  $TOOL needs an assembly graph; skipped for $SAMPLE"; record_status "$SAMPLE" "$TOOL" "skipped" "" "assembly graph unavailable"
+        elif [[ -z "$PLASGRAPH2_MODEL_DIR" ]]; then
+            warn "  $TOOL needs PLASGRAPH2_MODEL_DIR set to a pretrained model directory; skipped for $SAMPLE"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "PLASGRAPH2_MODEL_DIR not set"
+        else
+            rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT"
+            log "  $TOOL ($SAMPLE) ..."
+            local START; START=$(profile_start)
+            # plASgraph2 requires a gzipped GFA (its own examples/docs never
+            # show a plain .gfa input); the pipeline's own graph is plain, so
+            # gzip a copy into this tool's own output directory.
+            local GRAPH_GZ="$OUT/assembly_graph.gfa.gz" CSV="$OUT/${SAMPLE}_output.csv"
+            gzip -c "$GRAPH" > "$GRAPH_GZ"
+            [[ "$PLASGRAPH2_CPU_ONLY" == "1" ]] && export CUDA_VISIBLE_DEVICES=""
+            if profile_exec plASgraph2_classify.py gfa "$GRAPH_GZ" "$PLASGRAPH2_MODEL_DIR" "$CSV" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_plasgraph2.sh" "$CSV" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+        fi
+    elif tool_enabled RUN_PLASGRAPH2 plasgraph2; then
+        warn "plasgraph2 is enabled but plASgraph2_classify.py is not installed (or not on PATH); skipped for $SAMPLE"
+        record_status "$SAMPLE" "plasgraph2" "skipped" "" "command unavailable"
+    fi
+}
+
 # One sample's whole tool set. mob_recon, platon, plasmidspades, and
 # gplas2_external are independent given the same assembly, so they are
 # always launched through the same MAX_PARALLEL_TOOLS-gated job pool
@@ -274,6 +309,7 @@ process_sample() {
         tool_enabled RUN_GPLAS2_EXTERNAL gplas2_external && record_status "$SAMPLE" "gplas2_external" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_GENOMAD genomad && record_status "$SAMPLE" "genomad" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASME plasme && record_status "$SAMPLE" "plasme" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_PLASGRAPH2 plasgraph2 && record_status "$SAMPLE" "plasgraph2" "skipped" "" "assembly contigs unavailable"
         return 0
     fi
     log "=== Run tools on $SAMPLE ==="
@@ -285,6 +321,7 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_gplas2_external "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_genomad "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasme "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasgraph2 "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
 
     # gplas2_mob's classifier seed comes straight from mob_recon's own output
     # directory, so it must not start until that finished (successfully or
@@ -311,7 +348,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme plasgraph2; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

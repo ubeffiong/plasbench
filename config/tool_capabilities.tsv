@@ -11,6 +11,7 @@ hybracter_hybrid	reassembly	yes	hybrid_reads	Hybracter hybrid assembly with Plas
 trycycler_mob_recon	binning	yes	long_reads	Trycycler consensus long-read assembly followed by MOB-Recon plasmid bins.	long_read	yes
 genomad	ml_classification	no	assembly	Gene-based neural classifier for plasmid/virus detection on assembly contigs.	short_read	no
 plasme	ml_classification	no	assembly	Alignment+transformer hybrid classifier for plasmid contigs (short-read assemblies in this delivery).	short_read	no
+plasgraph2	ml_classification	no	assembly_graph	GNN per-node classifier over the assembly graph; no derived multi-contig grouping in its own output.	short_read	no
 mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.	short_read	no
 platon_like	classification	no	assembly	Demo contig classifier; declares no bins.	short_read	no
 spades_like	reassembly	no	paired_reads	Demo re-assembler; contigs are not bins.	short_read	no

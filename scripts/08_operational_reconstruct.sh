@@ -44,7 +44,7 @@ RECOMMENDATIONS="${RECOMMENDATIONS:-$RESULTS_DIR/benchmark.recommendations.tsv}"
 # instead of assuming stage 0 already has.
 mkdir -p "$DATA_DIR" "$RESULTS_DIR" "$LOG_DIR" "${TMP_DIR:-/tmp}"
 
-KNOWN_TOOLS=(mob_recon platon plasmidspades gplas2_mob gplas2_external)
+KNOWN_TOOLS=(mob_recon platon plasmidspades gplas2_mob gplas2_external genomad plasme plasgraph2)
 TOOL_SOURCE="explicit"
 if [[ -n "$TOOL" ]]; then
     match=0
