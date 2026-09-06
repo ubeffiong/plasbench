@@ -11,6 +11,26 @@ Push a `v*` tag (e.g. `v0.3.0`). `.github/workflows/release.yml` then:
 Step 3 is what makes the Zenodo archival below actually happen — Zenodo's
 GitHub integration listens for a *published Release*, not a bare tag push.
 
+**Step 1 needs a one-time setup before it will actually work.** The
+`plasbench` project does not exist on PyPI yet, and `pypa/gh-action-pypi-publish`
+authenticates via Trusted Publishing (OIDC) rather than a stored API token —
+there is no PyPI account/token secret to create. Instead:
+
+1. Sign in (or create an account) at [pypi.org](https://pypi.org).
+2. Go to [pypi.org/manage/account/publishing/](https://pypi.org/manage/account/publishing/)
+   and register a new **pending publisher** for project name `plasbench`,
+   owner `ubeffiong`, repository `plasbench`, workflow filename `release.yml`.
+   Leave the environment name blank unless you also add a matching
+   `environment:` key to the `publish` job in `release.yml` — the two must
+   match exactly, or every publish attempt fails with `invalid-publisher`.
+3. Push a `v*` tag as above. The first successful publish converts the
+   pending publisher into a real one and creates the PyPI project.
+
+Until this is done, that step fails on every release — by design this does
+not block the GHCR image push or the GitHub Release (see the
+`continue-on-error` comment on that step in `release.yml`), so the rest of
+the release still completes normally.
+
 ## Software archival: the zero-code Zenodo↔GitHub mirror
 
 This is a one-time, account-level setup only the repository owner can do —
