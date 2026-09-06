@@ -29,8 +29,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recommendation_model import (  # noqa: E402
-    RecommendationModel, TARGETS, encode_row, fit_feature_spec,
-    mean_absolute_error, solve_ridge,
+    RecommendationModel, TARGETS, attach_assembly_stats, encode_row, fit_feature_spec,
+    load_assembly_stats, mean_absolute_error, solve_ridge,
 )
 from select_operational_method import annotate, number, read_tsv, sample_metadata  # noqa: E402
 from study_groups import group_samples_by_study  # noqa: E402
@@ -104,6 +104,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scores", required=True)
     ap.add_argument("--sample-sheet", required=True)
+    ap.add_argument("--data-dir", help="Cohort data directory; per-sample assembly_stats.tsv (stage 2) "
+                                       "is joined onto the training rows as extra continuous features. "
+                                       "Omit and those features are simply absent.")
     ap.add_argument("--out", required=True)
     ap.add_argument("--min-studies", type=int, default=3)
     ap.add_argument("--min-training-samples", type=int, default=20)
@@ -117,6 +120,7 @@ def main():
         if row.get("sample") and row["sample"] not in metadata:
             metadata[row["sample"]] = {"sample_id": row["sample"]}
     rows = [annotate(row, metadata) for row in raw_scores]
+    attach_assembly_stats(rows, load_assembly_stats(args.data_dir))
     studies = group_samples_by_study(rows, metadata)
 
     reasons = []
@@ -158,7 +162,7 @@ def main():
         payload = model.to_dict(True, reason)
     else:
         payload = {
-            "schema_version": "1.0", "model_ready": False, "reason": "; ".join(reasons),
+            "schema_version": "1.1", "model_ready": False, "reason": "; ".join(reasons),
             "n_training_rows": len(rows), "n_studies": len(studies), "spec": None, "targets": {},
         }
 

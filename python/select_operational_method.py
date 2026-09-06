@@ -21,7 +21,8 @@ import shutil
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from recommendation_model import decision_score, load_model
+from recommendation_model import (DEFAULT_DECISION_PROFILE, DECISION_PROFILES, attach_assembly_stats,
+                                  decision_score, load_assembly_stats, load_model)
 
 
 NUMERIC = ("precision", "recall", "f1", "plasmid_recall", "bin_f1", "unmapped_pred_bp",
@@ -90,10 +91,48 @@ def annotate(row, metadata):
     result["read_depth_band"] = band(result["read_depth_x"], (30, 80), ("low", "moderate", "high"))
     result["amr_status"] = "AMR annotated" if number(row, "true_amr_gene_count", 0) > 0 else "AMR not annotated"
     result["fragmentation_excess_records"] = max(0.0, number(row, "predicted_record_count", 0.0) - number(row, "recovered_plasmid_count", 0.0))
+    # score_plasmids.py always writes analysis_track (short_read/long_read/
+    # hybrid); dict(row) above already copies it forward, but make it
+    # explicit (with the same fallback the scoring CLI itself defaults to)
+    # so it's a documented, guaranteed-present stratification field rather
+    # than an incidental pass-through.
+    result["analysis_track"] = row.get("analysis_track") or "short_read"
+    # read_quality_band is attached separately, by attach_read_quality_bands()
+    # (needs data_dir, which this function does not have) -- defaulted here
+    # so every row has the key even before that step runs, or when it's
+    # never called at all (e.g. an older invocation with no --data-dir).
+    result.setdefault("read_quality_band", "not_recorded")
     return result
 
 
-def tool_quality(rows, statuses, total_samples, model=None):
+def attach_read_quality_bands(rows, data_dir):
+    """Read each sample's data/<sample>/observed_read_quality.tsv (stage 2,
+    measure_read_quality.py; long-read/hybrid samples only) and set
+    read_quality_band on every row for that sample, in place.
+
+    Mirrors recommendation_model.py's load_assembly_stats/attach_assembly_stats
+    shape. A sample with no such file (short-read-only, or predates this
+    feature) keeps annotate()'s "not_recorded" default -- never an error.
+    """
+    if not data_dir:
+        return rows
+    quality_by_sample = {}
+    for path in sorted(Path(data_dir).glob("*/observed_read_quality.tsv")):
+        try:
+            with open(path, newline="", encoding="utf-8") as handle:
+                row = next(csv.DictReader(handle, delimiter="\t"), None)
+        except (OSError, csv.Error):
+            continue
+        if row and row.get("mean_phred_quality"):
+            quality_by_sample[path.parent.name] = number(row, "mean_phred_quality")
+    for row in rows:
+        quality = quality_by_sample.get(row.get("sample"))
+        if quality is not None:
+            row["read_quality_band"] = band(quality, (10, 20), ("low", "moderate", "high"))
+    return rows
+
+
+def tool_quality(rows, statuses, total_samples, model=None, decision_profile=DEFAULT_DECISION_PROFILE):
     """Multi-objective descriptive score, only used after eligibility checks.
 
     model (optional): a ready RecommendationModel (recommendation_model.py).
@@ -102,6 +141,11 @@ def tool_quality(rows, statuses, total_samples, model=None):
     from continuous isolate features, instead of a raw observed-value mean.
     Every other component (precision, recall, bin_score, failure_rate,
     penalties) is unchanged; the model was only asked to predict those two.
+
+    decision_profile: a named weight set from recommendation_model.py's
+    DECISION_PROFILES. The default reproduces today's original single
+    formula exactly; a different profile only changes ranking, never which
+    isolates/tools are eligible in the first place.
     """
     by_tool = defaultdict(list)
     for row in rows:
@@ -133,7 +177,7 @@ def tool_quality(rows, statuses, total_samples, model=None):
         if runtime is not None: resource_penalty += .02 * min(1.0, math.log1p(runtime) / math.log1p(3600))
         if memory is not None: resource_penalty += .01 * min(1.0, memory / (16 * 1024 * 1024))
         quality = decision_score(f1, precision, recall, plasmid, bin_score, failure_rate,
-                                 structural_penalty, resource_penalty)
+                                 structural_penalty, resource_penalty, profile=decision_profile)
         output[tool] = {
             "tool": tool, "n_scored": len(values), "coverage": len({row["sample"] for row in values}) / total_samples if total_samples else 0.0,
             "mean_f1": f1, "mean_precision": precision, "mean_recall": recall,
@@ -148,20 +192,43 @@ def eligible(summary, min_samples, min_coverage):
     return summary["n_scored"] >= min_samples and summary["coverage"] >= min_coverage
 
 
-def write_recommendations(rows, statuses, total_samples, out_path, min_samples, min_coverage, validation_ready=True, model=None):
+def applicability_tier(summary, min_samples, min_coverage):
+    """Graded eligibility, beyond eligible()'s existing binary pass/fail:
+    unsupported/low/moderate/high, based on how far n_scored/coverage clear
+    the configured minimums. Purely descriptive: eligible()'s own binary
+    gate is still what decides "primary" candidacy; this only adds
+    visibility into how comfortably a tool cleared it, letting a reader
+    treat a just-barely-eligible recommendation with more caution than one
+    resting on several times the minimum evidence.
+    """
+    if not eligible(summary, min_samples, min_coverage):
+        return "unsupported"
+    sample_ratio = summary["n_scored"] / min_samples if min_samples else float("inf")
+    coverage_margin = summary["coverage"] - min_coverage
+    if sample_ratio >= 2.0 and coverage_margin >= 0.15:
+        return "high"
+    if sample_ratio >= 1.4 or coverage_margin >= 0.08:
+        return "moderate"
+    return "low"
+
+
+def write_recommendations(rows, statuses, total_samples, out_path, min_samples, min_coverage, validation_ready=True,
+                          model=None, decision_profile=DEFAULT_DECISION_PROFILE):
     scopes = [("overall", "all", rows)]
     for field in ("organism", "gram_group", "truth_technology", "sample_origin", "collection_country",
-                  "plasmid_size_band", "plasmid_count_band", "read_depth_band", "amr_status"):
+                  "plasmid_size_band", "plasmid_count_band", "read_depth_band", "amr_status",
+                  "analysis_track", "read_quality_band"):
         groups = defaultdict(list)
         for row in rows:
             groups[row[field]].append(row)
         scopes.extend((field, value, group) for value, group in sorted(groups.items()))
-    columns = ["scope", "group", "tool", "eligible", "recommendation", "reason", "n_scored", "coverage",
+    columns = ["scope", "group", "tool", "eligible", "applicability", "recommendation", "reason", "n_scored", "coverage",
                "mean_f1", "mean_precision", "mean_recall", "mean_plasmid_recall", "mean_bin_f1", "failure_rate",
                "median_runtime_seconds", "median_peak_rss_kb", "decision_score"]
     recommendations, written = {}, []
     for scope, group, group_rows in scopes:
-        summaries = tool_quality(group_rows, statuses, total_samples if scope == "overall" else len({row["sample"] for row in group_rows}), model=model)
+        summaries = tool_quality(group_rows, statuses, total_samples if scope == "overall" else len({row["sample"] for row in group_rows}),
+                                 model=model, decision_profile=decision_profile)
         candidates = [item for item in summaries.values() if eligible(item, min_samples, min_coverage)] if validation_ready else []
         winner = max(candidates, key=lambda item: (item["decision_score"], item["mean_f1"], item["tool"])) if candidates else None
         recommendations[(scope, group)] = winner["tool"] if winner else None
@@ -173,6 +240,7 @@ def write_recommendations(rows, statuses, total_samples, out_path, min_samples, 
             if item.get("model_used"):
                 reason += " (model-fitted)"
             item.update({"scope": scope, "group": group, "eligible": str(eligible(item, min_samples, min_coverage)).lower(),
+                         "applicability": applicability_tier(item, min_samples, min_coverage) if validation_ready else "unsupported",
                          "recommendation": "primary" if winner and item["tool"] == winner["tool"] else "none",
                          "reason": reason})
             written.append(item)
@@ -333,6 +401,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--scores", required=True)
     parser.add_argument("--sample-sheet", required=True)
+    parser.add_argument("--data-dir", help="Cohort data directory; per-sample assembly_stats.tsv is joined "
+                                           "onto score rows so the recommendation model sees the same "
+                                           "features it was fitted with. Only consulted when "
+                                           "--recommendation-model is in use.")
     parser.add_argument("--results-dir", required=True)
     parser.add_argument("--out-prefix", required=True)
     parser.add_argument("--tool-status")
@@ -341,6 +413,10 @@ def main():
     parser.add_argument("--min-samples", type=int, default=5)
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
+    parser.add_argument("--decision-profile", choices=tuple(DECISION_PROFILES), default=DEFAULT_DECISION_PROFILE,
+                        help="Named decision_score weight set (recommendation_model.py). The default reproduces "
+                             "today's original single formula exactly; a different profile only changes ranking, "
+                             "never which isolates/tools are eligible in the first place.")
     parser.add_argument("--allow-experimental-ensemble", action="store_true", help="Record an experimental request; no consensus FASTA is fabricated.")
     args = parser.parse_args()
     if args.min_samples < 1 or not 0 < args.min_coverage <= 1:
@@ -354,9 +430,19 @@ def main():
         if row.get("sample") and row["sample"] not in metadata:
             metadata[row["sample"]] = {"sample_id": row["sample"]}
     rows = [annotate(row, metadata) for row in raw_scores]
+    attach_assembly_stats(rows, load_assembly_stats(args.data_dir))
+    attach_read_quality_bands(rows, args.data_dir)
     statuses = status_profiles(args.tool_status)
     validation_rows = read_tsv(args.recommendation_validation) if args.recommendation_validation and Path(args.recommendation_validation).is_file() else []
-    validation_ready = not args.recommendation_validation or bool(validation_rows) and all(row.get("status") == "assessed" for row in validation_rows)
+    # validate_recommendations.py also writes a per-stratum LOSO diagnostic
+    # row alongside each fold's "overall" row -- a stratum lacking enough
+    # training samples in one fold is a normal, expected not_assessed
+    # outcome for THAT stratum, never a reason to withhold every operational
+    # recommendation across the whole cohort. Only "overall" rows (or a row
+    # from a validation file written before the scope/group columns existed)
+    # gate readiness here.
+    overall_validation_rows = [row for row in validation_rows if row.get("scope", "overall") == "overall"]
+    validation_ready = not args.recommendation_validation or bool(overall_validation_rows) and all(row.get("status") == "assessed" for row in overall_validation_rows)
     model = None
     if args.recommendation_model:
         model, model_ready, _ = load_model(args.recommendation_model)
@@ -364,10 +450,11 @@ def main():
     out_prefix = Path(args.out_prefix)
     recommendations_path = out_prefix.with_name(out_prefix.name + ".recommendations.tsv")
     recommendations, recommendation_rows = write_recommendations(
-        rows, statuses, len(metadata), recommendations_path, args.min_samples, args.min_coverage, validation_ready, model=model)
+        rows, statuses, len(metadata), recommendations_path, args.min_samples, args.min_coverage, validation_ready,
+        model=model, decision_profile=args.decision_profile)
     stratified_path = out_prefix.with_name(out_prefix.name + ".stratified.tsv")
     with open(stratified_path, "w", newline="", encoding="utf-8") as handle:
-        columns = ["scope", "group", "tool", "eligible", "recommendation", "reason", "n_scored", "coverage",
+        columns = ["scope", "group", "tool", "eligible", "applicability", "recommendation", "reason", "n_scored", "coverage",
                    "mean_f1", "mean_precision", "mean_recall", "mean_plasmid_recall", "mean_bin_f1", "failure_rate",
                    "median_runtime_seconds", "median_peak_rss_kb", "decision_score"]
         writer = csv.DictWriter(handle, fieldnames=columns, delimiter="\t")

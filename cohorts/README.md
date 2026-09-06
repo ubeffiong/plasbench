@@ -99,6 +99,35 @@ plasbench run --cohort public-v1 --write-script run_public_v1.sh
 bash run_public_v1.sh   # after reviewing or editing it
 ```
 
+## Cross-cohort deduplication
+
+`accepted_accessions.tsv` is a generated ledger (never hand-edited) of every
+BioSample accepted into any released cohort here, keyed on BioSample rather
+than assembly accession -- an assembly can be resubmitted under a new
+accession while representing the same physical isolate, so BioSample is the
+stable identity across releases. Regenerate it after every release:
+
+```bash
+plasbench build-ledger --cohorts-dir cohorts --out cohorts/accepted_accessions.tsv
+```
+
+Both `curate-cohort` and `validate-cohort` accept an optional `--ledger`
+pointing at this file, rejecting a candidate/row whose BioSample is already
+in a prior release rather than silently accepting the same isolate twice
+under a different `sample_id`:
+
+```bash
+plasbench curate-cohort --candidates new_batch.tsv --out-dir new_batch_curated \
+  --ledger cohorts/accepted_accessions.tsv
+plasbench validate-cohort --samples cohorts/public-v3.tsv \
+  --ledger cohorts/accepted_accessions.tsv
+```
+
+Want to add an isolate of your own to one of these panels? See
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) — `plasbench prepare-contribution`
+wraps this ledger check (plus schema, NCBI evidence, a privacy screen, and
+metric bounds) and ends in a local git branch ready for a pull request.
+
 ## Sources
 
 **public-v1**

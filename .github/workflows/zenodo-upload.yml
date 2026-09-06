@@ -1,0 +1,79 @@
+name: Zenodo data archival
+
+# Separate from the zero-code Zenodo<->GitHub mirror (which archives the
+# SOFTWARE itself via .zenodo.json on every published release): this uploads
+# a large DATA asset -- the released cohorts' committed evidence -- as its
+# own citable Zenodo deposition with its own DOI, since a software-release
+# mirror does not package repository data files.
+#
+# Opt-in: requires a ZENODO_TOKEN repository secret the user provisions
+# themselves (see RELEASING.md). Never silently skipped -- if the secret is
+# absent, this job fails with a clear message.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require ZENODO_TOKEN
+        run: |
+          if [ -z "${{ secrets.ZENODO_TOKEN }}" ]; then
+            echo "::error::ZENODO_TOKEN repository secret is not set. This job archives" \
+                 "cohort data to Zenodo and must not run silently without it. See" \
+                 "RELEASING.md for the one-time setup, or remove this workflow if you" \
+                 "do not want data archival on releases."
+            exit 1
+          fi
+
+      - name: Package released cohort data
+        run: |
+          mkdir -p dist_data
+          tar -czf "dist_data/plasbench-cohorts-${{ github.ref_name }}.tar.gz" \
+            cohorts/*.tsv cohorts/*.lock.json cohorts/README.md
+
+      - name: Create Zenodo deposition
+        id: create
+        run: |
+          response=$(curl -sf -X POST "https://zenodo.org/api/deposit/depositions" \
+            -H "Authorization: Bearer ${{ secrets.ZENODO_TOKEN }}" \
+            -H "Content-Type: application/json" -d '{}')
+          echo "$response" > deposition.json
+          deposition_id=$(python3 -c "import json; print(json.load(open('deposition.json'))['id'])")
+          bucket_url=$(python3 -c "import json; print(json.load(open('deposition.json'))['links']['bucket'])")
+          echo "deposition_id=$deposition_id" >> "$GITHUB_OUTPUT"
+          echo "bucket_url=$bucket_url" >> "$GITHUB_OUTPUT"
+
+      - name: Upload cohort archive
+        run: |
+          asset="dist_data/plasbench-cohorts-${{ github.ref_name }}.tar.gz"
+          curl -sf -X PUT "${{ steps.create.outputs.bucket_url }}/$(basename "$asset")" \
+            -H "Authorization: Bearer ${{ secrets.ZENODO_TOKEN }}" \
+            --upload-file "$asset"
+
+      - name: Set deposition metadata
+        run: |
+          curl -sf -X PUT "https://zenodo.org/api/deposit/depositions/${{ steps.create.outputs.deposition_id }}" \
+            -H "Authorization: Bearer ${{ secrets.ZENODO_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "metadata": {
+                "title": "PlasBench released cohort data: ${{ github.ref_name }}",
+                "upload_type": "dataset",
+                "description": "Public cohort metadata (sample sheets and NCBI verification locks) shipped with PlasBench release ${{ github.ref_name }}. See https://github.com/${{ github.repository }} for the benchmarking pipeline itself.",
+                "creators": [{"name": "Effiong, Ubokobong"}],
+                "license": "CC-BY-4.0"
+              }
+            }'
+
+      - name: Publish deposition
+        run: |
+          curl -sf -X POST "https://zenodo.org/api/deposit/depositions/${{ steps.create.outputs.deposition_id }}/actions/publish" \
+            -H "Authorization: Bearer ${{ secrets.ZENODO_TOKEN }}"

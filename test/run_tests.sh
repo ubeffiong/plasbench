@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for test in test_scoring.py test_make_truth.py test_bin_matching.py test_merge_bin_metrics.py test_amr_truth.py test_recommendation_validation.py test_gplas_classifier_validation.py test_mob_to_gplas_classifier.py test_cohort_validation.py test_aggregate.py test_report_composition.py test_recovery_vocabulary.py test_explorer_view.py test_tool_versions.py test_report_javascript.py test_visual_report.py test_structural_and_annotation.py test_protein_annotation.py test_depth_ladder.py test_container_hygiene.py test_selection.py test_visualization_data.py test_operational_selection.py test_download_estimate.py test_local_inputs.py test_tool_capabilities_registry.py test_discover_long_read_hint.py test_read_quality_ladder.py test_pr_curve_scoring.py test_scores_validation.py test_merge_pr_metrics.py test_pr_curve_chart.py test_report_tracks.py test_compute_assembly_stats.py test_flag_cohort_outliers.py test_ridge_regression.py test_fit_recommendation_model.py test_select_unknown_sample_model.py; do
+for test in test_scoring.py test_make_truth.py test_bin_matching.py test_merge_bin_metrics.py test_amr_truth.py test_recommendation_validation.py test_gplas_classifier_validation.py test_mob_to_gplas_classifier.py test_cohort_validation.py test_aggregate.py test_report_composition.py test_recovery_vocabulary.py test_explorer_view.py test_tool_versions.py test_report_javascript.py test_visual_report.py test_structural_and_annotation.py test_protein_annotation.py test_depth_ladder.py test_container_hygiene.py test_selection.py test_visualization_data.py test_operational_selection.py test_download_estimate.py test_local_inputs.py test_tool_capabilities_registry.py test_discover_long_read_hint.py test_read_quality_ladder.py test_pr_curve_scoring.py test_scores_validation.py test_merge_pr_metrics.py test_pr_curve_chart.py test_report_tracks.py test_compute_assembly_stats.py test_flag_cohort_outliers.py test_ridge_regression.py test_fit_recommendation_model.py test_select_unknown_sample_model.py test_accession_ledger.py test_curate_cohort_dedup.py test_validate_cohort_ledger.py test_recommendation_model_features.py test_analysis_track_and_read_quality_band.py test_measure_read_quality.py test_per_stratum_loso.py test_decision_profiles.py test_prepare_contribution.py; do
     python3 "$HERE/$test"
 done
 bash "$HERE/test_gplas_adapter.sh"
@@ -30,4 +30,5 @@ bash "$HERE/test_plasme_stage.sh"
 bash "$HERE/test_plasgraph2_adapter.sh"
 bash "$HERE/test_plasgraph2_stage.sh"
 bash "$HERE/test_cohort_and_write_script.sh"
+bash "$HERE/test_stage_wiring_qc_model.sh"
 echo "ALL PLASBENCH TESTS PASSED"

@@ -159,3 +159,86 @@ ecoli_01	GCF_012345678.1	SRR12345678	Escherichia coli	hybrid	B	SAMN00000000	PRJN
 
 Tip: keep a `docs/provenance.tsv` noting BioProject/BioSample/strain for each pair — you'll
 want it for the methods section and the Zenodo deposit.
+
+---
+
+## Contributing new isolates
+
+Everything above is about finding pairs for *your own* run. This section is
+about growing the **shared, committed** `cohorts/` panels (`public-v1.tsv`,
+`public-v2.tsv`, or a new panel you propose) via a reviewable pull request —
+see [`CONTRIBUTING.md`](../CONTRIBUTING.md) for the full step-by-step. It
+requires no new infrastructure on your part beyond a normal git checkout:
+`plasbench prepare-contribution` runs entirely on your own machine and ends
+in a local branch, never an automatic push.
+
+### Where to look, in priority order
+
+1. **[NCTC 3000](https://www.sanger.ac.uk/resources/downloads/bacteria/nctc/)**
+   — complete, curated reference genomes for the UK National Collection of
+   Type Cultures, each with matched long-read and short-read sequencing done
+   for the same physical strain by the same project. This is the single
+   best source for new pairs: independence and pairing are already the
+   project's own design, not something you have to reconstruct from
+   incidental deposits.
+2. **[GenomeTrakr](https://www.ncbi.nlm.nih.gov/pathogens/genomretrakr/) /
+   [PulseNet](https://www.cdc.gov/pulsenet/index.html)** — public-health
+   genomic-surveillance networks that deposit large, organized collections
+   of foodborne/clinical pathogen genomes to NCBI, many with both a complete
+   assembly and Illumina reads per isolate. Larger and more geographically
+   diverse than NCTC 3000, but check each candidate against the quality
+   criteria above individually — not every deposit in these networks carries
+   a complete, plasmid-bearing assembly.
+3. **A published plasmid-reconstruction tool paper's own supplementary
+   cohort.** Many mob_recon/Platon/gplas-adjacent papers release their own
+   benchmark isolates. Reusing one (Route C, above) grows PlasBench's cohort
+   with data that already has independent scrutiny, and lets results be
+   cross-checked against that paper's own reported numbers.
+
+Whichever source you use, apply the same Route A/B quality criteria above
+(complete assembly, matched paired-end Illumina, same BioSample) before
+proposing a row.
+
+### The dedup mechanism
+
+Every isolate ever accepted into a released cohort is recorded in
+`cohorts/accepted_accessions.tsv`, keyed on **BioSample** (see
+[`cohorts/README.md`](../cohorts/README.md#cross-cohort-deduplication)) —
+because an assembly can be resubmitted under a new accession while
+representing the same physical isolate, BioSample is the identity that
+actually stays stable across re-releases. `prepare-contribution` checks your
+new rows against this ledger automatically; you do not need to cross-check
+it by hand.
+
+### Workflow: `plasbench prepare-contribution` → manual PR
+
+1. Find and verify pairs (above), then benchmark them yourself: stage them
+   with `plasbench init-local`/your own sample sheet, run
+   `plasbench run --samples your_sheet.tsv`, and let stage 6 produce a real
+   `scores.tsv` (and `tool_status.tsv`) for your new sample_id(s).
+2. Write a small cohort-rows TSV for just the new isolate(s), using the same
+   columns as the target cohort file (e.g. `cohorts/public-v2.tsv`'s own
+   header).
+3. Run:
+   ```bash
+   plasbench prepare-contribution --cohort public-v2 \
+     --new-rows my_new_rows.tsv --scores results/scores.tsv \
+     --tool-status results/tool_status.tsv
+   ```
+   This validates schema, NCBI-linked evidence (the same checks
+   `validate-cohort --online` runs), cross-cohort BioSample dedup, a
+   privacy/content screen (no local paths, environment variables, hostnames,
+   or raw sequence files in any field), and metric sanity bounds — then, only
+   if every check passes, appends your rows to `cohorts/public-v2.tsv`,
+   `cohorts/public-v2.scores.tsv`, `cohorts/public-v2.tool_status.tsv`,
+   updates `cohorts/public-v2.lock.json` and `accepted_accessions.tsv`, and
+   commits all of it to a new local branch `contrib/<label>`. Any check that
+   fails instead prints its reason and writes nothing.
+4. Review the commit (`git show`), then push it yourself and open a pull
+   request — nothing is ever pushed automatically:
+   ```bash
+   git push -u origin contrib/<label>
+   ```
+5. A maintainer reviews the PR (`.github/CODEOWNERS` gates every merge) the
+   same way any other contribution is reviewed, and merges it once
+   satisfied.

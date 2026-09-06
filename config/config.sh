@@ -255,6 +255,10 @@ export RECOMMENDATION_MODEL_MIN_SAMPLES="${RECOMMENDATION_MODEL_MIN_SAMPLES:-20}
 # folds) by at least this relative fraction, for every target -- never
 # "ready" on a technicality that is actually worse than just using the mean.
 export RECOMMENDATION_MODEL_MIN_IMPROVEMENT="${RECOMMENDATION_MODEL_MIN_IMPROVEMENT:-0.05}"
+# Rules-only (no ML) decision_score weight profile -- accuracy_first (today's
+# original formula), amr_surveillance, or rapid_screening. Changing this only
+# changes which tool is ranked highest; it never changes eligibility.
+export DECISION_PROFILE="${DECISION_PROFILE:-accuracy_first}"
 
 # Reuse a completed tool result by default. Set FORCE_RERUN_TOOLS=1 to discard
 # completed per-tool output and run it again (for example after a tool upgrade).

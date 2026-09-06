@@ -1688,7 +1688,19 @@ inherits its problems. See
 [§4.2](#42-build-a-cohort-of-your-own) for the tooling and
 [Appendix A](#appendix-a--selection-criteria-what-makes-a-sequence-eligible) /
 [Appendix B](#appendix-b--cohort-criteria-what-makes-a-set-of-sequences-a-cohort)
-for the rules. A cohort PR should include:
+for the rules.
+
+**Adding new isolate(s) to an existing public cohort** (`public-v1`,
+`public-v2`): use `plasbench prepare-contribution` — it wraps schema
+validation, NCBI-linked evidence verification, cross-cohort BioSample dedup,
+a privacy/content screen, and metric sanity bounds into one command, and
+ends in a local git branch with everything already committed, ready for you
+to push and open a PR. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full
+step-by-step; nothing is ever pushed on your behalf.
+
+**Proposing a new, separate panel** (e.g. `public-v3`) is a larger change:
+follow [§6.2](#62-suggesting-a-change-before-writing-it) and open an issue
+first. A cohort PR should include:
 
 - the sheet (`cohorts/<name>.tsv`) and its lock (`cohorts/<name>.lock.json`),
   generated with `--online --write-lock` on a **Linux** checkout so the lock pins

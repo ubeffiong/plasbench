@@ -29,6 +29,18 @@ def read_rows(path):
         return list(csv.DictReader((line for line in handle if line.strip() and not line.lstrip().startswith("#")), delimiter="\t"))
 
 
+def read_ledger(path):
+    """BioSample -> source_cohort, from build_accession_ledger.py's output.
+
+    BioSample, not assembly accession, is the identity key: an assembly can
+    be resubmitted under a new accession for the same physical isolate.
+    """
+    if not path or not Path(path).is_file():
+        return {}
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {row["biosample"]: row["source_cohort"] for row in csv.DictReader(handle, delimiter="\t") if row.get("biosample")}
+
+
 def safe_id(value, index):
     value = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
     return (value or "candidate") + f"_{index:03d}"
@@ -46,7 +58,11 @@ def main():
     parser.add_argument("--out-dir", required=True, help="Directory for accepted.tsv and rejected.tsv.")
     parser.add_argument("--email", help="Contact email sent to NCBI E-utilities.")
     parser.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
+    parser.add_argument("--ledger", help="cohorts/accepted_accessions.tsv (build_accession_ledger.py); "
+                                         "candidates already accepted into a prior cohort release are rejected. "
+                                         "Optional -- omitted means no cross-cohort dedup check runs.")
     args = parser.parse_args()
+    ledger = read_ledger(args.ledger)
     candidates = read_rows(args.candidates)
     required = {"assembly_accession", "sra_run"}
     if not candidates or any(not required.issubset(row) or not row["assembly_accession"] or not row["sra_run"] for row in candidates):
@@ -65,6 +81,8 @@ def main():
             if not run["bioproject"] or run["bioproject"] not in assembly["bioprojects"]: reasons.append("assembly and run BioProject do not match")
             if run["platform"].upper() != "ILLUMINA": reasons.append("run platform is not ILLUMINA")
             if run["layout"].upper() != "PAIRED": reasons.append("run is not paired-end")
+            existing_cohort = ledger.get(assembly["biosample"])
+            if existing_cohort: reasons.append(f"already in cohort {existing_cohort}")
             if reasons:
                 rejected.append({**candidate, "reason": "; ".join(reasons)})
                 continue

@@ -58,6 +58,22 @@ distinct probability value as a threshold and writes:
 alongside `mean_f1` -- supplementary, never a ranking replacement, since it is
 only defined for the subset of tools that expose probabilities.
 
+## The imputation policy a future model must follow
+
+`mean_pr_auc` exists for only 3 of the tool registry's ~18 rows (geNomad,
+PLASMe, plASgraph2) -- every classical tool (`mob_recon`, Platon,
+plasmidSPAdes, the long-read/hybrid reconstructors, ...) has no probability
+output and so has no `mean_pr_auc` at all. Any future feature-based
+recommendation model that uses this column **must treat a missing value as
+"not applicable," never as 0** -- 0 would look like a uniformly bad
+classifier, which is not what "this tool doesn't expose a probability" means.
+This is the exact same convention `select_operational_method.py`'s
+`tool_quality()` already applies to `bin_f1` (`bin_score if bin_score is not
+None else 1 - failure_rate`, never a bare `0`): a sparse per-tool metric is
+either explicitly substituted with a documented, defensible fallback, or
+excluded from that tool's feature vector entirely -- it is never silently
+zeroed.
+
 ## What this is not
 
 This is unrelated to `evidence.tsv`'s `ml_probability` (if added there): that

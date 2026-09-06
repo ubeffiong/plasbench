@@ -867,8 +867,13 @@ plasmid recovery. Enabling `RUN_RECOMMENDATION_MODEL=1` replaces those two
 mean-based terms (F1 and plasmid recall only -- every other term is
 unchanged) with a small, hand-rolled (pure Python, no new dependency) ridge
 regression predicting them directly from an isolate's own continuous
-features (read depth, plasmid size, plasmid count) instead of a coarse
-stratum bucket:
+features instead of a coarse stratum bucket. Those features are the
+isolate's read depth, plasmid size and plasmid count from `scores.tsv`, plus
+its GC content, N50, contig count and assembly size from the stage-2
+`data/<sample>/assembly_stats.tsv` -- the same per-isolate statistics the
+advisory cohort-QC flagger uses. A sample missing any of them (an operational
+isolate has no reference assembly, so no stats) has that feature imputed with
+the training mean rather than being unusable:
 
 ```bash
 plasbench run --samples config/accessions.tsv  # RUN_RECOMMENDATION_MODEL=1 in config/config.sh

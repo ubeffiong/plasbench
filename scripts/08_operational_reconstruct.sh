@@ -49,6 +49,10 @@ if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
 fi
 MODEL_ARGS=(); [[ -n "$RECOMMENDATION_MODEL" ]] && MODEL_ARGS=(--recommendation-model "$RECOMMENDATION_MODEL")
 [[ -n "$READ_DEPTH_X" ]] && MODEL_ARGS+=(--read-depth-x "$READ_DEPTH_X")
+# An operational isolate normally has no reference assembly, so no stage-2
+# assembly_stats.tsv -- pass it only if one happens to exist (e.g. this id is
+# also a benchmark isolate). Absent, the model imputes those features.
+[[ -s "$DATA_DIR/$SAMPLE/assembly_stats.tsv" ]] && MODEL_ARGS+=(--assembly-stats "$DATA_DIR/$SAMPLE/assembly_stats.tsv")
 # This can be the very first command run against a fresh DATA_DIR/RESULTS_DIR/
 # LOG_DIR (e.g. a new deployment that never ran stage 0), so create them here
 # instead of assuming stage 0 already has.

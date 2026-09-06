@@ -47,6 +47,7 @@ RECOMMENDATION_MODEL_ARGS=()
 if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
     python3 "$HERE/../python/fit_recommendation_model.py" \
         --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET" \
+        --data-dir "$DATA_DIR" \
         --min-studies "$RECOMMENDATION_MODEL_MIN_STUDIES" \
         --min-training-samples "$RECOMMENDATION_MODEL_MIN_SAMPLES" \
         --min-relative-improvement "$RECOMMENDATION_MODEL_MIN_IMPROVEMENT" \
@@ -60,12 +61,14 @@ fi
 python3 "$HERE/../python/select_operational_method.py" \
     --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET" \
     --results-dir "$RESULTS_DIR" --tool-status "$RESULTS_DIR/tool_status.tsv" \
+    --data-dir "$DATA_DIR" \
     --recommendation-validation "$RESULTS_DIR/benchmark.recommendation_validation.tsv" \
     "${RECOMMENDATION_MODEL_ARGS[@]}" \
     --out-prefix "$RESULTS_DIR/benchmark" \
     --min-samples "$RECOMMENDATION_MIN_SAMPLES" \
     --min-coverage "$RECOMMENDATION_MIN_COVERAGE" \
-    --analysis-track "$ANALYSIS_TRACK"
+    --analysis-track "$ANALYSIS_TRACK" \
+    --decision-profile "${DECISION_PROFILE:-accuracy_first}"
 
 python3 "$HERE/../python/write_manifest.py" \
     --project-root "$PROJECT_ROOT" --sample-sheet "$SAMPLE_SHEET" \

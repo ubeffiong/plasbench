@@ -139,7 +139,9 @@ be pooled into one operational conclusion.
 
 Optionally (`RUN_RECOMMENDATION_MODEL=1`, off by default), a hand-rolled
 ridge regression replaces the recommendation formula's F1/plasmid-recall
-terms with predictions from an isolate's own continuous features, fit and
+terms with predictions from an isolate's own continuous features -- read
+depth, plasmid size and count, plus GC content, N50, contig count and
+assembly size computed from that isolate's reference during stage 2 -- fit and
 gated by the identical leave-one-study-out folds above -- never used unless
 it demonstrably beats the plain per-tool mean under those folds. This is a
 descriptive recommendation, not a scoring change, and is not validated

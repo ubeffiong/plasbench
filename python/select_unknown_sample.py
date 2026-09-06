@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from recommendation_model import decision_score, load_model  # noqa: E402
+from recommendation_model import (ASSEMBLY_STAT_FIELDS, decision_score,  # noqa: E402
+                                  load_model)
 
 
 def rows(path):
@@ -13,7 +14,28 @@ def rows(path):
         return list(csv.DictReader(handle, delimiter="\t"))
 
 
-def live_model_recommendation(recommendation_rows, model, organism, gram_group, read_depth_x):
+def read_assembly_stats(path):
+    """Read a one-row assembly_stats.tsv for THIS isolate, if the caller has one.
+
+    An operational isolate normally has no reference assembly, so normally has
+    no stats -- in which case these features are simply absent and the model
+    imputes them with its training mean. Supplying them (e.g. re-selecting for
+    a benchmark isolate that does have a reference) lets the prediction use
+    the isolate's own GC content and assembly fragmentation instead.
+    """
+    if not path:
+        return {}
+    try:
+        with open(path, newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle, delimiter="	"):
+                return {field: row.get(field) for field in ASSEMBLY_STAT_FIELDS}
+    except (OSError, csv.Error):
+        return {}
+    return {}
+
+
+def live_model_recommendation(recommendation_rows, model, organism, gram_group, read_depth_x,
+                              assembly_stats=None):
     """Predict every 'overall'-eligible tool's F1/plasmid_recall directly
     from this isolate's own features (rather than looking up a discrete
     scope), combine with that tool's historical precision/recall/bin-score/
@@ -37,6 +59,7 @@ def live_model_recommendation(recommendation_rows, model, organism, gram_group, 
         features = {"tool": row["tool"], "organism": organism or "not_recorded", "gram_group": gram_group or "not_recorded",
                     "amr_status": "not_recorded", "read_depth_x": read_depth_x,
                     "true_plasmid_bp": None, "true_plasmid_count": None}
+        features.update(assembly_stats or {})
         f1 = model.predict("f1", features)
         plasmid = model.predict("plasmid_recall", features)
         precision = float(row.get("mean_precision") or 0.0)
@@ -53,7 +76,8 @@ def live_model_recommendation(recommendation_rows, model, organism, gram_group, 
     return chosen
 
 
-def choose_recommendation(recommendation_rows, organism, gram_group, model=None, read_depth_x=None):
+def choose_recommendation(recommendation_rows, organism, gram_group, model=None, read_depth_x=None,
+                          assembly_stats=None):
     """Return the evidence-gated primary-tool row for the most specific
     matching scope (organism, then gram_group, then overall), or None.
 
@@ -71,7 +95,8 @@ def choose_recommendation(recommendation_rows, organism, gram_group, model=None,
     explicitly used.
     """
     if model is not None:
-        live = live_model_recommendation(recommendation_rows, model, organism, gram_group, read_depth_x)
+        live = live_model_recommendation(recommendation_rows, model, organism, gram_group, read_depth_x,
+                                         assembly_stats)
         if live:
             return live
     eligible = [row for row in recommendation_rows if row.get("recommendation") == "primary"]
@@ -98,6 +123,9 @@ def main():
                                                         "instead of a discrete scope lookup. Ignored (falls back to the "
                                                         "unchanged scope lookup) when omitted or not model_ready.")
     parser.add_argument("--read-depth-x", type=float, help="This isolate's own read depth, if known, for live model prediction.")
+    parser.add_argument("--assembly-stats", help="Optional one-row assembly_stats.tsv for THIS isolate "
+                                                 "(compute_assembly_stats.py). Supplies GC content and assembly "
+                                                 "fragmentation to the model; absent, those features are imputed.")
     parser.add_argument("--tool-only", action="store_true",
                         help="Print just the recommended tool name and exit 0, or exit 1 with no "
                              "output if none is eligible. Writes no report; does not need "
@@ -108,7 +136,9 @@ def main():
     if args.recommendation_model:
         model, model_ready, _ = load_model(args.recommendation_model)
         model = model if model_ready else None
-    chosen = choose_recommendation(rows(args.recommendations), args.organism, args.gram_group, model=model, read_depth_x=args.read_depth_x)
+    chosen = choose_recommendation(rows(args.recommendations), args.organism, args.gram_group, model=model,
+                                   read_depth_x=args.read_depth_x,
+                                   assembly_stats=read_assembly_stats(args.assembly_stats))
 
     if args.tool_only:
         if not chosen:

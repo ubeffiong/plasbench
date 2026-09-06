@@ -1,11 +1,18 @@
 {
-  "title": "PlasBench: reproducible plasmid reconstruction benchmarking",
-  "description": "PlasBench evaluates plasmid reconstruction methods against complete-reference truth with provenance, cohort validation, and interactive reports.",
-  "license": "MIT",
+  "title": "PlasBench",
+  "description": "Benchmark plasmid-reconstruction tools against complete-reference truth.",
   "upload_type": "software",
-  "keywords": ["plasmid", "AMR", "bioinformatics", "benchmark", "genomics"],
-  "creators": [{"name": "PlasBench contributors"}],
+  "license": "MIT",
+  "creators": [
+    {"name": "Effiong, Ubokobong"}
+  ],
+  "keywords": ["bioinformatics", "plasmid", "benchmarking", "genomics"],
   "related_identifiers": [
-    {"identifier": "https://github.com/ubeffiong/plasbench", "relation": "isSupplementTo", "resource_type": "software"}
+    {
+      "identifier": "https://github.com/ubeffiong/plasbench",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    }
   ]
 }

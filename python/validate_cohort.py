@@ -181,15 +181,30 @@ def run_metadata(run, email=None, api_key=None):
             "layout": row.get("LibraryLayout", ""), "bases": row.get("bases", "")}
 
 
-def schema_errors(rows, fields):
+def read_ledger(path):
+    """BioSample -> source_cohort, from build_accession_ledger.py's output.
+
+    BioSample, not assembly accession, is the identity key: an assembly can
+    be resubmitted under a new accession for the same physical isolate.
+    """
+    if not path or not Path(path).is_file():
+        return {}
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {row["biosample"]: row["source_cohort"] for row in csv.DictReader(handle, delimiter="\t") if row.get("biosample")}
+
+
+def schema_errors(rows, fields, ledger=None):
     errors = []
     if any(key not in fields for key in REQUIRED):
         return ["cohort sheet must include: " + ", ".join(REQUIRED)]
+    ledger = ledger or {}
     seen = set()
     for number, row in enumerate(rows, 2):
         if not row["sample_id"] or row["sample_id"] in seen:
             errors.append(f"row {number}: missing or duplicate sample_id")
         seen.add(row["sample_id"])
+        existing_cohort = ledger.get(row.get("biosample"))
+        if existing_cohort: errors.append(f"row {number}: BioSample {row['biosample']} is already in cohort {existing_cohort}")
         if not ACCESSION.match(row["assembly_accession"]): errors.append(f"row {number}: invalid assembly accession")
         if not RUN.match(row["sra_run"]): errors.append(f"row {number}: invalid SRA run")
         if row["truth_technology"] not in ("long_read", "hybrid"): errors.append(f"row {number}: truth_technology must be long_read or hybrid")
@@ -287,9 +302,12 @@ def main():
                         help="NCBI API key (default: NCBI_API_KEY); raises the request allowance.")
     parser.add_argument("--write-lock", help="write retrieved verification evidence as JSON")
     parser.add_argument("--verify-lock", help="require a verification lock matching --samples")
+    parser.add_argument("--ledger", help="cohorts/accepted_accessions.tsv (build_accession_ledger.py); "
+                                         "rows whose BioSample is already in a prior cohort release fail "
+                                         "validation. Optional -- omitted means no cross-cohort dedup check runs.")
     args = parser.parse_args()
     rows, fields = read_rows(args.samples)
-    errors = schema_errors(rows, fields)
+    errors = schema_errors(rows, fields, ledger=read_ledger(args.ledger))
     if args.verify_lock:
         try:
             evidence_count = verify_lock(args.verify_lock, args.samples)

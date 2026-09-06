@@ -51,6 +51,19 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
             python3 "$HERE/../python/measure_depth.py" --truth "$TRUTH" --r1 "$R1" --r2 "$R2" --out "$DEPTH"
         fi
     fi
+    # read_quality_band (long-read/hybrid analog of read_depth_band): only
+    # when a long-read file is actually staged for this sample -- a
+    # short-read-only sample simply keeps annotate()'s "not_recorded"
+    # default, same convention as every other optional per-isolate feature.
+    LONG_READS="$SDIR/${LONG_READS_FILE:-long_reads.fastq.gz}"
+    QUALITY="$SDIR/observed_read_quality.tsv"
+    if [[ -s "$LONG_READS" ]]; then
+        if [[ -s "$QUALITY" && "$QUALITY" -nt "$LONG_READS" ]]; then
+            log "  observed read quality already measured for $SAMPLE"
+        else
+            python3 "$HERE/../python/measure_read_quality.py" --fastq "$LONG_READS" --out "$QUALITY" 2>> "$LOG_DIR/${SAMPLE}.truth.log" || warn "read-quality measurement failed for $SAMPLE; read_quality_band will be not_recorded"
+        fi
+    fi
     # Derive contextual features from installed annotation callers. A missing
     # caller yields "not evaluated" for its class rather than a false absence.
     FEATURES="$SDIR/truth_features.tsv"

@@ -185,11 +185,32 @@ def main(argv=None):
     cohort_parser.add_argument("--api-key", help="NCBI API key; defaults to NCBI_API_KEY when omitted.")
     cohort_parser.add_argument("--write-lock", type=Path, help="Write NCBI verification evidence as JSON; requires --online.")
     cohort_parser.add_argument("--verify-lock", type=Path, help="Require a verification lock that matches the cohort TSV.")
+    cohort_parser.add_argument("--ledger", type=Path, help="cohorts/accepted_accessions.tsv (build-ledger); "
+                                                            "rejects a row whose BioSample is already in a prior released cohort.")
     curate_parser = sub.add_parser("curate-cohort", help="Strictly screen candidate assembly/SRA pairs and write accepted/rejected tables.")
     curate_parser.add_argument("--candidates", type=Path, required=True)
     curate_parser.add_argument("--out-dir", type=Path, required=True)
     curate_parser.add_argument("--email")
     curate_parser.add_argument("--api-key")
+    curate_parser.add_argument("--ledger", type=Path, help="cohorts/accepted_accessions.tsv (build-ledger); "
+                                                           "rejects a candidate whose BioSample is already in a prior released cohort.")
+    ledger_parser = sub.add_parser("build-ledger", help="Regenerate the cross-cohort accession ledger from cohorts/*.lock.json.")
+    ledger_parser.add_argument("--cohorts-dir", type=Path, default=Path("cohorts"), help="Directory containing *.lock.json files (default: cohorts).")
+    ledger_parser.add_argument("--out", type=Path, default=Path("cohorts/accepted_accessions.tsv"))
+    contrib_parser = sub.add_parser(
+        "prepare-contribution",
+        help="Validate a new-isolate contribution and stage it on a local git branch for manual PR "
+             "(schema, NCBI-linked evidence, cross-cohort dedup, privacy screen, metric bounds; "
+             "nothing is pushed automatically).",
+    )
+    contrib_parser.add_argument("--cohort", required=True, help="Target cohort name, e.g. public-v2 (must already exist as cohorts/<NAME>.tsv).")
+    contrib_parser.add_argument("--new-rows", type=Path, required=True, help="TSV of new cohort rows; columns must be a subset of cohorts/<NAME>.tsv's own header.")
+    contrib_parser.add_argument("--scores", type=Path, required=True, help="Your own locally-produced scores.tsv containing row(s) for the new sample_id(s), and nothing else.")
+    contrib_parser.add_argument("--tool-status", type=Path, help="Optional locally-produced tool_status.tsv for the new sample_id(s).")
+    contrib_parser.add_argument("--cohorts-dir", type=Path, default=Path("cohorts"))
+    contrib_parser.add_argument("--branch-label", help="contrib/<label> branch name; required when contributing more than one sample.")
+    contrib_parser.add_argument("--email", help="Contact email sent to NCBI E-utilities.")
+    contrib_parser.add_argument("--api-key", help="NCBI API key; defaults to NCBI_API_KEY when omitted.")
     discover_parser = sub.add_parser("discover-cohort", help="Discover strict assembly/paired-Illumina candidate pairs from NCBI.")
     discover_parser.add_argument("--organism", action="append", required=True, help="Scientific name; repeat for each taxon.")
     discover_parser.add_argument("--out-dir", type=Path, required=True)
@@ -328,6 +349,10 @@ def main(argv=None):
                             help="Score only tools declared under this track this run (each tool's own "
                                  "track is still stamped correctly regardless); leave unset to score "
                                  "every enabled tool under its own correct track in one run.")
+        inputs.add_argument("--decision-profile", choices=("accuracy_first", "amr_surveillance", "rapid_screening"),
+                            help="Named decision_score weight set for operational recommendations (default: "
+                                 "accuracy_first, today's original formula). A different profile only changes "
+                                 "which tool ranks highest; it never changes which tools are eligible.")
         resources = command_parser.add_argument_group("resources and assembly")
         resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
@@ -416,10 +441,31 @@ def main(argv=None):
             command.extend(["--write-lock", str(args.write_lock)])
         if args.verify_lock:
             command.extend(["--verify-lock", str(args.verify_lock)])
+        if args.ledger:
+            command.extend(["--ledger", str(args.ledger)])
         code = run(command, root)
     elif args.command == "curate-cohort":
         command = [sys.executable, "python/curate_cohort.py", "--candidates", str(args.candidates),
                    "--out-dir", str(args.out_dir)]
+        if args.email:
+            command.extend(["--email", args.email])
+        if args.api_key:
+            command.extend(["--api-key", args.api_key])
+        if args.ledger:
+            command.extend(["--ledger", str(args.ledger)])
+        code = run(command, root)
+    elif args.command == "build-ledger":
+        command = [sys.executable, "python/build_accession_ledger.py",
+                   "--cohorts-dir", str(args.cohorts_dir), "--out", str(args.out)]
+        code = run(command, root)
+    elif args.command == "prepare-contribution":
+        command = [sys.executable, "python/prepare_contribution.py", "--cohort", args.cohort,
+                   "--new-rows", str(args.new_rows), "--scores", str(args.scores),
+                   "--cohorts-dir", str(args.cohorts_dir)]
+        if args.tool_status:
+            command.extend(["--tool-status", str(args.tool_status)])
+        if args.branch_label:
+            command.extend(["--branch-label", args.branch_label])
         if args.email:
             command.extend(["--email", args.email])
         if args.api_key:
@@ -537,6 +583,8 @@ def main(argv=None):
             env["LONG_READS_FILE"] = args.long_reads_file
         if args.analysis_track:
             env["ANALYSIS_TRACK_FILTER"] = args.analysis_track
+        if args.decision_profile:
+            env["DECISION_PROFILE"] = args.decision_profile
         positive_options = {"threads": "THREADS", "memory_gb": "MEMORY_GB", "min_read_len": "MIN_READ_LEN",
                             "parallel_samples": "MAX_PARALLEL_SAMPLES", "parallel_tools": "MAX_PARALLEL_TOOLS",
                             "trycycler_assembly_count": "TRYCYCLER_ASSEMBLY_COUNT"}

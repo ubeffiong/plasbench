@@ -5,7 +5,7 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 
@@ -36,3 +36,9 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/plasbench:${{ github.ref_name }},ghcr.io/${{ github.repository_owner }}/plasbench:latest
       # Quay publishing is optional. Add QUAY_USERNAME and QUAY_ROBOT_TOKEN
       # repository secrets, then add a quay.io login and a second image tag here.
+      # A published GitHub Release (not just a pushed tag) is what Zenodo's
+      # own GitHub integration archives -- see RELEASING.md. This step is what
+      # actually makes that zero-code mirror fire for every tag.
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

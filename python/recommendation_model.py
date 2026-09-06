@@ -15,21 +15,111 @@ prediction path (select_unknown_sample.py) call the same one implementation
 rather than risking two hand-copied formulas drifting apart.
 """
 
+import csv
 import json
+from pathlib import Path
 
-CONTINUOUS_FIELDS = ("read_depth_x", "true_plasmid_bp", "true_plasmid_count")
+# Per-isolate assembly statistics, computed fresh from the reference by
+# python/compute_assembly_stats.py during stage 2 and written to
+# data/<sample>/assembly_stats.tsv. These were originally computed only for
+# the advisory cohort-QC outlier flagger; feeding them to the model as well is
+# the point of having continuous features at all -- GC content and assembly
+# fragmentation plausibly bear on which reconstruction method wins, and the
+# model can learn its own splits on them rather than being handed a fixed
+# band. Absent for a live isolate that has no reference assembly (operational
+# mode): encode_row() imputes any missing continuous field with the training
+# mean, so a sample without stats simply falls back to average behaviour on
+# those axes instead of being unusable.
+ASSEMBLY_STAT_FIELDS = ("gc_percent", "n50", "contig_count", "assembly_size_bp")
+SCORE_CONTINUOUS_FIELDS = ("read_depth_x", "true_plasmid_bp", "true_plasmid_count")
+CONTINUOUS_FIELDS = SCORE_CONTINUOUS_FIELDS + ASSEMBLY_STAT_FIELDS
+# Models fitted before assembly stats were added stored three continuous
+# fields and no explicit field list. Their coefficient vectors are laid out in
+# this order, so an old JSON must be decoded against it -- see encode_row().
+LEGACY_CONTINUOUS_FIELDS = SCORE_CONTINUOUS_FIELDS
 CATEGORICAL_FIELDS = ("tool", "organism", "gram_group", "amr_status")
 TARGETS = ("f1", "plasmid_recall")
 
 
-def decision_score(f1, precision, recall, plasmid, bin_score, failure_rate, structural_penalty, resource_penalty):
-    """The exact formula select_operational_method.py's tool_quality() uses.
+def load_assembly_stats(data_dir):
+    """Read every data/<sample>/assembly_stats.tsv into {sample_id: {field: value}}.
 
-    Resource terms are deliberately small; scientific recovery is primary.
+    Missing files are simply absent from the result (a cohort predating this
+    feature, or a sample whose stage 2 did not run) -- never an error.
     """
-    return (.45 * f1 + .13 * precision + .13 * recall + .18 * plasmid
-            + .06 * (bin_score if bin_score is not None else 1 - failure_rate)
-            - .03 * failure_rate - structural_penalty - resource_penalty)
+    stats = {}
+    if not data_dir:
+        return stats
+    for path in sorted(Path(data_dir).glob("*/assembly_stats.tsv")):
+        try:
+            with open(path, newline="", encoding="utf-8") as handle:
+                for row in csv.DictReader(handle, delimiter="	"):
+                    sample = (row.get("sample_id") or path.parent.name).strip()
+                    if sample:
+                        stats[sample] = {field: row.get(field) for field in ASSEMBLY_STAT_FIELDS}
+        except (OSError, csv.Error):
+            continue
+    return stats
+
+
+def attach_assembly_stats(rows, stats):
+    """Copy each row's own sample's assembly stats onto it, in place.
+
+    A row whose sample has no stats is left untouched; encode_row() then
+    imputes those fields with the training mean.
+    """
+    if not stats:
+        return rows
+    for row in rows:
+        for field, value in stats.get(row.get("sample", ""), {}).items():
+            row.setdefault(field, value)
+    return rows
+
+
+# Named alternate weight sets for decision_score(), a rules-only improvement
+# (no ML): different research/operational contexts genuinely value the same
+# measured outcomes differently, and a single hidden formula can't express
+# that. "accuracy_first" is the exact original formula, unchanged, and stays
+# the default -- selecting a profile is opt-in, never a behavior change by
+# default. amr_surveillance/rapid_screening reweight the EXISTING terms this
+# formula already receives; they do not invent new inputs (e.g. no isolate-
+# level "AMR evidence present" signal is fed to this function today), so
+# read them as an approximation of those priorities via what's actually
+# measured, not a literal AMR-specific rule.
+DECISION_PROFILES = {
+    "accuracy_first": {  # today's original, unchanged formula
+        "f1": .45, "precision": .13, "recall": .13, "plasmid": .18, "bin_or_fallback": .06,
+        "failure_rate": -.03, "structural_penalty_scale": 1.0, "resource_penalty_scale": 1.0,
+    },
+    "amr_surveillance": {  # missing a plasmid (and so its AMR context) is the
+        # worst outcome for a surveillance program; a failed/skipped run is
+        # also less tolerable than for routine benchmarking.
+        "f1": .30, "precision": .10, "recall": .10, "plasmid": .35, "bin_or_fallback": .10,
+        "failure_rate": -.08, "structural_penalty_scale": 1.0, "resource_penalty_scale": 1.0,
+    },
+    "rapid_screening": {  # tolerant of lower F1 for speed; resource_penalty's
+        # weight is raised well above every other profile's.
+        "f1": .35, "precision": .10, "recall": .10, "plasmid": .15, "bin_or_fallback": .05,
+        "failure_rate": -.03, "structural_penalty_scale": 1.0, "resource_penalty_scale": 5.0,
+    },
+}
+DEFAULT_DECISION_PROFILE = "accuracy_first"
+
+
+def decision_score(f1, precision, recall, plasmid, bin_score, failure_rate, structural_penalty, resource_penalty,
+                   profile=DEFAULT_DECISION_PROFILE):
+    """The multi-objective weighted-sum formula select_operational_method.py's
+    tool_quality() uses. profile picks a named weight set from
+    DECISION_PROFILES (see above); the default reproduces the original,
+    single hand-picked formula exactly, byte-for-byte, when omitted.
+    """
+    weights = DECISION_PROFILES[profile]
+    return (weights["f1"] * f1 + weights["precision"] * precision + weights["recall"] * recall
+            + weights["plasmid"] * plasmid
+            + weights["bin_or_fallback"] * (bin_score if bin_score is not None else 1 - failure_rate)
+            + weights["failure_rate"] * failure_rate
+            - weights["structural_penalty_scale"] * structural_penalty
+            - weights["resource_penalty_scale"] * resource_penalty)
 
 
 # --- Minimal pure-Python linear algebra (no numpy) --------------------------
@@ -121,7 +211,23 @@ def fit_feature_spec(rows):
     vocab = {}
     for field in CATEGORICAL_FIELDS:
         vocab[field] = sorted({str(row.get(field) or "not_recorded") for row in rows})
-    return {"means": means, "stds": stds, "vocab": vocab}
+    # Record the exact ordered field list this spec was fitted with. The
+    # module constant can grow (it did, when assembly stats were added); a
+    # serialized model must keep decoding against the layout its coefficients
+    # were actually fitted in.
+    return {"continuous": list(CONTINUOUS_FIELDS), "means": means, "stds": stds, "vocab": vocab}
+
+
+def spec_continuous_fields(spec):
+    """The continuous fields this spec was fitted with, in coefficient order.
+
+    New specs carry the list explicitly. A spec written before assembly stats
+    existed has no "continuous" key, and its coefficients are laid out in the
+    three-field legacy order -- decode it that way rather than against the
+    current, longer module constant, which would silently misalign every
+    coefficient after the third.
+    """
+    return spec.get("continuous") or list(LEGACY_CONTINUOUS_FIELDS)
 
 
 def encode_row(row, spec):
@@ -131,7 +237,7 @@ def encode_row(row, spec):
     unseen category maps to all-zero for its one-hot block (falls back to
     the intercept)."""
     vector = []
-    for field in CONTINUOUS_FIELDS:
+    for field in spec_continuous_fields(spec):
         value = _as_float(row.get(field))
         value = spec["means"][field] if value is None else value
         vector.append((value - spec["means"][field]) / spec["stds"][field])
@@ -158,7 +264,7 @@ class RecommendationModel:
 
     def to_dict(self, model_ready, reason):
         return {
-            "schema_version": "1.0", "model_ready": model_ready, "reason": reason,
+            "schema_version": "1.1", "model_ready": model_ready, "reason": reason,
             "n_training_rows": self.n_training_rows, "n_studies": self.n_studies,
             "spec": self.spec,
             "targets": {
