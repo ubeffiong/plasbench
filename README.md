@@ -678,6 +678,65 @@ To see what PlasBench is doing in more detail, every stage writes a log:
 ls ~/plasbench-0.2.1/logs/
 ```
 
+---
+
+### Step 13 — Upgrading from an older version
+
+Each release lives in its own directory (`~/plasbench-0.1.9`, `~/plasbench-0.2.1`, ...) —
+upgrading means downloading the new one alongside the old one, not overwriting it. Repeat
+steps 3–5 with the new version number, then two things make this an upgrade rather than a
+second fresh install:
+
+**The conda environment updates in place — it does not need to be recreated.**
+`./install.sh --tools` (step 4) detects the existing `plasbench` environment from your old
+install and updates it to match the new version's requirements, leaving everything already
+installed into it (including MOB-suite's database) untouched:
+
+```
+[setup_conda] environment 'plasbench' already exists at:
+[setup_conda]   /home/you/miniforge3/envs/plasbench
+[setup_conda] updating it in place (nothing is deleted) ...
+```
+
+If you ever want a fully clean environment instead, remove it first, deliberately, before
+running step 4: `conda env remove -n plasbench`.
+
+**Point the new install at your existing databases instead of re-downloading them.**
+The Platon (~1.4 GB) and MOB-suite (~450 MB) databases live under each version's own
+`data/db/`, so a fresh directory starts without them. Skip step 7 and reuse what step 7
+already downloaded for the old version, either by copying it over:
+
+```bash
+mkdir -p ~/plasbench-0.2.1/data/db
+cp -r ~/plasbench-0.1.9/data/db/platon ~/plasbench-0.2.1/data/db/
+```
+
+or, for any command, by pointing `--platon-db` at the old location directly instead of
+copying anything:
+
+```bash
+plasbench run --cohort public-v1 --platon-db ~/plasbench-0.1.9/data/db/platon/db
+```
+
+MOB-suite's database lives inside the conda environment itself (not under a version
+directory), so it carries over automatically once the environment update above completes —
+nothing to copy for it.
+
+**Carry over anything you added yourself.** If you ran `plasbench init-local` or added a
+`config/local.tsv`/`.ncbi.env` to the old directory, copy those specific files into the new
+one too; only files you created are involved; nothing shipped by the release needs it.
+
+**Confirm the upgrade:**
+
+```bash
+conda activate plasbench
+plasbench --version   # should print the new version
+plasbench test
+```
+
+Once you've confirmed the new version works, the old directory can be deleted or kept
+around — PlasBench never reads across version directories on its own.
+
 
 ### Appendix A — Selection criteria: what makes a sequence eligible
 
