@@ -88,6 +88,15 @@ RUN { echo '#!/bin/sh'; \
  && chmod 0755 /opt/plasbench-bin/gplas
 USER $MAMBA_USER
 
+# git is not part of the pinned lock (it's a system tool, not a benchmarking
+# dependency), but `plasbench prepare-contribution` shells out to it to stage
+# a contribution branch -- without it, that command (and its test) fail
+# inside this image with a bare "No such file or directory: 'git'". Installed
+# last so it never invalidates the cache for the slow, network-fragile
+# mobsuite/gplas2 environment layers above.
+RUN micromamba install -y -n plasbench -c conda-forge git \
+    && micromamba clean --all --yes
+
 WORKDIR /opt/plasbench
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /opt/plasbench
 RUN micromamba run -n plasbench python -m pip install --no-deps .
