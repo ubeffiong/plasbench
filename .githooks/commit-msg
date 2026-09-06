@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Strips any "Co-Authored-By: Claude ..." trailer from a commit message
+# before the commit is finalized. This repo's owner does not want Claude (or
+# any AI assistant) listed as a co-author/contributor, regardless of how much
+# of a given commit an assistant helped write.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+set -euo pipefail
+MSG_FILE="$1"
+python3 - "$MSG_FILE" <<'EOF'
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, "rb") as handle:
+    message = handle.read()
+
+message = re.sub(rb'\n+Co-Authored-By:\s*Claude[^\r\n]*\r?\n?', b'', message, flags=re.IGNORECASE)
+message = message.rstrip(b'\n') + b'\n'
+
+with open(path, "wb") as handle:
+    handle.write(message)
+EOF
