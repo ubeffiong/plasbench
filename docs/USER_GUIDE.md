@@ -895,6 +895,23 @@ exactly as if this feature did not exist; when it is, `reason` fields in
 tag so the provenance of any given number is always visible -- no new
 columns, same schema either way.
 
+**Note on scope.** A separate cohort-growth planning exercise (see
+`cohorts/README.md`'s dedup ledger and `python/validate_recommendations.py`'s
+per-stratum leave-one-study-out validation) concluded the public cohorts'
+current study diversity did not yet justify *building* this model, and
+scoped that round of work to the model's rules-only prerequisites instead.
+This code was nonetheless already written and merged by the time that
+conclusion was reached. The two are not actually in conflict in practice:
+`RUN_RECOMMENDATION_MODEL` defaults to `0`, and `model_ready` requires
+clearing `RECOMMENDATION_MODEL_MIN_STUDIES` independent `source_study`
+groups with a genuine leave-one-study-out improvement over the plain
+per-tool mean -- the same bar that planning exercise's own analysis used, so
+the model stays inactive on today's cohorts regardless of which piece of
+work reached the repository first. Re-run the fit once the cohort's study
+diversity actually clears that bar; until then, treat any output this
+produces on the shipped cohorts (`public-v1`/`public-v2`) as not yet
+meaningful, gate or no gate.
+
 The model is also used for `plasbench reconstruct`'s live per-isolate
 recommendation (a genuinely new isolate has its own exact read depth/
 organism/Gram group *before* any tool has run on it, so predicting directly

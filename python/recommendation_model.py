@@ -13,6 +13,13 @@ formula select_operational_method.py's tool_quality() has always used,
 extracted here so both the stratified-table path and the live per-isolate
 prediction path (select_unknown_sample.py) call the same one implementation
 rather than risking two hand-copied formulas drifting apart.
+
+Note: RUN_RECOMMENDATION_MODEL defaults to 0 and fit_recommendation_model.py
+only ever sets model_ready=true once RECOMMENDATION_MODEL_MIN_STUDIES
+independent source_study groups show a genuine leave-one-study-out
+improvement -- see docs/USER_GUIDE.md's "Decision-support recommendation
+model" section for why that keeps this file inactive on the shipped cohorts
+regardless of when it was written relative to the cohort's own growth.
 """
 
 import csv

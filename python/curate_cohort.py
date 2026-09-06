@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from validate_cohort import (assembly_metadata, derive_truth_quality_tier,
-                             request_interval, run_metadata)
+                             read_ledger, request_interval, run_metadata)
 
 
 OUT_COLUMNS = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_technology",
@@ -27,18 +27,6 @@ OUT_COLUMNS = ("sample_id", "assembly_accession", "sra_run", "organism", "truth_
 def read_rows(path):
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader((line for line in handle if line.strip() and not line.lstrip().startswith("#")), delimiter="\t"))
-
-
-def read_ledger(path):
-    """BioSample -> source_cohort, from build_accession_ledger.py's output.
-
-    BioSample, not assembly accession, is the identity key: an assembly can
-    be resubmitted under a new accession for the same physical isolate.
-    """
-    if not path or not Path(path).is_file():
-        return {}
-    with open(path, newline="", encoding="utf-8") as handle:
-        return {row["biosample"]: row["source_cohort"] for row in csv.DictReader(handle, delimiter="\t") if row.get("biosample")}
 
 
 def safe_id(value, index):
