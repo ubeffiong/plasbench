@@ -35,7 +35,13 @@ for dir in "${PATH_DIRS[@]}"; do
         case "$name" in
             datasets|prefetch|fasterq-dump|fastp|minimap2|conda|mamba|micromamba|spades.py|plasmidspades.py|mob_recon|mob_init|mob_typer|mob_cluster|platon|gplas) continue ;;
         esac
-        [[ -x "$exe" && ! -e "$CLEAN_BIN/$name" ]] && ln -s "$exe" "$CLEAN_BIN/$name"
+        # `|| true`: some directories on a real machine's PATH (e.g. a
+        # protected Windows system directory under Git Bash) refuse symlink
+        # creation without elevated privileges. That single miss must not
+        # abort this whole script under `set -e` -- it just means whatever
+        # lived there isn't available under CLEAN_BIN, harmless unless this
+        # suite specifically needed it.
+        [[ -x "$exe" && ! -e "$CLEAN_BIN/$name" ]] && { ln -s "$exe" "$CLEAN_BIN/$name" 2>/dev/null || true; }
     done
 done
 

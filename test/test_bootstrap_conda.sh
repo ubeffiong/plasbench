@@ -29,7 +29,13 @@ for dir in "${PATH_DIRS[@]}"; do
     for exe in "$dir"/*; do
         name="$(basename "$exe")"
         case "$name" in micromamba|mamba|conda) continue ;; esac
-        [[ -x "$exe" && ! -e "$CLEAN_BIN/$name" ]] && ln -s "$exe" "$CLEAN_BIN/$name"
+        # `|| true`: some directories on a real machine's PATH (e.g. a
+        # protected Windows system directory under Git Bash) refuse symlink
+        # creation without elevated privileges. That single miss must not
+        # abort this whole script under `set -e` -- it just means whatever
+        # lived there isn't available under CLEAN_BIN, harmless unless this
+        # suite specifically needed it (nothing here does).
+        [[ -x "$exe" && ! -e "$CLEAN_BIN/$name" ]] && { ln -s "$exe" "$CLEAN_BIN/$name" 2>/dev/null || true; }
     done
 done
 
