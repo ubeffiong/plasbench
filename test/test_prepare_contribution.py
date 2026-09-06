@@ -11,6 +11,7 @@ local, and confined to a throwaway temp repo per scenario.
 import csv
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -88,6 +89,17 @@ def new_row(sample_id, biosample, **overrides):
 
 
 def main():
+    # prepare_contribution.py shells out to git for real -- on a machine
+    # without it (a bare `pip install` of the released tarball, per
+    # README.md's explicit curl-not-git-clone install path, is never
+    # guaranteed to have git present), this test cannot exercise the git
+    # branch it stages. Skip cleanly rather than crash with a raw
+    # FileNotFoundError, matching test_report_javascript.py's precedent for
+    # an optional external tool.
+    if not shutil.which("git"):
+        print("ALL PREPARE-CONTRIBUTION TESTS PASSED (git not found: skipped)")
+        return
+
     original_verify_row = prepare_contribution.verify_row
     prepare_contribution.verify_row = fake_verify_row_ok
     try:

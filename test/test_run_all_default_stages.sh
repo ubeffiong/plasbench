@@ -14,7 +14,13 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+# `cp -r` carries over the source directories' own permission bits. Under a
+# non-root user (e.g. this suite's Docker image), scripts/ and config/ are
+# themselves non-writable (dr-xr-xr-x, no write bit even for the owner) --
+# harmless to read from, but it means `rm -rf "$TMP"` cannot unlink entries
+# inside the copied scripts/config directories without first restoring the
+# write bit, regardless of the individual files' own (writable) permissions.
+trap 'chmod -R u+w "$TMP" 2>/dev/null || true; rm -rf "$TMP"' EXIT
 
 cp -r "$ROOT/scripts" "$TMP/scripts"
 cp -r "$ROOT/config" "$TMP/config"

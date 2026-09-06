@@ -14,6 +14,31 @@ ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# This suite's whole premise is simulating which tools are present or absent
+# -- but a real machine running this (e.g. this project's own Docker image,
+# which bundles working mob_recon/platon/mob_init/gplas shims and the core
+# datasets/prefetch/.../spades.py toolchain for real) already has every one
+# of these on PATH. Appending ":$PATH" would let those real binaries leak
+# through and override what a scenario intends to simulate as missing.
+# Build a clean base PATH instead: every real command EXCEPT the ones this
+# suite fakes, so each scenario's PATH prefix is the only place those names
+# can be found. Scan every directory actually on the CURRENT $PATH -- not a
+# hardcoded /usr/bin:/bin -- since a real command (python3, a conda env's own
+# bin/, ...) can live anywhere depending on the host.
+CLEAN_BIN="$TMP/clean_bin"
+mkdir -p "$CLEAN_BIN"
+IFS=':' read -ra PATH_DIRS <<< "$PATH"
+for dir in "${PATH_DIRS[@]}"; do
+    [[ -d "$dir" ]] || continue
+    for exe in "$dir"/*; do
+        name="$(basename "$exe")"
+        case "$name" in
+            datasets|prefetch|fasterq-dump|fastp|minimap2|conda|mamba|micromamba|spades.py|plasmidspades.py|mob_recon|mob_init|mob_typer|mob_cluster|platon|gplas) continue ;;
+        esac
+        [[ -x "$exe" && ! -e "$CLEAN_BIN/$name" ]] && ln -s "$exe" "$CLEAN_BIN/$name"
+    done
+done
+
 mkdir -p "$TMP/bin_full" "$TMP/bin_partial" "$TMP/data/db/platon/db" "$TMP/results" "$TMP/logs" "$TMP/tmp"
 touch "$TMP/data/db/platon/db/marker"
 
@@ -33,7 +58,7 @@ EOF
 chmod +x "$TMP/bin_partial/conda"
 
 run_setup() {
-    PATH="$1:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+    PATH="$1:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
         bash "$ROOT/scripts/00_setup.sh" "${@:2}" > "$TMP/run.log" 2>&1
 }
 
@@ -56,7 +81,7 @@ echo "missing reconstruction tools + --yes triggers install-tools -> conda end t
 
 # --- same gap, declining consent: must not touch conda at all. ---
 : > "$TMP/conda_calls.log"
-if PATH="$TMP/bin_partial:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+if PATH="$TMP/bin_partial:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
     bash "$ROOT/scripts/00_setup.sh" < /dev/null > "$TMP/run.log" 2>&1; then
     echo "FAIL: declining should exit non-zero" >&2; cat "$TMP/run.log" >&2; exit 1
 fi
@@ -80,7 +105,7 @@ EOF
 chmod +x "$TMP/bin_gplas/conda"
 
 : > "$TMP/conda_calls.log"
-if PATH="$TMP/bin_gplas:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+if PATH="$TMP/bin_gplas:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
     RUN_GPLAS2_MOB=1 bash "$ROOT/scripts/00_setup.sh" --yes > "$TMP/run.log" 2>&1; then
     echo "FAIL: this run should exit non-zero (a freshly-attempted install is never a passing check)" >&2
     cat "$TMP/run.log" >&2; exit 1
@@ -99,7 +124,7 @@ cat > "$TMP/bin_mobdb/mob_init" <<EOF
 echo "mob_init ran" >> "$TMP/mobinit_calls.log"
 EOF
 chmod +x "$TMP/bin_mobdb/mob_init"
-if PATH="$TMP/bin_mobdb:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+if PATH="$TMP/bin_mobdb:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
     bash "$ROOT/scripts/00_setup.sh" --yes > "$TMP/run.log" 2>&1; then :; fi
 grep -q "MOB-suite database" "$TMP/run.log" || { echo "FAIL: MOB-suite database gap not offered" >&2; cat "$TMP/run.log" >&2; exit 1; }
 [[ -s "$TMP/mobinit_calls.log" ]] || { echo "FAIL: mob_init was not actually invoked" >&2; cat "$TMP/run.log" >&2; exit 1; }

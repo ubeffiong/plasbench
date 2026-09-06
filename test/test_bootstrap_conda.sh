@@ -10,11 +10,34 @@ ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# This test's own fakes must be the ONLY conda-family package manager
+# bootstrap_conda.sh can find -- not whatever mamba/micromamba/conda happens
+# to already be installed on the machine running this suite (e.g. this
+# project's own Docker image is built FROM mambaorg/micromamba, which bakes
+# in a real micromamba on PATH; simply appending ":$PATH" would let that real
+# binary win over this test's staged fakes). Symlink every other real binary
+# through so bash itself and every other command still work. Scan every
+# directory actually on the CURRENT $PATH -- not a hardcoded /usr/bin:/bin --
+# since a real command (python3, a conda env's own bin/, ...) can live
+# anywhere depending on the host (e.g. a conda env's bin/ in a container, or
+# a non-standard install location on this suite's own dev machines).
+CLEAN_BIN="$TMP/clean_bin"
+mkdir -p "$CLEAN_BIN"
+IFS=':' read -ra PATH_DIRS <<< "$PATH"
+for dir in "${PATH_DIRS[@]}"; do
+    [[ -d "$dir" ]] || continue
+    for exe in "$dir"/*; do
+        name="$(basename "$exe")"
+        case "$name" in micromamba|mamba|conda) continue ;; esac
+        [[ -x "$exe" && ! -e "$CLEAN_BIN/$name" ]] && ln -s "$exe" "$CLEAN_BIN/$name"
+    done
+done
+
 # --- already-installed short circuit: no download attempted at all. ---
 mkdir -p "$TMP/bin_have_conda"
 printf '#!/usr/bin/env bash\necho fake-conda\n' > "$TMP/bin_have_conda/conda"
 chmod +x "$TMP/bin_have_conda/conda"
-out="$(PATH="$TMP/bin_have_conda:$PATH" bash "$ROOT/env/bootstrap_conda.sh" 2>&1)"
+out="$(PATH="$TMP/bin_have_conda:$CLEAN_BIN" bash "$ROOT/env/bootstrap_conda.sh" 2>&1)"
 echo "$out" | grep -q "Found 'conda' already installed" || { echo "FAIL: did not detect existing conda" >&2; echo "$out" >&2; exit 1; }
 echo "already-installed conda short-circuits with no download attempt -> PASS"
 
@@ -66,7 +89,7 @@ chmod +x "$TMP/bin_no_conda/uname"
 
 run_bootstrap() {
     : > "$TMP/curl_requests.log"; rm -f "$TMP/installer_invocations.log"
-    PATH="$TMP/bin_no_conda:/usr/bin:/bin" bash "$ROOT/env/bootstrap_conda.sh" "$@" > "$TMP/run.log" 2>&1
+    PATH="$TMP/bin_no_conda:$CLEAN_BIN" bash "$ROOT/env/bootstrap_conda.sh" "$@" > "$TMP/run.log" 2>&1
 }
 
 # --- --yes: installs without prompting, verifies checksum, runs installer
@@ -93,7 +116,7 @@ sha256sum "$TMP/fixtures/installer.sh" | awk '{print $1"  Miniforge3-test.sh"}' 
 # --- declining the interactive prompt must never download or install. ---
 PREFIX3="$TMP/prefix3"
 : > "$TMP/curl_requests.log"
-if PATH="$TMP/bin_no_conda:/usr/bin:/bin" PLASBENCH_CONDA_PREFIX="$PREFIX3" bash "$ROOT/env/bootstrap_conda.sh" < /dev/null > "$TMP/run.log" 2>&1; then
+if PATH="$TMP/bin_no_conda:$CLEAN_BIN" PLASBENCH_CONDA_PREFIX="$PREFIX3" bash "$ROOT/env/bootstrap_conda.sh" < /dev/null > "$TMP/run.log" 2>&1; then
     echo "FAIL: declining (EOF/no input) should exit non-zero" >&2; cat "$TMP/run.log" >&2; exit 1
 fi
 [[ ! -s "$TMP/curl_requests.log" ]] || { echo "FAIL: no download should happen before consent" >&2; cat "$TMP/curl_requests.log" >&2; exit 1; }

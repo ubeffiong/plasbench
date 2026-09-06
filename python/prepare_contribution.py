@@ -17,6 +17,7 @@ import csv
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -124,6 +125,12 @@ def main():
     parser.add_argument("--email", help="Contact email sent to NCBI E-utilities.")
     parser.add_argument("--api-key", help="NCBI API key; defaults to NCBI_API_KEY when omitted.")
     args = parser.parse_args()
+
+    if not shutil.which("git"):
+        raise SystemExit(
+            "ERROR: git is required by prepare-contribution (it stages your contribution as a "
+            "local git branch) but was not found on PATH. Install git and try again."
+        )
 
     errors = []
     cohorts_dir = args.cohorts_dir

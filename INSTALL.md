@@ -173,7 +173,21 @@ conda activate plasgraph2 && pip install -r requirements.txt
 
 ---
 
-## 7. Lock your versions (for reproducibility)
+## 7. Contributing a new isolate (optional)
+
+`plasbench prepare-contribution` (see `CONTRIBUTING.md`) stages a contribution
+as a local git branch, so it needs `git` on PATH -- unlike every step above,
+this is **not** a core pipeline dependency: the tarball install in this guide
+deliberately does not require a git checkout, and nothing else in PlasBench
+invokes git. Install it only if you intend to contribute an isolate:
+```bash
+git --version   # already present on most Linux systems; if not:
+sudo apt-get install -y git
+```
+
+---
+
+## 8. Lock your versions (for reproducibility)
 
 After a successful install:
 ```bash
