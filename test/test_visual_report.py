@@ -141,6 +141,11 @@ def main():
                    "drilldownModal", "PlasBench · Enterprise Report"):
         assert needed in page, f"enterprise dashboard affordance missing: {needed}"
     assert "srcdoc" in page, "dashboard must be isolated in a frame"
+    # A trusted frame-only handshake grows the embedded dashboard for long
+    # drilldowns and responsive chart layouts rather than clipping its content.
+    for needed in ("plasbench-enterprise-height", "ResizeObserver", "f.contentWindow",
+                   "Math.min(50000,Math.ceil(height)+24)"):
+        assert needed in page, f"responsive enterprise frame sizing missing: {needed}"
     # Nothing in the adopted view may simulate data. The upstream prototype
     # generated its dataset, highlighted random mismatches, jittered dot plots
     # and added noise to sorting; none of that may survive.
@@ -479,7 +484,8 @@ def main():
     assert "DOMContentLoaded" in page,         "section tracking must be built after the document is parsed, not mid-page"
 
     # Sentence case, with the colon the programme name takes.
-    assert "<title>PlasBench: Plasmid reconstruction benchmark</title>" in page
+    assert "<title>PlasBench report:" in page, \
+        "the document title must identify the named benchmark run"
     assert "<h1>PlasBench: Plasmid reconstruction benchmark</h1>" in page
 
     # Every icon class the explorer uses must be able to draw. Eighteen had no
