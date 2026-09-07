@@ -258,6 +258,12 @@ long-read or hybrid, reference assembly. `sra_run` must be a matched paired-end 
 run for the same isolate. The pipeline validates missing fields, duplicate IDs,
 and an empty sheet before starting a data stage.
 
+When no such assembly was ever deposited (some cohort sources only submit reads),
+`assembly_accession` may instead stay blank/`NA` if the row declares
+`truth_source=self_assembled_hybrid` plus `long_read_sra_run` -- PlasBench then builds
+the truth reference itself from that isolate's own long+short reads. See
+`docs/COHORTS.md`'s `truth_source`/`long_read_sra_run` section for the full workflow.
+
 ### Read and reference formats
 
 PlasBench's default input is **paired short-read FASTQ**. Expected local

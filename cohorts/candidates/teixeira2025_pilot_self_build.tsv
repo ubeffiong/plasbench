@@ -1,0 +1,19 @@
+# Self-built-hybrid-truth pilot cohort sheet, built from
+# self_build_candidates.tsv (python/resolve_ncbi_accessions.py) against
+# cohorts/candidates/teixeira2025_pilot_candidates.tsv. NOT a released
+# cohort -- a working sheet for the real pilot run proving
+# python/build_hybrid_truth.py end to end. See docs/COHORTS.md.
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	source_study	truth_source	long_read_sra_run
+enterobacter_hormaechei_bidmc100_001	NA	SRR2127568	Enterobacter hormaechei	hybrid	B	SAMN03280191	PRJNA271899			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR9214069
+escherichia_coli_bidmc106_002	NA	SRR2135110	Escherichia coli	hybrid	B	SAMN03280214	PRJNA271899			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR9214067
+citrobacter_freundii_complex_species_a_bidmc107_003	NA	SRR2132028	Citrobacter freundii complex (species A)	hybrid	B	SAMN03280169	PRJNA271899			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR9214066
+escherichia_coli_bidmc113_006	NA	SRR2131425	Escherichia coli	hybrid	B	SAMN03280217	PRJNA271899			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR9214055
+klebsiella_pneumoniae_bidmc89_010	NA	SRR2135067	Klebsiella pneumoniae	hybrid	B	SAMN03280415	PRJNA271899			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR9214024
+serratia_marcescens_bwh56_018	NA	SRR2127577	Serratia marcescens	hybrid	B	SAMN03280432	PRJNA271899			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR9214081
+klebsiella_pneumoniae_bwh78_023	NA	SRR12464867	Klebsiella pneumoniae	hybrid	B	SAMN08148230	PRJNA271899			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR9900613
+enterococcus_casseliflavus_az015_095	NA	SRR30225669	Enterococcus casseliflavus	hybrid	B	SAMN16255605	PRJNA663900			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR13957644
+enterococcus_faecalis_az008_111	NA	SRR30225745	Enterococcus faecalis	hybrid	B	SAMN16255549	PRJNA663900			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR13957679
+enterococcus_faecalis_az029_112	NA	SRR30225743	Enterococcus faecalis	hybrid	B	SAMN16255569	PRJNA663900			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR13386107
+enterococcus_faecium_az146_182	NA	SRR30225703	Enterococcus faecium	hybrid	B	SAMN16255531	PRJNA663900			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR13957688
+enterococcus_hirae_az077_207	NA	SRR30225689	Enterococcus hirae	hybrid	B	SAMN16255648	PRJNA663900			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR13385977
+enterococcus_pernyi_az045_223	NA	SRR30225679	Enterococcus pernyi	hybrid	B	SAMN16255535	PRJNA663900			Teixeira_2025_bbaf589	self_assembled_hybrid	SRR13386101

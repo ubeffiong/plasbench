@@ -26,6 +26,17 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 #                        truth assembly was built from -- see docs/COHORTS.md and
 #                        docs/METHODS.md's circularity section. Absent/empty/no means
 #                        "assume circular", and such a tool is skipped for this sample.
+#   truth_source        : optional, ncbi_deposited (default) or self_assembled_hybrid.
+#                        Set self_assembled_hybrid ONLY when no Complete Genome assembly
+#                        was ever deposited for this isolate -- assembly_accession then
+#                        stays blank/NA, and PlasBench builds the truth reference itself
+#                        via a Unicycler hybrid assembly (see long_read_sra_run below and
+#                        docs/COHORTS.md). Such a row can never declare
+#                        truth_independent_of_long_reads=yes (checked, not just advised):
+#                        the truth is built from this isolate's own long reads.
+#   long_read_sra_run   : required when truth_source=self_assembled_hybrid; the long-read
+#                        (ONT/PacBio) SRA run PlasBench fetches and assembles alongside
+#                        sra_run. Ignored/optional otherwise.
 #
 # Lines starting with '#' and blank lines are ignored.
 # A metadata-verified public seed panel is available at cohorts/public-v1.tsv.

@@ -71,7 +71,10 @@ def write_ledger(by_biosample, out_path):
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=COLUMNS, delimiter="\t")
+        # lineterminator="\n": csv's excel dialect otherwise writes "\r\n"
+        # regardless of file-open mode, corrupting the LAST column's value
+        # for any awk-based exact-match lookup (scripts/lib.sh: sample_column()).
+        writer = csv.DictWriter(handle, fieldnames=COLUMNS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         for biosample in sorted(by_biosample):
             writer.writerow(by_biosample[biosample])

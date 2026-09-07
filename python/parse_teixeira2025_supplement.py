@@ -21,8 +21,8 @@ publisher xlsx itself, which is not committed here (copyrighted supplementary
 material; see the paper's own Supplementary data link instead).
 
 Usage:
-  parse_teixeira2025_supplement.py \
-      --raw cohorts/candidates/teixeira2025_table_s1_raw.tsv \
+  parse_teixeira2025_supplement.py \\
+      --raw cohorts/candidates/teixeira2025_table_s1_raw.tsv \\
       --out cohorts/candidates/teixeira2025_candidates.tsv
 """
 
@@ -99,7 +99,10 @@ def write_candidates(path, candidates, extraction_date):
             "# curate-cohort, then a stratified pilot download/score, before any\n"
             "# release (see docs/FINDING_DATA.md).\n"
         )
-        writer = csv.DictWriter(handle, fieldnames=OUT_COLUMNS, delimiter="\t")
+        # lineterminator="\n": csv's excel dialect otherwise writes "\r\n"
+        # regardless of file-open mode, corrupting the LAST column's value
+        # for any awk-based exact-match lookup (scripts/lib.sh: sample_column()).
+        writer = csv.DictWriter(handle, fieldnames=OUT_COLUMNS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         writer.writerows(candidates)
 

@@ -27,7 +27,7 @@ distinct from both resolved.tsv (an existing assembly was found) and
 unresolved.tsv (neither an assembly nor a usable read pair exists).
 
 Usage:
-  resolve_ncbi_accessions.py --candidates cohorts/candidates/teixeira2025_pilot_candidates.tsv \
+  resolve_ncbi_accessions.py --candidates cohorts/candidates/teixeira2025_pilot_candidates.tsv \\
       --out-dir results/teixeira2025_pilot_resolution
 """
 
@@ -54,7 +54,10 @@ def read_rows(path):
 
 def write_rows(path, rows, fields):
     with open(path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", extrasaction="ignore")
+        # lineterminator="\n": csv's excel dialect otherwise writes "\r\n"
+        # regardless of file-open mode, corrupting the LAST column's value
+        # for any awk-based exact-match lookup (scripts/lib.sh: sample_column()).
+        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 

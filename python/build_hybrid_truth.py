@@ -35,10 +35,10 @@ Writes:
                      like annotation_provenance.json already is.
 
 Usage:
-  build_hybrid_truth.py --long-reads long_reads.fastq.gz \
-      --r1 SRR1_1.fastq.gz --r2 SRR1_2.fastq.gz \
-      --out-reference reference.fna --out-truth truth.tsv \
-      --out-provenance truth_provenance.json \
+  build_hybrid_truth.py --long-reads long_reads.fastq.gz \\
+      --r1 SRR1_1.fastq.gz --r2 SRR1_2.fastq.gz \\
+      --out-reference reference.fna --out-truth truth.tsv \\
+      --out-provenance truth_provenance.json \\
       --min-chromosome-length 1500000 --threads 4
 """
 

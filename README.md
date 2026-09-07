@@ -993,13 +993,14 @@ browser) with a left-hand navigation jumping between sections. In the order they
 | Run and output metadata | When this run happened, how many score rows, how many artifacts, and the completed/reused/failed/skipped counts at a glance |
 | Automated interpretation | A plain-language summary generated from the scores and execution statuses below |
 | Performance profile | A bar chart of mean precision/recall/F1 per tool |
-| Benchmark method ranking | The sortable leaderboard — every tool's mean scores across the cohort |
+| Benchmark method ranking | The sortable leaderboard — every tool's mean scores across the cohort, including whether the top-ranked tool's lead over the runner-up is statistically significant (paired permutation test), and the supplementary Mean NMI/Mean VI bin-clustering-quality columns |
 | Operational method recommendations | Which tool this cohort's evidence currently supports per stratum, and why (or why a recommendation is withheld — see [4.5](#45-recommendations-and-why-they-are-usually-withheld)) |
 | Leave-one-study-out validation | For each held-out study, whether the recommended method actually held up when trained on everything else |
 | Selected reconstructions | One card per sample: the actual chosen FASTA output, downloadable, with its decision explained |
-| All sample-tool scores | Every individual score row, filterable by sample/tool/organism/depth/F1 band, with a CSV export button |
+| All sample-tool scores | Every individual score row, filterable by sample/tool/organism/depth/F1 band, with a CSV export button. A sample with `truth_source=self_assembled_hybrid` carries a "self-built truth" badge next to its name |
 | Paired tool comparisons | Statistical head-to-head: is tool A's F1 actually different from tool B's on the samples they share |
 | Bin reconstruction diagnostics | Split/merge/contamination diagnostics for tools that report discrete bins (e.g. `mob_recon`) |
+| Zero-plasmid isolates (negative control) | Per tool, false-positive behavior on isolates with NO true plasmid at all — the only samples that can directly measure it, since precision/recall/F1 are correctly undefined there |
 | Cohort QC flags | Statistical outliers (assembly N50, GC%, ...) — advisory only, never excludes a sample |
 | Execution health | Every tool run's actual status (completed/reused/failed/skipped), runtime, and peak memory |
 | Tool drill-down | Click into one tool to see its score distribution across every sample |
@@ -1223,6 +1224,54 @@ plasbench validate-cohort --samples cohorts/my-cohort.tsv --online \
 > copy Git stores, so a lock written on Windows fails on Linux with *"sample-sheet checksum
 > differs from verification lock"*. `.gitattributes` forces LF for `*.tsv` and `*.json`
 > precisely to keep this stable.
+
+#### Building your own truth, when a source has reads but no assembly
+
+Some real cohort sources only ever deposit raw reads — a long-read (ONT/PacBio) run and a
+paired-end Illumina run under one BioSample — without ever formally submitting a finished
+assembly. `discover-cohort`/`curate-cohort` above can't help there: they both require an
+existing Complete Genome assembly to check. For exactly this gap, PlasBench builds the
+truth reference itself, via a hybrid (long+short read) Unicycler assembly, and three
+scripts (not yet wired into `plasbench` itself — run them with `python3 python/...`) turn a
+BioSample-only candidate table all the way into that truth:
+
+```bash
+# 1. Resolve BioSample -> assembly_accession/sra_run wherever an existing
+#    assembly already exists; where none does, check for the raw material
+#    instead (a long-read run + a paired Illumina run on the same BioSample).
+python3 python/resolve_ncbi_accessions.py \
+    --candidates my_biosample_candidates.tsv \
+    --out-dir resolution/ --email you@example.org
+
+# resolution/resolved.tsv            -- curate-cohort-ready (an assembly exists)
+# resolution/self_build_candidates.tsv -- no assembly, but reads exist for both
+# resolution/unresolved.tsv          -- neither; each row has a specific reason
+
+# 2. Build a cohort sheet from resolution/self_build_candidates.tsv: keep
+#    assembly_accession blank/NA, and add two columns --
+#    truth_source=self_assembled_hybrid and long_read_sra_run=<the ONT/PacBio run>.
+#    See config/accessions.tsv's own header comment for the full column list.
+
+# 3. Run it like any other cohort. Stage 1 additionally fetches the long
+#    reads; stage 2 builds truth.tsv itself instead of downloading one.
+plasbench run --cohort my-self-built-cohort
+```
+
+Chromosome/plasmid labeling comes only from Unicycler's own reported topology (a circular
+contig at or above `HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH`, default 1.5 Mb, is chromosome;
+every other circular contig is plasmid) — never a gene-content classifier, since several of
+those (`mob_recon`, PlaScope, RFPlasmid, ...) are themselves benchmarked tools here. An
+assembly that does not fully circularize is rejected outright, never accepted as a partial
+truth. Because the truth comes from the isolate's own long reads, `validate_cohort.py`
+refuses to let a `self_assembled_hybrid` row ever declare
+`truth_independent_of_long_reads=yes` — these isolates automatically skip every long-read/
+hybrid tool in [4.9](#49-long-read-and-hybrid-tools-and-the-circularity-constraint) and
+contribute to the short-read leaderboard only. See
+[`docs/COHORTS.md`](docs/COHORTS.md#truth_source--long_read_sra_run-optional-self-built-hybrid-truth)
+and [`docs/METHODS.md`](docs/METHODS.md) for the full method and rationale, and
+[`docs/FINDING_DATA.md`](docs/FINDING_DATA.md) for a real worked example (Teixeira et al.
+2025's 250-isolate cohort) including one candidate-extraction script specific to that
+paper's own supplementary table.
 
 ---
 

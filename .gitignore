@@ -3,6 +3,8 @@ results/
 results_demo/
 logs/
 tmp/
+# SRA Toolkit `fasterq-dump` working directories are transient local caches.
+/fasterq.tmp.*/
 *.sra
 *.fastq
 *.fastq.gz

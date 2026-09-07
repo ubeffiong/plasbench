@@ -36,7 +36,13 @@ def safe_id(value, index):
 
 def write_rows(path, rows, fields):
     with open(path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", extrasaction="ignore")
+        # lineterminator="\n": csv's own excel dialect defaults to "\r\n"
+        # regardless of how the file was opened -- left at its default, a
+        # TSV's LAST column silently carries a trailing \r on every row,
+        # which breaks any awk-based exact-match lookup on that column
+        # (e.g. scripts/lib.sh: sample_column()) without any visible sign
+        # in a normal text viewer.
+        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", extrasaction="ignore", lineterminator="\n")
         writer.writeheader(); writer.writerows(rows)
 
 

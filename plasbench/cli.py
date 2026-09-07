@@ -269,7 +269,17 @@ def main(argv=None):
     cohort_parser.add_argument("--verify-lock", type=Path, help="Require a verification lock that matches the cohort TSV.")
     cohort_parser.add_argument("--ledger", type=Path, help="cohorts/accepted_accessions.tsv (build-ledger); "
                                                             "rejects a row whose BioSample is already in a prior released cohort.")
-    curate_parser = sub.add_parser("curate-cohort", help="Strictly screen candidate assembly/SRA pairs and write accepted/rejected tables.")
+    curate_parser = sub.add_parser(
+        "curate-cohort",
+        help="Strictly screen candidate assembly/SRA pairs and write accepted/rejected tables.",
+        epilog="Candidates need assembly_accession AND sra_run populated. If a source only "
+               "gives a BioSample (no assembly at all was ever deposited), first run "
+               "'python3 python/resolve_ncbi_accessions.py --candidates ... --out-dir ...' -- "
+               "its resolved.tsv is curate-cohort-ready, and its self_build_candidates.tsv "
+               "identifies isolates PlasBench can build its own truth for instead (see "
+               "docs/COHORTS.md's truth_source=self_assembled_hybrid section).",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     curate_parser.add_argument("--candidates", type=Path, required=True)
     curate_parser.add_argument("--out-dir", type=Path, required=True)
     curate_parser.add_argument("--email")

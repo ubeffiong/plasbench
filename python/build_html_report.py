@@ -179,6 +179,53 @@ GLOSSARY = {
                "performance. Only available for tools that expose a per-record "
                "probability (adapters/SCORES.md); absent, not zero, otherwise.",
     },
+    "Significant vs runner-up": {
+        "what": "Whether the top-ranked tool's F1 advantage over the second-ranked "
+                "tool clears a paired, shared-sample, sign-flip permutation test "
+                "(Holm-adjusted p < 0.05, at least 5 shared samples).",
+        "why": "A leaderboard rank alone cannot say whether a gap is real or just "
+               "sample-to-sample noise. This is the same test behind the Paired "
+               "tool comparisons table below, applied specifically to the winner "
+               "versus its closest competitor. \"Not assessed\" means too few "
+               "shared samples existed for the test to run at all -- never read "
+               "that as a negative result.",
+    },
+    "Mean NMI": {
+        "what": "Normalized Mutual Information between a tool's predicted bins "
+                "and the true plasmids, bp-weighted, over a universe that "
+                "includes an unassigned bucket (true-plasmid bp no bin covers) "
+                "and a chromosome bucket (chromosome bp a bin wrongly claims).",
+        "why": "Bin F1 asks whether individual bins matched a truth plasmid "
+               "closely enough. NMI is supplementary: it scores the whole "
+               "partition at once, so it can surface a tool that merges several "
+               "plasmids into one bin or splits one plasmid across many, even "
+               "when a lenient per-bin match would still look reasonable. Read "
+               "it alongside Mean VI, not alone: NMI collapses to 0 for BOTH a "
+               "genuinely random assignment and a single giant over-merged bin, "
+               "and only VI's unnormalized scale tells those two apart.",
+    },
+    "Mean VI": {
+        "what": "Variation of Information between a tool's predicted bins and "
+                "the true plasmids, in nats, over the same bp-weighted universe "
+                "as NMI. 0 is a perfect partition; there is no fixed upper bound.",
+        "why": "NMI is normalized to [0, 1] and can look identical for very "
+               "different failure modes. VI's unnormalized scale distinguishes "
+               "them -- a merged bin (a smaller information loss) reads as a "
+               "lower VI than a truly independent, random assignment, even when "
+               "both give NMI = 0. Never a replacement for Bin F1 or the split/"
+               "merge/contamination counts; always supplementary.",
+    },
+    "Zero-plasmid specificity": {
+        "what": "For isolates with NO true plasmid only: 1 minus the fraction of "
+                "that isolate's chromosome bases a tool wrongly called plasmid.",
+        "why": "Precision and recall are undefined on a plasmid-free isolate (there "
+               "is nothing to recover, and a tool that predicts nothing gets a "
+               "correct abstention, not a score of zero). These isolates are "
+               "still valuable: they are the only ones that directly measure a "
+               "tool's false-positive behavior. A specificity of 1.0 means the "
+               "tool correctly called the whole chromosome not-plasmid; lower "
+               "values mean real chromosomal sequence was misclassified.",
+    },
 }
 
 # Terms whose label in the interface differs from the glossary key.
@@ -303,11 +350,18 @@ def guided_findings(leaderboard, cards, scores, status_counts):
         second = optional_number(leaderboard[1].get("mean_f1")) if len(leaderboard) > 1 else None
         margin = (f", {best_f1 - second:+.3f} ahead of {esc(leaderboard[1]['tool'])}"
                   if second is not None else "")
+        sig_raw = (best.get("significant_vs_runner_up") or "").strip().lower()
+        sig_clause = {
+            "true": " This lead is statistically significant against its closest competitor "
+                    "(paired sign-flip permutation test, Holm-adjusted).",
+            "false": " This lead is NOT statistically significant (paired permutation test) -- "
+                     "treat the rank as provisional, not a settled result.",
+        }.get(sig_raw, " Too few samples are shared with the runner-up for a paired "
+                       "significance test yet, so this lead is not statistically assessed.")
         findings.append({
-            "tone": "good", "label": "Highest Base F1",
+            "tone": "good" if sig_raw == "true" else "caution", "label": "Highest Base F1",
             "text": f"{esc(best['tool'])} leads on mean Base F1 at {best_f1:.3f}{margin}."
-                    f"{spread}. A lead on few samples is not evidence of superiority: "
-                    "the paired comparison section carries the interval and permutation evidence.",
+                    f"{spread}.{sig_clause}",
             "target": "#statistics", "action": "See the paired evidence",
         })
 
@@ -866,6 +920,9 @@ def read_tool_versions(path):
         "plasmidspades": "plasmidspades.py", "gplas": "gplas",
         "gplas2_external": "gplas", "gplas2_mob": "gplas",
         "plassembler": "plassembler", "flye_mob_recon": "flye",
+        "genomad": "genomad", "plasme": "PLASMe.py",
+        "plasgraph2": "plASgraph2_classify.py",
+        "rfplasmid": "rfplasmid", "plascope": "plaScope.sh",
     }
     versions = {label: details.get("version", "unreported")
                 for label, name in executable.items()
@@ -1003,19 +1060,34 @@ def score_row(row, metadata, tool_versions):
     truth_bp = int(number(row["true_plasmid_bp"]))
     version = tool_versions.get(row["tool"], "not recorded")
     band = score_band(number(row["f1"]))
+    # Self-built truth (truth_source=self_assembled_hybrid, see docs/COHORTS.md):
+    # the reference was assembled in-house from this isolate's own long+short
+    # reads (python/build_hybrid_truth.py), not downloaded as an existing NCBI
+    # assembly. Flagged inline rather than as its own column, since it applies
+    # to only some rows and a reader scanning by sample benefits from seeing
+    # it right next to the sample id.
+    truth_source = (sample_metadata.get("truth_source") or "ncbi_deposited").strip() or "ncbi_deposited"
+    self_built = truth_source == "self_assembled_hybrid"
+    sample_cell = esc(row["sample"])
+    if self_built:
+        sample_cell += ("<span class='truth-source-badge' "
+                        "title='Truth reference built in-house from this isolate&#39;s own long+short "
+                        "reads (python/build_hybrid_truth.py), not downloaded as an existing NCBI "
+                        "assembly -- see docs/COHORTS.md.'>self-built truth</span>")
     return (
         "<tr data-sample='{sample}' data-tool='{tool}' data-band='{band}' "
         "data-organism='{organism}' data-tech='{tech}' data-tier='{tier}' "
-        "data-origin='{origin}' data-size='{size}' data-depth='{depth}' data-version='{version}' data-track='{track}'>"
-        "<td>{sample}</td><td>{tool}</td><td>{version}</td><td>{origin}</td><td>{depth_text}</td>"
+        "data-origin='{origin}' data-size='{size}' data-depth='{depth}' data-version='{version}' "
+        "data-track='{track}' data-truth-source='{truth_source}'>"
+        "<td>{sample_cell}</td><td>{tool}</td><td>{version}</td><td>{origin}</td><td>{depth_text}</td>"
         "<td>{truth:,}</td><td>{tp:,}</td><td>{fp:,}</td><td>{fn:,}</td><td>{unambiguous:,}</td><td>{ambiguous:,}</td><td>{unmapped:,}</td>"
         "<td>{precision}</td><td>{recall}</td><td>{amr}</td><td>{circular}</td>"
         "<td><strong class='score {band}'>{f1}</strong></td></tr>"
     ).format(
-        sample=esc(row["sample"]), tool=esc(row["tool"]), version=esc(version),
+        sample=esc(row["sample"]), sample_cell=sample_cell, tool=esc(row["tool"]), version=esc(version),
         organism=esc(sample_metadata.get("organism", "")), tech=esc(sample_metadata.get("truth_technology", "")),
         tier=esc(sample_metadata.get("truth_quality_tier", "")), origin=esc(sample_metadata.get("sample_origin", "")),
-        track=esc(row.get("analysis_track") or "short_read"),
+        track=esc(row.get("analysis_track") or "short_read"), truth_source=esc(truth_source),
         size=size_band(truth_bp), depth="" if depth_value is None else depth_value,
         depth_text=esc(depth) if depth_value is not None else "-", truth=truth_bp,
         tp=int(number(row["TP_bp"])), fp=int(number(row["FP_bp"])), fn=int(number(row["FN_bp"])),
@@ -1038,11 +1110,34 @@ def interpretation(leaderboard, status_counts):
         notes.append(f"{winner['tool']} is the only scored tool (mean F1 {winner_f1:.3f}); no between-tool comparison is available.")
     else:
         runner = leaderboard[1]
-        gap = winner_f1 - number(runner["mean_f1"])
-        if gap >= 0.05:
-            notes.append(f"{winner['tool']} leads {runner['tool']} by {gap:.3f} mean F1 ({winner_f1:.3f} versus {number(runner['mean_f1']):.3f}).")
+        runner_f1 = number(runner["mean_f1"])
+        gap = winner_f1 - runner_f1
+        # Uses aggregate_results.py's own paired, shared-sample, sign-flip
+        # permutation test (Holm-adjusted) -- never a raw-gap-size heuristic.
+        # A large mean-F1 gap can still be statistically unsupported with few
+        # shared samples, and a small gap can still be real with many.
+        sig_raw = (winner.get("significant_vs_runner_up") or "").strip().lower()
+        if sig_raw in ("true", "1"):
+            notes.append(
+                f"{winner['tool']} leads {runner['tool']} by {gap:.3f} mean F1 "
+                f"({winner_f1:.3f} versus {runner_f1:.3f}), and this margin is statistically "
+                "significant against its closest competitor (paired sign-flip permutation "
+                "test, Holm-adjusted p<0.05 -- see Significant vs runner-up)."
+            )
+        elif sig_raw in ("false", "0"):
+            notes.append(
+                f"{winner['tool']} ranks above {runner['tool']} by {gap:.3f} mean F1 "
+                f"({winner_f1:.3f} versus {runner_f1:.3f}), but this margin is NOT "
+                "statistically significant (paired permutation test) -- this run alone "
+                "does not establish a real difference between the two."
+            )
         else:
-            notes.append(f"The top two tools are close: {winner['tool']} leads {runner['tool']} by {gap:.3f} mean F1. This run alone does not establish a clear winner.")
+            notes.append(
+                f"{winner['tool']} ranks above {runner['tool']} by {gap:.3f} mean F1 "
+                f"({winner_f1:.3f} versus {runner_f1:.3f}); too few samples are shared "
+                "between them for the paired significance test to run, so this margin "
+                "is not yet statistically assessed either way."
+            )
 
     for row in leaderboard:
         precision, recall = number(row["mean_precision"]), number(row["mean_recall"])
@@ -2092,7 +2187,8 @@ def display_tool_name(tool):
         "gplas2_mob": "gplas2-MOB", "gplas2_external": "gplas2 external",
         "mob_like": "MOB-like", "platon_like": "Platon-like",
         "spades_like": "SPAdes-like", "gplas_like": "gplas-like",
-        "weak_like": "Weak-like",
+        "weak_like": "Weak-like", "genomad": "geNomad", "plasme": "PLASMe",
+        "plasgraph2": "plASgraph2", "rfplasmid": "RFPlasmid", "plascope": "PlaScope",
     }
     return names.get(tool, str(tool).replace("_", " ").replace("-", " ").capitalize())
 
@@ -2328,11 +2424,25 @@ def main():
         score_by_sample[row["sample"]].append(row)
         score_by_tool[row["tool"]].append(row)
 
+    def significance_text(row):
+        """Human-readable rendering of aggregate_results.py's
+        significant_vs_runner_up: True/False/"not_assessed" (as a raw TSV
+        string) -> a labeled statement naming the exact test, never a bare
+        yes/no that could be mistaken for an unsupported eyeball comparison."""
+        raw = (row.get("significant_vs_runner_up") or "").strip().lower()
+        if raw in ("true", "1"):
+            return "significant", "Yes (paired permutation, Holm p<0.05)"
+        if raw in ("false", "0"):
+            return "not-significant", "No (paired permutation)"
+        return "not-assessed", "Not assessed (too few shared samples)"
+
     def leaderboard_row_html(row):
+        sig_class, sig_text = significance_text(row)
         return (
             "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
-            "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{perfect}</td><td>{strict}</td><td>{bin_f1}</td><td>{pr_auc}</td>"
-            "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span></td></tr>".format(
+            "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{perfect}</td><td>{strict}</td><td>{bin_f1}</td><td>{nmi}</td><td>{vi}</td><td>{pr_auc}</td>"
+            "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span></td>"
+            "<td><span class='sig-badge {sig_class}'>{sig_text}</span></td></tr>".format(
                 rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
                 scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
                 failed=esc(row.get("n_failed", "0")), skipped=esc(row.get("n_skipped", "0")),
@@ -2341,9 +2451,12 @@ def main():
                 perfect=esc(rate_text(row.get("reference_perfect_recovery_rate"), row.get("n_reference_perfect_assessed"))),
                 strict=esc(rate_text(row.get("strict_reference_reconstruction_rate"), row.get("n_strict_reconstruction_assessed"))),
                 bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"),
+                nmi=esc(row.get("mean_nmi") or "not bin-scored"),
+                vi=esc(row.get("mean_variation_of_information") or "not bin-scored"),
                 pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row["mean_f1"]),
                 f1_width=max(0, min(100, round(number(row["mean_f1"]) * 100))),
                 band=score_band(number(row["mean_f1"])),
+                sig_class=sig_class, sig_text=esc(sig_text),
             )
         )
 
@@ -2357,10 +2470,11 @@ def main():
     }
 
     def leaderboard_table(rows):
-        body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='14'>No scored tools yet.</td></tr>"
+        body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='17'>No scored tools yet.</td></tr>"
         return ("<div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th>"
                 "<th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th>"
-                "<th>Mean plasmid recall</th><th>Perfect reference recovery</th><th>Strict reconstruction</th><th>Mean bin F1</th><th>Mean PR-AUC</th><th>Mean F1</th></tr></thead>"
+                "<th>Mean plasmid recall</th><th>Perfect reference recovery</th><th>Strict reconstruction</th><th>Mean bin F1</th>"
+                "<th>Mean NMI</th><th>Mean VI</th><th>Mean PR-AUC</th><th>Mean F1</th><th>Significant vs runner-up</th></tr></thead>"
                 f"<tbody>{body}</tbody></table></div>")
 
     # One ranking per track. Pooling them would rank a tool given long reads
@@ -2412,6 +2526,31 @@ def main():
             )
         )
     bin_diagnostics_html = "".join(bin_rows) or "<tr><td colspan='14'>No tool supplied validated bin membership in this run.</td></tr>"
+
+    # Zero-plasmid negative control: a per-tool summary, not per-sample, from
+    # the leaderboard rows aggregate_results.py already computed (n_samples
+    # with true_plasmid_count==0, their mean isolate_specificity, and their
+    # total chromosome false-positive bp). Precision/recall/F1 are correctly
+    # undefined on these isolates -- this is the ONLY place their false-
+    # positive behavior is actually measured, so it gets its own section
+    # rather than being buried as blank cells in the main leaderboard.
+    zero_plasmid_rows = []
+    for row in leaderboard:
+        n_zero = number(row.get("n_zero_plasmid_isolates")) or 0
+        if n_zero <= 0:
+            continue
+        spec = row.get("mean_zero_plasmid_specificity") or ""
+        fp_bp = row.get("total_zero_plasmid_chromosome_fp_bp") or "0"
+        spec_value = optional_number(spec)
+        zero_plasmid_rows.append(
+            "<tr><td>{tool}</td><td>{n}</td><td><strong class='score {band}'>{spec}</strong></td><td>{fp_bp:,}</td></tr>".format(
+                tool=esc(row["tool"]), n=int(n_zero),
+                spec=esc(spec) if spec else "-",
+                band=score_band(spec_value) if spec_value is not None else "low",
+                fp_bp=int(number(fp_bp)) if fp_bp else 0,
+            )
+        )
+    zero_plasmid_html = "".join(zero_plasmid_rows) or "<tr><td colspan='4'>No plasmid-free isolate was scored in this run.</td></tr>"
 
     # Cohort QC flags (advisory only): only flagged rows shown by default,
     # the full advisory table (including every non-flagged value and any
@@ -2601,11 +2740,11 @@ def main():
 {vendor_html}
 <style>
 :root{{--ink:#17231d;--muted:#627067;--line:#d9e1da;--paper:#f6f8f4;--card:#fff;--green:#0c6b4f;--lime:#dcefdc;--amber:#9a5b00;--red:#a53028;}}
-*{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;gap:6px;margin:0 0 26px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow-x:auto;position:sticky;top:0;z-index:30;box-shadow:0 1px 3px rgba(21,36,28,.07);scrollbar-width:thin}} .nav a{{flex:0 0 auto;color:var(--muted);border:0;background:transparent;padding:8px 14px;text-decoration:none;font:600 13px Arial,sans-serif;border-radius:7px;white-space:nowrap;transition:background .15s,color .15s}} .nav a:hover{{background:#eef4ef;color:var(--ink)}} .nav a:focus-visible{{outline:2px solid var(--ink);outline-offset:-2px}} .nav a[aria-current='true']{{background:var(--green);color:#fff}} @media(prefers-reduced-motion:reduce){{.nav a{{transition:none}}}} section{{scroll-margin-top:64px}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .pr-chart-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 0 14px}} .pr-chart-card{{padding:10px}} .pr-chart-card h3{{margin:0 0 6px;font-size:13px}} .pr-chart{{display:block;width:100%;max-width:240px;height:auto}} .pr-chart .axis{{font:10px Arial,sans-serif;fill:#536158}} .pr-chart .pr-auc-label{{font:bold 11px Arial,sans-serif;fill:#174b3a}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}}  .sum-stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0 26px}} .sum-stat{{background:#fff;border:1px solid var(--line);border-top:4px solid var(--green);padding:14px 16px}} .sum-stat small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.08em}} .sum-stat strong{{display:block;font-size:24px;margin-top:5px;line-height:1.15}} .grade{{display:inline-block;min-width:30px;text-align:center;font-weight:bold;font-size:15px;padding:3px 9px;border-radius:5px;font-family:Arial,sans-serif}} .grade-a{{background:#dcefdc;color:#07573e;border:2px solid #17805a}} .grade-b{{background:#e4eef8;color:#17457e;border:2px solid #2563c9}} .grade-c{{background:#f6ead1;color:#765000;border:2px solid #a35c05}} .grade-d{{background:#f7ddda;color:#8c2018;border:2px solid #b3261e}} .grade-e{{background:#efe3e1;color:#5f1a14;border:2px solid #7a1b14}} .findings{{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:10px}} .finding{{background:#fff;border:1px solid var(--line);border-left:5px solid var(--muted);padding:14px 18px}} .finding.good{{border-left-color:var(--green)}} .finding.caution{{border-left-color:var(--amber)}} .finding .flabel{{font:bold 11px Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}} .finding p{{margin:5px 0 8px;font-size:14px}} .finding .goto{{font:bold 13px Arial,sans-serif;color:var(--green);text-decoration:none}} .finding .goto:hover{{text-decoration:underline}} .term-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}} .term-card{{background:#fff;border:1px solid var(--line);border-left:4px solid var(--green);padding:14px 16px}} .term-card h3{{margin:0 0 6px;font-size:15px}} .term-card .what{{margin:0 0 8px;font-size:13.5px}} .term-card .why{{margin:0;font-size:13px;color:var(--muted)}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
+*{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Georgia,'Times New Roman',serif}} header{{background:#183a2d;color:#fff;padding:48px max(24px,calc((100vw - 1320px)/2));border-bottom:6px solid #a8d29b}} h1,h2,h3,th,.nav,button,select,input,.metric,.status,.selection-card{{font-family:Arial,sans-serif}} h1{{font-size:clamp(28px,5vw,48px);margin:0 0 8px;letter-spacing:-.04em}} header p{{margin:0;color:#d9e7de}} main{{max-width:1320px;margin:auto;padding:28px 24px 64px}} .nav{{display:flex;gap:6px;margin:0 0 26px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow-x:auto;position:sticky;top:0;z-index:30;box-shadow:0 1px 3px rgba(21,36,28,.07);scrollbar-width:thin}} .nav a{{flex:0 0 auto;color:var(--muted);border:0;background:transparent;padding:8px 14px;text-decoration:none;font:600 13px Arial,sans-serif;border-radius:7px;white-space:nowrap;transition:background .15s,color .15s}} .nav a:hover{{background:#eef4ef;color:var(--ink)}} .nav a:focus-visible{{outline:2px solid var(--ink);outline-offset:-2px}} .nav a[aria-current='true']{{background:var(--green);color:#fff}} @media(prefers-reduced-motion:reduce){{.nav a{{transition:none}}}} section{{scroll-margin-top:64px}} .metrics{{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin-bottom:28px}} .metric{{background:var(--card);border-top:4px solid var(--green);padding:15px;box-shadow:0 1px 3px #15241c12}} .metric small{{color:var(--muted);display:block;text-transform:uppercase;font-size:10px;letter-spacing:.08em}} .metric strong{{font-size:27px;display:block;margin-top:4px}} section{{margin:38px 0}} h2{{font-size:21px;margin:0 0 5px}} h3{{margin:6px 0;font-size:17px}} .lead,.muted{{color:var(--muted)}} .panel{{background:var(--card);border:1px solid var(--line);overflow:auto}} table{{width:100%;border-collapse:collapse;min-width:760px;font-family:Arial,sans-serif;font-size:13px}} th{{background:#edf2ec;text-align:left;padding:10px;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em}} .sortable th{{cursor:pointer}} .sortable th:hover{{background:#dcebdc}} td{{border-top:1px solid var(--line);padding:9px 10px;white-space:nowrap}} tr:hover td{{background:#f5faf4}} .f1-bar{{display:block;width:100%;height:5px;background:#deeadf;margin-top:4px;min-width:64px}} .f1-bar i{{display:block;height:100%;background:var(--green)}} .f1-bar.medium i{{background:#c68221}} .f1-bar.low i{{background:#bd4b42}} .score.high{{color:#087250}} .score.medium{{color:#9a5b00}} .score.low{{color:#a53028}} .insight{{border-left:6px solid var(--green);background:#e7f1e7;padding:16px 20px}} .insight.caution{{border-color:var(--amber);background:#fbf2df}} .insight ul{{margin:6px 0 0;padding-left:20px}} .chart-card{{background:#fff;border:1px solid var(--line);padding:18px;overflow:auto}} .performance-chart{{display:block;min-width:650px;width:100%;height:auto}} .performance-chart .axis,.performance-chart .label{{font:12px Arial,sans-serif;fill:#536158}} .pr-chart-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 0 14px}} .pr-chart-card{{padding:10px}} .pr-chart-card h3{{margin:0 0 6px;font-size:13px}} .pr-chart{{display:block;width:100%;max-width:240px;height:auto}} .pr-chart .axis{{font:10px Arial,sans-serif;fill:#536158}} .pr-chart .pr-auc-label{{font:bold 11px Arial,sans-serif;fill:#174b3a}} .chart-legend,.legend{{display:flex;gap:16px;flex-wrap:wrap;font:12px Arial,sans-serif;margin:10px 0}} .chart-legend i,.legend i{{display:inline-block;width:10px;height:10px;margin-right:5px}} .metadata{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);font-family:Arial,sans-serif;font-size:13px}} .metadata div{{background:#fff;padding:12px}} .metadata small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}} .controls{{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}} select,input{{padding:7px;border:1px solid var(--line);background:#fff}} .count{{font:12px Arial,sans-serif;color:var(--muted);align-self:center}} .status,.selection-label{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold}} .completed,.reused{{background:#dcefdc;color:#07573e}} .failed{{background:#f7ddda;color:var(--red)}} .skipped{{background:#f6ead1;color:var(--amber)}} .sig-badge{{display:inline-block;padding:2px 7px;border-radius:12px;font-size:11px;font-weight:bold;white-space:nowrap}} .sig-badge.significant{{background:#dcefdc;color:#07573e}} .sig-badge.not-significant{{background:#e8e8e8;color:#4a4a4a}} .sig-badge.not-assessed{{background:#eef2ee;color:var(--muted)}} .truth-source-badge{{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:bold;background:#e4eef8;color:#17457e;font-family:Arial,sans-serif;vertical-align:middle}} .selection-card{{display:grid;grid-template-columns:1fr auto;gap:14px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--amber);padding:18px;margin:12px 0}} .selection-card.confident{{border-left-color:var(--green)}} .selection-label{{background:#f6ead1;color:#765000}} .confident .selection-label{{background:#dcefdc;color:#07573e}} .selection-actions{{text-align:right;min-width:190px}} .download-button{{display:inline-block;background:var(--green);color:#fff!important;padding:8px 10px;text-decoration:none;font-weight:bold}} .selection-card details{{grid-column:1/-1;border-top:1px solid var(--line)}} .selection-card summary{{padding:10px 0;cursor:pointer;font-weight:bold}} .selection-card ul{{margin:0;padding-left:20px}} details.sample,.explorer{{background:var(--card);border:1px solid var(--line);margin:10px 0;padding:0 14px}} details summary{{cursor:pointer;padding:13px 0;font-family:Arial,sans-serif}} details summary span{{float:right;color:var(--muted);font-size:12px}} .file-tree{{list-style:none;padding-left:18px;margin:0 0 15px;font-family:Arial,sans-serif;font-size:13px}} .file-tree li{{padding:3px 0}} .file-tree details summary{{padding:3px 0}} .file-tree a{{color:var(--green);text-decoration:none;font-weight:600}} .file-tree .file span{{color:var(--muted);font-size:11px;margin-left:8px}} .method{{columns:2;column-gap:32px;background:#ebf2ea;padding:18px 22px}}  .sum-stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0 26px}} .sum-stat{{background:#fff;border:1px solid var(--line);border-top:4px solid var(--green);padding:14px 16px}} .sum-stat small{{display:block;color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.08em}} .sum-stat strong{{display:block;font-size:24px;margin-top:5px;line-height:1.15}} .grade{{display:inline-block;min-width:30px;text-align:center;font-weight:bold;font-size:15px;padding:3px 9px;border-radius:5px;font-family:Arial,sans-serif}} .grade-a{{background:#dcefdc;color:#07573e;border:2px solid #17805a}} .grade-b{{background:#e4eef8;color:#17457e;border:2px solid #2563c9}} .grade-c{{background:#f6ead1;color:#765000;border:2px solid #a35c05}} .grade-d{{background:#f7ddda;color:#8c2018;border:2px solid #b3261e}} .grade-e{{background:#efe3e1;color:#5f1a14;border:2px solid #7a1b14}} .findings{{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:10px}} .finding{{background:#fff;border:1px solid var(--line);border-left:5px solid var(--muted);padding:14px 18px}} .finding.good{{border-left-color:var(--green)}} .finding.caution{{border-left-color:var(--amber)}} .finding .flabel{{font:bold 11px Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}} .finding p{{margin:5px 0 8px;font-size:14px}} .finding .goto{{font:bold 13px Arial,sans-serif;color:var(--green);text-decoration:none}} .finding .goto:hover{{text-decoration:underline}} .term-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}} .term-card{{background:#fff;border:1px solid var(--line);border-left:4px solid var(--green);padding:14px 16px}} .term-card h3{{margin:0 0 6px;font-size:15px}} .term-card .what{{margin:0 0 8px;font-size:13.5px}} .term-card .why{{margin:0;font-size:13px;color:var(--muted)}} .method p{{margin-top:0;break-inside:avoid}} footer{{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}} @media(max-width:700px){{main{{padding:20px 14px}}header{{padding:32px 14px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.metadata{{grid-template-columns:1fr}}.method{{columns:1}}.selection-card{{grid-template-columns:1fr}}.selection-actions{{text-align:left}}}}
 </style></head><body>
 <script>window.pbEsc=s=>String(s==null?'':s).replace(/[&<>\\u0022\\u0027]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','\\u0022':'&quot;','\\u0027':'&#39;'}}[c]));</script>
 <header><h1>PlasBench: Plasmid reconstruction benchmark</h1><p><strong>Run:</strong> {esc(run_label)} · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
-<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
+<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
 <div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: mean F1</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 {summary_html}
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
@@ -2619,6 +2758,7 @@ def main():
 <section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. Circular-truth recovery is not evidence that a predicted sequence is closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{tool_options}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Circular truth recovery</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 <section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values require at least five pairs. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool A</th><th>Tool B</th><th>Pairs</th><th>Mean F1 difference</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th><th>A wins / ties / B wins</th></tr></thead><tbody>{comparison_rows}</tbody></table></div><p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
+<section id='zero-plasmid'><h2>Zero-plasmid isolates (negative control)</h2><p class='lead'>Precision, recall, and F1 are correctly undefined on an isolate with no true plasmid at all -- there is nothing to recover, and a tool predicting nothing has made a correct abstention, not scored a zero. These isolates are still valuable: they are the only ones that directly measure false-positive behavior. Isolate specificity is 1 minus the fraction of that isolate's chromosome a tool wrongly called plasmid; chromosome FP bp is the same false call in raw bases, summed across every plasmid-free isolate a tool was scored on. A specificity below 1.0 means real chromosomal sequence was misclassified as plasmid on a sample where NO plasmid exists to justify it.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Plasmid-free isolates scored</th><th>Mean isolate specificity</th><th>Total chromosome FP bp</th></tr></thead><tbody>{zero_plasmid_html}</tbody></table></div></section>
 <section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed or unavailable tool is excluded from F1 aggregation. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
