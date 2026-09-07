@@ -9,6 +9,7 @@ tmp/
 __pycache__/
 *.pyc
 .ncbi.env
+config/local.env
 build/
 *.egg-info/
 !config/accessions.tsv

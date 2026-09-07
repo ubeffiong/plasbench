@@ -46,6 +46,30 @@ def project_root(value):
     return root
 
 
+def configured_data_dir(root):
+    """Return the persistent data location configured by install.sh.
+
+    The Bash workflow reads config/local.env itself. This small equivalent keeps
+    CLI commands that manage input FASTQs (notably init-local) in the same
+    storage location without evaluating arbitrary shell content in Python.
+    """
+    configured = os.environ.get("DATA_DIR") or os.environ.get("PLASBENCH_DATA_DIR")
+    if configured:
+        return Path(configured).expanduser()
+    settings = root / "config" / "local.env"
+    if settings.is_file():
+        for line in settings.read_text(encoding="utf-8").splitlines():
+            if line.startswith("export PLASBENCH_DATA_DIR="):
+                value = line.split("=", 1)[1].strip()
+                try:
+                    values = shlex.split(value)
+                except ValueError:
+                    break
+                if len(values) == 1:
+                    return Path(values[0]).expanduser()
+    return root / "data"
+
+
 def run(command, root, env=None):
     merged_env = os.environ.copy()
     # The Bash configuration derives PROJECT_ROOT from its script location. Do
@@ -135,6 +159,7 @@ def main(argv=None):
         description="PlasBench: benchmark plasmid-reconstruction tools against complete references.",
         epilog="Examples:\n"
                "  plasbench install-conda\n"
+               "  plasbench upgrade\n"
                "  plasbench check --yes\n"
                "  plasbench install-tools core\n"
                "  plasbench install-tools all\n"
@@ -157,6 +182,11 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
+    upgrade_parser = sub.add_parser(
+        "upgrade",
+        help="Download the latest release and reuse this install's shared reads and databases.",
+    )
+    upgrade_parser.add_argument("--yes", action="store_true", help="Pass --yes to the new release installer.")
     check_parser = sub.add_parser(
         "check",
         help="Check configured runtime dependencies (tools and databases); offers to install what's missing.",
@@ -170,7 +200,8 @@ def main(argv=None):
     local_parser.add_argument("--reads-2", required=True, help="Reverse reads (gzipped FASTQ).")
     local_parser.add_argument("--reference", help="Complete assembly FASTA for this isolate (the ground truth).")
     local_parser.add_argument("--sequence-report", help="NCBI sequence_report.jsonl, if you have one.")
-    local_parser.add_argument("--data-dir", default="data", help="Where sample directories live (default: data).")
+    local_parser.add_argument("--data-dir", type=Path,
+                              help="Where sample directories live (default: the configured shared data directory).")
     local_parser.add_argument("--samples", default="config/local.tsv", help="Sample sheet to create or append to.")
     local_parser.add_argument("--prefix", help="Read filename prefix (default: the sample id).")
     local_parser.add_argument("--accession", default="LOCAL", help="assembly_accession column value.")
@@ -409,15 +440,24 @@ def main(argv=None):
         code = run([bash_command(), "test/run_demo.sh"], root)
     elif args.command == "test":
         code = run([bash_command(), "test/run_tests.sh"], root)
+    elif args.command == "upgrade":
+        update_script = root / "update.sh"
+        if not update_script.is_file():
+            parser.error(f"upgrade script not found at {update_script}")
+        command = [bash_command(), "update.sh"]
+        if args.yes:
+            command.append("--yes")
+        code = run(command, root)
     elif args.command == "check":
         command = [bash_command(), "scripts/00_setup.sh"]
         if args.yes:
             command.append("--yes")
         code = run(command, root)
     elif args.command == "init-local":
+        data_dir = args.data_dir or configured_data_dir(root)
         command = [sys.executable, "python/init_local_sample.py",
                    "--sample", args.sample, "--reads-1", args.reads_1, "--reads-2", args.reads_2,
-                   "--data-dir", args.data_dir, "--samples", args.samples,
+                   "--data-dir", str(data_dir), "--samples", args.samples,
                    "--accession", args.accession, "--link", args.link]
         if args.reference:
             command.extend(["--reference", args.reference])

@@ -425,11 +425,18 @@ can see the scoring separate those before trusting it on real data.
 PlasBench needs a database for Platon and one for MOB-suite. Together they are about
 5.6 GB on disk. Do both.
 
+`./install.sh` configures a reusable data directory outside the versioned release
+folder. By default it is `~/.local/share/plasbench/data` (or
+`$XDG_DATA_HOME/plasbench/data` when `XDG_DATA_HOME` is set). This means databases and
+downloaded reads survive upgrades. To choose a different shared location before the
+first install, use `PLASBENCH_DATA_DIR=/path/to/plasbench-data ./install.sh --tools`.
+
 #### 7a — Platon database
 
 ```bash
-mkdir -p ~/plasbench-0.2.1/data/db/platon
-cd ~/plasbench-0.2.1/data/db/platon
+PLASBENCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/plasbench/data"
+mkdir -p "$PLASBENCH_DATA_DIR/db/platon"
+cd "$PLASBENCH_DATA_DIR/db/platon"
 curl -fL -C - --retry 10 --retry-all-errors -o db.tar.gz https://zenodo.org/records/4066768/files/db.tar.gz
 ```
 
@@ -450,7 +457,7 @@ Then unpack:
 ```bash
 tar -xzf db.tar.gz
 rm -f db.tar.gz
-ls ~/plasbench-0.2.1/data/db/platon/db | wc -l
+ls "$PLASBENCH_DATA_DIR/db/platon/db" | wc -l
 ```
 
 The last command should print **31**.
@@ -491,12 +498,12 @@ python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.absp
 ```
 
 Copy their `databases` directory into the path it printed, then copy their Platon `db`
-directory into `~/plasbench-0.2.1/data/db/platon/db`. Confirm both:
+directory into `$PLASBENCH_DATA_DIR/db/platon/db`. Confirm both:
 
 ```bash
 MOB_DB="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))')"
 ls "$MOB_DB" | wc -l                                    # expect 31
-ls ~/plasbench-0.2.1/data/db/platon/db | wc -l          # expect 31
+ls "$PLASBENCH_DATA_DIR/db/platon/db" | wc -l           # expect 31
 ```
 
 ---
@@ -696,15 +703,19 @@ One command, run from inside your current install directory:
 
 ```bash
 ./update.sh
+# Equivalent when you are in the PlasBench install directory:
+plasbench upgrade
 ```
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, unpacks it into a new sibling
 directory (`~/plasbench-0.1.9` → `~/plasbench-0.2.1`, your current one is never touched
-or deleted), copies over your Platon/MOB-suite databases and any `config/local.tsv` or
-`.ncbi.env` you added so nothing needs re-downloading, and runs the new version's own
-installer — which updates the shared `plasbench` conda environment in place rather than
-recreating it, so nothing already installed into it is lost. Finish with:
+or deleted), then reuses one physical data directory for reads and databases. On the
+first upgrade from an older release, it **moves** the old `data/` directory once to
+`~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
+with a compatibility link; it never copies or re-downloads the database. It also carries
+over `config/local.tsv` and `.ncbi.env`, and updates the shared `plasbench` conda
+environment in place rather than recreating it. Finish with:
 
 ```bash
 cd ~/plasbench-0.2.1        # the directory ./update.sh just printed
@@ -721,17 +732,16 @@ automates:
   everything already installed into it (including MOB-suite's database) untouched. To
   force a fully clean environment instead, remove it first, deliberately:
   `conda env remove -n plasbench`.
-- **The databases** (Platon ~1.4 GB, MOB-suite ~450 MB) live under each version's own
-  `data/db/`, so a fresh directory starts without them — copy `data/db/platon` over from
-  the old directory, or point any command at the old location directly with
-  `--platon-db ~/plasbench-0.1.9/data/db/platon/db`. MOB-suite's database lives inside
-  the conda environment itself, so it carries over automatically once the environment
-  updates.
+- **Reads and the Platon database** live in the stable shared data directory. The default
+  is `~/.local/share/plasbench/data`; set `PLASBENCH_DATA_DIR` before installation to
+  choose another location. You may delete an old version directory after confirming the
+  upgrade: its `data/` link points to the shared files, not a separate copy. MOB-suite's
+  database remains inside the shared conda environment and carries over automatically.
 - **Anything you added yourself** — `config/local.tsv`, `.ncbi.env` — copy those specific
   files into the new directory; nothing shipped by the release needs it.
 
 Once you've confirmed the new version works, the old directory can be deleted or kept
-around — PlasBench never reads across version directories on its own.
+around. The shared data remains available to every installed release.
 
 ---
 
@@ -1083,7 +1093,7 @@ Manipulations worth knowing:
 | Work offline from pre-staged reads | `--local-inputs` |
 | Restrict scoring to one track only | `--analysis-track long_read` (or `hybrid`); not needed for a normal mixed run |
 | Put outputs somewhere else | `--data-dir`, `--results-dir`, `--log-dir` |
-| Use a Platon database elsewhere | `--platon-db ~/plasbench-0.2.1/data/db/platon/db` |
+| Use a Platon database elsewhere | `--platon-db "$PLASBENCH_DATA_DIR/db/platon/db"` |
 | Run more samples at once | `--parallel-samples N` — each concurrent assembly needs its own memory budget |
 | Run more tools at once | `--parallel-tools N` — cheaper to raise than parallel samples |
 | Inspect before committing | `--write-script run.sh`, then read or edit it |

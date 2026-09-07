@@ -30,6 +30,34 @@ done
 
 say() { printf '[plasbench-install] %s\n' "$*"; }
 
+# Code releases are deliberately versioned directories, but downloaded reads
+# and reference databases must not be. Persist their location outside the
+# release tree so a future ./update.sh can reuse it without a multi-GB copy.
+default_data_dir() {
+    printf '%s\n' "${PLASBENCH_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/plasbench/data}"
+}
+
+configure_shared_data() {
+    local settings="$HERE/config/local.env" data_dir
+
+    # Re-running the installer must retain the location chosen by an earlier
+    # install, rather than silently falling back to the default path.
+    if [[ -f "$settings" ]]; then
+        # shellcheck disable=SC1090
+        source "$settings"
+    fi
+    data_dir="$(default_data_dir)"
+    mkdir -p "$data_dir" "$(dirname "$settings")"
+    if [[ ! -f "$settings" ]] || ! grep -q '^export PLASBENCH_DATA_DIR=' "$settings"; then
+        {
+            echo '# Created by install.sh. Keep reusable reads and databases outside versioned releases.'
+            printf 'export PLASBENCH_DATA_DIR=%q\n' "$data_dir"
+        } >> "$settings"
+        chmod 600 "$settings" 2>/dev/null || true
+    fi
+    say "shared data directory: $data_dir"
+}
+
 # Long steps are silent for many minutes -- conda solving, a 450MB database
 # download -- and silence reads as a hang. Announce each phase, how many there
 # are, and what "slow" means for it, so a user can tell waiting from stuck.
@@ -47,9 +75,10 @@ step_done() {
     printf '[plasbench-install] done in %dm %02ds\n' $((elapsed / 60)) $((elapsed % 60))
 }
 
-# 1. A conda-family manager. env/bootstrap_conda.sh detects one and, if none is
+# 1. Shared data storage, then a conda-family manager. env/bootstrap_conda.sh detects one and, if none is
 #    present, offers to install Miniforge -- so a user does not have to install
 #    conda separately before running this script.
+configure_shared_data
 if ! command -v conda >/dev/null 2>&1 && ! command -v mamba >/dev/null 2>&1    && ! command -v micromamba >/dev/null 2>&1; then
     step 1 "conda-family package manager" "downloading and installing Miniforge (~120 MB)"
     bash env/bootstrap_conda.sh $ASSUME_YES || {

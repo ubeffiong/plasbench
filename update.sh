@@ -7,12 +7,11 @@
 #   ./update.sh
 #
 # It finds the latest release, downloads and verifies it, migrates your
-# existing databases (Platon, and anything else under data/db/) and any
-# config/local.tsv or .ncbi.env you added, into a new sibling directory
-# (e.g. ~/plasbench-0.2.1), then runs that new version's own installer --
-# which updates the shared 'plasbench' conda environment in place rather
-# than recreating it (see env/setup_conda.sh). Nothing in the current
-# directory is deleted; it is left exactly as it is.
+# existing downloaded inputs and databases into one stable user data location,
+# then runs the new version's own installer. Code remains versioned, but data
+# is shared; the existing checkout receives a compatibility symlink so it
+# continues to work. The shared 'plasbench' conda environment is updated in
+# place rather than recreated (see env/setup_conda.sh).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
@@ -30,6 +29,65 @@ for arg in "$@"; do
 done
 
 say() { printf '[plasbench-update] %s\n' "$*"; }
+
+# Carry forward an existing shared location if an earlier install already
+# configured one. This file is user-owned and created by install.sh.
+if [[ -f "$HERE/config/local.env" ]]; then
+    # shellcheck disable=SC1090
+    source "$HERE/config/local.env"
+fi
+
+default_data_dir() {
+    printf '%s\n' "${PLASBENCH_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/plasbench/data}"
+}
+
+write_data_setting() {
+    local install_dir data_dir settings
+    install_dir="$1"
+    data_dir="$2"
+    settings="$install_dir/config/local.env"
+    mkdir -p "$(dirname "$settings")" "$data_dir"
+    if [[ ! -f "$settings" ]] || ! grep -q '^export PLASBENCH_DATA_DIR=' "$settings"; then
+        {
+            echo '# Created by PlasBench update; reusable inputs and databases are shared.'
+            printf 'export PLASBENCH_DATA_DIR=%q\n' "$data_dir"
+        } >> "$settings"
+        chmod 600 "$settings" 2>/dev/null || true
+    fi
+}
+
+share_existing_data() {
+    local old_data="$HERE/data" requested="$1" parent
+    SHARED_DATA_DIR="$requested"
+    [[ -d "$old_data" ]] || return 0
+
+    # An earlier upgrade may already have replaced data/ with a symlink. If
+    # no explicit setting exists, use its resolved target instead of guessing
+    # a new default directory.
+    if [[ -L "$old_data" ]]; then
+        if [[ -z "${PLASBENCH_DATA_DIR:-}" ]]; then
+            SHARED_DATA_DIR="$(cd "$old_data" && pwd -P)"
+        fi
+        return 0
+    fi
+
+    if [[ ! -e "$requested" ]]; then
+        parent="$(dirname "$requested")"
+        mkdir -p "$parent"
+        say "moving reusable data to $requested (no copy and no re-download)..."
+        mv "$old_data" "$requested"
+        ln -s "$requested" "$old_data"
+        return 0
+    fi
+
+    # Two independent data locations can legitimately exist (for example a
+    # user explicitly set PLASBENCH_DATA_DIR before upgrading). Never merge or
+    # delete either automatically; keep using the current one safely.
+    if [[ "$(cd "$old_data" && pwd -P)" != "$(cd "$requested" && pwd -P)" ]]; then
+        SHARED_DATA_DIR="$old_data"
+        say "existing data directory differs from $requested; reusing $old_data without copying it."
+    fi
+}
 
 CURRENT_VERSION="$(python3 -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('plasbench/__init__.py').read()).group(1))" 2>/dev/null || echo unknown)"
 say "current version: $CURRENT_VERSION"
@@ -76,14 +134,12 @@ say "unpacking to $NEW_DIR ..."
 mkdir -p "$PARENT_DIR"
 tar -xzf "$DOWNLOAD_DIR/$TARBALL" -C "$PARENT_DIR"
 
-# Migrate large, slow-to-redownload databases and anything you added yourself
-# -- never anything the release itself ships, so a stale copy can never mask
-# a real update to a shipped file.
-if [[ -d "$HERE/data/db" ]]; then
-    say "copying data/db/ (Platon and friends) from the current install..."
-    mkdir -p "$NEW_DIR/data"
-    cp -r "$HERE/data/db" "$NEW_DIR/data/"
-fi
+# Make old and new code use one physical directory for reads and databases.
+# This first upgrade moves old data once, then leaves a compatibility symlink;
+# later upgrades only reuse the existing shared path.
+share_existing_data "$(default_data_dir)"
+write_data_setting "$HERE" "$SHARED_DATA_DIR"
+write_data_setting "$NEW_DIR" "$SHARED_DATA_DIR"
 for extra in .ncbi.env config/local.tsv; do
     if [[ -f "$HERE/$extra" && ! -f "$NEW_DIR/$extra" ]]; then
         say "copying $extra from the current install..."
@@ -92,11 +148,12 @@ for extra in .ncbi.env config/local.tsv; do
     fi
 done
 
-say "installing $LATEST_VERSION (this updates the shared 'plasbench' conda environment in place)..."
-( cd "$NEW_DIR" && ./install.sh --tools $ASSUME_YES )
+say "installing $LATEST_VERSION (reusing $SHARED_DATA_DIR and the shared 'plasbench' conda environment)..."
+( cd "$NEW_DIR" && PLASBENCH_DATA_DIR="$SHARED_DATA_DIR" ./install.sh --tools $ASSUME_YES )
 
 say "done."
 say "Your new install is at: $NEW_DIR"
+say "Reusable reads and databases: $SHARED_DATA_DIR"
 say "Next:"
 say "  cd $NEW_DIR"
 say "  conda activate plasbench"

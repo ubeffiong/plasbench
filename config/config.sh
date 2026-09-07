@@ -9,7 +9,16 @@
 export PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 # --- Where things go ---------------------------------------------------------
-export DATA_DIR="${DATA_DIR:-$PROJECT_ROOT/data}"          # downloaded refs + reads
+# The installer creates this ignored file on first use. It points reusable
+# downloads and databases at a stable user location, so upgrading the source
+# checkout never redownloads them. Explicit environment variables still win.
+LOCAL_SETTINGS="${PLASBENCH_LOCAL_SETTINGS:-$PROJECT_ROOT/config/local.env}"
+if [[ -f "$LOCAL_SETTINGS" ]]; then
+    # shellcheck disable=SC1090
+    source "$LOCAL_SETTINGS"
+fi
+
+export DATA_DIR="${DATA_DIR:-${PLASBENCH_DATA_DIR:-$PROJECT_ROOT/data}}" # refs + reads + DBs
 export RESULTS_DIR="${RESULTS_DIR:-$PROJECT_ROOT/results}" # all outputs
 export LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/logs}"
 export TMP_DIR="${TMP_DIR:-$PROJECT_ROOT/tmp}"

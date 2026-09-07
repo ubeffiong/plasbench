@@ -175,12 +175,30 @@ access to NCBI/SRA, and typically 20-40 GB free disk space per active run.
 ```bash
 git clone https://github.com/ubeffiong/plasbench.git
 cd plasbench
-bash env/setup_conda.sh
+./install.sh
 conda activate plasbench
-python -m pip install --no-deps .
 plasbench check
 plasbench test
 plasbench demo
+```
+
+The installer records a stable shared directory for downloaded FASTQs, truth
+references, and databases: `~/.local/share/plasbench/data` by default (or
+`$XDG_DATA_HOME/plasbench/data`). Code can therefore live in versioned release
+directories without duplicating multi-gigabyte inputs. Choose another location
+on the first install with:
+
+```bash
+PLASBENCH_DATA_DIR=/mnt/fast-disk/plasbench-data ./install.sh --tools
+```
+
+Upgrade from inside an installed release with either command below. The first
+upgrade from an older release moves its local `data/` directory once into the
+shared location and leaves a compatibility link; later upgrades reuse it.
+
+```bash
+./update.sh
+plasbench upgrade
 ```
 
 Install the Platon database only when Platon is enabled:
