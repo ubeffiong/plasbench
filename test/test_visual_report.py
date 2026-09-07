@@ -120,7 +120,8 @@ def main():
     # filtering, canvas tooltip, clustering, and drilldown; the detailed tracks
     # now live beneath the same dashboard rather than beside another matrix.
     for needed in ("Sample–Tool Heatmap", "heatmapCanvas", "heatmapTooltip",
-                   "clusterBtn", "drilldownModal", "getContext"):
+                   "clusterBtn", "drilldownModal", "getContext", "heatmapLegend",
+                   "devicePixelRatio", "horizontal scrollbar"):
         assert needed in page, f"sample-tool heatmap affordance missing: {needed}"
     assert "cv-canvas" not in page, "duplicate Sample x method matrix must not be emitted"
     assert "vq-heatmap" not in page and "vq-cell" not in page, \

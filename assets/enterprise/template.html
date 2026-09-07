@@ -435,9 +435,37 @@
 
         .heatmap-wrap canvas {
             display: block;
-            width: 100%;
+            /* Keep the measured grid at a readable size.  A narrow panel
+               scrolls horizontally rather than raster-scaling labels to blur. */
+            width: auto;
+            max-width: none;
             height: auto;
             cursor: pointer;
+        }
+        .heatmap-scale {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 28px;
+            padding: 4px 10px 7px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+        .heatmap-scale-ramp {
+            width: 116px;
+            height: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 99px;
+            background: linear-gradient(90deg, #eaf5ee, #a6d8bd, #5cb08a, #207e5c, #084d37);
+        }
+        .heatmap-scale .heatmap-key {
+            width: 10px;
+            height: 10px;
+            border: 1px solid #c6d0ca;
+            background: #f2f7f3;
+            display: inline-block;
         }
 
         .heatmap-tooltip {
@@ -1389,6 +1417,7 @@
                         <canvas id="heatmapCanvas" tabindex="0" role="application" aria-label="Sample-tool heatmap. Click a cell to select it; use arrow keys after selection to navigate and Enter to open the selected contig drilldown."></canvas>
                         <div class="selected-cell-indicator" id="cellIndicator"></div>
                     </div>
+                    <div class="heatmap-scale" id="heatmapLegend" aria-live="polite"></div>
                 </div>
             </div>
             <!-- CONTIG DRILLDOWN (inline; expandable) -->
@@ -1593,6 +1622,8 @@
         const totalCount = document.getElementById('totalCount');
         const selectionInfo = document.getElementById('selectionInfo');
         const heatmapSub = document.getElementById('heatmapSub');
+        const heatmapWrap = document.getElementById('heatmapWrap');
+        const heatmapLegend = document.getElementById('heatmapLegend');
 
         // Drilldown
         const drilldownModal = document.getElementById('drilldownModal');
@@ -1790,10 +1821,16 @@
             const totalW = pad.left + cols * colW + pad.right;
             const totalH = pad.top + rows * rowH + pad.bottom;
 
-            canvas.width = totalW;
-            canvas.height = totalH;
-            canvas.style.width = totalW + 'px';
+            // Render at device density and never let CSS squeeze text into a
+            // smaller raster. The wrapper provides a horizontal scrollbar on
+            // small displays while wide panels use their available space.
+            const pixelRatio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+            const cssWidth = Math.max(totalW, (heatmapWrap.clientWidth || totalW) - 6);
+            canvas.width = Math.ceil(totalW * pixelRatio);
+            canvas.height = Math.ceil(totalH * pixelRatio);
+            canvas.style.width = cssWidth + 'px';
             canvas.style.height = totalH + 'px';
+            ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 
             ctx.clearRect(0, 0, totalW, totalH);
             ctx.fillStyle = '#f3f6f4';
@@ -1908,6 +1945,15 @@
             ctx.textBaseline = 'top';
             ctx.fillText('Metric: ' + getMetricLabel(), 6, 6);
 
+            const lowLabel = state.metric === 'runtime' || state.metric === 'memory'
+                ? '0' : '0%';
+            const highLabel = state.metric === 'runtime' || state.metric === 'memory'
+                ? String(Math.round(maxVal)) : Math.round(maxVal * 100) + '%';
+            heatmapLegend.innerHTML =
+                '<strong>Cell value</strong><span>' + lowLabel + '</span><span class="heatmap-scale-ramp" aria-hidden="true"></span>' +
+                '<span>' + highLabel + '</span><span class="heatmap-key" aria-hidden="true"></span><span>not completed</span>' +
+                '<span>Click a cell for plasmid recovery; hover for exact values.</span>';
+
             if (state.selectedSample && state.selectedTool) {
                 const rowIdx = filtered.indexOf(state.selectedSample);
                 const colIdx = visibleTools.findIndex(t => t.id === state.selectedTool);
@@ -1915,8 +1961,8 @@
                     const x = pad.left + colIdx * colW;
                     const y = pad.top + rowIdx * rowH;
                     const rect = canvas.getBoundingClientRect();
-                    const scaleX = canvas.width / rect.width;
-                    const scaleY = canvas.height / rect.height;
+                    const scaleX = totalW / rect.width;
+                    const scaleY = totalH / rect.height;
                     indicator.style.display = 'block';
                     indicator.style.left = (canvas.offsetLeft + x / scaleX) + 'px';
                     indicator.style.top = (canvas.offsetTop + y / scaleY) + 'px';
@@ -2312,10 +2358,10 @@
         function getCellFromPoint(px, py) {
             const data = canvas._cellData;
             if (!data) return null;
-            const { filtered, visibleTools, pad, rowH, colW, rows, cols } = data;
+            const { filtered, visibleTools, pad, rowH, colW, rows, cols, totalW, totalH } = data;
             const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
+            const scaleX = totalW / rect.width;
+            const scaleY = totalH / rect.height;
             const x = (px - rect.left) * scaleX;
             const y = (py - rect.top) * scaleY;
 

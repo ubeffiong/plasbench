@@ -2051,7 +2051,7 @@ def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
             "window.addEventListener('message',event=>{if(event.source!==f.contentWindow)return;"
             "const value=event.data;if(!value||value.type!=='plasbench-enterprise-height')return;"
             "const height=Number(value.height);if(!Number.isFinite(height)||height<1)return;"
-            "f.style.height=Math.max(900,Math.min(50000,Math.ceil(height)+24))+'px';});}})();</script>"
+            "f.style.height=Math.max(900,Math.min(50000,Math.ceil(height)+24))+'px';});})();</script>"
             + evidence_html + "</section>")
 
 

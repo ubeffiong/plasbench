@@ -700,7 +700,18 @@ cd ~/plasbench-0.2.2
 cat results/benchmark.leaderboard.md
 ```
 
-That is the ranking. To open the full interactive report, from **Windows** run:
+That is the ranking. At the end of an interactive `plasbench run`, `plasbench report`, or
+`plasbench demo`, PlasBench prints the absolute report path and asks whether to open it.
+For a non-interactive run, or to reopen any finished report later, use:
+
+```bash
+plasbench open-report --results-dir results
+```
+
+To open automatically without a prompt, add `--open-report` to `run`, `report`, or `demo`.
+To suppress the interactive prompt, add `--no-report-prompt`.
+
+To open the full interactive report manually from **Windows**, run:
 
 ```bash
 explorer.exe "$(wslpath -w results/benchmark.report.html)"

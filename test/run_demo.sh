@@ -124,6 +124,7 @@ done | sed -n "1,10p"
 echo
 echo "===== interactive HTML report ====="
 echo "$DEMO/benchmark.report.html"
+echo "Open it with: plasbench open-report --report \"$DEMO/benchmark.report.html\""
 echo
 echo "All demo data is synthetic. It demonstrates the engine, not a biological result."
 echo "Demo outputs are in: $DEMO"

@@ -6,6 +6,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import webbrowser
 from pathlib import Path
 
 from . import __version__
@@ -94,6 +95,45 @@ def bash_command():
     return shutil.which("bash") or "bash"
 
 
+def open_report_in_browser(report):
+    """Open a local report with the host's browser, including WSL hosts."""
+    report = Path(report).resolve()
+    if not report.is_file():
+        raise SystemExit(f"ERROR: report not found: {report}")
+    if os.name == "nt":
+        os.startfile(str(report))  # type: ignore[attr-defined]
+        return
+    # wslview translates the Linux pathname to Windows before opening it.
+    if os.environ.get("WSL_DISTRO_NAME") and shutil.which("wslview"):
+        subprocess.Popen(["wslview", str(report)], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+        return
+    webbrowser.open(report.as_uri())
+
+
+def announce_report(report, open_now=False, prompt=True):
+    """Give every completed benchmark the same clear report handoff."""
+    report = Path(report).resolve()
+    if not report.is_file():
+        return
+    print("\n[plasbench] Benchmark report ready")
+    print(f"[plasbench] Report file : {report}")
+    print(f"[plasbench] Open command: plasbench open-report --report {shlex.quote(str(report))}")
+    if open_now:
+        open_report_in_browser(report)
+        print("[plasbench] Opening the report in your default browser.")
+    elif prompt and sys.stdin.isatty():
+        try:
+            answer = input("[plasbench] Open the report now? [y/N] ").strip().lower()
+        except EOFError:
+            answer = ""
+        if answer in {"y", "yes"}:
+            open_report_in_browser(report)
+            print("[plasbench] Opening the report in your default browser.")
+        else:
+            print("[plasbench] Report was not opened. Run the Open command above whenever you are ready.")
+
+
 def print_docs(root, topic):
     guide = root / "docs" / "USER_GUIDE.md"
     if not guide.is_file():
@@ -180,7 +220,16 @@ def main(argv=None):
     parser.add_argument("--project-root", type=project_root, default=Path.cwd(),
                         help="PlasBench source checkout (default: current directory).")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
+    demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
+    demo_parser.add_argument("--open-report", action="store_true",
+                             help="Open the completed demo report without prompting.")
+    demo_parser.add_argument("--no-report-prompt", action="store_true",
+                             help="Do not offer to open the completed demo report.")
+    open_report_parser = sub.add_parser("open-report", help="Open a completed HTML report in the default browser.")
+    open_report_group = open_report_parser.add_mutually_exclusive_group(required=True)
+    open_report_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
+    open_report_group.add_argument("--results-dir", type=Path,
+                                   help="Results directory containing benchmark.report.html.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
     upgrade_parser = sub.add_parser(
         "upgrade",
@@ -368,6 +417,10 @@ def main(argv=None):
                                  "so you can review or edit them before running it yourself with bash.")
         inputs.add_argument("--data-dir", type=Path, help="Directory for downloaded references, reads, and assemblies.")
         inputs.add_argument("--results-dir", type=Path, help="Directory for predictions, scores, and reports.")
+        inputs.add_argument("--open-report", action="store_true",
+                            help="Open benchmark.report.html after a successful report-producing run; never prompts.")
+        inputs.add_argument("--no-report-prompt", action="store_true",
+                            help="Do not offer to open benchmark.report.html when an interactive run finishes.")
         inputs.add_argument("--log-dir", type=Path, help="Directory for tool and mapping logs.")
         inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
         inputs.add_argument("--genomad-db", type=Path, help="Path to the installed geNomad database directory (containing genomad_db/).")
@@ -440,6 +493,11 @@ def main(argv=None):
     root = args.project_root
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
+    elif args.command == "open-report":
+        report = args.report or (args.results_dir / "benchmark.report.html")
+        open_report_in_browser(report)
+        print(f"[plasbench] Opening report: {Path(report).resolve()}")
+        code = 0
     elif args.command == "test":
         code = run([bash_command(), "test/run_tests.sh"], root)
     elif args.command == "upgrade":
@@ -668,4 +726,16 @@ def main(argv=None):
             code = 0
         else:
             code = run([bash_command(), "scripts/run_all.sh", *stages], root, env)
+    # A report is an end product, not an unadvertised file. Keep this handoff
+    # in the Python CLI so demo, local-isolate, and cohort benchmark workflows
+    # behave identically even though they use different Bash entry points.
+    if code == 0 and args.command == "demo":
+        announce_report(root / "results_demo" / "benchmark.report.html", args.open_report,
+                        not args.no_report_prompt)
+    elif code == 0 and args.command in {"run", "report"} and not args.write_script:
+        stages = ["6"] if args.command == "report" else (args.stages or ["0", "1", "2", "3", "4", "7", "5", "6"])
+        if "6" in stages:
+            results_dir = args.results_dir or (root / "results")
+            announce_report(results_dir / "benchmark.report.html", args.open_report,
+                            not args.no_report_prompt)
     raise SystemExit(code)
