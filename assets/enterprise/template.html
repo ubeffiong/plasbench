@@ -3247,27 +3247,26 @@
             }
         });
 
-        // The standalone report embeds this dashboard. Measure it after every
-        // layout change so a detailed drilldown is never clipped by a fixed frame.
+        // The standalone report embeds this dashboard. Measure the content box,
+        // not documentElement: its scrollHeight inherits the iframe viewport and
+        // would preserve blank space after a previously larger dashboard state.
         let frameHeightPending = false;
         function reportFrameHeight() {
             if (window.parent === window || frameHeightPending) return;
             frameHeightPending = true;
             requestAnimationFrame(() => {
                 frameHeightPending = false;
-                const root = document.documentElement;
-                const body = document.body;
-                const height = Math.max(
-                    root.scrollHeight, root.offsetHeight,
-                    body ? body.scrollHeight : 0, body ? body.offsetHeight : 0
-                );
+                const content = document.querySelector('.app');
+                const height = Math.ceil(content
+                    ? content.getBoundingClientRect().height
+                    : document.documentElement.scrollHeight);
                 window.parent.postMessage({ type: 'plasbench-enterprise-height', height: height }, '*');
             });
         }
         if (window.parent !== window && 'ResizeObserver' in window) {
             const frameHeightObserver = new ResizeObserver(reportFrameHeight);
-            frameHeightObserver.observe(document.documentElement);
-            if (document.body) frameHeightObserver.observe(document.body);
+            const content = document.querySelector('.app');
+            if (content) frameHeightObserver.observe(content);
         }
         window.addEventListener('load', reportFrameHeight);
         window.addEventListener('resize', reportFrameHeight);

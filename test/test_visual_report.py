@@ -145,7 +145,7 @@ def main():
     # A trusted frame-only handshake grows the embedded dashboard for long
     # drilldowns and responsive chart layouts rather than clipping its content.
     for needed in ("plasbench-enterprise-height", "ResizeObserver", "f.contentWindow",
-                   "Math.min(50000,Math.ceil(height)+24)"):
+                   "Math.min(50000,Math.ceil(height)+24)", "content.getBoundingClientRect().height"):
         assert needed in page, f"responsive enterprise frame sizing missing: {needed}"
     # Nothing in the adopted view may simulate data. The upstream prototype
     # generated its dataset, highlighted random mismatches, jittered dot plots
