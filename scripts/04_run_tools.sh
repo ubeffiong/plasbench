@@ -39,12 +39,12 @@ profile_elapsed() { printf '%s' "$(( $(date +%s) - $1 ))"; }
 profile_rss() { [[ -s "$1" ]] && tr -d '[:space:]' < "$1" || true; }
 profile_exec() {
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
-    if [[ -x /usr/bin/time ]]; then /usr/bin/time -f '%M' -o "$PROFILE_RSS_FILE" "$@"; else "$@"; fi
+    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" /usr/bin/time -f '%M' -o "$PROFILE_RSS_FILE" "$@"; else run_with_heartbeat "$SAMPLE / $TOOL" "$@"; fi
 }
 profile_exec_in_dir() {
     local run_dir="$1"; shift
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
-    if [[ -x /usr/bin/time ]]; then (cd "$run_dir" && /usr/bin/time -f '%M' -o "$PROFILE_RSS_FILE" "$@"); else (cd "$run_dir" && "$@"); fi
+    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && /usr/bin/time -f "%M" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@"; else run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@"; fi
 }
 
 is_complete() {

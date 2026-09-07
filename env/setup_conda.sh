@@ -3,6 +3,7 @@
 # Auto-detects mamba (faster) and falls back to conda.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/../scripts/lib.sh"
 ENV_NAME="${PLASBENCH_ENV_NAME:-plasbench}"
 
 if command -v mamba >/dev/null 2>&1; then
@@ -41,8 +42,10 @@ if PREFIX_PATH="$(env_prefix)"; then
     echo "[setup_conda] environment '$ENV_NAME' already exists at:"
     echo "[setup_conda]   $PREFIX_PATH"
     echo "[setup_conda] updating it in place (nothing is deleted) ..."
-    "$SOLVER" env update --prefix "$PREFIX_PATH" --file "$HERE/environment.yml" --prune=false 2>/dev/null \
-        || "$SOLVER" env update --prefix "$PREFIX_PATH" --file "$HERE/environment.yml"
+    run_with_heartbeat "Conda is solving/linking the PlasBench environment" \
+        "$SOLVER" env update --prefix "$PREFIX_PATH" --file "$HERE/environment.yml" --prune=false 2>/dev/null \
+        || run_with_heartbeat "Conda is solving/linking the PlasBench environment" \
+            "$SOLVER" env update --prefix "$PREFIX_PATH" --file "$HERE/environment.yml"
     echo "[setup_conda] update complete."
     echo
     echo "[setup_conda] To rebuild it from scratch instead, remove it first -- deliberately:"
@@ -50,7 +53,8 @@ if PREFIX_PATH="$(env_prefix)"; then
     echo "    bash env/setup_conda.sh"
 else
     echo "[setup_conda] creating environment '$ENV_NAME' (this can take a few minutes)..."
-    "$SOLVER" env create -f "$HERE/environment.yml"
+    run_with_heartbeat "Conda is creating/linking the PlasBench environment" \
+        "$SOLVER" env create -f "$HERE/environment.yml"
 fi
 
 echo

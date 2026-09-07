@@ -2,6 +2,7 @@
 # Install an optional PlasBench dependency profile into an existing conda env.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/../scripts/lib.sh"
 ENV_NAME="plasbench"; PROFILE="core"
 [[ "${1:-}" == "--env" ]] && { ENV_NAME="$2"; shift 2; }
 [[ $# -gt 0 ]] && PROFILE="$1"
@@ -137,4 +138,4 @@ EOF
  *) PKGS=("$PROFILE");;
 esac
 echo "[plasbench] installing into $TARGET_LABEL: ${PKGS[*]}"
-"${SOLVER[@]}" "${PKGS[@]}"
+run_with_heartbeat "Conda is solving/linking dependency tools: ${PKGS[*]}" "${SOLVER[@]}" "${PKGS[@]}"

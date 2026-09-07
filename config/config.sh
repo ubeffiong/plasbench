@@ -61,6 +61,11 @@ export ANALYSIS_TRACK_FILTER="${ANALYSIS_TRACK_FILTER:-}"
 # retries each fetch this many times before recording the sample as failed.
 export NETWORK_RETRIES="${NETWORK_RETRIES:-3}"
 export NETWORK_RETRY_DELAY_SECONDS="${NETWORK_RETRY_DELAY_SECONDS:-15}"
+# Long commands continue normally, but after this many quiet seconds PlasBench
+# prints a live elapsed-time status line. This is especially useful while
+# Conda links MOB-suite or a tool writes its detailed output only to a log.
+export HEARTBEAT_DELAY_SECONDS="${HEARTBEAT_DELAY_SECONDS:-180}"
+export HEARTBEAT_INTERVAL_SECONDS="${HEARTBEAT_INTERVAL_SECONDS:-60}"
 
 # Defaults are derived from the machine, not fixed. One fixed number is wrong at
 # both ends: 16GB told SPAdes it had four times the RAM on a 4GB box, turning

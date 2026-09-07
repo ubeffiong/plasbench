@@ -102,8 +102,8 @@ else
     fi
 fi
 
-log "Running mob_init ..."
-mob_init || die "mob_init failed; check network access and see its output above.
+log "Running mob_init (a live status line appears every minute after 3 quiet minutes) ..."
+run_with_heartbeat "MOB-suite database download/index build" mob_init || die "mob_init failed; check network access and see its output above.
 If your connection keeps dropping, a prebuilt database directory can be copied
 into $DB_DIR instead -- every file in it is plain data with no absolute paths."
 log "MOB-suite database ready."

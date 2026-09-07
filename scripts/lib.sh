@@ -3,6 +3,37 @@
 
 # Pretty logging with timestamps.
 log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
+
+# Run a potentially quiet command while keeping the user informed. Detailed
+# stdout/stderr may be redirected to a per-tool log by the caller; heartbeat
+# lines prefer /dev/tty so they still reach the interactive terminal.
+heartbeat_log() {
+    local message="$*"
+    if [[ -w /dev/tty ]]; then
+        printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$message" > /dev/tty
+    else
+        log "$message" >&2
+    fi
+}
+
+run_with_heartbeat() {
+    local description="$1"; shift
+    local delay="${HEARTBEAT_DELAY_SECONDS:-180}" interval="${HEARTBEAT_INTERVAL_SECONDS:-60}"
+    local started elapsed=0 last_notice=0 pid
+    started="$(date +%s)"
+    "$@" & pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        # Poll cheaply so a fast command returns promptly; only print at the
+        # much less frequent configured interval once the quiet-delay passes.
+        sleep 1
+        elapsed=$(( $(date +%s) - started ))
+        if [[ "$elapsed" -ge "$delay" && $(( elapsed - last_notice )) -ge "$interval" ]] && kill -0 "$pid" 2>/dev/null; then
+            heartbeat_log "still working: $description (${elapsed}s elapsed; detailed output may be in its log file)"
+            last_notice="$elapsed"
+        fi
+    done
+    wait "$pid"
+}
 warn() { printf '[%s] WARNING: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
 die()  { printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; exit 1; }
 
