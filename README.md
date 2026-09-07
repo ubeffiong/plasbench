@@ -715,6 +715,81 @@ ls ~/plasbench-0.2.2/logs/
 
 ---
 
+### Transfer databases and staged cohort files from another PC
+
+Use this optional procedure when a second PC already has the PlasBench
+databases, downloaded references, or paired FASTQ files. It avoids downloading
+the same large files again. Only copy from a trusted machine that used the same
+or a compatible PlasBench release; transfer files do not replace cohort
+validation or the benchmark's provenance records.
+
+On the **source PC**, activate the environment and identify the stable shared
+data directory. The default is shown below, but its `config/local.env` file may
+name a different location:
+
+```bash
+cd ~/plasbench-0.2.3
+source config/local.env
+echo "$PLASBENCH_DATA_DIR"
+```
+
+Copy the complete shared directory to an external drive or a network location.
+`rsync` is preferred because it resumes interrupted copies and preserves file
+timestamps; omit `--delete` so a transfer can never remove destination files.
+
+```bash
+rsync -a --info=progress2 "$PLASBENCH_DATA_DIR/" /media/$USER/USB_DRIVE/plasbench-data/
+(cd "$PLASBENCH_DATA_DIR" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > plasbench-data.sha256
+```
+
+Copy `plasbench-data.sha256` beside the transferred `plasbench-data/` directory.
+On the **destination PC**, install PlasBench normally first, then copy into its
+configured shared directory and verify the files before running a cohort:
+
+```bash
+cd ~/plasbench-0.2.3
+source config/local.env
+rsync -a --info=progress2 /media/$USER/USB_DRIVE/plasbench-data/ "$PLASBENCH_DATA_DIR/"
+cd "$PLASBENCH_DATA_DIR"
+sha256sum -c /media/$USER/USB_DRIVE/plasbench-data.sha256
+```
+
+That shared directory includes staged reference FASTA files and paired FASTQs
+under `<shared-data-directory>/<sample_id>/`, as well as Platon and other
+PlasBench-managed databases under `db/`. Re-running `plasbench run` reuses valid files already
+there; it downloads only missing inputs.
+
+MOB-suite's database is different: it lives inside the Conda environment, not
+inside `$PLASBENCH_DATA_DIR`. Install the same MOB-suite package version on the
+destination first, then copy only its `databases/` directory. These commands
+print the exact source and destination paths without guessing where Conda was
+installed:
+
+```bash
+MOB_DB="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))')"
+echo "$MOB_DB"
+rsync -a --info=progress2 /path/from/source-PC/mob_suite/databases/ "$MOB_DB/"
+plasbench check
+```
+
+For cohort definitions, copy the small text files from `cohorts/` and their
+matching `*.lock.json` evidence files, then validate them on the destination.
+Do **not** overwrite a released cohort with different content under the same
+name; use a new cohort name for a changed sample sheet.
+
+```bash
+rsync -a --info=progress2 /path/from/source-PC/plasbench/cohorts/ ~/plasbench-0.2.3/cohorts/
+plasbench validate-cohort --samples cohorts/my-cohort.tsv --verify-lock cohorts/my-cohort.lock.json
+```
+
+Do not transfer `.ncbi.env` unless both machines are under the same authorized
+control: it contains an NCBI API key and email. Create a separate local file on
+the destination instead. Results can be copied for viewing, but should not be
+merged with a newly run benchmark; each run's `run_manifest.json` preserves its
+own provenance.
+
+---
+
 ### Upgrade an existing installation
 
 One command, run from inside your current install directory:
