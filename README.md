@@ -463,16 +463,33 @@ first install, use `PLASBENCH_DATA_DIR=/path/to/plasbench-data ./install.sh --to
 
 #### 7a — Platon database
 
+First check whether the database is already present. This is safe to run on
+every installation or upgrade: it exits without downloading when it finds a
+populated database directory.
+
 ```bash
-PLASBENCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/plasbench/data"
-mkdir -p "$PLASBENCH_DATA_DIR/db/platon"
-cd "$PLASBENCH_DATA_DIR/db/platon"
-curl -fL -C - --retry 10 --retry-all-errors -o db.tar.gz https://zenodo.org/records/4066768/files/db.tar.gz
+bash env/download_platon_db.sh
 ```
 
-That is a 1.69 GB download. **`-C -` means it resumes**: if it stops partway, run the
-exact same `curl` command again and it continues from where it stopped rather than
-starting over.
+If it says `already present ... nothing to do`, continue to step 7b. If it
+says the database is missing, use the manual download below. The manual route
+is retained because Platon periodically changes its published database URL.
+
+```bash
+source config/local.env
+PLATON_DB="$PLASBENCH_DATA_DIR/db/platon/db"
+if [[ -d "$PLATON_DB" && -n "$(find "$PLATON_DB" -type f -print -quit)" ]]; then
+  echo "Platon database already present at $PLATON_DB; no download needed."
+else
+  mkdir -p "$(dirname "$PLATON_DB")"
+  cd "$(dirname "$PLATON_DB")"
+  curl -fL -C - --retry 10 --retry-all-errors -o db.tar.gz https://zenodo.org/records/4066768/files/db.tar.gz
+fi
+```
+
+Only when the database is absent, this is a 1.69 GB download. **`-C -` means it
+resumes**: if it stops partway, run the exact same block again and it continues
+from the partial archive rather than starting over.
 
 Check you got the whole file before unpacking it:
 
@@ -482,11 +499,14 @@ ls -l db.tar.gz
 
 The size must be **1690687855**. If it is smaller, run the `curl` command again.
 
-Then unpack:
+If you downloaded an archive, then unpack it. This command safely does nothing
+when no archive was needed:
 
 ```bash
-tar -xzf db.tar.gz
-rm -f db.tar.gz
+if [[ -f db.tar.gz ]]; then
+  tar -xzf db.tar.gz
+  rm -f db.tar.gz
+fi
 ls "$PLASBENCH_DATA_DIR/db/platon/db" | wc -l
 ```
 
