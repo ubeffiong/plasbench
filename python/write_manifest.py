@@ -99,7 +99,16 @@ def recommendation_model_status(results_dir):
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {"available": False}
-    return {"available": True, "model_ready": bool(payload.get("model_ready")), "reason": payload.get("reason", "")}
+    card = Path(results_dir) / "benchmark.recommendation_model.card.md"
+    validation = payload.get("validation") or {}
+    return {
+        "available": True,
+        "model_ready": bool(payload.get("model_ready")),
+        "reason": payload.get("reason", ""),
+        "validation_strategy": validation.get("strategy", "not_recorded"),
+        "validation_claim": validation.get("claim", "not_recorded"),
+        "model_card": str(card) if card.is_file() else None,
+    }
 
 
 def directory_identity(path):
@@ -146,7 +155,8 @@ def main():
                 "RUN_PLASGRAPH2", "PLASGRAPH2_MODEL_DIR", "PLASGRAPH2_CPU_ONLY", "PLASGRAPH2_VERSION",
                 "COHORT_QC_FLAGS_ENABLED", "COHORT_QC_MIN_COHORT_SIZE", "COHORT_QC_ZSCORE_THRESHOLD",
                 "RUN_RECOMMENDATION_MODEL", "RECOMMENDATION_MODEL_MIN_STUDIES",
-                "RECOMMENDATION_MODEL_MIN_SAMPLES", "RECOMMENDATION_MODEL_MIN_IMPROVEMENT", "DECISION_PROFILE")
+                "RECOMMENDATION_MODEL_MIN_SAMPLES", "RECOMMENDATION_MODEL_MIN_IMPROVEMENT",
+                "RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES", "RECOMMENDATION_MODEL_NESTED_MIN_STUDIES", "DECISION_PROFILE")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     truth_tables = {}

@@ -271,7 +271,7 @@ class RecommendationModel:
 
     def to_dict(self, model_ready, reason):
         return {
-            "schema_version": "1.1", "model_ready": model_ready, "reason": reason,
+            "schema_version": "1.2", "model_ready": model_ready, "reason": reason,
             "n_training_rows": self.n_training_rows, "n_studies": self.n_studies,
             "spec": self.spec,
             "targets": {

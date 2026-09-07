@@ -901,10 +901,20 @@ This is a **descriptive recommendation, not a scoring change, and not
 validated beyond the cohorts it was fit on** -- the identical caveat this
 project already applies to `operational_method_recommendation` and
 `truth_set_best_candidate` elsewhere in this guide. It is fit and leave-
-one-study-out validated fresh every run (`benchmark.recommendation_model.json`),
-using the *same* per-study folds `benchmark.recommendation_validation.tsv`
-already uses, and is only ever used when it demonstrably beats the plain
-per-tool mean under those folds (`RECOMMENDATION_MODEL_MIN_STUDIES`,
+one-study-out validated fresh every run (`benchmark.recommendation_model.json`)
+and writes a human-readable `benchmark.recommendation_model.card.md` alongside
+it. The card records exact input checksums, observed organisms/tracks/studies,
+thresholds, validation results, scope, and limitations for release review.
+
+At the default nested-validation threshold (60 score rows and 5 independent
+source studies), lambda selection happens only within each outer training fold;
+the held-out study is used only once for evaluation. Below that threshold,
+PlasBench uses an explicitly labeled **approximate LOSO** fallback because a
+nested split would be too data-starved. Its reported improvement may be
+optimistic and must not be described as unbiased validation. Both the JSON and
+model card carry this validation label. The model is only ever used when it
+demonstrably beats the plain per-tool mean under its declared folds
+(`RECOMMENDATION_MODEL_MIN_STUDIES`,
 `RECOMMENDATION_MODEL_MIN_SAMPLES`, `RECOMMENDATION_MODEL_MIN_IMPROVEMENT` in
 `config/config.sh`) -- never "ready" on a technicality that is actually
 worse than the mean. When it isn't ready, every downstream script behaves

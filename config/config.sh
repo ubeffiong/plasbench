@@ -269,6 +269,11 @@ export RECOMMENDATION_MODEL_MIN_SAMPLES="${RECOMMENDATION_MODEL_MIN_SAMPLES:-20}
 # folds) by at least this relative fraction, for every target -- never
 # "ready" on a technicality that is actually worse than just using the mean.
 export RECOMMENDATION_MODEL_MIN_IMPROVEMENT="${RECOMMENDATION_MODEL_MIN_IMPROVEMENT:-0.05}"
+# At this scale the model changes from approximate LOSO (where the same folds
+# select lambda and estimate error) to nested, study-level LOSO.  The latter
+# keeps every outer held-out study out of hyperparameter selection.
+export RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES="${RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES:-60}"
+export RECOMMENDATION_MODEL_NESTED_MIN_STUDIES="${RECOMMENDATION_MODEL_NESTED_MIN_STUDIES:-5}"
 # Rules-only (no ML) decision_score weight profile -- accuracy_first (today's
 # original formula), amr_surveillance, or rapid_screening. Changing this only
 # changes which tool is ranked highest; it never changes eligibility.

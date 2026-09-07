@@ -99,20 +99,24 @@ echo "stage 6 passes --cohort-qc-flags through and the report renders its conten
 
 # --- the model gate must not be faked on a tiny cohort -----------------------
 MODEL="$TMP/results/benchmark.recommendation_model.json"
-rm -f "$MODEL"
+MODEL_CARD="$TMP/results/benchmark.recommendation_model.card.md"
+rm -f "$MODEL" "$MODEL_CARD"
 aggregate env RUN_RECOMMENDATION_MODEL=1 || { echo "FAIL: stage 6 failed with the model enabled" >&2; cat "$TMP/stage6.log" >&2; exit 1; }
 [[ -s "$MODEL" ]] || { echo "FAIL: RUN_RECOMMENDATION_MODEL=1 produced no model JSON" >&2; cat "$TMP/stage6.log" >&2; exit 1; }
+[[ -s "$MODEL_CARD" ]] || { echo "FAIL: RUN_RECOMMENDATION_MODEL=1 produced no model card" >&2; cat "$TMP/stage6.log" >&2; exit 1; }
 python3 - "$MODEL" <<'PYEOF' || { echo "FAIL: the model gate was satisfied on data that cannot support it" >&2; exit 1; }
 import json, sys
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
 assert payload["model_ready"] is False, "a 1-sample, 1-study cohort must never be model_ready"
 assert "source_study" in payload["reason"] or "training row" in payload["reason"], payload["reason"]
 PYEOF
-echo "RUN_RECOMMENDATION_MODEL=1 fits, withholds on insufficient data, and says why -> PASS"
+grep -q "Model ready:\*\* no" "$MODEL_CARD" || { echo "FAIL: model card does not disclose the withheld model" >&2; exit 1; }
+echo "RUN_RECOMMENDATION_MODEL=1 fits, writes a card, withholds on insufficient data, and says why -> PASS"
 
-rm -f "$MODEL"
+rm -f "$MODEL" "$MODEL_CARD"
 aggregate env RUN_RECOMMENDATION_MODEL=0 || { echo "FAIL: stage 6 failed with the model disabled" >&2; cat "$TMP/stage6.log" >&2; exit 1; }
 [[ ! -e "$MODEL" ]] || { echo "FAIL: RUN_RECOMMENDATION_MODEL=0 still fitted a model" >&2; exit 1; }
+[[ ! -e "$MODEL_CARD" ]] || { echo "FAIL: RUN_RECOMMENDATION_MODEL=0 still wrote a model card" >&2; exit 1; }
 echo "RUN_RECOMMENDATION_MODEL=0 fits nothing -> PASS"
 
 echo "ALL STAGE WIRING (QC + MODEL) TESTS PASSED"

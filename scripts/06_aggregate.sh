@@ -51,6 +51,9 @@ if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
         --min-studies "$RECOMMENDATION_MODEL_MIN_STUDIES" \
         --min-training-samples "$RECOMMENDATION_MODEL_MIN_SAMPLES" \
         --min-relative-improvement "$RECOMMENDATION_MODEL_MIN_IMPROVEMENT" \
+        --nested-min-training-samples "$RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES" \
+        --nested-min-studies "$RECOMMENDATION_MODEL_NESTED_MIN_STUDIES" \
+        --model-card "$RESULTS_DIR/benchmark.recommendation_model.card.md" \
         --out "$RESULTS_DIR/benchmark.recommendation_model.json"
     RECOMMENDATION_MODEL_ARGS=(--recommendation-model "$RESULTS_DIR/benchmark.recommendation_model.json")
 fi
@@ -103,5 +106,6 @@ log "  Study holdout test : $RESULTS_DIR/benchmark.recommendation_validation.tsv
 log "  Cohort QC flags   : $RESULTS_DIR/benchmark.cohort_qc_flags.tsv (advisory only)"
 if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
     log "  Recommendation model: $RESULTS_DIR/benchmark.recommendation_model.json"
+    log "  Model card           : $RESULTS_DIR/benchmark.recommendation_model.card.md"
 fi
 log "  Selected output   : $RESULTS_DIR/<sample>/selected_candidate/"

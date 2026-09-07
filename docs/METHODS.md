@@ -141,10 +141,16 @@ Optionally (`RUN_RECOMMENDATION_MODEL=1`, off by default), a hand-rolled
 ridge regression replaces the recommendation formula's F1/plasmid-recall
 terms with predictions from an isolate's own continuous features -- read
 depth, plasmid size and count, plus GC content, N50, contig count and
-assembly size computed from that isolate's reference during stage 2 -- fit and
-gated by the identical leave-one-study-out folds above -- never used unless
-it demonstrably beats the plain per-tool mean under those folds. This is a
-descriptive recommendation, not a scoring change, and is not validated
+assembly size computed from that isolate's reference during stage 2. At
+sufficient cohort scale (default: 60 rows and 5 source studies), its ridge
+penalty is selected in an inner study-level LOSO loop and evaluated only on an
+outer held-out study. Below that scale, PlasBench records an **approximate
+LOSO** result instead: the same folds choose lambda and estimate MAE, so its
+apparent improvement can be optimistic. Every fit writes
+`benchmark.recommendation_model.card.md` with input checksums, observed scope,
+validation strategy/results, and limitations. The model is never used unless
+it demonstrably beats the plain per-tool mean under its declared folds. This
+is a descriptive recommendation, not a scoring change, and is not validated
 beyond the cohorts it was fit on. See `docs/USER_GUIDE.md`'s "Decision-support
 recommendation model" section.
 

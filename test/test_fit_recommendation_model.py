@@ -88,7 +88,27 @@ def main():
         f1_target = payload["targets"]["f1"]
         assert f1_target["loso_mean_absolute_error"] < f1_target["baseline_loso_mean_absolute_error"], f1_target
         assert "model-fitted" in payload["reason"]
+        assert payload["validation"]["strategy"] == "approximate_loso"
+        card = os.path.join(tmp, "model.card.md")
+        assert os.path.isfile(card)
+        assert "Small-cohort approximation" in open(card, encoding="utf-8").read()
         print("enough data with a planted real signal -> ready, LOSO MAE genuinely beats the baseline -> PASS")
+
+    with tempfile.TemporaryDirectory(prefix="fit_model_nested_") as tmp:
+        # Six independent studies allow lambda to be selected inside each
+        # outer study holdout rather than reusing held-out outcomes.
+        sample_rows, score_rows = make_cohort(6, 10, lambda d: min(0.99, 0.35 + 0.008 * d), 0.01, seed=9)
+        sheet, scores = write_fixture(tmp, sample_rows, score_rows)
+        payload = run_fit(tmp, sheet, scores, min_studies=3, min_training_samples=20,
+                          min_relative_improvement=0.01, nested_min_training_samples=50,
+                          nested_min_studies=5)
+        assert payload["model_ready"] is True, payload["reason"]
+        assert payload["validation"]["strategy"] == "nested_loso", payload["validation"]
+        assert len(payload["validation"]["outer_fold_lambdas"]["f1"]) == 6
+        card = open(os.path.join(tmp, "model.card.md"), encoding="utf-8").read()
+        assert "Outer held-study estimate" in card
+        assert "Training cohort snapshot" in card
+        print("large diverse cohort -> nested LOSO selects lambda inside outer folds -> PASS")
 
     print("ALL FIT RECOMMENDATION MODEL TESTS PASSED")
 
