@@ -9,6 +9,9 @@ FIELDS = [
     "bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins",
     "missed_plasmids", "split_events", "merge_events", "contaminated_bins",
     "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction",
+    # Supplementary to bin_f1/split_events/merge_events/contamination_fraction
+    # above, never a replacement -- see score_bins.py's clustering_agreement().
+    "nmi", "variation_of_information",
     "perfect_reference_recovery", "strict_reference_reconstruction",
 ]
 

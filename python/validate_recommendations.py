@@ -64,7 +64,12 @@ def evaluate_fold(scope, group, group_rows, held_samples, min_train_samples, stu
         return None
     by_tool = defaultdict(list)
     for row in training:
-        by_tool[row["tool"]].append(float(row["f1"]))
+        # f1 is undefined ("") for a zero-true-plasmid isolate -- excluded
+        # from training exactly like every other consumer of this field
+        # (aggregate_results.py's summarise()/write_comparisons()), never
+        # coerced to a crash or a misleading 0.0.
+        if row["f1"]:
+            by_tool[row["tool"]].append(float(row["f1"]))
     eligible = {tool: values for tool, values in by_tool.items() if len(values) >= min_train_samples}
     training_samples = len({row["sample"] for row in training})
     held_sample_count = len({row["sample"] for row in held_rows})
@@ -75,7 +80,7 @@ def evaluate_fold(scope, group, group_rows, held_samples, min_train_samples, stu
                 "held_out_f1_ci_low": "", "held_out_f1_ci_high": "", "status": "not_assessed",
                 "note": "No method met the minimum independent training-sample gate for this stratum."}
     selected = max(eligible, key=lambda tool: (statistics.mean(eligible[tool]), tool))
-    held = [float(row["f1"]) for row in held_rows if row["tool"] == selected]
+    held = [float(row["f1"]) for row in held_rows if row["tool"] == selected and row["f1"]]
     if not held:
         return {**base, "selected_method_from_training": selected, "held_out_mean_f1": "",
                 "held_out_f1_ci_low": "", "held_out_f1_ci_high": "", "status": "not_assessed",

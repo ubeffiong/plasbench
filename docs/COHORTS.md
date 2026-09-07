@@ -187,6 +187,45 @@ which exits 0 if the guard applies to it and 1 if it does not.
 Set the column to `yes` when a sample's long reads are NOT the reads its truth
 assembly was built from.
 
+## truth_source / long_read_sra_run (optional): self-built hybrid truth
+
+Every cohort row so far has downloaded an existing NCBI Complete Genome
+assembly as its truth reference. Some real cohort sources instead deposit
+only raw reads -- both a long-read (ONT/PacBio) run and a paired-end
+Illumina run under the same BioSample -- without ever formally submitting a
+finished assembly (see `docs/FINDING_DATA.md`'s Route C for a worked
+example). For exactly this shape, `truth_source=self_assembled_hybrid` tells
+stage 1 to fetch `long_read_sra_run` in addition to the usual short reads,
+and stage 2 to build the truth reference itself with
+`python/build_hybrid_truth.py` (a Unicycler hybrid assembly) instead of
+downloading one. `assembly_accession` stays blank/`NA` for these rows, same
+as an operational sample with no known truth.
+
+Chromosome/plasmid labeling comes only from Unicycler's own circularity/
+length output -- never a gene-content classifier, since several of those
+(`mob_recon`, PlaScope, RFPlasmid, ...) ARE benchmarked prediction tools
+here, and using one to build "truth" would make it trivially perfect
+against itself. An assembly that does not fully circularize is rejected
+outright (`HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH` in `config/config.sh`,
+default 1,500,000 bp) -- never accepted as a partial or uncertain truth.
+
+**A self-built truth is never independent of the long reads that built it,
+by construction.** `validate_cohort.py`'s schema check enforces this as a
+hard rule, not a judgment call: a `self_assembled_hybrid` row must never
+declare `truth_independent_of_long_reads=yes`. Left unset (the required
+state), `long_read_truth_eligible()`'s existing default applies unchanged --
+every long-read/hybrid tool above is automatically excluded from scoring on
+these samples. They contribute to the short-read track only.
+
+```bash
+python3 python/build_hybrid_truth.py \
+    --long-reads data/<sample>/long_reads.fastq.gz \
+    --r1 data/<sample>/<run>_1.fastq.gz --r2 data/<sample>/<run>_2.fastq.gz \
+    --out-reference data/<sample>/reference.fna \
+    --out-truth data/<sample>/truth.tsv \
+    --out-provenance data/<sample>/truth_provenance.json
+```
+
 **If you are building a cohort for any tool in that table, you almost
 certainly need this column.** Leaving it out is not neutral -- every sample is
 skipped, and a run that looks like it succeeded produces an empty leaderboard

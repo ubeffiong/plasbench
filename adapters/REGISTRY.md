@@ -20,6 +20,8 @@ rather than assigning an artificial zero score.
 | geNomad | ml_classification | not applicable | short-read assembly | `adapt_genomad.sh` | optional |
 | PLASMe | ml_classification | not applicable | short-read assembly | `adapt_plasme.sh` | optional |
 | plASgraph2 | ml_classification | not applicable | assembly graph | `adapt_plasgraph2.sh` | optional |
+| RFPlasmid | ml_classification | not applicable | short-read assembly | `adapt_rfplasmid.sh` | optional |
+| PlaScope | classification | not applicable | short-read assembly (E. coli/Klebsiella only) | `adapt_plascope.sh` | optional |
 
 The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
 computes bin metrics for declared binning methods; the report labels all other
@@ -141,6 +143,73 @@ shipped inside the checkout -- `PLASGRAPH2_MODEL_DIR` must point at it (e.g.
 the checkout's `model/ESKAPEE_model/`) after manual setup; see INSTALL.md.
 
     adapt_plasgraph2.sh <plasgraph2_output_csv> <base_assembly_fasta> <out_fasta>
+
+## adapt_rfplasmid.sh (ML classifier, see adapters/SCORES.md)
+
+`rfplasmid --species SPECIES --input <dir-of-fasta> --out OUT_DIR` requires a
+DIRECTORY of `*.fasta` files as input, not a single file, unlike
+geNomad/PLASMe -- `scripts/04_run_tools.sh`'s `run_rfplasmid()` therefore
+stages this sample's own `contigs.fasta` alone into a per-sample temp
+directory before invoking it. RFPlasmid also auto-appends a timestamp to
+`--out` if that path already exists, so `run_rfplasmid()` removes `OUT`
+first and lets RFPlasmid create it fresh, rather than pre-creating it.
+
+RFPlasmid writes one file, `prediction.csv` (an R `write.csv` table: header
+names and string-typed cells double-quoted, numeric cells not), with a
+`prediction` column (`"p"`/`"c"` hard call), a `votes plasmid` column (the
+underlying random forest's plasmid vote fraction, in [0,1] -- the
+continuous score the PR-curve sweep needs), and a `contigID` column (the
+original input FASTA record's own description, confirmed directly from
+RFPlasmid's own source since its docs do not spell out these column names
+precisely). RFPlasmid writes no separate hard-call FASTA of its own, so this
+adapter reconstructs `pred_rfplasmid.plasmid.fasta` itself from the `"p"`
+rows, rather than taking a tool-written FASTA unchanged (unlike
+`adapt_genomad.sh`/`adapt_plasme.sh`). Like Platon/geNomad/PLASMe, RFPlasmid
+is a per-contig classifier with no grouping output, so `bins.tsv` is always
+header-only.
+
+RFPlasmid's species/genus model is chosen via `RFPLASMID_SPECIES`
+(`config/config.sh`); an unsupported species is RFPlasmid's own error, not
+something this adapter or `run_rfplasmid()` pre-validates. RFPlasmid is a
+real bioconda package, but bundles CheckM as a transitive dependency, and
+CheckM always needs its own reference data directory configured once
+post-install (`checkm data setRoot`) regardless of how it was installed --
+see `env/install_tools.sh`'s `rfplasmid` case and INSTALL.md.
+
+    adapt_rfplasmid.sh <rfplasmid_out_dir> <base_assembly_fasta> <out_fasta>
+
+## adapt_plascope.sh
+
+`plaScope.sh --fasta <assembly> -a <spades|unicycler> -o <out> --sample
+<prefix> --db_dir ... --db_name ...` writes, under
+`<out>/<prefix>_PlaScope/`, a `PlaScope_predictions/` directory containing
+up to three FASTA files -- `<prefix>_plasmid.fasta`, `<prefix>_chromosome.fasta`,
+`<prefix>_unclassified.fasta` -- from its own Centrifuge-based hard call, and
+a `Centrifuge_results/` directory with the underlying classification table.
+Each predictions file is written lazily and simply does not exist when zero
+contigs landed in that class -- a missing `*_plasmid.fasta` is scored as
+"predicted none", same policy as `adapt_platon.sh`/`adapt_plassembler.sh`.
+`run_plascope()` passes `<out>/<prefix>_PlaScope` (not the raw `-o` value) as
+this adapter's out_dir, so the sample prefix does not need to be known here
+-- the plasmid FASTA is found by glob.
+
+PlaScope produces no continuous per-contig score, only a hard
+chromosome/plasmid/unclassified call, so `method_class=classification` (the
+Platon/MOB-suite shape) -- no `candidates.fasta`/`scores.tsv`, and `bins.tsv`
+is always header-only.
+
+**Species gate (the tool's defining constraint):** PlaScope needs a
+species-specific Centrifuge database, and only *E. coli* and *Klebsiella*
+pre-built databases exist (Zenodo). `run_plascope()` looks up each sample's
+`organism` column (`config/accessions.tsv` via `scripts/lib.sh`'s
+`sample_column()`) and skips every other organism with a distinct
+`"no PlaScope database for organism <X>"` reason in `tool_status.tsv` --
+visibly different from a generic `"command unavailable"` skip, so a reader
+understands it is a structural limitation of the tool, not a broken install.
+See `env/download_plascope_db.sh` and `config/config.sh`'s
+`PLASCOPE_ECOLI_DB`/`PLASCOPE_KLEBSIELLA_DB`.
+
+    adapt_plascope.sh <plascope_prefix_dir> <unused_base_asm> <out_fasta>
 
 ## trycycler_mob_recon (no new adapter)
 

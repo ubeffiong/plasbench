@@ -251,6 +251,80 @@ run_plasme() {
     fi
 }
 
+run_rfplasmid() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    if tool_enabled RUN_RFPLASMID rfplasmid && have rfplasmid; then
+        local TOOL="rfplasmid" OUT="$RDIR/rfplasmid" PRED="$RDIR/pred_rfplasmid.plasmid.fasta" DONE="$RDIR/.rfplasmid.complete"
+        local STAGE="$RDIR/rfplasmid_input"
+        if is_complete "$DONE" "$PRED"; then
+            log "  rfplasmid: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        else
+            # RFPlasmid takes a DIRECTORY of *.fasta files as --input (not a
+            # single file, unlike geNomad/PLASMe), and auto-appends a
+            # timestamp to --out if that path already exists -- so OUT must
+            # NOT exist yet when rfplasmid runs (it creates it itself), and
+            # this sample's contigs are staged alone so RFPlasmid's own
+            # internal genome/contig numbering stays this-sample-only.
+            rm -rf "$OUT" "$PRED" "$DONE" "$STAGE"; mkdir -p "$STAGE"
+            cp "$CONTIGS" "$STAGE/${SAMPLE}.fasta"
+            log "  rfplasmid ($SAMPLE) ..."
+            local START; START=$(profile_start)
+            local jelly_flag=(); [[ "$RFPLASMID_JELLY" == "1" ]] && jelly_flag=(--jelly)
+            if profile_exec rfplasmid --species "$RFPLASMID_SPECIES" --input "$STAGE" --out "$OUT" \
+                    --threads "$RFPLASMID_THREADS" "${jelly_flag[@]}" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_rfplasmid.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "rfplasmid failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+            rm -rf "$STAGE"
+        fi
+    elif tool_enabled RUN_RFPLASMID rfplasmid; then
+        warn "rfplasmid is enabled but not installed; skipped for $SAMPLE"
+        record_status "$SAMPLE" "rfplasmid" "skipped" "" "command unavailable"
+    fi
+}
+
+run_plascope() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    if tool_enabled RUN_PLASCOPE plascope && have plaScope.sh; then
+        local TOOL="plascope" OUT="$RDIR/plascope" PRED="$RDIR/pred_plascope.plasmid.fasta" DONE="$RDIR/.plascope.complete"
+        # PlaScope needs a species-specific Centrifuge database; only E. coli
+        # and Klebsiella pre-built databases exist (see config/config.sh), so
+        # every other organism is a structural, not a tool-install, gap.
+        local organism; organism="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" organism)"
+        local db=""
+        case "$organism" in
+            "Escherichia coli"*) db="$PLASCOPE_ECOLI_DB" ;;
+            "Klebsiella"*) db="$PLASCOPE_KLEBSIELLA_DB" ;;
+        esac
+        if is_complete "$DONE" "$PRED"; then
+            log "  plascope: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif [[ -z "$db" ]]; then
+            warn "  $TOOL has no database for organism '${organism:-not_recorded}'; skipped for $SAMPLE"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "no PlaScope database for organism ${organism:-not_recorded}"
+        else
+            # plaScope.sh errors out if <out>/<sample>_PlaScope/{PlaScope_predictions,
+            # Centrifuge_results} already exist -- OUT must not exist yet; it
+            # creates the whole tree itself.
+            rm -rf "$OUT" "$PRED" "$DONE"
+            log "  plascope ($SAMPLE, organism=$organism) ..."
+            local START; START=$(profile_start)
+            if profile_exec plaScope.sh --fasta "$CONTIGS" -a "$ASSEMBLER" -o "$OUT" --sample "$SAMPLE" \
+                    --db_dir "$(dirname "$db")" --db_name "$(basename "$db")" -t "$PLASCOPE_THREADS" \
+                    > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_plascope.sh" "$OUT/${SAMPLE}_PlaScope" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $db" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+        fi
+    elif tool_enabled RUN_PLASCOPE plascope; then
+        warn "plascope is enabled but not installed; skipped for $SAMPLE"
+        record_status "$SAMPLE" "plascope" "skipped" "" "command unavailable"
+    fi
+}
+
 run_plasgraph2() {
     local SAMPLE="$1" SDIR="$2" RDIR="$3" CONTIGS="$4"
     if tool_enabled RUN_PLASGRAPH2 plasgraph2 && have plASgraph2_classify.py; then
@@ -309,6 +383,8 @@ process_sample() {
         tool_enabled RUN_GPLAS2_EXTERNAL gplas2_external && record_status "$SAMPLE" "gplas2_external" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_GENOMAD genomad && record_status "$SAMPLE" "genomad" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASME plasme && record_status "$SAMPLE" "plasme" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_RFPLASMID rfplasmid && record_status "$SAMPLE" "rfplasmid" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_PLASCOPE plascope && record_status "$SAMPLE" "plascope" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASGRAPH2 plasgraph2 && record_status "$SAMPLE" "plasgraph2" "skipped" "" "assembly contigs unavailable"
         return 0
     fi
@@ -321,6 +397,8 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_gplas2_external "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_genomad "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasme "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_rfplasmid "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plascope "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasgraph2 "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
 
     # gplas2_mob's classifier seed comes straight from mob_recon's own output
@@ -348,7 +426,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme plasgraph2; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plascope plasgraph2; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

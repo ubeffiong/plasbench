@@ -27,6 +27,7 @@ NEED_MOBSUITE_DB=0
 NEED_BAKTA_DB=0
 NEED_GENOMAD_DB=0
 NEED_PLASME_DB=0
+NEED_PLASCOPE_DB=0
 
 for candidate in micromamba mamba conda; do
     have "$candidate" && { CONDA_TOOL="$candidate"; break; }
@@ -149,6 +150,26 @@ if [[ "${RUN_PLASME:-0}" -eq 1 ]]; then
         NEED_PLASME_DB=1; CORE_OK=0
     fi
 fi
+if [[ "${RUN_RFPLASMID:-0}" -eq 1 ]]; then
+    check_tool rfplasmid rfplasmid
+    # CheckM's reference data is a real prerequisite (bundled as a transitive
+    # bioconda dependency, but its ~1.4GB data directory is always a separate,
+    # one-time `checkm data setRoot` step regardless of install method) --
+    # not something this project can verify from a config var, so it is
+    # documented (env/install_tools.sh, INSTALL.md) rather than checked here.
+fi
+if [[ "${RUN_PLASCOPE:-0}" -eq 1 ]]; then
+    check_tool plaScope.sh plascope
+    plascope_ecoli_ok=0; plascope_kleb_ok=0
+    [[ -n "${PLASCOPE_ECOLI_DB:-}" && -s "${PLASCOPE_ECOLI_DB}.1.cf" ]] && plascope_ecoli_ok=1
+    [[ -n "${PLASCOPE_KLEBSIELLA_DB:-}" && -s "${PLASCOPE_KLEBSIELLA_DB}.1.cf" ]] && plascope_kleb_ok=1
+    if [[ "$plascope_ecoli_ok" -eq 1 || "$plascope_kleb_ok" -eq 1 ]]; then
+        log "  [ok]   PlaScope DB(s) present (E. coli: $plascope_ecoli_ok, Klebsiella: $plascope_kleb_ok)"
+    else
+        warn "  [MISS] no PlaScope database found (neither E. coli nor Klebsiella) -- every sample will be skipped with 'no PlaScope database for organism <X>' until at least one is installed"
+        NEED_PLASCOPE_DB=1; CORE_OK=0
+    fi
+fi
 if [[ "${RUN_PLASGRAPH2:-0}" -eq 1 ]]; then
     check_tool plASgraph2_classify.py plasgraph2
     # No database to download -- the pretrained model ships inside the git
@@ -214,7 +235,7 @@ fi
 NOTHING_MISSING=0
 [[ "$CORE_OK" -eq 1 && ${#NEEDED_PROFILES[@]} -eq 0 && "$NEED_PLATON_DB" -eq 0 \
     && "$NEED_MOBSUITE_DB" -eq 0 && "$NEED_BAKTA_DB" -eq 0 && "$NEED_PLASSEMBLER_DB" -eq 0 \
-    && "$NEED_GENOMAD_DB" -eq 0 && "$NEED_PLASME_DB" -eq 0 ]] && NOTHING_MISSING=1
+    && "$NEED_GENOMAD_DB" -eq 0 && "$NEED_PLASME_DB" -eq 0 && "$NEED_PLASCOPE_DB" -eq 0 ]] && NOTHING_MISSING=1
 
 echo
 if [[ "$NOTHING_MISSING" -eq 1 ]]; then
@@ -226,7 +247,7 @@ warn "Some dependencies are missing."
 FIXABLE=0
 [[ "$NEED_CONDA" -eq 1 || ${#NEEDED_PROFILES[@]} -gt 0 || "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 \
     || "$NEED_BAKTA_DB" -eq 1 || "$NEED_PLASSEMBLER_DB" -eq 1 || "$NEED_GENOMAD_DB" -eq 1 \
-    || "$NEED_PLASME_DB" -eq 1 ]] && FIXABLE=1
+    || "$NEED_PLASME_DB" -eq 1 || "$NEED_PLASCOPE_DB" -eq 1 ]] && FIXABLE=1
 
 if [[ "$FIXABLE" -eq 0 ]]; then
     for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && warn "  $note"; done
@@ -243,6 +264,7 @@ for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $pr
 [[ "$NEED_PLASSEMBLER_DB" -eq 1 ]] && echo "  - the Plassembler database (also used by both Hybracter modes)"
 [[ "$NEED_GENOMAD_DB" -eq 1 ]] && echo "  - the geNomad database"
 [[ "$NEED_PLASME_DB" -eq 1 ]] && echo "  - the PLASMe database (~12.4 GB)"
+[[ "$NEED_PLASCOPE_DB" -eq 1 ]] && echo "  - a PlaScope database (E. coli and/or Klebsiella; needs a URL you provide, see prompt below)"
 for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && echo "  (not automatic) $note"; done
 echo
 
@@ -286,6 +308,9 @@ if [[ "$NEED_GENOMAD_DB" -eq 1 ]]; then
 fi
 if [[ "$NEED_PLASME_DB" -eq 1 ]]; then
     bash "$HERE/../env/download_plasme_db.sh" "${YES_FLAG[@]}" || warn "PLASMe database step did not complete; see output above"
+fi
+if [[ "$NEED_PLASCOPE_DB" -eq 1 ]]; then
+    bash "$HERE/../env/download_plascope_db.sh" || warn "PlaScope database step did not complete; see output above"
 fi
 
 echo

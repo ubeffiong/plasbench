@@ -81,11 +81,25 @@ download_sample() {
     local HAS_REFERENCE=1
     [[ -z "$ASM" || "$ASM" == "NA" ]] && HAS_REFERENCE=0
 
+    # self_assembled_hybrid: a benchmark sample (not operational) whose truth
+    # is built in-house by build_hybrid_truth.py (stage 2) from this
+    # isolate's own long+short reads, for cohort sources that deposit reads
+    # but never submitted a formal assembly -- see docs/FINDING_DATA.md.
+    # assembly_accession stays blank/NA for these rows too (HAS_REFERENCE=0,
+    # same branch as an operational sample), but unlike an operational
+    # sample, long reads must also be fetched here.
+    local TRUTH_SOURCE LONG_READ_SRA_RUN LONG_READS
+    TRUTH_SOURCE="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" truth_source)"
+    LONG_READ_SRA_RUN="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" long_read_sra_run)"
+    LONG_READS="$SDIR/${LONG_READS_FILE:-long_reads.fastq.gz}"
+
     if [[ "$LOCAL_INPUTS_ONLY" == "1" ]]; then
         local missing=()
         if [[ "$HAS_REFERENCE" -eq 1 ]]; then
             [[ -s "$REF" ]] || missing+=("$REF")
             [[ -s "$REPORT" || -s "$SDIR/truth.tsv" ]] || missing+=("$REPORT or $SDIR/truth.tsv")
+        elif [[ "$TRUTH_SOURCE" == "self_assembled_hybrid" ]]; then
+            [[ -s "$LONG_READS" || -s "$SDIR/truth.tsv" ]] || missing+=("$LONG_READS or $SDIR/truth.tsv")
         fi
         [[ -s "$R1" ]] || missing+=("$R1")
         [[ -s "$R2" ]] || missing+=("$R2")
@@ -94,6 +108,8 @@ download_sample() {
         fi
         if [[ "$HAS_REFERENCE" -eq 1 ]]; then
             log "  local reference, truth/report, and paired reads verified; download skipped"
+        elif [[ "$TRUTH_SOURCE" == "self_assembled_hybrid" ]]; then
+            log "  local long+short reads verified (truth_source=self_assembled_hybrid); download skipped"
         else
             log "  local paired reads verified (no accession: reference/truth skipped); download skipped"
         fi
@@ -106,7 +122,9 @@ download_sample() {
     need fasterq-dump
 
     # ---- (a) reference assembly + sequence report ----
-    if [[ "$HAS_REFERENCE" -eq 0 ]]; then
+    if [[ "$HAS_REFERENCE" -eq 0 && "$TRUTH_SOURCE" == "self_assembled_hybrid" ]]; then
+        log "  truth_source=self_assembled_hybrid; reference will be built from reads in stage 2, not downloaded"
+    elif [[ "$HAS_REFERENCE" -eq 0 ]]; then
         log "  no assembly_accession given; skipping reference download (operational sample)"
     elif [[ -s "$REF" && -s "$REPORT" ]]; then
         log "  reference already present, skipping download"
@@ -174,6 +192,56 @@ download_sample() {
             return 0
         fi
         log "  reads -> $R1 , $R2"
+    fi
+
+    # ---- (c) long reads (truth_source=self_assembled_hybrid only) ----
+    # Every existing long-read/hybrid cohort row stages long_reads.fastq.gz
+    # manually; this is the one automated fetch path, needed because these
+    # rows' whole premise is "the isolate's own long reads are deposited in
+    # SRA, but no assembly is". Same prefetch/fasterq-dump pattern as (b)
+    # above, into the SAME $LONG_READS_FILE location stage 7's tools already
+    # read -- no new long-read staging convention is invented.
+    if [[ "$TRUTH_SOURCE" == "self_assembled_hybrid" ]]; then
+        if [[ -z "$LONG_READ_SRA_RUN" ]]; then
+            warn "truth_source=self_assembled_hybrid but long_read_sra_run is empty for $SAMPLE; skipping"
+            record_download "$SAMPLE" "failed" "truth_source=self_assembled_hybrid requires long_read_sra_run"
+            return 0
+        fi
+        if [[ -s "$LONG_READS" ]]; then
+            log "  long reads already present, skipping download"
+        else
+            log "  prefetching long-read run $LONG_READ_SRA_RUN ..."
+            if ! retry_network "prefetch $LONG_READ_SRA_RUN" \
+                    prefetch -O "$SDIR" "$LONG_READ_SRA_RUN" > "$LOG_DIR/${SAMPLE}.long_prefetch.log" 2>&1; then
+                warn "prefetch failed for $SAMPLE ($LONG_READ_SRA_RUN); skipping this sample"
+                record_download "$SAMPLE" "failed" "prefetch failed for $LONG_READ_SRA_RUN; see $LOG_DIR/${SAMPLE}.long_prefetch.log"
+                return 0
+            fi
+            log "  extracting long-read FASTQ (fasterq-dump) ..."
+            if ! fasterq-dump --threads "$THREADS" -O "$SDIR" \
+                    "$SDIR/$LONG_READ_SRA_RUN/$LONG_READ_SRA_RUN.sra" > "$LOG_DIR/${SAMPLE}.long_fasterq.log" 2>&1 \
+                 && ! retry_network "fasterq-dump $LONG_READ_SRA_RUN" \
+                        fasterq-dump --threads "$THREADS" -O "$SDIR" "$LONG_READ_SRA_RUN" \
+                        > "$LOG_DIR/${SAMPLE}.long_fasterq.log" 2>&1; then
+                warn "fasterq-dump failed for $SAMPLE ($LONG_READ_SRA_RUN); skipping this sample"
+                record_download "$SAMPLE" "failed" "fasterq-dump failed for $LONG_READ_SRA_RUN; see $LOG_DIR/${SAMPLE}.long_fasterq.log"
+                return 0
+            fi
+            # Long reads are a single-end run (no --split-files): fasterq-dump
+            # writes <RUN>.fastq directly. Rename into the fixed
+            # $LONG_READS_FILE location every long-read/hybrid tool expects.
+            if [[ -f "$SDIR/${LONG_READ_SRA_RUN}.fastq" ]]; then
+                pigz -f "$SDIR/${LONG_READ_SRA_RUN}.fastq" 2>/dev/null || gzip -f "$SDIR/${LONG_READ_SRA_RUN}.fastq" 2>/dev/null || true
+                mv -f "$SDIR/${LONG_READ_SRA_RUN}.fastq.gz" "$LONG_READS"
+            fi
+            rm -rf "$SDIR/$LONG_READ_SRA_RUN"
+            if [[ ! -s "$LONG_READS" ]]; then
+                warn "long-read FASTQ not produced for $LONG_READ_SRA_RUN; skipping $SAMPLE"
+                record_download "$SAMPLE" "failed" "long-read FASTQ not produced for $LONG_READ_SRA_RUN"
+                return 0
+            fi
+            log "  long reads -> $LONG_READS"
+        fi
     fi
 
     record_download "$SAMPLE" "ok" ""

@@ -75,6 +75,31 @@ case "$PROFILE" in
  hybracter) PKGS=(hybracter);;
  trycycler) PKGS=(trycycler flye medaka);;
  genomad) PKGS=(genomad);;
+ rfplasmid)
+    # rfplasmid is a real bioconda package (unlike plasme/plasgraph2 below),
+    # and it pulls in CheckM and Jellyfish as transitive dependencies -- so
+    # the package install itself is a normal one-liner. CheckM, however,
+    # always needs its own ~1.4GB reference data directory configured once
+    # after install, regardless of how it was installed -- this is a CheckM
+    # prerequisite, not a PlasBench-managed database, so there is no
+    # env/download_rfplasmid_db.sh here.
+    PKGS=(rfplasmid)
+    cat >&2 <<'EOF'
+NOTE: rfplasmid also requires CheckM's own reference data to be set up once
+      (a one-time step independent of this install, per CheckM's own docs):
+          checkm data setRoot /path/to/checkm_data
+      (downloading/extracting that data first if you have not already; see
+      https://github.com/Ecogenomics/CheckM/wiki for the current download
+      link). RFPlasmid will fail with a clear CheckM error if this is not
+      done. See INSTALL.md for the full walkthrough.
+EOF
+    ;;
+ plascope)
+    # plascope is a real bioconda package -- the species-specific Centrifuge
+    # database is a separate download (env/download_plascope_db.sh), not
+    # something this profile installs.
+    PKGS=(plascope)
+    ;;
  plasme)
     # PLASMe is distributed as a git checkout with its own conda env file,
     # not a bioconda package -- there is no package for this profile to

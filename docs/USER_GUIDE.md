@@ -13,8 +13,10 @@ every predicted-plasmid FASTA back to a complete reference assembly and scoring
 the same reference bases for every tool.
 
 The benchmark compares, on the short-read track, MOB-suite `mob_recon`,
-Platon, plasmidSPAdes, optional classifier-backed gplas2 modes, and the ML
-classifiers geNomad, PLASMe and plASgraph2; and, on the long-read and hybrid
+Platon, plasmidSPAdes, optional classifier-backed gplas2 modes, the ML
+classifiers geNomad, PLASMe, plASgraph2 and RFPlasmid, and the
+species-gated (E. coli/Klebsiella only) Centrifuge classifier PlaScope; and,
+on the long-read and hybrid
 tracks, `flye_mob_recon`, `hybracter_long`, `trycycler_mob_recon`,
 `plassembler` and `hybracter_hybrid`. Everything beyond the short-read core is
 off by default and switched on per tool. Every isolate needs a complete
@@ -437,6 +439,19 @@ see `INSTALL.md` section 6 for the manual git-clone setup.
 plasbench run --plasgraph2 on --plasgraph2-model-dir /path/to/plASgraph2/model/ESKAPEE_model
 ```
 
+RFPlasmid (random forest over single-copy marker genes, plasmid genes, and
+kmers) follows the same contract from its own `prediction.csv`'s "votes
+plasmid" column. It IS installable via `plasbench install-tools rfplasmid`
+(a real bioconda package), but bundles CheckM as a transitive dependency,
+and CheckM always needs its own reference data directory configured once
+post-install (`checkm data setRoot`), regardless of install method -- see
+`INSTALL.md`.
+
+```bash
+plasbench install-tools rfplasmid
+plasbench run --rfplasmid on
+```
+
 Per sample/tool, this writes `<tool>.pr_curve.tsv` (`threshold, precision,
 recall, tp_bp, fp_bp, fn_bp`) and `<tool>.pr_summary.tsv` (`pr_auc,
 pr_n_thresholds`) under `results/<sample>/`; `mean_pr_auc`/`n_pr_scored`
@@ -444,6 +459,21 @@ appear as supplementary leaderboard columns in
 `benchmark.leaderboard.tsv` -- never a ranking replacement, and gracefully
 absent (not zero) for every tool that doesn't expose a probability. See
 `adapters/SCORES.md` for the full adapter contract behind this.
+
+PlaScope (Centrifuge-based hard classification against a species-specific
+database) does NOT follow the PR-curve contract above -- it exposes no
+continuous score, only a chromosome/plasmid/unclassified call, so it is
+scored as one hard-inclusion point like Platon/`mob_recon`, never PR-curve
+swept. It also needs a species-specific database that only exists pre-built
+for *E. coli* and *Klebsiella*; every other organism is skipped with a
+`"no PlaScope database for organism <X>"` reason in `tool_status.tsv`,
+distinct from a generic "command unavailable" skip.
+
+```bash
+plasbench install-tools plascope
+bash env/download_plascope_db.sh
+plasbench run --plascope on
+```
 
 ### Install dependency tools
 
@@ -636,6 +666,8 @@ still exits non-zero -- nothing fails silently.
 --genomad on|off         Optional geNomad ML classification (assembly contigs). Default: off.
 --plasme on|off          Optional PLASMe ML classification (assembly contigs). Default: off.
 --plasgraph2 on|off      Optional plASgraph2 GNN classification (assembly graph). Default: off.
+--rfplasmid on|off       Optional RFPlasmid random-forest classification (assembly contigs). Default: off.
+--plascope on|off        Optional PlaScope Centrifuge classification (E. coli/Klebsiella only). Default: off.
 --force-rerun-tools      Delete completed tool outputs and run them again.
 ```
 

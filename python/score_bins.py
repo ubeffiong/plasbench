@@ -7,6 +7,7 @@ maximum-weight bipartite match; it is not a greedy overlap heuristic.
 """
 import argparse
 import csv
+import math
 from collections import defaultdict
 
 
@@ -86,6 +87,101 @@ def merge_intervals(intervals):
         if merged and start <= merged[-1][1]: merged[-1][1] = max(merged[-1][1], stop)
         else: merged.append([start, stop])
     return merged
+
+
+def bp_entropy(weights_by_label):
+    """Shannon entropy (natural log) of a discrete bp-weighted distribution."""
+    total = sum(weights_by_label.values())
+    if total <= 0:
+        return 0.0
+    entropy = 0.0
+    for weight in weights_by_label.values():
+        if weight <= 0:
+            continue
+        p = weight / total
+        entropy -= p * math.log(p)
+    return entropy
+
+
+def clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins):
+    """NMI and Variation of Information over a deliberately scoped bp-weighted
+    contingency table -- NOT just the matched-pair bins the Hungarian
+    assignment above picked, so a tool that over-merges everything into one
+    bin, or leaves plasmid sequence completely unassigned, is actually
+    penalized here rather than invisible to it (both would score well under
+    a "matched pairs only" metric).
+
+    Rows (predicted clusters): every real bin_id, plus a virtual
+    "__unassigned__" row for true-plasmid bp that NO bin covers at all
+    (a missed plasmid, or a partially-recovered one).
+    Columns (truth clusters): every true plasmid, plus a virtual
+    "CHROMOSOME" column for chromosome bp a bin wrongly claims.
+
+    Deliberately excluded: chromosome bp that no bin ever claims. That is
+    the correct, desired outcome for the vast majority of a bacterial
+    genome, not a clustering decision -- including it would swamp the
+    contingency table with an enormous, uninteresting "true negative" mass
+    and trivially inflate agreement, since neither NMI nor VI is being asked
+    to cluster the whole genome, only the fraction of it a tool actually made
+    a plasmid-related decision about (matches score_bins.py's precision/
+    recall/f1 above, which are also computed only over bins/plasmids, never
+    over unclaimed chromosome).
+
+    Returns (nmi, vi), or (None, None) if the table is empty (no true
+    plasmid bp and no wrongly-claimed chromosome bp at all).
+    """
+    row_weights = defaultdict(lambda: defaultdict(int))  # row -> {col: bp}
+    claimed_by_plasmid = defaultdict(int)
+    for (bin_id, plasmid), bp in overlaps.items():
+        if bp > 0:
+            row_weights[bin_id][plasmid] += bp
+            claimed_by_plasmid[plasmid] += bp
+    for bin_id, bp in chromosome_bp.items():
+        if bp > 0:
+            row_weights[bin_id]["CHROMOSOME"] += bp
+    for plasmid, length in plasmids.items():
+        missed = length - claimed_by_plasmid.get(plasmid, 0)
+        if missed > 0:
+            row_weights["__unassigned__"][plasmid] += missed
+
+    total = sum(sum(cols.values()) for cols in row_weights.values())
+    if total <= 0:
+        return None, None
+
+    row_totals = {row: sum(cols.values()) for row, cols in row_weights.items()}
+    col_totals = defaultdict(int)
+    for cols in row_weights.values():
+        for col, bp in cols.items():
+            col_totals[col] += bp
+
+    h_row = bp_entropy(row_totals)
+    h_col = bp_entropy(dict(col_totals))
+    mutual_information = 0.0
+    for row, cols in row_weights.items():
+        for col, bp in cols.items():
+            if bp <= 0:
+                continue
+            p_joint = bp / total
+            p_row = row_totals[row] / total
+            p_col = col_totals[col] / total
+            mutual_information += p_joint * math.log(p_joint / (p_row * p_col))
+
+    # Normalization convention: arithmetic mean of the two entropies (the
+    # same convention scikit-learn's normalized_mutual_info_score defaults
+    # to), so a reader can cross-check this against a familiar reference
+    # implementation. If both sides are a single point mass (H=0 for both --
+    # one bin, one plasmid, no chromosome contamination, nothing missed),
+    # agreement is perfect by construction. If only one side has zero
+    # entropy, no information could possibly be shared with the other side's
+    # real variability, so NMI is 0 by convention (matches scikit-learn).
+    if h_row == 0.0 and h_col == 0.0:
+        nmi = 1.0
+    elif h_row == 0.0 or h_col == 0.0:
+        nmi = 0.0
+    else:
+        nmi = 2 * mutual_information / (h_row + h_col)
+    vi = h_row + h_col - 2 * mutual_information
+    return nmi, vi
 
 
 def maximum_weight(edges, bins_list, plasmids_list):
@@ -203,10 +299,15 @@ def main():
     precision = len(matched) / len(all_bins) if all_bins else 0.0; recall = len(matched) / len(plasmids) if plasmids else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     total_bp, chromosome_total = sum(total_mapped.values()), sum(chromosome_bp.values())
+    # Supplementary to bin_f1/split_events/merge_events/contamination_fraction
+    # above -- never a replacement for them. "" (not 0) when the contingency
+    # table is empty (no true plasmid bp and nothing wrongly claimed as
+    # plasmid), matching this file's existing availability-aware convention.
+    nmi, vi = clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins)
     with open(args.summary, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t")
-        writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction"])
-        writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}"])
+        writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction", "nmi", "variation_of_information"])
+        writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else ""])
     print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)}")
 
 

@@ -1,0 +1,270 @@
+# Source: Teixeira et al. 2025, "Circling in on plasmids: benchmarking plasmid
+# detection and reconstruction tools for short-read data from diverse
+# species", Briefings in Bioinformatics 26(6):bbaf589, DOI 10.1093/bib/bbaf589.
+# Table: Supplementary Table 1 (ST1) - "Biosample identifiers and assembly
+# statistics for Enterobacterales and Enterococcus isolates", from
+# circling_in_on_plasmids_-_supplementary_tables_bbaf589.xlsx.
+# Extracted: 2026-09-07, by python/parse_teixeira2025_supplement.py's author,
+# via openpyxl against the publisher-hosted xlsx (not committed here -- see
+# the paper's own Supplementary data link at
+# https://academic.oup.com/bib/article/26/6/bbaf589/8320154).
+# Columns are ST1's own, verbatim: BioSample, Taxon, and Identifier (the
+# paper's own isolate name), plus four columns describing each isolate's prior
+# publication/sequencing-instrument provenance (ST1's own footnote: some
+# Enterobacterales isolates had previously published Illumina-only assemblies,
+# but new Illumina-only assemblies were generated for this study regardless).
+# This is a raw, unmodified transcription -- it is not itself a candidate
+# table (no assembly_accession/sra_run; see
+# python/parse_teixeira2025_supplement.py and teixeira2025_candidates.tsv).
+
+biosample	taxon	identifier	prior_illumina_assembly_source	illumina_instrument	prior_hybrid_assembly_source	long_read_instrument
+SAMN03280191	Enterobacter hormaechei	BIDMC100	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280214	Escherichia coli	BIDMC106	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280169	Citrobacter freundii complex (species A)	BIDMC107	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280170	Citrobacter portucalensis	BIDMC108	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN03280193	Enterobacter hormaechei	BIDMC110	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280217	Escherichia coli	BIDMC113	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN02138646	Escherichia coli	BIDMC19A	Cerqueira et al., 2017	HiSeq 2000	Salamzade et al., 2022	GridION
+SAMN02581401	Escherichia coli	BIDMC82	Cerqueira et al., 2017	HiSeq 2000	Salamzade et al., 2022	GridION
+SAMN03280187	Enterobacter hormaechei	BIDMC87	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280415	Klebsiella pneumoniae	BIDMC89	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280189	Enterobacter hormaechei	BIDMC94	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN03280208	Escherichia coli	BIDMC98	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN02138592	Enterobacter hormaechei	BWH27	Cerqueira et al., 2017	HiSeq 2000	newly sequenced	GridION
+SAMN02138596	Enterobacter asburiae	BWH31	Cerqueira et al., 2017	HiSeq 2000	newly sequenced	GridION
+SAMN02138600	Enterobacter hormaechei	BWH37	Cerqueira et al., 2017	HiSeq 2000	Salamzade et al., 2022	GridION
+SAMN03280195	Escherichia coli	BWH49	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280196	Escherichia coli	BWH50	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280432	Serratia marcescens	BWH56	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280199	Serratia marcescens	BWH57	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521876	Escherichia coli	BWH69	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148225	Escherichia coli	BWH73	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148229	Serratia marcescens	BWH77	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148230	Klebsiella pneumoniae	BWH78	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN02138541	Enterobacter hormaechei	MGH1	Cerqueira et al., 2017	HiSeq 2000	newly sequenced	GridION
+SAMN03280398	Klebsiella pneumoniae	MGH101	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280163	Citrobacter freundii complex (species A)	MGH103	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN03280165	Citrobacter portucalensis	MGH105	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN03280167	Citrobacter freundii complex (species A)	MGH109	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280402	Klebsiella quasipneumoniae	MGH113	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280183	Enterobacter hormaechei	MGH119	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280205	Escherichia coli	MGH121	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280408	Klebsiella quasipneumoniae	MGH123	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521880	Escherichia coli	MGH129	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521883	Enterobacter roggenkampii	MGH132	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN02138554	Enterobacter hormaechei	MGH14	Cerqueira et al., 2017	HiSeq 2000	Salamzade et al., 2022	GridION
+SAMN04521892	Escherichia coli	MGH143	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521896	Klebsiella pneumoniae	MGH147	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521898	Klebsiella pneumoniae	MGH149	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN02138555	Enterobacter hormaechei	MGH15	Cerqueira et al., 2017	HiSeq 2000	newly sequenced	GridION
+SAMN04521900	Citrobacter amalonaticus	MGH151	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521902	Klebsiella pneumoniae	MGH153	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521908	Enterobacter hormaechei	MGH159	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521910	Klebsiella pneumoniae	MGH161	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521926	Enterobacter hormaechei	MGH177	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521932	Pluralibacter gergoviae	MGH183	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148243	Klebsiella pneumoniae	MGH189	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148289	Klebsiella pneumoniae	MGH193	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148235	Enterobacter hormaechei	MGH197	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148251	Klebsiella pneumoniae	MGH211	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148253	Citrobacter freundii complex (species A)	MGH214	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148295	Escherichia coli	MGH217	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148256	Enterobacter hormaechei	MGH219	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148259	Serratia marcescens	MGH225	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148241	Klebsiella pneumoniae	MGH230	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148266	Klebsiella aerogenes	MGH233	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148269	Enterobacter roggenkampii	MGH239	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148270	Enterobacter kobei	MGH240	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148273	Enterobacter asburiae	MGH243	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148275	Serratia marcescens	MGH245	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148277	Klebsiella aerogenes	MGH247	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148341	Citrobacter freundii	MGH279	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN08148335	Citrobacter freundii	MGH281	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN08148334	Citrobacter freundii	MGH281c	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN08148336	Citrobacter freundii	MGH283	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN02138543	Enterobacter hormaechei	MGH3	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN02138577	Enterobacter kobei	MGH37	Cerqueira et al., 2017	HiSeq 2000	newly sequenced	GridION
+SAMN02138579	Klebsiella pneumoniae	MGH39	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN02138583	Klebsiella pneumoniae	MGH43	Cerqueira et al., 2017	HiSeq 2000	newly sequenced	GridION
+SAMN02138546	Enterobacter hormaechei	MGH6	Cerqueira et al., 2017	HiSeq 2000	newly sequenced	GridION
+SAMN02138547	Enterobacter hormaechei	MGH7	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN03280386	Klebsiella pneumoniae	MGH83	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN03280388	Klebsiella pneumoniae	MGH89	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280396	Klebsiella pneumoniae	MGH97	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280161	Citrobacter freundii complex (species A)	MGH99	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521851	Enterobacter hormaechei	UCI101	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521855	Klebsiella pneumoniae	UCI105	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521857	Klebsiella pneumoniae	UCI107	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN04521867	Klebsiella pneumoniae	UCI117	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN04521871	Escherichia coli	UCI121	Salamzade et al., 2022	HiSeq 2500/HiSeq X	Salamzade et al., 2022	GridION
+SAMN08148172	Klebsiella pneumoniae	UCI123	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148189	Citrobacter freundii complex (species A)	UCI141	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148195	Enterobacter hormaechei	UCI147	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148196	Enterobacter hormaechei	UCI148	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148199	Citrobacter freundii complex (species A)	UCI151	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148208	Enterobacter hormaechei	UCI161	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148302	Klebsiella aerogenes	UCI179	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148306	Klebsiella pneumoniae	UCI187	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148308	Escherichia coli	UCI191	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN08148309	Enterobacter asburiae	UCI193	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280422	Klebsiella pneumoniae	UCI75	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280175	Enterobacter hormaechei	UCI85	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280171	Klebsiella aerogenes	UCI89	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN03280428	Klebsiella pneumoniae	UCI93	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+SAMN16255385	Enterococcus canintestini	DIV0755b	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255605	Enterococcus casseliflavus	AZ015	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255583	Enterococcus casseliflavus	AZ040	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255413	Enterococcus casseliflavus	AZ046	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255565	Enterococcus casseliflavus	AZ049	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255426	Enterococcus casseliflavus	AZ051	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255478	Enterococcus casseliflavus	AZ083	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255516	Enterococcus casseliflavus	AZ136	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255428	Enterococcus casseliflavus	AZ173	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255393	Enterococcus flavescens	DIV0755f	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255556	Enterococcus casseliflavus	DIV0765a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255389	Enterococcus flavescens	DIV1083b	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255437	Enterococcus casseliflavus	DIV1096b	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255419	Enterococcus casseliflavus	DIV1297f	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255392	Enterococcus casseliflavus	GCID-2564	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255414	Enterococcus casseliflavus	AZ149	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255373	Enterococcus devriesei	GCID-2726	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255549	Enterococcus faecalis	AZ008	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255569	Enterococcus faecalis	AZ029	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255544	Enterococcus faecalis	AZ081	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255637	Enterococcus faecalis	AZ088	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255455	Enterococcus faecalis	AZ107	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255540	Enterococcus faecalis	AZ112	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255510	Enterococcus faecalis	AZ129	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255618	Enterococcus faecalis	AZ134	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255663	Enterococcus faecalis	AZ151	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255678	Enterococcus faecalis	AZ180	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255610	Enterococcus faecalis	AZ183	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255586	Enterococcus faecalis	DIV0188	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255653	Enterococcus faecalis	DIV0198e	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255418	Enterococcus faecalis	DIV0206e	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255382	Enterococcus faecalis	DIV0238e	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255616	Enterococcus faecalis	DIV0682	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255381	Enterococcus faecalis	DIV0719d	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255596	Enterococcus faecalis	DIV0839b	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255673	Enterococcus faecalis	DIV0841a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255423	Enterococcus faecalis	DIV1315a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255701	Enterococcus faecalis	DIV1318a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255629	Enterococcus faecalis	DIV1325a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255669	Enterococcus faecalis	DIV1337a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255666	Enterococcus faecalis	DIV1347a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255627	Enterococcus faecalis	DIV1368f	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255483	Enterococcus faecalis	DIV1375a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255717	Enterococcus faecalis	DIV1406a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255671	Enterococcus faecalis	DIV1409a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255407	Enterococcus faecalis	DIV1444a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255461	Enterococcus faecalis	DIV1537a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255545	Enterococcus faecalis	DIV1614a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255660	Enterococcus faecalis	DIV2372	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255724	Enterococcus faecalis	DIV2385	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255555	Enterococcus faecalis	DIV2386	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255441	Enterococcus faecalis	DIV2416	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255417	Enterococcus faecalis	DIV2419	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255642	Enterococcus faecalis	DIV2454a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255450	Enterococcus faecalis	DIV2455a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255449	Enterococcus faecalis	DIV2461a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255675	Enterococcus faecalis	DIV2463a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255451	Enterococcus faecalis	DIV2468a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255472	Enterococcus faecalis	GCID-2553	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255485	Enterococcus faecalis	GCID-2561	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255481	Enterococcus faecalis	GCID-2573	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255728	Enterococcus faecalis	GCID-2583	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255489	Enterococcus faecalis	GCID-2608	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255480	Enterococcus faecalis	GCID-2611	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255654	Enterococcus faecalis	GCID-2612	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255631	Enterococcus faecalis	GCID-2636	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255638	Enterococcus faecalis	GCID-2646	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255460	Enterococcus faecalis	GCID-2648	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255606	Enterococcus faecalis	GCID-2653	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255665	Enterococcus faecalis	GCID-2660	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255484	Enterococcus faecalis	GCID-2662	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255444	Enterococcus faecalis	GCID-2664	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255714	Enterococcus faecalis	GCID-2674	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255604	Enterococcus faecalis	GCID-2676	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255684	Enterococcus faecalis	GCID-2680	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255487	Enterococcus faecalis	GCID-2685	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255415	Enterococcus faecalis	GCID-2687	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255590	Enterococcus faecalis	GCID-2694	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255603	Enterococcus faecalis	GCID-2700	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255719	Enterococcus faecalis	GCID-2705	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255492	Enterococcus faecalis	GCID-2708	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255698	Enterococcus faecalis	GCID-2709	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255704	Enterococcus faecalis	GCID-2712	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255726	Enterococcus faecalis	GCID-2718	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255488	Enterococcus faecalis	GCID-2720	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255552	Enterococcus faecalis	GCID-2723	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255664	Enterococcus faecalis	GCID-2730	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255479	Enterococcus faecalis	GCID-2732	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255531	Enterococcus faecium	AZ146	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255609	Enterococcus faecium	DIV0007	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255635	Enterococcus faecium	DIV0436a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255647	Enterococcus faecium	DIV0673	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255539	Enterococcus faecium	DIV0837a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255585	Enterococcus lactis	DIV0872a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255690	Enterococcus faecium	DIV0901a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255564	Enterococcus faecium	DIV1248a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255582	Enterococcus lactis	DIV2377	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255589	Enterococcus lactis	DIV2383	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255578	Enterococcus lactis	DIV2391	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255538	Enterococcus faecium	DIV2446a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255579	Enterococcus lactis	GCID-2651	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255580	Enterococcus lactis	GCID-2675	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255708	Enterococcus faecium	GCID-2696	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255723	Enterococcus faecium	GCID-2719	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255722	Enterococcus faecium	GCID-2733	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255581	Enterococcus flavescens	AZ063	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255534	Enterococcus flavescens	DIV0970a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255396	Enterococcus flavescens	DIV2449a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255395	Enterococcus flavescens	DIV2469a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255394	Enterococcus flavescens	DIV2472a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255561	Enterococcus gallinarum	AZ034	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255465	Enterococcus gallinarum	GCID-2724	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255386	Enterococcus gilvus	AZ048	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255648	Enterococcus hirae	AZ077	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255438	Enterococcus hirae	AZ078	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255628	Enterococcus hirae	AZ082	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255624	Enterococcus hirae	AZ085	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255598	Enterococcus hirae	DIV1371a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255541	Enterococcus hirae	DIV1421a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255443	Enterococcus hirae	DIV1682a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255447	Enterococcus hirae	DIV1726a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255431	Enterococcus hirae	GCID-2549	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255601	Enterococcus hirae	GCID-2585	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255442	Enterococcus hirae	GCID-2672	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255473	Enterococcus lactis	DIV1283b	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255712	Enterococcus mangumiae	DIV2359	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255644	Enterococcus mangumiae	DIV2371	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255696	Enterococcus mangumiae	DIV2381	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255711	Enterococcus mangumiae	DIV2417	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255535	Enterococcus pernyi	AZ045	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255420	Enterococcus mundtii	AZ062	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255521	Enterococcus pernyi	AZ080	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255399	Enterococcus pernyi	AZ084	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255587	Enterococcus pernyi	AZ093	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255519	Enterococcus pernyi	AZ095b	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255497	Enterococcus pernyi	AZ147	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255514	Enterococcus pernyi	AZ153	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255515	Enterococcus pernyi	AZ156	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255499	Enterococcus pernyi	AZ161	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255501	Enterococcus pernyi	AZ162	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255469	Enterococcus pernyi	AZ171	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255467	Enterococcus pernyi	AZ172	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255597	Enterococcus mundtii	DIV0806c	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255518	Enterococcus pernyi	DIV0996a	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255528	Enterococcus pernyi	DIV1286c	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255551	Enterococcus mundtii	DIV1288f	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255527	Enterococcus pernyi	DIV1368e	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255433	Enterococcus pernyi	DIV2389	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255558	Enterococcus pernyi	DIV2316	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255536	Enterococcus pernyi	DIV2357	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255458	Enterococcus pernyi	GCID-2587	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255503	Enterococcus pernyi	GCID-2731	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255436	Enterococcus mundtii	GCID-2734	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255370	Enterococcus raffinosus	GCID-2558	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255362	Enterococcus angrensis	AZ109	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+SAMN16255364	Enterococcus sp.	GCID-2686	newly sequenced	NovaSeq 6000	newly sequenced	GridION
+SAMN16255548	Enterococcus thailandicus	GCID-2628	newly sequenced	NovaSeq 6000	newly sequenced	GridION

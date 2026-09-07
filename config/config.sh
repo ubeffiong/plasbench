@@ -175,6 +175,40 @@ export PLASGRAPH2_VERSION="${PLASGRAPH2_VERSION:-}"
 # GPU-independent runs. Set to 0 to let plASgraph2/TensorFlow use a GPU if
 # one is available and configured.
 export PLASGRAPH2_CPU_ONLY="${PLASGRAPH2_CPU_ONLY:-1}"
+# RFPlasmid: a random-forest classifier over single-copy marker genes,
+# plasmid genes, and kmers, trained per species/genus (see specieslist.txt
+# in its own checkout/package for the full list -- e.g. Enterobacteriaceae,
+# Enterococcus, Staphylococcus, Generic). Off by default. Exposes a per-contig
+# "votes plasmid" fraction in [0,1] (its underlying random forest's vote
+# share), so it is also PR-curve/PR-AUC scored alongside its own hard call --
+# see adapters/SCORES.md. Bioconda package (env/install_tools.sh's rfplasmid
+# case), but bundles CheckM as a transitive dependency, and CheckM always
+# needs its own ~1.4GB reference data directory set up once regardless of how
+# it was installed (`checkm data setRoot`, see CheckM's own docs) -- a real
+# prerequisite beyond the bioconda install itself, not a PlasBench-specific
+# database this project downloads for you.
+export RUN_RFPLASMID="${RUN_RFPLASMID:-0}"
+export RFPLASMID_THREADS="${RFPLASMID_THREADS:-$THREADS}"
+export RFPLASMID_SPECIES="${RFPLASMID_SPECIES:-Enterobacteriaceae}"
+# --jelly (Jellyfish-based kmer counting) is RFPlasmid's own recommended,
+# faster path and is bundled by the bioconda package -- on by default here.
+export RFPLASMID_JELLY="${RFPLASMID_JELLY:-1}"
+# PlaScope: Centrifuge classification (chromosome/plasmid/unclassified hard
+# call, no continuous score) against a SPECIES-SPECIFIC custom database.
+# Off by default. Only two pre-built databases exist (Zenodo), so
+# run_plascope() (scripts/04_run_tools.sh) skips every sample whose
+# config/accessions.tsv "organism" column is not Escherichia coli or
+# Klebsiella, with a distinct "no PlaScope database for organism <X>" reason
+# -- a structural limitation, never conflated with "command unavailable".
+export RUN_PLASCOPE="${RUN_PLASCOPE:-0}"
+export PLASCOPE_THREADS="${PLASCOPE_THREADS:-$THREADS}"
+# Each is a full Centrifuge index PREFIX (dir + basename, no .N.cf suffix),
+# matching the basename each Zenodo record actually ships -- the two
+# databases use different basenames, so no shared PLASCOPE_DB_DIR var is
+# needed; run_plascope() derives --db_dir/--db_name from whichever prefix
+# applies via dirname/basename.
+export PLASCOPE_ECOLI_DB="${PLASCOPE_ECOLI_DB:-$DATA_DIR/db/plascope/ecoli/chromosome_plasmid_db}"           # Zenodo 10.5281/zenodo.1311641
+export PLASCOPE_KLEBSIELLA_DB="${PLASCOPE_KLEBSIELLA_DB:-$DATA_DIR/db/plascope/klebsiella/Klebsiella_PlaScope}"  # Zenodo 10.5281/zenodo.1311647
 export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
 # CIRCULARITY GUARD (see scripts/lib.sh: long_read_truth_eligible). Off by
 # default: a sample without a declared truth_independent_of_long_reads=yes is
@@ -306,6 +340,19 @@ export FLYE_READ_TYPE="${FLYE_READ_TYPE:-nano-hq}"
 # Trycycler's own Flye assemblies default to the same read type as
 # flye_mob_recon's, since both feed the same instrument's reads to Flye.
 export TRYCYCLER_READ_TYPE="${TRYCYCLER_READ_TYPE:-$FLYE_READ_TYPE}"
+
+# --- Self-built hybrid truth (truth_source=self_assembled_hybrid rows) ------
+# For cohort sources that deposit long+short reads but never submitted a
+# formal Complete Genome assembly (see docs/FINDING_DATA.md): stage 2 builds
+# the truth reference itself via python/build_hybrid_truth.py (Unicycler
+# hybrid assembly), instead of downloading an existing one. Chromosome/
+# plasmid labeling comes only from Unicycler's own circular=/length topology
+# -- never a gene-content classifier -- and a non-circularizing assembly is
+# rejected outright, never accepted as a partial/uncertain truth. Unrelated
+# to LONG_READS_FILE above (which stage 7's BENCHMARKED long-read/hybrid
+# tools consume); this is truth CONSTRUCTION, gated separately.
+export HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH="${HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH:-1500000}"
+export HYBRID_TRUTH_THREADS="${HYBRID_TRUTH_THREADS:-$THREADS}"
 
 # --- Mapping (scoring) -------------------------------------------------------
 # minimap2 preset for aligning predicted-plasmid contigs back to the reference.

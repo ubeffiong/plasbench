@@ -50,9 +50,11 @@ from collections import defaultdict
 
 
 def read_truth(path):
-    """Return dict sequence_id -> (molecule_type, length) and total plasmid bp."""
+    """Return dict sequence_id -> (molecule_type, length), total plasmid bp,
+    and total chromosome bp."""
     truth = {}
     total_plasmid = 0
+    total_chromosome = 0
     with open(path) as fh:
         header = fh.readline().rstrip("\n").split("\t")
         # Be tolerant of column order as long as names are present.
@@ -77,7 +79,9 @@ def read_truth(path):
             truth[seq_id] = (mol, length)
             if mol == "PLASMID":
                 total_plasmid += length
-    return truth, total_plasmid
+            else:
+                total_chromosome += length
+    return truth, total_plasmid, total_chromosome
 
 
 def read_fasta_lengths(path):
@@ -362,6 +366,22 @@ def filter_covered_by_qname(covered_by_query, included_qnames):
     return covered
 
 
+def fp_record_count(covered_by_query, truth):
+    """Count distinct predicted records (by qname) with any retained coverage
+    landing on a CHROMOSOME-labelled truth sequence -- a record-level
+    complement to chromosome_fp_bp's base-level count, useful for a
+    zero-plasmid negative-control isolate where "how many separate contigs
+    were wrongly called plasmid" is as informative as "how many bases"."""
+    offenders = set()
+    for tname, entries in covered_by_query.items():
+        if truth.get(tname, (None,))[0] != "CHROMOSOME":
+            continue
+        for qname, start, end in entries:
+            if end > start:
+                offenders.add(qname)
+    return len(offenders)
+
+
 def sweep_thresholds(covered_by_query, probabilities, truth, total_plasmid):
     """Compute one (precision, recall) point per distinct probability value,
     high-to-low, plus the empty-inclusion endpoint every threshold above the
@@ -474,13 +494,13 @@ def main():
     ap.add_argument("--pr-summary-out", help="Write a one-row (pr_auc, pr_n_thresholds) summary here.")
     args = ap.parse_args()
 
-    truth, total_plasmid = read_truth(args.truth)
+    truth, total_plasmid, total_chromosome = read_truth(args.truth)
     try:
         pred_lengths = read_fasta_lengths(args.pred_fasta)
         if (args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1
                 or args.min_alignment_mapq < 0 or not 0 <= args.min_alignment_query_coverage <= 1):
             raise ValueError("alignment thresholds must be min-length >= 1, identity/query coverage in [0, 1], and MAPQ >= 0")
-        covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, alignment, _ = parse_paf_intervals(
+        covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, alignment, covered_by_query = parse_paf_intervals(
             args.paf, truth, pred_lengths, args.min_alignment_length,
             args.min_alignment_identity, args.min_alignment_mapq, args.min_alignment_query_coverage)
         ambiguous_bp = ambiguous_query_bp(args.ambiguity_paf, truth, pred_lengths,
@@ -553,9 +573,33 @@ def main():
         if safe_div(merge_intervals(covered.get(seq_id, []))[1], truth[seq_id][1]) >= args.plasmid_recovery_threshold
     )
 
-    precision = safe_div(tp, tp + fp)
-    recall = safe_div(tp, tp + fn)          # completeness
-    f1 = safe_div(2 * precision * recall, precision + recall)
+    # Undefined ratios are reported as "" (not-applicable), never a misleading
+    # 0.0/0.0000 -- matching this file's own existing convention for
+    # amr_gene_recall/circular_plasmid_recall below. Without this, a tool that
+    # correctly predicts nothing on a zero-true-plasmid isolate (tp=0, fn=0)
+    # and a tool that wrongly hallucinates plasmid content on that same
+    # isolate (tp=0, fp>0) were previously indistinguishable: both scored
+    # precision=recall=f1=0.0, which reads as total failure for the tool that
+    # actually did the correct thing. precision is undefined when nothing was
+    # predicted at all (tp+fp == 0); recall is undefined when there was no
+    # true plasmid to recall (tp+fn == 0, i.e. total_plasmid == 0); f1 is
+    # undefined whenever either input to it is.
+    precision_defined = (tp + fp) > 0
+    recall_defined = (tp + fn) > 0
+    precision = safe_div(tp, tp + fp) if precision_defined else None
+    recall = safe_div(tp, tp + fn) if recall_defined else None          # completeness
+    f1 = safe_div(2 * precision * recall, precision + recall) if (precision is not None and recall is not None) else None
+
+    # isolate_specificity/chromosome_fp_bp/fp_predicted_record_count are
+    # always defined (every real isolate has a non-zero chromosome) and are
+    # most informative precisely for a zero-true-plasmid negative-control
+    # isolate, where they are the ONLY metrics that can measure a tool's
+    # false-positive behaviour -- precision/recall/f1 above are undefined
+    # there. specificity = fraction of the (all-)chromosome NOT wrongly
+    # claimed as plasmid; the classic true-negative-rate definition.
+    isolate_specificity = safe_div(total_chromosome - fp, total_chromosome) if total_chromosome > 0 else None
+    chromosome_fp_bp = fp
+    fp_predicted_record_count = fp_record_count(covered_by_query, truth)
 
     header = [
         "sample", "tool", "analysis_track", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp",
@@ -564,11 +608,12 @@ def main():
         "recovered_amr_gene_count", "amr_gene_recall", "true_circular_plasmid_count",
         "recovered_circular_plasmid_count", "circular_truth_plasmid_recovery", "circular_plasmid_recall", "alignment_total",
         "alignment_retained", "filtered_alignment_count", "precision", "recall", "f1",
+        "isolate_specificity", "chromosome_fp_bp", "fp_predicted_record_count",
     ]
     row = [
         args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
         mapped_pred_bp, max(0, mapped_pred_bp - ambiguous_bp), unmapped_pred_bp, off_truth_pred_bp, ambiguous_bp, len(true_plasmids), recovered_plasmids,
-        f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}", predicted_records,
+        f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}" if true_plasmids else "", predicted_records,
         len(amr_genes) if args.amr_genes else "", recovered_amr if args.amr_genes else "",
         f"{safe_div(recovered_amr, len(amr_genes)):.4f}" if args.amr_genes else "",
         len(circular_plasmids) if args.circular_plasmids else "", recovered_circular if args.circular_plasmids else "",
@@ -577,7 +622,11 @@ def main():
         # circular_truth_plasmid_recovery field, which does not claim closure.
         f"{safe_div(recovered_circular, len(circular_plasmids)):.4f}" if args.circular_plasmids else "",
         alignment["alignment_total"], alignment["alignment_retained"], alignment["filtered_alignment_count"],
-        f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}",
+        f"{precision:.4f}" if precision is not None else "",
+        f"{recall:.4f}" if recall is not None else "",
+        f"{f1:.4f}" if f1 is not None else "",
+        f"{isolate_specificity:.4f}" if isolate_specificity is not None else "",
+        chromosome_fp_bp, fp_predicted_record_count,
     ]
 
     new_file = not os.path.exists(args.out) or os.path.getsize(args.out) == 0
@@ -587,9 +636,11 @@ def main():
         fh.write("\t".join(str(x) for x in row) + "\n")
 
     # Also echo a human-readable line to stderr for the logs.
+    def fmt3(value):
+        return f"{value:.3f}" if value is not None else "n/a"
     sys.stderr.write(
         f"[score] {args.sample} / {args.tool}: "
-        f"precision={precision:.3f} recall={recall:.3f} f1={f1:.3f} "
+        f"precision={fmt3(precision)} recall={fmt3(recall)} f1={fmt3(f1)} "
         f"(TP={tp} FP={fp} FN={fn})\n"
     )
 

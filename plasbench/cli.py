@@ -313,7 +313,7 @@ def main(argv=None):
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plascope, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -473,6 +473,8 @@ def main(argv=None):
             ("--genomad", "genomad", "Enable or disable optional geNomad ML classification."),
             ("--plasme", "plasme", "Enable or disable optional PLASMe alignment+transformer classification."),
             ("--plasgraph2", "plasgraph2", "Enable or disable optional plASgraph2 GNN classification (assembly graph)."),
+            ("--rfplasmid", "rfplasmid", "Enable or disable optional RFPlasmid random-forest classification (assembly contigs)."),
+            ("--plascope", "plascope", "Enable or disable optional PlaScope Centrifuge classification (E. coli/Klebsiella only)."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
         tools.add_argument("--force-rerun-tools", action="store_true",
@@ -710,7 +712,9 @@ def main(argv=None):
                                    ("trycycler_mob_recon", "RUN_TRYCYCLER_MOB_RECON"),
                                    ("genomad", "RUN_GENOMAD"),
                                    ("plasme", "RUN_PLASME"),
-                                   ("plasgraph2", "RUN_PLASGRAPH2")):
+                                   ("plasgraph2", "RUN_PLASGRAPH2"),
+                                   ("rfplasmid", "RUN_RFPLASMID"),
+                                   ("plascope", "RUN_PLASCOPE")):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"

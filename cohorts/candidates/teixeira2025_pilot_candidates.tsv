@@ -1,0 +1,19 @@
+# Stratified pilot subset (14 isolates spanning Enterobacterales and Enterococcus)
+# selected from teixeira2025_candidates.tsv for Phase C Part 7 validation, per
+# the plan's "download a small stratified pilot first" gate -- before any
+# public-v3 release. assembly_accession/sra_run still pending until
+# resolve_ncbi_accessions.py runs against this file.
+sample_id	assembly_accession	sra_run	organism	biosample	source_study	source_doi	source_table	paper_identifier	prior_illumina_assembly_source	illumina_instrument	prior_hybrid_assembly_source	long_read_instrument
+enterobacter_hormaechei_bidmc100_001			Enterobacter hormaechei	SAMN03280191	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	BIDMC100	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+escherichia_coli_bidmc106_002			Escherichia coli	SAMN03280214	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	BIDMC106	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+citrobacter_freundii_complex_species_a_bidmc107_003			Citrobacter freundii complex (species A)	SAMN03280169	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	BIDMC107	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+escherichia_coli_bidmc113_006			Escherichia coli	SAMN03280217	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	BIDMC113	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+klebsiella_pneumoniae_bidmc89_010			Klebsiella pneumoniae	SAMN03280415	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	BIDMC89	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+serratia_marcescens_bwh56_018			Serratia marcescens	SAMN03280432	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	BWH56	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+klebsiella_pneumoniae_bwh78_023			Klebsiella pneumoniae	SAMN08148230	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	BWH78	Salamzade et al., 2022	HiSeq 2500/HiSeq X	newly sequenced	GridION
+enterococcus_casseliflavus_az015_095			Enterococcus casseliflavus	SAMN16255605	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	AZ015	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+enterococcus_faecalis_az008_111			Enterococcus faecalis	SAMN16255549	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	AZ008	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+enterococcus_faecalis_az029_112			Enterococcus faecalis	SAMN16255569	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	AZ029	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+enterococcus_faecium_az146_182			Enterococcus faecium	SAMN16255531	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	AZ146	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+enterococcus_hirae_az077_207			Enterococcus hirae	SAMN16255648	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	AZ077	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION
+enterococcus_pernyi_az045_223			Enterococcus pernyi	SAMN16255535	Teixeira_2025_bbaf589	10.1093/bib/bbaf589	ST1	AZ045	newly sequenced	NovaSeq 6000	Sgardioli, 2021	GridION

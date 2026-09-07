@@ -149,7 +149,14 @@ def main():
     ok &= (tp2 == 2000)
     print(f"  overlap TP == 2000 (no double count) ? {tp2} -> {tp2==2000}")
 
-    # Third scenario: empty prediction file -> all FN, zero precision/recall.
+    # Third scenario: empty prediction file -> all FN, recall genuinely 0
+    # (a real truth plasmid existed and none of it was recovered), but
+    # precision/f1 are UNDEFINED ("") rather than a misleading 0.0/0.0000 --
+    # nothing was predicted at all (tp+fp == 0), so there is nothing to
+    # assess precision of. This is deliberately different from recall: recall
+    # asks "of the true plasmid, how much was found" (well-defined and
+    # genuinely 0 here), while precision asks "of what was predicted, how
+    # much was correct" (undefined when nothing was predicted).
     empty = os.path.join(tmp, "empty.paf")
     empty_pred = os.path.join(tmp, "empty.fasta")
     open(empty, "w").close()
@@ -162,10 +169,11 @@ def main():
     )
     with open(out3) as fh:
         r3 = dict(zip(header, fh.read().strip().splitlines()[1].split("\t")))
-    ok &= (int(r3["TP_bp"]) == 0 and int(r3["FN_bp"]) == 3000 and float(r3["f1"]) == 0.0)
-    print(f"  empty pred -> TP=0 FN=3000 f1=0 ? "
-          f"{r3['TP_bp']},{r3['FN_bp']},{r3['f1']} -> "
-          f"{int(r3['TP_bp'])==0 and int(r3['FN_bp'])==3000 and float(r3['f1'])==0.0}")
+    ok &= (int(r3["TP_bp"]) == 0 and int(r3["FN_bp"]) == 3000
+           and r3["precision"] == "" and float(r3["recall"]) == 0.0 and r3["f1"] == "")
+    print(f"  empty pred -> TP=0 FN=3000, precision/f1 undefined, recall=0 ? "
+          f"precision={r3['precision']!r} recall={r3['recall']} f1={r3['f1']!r} -> "
+          f"{int(r3['TP_bp'])==0 and int(r3['FN_bp'])==3000 and r3['precision']=='' and float(r3['recall'])==0.0 and r3['f1']==''}")
 
     # Coordinates supplied by external callers are bounded to the reference;
     # a malformed overhang must not inflate a base-level score.

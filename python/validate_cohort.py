@@ -205,7 +205,20 @@ def schema_errors(rows, fields, ledger=None):
         seen.add(row["sample_id"])
         existing_cohort = ledger.get(row.get("biosample"))
         if existing_cohort: errors.append(f"row {number}: BioSample {row['biosample']} is already in cohort {existing_cohort}")
-        if not ACCESSION.match(row["assembly_accession"]): errors.append(f"row {number}: invalid assembly accession")
+        # truth_source is optional; absent/empty means today's unchanged
+        # behavior (an existing NCBI-deposited assembly is the truth). Only
+        # "self_assembled_hybrid" changes what is required below -- see
+        # build_hybrid_truth.py: PlasBench builds its own truth via hybrid
+        # assembly from this isolate's own long+short reads when no
+        # pre-existing Complete Genome assembly was ever deposited.
+        truth_source = (row.get("truth_source") or "ncbi_deposited").strip()
+        if truth_source not in ("ncbi_deposited", "self_assembled_hybrid"):
+            errors.append(f"row {number}: truth_source must be ncbi_deposited or self_assembled_hybrid, got {row['truth_source']!r}")
+        if truth_source == "self_assembled_hybrid":
+            if not RUN.match(row.get("long_read_sra_run") or ""):
+                errors.append(f"row {number}: truth_source=self_assembled_hybrid requires a valid long_read_sra_run")
+        else:
+            if not ACCESSION.match(row["assembly_accession"]): errors.append(f"row {number}: invalid assembly accession")
         if not RUN.match(row["sra_run"]): errors.append(f"row {number}: invalid SRA run")
         if row["truth_technology"] not in ("long_read", "hybrid"): errors.append(f"row {number}: truth_technology must be long_read or hybrid")
         if row["truth_quality_tier"] not in ("A", "B", "C"): errors.append(f"row {number}: truth_quality_tier must be A/B/C")
@@ -224,10 +237,59 @@ def schema_errors(rows, fields, ledger=None):
                 f"row {number}: truth_independent_of_long_reads must be yes/true/1/no/false/0 when supplied, "
                 f"got {row['truth_independent_of_long_reads']!r}"
             )
+        # Hard rule, not a judgment call: a self-built truth is NOT independent
+        # of the long reads that built it, by construction. Declaring
+        # otherwise here would silently defeat scripts/lib.sh's own
+        # long_read_truth_eligible() circularity guard for every long-read/
+        # hybrid tool on this sample -- there is no override for this one.
+        if truth_source == "self_assembled_hybrid" and independence in ("yes", "true", "1"):
+            errors.append(
+                f"row {number}: truth_source=self_assembled_hybrid must never declare "
+                "truth_independent_of_long_reads=yes -- the truth is built from this "
+                "isolate's own long reads, so it is never independent of them"
+            )
     return errors
 
 
+def verify_self_assembled_row(row, email=None, api_key=None):
+    """Verification for a truth_source=self_assembled_hybrid row: there is no
+    NCBI assembly to check (that is the whole premise of this truth_source),
+    so this cross-checks both deposited read runs -- long-read and
+    short-read -- against the declared BioSample/BioProject instead. The
+    actual truth-QUALITY gate (a trustworthy, fully circularized chromosome)
+    is build_hybrid_truth.py's own check at build time, not this metadata
+    check, which only confirms the two runs are real and linked."""
+    long_run = run_metadata(row["long_read_sra_run"], email, api_key)
+    time.sleep(0.11 if api_key else 0.34)
+    run = run_metadata(row["sra_run"], email, api_key)
+    errors = []
+    if long_run["platform"].upper() not in ("OXFORD_NANOPORE", "PACBIO_SMRT"):
+        errors.append("long_read_sra_run platform is not Oxford Nanopore or PacBio")
+    if long_run["biosample"] != row["biosample"]: errors.append("long_read_sra_run BioSample does not match cohort row")
+    if long_run["bioproject"] != row["bioproject"]: errors.append("long_read_sra_run BioProject does not match cohort row")
+    if run["biosample"] != row["biosample"]: errors.append("SRA BioSample does not match cohort row")
+    if run["bioproject"] != row["bioproject"]: errors.append("SRA BioProject does not match cohort row")
+    if run["platform"].upper() != "ILLUMINA": errors.append("SRA platform is not ILLUMINA")
+    if run["layout"].upper() != "PAIRED": errors.append("SRA library is not paired-end")
+    derived_tier = derive_truth_quality_tier(errors, row.get("source_study"))
+    if derived_tier and row["truth_quality_tier"] != derived_tier:
+        errors.append(
+            f"declared truth_quality_tier {row['truth_quality_tier']} does not match "
+            f"evidence-derived tier {derived_tier}"
+        )
+    # Unconditionally "hybrid": reaching this function at all means both a
+    # long-read and a short-read run were declared for this row -- unlike
+    # assembly_metadata()'s NCBI-derived value, this is not itself an
+    # evidence check (the platform/BioSample/BioProject checks above are).
+    assembly = {"derived_truth_technology": "hybrid", "derived_truth_quality_tier": derived_tier,
+                "biosample": row.get("biosample", ""), "bioprojects": [row.get("bioproject", "")]}
+    return {"sample_id": row["sample_id"], "assembly": assembly, "run": run,
+            "long_read_run": long_run, "errors": errors}
+
+
 def verify_row(row, email=None, api_key=None):
+    if (row.get("truth_source") or "ncbi_deposited").strip() == "self_assembled_hybrid":
+        return verify_self_assembled_row(row, email, api_key)
     assembly = assembly_metadata(row["assembly_accession"], email, api_key)
     time.sleep(0.11 if api_key else 0.34)
     run = run_metadata(row["sra_run"], email, api_key)

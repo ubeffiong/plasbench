@@ -60,6 +60,68 @@ Some plasmid-benchmark papers and resources publish curated isolate sets with ma
 Reusing (and citing) an established truth set is legitimate and saves time; you can then add
 your own newly-curated pairs on top.
 
+**Worked example, and a real pitfall: Teixeira et al. 2025's 250-isolate cohort.**
+"Circling in on plasmids" (*Briefings in Bioinformatics* 26(6):bbaf589, DOI
+10.1093/bib/bbaf589) benchmarks the same class of tools PlasBench does, over 93
+Enterobacterales and 157 *Enterococcus* isolates with matched short+long reads --
+particularly valuable since PlasBench's own `public-v1`/`public-v2` cohorts have zero
+*Enterococcus* representation. Its Supplementary Table S1 (BioSample, Taxon, isolate
+identifier) is extracted, with full source-paper provenance, into
+`cohorts/candidates/teixeira2025_candidates.tsv` by
+`python/parse_teixeira2025_supplement.py` -- a one-time migration script, not part of
+the ongoing pipeline.
+
+The pitfall: ST1 gives BioSample identifiers, not assembly accessions, and the paper's
+own Data Availability statement names only the SRA and BioSample databases -- it does
+**not** claim its newly-generated hybrid assemblies were separately submitted as NCBI
+Assembly-database "Complete Genome" records. Checking this directly (BioSample ->
+assembly lookup) confirms it: some BioSamples in this cohort currently resolve to no
+assembly, or only a lower-status (Contig/Scaffold) one, even though both a long-read
+(ONT) and a paired-end Illumina run are deposited under the same BioSample/BioProject --
+sufficient to build a hybrid assembly, but not a pre-existing one PlasBench can just
+download. Other BioSamples in the very same BioProject **do** already have a properly
+deposited Complete Genome assembly, so this is a per-isolate, evolving state (NCBI
+processing/resubmission over time), not a blanket rejection of the source.
+
+`python/resolve_ncbi_accessions.py` is the generic (not Teixeira-specific) resolution
+step for exactly this shape of gap: given a candidates TSV with `biosample` populated
+and `assembly_accession`/`sra_run` empty, it finds a deposited Complete Genome assembly
+and a BioProject-matching paired Illumina run per BioSample, writing `resolved.tsv`
+(curate-cohort-ready). When no such assembly exists, it does not stop there: it also
+checks for a long-read (ONT/PacBio) run alongside the paired Illumina run on that same
+BioSample, writing `self_build_candidates.tsv` for exactly the isolates PlasBench could
+build its own truth for (see `docs/COHORTS.md`'s `truth_source=self_assembled_hybrid`
+section and `python/build_hybrid_truth.py`). `unresolved.tsv` catches everything left
+over, each with a specific reason -- no assembly and no long-read run either, ambiguous
+multiple complete candidates, or no matching paired run -- never a guess.
+
+Running the full resolution against all 250 Teixeira et al. 2025 candidates found: only
+5 (all *Citrobacter*) resolve to an existing Complete Genome assembly -- the paper's own
+Data Availability statement names only SRA and BioSample, not GenBank/RefSeq Assembly,
+so its newly-generated hybrid assemblies were mostly never formally submitted. The raw
+material for the rest is real, though: spot-checked BioSamples do have both a long-read
+and a paired Illumina run deposited under the Broad Institute's own submission -- exactly
+the `self_build_candidates.tsv` case.
+
+```bash
+python3 python/parse_teixeira2025_supplement.py
+python3 python/resolve_ncbi_accessions.py \
+    --candidates cohorts/candidates/teixeira2025_candidates.tsv \
+    --out-dir results/teixeira2025_resolution --email you@example.org
+plasbench curate-cohort --candidates results/teixeira2025_resolution/resolved.tsv \
+    --out-dir results/teixeira2025_curated --ledger cohorts/accepted_accessions.tsv
+# for self_build_candidates.tsv rows: build a cohort sheet with
+# truth_source=self_assembled_hybrid and long_read_sra_run set, then run
+# stages 0-2 per docs/COHORTS.md before trusting any of them.
+```
+
+As with every candidate source, `curate-cohort`'s own accepted/rejected split (or, for
+self-build candidates, `build_hybrid_truth.py`'s own circularization check) is the real
+gate -- resolution only gets a row *to* that gate, it does not pass it. Download and
+score a small stratified pilot before trusting the results, and never merge accepted
+rows directly into `public-v1`/`public-v2`; see `cohorts/README.md`'s cross-cohort dedup
+section and this project's own append-only convention for those two files.
+
 ### Quality criteria (keep only good pairs)
 
 - **Complete** assembly (not "chromosome" or "scaffold" level) — you need closed plasmids.

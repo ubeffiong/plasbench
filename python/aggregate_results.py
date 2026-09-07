@@ -72,9 +72,14 @@ def read_scores(path):
             rows.append({
                 "sample": f[idx["sample"]],
                 "tool": f[idx["tool"]],
-                "precision": float(f[idx["precision"]]),
-                "recall": float(f[idx["recall"]]),
-                "f1": float(f[idx["f1"]]),
+                # Undefined on a zero-true-plasmid isolate (precision) or when
+                # there was no true plasmid to recall (recall/f1) -- see
+                # score_plasmids.py. Gracefully absent, never a misleading
+                # 0.0, matching plasmid_recall/bin_f1/pr_auc's existing
+                # pattern immediately below.
+                "precision": float(f[idx["precision"]]) if "precision" in idx and f[idx["precision"]] else None,
+                "recall": float(f[idx["recall"]]) if "recall" in idx and f[idx["recall"]] else None,
+                "f1": float(f[idx["f1"]]) if "f1" in idx and f[idx["f1"]] else None,
                 "analysis_track": f[idx["analysis_track"]] if "analysis_track" in idx and f[idx["analysis_track"]] else "short_read",
                 # A missing plasmid-level value is not evidence of zero recovery.
                 "plasmid_recall": (
@@ -83,12 +88,25 @@ def read_scores(path):
                     else None
                 ),
                 "bin_f1": float(f[idx["bin_f1"]]) if "bin_f1" in idx and f[idx["bin_f1"]] else None,
+                # Supplementary bin-quality metrics (score_bins.py's
+                # clustering_agreement()); absent for binning_capable=no
+                # tools and for a sample with an empty contingency table --
+                # gracefully None, never 0, mirroring bin_f1 immediately above.
+                "nmi": float(f[idx["nmi"]]) if "nmi" in idx and f[idx["nmi"]] else None,
+                "variation_of_information": float(f[idx["variation_of_information"]]) if "variation_of_information" in idx and f[idx["variation_of_information"]] else None,
                 # Only defined for tools whose adapter exposed a per-record
                 # probability (adapters/SCORES.md); gracefully absent, never 0,
                 # for every other tool -- see merge_pr_metrics.py.
                 "pr_auc": float(f[idx["pr_auc"]]) if "pr_auc" in idx and f[idx["pr_auc"]] else None,
                 "perfect_reference_recovery": f[idx["perfect_reference_recovery"]] if "perfect_reference_recovery" in idx else "",
                 "strict_reference_reconstruction": f[idx["strict_reference_reconstruction"]] if "strict_reference_reconstruction" in idx else "",
+                # Negative-control fields (score_plasmids.py): always defined
+                # for a real isolate, most informative on a zero-true-plasmid
+                # one, where they are the only signal of false-positive
+                # behaviour since precision/recall/f1 above are undefined.
+                "isolate_specificity": float(f[idx["isolate_specificity"]]) if "isolate_specificity" in idx and f[idx["isolate_specificity"]] else None,
+                "chromosome_fp_bp": int(f[idx["chromosome_fp_bp"]]) if "chromosome_fp_bp" in idx and f[idx["chromosome_fp_bp"]] else None,
+                "true_plasmid_count": int(f[idx["true_plasmid_count"]]) if "true_plasmid_count" in idx and f[idx["true_plasmid_count"]] else None,
             })
     return rows
 
@@ -118,20 +136,37 @@ def read_status(path):
 
 
 def summarise(rows, status_counts):
-    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0})
+    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0,
+                                   "zero_plasmid_specificity": [], "zero_plasmid_fp_bp": [], "n_zero_plasmid": 0,
+                                   "nmi": [], "vi": []})
     for r in rows:
         t = by_tool[r["tool"]]
-        t["precision"].append(r["precision"])
-        t["recall"].append(r["recall"])
-        t["f1"].append(r["f1"])
+        # Undefined (score_plasmids.py) on a zero-true-plasmid isolate or one
+        # with no true plasmid to recall -- excluded from the mean here
+        # exactly like plasmid_recall/bin_f1/pr_auc below, never coerced to 0.
+        if r["precision"] is not None: t["precision"].append(r["precision"])
+        if r["recall"] is not None: t["recall"].append(r["recall"])
+        if r["f1"] is not None: t["f1"].append(r["f1"])
         if r["plasmid_recall"] is not None:
             t["plasmid_recall"].append(r["plasmid_recall"])
         if r["bin_f1"] is not None: t["bin_f1"].append(r["bin_f1"])
+        if r["nmi"] is not None: t["nmi"].append(r["nmi"])
+        if r["variation_of_information"] is not None: t["vi"].append(r["variation_of_information"])
         if r["pr_auc"] is not None: t["pr_auc"].append(r["pr_auc"])
         if r["perfect_reference_recovery"] in ("yes", "no"):
             t["perfect"].append(r["perfect_reference_recovery"] == "yes")
         if r["strict_reference_reconstruction"] in ("yes", "no"):
             t["strict"].append(r["strict_reference_reconstruction"] == "yes")
+        # Negative-control summary: isolates with zero true plasmids are the
+        # only ones that can measure false-positive plasmid calls directly
+        # (precision/recall/f1 are undefined there) -- kept as its own
+        # separate tally, never blended into the main ranking metrics above.
+        if r["true_plasmid_count"] == 0:
+            t["n_zero_plasmid"] += 1
+            if r["isolate_specificity"] is not None:
+                t["zero_plasmid_specificity"].append(r["isolate_specificity"])
+            if r["chromosome_fp_bp"] is not None:
+                t["zero_plasmid_fp_bp"].append(r["chromosome_fp_bp"])
         t["n"] += 1
 
     summary = []
@@ -140,15 +175,22 @@ def summarise(rows, status_counts):
         summary.append({
             "tool": tool,
             "n_samples": d["n"],
-            "mean_precision": statistics.mean(d["precision"]),
-            "mean_recall": statistics.mean(d["recall"]),
-            "mean_f1": statistics.mean(d["f1"]),
+            "mean_precision": statistics.mean(d["precision"]) if d["precision"] else None,
+            "mean_recall": statistics.mean(d["recall"]) if d["recall"] else None,
+            "mean_f1": statistics.mean(d["f1"]) if d["f1"] else None,
             "f1_ci_low": f1_ci_low,
             "f1_ci_high": f1_ci_high,
-            "median_f1": statistics.median(d["f1"]),
+            "median_f1": statistics.median(d["f1"]) if d["f1"] else None,
             "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]) if d["plasmid_recall"] else None,
+            "n_zero_plasmid_isolates": d["n_zero_plasmid"],
+            "mean_zero_plasmid_specificity": statistics.mean(d["zero_plasmid_specificity"]) if d["zero_plasmid_specificity"] else None,
+            "total_zero_plasmid_chromosome_fp_bp": sum(d["zero_plasmid_fp_bp"]) if d["zero_plasmid_fp_bp"] else None,
             "mean_bin_f1": statistics.mean(d["bin_f1"]) if d["bin_f1"] else None,
             "n_bin_scored": len(d["bin_f1"]),
+            # Supplementary, never a ranking replacement -- see
+            # score_bins.py's clustering_agreement().
+            "mean_nmi": statistics.mean(d["nmi"]) if d["nmi"] else None,
+            "mean_variation_of_information": statistics.mean(d["vi"]) if d["vi"] else None,
             # Supplementary, never a ranking replacement: only defined for
             # tools that expose a probability (adapters/SCORES.md); ranking
             # below stays on mean_f1 so every tool remains comparable.
@@ -162,8 +204,10 @@ def summarise(rows, status_counts):
             "n_failed": status_counts[tool]["failed"],
             "n_skipped": status_counts[tool]["skipped"],
         })
-    # Rank by mean F1 (descending).
-    summary.sort(key=lambda x: x["mean_f1"], reverse=True)
+    # Rank by mean F1 (descending). A tool scored only on zero-true-plasmid
+    # isolates has no defined mean_f1 at all -- sort it last rather than
+    # crashing the comparison against a real float.
+    summary.sort(key=lambda x: (x["mean_f1"] is None, -(x["mean_f1"] or 0.0)))
     return summary
 
 
@@ -204,10 +248,20 @@ def holm_adjust(pvalues):
     return adjusted
 
 
-def write_comparisons(rows, path):
+def compute_comparisons(rows):
+    """Paired, shared-sample, sign-flip permutation comparisons for every
+    pair of tools, Holm-adjusted across all pairs computed here. Shared by
+    write_comparisons() (writes benchmark.paired_comparisons.tsv) and
+    attach_significance() (derives the leaderboard's significant_vs_runner_up
+    flag), so both always agree on the same underlying test."""
     by_tool = defaultdict(dict)
     for row in rows:
-        by_tool[row["tool"]][row["sample"]] = row["f1"]
+        # f1 is undefined (None) for a zero-true-plasmid isolate -- excluded
+        # from the paired comparison entirely for that sample/tool, same as
+        # it is excluded from summarise()'s mean_f1 above, rather than
+        # letting a None reach the subtraction below.
+        if row["f1"] is not None:
+            by_tool[row["tool"]][row["sample"]] = row["f1"]
     tools = sorted(by_tool)
     comparisons = []
     for i, a in enumerate(tools):
@@ -226,6 +280,37 @@ def write_comparisons(rows, path):
             })
     for row, adjusted in zip(comparisons, holm_adjust([x["permutation_p_value"] for x in comparisons])):
         row["permutation_p_value_holm"] = adjusted
+    return comparisons
+
+
+def attach_significance(summary, comparisons, alpha=0.05):
+    """Mark the top-ranked tool as significantly better than the runner-up
+    using the SAME paired, shared-sample, sign-flip permutation test (Holm-
+    adjusted) already computed by compute_comparisons() -- never a bootstrap-
+    CI-overlap heuristic, which is a weaker and different claim for a paired
+    comparison. Every row gets a value: "not_assessed" when there is no
+    runner-up, or the pair was never tested (fewer than 5 shared samples,
+    paired_permutation_pvalue's own existing gate); True/False otherwise.
+    Mutates summary in place; also returns it."""
+    for row in summary:
+        row["significant_vs_runner_up"] = "not_assessed"
+    if len(summary) < 2:
+        return summary
+    top, runner_up = summary[0]["tool"], summary[1]["tool"]
+    pair = next(
+        (c for c in comparisons
+         if {c["tool_a"], c["tool_b"]} == {top, runner_up}),
+        None,
+    )
+    if pair is None or pair["permutation_p_value_holm"] is None:
+        return summary
+    summary[0]["significant_vs_runner_up"] = pair["permutation_p_value_holm"] < alpha
+    return summary
+
+
+def write_comparisons(rows, path, comparisons=None):
+    if comparisons is None:
+        comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
         handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\n")
         for row in comparisons:
@@ -244,22 +329,39 @@ def write_comparisons(rows, path):
 
 def write_tsv(summary, path):
     cols = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
-            "mean_recall", "mean_plasmid_recall", "n_bin_scored", "mean_bin_f1", "n_pr_scored", "mean_pr_auc",
+            "mean_recall", "mean_plasmid_recall", "n_bin_scored", "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "n_pr_scored", "mean_pr_auc",
             "n_reference_perfect_assessed", "reference_perfect_recovery_rate", "n_strict_reconstruction_assessed", "strict_reference_reconstruction_rate",
-            "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1"]
+            "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1", "significant_vs_runner_up",
+            "n_zero_plasmid_isolates", "mean_zero_plasmid_specificity", "total_zero_plasmid_chromosome_fp_bp"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
             fh.write("\t".join(str(x) for x in [
                 i, s["tool"], s["n_samples"], s["n_completed"], s["n_failed"], s["n_skipped"],
-                f"{s['mean_precision']:.4f}", f"{s['mean_recall']:.4f}",
+                f"{s['mean_precision']:.4f}" if s["mean_precision"] is not None else "",
+                f"{s['mean_recall']:.4f}" if s["mean_recall"] is not None else "",
                 f"{s['mean_plasmid_recall']:.4f}" if s["mean_plasmid_recall"] is not None else "",
                 s['n_bin_scored'], f"{s['mean_bin_f1']:.4f}" if s['mean_bin_f1'] is not None else "",
+                f"{s['mean_nmi']:.4f}" if s['mean_nmi'] is not None else "",
+                f"{s['mean_variation_of_information']:.4f}" if s['mean_variation_of_information'] is not None else "",
                 s['n_pr_scored'], f"{s['mean_pr_auc']:.4f}" if s['mean_pr_auc'] is not None else "",
                 s['n_reference_perfect_assessed'], f"{s['reference_perfect_recovery_rate']:.4f}" if s['reference_perfect_recovery_rate'] is not None else "",
                 s['n_strict_reconstruction_assessed'], f"{s['strict_reference_reconstruction_rate']:.4f}" if s['strict_reference_reconstruction_rate'] is not None else "",
-                f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}" if s["f1_ci_low"] is not None else "",
-                f"{s['f1_ci_high']:.4f}" if s["f1_ci_high"] is not None else "", f"{s['median_f1']:.4f}",
+                f"{s['mean_f1']:.4f}" if s["mean_f1"] is not None else "",
+                f"{s['f1_ci_low']:.4f}" if s["f1_ci_low"] is not None else "",
+                f"{s['f1_ci_high']:.4f}" if s["f1_ci_high"] is not None else "",
+                f"{s['median_f1']:.4f}" if s["median_f1"] is not None else "",
+                # Derived from the SAME paired, shared-sample, sign-flip
+                # permutation test (Holm-adjusted) as
+                # benchmark.paired_comparisons.tsv -- see attach_significance().
+                # Never a bootstrap-CI-overlap heuristic.
+                s.get("significant_vs_runner_up", "not_assessed"),
+                # Negative-control summary: only meaningful for isolates with
+                # zero true plasmids (score_plasmids.py's isolate_specificity/
+                # chromosome_fp_bp), never blended into the ranking metrics above.
+                s["n_zero_plasmid_isolates"],
+                f"{s['mean_zero_plasmid_specificity']:.4f}" if s["mean_zero_plasmid_specificity"] is not None else "",
+                s["total_zero_plasmid_chromosome_fp_bp"] if s["total_zero_plasmid_chromosome_fp_bp"] is not None else "",
             ]) + "\n")
 
 
@@ -274,18 +376,31 @@ def write_md(summary, path):
         fh.write("Ranked by mean base-level F1 across samples "
                  "(positive class = plasmid).\n\n")
         fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | "
-                 "Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | **Mean F1** | 95% F1 CI | Median F1 |\n")
-        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:"]) + "|\n")
+                 "Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | **Mean F1** | 95% F1 CI | Median F1 | Significant vs runner-up |\n")
+        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", ":---"]) + "|\n")
         for i, s in enumerate(summary, start=1):
             plasmid_recall = f"{s['mean_plasmid_recall']:.3f}" if s["mean_plasmid_recall"] is not None else "not annotated"
             ci = (f"{s['f1_ci_low']:.3f}–{s['f1_ci_high']:.3f}"
                   if s["f1_ci_low"] is not None else "n < 5")
+            # A tool scored only on zero-true-plasmid isolates has no defined
+            # mean precision/recall/f1 at all (score_plasmids.py) -- "not
+            # applicable" rather than crashing on a None float format.
+            mean_precision = f"{s['mean_precision']:.3f}" if s["mean_precision"] is not None else "n/a"
+            mean_recall = f"{s['mean_recall']:.3f}" if s["mean_recall"] is not None else "n/a"
+            mean_f1 = f"{s['mean_f1']:.3f}" if s["mean_f1"] is not None else "n/a"
+            median_f1 = f"{s['median_f1']:.3f}" if s["median_f1"] is not None else "n/a"
+            # Only the winner (rank 1) ever carries a real value here -- see
+            # attach_significance(). Paired sign-flip permutation test on
+            # shared samples, Holm-adjusted across every pairwise comparison.
+            significance = s.get("significant_vs_runner_up", "not_assessed")
+            significance_text = {True: "yes (paired permutation, Holm-adjusted)",
+                                 False: "no (paired permutation, Holm-adjusted)"}.get(significance, "not assessed")
             fh.write(
                 f"| {i} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "
-                f"{s['mean_precision']:.3f} | {s['mean_recall']:.3f} | "
+                f"{mean_precision} | {mean_recall} | "
                 f"{plasmid_recall} | {format_rate(s['reference_perfect_recovery_rate'], s['n_reference_perfect_assessed'])} | "
                 f"{format_rate(s['strict_reference_reconstruction_rate'], s['n_strict_reconstruction_assessed'])} | "
-                f"**{s['mean_f1']:.3f}** | {ci} | {s['median_f1']:.3f} |\n"
+                f"**{mean_f1}** | {ci} | {median_f1} | {significance_text} |\n"
             )
         fh.write("\n_Recall = completeness (fraction of true plasmid bases "
                  "recovered). Plasmid recall = fraction of truth plasmids meeting the configured "
@@ -302,6 +417,10 @@ def write_track_leaderboards(rows, status_counts, prefix):
         tracks[row["analysis_track"]].append(row)
     for track, track_rows in tracks.items():
         summary = summarise(track_rows, status_counts)
+        # Significance is computed against this track's OWN shared samples,
+        # not the global comparison -- a tool's runner-up, and how many
+        # samples they actually share, can differ per track.
+        attach_significance(summary, compute_comparisons(track_rows))
         track_prefix = f"{prefix}.{track}"
         write_tsv(summary, track_prefix + ".leaderboard.tsv")
         write_md(summary, track_prefix + ".leaderboard.md")
@@ -338,17 +457,21 @@ def main():
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}")
     summary = summarise(rows, status_counts)
+    comparisons = compute_comparisons(rows)
+    attach_significance(summary, comparisons)
     write_tsv(summary, args.out_prefix + ".leaderboard.tsv")
     write_md(summary, args.out_prefix + ".leaderboard.md")
     write_track_leaderboards(rows, status_counts, args.out_prefix)
-    write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv")
+    write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv", comparisons=comparisons)
 
     # Print the leaderboard to stdout so it appears in the run log.
     print("\n=== LEADERBOARD (mean F1, descending) ===")
+    def fmt3(value):
+        return f"{value:.3f}" if value is not None else "n/a"
     for i, s in enumerate(summary, start=1):
         print(f"{i:>2}. {s['tool']:<16} "
-              f"F1={s['mean_f1']:.3f}  "
-              f"P={s['mean_precision']:.3f}  R={s['mean_recall']:.3f}  "
+              f"F1={fmt3(s['mean_f1'])}  "
+              f"P={fmt3(s['mean_precision'])}  R={fmt3(s['mean_recall'])}  "
               f"(scored={s['n_samples']}, completed={s['n_completed']}, failed={s['n_failed']}, skipped={s['n_skipped']})")
 
 

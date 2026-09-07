@@ -14,15 +14,39 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     REPORT="$SDIR/sequence_report.jsonl"
     TRUTH="$SDIR/truth.tsv"
     DEPTH="$SDIR/observed_depth.tsv"
-    [[ -s "$REF" ]] || { warn "missing reference for $SAMPLE; run 01_download.sh first"; continue; }
+    TRUTH_SOURCE="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" truth_source)"
     if [[ -s "$TRUTH" ]]; then
         log "  existing truth.tsv retained for $SAMPLE"
     fi
-    if [[ ! -s "$TRUTH" ]]; then
-        [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; continue; }
-        log "=== Truth for $SAMPLE ==="
-        python3 "$HERE/../python/make_truth.py" --report "$REPORT" --fasta "$REF" --out "$TRUTH" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2)
-        log "  truth -> $TRUTH"
+    if [[ "$TRUTH_SOURCE" == "self_assembled_hybrid" ]]; then
+        # No pre-existing assembly to check for -- see build_hybrid_truth.py.
+        LONG_READS="$SDIR/${LONG_READS_FILE:-long_reads.fastq.gz}"
+        R1="$SDIR/${SRA}_1.fastq.gz"; R2="$SDIR/${SRA}_2.fastq.gz"
+        if [[ ! -s "$TRUTH" ]]; then
+            if [[ ! -s "$LONG_READS" || ! -s "$R1" || ! -s "$R2" ]]; then
+                warn "missing long and/or short reads for self_assembled_hybrid sample $SAMPLE; run 01_download.sh first"
+                continue
+            fi
+            log "=== Building self-assembled hybrid truth for $SAMPLE ==="
+            if ! python3 "$HERE/../python/build_hybrid_truth.py" \
+                    --long-reads "$LONG_READS" --r1 "$R1" --r2 "$R2" \
+                    --out-reference "$REF" --out-truth "$TRUTH" \
+                    --out-provenance "$SDIR/truth_provenance.json" \
+                    --min-chromosome-length "$HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH" \
+                    --threads "$HYBRID_TRUTH_THREADS" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2); then
+                warn "self-assembled hybrid truth build failed for $SAMPLE; see $LOG_DIR/${SAMPLE}.truth.log"
+                continue
+            fi
+            log "  truth -> $TRUTH (self-assembled hybrid; see $SDIR/truth_provenance.json)"
+        fi
+    else
+        [[ -s "$REF" ]] || { warn "missing reference for $SAMPLE; run 01_download.sh first"; continue; }
+        if [[ ! -s "$TRUTH" ]]; then
+            [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; continue; }
+            log "=== Truth for $SAMPLE ==="
+            python3 "$HERE/../python/make_truth.py" --report "$REPORT" --fasta "$REF" --out "$TRUTH" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2)
+            log "  truth -> $TRUTH"
+        fi
     fi
     # Validate however the table arrived. A hand-written one is retained as-is,
     # and every way it can be wrong is silent: an id absent from the reference
