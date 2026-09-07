@@ -187,6 +187,8 @@ def main(argv=None):
         help="Download the latest release and reuse this install's shared reads and databases.",
     )
     upgrade_parser.add_argument("--yes", action="store_true", help="Pass --yes to the new release installer.")
+    upgrade_parser.add_argument("--refresh-tools", action="store_true",
+                                help="Also refresh Conda packages/tools; normally unnecessary and may download channel indexes.")
     check_parser = sub.add_parser(
         "check",
         help="Check configured runtime dependencies (tools and databases); offers to install what's missing.",
@@ -447,6 +449,8 @@ def main(argv=None):
         command = [bash_command(), "update.sh"]
         if args.yes:
             command.append("--yes")
+        if args.refresh_tools:
+            command.append("--refresh-tools")
         code = run(command, root)
     elif args.command == "check":
         command = [bash_command(), "scripts/00_setup.sh"]

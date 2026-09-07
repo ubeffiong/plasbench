@@ -18,9 +18,11 @@ cd "$HERE"
 
 REPO="ubeffiong/plasbench"
 ASSUME_YES=""
+REFRESH_TOOLS=0
 for arg in "$@"; do
     case "$arg" in
         -y|--yes) ASSUME_YES="--yes" ;;
+        --refresh-tools) REFRESH_TOOLS=1 ;;
         -h|--help)
             sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
@@ -148,8 +150,12 @@ for extra in .ncbi.env config/local.tsv; do
     fi
 done
 
-say "installing $LATEST_VERSION (reusing $SHARED_DATA_DIR and the shared 'plasbench' conda environment)..."
-( cd "$NEW_DIR" && PLASBENCH_DATA_DIR="$SHARED_DATA_DIR" ./install.sh --tools $ASSUME_YES )
+INSTALL_ARGS=()
+[[ "$REFRESH_TOOLS" -eq 1 ]] && INSTALL_ARGS+=(--tools --refresh-env)
+[[ -n "$ASSUME_YES" ]] && INSTALL_ARGS+=("$ASSUME_YES")
+say "installing $LATEST_VERSION (reusing $SHARED_DATA_DIR and the existing conda environment without refreshing packages)..."
+( cd "$NEW_DIR" && PLASBENCH_DATA_DIR="$SHARED_DATA_DIR" ./install.sh "${INSTALL_ARGS[@]}" )
+[[ "$REFRESH_TOOLS" -eq 1 ]] || say "tools and databases were reused. Run './update.sh --refresh-tools' only if release notes require new dependencies."
 
 say "done."
 say "Your new install is at: $NEW_DIR"

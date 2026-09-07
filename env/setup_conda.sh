@@ -5,6 +5,14 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../scripts/lib.sh"
 ENV_NAME="${PLASBENCH_ENV_NAME:-plasbench}"
+REUSE_EXISTING=0
+for arg in "$@"; do
+    case "$arg" in
+        --reuse-existing) REUSE_EXISTING=1 ;;
+        -h|--help) echo "usage: setup_conda.sh [--reuse-existing]"; exit 0 ;;
+        *) echo "ERROR: unknown option: $arg" >&2; exit 2 ;;
+    esac
+done
 
 if command -v mamba >/dev/null 2>&1; then
     SOLVER=mamba
@@ -41,6 +49,10 @@ if PREFIX_PATH="$(env_prefix)"; then
     # Updating is non-destructive and converges to the same specification.
     echo "[setup_conda] environment '$ENV_NAME' already exists at:"
     echo "[setup_conda]   $PREFIX_PATH"
+    if [[ "$REUSE_EXISTING" -eq 1 ]]; then
+        echo "[setup_conda] reusing it unchanged (no channel refresh or package download)."
+        exit 0
+    fi
     echo "[setup_conda] updating it in place (nothing is deleted) ..."
     run_with_heartbeat "Conda is solving/linking the PlasBench environment" \
         "$SOLVER" env update --prefix "$PREFIX_PATH" --file "$HERE/environment.yml" --prune=false 2>/dev/null \

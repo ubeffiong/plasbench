@@ -384,8 +384,10 @@ cd "$HOME/plasbench-${VERSION:-0.2.3}"
 ./install.sh --tools
 ```
 
-This is the long step: **30–90 minutes**, downloading roughly 1 GB of tools. It prints
-numbered phases so you can tell waiting from stuck:
+On a new machine this is the long step: **30–90 minutes**, downloading roughly
+1 GB of tools. On an existing installation it reuses the environment and does
+not refresh Conda package indexes unless you explicitly pass `--refresh-env`.
+It prints numbered phases so you can tell waiting from stuck:
 
 ```
 [plasbench-install] ===== step 2/4: conda environment 'plasbench' =====
@@ -828,8 +830,8 @@ or deleted), then reuses one physical data directory for reads and databases. On
 first upgrade from an older release, it **moves** the old `data/` directory once to
 `~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
 with a compatibility link; it never copies or re-downloads the database. It also carries
-over `config/local.tsv` and `.ncbi.env`, and updates the shared `plasbench` conda
-environment in place rather than recreating it. Finish with:
+over `config/local.tsv` and `.ncbi.env`, then installs the new PlasBench code into the
+existing `plasbench` environment **without refreshing Conda packages or tools**. Finish with:
 
 ```bash
 cd ~/plasbench-0.2.2        # the directory ./update.sh just printed
@@ -841,10 +843,10 @@ If `./update.sh` says a destination directory already exists, or you'd rather do
 part by hand (say, on a machine with no internet access to GitHub's API), see what it
 automates:
 
-- **The conda environment** updates in place — `./install.sh --tools` (step 4) detects
-  the existing `plasbench` environment and updates it to match the new version, leaving
-  everything already installed into it (including MOB-suite's database) untouched. To
-  force a fully clean environment instead, remove it first, deliberately:
+- **The conda environment and tools** are reused unchanged. This avoids repeated Conda
+  channel-index downloads and package linking on ordinary code updates. If a future
+  release specifically requires new dependency versions, run `./update.sh --refresh-tools`.
+  To force a fully clean environment instead, remove it first, deliberately:
   `conda env remove -n plasbench`.
 - **Reads and the Platon database** live in the stable shared data directory. The default
   is `~/.local/share/plasbench/data`; set `PLASBENCH_DATA_DIR` before installation to

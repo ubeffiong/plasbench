@@ -16,10 +16,12 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
 WITH_TOOLS=0
+REFRESH_ENV=0
 ASSUME_YES=""
 for arg in "$@"; do
     case "$arg" in
         --tools) WITH_TOOLS=1 ;;
+        --refresh-env) REFRESH_ENV=1 ;;
         -y|--yes) ASSUME_YES="--yes" ;;
         -h|--help)
             sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
@@ -134,8 +136,10 @@ EOF
 fi
 
 # 2. Reproducible environment.
-step 2 "conda environment 'plasbench'"      "solving and downloading packages. Typically 5-20 minutes; conda prints its own progress below, and long pauses while it solves are normal."
-bash env/setup_conda.sh
+step 2 "conda environment 'plasbench'"      "creating it when absent, or reusing the existing environment without downloading package indexes. Pass --refresh-env only when you intentionally need dependency updates."
+SETUP_ARGS=()
+[[ "$REFRESH_ENV" -eq 0 ]] && SETUP_ARGS+=(--reuse-existing)
+bash env/setup_conda.sh "${SETUP_ARGS[@]}"
 step_done
 
 # 3. The CLI itself. --no-deps because every dependency is a conda package.

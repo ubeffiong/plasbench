@@ -106,6 +106,10 @@ grep -Fq "$SHARED_DATA" "$NEW2/config/local.env" || { echo "FAIL: new install do
 [[ -f "$NEW2/.ncbi.env" ]] || { echo "FAIL: .ncbi.env was not migrated" >&2; exit 1; }
 [[ -f "$NEW2/config/local.tsv" ]] || { echo "FAIL: config/local.tsv was not migrated" >&2; exit 1; }
 grep -q -- "--yes" "$TMP/install_invocations.log" || { echo "FAIL: the new install.sh was not invoked with --yes" >&2; cat "$TMP/install_invocations.log" >&2; exit 1; }
+if grep -q -- "--tools" "$TMP/install_invocations.log"; then
+    echo "FAIL: an ordinary code update must reuse existing tools, not refresh them" >&2
+    cat "$TMP/install_invocations.log" >&2; exit 1
+fi
 echo "a real upgrade downloads, verifies, unpacks, and reuses one shared data directory -> PASS"
 
 # --- an existing destination directory is never overwritten ---
