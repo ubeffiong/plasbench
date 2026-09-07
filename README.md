@@ -217,7 +217,12 @@ plasbench/
 
 ---
 
-## 3. Step by step: from a new machine to your first leaderboard
+## 3. Standard lab workflow: from a new machine to your first leaderboard
+
+Follow **steps 1–11 in order** for a normal first installation and benchmark.
+They are the expected laboratory workflow. The support, recovery, and upgrade
+guides begin only after step 11 and are **not** extra steps you must perform
+when everything has worked normally.
 
 **Every command on this page is complete. Copy and paste it exactly as written.**
 Nothing here is a placeholder, and you never have to go and look something up
@@ -280,6 +285,8 @@ conda --version
 ```
 
 If that prints a version number (for example `conda 26.5.3`), skip to step 3.
+The commands below are an **only-if-needed recovery branch** for a machine
+without Conda; they are not part of the normal path when Conda is already available.
 
 If it says `command not found`, install Miniforge:
 
@@ -326,7 +333,7 @@ sha256sum -c "plasbench-${VERSION:-0.2.3}.tar.gz.sha256"
 The last command must print exactly:
 
 ```
-plasbench-0.2.2.tar.gz: OK
+plasbench-0.2.3.tar.gz: OK
 ```
 
 If instead you see `curl: (22) ... 404`, the version number in the URL is wrong — check
@@ -338,14 +345,14 @@ failed and left an error page in place of the file. Delete both files and run th
 commands again:
 
 ```bash
-rm -f plasbench-0.2.2.tar.gz plasbench-0.2.2.tar.gz.sha256
+rm -f plasbench-0.2.3.tar.gz plasbench-0.2.3.tar.gz.sha256
 ```
 
 Now unpack it:
 
 ```bash
-tar -xzf "plasbench-${VERSION:-0.2.2}.tar.gz"
-cd "$HOME/plasbench-${VERSION:-0.2.2}"
+tar -xzf "plasbench-${VERSION:-0.2.3}.tar.gz"
+cd "$HOME/plasbench-${VERSION:-0.2.3}"
 ```
 
 ---
@@ -482,7 +489,11 @@ If it is already installed, the script tells you so and does nothing:
 **If this download keeps failing**, see step 7c. Do not keep retrying it: MOB-suite's
 downloader cannot resume, so every attempt restarts from zero.
 
-#### 7c — If a database download will not complete
+#### 7c — Troubleshooting only: if a database download will not complete
+
+**Do not run this subsection during a normal installation.** Use it only after
+the standard Platon or MOB-suite database download has repeatedly failed. It is
+an alternative recovery route, not a third database-installation task.
 
 On a slow or unreliable connection the MOB-suite download may never finish. Both
 databases are ordinary data files with no absolute paths inside them, so a copy from
@@ -673,7 +684,14 @@ however different their averages look.
 
 ---
 
-### Step 12 — When something goes wrong
+## 3A. Support, recovery, and upgrades — use only when needed
+
+You have completed the normal first-run workflow after step 11. This section
+is intentionally separate: use the relevant item only if you see a problem,
+need to recover a failed install/download, or want to move to a newer version.
+None of these actions are required for a successful ordinary benchmark run.
+
+### Troubleshooting a specific message
 
 | What you see | What it means | What to do |
 |---|---|---|
@@ -697,7 +715,7 @@ ls ~/plasbench-0.2.2/logs/
 
 ---
 
-### Step 13 — Upgrading from an older version
+### Upgrade an existing installation
 
 One command, run from inside your current install directory:
 
@@ -745,7 +763,12 @@ around. The shared data remains available to every installed release.
 
 ---
 
-### Step 14 — Quick reference: one example, every command, and reading the report
+## 3B. Reference after the normal workflow
+
+The material below is reference material. It is useful after your first run,
+but it is not another installation sequence and does not replace steps 1–11.
+
+### Quick reference: one example, every command, and reading the report
 
 #### A complete end-to-end example
 
