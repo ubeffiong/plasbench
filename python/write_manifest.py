@@ -49,6 +49,17 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def checksum_record(path, warnings, category):
+    """Return a checksum record without making a transient Windows lock fatal."""
+    try:
+        return {"sha256": sha256(path), "bytes": path.stat().st_size}
+    except OSError as error:
+        message = f"Could not checksum {category} '{path.name}': {error}"
+        warnings.append(message)
+        return {"sha256": None, "bytes": None, "checksum_status": "unavailable",
+                "checksum_error": str(error)}
+
+
 def command_version(name):
     executable = shutil.which(name)
     if not executable:
@@ -159,20 +170,23 @@ def main():
                 "RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES", "RECOMMENDATION_MODEL_NESTED_MIN_STUDIES", "DECISION_PROFILE")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
+    manifest_warnings = []
     truth_tables = {}
     for sample in samples:
         truth = Path(args.data_dir) / sample["sample_id"] / "truth.tsv"
         if truth.is_file():
-            truth_tables[sample["sample_id"]] = {"sha256": sha256(truth), "bytes": truth.stat().st_size}
+            truth_tables[sample["sample_id"]] = checksum_record(
+                truth, manifest_warnings, "truth table")
     outputs = {}
     for path in Path(args.results_dir).glob("benchmark*"):
         if path.is_file():
-            outputs[path.name] = {"sha256": sha256(path), "bytes": path.stat().st_size}
+            outputs[path.name] = checksum_record(path, manifest_warnings, "output")
     selected_candidates = {}
     for report in Path(args.results_dir).glob("*/selected_candidate/selection_report.json"):
         sample = report.parents[1].name
         selected_candidates[sample] = {
-            "selection_report": {"sha256": sha256(report), "bytes": report.stat().st_size},
+            "selection_report": checksum_record(
+                report, manifest_warnings, "selection report"),
             "files": sorted(path.name for path in report.parent.iterdir() if path.is_file()),
         }
     manifest = {
@@ -197,15 +211,19 @@ def main():
                    "plasme": directory_identity(os.environ.get("PLASME_CHECKOUT_DIR", "")),
                    "recommendation": recommendation_model_status(args.results_dir)},
         "settings": {key: os.environ.get(key) for key in settings},
-        "input_checksums": {"sample_sheet": sha256(sample_sheet), "truth_tables": truth_tables},
+        "input_checksums": {"sample_sheet": checksum_record(
+            sample_sheet, manifest_warnings, "sample sheet"), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},
         "execution_profiles": status_rows(args.results_dir),
         "outputs": outputs, "selected_candidates": selected_candidates,
+        "warnings": manifest_warnings,
     }
     with open(args.out, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2, sort_keys=True)
         handle.write("\n")
     print(f"Wrote run manifest: {args.out}")
+    for warning in manifest_warnings:
+        print(f"Manifest warning: {warning}", file=sys.stderr)
 
 
 if __name__ == "__main__":

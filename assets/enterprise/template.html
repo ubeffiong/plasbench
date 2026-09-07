@@ -339,11 +339,14 @@
         /* ── Main Grid ── */
         .main-grid {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            /* Explicitly reserve half of the available row for each view.
+               This prevents a wide recovery track from stretching its column. */
+            grid-template-columns: calc((100% - 18px) / 2) calc((100% - 18px) / 2);
             grid-template-rows: auto auto;
             gap: 18px;
             margin-top: 14px;
-            flex: 1;
+            /* Avoid an iframe-height feedback loop in the parent report. */
+            flex: 0 0 auto;
             min-height: 0;
         }
 
@@ -351,8 +354,8 @@
             .main-grid {
                 grid-template-columns: 1fr;
             }
-            .main-grid > .panel:nth-of-type(1),
-            .main-grid > .panel:nth-of-type(2),
+            .main-grid > #heatmapPanel,
+            .main-grid > #recoveryPanel,
             .main-grid > #drilldownModal {
                 grid-column: 1;
                 grid-row: auto;
@@ -363,12 +366,21 @@
         /* Row one is the matrix beside plasmid recovery, both the same height so
            the eye can compare them. The drilldown spans the full width beneath,
            because contig evidence needs the horizontal room. */
-        .main-grid > .panel:nth-of-type(1) { grid-column: 1; grid-row: 1; }
-        .main-grid > .panel:nth-of-type(2) { grid-column: 2; grid-row: 1; }
+        .main-grid > #heatmapPanel { grid-column: 1; grid-row: 1; }
+        .main-grid > #recoveryPanel { grid-column: 2; grid-row: 1; }
         .main-grid > #drilldownModal { grid-column: 1 / -1; grid-row: 2; }
-        .main-grid > .panel:nth-of-type(1),
-        .main-grid > .panel:nth-of-type(2) { height: 430px; }
-        .main-grid > #drilldownModal { min-height: 520px; }
+        .main-grid > #heatmapPanel,
+        .main-grid > #recoveryPanel { height: 430px; }
+        /* Before a cell is selected this is an instructional empty state. Keep
+           it compact; selected contigs scroll inside the panel or can expand. */
+        .main-grid > #drilldownModal:not(.expanded) {
+            height: 400px;
+            max-height: 400px;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .main-grid > #drilldownModal:not(.expanded) .modal { height: 100%; }
+        .main-grid > #drilldownModal:not(.expanded) .modal-body { min-height: 0; }
 
         .panel {
             background: var(--bg-secondary);
@@ -1403,7 +1415,7 @@
         <div class="main-grid">
 
             <!-- ─── HEATMAP PANEL ─── -->
-            <div class="panel">
+            <div class="panel" id="heatmapPanel">
                 <div class="panel-header">
                     <h2><i class="fas fa-th"></i> Sample–Tool Heatmap <span class="sub" id="heatmapSub">base F1</span></h2>
                     <div class="panel-actions">
@@ -1493,7 +1505,7 @@
             </div>
 
             <!-- PLASMID RECOVERY PANEL -->
-            <div class="panel">
+            <div class="panel" id="recoveryPanel">
                 <div class="panel-header">
                     <h2><i class="fas fa-dna"></i> Plasmid Recovery <span class="sub" id="plasmidContext">select a cell</span></h2>
                     <div class="panel-actions">

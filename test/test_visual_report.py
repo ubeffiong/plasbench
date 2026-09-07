@@ -173,15 +173,22 @@ def main():
 
     # Layout: equal desktop columns keep the matrix and plasmid-level recovery
     # view equally prominent without compromising the full-width drilldown.
-    assert "minmax(0, 1fr) minmax(0, 1fr)" in page, "heatmap/plasmid split must be 50/50"
+    assert "calc((100% - 18px) / 2) calc((100% - 18px) / 2)" in page, \
+        "heatmap/plasmid split must be an explicit 50/50 allocation"
     # Row one is matrix beside plasmid recovery at equal height; the drilldown
     # spans the full width beneath, so contig evidence gets the horizontal room.
     assert "grid-column: 1 / -1" in page, "drilldown must span both columns"
     assert "left-stack" not in page, "the stacked left column has been replaced by explicit placement"
+    for needed in ("id=\"heatmapPanel\"", "id=\"recoveryPanel\"",
+                   "#heatmapPanel { grid-column: 1; grid-row: 1; }",
+                   "#recoveryPanel { grid-column: 2; grid-row: 1; }"):
+        assert needed in page, f"balanced heatmap/recovery placement missing: {needed}"
     # The drilldown belongs to the layout; only .expanded promotes it to an overlay.
     assert ".modal-overlay.expanded" in page, "drilldown must have an expanded state"
     assert "expandDrilldownBtn" in page, "drilldown must offer a full-screen control"
     assert "collapseDrilldown" in page, "escape and close must collapse, not hide"
+    assert "#drilldownModal:not(.expanded)" in page and "max-height: 400px" in page, \
+        "inline drilldown must stay compact until explicitly expanded"
     # Heading is readable on the light surface; the gradient fill was invisible.
     assert "-webkit-text-fill-color: transparent" not in page,         "gradient text fill is unreadable on the light surface"
     assert "color: #000;" in page, "dashboard heading must be black"

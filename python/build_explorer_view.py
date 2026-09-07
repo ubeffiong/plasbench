@@ -18,7 +18,7 @@ builds a depth profile. It is null everywhere.
 import json
 from collections import defaultdict
 
-from build_enterprise_view import contig_rows
+from build_enterprise_view import contig_rows, display_tool_name
 
 
 # Reference bases outside any CIGAR-bounded local alignment are unknown rather
@@ -324,7 +324,9 @@ def build(visualizations, structural, versions):
                     feature["statusByTool"][tool] = protein_status(feature, segments)
                 tracks.append({
                     "id": tool,
-                    "label": tool,
+                    # IDs remain stable for filtering and artifact paths; only
+                    # the reader-facing label is human-friendly.
+                    "label": display_tool_name(tool),
                     "version": versions.get(tool, "not recorded"),
                     "segments": segments,
                     "contigs": [{"id": r["id"], "start": r["alignmentStart"],
