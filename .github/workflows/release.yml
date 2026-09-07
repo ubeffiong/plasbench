@@ -37,7 +37,7 @@ jobs:
           )"
           test "$VERSION" = "$PACKAGE_VERSION"
           bash scripts/make_release.sh
-          sha256sum -c "dist/plasbench-${VERSION}.tar.gz.sha256"
+          (cd dist && sha256sum -c "plasbench-${VERSION}.tar.gz.sha256")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       # continue-on-error: the plasbench project does not exist on PyPI yet
       # (no Trusted Publisher has been registered there -- see RELEASING.md).
