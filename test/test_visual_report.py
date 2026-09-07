@@ -165,8 +165,9 @@ def main():
     # Heatmap and plasmid panels share a row down to laptop widths.
     assert "@media (max-width: 900px)" in page, "grid must stay two-column above 900px"
 
-    # Layout: 40/60 columns, with the heatmap column split into two equal rows.
-    assert "minmax(0, 2fr) minmax(0, 3fr)" in page, "heatmap/plasmid split must be 40/60"
+    # Layout: equal desktop columns keep the matrix and plasmid-level recovery
+    # view equally prominent without compromising the full-width drilldown.
+    assert "minmax(0, 1fr) minmax(0, 1fr)" in page, "heatmap/plasmid split must be 50/50"
     # Row one is matrix beside plasmid recovery at equal height; the drilldown
     # spans the full width beneath, so contig evidence gets the horizontal room.
     assert "grid-column: 1 / -1" in page, "drilldown must span both columns"
