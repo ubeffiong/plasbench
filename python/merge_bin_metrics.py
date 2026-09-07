@@ -9,7 +9,38 @@ FIELDS = [
     "bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins",
     "missed_plasmids", "split_events", "merge_events", "contaminated_bins",
     "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction",
+    "perfect_reference_recovery", "strict_reference_reconstruction",
 ]
+
+
+def value(row, field):
+    try:
+        return float(row.get(field, ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def perfect_metrics(row):
+    """Return availability-aware reference-perfect labels.
+
+    These labels are deliberately stricter than high F1, but are not claims of
+    nucleotide-identical sequence or circular closure.  The structural label
+    is withheld rather than guessed when a tool did not provide bin evidence.
+    """
+    required = ("f1", "plasmid_recall", "unmapped_pred_bp", "off_truth_pred_bp",
+                "ambiguously_mapped_pred_bp")
+    if any(value(row, field) is None for field in required):
+        return "", ""
+    recovery = (value(row, "f1") >= 0.99995 and value(row, "plasmid_recall") >= 0.99995
+                and all(value(row, field) == 0 for field in required[2:]))
+    recovery_label = "yes" if recovery else "no"
+    structural = ("bin_f1", "split_events", "merge_events", "contaminated_bins",
+                  "contamination_fraction", "repeat_ambiguity_bp")
+    if any(value(row, field) is None for field in structural):
+        return recovery_label, ""
+    strict = recovery and value(row, "bin_f1") >= 0.99995 and all(
+        value(row, field) == 0 for field in structural[1:])
+    return recovery_label, "yes" if strict else "no"
 
 
 def main():
@@ -33,6 +64,7 @@ def main():
         summary = summaries.get((row["sample"], row["tool"]), {})
         for field in FIELDS:
             row[field] = summary.get(field, "")
+        row["perfect_reference_recovery"], row["strict_reference_reconstruction"] = perfect_metrics(row)
     with open(args.scores, "w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
         writer.writeheader()

@@ -87,6 +87,8 @@ def read_scores(path):
                 # probability (adapters/SCORES.md); gracefully absent, never 0,
                 # for every other tool -- see merge_pr_metrics.py.
                 "pr_auc": float(f[idx["pr_auc"]]) if "pr_auc" in idx and f[idx["pr_auc"]] else None,
+                "perfect_reference_recovery": f[idx["perfect_reference_recovery"]] if "perfect_reference_recovery" in idx else "",
+                "strict_reference_reconstruction": f[idx["strict_reference_reconstruction"]] if "strict_reference_reconstruction" in idx else "",
             })
     return rows
 
@@ -116,7 +118,7 @@ def read_status(path):
 
 
 def summarise(rows, status_counts):
-    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "n": 0})
+    by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0})
     for r in rows:
         t = by_tool[r["tool"]]
         t["precision"].append(r["precision"])
@@ -126,6 +128,10 @@ def summarise(rows, status_counts):
             t["plasmid_recall"].append(r["plasmid_recall"])
         if r["bin_f1"] is not None: t["bin_f1"].append(r["bin_f1"])
         if r["pr_auc"] is not None: t["pr_auc"].append(r["pr_auc"])
+        if r["perfect_reference_recovery"] in ("yes", "no"):
+            t["perfect"].append(r["perfect_reference_recovery"] == "yes")
+        if r["strict_reference_reconstruction"] in ("yes", "no"):
+            t["strict"].append(r["strict_reference_reconstruction"] == "yes")
         t["n"] += 1
 
     summary = []
@@ -148,6 +154,10 @@ def summarise(rows, status_counts):
             # below stays on mean_f1 so every tool remains comparable.
             "mean_pr_auc": statistics.mean(d["pr_auc"]) if d["pr_auc"] else None,
             "n_pr_scored": len(d["pr_auc"]),
+            "n_reference_perfect_assessed": len(d["perfect"]),
+            "reference_perfect_recovery_rate": statistics.mean(d["perfect"]) if d["perfect"] else None,
+            "n_strict_reconstruction_assessed": len(d["strict"]),
+            "strict_reference_reconstruction_rate": statistics.mean(d["strict"]) if d["strict"] else None,
             "n_completed": status_counts[tool]["completed"] + status_counts[tool]["reused"],
             "n_failed": status_counts[tool]["failed"],
             "n_skipped": status_counts[tool]["skipped"],
@@ -235,6 +245,7 @@ def write_comparisons(rows, path):
 def write_tsv(summary, path):
     cols = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
             "mean_recall", "mean_plasmid_recall", "n_bin_scored", "mean_bin_f1", "n_pr_scored", "mean_pr_auc",
+            "n_reference_perfect_assessed", "reference_perfect_recovery_rate", "n_strict_reconstruction_assessed", "strict_reference_reconstruction_rate",
             "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
@@ -245,9 +256,16 @@ def write_tsv(summary, path):
                 f"{s['mean_plasmid_recall']:.4f}" if s["mean_plasmid_recall"] is not None else "",
                 s['n_bin_scored'], f"{s['mean_bin_f1']:.4f}" if s['mean_bin_f1'] is not None else "",
                 s['n_pr_scored'], f"{s['mean_pr_auc']:.4f}" if s['mean_pr_auc'] is not None else "",
+                s['n_reference_perfect_assessed'], f"{s['reference_perfect_recovery_rate']:.4f}" if s['reference_perfect_recovery_rate'] is not None else "",
+                s['n_strict_reconstruction_assessed'], f"{s['strict_reference_reconstruction_rate']:.4f}" if s['strict_reference_reconstruction_rate'] is not None else "",
                 f"{s['mean_f1']:.4f}", f"{s['f1_ci_low']:.4f}" if s["f1_ci_low"] is not None else "",
                 f"{s['f1_ci_high']:.4f}" if s["f1_ci_high"] is not None else "", f"{s['median_f1']:.4f}",
             ]) + "\n")
+
+
+def format_rate(rate, assessed):
+    """Display an availability-aware rate without turning missing evidence into zero."""
+    return f"{rate:.1%} (n={assessed})" if rate is not None else "not assessed"
 
 
 def write_md(summary, path):
@@ -256,8 +274,8 @@ def write_md(summary, path):
         fh.write("Ranked by mean base-level F1 across samples "
                  "(positive class = plasmid).\n\n")
         fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | "
-                 "Mean base recall | Mean plasmid recall | **Mean F1** | 95% F1 CI | Median F1 |\n")
-        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:"]) + "|\n")
+                 "Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | **Mean F1** | 95% F1 CI | Median F1 |\n")
+        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:"]) + "|\n")
         for i, s in enumerate(summary, start=1):
             plasmid_recall = f"{s['mean_plasmid_recall']:.3f}" if s["mean_plasmid_recall"] is not None else "not annotated"
             ci = (f"{s['f1_ci_low']:.3f}–{s['f1_ci_high']:.3f}"
@@ -265,12 +283,16 @@ def write_md(summary, path):
             fh.write(
                 f"| {i} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "
                 f"{s['mean_precision']:.3f} | {s['mean_recall']:.3f} | "
-                f"{plasmid_recall} | **{s['mean_f1']:.3f}** | {ci} | {s['median_f1']:.3f} |\n"
+                f"{plasmid_recall} | {format_rate(s['reference_perfect_recovery_rate'], s['n_reference_perfect_assessed'])} | "
+                f"{format_rate(s['strict_reference_reconstruction_rate'], s['n_strict_reconstruction_assessed'])} | "
+                f"**{s['mean_f1']:.3f}** | {ci} | {s['median_f1']:.3f} |\n"
             )
         fh.write("\n_Recall = completeness (fraction of true plasmid bases "
                  "recovered). Plasmid recall = fraction of truth plasmids meeting the configured "
                  "recovery threshold; it is not available for legacy score rows. Precision = 1 - "
-                 "chromosomal contamination._\n")
+                 "chromosomal contamination. Perfect reference recovery requires F1/plasmid recall of 1 "
+                 "and zero ambiguous, unmapped, and off-truth predicted bases. Strict reconstruction also "
+                 "requires perfect available bin diagnostics; neither measure proves nucleotide identity or closure._\n")
 
 
 def write_track_leaderboards(rows, status_counts, prefix):

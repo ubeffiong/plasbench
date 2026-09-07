@@ -77,6 +77,14 @@ GLOSSARY = {
                "method can score well on either alone; F1 only rises when both "
                "hold. It is not a measure of structural correctness.",
     },
+    "Perfect reference recovery": {
+        "what": "Rate of scored samples with F1 and plasmid recall of 1, and no ambiguous, unmapped, or off-truth predicted bases.",
+        "why": "It identifies fully supported recovery against this reference, while remaining stricter than a high average F1. It does not prove nucleotide identity or circular closure.",
+    },
+    "Strict reconstruction": {
+        "what": "Perfect reference recovery plus perfect available bin diagnostics, with no split, merge, contamination, or repeat-ambiguity events.",
+        "why": "It is the stronger structural screen when a tool provides validated bins. It is withheld, not treated as zero, for tools without bin evidence.",
+    },
     "Base precision": {
         "what": "TP / (TP + FP) over reference bases.",
         "why": "How much of what the method called plasmid really is plasmid. "
@@ -183,6 +191,8 @@ GLOSSARY_ALIASES = {
     "Contamination fraction": "Chromosomal contamination",
     "Mean plasmid recall": "Plasmid recall",
     "Mean PR-AUC": "PR-AUC",
+    "Perfect reference recovery": "Perfect reference recovery",
+    "Strict reconstruction": "Strict reconstruction",
 }
 
 
@@ -872,6 +882,12 @@ def number(value):
 
 def optional_number(value):
     return float(value) if value not in (None, "") else None
+
+
+def rate_text(rate, assessed):
+    rate = optional_number(rate)
+    assessed = optional_number(assessed)
+    return f"{rate:.1%} (n={int(assessed)})" if rate is not None and assessed is not None else "not assessed"
 
 
 def esc(value):
@@ -2258,13 +2274,15 @@ def main():
     def leaderboard_row_html(row):
         return (
             "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
-            "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{bin_f1}</td><td>{pr_auc}</td>"
+            "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{perfect}</td><td>{strict}</td><td>{bin_f1}</td><td>{pr_auc}</td>"
             "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span></td></tr>".format(
                 rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
                 scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
                 failed=esc(row.get("n_failed", "0")), skipped=esc(row.get("n_skipped", "0")),
                 precision=esc(row["mean_precision"]), recall=esc(row["mean_recall"]),
                 plasmid_recall=esc(row.get("mean_plasmid_recall") or "not annotated"),
+                perfect=esc(rate_text(row.get("reference_perfect_recovery_rate"), row.get("n_reference_perfect_assessed"))),
+                strict=esc(rate_text(row.get("strict_reference_reconstruction_rate"), row.get("n_strict_reconstruction_assessed"))),
                 bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"),
                 pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row["mean_f1"]),
                 f1_width=max(0, min(100, round(number(row["mean_f1"]) * 100))),
@@ -2282,10 +2300,10 @@ def main():
     }
 
     def leaderboard_table(rows):
-        body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='12'>No scored tools yet.</td></tr>"
+        body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='14'>No scored tools yet.</td></tr>"
         return ("<div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th>"
                 "<th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th>"
-                "<th>Mean plasmid recall</th><th>Mean bin F1</th><th>Mean PR-AUC</th><th>Mean F1</th></tr></thead>"
+                "<th>Mean plasmid recall</th><th>Perfect reference recovery</th><th>Strict reconstruction</th><th>Mean bin F1</th><th>Mean PR-AUC</th><th>Mean F1</th></tr></thead>"
                 f"<tbody>{body}</tbody></table></div>")
 
     # One ranking per track. Pooling them would rank a tool given long reads
@@ -2528,7 +2546,7 @@ def main():
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
 <section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. Where at least five shared samples exist, the statistics section adds paired confidence intervals and permutation evidence with Holm adjustment.</p><ul>{insight_html}</ul></div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
-<section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p>{leaderboard_panels}</section>
+<section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Perfect reference recovery requires F1 and plasmid recall of 1 with no ambiguous, unmapped, or off-truth predicted bases. Strict reconstruction additionally requires perfect available bin diagnostics; neither label proves nucleotide identity or circular closure. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p>{leaderboard_panels}</section>
 <section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p><div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
 <section id='validation'><h2>Leave-one-study-out validation</h2><p class='lead'>For each source study, the method is selected using all other studies and then evaluated only on the held-out study. A withheld result means the cohort does not yet have enough independent study evidence; it is not a failed method.</p><div class='panel'><table class='sortable'><thead><tr><th>Held-out study</th><th>Held-out samples</th><th>Training-selected method</th><th>Training samples</th><th>Held-out mean F1</th><th>Status</th><th>Interpretation</th></tr></thead><tbody>{validation_rows}</tbody></table></div></section>
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>

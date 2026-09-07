@@ -11,6 +11,11 @@ coverage. The final report uses them for filters and preserves them in its CSV
 export. True plasmid-size filters are calculated directly from each reference's
 truth table, rather than relying on a manually entered size.
 
+Read [`SCENARIOS.md`](SCENARIOS.md) before creating a clinical-outbreak or
+metagenomic panel. Outbreak cohorts need dependence-aware holdouts;
+metagenomic benchmarking requires a separate truth and scoring design and is
+not yet an executable PlasBench scenario.
+
 Validate locally:
 
 ```bash
