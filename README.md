@@ -313,7 +313,28 @@ This must now print a version number before you continue.
 
 ### Step 3 — Download PlasBench
 
-Don't know the current version number? Resolve it first instead of guessing:
+#### First option: install the latest stable release automatically
+
+This is the recommended path for most laboratory users. It always resolves the
+latest published GitHub release, verifies its SHA-256 checksum, extracts it in
+your home directory, and starts the normal installer. Add `--tools` to install
+the benchmark tools and their databases at the same time.
+
+```bash
+cd ~
+curl -fL -O https://raw.githubusercontent.com/ubeffiong/plasbench/main/scripts/install_latest.sh
+bash install_latest.sh --tools
+```
+
+The script prints the installed version and directory when it completes. In a
+new terminal, continue with step 5. To install into another location, set
+`PLASBENCH_INSTALL_DIR=/path/to/location` before running it.
+
+#### Alternative: choose or inspect a specific release version
+
+Use this route only when you need to install an older release, reproduce a
+published run exactly, or inspect the download commands before executing them.
+Resolve the latest version first instead of guessing:
 
 ```bash
 VERSION="$(curl -fsSL https://api.github.com/repos/ubeffiong/plasbench/releases/latest | grep -m1 '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')"
