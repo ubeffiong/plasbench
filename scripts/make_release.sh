@@ -86,7 +86,7 @@ if [[ -n "$offenders" ]]; then
 fi
 echo "[make_release] line endings verified: no CR in .sh, .tsv or .json"
 
-chmod +x "$STAGE/$PKG/install.sh" 2>/dev/null || true
+chmod +x "$STAGE/$PKG/install.sh" "$STAGE/$PKG/update.sh" 2>/dev/null || true
 find "$STAGE/$PKG/scripts" "$STAGE/$PKG/adapters" "$STAGE/$PKG/env" \
      -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
 

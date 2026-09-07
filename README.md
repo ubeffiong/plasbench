@@ -306,11 +306,21 @@ This must now print a version number before you continue.
 
 ### Step 3 — Download PlasBench
 
+Don't know the current version number? Resolve it first instead of guessing:
+
+```bash
+VERSION="$(curl -fsSL https://api.github.com/repos/ubeffiong/plasbench/releases/latest | grep -m1 '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')"
+echo "$VERSION"
+```
+
+Then, with a version number in hand (either from `$VERSION` above, or the one already in
+this guide):
+
 ```bash
 cd ~
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.2.1/plasbench-0.2.1.tar.gz
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.2.1/plasbench-0.2.1.tar.gz.sha256
-sha256sum -c plasbench-0.2.1.tar.gz.sha256
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.1}/plasbench-${VERSION:-0.2.1}.tar.gz"
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.1}/plasbench-${VERSION:-0.2.1}.tar.gz.sha256"
+sha256sum -c "plasbench-${VERSION:-0.2.1}.tar.gz.sha256"
 ```
 
 The last command must print exactly:
@@ -334,8 +344,8 @@ rm -f plasbench-0.2.1.tar.gz plasbench-0.2.1.tar.gz.sha256
 Now unpack it:
 
 ```bash
-tar -xzf plasbench-0.2.1.tar.gz
-cd ~/plasbench-0.2.1
+tar -xzf "plasbench-${VERSION:-0.2.1}.tar.gz"
+cd "$HOME/plasbench-${VERSION:-0.2.1}"
 ```
 
 ---
@@ -682,60 +692,162 @@ ls ~/plasbench-0.2.1/logs/
 
 ### Step 13 — Upgrading from an older version
 
-Each release lives in its own directory (`~/plasbench-0.1.9`, `~/plasbench-0.2.1`, ...) —
-upgrading means downloading the new one alongside the old one, not overwriting it. Repeat
-steps 3–5 with the new version number, then two things make this an upgrade rather than a
-second fresh install:
-
-**The conda environment updates in place — it does not need to be recreated.**
-`./install.sh --tools` (step 4) detects the existing `plasbench` environment from your old
-install and updates it to match the new version's requirements, leaving everything already
-installed into it (including MOB-suite's database) untouched:
-
-```
-[setup_conda] environment 'plasbench' already exists at:
-[setup_conda]   /home/you/miniforge3/envs/plasbench
-[setup_conda] updating it in place (nothing is deleted) ...
-```
-
-If you ever want a fully clean environment instead, remove it first, deliberately, before
-running step 4: `conda env remove -n plasbench`.
-
-**Point the new install at your existing databases instead of re-downloading them.**
-The Platon (~1.4 GB) and MOB-suite (~450 MB) databases live under each version's own
-`data/db/`, so a fresh directory starts without them. Skip step 7 and reuse what step 7
-already downloaded for the old version, either by copying it over:
+One command, run from inside your current install directory:
 
 ```bash
-mkdir -p ~/plasbench-0.2.1/data/db
-cp -r ~/plasbench-0.1.9/data/db/platon ~/plasbench-0.2.1/data/db/
+./update.sh
 ```
 
-or, for any command, by pointing `--platon-db` at the old location directly instead of
-copying anything:
+That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
+It finds the latest release, downloads and verifies it, unpacks it into a new sibling
+directory (`~/plasbench-0.1.9` → `~/plasbench-0.2.1`, your current one is never touched
+or deleted), copies over your Platon/MOB-suite databases and any `config/local.tsv` or
+`.ncbi.env` you added so nothing needs re-downloading, and runs the new version's own
+installer — which updates the shared `plasbench` conda environment in place rather than
+recreating it, so nothing already installed into it is lost. Finish with:
 
 ```bash
-plasbench run --cohort public-v1 --platon-db ~/plasbench-0.1.9/data/db/platon/db
-```
-
-MOB-suite's database lives inside the conda environment itself (not under a version
-directory), so it carries over automatically once the environment update above completes —
-nothing to copy for it.
-
-**Carry over anything you added yourself.** If you ran `plasbench init-local` or added a
-`config/local.tsv`/`.ncbi.env` to the old directory, copy those specific files into the new
-one too; only files you created are involved; nothing shipped by the release needs it.
-
-**Confirm the upgrade:**
-
-```bash
+cd ~/plasbench-0.2.1        # the directory ./update.sh just printed
 conda activate plasbench
-plasbench --version   # should print the new version
-plasbench test
+plasbench --version         # should print the new version
 ```
+
+If `./update.sh` says a destination directory already exists, or you'd rather do each
+part by hand (say, on a machine with no internet access to GitHub's API), see what it
+automates:
+
+- **The conda environment** updates in place — `./install.sh --tools` (step 4) detects
+  the existing `plasbench` environment and updates it to match the new version, leaving
+  everything already installed into it (including MOB-suite's database) untouched. To
+  force a fully clean environment instead, remove it first, deliberately:
+  `conda env remove -n plasbench`.
+- **The databases** (Platon ~1.4 GB, MOB-suite ~450 MB) live under each version's own
+  `data/db/`, so a fresh directory starts without them — copy `data/db/platon` over from
+  the old directory, or point any command at the old location directly with
+  `--platon-db ~/plasbench-0.1.9/data/db/platon/db`. MOB-suite's database lives inside
+  the conda environment itself, so it carries over automatically once the environment
+  updates.
+- **Anything you added yourself** — `config/local.tsv`, `.ncbi.env` — copy those specific
+  files into the new directory; nothing shipped by the release needs it.
 
 Once you've confirmed the new version works, the old directory can be deleted or kept
 around — PlasBench never reads across version directories on its own.
+
+---
+
+### Step 14 — Quick reference: one example, every command, and reading the report
+
+#### A complete end-to-end example
+
+Everything below this line assumes you've done steps 1–9 (installed, activated, got the
+databases). This one block goes from nothing run yet to an HTML report:
+
+```bash
+conda activate plasbench
+plasbench run --cohort public-v1 --threads 8 --memory-gb 16
+```
+
+That downloads `public-v1`'s 10 isolates, assembles them, runs the default tools
+(`mob_recon`, `platon`, `plasmidSPAdes`), scores every prediction against the complete
+reference, and writes `results/benchmark.report.html` — open that file in a browser (see
+below for how to read it). Re-running the same command later reuses everything already
+completed (see [step 10](#step-10--run-your-first-benchmark)) instead of starting over.
+
+#### Every `plasbench` command
+
+Every command also accepts `--help` for its complete, authoritative option list — this
+table is a map of what exists, not a substitute for that. Options in *italics* are the
+ones you'll actually reach for most often; every command has more than shown here.
+
+| Command | What it does | Common options |
+|---|---|---|
+| `run` | Run the full benchmark, or just the stages you list (`0`-`7`). The main entry point. | *`--cohort`/`--samples`*, *`--threads`*, *`--memory-gb`*, `--parallel-samples`, `--parallel-tools`, `--analysis-track`, `--decision-profile`, `--write-script`, `--local-inputs`, one on/off flag per tool (e.g. `--platon off`) |
+| `report` | Re-render the leaderboard/HTML report from scores already on disk — no re-running any tool. | Same input/output flags as `run` (`--results-dir`, `--cohort`, ...) |
+| `demo` | Offline synthetic demo — no data, no tools, no network. Good for "is my install even working." | none |
+| `test` | The full offline regression suite (what CI runs). | none |
+| `check` | Check configured tools/databases; offers to install what's missing. | `--yes` |
+| `install-conda` | Detect (or install) a conda-family manager. | `--yes`, `--prefix` |
+| `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `all`, ...). | *`profile`* (positional) |
+| `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
+| `validate-cohort` | Check a cohort sheet's schema, or verify it against NCBI online. | *`--samples`*, `--online`, `--write-lock`, `--verify-lock`, `--ledger` |
+| `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
+| `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
+| `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |
+| `build-ledger` | Regenerate the cross-cohort BioSample dedup ledger from every `cohorts/*.lock.json`. | `--cohorts-dir`, `--out` |
+| `prepare-contribution` | Validate a new isolate and stage it on a local git branch, ready for a PR. | *`--cohort`*, *`--new-rows`*, *`--scores`*, `--tool-status` |
+| `select-candidates` | Recompute recommendations from an existing `scores.tsv` (what stage 6 calls internally). | `--scores`, `--samples`, `--results-dir`, `--min-samples`, `--min-coverage` |
+| `select-unknown` | Pick an evidence-gated method for a sample with no ground truth. | *`--recommendations`*, *`--sample-id`*, `--organism`, `--gram-group` |
+| `reconstruct` | Reconstruct plasmids for ONE new operational isolate, using only the recommended (or `--tool`-forced) method. | *`--sample`*, *`--sra`*, `--tool`, `--organism`, `--read-depth-x` |
+| `depth-ladder` / `depth-report` | Build a fixed-depth subsampling series from staged reads, then summarize F1 vs depth. | `--samples`, `--data-dir`, `--out-dir`, `--depths` |
+| `read-quality-ladder` / `read-quality-report` | The long-read analog of the depth ladder, sweeping length/quality instead of coverage. | `--samples`, `--data-dir`, `--out-dir`, `--rungs` |
+| `docs` | Print this user guide, or one topic (`--topic outputs`, `--topic commands`, ...). | `--topic` |
+| `concept-note` | Print the non-technical project summary. | none |
+
+#### The sample sheet: what it is, and how to get one
+
+Every command that takes `--samples`/`--cohort` reads the same schema: a tab-separated
+file, one isolate per row, documented in full in
+[`config/accessions.tsv`](config/accessions.tsv)'s own header comment (open that file —
+every column is explained there, including which ones are optional). You rarely need to
+write one by hand:
+
+- **Your own isolate:** `plasbench init-local --sample NAME --reads-1 ... --reads-2 ...`
+  appends a correctly-formed row to `config/local.tsv` for you.
+- **A cohort from public data:** `plasbench discover-cohort --organism "..."` followed by
+  `plasbench curate-cohort` produces `accepted.tsv` in exactly this schema — see
+  [4.2](#42-build-a-cohort-of-your-own) for the full walkthrough.
+- **A cohort PlasBench already ships:** `cohorts/public-v1.tsv` and `cohorts/public-v2.tsv`
+  are ordinary examples of this same schema — open either one directly to see real,
+  filled-in rows.
+
+#### Seeing the exact commands PlasBench runs
+
+For `run`/`report`, add `--write-script FILE` instead of running immediately: it writes
+the exact resolved shell commands (every stage, every argument, every environment
+variable) to a plain, editable bash script instead of executing them, so you can read or
+change it before running it yourself:
+
+```bash
+plasbench run --cohort public-v1 --write-script run_public_v1.sh
+cat run_public_v1.sh    # read exactly what would run
+bash run_public_v1.sh   # then run it, once you're satisfied
+```
+
+The cohort-building commands (`discover-cohort`, `curate-cohort`, `build-ledger`,
+`validate-cohort`, `prepare-contribution`) don't wrap a multi-stage pipeline the way
+`run` does — each one already *is* a single, direct invocation of one Python script
+under [`python/`](python/), so `--help` on the command shows its complete, real argument
+list, and the script itself (e.g. `python/discover_ncbi_cohort.py`) is the literal,
+readable source of what NCBI queries and validation rules it applies — there is no
+separate "generated command" to extract, because you're already looking at it.
+
+#### Reading `benchmark.report.html`
+
+The report is one self-contained HTML file (no server needed — open it directly in a
+browser) with a left-hand navigation jumping between sections. In the order they appear:
+
+| Section | What it shows |
+|---|---|
+| Run and output metadata | When this run happened, how many score rows, how many artifacts, and the completed/reused/failed/skipped counts at a glance |
+| Automated interpretation | A plain-language summary generated from the scores and execution statuses below |
+| Performance profile | A bar chart of mean precision/recall/F1 per tool |
+| Benchmark method ranking | The sortable leaderboard — every tool's mean scores across the cohort |
+| Operational method recommendations | Which tool this cohort's evidence currently supports per stratum, and why (or why a recommendation is withheld — see [4.5](#45-recommendations-and-why-they-are-usually-withheld)) |
+| Leave-one-study-out validation | For each held-out study, whether the recommended method actually held up when trained on everything else |
+| Selected reconstructions | One card per sample: the actual chosen FASTA output, downloadable, with its decision explained |
+| All sample-tool scores | Every individual score row, filterable by sample/tool/organism/depth/F1 band, with a CSV export button |
+| Paired tool comparisons | Statistical head-to-head: is tool A's F1 actually different from tool B's on the samples they share |
+| Bin reconstruction diagnostics | Split/merge/contamination diagnostics for tools that report discrete bins (e.g. `mob_recon`) |
+| Cohort QC flags | Statistical outliers (assembly N50, GC%, ...) — advisory only, never excludes a sample |
+| Execution health | Every tool run's actual status (completed/reused/failed/skipped), runtime, and peak memory |
+| Tool drill-down | Click into one tool to see its score distribution across every sample |
+| Sample drill-down | Click into one sample to compare every tool that ran on it, side by side |
+| Keys, legend, and metric definitions | Every term the report uses, defined once — the same text also appears as a tooltip wherever that term is used |
+| Artifact explorer | Every file this run produced or consumed, browsable and downloadable directly from the report |
+| Scoring method and interpretation | The precision/recall/F1 definitions in full, and what "run integrity" means for a failed tool |
+
+Every column heading in a table is clickable to sort by it; hovering most terms shows the
+same definition as the Keys section, so you rarely need to leave the page you're on.
 
 
 ### Appendix A — Selection criteria: what makes a sequence eligible
