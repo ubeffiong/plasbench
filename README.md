@@ -59,9 +59,9 @@ leaderboard, and assumes no prior experience with conda or bioinformatics toolin
 The short version of that route is:
 
 ```bash
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.2.2/plasbench-0.2.2.tar.gz
-tar -xzf plasbench-0.2.2.tar.gz
-cd plasbench-0.2.2
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.2.3/plasbench-0.2.3.tar.gz
+tar -xzf plasbench-0.2.3.tar.gz
+cd plasbench-0.2.3
 ./install.sh --tools
 conda activate plasbench
 plasbench test
@@ -318,9 +318,9 @@ this guide):
 
 ```bash
 cd ~
-curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.2}/plasbench-${VERSION:-0.2.2}.tar.gz"
-curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.2}/plasbench-${VERSION:-0.2.2}.tar.gz.sha256"
-sha256sum -c "plasbench-${VERSION:-0.2.2}.tar.gz.sha256"
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.3}/plasbench-${VERSION:-0.2.3}.tar.gz"
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.3}/plasbench-${VERSION:-0.2.3}.tar.gz.sha256"
+sha256sum -c "plasbench-${VERSION:-0.2.3}.tar.gz.sha256"
 ```
 
 The last command must print exactly:

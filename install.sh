@@ -38,7 +38,7 @@ default_data_dir() {
 }
 
 configure_shared_data() {
-    local settings="$HERE/config/local.env" data_dir
+    local settings="$HERE/config/local.env" data_dir legacy_dir had_setting=0
 
     # Re-running the installer must retain the location chosen by an earlier
     # install, rather than silently falling back to the default path.
@@ -46,9 +46,29 @@ configure_shared_data() {
         # shellcheck disable=SC1090
         source "$settings"
     fi
+    [[ -n "${PLASBENCH_DATA_DIR:-}" ]] && had_setting=1
     data_dir="$(default_data_dir)"
-    mkdir -p "$data_dir" "$(dirname "$settings")"
-    if [[ ! -f "$settings" ]] || ! grep -q '^export PLASBENCH_DATA_DIR=' "$settings"; then
+    legacy_dir="$HERE/data"
+    mkdir -p "$(dirname "$settings")"
+
+    # v0.2.1 and older updaters copied databases into the newly unpacked
+    # release's data/. Move that inherited directory once before writing the
+    # shared setting, so the first upgrade also avoids a re-download.
+    if [[ "$had_setting" -eq 0 && -d "$legacy_dir" && ! -L "$legacy_dir" ]]; then
+        if [[ ! -e "$data_dir" ]]; then
+            say "moving inherited data to $data_dir (no copy and no re-download)..."
+            mkdir -p "$(dirname "$data_dir")"
+            mv "$legacy_dir" "$data_dir"
+            ln -s "$data_dir" "$legacy_dir"
+        elif [[ "$(cd "$legacy_dir" && pwd -P)" != "$(cd "$data_dir" && pwd -P)" ]]; then
+            # Never merge two independently created data directories. Keep
+            # the inherited one as this installation's configured location.
+            data_dir="$legacy_dir"
+            say "keeping existing inherited data at $data_dir (no copy and no re-download)..."
+        fi
+    fi
+    mkdir -p "$data_dir"
+    if [[ "$had_setting" -eq 0 ]]; then
         {
             echo '# Created by install.sh. Keep reusable reads and databases outside versioned releases.'
             printf 'export PLASBENCH_DATA_DIR=%q\n' "$data_dir"
