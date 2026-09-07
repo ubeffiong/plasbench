@@ -19,6 +19,26 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install build
       - run: python -m build
+      - id: version
+        name: Validate release version and build install archive
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION="$(python - <<'PY'
+          import pathlib
+          import re
+
+          text = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
+          match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+          if not match:
+              raise SystemExit("could not read project version")
+          print(match.group(1))
+          PY
+          )"
+          test "$VERSION" = "$PACKAGE_VERSION"
+          bash scripts/make_release.sh
+          sha256sum -c "dist/plasbench-${VERSION}.tar.gz.sha256"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       # continue-on-error: the plasbench project does not exist on PyPI yet
       # (no Trusted Publisher has been registered there -- see RELEASING.md).
       # A step failure otherwise skips every step after it in this job, which
@@ -50,3 +70,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          files: |
+            dist/plasbench-${{ steps.version.outputs.version }}.tar.gz
+            dist/plasbench-${{ steps.version.outputs.version }}.tar.gz.sha256
+          fail_on_unmatched_files: true
