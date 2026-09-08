@@ -16,15 +16,12 @@ trap 'rm -rf "$TMP"' EXIT
 # project's own Docker image is built FROM mambaorg/micromamba, which bakes
 # in a real micromamba on PATH; simply appending ":$PATH" would let that real
 # binary win over this test's staged fakes). Symlink every other real binary
-# through so bash itself and every other command still work. Scan every
-# directory actually on the CURRENT $PATH -- not a hardcoded /usr/bin:/bin --
-# since a real command (python3, a conda env's own bin/, ...) can live
-# anywhere depending on the host (e.g. a conda env's bin/ in a container, or
-# a non-standard install location on this suite's own dev machines).
+# through so bash itself and every other command still work. Restrict this to
+# standard POSIX command directories: enumerating an inherited WSL PATH can
+# traverse mounted Windows locations and make an offline test appear hung.
 CLEAN_BIN="$TMP/clean_bin"
 mkdir -p "$CLEAN_BIN"
-IFS=':' read -ra PATH_DIRS <<< "$PATH"
-for dir in "${PATH_DIRS[@]}"; do
+for dir in /usr/bin /bin; do
     [[ -d "$dir" ]] || continue
     for exe in "$dir"/*; do
         name="$(basename "$exe")"

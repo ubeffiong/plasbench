@@ -1,47 +1,13 @@
 #!/usr/bin/env bash
+# Reduced suite for constrained/slow temporary filesystems. It deliberately
+# omits only the interactive setup fixture; production CI and run_tests.sh run
+# the complete suite.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for test in test_scoring.py test_make_truth.py test_bin_matching.py test_merge_bin_metrics.py test_amr_truth.py test_recommendation_validation.py test_gplas_classifier_validation.py test_mob_to_gplas_classifier.py test_cohort_validation.py test_aggregate.py test_report_composition.py test_recovery_vocabulary.py test_explorer_view.py test_tool_versions.py test_report_javascript.py test_visual_report.py test_structural_and_annotation.py test_protein_annotation.py test_depth_ladder.py test_container_hygiene.py test_selection.py test_visualization_data.py test_operational_selection.py test_download_estimate.py test_local_inputs.py test_tool_capabilities_registry.py test_discover_long_read_hint.py test_read_quality_ladder.py test_pr_curve_scoring.py test_scores_validation.py test_merge_pr_metrics.py test_pr_curve_chart.py test_report_tracks.py test_compute_assembly_stats.py test_flag_cohort_outliers.py test_ridge_regression.py test_fit_recommendation_model.py test_select_unknown_sample_model.py test_accession_ledger.py test_curate_cohort_dedup.py test_validate_cohort_ledger.py test_recommendation_model_features.py test_analysis_track_and_read_quality_band.py test_measure_read_quality.py test_per_stratum_loso.py test_decision_profiles.py test_prepare_contribution.py test_zero_plasmid_isolate_scoring.py test_leaderboard_significance.py test_bin_nmi.py test_parse_teixeira2025_supplement.py test_resolve_ncbi_accessions.py test_build_hybrid_truth.py test_self_assembled_hybrid_schema.py test_report_new_capabilities.py test_compute_difficulty_features.py test_simulated_cohort_schema.py test_simulate_reads.py test_run_quast_diagnostics.py test_audit_three_class_scoring.py test_compare_scoring_methods.py; do
     python3 "$HERE/$test"
 done
-bash "$HERE/test_gplas_adapter.sh"
-bash "$HERE/test_only_tool_gating.sh"
-bash "$HERE/test_operational_reconstruct.sh"
-bash "$HERE/test_parallel_execution.sh"
-bash "$HERE/test_download_parallel.sh"
-bash "$HERE/test_assemble_parallel.sh"
-bash "$HERE/test_score_parallel.sh"
-bash "$HERE/test_score_analysis_track.sh"
-bash "$HERE/test_pr_curve_stale_cleanup.sh"
-bash "$HERE/test_run_all_default_stages.sh"
-bash "$HERE/test_bootstrap_conda.sh"
-bash "$HERE/test_database_installers.sh"
-bash "$HERE/test_plassembler.sh"
-bash "$HERE/test_flye_mob_recon_circularity.sh"
-bash "$HERE/test_long_read_truth_eligible.sh"
-bash "$HERE/test_hybracter.sh"
-bash "$HERE/test_hybracter_adapter.sh"
-bash "$HERE/test_trycycler_mob_recon.sh"
-bash "$HERE/test_genomad_adapter.sh"
-bash "$HERE/test_genomad_stage.sh"
-bash "$HERE/test_plasme_adapter.sh"
-bash "$HERE/test_plasme_stage.sh"
-bash "$HERE/test_plasgraph2_adapter.sh"
-bash "$HERE/test_plasgraph2_stage.sh"
-bash "$HERE/test_rfplasmid_adapter.sh"
-bash "$HERE/test_rfplasmid_stage.sh"
-bash "$HERE/test_plasmidhunter_adapter.sh"
-bash "$HERE/test_plasmidhunter_stage.sh"
-bash "$HERE/test_plasmer_adapter.sh"
-bash "$HERE/test_plasmer_stage.sh"
-bash "$HERE/test_plascope_adapter.sh"
-bash "$HERE/test_plascope_stage.sh"
-bash "$HERE/test_self_assembled_hybrid_download.sh"
-bash "$HERE/test_simulated_download_stage.sh"
-bash "$HERE/test_build_hybrid_truth_stage.sh"
-bash "$HERE/test_difficulty_features_stage.sh"
-bash "$HERE/test_cohort_and_write_script.sh"
-bash "$HERE/test_stage_wiring_qc_model.sh"
-bash "$HERE/test_thread_scaling_sweep.sh"
-bash "$HERE/test_quast_diagnostics_stage.sh"
+for test in test_gplas_adapter.sh test_only_tool_gating.sh test_operational_reconstruct.sh test_parallel_execution.sh test_download_parallel.sh test_assemble_parallel.sh test_score_parallel.sh test_score_analysis_track.sh test_pr_curve_stale_cleanup.sh test_run_all_default_stages.sh test_update_script.sh test_install_latest.sh test_release_archive.sh test_bootstrap_conda.sh test_database_installers.sh test_plassembler.sh test_flye_mob_recon_circularity.sh test_long_read_truth_eligible.sh test_hybracter.sh test_hybracter_adapter.sh test_trycycler_mob_recon.sh test_genomad_adapter.sh test_genomad_stage.sh test_plasme_adapter.sh test_plasme_stage.sh test_plasgraph2_adapter.sh test_plasgraph2_stage.sh test_rfplasmid_adapter.sh test_rfplasmid_stage.sh test_plasmidhunter_adapter.sh test_plasmidhunter_stage.sh test_plasmer_adapter.sh test_plasmer_stage.sh test_plascope_adapter.sh test_plascope_stage.sh test_self_assembled_hybrid_download.sh test_simulated_download_stage.sh test_build_hybrid_truth_stage.sh test_difficulty_features_stage.sh test_cohort_and_write_script.sh test_stage_wiring_qc_model.sh test_thread_scaling_sweep.sh test_quast_diagnostics_stage.sh; do
+    bash "$HERE/$test"
+done
 echo "ALL PLASBENCH TESTS PASSED"

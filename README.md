@@ -59,9 +59,9 @@ leaderboard, and assumes no prior experience with conda or bioinformatics toolin
 The short version of that route is:
 
 ```bash
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.2.5/plasbench-0.2.5.tar.gz
-tar -xzf plasbench-0.2.5.tar.gz
-cd plasbench-0.2.5
+curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.2.6/plasbench-0.2.6.tar.gz
+tar -xzf plasbench-0.2.6.tar.gz
+cd plasbench-0.2.6
 ./install.sh --tools
 conda activate plasbench
 plasbench test
@@ -346,9 +346,9 @@ this guide):
 
 ```bash
 cd ~
-curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.5}/plasbench-${VERSION:-0.2.5}.tar.gz"
-curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.5}/plasbench-${VERSION:-0.2.5}.tar.gz.sha256"
-sha256sum -c "plasbench-${VERSION:-0.2.5}.tar.gz.sha256"
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.6}/plasbench-${VERSION:-0.2.6}.tar.gz"
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.6}/plasbench-${VERSION:-0.2.6}.tar.gz.sha256"
+sha256sum -c "plasbench-${VERSION:-0.2.6}.tar.gz.sha256"
 ```
 
 The last command must print exactly:
@@ -372,8 +372,8 @@ rm -f plasbench-0.2.3.tar.gz plasbench-0.2.3.tar.gz.sha256
 Now unpack it:
 
 ```bash
-tar -xzf "plasbench-${VERSION:-0.2.5}.tar.gz"
-cd "$HOME/plasbench-${VERSION:-0.2.5}"
+tar -xzf "plasbench-${VERSION:-0.2.6}.tar.gz"
+cd "$HOME/plasbench-${VERSION:-0.2.6}"
 ```
 
 ---
@@ -515,7 +515,7 @@ The last command should print **31**.
 #### 7b — MOB-suite database
 
 ```bash
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 bash env/download_mobsuite_db.sh
 ```
 
@@ -576,7 +576,7 @@ Now write it into a file PlasBench reads. Replace the two values with your own, 
 everything else exactly as shown:
 
 ```bash
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 cat > .ncbi.env <<'EOF'
 NCBI_API_KEY=paste_your_key_here
 NCBI_EMAIL=your.email@example.org
@@ -597,7 +597,7 @@ This file is ignored by Git and is never included in a release archive. Do not s
 ### Step 9 — Confirm the whole installation
 
 ```bash
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 plasbench check
 ```
 
@@ -620,7 +620,7 @@ Start with `public-v1`: 10 isolates, the smallest shipped cohort. First confirm 
 cohort has not been altered:
 
 ```bash
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 plasbench validate-cohort --samples cohorts/public-v1.tsv --verify-lock cohorts/public-v1.lock.json
 ```
 
@@ -696,7 +696,7 @@ to be chromosome, which quietly inflates the scores.
 ### Step 11 — Look at the results
 
 ```bash
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 cat results/benchmark.leaderboard.md
 ```
 
@@ -771,7 +771,7 @@ None of these actions are required for a successful ordinary benchmark run.
 To see what PlasBench is doing in more detail, every stage writes a log:
 
 ```bash
-ls ~/plasbench-0.2.5/logs/
+ls ~/plasbench-0.2.6/logs/
 ```
 
 ---
@@ -863,7 +863,7 @@ plasbench upgrade
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, unpacks it into a new sibling
-directory (`~/plasbench-0.1.9` → `~/plasbench-0.2.5`, your current one is never touched
+directory (`~/plasbench-0.1.9` → `~/plasbench-0.2.6`, your current one is never touched
 or deleted), then reuses one physical data directory for reads and databases. On the
 first upgrade from an older release, it **moves** the old `data/` directory once to
 `~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
@@ -872,7 +872,7 @@ over `config/local.tsv` and `.ncbi.env`, then installs the new PlasBench code in
 existing `plasbench` environment **without refreshing Conda packages or tools**. Finish with:
 
 ```bash
-cd ~/plasbench-0.2.5        # the directory ./update.sh just printed
+cd ~/plasbench-0.2.6        # the directory ./update.sh just printed
 conda activate plasbench
 plasbench --version         # should print the new version
 ```
@@ -1956,7 +1956,7 @@ to `isolate_001`, not a reference strain or another patient isolate.
 
 ```bash
 # 1. Enter your PlasBench checkout or extracted release directory.
-export PB="$HOME/plasbench-0.2.5"
+export PB="$HOME/plasbench-0.2.6"
 cd "$PB"
 conda activate plasbench
 
@@ -2034,7 +2034,7 @@ the sample-sheet row:
 
 ```bash
 conda activate plasbench
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 
 plasbench init-local \
     --sample my_isolate \
@@ -2094,7 +2094,7 @@ Run it once per isolate; rows accumulate in the same sheet.
 digits, dot, dash, underscore only:
 
 ```bash
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 mkdir -p data/my_isolate config
 ```
 
@@ -2204,7 +2204,7 @@ it fails, so a bad table costs you seconds rather than a night of compute.
 
 ```bash
 conda activate plasbench
-cd ~/plasbench-0.2.5
+cd ~/plasbench-0.2.6
 
 REQUIRE_CURATED_METADATA=0 plasbench run \
     --samples config/local.tsv \

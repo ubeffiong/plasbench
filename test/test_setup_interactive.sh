@@ -22,18 +22,17 @@ trap 'rm -rf "$TMP"' EXIT
 # through and override what a scenario intends to simulate as missing.
 # Build a clean base PATH instead: every real command EXCEPT the ones this
 # suite fakes, so each scenario's PATH prefix is the only place those names
-# can be found. Scan every directory actually on the CURRENT $PATH -- not a
-# hardcoded /usr/bin:/bin -- since a real command (python3, a conda env's own
-# bin/, ...) can live anywhere depending on the host.
+# can be found. Restrict this to standard POSIX command directories: scanning
+# an inherited WSL PATH can traverse mounted Windows locations and make this
+# otherwise offline fixture appear hung.
 CLEAN_BIN="$TMP/clean_bin"
 mkdir -p "$CLEAN_BIN"
-IFS=':' read -ra PATH_DIRS <<< "$PATH"
-for dir in "${PATH_DIRS[@]}"; do
+for dir in /usr/bin /bin; do
     [[ -d "$dir" ]] || continue
     for exe in "$dir"/*; do
         name="$(basename "$exe")"
         case "$name" in
-            datasets|prefetch|fasterq-dump|fastp|minimap2|conda|mamba|micromamba|spades.py|plasmidspades.py|mob_recon|mob_init|mob_typer|mob_cluster|platon|gplas) continue ;;
+            datasets|prefetch|fasterq-dump|fastp|minimap2|unzip|conda|mamba|micromamba|spades.py|plasmidspades.py|mob_recon|mob_init|mob_typer|mob_cluster|platon|gplas) continue ;;
         esac
         # `|| true`: some directories on a real machine's PATH (e.g. a
         # protected Windows system directory under Git Bash) refuse symlink
@@ -48,10 +47,10 @@ done
 mkdir -p "$TMP/bin_full" "$TMP/bin_partial" "$TMP/data/db/platon/db" "$TMP/results" "$TMP/logs" "$TMP/tmp"
 touch "$TMP/data/db/platon/db/marker"
 
-for t in datasets prefetch fasterq-dump fastp minimap2 conda spades.py plasmidspades.py mob_recon platon; do
+for t in datasets prefetch fasterq-dump fastp minimap2 unzip python3 conda spades.py plasmidspades.py mob_recon platon; do
     printf '#!/usr/bin/env bash\ntrue\n' > "$TMP/bin_full/$t"; chmod +x "$TMP/bin_full/$t"
 done
-for t in datasets prefetch fasterq-dump fastp minimap2 conda spades.py plasmidspades.py; do
+for t in datasets prefetch fasterq-dump fastp minimap2 unzip python3 conda spades.py plasmidspades.py; do
     printf '#!/usr/bin/env bash\ntrue\n' > "$TMP/bin_partial/$t"; chmod +x "$TMP/bin_partial/$t"
 done
 # Fake conda logs what install_tools.sh actually asks it to install, so the
@@ -100,7 +99,7 @@ echo "declining consent never touches conda -> PASS"
 # actually invokes conda. gplas is otherwise not needed, so bin_full (which
 # lacks it) plus a logging conda is enough to isolate this one gap. ---
 mkdir -p "$TMP/bin_gplas"
-for t in datasets prefetch fasterq-dump fastp minimap2 spades.py plasmidspades.py mob_recon platon; do
+for t in datasets prefetch fasterq-dump fastp minimap2 unzip spades.py plasmidspades.py mob_recon platon; do
     printf '#!/usr/bin/env bash\ntrue\n' > "$TMP/bin_gplas/$t"; chmod +x "$TMP/bin_gplas/$t"
 done
 cat > "$TMP/bin_gplas/conda" <<EOF
@@ -122,7 +121,7 @@ echo "missing gplas (RUN_GPLAS2_MOB=1) + --yes triggers install-tools -> conda e
 
 # --- MOB-suite database: offered and actually invoked once mob_recon/mob_init exist. ---
 mkdir -p "$TMP/bin_mobdb"
-for t in datasets prefetch fasterq-dump fastp minimap2 conda spades.py plasmidspades.py mob_recon mob_init platon; do
+for t in datasets prefetch fasterq-dump fastp minimap2 unzip conda spades.py plasmidspades.py mob_recon mob_init platon; do
     printf '#!/usr/bin/env bash\ntrue\n' > "$TMP/bin_mobdb/$t"; chmod +x "$TMP/bin_mobdb/$t"
 done
 cat > "$TMP/bin_mobdb/mob_init" <<EOF

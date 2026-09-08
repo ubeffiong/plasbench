@@ -38,7 +38,13 @@ destination="${PLASBENCH_INSTALL_DIR:-$HOME}"
 target="$destination/plasbench-$version"
 [[ ! -e "$target" ]] || { echo "ERROR: $target already exists. Use ./update.sh there, or set PLASBENCH_INSTALL_DIR." >&2; exit 1; }
 mkdir -p "$destination"
-archive="$destination/plasbench-$version.tar.gz"
+# The release archive is only an installation transport. Keeping a copy in
+# $HOME after extraction wastes space and can mislead users into treating an
+# old archive as the installed version, so download it into a private temporary
+# directory and remove it on every exit path.
+download_dir="$(mktemp -d)"
+trap 'rm -rf "$download_dir"' EXIT
+archive="$download_dir/plasbench-$version.tar.gz"
 checksum="$archive.sha256"
 url="https://github.com/$REPO/releases/download/$tag/plasbench-$version.tar.gz"
 
@@ -46,7 +52,7 @@ say "downloading PlasBench $version..."
 curl -fL -o "$archive" "$url"
 curl -fL -o "$checksum" "$url.sha256"
 say "verifying the release checksum..."
-(cd "$destination" && sha256sum -c "$(basename "$checksum")")
+(cd "$download_dir" && sha256sum -c "$(basename "$checksum")")
 say "extracting to $target..."
 tar -xzf "$archive" -C "$destination"
 
