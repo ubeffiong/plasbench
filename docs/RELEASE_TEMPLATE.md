@@ -1,7 +1,8 @@
 ## PlasBench release documentation
 
-Read the [changelog](../../CHANGELOG.md) for user-visible changes and the
-[release guide](../../docs/RELEASES.md) for installation, verification,
+Read the [changelog](https://github.com/ubeffiong/plasbench/blob/main/CHANGELOG.md)
+for user-visible changes and the
+[release guide](https://github.com/ubeffiong/plasbench/blob/main/docs/RELEASES.md) for installation, verification,
 container use, upgrade, and rollback instructions.
 
 ### Download and verify
@@ -14,7 +15,7 @@ sha256sum -c plasbench-<version>.tar.gz.sha256
 
 The command must print `OK`. The GitHub release archive is the recommended
 terminal/WSL distribution. The latest-release installer and full lab workflow
-are documented in the [README](../../README.md).
+are documented in the [README](https://github.com/ubeffiong/plasbench#3-step-by-step-from-a-new-machine-to-your-first-leaderboard).
 
 ### Container
 
@@ -36,4 +37,3 @@ tool/database versions, and execution-health table. Read the report’s
 confidence and long-read-confirmation flags before downstream interpretation.
 
 ---
-

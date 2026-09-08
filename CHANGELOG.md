@@ -5,6 +5,15 @@ All notable changes to PlasBench are documented here. Version numbers follow
 the matching GitHub Release is the published distribution with verified
 archives, container references, and release notes.
 
+## [0.2.7] - 2026-09-08
+
+### Changed
+
+- Adds a complete user-facing release guide, reusable GitHub Release template,
+  and version-specific release notes.
+- Corrects `CITATION.cff` to the current release metadata.
+- Corrects stale PyPI release guidance after verified Trusted Publishing.
+
 ## [0.2.6] - 2026-09-08
 
 ### Added
@@ -45,7 +54,6 @@ archives, container references, and release notes.
   bioinformatics tools and databases are installed separately through the
   documented installer routes.
 - **GHCR** supplies the container image. Use an immutable version tag such as
-  `ghcr.io/ubeffiong/plasbench:v0.2.6` for reproducible work, not `latest`.
+  `ghcr.io/ubeffiong/plasbench:v0.2.7` for reproducible work, not `latest`.
 - **Run manifests and cohort locks** are required companions when reporting or
   comparing scientific results; a software version alone is insufficient.
-
