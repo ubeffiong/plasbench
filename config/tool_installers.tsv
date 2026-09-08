@@ -1,0 +1,18 @@
+tool	profile	install_mode	automated	runtime	database_mode	verify_command	notes
+mob_recon	reconstruction	conda	yes	plasbench	automated	mob_recon --version	MOB-suite database is installed by the managed database step.
+platon	reconstruction	conda	yes	plasbench	automated	platon --version	Platon database is installed by the managed database step.
+plasmidspades	assembly	conda	yes	plasbench	none	plasmidspades.py --help	Provided by SPAdes.
+gplas2_mob	gplas2	isolated_source	planned	gplas2	none	gplas --help	Requires a pinned gplas2 source runtime and MOB-compatible graph identifiers.
+gplas2_external	gplas2	isolated_source	planned	gplas2	none	gplas --help	Requires a pinned gplas2 source runtime and validated external classifier input.
+flye_mob_recon	long-read	conda	yes	plasbench	automated	flye --version	Uses the MOB-suite managed database.
+plassembler	plassembler	conda	yes	plasbench	automated	plassembler --help	Uses the Plassembler managed database.
+hybracter_long	hybracter	conda	yes	plasbench	automated	hybracter --help	Uses the Plassembler managed database.
+hybracter_hybrid	hybracter	conda	yes	plasbench	automated	hybracter --help	Uses the Plassembler managed database.
+trycycler_mob_recon	trycycler	conda	yes	plasbench	automated	trycycler --help	Uses the MOB-suite managed database.
+genomad	genomad	conda	yes	plasbench	automated	genomad --version	geNomad database is installed by the managed database step.
+plasme	plasme	isolated_source	planned	plasme	automated	PLASMe.py --help	Pinned source runtime required; PLASMe database is managed separately.
+rfplasmid	rfplasmid	conda	yes	plasbench	manual	RFPlasmid --help	CheckM reference data must be configured from its licensed upstream distribution.
+plasmidhunter	plasmidhunter	conda_pip	yes	plasbench	none	plasmidhunter --help	Conda dependencies plus the PyPI package in the same managed environment.
+plasmer	plasmer	conda	yes	plasbench	manual	Plasmer --help	The upstream database has no stable checksummed direct URL; installation cannot safely fabricate one.
+plascope	plascope	conda	yes	plasbench	automated	plaScope.sh --help	Species-specific databases are managed separately.
+plasgraph2	plasgraph2	isolated_source	planned	plasgraph2	none	plASgraph2_classify.py --help	Pinned source runtime and shipped pretrained model required.

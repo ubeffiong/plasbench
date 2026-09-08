@@ -55,6 +55,23 @@ You should see `[ok]` next to each tool you've enabled in `config/config.sh`.
 
 ## 3. One-time tool databases
 
+### Installer inventory and plan
+
+The existing installer has one registry for every supported non-demo adapter;
+it does not maintain a second package list. Before downloading anything, use:
+
+```bash
+plasbench install-tools list       # every supported adapter and its installer state
+plasbench install-tools plan       # same machine-readable plan for records/automation
+plasbench install-tools validate   # confirms registry coverage; no downloads
+```
+
+`plasbench install-tools all` runs every **verified automatic** profile through
+its existing installer path. It deliberately does not fake an installation for
+source-only runtimes (currently gplas2, PLASMe and plASgraph2) or databases
+without a stable upstream checksum. Those rows remain explicit as `planned` or
+`manual` in the registry, and their own profile prints the safe next step.
+
 ### Platon database (required if `RUN_PLATON=1`)
 ```bash
 bash env/download_platon_db.sh
@@ -72,18 +89,20 @@ populate the cache, or set `--database_directory` in `scripts/04_run_tools.sh`.
 ## 4. gplas2 modes (optional)
 
 PlasBench uses it only through explicit classifier-backed modes, so it remains
-off by default. Install it the same way as any other optional tool:
+off by default. The legacy `gplas` conda package is **not** gplas2; do not use
+it as a substitute. Inspect its explicit source-runtime contract first:
 
 ```bash
-plasbench install-tools gplas
+plasbench install-tools plan | grep gplas2
 # then enable RUN_GPLAS2_MOB=1 or RUN_GPLAS2_EXTERNAL=1 in config/config.sh
 ```
 `gplas2_mob` uses deterministic MOB-recon membership from the same assembly
 graph. `gplas2_external` requires one validated `<sample>.tsv` classifier table
 per graph. Both need an **assembly graph**; set `ASSEMBLER=unicycler` for the
 cleanest graphs. `bash scripts/00_setup.sh` (or `plasbench check`) detects a
-missing `gplas` binary whenever either mode is enabled and offers to install
-it for you, the same as it does for mob_recon or Platon.
+missing `gplas` binary whenever either mode is enabled and records a clear
+source-runtime instruction rather than silently installing the incompatible
+legacy executable.
 
 ---
 

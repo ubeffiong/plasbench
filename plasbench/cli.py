@@ -47,6 +47,11 @@ def project_root(value):
     return root
 
 
+def is_project_root(root):
+    """Whether *root* contains the runnable pipeline, not merely the CLI wheel."""
+    return (root / "scripts" / "run_all.sh").is_file()
+
+
 def configured_data_dir(root):
     """Return the persistent data location configured by install.sh.
 
@@ -322,9 +327,23 @@ def main(argv=None):
     )
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
-    install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, simulate, quast, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
+    install_parser = sub.add_parser("install-tools", help="Install, inspect, or verify registered bioinformatics tool profiles.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, reconstruction, simulate, quast, long-read, annotation, annotation-prokka, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
+    install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
+    candidate_dataset_parser = sub.add_parser("candidate-dataset", help="Build an auditable, label-safe candidate-quality dataset from a completed run.")
+    candidate_dataset_parser.add_argument("--scores", type=Path, required=True)
+    candidate_dataset_parser.add_argument("--samples", type=Path, required=True)
+    candidate_dataset_parser.add_argument("--results-dir", type=Path, required=True)
+    candidate_dataset_parser.add_argument("--out-prefix", type=Path, required=True)
+    candidate_dataset_parser.add_argument("--tool-status", type=Path)
+    import_external_parser = sub.add_parser("import-external-benchmark", help="Archive source-labelled external benchmark evidence without altering native ranks.")
+    import_external_parser.add_argument("--predictions", type=Path, required=True)
+    import_external_parser.add_argument("--ani", type=Path)
+    import_external_parser.add_argument("--out-dir", type=Path, required=True)
+    import_external_parser.add_argument("--source-repository", required=True)
+    import_external_parser.add_argument("--source-revision", required=True)
+    import_external_parser.add_argument("--citation", required=True)
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
                              help="Guide topic to print (default: all).")
@@ -507,6 +526,16 @@ def main(argv=None):
             ", ".join(repr(s) for s in invalid_stages),
             ", ".join(repr(s) for s in sorted(VALID_STAGES))))
     root = args.project_root
+    # argparse does not apply ``type=project_root`` to a Path-valued default.
+    # Without this explicit check, invoking the CLI from a random directory
+    # failed later with a shell "file not found" message. The report opener is
+    # deliberately standalone; every other command needs the release tree.
+    if args.command != "open-report" and not is_project_root(root):
+        parser.error(
+            f"{root} is not a PlasBench release/source directory (scripts/run_all.sh missing). "
+            "Run 'cd \"$PB\"' using the installation directory from the README, "
+            "or pass --project-root /path/to/plasbench before the command."
+        )
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
     elif args.command == "open-report":
@@ -611,7 +640,25 @@ def main(argv=None):
             command.extend(["--prefix", str(args.prefix)])
         code = run(command, root)
     elif args.command == "install-tools":
-        code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.profile], root)
+        command = [bash_command(), "env/install_tools.sh", "--env", args.env]
+        if args.yes:
+            command.append("--yes")
+        command.append(args.profile)
+        code = run(command, root)
+    elif args.command == "candidate-dataset":
+        command = [sys.executable, "python/build_candidate_quality_dataset.py", "--scores", str(args.scores),
+                   "--sample-sheet", str(args.samples), "--results-dir", str(args.results_dir),
+                   "--out-prefix", str(args.out_prefix)]
+        if args.tool_status:
+            command.extend(["--tool-status", str(args.tool_status)])
+        code = run(command, root)
+    elif args.command == "import-external-benchmark":
+        command = [sys.executable, "python/import_external_benchmark.py", "--predictions", str(args.predictions),
+                   "--out-dir", str(args.out_dir), "--source-repository", args.source_repository,
+                   "--source-revision", args.source_revision, "--citation", args.citation]
+        if args.ani:
+            command.extend(["--ani", str(args.ani)])
+        code = run(command, root)
     elif args.command == "depth-ladder":
         code = run([sys.executable, "python/make_depth_ladder.py", "--samples", str(args.samples),
                     "--data-dir", str(args.data_dir), "--out-dir", str(args.out_dir),

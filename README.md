@@ -59,10 +59,8 @@ leaderboard, and assumes no prior experience with conda or bioinformatics toolin
 The short version of that route is:
 
 ```bash
-curl -fL -O https://github.com/ubeffiong/plasbench/releases/download/v0.2.6/plasbench-0.2.6.tar.gz
-tar -xzf plasbench-0.2.6.tar.gz
-cd plasbench-0.2.6
-./install.sh --tools
+curl -fL -O https://raw.githubusercontent.com/ubeffiong/plasbench/main/scripts/install_latest.sh
+bash install_latest.sh --tools
 conda activate plasbench
 plasbench test
 ```
@@ -150,6 +148,8 @@ plasbench test && plasbench demo
   guide in the terminal.
 - [`docs/CONCEPT_NOTE.md`](docs/CONCEPT_NOTE.md) or `plasbench concept-note` — a
   non-technical overview for partners and funders.
+- [`docs/EXTERNAL_EVIDENCE.md`](docs/EXTERNAL_EVIDENCE.md) — safely importing
+  published benchmark evidence and using the candidate-quality research dataset.
 
 ---
 
@@ -326,9 +326,18 @@ curl -fL -O https://raw.githubusercontent.com/ubeffiong/plasbench/main/scripts/i
 bash install_latest.sh --tools
 ```
 
-The script prints the installed version and directory when it completes. In a
-new terminal, continue with step 5. To install into another location, set
-`PLASBENCH_INSTALL_DIR=/path/to/location` before running it.
+The script prints the installed version and directory when it completes. Save
+that directory for the later commands in this guide. In the same terminal,
+define `PB` once (replace the placeholder with the path the script printed):
+
+```bash
+PB="/path/printed/by-install_latest.sh"
+cd "$PB"
+```
+
+In a new terminal, define `PB` again before any command below that uses it.
+To install into another location, set `PLASBENCH_INSTALL_DIR=/path/to/location`
+before running the installer.
 
 #### Alternative: choose or inspect a specific release version
 
@@ -346,15 +355,16 @@ this guide):
 
 ```bash
 cd ~
-curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.6}/plasbench-${VERSION:-0.2.6}.tar.gz"
-curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION:-0.2.6}/plasbench-${VERSION:-0.2.6}.tar.gz.sha256"
-sha256sum -c "plasbench-${VERSION:-0.2.6}.tar.gz.sha256"
+test -n "$VERSION" || { echo "Could not resolve a release version" >&2; exit 1; }
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION}/plasbench-${VERSION}.tar.gz"
+curl -fL -O "https://github.com/ubeffiong/plasbench/releases/download/v${VERSION}/plasbench-${VERSION}.tar.gz.sha256"
+sha256sum -c "plasbench-${VERSION}.tar.gz.sha256"
 ```
 
 The last command must print exactly:
 
 ```
-plasbench-0.2.3.tar.gz: OK
+plasbench-<resolved-version>.tar.gz: OK
 ```
 
 If instead you see `curl: (22) ... 404`, the version number in the URL is wrong — check
@@ -366,14 +376,15 @@ failed and left an error page in place of the file. Delete both files and run th
 commands again:
 
 ```bash
-rm -f plasbench-0.2.3.tar.gz plasbench-0.2.3.tar.gz.sha256
+rm -f "plasbench-${VERSION}.tar.gz" "plasbench-${VERSION}.tar.gz.sha256"
 ```
 
 Now unpack it:
 
 ```bash
-tar -xzf "plasbench-${VERSION:-0.2.6}.tar.gz"
-cd "$HOME/plasbench-${VERSION:-0.2.6}"
+tar -xzf "plasbench-${VERSION}.tar.gz"
+PB="$HOME/plasbench-${VERSION}"
+cd "$PB"
 ```
 
 ---
@@ -417,7 +428,7 @@ plasbench --version
 You should see your prompt change to start with `(plasbench)`, and the version print:
 
 ```
-plasbench 0.2.2
+plasbench <installed-version>
 ```
 
 **You must run `conda activate plasbench` in every new terminal window** before using
@@ -515,7 +526,7 @@ The last command should print **31**.
 #### 7b — MOB-suite database
 
 ```bash
-cd ~/plasbench-0.2.6
+cd "$PB" # Set PB to the directory printed in step 3 if this is a new terminal.
 bash env/download_mobsuite_db.sh
 ```
 
@@ -576,7 +587,7 @@ Now write it into a file PlasBench reads. Replace the two values with your own, 
 everything else exactly as shown:
 
 ```bash
-cd ~/plasbench-0.2.6
+cd "$PB"
 cat > .ncbi.env <<'EOF'
 NCBI_API_KEY=paste_your_key_here
 NCBI_EMAIL=your.email@example.org
@@ -597,7 +608,7 @@ This file is ignored by Git and is never included in a release archive. Do not s
 ### Step 9 — Confirm the whole installation
 
 ```bash
-cd ~/plasbench-0.2.6
+cd "$PB"
 plasbench check
 ```
 
@@ -620,7 +631,7 @@ Start with `public-v1`: 10 isolates, the smallest shipped cohort. First confirm 
 cohort has not been altered:
 
 ```bash
-cd ~/plasbench-0.2.6
+cd "$PB"
 plasbench validate-cohort --samples cohorts/public-v1.tsv --verify-lock cohorts/public-v1.lock.json
 ```
 
@@ -696,7 +707,7 @@ to be chromosome, which quietly inflates the scores.
 ### Step 11 — Look at the results
 
 ```bash
-cd ~/plasbench-0.2.6
+cd "$PB"
 cat results/benchmark.leaderboard.md
 ```
 
@@ -760,8 +771,8 @@ None of these actions are required for a successful ordinary benchmark run.
 | `conda: command not found` | Step 2 not done, or shell not restarted | Run step 2, then `exec bash` |
 | `sha256sum: no properly formatted checksum lines found` | Download returned an error page | `rm` both files, redo step 3 |
 | `curl: (22) ... 404` | Wrong version in the URL | Check the Releases page for the current version |
-| `set: pipefail: invalid option name` | Archive from before v0.1.3 | Download v0.2.2 (step 3) |
-| `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.3 | Download v0.2.2 |
+| `set: pipefail: invalid option name` | Archive from before v0.1.3 | Reinstall using the latest-release command in step 3 |
+| `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.3 | Reinstall the latest release, then revalidate the cohort lock |
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
 | `[MISS] Platon DB not found` | Step 7a incomplete | Redo step 7a; the `curl` resumes |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
@@ -771,7 +782,7 @@ None of these actions are required for a successful ordinary benchmark run.
 To see what PlasBench is doing in more detail, every stage writes a log:
 
 ```bash
-ls ~/plasbench-0.2.6/logs/
+ls "$PB/logs/"
 ```
 
 ---
@@ -789,7 +800,7 @@ data directory. The default is shown below, but its `config/local.env` file may
 name a different location:
 
 ```bash
-cd ~/plasbench-0.2.3
+cd "$PB"
 source config/local.env
 echo "$PLASBENCH_DATA_DIR"
 ```
@@ -808,7 +819,7 @@ On the **destination PC**, install PlasBench normally first, then copy into its
 configured shared directory and verify the files before running a cohort:
 
 ```bash
-cd ~/plasbench-0.2.3
+cd "$PB"
 source config/local.env
 rsync -a --info=progress2 /media/$USER/USB_DRIVE/plasbench-data/ "$PLASBENCH_DATA_DIR/"
 cd "$PLASBENCH_DATA_DIR"
@@ -839,7 +850,7 @@ Do **not** overwrite a released cohort with different content under the same
 name; use a new cohort name for a changed sample sheet.
 
 ```bash
-rsync -a --info=progress2 /path/from/source-PC/plasbench/cohorts/ ~/plasbench-0.2.3/cohorts/
+rsync -a --info=progress2 /path/from/source-PC/plasbench/cohorts/ "$PB/cohorts/"
 plasbench validate-cohort --samples cohorts/my-cohort.tsv --verify-lock cohorts/my-cohort.lock.json
 ```
 
@@ -863,7 +874,7 @@ plasbench upgrade
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, unpacks it into a new sibling
-directory (`~/plasbench-0.1.9` → `~/plasbench-0.2.6`, your current one is never touched
+directory (for example `~/plasbench-0.1.9` → `~/plasbench-<new-version>`, your current one is never touched
 or deleted), then reuses one physical data directory for reads and databases. On the
 first upgrade from an older release, it **moves** the old `data/` directory once to
 `~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
@@ -872,7 +883,7 @@ over `config/local.tsv` and `.ncbi.env`, then installs the new PlasBench code in
 existing `plasbench` environment **without refreshing Conda packages or tools**. Finish with:
 
 ```bash
-cd ~/plasbench-0.2.6        # the directory ./update.sh just printed
+cd /path/printed/by-update.sh
 conda activate plasbench
 plasbench --version         # should print the new version
 ```
@@ -1956,7 +1967,7 @@ to `isolate_001`, not a reference strain or another patient isolate.
 
 ```bash
 # 1. Enter your PlasBench checkout or extracted release directory.
-export PB="$HOME/plasbench-0.2.6"
+export PB="/path/to/your/extracted-or-cloned-plasbench"
 cd "$PB"
 conda activate plasbench
 
@@ -2034,7 +2045,7 @@ the sample-sheet row:
 
 ```bash
 conda activate plasbench
-cd ~/plasbench-0.2.6
+cd "$PB"
 
 plasbench init-local \
     --sample my_isolate \
@@ -2094,7 +2105,7 @@ Run it once per isolate; rows accumulate in the same sheet.
 digits, dot, dash, underscore only:
 
 ```bash
-cd ~/plasbench-0.2.6
+cd "$PB"
 mkdir -p data/my_isolate config
 ```
 
@@ -2204,7 +2215,7 @@ it fails, so a bad table costs you seconds rather than a night of compute.
 
 ```bash
 conda activate plasbench
-cd ~/plasbench-0.2.6
+cd "$PB"
 
 REQUIRE_CURATED_METADATA=0 plasbench run \
     --samples config/local.tsv \

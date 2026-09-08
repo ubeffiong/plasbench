@@ -73,6 +73,12 @@ python3 "$HERE/../python/select_operational_method.py" \
     --analysis-track "$ANALYSIS_TRACK" \
     --decision-profile "${DECISION_PROFILE:-accuracy_first}"
 
+# Preserve a separate, truth-label-safe candidate dataset for future
+# selection-model research. This does not change today's recommendations.
+python3 "$HERE/../python/build_candidate_quality_dataset.py" \
+    --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET" --results-dir "$RESULTS_DIR" \
+    --tool-status "$RESULTS_DIR/tool_status.tsv" --out-prefix "$RESULTS_DIR/benchmark"
+
 python3 "$HERE/../python/write_manifest.py" \
     --project-root "$PROJECT_ROOT" --sample-sheet "$SAMPLE_SHEET" \
     --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" \
@@ -110,3 +116,4 @@ if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
     log "  Model card           : $RESULTS_DIR/benchmark.recommendation_model.card.md"
 fi
 log "  Selected output   : $RESULTS_DIR/<sample>/selected_candidate/"
+log "  Candidate dataset : $RESULTS_DIR/benchmark.candidate_{features,labels}.tsv"

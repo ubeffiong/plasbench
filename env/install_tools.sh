@@ -3,9 +3,18 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../scripts/lib.sh"
-ENV_NAME="plasbench"; PROFILE="core"
+ENV_NAME="plasbench"; PROFILE="core"; ASSUME_YES=0
 [[ "${1:-}" == "--env" ]] && { ENV_NAME="$2"; shift 2; }
+[[ "${1:-}" == "--yes" ]] && { ASSUME_YES=1; shift; }
 [[ $# -gt 0 ]] && PROFILE="$1"
+
+# These inspection actions share the machine-readable registry with CI. They
+# do not touch an environment, which makes them safe before any download.
+case "$PROFILE" in
+  list|plan|validate)
+    exec python3 "$HERE/../python/tool_installer_registry.py" "$PROFILE"
+    ;;
+esac
 
 # Resolve the environment to an absolute PREFIX and install with -p, never -n.
 #
@@ -213,8 +222,38 @@ WARNING: bioconda's 'gplas' is version 0.6.1 and does NOT provide the
          SPAdes contig ids never match its GFA segment ids.
 EOF
     PKGS=(gplas);;
- # gplas is deliberately NOT in 'all': see the warning above.
- all) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk unzip spades unicycler flye mob_suite platon bakta);;
+ gplas2)
+    # Kept separate from the legacy bioconda gplas package above. Calling it
+    # through the registry is useful, but resolving an unpinned package named
+    # "gplas2" would be an unsafe and misleading installation attempt.
+    cat >&2 <<'EOF'
+gplas2 is a source-distributed isolated runtime. It is registered so that
+`plasbench install-tools list` and CI cannot forget it, but PlasBench will not
+clone a floating branch or install an unreviewed dependency set automatically.
+Use `plasbench install-tools plan` to see its verification contract, then
+follow INSTALL.md's pinned-source instructions after validating the exact
+gplas2 revision and its classifier-table provenance for your study.
+EOF
+    exit 2
+    ;;
+ # `all` is intentionally an orchestrator rather than a second, drifting
+ # package list. Every verified automatic profile is invoked through its own
+ # existing code path. Isolated-source runtimes remain visible in `plan` as
+ # planned until their pin, checksum, and smoke test have been validated.
+ all)
+    failures=0
+    for installed_profile in core assembly reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast annotation annotation-prokka; do
+        echo "[plasbench] ===== install-tools $installed_profile ====="
+        "$0" --env "$ENV_NAME" "$installed_profile" || failures=1
+    done
+    if [[ "$ASSUME_YES" -eq 1 ]]; then
+        echo "[plasbench] Automatic package installation complete. Run 'plasbench check --yes' to install and verify databases supported by your enabled tools."
+    else
+        echo "[plasbench] Package installation complete. Run 'plasbench check' to review and optionally install databases for enabled tools."
+    fi
+    python3 "$HERE/../python/tool_installer_registry.py" plan
+    exit "$failures"
+    ;;
  *) PKGS=("$PROFILE");;
 esac
 echo "[plasbench] installing into $TARGET_LABEL: ${PKGS[*]}"
