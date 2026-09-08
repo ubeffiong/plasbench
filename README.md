@@ -150,6 +150,9 @@ plasbench test && plasbench demo
   non-technical overview for partners and funders.
 - [`docs/EXTERNAL_EVIDENCE.md`](docs/EXTERNAL_EVIDENCE.md) — safely importing
   published benchmark evidence and using the candidate-quality research dataset.
+- [`CHANGELOG.md`](CHANGELOG.md) and [`docs/RELEASES.md`](docs/RELEASES.md) —
+  what changed in each release, which distribution to use, verification,
+  upgrades, rollbacks, and release limits.
 
 ---
 

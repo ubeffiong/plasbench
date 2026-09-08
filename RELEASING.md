@@ -4,17 +4,17 @@
 
 Push a `v*` tag (e.g. `v0.3.0`). `.github/workflows/release.yml` then:
 
-1. Builds and publishes the Python package to PyPI.
+1. Builds and publishes the Python package to PyPI through Trusted Publishing.
 2. Builds and pushes the container image to GHCR.
 3. Publishes a **GitHub Release** for the tag (with auto-generated notes).
 
 Step 3 is what makes the Zenodo archival below actually happen — Zenodo's
 GitHub integration listens for a *published Release*, not a bare tag push.
 
-**Step 1 needs a one-time setup before it will actually work.** The
-`plasbench` project does not exist on PyPI yet, and `pypa/gh-action-pypi-publish`
-authenticates via Trusted Publishing (OIDC) rather than a stored API token —
-there is no PyPI account/token secret to create. Instead:
+**PyPI is configured through Trusted Publishing (OIDC), not a stored API
+token.** The release workflow has successfully published `plasbench` to PyPI.
+For a repository fork or a replacement publisher, register the relevant
+publisher at PyPI before tagging:
 
 1. Sign in (or create an account) at [pypi.org](https://pypi.org).
 2. Go to [pypi.org/manage/account/publishing/](https://pypi.org/manage/account/publishing/)
@@ -23,13 +23,12 @@ there is no PyPI account/token secret to create. Instead:
    Leave the environment name blank unless you also add a matching
    `environment:` key to the `publish` job in `release.yml` — the two must
    match exactly, or every publish attempt fails with `invalid-publisher`.
-3. Push a `v*` tag as above. The first successful publish converts the
-   pending publisher into a real one and creates the PyPI project.
+3. Push a `v*` tag as above. A new version must be higher than the version
+   already published on PyPI; PyPI never permits replacing a published file.
 
-Until this is done, that step fails on every release — by design this does
-not block the GHCR image push or the GitHub Release (see the
-`continue-on-error` comment on that step in `release.yml`), so the rest of
-the release still completes normally.
+If PyPI publishing fails, investigate the release job and publish a new patch
+version once corrected. Do not mutate a published archive or reuse a version.
+See [docs/RELEASES.md](docs/RELEASES.md) for the user-facing release contract.
 
 ## Software archival: the zero-code Zenodo↔GitHub mirror
 
