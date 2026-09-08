@@ -40,8 +40,8 @@ jobs:
           (cd dist && sha256sum -c "plasbench-${VERSION}.tar.gz.sha256")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       # PyPI uses Trusted Publishing (OIDC). The release remains useful when a
-      # transient PyPI failure occurs, so GHCR and GitHub archive publication
-      # continue; the release notes must state whether PyPI succeeded.
+      # PyPI publication failure occurs, so GHCR and GitHub archive publication
+      # continue. Verify the public PyPI project separately before claiming it.
       - uses: pypa/gh-action-pypi-publish@release/v1
         continue-on-error: true
       - uses: docker/login-action@v3

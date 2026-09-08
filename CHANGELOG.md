@@ -12,7 +12,8 @@ archives, container references, and release notes.
 - Adds a complete user-facing release guide, reusable GitHub Release template,
   and version-specific release notes.
 - Corrects `CITATION.cff` to the current release metadata.
-- Corrects stale PyPI release guidance after verified Trusted Publishing.
+- Clarifies PyPI Trusted Publishing and requires public availability checks
+  before a release claims PyPI publication.
 
 ## [0.2.6] - 2026-09-08
 

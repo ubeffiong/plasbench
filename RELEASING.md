@@ -11,10 +11,11 @@ Push a `v*` tag (e.g. `v0.3.0`). `.github/workflows/release.yml` then:
 Step 3 is what makes the Zenodo archival below actually happen — Zenodo's
 GitHub integration listens for a *published Release*, not a bare tag push.
 
-**PyPI is configured through Trusted Publishing (OIDC), not a stored API
-token.** The release workflow has successfully published `plasbench` to PyPI.
-For a repository fork or a replacement publisher, register the relevant
-publisher at PyPI before tagging:
+**PyPI uses Trusted Publishing (OIDC), not a stored API token.** Check the
+public project page after every release; a green workflow step with
+`continue-on-error` is not proof that the package is available on PyPI. For a
+repository fork or a replacement publisher, register the relevant publisher at
+PyPI before tagging:
 
 1. Sign in (or create an account) at [pypi.org](https://pypi.org).
 2. Go to [pypi.org/manage/account/publishing/](https://pypi.org/manage/account/publishing/)
@@ -26,8 +27,10 @@ publisher at PyPI before tagging:
 3. Push a `v*` tag as above. A new version must be higher than the version
    already published on PyPI; PyPI never permits replacing a published file.
 
-If PyPI publishing fails, investigate the release job and publish a new patch
-version once corrected. Do not mutate a published archive or reuse a version.
+If PyPI publishing fails, GitHub Release assets and GHCR can still publish,
+but document the absence clearly and investigate the release job. Publish a
+new patch version once corrected. Do not mutate a published archive or reuse a
+version.
 See [docs/RELEASES.md](docs/RELEASES.md) for the user-facing release contract.
 
 ## Software archival: the zero-code Zenodo↔GitHub mirror

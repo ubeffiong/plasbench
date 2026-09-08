@@ -7,11 +7,8 @@ container use, upgrade, and rollback instructions.
 
 ### Download and verify
 
-Download both release assets, then verify the archive before extracting it:
-
-```bash
-sha256sum -c plasbench-<version>.tar.gz.sha256
-```
+Download the archive and matching `.sha256` asset shown on this release page,
+then run `sha256sum -c <checksum-file>` before extracting it.
 
 The command must print `OK`. The GitHub release archive is the recommended
 terminal/WSL distribution. The latest-release installer and full lab workflow
@@ -19,12 +16,9 @@ are documented in the [README](https://github.com/ubeffiong/plasbench#3-step-by-
 
 ### Container
 
-For reproducible use, select the immutable image tag matching this release:
-
-```bash
-docker pull ghcr.io/ubeffiong/plasbench:v<version>
-docker run --rm ghcr.io/ubeffiong/plasbench:v<version> plasbench --version
-```
+For reproducible use, select the immutable GHCR image tag matching this
+release. The precise pull command belongs in the version-specific release
+notes, not a generic template.
 
 `latest` is suitable for exploration but should not be cited in a protocol.
 
