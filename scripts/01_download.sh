@@ -116,10 +116,15 @@ download_sample() {
         return 0
     fi
 
-    # Download clients are only required when this sample actually needs them.
+    # Download clients are only required when this sample actually needs them
+    # -- a truth_source=simulated sample never touches SRA at all (its reads
+    # are generated locally by python/simulate_reads.py below), so it does
+    # not need sra-tools installed.
     [[ "$HAS_REFERENCE" -eq 1 ]] && need datasets
-    need prefetch
-    need fasterq-dump
+    if [[ "$TRUTH_SOURCE" != "simulated" ]]; then
+        need prefetch
+        need fasterq-dump
+    fi
 
     # ---- (a) reference assembly + sequence report ----
     if [[ "$HAS_REFERENCE" -eq 0 && "$TRUTH_SOURCE" == "self_assembled_hybrid" ]]; then
@@ -162,7 +167,42 @@ download_sample() {
     fi
 
     # ---- (b) Illumina reads ----
-    if [[ -s "$R1" && -s "$R2" ]]; then
+    if [[ "$TRUTH_SOURCE" == "simulated" ]]; then
+        # simulated: assembly_accession is a REAL reference (downloaded
+        # above, unchanged), but sra_run is not a real SRA accession -- reads
+        # are generated locally from that reference instead. Both short and
+        # long reads come out of ONE simulate_reads.py invocation, so this
+        # replaces both (b) and (c) below for a simulated row; the (c) block
+        # only ever fires for truth_source=self_assembled_hybrid.
+        if [[ -s "$R1" && -s "$R2" && -s "$LONG_READS" ]]; then
+            log "  simulated reads already present, skipping simulation"
+        elif [[ ! -s "$REF" ]]; then
+            warn "truth_source=simulated but no reference was downloaded for $SAMPLE; skipping"
+            record_download "$SAMPLE" "failed" "truth_source=simulated requires a downloaded reference to simulate reads from"
+            return 0
+        else
+            local SEED SHORT_DEPTH LONG_DEPTH SHORT_MODEL LONG_MODEL
+            SEED="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" simulation_seed)"
+            SHORT_DEPTH="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" simulation_short_depth_x)"
+            LONG_DEPTH="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" simulation_long_depth_x)"
+            SHORT_MODEL="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" simulation_short_error_model)"
+            LONG_MODEL="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" simulation_long_error_model)"
+            [[ -z "$SHORT_MODEL" ]] && SHORT_MODEL="$SIMULATE_SHORT_MODEL"
+            [[ -z "$LONG_MODEL" ]] && LONG_MODEL="$SIMULATE_LONG_MODEL"
+            log "  simulating reads from $REF (seed=$SEED, short=${SHORT_DEPTH}x $SHORT_MODEL, long=${LONG_DEPTH}x $LONG_MODEL) ..."
+            if ! python3 "$HERE/../python/simulate_reads.py" --reference "$REF" \
+                    --out-r1 "$R1" --out-r2 "$R2" --out-long "$LONG_READS" \
+                    --out-provenance "$SDIR/simulation_provenance.json" \
+                    --seed "$SEED" --short-depth "$SHORT_DEPTH" --long-depth "$LONG_DEPTH" \
+                    --short-model "$SHORT_MODEL" --long-model "$LONG_MODEL" --threads "$SIMULATE_THREADS" \
+                    > "$LOG_DIR/${SAMPLE}.simulate.log" 2>&1; then
+                warn "read simulation failed for $SAMPLE; skipping this sample"
+                record_download "$SAMPLE" "failed" "simulate_reads.py failed; see $LOG_DIR/${SAMPLE}.simulate.log"
+                return 0
+            fi
+            log "  simulated reads -> $R1 , $R2 , $LONG_READS"
+        fi
+    elif [[ -s "$R1" && -s "$R2" ]]; then
         log "  reads already present, skipping download"
     else
         log "  prefetching $SRA ..."

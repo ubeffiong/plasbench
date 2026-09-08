@@ -43,6 +43,34 @@ record_assembly_status() {
         > "$STATUS_SHARDS/${sample}.tsv"
 }
 
+# Difficulty features (RUN_DIFFICULTY_FEATURES, off by default; see
+# python/compute_difficulty_features.py). Computed HERE, not in
+# 02_truth.sh, because the assembly graph this needs (assembly_graph.gfa)
+# does not exist until this stage produces it. Runs whenever contigs exist
+# (a fresh assembly or a reused one) and truth.tsv is already there from
+# stage 2 -- so a sample re-assembled before this flag was ever turned on
+# still gets its difficulty features computed on the next run, not skipped
+# forever because assembly itself was already "reused".
+maybe_compute_difficulty_features() {
+    local sample="$1" sdir="$2" t1="$3" t2="$4"
+    [[ "${RUN_DIFFICULTY_FEATURES:-0}" -eq 1 ]] || return 0
+    local ref="$sdir/reference.fna" truth="$sdir/truth.tsv" graph="$sdir/assembly_graph.gfa"
+    local out="$sdir/difficulty_features.tsv"
+    if [[ ! -s "$ref" || ! -s "$truth" ]]; then
+        warn "  difficulty features: no truth reference yet for $sample; skipped"
+        return 0
+    fi
+    if [[ -s "$out" && "$out" -nt "$ref" ]]; then
+        log "  difficulty features already computed for $sample"
+        return 0
+    fi
+    python3 "$HERE/../python/compute_difficulty_features.py" --fasta "$ref" --truth "$truth" \
+            --out "$out" --graph "$graph" --r1 "$t1" --r2 "$t2" \
+            --threads "$DIFFICULTY_FEATURES_THREADS" --sample-id "$sample" \
+            > "$LOG_DIR/${sample}.difficulty.log" 2>&1 || \
+        warn "difficulty-feature computation failed for $sample; see $LOG_DIR/${sample}.difficulty.log"
+}
+
 assemble_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
     local SDIR="$DATA_DIR/$SAMPLE"
@@ -81,6 +109,13 @@ assemble_sample() {
     local GRAPH="$SDIR/assembly_graph.gfa"
     if [[ -s "$CONTIGS" ]]; then
         log "  base assembly present, skipping"
+        # Trimmed reads may not exist yet on a reused-assembly re-run with
+        # RUN_DIFFICULTY_FEATURES newly turned on (they are only re-derived
+        # above if missing); fall back to the untrimmed pair, which is
+        # always present whenever an assembly is.
+        local dt1="$T1" dt2="$T2"
+        [[ -s "$dt1" && -s "$dt2" ]] || { dt1="$R1"; dt2="$R2"; }
+        maybe_compute_difficulty_features "$SAMPLE" "$SDIR" "$dt1" "$dt2"
         record_assembly_status "$SAMPLE" "reused" "$CONTIGS" "completed assembly reused"
         return 0
     fi
@@ -117,6 +152,7 @@ assemble_sample() {
         die "unknown ASSEMBLER='$ASSEMBLER' (use spades or unicycler)"
     fi
     log "  contigs -> $CONTIGS"
+    maybe_compute_difficulty_features "$SAMPLE" "$SDIR" "$T1" "$T2"
     record_assembly_status "$SAMPLE" "completed" "$CONTIGS" "" "$(( $(date +%s) - START ))"
 }
 

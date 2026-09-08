@@ -43,6 +43,179 @@ judgment call: a `self_assembled_hybrid` row may never declare
 unchanged, so every long-read/hybrid tool is automatically excluded from
 scoring on these samples; they contribute to the short-read track only.
 
+### Simulated reads from a real reference (`truth_source=simulated`)
+
+The mirror image of self-built hybrid truth above: `assembly_accession` is a REAL,
+independently-deposited Complete Genome assembly (required, downloaded and used as truth
+unchanged — checked online by `validate_cohort.py`'s `verify_simulated_row()` against the
+exact same Complete-Genome/plasmid-replicon bar as an `ncbi_deposited` row), but the reads
+are not real sequencing data: `python/simulate_reads.py` generates them locally with
+InSilicoSeq (short reads) and Badread (long reads) at a depth, seed, and error model
+declared in the cohort sheet (`simulation_seed`, `simulation_short_depth_x`,
+`simulation_long_depth_x`, and two optional error-model columns). `sra_run` is reused as
+the local read-file prefix for these rows, never a real SRA accession, so
+`validate_cohort.py` does not apply its SRR/ERR/DRR pattern check to it.
+
+Short-read depth is applied UNIFORMLY across every reference contig (chromosome and
+plasmid(s) alike) via InSilicoSeq's `--coverage_file`, a documented simplification rather
+than a per-replicon depth model. Badread's read-length distribution is deliberately left at
+its own natural default rather than forced to a fixed length, unlike some published
+simulation pipelines that fix every long read to exactly 10,000 bp — a real fidelity choice
+worth flagging, not copying uncritically, since real long-read runs are not length-uniform.
+
+Because the reference is real and independently deposited, a `simulated` row's truth is, by
+construction, independent of whatever reads (real or simulated) exist for it — the opposite
+relationship from `self_assembled_hybrid` above, where the truth is built FROM the reads. A
+`simulated` row may therefore freely declare `truth_independent_of_long_reads=yes` with no
+special restriction. The HTML report still marks every simulated sample with its own
+distinct "simulated reads" badge (never the same badge as `self_assembled_hybrid`'s
+"self-built truth"), so a simulated isolate can never be silently read as a real-world
+result.
+
+### Difficulty descriptors (benchmark-only, never a live recommendation input)
+
+`python/compute_difficulty_features.py` (gated by `RUN_DIFFICULTY_FEATURES`, off by
+default; run in stage 3, once this isolate's own assembly graph exists) computes three
+signals for how intrinsically hard *this isolate* is to correctly separate into plasmid
+vs. chromosome, independent of any tool's own performance on it:
+
+- **`gfa_dead_end_count`** — the assembly graph's own dead-end count
+  ([rrwick/GFA-dead-end-counter](https://github.com/rrwick/GFA-dead-end-counter), the
+  same author as Filtlong and Trycycler), a direct fragmentation signal.
+- **`plasmid_chromosome_depth_ratio`** — median plasmid-contig depth divided by median
+  chromosome-contig depth, from aligning this isolate's own short reads back to its
+  truth reference (`minimap2` + `samtools coverage`).
+- **`plasmid_chromosome_mash_distance`** — the minimum Mash distance between this
+  isolate's own truth plasmid sequence(s) and its own truth chromosome. A plasmid
+  sharing many k-mers with its own chromosome (shared IS elements, integrated regions)
+  is intrinsically harder to correctly separate for every tool, not just a weak one; the
+  *minimum* across a multi-plasmid isolate's plasmids is reported, since the most
+  chromosome-similar plasmid is the harder case to flag.
+
+Each of the three fields is independently optional: a missing prerequisite (no assembly
+graph, no reads, the external tool not installed) leaves that field empty, never a
+guessed or zero value — the same convention every other optional per-isolate feature in
+this project follows.
+
+**These are truth-derived, exactly like `plasmid_count` and Inc-type stratification, and
+follow the same rule: benchmark-only descriptors, never wired into
+`recommendation_model.py`.** A genuinely unknown operational isolate has no truth
+reference to compute a plasmid-vs-chromosome Mash distance or depth ratio from, so
+feeding these to a live recommendation model would be leakage, not a real feature —
+`recommendation_model.py`'s `ASSEMBLY_STAT_FIELDS` deliberately excludes them, with that
+exclusion stated in code so it cannot be "fixed" accidentally later.
+
+### QUAST supplementary diagnostics (`RUN_QUAST_DIAGNOSTICS`, off by default)
+
+`python/run_quast_diagnostics.py` (stage 5) runs QUAST three ways per sample/tool,
+against the SAME predicted-plasmid FASTA: a `combined` reference (every truth plasmid
+in one multi-FASTA), one `individual` run per truth plasmid, and a `chromosome`-only
+reference. This is C-Connor/PlasmidToolBenchMarking's own verified pattern (a sibling
+plasmid-tool benchmarking pipeline), reused here for a genuinely different purpose:
+explaining WHY a low F1 happened (a high chromosome-reference genome fraction means the
+tool's "plasmid" call actually contains substantial chromosome sequence; an uneven
+per-plasmid genome fraction means recall is concentrated in one plasmid, not spread
+evenly), never replacing `score_plasmids.py`'s own base-level precision/recall/F1 as the
+ranking metric. `--min-contig 0` is always passed explicitly — QUAST's own default
+(500 bp) would otherwise silently drop short plasmid contigs from the analysis, exactly
+the kind of hidden filtering this project avoids elsewhere. Report.tsv is parsed by ROW
+LABEL ("Genome fraction (%)", "# misassemblies", "Duplication ratio"), never a fixed row
+position, since QUAST only emits fields applicable to a given run. Real per-tool-per-
+sample compute cost (up to `2 + n_truth_plasmids` QUAST invocations), so off by default
+like every other optional diagnostic in this project.
+
+### Equal CPU allocation across tools (fairness policy)
+
+Every registered tool gets its own `<TOOL>_THREADS` config variable, defaulting to the
+same shared `$THREADS` value — never a tool-specific hardcoded thread count, and never one
+tool silently favored with more CPU than another by default. This is a deliberate fairness
+policy, not an accident of how the config file grew: a tool given more threads than its
+competitors runs faster (and, for a genuinely parallelizable step, sometimes also more
+accurately, e.g. via better default heuristics tuned for multi-core execution) for reasons
+that have nothing to do with the tool itself. C-Connor/PlasmidToolBenchMarking, a sibling
+plasmid-tool benchmarking pipeline, states this concern explicitly and independently: its
+own Nextflow configuration labels every tool process `process_8` (8 CPUs each), applied
+uniformly "even if the tool does not support multi-threading" — external validation that
+this is a real methodological concern in this space, not a PlasBench-specific scruple.
+
+An audit of every `<TOOL>_THREADS` variable against its tool's real invocation (2026-09-08)
+found the policy correctly wired for every tool that actually accepts a thread-count flag,
+with three exceptions worth recording:
+
+- **`flye_mob_recon` and `plassembler`** previously used the general `$THREADS` value
+  directly in their Flye/MOB-Recon/Plassembler invocations, with no dedicated override
+  variable of their own — inconsistent with every other tool's own `<TOOL>_THREADS`
+  pattern (though not itself unfair, since the shared default was still identical for
+  every tool). Fixed: both now have their own `FLYE_MOB_RECON_THREADS`/
+  `PLASSEMBLER_THREADS` variables, defaulting to `$THREADS` like everywhere else.
+- **`GPLAS_THREADS`** exists but is not actually wired into any invocation: the `gplas`
+  binary itself takes no thread flag (confirmed single-threaded), and neither
+  `python/mob_to_gplas_classifier.py` nor `python/validate_gplas_classifier.py`
+  (gplas2_mob's/gplas2_external's own classifier-prep steps) accept one either — both are
+  lightweight single-threaded table/graph transformations. The variable is kept for
+  interface consistency with every other tool's own `<TOOL>_THREADS` var, with its
+  `config/config.sh` comment corrected to say so plainly, rather than silently deleted or
+  left with a misleading comment implying it does something it does not.
+- **`plASgraph2`**'s adapter invocation passes no thread-count flag at all, and whether
+  `plASgraph2_classify.py` even accepts one has not been verified this pass — recorded
+  here as an open question for whoever next revisits this policy, not silently assumed
+  either way.
+
+#### Thread-scaling sweep (`scripts/thread_scaling_sweep.sh`, opt-in)
+
+An empirical check for the fairness policy above, not just a documentation claim: reruns
+ONE already-registered tool on a small, already-assembled sample subset at several
+thread counts (default 1/4/8), reusing `scripts/04_run_tools.sh`'s own `ONLY_TOOL`
+restriction and its existing `profile_exec`/RSS-capture instrumentation — the SAME
+`tool_status.tsv` `runtime_seconds`/`peak_rss_kb` columns a normal run already writes,
+never a second profiling mechanism. Writes
+`results/thread_scaling_sweep.<tool>.tsv` (`tool, sample, threads, runtime_seconds,
+peak_rss_kb`). Every sweep point is force-rerun (a cached "reused" result would report a
+stale runtime from a different thread count), so this only ever touches stage 4, never
+stages 1-3.
+
+```bash
+bash scripts/thread_scaling_sweep.sh --tool platon --samples s1,s2 --threads 1,4,8
+```
+
+Answers whether the leaderboard's own runtime numbers (and, for a genuinely
+parallelizable step, sometimes its reported accuracy too) depend on the thread-count
+choice a tool happens to be given — not run automatically, since it multiplies one
+tool's own stage-4 runtime by the number of sweep points.
+
+### Research and investigation scripts (one-off, never part of the pipeline)
+
+Two scripts exist purely to investigate open questions raised by the sibling-repo
+cross-pollination review, matching `python/parse_teixeira2025_supplement.py`'s own
+"one-time migration/investigation script" precedent — neither is wired into any stage
+script, gated behind a config toggle, or run automatically. Run them by hand; each
+script's own module docstring is the full usage reference.
+
+- **`python/audit_three_class_scoring.py`** — checks whether PlasBench's binary
+  plasmid/chromosome truth model is missing something RasmussenLab/PlasMAAG models
+  explicitly as a third class (`candidate_virus`): does any curated isolate's truth
+  reference contain an INTEGRATED PROVIRUS region embedded inside a truth plasmid or
+  chromosome sequence? Runs geNomad's own provirus-finding (on by default in
+  `genomad end-to-end`, confirmed from geNomad's own source) against the truth
+  reference itself, and cross-references its real `<prefix>_virus_summary.tsv` output
+  (specifically its `coordinates`/`seq_name` columns — verified from geNomad's own
+  documentation, not assumed) against truth.tsv's own sequence boundaries. A research
+  script, not a fix: per the approved plan, a three-class scoring change is only worth
+  designing if running this across a real cohort finds a genuine, non-trivial incidence
+  — this script has not yet been run against real cohort data (it requires a geNomad
+  database this project's own development environment does not have installed), so
+  that finding is still outstanding for whoever runs it next.
+- **`python/compare_scoring_methods.py`** — cross-checks PlasBench's own minimap2-based
+  scoring (`score_plasmids.py`'s exact interval-merge) against
+  C-Connor/PlasmidToolBenchMarking's own verified BLASTN command (confirmed by direct
+  fetch of `modules/BlastContigs/main.nf`: `blastn -perc_identity 80 -evalue 1E-20
+  -culling_limit 1 -max_target_seqs 10000 -dust no -outfmt '6 qseqid qlen sseqid slen
+  length pident qcovhsp' -subject <reference> -query <prediction>`), for the SAME
+  sample/tool. That repo's own chosen `-outfmt` has no alignment coordinates to
+  interval-merge exactly, so this script computes a clearly-labeled, capped
+  hit-length proxy F1 rather than claiming methodological equivalence, and reports it
+  next to PlasBench's own real (never re-derived) F1 from an existing `scores.tsv` row.
+
 ## Predictions
 Each tool emits a set of sequences it considers plasmid. A thin per-tool adapter
 (`adapters/`) normalises these disparate outputs into a single **predicted-plasmid FASTA**:
@@ -130,6 +303,31 @@ reference length (default 90%). `plasmid_recall` is the fraction of true
 replicons meeting that threshold. `predicted_record_count` is intentionally a
 sequence-record proxy, not a bin-level precision claim: tools differ in whether
 they output one contig, multiple contigs, or one FASTA per plasmid bin.
+
+### Graded plasmid-recovery completeness tiers (supplementary, never a ranking replacement)
+`plasmid_recall` answers one question at one configured threshold: recovered, or not.
+`score_plasmids.py` additionally computes each true plasmid's own per-plasmid
+completeness fraction once (covered bp / reference length) and reports it against two
+further FIXED bands, independent of `--plasmid-recovery-threshold`:
+
+- **`plasmid_recall_ge50`** — fraction of true plasmids at least half covered.
+- **`plasmid_recall_ge90`** — fraction of true plasmids at least 90% covered.
+- **`complete_circular_plasmid_recall`** — fraction of the isolate's CIRCULAR true
+  plasmids that are essentially fully covered (matching `merge_bin_metrics.py`'s own
+  "essentially 1.0" convention for its perfect-recovery label) — the strictest
+  per-plasmid claim this script makes. Only defined when circular-truth evidence was
+  supplied at all (`--circular-plasmids`); reported as not-applicable, never a fabricated
+  0, otherwise.
+
+These fill a genuine gap between "any recall" and the whole-sample "Perfect reference
+recovery"/"Strict reconstruction" labels (`merge_bin_metrics.py`'s `perfect_metrics()`,
+which score every predicted base across the WHOLE sample at once, not one plasmid at a
+time): a tool that gets every plasmid to 60% complete and one that gets half its plasmids
+to 100% complete can land on the same `plasmid_recall` and the same `mean_f1`, yet
+represent very different practical outcomes. None of these bands replace `mean_f1` as the
+ranking metric or `mean_plasmid_recall` as the primary completeness figure; the HTML
+report surfaces them in their own "Graded plasmid recovery" section, explicitly labeled as
+supplementary.
 
 For adapters that supply `pred_<tool>.bins.tsv`, PlasBench also performs
 deterministic global one-to-one bin matching using a maximum-weight assignment,

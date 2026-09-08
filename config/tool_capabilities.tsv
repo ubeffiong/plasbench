@@ -12,6 +12,8 @@ trycycler_mob_recon	binning	yes	long_reads	Trycycler consensus long-read assembl
 genomad	ml_classification	no	assembly	Gene-based neural classifier for plasmid/virus detection on assembly contigs.	short_read	no
 plasme	ml_classification	no	assembly	Alignment+transformer hybrid classifier for plasmid contigs (short-read assemblies in this delivery).	short_read	no
 rfplasmid	ml_classification	no	assembly	Random-forest classifier over single-copy marker genes, plasmid genes, and kmers, per species/genus model.	short_read	no
+plasmidhunter	ml_classification	no	assembly	Diamond+Prodigal gene-content classifier (Naive Bayes) for plasmid/chromosome contigs; species-agnostic single model.	short_read	no
+plasmer	ml_classification	no	assembly	Multi-tool ensemble (kmer-db/Prodigal/HMMER/BLAST/Infernal/Diamond/Kraken2) feeding a random-forest classifier; requires a custom conda channel and a documented 32GB RAM minimum.	short_read	no
 plascope	classification	no	assembly	Centrifuge-based hard classification (chromosome/plasmid/unclassified) against a species-specific database; E. coli and Klebsiella only.	short_read	no
 plasgraph2	ml_classification	no	assembly_graph	GNN per-node classifier over the assembly graph; no derived multi-contig grouping in its own output.	short_read	no
 mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.	short_read	no

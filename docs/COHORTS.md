@@ -245,3 +245,86 @@ anyway; using it stays visible in `tool_status.tsv`'s recorded reason.
 
 Short-read tools ignore this column entirely; their inputs are already
 independent of the truth.
+
+## truth_source=simulated: reads generated locally from a real reference
+
+The mirror image of `self_assembled_hybrid` above. There, the truth is BUILT
+from real reads because no assembly was ever deposited. Here, the truth is a
+REAL, independently-deposited Complete Genome assembly -- `assembly_accession`
+is required and downloaded exactly like an `ncbi_deposited` row, unchanged --
+but the reads are not real sequencing data at all: `python/simulate_reads.py`
+generates them locally with InSilicoSeq (short reads) and Badread (long
+reads) at a depth, seed, and error model YOU choose, rather than inheriting
+whatever a real deposited run happened to have.
+
+This is useful when the read-generating process itself needs to be
+controlled for -- a specific depth to test how performance degrades with
+coverage, a fixed seed for exact reproducibility, or a specific error
+profile -- none of which you can dictate about a real SRA run.
+
+`sra_run` still needs a value (every cohort row has one), but for a
+simulated row it is NOT a real SRA accession: it is reused as the local
+read-file prefix (`data/<sample>/<sra_run>_1.fastq.gz`, etc.), so
+`validate_cohort.py` does not apply the usual SRR/ERR/DRR pattern to it --
+any short, filesystem-safe string works (`SIMULATED`, or anything else you
+choose).
+
+Four more columns apply only to a `simulated` row:
+
+| Column | Required? | Meaning |
+|---|---|---|
+| `simulation_seed` | required | integer RNG seed, passed to both InSilicoSeq and Badread |
+| `simulation_short_depth_x` | required | short-read fold coverage, applied UNIFORMLY to every reference contig (chromosome and plasmid(s) alike -- a documented simplification, not a per-replicon depth model) |
+| `simulation_long_depth_x` | required | long-read fold coverage, independent of the short-read one |
+| `simulation_short_error_model` | optional | an InSilicoSeq `--model` value (default: `config/config.sh`'s `SIMULATE_SHORT_MODEL`, `novaseq`) |
+| `simulation_long_error_model` | optional | a Badread `--error_model`/`--qscore_model` value (default: `SIMULATE_LONG_MODEL`, `nanopore2020`) |
+
+Badread's read-length distribution is deliberately left at its own natural
+default, never forced to a fixed length -- unlike some published simulation
+pipelines that fix every long read to exactly 10,000 bp, a choice worth
+flagging rather than copying uncritically, since real long-read runs do not
+look like that.
+
+```bash
+python3 python/simulate_reads.py \
+    --reference data/<sample>/reference.fna \
+    --out-r1 data/<sample>/<sra_run>_1.fastq.gz --out-r2 data/<sample>/<sra_run>_2.fastq.gz \
+    --out-long data/<sample>/long_reads.fastq.gz \
+    --out-provenance data/<sample>/simulation_provenance.json \
+    --seed 42 --short-depth 60 --long-depth 40
+```
+
+`validate_cohort.py`'s online verification checks the reference the SAME way
+as an `ncbi_deposited` row -- Complete Genome, declares plasmid replicons --
+since simulating from a bad or incomplete reference would be exactly as
+meaningless as scoring against one. No SRA-run check applies at all, since
+`sra_run` is not real here.
+
+**A simulated isolate must never be silently read as a real-world result.**
+The HTML report marks every simulated sample with a distinct "simulated
+reads" badge (visually different from `self_assembled_hybrid`'s "self-built
+truth" badge, since the situations are opposite: here the reference is real
+and only the reads are synthetic) next to its name in the scores table, and
+`data-truth-source='simulated'` on its row for filtering/styling.
+
+### Where to find candidate reference genomes for a simulated cohort
+
+`cohorts/candidates/simulated_reference_candidates.tsv` lists the IDENTITY
+(organism/strain where stated, approximate genome size, source study) of 20
+reference genomes used by a sibling benchmarking project
+(gbouras13/plassembler_simulation_benchmarking), extracted from that repo's
+own CSV inputs rather than vendoring its checked-in FASTA files. This list
+is a **starting point, not a ready-to-run cohort**: `assembly_accession`/
+`sra_run`/`biosample` are intentionally empty, since the source repo's own
+files give only an internal isolate identifier, never a BioSample or NCBI
+accession. Resolving each to a real assembly (organism/strain name -> a real
+BioSample -> `python/resolve_ncbi_accessions.py`'s existing biosample ->
+accession chain) is a separate, not-yet-done research step for whoever picks
+this up next -- never fabricate a BioSample or accession to skip it.
+Fourteen of the twenty rows also have their organism recorded as
+`unconfirmed`, because the source repo's own files give only a bare isolate
+identifier
+(e.g. `MGH78578`, `RBHSTW-00059`) with no stated genus/species; confirming
+those requires reading the actual cited paper (Wick et al., Houtak et al.,
+Mathers et al., or De Maio et al. -- see each row's `source_study`), not a
+guess from the identifier's shape.

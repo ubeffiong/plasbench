@@ -70,6 +70,10 @@ case "$PROFILE" in
  # analog of the depth ladder's seqtk (which ships in 'core' for the same
  # reason). Bundled here so a user who has set themselves up for long reads
  # already has it, rather than discovering a missing binary later.
+ # insilicoseq (short-read simulation) and badread (long-read simulation),
+ # both real bioconda packages, for python/simulate_reads.py's simulated
+ # ground-truth track (truth_source=simulated) -- see docs/COHORTS.md.
+ simulate) PKGS=(insilicoseq badread);;
  long-read) PKGS=(flye mob_suite filtlong);;
  plassembler) PKGS=(plassembler);;
  hybracter) PKGS=(hybracter);;
@@ -99,6 +103,51 @@ EOF
     # database is a separate download (env/download_plascope_db.sh), not
     # something this profile installs.
     PKGS=(plascope)
+    ;;
+ plasmidhunter)
+    # PlasmidHunter's classifier itself is a PyPI package (`pip install
+    # plasmidhunter`), not a bioconda package -- only its diamond/prodigal
+    # dependencies are conda packages, both already available via existing
+    # profiles. Install those through the normal conda solver first, then
+    # pip-install the tool itself into the SAME resolved environment prefix
+    # (never a bare `pip install` on whatever's first on PATH), and exit here
+    # rather than falling through to the single bottom-of-file conda install,
+    # which only ever runs one solver command.
+    PKGS=(diamond prodigal)
+    echo "[plasbench] installing into $TARGET_LABEL: ${PKGS[*]}"
+    run_with_heartbeat "Conda is solving/linking dependency tools: ${PKGS[*]}" "${SOLVER[@]}" "${PKGS[@]}"
+    if [[ -n "${TARGET_PREFIX:-}" && -x "$TARGET_PREFIX/bin/pip" ]]; then
+        PIP_BIN="$TARGET_PREFIX/bin/pip"
+    else
+        PIP_BIN="pip"
+        echo "WARNING: could not resolve an existing $ENV_NAME prefix's own pip; falling back to 'pip' on PATH -- re-run this profile after the conda env above is created if that installs plasmidhunter into the wrong environment." >&2
+    fi
+    echo "[plasbench] installing plasmidhunter via pip ($PIP_BIN)"
+    run_with_heartbeat "pip is installing plasmidhunter" "$PIP_BIN" install plasmidhunter
+    exit 0
+    ;;
+ plasmer)
+    # Plasmer is a real conda package, but published under its own custom
+    # channel (not plain bioconda) -- its own README's exact install
+    # command is `conda install -c iskoldt -c bioconda -c conda-forge
+    # -c defaults plasmer`. This profile's own CHANNELS array (conda-forge,
+    # bioconda) is not enough on its own, so -c iskoldt is prepended here
+    # rather than reused from the shared SOLVER array.
+    if TARGET_PREFIX="$(resolve_prefix)"; then
+        SOLVER=("$SOLVER_BIN" install -y -p "$TARGET_PREFIX" -c iskoldt "${CHANNELS[@]}" -c defaults)
+    else
+        SOLVER=("$SOLVER_BIN" install -y -n "$ENV_NAME" -c iskoldt "${CHANNELS[@]}" -c defaults)
+    fi
+    PKGS=(plasmer)
+    cat >&2 <<'EOF'
+NOTE: Plasmer's own README states "A minimum of 32GB system memory is
+      required for kmer-db to load the databases" -- this is a real,
+      documented requirement, not a PlasBench-imposed default (see
+      PLASMER_MEMORY_GB in config/config.sh). It also requires a pre-built
+      database, downloaded separately (Zenodo/Google Drive, not bundled by
+      the package) -- point PLASMER_DB at it after downloading. See
+      INSTALL.md for the full walkthrough.
+EOF
     ;;
  plasme)
     # PLASMe is distributed as a git checkout with its own conda env file,

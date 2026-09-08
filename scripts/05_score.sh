@@ -203,6 +203,13 @@ score_sample() {
             rm -f "$RDIR/${tool}.bin_matches.tsv" "$RDIR/${tool}.bin_summary.tsv"
             log "  $tool: bin diagnostics not applicable to declared method class"
         fi
+        if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
+            python3 "$HERE/../python/run_quast_diagnostics.py" --query "$PRED" --reference "$REF" --truth "$TRUTH" \
+                --sample "$SAMPLE" --tool "$tool" --out "$RDIR/${tool}.quast_diagnostics.tsv" \
+                --threads "$QUAST_DIAGNOSTICS_THREADS" --min-contig "$QUAST_DIAGNOSTICS_MIN_CONTIG" \
+                >> "$LOG_DIR/${SAMPLE}.${tool}.quast.log" 2>&1 || \
+                warn "QUAST diagnostics failed for $SAMPLE/$tool; base-level score is retained"
+        fi
     done
     # Keep retained reference-coordinate blocks separate from the aggregate TSV.
     # The HTML explorer consumes this bounded artifact; it never treats it as a
@@ -255,5 +262,26 @@ rm -rf "$SCORE_SHARDS" "$FAILURE_SHARDS"
 
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_pr_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
+
+# Merge every per-sample-per-tool QUAST diagnostics file into one combined
+# TSV, same "first non-empty file's header, then every file's data rows"
+# convention as the score-shard merge above. Each file already carries its
+# own header (written unconditionally by run_quast_diagnostics.py, even for
+# a tool with zero comparisons), so an empty-of-DATA file still contributes
+# its header if it happens to be first, harmlessly.
+if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
+    QUAST_DIAGNOSTICS="$RESULTS_DIR/quast_diagnostics.tsv"
+    : > "$QUAST_DIAGNOSTICS"
+    header_written=0
+    shopt -s nullglob
+    for shard in "$RESULTS_DIR"/*/*.quast_diagnostics.tsv; do
+        if [[ "$header_written" -eq 0 ]]; then
+            cat "$shard" >> "$QUAST_DIAGNOSTICS"; header_written=1
+        else
+            tail -n +2 "$shard" >> "$QUAST_DIAGNOSTICS"
+        fi
+    done
+    shopt -u nullglob
+fi
 
 log "Stage 5 (score) complete. Combined scores: $SCORES"

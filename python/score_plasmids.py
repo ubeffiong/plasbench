@@ -548,11 +548,22 @@ def main():
     if not 0 < args.plasmid_recovery_threshold <= 1:
         raise SystemExit("ERROR: --plasmid-recovery-threshold must be in (0, 1].")
     true_plasmids = [seq_id for seq_id, (mol, _) in truth.items() if mol == "PLASMID"]
-    recovered_plasmids = 0
-    for seq_id in true_plasmids:
-        _, covered_bp = merge_intervals(covered.get(seq_id, []))
-        if safe_div(covered_bp, truth[seq_id][1]) >= args.plasmid_recovery_threshold:
-            recovered_plasmids += 1
+    # Per-plasmid completeness fraction, computed once and reused below for
+    # every tier (the configurable --plasmid-recovery-threshold gate, plus
+    # the two fixed graded bands) rather than re-running merge_intervals per
+    # threshold. A genuine intermediate gap this fills: the existing
+    # recovered_plasmid_count/plasmid_recall answer only "recovered at the
+    # configured threshold or not", with no visibility into a plasmid that
+    # is, say, half-assembled versus barely started -- these graded bands
+    # are purely supplementary breakdowns, never a replacement for the
+    # existing single-threshold recall or for F1 as the ranking metric.
+    completeness = {
+        seq_id: safe_div(merge_intervals(covered.get(seq_id, []))[1], truth[seq_id][1])
+        for seq_id in true_plasmids
+    }
+    recovered_plasmids = sum(1 for frac in completeness.values() if frac >= args.plasmid_recovery_threshold)
+    recovered_plasmids_ge50 = sum(1 for frac in completeness.values() if frac >= 0.5)
+    recovered_plasmids_ge90 = sum(1 for frac in completeness.values() if frac >= 0.9)
     predicted_records = len(pred_lengths)
     try:
         amr_genes = read_amr_genes(args.amr_genes, truth)
@@ -568,10 +579,17 @@ def main():
         circular_plasmids = read_circular_plasmids(args.circular_plasmids, truth)
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}")
-    recovered_circular = sum(
-        1 for seq_id in circular_plasmids
-        if safe_div(merge_intervals(covered.get(seq_id, []))[1], truth[seq_id][1]) >= args.plasmid_recovery_threshold
-    )
+    recovered_circular = sum(1 for seq_id in circular_plasmids if completeness[seq_id] >= args.plasmid_recovery_threshold)
+    # The top graded band: essentially fully covered (matching
+    # merge_bin_metrics.py's own "essentially 1.0" convention for its
+    # perfect-recovery label) AND circular -- the strictest per-plasmid
+    # completeness claim this script makes, distinct from (and never a
+    # replacement for) the sample-wide "Perfect reference recovery"/"Strict
+    # reconstruction" labels merge_bin_metrics.py computes across the WHOLE
+    # sample, not per plasmid. Only defined when circular truth is known.
+    recovered_complete_circular = sum(
+        1 for seq_id in circular_plasmids if completeness[seq_id] >= 0.99995
+    ) if args.circular_plasmids else None
 
     # Undefined ratios are reported as "" (not-applicable), never a misleading
     # 0.0/0.0000 -- matching this file's own existing convention for
@@ -609,6 +627,9 @@ def main():
         "recovered_circular_plasmid_count", "circular_truth_plasmid_recovery", "circular_plasmid_recall", "alignment_total",
         "alignment_retained", "filtered_alignment_count", "precision", "recall", "f1",
         "isolate_specificity", "chromosome_fp_bp", "fp_predicted_record_count",
+        "recovered_plasmid_count_ge50", "plasmid_recall_ge50",
+        "recovered_plasmid_count_ge90", "plasmid_recall_ge90",
+        "recovered_complete_circular_plasmid_count", "complete_circular_plasmid_recall",
     ]
     row = [
         args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
@@ -627,6 +648,16 @@ def main():
         f"{f1:.4f}" if f1 is not None else "",
         f"{isolate_specificity:.4f}" if isolate_specificity is not None else "",
         chromosome_fp_bp, fp_predicted_record_count,
+        # Graded plasmid-recovery completeness bands (supplementary to
+        # plasmid_recall's single configured threshold above, never a
+        # replacement for it or for F1 as the ranking metric): an
+        # intermediate view between "any recall" and perfect recovery.
+        recovered_plasmids_ge50,
+        f"{safe_div(recovered_plasmids_ge50, len(true_plasmids)):.4f}" if true_plasmids else "",
+        recovered_plasmids_ge90,
+        f"{safe_div(recovered_plasmids_ge90, len(true_plasmids)):.4f}" if true_plasmids else "",
+        recovered_complete_circular if recovered_complete_circular is not None else "",
+        f"{safe_div(recovered_complete_circular, len(circular_plasmids)):.4f}" if recovered_complete_circular is not None else "",
     ]
 
     new_file = not os.path.exists(args.out) or os.path.getsize(args.out) == 0

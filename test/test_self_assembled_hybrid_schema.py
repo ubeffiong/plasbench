@@ -64,7 +64,7 @@ def main():
     # --- Case 5: an invalid truth_source value is rejected outright. ---
     row = base_row(truth_source="made_up_value")
     errors = vc.schema_errors([row], FIELDS)
-    assert any("truth_source must be ncbi_deposited or self_assembled_hybrid" in e for e in errors), errors
+    assert any("truth_source must be ncbi_deposited, self_assembled_hybrid, or simulated" in e for e in errors), errors
     print("an unrecognized truth_source value is rejected -> PASS")
 
     # --- Case 6: a normal ncbi_deposited row still requires a real

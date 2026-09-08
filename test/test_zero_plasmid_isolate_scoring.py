@@ -43,8 +43,13 @@ def run_scorer(truth, paf, pred_fasta, tool, out):
          "--sample", "NEG_CONTROL", "--tool", tool, "--out", out],
         check=True,
     )
+    # .splitlines() alone, never .strip() first: score_plasmids.py can
+    # legitimately write an empty final column (e.g. no --circular-plasmids
+    # given), and str.strip() on the whole file would silently swallow that
+    # trailing tab-delimited empty field along with the newline, corrupting
+    # the last column's parse -- see test_scoring.py's own fix for the same bug.
     with open(out) as fh:
-        lines = fh.read().strip().splitlines()
+        lines = fh.read().splitlines()
     return dict(zip(lines[0].split("\t"), lines[1].split("\t")))
 
 

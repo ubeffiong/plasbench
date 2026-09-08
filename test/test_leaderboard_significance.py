@@ -36,6 +36,7 @@ def make_row(sample, tool, f1):
         "pr_auc": None, "perfect_reference_recovery": "", "strict_reference_reconstruction": "",
         "isolate_specificity": None, "chromosome_fp_bp": None, "true_plasmid_count": 1,
         "nmi": None, "variation_of_information": None,
+        "plasmid_recall_ge50": None, "plasmid_recall_ge90": None, "complete_circular_plasmid_recall": None,
     }
 
 

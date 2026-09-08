@@ -118,7 +118,15 @@ export MAX_PARALLEL_TOOLS="${MAX_PARALLEL_TOOLS:-1}"       # independent tools w
 export MOB_RECON_THREADS="${MOB_RECON_THREADS:-$THREADS}"
 export PLATON_THREADS="${PLATON_THREADS:-$THREADS}"
 export PLASMIDSPADES_THREADS="${PLASMIDSPADES_THREADS:-$THREADS}"
-export GPLAS_THREADS="${GPLAS_THREADS:-$THREADS}"          # gplas itself is single-threaded; governs its classifier-prep step
+# NOT currently wired into any invocation: the gplas binary itself takes no
+# thread flag (confirmed single-threaded), and neither
+# python/mob_to_gplas_classifier.py nor python/validate_gplas_classifier.py
+# (gplas2_mob/gplas2_external's own classifier-prep steps) accept one either
+# -- both are lightweight single-threaded table/graph transformations, not
+# compute-heavy work. Kept only for interface consistency with every other
+# tool's own <TOOL>_THREADS var; do not assume setting this changes gplas2's
+# actual runtime.
+export GPLAS_THREADS="${GPLAS_THREADS:-$THREADS}"
 export GENOMAD_THREADS="${GENOMAD_THREADS:-$THREADS}"
 # Per-tool memory estimates (GB), used only for the oversubscription warning
 # in lib.sh's warn_resource_oversubscription -- advisory, never enforced.
@@ -193,6 +201,36 @@ export RFPLASMID_SPECIES="${RFPLASMID_SPECIES:-Enterobacteriaceae}"
 # --jelly (Jellyfish-based kmer counting) is RFPlasmid's own recommended,
 # faster path and is bundled by the bioconda package -- on by default here.
 export RFPLASMID_JELLY="${RFPLASMID_JELLY:-1}"
+# PlasmidHunter: a Diamond+Prodigal gene-content classifier over a single
+# species-agnostic Naive Bayes model (no per-species/genus model choice,
+# unlike RFPlasmid). Off by default. Exposes a per-contig "Probability of 1"
+# (plasmid-class probability) in [0,1], so it is also PR-curve/PR-AUC scored
+# alongside its own hard call -- see adapters/SCORES.md. Installed via
+# `pip install plasmidhunter` plus its diamond/prodigal conda deps (both
+# already available via existing profiles; see env/install_tools.sh).
+export RUN_PLASMIDHUNTER="${RUN_PLASMIDHUNTER:-0}"
+export PLASMIDHUNTER_THREADS="${PLASMIDHUNTER_THREADS:-$THREADS}"
+# Plasmer: a heavy multi-tool ensemble classifier (kmer-db + Prodigal +
+# HMMER + BLAST + Infernal + Diamond + Kraken2 feeding an R random-forest)
+# requiring a custom conda channel and a real, documented minimum of 32GB
+# system RAM (its own README: "A minimum of 32GB system memory is required
+# for kmer-db to load the databases"). Off by default. Exposes a per-contig
+# plasmid-class probability for every contig that actually went through its
+# random-forest model (its own predProb.tsv -- contigs excluded by its own
+# length rules have no probability at all), so it is also PR-curve/PR-AUC
+# scored -- see adapters/SCORES.md. A pre-built database (Zenodo/Google
+# Drive, not bundled by the package) must be downloaded separately and
+# pointed at via PLASMER_DB; see INSTALL.md.
+export RUN_PLASMER="${RUN_PLASMER:-0}"
+export PLASMER_THREADS="${PLASMER_THREADS:-$THREADS}"
+export PLASMER_DB="${PLASMER_DB:-$DATA_DIR/db/plasmer}"
+export PLASMER_MIN_LENGTH="${PLASMER_MIN_LENGTH:-500}"     # Plasmer's own -m default
+export PLASMER_LENGTH="${PLASMER_LENGTH:-500000}"          # Plasmer's own -l (chromosome length threshold) default
+# A real, documented kmer-db RAM floor -- deliberately NOT derived from the
+# general $MEMORY_GB assembler budget above, since this is a fixed
+# requirement of Plasmer's own database-loading step, not something that
+# scales with this machine's available memory.
+export PLASMER_MEMORY_GB="${PLASMER_MEMORY_GB:-32}"
 # PlaScope: Centrifuge classification (chromosome/plasmid/unclassified hard
 # call, no continuous score) against a SPECIES-SPECIFIC custom database.
 # Off by default. Only two pre-built databases exist (Zenodo), so
@@ -210,6 +248,7 @@ export PLASCOPE_THREADS="${PLASCOPE_THREADS:-$THREADS}"
 export PLASCOPE_ECOLI_DB="${PLASCOPE_ECOLI_DB:-$DATA_DIR/db/plascope/ecoli/chromosome_plasmid_db}"           # Zenodo 10.5281/zenodo.1311641
 export PLASCOPE_KLEBSIELLA_DB="${PLASCOPE_KLEBSIELLA_DB:-$DATA_DIR/db/plascope/klebsiella/Klebsiella_PlaScope}"  # Zenodo 10.5281/zenodo.1311647
 export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
+export FLYE_MOB_RECON_THREADS="${FLYE_MOB_RECON_THREADS:-$THREADS}"
 # CIRCULARITY GUARD (see scripts/lib.sh: long_read_truth_eligible). Off by
 # default: a sample without a declared truth_independent_of_long_reads=yes is
 # skipped for flye_mob_recon rather than scored against its own input. Setting
@@ -223,6 +262,7 @@ export FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH="${FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUT
 # Off by default. It is scored on its own track (ANALYSIS_TRACK=hybrid) and is
 # never ranked against short-read-only tools -- see docs/METHODS.md.
 export RUN_PLASSEMBLER="${RUN_PLASSEMBLER:-0}"
+export PLASSEMBLER_THREADS="${PLASSEMBLER_THREADS:-$THREADS}"
 export PLASSEMBLER_DB="${PLASSEMBLER_DB:-$DATA_DIR/db/plassembler}"
 # Passed to plassembler -c: contigs at least this long are treated as
 # chromosome. Must be smaller than the smallest chromosome in the cohort.
@@ -354,6 +394,20 @@ export TRYCYCLER_READ_TYPE="${TRYCYCLER_READ_TYPE:-$FLYE_READ_TYPE}"
 export HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH="${HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH:-1500000}"
 export HYBRID_TRUTH_THREADS="${HYBRID_TRUTH_THREADS:-$THREADS}"
 
+# --- Simulated reads (truth_source=simulated rows) ---------------------------
+# The mirror image of self-built hybrid truth above: assembly_accession is a
+# REAL, independently-deposited Complete Genome assembly (so it IS the truth,
+# downloaded and used exactly like an ncbi_deposited row -- see
+# validate_cohort.py's verify_simulated_row()), but short+long reads are
+# generated locally by python/simulate_reads.py (InSilicoSeq + Badread)
+# instead of downloaded from SRA. Per-row seed/depth/error-model values live
+# in the cohort sheet itself (simulation_seed, simulation_short_depth_x,
+# simulation_long_depth_x -- required; simulation_short_error_model,
+# simulation_long_error_model -- optional, these are just the defaults below).
+export SIMULATE_SHORT_MODEL="${SIMULATE_SHORT_MODEL:-novaseq}"
+export SIMULATE_LONG_MODEL="${SIMULATE_LONG_MODEL:-nanopore2020}"
+export SIMULATE_THREADS="${SIMULATE_THREADS:-$THREADS}"
+
 # --- Mapping (scoring) -------------------------------------------------------
 # minimap2 preset for aligning predicted-plasmid contigs back to the reference.
 export MINIMAP2_PRESET="${MINIMAP2_PRESET:-asm5}" # asm5 = <5% divergence
@@ -372,6 +426,34 @@ export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"
 export RUN_REFERENCE_ANNOTATION="${RUN_REFERENCE_ANNOTATION:-1}"
 export ANNOTATION_AMR_DB="${ANNOTATION_AMR_DB:-ncbi}"
 export ANNOTATION_REPLICON_DB="${ANNOTATION_REPLICON_DB:-plasmidfinder}"
+
+# Truth-derived DIFFICULTY descriptors (python/compute_difficulty_features.py):
+# how intrinsically hard this isolate is to separate into plasmid vs.
+# chromosome, independent of any tool's own performance -- dead-end count in
+# the assembly graph, plasmid-vs-chromosome read-depth ratio, and
+# plasmid-vs-chromosome Mash distance. Benchmark-only stratifiers, same as
+# plasmid_count and Inc-type: a genuinely unknown operational isolate has no
+# truth reference to compute these from, so they are never wired into
+# recommendation_model.py. Off by default (real per-isolate compute cost:
+# an alignment plus two external-tool calls), same convention as
+# RUN_REFERENCE_ANNOTATION. Each of the three fields is independently
+# skipped (left empty, not guessed) when its own prerequisite is missing.
+export RUN_DIFFICULTY_FEATURES="${RUN_DIFFICULTY_FEATURES:-0}"
+export DIFFICULTY_FEATURES_THREADS="${DIFFICULTY_FEATURES_THREADS:-$THREADS}"
+
+# Optional QUAST supplementary diagnostics (python/run_quast_diagnostics.py,
+# stage 5): three QUAST runs per sample/tool -- combined all-plasmids
+# reference, one per individual truth plasmid, and chromosome-only
+# reference (C-Connor/PlasmidToolBenchMarking's own verified pattern, see
+# docs/METHODS.md) -- surfacing genome fraction/misassembly count/
+# duplication ratio to explain WHY a low F1 happened, never a replacement
+# for score_plasmids.py's own base-level precision/recall/F1 ranking. Off
+# by default (real per-tool-per-sample compute cost: up to
+# 2+n_truth_plasmids QUAST invocations). --min-contig 0 is always passed
+# (QUAST's own 500bp default would silently drop short plasmid contigs).
+export RUN_QUAST_DIAGNOSTICS="${RUN_QUAST_DIAGNOSTICS:-0}"
+export QUAST_DIAGNOSTICS_THREADS="${QUAST_DIAGNOSTICS_THREADS:-$THREADS}"
+export QUAST_DIAGNOSTICS_MIN_CONTIG="${QUAST_DIAGNOSTICS_MIN_CONTIG:-0}"
 
 # Optional standardized CDS/product annotation for truth and every predicted
 # plasmid FASTA. FASTA alone has no protein names. Bakta is preferred; Prokka

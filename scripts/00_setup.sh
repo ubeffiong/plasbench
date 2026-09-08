@@ -158,6 +158,32 @@ if [[ "${RUN_RFPLASMID:-0}" -eq 1 ]]; then
     # not something this project can verify from a config var, so it is
     # documented (env/install_tools.sh, INSTALL.md) rather than checked here.
 fi
+if [[ "${RUN_PLASMIDHUNTER:-0}" -eq 1 ]]; then
+    check_tool plasmidhunter plasmidhunter
+    # No separate database to verify -- PlasmidHunter's Naive Bayes model
+    # ships inside its own PyPI package.
+fi
+if [[ "${RUN_PLASMER:-0}" -eq 1 ]]; then
+    check_tool Plasmer plasmer
+    # Unlike Platon/MOB-suite/geNomad/PLASMe/PlaScope, Plasmer's database has
+    # no scripted downloader here -- it is hosted on Zenodo/Google Drive with
+    # no single stable direct-download URL this project can automate, so a
+    # missing database is an UNFIXABLE manual step (same treatment as
+    # PLASGRAPH2_MODEL_DIR below), not one install-tools/00_setup.sh can fetch.
+    if [[ -d "${PLASMER_DB:-}" ]] && [[ -n "$(ls -A "$PLASMER_DB" 2>/dev/null)" ]]; then
+        log "  [ok]   Plasmer DB at $PLASMER_DB"
+    else
+        warn "  [MISS] Plasmer DB not found at ${PLASMER_DB:-not set}"
+        UNFIXABLE+=("Plasmer database: download it from Zenodo/Google Drive per Plasmer's own README, then point PLASMER_DB at it; see INSTALL.md")
+        CORE_OK=0
+    fi
+    # Plasmer's own README documents a real 32GB kmer-db RAM floor -- a soft
+    # warning here, like warn_resource_oversubscription elsewhere, never a
+    # hard block, since the user may still choose to try it.
+    if [[ "$PLASBENCH_AVAILABLE_GB" -lt "${PLASMER_MEMORY_GB:-32}" ]]; then
+        warn "  [WARN] Plasmer documents a ~${PLASMER_MEMORY_GB:-32}GB RAM minimum (kmer-db database loading), but only ~${PLASBENCH_AVAILABLE_GB}GB is currently available -- it may fail or be forced to swap."
+    fi
+fi
 if [[ "${RUN_PLASCOPE:-0}" -eq 1 ]]; then
     check_tool plaScope.sh plascope
     plascope_ecoli_ok=0; plascope_kleb_ok=0

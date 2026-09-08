@@ -206,20 +206,42 @@ def schema_errors(rows, fields, ledger=None):
         existing_cohort = ledger.get(row.get("biosample"))
         if existing_cohort: errors.append(f"row {number}: BioSample {row['biosample']} is already in cohort {existing_cohort}")
         # truth_source is optional; absent/empty means today's unchanged
-        # behavior (an existing NCBI-deposited assembly is the truth). Only
+        # behavior (an existing NCBI-deposited assembly is the truth).
         # "self_assembled_hybrid" changes what is required below -- see
         # build_hybrid_truth.py: PlasBench builds its own truth via hybrid
         # assembly from this isolate's own long+short reads when no
         # pre-existing Complete Genome assembly was ever deposited.
+        # "simulated" is the opposite direction: assembly_accession is a REAL,
+        # independently-deposited reference (so it IS the truth, unchanged),
+        # but sra_run is not a real SRA accession at all -- reads are
+        # generated locally by python/simulate_reads.py, and sra_run is
+        # reused only as the local read-file prefix. See
+        # docs/COHORTS.md#truth_source--long_read_sra_run-optional-self-built-hybrid-truth.
         truth_source = (row.get("truth_source") or "ncbi_deposited").strip()
-        if truth_source not in ("ncbi_deposited", "self_assembled_hybrid"):
-            errors.append(f"row {number}: truth_source must be ncbi_deposited or self_assembled_hybrid, got {row['truth_source']!r}")
+        if truth_source not in ("ncbi_deposited", "self_assembled_hybrid", "simulated"):
+            errors.append(f"row {number}: truth_source must be ncbi_deposited, self_assembled_hybrid, or simulated, got {row['truth_source']!r}")
         if truth_source == "self_assembled_hybrid":
             if not RUN.match(row.get("long_read_sra_run") or ""):
                 errors.append(f"row {number}: truth_source=self_assembled_hybrid requires a valid long_read_sra_run")
+            if not RUN.match(row["sra_run"]): errors.append(f"row {number}: invalid SRA run")
+        elif truth_source == "simulated":
+            if not ACCESSION.match(row["assembly_accession"]):
+                errors.append(f"row {number}: truth_source=simulated requires a valid assembly_accession (the real reference genome reads are simulated from)")
+            if not re.match(r"^[A-Za-z0-9_.-]+$", row.get("sra_run") or ""):
+                errors.append(f"row {number}: truth_source=simulated requires a non-empty, filesystem-safe sra_run value (used as the local simulated-read file prefix, not a real SRA accession)")
+            seed = (row.get("simulation_seed") or "").strip()
+            if not seed.isdigit():
+                errors.append(f"row {number}: truth_source=simulated requires an integer simulation_seed")
+            for field in ("simulation_short_depth_x", "simulation_long_depth_x"):
+                value = (row.get(field) or "").strip()
+                try:
+                    if not value or float(value) <= 0:
+                        errors.append(f"row {number}: truth_source=simulated requires {field} > 0")
+                except ValueError:
+                    errors.append(f"row {number}: {field} must be numeric")
         else:
             if not ACCESSION.match(row["assembly_accession"]): errors.append(f"row {number}: invalid assembly accession")
-        if not RUN.match(row["sra_run"]): errors.append(f"row {number}: invalid SRA run")
+            if not RUN.match(row["sra_run"]): errors.append(f"row {number}: invalid SRA run")
         if row["truth_technology"] not in ("long_read", "hybrid"): errors.append(f"row {number}: truth_technology must be long_read or hybrid")
         if row["truth_quality_tier"] not in ("A", "B", "C"): errors.append(f"row {number}: truth_quality_tier must be A/B/C")
         depth = (row.get("read_depth_x") or "").strip()
@@ -287,9 +309,30 @@ def verify_self_assembled_row(row, email=None, api_key=None):
             "long_read_run": long_run, "errors": errors}
 
 
+def verify_simulated_row(row, email=None, api_key=None):
+    """Verification for a truth_source=simulated row: reads are generated
+    locally by python/simulate_reads.py from a REAL NCBI reference assembly,
+    never from a real sequencing run -- so this checks only that the
+    reference itself clears the same Complete-Genome/plasmid-replicon bar
+    every ncbi_deposited row must, and skips every SRA-run check entirely,
+    since sra_run here is a local read-file prefix, not a real accession."""
+    assembly = assembly_metadata(row["assembly_accession"], email, api_key)
+    errors = []
+    if assembly["assembly_status"].lower() != "complete genome": errors.append("assembly is not Complete Genome")
+    if assembly["datasets_assembly_level"].lower() != "complete genome": errors.append("Datasets v2 assembly level is not Complete Genome")
+    if not assembly["has_plasmid"]: errors.append("assembly metadata does not declare plasmid replicons")
+    if assembly["biosample"] != row["biosample"]: errors.append("assembly BioSample does not match cohort row")
+    if row["bioproject"] not in assembly["bioprojects"]: errors.append("assembly BioProject does not match cohort row")
+    return {"sample_id": row["sample_id"], "assembly": assembly, "run": None,
+            "long_read_run": None, "errors": errors}
+
+
 def verify_row(row, email=None, api_key=None):
-    if (row.get("truth_source") or "ncbi_deposited").strip() == "self_assembled_hybrid":
+    truth_source = (row.get("truth_source") or "ncbi_deposited").strip()
+    if truth_source == "self_assembled_hybrid":
         return verify_self_assembled_row(row, email, api_key)
+    if truth_source == "simulated":
+        return verify_simulated_row(row, email, api_key)
     assembly = assembly_metadata(row["assembly_accession"], email, api_key)
     time.sleep(0.11 if api_key else 0.34)
     run = run_metadata(row["sra_run"], email, api_key)

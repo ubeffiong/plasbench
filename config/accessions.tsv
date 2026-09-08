@@ -26,17 +26,34 @@ sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tie
 #                        truth assembly was built from -- see docs/COHORTS.md and
 #                        docs/METHODS.md's circularity section. Absent/empty/no means
 #                        "assume circular", and such a tool is skipped for this sample.
-#   truth_source        : optional, ncbi_deposited (default) or self_assembled_hybrid.
-#                        Set self_assembled_hybrid ONLY when no Complete Genome assembly
-#                        was ever deposited for this isolate -- assembly_accession then
-#                        stays blank/NA, and PlasBench builds the truth reference itself
-#                        via a Unicycler hybrid assembly (see long_read_sra_run below and
-#                        docs/COHORTS.md). Such a row can never declare
+#   truth_source        : optional, ncbi_deposited (default), self_assembled_hybrid, or
+#                        simulated. Set self_assembled_hybrid ONLY when no Complete Genome
+#                        assembly was ever deposited for this isolate -- assembly_accession
+#                        then stays blank/NA, and PlasBench builds the truth reference
+#                        itself via a Unicycler hybrid assembly (see long_read_sra_run
+#                        below and docs/COHORTS.md). Such a row can never declare
 #                        truth_independent_of_long_reads=yes (checked, not just advised):
 #                        the truth is built from this isolate's own long reads.
+#                        Set simulated for the OPPOSITE case: assembly_accession is a REAL
+#                        reference (required, downloaded and used as truth unchanged), but
+#                        reads are generated locally by python/simulate_reads.py
+#                        (InSilicoSeq + Badread) instead of downloaded from SRA -- sra_run
+#                        then holds a local read-file-prefix label, not a real accession
+#                        (see simulation_seed etc. below and docs/COHORTS.md).
 #   long_read_sra_run   : required when truth_source=self_assembled_hybrid; the long-read
 #                        (ONT/PacBio) SRA run PlasBench fetches and assembles alongside
 #                        sra_run. Ignored/optional otherwise.
+#   simulation_seed     : required when truth_source=simulated; an integer RNG seed passed
+#                        to both InSilicoSeq and Badread for reproducible simulated reads.
+#   simulation_short_depth_x : required when truth_source=simulated; the uniform simulated
+#                        short-read depth (fold coverage) applied to every reference contig
+#                        (chromosome and plasmid(s) alike -- a documented simplification).
+#   simulation_long_depth_x  : required when truth_source=simulated; the simulated
+#                        long-read depth (fold coverage), independent of the short-read one.
+#   simulation_short_error_model : optional when truth_source=simulated; an InSilicoSeq
+#                        --model value (default: config/config.sh's SIMULATE_SHORT_MODEL).
+#   simulation_long_error_model  : optional when truth_source=simulated; a Badread
+#                        --error_model/--qscore_model value (default: SIMULATE_LONG_MODEL).
 #
 # Lines starting with '#' and blank lines are ignored.
 # A metadata-verified public seed panel is available at cohorts/public-v1.tsv.

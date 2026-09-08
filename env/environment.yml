@@ -19,7 +19,9 @@ dependencies:
   # separately with: plasbench install-tools gplas (see INSTALL.md)
   # --- scoring / mapping ---
   - minimap2               # align predicted plasmids back to the reference
-  - samtools               # convenience (sorting/indexing if you extend)
+  - samtools               # coverage/depth (RUN_DIFFICULTY_FEATURES; also convenience if you extend)
+  - mash                   # plasmid-vs-chromosome k-mer distance (RUN_DIFFICULTY_FEATURES);
+                            # previously only a transitive lock dependency via mob_suite
   # --- glue ---
   - python>=3.9            # scoring scripts use the stdlib only
   - pip                    # install the PlasBench command-line wrapper

@@ -17,7 +17,7 @@ from pathlib import Path
 TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycler",
          "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3",
          "plassembler", "flye", "hybracter", "trycycler", "genomad", "PLASMe.py",
-         "plASgraph2_classify.py", "rfplasmid", "plaScope.sh")
+         "plASgraph2_classify.py", "rfplasmid", "plasmidhunter", "Plasmer", "plaScope.sh")
 
 
 def tool_version():

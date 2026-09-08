@@ -21,6 +21,8 @@ rather than assigning an artificial zero score.
 | PLASMe | ml_classification | not applicable | short-read assembly | `adapt_plasme.sh` | optional |
 | plASgraph2 | ml_classification | not applicable | assembly graph | `adapt_plasgraph2.sh` | optional |
 | RFPlasmid | ml_classification | not applicable | short-read assembly | `adapt_rfplasmid.sh` | optional |
+| PlasmidHunter | ml_classification | not applicable | short-read assembly | `adapt_plasmidhunter.sh` | optional |
+| Plasmer | ml_classification | not applicable | short-read assembly | `adapt_plasmer.sh` | optional |
 | PlaScope | classification | not applicable | short-read assembly (E. coli/Klebsiella only) | `adapt_plascope.sh` | optional |
 
 The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
@@ -177,6 +179,92 @@ post-install (`checkm data setRoot`) regardless of how it was installed --
 see `env/install_tools.sh`'s `rfplasmid` case and INSTALL.md.
 
     adapt_rfplasmid.sh <rfplasmid_out_dir> <base_assembly_fasta> <out_fasta>
+
+## adapt_plasmidhunter.sh (ML classifier, see adapters/SCORES.md)
+
+`plasmidhunter -i <assembly.fasta> -c <cpu> -o OUT_DIR` takes a single FASTA
+file as input (simpler than RFPlasmid's directory-of-fasta requirement), and
+errors if `OUT_DIR` already exists, so `run_plasmidhunter()` removes `OUT`
+first and lets PlasmidHunter create it fresh, matching PLASMe/RFPlasmid.
+
+PlasmidHunter writes one file, `predictions.tsv` (a plain pandas
+`to_csv(sep='\t')` table with no `index_label`, so its first column is an
+UNNAMED row index), with columns `Prediction (0: chromosome, 1: plasmid)`
+(a float hard call) and `Probability of 1` (the plasmid-class probability in
+[0,1] -- the continuous score the PR-curve sweep needs; confirmed directly
+from PlasmidHunter's own source, `functions.py`'s `predict()`, since its
+README does not spell out these exact header strings). The unnamed index
+column IS the original input FASTA's contig id: PlasmidHunter derives it by
+running Prodigal on each contig (gene names `<contig_id>_<genenum>`, Prodigal's
+own convention) and stripping the trailing `_<genenum>` suffix
+(`functions.py`'s `daa_to_hits()`), so it always matches the FASTA header's
+first whitespace-delimited token exactly -- confirmed by tracing that
+function, never assumed. PlasmidHunter writes no separate hard-call FASTA of
+its own, so this adapter reconstructs `pred_plasmidhunter.plasmid.fasta`
+itself from the rows where the prediction column is `>= 0.5`, rather than
+taking a tool-written FASTA unchanged (unlike `adapt_genomad.sh`/
+`adapt_plasme.sh`). Like Platon/geNomad/PLASMe/RFPlasmid, PlasmidHunter is a
+per-contig classifier with no grouping output, so `bins.tsv` is always
+header-only.
+
+Unlike RFPlasmid, PlasmidHunter has no per-species/genus model choice -- one
+species-agnostic Naive Bayes model is used for every organism. It is a PyPI
+package (`pip install plasmidhunter`), not a bioconda package; only its
+`diamond`/`prodigal` dependencies are conda packages -- see
+`env/install_tools.sh`'s `plasmidhunter` case and INSTALL.md.
+
+    adapt_plasmidhunter.sh <plasmidhunter_out_dir> <base_assembly_fasta> <out_fasta>
+
+## adapt_plasmer.sh (ML classifier, see adapters/SCORES.md)
+
+`Plasmer -g <assembly> -p <prefix> -d <db> -t <threads> -m <min_length> -l
+<length> -o OUT_DIR` writes, under `OUT_DIR/results/` (confirmed directly
+from Plasmer's own `scripts/Plasmer` driver source, since its README does
+not spell out these exact filenames):
+
+- `<prefix>.plasmer.predPlasmids.fa` -- Plasmer's OWN hard-call plasmid-only
+  FASTA (its own `extract_predPlasmids_seqs.py`, filtering `predClass.tsv`'s
+  label column strictly on `"plasmid"`, no extra cutoff) -- taken unchanged
+  here, like `adapt_platon.sh`/`adapt_plascope.sh`, not reconstructed.
+- `<prefix>.plasmer.predClass.tsv` -- a HEADERLESS 2-column table
+  (`contig_id`, `label`), assembled by concatenating three different
+  intermediate sources. `label` is one of THREE values: `"chromosome"`/
+  `"plasmid"` (from Plasmer's random-forest model), a hard `"chromosome"`
+  call for any sequence at or above the `-l` length threshold (never
+  RF-scored), or `"shorter_than_<N>"` for any sequence at or below the `-m`
+  minimum length (also never RF-scored). Not used directly by this adapter.
+- `<prefix>.plasmer.predProb.tsv` -- a REAL 3-column table WITH a header
+  (`Contig`, `chromosome`, `plasmid`), covering ONLY the contigs that
+  actually went through the random-forest model (excludes both the
+  length-rule and too-short classes above). The `plasmid` column is the
+  continuous score the PR-curve sweep needs. Row ids match the input FASTA
+  header's first whitespace-delimited token exactly (Biopython's own
+  `SeqIO` `record.id` convention) -- no Prodigal-style renaming needed,
+  unlike PlasmidHunter.
+
+Per `adapters/SCORES.md`, `.candidates.fasta`'s record set must EXACTLY
+equal `.scores.tsv`'s -- so both are built here from `predProb.tsv`'s
+contig set only, never `predClass.tsv`'s wider set (which would include
+un-scored, length-filtered contigs `predProb.tsv` never mentions).
+
+`scripts/04_run_tools.sh`'s `run_plasmer()` passes the raw `-o` value as
+this adapter's `out_dir`; results live under `out_dir/results/` with a
+`${prefix}.plasmer.*` naming convention, found here by glob so the prefix
+does not need to be passed separately (same idea as `adapt_plascope.sh`).
+Plasmer is a per-contig classifier with no grouping/bin output, so (like
+Platon/geNomad/PLASMe/RFPlasmid/PlasmidHunter) `bins.tsv` is header-only.
+
+Unlike PLASMe/RFPlasmid/PlasmidHunter, real Plasmer does NOT error on an
+existing `-o` directory (a plain `mkdir`, no `set -e` in its own driver
+script) -- `run_plasmer()` still removes it first for a clean, idempotent
+rerun. Plasmer is published under a custom conda channel
+(`-c iskoldt -c bioconda -c conda-forge -c defaults`), needs a separately
+downloaded database (Zenodo/Google Drive, not bundled -- see
+`env/install_tools.sh`'s `plasmer` case and INSTALL.md), and documents a
+real 32GB system-RAM minimum for its kmer-db step (`PLASMER_MEMORY_GB` in
+`config/config.sh`).
+
+    adapt_plasmer.sh <plasmer_out_dir> <base_assembly_fasta> <out_fasta>
 
 ## adapt_plascope.sh
 

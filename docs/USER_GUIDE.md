@@ -14,7 +14,7 @@ the same reference bases for every tool.
 
 The benchmark compares, on the short-read track, MOB-suite `mob_recon`,
 Platon, plasmidSPAdes, optional classifier-backed gplas2 modes, the ML
-classifiers geNomad, PLASMe, plASgraph2 and RFPlasmid, and the
+classifiers geNomad, PLASMe, plASgraph2, RFPlasmid, PlasmidHunter and Plasmer, and the
 species-gated (E. coli/Klebsiella only) Centrifuge classifier PlaScope; and,
 on the long-read and hybrid
 tracks, `flye_mob_recon`, `hybracter_long`, `trycycler_mob_recon`,
@@ -264,6 +264,12 @@ When no such assembly was ever deposited (some cohort sources only submit reads)
 the truth reference itself from that isolate's own long+short reads. See
 `docs/COHORTS.md`'s `truth_source`/`long_read_sra_run` section for the full workflow.
 
+The opposite case is also supported: `truth_source=simulated` keeps a REQUIRED, real
+`assembly_accession` as truth, but generates `sra_run`'s reads locally (InSilicoSeq +
+Badread) at a depth/seed/error-model you choose, instead of downloading a real sequencing
+run -- useful for controlled comparisons a real deposited run cannot give you. See
+`docs/COHORTS.md`'s `truth_source=simulated` section for the full column reference.
+
 ### Read and reference formats
 
 PlasBench's default input is **paired short-read FASTQ**. Expected local
@@ -456,6 +462,36 @@ post-install (`checkm data setRoot`), regardless of install method -- see
 ```bash
 plasbench install-tools rfplasmid
 plasbench run --rfplasmid on
+```
+
+PlasmidHunter (Diamond+Prodigal gene-content classifier over one
+species-agnostic Naive Bayes model, unlike RFPlasmid's per-species/genus
+choice) follows the same contract from its own `predictions.tsv`'s
+"Probability of 1" column. It is not a bioconda package -- install it via
+`plasbench install-tools plasmidhunter`, which installs its `diamond`/
+`prodigal` dependencies through conda and then runs `pip install
+plasmidhunter` into the same environment.
+
+```bash
+plasbench install-tools plasmidhunter
+plasbench run --plasmidhunter on
+```
+
+Plasmer (a kmer-db/Prodigal/HMMER/BLAST/Infernal/Diamond/Kraken2 ensemble
+feeding an R random-forest model) follows the same contract from its own
+`predProb.tsv`'s "plasmid" probability column -- but only for contigs that
+actually went through the random-forest step; contigs excluded by its own
+length rules (too short, or long enough to be hard-called chromosome) have
+no probability at all, and are correspondingly absent from both
+`.candidates.fasta` and `.scores.tsv`, not scored as 0. It IS installable
+via `plasbench install-tools plasmer`, but from its own custom conda channel
+(`-c iskoldt`), needs a separately downloaded database (Zenodo/Google Drive,
+not bundled -- point `PLASMER_DB` at it), and documents a real 32GB
+system-RAM minimum for its kmer-db step; see `INSTALL.md`.
+
+```bash
+plasbench install-tools plasmer
+plasbench run --plasmer on
 ```
 
 Per sample/tool, this writes `<tool>.pr_curve.tsv` (`threshold, precision,
@@ -673,6 +709,8 @@ still exits non-zero -- nothing fails silently.
 --plasme on|off          Optional PLASMe ML classification (assembly contigs). Default: off.
 --plasgraph2 on|off      Optional plASgraph2 GNN classification (assembly graph). Default: off.
 --rfplasmid on|off       Optional RFPlasmid random-forest classification (assembly contigs). Default: off.
+--plasmidhunter on|off   Optional PlasmidHunter gene-content Naive Bayes classification (assembly contigs). Default: off.
+--plasmer on|off         Optional Plasmer ensemble classification (assembly contigs; requires ~32GB RAM). Default: off.
 --plascope on|off        Optional PlaScope Centrifuge classification (E. coli/Klebsiella only). Default: off.
 --force-rerun-tools      Delete completed tool outputs and run them again.
 ```

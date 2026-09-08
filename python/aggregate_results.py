@@ -107,6 +107,14 @@ def read_scores(path):
                 "isolate_specificity": float(f[idx["isolate_specificity"]]) if "isolate_specificity" in idx and f[idx["isolate_specificity"]] else None,
                 "chromosome_fp_bp": int(f[idx["chromosome_fp_bp"]]) if "chromosome_fp_bp" in idx and f[idx["chromosome_fp_bp"]] else None,
                 "true_plasmid_count": int(f[idx["true_plasmid_count"]]) if "true_plasmid_count" in idx and f[idx["true_plasmid_count"]] else None,
+                # Graded plasmid-recovery completeness bands (score_plasmids.py):
+                # supplementary to plasmid_recall's single configured threshold
+                # above, an intermediate view between "any recall" and perfect
+                # recovery. Gracefully absent (never 0) when undefined, matching
+                # plasmid_recall's own convention immediately above.
+                "plasmid_recall_ge50": float(f[idx["plasmid_recall_ge50"]]) if "plasmid_recall_ge50" in idx and f[idx["plasmid_recall_ge50"]] else None,
+                "plasmid_recall_ge90": float(f[idx["plasmid_recall_ge90"]]) if "plasmid_recall_ge90" in idx and f[idx["plasmid_recall_ge90"]] else None,
+                "complete_circular_plasmid_recall": float(f[idx["complete_circular_plasmid_recall"]]) if "complete_circular_plasmid_recall" in idx and f[idx["complete_circular_plasmid_recall"]] else None,
             })
     return rows
 
@@ -138,7 +146,8 @@ def read_status(path):
 def summarise(rows, status_counts):
     by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0,
                                    "zero_plasmid_specificity": [], "zero_plasmid_fp_bp": [], "n_zero_plasmid": 0,
-                                   "nmi": [], "vi": []})
+                                   "nmi": [], "vi": [],
+                                   "plasmid_recall_ge50": [], "plasmid_recall_ge90": [], "complete_circular_plasmid_recall": []})
     for r in rows:
         t = by_tool[r["tool"]]
         # Undefined (score_plasmids.py) on a zero-true-plasmid isolate or one
@@ -149,6 +158,12 @@ def summarise(rows, status_counts):
         if r["f1"] is not None: t["f1"].append(r["f1"])
         if r["plasmid_recall"] is not None:
             t["plasmid_recall"].append(r["plasmid_recall"])
+        if r["plasmid_recall_ge50"] is not None:
+            t["plasmid_recall_ge50"].append(r["plasmid_recall_ge50"])
+        if r["plasmid_recall_ge90"] is not None:
+            t["plasmid_recall_ge90"].append(r["plasmid_recall_ge90"])
+        if r["complete_circular_plasmid_recall"] is not None:
+            t["complete_circular_plasmid_recall"].append(r["complete_circular_plasmid_recall"])
         if r["bin_f1"] is not None: t["bin_f1"].append(r["bin_f1"])
         if r["nmi"] is not None: t["nmi"].append(r["nmi"])
         if r["variation_of_information"] is not None: t["vi"].append(r["variation_of_information"])
@@ -182,6 +197,15 @@ def summarise(rows, status_counts):
             "f1_ci_high": f1_ci_high,
             "median_f1": statistics.median(d["f1"]) if d["f1"] else None,
             "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]) if d["plasmid_recall"] else None,
+            # Graded plasmid-recovery completeness bands (score_plasmids.py):
+            # supplementary breakdowns between "any recall" (mean_plasmid_recall
+            # above, at its own configured threshold) and perfect recovery
+            # (reference_perfect_recovery_rate below) -- never a ranking
+            # replacement for mean_f1.
+            "mean_plasmid_recall_ge50": statistics.mean(d["plasmid_recall_ge50"]) if d["plasmid_recall_ge50"] else None,
+            "mean_plasmid_recall_ge90": statistics.mean(d["plasmid_recall_ge90"]) if d["plasmid_recall_ge90"] else None,
+            "mean_complete_circular_plasmid_recall": statistics.mean(d["complete_circular_plasmid_recall"]) if d["complete_circular_plasmid_recall"] else None,
+            "n_complete_circular_assessed": len(d["complete_circular_plasmid_recall"]),
             "n_zero_plasmid_isolates": d["n_zero_plasmid"],
             "mean_zero_plasmid_specificity": statistics.mean(d["zero_plasmid_specificity"]) if d["zero_plasmid_specificity"] else None,
             "total_zero_plasmid_chromosome_fp_bp": sum(d["zero_plasmid_fp_bp"]) if d["zero_plasmid_fp_bp"] else None,
@@ -329,7 +353,10 @@ def write_comparisons(rows, path, comparisons=None):
 
 def write_tsv(summary, path):
     cols = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
-            "mean_recall", "mean_plasmid_recall", "n_bin_scored", "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "n_pr_scored", "mean_pr_auc",
+            "mean_recall", "mean_plasmid_recall",
+            "mean_plasmid_recall_ge50", "mean_plasmid_recall_ge90",
+            "n_complete_circular_assessed", "mean_complete_circular_plasmid_recall",
+            "n_bin_scored", "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "n_pr_scored", "mean_pr_auc",
             "n_reference_perfect_assessed", "reference_perfect_recovery_rate", "n_strict_reconstruction_assessed", "strict_reference_reconstruction_rate",
             "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1", "significant_vs_runner_up",
             "n_zero_plasmid_isolates", "mean_zero_plasmid_specificity", "total_zero_plasmid_chromosome_fp_bp"]
@@ -341,6 +368,10 @@ def write_tsv(summary, path):
                 f"{s['mean_precision']:.4f}" if s["mean_precision"] is not None else "",
                 f"{s['mean_recall']:.4f}" if s["mean_recall"] is not None else "",
                 f"{s['mean_plasmid_recall']:.4f}" if s["mean_plasmid_recall"] is not None else "",
+                f"{s['mean_plasmid_recall_ge50']:.4f}" if s["mean_plasmid_recall_ge50"] is not None else "",
+                f"{s['mean_plasmid_recall_ge90']:.4f}" if s["mean_plasmid_recall_ge90"] is not None else "",
+                s['n_complete_circular_assessed'],
+                f"{s['mean_complete_circular_plasmid_recall']:.4f}" if s["mean_complete_circular_plasmid_recall"] is not None else "",
                 s['n_bin_scored'], f"{s['mean_bin_f1']:.4f}" if s['mean_bin_f1'] is not None else "",
                 f"{s['mean_nmi']:.4f}" if s['mean_nmi'] is not None else "",
                 f"{s['mean_variation_of_information']:.4f}" if s['mean_variation_of_information'] is not None else "",

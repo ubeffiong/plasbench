@@ -515,7 +515,7 @@ The last command should print **31**.
 #### 7b — MOB-suite database
 
 ```bash
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 bash env/download_mobsuite_db.sh
 ```
 
@@ -576,7 +576,7 @@ Now write it into a file PlasBench reads. Replace the two values with your own, 
 everything else exactly as shown:
 
 ```bash
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 cat > .ncbi.env <<'EOF'
 NCBI_API_KEY=paste_your_key_here
 NCBI_EMAIL=your.email@example.org
@@ -597,7 +597,7 @@ This file is ignored by Git and is never included in a release archive. Do not s
 ### Step 9 — Confirm the whole installation
 
 ```bash
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 plasbench check
 ```
 
@@ -620,7 +620,7 @@ Start with `public-v1`: 10 isolates, the smallest shipped cohort. First confirm 
 cohort has not been altered:
 
 ```bash
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 plasbench validate-cohort --samples cohorts/public-v1.tsv --verify-lock cohorts/public-v1.lock.json
 ```
 
@@ -696,7 +696,7 @@ to be chromosome, which quietly inflates the scores.
 ### Step 11 — Look at the results
 
 ```bash
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 cat results/benchmark.leaderboard.md
 ```
 
@@ -736,6 +736,13 @@ this entire resistance plasmid?", read `mean_plasmid_recall`. Also read the conf
 interval: two tools whose intervals overlap are not distinguishable at this sample size,
 however different their averages look.
 
+`mean_plasmid_recall` answers one question at one configured threshold: recovered, or
+not. The report's "Graded plasmid recovery" section breaks that into intermediate bands —
+the fraction of a tool's plasmids at least half covered, at least 90% covered, and (for
+isolates with known circular truth) essentially fully covered and circular — so you can
+see whether a tool's misses tend to be near-complete or barely started. Supplementary
+only; `mean_f1` and `mean_plasmid_recall` remain the ranking metrics.
+
 ---
 
 ## 3A. Support, recovery, and upgrades — use only when needed
@@ -764,7 +771,7 @@ None of these actions are required for a successful ordinary benchmark run.
 To see what PlasBench is doing in more detail, every stage writes a log:
 
 ```bash
-ls ~/plasbench-0.2.2/logs/
+ls ~/plasbench-0.2.5/logs/
 ```
 
 ---
@@ -856,7 +863,7 @@ plasbench upgrade
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, unpacks it into a new sibling
-directory (`~/plasbench-0.1.9` → `~/plasbench-0.2.2`, your current one is never touched
+directory (`~/plasbench-0.1.9` → `~/plasbench-0.2.5`, your current one is never touched
 or deleted), then reuses one physical data directory for reads and databases. On the
 first upgrade from an older release, it **moves** the old `data/` directory once to
 `~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
@@ -865,7 +872,7 @@ over `config/local.tsv` and `.ncbi.env`, then installs the new PlasBench code in
 existing `plasbench` environment **without refreshing Conda packages or tools**. Finish with:
 
 ```bash
-cd ~/plasbench-0.2.2        # the directory ./update.sh just printed
+cd ~/plasbench-0.2.5        # the directory ./update.sh just printed
 conda activate plasbench
 plasbench --version         # should print the new version
 ```
@@ -1273,6 +1280,36 @@ and [`docs/METHODS.md`](docs/METHODS.md) for the full method and rationale, and
 2025's 250-isolate cohort) including one candidate-extraction script specific to that
 paper's own supplementary table.
 
+#### Simulated reads from a real reference, when you need to control the read-generating process
+
+The opposite gap from the one above: `assembly_accession` is a REAL, independently-deposited
+Complete Genome assembly (required, downloaded and used as truth unchanged, exactly like an
+`ncbi_deposited` row) — but the reads are generated locally instead of downloaded from SRA,
+via `python/simulate_reads.py` (InSilicoSeq for short reads, Badread for long reads). Useful
+when you need a *specific, chosen* depth, seed, or error model rather than whatever a real
+deposited run happens to have — e.g. a depth-degradation sweep, or an exactly reproducible
+run.
+
+```bash
+# Add truth_source=simulated plus four columns to a cohort sheet whose
+# assembly_accession is real: simulation_seed, simulation_short_depth_x,
+# simulation_long_depth_x (all required), and optionally
+# simulation_short_error_model / simulation_long_error_model. sra_run still
+# needs a value, but it is reused as the local read-file prefix, not a real
+# SRA accession -- see config/accessions.tsv's header comment.
+plasbench install-tools simulate   # insilicoseq + badread
+plasbench run --cohort my-simulated-cohort
+```
+
+Short-read depth is applied uniformly across every reference contig (chromosome and
+plasmid(s) alike); Badread's read-length distribution is left at its own natural default,
+never forced to a fixed length. The HTML report marks every simulated sample with a distinct
+"simulated reads" badge (visually different from `self_assembled_hybrid`'s "self-built
+truth" badge above — the situations are opposite) so a simulated isolate is never mistaken
+for a real-world result. See
+[`docs/COHORTS.md`](docs/COHORTS.md#truth_sourcesimulated-reads-generated-locally-from-a-real-reference)
+for the full column reference.
+
 ---
 
 ### 4.3 Run the study
@@ -1566,7 +1603,7 @@ correlated and does not count them as independent evidence.
 
 ### 4.11 ML classifiers, and reading a precision–recall curve
 
-Three machine-learning tools sit alongside the classical short-read ones, all
+Six machine-learning tools sit alongside the classical short-read ones, all
 off by default and independently switchable:
 
 | Tool | What it is | Input |
@@ -1574,9 +1611,14 @@ off by default and independently switchable:
 | `genomad` | Gene-based neural classifier | assembly contigs |
 | `plasme` | Alignment + transformer hybrid | assembly contigs |
 | `plasgraph2` | Graph neural network over assembly-graph nodes | assembly graph |
+| `rfplasmid` | Random forest over marker genes, plasmid genes, and kmers (per species/genus model) | assembly contigs |
+| `plasmidhunter` | Diamond+Prodigal gene-content Naive Bayes classifier (one species-agnostic model) | assembly contigs |
+| `plasmer` | kmer-db/Prodigal/HMMER/BLAST/Infernal/Diamond/Kraken2 ensemble feeding a random forest | assembly contigs |
 
-**geNomad installs from bioconda; the other two do not** — PLASMe and plASgraph2
-are git checkouts with their own environments, so `plasbench install-tools`
+**geNomad and RFPlasmid install from bioconda; PlasmidHunter installs from PyPI
+plus two bioconda dependencies; Plasmer installs from its own custom conda
+channel; PLASMe and plASgraph2 install from neither** — the latter two are
+git checkouts with their own environments, so `plasbench install-tools`
 prints the exact commands instead of attempting an install that would fail:
 
 ```bash
@@ -1590,11 +1632,21 @@ plasbench run --cohort my-cohort --plasme on
 plasbench install-tools plasgraph2      # prints the git clone + pip steps
 plasbench run --cohort my-cohort --plasgraph2 on \
               --plasgraph2-model-dir /path/to/plASgraph2/model/ESKAPEE_model
+
+plasbench install-tools rfplasmid       # bioconda; also needs a one-time CheckM data setup, see INSTALL.md
+plasbench run --cohort my-cohort --rfplasmid on
+
+plasbench install-tools plasmidhunter   # installs diamond+prodigal via conda, then `pip install plasmidhunter`
+plasbench run --cohort my-cohort --plasmidhunter on
+
+plasbench install-tools plasmer         # conda, from Plasmer's own custom channel; documents a ~32GB RAM minimum
+# download Plasmer's database separately (Zenodo/Google Drive) and set PLASMER_DB to it
+plasbench run --cohort my-cohort --plasmer on
 ```
 
-All three are short-read-track tools, so they appear in
+All six are short-read-track tools, so they appear in
 `benchmark.short_read.leaderboard.tsv` next to MOB-Recon and Platon and are
-ranked on the same `mean_f1`. All three are contig **classifiers**, not
+ranked on the same `mean_f1`. All six are contig **classifiers**, not
 binners: they say "this contig is plasmid", never "these three contigs are one
 plasmid". The report labels their bin diagnostics *not applicable* rather than
 inventing a bin score — see [`adapters/REGISTRY.md`](adapters/REGISTRY.md).
@@ -1640,6 +1692,319 @@ there.
 Everything so far downloads isolates from NCBI. This section is for benchmarking
 **your own sequencing data**. Every command is complete; copy it as written.
 
+### 5.0 Prepare inputs before running: choose one route
+
+Do not start with `plasbench run` until you know which input route describes
+your study. PlasBench does **not** accept FASTQ paths directly on the `run`
+command. This is intentional: a benchmark needs a durable sample sheet and a
+per-sample folder so that inputs, truth, tool outputs, checksums, and the final
+report all remain connected. `--reads-1` and `--reads-2` belong to
+`plasbench init-local`, which stages files; `plasbench run --samples ...` then
+uses the staged files.
+
+| Your starting material | Use this route | What you prepare | What PlasBench does |
+|---|---|---|---|
+| A complete NCBI genome plus matched Illumina SRA run | [Curated NCBI benchmark](#route-a-curated-ncbi-benchmark) | A full cohort TSV with accessions and metadata | Downloads reads/reference, builds truth labels, assembles, runs tools, scores, and reports |
+| Your paired Illumina FASTQs plus a complete assembly of the same isolate | [Local truth-set benchmark](#end-to-end-local-input-example-stage-validate-run-and-open-the-report) | R1, R2, complete reference FASTA, and reviewed truth labels | Uses only your local files; no NCBI download |
+| Your paired Illumina FASTQs plus ONT/PacBio reads, but no deposited complete assembly | [Self-built hybrid truth benchmark](#route-c-self-built-hybrid-truth-benchmark) | R1, R2, long-read FASTQ, and a carefully reviewed cohort row | Builds a strict Unicycler hybrid truth; only short-read tools are eligible for that sample |
+| A complete reference where you want controlled synthetic read conditions | [Simulated benchmark](#route-d-simulated-benchmark) | Curated NCBI reference accession and simulation settings | Downloads the reference, simulates paired short and long reads, and records seed/profile provenance |
+| A new isolate without a known complete reference | [Operational reconstruction](#route-e-operational-reconstruction) | Paired reads only, or an SRA run | Reconstructs candidates but does not claim benchmark scores or a verified "best" sequence |
+
+**Keep these routes separate.** A real cohort, synthetic cohort, self-built
+truth cohort, and operational sample answer different scientific questions.
+They must use separate sample sheets and result directories. PlasBench keeps
+short-read, long-read, and hybrid leaderboards separate; you should also avoid
+combining synthetic and real outcomes into one published conclusion.
+
+#### Input-preparation checklist for every laboratory sample
+
+1. Give the isolate a stable `sample_id`: letters, digits, `.`, `_`, and `-`
+   only. Do not use spaces, `/`, `:`, or a changing patient/sample description.
+2. Confirm that R1 and R2 originate from the **same paired-end library** and
+   same isolate. Do not pair files merely because their filenames are similar.
+3. Keep original FASTQs read-only in your laboratory archive. Let
+   `init-local --link hardlink` or `--link symlink` avoid needless duplicate
+   copies where your filesystem supports it.
+4. Ensure reads are paired, non-empty, and gzip-compressed. PlasBench rejects
+   single-end inputs and a plain-text file renamed with `.gz`.
+5. For a scored benchmark, confirm that the reference FASTA comes from the
+   **same biological isolate** as the reads. A reference from a related strain
+   is not valid truth.
+6. Review every reference sequence as `PLASMID` or `CHROMOSOME`. Never infer
+   molecule type from sequence length. If you have NCBI's
+   `sequence_report.jsonl`, retain it with the reference.
+7. For a long-read/hybrid reconstruction comparison, document whether the
+   long reads are independent of the reads used to create truth. If they are
+   the same, PlasBench correctly skips long-read/hybrid tool scoring rather
+   than producing a circular result.
+8. Use a new results directory for each scientific run. Reusing the same
+   directory is appropriate only when resuming the same sample sheet and
+   settings.
+
+#### Required on-disk layout
+
+The local directory name is always the `sample_id`. The read prefix is the
+value in the `sra_run` column for local rows. The following is the complete
+layout for a scored local short-read benchmark:
+
+```text
+data/
+  isolate_001/
+    isolate_001_1.fastq.gz      # paired forward reads
+    isolate_001_2.fastq.gz      # paired reverse reads
+    reference.fna               # complete same-isolate reference
+    truth.tsv                   # reviewed PLASMID/CHROMOSOME labels
+    sequence_report.jsonl       # optional preferred NCBI source for labels
+config/
+  local.tsv                     # one row per isolate
+```
+
+For a self-built hybrid truth sample, add
+`data/<sample_id>/long_reads.fastq.gz`. For a simulated sample, do **not** put
+ad hoc reads in the directory: PlasBench creates the short and long FASTQs from
+the declared reference and records `simulation_provenance.json`. For an
+operational sample, omit `reference.fna` and `truth.tsv`; that sample cannot
+produce an F1 score, plasmid recall, or an evidence-backed selection claim.
+
+#### Route A: Curated NCBI benchmark
+
+Use this when NCBI already has both a complete/hybrid assembly and a matched
+paired-end Illumina run for the same isolate. Start by copying the full header
+from `config/accessions.tsv` into a new study sheet. The following is an
+**illustrative row shape only**: replace every accession and curator field with
+verified values before running it.
+
+```tsv
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	source_study	gram_group	collection_country
+isolate_001	GCF_012345678.1	SRR012345678	Escherichia coli	hybrid	C	SAMN01234567	PRJNA012345	clinical	80	pending_review	Gram-negative	Nigeria
+```
+
+Preparation and run:
+
+```bash
+# 1. Save your completed rows as cohorts/my_cohort.tsv.
+# 2. Verify the accession pairing online, then lock the reviewed evidence.
+plasbench validate-cohort --samples cohorts/my_cohort.tsv --online \
+  --write-lock cohorts/my_cohort.lock.json
+
+# 3. Download, benchmark, and write a separate report directory.
+plasbench run --samples cohorts/my_cohort.tsv \
+  --results-dir results/my_cohort \
+  --threads 8 --memory-gb 24 --open-report
+```
+
+The `assembly_accession` supplies the reference/truth source and `sra_run`
+supplies the paired short reads. Do not run the illustrative accessions above:
+they only demonstrate the columns. A failed online validation is a data-curation
+task, not a reason to weaken the cohort requirements.
+
+#### Route C: Self-built hybrid truth benchmark
+
+Use this only when the same BioSample has paired Illumina reads and ONT/PacBio
+reads but **no deposited complete assembly**. The row still needs the full
+curated schema; these are the extra fields that change the workflow:
+
+```tsv
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	truth_source	long_read_sra_run
+isolate_002	NA	SRR_SHORT_READS	Klebsiella pneumoniae	hybrid	C	SAMN_REAL_SAMPLE	PRJNA_REAL_STUDY	self_assembled_hybrid	SRR_LONG_READS
+```
+
+Prepare and run it as follows:
+
+```bash
+# Put the completed full-schema row in cohorts/self_build.tsv, then verify it.
+plasbench validate-cohort --samples cohorts/self_build.tsv --online \
+  --write-lock cohorts/self_build.lock.json
+
+# Stage 1 fetches both short and long reads. Stage 2 runs Unicycler and accepts
+# truth only when its strict circular-contig checks pass.
+plasbench run --samples cohorts/self_build.tsv \
+  --results-dir results/self_build \
+  --threads 8 --memory-gb 24 --open-report
+```
+
+PlasBench writes `data/isolate_002/reference.fna`, `truth.tsv`, and
+`truth_provenance.json` only after a strict hybrid assembly succeeds. Because
+the long reads created this truth, long-read and hybrid reconstruction tools are
+automatically excluded for this sample; its valid contribution is to the
+short-read track.
+
+#### Route D: Simulated benchmark
+
+Use this to control depth, error profile, and random seed while preserving an
+exact real complete reference as truth. Create a **separate** full-schema TSV;
+the added simulation fields are shown below. The accession and metadata values
+are examples, not a runnable cohort:
+
+```tsv
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	truth_source	simulation_seed	simulation_short_depth_x	simulation_long_depth_x	simulation_short_error_model	simulation_long_error_model
+synthetic_001	GCF_012345678.1	synthetic_001	Escherichia coli	hybrid	C	SAMN01234567	PRJNA012345	simulated	42	80	40	novaseq	nanopore2020
+```
+
+```bash
+# Install InSilicoSeq and Badread once, then validate and run the separate track.
+plasbench install-tools simulate
+plasbench validate-cohort --samples cohorts/synthetic.tsv --online \
+  --write-lock cohorts/synthetic.lock.json
+plasbench run --samples cohorts/synthetic.tsv \
+  --results-dir results/synthetic \
+  --threads 8 --memory-gb 24 --open-report
+```
+
+Stage 1 downloads `assembly_accession`, creates the paired short reads and long
+reads, and writes `simulation_provenance.json`. Do not add a real SRA accession
+to `sra_run` for this route: it is a safe local read-prefix label such as
+`synthetic_001`, not a download instruction.
+
+#### Route E: Operational reconstruction
+
+Use this only when no complete truth reference exists and your purpose is to
+recover candidates for follow-up, not to benchmark a method. For a public SRA
+run, the focused operational command is:
+
+```bash
+plasbench reconstruct \
+  --sample new_isolate_001 \
+  --sra SRR012345678 \
+  --organism "Escherichia coli" \
+  --gram-group Gram-negative \
+  --results-dir results/new_isolate_001
+```
+
+The command downloads that run, consults benchmark recommendations when they
+are available, and writes candidates plus a cautionary selection report. It
+does not create F1, recall, a validated structural claim, or a statement that a
+candidate is biologically complete. See [Section 5.9](#59-operational-mode-reconstruct-without-scoring)
+for the local operational-sheet alternative and the evidence limits.
+
+#### Sample-sheet fields: use the smallest valid sheet for the route
+
+A local truth-set sheet may use the three columns below. The third field is a
+local filename prefix, not an SRA accession:
+
+```tsv
+sample_id	assembly_accession	sra_run
+isolate_001	LOCAL	isolate_001
+```
+
+A curated or self-built cohort must instead use the full schema in
+[`config/accessions.tsv`](config/accessions.tsv), including `organism`, truth
+metadata, `biosample`, and `bioproject`. Important extended fields are:
+
+| Field | When required | Meaning |
+|---|---|---|
+| `truth_source` | Optional; defaults to `ncbi_deposited` | Use `self_assembled_hybrid` only when there is no deposited complete assembly; use `simulated` only for controlled synthetic reads from a real complete reference |
+| `long_read_sra_run` | `self_assembled_hybrid` only | Matched ONT/PacBio run used together with the short reads to build truth |
+| `truth_independent_of_long_reads` | Long-read/hybrid tool eligibility | Set `yes` only when the tool's long reads did not create the truth reference |
+| `simulation_seed` | `simulated` only | Integer seed; it makes generated reads reproducible |
+| `simulation_short_depth_x` and `simulation_long_depth_x` | `simulated` only | Requested coverage for InSilicoSeq and Badread |
+| `simulation_short_error_model` and `simulation_long_error_model` | Optional for `simulated` | Override the configured simulator profiles when scientifically justified |
+
+Validate a curated sheet before downloading anything:
+
+```bash
+plasbench validate-cohort --samples cohorts/my_cohort.tsv --online \
+  --write-lock cohorts/my_cohort.lock.json
+```
+
+This checks accession identity, complete-reference evidence, BioSample and
+BioProject consistency, and paired Illumina evidence. It does not make a weak
+or mismatched biological pairing valid; review source-study metadata before
+adding it to a release cohort.
+
+#### How prepared inputs enter the pipeline command
+
+The input route is carried by the TSV supplied to `--samples`; the files are
+then found in `--data-dir/<sample_id>/`. This keeps one auditable declaration
+of every isolate rather than a long command containing individual FASTQ paths.
+
+| Prepared input | End-to-end command shape | Where PlasBench gets the files |
+|---|---|---|
+| Curated deposited cohort | `plasbench run --samples cohorts/my_cohort.tsv --results-dir results/my_cohort` | Downloads `assembly_accession` and `sra_run` after validation |
+| Locally staged truth-set | `plasbench run --samples config/local.tsv --local-inputs --data-dir "$PB/data"` | Uses `data/<sample_id>/` only; it never contacts NCBI |
+| Self-built hybrid truth cohort | `plasbench run --samples cohorts/self_build.tsv --results-dir results/self_build` | Downloads `sra_run` plus `long_read_sra_run`, then creates `reference.fna` and `truth.tsv` in stage 2 |
+| Synthetic cohort | `plasbench run --samples cohorts/synthetic.tsv --results-dir results/synthetic` | Downloads the declared real reference, then creates reads from the simulation fields |
+
+For example, these are complete minimal commands once the named TSV files have
+already been prepared and validated:
+
+```bash
+# A real NCBI-backed study.
+plasbench run --samples cohorts/my_cohort.tsv \
+  --threads 8 --memory-gb 24 \
+  --results-dir results/my_cohort \
+  --open-report
+
+# A controlled synthetic study. Install simulators once before the first run.
+plasbench install-tools simulate
+plasbench run --samples cohorts/synthetic.tsv \
+  --threads 8 --memory-gb 24 \
+  --results-dir results/synthetic \
+  --open-report
+```
+
+Do not add a synthetic row to a real-cohort TSV merely because its reference is
+real. Its reads and error model are generated, so it needs its own cohort name,
+result directory, interpretation, and release metadata.
+
+#### End-to-end local input example: stage, validate, run, and open the report
+
+This example is the normal route for a laboratory isolate with paired Illumina
+FASTQs and an independently produced complete reference assembly. Replace only
+the three paths on the `init-local` command. The complete reference must belong
+to `isolate_001`, not a reference strain or another patient isolate.
+
+```bash
+# 1. Enter your PlasBench checkout or extracted release directory.
+export PB="$HOME/plasbench-0.2.5"
+cd "$PB"
+conda activate plasbench
+
+# 2. Confirm software and databases before starting a long run.
+plasbench check --yes
+
+# 3. Stage the inputs. --link hardlink avoids copying large FASTQs when the
+#    source and PlasBench data directory are on the same filesystem.
+plasbench init-local \
+  --sample isolate_001 \
+  --reads-1 /lab/incoming/isolate_001_R1.fastq.gz \
+  --reads-2 /lab/incoming/isolate_001_R2.fastq.gz \
+  --reference /lab/assemblies/isolate_001_complete.fasta \
+  --samples config/local.tsv \
+  --data-dir "$PB/data" \
+  --link hardlink
+
+# 4. Inspect and correct every REVIEW row before continuing. This is the
+#    ground truth used for all scores.
+cat "$PB/data/isolate_001/truth.tsv"
+
+# Edit only if init-local reported REVIEW values:
+nano "$PB/data/isolate_001/truth.tsv"
+
+# 5. Run the pipeline. The --samples file is how the staged FASTQs enter the
+#    pipeline; --local-inputs guarantees that no NCBI/SRA download is attempted.
+REQUIRE_CURATED_METADATA=0 plasbench run \
+  --samples config/local.tsv \
+  --data-dir "$PB/data" \
+  --results-dir "$PB/results/isolate_001_benchmark" \
+  --log-dir "$PB/logs/isolate_001_benchmark" \
+  --local-inputs \
+  --threads 4 \
+  --memory-gb 12 \
+  --mob-recon on \
+  --platon on \
+  --plasmidspades on \
+  --open-report
+```
+
+The final command runs stages 0-6 by default. It validates the exact FASTQ,
+reference, and truth-table paths before computing; reuses completed work if the
+same run is resumed; prints the report file path; and opens
+`$PB/results/isolate_001_benchmark/benchmark.report.html` in your browser.
+The benchmarked reconstructed plasmid FASTAs remain under the selected results
+directory, including the per-sample `selected_candidate/` folder when truth-set
+selection is available.
+
 ### 5.1 Two modes — pick one first
 
 **Benchmarking** scores tools, so it needs a known answer. FASTQ alone is not
@@ -1669,7 +2034,7 @@ the sample-sheet row:
 
 ```bash
 conda activate plasbench
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 
 plasbench init-local \
     --sample my_isolate \
@@ -1729,7 +2094,7 @@ Run it once per isolate; rows accumulate in the same sheet.
 digits, dot, dash, underscore only:
 
 ```bash
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 mkdir -p data/my_isolate config
 ```
 
@@ -1839,7 +2204,7 @@ it fails, so a bad table costs you seconds rather than a night of compute.
 
 ```bash
 conda activate plasbench
-cd ~/plasbench-0.2.2
+cd ~/plasbench-0.2.5
 
 REQUIRE_CURATED_METADATA=0 plasbench run \
     --samples config/local.tsv \

@@ -285,6 +285,63 @@ run_rfplasmid() {
     fi
 }
 
+run_plasmidhunter() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    if tool_enabled RUN_PLASMIDHUNTER plasmidhunter && have plasmidhunter; then
+        local TOOL="plasmidhunter" OUT="$RDIR/plasmidhunter" PRED="$RDIR/pred_plasmidhunter.plasmid.fasta" DONE="$RDIR/.plasmidhunter.complete"
+        if is_complete "$DONE" "$PRED"; then
+            log "  plasmidhunter: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        else
+            # plasmidhunter errors if -o already exists, like PLASMe/RFPlasmid.
+            rm -rf "$OUT" "$PRED" "$DONE"
+            log "  plasmidhunter ($SAMPLE) ..."
+            local START; START=$(profile_start)
+            if profile_exec plasmidhunter -i "$CONTIGS" -o "$OUT" -c "$PLASMIDHUNTER_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_plasmidhunter.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "plasmidhunter failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+        fi
+    elif tool_enabled RUN_PLASMIDHUNTER plasmidhunter; then
+        warn "plasmidhunter is enabled but not installed; skipped for $SAMPLE"
+        record_status "$SAMPLE" "plasmidhunter" "skipped" "" "command unavailable"
+    fi
+}
+
+run_plasmer() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    if tool_enabled RUN_PLASMER plasmer && have Plasmer; then
+        local TOOL="plasmer" OUT="$RDIR/plasmer" PRED="$RDIR/pred_plasmer.plasmid.fasta" DONE="$RDIR/.plasmer.complete"
+        if is_complete "$DONE" "$PRED"; then
+            log "  plasmer: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif [[ ! -d "$PLASMER_DB" ]]; then
+            warn "  $TOOL has no database at $PLASMER_DB; skipped for $SAMPLE"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "no Plasmer database at $PLASMER_DB"
+        else
+            # Unlike PLASMe/RFPlasmid/PlasmidHunter, real Plasmer does not
+            # error on an existing -o directory (a plain mkdir, no set -e in
+            # its own driver script) -- but this project still removes it
+            # first for a clean, idempotent rerun, since a stale
+            # intermediate/ left over from a different sample could
+            # otherwise leak into this one's outputs.
+            rm -rf "$OUT" "$PRED" "$DONE"
+            log "  plasmer ($SAMPLE) ..."
+            local START; START=$(profile_start)
+            if profile_exec Plasmer -g "$CONTIGS" -p "$SAMPLE" -d "$PLASMER_DB" -t "$PLASMER_THREADS" \
+                    -m "$PLASMER_MIN_LENGTH" -l "$PLASMER_LENGTH" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_plasmer.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLASMER_DB" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "plasmer failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+        fi
+    elif tool_enabled RUN_PLASMER plasmer; then
+        warn "plasmer is enabled but not installed; skipped for $SAMPLE"
+        record_status "$SAMPLE" "plasmer" "skipped" "" "command unavailable"
+    fi
+}
+
 run_plascope() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLASCOPE plascope && have plaScope.sh; then
@@ -384,6 +441,8 @@ process_sample() {
         tool_enabled RUN_GENOMAD genomad && record_status "$SAMPLE" "genomad" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASME plasme && record_status "$SAMPLE" "plasme" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_RFPLASMID rfplasmid && record_status "$SAMPLE" "rfplasmid" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_PLASMIDHUNTER plasmidhunter && record_status "$SAMPLE" "plasmidhunter" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_PLASMER plasmer && record_status "$SAMPLE" "plasmer" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASCOPE plascope && record_status "$SAMPLE" "plascope" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASGRAPH2 plasgraph2 && record_status "$SAMPLE" "plasgraph2" "skipped" "" "assembly contigs unavailable"
         return 0
@@ -398,6 +457,8 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_genomad "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasme "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_rfplasmid "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmidhunter "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmer "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plascope "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasgraph2 "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
 
@@ -413,6 +474,13 @@ process_sample() {
 warn_resource_oversubscription "stage 4 (reconstruction)" "$(( MAX_PARALLEL_SAMPLES * MAX_PARALLEL_TOOLS ))" \
     "$(( (MOB_RECON_THREADS>PLATON_THREADS?MOB_RECON_THREADS:PLATON_THREADS)>PLASMIDSPADES_THREADS ? (MOB_RECON_THREADS>PLATON_THREADS?MOB_RECON_THREADS:PLATON_THREADS) : PLASMIDSPADES_THREADS ))" \
     "$PLASMIDSPADES_MEMORY_GB"
+# Plasmer's real, documented kmer-db RAM floor is a fixed cost per
+# concurrent job, unrelated to its own thread count -- checked separately
+# from the general reconstruction-stage warning above, and only when it is
+# actually enabled.
+if [[ "${RUN_PLASMER:-0}" -eq 1 ]]; then
+    warn_resource_oversubscription "stage 4 (plasmer)" "$(( MAX_PARALLEL_SAMPLES * MAX_PARALLEL_TOOLS ))" "$PLASMER_THREADS" "$PLASMER_MEMORY_GB"
+fi
 
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
@@ -426,7 +494,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plascope plasgraph2; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

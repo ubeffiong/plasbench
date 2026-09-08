@@ -36,6 +36,8 @@ SCORE_HEADER = "\t".join(SCORE_COLUMNS) + "\n"
 
 LEADER_COLUMNS = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped",
                    "mean_precision", "mean_recall", "mean_f1", "mean_plasmid_recall",
+                   "mean_plasmid_recall_ge50", "mean_plasmid_recall_ge90",
+                   "n_complete_circular_assessed", "mean_complete_circular_plasmid_recall",
                    "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "mean_pr_auc",
                    "significant_vs_runner_up", "n_zero_plasmid_isolates",
                    "mean_zero_plasmid_specificity", "total_zero_plasmid_chromosome_fp_bp"]
@@ -55,7 +57,10 @@ def score_row(sample, tool, f1):
 def leader_row(**overrides):
     values = {"rank": "1", "tool": "tool_a", "n_samples": "1", "n_completed": "1", "n_failed": "0",
               "n_skipped": "0", "mean_precision": "0.900", "mean_recall": "0.900", "mean_f1": "0.900",
-              "mean_plasmid_recall": "0.900", "mean_bin_f1": "", "mean_nmi": "", "mean_variation_of_information": "",
+              "mean_plasmid_recall": "0.900",
+              "mean_plasmid_recall_ge50": "", "mean_plasmid_recall_ge90": "",
+              "n_complete_circular_assessed": "0", "mean_complete_circular_plasmid_recall": "",
+              "mean_bin_f1": "", "mean_nmi": "", "mean_variation_of_information": "",
               "mean_pr_auc": "", "significant_vs_runner_up": "not_assessed", "n_zero_plasmid_isolates": "0",
               "mean_zero_plasmid_specificity": "", "total_zero_plasmid_chromosome_fp_bp": ""}
     values.update(overrides)
@@ -174,5 +179,41 @@ with tempfile.TemporaryDirectory() as tmp:
     # must NOT exist is an actual <span> using it against this sample's row.
     check("a plain ncbi_deposited sample (no truth_source declared) gets NO self-built-truth badge",
           "<span class='truth-source-badge'" not in html and "self-built truth" not in html)
+
+# --- 5. simulated truth-source badge -- a DISTINCT badge from self-built
+# truth, since a simulated row's own reference IS real (unlike self-built
+# truth), only its reads are not. ---
+with tempfile.TemporaryDirectory() as tmp:
+    html = build(tmp, [leader_row(rank="1", tool="tool_a")], sample_truth_source="simulated")
+    check("a simulated sample gets the 'simulated reads' badge in the scores table",
+          "simulated-badge" in html and "simulated reads" in html)
+    check("the simulated row carries a data-truth-source attribute for filtering/styling",
+          "data-truth-source='simulated'" in html)
+    check("a simulated sample does NOT also get the self-built-truth badge text",
+          "self-built truth" not in html)
+
+# --- 6. Graded plasmid-recovery completeness tiers ---------------------------
+with tempfile.TemporaryDirectory() as tmp:
+    html = build(tmp, [
+        leader_row(rank="1", tool="tool_a", mean_plasmid_recall_ge50="0.900",
+                   mean_plasmid_recall_ge90="0.700", n_complete_circular_assessed="4",
+                   mean_complete_circular_plasmid_recall="0.5000"),
+    ])
+    check("the nav bar links the new Graded plasmid recovery section", "href='#graded-tiers'" in html)
+    check("the section header names all three graded bands",
+          "id='graded-tiers'" in html and "Recall ≥50% complete" in html
+          and "Recall ≥90% complete" in html and "Complete + circular recall" in html)
+    check("a tool's real ge50/ge90/complete-circular values render in the section",
+          "0.900" in html and "0.700" in html and "0.500" in html)
+
+with tempfile.TemporaryDirectory() as tmp:
+    html = build(tmp, [
+        leader_row(rank="1", tool="tool_a", mean_plasmid_recall_ge50="", mean_plasmid_recall_ge90="",
+                   n_complete_circular_assessed="0", mean_complete_circular_plasmid_recall=""),
+    ])
+    check("a tool with no plasmid-level evidence shows 'not annotated' for the ge50/ge90 bands, never a fabricated 0",
+          html.count("not annotated") >= 2)
+    check("a tool with no circular-truth evidence shows 'not assessed' for the complete+circular band, never a fabricated 0",
+          "not assessed" in html)
 
 print("\nALL REPORT NEW CAPABILITIES TESTS PASSED")

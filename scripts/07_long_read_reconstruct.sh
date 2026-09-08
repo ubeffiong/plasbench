@@ -96,8 +96,8 @@ for_sample() {
     local note="Flye $FLYE_READ_TYPE plus MOB-Recon"
     [[ "$eligibility" == "override" ]] && note="$note; FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH=1 -- truth may derive from these long reads"
     log "  $tool: Flye ($FLYE_READ_TYPE) then MOB-Recon for $sample"
-    if profile_run "$rss" flye "--$FLYE_READ_TYPE" "$reads" --out-dir "$flye_dir" --threads "$THREADS" > "$LOG_DIR/$sample.$tool.log" 2>&1 && \
-       profile_run "$rss" mob_recon --infile "$flye_dir/assembly.fasta" --outdir "$mob_dir" --num_threads "$THREADS" --force >> "$LOG_DIR/$sample.$tool.log" 2>&1 && \
+    if profile_run "$rss" flye "--$FLYE_READ_TYPE" "$reads" --out-dir "$flye_dir" --threads "$FLYE_MOB_RECON_THREADS" > "$LOG_DIR/$sample.$tool.log" 2>&1 && \
+       profile_run "$rss" mob_recon --infile "$flye_dir/assembly.fasta" --outdir "$mob_dir" --num_threads "$FLYE_MOB_RECON_THREADS" --force >> "$LOG_DIR/$sample.$tool.log" 2>&1 && \
        bash "$ADAPT" "$mob_dir" "$flye_dir/assembly.fasta" "$pred" >> "$LOG_DIR/$sample.$tool.log" 2>&1; then
         touch "$done_file"
         printf '%s\t%s\tcompleted\t%s\t%s\t%s\t%s\n' "$sample" "$tool" "$pred" "$note" "$(( $(date +%s) - start ))" "$(tr -d '[:space:]' < "$rss" 2>/dev/null || true)" >> "$STATUS"
@@ -163,7 +163,7 @@ run_plassembler_for_sample() {
 
     if profile_run "$rss" plassembler run -d "$PLASSEMBLER_DB" \
             -l "$reads" -1 "$r1" -2 "$r2" -o "$out_dir" \
-            -t "$THREADS" -c "$PLASSEMBLER_CHROMOSOME_LENGTH" -f \
+            -t "$PLASSEMBLER_THREADS" -c "$PLASSEMBLER_CHROMOSOME_LENGTH" -f \
             > "$LOG_DIR/$sample.$tool.log" 2>&1 && \
        bash "$HERE/../adapters/adapt_plassembler.sh" "$out_dir" "" "$pred" \
             >> "$LOG_DIR/$sample.$tool.log" 2>&1; then

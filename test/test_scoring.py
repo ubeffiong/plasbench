@@ -74,8 +74,13 @@ def main():
         check=True,
     )
 
+    # .splitlines() alone (never .strip() first): score_plasmids.py can
+    # legitimately write an EMPTY final column (e.g. no --circular-plasmids
+    # given), and str.strip() on the whole file would silently swallow that
+    # trailing tab-delimited empty field along with the newline, corrupting
+    # the last column's parse -- a real bug this test caught in itself.
     with open(out) as fh:
-        lines = fh.read().strip().splitlines()
+        lines = fh.read().splitlines()
     header = lines[0].split("\t")
     row = dict(zip(header, lines[1].split("\t")))
 
@@ -94,6 +99,21 @@ def main():
     ok &= (int(row["unmapped_pred_bp"]) == 100)
     print(f"  unmapped prediction == 100 ? {row['unmapped_pred_bp']} -> {int(row['unmapped_pred_bp'])==100}")
 
+    # Graded plasmid-recovery completeness bands: plasmidA is 100% covered
+    # (counts for both >=50% and >=90%), plasmidB is exactly 50% covered
+    # (counts for >=50% only) -- a real intermediate case neither the
+    # all-or-nothing recovered_plasmid_count nor F1 alone can distinguish.
+    ge50_count = int(row["recovered_plasmid_count_ge50"]); ge50_recall = float(row["plasmid_recall_ge50"])
+    ge90_count = int(row["recovered_plasmid_count_ge90"]); ge90_recall = float(row["plasmid_recall_ge90"])
+    ok &= (ge50_count == 2 and approx(ge50_recall, 1.0))
+    print(f"  >=50% complete: 2/2 plasmids (plasmidA 100%, plasmidB 50%) ? count={ge50_count} recall={ge50_recall} -> {ge50_count==2 and approx(ge50_recall,1.0)}")
+    ok &= (ge90_count == 1 and approx(ge90_recall, 0.5))
+    print(f"  >=90% complete: 1/2 plasmids (plasmidA only) ? count={ge90_count} recall={ge90_recall} -> {ge90_count==1 and approx(ge90_recall,0.5)}")
+    # No --circular-plasmids given for this scenario -- the complete+circular
+    # band must be reported as not-applicable ("") never a fabricated 0.
+    ok &= (row["recovered_complete_circular_plasmid_count"] == "" and row["complete_circular_plasmid_recall"] == "")
+    print(f"  complete+circular band is blank (not assessed) without circular-truth evidence ? {row['recovered_complete_circular_plasmid_count']!r} -> {row['recovered_complete_circular_plasmid_count']==''}")
+
     # Query-coverage filtering rejects small local placements even when they
     # pass identity, length, and MAPQ thresholds.
     local_paf = os.path.join(tmp, "local.paf"); local_pred = os.path.join(tmp, "local.fasta")
@@ -105,7 +125,7 @@ def main():
          "--sample", "SYNTH", "--tool", "query-coverage", "--out", query_coverage_out,
          "--min-alignment-query-coverage", "0.75"], check=True)
     with open(query_coverage_out) as fh:
-        query_row = dict(zip(fh.readline().strip().split("\t"), fh.readline().strip().split("\t")))
+        query_row = dict(zip(fh.readline().rstrip("\n").split("\t"), fh.readline().rstrip("\n").split("\t")))
     ok &= int(query_row["filtered_alignment_count"]) == 1
     print(f"  query-coverage threshold filters short placements ? {query_row['filtered_alignment_count']} -> {int(query_row['filtered_alignment_count']) == 1}")
 
@@ -123,7 +143,7 @@ def main():
         check=True,
     )
     with open(ambiguity_out) as fh:
-        ambiguity_row = dict(zip(fh.readline().strip().split("\t"), fh.readline().strip().split("\t")))
+        ambiguity_row = dict(zip(fh.readline().rstrip("\n").split("\t"), fh.readline().rstrip("\n").split("\t")))
     ok &= (int(ambiguity_row["ambiguously_mapped_pred_bp"]) == 500 and ambiguity_row["f1"] == row["f1"])
     print("  secondary ambiguity is reported without changing F1 ? "
           f"{ambiguity_row['ambiguously_mapped_pred_bp']} bp -> "
@@ -144,7 +164,7 @@ def main():
         check=True,
     )
     with open(out2) as fh:
-        r2 = dict(zip(header, fh.read().strip().splitlines()[1].split("\t")))
+        r2 = dict(zip(header, fh.read().splitlines()[1].split("\t")))
     tp2 = int(r2["TP_bp"])
     ok &= (tp2 == 2000)
     print(f"  overlap TP == 2000 (no double count) ? {tp2} -> {tp2==2000}")
@@ -168,7 +188,7 @@ def main():
         check=True,
     )
     with open(out3) as fh:
-        r3 = dict(zip(header, fh.read().strip().splitlines()[1].split("\t")))
+        r3 = dict(zip(header, fh.read().splitlines()[1].split("\t")))
     ok &= (int(r3["TP_bp"]) == 0 and int(r3["FN_bp"]) == 3000
            and r3["precision"] == "" and float(r3["recall"]) == 0.0 and r3["f1"] == "")
     print(f"  empty pred -> TP=0 FN=3000, precision/f1 undefined, recall=0 ? "
@@ -189,7 +209,7 @@ def main():
         check=True,
     )
     with open(out4) as fh:
-        r4 = dict(zip(header, fh.read().strip().splitlines()[1].split("\t")))
+        r4 = dict(zip(header, fh.read().splitlines()[1].split("\t")))
     ok &= (int(r4["TP_bp"]) == 150)
     print(f"  out-of-bounds PAF is clipped to 150 bp ? {r4['TP_bp']} -> {int(r4['TP_bp'])==150}")
 
@@ -212,13 +232,36 @@ def main():
         check=True,
     )
     with open(out5) as fh:
-        r5 = dict(zip(fh.readline().strip().split("\t"), fh.readline().strip().split("\t")))
+        r5 = dict(zip(fh.readline().rstrip("\n").split("\t"), fh.readline().rstrip("\n").split("\t")))
     ok &= (int(r5["off_truth_pred_bp"]) == 400 and int(r5["unmapped_pred_bp"]) == 100
            and int(r5["TP_bp"]) == 2000 and int(r5["FP_bp"]) == 0)
     print(f"  off-truth alignment counted separately from unmapped ? "
           f"off_truth={r5['off_truth_pred_bp']} unmapped={r5['unmapped_pred_bp']} "
           f"TP={r5['TP_bp']} FP={r5['FP_bp']} -> "
           f"{int(r5['off_truth_pred_bp'])==400 and int(r5['unmapped_pred_bp'])==100 and int(r5['TP_bp'])==2000 and int(r5['FP_bp'])==0}")
+
+    # Complete+circular graded band: reusing the same truth/paf/pred as the
+    # main scenario (plasmidA 100% covered, plasmidB 50% covered), but now
+    # declaring BOTH as circular truth. Only plasmidA is complete enough to
+    # count -- plasmidB being circular does not help it if it is not also
+    # essentially fully covered.
+    circular_tsv = os.path.join(tmp, "circular.tsv")
+    with open(circular_tsv, "w") as fh:
+        fh.write("sequence_id\nplasmidA\nplasmidB\n")
+    out6 = os.path.join(tmp, "scores6.tsv")
+    subprocess.run(
+        [sys.executable, SCORER, "--truth", truth, "--paf", paf, "--pred-fasta", pred,
+         "--sample", "SYNTH", "--tool", "circular", "--out", out6,
+         "--circular-plasmids", circular_tsv],
+        check=True,
+    )
+    with open(out6) as fh:
+        r6 = dict(zip(fh.readline().rstrip("\n").split("\t"), fh.readline().rstrip("\n").split("\t")))
+    circ_count = int(r6["recovered_complete_circular_plasmid_count"])
+    circ_recall = float(r6["complete_circular_plasmid_recall"])
+    ok &= (circ_count == 1 and approx(circ_recall, 0.5))
+    print(f"  complete+circular: 1/2 circular plasmids essentially fully covered (plasmidA only) ? "
+          f"count={circ_count} recall={circ_recall} -> {circ_count==1 and approx(circ_recall,0.5)}")
 
     # Invalid PAFs must fail with a concise scorer error rather than an index
     # exception that leaves a user guessing which input needs repair.

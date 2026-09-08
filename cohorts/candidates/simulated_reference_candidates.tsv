@@ -1,0 +1,55 @@
+# Candidate reference-genome IDENTITY list extracted from
+# gbouras13/plassembler_simulation_benchmarking (MIT-licensed), for
+# PlasBench's own truth_source=simulated track. Per this project's policy of
+# never vendoring someone else's checked-in FASTA files, these rows carry
+# only the IDENTITY of that repo's 20 reference genomes (organism/strain
+# where the repo's own files state it, approximate genome size, and source
+# study), extracted 2026-09-08 directly from that repo's own
+# benchmarking_simulate.csv (8 rows, Wick/Houtak/Mathers et al.),
+# benchmarking_real.csv (6 rows, a subset re-using the same organisms with
+# real instead of simulated reads -- not duplicated below), and
+# benchmarking_simulate_demaio.csv (12 rows, De Maio et al.) -- see that
+# repo's own README.md for the exact citation groupings. PlasBench downloads
+# its OWN copy of each genome from NCBI once resolved, never the checked-in
+# FASTA files themselves.
+#
+# assembly_accession/sra_run/biosample are intentionally EMPTY pending
+# resolution -- this file is NOT yet valid input to
+# python/resolve_ncbi_accessions.py (which requires a populated biosample
+# column) or `plasbench curate-cohort` (which requires assembly_accession/
+# sra_run). The repo's own CSVs give only an internal isolate identifier and
+# an approximate genome size (its `-l`-style chromosome-length threshold for
+# its own simulation step) -- NOT a BioSample or NCBI accession -- so a real
+# per-genome NCBI search (organism/strain name -> BioSample -> assembly
+# accession, the same chain resolve_ncbi_accessions.py already automates
+# once a biosample is known) is a required, separate, NOT-YET-DONE step
+# before this list can seed a real simulated cohort. Never fabricate a
+# BioSample or accession here to skip that step.
+#
+# organism/strain is populated ONLY where the source repo's own filename
+# states it explicitly (six of the eight Wick/Houtak/Mathers genomes below);
+# "unconfirmed" means the repo's own files give an isolate identifier with
+# no stated genus/species, and identifying it requires reading the actual
+# cited paper (Wick et al., Houtak et al., Mathers et al., or De Maio et
+# al. -- see source_study), not a guess from the identifier's shape alone.
+sample_id	assembly_accession	sra_run	organism	strain	biosample	source_study	approx_genome_size_bp	notes
+wick_houtak_mathers_sim_001			unconfirmed	cav1217_combined		Wick_Houtak_Mathers	5000000	benchmarking_simulate.csv row 1; organism not stated in the repo's own files
+wick_houtak_mathers_sim_002			Acinetobacter baumannii	J9		Wick_Houtak_Mathers	3500000	benchmarking_simulate.csv row 2; also in benchmarking_real.csv (real-read variant, not a separate genome)
+wick_houtak_mathers_sim_003			Citrobacter koseri	MINF_9D		Wick_Houtak_Mathers	4500000	benchmarking_simulate.csv row 3; benchmarking_real.csv lists this strain as "Citrobacter_koseri_MINF" (real-read variant, not a separate genome)
+wick_houtak_mathers_sim_004			Enterobacter kobei	MSB1_1B		Wick_Houtak_Mathers	4500000	benchmarking_simulate.csv row 4; also in benchmarking_real.csv (real-read variant, not a separate genome)
+wick_houtak_mathers_sim_005			Haemophilus unknown	M1C132_1		Wick_Houtak_Mathers	2000000	benchmarking_simulate.csv row 5; "unknown" species is the repo's own stated identifier, not this project's uncertainty marker; also in benchmarking_real.csv
+wick_houtak_mathers_sim_006			Klebsiella oxytoca	MSB1_2C		Wick_Houtak_Mathers	5500000	benchmarking_simulate.csv row 6; also in benchmarking_real.csv (real-read variant, not a separate genome)
+wick_houtak_mathers_sim_007			Klebsiella variicola	INF345		Wick_Houtak_Mathers	5000000	benchmarking_simulate.csv row 7; also in benchmarking_real.csv (real-read variant, not a separate genome); an initial NCBI assembly-db search on this exact strain string returned zero hits -- likely needs an alternate name/synonym, not yet resolved
+wick_houtak_mathers_sim_008			unconfirmed	C222		Wick_Houtak_Mathers	2500000	benchmarking_simulate.csv row 8; organism not stated in the repo's own files
+de_maio_sim_001			unconfirmed	MGH78578		De_Maio	4500000	benchmarking_simulate_demaio.csv row 1; organism not stated in the repo's own files (this specific identifier is independently well-known elsewhere as a Klebsiella pneumoniae reference strain, but that is NOT verified from this repo's own files, so it is not asserted here)
+de_maio_sim_002			unconfirmed	RBHSTW-00059		De_Maio	4500000	benchmarking_simulate_demaio.csv row 2; organism not stated in the repo's own files
+de_maio_sim_003			unconfirmed	RBHSTW-00122		De_Maio	4500000	benchmarking_simulate_demaio.csv row 3; organism not stated in the repo's own files
+de_maio_sim_004			unconfirmed	RBHSTW-00127		De_Maio	4500000	benchmarking_simulate_demaio.csv row 4; organism not stated in the repo's own files
+de_maio_sim_005			unconfirmed	RBHSTW-00128		De_Maio	4500000	benchmarking_simulate_demaio.csv row 5; organism not stated in the repo's own files
+de_maio_sim_006			unconfirmed	RBHSTW-00131		De_Maio	4500000	benchmarking_simulate_demaio.csv row 6; organism not stated in the repo's own files
+de_maio_sim_007			unconfirmed	RBHSTW-00142		De_Maio	4500000	benchmarking_simulate_demaio.csv row 7; organism not stated in the repo's own files
+de_maio_sim_008			unconfirmed	RBHSTW-00167		De_Maio	4500000	benchmarking_simulate_demaio.csv row 8; organism not stated in the repo's own files
+de_maio_sim_009			unconfirmed	RBHSTW-00189		De_Maio	4500000	benchmarking_simulate_demaio.csv row 9; organism not stated in the repo's own files
+de_maio_sim_010			unconfirmed	RBHSTW-00277		De_Maio	4500000	benchmarking_simulate_demaio.csv row 10; organism not stated in the repo's own files
+de_maio_sim_011			unconfirmed	RBHSTW-00350		De_Maio	4500000	benchmarking_simulate_demaio.csv row 11; organism not stated in the repo's own files
+de_maio_sim_012			unconfirmed	RHB11-C04		De_Maio	4500000	benchmarking_simulate_demaio.csv row 12; organism not stated in the repo's own files
