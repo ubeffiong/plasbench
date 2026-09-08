@@ -349,7 +349,8 @@ export RECOMMENDATION_MODEL_MIN_IMPROVEMENT="${RECOMMENDATION_MODEL_MIN_IMPROVEM
 export RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES="${RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES:-60}"
 export RECOMMENDATION_MODEL_NESTED_MIN_STUDIES="${RECOMMENDATION_MODEL_NESTED_MIN_STUDIES:-5}"
 # Rules-only (no ML) decision_score weight profile -- accuracy_first (today's
-# original formula), amr_surveillance, or rapid_screening. Changing this only
+# original formula), amr_surveillance, amr_context (requires curated AMR truth),
+# or rapid_screening. Changing this only
 # changes which tool is ranked highest; it never changes eligibility.
 export DECISION_PROFILE="${DECISION_PROFILE:-accuracy_first}"
 

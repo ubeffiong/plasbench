@@ -1,0 +1,3 @@
+candidate_id	kind	source_url	license_review	scope_fit	truth_quality	independence_review	database_leakage_review	output_contract	dependency_status	decision	notes
+nf_core_mag	workflow	https://github.com/nf-core/mag	approved	approved	not_applicable	not_applicable	not_applicable	approved	approved	research_only	Use as an upstream provenance/profile reference; do not embed or treat its outputs as plasmid truth.
+camisim	dataset	https://github.com/CAMI-challenge/CAMISIM	approved	approved	approved	not_applicable	not_applicable	approved	approved	research_only	Controlled synthetic-community design only; never mix with real operational ranking.

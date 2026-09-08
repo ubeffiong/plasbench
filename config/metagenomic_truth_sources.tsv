@@ -1,0 +1,4 @@
+cohort_id	artifact_id	role	filename	url	md5	license	provenance_note
+bmock12	bmock12_scaffolds	assembly_fasta_gz	scaffolds.fasta.gz	https://ndownloader.figshare.com/files/34048034	12b253802cfbc6cb18225cb1d3989140	CC-BY-4.0	Published BMock12 scaffold assembly from Figshare v2.
+bmock12	bmock12_graph	assembly_graph_gz	assembly_graph_with_scaffolds.gfa.gz	https://ndownloader.figshare.com/files/34048016	5210c4fda82cf169289f2ebd5132f872	CC-BY-4.0	Published BMock12 assembly graph from Figshare v2.
+bmock12	bmock12_gold_standard	gold_standard	gold_standard.gsa	https://ndownloader.figshare.com/files/34048028	0763ecf521bb4003c7cd4725e4bbd897	CC-BY-4.0	Published contig-to-source-genome gold standard from Figshare v2.

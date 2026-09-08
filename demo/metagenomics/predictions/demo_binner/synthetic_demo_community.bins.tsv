@@ -1,0 +1,5 @@
+predicted_bin_id	contig_id	graph_path	orientation	path_confidence	plasmid_score	ambiguity_status	source_tool
+bin_a	plasmid_a_1	plasmid_a_1+	+	0.98	0.97	resolved	demo_binner
+bin_a	plasmid_a_2	plasmid_a_2+	+	0.95	0.96	resolved	demo_binner
+bin_b	plasmid_b_1	plasmid_b_1+	+	0.77	0.83	ambiguous	demo_binner
+bin_b	chromosome_1	chromosome_1+	+	0.41	0.64	ambiguous	demo_binner

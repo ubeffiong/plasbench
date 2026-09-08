@@ -31,6 +31,8 @@ DOC_TOPICS = {
     "metrics": "Metric Definitions",
     "selection": "Operational Selection",
     "long-reads": "Long-Read Reconstruction",
+    "metagenomics": "Metagenomic Plasmid Benchmarking",
+    "orthogonal-validation": "Orthogonal Validation Evidence",
     "console": "Console Messages",
     "troubleshooting": "Troubleshooting",
     "reproducibility": "Reproducibility and Citation",
@@ -211,10 +213,16 @@ def main(argv=None):
                "  plasbench demo\n"
                "  plasbench run --cohort public-v1 --threads 8\n"
                "  plasbench run --samples samples.tsv --threads 8\n"
+               "  plasbench run --mode metagenomics --samples meta_samples.tsv --predictions-dir predictions_meta --results-dir results_meta\n"
+               "  plasbench run --mode meta --cohort bmock12 --predictions-dir predictions_meta --results-dir results_meta\n"
+               "  plasbench metagenomics validate --manifest meta_samples.tsv\n"
+               "  plasbench materialize-meta-bmock12 --out-dir data/metagenomics\n"
+               "  plasbench validate-orthogonal-evidence --evidence evidence.tsv --out results/orthogonal_validation.summary.json\n"
                "  plasbench run --cohort public-v1 --write-script run_public_v1.sh\n"
                "  plasbench run 3 4 5 6 --platon off --assembler unicycler\n"
                "  plasbench select-candidates --scores results/scores.tsv --samples config/accessions.tsv --results-dir results --out-prefix results/benchmark\n"
                "  plasbench reconstruct --sample new_isolate_01 --sra SRR12345678\n"
+               "  plasbench metagenomics validate --manifest meta_samples.tsv\n"
                "  plasbench report --results-dir results\n"
                "\n"
                "Run 'plasbench docs' for the full guide, or 'plasbench docs --topic TOPIC'\n"
@@ -274,6 +282,9 @@ def main(argv=None):
     cohort_parser.add_argument("--verify-lock", type=Path, help="Require a verification lock that matches the cohort TSV.")
     cohort_parser.add_argument("--ledger", type=Path, help="cohorts/accepted_accessions.tsv (build-ledger); "
                                                             "rejects a row whose BioSample is already in a prior released cohort.")
+    orthogonal_parser = sub.add_parser("validate-orthogonal-evidence", help="Validate optional laboratory or independent-technology evidence without changing computational scores.")
+    orthogonal_parser.add_argument("--evidence", type=Path, required=True, help="TSV described in docs/ORTHOGONAL_VALIDATION.md.")
+    orthogonal_parser.add_argument("--out", type=Path, help="Optional summary JSON, normally results/orthogonal_validation.summary.json.")
     curate_parser = sub.add_parser(
         "curate-cohort",
         help="Strictly screen candidate assembly/SRA pairs and write accepted/rejected tables.",
@@ -328,7 +339,7 @@ def main(argv=None):
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install, inspect, or verify registered bioinformatics tool profiles.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, reconstruction, simulate, quast, long-read, annotation, annotation-prokka, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
     candidate_dataset_parser = sub.add_parser("candidate-dataset", help="Build an auditable, label-safe candidate-quality dataset from a completed run.")
@@ -348,6 +359,43 @@ def main(argv=None):
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
                              help="Guide topic to print (default: all).")
     sub.add_parser("concept-note", help="Print the non-technical researcher and donor concept note.")
+    meta_parser = sub.add_parser("metagenomics", aliases=("meta", "beta"),
+                                 help="Validate, score, or report the separate graph-aware metagenomic track.")
+    meta_parser.add_argument("action", choices=("validate", "score", "report"))
+    meta_parser.add_argument("-s", "--manifest", "--samples", type=Path, required=True, help="Community manifest TSV; see docs/METAGENOMICS.md.")
+    meta_parser.add_argument("-p", "--predictions-dir", type=Path, help="Normalized <tool>/<community>.bins.tsv directory; required for score.")
+    meta_parser.add_argument("-o", "--results-dir", type=Path, help="Metagenomic result directory; required for score/report.")
+    meta_parser.add_argument("--open-report", action="store_true", help="Open metagenomics.report.html after scoring.")
+    meta_parser.add_argument("--no-report-prompt", action="store_true", help="Do not offer to open the metagenomic report.")
+    meta_parser.add_argument("--release-ready", action="store_true", help="For validate only: require public-release provenance fields for scored communities.")
+    meta_audit = sub.add_parser("audit-meta-cohort", help="Audit a community manifest for regime coverage and duplicate-reference leakage.")
+    meta_audit.add_argument("--manifest", type=Path, required=True)
+    meta_audit.add_argument("--out", type=Path, required=True)
+    meta_audit.add_argument("--release-ready", action="store_true")
+    meta_design = sub.add_parser("design-meta-synthetic", help="Write a deterministic, provenance-pinned synthetic-community design; it does not fabricate reads.")
+    meta_design.add_argument("--members", type=Path, required=True, help="TSV following cohorts/metagenomics.synthetic-members.example.tsv.")
+    meta_design.add_argument("--out-dir", type=Path, required=True)
+    meta_design.add_argument("--seed", type=int, required=True)
+    meta_design.add_argument("--simulator", default="CAMISIM")
+    meta_design.add_argument("--simulator-version", required=True)
+    meta_design.add_argument("--container-image", required=True)
+    meta_design.add_argument("--container-digest", required=True)
+    meta_intake = sub.add_parser("validate-meta-intake", help="Validate an external metagenomic tool/dataset intake decision before implementation.")
+    meta_intake.add_argument("--intake", type=Path, default=Path("config/metagenomic_ecosystem_intake.tsv"))
+    bmock_parser = sub.add_parser("materialize-meta-bmock12", help="Download, checksum-verify, and convert BMock12's real physical-community gold standard.")
+    bmock_parser.add_argument("--out-dir", type=Path, required=True, help="Directory for BMock12 assembly, graph, truth TSV, and executable manifest.")
+    bmock_parser.add_argument("--source-manifest", type=Path, default=Path("config/metagenomic_truth_sources.tsv"), help="Checksum-pinned artifact registry.")
+    bmock_parser.add_argument("--retries", type=int, default=3, help="Download attempts per artifact (default: 3).")
+    meta_normalize = sub.add_parser("normalize-meta-classifier", help="Normalize PPR-Meta or PlasmidHunter probability output for the meta track.")
+    meta_normalize.add_argument("--tool", choices=("ppr_meta", "plasmidhunter"), required=True)
+    meta_normalize.add_argument("--input", type=Path, required=True)
+    meta_normalize.add_argument("--out", type=Path, required=True)
+    meta_normalize.add_argument("--threshold", type=float, default=0.5)
+    mobilome_parser = sub.add_parser("import-mobilome-evidence", help="Import MAP-compatible GFF3 as non-scoring metagenomic evidence.")
+    mobilome_parser.add_argument("--gff", type=Path, required=True)
+    mobilome_parser.add_argument("--community", required=True)
+    mobilome_parser.add_argument("--sample", required=True)
+    mobilome_parser.add_argument("--out", type=Path, required=True)
     report_parser = sub.add_parser("report", help="Regenerate the leaderboard and HTML report from scores.")
     select_parser = sub.add_parser("select-candidates", help="Create conservative recommendations and copy existing selected candidates.")
     select_parser.add_argument("--scores", type=Path, required=True)
@@ -441,13 +489,13 @@ def main(argv=None):
     def add_run_options(command_parser):
         inputs = command_parser.add_argument_group("inputs and outputs")
         samples_or_cohort = inputs.add_mutually_exclusive_group()
-        samples_or_cohort.add_argument("--samples", type=Path, help="Sample-sheet TSV; defaults to config/accessions.tsv.")
-        samples_or_cohort.add_argument("--cohort", help="Shorthand for --samples cohorts/<NAME>.tsv, e.g. --cohort public-v1.")
+        samples_or_cohort.add_argument("-s", "--samples", type=Path, help="Sample-sheet TSV; defaults to config/accessions.tsv.")
+        samples_or_cohort.add_argument("-c", "--cohort", help="Isolate: shorthand for --samples cohorts/<NAME>.tsv (e.g. public-v1). Meta: --cohort bmock12 materializes the bundled physical truth control.")
         inputs.add_argument("--write-script", type=Path,
                             help="Write the exact resolved commands to this file instead of running them, "
                                  "so you can review or edit them before running it yourself with bash.")
-        inputs.add_argument("--data-dir", type=Path, help="Directory for downloaded references, reads, and assemblies.")
-        inputs.add_argument("--results-dir", type=Path, help="Directory for predictions, scores, and reports.")
+        inputs.add_argument("-d", "--data-dir", type=Path, help="Directory for downloaded references, reads, and assemblies.")
+        inputs.add_argument("-o", "--results-dir", type=Path, help="Directory for predictions, scores, and reports.")
         inputs.add_argument("--open-report", action="store_true",
                             help="Open benchmark.report.html after a successful report-producing run; never prompts.")
         inputs.add_argument("--no-report-prompt", action="store_true",
@@ -471,7 +519,7 @@ def main(argv=None):
                                  "accuracy_first, today's original formula). A different profile only changes "
                                  "which tool ranks highest; it never changes which tools are eligible.")
         resources = command_parser.add_argument_group("resources and assembly")
-        resources.add_argument("--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
+        resources.add_argument("-t", "--threads", type=int, help="CPU threads per tool (default: config value, normally 4).")
         resources.add_argument("--memory-gb", type=int, help="SPAdes memory limit in GB (default: config value, normally 16).")
         resources.add_argument("--parallel-samples", type=int,
                                help="Samples to download/assemble/reconstruct/score concurrently "
@@ -515,8 +563,16 @@ def main(argv=None):
 
     add_run_options(run_parser)
     add_run_options(report_parser)
+    run_parser.add_argument("-m", "--mode", choices=("isolate", "metagenomics", "meta", "beta"), default="isolate",
+                            help="Workflow mode (default: isolate). With --cohort bmock12, meta materializes/reuses the bundled physical control before scoring normalized community outputs.")
+    run_parser.add_argument("-p", "--predictions-dir", type=Path,
+                            help="Metagenomics only: directory holding <tool>/<community>.bins.tsv normalized outputs.")
 
     args = parser.parse_args(argv)
+    # Keep accepted shorthand spellings out of downstream control flow and
+    # manifests. The stored mode is always the scientifically explicit name.
+    if getattr(args, "mode", "") in {"meta", "beta"}:
+        args.mode = "metagenomics"
 
     # See the note on the "stages" argument above: validated here rather than
     # via argparse's own `choices`.
@@ -590,6 +646,11 @@ def main(argv=None):
             command.extend(["--verify-lock", str(args.verify_lock)])
         if args.ledger:
             command.extend(["--ledger", str(args.ledger)])
+        code = run(command, root)
+    elif args.command == "validate-orthogonal-evidence":
+        command = [sys.executable, "python/validate_orthogonal_evidence.py", "--evidence", str(args.evidence)]
+        if args.out:
+            command.extend(["--out", str(args.out)])
         code = run(command, root)
     elif args.command == "curate-cohort":
         command = [sys.executable, "python/curate_cohort.py", "--candidates", str(args.candidates),
@@ -716,6 +777,78 @@ def main(argv=None):
     elif args.command == "concept-note":
         print_concept_note(root)
         code = 0
+    elif args.command in {"metagenomics", "meta", "beta"}:
+        command = [sys.executable, "python/metagenomics.py", args.action, "--manifest", str(args.manifest)]
+        if args.action == "validate" and args.release_ready:
+            command.append("--release-ready")
+        if args.action == "score":
+            if not args.predictions_dir or not args.results_dir:
+                parser.error("metagenomics score requires --predictions-dir and --results-dir")
+            command.extend(["--predictions-dir", str(args.predictions_dir), "--out-dir", str(args.results_dir)])
+        elif args.action == "report":
+            if not args.results_dir:
+                parser.error("metagenomics report requires --results-dir")
+            command.extend(["--results-dir", str(args.results_dir)])
+        code = run(command, root)
+        if code == 0 and args.action in {"score", "report"}:
+            announce_report(args.results_dir / "metagenomics.report.html", args.open_report, not args.no_report_prompt)
+    elif args.command == "audit-meta-cohort":
+        command = [sys.executable, "python/audit_metagenomic_cohort.py", "--manifest", str(args.manifest), "--out", str(args.out)]
+        if args.release_ready:
+            command.append("--release-ready")
+        code = run(command, root)
+    elif args.command == "design-meta-synthetic":
+        code = run([sys.executable, "python/design_synthetic_communities.py", "--members", str(args.members),
+                    "--out-dir", str(args.out_dir), "--seed", str(args.seed), "--simulator", args.simulator,
+                    "--simulator-version", args.simulator_version, "--container-image", args.container_image,
+                    "--container-digest", args.container_digest], root)
+    elif args.command == "validate-meta-intake":
+        code = run([sys.executable, "python/validate_metagenomic_intake.py", "--intake", str(args.intake)], root)
+    elif args.command == "materialize-meta-bmock12":
+        code = run([sys.executable, "python/materialize_bmock12_truth.py", "--out-dir", str(args.out_dir),
+                    "--source-manifest", str(args.source_manifest), "--retries", str(args.retries)], root)
+    elif args.command == "normalize-meta-classifier":
+        command = [sys.executable, "python/normalize_metagenomic_classifier.py", "--tool", args.tool,
+                   "--input", str(args.input), "--out", str(args.out), "--threshold", str(args.threshold)]
+        code = run(command, root)
+    elif args.command == "import-mobilome-evidence":
+        command = [sys.executable, "python/import_mobilome_evidence.py", "--gff", str(args.gff),
+                   "--community", args.community, "--sample", args.sample, "--out", str(args.out)]
+        code = run(command, root)
+    elif args.command == "run" and args.mode == "metagenomics":
+        if not args.predictions_dir:
+            parser.error("plasbench run --mode meta requires --predictions-dir containing normalized community outputs")
+        if args.cohort:
+            if args.cohort == "bmock12":
+                if args.write_script:
+                    parser.error("--write-script with --mode meta --cohort bmock12 is not supported yet; run the command directly so the verified control can be materialized first")
+                control_dir = configured_data_dir(root) / "metagenomics" / "controls"
+                source_manifest = root / "config" / "metagenomic_truth_sources.tsv"
+                print(f"[plasbench] Preparing the BMock12 physical truth control in {control_dir}")
+                code = run([sys.executable, "python/materialize_bmock12_truth.py", "--out-dir", str(control_dir),
+                            "--source-manifest", str(source_manifest)], root)
+                if code != 0:
+                    raise SystemExit(code)
+                args.samples = control_dir / "bmock12" / "metagenomics-bmock12-verified.tsv"
+                print(f"[plasbench] Using verified community manifest: {args.samples}")
+            else:
+                cohort_path = root / "cohorts" / f"metagenomics-{args.cohort}.tsv"
+                if not cohort_path.is_file():
+                    available = sorted(path.stem.removeprefix("metagenomics-") for path in (root / "cohorts").glob("metagenomics-*.tsv"))
+                    parser.error(f"no such metagenomic cohort '{args.cohort}'; available: {', '.join(available) if available else 'none'}")
+                args.samples = cohort_path
+        if not args.samples:
+            parser.error("plasbench run --mode meta requires --samples or --cohort bmock12")
+        meta_results = args.results_dir or (root / "results_meta")
+        command = [sys.executable, "python/metagenomics.py", "score", "--manifest", str(args.samples),
+                   "--predictions-dir", str(args.predictions_dir), "--out-dir", str(meta_results)]
+        if args.write_script:
+            write_run_script(args.write_script, root, command, {})
+            code = 0
+        else:
+            code = run(command, root)
+        if code == 0 and not args.write_script:
+            announce_report(meta_results / "metagenomics.report.html", args.open_report, not args.no_report_prompt)
     else:
         if args.cohort:
             cohort_path = root / "cohorts" / f"{args.cohort}.tsv"
@@ -799,7 +932,7 @@ def main(argv=None):
     if code == 0 and args.command == "demo":
         announce_report(root / "results_demo" / "benchmark.report.html", args.open_report,
                         not args.no_report_prompt)
-    elif code == 0 and args.command in {"run", "report"} and not args.write_script:
+    elif code == 0 and args.command in {"run", "report"} and not args.write_script and getattr(args, "mode", "isolate") == "isolate":
         stages = ["6"] if args.command == "report" else (args.stages or ["0", "1", "2", "3", "4", "7", "5", "6"])
         if "6" in stages:
             results_dir = args.results_dir or (root / "results")

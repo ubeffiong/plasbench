@@ -109,12 +109,21 @@ DECISION_PROFILES = {
         "f1": .35, "precision": .10, "recall": .10, "plasmid": .15, "bin_or_fallback": .05,
         "failure_rate": -.03, "structural_penalty_scale": 1.0, "resource_penalty_scale": 5.0,
     },
+    "amr_context": {  # Only valid where curated truth AMR coordinates exist.
+        # It makes gene recovery and bin integrity co-primary with base-level
+        # performance, rather than pretending a high F1 alone preserves AMR
+        # context. select_operational_method.py falls back visibly when an
+        # evaluated stratum has no assessable AMR-gene recovery values.
+        "f1": .20, "precision": .08, "recall": .07, "plasmid": .25, "bin_or_fallback": .12,
+        "failure_rate": -.08, "structural_penalty_scale": 1.5, "resource_penalty_scale": 1.0,
+        "amr_gene_recall": .20,
+    },
 }
 DEFAULT_DECISION_PROFILE = "accuracy_first"
 
 
 def decision_score(f1, precision, recall, plasmid, bin_score, failure_rate, structural_penalty, resource_penalty,
-                   profile=DEFAULT_DECISION_PROFILE):
+                   profile=DEFAULT_DECISION_PROFILE, amr_gene_recall=None):
     """The multi-objective weighted-sum formula select_operational_method.py's
     tool_quality() uses. profile picks a named weight set from
     DECISION_PROFILES (see above); the default reproduces the original,
@@ -126,7 +135,8 @@ def decision_score(f1, precision, recall, plasmid, bin_score, failure_rate, stru
             + weights["bin_or_fallback"] * (bin_score if bin_score is not None else 1 - failure_rate)
             + weights["failure_rate"] * failure_rate
             - weights["structural_penalty_scale"] * structural_penalty
-            - weights["resource_penalty_scale"] * resource_penalty)
+            - weights["resource_penalty_scale"] * resource_penalty
+            + weights.get("amr_gene_recall", 0.0) * (amr_gene_recall if amr_gene_recall is not None else 0.0))
 
 
 # --- Minimal pure-Python linear algebra (no numpy) --------------------------

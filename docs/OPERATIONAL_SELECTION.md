@@ -58,6 +58,13 @@ The report uses a multi-objective score only *after* these gates. Therefore a
 method tested on a small subset cannot become an operational recommendation.
 Change the gates in `config/config.sh` only with a documented study rationale.
 
+For AMR studies, use `--decision-profile amr_context` only when the cohort has
+curator-supplied, coordinate-validated `truth_amr.tsv` records. It makes AMR
+gene recovery, plasmid recall, bin integrity, and structural penalties
+co-primary. Where a stratum has no assessable AMR truth, PlasBench visibly
+falls back to `amr_surveillance`; missing evidence is never treated as zero
+gene recovery.
+
 ## Structural and confidence limits
 
 PlasBench reports **circular-truth recovery**, which means a circular reference

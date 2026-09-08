@@ -526,6 +526,7 @@ micromamba, mamba, or conda and installs into `plasbench` by default:
 ```bash
 plasbench install-tools core
 plasbench install-tools assembly
+plasbench install-tools metagenomics
 plasbench install-tools reconstruction
 plasbench install-tools long-read
 plasbench install-tools annotation
@@ -536,7 +537,8 @@ plasbench install-tools --env myenv mob_suite
 ```
 
 `core` installs NCBI download, QC, and minimap2 tools; `assembly` installs
-SPAdes/Unicycler; `reconstruction` installs MOB-suite/Platon; `gplas` installs
+SPAdes/Unicycler; `metagenomics` installs the tested baseline runtime for
+metaSPAdes and geNomad; `reconstruction` installs MOB-suite/Platon; `gplas` installs
 gplas. `RUN_GPLAS2_MOB=1` then seeds
 gplas with deterministic MOB-recon membership from the same assembly graph and
 writes a provenance JSON; these seed values are hard labels, not calibrated
@@ -1067,7 +1069,56 @@ WSL or Bash issue on Windows
     bioinformatics environment is supported on Linux/WSL2.
 ```
 
-## Reproducibility and Citation
+## Metagenomic Plasmid Benchmarking
+
+For mixed-community work, use the separate `plasbench meta` route rather than
+an isolate benchmark. It supports graph/bin reconstruction scoring and a
+separate three-class contig-classification contract, retains uncertain calls,
+and can import MAP-compatible mobilome evidence without treating that evidence
+as truth. Follow [`METAGENOMICS.md`](METAGENOMICS.md) for the complete manifest,
+PPR-Meta/PlasmidHunter normalization, MAP import, and experimental-tool rules.
+
+Metagenomic communities are not treated as large isolates. Use the separate
+community/bin contract when several organisms or strains are present:
+
+```bash
+plasbench metagenomics validate --manifest meta_samples.tsv
+plasbench metagenomics score \
+  --manifest meta_samples.tsv \
+  --predictions-dir predictions_meta \
+  --out-dir results_meta
+```
+
+The manifest declares sample grouping, information regime, truth status, graph
+files, and optional independent linkage evidence. Tool adapters must emit
+`<tool>/<community>.bins.tsv` records with bin membership, path/orientation,
+confidence, plasmid score, and ambiguity status. The resulting dedicated
+`metagenomics.report.html` reports global bin matching, split/merge events,
+and separate chromosome/virus contamination. It does not create host
+assignments, circularity claims, or clinical confirmation. Use
+`plasbench run -m metagenomics --samples meta_samples.tsv --predictions-dir
+predictions_meta --results-dir results_meta` as an equivalent score-and-report
+shortcut. Full schemas and interpretation rules are in `docs/METAGENOMICS.md`.
+
+## Orthogonal Validation Evidence
+
+Benchmark scores measure computational agreement with a declared reference;
+they do not prove that an AMR gene is plasmid-borne, transferable, closed, or
+clinically significant. Preserve optional independent laboratory or technology
+evidence with a separate, reviewable table:
+
+```bash
+plasbench validate-orthogonal-evidence \
+  --evidence orthogonal_evidence.tsv \
+  --out results/orthogonal_validation.summary.json
+```
+
+Supported evidence includes independent long reads, hybrid assembly, targeted
+PCR, plasmid extraction, conjugation, Hi-C, and optical mapping. Each record
+requires a reference and is labelled confirmed, supportive, inconclusive, or
+contradicted. The summary is downloadable from the report artifact explorer;
+it never changes benchmark scores or upgrades a candidate to a biological
+claim. See `docs/ORTHOGONAL_VALIDATION.md` for the schema.
 
 ## Long-Read Reconstruction
 
@@ -1149,6 +1200,8 @@ plasbench select-unknown --recommendations results/benchmark.recommendations.tsv
   --sample-id new_isolate --results-dir results \
   --organism "Klebsiella pneumoniae" --gram-group Gram_negative
 ```
+
+## Reproducibility and Citation
 
 Record the PlasBench version, command line, `config/config.sh`, input sample
 sheet, tool versions, database versions, and final report alongside published

@@ -162,6 +162,8 @@ def tool_quality(rows, statuses, total_samples, model=None, decision_profile=DEF
         precision, recall = mean("precision"), mean("recall")
         bin_values = [number(row, "bin_f1") for row in values if number(row, "bin_f1") is not None]
         bin_score = sum(bin_values) / len(bin_values) if bin_values else None
+        amr_values = [number(row, "amr_gene_recall") for row in values if number(row, "amr_gene_recall") is not None]
+        amr_gene_recall = sum(amr_values) / len(amr_values) if amr_values else None
         profile = statuses[tool]
         completed = profile["counts"]["completed"] + profile["counts"]["reused"]
         failed = profile["counts"]["failed"] + profile["counts"]["skipped"]
@@ -176,12 +178,20 @@ def tool_quality(rows, statuses, total_samples, model=None, decision_profile=DEF
         resource_penalty = 0.0
         if runtime is not None: resource_penalty += .02 * min(1.0, math.log1p(runtime) / math.log1p(3600))
         if memory is not None: resource_penalty += .01 * min(1.0, memory / (16 * 1024 * 1024))
+        effective_profile = decision_profile
+        # A missing AMR truth table is not evidence of failed AMR recovery.
+        # Never convert unavailable into zero merely to make an AMR-focused
+        # profile executable; downgrade visibly to its non-gene counterpart.
+        if decision_profile == "amr_context" and amr_gene_recall is None:
+            effective_profile = "amr_surveillance"
         quality = decision_score(f1, precision, recall, plasmid, bin_score, failure_rate,
-                                 structural_penalty, resource_penalty, profile=decision_profile)
+                                 structural_penalty, resource_penalty, profile=effective_profile,
+                                 amr_gene_recall=amr_gene_recall)
         output[tool] = {
             "tool": tool, "n_scored": len(values), "coverage": len({row["sample"] for row in values}) / total_samples if total_samples else 0.0,
             "mean_f1": f1, "mean_precision": precision, "mean_recall": recall,
             "mean_plasmid_recall": plasmid, "mean_bin_f1": bin_score,
+            "mean_amr_gene_recall": amr_gene_recall, "decision_profile_effective": effective_profile,
             "failure_rate": failure_rate, "median_runtime_seconds": runtime,
             "median_peak_rss_kb": memory, "decision_score": quality, "model_used": model is not None,
         }
@@ -223,7 +233,7 @@ def write_recommendations(rows, statuses, total_samples, out_path, min_samples, 
             groups[row[field]].append(row)
         scopes.extend((field, value, group) for value, group in sorted(groups.items()))
     columns = ["scope", "group", "tool", "eligible", "applicability", "recommendation", "reason", "n_scored", "coverage",
-               "mean_f1", "mean_precision", "mean_recall", "mean_plasmid_recall", "mean_bin_f1", "failure_rate",
+               "mean_f1", "mean_precision", "mean_recall", "mean_plasmid_recall", "mean_bin_f1", "mean_amr_gene_recall", "decision_profile_effective", "failure_rate",
                "median_runtime_seconds", "median_peak_rss_kb", "decision_score"]
     recommendations, written = {}, []
     for scope, group, group_rows in scopes:

@@ -1,0 +1,4 @@
+predicted_bin_id	contig_id	graph_path	orientation	path_confidence	plasmid_score	ambiguity_status	source_tool
+merged_bin	plasmid_a_1	plasmid_a_1+	+	0.96	0.95	resolved	conservative_binner
+merged_bin	plasmid_a_2	plasmid_a_2+	+	0.94	0.94	resolved	conservative_binner
+merged_bin	plasmid_b_1	plasmid_b_1+	+	0.81	0.85	resolved	conservative_binner

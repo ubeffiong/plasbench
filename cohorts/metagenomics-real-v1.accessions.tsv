@@ -1,0 +1,7 @@
+community_id	bioproject	biosample	short_read_run	long_read_run	hic_run	data_role	public_source
+zymo_hmw_illumina	PRJEB48692	SAMEA10644975	ERR7255689			physical_mock_short_read	https://www.ebi.ac.uk/ena/browser/view/PRJEB48692
+zymo_hmw_ont_r94	PRJEB48692	SAMEA10644976		ERR7255742		physical_mock_long_read	https://www.ebi.ac.uk/ena/browser/view/PRJEB48692
+zymo_hmw_ont_r104	PRJEB48692	SAMEA10644977		ERR7287988		physical_mock_long_read	https://www.ebi.ac.uk/ena/browser/view/PRJEB48692
+wastewater_ww	PRJNA506462	SAMN10456909	SRR8239393		SRR8239392	real_environmental_evidence	https://www.ncbi.nlm.nih.gov/bioproject/PRJNA506462
+wastewater_wwec	PRJNA506462	SAMN10456910	SRR8239395		SRR8239394	real_environmental_evidence	https://www.ncbi.nlm.nih.gov/bioproject/PRJNA506462
+wastewater_lulu_island	PRJNA620832	SAMN14511163	SRR11809874			real_environmental_observational	https://www.ncbi.nlm.nih.gov/bioproject/PRJNA620832

@@ -57,11 +57,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("list", "plan", "validate"))
     parser.add_argument("--registry", type=Path, default=Path("config/tool_installers.tsv"))
+    parser.add_argument("--metagenomic-registry", type=Path, default=Path("config/metagenomic_tool_installers.tsv"),
+                        help="Optional non-isolate adapter registry displayed with installation plans.")
     parser.add_argument("--capabilities", type=Path, default=Path("config/tool_capabilities.tsv"))
     args = parser.parse_args(argv)
     try:
         rows = read_tsv(args.registry)
         errors = validate(rows, capability_tools(args.capabilities))
+        meta_rows = read_tsv(args.metagenomic_registry) if args.metagenomic_registry.is_file() else []
     except (OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -70,13 +73,15 @@ def main(argv: list[str] | None = None) -> int:
             print("INSTALLER REGISTRY INVALID:", file=sys.stderr)
             print("\n".join(f"  - {error}" for error in errors), file=sys.stderr)
             return 1
-        print(f"INSTALLER REGISTRY VALID: {len(rows)} supported adapters covered")
+        print(f"INSTALLER REGISTRY VALID: {len(rows)} isolate adapters and {len(meta_rows)} metagenomic contracts covered")
         return 0
     if errors:
         print("WARNING: registry has validation errors; run 'install-tools validate' before installing.", file=sys.stderr)
     writer = csv.writer(sys.stdout, delimiter="\t", lineterminator="\n")
     writer.writerow(("tool", "profile", "install_mode", "automated", "runtime", "database_mode", "verify_command", "notes"))
     for row in rows:
+        writer.writerow(tuple(row[column] for column in ("tool", "profile", "install_mode", "automated", "runtime", "database_mode", "verify_command", "notes")))
+    for row in meta_rows:
         writer.writerow(tuple(row[column] for column in ("tool", "profile", "install_mode", "automated", "runtime", "database_mode", "verify_command", "notes")))
     return 0
 

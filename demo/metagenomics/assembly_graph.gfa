@@ -1,0 +1,8 @@
+H	VN:Z:1.0
+S	plasmid_a_1	*
+S	plasmid_a_2	*
+S	plasmid_b_1	*
+S	chromosome_1	*
+S	chromosome_2	*
+S	phage_1	*
+L	plasmid_a_1	+	plasmid_a_2	+	0M

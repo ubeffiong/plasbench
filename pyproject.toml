@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plasbench"
-version = "0.2.7"
-description = "Benchmark plasmid-reconstruction tools against complete-reference truth."
+version = "0.2.8"
+description = "A reproducible, evidence-calibrated framework for benchmarking plasmid reconstruction from sequence to biological function."
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}

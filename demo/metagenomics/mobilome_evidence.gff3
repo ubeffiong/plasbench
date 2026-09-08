@@ -1,0 +1,4 @@
+##gff-version 3
+plasmid_a_1	DemoEvidence	replicon	51	460	.	+	.	ID=repA;product=putative replication initiator
+plasmid_b_1	DemoEvidence	AMR_gene	100	690	.	+	.	ID=amr_demo;product=demonstration resistance-context feature
+phage_1	DemoEvidence	phage_feature	1	880	.	+	.	ID=phage_demo;product=demonstration phage feature

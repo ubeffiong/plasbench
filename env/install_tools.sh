@@ -73,6 +73,39 @@ case "$PROFILE" in
  locked) LOCK="$HERE/environment.lock.yml"; grep -q '^@EXPLICIT$' "$LOCK" || { echo "ERROR: $LOCK is not a Conda @EXPLICIT lock. Regenerate with: bash env/lock_environment.sh" >&2; exit 2; }; "${CREATE[@]}" $(awk '!/^(@|#|$)/ {print}' "$LOCK"); exit;;
  core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk unzip);;
  assembly) PKGS=(spades unicycler);;
+ # The executable metagenomic scorer consumes graph/bin tables produced by
+ # adapters. SPAdes supplies metaSPAdes and geNomad supplies a transparent
+ # contig-classification baseline. Graph deconvolution tools with unpinned
+ # upstream runtimes are intentionally not claimed as installed here.
+ metagenomics) PKGS=(spades genomad);;
+ ppr-meta)
+    cat >&2 <<'EOF'
+PPR-Meta is a legacy Python 2/TensorFlow 1/MATLAB-runtime application. To avoid
+an unpinned and unsafe install, PlasBench does not install it automatically.
+Use a locally validated, digest-pinned container, retain the image digest in
+your community manifest, then normalize its CSV with:
+    plasbench normalize-meta-classifier --tool ppr_meta --input result.csv --out tool/community.classification.tsv
+EOF
+    exit 2
+    ;;
+ plsmd)
+    cat >&2 <<'EOF'
+plsMD is distributed as a Docker workflow with a PLSDB-dependent database.
+It is registered as an isolate short-read reconstruction candidate, but no
+floating image or database is installed automatically. Pin and validate the
+image digest and PLSDB release before using it in a benchmark.
+EOF
+    exit 2
+    ;;
+ mobilome-map)
+    cat >&2 <<'EOF'
+The EBI Mobilome Annotation Pipeline is a Nextflow/container evidence workflow.
+It is intentionally not installed into the PlasBench conda environment. Run a
+pinned upstream release, then import its GFF3 as non-scoring evidence with:
+    plasbench import-mobilome-evidence --gff sample_mobilome.gff.gz --community ID --sample ID --out results/metagenomics.mobilome_evidence.tsv
+EOF
+    exit 2
+    ;;
  reconstruction) PKGS=(mob_suite platon);;
  # filtlong is not needed to RUN flye_mob_recon -- it is what
  # `plasbench read-quality-ladder` filters long reads with, the long-read
@@ -242,6 +275,9 @@ EOF
  # planned until their pin, checksum, and smoke test have been validated.
  all)
     failures=0
+    # `metagenomics` is deliberately absent: its two baseline dependencies are
+    # already covered by `assembly` and `genomad` below. Keeping it out avoids
+    # a redundant second solver transaction during install-tools all.
     for installed_profile in core assembly reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast annotation annotation-prokka; do
         echo "[plasbench] ===== install-tools $installed_profile ====="
         "$0" --env "$ENV_NAME" "$installed_profile" || failures=1

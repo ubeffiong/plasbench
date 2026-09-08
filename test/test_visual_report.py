@@ -110,7 +110,7 @@ def main():
     assert "not measured" in page, "missing-metric wording absent"
     assert "not counted as zero" in page or "rather than as zero" in page or         "excluded rather than counted as zero" in page, "zero-substitution caveat absent"
     # The programme rename must hold in the shipped page.
-    assert "PlasBench: Plasmid reconstruction benchmark" in page, "report title not renamed"
+    assert "PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools" in page, "report title not updated"
     # Only the report's own branding is asserted: a user's directory may legitimately
     # contain "SPREAD" and would surface through the artifact explorer's file paths.
     for banner in ("SPREAD plasmid benchmark report", "SPREAD plasmid reconstruction benchmark"):
@@ -494,7 +494,7 @@ def main():
     # Sentence case, with the colon the programme name takes.
     assert "<title>PlasBench report:" in page, \
         "the document title must identify the named benchmark run"
-    assert "<h1>PlasBench: Plasmid reconstruction benchmark</h1>" in page
+    assert "<h1>PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools</h1>" in page
 
     # Every icon class the explorer uses must be able to draw. Eighteen had no
     # glyph in the vendored subset and rendered as nothing at all, including

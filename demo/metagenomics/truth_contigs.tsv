@@ -1,0 +1,7 @@
+contig_id	truth_bin_id	biological_class
+plasmid_a_1	plasmid_a	plasmid
+plasmid_a_2	plasmid_a	plasmid
+plasmid_b_1	plasmid_b	plasmid
+chromosome_1	chromosome	chromosome
+chromosome_2	chromosome	chromosome
+phage_1	phage	virus

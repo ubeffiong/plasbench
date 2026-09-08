@@ -1,0 +1,6 @@
+tool	profile	install_mode	automated	runtime	database_mode	verify_command	notes
+ppr_meta	ppr-meta	container_pinned	planned	legacy_container	none	PPR_Meta --help	Three-class contig classifier; pin a verified legacy container image and normalize its CSV with plasbench normalize-meta-classifier.
+plasmidhunter_meta	plasmidhunter	conda_pip	yes	plasbench	none	plasmidhunter --help	Uses the existing PlasmidHunter installation profile; normalize its probability table rather than fabricating bins.
+plsmd	plsmd	container_pinned	planned	docker	manual	plsMD --help	Isolate short-read reconstruction only; validate final FASTA and database provenance before enabling a native adapter.
+plassembler_meta	plassembler	conda	planned	plasbench	automated	plassembler --help	Experimental high-depth mock-community only; no routine-metagenome recommendation claim.
+mobilome_annotation_pipeline	mobilome-map	nextflow_container	planned	nextflow_container	automated	nextflow run EBI-Metagenomics/mobilome-annotation-pipeline --help	Imports MAP-compatible GFF3 as non-scoring evidence through plasbench import-mobilome-evidence.

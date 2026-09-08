@@ -12,9 +12,10 @@ export. True plasmid-size filters are calculated directly from each reference's
 truth table, rather than relying on a manually entered size.
 
 Read [`SCENARIOS.md`](SCENARIOS.md) before creating a clinical-outbreak or
-metagenomic panel. Outbreak cohorts need dependence-aware holdouts;
-metagenomic benchmarking requires a separate truth and scoring design and is
-not yet an executable PlasBench scenario.
+metagenomic panel. Outbreak cohorts need dependence-aware holdouts.
+Metagenomics has its own executable community/bin scoring track and separate
+truth contract in [`METAGENOMICS.md`](METAGENOMICS.md); it must never be mixed
+with this isolate cohort format or its leaderboards.
 
 Validate locally:
 
@@ -127,6 +128,12 @@ apply identical evidence rules and differ only in curation grade. Read
 | [`public-v1.tsv`](../cohorts/public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](../cohorts/public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
 
+These are versioned **input cohort manifests**, not a substitute for released
+performance evidence. A public performance claim requires a reproducible run,
+its complete manifest and tool/database versions, generated scores/report, and
+the governance review described in `docs/GOVERNANCE.md`. Do not cite a shipped
+demo report as a real-cohort result.
+
 **`public-v1` is frozen.** Published results reference it by name and its lock
 certifies that exact sheet, so new isolates belong in `public-v2` or your own
 panel — never appended to v1.
@@ -136,6 +143,67 @@ panel to six organisms and five African countries. Those rows are tier B: every
 deposited-evidence check passes, but no source publication has been reviewed.
 Promote one to tier A by reviewing its publication, recording it in
 `source_study`, and re-running `--online --write-lock`.
+
+### What the shipped panels can support
+
+`public-v1` (10 reviewed rows) is fit for reproducible workflow smoke tests,
+documentation examples, and a narrow proof-of-work. `public-v2` (32 rows) is
+fit for adapter integration, exploratory comparisons, and verifying that a
+benchmark can span multiple organisms and deposited geographies. Neither panel
+is yet fit to publish a broad operational recommendation by organism, plasmid
+size, read depth, source setting, or geography: v2 remains *E. coli*-weighted,
+has tier-B publication review outstanding, and has too few observations in most
+strata for independent hold-out evidence.
+
+The metagenomic track now includes one executable **truth-scored real physical
+community control**: BMock12. Its source inventory is
+[`metagenomics-physical-mock-v1.tsv`](../cohorts/metagenomics-physical-mock-v1.tsv)
+and the checksum-pinned artifacts are declared in
+[`metagenomic_truth_sources.tsv`](../config/metagenomic_truth_sources.tsv).
+The materializer downloads the released CC-BY 4.0 scaffolds, assembly graph,
+and contig-to-source-genome gold standard, verifies every checksum, and writes
+a scoreable manifest without silently downloading BMock12's approximately 64
+Gbp Illumina input:
+
+```bash
+plasbench materialize-meta-bmock12 --out-dir "$HOME/.local/share/plasbench/metagenomics/controls"
+plasbench metagenomics validate \
+  --manifest "$HOME/.local/share/plasbench/metagenomics/controls/bmock12/metagenomics-bmock12-verified.tsv"
+```
+
+This is a **real physical negative plasmid control**, not a positive plasmid
+reconstruction leaderboard. The released truth assigns scaffolds to the 12
+component genomes but does not make a validated plasmid-replicon call, so
+PlasBench labels its truth as chromosome. It supports reproducible assessment
+of plasmid false positives, chromosome contamination, bin purity, and tool
+behavior on an independently deposited assembly graph. It cannot estimate
+plasmid recall and must not be combined with a plasmid-positive ranking.
+
+[`metagenomics-real-v1.tsv`](../cohorts/metagenomics-real-v1.tsv) remains an
+accession-resolved, six-community operational-review panel: three public
+physical Zymo HMW mock sequencing conditions and three public real wastewater
+communities. Its companion [accession ledger](../cohorts/metagenomics-real-v1.accessions.tsv)
+records the exact ENA/NCBI projects, BioSamples, and WGS/ONT/Hi-C runs.
+
+This panel is deliberately not a leaderboard cohort. The Zymo rows lack an
+independently validated component-to-contig truth projection, and the real
+wastewater rows have no deposited contig-level plasmid gold standard. The
+physical mock rows also share the same reference cluster and are sequencing
+conditions, not independent communities. Therefore PlasBench preserves their
+outputs for evidence review but blocks a release-ready operational ranking.
+
+The bundled example and high-depth mock templates remain contract fixtures.
+Together with BMock12 and the real-v1 review panel, they support offline
+schema, scoring, report, uncertainty, phage, contamination, split/merge, and
+leakage-gate regression tests. None supports an operational recommendation for
+routine environmental or clinical metagenomics until independently curated,
+plasmid-positive community truth tables are released.
+
+```bash
+plasbench metagenomics validate --manifest cohorts/metagenomics-real-v1.tsv
+plasbench audit-meta-cohort --manifest cohorts/metagenomics-real-v1.tsv \
+  --out results_meta/metagenomics-real-v1.audit.json
+```
 
 ```bash
 plasbench run --cohort public-v1    # reproducible headline results

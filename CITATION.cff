@@ -1,10 +1,10 @@
 cff-version: 1.2.0
 message: "If you use PlasBench, please cite the software release and its benchmark cohort."
-title: "PlasBench: a reproducible benchmark for plasmid reconstruction"
+title: "PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools"
 authors:
   - family-names: "Effiong"
     given-names: "Ubokobong"
 license: "MIT"
 repository-code: "https://github.com/ubeffiong/plasbench"
-version: "0.2.7"
+version: "0.2.8"
 date-released: "2026-09-08"

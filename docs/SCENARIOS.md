@@ -24,13 +24,17 @@ holdout validation when enough are available.
 
 ## Metagenomics
 
-Metagenomics is **not yet an executable PlasBench scenario**. Metagenomic
-reads contain multiple organisms and strains, so isolate-level reference
-labels and the current one-isolate-per-row score are invalid substitutes. A
-future metagenomic benchmark needs separately declared ground truth,
-abundance-aware metrics, strain-resolution rules, host-assignment criteria,
-and contamination controls. Do not label a metagenomic run as a PlasBench
-benchmark result until those rules and a verified cohort are released.
+Metagenomics is an executable **separate graph/bin scoring track**. It accepts
+a declared community manifest and normalized, provenance-preserving tool-bin
+tables; it does not run the isolate stages, reuse isolate reference labels, or
+pool ranks with isolate leaderboards. See `docs/METAGENOMICS.md`.
+
+Use `plasbench metagenomics validate` before any tool run, then
+`plasbench metagenomics score` once adapter outputs are available. Synthetic
+and mock communities are eligible only for their own labelled results; a
+verified community cohort is still required before making public operational
+claims. Host assignment requires independent evidence and is never inferred
+from a candidate bin.
 
 ## Strict Reference Metrics
 

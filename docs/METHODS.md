@@ -369,6 +369,18 @@ contingency table is empty or the tool is not `binning_capable`.
 
 ## Structural and AMR evidence
 
+### External evaluator cross-checks
+
+PlasBench's native base, bin, split/merge, contamination, AMR, and QUAST
+diagnostics remain the source of its native results. An external evaluator such
+as PlasEval can be useful as a supplementary structural cross-check, but its
+metrics must be archived with its exact version, command, truth definition, and
+source citation using `plasbench import-external-benchmark`; they are not mixed
+into `scores.tsv`, the native leaderboard, or operational recommendations.
+This prevents a superficially similar metric from silently changing a published
+rank. PlasEval integration becomes a first-class adapter only after its
+versioned input/output contract and a regression fixture are available.
+
 `circular_truth_plasmid_recovery` only says a circular *reference* plasmid was
 covered. PlasBench does not infer closure from that fact. A source may supply
 `pred_<tool>.evidence.tsv` with `record_id`, `evidence_type`, and

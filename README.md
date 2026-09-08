@@ -1,7 +1,10 @@
-# PlasBench
+# PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools
 
-A reproducible, Ubuntu-first pipeline that **benchmarks how well plasmid-reconstruction
-tools recover plasmids**, using complete (long-read) assemblies as ground truth.
+> **Benchmarking plasmid reconstruction from sequence to biological function.**
+
+PlasBench is a reproducible, Ubuntu-first framework that **benchmarks how well
+plasmid-reconstruction tools recover plasmids**, using complete (long-read)
+assemblies as ground truth.
 
 **Read support:** the default workflow consumes paired-end short-read FASTQ files
 (`*_1.fastq.gz`, `*_2.fastq.gz`), normally Illumina, and that is what a plain
@@ -24,6 +27,28 @@ Results are never pooled across these input tracks. Aggregation writes one
 leaderboard per track — short-read, long-read and hybrid — and the HTML report
 ranks within each, so a tool given long reads is never ranked against one given
 only short reads.
+
+**Metagenomics:** PlasBench also provides a separate graph-aware metagenomic
+score and report workflow for normalized community-bin outputs. It is not an
+extension of an isolate run: it has a dedicated manifest, three-class
+plasmid/chromosome/virus truth contract, global bin matching, and its own
+`metagenomics.report.html`. Start with [the metagenomics guide](docs/METAGENOMICS.md);
+never compare its ranks directly with isolate results or interpret a candidate
+bin as host linkage.
+
+For a small, real physical-community truth control, run
+`plasbench materialize-meta-bmock12 --out-dir "$HOME/.local/share/plasbench/metagenomics/controls"`.
+It downloads and checksum-verifies BMock12's released assembly, graph, and
+contig truth, but intentionally does not download its ~64 Gbp raw-read archive.
+See [the metagenomics guide](docs/METAGENOMICS.md#real-physical-truth-control-bmock12)
+for its strict negative-control interpretation.
+
+The metagenomic route can score three-class probability classifiers
+(plasmid/chromosome/phage) without fabricating bins, and display imported
+mobilome evidence such as AMR, phage, ICE/IME, insertion-sequence, and protein
+annotations. These evidence layers are explicitly non-scoring. The
+[metagenomics guide](docs/METAGENOMICS.md) documents PPR-Meta, PlasmidHunter,
+EBI MAP, plsMD, and experimental Plassembler boundaries.
 
 For each isolate the pipeline:
 
@@ -49,6 +74,8 @@ For each isolate the pipeline:
 | You are… | Go to | You need |
 |---|---|---|
 | a laboratory that wants to run the benchmark | **[Section 3 — step by step](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** | a Linux machine, or Windows with WSL2 |
+| a laboratory benchmarking a mixed community | [Metagenomic workflow](#metagenomic-community-workflow) below, then [`docs/METAGENOMICS.md`](docs/METAGENOMICS.md) | declared community manifest, graph/bin outputs, and truth when scoring is required |
+| a laboratory recording PCR, conjugation, long-read, or Hi-C evidence | [Orthogonal validation](#orthogonal-validation-evidence) below | reviewable evidence TSV with accession, DOI, protocol, or laboratory-record reference |
 | someone who would rather install nothing | [Container](#container) below | Docker only |
 | modifying PlasBench, or citing exact source | [Source checkout](#source-checkout) below | git and conda |
 
@@ -150,6 +177,12 @@ plasbench test && plasbench demo
   non-technical overview for partners and funders.
 - [`docs/EXTERNAL_EVIDENCE.md`](docs/EXTERNAL_EVIDENCE.md) — safely importing
   published benchmark evidence and using the candidate-quality research dataset.
+- [`docs/METAGENOMICS.md`](docs/METAGENOMICS.md) — separate graph-aware
+  community/bin benchmarking, its input contract, scoring limits, and report.
+- [`docs/ORTHOGONAL_VALIDATION.md`](docs/ORTHOGONAL_VALIDATION.md) — preserving
+  independent laboratory or technology evidence without inflating a computational claim.
+- [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md) — public cohort release, review,
+  tool-refresh, representation, and conflict-of-interest standards.
 - [`CHANGELOG.md`](CHANGELOG.md) and [`docs/RELEASES.md`](docs/RELEASES.md) —
   what changed in each release, which distribution to use, verification,
   upgrades, rollbacks, and release limits.
@@ -936,6 +969,271 @@ reference, and writes `results/benchmark.report.html` — open that file in a br
 below for how to read it). Re-running the same command later reuses everything already
 completed (see [step 10](#step-10--run-your-first-benchmark)) instead of starting over.
 
+#### Metagenomic community workflow
+
+This is a **separate** workflow for mixed communities, including wastewater,
+environmental, gut, or multi-sample surveillance data. Do not use an isolate
+sample sheet or compare the resulting ranks with an isolate leaderboard.
+
+**Start with the included real physical control.** BMock12 is a real 12-strain
+mock community with a separately released, checksum-pinned assembly graph and
+contig-level source-genome truth. Use the same `plasbench run --cohort ...`
+pattern as the isolate workflow. This command automatically downloads or reuses
+about 30 MB of benchmark artifacts, not the approximately 64-Gbp raw-read run:
+
+```bash
+# Run/normalize the selected metagenomic tool(s) first and put their tables in
+# predictions_meta/. Then run the bundled cohort in one command.
+plasbench run --mode meta --cohort bmock12 \
+  --predictions-dir predictions_meta \
+  --results-dir results_meta_bmock12 \
+  --open-report
+```
+
+The completed report is
+`results_meta_bmock12/metagenomics.report.html`. BMock12's public gold standard
+labels source-genome membership rather than validated plasmid replicons. It is
+therefore a **chromosome-specificity and plasmid false-positive control**. It
+can show whether a tool incorrectly calls known chromosomal scaffold content as
+plasmid, but cannot measure plasmid recall, validate plasmid closure, or select
+a best metagenomic reconstructor. Re-running the same `plasbench run` command
+reuses every checksum-verified control artifact.
+
+If you only want to inspect or download the control before running a tool, use:
+
+```bash
+plasbench materialize-meta-bmock12 \
+  --out-dir "$HOME/.local/share/plasbench/metagenomics/controls"
+```
+
+##### Metagenomic preparation: full laboratory flow
+
+Follow these steps in order for every new metagenomic project. Unlike the
+isolate route, PlasBench does **not** silently assemble a community or choose a
+metagenomic recovery method for you: assembly, co-assembly, host depletion, and
+tool choice materially change the scientific question. PlasBench records those
+choices and scores the normalized outputs you provide.
+
+**Step 1 - decide which result you need.** Choose one route before copying any
+files. Do not switch routes after tools have run.
+
+| Your material | What PlasBench can do | What it cannot claim |
+|---|---|---|
+| BMock12 bundled physical control | Score chromosome specificity and plasmid false positives against released contig truth | Plasmid recall, circularity, or the best reconstruction |
+| Your community with an independently deposited contig/bin truth table | Score compatible reconstruction and classifier outputs | Host linkage or clinical confirmation from a bin alone |
+| Your wastewater, stool, soil, or outbreak community without contig truth | Preserve predictions, evidence, and a report for review | A benchmark rank, a tool recommendation, or ground-truth accuracy |
+
+**Step 2 - create a clean project layout.** Keep the raw laboratory delivery
+read-only. Work on copies or symbolic links beneath one project directory.
+
+```bash
+mkdir -p meta_project/{raw_fastq,trimmed_fastq,assembly,predictions_meta,results_meta,metadata}
+cd meta_project
+
+# Example names: do not use spaces, commas, or duplicate sample identifiers.
+ln -s /path/from_the_sequencing_facility/community_01_R1.fastq.gz raw_fastq/community_01_R1.fastq.gz
+ln -s /path/from_the_sequencing_facility/community_01_R2.fastq.gz raw_fastq/community_01_R2.fastq.gz
+```
+
+Each paired-end Illumina sample needs an R1 and R2 FASTQ from the *same library
+and sample*. Keep the facility checksum sheet, run accession, extraction kit,
+library kit, read length, date, and any host-depletion or plasmid-enrichment
+step in your laboratory record. For long reads, keep the ONT/PacBio FASTQ and
+declare it in the manifest as supporting evidence; do not call it host linkage
+unless you have a separately validated linking analysis.
+
+**Step 3 - check the files before analysis.** These checks are fast and do not
+alter data. A failed gzip check means stop and request/re-download the affected
+file; do not try to assemble it.
+
+```bash
+gzip -t raw_fastq/community_01_R1.fastq.gz
+gzip -t raw_fastq/community_01_R2.fastq.gz
+
+# Record the exact delivered files for the run manifest and laboratory archive.
+sha256sum raw_fastq/community_01_R1.fastq.gz raw_fastq/community_01_R2.fastq.gz \
+  | tee metadata/community_01.reads.sha256
+```
+
+Run your laboratory's approved read QC and trimming procedure next. If you use
+host-read removal, record the exact depletion reference and version. Never mix
+pre- and post-depletion reads in the same assembly. Preserve the retained read
+pair names and write down the final read count/depth. PlasBench treats these as
+upstream provenance, not a property of the plasmid tool.
+
+**Step 4 - assemble consistently.** Use one declared assembler and parameter
+set within a comparability group. A single community can use a per-sample
+assembly; a multisample study may use a co-assembly only when every sample in
+that community points to the same co-assembly identifier. Keep the final FASTA
+and, for graph-aware tools, the final GFA and path file. For example, a
+laboratory may run its validated MEGAHIT procedure like this:
+
+```bash
+megahit \
+  -1 trimmed_fastq/community_01_R1.fastq.gz \
+  -2 trimmed_fastq/community_01_R2.fastq.gz \
+  -o assembly/community_01 \
+  --num-cpu-threads 8
+
+# Expected assembly handoff for a contig-based tool:
+# assembly/community_01/final.contigs.fa
+```
+
+MEGAHIT is an example, not a PlasBench recommendation. Record its version and
+all options. A graph-aware method additionally needs the compatible assembly
+graph produced by its assembler; do not invent a GFA by converting FASTA.
+
+**Step 5 - create and validate the community manifest.** Start from the
+shipped header, retain every column, and populate the paths relative to the
+manifest file whenever possible. This makes the project portable between
+computers.
+
+```bash
+cp "$PB/cohorts/metagenomics.example.tsv" metadata/meta_samples.tsv
+# Edit metadata/meta_samples.tsv in a spreadsheet or text editor.
+# Do not rename its column headers.
+
+plasbench meta validate -s metadata/meta_samples.tsv
+```
+
+For a truth-backed benchmark, `truth_contigs_tsv` is required and must map each
+assembled contig to a `truth_bin_id` and `biological_class`. For an operational
+community without truth, set `truth_status` to `unavailable`, leave the truth
+path blank, and use the resulting report only for evidence review. Before a
+public scored-cohort release, run:
+
+```bash
+plasbench meta validate -s metadata/meta_samples.tsv --release-ready
+plasbench audit-meta-cohort --manifest metadata/meta_samples.tsv \
+  --out results_meta/cohort_audit.json --release-ready
+```
+
+**Step 6 - run your selected metagenomic tools and normalize their outputs.**
+Run each tool with the same declared assembly/read input. Keep its unmodified
+output and log under `tool_raw/`; put only PlasBench-normalized tables below
+`predictions_meta/`. This protects the benchmark from adapter changes and lets
+another analyst inspect the original result.
+
+```text
+meta_project/
+  tool_raw/
+    graph_tool/community_01/...
+    classifier_tool/community_01/...
+  predictions_meta/
+    graph_tool/community_01.bins.tsv
+    classifier_tool/community_01.classification.tsv
+```
+
+Use `*.bins.tsv` only when the tool actually reconstructs or bins contigs.
+Use `*.classification.tsv` for a classifier; it must retain plasmid,
+chromosome, and phage probabilities or explicitly declare the classes the tool
+does not support. For PPR-Meta or PlasmidHunter, PlasBench can normalize their
+probability tables without fabricating bins:
+
+```bash
+plasbench normalize-meta-classifier --tool ppr_meta \
+  --input tool_raw/ppr_meta/community_01.csv \
+  --threshold 0.70 \
+  --out predictions_meta/ppr_meta/community_01.classification.tsv
+```
+
+**Step 7 - run PlasBench and open the report.** This is the metagenomic
+equivalent of `plasbench run --cohort public-v1` for isolates:
+
+```bash
+plasbench run --mode meta \
+  --samples metadata/meta_samples.tsv \
+  --predictions-dir predictions_meta \
+  --results-dir results_meta \
+  --open-report
+```
+
+When it finishes, the terminal prints the absolute path and an open command.
+The report is `results_meta/metagenomics.report.html`. Re-run exactly the same
+command after adding another tool: existing input artifacts remain in place and
+the report is rebuilt from the current normalized tables.
+
+**Step 8 - review before sharing.** Read the decision-boundary banner first.
+Then check the community-by-tool matrix, classifier versus reconstruction
+sections, bin contamination, uncertainty calls, source-study balance, database
+identity, and raw-artifact links. Do not report a truth-unavailable community
+as a sensitivity/specificity benchmark. Do not present a candidate plasmid bin
+as a confirmed host-plasmid link, circular plasmid, transmission event, or
+clinical finding without independent evidence.
+
+**Use this route for your own truth-backed community.** Before scoring, make a
+community manifest and normalize each tool's output into one of these exact
+paths (tool directory names are your choice):
+
+```text
+predictions_meta/
+  graph_tool/community_01.bins.tsv
+  classifier_tool/community_01.classification.tsv
+```
+
+`*.bins.tsv` is for a genuine plasmid-bin/reconstruction method. Each row
+declares a predicted bin and one constituent contig. `*.classification.tsv` is
+for a contig classifier and preserves plasmid/chromosome/virus probabilities;
+it never fabricates bins. The full column contracts and adapters are in
+[`adapters/METAGENOMICS.md`](adapters/METAGENOMICS.md). A truth-backed manifest
+must reference a local `truth_contigs_tsv` whose rows contain
+`contig_id`, `truth_bin_id`, and `biological_class` (`plasmid`, `chromosome`,
+or `virus`).
+
+```bash
+# 1. Check the community manifest and its declared reads/assembly/graph/truth files.
+plasbench meta validate -s meta_samples.tsv
+
+# 2. Require additional provenance fields before publishing a scored cohort.
+plasbench meta validate -s meta_samples.tsv --release-ready
+
+# 3. Normalize a probability classifier. This remains separate from bin recovery.
+plasbench normalize-meta-classifier --tool ppr_meta --input ppr_meta.csv \
+  --threshold 0.70 --out predictions_meta/ppr_meta/community_01.classification.tsv
+
+# 4. Score already-normalized tool bin tables and generate a separate report.
+plasbench meta score -s meta_samples.tsv -p predictions_meta -o results_meta
+
+# Equivalent shortcut: -m/--mode accepts meta, beta, or metagenomics.
+plasbench run -m meta -s meta_samples.tsv -p predictions_meta -o results_meta
+```
+
+The output is `results_meta/metagenomics.report.html`, with three-class
+plasmid/chromosome/virus truth, global bin matching, split/merge diagnostics,
+separate chromosome/virus contamination, three-class classifier metrics, and
+non-scoring imported mobilome evidence. A candidate bin is **not** a host
+assignment, closed plasmid, or clinical confirmation. See
+[`docs/METAGENOMICS.md`](docs/METAGENOMICS.md) and the
+[metagenomic adapter contract](adapters/METAGENOMICS.md).
+
+**Important cohort boundary.** `cohorts/metagenomics-real-v1.tsv` is an
+accession-resolved review panel for Zymo physical-mock and wastewater studies,
+not an executable truth-scored leaderboard. Wastewater data remain useful for
+evidence review but have no deposited contig-level plasmid gold standard. The
+new `cohorts/metagenomics-physical-mock-v1.tsv` records BMock12 (materialized
+by the command above), MBARC-26, and an HMP mock candidate. MBARC-26 and HMP
+remain unscored until their complete versioned component references and
+independent contig-level projections are curated. See
+[`docs/COHORTS.md`](docs/COHORTS.md) for the evidence and release rules.
+
+#### Orthogonal validation evidence
+
+Computational recovery metrics and visual evidence are not wet-lab
+confirmation. Preserve independent evidence without changing benchmark scores:
+
+```bash
+plasbench validate-orthogonal-evidence \
+  --evidence orthogonal_evidence.tsv \
+  --out results/orthogonal_validation.summary.json
+```
+
+The evidence TSV records a sample, evidence type, status, and a public or
+laboratory reference. Supported types include independent long reads, hybrid
+assemblies, targeted PCR, plasmid extraction, conjugation, Hi-C, and optical
+mapping. Its summary is available in the report's Results file explorer; it
+does not prove host linkage, transferability, circular closure, or clinical
+impact by itself. See [`docs/ORTHOGONAL_VALIDATION.md`](docs/ORTHOGONAL_VALIDATION.md).
+
 #### Every `plasbench` command
 
 Every command also accepts `--help` for its complete, authoritative option list — this
@@ -944,7 +1242,14 @@ ones you'll actually reach for most often; every command has more than shown her
 
 | Command | What it does | Common options |
 |---|---|---|
-| `run` | Run the full benchmark, or just the stages you list (`0`-`7`). The main entry point. | *`--cohort`/`--samples`*, *`--threads`*, *`--memory-gb`*, `--parallel-samples`, `--parallel-tools`, `--analysis-track`, `--decision-profile`, `--write-script`, `--local-inputs`, one on/off flag per tool (e.g. `--platon off`) |
+| `run` | Run the full isolate benchmark, selected stages, or the separate metagenomic score/report shortcut. | *`-c`/`--cohort`*, *`-s`/`--samples`*, *`-t`/`--threads`*, *`-o`/`--results-dir`*, `--decision-profile`, `-m meta`, `-p predictions_meta`, `--write-script`, one on/off flag per isolate tool (e.g. `--platon off`) |
+| `metagenomics` / `meta` / `beta` | Validate, score, or report community bin recovery and three-class classifier outputs. Never mixes with isolate scores. | `validate`/`score`/`report`, *`-s`/`--manifest`*, `-p`/`--predictions-dir`, `-o`/`--results-dir`, `--release-ready` |
+| `materialize-meta-bmock12` | Download, checksum-verify, and convert BMock12's released real physical-community graph/assembly/truth artifacts into a scoreable manifest. Does not download raw reads. | *`--out-dir`*, `--source-manifest`, `--retries` |
+| `audit-meta-cohort` | Check community regimes, study balance, and reference-cluster leakage before release. | `--manifest`, `--out`, `--release-ready` |
+| `design-meta-synthetic` | Write a deterministic, container-pinned community simulation design without pretending it has generated reads. | `--members`, `--out-dir`, `--seed`, simulator/image/digest identity |
+| `validate-meta-intake` | Validate the governance record for an external tool, workflow, data source, or evidence provider. | `--intake` |
+| `normalize-meta-classifier` | Normalize PPR-Meta or PlasmidHunter contig probabilities without inventing bins. | `--tool`, `--input`, `--out`, `--threshold` |
+| `import-mobilome-evidence` | Import MAP-compatible GFF3 as non-scoring mobilome context. | `--gff`, `--community`, `--sample`, `--out` |
 | `report` | Re-render the leaderboard/HTML report from scores already on disk — no re-running any tool. | Same input/output flags as `run` (`--results-dir`, `--cohort`, ...) |
 | `demo` | Offline synthetic demo — no data, no tools, no network. Good for "is my install even working." | none |
 | `test` | The full offline regression suite (what CI runs). | none |
@@ -953,6 +1258,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `all`, ...). | *`profile`* (positional) |
 | `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
 | `validate-cohort` | Check a cohort sheet's schema, or verify it against NCBI online. | *`--samples`*, `--online`, `--write-lock`, `--verify-lock`, `--ledger` |
+| `validate-orthogonal-evidence` | Validate optional independent laboratory/technology evidence without changing computational scores. | *`--evidence`*, `--out` |
 | `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |

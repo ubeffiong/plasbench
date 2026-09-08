@@ -69,6 +69,18 @@ def test_unknown_profile_raises():
     print("an unrecognized profile name fails clearly rather than silently using a default -> PASS")
 
 
+def test_amr_context_uses_curated_gene_recovery():
+    # Both methods are otherwise equal; a profile explicitly selected for AMR
+    # context must prefer the method recovering more independently curated
+    # truth genes, not invent a preference from a generic database scan.
+    shared = dict(f1=.85, precision=.85, recall=.85, plasmid=.85, bin_score=.85,
+                  failure_rate=0., structural_penalty=.01, resource_penalty=.01, profile="amr_context")
+    low = decision_score(**shared, amr_gene_recall=.20)
+    high = decision_score(**shared, amr_gene_recall=.95)
+    assert high > low
+    print("amr_context gives co-primary weight to curated AMR-gene recovery -> PASS")
+
+
 def test_applicability_tiers():
     min_samples, min_coverage = 5, 0.80
     unsupported = {"n_scored": 3, "coverage": 0.90}
@@ -90,8 +102,9 @@ def main():
     test_amr_surveillance_weighs_plasmid_recall_more()
     test_rapid_screening_weighs_resource_penalty_more()
     test_unknown_profile_raises()
+    test_amr_context_uses_curated_gene_recovery()
     test_applicability_tiers()
-    assert set(DECISION_PROFILES) == {"accuracy_first", "amr_surveillance", "rapid_screening"}
+    assert set(DECISION_PROFILES) == {"accuracy_first", "amr_surveillance", "rapid_screening", "amr_context"}
     print("ALL DECISION PROFILE TESTS PASSED")
 
 

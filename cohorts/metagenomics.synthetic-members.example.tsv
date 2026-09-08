@@ -1,0 +1,3 @@
+community_id	sample_id	reference_fasta	abundance_percent	coverage_x	plasmid_copy_number	community_complexity	phage_burden	contamination_level
+synthetic_community_01	member_01	complete_reference_01.fasta	60	60	5	medium	low	low
+synthetic_community_01	member_02	complete_reference_02.fasta	40	40	1	medium	low	low

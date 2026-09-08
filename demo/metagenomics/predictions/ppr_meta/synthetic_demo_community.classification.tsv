@@ -1,0 +1,7 @@
+contig_id	predicted_class	plasmid_probability	chromosome_probability	phage_probability	uncertainty_status	source_tool	supported_classes
+plasmid_a_1	plasmid	0.97	0.02	0.01	resolved	ppr_meta	plasmid|chromosome|virus
+plasmid_a_2	plasmid	0.91	0.05	0.04	resolved	ppr_meta	plasmid|chromosome|virus
+plasmid_b_1	plasmid	0.72	0.18	0.10	resolved	ppr_meta	plasmid|chromosome|virus
+chromosome_1	chromosome	0.04	0.92	0.04	resolved	ppr_meta	plasmid|chromosome|virus
+chromosome_2	chromosome	0.12	0.78	0.10	resolved	ppr_meta	plasmid|chromosome|virus
+phage_1	uncertain	0.34	0.31	0.35	uncertain	ppr_meta	plasmid|chromosome|virus

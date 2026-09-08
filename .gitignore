@@ -1,6 +1,7 @@
 data/
 results/
 results_demo/
+results_demo_metagenomics/
 logs/
 tmp/
 # SRA Toolkit `fasterq-dump` working directories are transient local caches.

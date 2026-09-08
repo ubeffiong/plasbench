@@ -1,5 +1,9 @@
 # Concept Note: PlasBench
 
+## PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools
+
+**Tagline:** *Benchmarking plasmid reconstruction from sequence to biological function.*
+
 ## A reproducible benchmark for trustworthy plasmid research and antimicrobial-resistance surveillance
 
 **Project name:** PlasBench (Plasmid Benchmarking Platform)  
