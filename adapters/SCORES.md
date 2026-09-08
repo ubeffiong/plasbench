@@ -1,8 +1,8 @@
 # Scores Contract (optional PR-curve/PR-AUC support)
 
 Companion to `adapters/BINS.md`, for tools that expose a per-record confidence
-score (plASgraph2, geNomad, PLASMe) rather than only a hard plasmid/not-plasmid
-call. This is an entirely optional, additive axis: a tool with no `.scores.tsv`
+score (plASgraph2, geNomad, PLASMe, RFPlasmid, PlasmidHunter, Plasmer) rather
+than only a hard plasmid/not-plasmid call. This is an entirely optional, additive axis: a tool with no `.scores.tsv`
 is scored exactly as every existing tool always has been -- one hard-inclusion
 point (precision/recall/F1) from `pred_<tool>.plasmid.fasta` alone.
 
@@ -14,9 +14,11 @@ tool's actual hard call, still what the point-estimate F1 is computed from.
 
 - **`pred_<tool>.candidates.fasta`** -- every contig/node the tool actually
   scored, a superset of (or equal to) `.plasmid.fasta`'s record set. Not an
-  extra tool invocation: geNomad, PLASMe, and plASgraph2 all natively score
-  every input contig/node they receive, so this is just the adapter writing
-  out that wider set instead of discarding it.
+  extra tool invocation: every probability-scoring tool in the registry
+  (geNomad, PLASMe, plASgraph2, RFPlasmid, PlasmidHunter, Plasmer) natively
+  scores every input contig/node it receives (or, for Plasmer, every contig
+  that clears its own length-based pre-filter), so this is just the adapter
+  writing out that wider set instead of discarding it.
 - **`pred_<tool>.scores.tsv`** -- header `record_id\tprobability` (extra
   columns are tolerated). Rules:
   - `record_id` must be unique, and the record_id set must **exactly equal**
@@ -60,10 +62,11 @@ only defined for the subset of tools that expose probabilities.
 
 ## The imputation policy a future model must follow
 
-`mean_pr_auc` exists for only 3 of the tool registry's ~18 rows (geNomad,
-PLASMe, plASgraph2) -- every classical tool (`mob_recon`, Platon,
-plasmidSPAdes, the long-read/hybrid reconstructors, ...) has no probability
-output and so has no `mean_pr_auc` at all. Any future feature-based
+`mean_pr_auc` exists for only 6 of the tool registry's ~17 real (non-demo) rows
+(geNomad, PLASMe, plASgraph2, RFPlasmid, PlasmidHunter, Plasmer) -- every
+classical tool (`mob_recon`, Platon, plasmidSPAdes, the long-read/hybrid
+reconstructors, ...) and PlaScope (a hard classification only, no continuous
+score) has no probability output and so has no `mean_pr_auc` at all. Any future feature-based
 recommendation model that uses this column **must treat a missing value as
 "not applicable," never as 0** -- 0 would look like a uniformly bad
 classifier, which is not what "this tool doesn't expose a probability" means.

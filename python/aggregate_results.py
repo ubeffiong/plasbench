@@ -402,6 +402,15 @@ def format_rate(rate, assessed):
 
 
 def write_md(summary, path):
+    # Deliberately narrower than write_tsv()'s own `cols` list: the graded
+    # plasmid-recovery completeness tiers (mean_plasmid_recall_ge50/ge90,
+    # mean_complete_circular_plasmid_recall) and NMI/VI/PR-AUC are
+    # programmatic/supplementary columns already carried in full by the TSV
+    # and the HTML report's own dedicated sections -- this Markdown table is
+    # kept to the compact, at-a-glance ranking view it has always been,
+    # never meant to duplicate every column the TSV carries. Not an
+    # oversight; add a column here only if it belongs in the headline view,
+    # not just because write_tsv()/build_html_report.py gained one.
     with open(path, "w") as fh:
         fh.write("# Plasmid reconstruction leaderboard\n\n")
         fh.write("Ranked by mean base-level F1 across samples "

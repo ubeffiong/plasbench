@@ -119,6 +119,23 @@ bash "$ROOT/scripts/01_download.sh" > "$TMP/stage.log" 2>&1 || { echo "FAIL: re-
 [[ ! -s "$TMP/iss_calls.log" && ! -s "$TMP/badread_calls.log" ]] || { echo "FAIL: expected no re-simulation when reads already exist" >&2; exit 1; }
 echo "already-simulated reads are reused on a re-run, not regenerated -> PASS"
 
+# --- Partial state from a mid-simulation failure (short reads written, then
+# badread died before long_reads.fastq.gz existed) must NOT be treated as
+# "already simulated" -- the skip check requires ALL THREE outputs, so a
+# missing long_reads.fastq.gz alone must trigger a full re-simulation of all
+# three files, never a silent "close enough" reuse of the stale short reads. ---
+rm -f "$TMP/data/s1/long_reads.fastq.gz"
+: > "$TMP/iss_calls.log"; : > "$TMP/badread_calls.log"
+PATH="$TMP/bin:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+SAMPLE_SHEET="$TMP/sheet.tsv" REQUIRE_CURATED_METADATA=0 LOCAL_INPUTS_ONLY=0 DOWNLOAD_CONFIRM=0 \
+ISS_CALLS_LOG="$TMP/iss_calls.log" BADREAD_CALLS_LOG="$TMP/badread_calls.log" \
+ISS_COVERAGE_CAPTURE="$TMP/coverage_capture.tsv" \
+bash "$ROOT/scripts/01_download.sh" > "$TMP/stage.log" 2>&1 || { echo "FAIL: re-run after a partial (long-reads-missing) state should succeed" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+[[ "$(status_field s1 2)" == "ok" ]] || { echo "FAIL: expected ok after re-simulating from a partial state, got: $(status_field s1 2)" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+[[ -s "$TMP/iss_calls.log" && -s "$TMP/badread_calls.log" ]] || { echo "FAIL: a missing long_reads.fastq.gz alone must trigger full re-simulation (iss AND badread), not a skip" >&2; exit 1; }
+[[ -s "$TMP/data/s1/SIMULATED_1.fastq.gz" && -s "$TMP/data/s1/SIMULATED_2.fastq.gz" && -s "$TMP/data/s1/long_reads.fastq.gz" ]] || { echo "FAIL: expected all three simulated outputs present after recovering from the partial state" >&2; ls "$TMP/data/s1" >&2; exit 1; }
+echo "a partial state (short reads present, long reads missing after a mid-simulation failure) triggers a full re-simulation, not a silent skip -> PASS"
+
 # --- No reference downloaded at all -> a specific failure, never a silent
 # "nothing to simulate from" proceed. ---
 rm -rf "$TMP/data"; mkdir -p "$TMP/data/s1"

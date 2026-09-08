@@ -59,6 +59,24 @@ def main():
     original_which = audit.shutil.which
     original_run = audit.subprocess.run
     try:
+        # --- main(): a missing --reference/--truth path fails loudly (sys.exit(1)
+        # with a clear message), never an unhandled FileNotFoundError traceback. ---
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            old_argv = sys.argv
+            try:
+                sys.argv = ["audit_three_class_scoring.py", "--reference", str(tmp / "no_such_reference.fna"),
+                           "--truth", str(tmp / "no_such_truth.tsv"), "--sample", "s1",
+                           "--genomad-db", "db", "--out", str(tmp / "out.tsv")]
+                try:
+                    audit.main()
+                    raise AssertionError("expected SystemExit for a missing --reference path")
+                except SystemExit as exc:
+                    assert exc.code == 1
+            finally:
+                sys.argv = old_argv
+        print("main() with a missing --reference/--truth path fails loudly (sys.exit(1)), never a raw traceback -> PASS")
+
         # --- main(): genomad missing -> a clean header-only output, never a
         # fabricated 'no provirus found' claim. ---
         audit.shutil.which = lambda name: None
@@ -90,6 +108,14 @@ def main():
             idx = command.index("end-to-end")
             fasta = Path(command[idx + 3])
             out_dir = Path(command[idx + 4])
+            db = command[idx + 5]
+            # Regression pin: run_genomad() must append the fixed "genomad_db"
+            # leaf subdirectory to the caller's --genomad-db value itself,
+            # exactly like scripts/04_run_tools.sh's own run_genomad() does
+            # with "$GENOMAD_DB/genomad_db" -- a caller passing the SAME
+            # GENOMAD_DB config value must reach the real database, not its
+            # parent directory (a real bug this test specifically catches).
+            assert db == str(Path("configured_genomad_db_parent") / "genomad_db"), db
             prefix = fasta.stem
             summary_dir = out_dir / f"{prefix}_summary"
             summary_dir.mkdir(parents=True, exist_ok=True)
@@ -112,7 +138,8 @@ def main():
             old_argv = sys.argv
             try:
                 sys.argv = ["audit_three_class_scoring.py", "--reference", str(reference), "--truth", str(truth),
-                           "--sample", "s1", "--genomad-db", str(tmp / "db"), "--out", str(out), "--threads", "2"]
+                           "--sample", "s1", "--genomad-db", "configured_genomad_db_parent",
+                           "--out", str(out), "--threads", "2"]
                 audit.main()
             finally:
                 sys.argv = old_argv

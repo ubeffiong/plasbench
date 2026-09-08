@@ -67,7 +67,7 @@ def leader_row(**overrides):
     return "\t".join(values.get(column, "") for column in LEADER_COLUMNS) + "\n"
 
 
-def build(tmp, leader_rows, sample_truth_source=""):
+def build(tmp, leader_rows, sample_truth_source="", data_dir=None):
     results = Path(tmp) / "results"
     results.mkdir(parents=True, exist_ok=True)
     scores = SCORE_HEADER + score_row("s1", "tool_a", "0.900") + score_row("s1", "tool_b", "0.850")
@@ -88,12 +88,13 @@ def build(tmp, leader_rows, sample_truth_source=""):
         encoding="utf-8",
     )
     out = results / "benchmark.report.html"
-    result = subprocess.run(
-        [sys.executable, str(REPORT), "--project-root", str(ROOT), "--scores", str(results / "scores.tsv"),
-         "--tool-status", str(results / "tool_status.tsv"),
-         "--leaderboard", str(results / "benchmark.leaderboard.tsv"),
-         "--sample-sheet", str(sheet), "--out", str(out)],
-        capture_output=True, text=True)
+    args = [sys.executable, str(REPORT), "--project-root", str(ROOT), "--scores", str(results / "scores.tsv"),
+            "--tool-status", str(results / "tool_status.tsv"),
+            "--leaderboard", str(results / "benchmark.leaderboard.tsv"),
+            "--sample-sheet", str(sheet), "--out", str(out)]
+    if data_dir is not None:
+        args += ["--data-dir", str(data_dir)]
+    result = subprocess.run(args, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return out.read_text(encoding="utf-8")
 
@@ -215,5 +216,38 @@ with tempfile.TemporaryDirectory() as tmp:
           html.count("not annotated") >= 2)
     check("a tool with no circular-truth evidence shows 'not assessed' for the complete+circular band, never a fabricated 0",
           "not assessed" in html)
+
+# --- 7. Isolate difficulty section (python/compute_difficulty_features.py) ---
+with tempfile.TemporaryDirectory() as tmp:
+    html = build(tmp, [leader_row(rank="1", tool="tool_a")])  # no --data-dir given at all
+    check("the nav bar links the new Isolate difficulty section", "href='#isolate-difficulty'" in html)
+    check("with no --data-dir given, the section says so plainly rather than an empty table",
+          "id='isolate-difficulty'" in html and "RUN_DIFFICULTY_FEATURES" in html)
+
+with tempfile.TemporaryDirectory() as tmp:
+    data_dir = Path(tmp) / "data" / "s1"
+    data_dir.mkdir(parents=True)
+    (data_dir / "difficulty_features.tsv").write_text(
+        "sample_id\tgfa_dead_end_count\tplasmid_chromosome_depth_ratio\tplasmid_chromosome_mash_distance\n"
+        "s1\t7\t0.4231\t0.012345\n",
+        encoding="utf-8",
+    )
+    html = build(tmp, [leader_row(rank="1", tool="tool_a")], data_dir=Path(tmp) / "data")
+    check("a sample with real difficulty_features.tsv shows its dead-end count, depth ratio, and Mash distance",
+          "id='isolate-difficulty'" in html and ">7<" in html and "0.4231" in html and "0.012345" in html)
+
+with tempfile.TemporaryDirectory() as tmp:
+    data_dir = Path(tmp) / "data" / "s1"
+    data_dir.mkdir(parents=True)
+    # A row where every field is empty (RUN_DIFFICULTY_FEATURES=1 but every
+    # external tool unavailable) must not render as a fabricated data row.
+    (data_dir / "difficulty_features.tsv").write_text(
+        "sample_id\tgfa_dead_end_count\tplasmid_chromosome_depth_ratio\tplasmid_chromosome_mash_distance\n"
+        "s1\t\t\t\n",
+        encoding="utf-8",
+    )
+    html = build(tmp, [leader_row(rank="1", tool="tool_a")], data_dir=Path(tmp) / "data")
+    check("a sample whose difficulty_features.tsv has every field empty is not shown as a fabricated data row",
+          "No isolate difficulty features are available" in html)
 
 print("\nALL REPORT NEW CAPABILITIES TESTS PASSED")

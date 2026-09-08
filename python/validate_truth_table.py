@@ -99,6 +99,9 @@ def main() -> int:
         # behave differently during the run.
         if raw_id != raw_id.strip() or raw_molecule != raw_molecule.strip():
             whitespace.append(number)
+        if seq_id in seen:
+            problems.append(f"line {number}: '{seq_id}' is a duplicate sequence_id -- "
+                            "scoring silently uses only the last row for a repeated id.")
         seen.add(seq_id)
         if molecule == "REVIEW":
             review += 1

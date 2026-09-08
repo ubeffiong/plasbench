@@ -56,14 +56,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-
-def read_truth(path):
-    """sequence_id -> (molecule_type, length)."""
-    truth = {}
-    with open(path, newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            truth[row["sequence_id"]] = (row["molecule_type"].upper(), int(row["length"]))
-    return truth
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from audit_three_class_scoring import read_truth  # noqa: E402
 
 
 def read_minimap2_f1(scores_path, sample, tool):
@@ -131,6 +125,14 @@ def main():
     ap.add_argument("--scores", required=True, help="An existing scores.tsv from a real PlasBench run.")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
+
+    # Fail loudly on a typo'd/missing input path, rather than an unhandled
+    # FileNotFoundError -- this script's own docstring promises "never
+    # crashes", which a bare exception traceback would violate.
+    for label, path in (("--reference", args.reference), ("--truth", args.truth), ("--scores", args.scores)):
+        if not Path(path).is_file():
+            sys.stderr.write(f"[compare_scoring_methods] {label} does not exist: {path}\n")
+            sys.exit(1)
 
     header = ["sample", "tool", "minimap2_f1", "blastn_f1_proxy", "absolute_difference"]
     minimap2_f1 = read_minimap2_f1(args.scores, args.sample, args.tool)

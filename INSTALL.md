@@ -171,9 +171,103 @@ conda activate plasgraph2 && pip install -r requirements.txt
 # informational, recorded in run_manifest.json for readability
 ```
 
+RFPlasmid (random forest over marker genes, plasmid genes, and kmers) IS a
+real bioconda package, unlike the two above:
+
+```bash
+plasbench install-tools rfplasmid
+# RFPlasmid bundles CheckM as a transitive dependency, and CheckM always
+# needs its own ~1.4GB reference data directory set up once, regardless of
+# how it was installed:
+checkm data setRoot /path/to/checkm_data   # download/extract the data first
+                                            # if you have not already; see
+                                            # https://github.com/Ecogenomics/CheckM/wiki
+# then enable RUN_RFPLASMID=1 in config/config.sh, or --rfplasmid on
+```
+
+PlasmidHunter (a Diamond+Prodigal gene-content Naive Bayes classifier, one
+species-agnostic model) is a PyPI package, not a bioconda package -- only its
+`diamond`/`prodigal` dependencies are conda packages:
+
+```bash
+plasbench install-tools plasmidhunter   # installs diamond+prodigal via conda,
+                                         # then `pip install plasmidhunter`
+# then enable RUN_PLASMIDHUNTER=1 in config/config.sh, or --plasmidhunter on
+```
+
+Plasmer (a kmer-db/Prodigal/HMMER/BLAST/Infernal/Diamond/Kraken2 ensemble
+feeding an R random forest) is published under its own custom conda channel,
+and its README documents a real **32GB system RAM minimum** for its kmer-db
+step (not a PlasBench-imposed default -- see `PLASMER_MEMORY_GB` in
+`config/config.sh`):
+
+```bash
+plasbench install-tools plasmer   # conda, from Plasmer's own custom channel
+                                   # (-c iskoldt -c bioconda -c conda-forge)
+# download Plasmer's database separately (Zenodo/Google Drive -- Plasmer's
+# own package does not bundle it) and point PLASMER_DB at it
+# then enable RUN_PLASMER=1 in config/config.sh, or --plasmer on
+```
+
+PlaScope (Centrifuge-based hard classification, E. coli/Klebsiella only --
+no continuous score, so it is never PR-AUC scored like the tools above) is
+also a real bioconda package, but needs a species-specific database:
+
+```bash
+plasbench install-tools plascope
+bash env/download_plascope_db.sh   # E. coli and/or Klebsiella; only these two exist
+# then enable RUN_PLASCOPE=1 in config/config.sh, or --plascope on
+```
+
 ---
 
-## 7. Contributing a new isolate (optional)
+## 7. Simulated-cohort reads (optional)
+
+For `truth_source=simulated` cohort rows (see `docs/COHORTS.md`): reads are
+generated locally from a real reference assembly, using InSilicoSeq (short
+reads) and Badread (long reads), both real bioconda packages:
+
+```bash
+plasbench install-tools simulate   # insilicoseq + badread
+```
+
+No database or extra setup is needed -- `python/simulate_reads.py` reads its
+seed/depth/error-model parameters directly from the cohort sheet's own
+`simulation_seed`/`simulation_short_depth_x`/`simulation_long_depth_x`
+columns.
+
+---
+
+## 8. Supplementary diagnostics (optional)
+
+Two more optional, off-by-default features (see `docs/METHODS.md`):
+
+**`RUN_QUAST_DIAGNOSTICS`** (stage 5) needs QUAST, a real bioconda package:
+```bash
+plasbench install-tools quast
+# then enable RUN_QUAST_DIAGNOSTICS=1 in config/config.sh
+```
+
+**`RUN_DIFFICULTY_FEATURES`** (stage 3) needs three tools: `minimap2` and
+`samtools` are already installed as part of the core environment (step 2
+above); `mash` is a direct `env/environment.yml` dependency, also already
+installed. The third, `deadends`
+([rrwick/GFA-dead-end-counter](https://github.com/rrwick/GFA-dead-end-counter)),
+has **no bioconda package** -- build it from source per that repo's own
+instructions, or download a prebuilt binary from its GitHub releases page,
+and put `deadends` on PATH. Each of the three difficulty-feature fields is
+independently optional: a missing tool leaves that one field empty, never a
+guessed value, so `RUN_DIFFICULTY_FEATURES=1` without `deadends` installed
+still works, just without the dead-end-count field.
+```bash
+git clone https://github.com/rrwick/GFA-dead-end-counter.git && cd GFA-dead-end-counter && cargo build --release
+# put the resulting target/release/deadends on PATH, then enable
+# RUN_DIFFICULTY_FEATURES=1 in config/config.sh
+```
+
+---
+
+## 9. Contributing a new isolate (optional)
 
 `plasbench prepare-contribution` (see `CONTRIBUTING.md`) stages a contribution
 as a local git branch, so it needs `git` on PATH -- unlike every step above,
@@ -187,7 +281,7 @@ sudo apt-get install -y git
 
 ---
 
-## 8. Lock your versions (for reproducibility)
+## 10. Lock your versions (for reproducibility)
 
 After a successful install:
 ```bash

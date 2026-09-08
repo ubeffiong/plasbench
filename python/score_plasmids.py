@@ -76,6 +76,10 @@ def read_truth(path):
             length = int(f[i_len])
             if mol not in ("PLASMID", "CHROMOSOME"):
                 sys.exit(f"ERROR: molecule_type must be PLASMID/CHROMOSOME, got '{mol}'")
+            if length <= 0:
+                sys.exit(f"ERROR: truth sequence '{seq_id}' has non-positive length {length}.")
+            if seq_id in truth:
+                sys.exit(f"ERROR: duplicate sequence_id '{seq_id}' in truth file.")
             truth[seq_id] = (mol, length)
             if mol == "PLASMID":
                 total_plasmid += length
@@ -547,6 +551,8 @@ def main():
 
     if not 0 < args.plasmid_recovery_threshold <= 1:
         raise SystemExit("ERROR: --plasmid-recovery-threshold must be in (0, 1].")
+    if not 0 < args.amr_gene_recovery_threshold <= 1:
+        raise SystemExit("ERROR: --amr-gene-recovery-threshold must be in (0, 1].")
     true_plasmids = [seq_id for seq_id, (mol, _) in truth.items() if mol == "PLASMID"]
     # Per-plasmid completeness fraction, computed once and reused below for
     # every tier (the configurable --plasmid-recovery-threshold gate, plus

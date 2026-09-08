@@ -100,6 +100,14 @@ def split_reference_by_label(fasta_path, labels, out_dir):
 
 
 def dead_end_count(graph_path):
+    """rrwick/GFA-dead-end-counter's own `deadends <gfa>` invocation.
+    Verified directly from its source (src/main.rs): the ONLY success-path
+    output is `println!("{}", count_dead_ends(&gfa))` -- a bare integer plus
+    newline, nothing else (zero dead ends prints plain "0", not a different
+    message); every failure path (e.g. a missing file) writes to stderr via
+    `quit_with_error` and exits non-zero, leaving stdout empty. The
+    `.isdigit()` check below is therefore a verified success/failure
+    discriminator, not an unconfirmed assumption about the tool's format."""
     executable = shutil.which("deadends")
     if not executable or not graph_path or not Path(graph_path).is_file():
         return ""

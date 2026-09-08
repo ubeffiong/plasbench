@@ -86,6 +86,27 @@ def main():
     original_which = csm.shutil.which
     original_run = csm.subprocess.run
     try:
+        # --- main(): a missing --reference/--truth/--scores path fails
+        # loudly (sys.exit(1)), never an unhandled FileNotFoundError traceback. ---
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            pred = tmp / "pred.fasta"
+            pred.write_text(">q1\nAAAA\n")
+            old_argv = sys.argv
+            try:
+                sys.argv = ["compare_scoring_methods.py", "--sample", "s1", "--tool", "platon",
+                           "--reference", str(tmp / "no_such_reference.fna"), "--truth", str(tmp / "no_such_truth.tsv"),
+                           "--pred-fasta", str(pred), "--scores", str(tmp / "no_such_scores.tsv"),
+                           "--out", str(tmp / "out.tsv")]
+                try:
+                    csm.main()
+                    raise AssertionError("expected SystemExit for a missing --reference path")
+                except SystemExit as exc:
+                    assert exc.code == 1
+            finally:
+                sys.argv = old_argv
+        print("main() with a missing --reference/--truth/--scores path fails loudly (sys.exit(1)), never a raw traceback -> PASS")
+
         # --- main(): blastn missing -> minimap2_f1 still reported (read
         # from the real scores.tsv), blastn_f1_proxy left blank. ---
         csm.shutil.which = lambda name: None

@@ -67,4 +67,32 @@ bash "$ROOT/adapters/adapt_plasmer.sh" "$TMP/out2" "$base_asm" "$TMP/pred2.plasm
 [[ "$(tail -n +2 "$TMP/pred2.scores.tsv" | wc -l)" -eq 0 ]] || { echo "FAIL: expected no scores when no predProb.tsv exists" >&2; exit 1; }
 echo "no results/ output at all is scored as 'no plasmids', not a failure -> PASS"
 
+# Multiple matches of either glob is an unexpected shape (Plasmer normally
+# writes exactly one of each per sample) but must not silently misbehave:
+# predPlasmids.fa hits are concatenated (with a warning), predProb.tsv uses
+# only its first match (with a warning) -- both warnings must actually fire.
+rm -rf "$TMP/out3"; mkdir -p "$TMP/out3/results"
+printf '>c1\nACGTACGT\n' > "$TMP/out3/results/sampleA.plasmer.predPlasmids.fa"
+printf '>c2\nTTGGTTGG\n' > "$TMP/out3/results/sampleB.plasmer.predPlasmids.fa"
+{
+    printf 'Contig\tchromosome\tplasmid\n'
+    printf 'c1\t0.05\t0.95\n'
+} > "$TMP/out3/results/sampleA.plasmer.predProb.tsv"
+{
+    printf 'Contig\tchromosome\tplasmid\n'
+    printf 'c2\t0.10\t0.90\n'
+} > "$TMP/out3/results/sampleB.plasmer.predProb.tsv"
+stderr3="$TMP/adapt3.stderr"
+bash "$ROOT/adapters/adapt_plasmer.sh" "$TMP/out3" "$base_asm" "$TMP/pred3.plasmid.fasta" 2> "$stderr3"
+
+grep -q 'WARNING:.*predPlasmids.fa files found' "$stderr3" || { echo "FAIL: expected a multi-match warning for predPlasmids.fa" >&2; cat "$stderr3" >&2; exit 1; }
+[[ "$(grep -c '^>' "$TMP/pred3.plasmid.fasta")" -eq 2 ]] || { echo "FAIL: expected both predPlasmids.fa matches concatenated (c1, c2)" >&2; cat "$TMP/pred3.plasmid.fasta" >&2; exit 1; }
+for id in c1 c2; do grep -q "^>$id\$" "$TMP/pred3.plasmid.fasta" || { echo "FAIL: pred3.plasmid.fasta missing $id" >&2; exit 1; }; done
+echo "multiple predPlasmids.fa matches: warned and concatenated -> PASS"
+
+grep -q 'WARNING:.*predProb.tsv files found' "$stderr3" || { echo "FAIL: expected a multi-match warning for predProb.tsv" >&2; cat "$stderr3" >&2; exit 1; }
+[[ "$(tail -n +2 "$TMP/pred3.scores.tsv" | wc -l)" -eq 1 ]] || { echo "FAIL: expected only the first predProb.tsv match's row (1)" >&2; cat "$TMP/pred3.scores.tsv" >&2; exit 1; }
+grep -q '^c1' "$TMP/pred3.scores.tsv" || { echo "FAIL: expected sampleA's c1 (the first match, alphabetically) to be the one used" >&2; cat "$TMP/pred3.scores.tsv" >&2; exit 1; }
+echo "multiple predProb.tsv matches: warned and only the first used -> PASS"
+
 echo "ALL PLASMER ADAPTER TESTS PASSED"

@@ -323,7 +323,7 @@ def main(argv=None):
     conda_parser.add_argument("--yes", action="store_true", help="Install without an interactive confirmation prompt.")
     conda_parser.add_argument("--prefix", type=Path, help="Install location (default: $HOME/miniforge3).")
     install_parser = sub.add_parser("install-tools", help="Install an optional bioinformatics dependency profile.")
-    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, simulate, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
+    install_parser.add_argument("profile", nargs="?", default="core", help="locked, core, assembly, reconstruction, simulate, quast, long-read, annotation, annotation-prokka, gplas, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     docs_parser = sub.add_parser("docs", help="Print the comprehensive user guide or a topic.")
     docs_parser.add_argument("--topic", choices=("all", *DOC_TOPICS), default="all",
@@ -354,7 +354,9 @@ def main(argv=None):
     )
     reconstruct_parser.add_argument("--sample", required=True, help="New sample id (letters, digits, dot, dash, underscore only).")
     reconstruct_parser.add_argument("--sra", required=True, help="SRA run accession for this sample's Illumina reads.")
-    reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external", "genomad", "plasme", "plasgraph2"),
+    reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external",
+                                                       "genomad", "plasme", "plasgraph2", "rfplasmid", "plasmidhunter",
+                                                       "plasmer", "plascope"),
                                     help="Run exactly this tool, skipping the benchmark recommendation lookup.")
     reconstruct_parser.add_argument("--recommendation-model", type=Path,
                                     help="Optional fitted recommendation-model JSON (default: <results-dir>/benchmark.recommendation_model.json "

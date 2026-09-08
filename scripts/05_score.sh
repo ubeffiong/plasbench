@@ -20,7 +20,16 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need minimap2
 need python3
-warn_resource_oversubscription "stage 5 (scoring)" "$MAX_PARALLEL_SAMPLES" "$THREADS"
+# Per sample*tool job, minimap2 (at $THREADS) and, when enabled, the QUAST
+# diagnostics step (at QUAST_DIAGNOSTICS_THREADS) run sequentially -- so the
+# job's PEAK thread demand is the max of the two, not their sum. Defaults to
+# $THREADS (a no-op here) unless a user overrides QUAST_DIAGNOSTICS_THREADS
+# independently higher.
+SCORE_STAGE_THREADS="$THREADS"
+if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" == "1" && "$QUAST_DIAGNOSTICS_THREADS" -gt "$SCORE_STAGE_THREADS" ]]; then
+    SCORE_STAGE_THREADS="$QUAST_DIAGNOSTICS_THREADS"
+fi
+warn_resource_oversubscription "stage 5 (scoring)" "$MAX_PARALLEL_SAMPLES" "$SCORE_STAGE_THREADS"
 
 SCORES="$RESULTS_DIR/scores.tsv"
 SCORE_FAILURES="$RESULTS_DIR/score_failures.tsv"

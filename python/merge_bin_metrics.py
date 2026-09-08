@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Join per-sample bin summaries into the canonical PlasBench score table."""
+"""Join per-sample bin summaries into the canonical PlasBench score table.
+
+Note on the graded plasmid-recovery completeness tiers
+(recovered_plasmid_count_ge50/ge90, complete_circular_plasmid_recall, ...):
+those fields are computed and written directly by score_plasmids.py, not
+here. This file deliberately needed NO changes for them: `main()` below
+reads scores.tsv with `fieldnames = list(rows[0])` (whatever columns are
+already present) and only APPENDS the FIELDS this file itself owns (the
+bin-matching fields below), so score_plasmids.py's own columns -- old or
+new -- pass through this join completely unchanged.
+"""
 
 import argparse
 import csv

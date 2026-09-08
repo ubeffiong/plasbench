@@ -80,6 +80,7 @@ python3 "$HERE/../python/write_manifest.py" \
 
 python3 "$HERE/../python/build_html_report.py" \
     --project-root "$PROJECT_ROOT" \
+    --data-dir "$DATA_DIR" \
     --scores "$SCORES" \
     --tool-status "$RESULTS_DIR/tool_status.tsv" \
     --leaderboard "$RESULTS_DIR/benchmark.leaderboard.tsv" \

@@ -75,6 +75,12 @@ SWEEP_SHEET="$TMP_DIR/thread_scaling_sweep.sheet.tsv"
     done
 } > "$SWEEP_SHEET"
 
+# Sweep tmp dirs/sheet are scratch, re-created fresh each run -- clean them
+# up when the sweep finishes OR dies partway through, not just defensively
+# at the start of the next iteration.
+cleanup_sweep_tmp() { rm -rf "$TMP_DIR/thread_scaling_sweep.${TOOL}."*threads "$SWEEP_SHEET" 2>/dev/null || true; }
+trap cleanup_sweep_tmp EXIT
+
 IFS=',' read -ra THREAD_POINTS <<< "$THREAD_LIST"
 for threads in "${THREAD_POINTS[@]}"; do
     log "=== thread-scaling sweep: $TOOL at $threads thread(s) (samples: $SAMPLES) ==="

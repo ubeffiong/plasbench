@@ -213,6 +213,20 @@ if [[ "${RUN_PLASGRAPH2:-0}" -eq 1 ]]; then
         log "  [ok]   plASgraph2 model dir at $PLASGRAPH2_MODEL_DIR"
     fi
 fi
+if [[ "${RUN_DIFFICULTY_FEATURES:-0}" -eq 1 ]]; then
+    # Each of the three difficulty fields is independently optional by
+    # design (a missing tool leaves that one field empty, never a guessed
+    # value, per python/compute_difficulty_features.py) -- these checks are
+    # therefore advisory only (required=0: warn, never CORE_OK=0), so
+    # enabling this never blocks a run over a supplementary diagnostic.
+    # minimap2/samtools are unconditionally required elsewhere already, so
+    # not re-checked here.
+    check_tool mash "" 0
+    check_tool deadends "" 0
+fi
+if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
+    check_tool quast.py quast 0
+fi
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 ]]; then
     if [[ "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
         check_tool bakta annotation

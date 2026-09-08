@@ -59,12 +59,18 @@ shopt -u nullglob
 if [[ "${#plasmid_fasta[@]}" -eq 0 ]]; then
     echo "[adapt_plasmer] no *.plasmer.predPlasmids.fa found under $OUT_DIR/results (predicted none)" >&2
 else
+    if [[ "${#plasmid_fasta[@]}" -gt 1 ]]; then
+        echo "[adapt_plasmer] WARNING: ${#plasmid_fasta[@]} *.plasmer.predPlasmids.fa files found under $OUT_DIR/results (expected 1 per sample); concatenating all of them into $OUT_FASTA" >&2
+    fi
     cat "${plasmid_fasta[@]}" >> "$OUT_FASTA"
 fi
 
 if [[ "${#prob_tsv[@]}" -eq 0 ]]; then
     echo "[adapt_plasmer] no *.plasmer.predProb.tsv found under $OUT_DIR/results (no scores/candidates)" >&2
 else
+    if [[ "${#prob_tsv[@]}" -gt 1 ]]; then
+        echo "[adapt_plasmer] WARNING: ${#prob_tsv[@]} *.plasmer.predProb.tsv files found under $OUT_DIR/results (expected 1 per sample); using only the first (${prob_tsv[0]}) -- the rest are ignored" >&2
+    fi
     # The header names the plasmid-probability column, never assumed a fixed
     # position, in case a future Plasmer version reorders it.
     awk -F'\t' -v scores_out="$SCORES" -v candidates_out="$CANDIDATES" '

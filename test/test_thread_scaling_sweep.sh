@@ -61,6 +61,10 @@ for t in 1 4 8; do
 done
 echo "sweep produces exactly one row per thread count, each with a real runtime -> PASS"
 
+[[ -z "$(find "$TMP/tmp" -maxdepth 1 -name 'thread_scaling_sweep.*' 2>/dev/null)" ]] \
+    || { echo "FAIL: expected no leftover thread_scaling_sweep.* scratch dirs/files in TMP_DIR after a successful run" >&2; find "$TMP/tmp" -maxdepth 1 -name 'thread_scaling_sweep.*' >&2; exit 1; }
+echo "no leftover thread_scaling_sweep.* scratch dirs/files remain in TMP_DIR after the sweep finishes -> PASS"
+
 grep -q -- "--threads 1$" "$TMP/platon_calls.log" || { echo "FAIL: expected platon to actually be invoked with --threads 1" >&2; cat "$TMP/platon_calls.log" >&2; exit 1; }
 grep -q -- "--threads 4$" "$TMP/platon_calls.log" || { echo "FAIL: expected platon to actually be invoked with --threads 4" >&2; cat "$TMP/platon_calls.log" >&2; exit 1; }
 grep -q -- "--threads 8$" "$TMP/platon_calls.log" || { echo "FAIL: expected platon to actually be invoked with --threads 8" >&2; cat "$TMP/platon_calls.log" >&2; exit 1; }

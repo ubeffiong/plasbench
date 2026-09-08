@@ -63,6 +63,29 @@ def read_sample_metadata(path):
     return {row["sample_id"]: row for row in read_tsv(path) if row.get("sample_id")}
 
 
+def read_difficulty_features(data_dir, samples):
+    """sample -> difficulty_features.tsv row, for every sample that has one.
+
+    difficulty_features.tsv (python/compute_difficulty_features.py) lives
+    under DATA_DIR/<sample>/, not RESULTS_DIR -- the only per-sample file
+    this report reads from there, since every other input lives under
+    RESULTS_DIR or is the sample sheet itself. Off by default
+    (RUN_DIFFICULTY_FEATURES=0), so an absent --data-dir, or a sample with
+    no difficulty_features.tsv at all, is the normal case, not an error.
+    """
+    if not data_dir:
+        return {}
+    features = {}
+    for sample in samples:
+        path = Path(data_dir) / sample / "difficulty_features.tsv"
+        if not path.is_file():
+            continue
+        rows = read_tsv(path)
+        if rows:
+            features[sample] = rows[0]
+    return features
+
+
 # One definition per term, used in three places: the keys section renders from
 # it, every occurrence of the term in the report is annotated from it, and the
 # guided findings quote it. Adding a term here makes it explained everywhere.
@@ -242,6 +265,33 @@ GLOSSARY = {
                "Perfect reference recovery in the main ranking table -- shows how "
                "many plasmids a tool nearly finished, not just started. "
                "Supplementary only -- never a replacement for Mean F1.",
+    },
+    "GFA dead-end count": {
+        "what": "The isolate's own assembly graph dead-end count "
+                "(rrwick/GFA-dead-end-counter), a direct fragmentation signal.",
+        "why": "A more fragmented graph is intrinsically harder for every tool to "
+               "correctly resolve into complete plasmid/chromosome sequences, not "
+               "just a weak one -- this describes the ISOLATE, never a tool's own "
+               "performance on it. Only available with RUN_DIFFICULTY_FEATURES=1 "
+               "and an assembly graph.",
+    },
+    "Plasmid/chromosome depth ratio": {
+        "what": "Median plasmid-contig read depth divided by median "
+                "chromosome-contig read depth, from this isolate's own truth "
+                "reference and short reads.",
+        "why": "A very low or very high depth ratio can make plasmid-vs-chromosome "
+               "separation intrinsically harder (e.g. a low-copy plasmid barely "
+               "distinguishable from chromosomal depth) -- a difficulty signal "
+               "about the isolate, never a tool-performance measure.",
+    },
+    "Plasmid/chromosome Mash distance": {
+        "what": "The MINIMUM Mash (k-mer) distance between this isolate's own "
+                "truth plasmid sequence(s) and its own truth chromosome.",
+        "why": "A plasmid sharing many k-mers with its own chromosome (shared IS "
+               "elements, integrated regions) is intrinsically harder to "
+               "correctly separate for every tool -- the minimum across a "
+               "multi-plasmid isolate is reported, since the most "
+               "chromosome-similar plasmid is the harder case to flag.",
     },
     "Complete + circular recall": {
         "what": "Fraction of a tool's CIRCULAR true plasmids that are essentially "
@@ -2408,6 +2458,8 @@ function overlay(){const x=state(),svg=$('vq-tracks').querySelector('svg');if(!x
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--project-root", required=True)
+    ap.add_argument("--data-dir", help="Optional DATA_DIR, to surface per-sample difficulty_features.tsv "
+                                       "(python/compute_difficulty_features.py) when RUN_DIFFICULTY_FEATURES=1.")
     ap.add_argument("--scores", required=True)
     ap.add_argument("--tool-status", required=True)
     ap.add_argument("--leaderboard", required=True)
@@ -2441,6 +2493,7 @@ def main():
 
     tools = sorted({row["tool"] for row in scores} | {row["tool"] for row in status})
     samples = sorted({row["sample"] for row in scores} | {row["sample"] for row in status})
+    difficulty_features = read_difficulty_features(args.data_dir, samples)
     organisms = sorted({row.get("organism") or "" for row in metadata.values()} - {""})
     technologies = sorted({row.get("truth_technology") or "" for row in metadata.values()} - {""})
     tiers = sorted({row.get("truth_quality_tier") or "" for row in metadata.values()} - {""})
@@ -2621,6 +2674,36 @@ def main():
             )
         )
     graded_tiers_html = "".join(graded_tier_rows) or "<tr><td colspan='4'>No tool was scored in this run.</td></tr>"
+
+    # Isolate difficulty (python/compute_difficulty_features.py, gated by
+    # RUN_DIFFICULTY_FEATURES, off by default): truth-derived, per-ISOLATE
+    # (not per-tool) signals for how intrinsically hard this isolate is to
+    # separate into plasmid vs. chromosome -- never a tool-performance
+    # measure, and never wired into recommendation_model.py (see
+    # docs/METHODS.md). Each of the three fields is independently optional;
+    # a row is shown only for a sample with at least one real value.
+    difficulty_rows = []
+    for sample in samples:
+        row = difficulty_features.get(sample)
+        if not row:
+            continue
+        dead_ends = (row.get("gfa_dead_end_count") or "").strip()
+        depth_ratio = optional_number(row.get("plasmid_chromosome_depth_ratio"))
+        mash_distance = optional_number(row.get("plasmid_chromosome_mash_distance"))
+        if not dead_ends and depth_ratio is None and mash_distance is None:
+            continue
+        difficulty_rows.append(
+            "<tr><td>{sample}</td><td>{dead_ends}</td><td>{depth_ratio}</td><td>{mash_distance}</td></tr>".format(
+                sample=esc(sample),
+                dead_ends=esc(dead_ends) if dead_ends else "not available",
+                depth_ratio=f"{depth_ratio:.4f}" if depth_ratio is not None else "not available",
+                mash_distance=f"{mash_distance:.6f}" if mash_distance is not None else "not available",
+            )
+        )
+    difficulty_html = "".join(difficulty_rows) or (
+        "<tr><td colspan='4'>No isolate difficulty features are available for this run "
+        "(RUN_DIFFICULTY_FEATURES=0 by default, or --data-dir was not supplied to the report).</td></tr>"
+    )
 
     # Cohort QC flags (advisory only): only flagged rows shown by default,
     # the full advisory table (including every non-flagged value and any
@@ -2814,7 +2897,7 @@ def main():
 </style></head><body>
 <script>window.pbEsc=s=>String(s==null?'':s).replace(/[&<>\\u0022\\u0027]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','\\u0022':'&quot;','\\u0027':'&#39;'}}[c]));</script>
 <header><h1>PlasBench: Plasmid reconstruction benchmark</h1><p><strong>Run:</strong> {esc(run_label)} · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
-<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
+<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#isolate-difficulty'>Isolate difficulty</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
 <div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: mean F1</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 {summary_html}
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
@@ -2830,6 +2913,7 @@ def main():
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
 <section id='zero-plasmid'><h2>Zero-plasmid isolates (negative control)</h2><p class='lead'>Precision, recall, and F1 are correctly undefined on an isolate with no true plasmid at all -- there is nothing to recover, and a tool predicting nothing has made a correct abstention, not scored a zero. These isolates are still valuable: they are the only ones that directly measure false-positive behavior. Isolate specificity is 1 minus the fraction of that isolate's chromosome a tool wrongly called plasmid; chromosome FP bp is the same false call in raw bases, summed across every plasmid-free isolate a tool was scored on. A specificity below 1.0 means real chromosomal sequence was misclassified as plasmid on a sample where NO plasmid exists to justify it.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Plasmid-free isolates scored</th><th>Mean isolate specificity</th><th>Total chromosome FP bp</th></tr></thead><tbody>{zero_plasmid_html}</tbody></table></div></section>
 <section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered AND circular, the strictest per-plasmid claim this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>
+<section id='isolate-difficulty'><h2>Isolate difficulty</h2><p class='lead'>Truth-derived signals for how intrinsically hard THIS isolate is to correctly separate into plasmid vs. chromosome, independent of any tool's own performance on it -- never a tool-performance measure, and never wired into the recommendation model (see docs/METHODS.md). Off by default (RUN_DIFFICULTY_FEATURES); each field is independently optional and shown as "not available" rather than a guessed value when its own prerequisite (an assembly graph, short reads, or the external tool) was missing.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>GFA dead-end count</th><th>Plasmid/chromosome depth ratio</th><th>Plasmid/chromosome Mash distance</th></tr></thead><tbody>{difficulty_html}</tbody></table></div></section>
 <section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed or unavailable tool is excluded from F1 aggregation. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>

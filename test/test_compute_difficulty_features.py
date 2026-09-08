@@ -9,6 +9,7 @@ matching this session's own established convention for testing code that
 shells out to bioinformatics tools.
 """
 import csv
+import io
 import os
 import subprocess
 import sys
@@ -118,6 +119,56 @@ def main():
     # --- depth_ratio: reads given but the files don't actually exist -> empty. ---
     assert cdf.depth_ratio("ref.fasta", "truth.tsv", "no_such_r1.fq.gz", "no_such_r2.fq.gz", 4) == ""
     print("depth_ratio with non-existent read files is empty, not passed to minimap2 blindly -> PASS")
+
+    # --- depth_ratio: real success path, both tools installed -- the
+    # median-depth-ratio computation itself, not just the missing-
+    # prerequisite short-circuits above. ---
+    original_popen = cdf.subprocess.Popen
+    with tempfile.TemporaryDirectory() as rtmp:
+        r1, r2 = Path(rtmp) / "r1.fq.gz", Path(rtmp) / "r2.fq.gz"
+        r1.write_bytes(b"fake"); r2.write_bytes(b"fake")
+        truth = Path(rtmp) / "truth.tsv"
+        write_truth(truth, [("chr1", "CHROMOSOME", "5000000"), ("plas1", "PLASMID", "50000")])
+
+        cdf.shutil.which = lambda name: f"/usr/bin/{name}" if name in ("minimap2", "samtools") else None
+
+        class FakeAlign:
+            def __init__(self):
+                self.stdout = io.BytesIO()
+                self.returncode = 0
+            def wait(self, timeout=None):
+                return 0
+
+        def fake_popen(command, **kwargs):
+            assert command[0] == "/usr/bin/minimap2"
+            return FakeAlign()
+
+        def fake_run(command, **kwargs):
+            if command[1] == "sort":
+                bam = Path(command[command.index("-o") + 1])
+                bam.write_bytes(b"fake-bam")
+                return subprocess.CompletedProcess(command, 0)
+            if command[1] == "index":
+                return subprocess.CompletedProcess(command, 0)
+            if command[1] == "coverage":
+                # #rname/meandepth columns, looked up by header name -- chr1
+                # at 40x, plas1 at 10x -> ratio 10/40 = 0.25.
+                stdout = "#rname\tstartpos\tendpos\tnumreads\tcovbases\tcoverage\tmeandepth\tmeanbaseq\tmeanmapq\n" \
+                         "chr1\t1\t5000000\t100\t5000000\t100.0\t40.0000\t35.0\t60.0\n" \
+                         "plas1\t1\t50000\t10\t50000\t100.0\t10.0000\t35.0\t60.0\n"
+                return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+            raise AssertionError(f"unexpected samtools subcommand: {command}")
+
+        cdf.subprocess.Popen = fake_popen
+        cdf.subprocess.run = fake_run
+        try:
+            ratio = cdf.depth_ratio("ref.fasta", str(truth), str(r1), str(r2), 4)
+            assert ratio == "0.2500", ratio
+            print("depth_ratio computes the real median plasmid/chromosome depth ratio from samtools coverage -> PASS")
+        finally:
+            cdf.shutil.which = original_which
+            cdf.subprocess.run = original_run
+            cdf.subprocess.Popen = original_popen
 
     # --- mash_distance: tool missing -> empty. ---
     cdf.shutil.which = lambda name: None

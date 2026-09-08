@@ -149,6 +149,12 @@ NOTE: Plasmer's own README states "A minimum of 32GB system memory is
       INSTALL.md for the full walkthrough.
 EOF
     ;;
+ # QUAST is a real bioconda package, for the optional RUN_QUAST_DIAGNOSTICS
+ # supplementary diagnostics stage (see docs/METHODS.md). `deadends`
+ # (rrwick/GFA-dead-end-counter, for the separate optional
+ # RUN_DIFFICULTY_FEATURES) has no bioconda package at all -- there is no
+ # profile for it here; see INSTALL.md for its manual-binary install steps.
+ quast) PKGS=(quast);;
  plasme)
     # PLASMe is distributed as a git checkout with its own conda env file,
     # not a bioconda package -- there is no package for this profile to

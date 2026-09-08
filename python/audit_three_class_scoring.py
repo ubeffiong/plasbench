@@ -21,6 +21,11 @@ scripts/04_run_tools.sh's own run_genomad() uses, `genomad end-to-end
 --threads N <fasta> <outdir> <genomad_db>`) against the TRUTH REFERENCE
 itself (not a tool's prediction -- this audits the ground truth, not any
 tool's output), then parses geNomad's own provirus-detection output.
+--genomad-db takes the SAME value as GENOMAD_DB in config/config.sh (the
+PARENT directory) -- this script appends the fixed "genomad_db" leaf
+subdirectory itself, exactly like run_genomad() does with
+"$GENOMAD_DB/genomad_db", so a user does not need to separately know or
+reconstruct that internal path convention.
 
 geNomad's provirus finding runs by default inside `end-to-end` (confirmed
 directly from its own source, genomad/cli.py: gated by
@@ -51,7 +56,7 @@ evidence.
 Usage:
   audit_three_class_scoring.py --reference data/s1/reference.fna \\
       --truth data/s1/truth.tsv --sample s1 \\
-      --genomad-db /path/to/genomad_db --out s1.provirus_audit.tsv \\
+      --genomad-db /path/to/data/db/genomad --out s1.provirus_audit.tsv \\
       --threads 4
 """
 
@@ -95,7 +100,16 @@ def parse_provirus_calls(virus_summary_path):
     return calls
 
 
-def run_genomad(genomad_path, fasta, out_dir, genomad_db, threads):
+def run_genomad(genomad_path, fasta, out_dir, genomad_db_parent, threads):
+    """genomad_db_parent is GENOMAD_DB's own config/config.sh value (the
+    PARENT directory) -- the actual database genomad itself reads lives one
+    level down, at "<genomad_db_parent>/genomad_db", exactly the same
+    convention scripts/04_run_tools.sh's own run_genomad() uses
+    ("$GENOMAD_DB/genomad_db"). Appending it here, rather than requiring the
+    caller to already know and append this subdirectory themselves, is what
+    makes this genuinely the SAME real invocation, not just a similar one a
+    caller could get subtly wrong."""
+    genomad_db = Path(genomad_db_parent) / "genomad_db"
     command = [genomad_path, "end-to-end", "--threads", str(threads), str(fasta), str(out_dir), str(genomad_db)]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
@@ -114,7 +128,11 @@ def main():
     ap.add_argument("--reference", required=True)
     ap.add_argument("--truth", required=True)
     ap.add_argument("--sample", required=True)
-    ap.add_argument("--genomad-db", required=True)
+    ap.add_argument("--genomad-db", required=True,
+                    help="GENOMAD_DB's own value from config/config.sh (the PARENT directory) -- "
+                         "this script appends '/genomad_db' itself, the same convention "
+                         "scripts/04_run_tools.sh's own run_genomad() uses, so pass the SAME "
+                         "value here, not the genomad_db leaf directory itself.")
     ap.add_argument("--out", required=True)
     ap.add_argument("--threads", type=int, default=4)
     args = ap.parse_args()
@@ -122,6 +140,15 @@ def main():
     header = ["sample", "host_sequence_id", "molecule_type", "host_length_bp",
               "provirus_start", "provirus_end", "provirus_length_bp", "fraction_of_host_sequence"]
     rows = []
+
+    # Fail loudly on a typo'd/missing input path, rather than an unhandled
+    # FileNotFoundError -- this script's own docstring promises "never
+    # crashes, never fabricates a finding", which a bare exception traceback
+    # would violate just as much as a fabricated result would.
+    for label, path in (("--reference", args.reference), ("--truth", args.truth)):
+        if not Path(path).is_file():
+            sys.stderr.write(f"[audit_three_class_scoring] {label} does not exist: {path}\n")
+            sys.exit(1)
 
     genomad_path = shutil.which("genomad")
     if not genomad_path:

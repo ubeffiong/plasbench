@@ -58,7 +58,7 @@ MODEL_ARGS=(); [[ -n "$RECOMMENDATION_MODEL" ]] && MODEL_ARGS=(--recommendation-
 # instead of assuming stage 0 already has.
 mkdir -p "$DATA_DIR" "$RESULTS_DIR" "$LOG_DIR" "${TMP_DIR:-/tmp}"
 
-KNOWN_TOOLS=(mob_recon platon plasmidspades gplas2_mob gplas2_external genomad plasme plasgraph2)
+KNOWN_TOOLS=(mob_recon platon plasmidspades gplas2_mob gplas2_external genomad plasme plasgraph2 rfplasmid plasmidhunter plasmer plascope)
 TOOL_SOURCE="explicit"
 if [[ -n "$TOOL" ]]; then
     match=0
