@@ -191,8 +191,10 @@ plasbench test && plasbench demo
 
 ## Ownership, Citation, And Branding
 
-PlasBench is open-source software under the [MIT License](LICENSE), copyright
-2026 Ubokobong Effiong. Please cite the version and benchmark cohort used in
+PlasBench is open-source software under the [GNU General Public License,
+version 3](LICENSE), copyright 2026 Ubokobong Effiong. Releases v0.1.0 through
+v0.1.4 were published under the MIT License; this applies from this point
+forward. Please cite the version and benchmark cohort used in
 research outputs; citation metadata is in [`CITATION.cff`](CITATION.cff).
 The PlasBench name and branding may not be used to imply endorsement or an
 official release of a modified version. See [`NOTICE`](NOTICE) and
@@ -2788,7 +2790,7 @@ that stops being about the work.
 
 ### 6.7 Licence and attribution
 
-PlasBench is MIT licensed. By contributing you agree your contribution is
+PlasBench is GPL-3.0 licensed. By contributing you agree your contribution is
 released under the same licence.
 
 Contributors are credited in the commit history. If your contribution is
@@ -2851,4 +2853,5 @@ swept across every threshold. It never replaces F1 and never changes it — see
   this is the actual publishable artifact PlasBench asks for.
 
 ## 10. License
-MIT — see `LICENSE`.
+GPL-3.0-only — see `LICENSE`. (Releases v0.1.0 through v0.1.4 were published
+under the MIT License.)

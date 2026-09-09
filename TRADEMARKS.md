@@ -1,8 +1,9 @@
 # PlasBench Name And Branding Policy
 
-The PlasBench source code is available under the MIT License. That license
-does not grant permission to represent a modified, redistributed, hosted, or
-commercial offering as an official PlasBench release.
+The PlasBench source code is available under the GNU General Public License,
+version 3 (GPL-3.0-only). That license does not grant permission to represent
+a modified, redistributed, hosted, or commercial offering as an official
+PlasBench release.
 
 "PlasBench", the PlasBench logo, and associated visual identity are project
 identifiers of Ubokobong Effiong. This policy does not assert a registered

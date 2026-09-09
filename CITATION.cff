@@ -4,7 +4,7 @@ title: "PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework fo
 authors:
   - family-names: "Effiong"
     given-names: "Ubokobong"
-license: "MIT"
+license: "GPL-3.0-only"
 repository-code: "https://github.com/ubeffiong/plasbench"
 version: "0.1.4"
 date-released: "2026-09-09"

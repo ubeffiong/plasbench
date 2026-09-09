@@ -45,7 +45,7 @@ test:
 
 about:
   home: https://github.com/ubeffiong/plasbench
-  license: MIT
+  license: GPL-3.0-only
   license_file: LICENSE
   summary: Benchmark plasmid-reconstruction tools against complete-reference truth.
   description: |

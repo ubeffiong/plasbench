@@ -11,6 +11,16 @@ below folds in every change from the tags it supersedes -- nothing from that
 history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
+## Unreleased
+
+### Changed
+
+- **Relicensed from MIT to the GNU General Public License, version 3
+  (GPL-3.0-only)**, effective from this point forward. Releases v0.1.0
+  through v0.1.4 remain published under the MIT License as distributed;
+  this change is not retroactive. See `LICENSE`, `NOTICE`, and
+  `CITATION.cff`.
+
 ## [0.1.4] - 2026-09-08
 
 Supersedes the removed v0.2.5-v0.2.8 tags.
