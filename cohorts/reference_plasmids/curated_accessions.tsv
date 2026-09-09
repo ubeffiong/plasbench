@@ -1,0 +1,17 @@
+accession	organism	plasmid_name	description
+AP001918.1	Escherichia coli	F	Prototype IncFI conjugative fertility (F) plasmid from E. coli K-12; canonical model for F-type tra/conjugation systems
+FN868832.1	Escherichia coli	pCT	IncK plasmid carrying blaCTX-M-14 ESBL; widely used model for global CTX-M-14 dissemination studies
+EU935739.1	Escherichia coli	pEK499	Multireplicon (FII/FIA/FIB) plasmid carrying blaCTX-M-15 from UK epidemic ST131 lineage strain
+AP012208.1	Escherichia coli	pNDM-1_Dok01	IncFII plasmid carrying blaNDM-1 carbapenemase; one of the first fully characterized NDM-1 plasmids (Japan)
+AE006471.2	Salmonella enterica	pSLT	Virulence plasmid (spv operon) of serovar Typhimurium reference strain LT2
+CP000604.1	Salmonella enterica	pSN254	IncA/C multidrug-resistance plasmid from serovar Newport strain SL254; MDR-AmpC reference
+AP005147.1	Salmonella enterica	R64	Classic IncI1 conjugative plasmid; reference model for thin (type IV) pilus biogenesis
+GU595196.1	Klebsiella pneumoniae	pKpQIL	IncFIIK plasmid carrying blaKPC-3; principal driver of the ST258 KPC pandemic clone
+JN626286.1	Klebsiella pneumoniae	pOXA-48	IncL plasmid carrying blaOXA-48 carbapenemase; globally disseminated conjugative reference plasmid
+FJ628167.2	Klebsiella pneumoniae	pKP048	IncFII plasmid carrying blaKPC-2; one of the earliest characterized KPC-2 plasmids (China)
+CP000522.1	Acinetobacter baumannii	pAB1	Small resident plasmid of reference strain ATCC 17978; widely used intrinsic-plasmid model
+JQ904627.1	Acinetobacter baumannii	pRAY*	Small mobilizable plasmid carrying aphA1b (gentamicin resistance); globally disseminated across GC lineages
+CP012005.1	Acinetobacter baumannii	pAB3	Large plasmid from ATCC 17978-mff derivative; reference for larger A. baumannii plasmid biology
+AF051917.1	Staphylococcus aureus	pSK41	Prototype multiresistance conjugative staphylococcal plasmid (aminoglycoside/antiseptic resistance); conjugation model
+J01764.1	Staphylococcus aureus	pT181	Classic rolling-circle-replicating tetracycline-resistance plasmid; foundational RC-plasmid replication/copy-number model
+GU565967.1	Staphylococcus aureus	pSK1	Beta-lactamase/aminoglycoside-resistance plasmid; reference member of the staphylococcal penicillinase-plasmid family

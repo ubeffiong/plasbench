@@ -13,6 +13,18 @@ history is lost, only the numbering is cleaner. See
 
 ## Unreleased
 
+### Added
+
+- Optional operational-mode novel-vs-known plasmid classification
+  (`RUN_PLASMID_NOVELTY_CLASSIFICATION`, `python/classify_operational_plasmid.py`,
+  `python/build_plasmid_reference_set.py`): Mash distance from a truth-unknown
+  isolate's own reconstructed candidate to a small, curated reference plasmid
+  set, independently reimplementing santirdnd/COPLA's own known-cluster-or-
+  novel pattern with PlasBench's existing Mash dependency rather than COPLA's
+  code or its `graph-tool`/nested-SBM machinery. Off by default; a purely
+  supplementary, operational-only signal never wired into
+  `recommendation_model.py`. See `docs/OPERATIONAL_SELECTION.md`.
+
 ### Changed
 
 - **Relicensed from MIT to the GNU General Public License, version 3

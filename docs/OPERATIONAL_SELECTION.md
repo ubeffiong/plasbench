@@ -141,3 +141,52 @@ plasbench select-unknown --recommendations results/benchmark.recommendations.tsv
 Open `results/benchmark.report.html` and use **Operational method
 recommendations**, **Sample drill-down**, and the artifact explorer to inspect
 or download each retained candidate.
+
+## Novel-vs-known plasmid classification (optional)
+
+For a truth-unknown sample, `plasbench reconstruct` can also answer a
+different question than tool selection: is this isolate's own reconstructed
+plasmid similar to anything PlasBench has a reference for, or does it look
+genuinely novel? This independently reimplements santirdnd/COPLA's own
+known-cluster-or-novel pattern (Mash distance to a reference network, then a
+membership call with a confidence score) using Mash -- already a direct
+PlasBench dependency -- against a small, PlasBench-curated reference set,
+rather than COPLA's own code or its `graph-tool`/nested-SBM machinery; see
+`python/classify_operational_plasmid.py`'s own module docstring for exactly
+what differs and why.
+
+This is an **operational-only** signal. It is never computed for a benchmark
+isolate that has truth, and its output must never be wired into
+`recommendation_model.py`'s training features -- a genuinely unknown isolate
+has no truth reference, which is the entire reason this signal exists in the
+first place; feeding it back into the model would be leakage, not a real
+feature, exactly like `compute_difficulty_features.py`'s own fields.
+
+Off by default (`RUN_PLASMID_NOVELTY_CLASSIFICATION=0`). To use it:
+
+```bash
+# One-time setup: build the reference set from the committed, curated
+# accession list (needs mash and network access; not part of any stage):
+python3 python/build_plasmid_reference_set.py \
+    --accessions cohorts/reference_plasmids/curated_accessions.tsv \
+    --out-dir data/db/plasmid_reference
+
+# Then enable it for reconstruction:
+RUN_PLASMID_NOVELTY_CLASSIFICATION=1 plasbench reconstruct --sample new_isolate_01 \
+  --sra SRR12345678 --organism "Klebsiella pneumoniae" --gram-group Gram_negative
+```
+
+The curated set currently starts small and deliberately (16 real, verified
+NCBI plasmids spanning *E. coli*, *Salmonella enterica*, *Klebsiella
+pneumoniae*, *Acinetobacter baumannii*, and *Staphylococcus aureus* --
+`cohorts/reference_plasmids/curated_accessions.tsv` records exactly which,
+with a one-line justification for each). A `known_cluster` call means the
+nearest reference is within `PLASMID_NOVELTY_SIMILARITY_THRESHOLD` (default
+Mash distance 0.05, roughly ANI >= 95%) AND that reference's own cluster has
+at least `PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS` members (default 2); anything
+else is `novel`, and a missing `mash` or reference set gives
+`insufficient_reference` rather than guessing either way. The result appears
+in `results/<sample>/plasmid_similarity.tsv` and under `plasmid_novelty` in
+`selection_report.json` -- a supplementary signal alongside tool selection,
+not a gate on it: a failed or skipped classification never blocks
+reconstruction or the rest of the report.

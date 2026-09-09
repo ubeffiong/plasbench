@@ -456,6 +456,31 @@ export RUN_QUAST_DIAGNOSTICS="${RUN_QUAST_DIAGNOSTICS:-0}"
 export QUAST_DIAGNOSTICS_THREADS="${QUAST_DIAGNOSTICS_THREADS:-$THREADS}"
 export QUAST_DIAGNOSTICS_MIN_CONTIG="${QUAST_DIAGNOSTICS_MIN_CONTIG:-0}"
 
+# Optional operational-mode (no-truth) novel-vs-known plasmid classification
+# (python/classify_operational_plasmid.py, scripts/08_operational_reconstruct.sh):
+# Mash distance from this isolate's own reconstructed candidate plasmid to a
+# small, PlasBench-curated reference set, built once by
+# python/build_plasmid_reference_set.py, reimplementing
+# santirdnd/COPLA's own known-cluster-vs-novel pattern independently -- see
+# that script's own docstring for exactly how and why it differs from
+# COPLA's live graph-tool/SBM machinery. This is an OPERATIONAL-only signal:
+# it is never computed for a benchmark isolate that has truth, and its
+# output must never be wired into recommendation_model.py's training
+# features. Off by default (a new, unvalidated signal with only a 16-plasmid
+# starting reference set). PLASMID_REFERENCE_SKETCH/_METADATA point at the
+# build script's own output; absent files or a missing `mash` leave the
+# classification empty ("insufficient_reference"), never guessed. The
+# curated INPUT accession list is committed (cohorts/reference_plasmids/
+# curated_accessions.tsv, small, real provenance); the actual downloaded
+# sequences/sketch built FROM it are real data, not metadata, so -- same
+# convention as PLATON_DB/GENOMAD_DB/PLASME_DB above -- they live under
+# DATA_DIR/db, gitignored, built once by build_plasmid_reference_set.py.
+export RUN_PLASMID_NOVELTY_CLASSIFICATION="${RUN_PLASMID_NOVELTY_CLASSIFICATION:-0}"
+export PLASMID_REFERENCE_SKETCH="${PLASMID_REFERENCE_SKETCH:-$DATA_DIR/db/plasmid_reference/reference.msh}"
+export PLASMID_REFERENCE_METADATA="${PLASMID_REFERENCE_METADATA:-$DATA_DIR/db/plasmid_reference/reference_metadata.tsv}"
+export PLASMID_NOVELTY_SIMILARITY_THRESHOLD="${PLASMID_NOVELTY_SIMILARITY_THRESHOLD:-0.05}"
+export PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS="${PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS:-2}"
+
 # Optional standardized CDS/product annotation for truth and every predicted
 # plasmid FASTA. FASTA alone has no protein names. Bakta is preferred; Prokka
 # is a compatible fallback. Annotation failure never changes DNA-level scores.

@@ -90,13 +90,31 @@ SAMPLE_SHEET="$TMP_SHEET" ONLY_TOOL="$TOOL" ANALYSIS_TRACK="$TRACK" bash "$HERE/
 PRED="$RESULTS_DIR/$SAMPLE/pred_${TOOL}.plasmid.fasta"
 [[ -s "$PRED" ]] || die "$TOOL did not produce a prediction for $SAMPLE; see $LOG_DIR/${SAMPLE}.${TOOL}.log"
 
+# Optional operational-mode novel-vs-known plasmid classification (see
+# config/config.sh's own comment): runs against $PRED directly (identical
+# content to whatever selected_candidate/candidate.plasmid.fasta becomes
+# below), so it is available to BOTH branches uniformly. A failure here
+# never aborts the stage or blocks a selection report -- it is a
+# supplementary signal, not a gate.
+NOVELTY_ARGS=()
+if [[ "${RUN_PLASMID_NOVELTY_CLASSIFICATION:-0}" -eq 1 ]]; then
+    SIMILARITY_OUT="$RESULTS_DIR/$SAMPLE/plasmid_similarity.tsv"
+    python3 "$HERE/../python/classify_operational_plasmid.py" --query "$PRED" \
+        --reference-sketch "$PLASMID_REFERENCE_SKETCH" --reference-metadata "$PLASMID_REFERENCE_METADATA" \
+        --similarity-threshold "$PLASMID_NOVELTY_SIMILARITY_THRESHOLD" \
+        --min-cluster-members "$PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS" \
+        --sample-id "$SAMPLE" --out "$SIMILARITY_OUT" \
+        || warn "plasmid novelty classification failed for $SAMPLE; selection_report.json will omit it"
+    [[ -s "$SIMILARITY_OUT" ]] && NOVELTY_ARGS=(--plasmid-similarity "$SIMILARITY_OUT")
+fi
+
 if [[ "$TOOL_SOURCE" == "recommended" ]]; then
     # The tool that just ran IS the benchmark recommendation for this
     # metadata, so the normal selection path can re-derive it, find the
     # prediction it just produced, and write the standard report.
     python3 "$HERE/../python/select_unknown_sample.py" --recommendations "$RECOMMENDATIONS" \
         --sample-id "$SAMPLE" --results-dir "$RESULTS_DIR" --organism "$ORGANISM" \
-        --gram-group "$GRAM_GROUP" --analysis-track "$TRACK" "${MODEL_ARGS[@]}"
+        --gram-group "$GRAM_GROUP" --analysis-track "$TRACK" "${MODEL_ARGS[@]}" "${NOVELTY_ARGS[@]}"
 else
     # An explicit --tool override may not match whatever the benchmark would
     # have recommended (or no recommendations file may exist at all yet), so
@@ -108,6 +126,7 @@ else
     python3 "$HERE/../python/write_operational_override_report.py" \
         --sample-id "$SAMPLE" --tool "$TOOL" --analysis-track "$TRACK" \
         --organism "$ORGANISM" --gram-group "$GRAM_GROUP" \
+        --candidate-fasta "$OUT_DIR/candidate.plasmid.fasta" "${NOVELTY_ARGS[@]}" \
         --out "$RESULTS_DIR/$SAMPLE/selection_report.json"
 fi
 

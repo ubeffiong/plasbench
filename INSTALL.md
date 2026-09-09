@@ -286,7 +286,23 @@ git clone https://github.com/rrwick/GFA-dead-end-counter.git && cd GFA-dead-end-
 
 ---
 
-## 9. Contributing a new isolate (optional)
+## 9. Operational-mode plasmid novelty classification (optional)
+
+`RUN_PLASMID_NOVELTY_CLASSIFICATION` (`plasbench reconstruct`, see
+`docs/OPERATIONAL_SELECTION.md`) needs no new tool -- it reuses `mash`,
+already installed in step 2. It does need a one-time reference-set build
+(needs network access to NCBI; not part of any pipeline stage):
+
+```bash
+python3 python/build_plasmid_reference_set.py \
+    --accessions cohorts/reference_plasmids/curated_accessions.tsv \
+    --out-dir data/db/plasmid_reference
+# then enable RUN_PLASMID_NOVELTY_CLASSIFICATION=1 in config/config.sh
+```
+
+---
+
+## 10. Contributing a new isolate (optional)
 
 `plasbench prepare-contribution` (see `CONTRIBUTING.md`) stages a contribution
 as a local git branch, so it needs `git` on PATH -- unlike every step above,
@@ -300,7 +316,7 @@ sudo apt-get install -y git
 
 ---
 
-## 10. Lock your versions (for reproducibility)
+## 11. Lock your versions (for reproducibility)
 
 After a successful install:
 ```bash

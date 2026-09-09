@@ -7,8 +7,11 @@ report cannot claim this was an evidence-gated choice.
 """
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from select_unknown_sample import read_plasmid_similarity  # noqa: E402
 
 
 def main():
@@ -18,6 +21,11 @@ def main():
     parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
     parser.add_argument("--organism", default="")
     parser.add_argument("--gram-group", default="")
+    parser.add_argument("--candidate-fasta", help="This isolate's copied candidate.plasmid.fasta, used only to "
+                                                   "match --plasmid-similarity rows to this isolate's own records.")
+    parser.add_argument("--plasmid-similarity", help="Optional plasmid_similarity.tsv (classify_operational_plasmid.py); "
+                                                     "merged into the report under 'plasmid_novelty' when both this "
+                                                     "and --candidate-fasta are given.")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -32,6 +40,10 @@ def main():
                         "This tool was explicitly requested, not chosen from benchmark evidence.",
                         "Confirm structural or high-consequence AMR findings with long-read or hybrid evidence."],
     }
+    if args.candidate_fasta:
+        novelty = read_plasmid_similarity(args.plasmid_similarity, args.candidate_fasta)
+        if novelty:
+            report["plasmid_novelty"] = novelty
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {args.out}")

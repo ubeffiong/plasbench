@@ -59,7 +59,25 @@ outdir="" prefix=""
 while [[ \$# -gt 0 ]]; do case "\$1" in --output) outdir="\$2"; shift 2;; --prefix) prefix="\$2"; shift 2;; *) shift;; esac; done
 mkdir -p "\$outdir"; printf '>c1\nACGT\n' > "\$outdir/\$prefix.plasmid.fasta"
 EOF
-chmod +x "$TMP/bin/prefetch" "$TMP/bin/fasterq-dump" "$TMP/bin/fastp" "$TMP/bin/spades.py" "$TMP/bin/mob_recon" "$TMP/bin/platon"
+cat > "$TMP/bin/mash_fake.py" <<'EOF'
+import os, sys
+with open(os.environ["MASH_CALLS_LOG"], "a") as f:
+    f.write("mash " + sys.argv[1] + "\n")
+if sys.argv[1] == "sketch":
+    out = sys.argv[sys.argv.index("-o") + 1]
+    open(out + ".msh", "w").close()
+elif sys.argv[1] == "dist":
+    sys.stdout.write("CP001.1\tc1\t0.0100\t0.0\t100/100\n")
+EOF
+cat > "$TMP/bin/mash" <<EOF
+#!/usr/bin/env bash
+exec python3 "\$(dirname "\${BASH_SOURCE[0]}")/mash_fake.py" "\$@"
+EOF
+cat > "$TMP/bin/mash.bat" <<'EOF'
+@echo off
+python3 "%~dp0mash_fake.py" %*
+EOF
+chmod +x "$TMP/bin/prefetch" "$TMP/bin/fasterq-dump" "$TMP/bin/fastp" "$TMP/bin/spades.py" "$TMP/bin/mob_recon" "$TMP/bin/platon" "$TMP/bin/mash" "$TMP/bin/mash_fake.py"
 
 reconstruct() {
     PATH="$TMP/bin:$PATH" \
@@ -113,5 +131,25 @@ reconstruct --sample opC --sra SRR3 --tool platon > "$TMP/stage.log" 2>&1
 after="$(md5sum "$TMP/results/benched_sample/pred_mob_recon.plasmid.fasta")"
 [[ "$before" == "$after" ]] || { echo "FAIL: an unrelated benchmark sample's output was modified" >&2; exit 1; }
 echo "an existing benchmark sample's output is left untouched -> PASS"
+
+# --- RUN_PLASMID_NOVELTY_CLASSIFICATION=1: classify_operational_plasmid.py
+# runs against the fresh prediction and its call is merged into
+# selection_report.json under plasmid_novelty. Off by default already
+# covered above (opA/opB/opC never invoked mash at all). ---
+mkdir -p "$TMP/refset"
+printf 'accession\torganism\tplasmid_name\tlength_bp\tcluster_id\tcluster_member_count\nCP001.1\tKlebsiella pneumoniae\tpKPC-a\t100000\tCP001.1\t2\n' > "$TMP/refset/reference_metadata.tsv"
+printf 'fake-sketch' > "$TMP/refset/reference.msh"
+: > "$TMP/calls.log"
+PATH="$TMP/bin:$PATH" \
+    DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+    RUN_PLASMID_NOVELTY_CLASSIFICATION=1 MASH_CALLS_LOG="$TMP/calls.log" \
+    PLASMID_REFERENCE_SKETCH="$TMP/refset/reference.msh" PLASMID_REFERENCE_METADATA="$TMP/refset/reference_metadata.tsv" \
+    bash "$ROOT/scripts/08_operational_reconstruct.sh" --sample opD --sra SRR4 --tool platon > "$TMP/stage.log" 2>&1
+grep -q "mash sketch" "$TMP/calls.log" || { echo "FAIL: expected mash sketch to be invoked when RUN_PLASMID_NOVELTY_CLASSIFICATION=1" >&2; cat "$TMP/stage.log" >&2; exit 1; }
+[[ -s "$TMP/results/opD/plasmid_similarity.tsv" ]] || { echo "FAIL: expected plasmid_similarity.tsv to be written" >&2; exit 1; }
+report="$TMP/results/opD/selection_report.json"
+grep -q '"plasmid_novelty"' "$report" || { echo "FAIL: expected plasmid_novelty merged into selection_report.json" >&2; cat "$report" >&2; exit 1; }
+grep -q '"cluster_membership_status": "known_cluster"' "$report" || { echo "FAIL: expected a known_cluster call from the faked mash distance" >&2; cat "$report" >&2; exit 1; }
+echo "RUN_PLASMID_NOVELTY_CLASSIFICATION=1 classifies the fresh prediction and merges it into the report -> PASS"
 
 echo "ALL OPERATIONAL RECONSTRUCT TESTS PASSED"

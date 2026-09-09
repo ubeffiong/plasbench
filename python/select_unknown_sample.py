@@ -14,6 +14,30 @@ def rows(path):
         return list(csv.DictReader(handle, delimiter="\t"))
 
 
+def read_plasmid_similarity(path, query_fasta):
+    """query_record_id -> row dict, from classify_operational_plasmid.py's
+    own output TSV, for the records that actually belong to THIS isolate's
+    selected candidate FASTA -- filtering by id (not just "every row in the
+    file") in case the file is ever reused/appended across samples.
+
+    Absent path, missing file, or a candidate FASTA with no matching rows is
+    simply "no novelty signal", the normal case (RUN_PLASMID_NOVELTY_
+    CLASSIFICATION is off by default) -- never an error."""
+    if not path:
+        return {}
+    try:
+        record_ids = set()
+        with open(query_fasta) as handle:
+            for line in handle:
+                if line.startswith(">"):
+                    record_ids.add(line[1:].strip().split()[0])
+        with open(path, newline="", encoding="utf-8") as handle:
+            return {row["query_record_id"]: row for row in csv.DictReader(handle, delimiter="\t")
+                    if row.get("query_record_id") in record_ids}
+    except (OSError, csv.Error, KeyError):
+        return {}
+
+
 def read_assembly_stats(path):
     """Read a one-row assembly_stats.tsv for THIS isolate, if the caller has one.
 
@@ -126,6 +150,10 @@ def main():
     parser.add_argument("--assembly-stats", help="Optional one-row assembly_stats.tsv for THIS isolate "
                                                  "(compute_assembly_stats.py). Supplies GC content and assembly "
                                                  "fragmentation to the model; absent, those features are imputed.")
+    parser.add_argument("--plasmid-similarity", help="Optional plasmid_similarity.tsv for THIS isolate's selected "
+                                                     "candidate (classify_operational_plasmid.py). When given, its "
+                                                     "per-record novel-vs-known calls are merged into the report "
+                                                     "under 'plasmid_novelty'. Never affects tool selection itself.")
     parser.add_argument("--tool-only", action="store_true",
                         help="Print just the recommended tool name and exit 0, or exit 1 with no "
                              "output if none is eligible. Writes no report; does not need "
@@ -168,6 +196,9 @@ def main():
             selected.mkdir(parents=True, exist_ok=True)
             shutil.copy2(pred, selected / "candidate.plasmid.fasta")
             report["selected_candidate_fasta"] = "selected_candidate/candidate.plasmid.fasta"
+            novelty = read_plasmid_similarity(args.plasmid_similarity, pred)
+            if novelty:
+                report["plasmid_novelty"] = novelty
         else:
             report["selection_reason"] += " Prediction FASTA was not found; run the nominated tool first."
     else:
