@@ -128,6 +128,20 @@ Want to add an isolate of your own to one of these panels? See
 wraps this ledger check (plus schema, NCBI evidence, a privacy screen, and
 metric bounds) and ends in a local git branch ready for a pull request.
 
+## Data archival (Zenodo)
+
+This cohort metadata (`cohorts/*.tsv`, `cohorts/*.lock.json`, this README) is
+archived to Zenodo as its own dataset DOI whenever a GitHub release publishes
+with `ZENODO_TOKEN` configured (`.github/workflows/zenodo-upload.yml`) --
+separate from any software-archive DOI a release may also carry. Recorded
+here per `docs/RELEASING.md`'s own instruction, not as a claim that every
+release triggers one:
+
+| Release | Zenodo DOI |
+|---|---|
+| [v0.1.3](https://github.com/ubeffiong/plasbench/releases/tag/v0.1.3) | [10.5281/zenodo.22671309](https://doi.org/10.5281/zenodo.22671309) |
+| [v0.1.4](https://github.com/ubeffiong/plasbench/releases/tag/v0.1.4) | [10.5281/zenodo.22671314](https://doi.org/10.5281/zenodo.22671314) |
+
 ## Sources
 
 **public-v1**
