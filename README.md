@@ -807,8 +807,8 @@ None of these actions are required for a successful ordinary benchmark run.
 | `conda: command not found` | Step 2 not done, or shell not restarted | Run step 2, then `exec bash` |
 | `sha256sum: no properly formatted checksum lines found` | Download returned an error page | `rm` both files, redo step 3 |
 | `curl: (22) ... 404` | Wrong version in the URL | Check the Releases page for the current version |
-| `set: pipefail: invalid option name` | Archive from before v0.1.3 | Reinstall using the latest-release command in step 3 |
-| `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.3 | Reinstall the latest release, then revalidate the cohort lock |
+| `set: pipefail: invalid option name` | Archive from before v0.1.1 | Reinstall using the latest-release command in step 3 |
+| `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.1 | Reinstall the latest release, then revalidate the cohort lock |
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
 | `[MISS] Platon DB not found` | Step 7a incomplete | Redo step 7a; the `curl` resumes |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
@@ -910,7 +910,7 @@ plasbench upgrade
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, unpacks it into a new sibling
-directory (for example `~/plasbench-0.1.9` → `~/plasbench-<new-version>`, your current one is never touched
+directory (for example `~/plasbench-0.1.3` → `~/plasbench-<new-version>`, your current one is never touched
 or deleted), then reuses one physical data directory for reads and databases. On the
 first upgrade from an older release, it **moves** the old `data/` directory once to
 `~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
