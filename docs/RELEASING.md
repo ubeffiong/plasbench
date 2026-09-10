@@ -9,13 +9,16 @@ base image; update it only through `env/lock_environment.sh`.
 ## One-time setup
 
 1. The canonical source repository is `ubeffiong/plasbench`.
-2. Register the `plasbench` project on PyPI and configure GitHub OIDC trusted publishing.
-3. Create a Quay repository or use the GitHub Container Registry image published by the
+2. Create a Quay repository or use the GitHub Container Registry image published by the
    release workflow; replace `YOUR_QUAY_NAMESPACE` in `galaxy/plasbench_score.xml`.
-4. Fork `bioconda-recipes`, fill the source URL and SHA256 in
+3. Fork `bioconda-recipes`, fill the source URL and SHA256 in
    `recipes/bioconda/meta.yaml.template`, then open the Bioconda pull request.
-5. Create a Galaxy Tool Shed account, copy `galaxy/.shed.yml.example` to `.shed.yml`,
+4. Create a Galaxy Tool Shed account, copy `galaxy/.shed.yml.example` to `.shed.yml`,
    replace all placeholders, and publish after Planemo tests pass.
+
+PlasBench does not publish to PyPI (removed after PyPI Trusted Publishing
+never actually succeeded -- see `RELEASING.md` at the repo root for why).
+The GitHub Release archive is the Python-package distribution.
 
 ## Release sequence
 
@@ -25,8 +28,8 @@ base image; update it only through `env/lock_environment.sh`.
    solve `environment.yml` at build time.
 3. Run `python -m pip install --no-deps .`, `plasbench test`, and `plasbench demo`.
 4. Build locally with `docker build -t plasbench:<version> .`.
-5. Commit, tag `v<version>`, and push the tag. The GitHub release workflow builds the
-   PyPI distribution and pushes the GHCR image after trusted publishing is configured.
+5. Commit, tag `v<version>`, and push the tag. The GitHub release workflow builds and
+   pushes the GHCR image, then publishes the GitHub Release.
 6. Create or update the Bioconda and Galaxy Tool Shed submissions from that immutable tag.
 7. Connect this GitHub repository to Zenodo, create a GitHub release from the
    verified cohort tag, and archive it. Zenodo reads `.zenodo.json` and mints

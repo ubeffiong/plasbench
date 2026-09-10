@@ -11,6 +11,21 @@ below folds in every change from the tags it supersedes -- nothing from that
 history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
+## Unreleased
+
+### Removed
+
+- **PyPI publishing.** `.github/workflows/release.yml`'s `pypa/gh-action-pypi-publish`
+  step (and the now-unused `python -m build` step that only fed it) failed on
+  every real attempt with `invalid-publisher` -- the trusted-publisher
+  registration on PyPI's side never actually matched this workflow, and
+  `plasbench` was never reachable at pypi.org/project/plasbench despite
+  `continue-on-error` making every release job show green. A step that
+  always fails silently is worse than no step: it lets a broken channel look
+  configured. The GitHub Release archive remains the Python-package
+  distribution; see `RELEASING.md` for how to re-add PyPI later with a
+  verified trusted publisher.
+
 ## [0.1.5] - 2026-09-10
 
 ### Added
@@ -265,11 +280,10 @@ workflow.
 ## Release Reading Guide
 
 - **GitHub Release assets** are the checksum-verified source distribution for
-  terminal installations.
-- **PyPI** supplies the lightweight Python/CLI package; external
-  bioinformatics tools and databases are installed separately through the
-  documented installer routes.
+  terminal installations. There is no PyPI package (removed; see "Unreleased"
+  above) -- external bioinformatics tools and databases are installed
+  separately through the documented installer routes regardless.
 - **GHCR** supplies the container image. Use an immutable version tag such as
-  `ghcr.io/ubeffiong/plasbench:v0.1.4` for reproducible work, not `latest`.
+  `ghcr.io/ubeffiong/plasbench:v0.1.5` for reproducible work, not `latest`.
 - **Run manifests and cohort locks** are required companions when reporting or
   comparing scientific results; a software version alone is insufficient.

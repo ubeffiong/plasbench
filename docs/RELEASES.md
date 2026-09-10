@@ -10,9 +10,14 @@ and what maintainers must verify before publishing one.
 | Need | Recommended distribution | What it includes |
 | --- | --- | --- |
 | A normal Linux/WSL installation | The checksum-verified GitHub release archive | Source, scripts, documentation, tests, and the CLI installer |
-| A Python-only integration | PyPI `plasbench` package | CLI and Python entry points; it does not include the third-party tool stack |
 | A reproducible/container run | A versioned GHCR image | The packaged runtime environment; mount data and results from the host |
 | A development or audit checkout | A signed/tagged Git commit | Source history and full project context |
+
+PlasBench does not publish to PyPI. An earlier PyPI Trusted Publishing step
+was removed after it never actually succeeded (`invalid-publisher`
+on every attempt; the project was never reachable at
+pypi.org/project/plasbench) -- see `RELEASING.md` for the history and how to
+re-add it if a maintainer sets up a working trusted publisher.
 
 Start with the latest verified release installer in [README.md](../README.md).
 To reproduce a past analysis, replace `latest` with the exact release version
@@ -67,10 +72,9 @@ Each release is expected to publish:
    limitations, and links to installation, documentation, and the issue
    tracker.
 2. A source archive and SHA-256 checksum.
-3. A PyPI package, if Trusted Publishing succeeds.
-4. A versioned GHCR container image and `latest` tag.
-5. A source tag whose version matches `pyproject.toml`.
-6. When configured, a Zenodo software archive and separately versioned cohort
+3. A versioned GHCR container image and `latest` tag.
+4. A source tag whose version matches `pyproject.toml`.
+5. When configured, a Zenodo software archive and separately versioned cohort
    deposition.
 
 The GitHub release page is the source of distribution assets. The changelog is
@@ -94,7 +98,7 @@ procedure.
 
 1. Check that the GitHub Release contains both archive assets and that the
    checksum validates.
-2. Check the PyPI project version and the versioned GHCR image separately.
+2. Check the versioned GHCR image is pullable.
 3. Replace generic auto-generated release notes with a concise release summary
    when needed; include changes, upgrade guidance, known limitations, and
    links to `CHANGELOG.md` and `RELEASES.md`.
