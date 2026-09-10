@@ -11,21 +11,6 @@ below folds in every change from the tags it supersedes -- nothing from that
 history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
-## Unreleased
-
-### Removed
-
-- **PyPI publishing.** `.github/workflows/release.yml`'s `pypa/gh-action-pypi-publish`
-  step (and the now-unused `python -m build` step that only fed it) failed on
-  every real attempt with `invalid-publisher` -- the trusted-publisher
-  registration on PyPI's side never actually matched this workflow, and
-  `plasbench` was never reachable at pypi.org/project/plasbench despite
-  `continue-on-error` making every release job show green. A step that
-  always fails silently is worse than no step: it lets a broken channel look
-  configured. The GitHub Release archive remains the Python-package
-  distribution; see `RELEASING.md` for how to re-add PyPI later with a
-  verified trusted publisher.
-
 ## [0.1.5] - 2026-09-10
 
 ### Added
@@ -82,6 +67,19 @@ history is lost, only the numbering is cleaner. See
   both release notes and `cohorts/README.md`, per `docs/RELEASING.md`'s own
   instruction. These are dataset-only DOIs (the archived `cohorts/*.tsv`),
   not a software citation.
+
+### Removed
+
+- **PyPI publishing.** `.github/workflows/release.yml`'s `pypa/gh-action-pypi-publish`
+  step (and the now-unused `python -m build` step that only fed it) failed on
+  every real attempt with `invalid-publisher` -- the trusted-publisher
+  registration on PyPI's side never actually matched this workflow, and
+  `plasbench` was never reachable at pypi.org/project/plasbench despite
+  `continue-on-error` making every release job show green. A step that
+  always fails silently is worse than no step: it lets a broken channel look
+  configured. The GitHub Release archive remains the Python-package
+  distribution; see `RELEASING.md` for how to re-add PyPI later with a
+  verified trusted publisher.
 
 ## [0.1.4] - 2026-09-08
 
