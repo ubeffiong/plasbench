@@ -2,7 +2,7 @@
   "title": "PlasBench",
   "description": "Benchmark plasmid-reconstruction tools against complete-reference truth.",
   "upload_type": "software",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "creators": [
     {"name": "Effiong, Ubokobong"}
   ],

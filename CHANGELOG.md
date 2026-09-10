@@ -11,7 +11,7 @@ below folds in every change from the tags it supersedes -- nothing from that
 history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
-## Unreleased
+## [0.1.5] - 2026-09-10
 
 ### Added
 
@@ -21,9 +21,33 @@ history is lost, only the numbering is cleaner. See
   isolate's own reconstructed candidate to a small, curated reference plasmid
   set, independently reimplementing santirdnd/COPLA's own known-cluster-or-
   novel pattern with PlasBench's existing Mash dependency rather than COPLA's
-  code or its `graph-tool`/nested-SBM machinery. Off by default; a purely
+  code or its `graph-tool`/nested-SBM machinery. Off by default -- a purely
   supplementary, operational-only signal never wired into
-  `recommendation_model.py`. See `docs/OPERATIONAL_SELECTION.md`.
+  `recommendation_model.py`'s training features, since a genuinely unknown
+  isolate has no truth reference, the entire reason this signal exists.
+  - `python/build_plasmid_reference_set.py` builds the reference Mash sketch
+    and metadata once from a committed, curated accession list
+    (`cohorts/reference_plasmids/curated_accessions.tsv`, 16 real NCBI
+    plasmids spanning *E. coli*, *Salmonella enterica*, *Klebsiella
+    pneumoniae*, *Acinetobacter baumannii*, and *Staphylococcus aureus*, each
+    with a one-line provenance justification). The built sketch/metadata are
+    real downloaded data, not tracked metadata, so -- the same convention as
+    `PLATON_DB`/`GENOMAD_DB`/`PLASME_DB` -- they live under `DATA_DIR/db`,
+    gitignored.
+  - `python/classify_operational_plasmid.py` calls the built-in `mash dist`
+    against that sketch and calls `known_cluster` when the nearest reference
+    is within `PLASMID_NOVELTY_SIMILARITY_THRESHOLD` (default Mash distance
+    0.05, roughly ANI >= 95%) AND that reference's cluster has at least
+    `PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS` members (default 2); otherwise
+    `novel`. A missing `mash` binary or reference set gives
+    `insufficient_reference`, never a guess.
+  - Wired into `scripts/08_operational_reconstruct.sh` (`plasbench
+    reconstruct`); results land in `results/<sample>/plasmid_similarity.tsv`
+    and under `plasmid_novelty` in `selection_report.json`. A failed or
+    skipped classification never blocks reconstruction or the rest of the
+    report -- it is supplementary, not a gate.
+  - See `docs/OPERATIONAL_SELECTION.md`'s new "Novel-vs-known plasmid
+    classification" section for the full usage walkthrough.
 
 ### Changed
 
@@ -32,6 +56,17 @@ history is lost, only the numbering is cleaner. See
   through v0.1.4 remain published under the MIT License as distributed;
   this change is not retroactive. See `LICENSE`, `NOTICE`, and
   `CITATION.cff`.
+
+### Documentation
+
+- Recorded the two real, permanent Zenodo dataset DOIs minted by the
+  existing `zenodo-upload.yml` workflow when the v0.1.3/v0.1.4 GitHub
+  Releases were created during the v0.1.x renumbering
+  ([10.5281/zenodo.22671309](https://doi.org/10.5281/zenodo.22671309),
+  [10.5281/zenodo.22671314](https://doi.org/10.5281/zenodo.22671314)), in
+  both release notes and `cohorts/README.md`, per `docs/RELEASING.md`'s own
+  instruction. These are dataset-only DOIs (the archived `cohorts/*.tsv`),
+  not a software citation.
 
 ## [0.1.4] - 2026-09-08
 
