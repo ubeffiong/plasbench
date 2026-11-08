@@ -28,9 +28,17 @@ STATUS_SHARDS="$(shard_dir "run_tools")"
 # in a fixed sample x tool order -- so its row order matches a sequential
 # run's exactly, however the parallel jobs actually interleaved.
 record_status() {
-    local sample="$1" tool="$2" rss="${7:-}"
+    local sample="$1" tool="$2" reason="$5" rss="${7:-}"
     [[ -z "$rss" && -n "${6:-}" ]] && rss="$(profile_rss "${PROFILE_RSS_FILE:-}")"
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "${6:-}" "$rss" \
+    # A failed run's exit code goes into the free-text reason, not a new column:
+    # tool_status.tsv has other readers (and contribution files that must keep a
+    # matching header), so its schema stays fixed. aggregate_results.py reads
+    # "exit_code=<n>" back to tell a timeout/OOM kill (124/137) from a tool that
+    # simply failed.
+    if [[ "$3" == "failed" && -s "$LOG_DIR/${sample}.${tool}.exit" ]]; then
+        reason="${reason:+$reason; }exit_code=$(tr -d '[:space:]' < "$LOG_DIR/${sample}.${tool}.exit")"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$reason" "${6:-}" "$rss" \
         > "$STATUS_SHARDS/${sample}.${tool}.tsv"
 }
 
@@ -39,12 +47,18 @@ profile_elapsed() { printf '%s' "$(( $(date +%s) - $1 ))"; }
 profile_rss() { [[ -s "$1" ]] && tr -d '[:space:]' < "$1" || true; }
 profile_exec() {
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
-    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" /usr/bin/time -f '%M' -o "$PROFILE_RSS_FILE" "$@"; else run_with_heartbeat "$SAMPLE / $TOOL" "$@"; fi
+    local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file"
+    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" /usr/bin/time -f '%M' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" "$@" || rc=$?; fi
+    printf '%s\n' "$rc" > "$exit_file"
+    return "$rc"
 }
 profile_exec_in_dir() {
     local run_dir="$1"; shift
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
-    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && /usr/bin/time -f "%M" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@"; else run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@"; fi
+    local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file"
+    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && /usr/bin/time -f "%M" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
+    printf '%s\n' "$rc" > "$exit_file"
+    return "$rc"
 }
 
 is_complete() {

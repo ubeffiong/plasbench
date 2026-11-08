@@ -918,9 +918,13 @@ The run works through seven stages, printed as it goes:
 It finishes with `############ DONE ############`.
 
 **Watch stage 2.** It prints a line per isolate like
-`3 plasmid, 1 chromosome sequences (0 defaulted)`. The number in brackets must be
-**0**. Anything else means a reference sequence could not be classified and was assumed
-to be chromosome, which quietly inflates the scores.
+`3 plasmid, 1 chromosome sequences (0 unresolved)`. The number in brackets must be
+**0**. A reference sequence that cannot be labelled (absent from the sequence report,
+a location type other than Plasmid or Chromosome, or contradictory entries) is written as
+`REVIEW`, and the run stops with a message naming it rather than guessing, because a wrong
+guess would quietly bias the scores. Decide each one, edit `truth.tsv`, and re-run. Set
+`ALLOW_DEFAULTED_TRUTH=1` only to deliberately restore the old behaviour of treating them
+as chromosome.
 
 ---
 
@@ -1000,7 +1004,7 @@ None of these actions are required for a successful ordinary benchmark run.
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
 | `[MISS] Platon DB not found` | Step 7a incomplete | Redo step 7a; the `curl` resumes |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
-| `0 defaulted` is not 0 in stage 2 | A reference sequence was not classified | Inspect that reference before trusting recall |
+| Stage 2 stops: `truth table ... still says REVIEW` | A reference sequence could not be labelled plasmid or chromosome | Open `truth.tsv`, replace each `REVIEW` after inspecting that sequence, re-run |
 | Download stops partway, repeatedly | Connection drops on large transfers | Step 7c — copy the databases from another machine |
 
 To see what PlasBench is doing in more detail, every stage writes a log:
@@ -2741,8 +2745,9 @@ cat results/benchmark.leaderboard.md
 cut -f1,2,3 results/tool_status.tsv
 ```
 
-Check that stage 2 reported `(0 defaulted)` for each isolate. A non-zero count
-means a reference sequence was not classified and was assumed to be chromosome.
+Check that stage 2 reported `(0 unresolved)` for each isolate. A non-zero count
+means a reference sequence could not be labelled and was written as `REVIEW`, which stops
+the run until you decide.
 
 ---
 

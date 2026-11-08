@@ -44,7 +44,12 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
         if [[ ! -s "$TRUTH" ]]; then
             [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; continue; }
             log "=== Truth for $SAMPLE ==="
-            python3 "$HERE/../python/make_truth.py" --report "$REPORT" --fasta "$REF" --out "$TRUTH" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2)
+            # An unresolvable sequence is written as REVIEW and stops the run at
+            # the validator below. ALLOW_DEFAULTED_TRUTH=1 restores the old
+            # guess-CHROMOSOME behaviour; use it only after reviewing the warnings.
+            TRUTH_ARGS=()
+            [[ "${ALLOW_DEFAULTED_TRUTH:-0}" == "1" ]] && TRUTH_ARGS+=(--allow-default)
+            python3 "$HERE/../python/make_truth.py" --report "$REPORT" --fasta "$REF" --out "$TRUTH" "${TRUTH_ARGS[@]+"${TRUTH_ARGS[@]}"}" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2)
             log "  truth -> $TRUTH"
         fi
     fi

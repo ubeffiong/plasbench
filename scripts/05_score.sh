@@ -153,7 +153,11 @@ score_sample() {
         local AMBIGUITY_ARGS=()
         if [[ -s "$PRED" ]]; then
             # Secondary mappings can make repetitive sequence appear to be claimed on
-            # multiple reference replicons. Score each prediction from its best hit.
+            # multiple reference replicons, so --secondary=no keeps only each region's
+            # primary placement. A chimeric record still contributes every one of its
+            # primary pieces; the scorer also drops any tp:A:S row it is handed. Which
+            # copy of a repeat is "primary" is minimap2's arbitrary choice at low MAPQ,
+            # which is why the MAPQ filter below, not this flag, protects precision.
             if ! minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
                 rm -f "$PAF"; warn "minimap2 failed for $SAMPLE/$tool; excluded from scoring"; continue
             fi

@@ -470,14 +470,16 @@ export RUN_QUAST_DIAGNOSTICS="${RUN_QUAST_DIAGNOSTICS:-0}"
 export QUAST_DIAGNOSTICS_THREADS="${QUAST_DIAGNOSTICS_THREADS:-$THREADS}"
 export QUAST_DIAGNOSTICS_MIN_CONTIG="${QUAST_DIAGNOSTICS_MIN_CONTIG:-0}"
 
-# Optional operational-mode (no-truth) novel-vs-known plasmid classification
-# (python/classify_operational_plasmid.py, scripts/08_operational_reconstruct.sh):
-# Mash distance from this isolate's own reconstructed candidate plasmid to a
-# small, PlasBench-curated reference set, built once by
-# python/build_plasmid_reference_set.py, reimplementing
-# santirdnd/COPLA's own known-cluster-vs-novel pattern independently -- see
-# that script's own docstring for exactly how and why it differs from
-# COPLA's live graph-tool/SBM machinery. This is an OPERATIONAL-only signal:
+# Optional operational-mode (no-truth) nearest-reference screen -- EXPERIMENTAL
+# AND UNVALIDATED (python/classify_operational_plasmid.py,
+# scripts/08_operational_reconstruct.sh): Mash distance from this isolate's own
+# reconstructed candidate plasmid to a small, PlasBench-curated reference set,
+# built once by python/build_plasmid_reference_set.py, following the pattern of
+# COPLA's membership call -- see that script's own docstring for how it differs
+# from COPLA's live graph-tool/SBM machinery, and for why a Mash distance of
+# 0.05 is NOT "95% similar" for plasmids. It reports how close a record is to
+# 16 references; it is not a taxonomy, not relatedness, and "no_close_reference"
+# is not evidence of novelty. This is an OPERATIONAL-only signal:
 # it is never computed for a benchmark isolate that has truth, and its
 # output must never be wired into recommendation_model.py's training
 # features. Off by default (a new, unvalidated signal with only a 16-plasmid
