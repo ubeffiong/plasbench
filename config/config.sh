@@ -222,31 +222,6 @@ export ASSEMBLY_MEMORY_GB="${ASSEMBLY_MEMORY_GB:-$MEMORY_GB}"  # stage 3 (SPAdes
 # Turn tools off if you have not installed them yet.
 export RUN_MOB_RECON="${RUN_MOB_RECON:-1}"
 export RUN_PLATON="${RUN_PLATON:-1}"
-# plsMD (python adapter adapters/adapt_plsmd.sh): reference-guided plasmid reconstruction from a Unicycler assembly
-# against a PLSDB BLAST index. Off by default. It is Docker-packaged upstream: PLSMD_CMD can be the wrapper script
-# `plsMD`. PLSMD_DB is the BLAST index PREFIX (a file PLSMD_DB.nhr must exist). Needs ASSEMBLER=unicycler. The
-# PLSDB release it uses must be entered in config/tool_database_releases.tsv or leakage is reported as not assessed.
-export RUN_PLSMD="${RUN_PLSMD:-0}"
-# Evaluation additions learned from PlasEval, plsMD and GAEMR (docs/SCIENTIFIC_GUIDE.md section 7.9). All descriptive.
-#   RUN_BIN_AGREEMENT      best-match (non-one-to-one) P/R/F1 and split/join dissimilarity on the contig labels;
-#                          DISSIMILARITY_ALPHA is the length exponent (0 ignores contig length, 1 is fully weighted).
-#   RUN_COPY_NUMBER        tool vs truth plasmid copy number per matched bin (needs depth headers and truth depth).
-#   RUN_ASSEMBLY_ADEQUACY  share of each truth plasmid the short-read assembly contains, flagged below MIN_ASSEMBLY_ADEQUACY.
-#   RUN_REPEAT_CONTENT     k-mer repeat content of the truth (REPEAT_KMER, GAEMR used 29).
-#   RUN_TRUTH_DEPTH_ANOMALIES (off) windows of unusual read depth on the truth (DEPTH_WINDOW_BP, DEPTH_ANOMALY_Z).
-export RUN_BIN_AGREEMENT="${RUN_BIN_AGREEMENT:-1}"
-export DISSIMILARITY_ALPHA="${DISSIMILARITY_ALPHA:-0.5}"
-export RUN_COPY_NUMBER="${RUN_COPY_NUMBER:-1}"
-export RUN_ASSEMBLY_ADEQUACY="${RUN_ASSEMBLY_ADEQUACY:-1}"
-export MIN_ASSEMBLY_ADEQUACY="${MIN_ASSEMBLY_ADEQUACY:-0.90}"
-export RUN_REPEAT_CONTENT="${RUN_REPEAT_CONTENT:-1}"
-export REPEAT_KMER="${REPEAT_KMER:-29}"
-export RUN_TRUTH_DEPTH_ANOMALIES="${RUN_TRUTH_DEPTH_ANOMALIES:-0}"
-export DEPTH_WINDOW_BP="${DEPTH_WINDOW_BP:-1000}"
-export DEPTH_ANOMALY_Z="${DEPTH_ANOMALY_Z:-3}"
-export PLSMD_CMD="${PLSMD_CMD:-plsMD}"
-export PLSMD_DB="${PLSMD_DB:-}"
-export PLSMD_THREADS="${PLSMD_THREADS:-$THREADS}"
 export RUN_PLASMIDSPADES="${RUN_PLASMIDSPADES:-1}"
  # gplas2 modes are kept separate because binning quality depends on the source
 # classifier. External prediction TSVs must use gplas2's documented columns.
@@ -675,3 +650,30 @@ export VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP="${VISUALIZATION_MAX_NUCLEOTIDE
 if [[ ! -f "$SAMPLE_SHEET" ]]; then
     echo "WARNING: sample sheet not found at $SAMPLE_SHEET" >&2
 fi
+
+# ---- Added with the plsMD / PlasEval / GAEMR work (kept at the end so existing line citations in docs stay valid) ----
+# plsMD (python adapter adapters/adapt_plsmd.sh): reference-guided plasmid reconstruction from a Unicycler assembly
+# against a PLSDB BLAST index. Off by default. It is Docker-packaged upstream: PLSMD_CMD can be the wrapper script
+# `plsMD`. PLSMD_DB is the BLAST index PREFIX (a file PLSMD_DB.nhr must exist). Needs ASSEMBLER=unicycler. The
+# PLSDB release it uses must be entered in config/tool_database_releases.tsv or leakage is reported as not assessed.
+export RUN_PLSMD="${RUN_PLSMD:-0}"
+export PLSMD_CMD="${PLSMD_CMD:-plsMD}"
+export PLSMD_DB="${PLSMD_DB:-}"
+export PLSMD_THREADS="${PLSMD_THREADS:-$THREADS}"
+# Evaluation additions learned from PlasEval, plsMD and GAEMR (docs/SCIENTIFIC_GUIDE.md section 7.9). All descriptive.
+#   RUN_BIN_AGREEMENT      best-match (non-one-to-one) P/R/F1 and split/join dissimilarity on the contig labels;
+#                          DISSIMILARITY_ALPHA is the length exponent (0 ignores contig length, 1 is fully weighted).
+#   RUN_COPY_NUMBER        tool vs truth plasmid copy number per matched bin (needs depth headers and truth depth).
+#   RUN_ASSEMBLY_ADEQUACY  share of each truth plasmid the short-read assembly contains, flagged below MIN_ASSEMBLY_ADEQUACY.
+#   RUN_REPEAT_CONTENT     k-mer repeat content of the truth (REPEAT_KMER, GAEMR used 29).
+#   RUN_TRUTH_DEPTH_ANOMALIES (off) windows of unusual read depth on the truth (DEPTH_WINDOW_BP, DEPTH_ANOMALY_Z).
+export RUN_BIN_AGREEMENT="${RUN_BIN_AGREEMENT:-1}"
+export DISSIMILARITY_ALPHA="${DISSIMILARITY_ALPHA:-0.5}"
+export RUN_COPY_NUMBER="${RUN_COPY_NUMBER:-1}"
+export RUN_ASSEMBLY_ADEQUACY="${RUN_ASSEMBLY_ADEQUACY:-1}"
+export MIN_ASSEMBLY_ADEQUACY="${MIN_ASSEMBLY_ADEQUACY:-0.90}"
+export RUN_REPEAT_CONTENT="${RUN_REPEAT_CONTENT:-1}"
+export REPEAT_KMER="${REPEAT_KMER:-29}"
+export RUN_TRUTH_DEPTH_ANOMALIES="${RUN_TRUTH_DEPTH_ANOMALIES:-0}"
+export DEPTH_WINDOW_BP="${DEPTH_WINDOW_BP:-1000}"
+export DEPTH_ANOMALY_Z="${DEPTH_ANOMALY_Z:-3}"
