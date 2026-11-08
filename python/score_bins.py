@@ -27,6 +27,7 @@ endpoints (docs/METHODS.md, "Endpoints"):
 import argparse
 import csv
 import math
+import os
 from collections import defaultdict
 
 
@@ -254,6 +255,63 @@ def read_assembly_coverage(path, plasmids):
     return covered
 
 
+OUTCOME_FIELDS = ["true_plasmid", "length", "best_bin", "best_bin_recall", "best_bin_precision",
+                  "bins_holding_share", "merged_with", "contamination_fraction", "outcome"]
+OUTCOMES = ("perfect", "fragmented", "merged", "fragmented_and_merged", "partial", "missed")
+
+
+def plasmid_outcomes(overlaps, plasmids, total_mapped, chromosome_bp, perfect=0.95, fragment_share=0.20,
+                     missed_recall=0.50):
+    """One outcome per truth plasmid (scoring specification, WP1).
+
+    best bin   the bin holding most of the plasmid's bases
+    missed     best-bin recall < missed_recall (or no bin at all)
+    fragmented another bin also holds >= fragment_share of the plasmid
+    merged     the best bin also holds >= fragment_share of another truth plasmid
+    perfect    best-bin recall and precision >= perfect, neither fragmented nor merged
+    partial    anything else
+    contamination_fraction = chromosome bases / all mapped bases of the best bin.
+    """
+    by_plasmid, by_bin = {}, {}
+    for (bin_id, plasmid), bp in overlaps.items():
+        by_plasmid.setdefault(plasmid, {})[bin_id] = bp
+        by_bin.setdefault(bin_id, {})[plasmid] = bp
+    rows = []
+    for plasmid in sorted(plasmids):
+        length = plasmids[plasmid]
+        bins = by_plasmid.get(plasmid, {})
+        if not bins:
+            rows.append({"true_plasmid": plasmid, "length": length, "best_bin": "", "best_bin_recall": "0.0000",
+                         "best_bin_precision": "", "bins_holding_share": 0, "merged_with": "",
+                         "contamination_fraction": "", "outcome": "missed"})
+            continue
+        best = max(bins, key=lambda b: (bins[b], b))
+        recall = safe_div(bins[best], length)
+        precision = safe_div(bins[best], total_mapped.get(best, 0))
+        holding = sorted(b for b, bp in bins.items() if safe_div(bp, length) >= fragment_share)
+        others = sorted(p for p, bp in by_bin.get(best, {}).items()
+                        if p != plasmid and safe_div(bp, plasmids[p]) >= fragment_share)
+        fragmented, merged = len(holding) > 1, bool(others)
+        if recall < missed_recall:
+            outcome = "missed"
+        elif fragmented and merged:
+            outcome = "fragmented_and_merged"
+        elif fragmented:
+            outcome = "fragmented"
+        elif merged:
+            outcome = "merged"
+        elif recall >= perfect and precision >= perfect:
+            outcome = "perfect"
+        else:
+            outcome = "partial"
+        rows.append({"true_plasmid": plasmid, "length": length, "best_bin": best,
+                     "best_bin_recall": f"{recall:.4f}", "best_bin_precision": f"{precision:.4f}",
+                     "bins_holding_share": len(holding), "merged_with": ",".join(others),
+                     "contamination_fraction": f"{safe_div(chromosome_bp.get(best, 0), total_mapped.get(best, 0)):.4f}",
+                     "outcome": outcome})
+    return rows
+
+
 def maximum_weight(edges, bins_list, plasmids_list):
     """Return a maximum-weight one-to-one assignment using Hungarian O(n^3)."""
     n = max(len(bins_list), len(plasmids_list))
@@ -348,6 +406,10 @@ def main():
     parser.add_argument("--split-threshold", type=float, default=.1)
     parser.add_argument("--ambiguity-paf", help="Optional all-mapping PAF for repeat-associated bin ambiguity.")
     parser.add_argument("--cprr-out", help="Per-truth-plasmid correct-reconstruction table (CPRR).")
+    parser.add_argument("--outcomes-out", help="Per-truth-plasmid outcome table (perfect/fragmented/merged/missed).")
+    parser.add_argument("--perfect-threshold", type=float, default=float(os.environ.get("PERFECT_THRESHOLD", 0.95)))
+    parser.add_argument("--fragment-share", type=float, default=float(os.environ.get("FRAGMENT_SHARE", 0.20)))
+    parser.add_argument("--missed-recall", type=float, default=float(os.environ.get("MISSED_RECALL", 0.50)))
     parser.add_argument("--assembly-coverage", help="contig_classification.py coverage table: per truth plasmid, bases "
                                                     "the assembly covers (assembly-aware binning recall).")
     parser.add_argument("--cprr-min-coverage", type=float, default=0.95,
@@ -454,6 +516,14 @@ def main():
             writer.writerow(CPRR_FIELDS)
             for row in cprr_rows:
                 writer.writerow([row[field] for field in CPRR_FIELDS])
+    outcomes = plasmid_outcomes(overlaps, plasmids, total_mapped, chromosome_bp, args.perfect_threshold,
+                                args.fragment_share, args.missed_recall)
+    if args.outcomes_out:
+        with open(args.outcomes_out, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=OUTCOME_FIELDS, delimiter="\t", lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(outcomes)
+    outcome_counts = {name: sum(row["outcome"] == name for row in outcomes) for name in OUTCOMES}
     cprr_total = len(cprr_rows)
     cprr_correct = sum(row["correct"] == "yes" for row in cprr_rows)
     cprr_correct_no_identity = sum(row["correct_without_identity"] == "yes" for row in cprr_rows)
@@ -462,13 +532,15 @@ def main():
         writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction", "nmi", "variation_of_information",
                          "lw_bin_precision", "lw_bin_recall", "lw_bin_f1",
                          "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",
-                         "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware"])
+                         "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware"]
+                        + [f"outcome_{name}" for name in OUTCOMES])
         writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else "",
                          f"{lw['precision']:.4f}", f"{lw['recall']:.4f}", f"{lw['f1']:.4f}",
                          cprr_total, cprr_correct, cprr_correct_no_identity,
                          f"{ari:.4f}" if ari is not None else "",
                          f"{lw_recall_assembly:.4f}" if lw_recall_assembly is not None else "",
-                         f"{lw_f1_assembly:.4f}" if lw_f1_assembly is not None else ""])
+                         f"{lw_f1_assembly:.4f}" if lw_f1_assembly is not None else ""]
+                        + [outcome_counts[name] for name in OUTCOMES])
     print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)} "
           f"lw_bin_f1={lw['f1']:.4f} cprr={cprr_correct}/{cprr_total}")
 

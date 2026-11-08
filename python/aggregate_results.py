@@ -41,6 +41,11 @@ LADDER_SUFFIX = re.compile(r"^(?P<parent>.+)__\d+(?:\.\d+)?x$")
 # the machine ran out of something, not that the tool produced a wrong answer.
 EXIT_CODE = re.compile(r"exit_code=(\d+)")
 RESOURCE_EXIT_CODES = {124, 137}
+# The container or command could not start (125/126/127): says nothing about the
+# tool, so the run is never scored (scoring specification WP4).
+INFRASTRUCTURE_EXIT_CODES = {125, 126, 127}
+OUTCOME_STATE_FIELDS = ["analysis_track", "tool", "n_runs", "completed", "reused", "failed_tool", "failed_resource",
+                        "infrastructure_failure", "not_applicable", "retried"]
 
 
 def sample_parents(sample_sheet):
@@ -204,6 +209,17 @@ def read_scores(path):
                 "plasmid_recall_ge50": float(f[idx["plasmid_recall_ge50"]]) if "plasmid_recall_ge50" in idx and f[idx["plasmid_recall_ge50"]] else None,
                 "plasmid_recall_ge90": float(f[idx["plasmid_recall_ge90"]]) if "plasmid_recall_ge90" in idx and f[idx["plasmid_recall_ge90"]] else None,
                 "complete_circular_plasmid_recall": float(f[idx["complete_circular_plasmid_recall"]]) if "complete_circular_plasmid_recall" in idx and f[idx["complete_circular_plasmid_recall"]] else None,
+                # Scoring-specification additions (score_plasmids.py / score_bins.py).
+                "mcc": float(f[idx["mcc"]]) if "mcc" in idx and f[idx["mcc"]] else None,
+                "f2": float(f[idx["f2"]]) if "f2" in idx and f[idx["f2"]] else None,
+                "f0_5": float(f[idx["f0_5"]]) if "f0_5" in idx and f[idx["f0_5"]] else None,
+                "abstention_rate": float(f[idx["abstention_rate"]]) if "abstention_rate" in idx and f[idx["abstention_rate"]] else None,
+                "outcome_perfect": int(f[idx["outcome_perfect"]]) if "outcome_perfect" in idx and f[idx["outcome_perfect"]] else None,
+                "outcome_fragmented": int(f[idx["outcome_fragmented"]]) if "outcome_fragmented" in idx and f[idx["outcome_fragmented"]] else None,
+                "outcome_merged": int(f[idx["outcome_merged"]]) if "outcome_merged" in idx and f[idx["outcome_merged"]] else None,
+                "outcome_fragmented_and_merged": int(f[idx["outcome_fragmented_and_merged"]]) if "outcome_fragmented_and_merged" in idx and f[idx["outcome_fragmented_and_merged"]] else None,
+                "outcome_partial": int(f[idx["outcome_partial"]]) if "outcome_partial" in idx and f[idx["outcome_partial"]] else None,
+                "outcome_missed": int(f[idx["outcome_missed"]]) if "outcome_missed" in idx and f[idx["outcome_missed"]] else None,
             })
     return rows
 
@@ -232,17 +248,42 @@ def read_status(path):
     return counts
 
 
-def failure_class(reason):
-    """'resource' when the recorded exit code is a timeout/SIGKILL, else 'tool'.
+def failure_class(reason, exit_code=None):
+    """'resource' when the recorded exit code is a timeout/SIGKILL,
+    'infrastructure' for 125/126/127 (the command or container never started),
+    else 'tool'.
 
     A failure with no recorded exit code (a status file from before exit codes
     were captured) is 'tool', which is the conservative reading: it is scored as
     the tool's failure exactly as it always was.
     """
-    match = EXIT_CODE.search(reason or "")
-    if match and int(match.group(1)) in RESOURCE_EXIT_CODES:
+    code = None
+    if exit_code not in (None, ""):
+        try:
+            code = int(exit_code)
+        except ValueError:
+            code = None
+    if code is None:
+        match = EXIT_CODE.search(reason or "")
+        code = int(match.group(1)) if match else None
+    if code in RESOURCE_EXIT_CODES:
         return "resource"
+    if code in INFRASTRUCTURE_EXIT_CODES:
+        return "infrastructure"
     return "tool"
+
+
+def read_outcome_side_table(status_path):
+    """(sample, tool) -> row of tool_outcomes.tsv (04_run_tools.sh), next to
+    tool_status.tsv. Absent for results from before the side table existed;
+    callers then fall back to the exit code in the reason text."""
+    if not status_path:
+        return {}
+    path = Path(status_path).with_name("tool_outcomes.tsv")
+    if not path.is_file():
+        return {}
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {(r.get("sample"), r.get("tool")): r for r in csv.DictReader(handle, delimiter="\t")}
 
 
 def read_failures(path):
@@ -258,10 +299,46 @@ def read_failures(path):
         reader = csv.DictReader(handle, delimiter="\t")
         if not reader.fieldnames or "sample" not in reader.fieldnames:
             return failures
+        side = read_outcome_side_table(path)
         for row in reader:
-            if row.get("status") == "failed" and row.get("sample") and row.get("tool"):
-                failures.append((row["tool"], row["sample"], failure_class(row.get("reason"))))
+            if not (row.get("sample") and row.get("tool")):
+                continue
+            if row.get("status") == "infrastructure_failure":
+                failures.append((row["tool"], row["sample"], "infrastructure"))
+            elif row.get("status") == "failed":
+                extra = side.get((row["sample"], row["tool"]), {})
+                kind = extra.get("failure_class") or failure_class(row.get("reason"), extra.get("exit_code"))
+                failures.append((row["tool"], row["sample"], kind))
     return failures
+
+
+def outcome_states(path, tool_tracks=None):
+    """One row per tool: how every run ended (scoring specification WP4).
+    not_applicable is a skipped run (input the tool cannot use, tool absent)."""
+    counts = {}
+    if not path or not Path(path).is_file():
+        return []
+    side = read_outcome_side_table(path)
+    kinds = {(sample, tool): kind for tool, sample, kind in read_failures(path)}
+    with open(path, newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle, delimiter="\t"):
+            tool, sample, status = row.get("tool"), row.get("sample"), row.get("status")
+            if not tool:
+                continue
+            c = counts.setdefault(tool, {k: 0 for k in OUTCOME_STATE_FIELDS[2:]})
+            c["n_runs"] += 1
+            if status in ("completed", "reused"):
+                c[status] += 1
+            elif status == "skipped":
+                c["not_applicable"] += 1
+            elif status in ("failed", "infrastructure_failure"):
+                kind = kinds.get((sample, tool), "tool")
+                c["infrastructure_failure" if kind == "infrastructure" else f"failed_{kind}"] += 1
+            try:
+                c["retried"] += int((side.get((sample, tool)) or {}).get("attempts") or 1) > 1
+            except ValueError:
+                pass
+    return [{"analysis_track": (tool_tracks or {}).get(tool, ""), "tool": tool, **c} for tool, c in sorted(counts.items())]
 
 
 def read_failed_samples(path, resource_policy="score-zero"):
@@ -275,6 +352,8 @@ def read_failed_samples(path, resource_policy="score-zero"):
     """
     failed = defaultdict(set)
     for tool, sample, kind in read_failures(path):
+        if kind == "infrastructure":
+            continue  # never scored: rerun instead
         if kind == "resource" and resource_policy == "exclude":
             continue
         failed[tool].add(sample)
@@ -481,9 +560,13 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
         row["is_baseline"] = "yes" if (design.is_baseline(row["tool"]) if design else row["tool"].startswith("baseline_")) else "no"
         tool_rows = [r for r in rows if r["tool"] == row["tool"]]
         for key in ("contig_f1_count", "contig_mcc_count", "contig_f1_bp", "contig_mcc_bp",
-                    "bin_ari", "lw_bin_f1_assembly_aware"):
+                    "bin_ari", "lw_bin_f1_assembly_aware", "mcc", "f2", "f0_5", "abstention_rate"):
             values = [r[key] for r in tool_rows if r.get(key) is not None]
             row[f"mean_{key}"] = statistics.mean(values) if values else None
+        for key in ("outcome_perfect", "outcome_fragmented", "outcome_merged", "outcome_fragmented_and_merged",
+                    "outcome_partial", "outcome_missed"):
+            values = [r[key] for r in tool_rows if r.get(key) is not None]
+            row[f"total_{key}"] = sum(values) if values else None
         # Micro average: TP/FP/FN bases pooled over every sample the tool was
         # scored on (large isolates weigh more). mean_precision/recall/f1 are the
         # macro average: per isolate, then averaged.
@@ -739,7 +822,11 @@ def write_tsv(summary, path):
             "micro_precision", "micro_recall", "micro_f1",
             "mean_contig_f1_count", "mean_contig_mcc_count", "mean_contig_f1_bp", "mean_contig_mcc_bp",
             "mean_bin_ari", "mean_lw_bin_f1_assembly_aware",
-            "n_plasmids_in_tool_database", "mean_recovery_in_tool_database", "mean_recovery_not_in_tool_database"]
+            "n_plasmids_in_tool_database", "mean_recovery_in_tool_database", "mean_recovery_not_in_tool_database",
+            "mean_mcc", "mean_f2", "mean_f0_5", "mean_abstention_rate",
+            "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
+            "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed",
+            "n_failed_tool", "n_infrastructure_failure", "n_not_applicable"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -799,6 +886,12 @@ def write_tsv(summary, path):
                 fmt4(s.get("mean_bin_ari")), fmt4(s.get("mean_lw_bin_f1_assembly_aware")),
                 s.get("n_plasmids_in_tool_database", ""), fmt4(s.get("mean_recovery_in_tool_database")),
                 fmt4(s.get("mean_recovery_not_in_tool_database")),
+                fmt4(s.get("mean_mcc")), fmt4(s.get("mean_f2")), fmt4(s.get("mean_f0_5")),
+                fmt4(s.get("mean_abstention_rate")),
+                *("" if s.get(k) is None else s[k] for k in (
+                    "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
+                    "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed")),
+                s.get("n_failed_tool", ""), s.get("n_infrastructure_failure", ""), s.get("n_not_applicable", ""),
             ]) + "\n")
 
 
@@ -1132,6 +1225,21 @@ def main():
     # The combined files hold every (track, task) leaderboard, each ranked on
     # its own (rank restarts per group). They never rank across groups.
     summary = [row for *_, track_summary, _ in per_track for row in track_summary]
+    # Outcome states per tool (completed / failed: tool, resource / infrastructure /
+    # not applicable / retried), beside accuracy in the leaderboard and the report.
+    states = outcome_states(args.tool_status, tool_tracks)
+    if states:
+        write_rows(states, args.out_prefix + ".outcome_states.tsv", OUTCOME_STATE_FIELDS)
+        by_tool = {r["tool"]: r for r in states}
+        for row in summary:
+            state = by_tool.get(row["tool"])
+            if state:
+                row.update(n_failed_tool=state["failed_tool"], n_infrastructure_failure=state["infrastructure_failure"],
+                           n_not_applicable=state["not_applicable"])
+        infra = sum(r["infrastructure_failure"] for r in states)
+        if infra:
+            print(f"[aggregate] {infra} run(s) were infrastructure failures (exit 125/126/127 or disk full): "
+                  "not scored; rerun them.")
     if args.database_containment:
         database_recovery(summary, args.database_containment, os.path.dirname(os.path.abspath(args.out_prefix)))
     comparisons = [row for *_, track_comparisons in per_track for row in track_comparisons]

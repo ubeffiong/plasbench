@@ -315,6 +315,9 @@ score_sample() {
                 --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
                 --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
                 --cprr-out "$RDIR/${tool}.cprr.tsv" \
+                --outcomes-out "$RDIR/${tool}.plasmid_outcomes.tsv" \
+                --perfect-threshold "${PERFECT_THRESHOLD:-0.95}" --fragment-share "${FRAGMENT_SHARE:-0.20}" \
+                --missed-recall "${MISSED_RECALL:-0.50}" \
                 --cprr-min-coverage "$CPRR_MIN_COVERAGE" \
                 --cprr-min-share "$CPRR_MIN_SHARE" \
                 --cprr-min-identity "$CPRR_MIN_IDENTITY" \

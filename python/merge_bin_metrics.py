@@ -29,6 +29,9 @@ FIELDS = [
     "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",
     # Clustering agreement (bp-weighted ARI) and assembly-aware binning recall.
     "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware",
+    # Per-plasmid outcome counts (score_bins.py --outcomes-out).
+    "outcome_perfect", "outcome_fragmented", "outcome_merged", "outcome_fragmented_and_merged",
+    "outcome_partial", "outcome_missed",
 ]
 
 
