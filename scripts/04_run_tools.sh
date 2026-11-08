@@ -243,7 +243,7 @@ run_baseline() {
             record_status "$SAMPLE" "$TOOL" "skipped" "" "abricate not installed"
             return 0
         fi
-        local HITS="$RDIR/${TOOL}.replicon_hits.tsv" HITS_TMP db first=1
+        local HITS="$RDIR/${TOOL}.replicon_hits.tsv" db first=1
         : > "$HITS"
         for db in $REPLICON_ABRICATE_DBS; do
             if abricate --db "$db" --threads "$THREADS" "$CONTIGS" > "$HITS.tmp" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
