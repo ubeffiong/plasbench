@@ -1342,11 +1342,20 @@ def robustness_section(track_leaderboards, ordered_tracks):
             ranked_on += " shared" if basis == "shared_samples" else (" own (no overlap)" if basis else "")
             overlap = "-"
             if row.get("n_possible_db_overlap") not in (None, ""):
-                if (optional_number(row.get("n_possible_db_overlap")) or 0) == 0 and \
-                        (optional_number(row.get("n_after_database")) or 0) == 0:
-                    overlap = "n/a (no reference database, or dates not filled)"
+                possible = optional_number(row.get("n_possible_db_overlap")) or 0
+                after_db = optional_number(row.get("n_after_database")) or 0
+                unknown = optional_number(row.get("n_unknown_overlap")) or 0
+                if possible == 0 and after_db == 0 and unknown > 0:
+                    # The screen ran but could not judge these pairs (database release
+                    # date not filled in). That is not the same as "checked and clean".
+                    overlap = (f"<strong>not assessed</strong> ({int(unknown)} pair(s) unknown: "
+                               f"database release date not filled in)")
+                elif possible == 0 and after_db == 0:
+                    overlap = "n/a (tool uses no reference database)"
                 else:
                     overlap = f"{esc(row['n_possible_db_overlap'])} possible / {_value_or(row, 'n_after_database', '0')} after"
+                    if unknown > 0:
+                        overlap += f" / {int(unknown)} unknown"
             redundant = optional_number(row.get("total_redundant_pred_bp"))
             body.append(
                 "<tr><td>{tool}</td><td><strong>{f1}</strong></td><td>{ranked_on}</td><td>{clusters}</td>"
@@ -1572,6 +1581,54 @@ def pr_curve_chart(points, pr_auc=None):
     )
 
 
+NEAREST_REFERENCE_LABELS = {
+    "close_reference_match": "Close match to a reference plasmid",
+    "no_close_reference": "No close reference in the reference set",
+    "insufficient_reference": "Could not be assessed",
+    # Labels written before the screen was renamed; reports from earlier runs
+    # still open, and show the same meaning under today's wording.
+    "known_cluster": "Close match to a reference plasmid (recorded as 'known_cluster')",
+    "novel": "No close reference in the reference set (recorded as 'novel')",
+}
+
+
+def nearest_reference_block(novelty):
+    """HTML for a selection report's `plasmid_novelty` mapping, or '' when absent.
+
+    The result is experimental and easy to over-read, so the caveat is part of the
+    block and not a footnote: a Mash distance under the threshold is not "95%
+    similar" for plasmids, and "no close reference" is not evidence of novelty.
+    """
+    if not novelty:
+        return ""
+    rows = []
+    for record_id, row in novelty.items():
+        status = row.get("cluster_membership_status", "")
+        margin = row.get("distance_margin") or row.get("confidence_score") or "-"
+        rows.append(
+            "<tr><td>{record}</td><td>{status}</td><td>{reference}</td><td>{distance}</td><td>{support}</td>"
+            "<td>{margin}</td></tr>".format(
+                record=esc(record_id),
+                status=esc(NEAREST_REFERENCE_LABELS.get(status, status or "not recorded")),
+                reference=esc(" ".join(part for part in (row.get("best_reference_id"), row.get("best_reference_plasmid_name")) if part) or "-"),
+                distance=esc(row.get("mash_distance") or "-"),
+                support=esc(" / ".join(part for part in (
+                    f"p={row['mash_p_value']}" if row.get("mash_p_value") else "",
+                    f"shared {row['shared_hashes']}" if row.get("shared_hashes") else "") if part) or "-"),
+                margin=esc(margin)))
+    return (
+        "<details><summary>Nearest-reference screen (experimental, unvalidated)</summary>"
+        "<p class='muted'>How close each predicted record is, by Mash distance, to a small curated "
+        "set of reference plasmids. It is not a plasmid classification, not evidence of relatedness, "
+        "and not a test of novelty. A distance under the threshold does not mean 95% similarity: "
+        "two equal-size plasmids sharing about a third of their sequence already pass it, and a "
+        "fragment under about a fifth of a reference plasmid can fail it. Each record is judged on "
+        "its own, so one plasmid split into contigs can receive different calls.</p>"
+        "<table><thead><tr><th>Record</th><th>Call</th><th>Nearest reference</th><th>Mash distance</th>"
+        "<th>Support</th><th>Distance margin</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+        "</details>")
+
+
 def selection_card(sample, results_dir, report_path):
     """Render a plain-language view of a machine-readable selection report."""
     # Candidates live in one collection directory, each file carrying its sample
@@ -1628,10 +1685,12 @@ def selection_card(sample, results_dir, report_path):
 <div><span class='selection-label'>{status}</span><h3>{sample}: {tool}</h3><p>{score}</p><p><strong>Confidence:</strong> {confidence}</p></div>
 <div class='selection-actions'>{fasta}<br>{report}</div>
 <details><summary>Why this selection needs review</summary><ul>{reasons}</ul><p><strong>Agreement between methods:</strong> {agreement}</p><p><strong>Structural evidence:</strong> {structural}</p><p><strong>Other evaluated methods:</strong> {alternatives}</p><p class='muted'>This card does not claim that the sequence is closed, circular, or clinically validated.</p></details>
+{nearest}
 </div>""".format(
         tone="confirmation" if confidence != "high" else "confident", status=esc(status), sample=esc(sample),
         tool=esc(selected_tool), score=score_text, confidence=esc(confidence_label), fasta=fasta_link,
-        report=report_link, reasons=reasons, alternatives=alternatives, agreement=esc(agreement_text), structural=esc(structural_text))
+        report=report_link, reasons=reasons, alternatives=alternatives, agreement=esc(agreement_text), structural=esc(structural_text),
+        nearest=nearest_reference_block(report.get("plasmid_novelty")))
 
 
 INLINE_VISUALIZATION_BUDGET = 6 * 1024 * 1024

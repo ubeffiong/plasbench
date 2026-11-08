@@ -35,6 +35,7 @@ Standard library only.
 
 import argparse
 import gzip
+import os
 import sys
 
 SEPARATOR = "__plasbench_window__"
@@ -45,18 +46,20 @@ def open_text(path):
 
 
 def read_truth(path):
-    truth = {}
-    with open(path) as handle:
-        header = handle.readline().rstrip("\n").split("\t")
-        try:
-            i_id, i_type, i_len = (header.index(c) for c in ("sequence_id", "molecule_type", "length"))
-        except ValueError:
-            sys.exit("ERROR: truth TSV needs sequence_id, molecule_type, length columns")
-        for line in handle:
-            if not line.strip():
-                continue
-            fields = line.rstrip("\n").split("\t")
-            truth[fields[i_id]] = (fields[i_type].strip().upper(), int(fields[i_len]))
+    """Read truth with exactly the scorer's validation.
+
+    This used to be a looser copy that accepted duplicate ids, non-positive
+    lengths and unknown molecule types, so the ceiling could be computed from a
+    table the scorer itself would refuse. It now delegates to
+    score_plasmids.read_truth.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from score_plasmids import read_truth as scorer_read_truth
+    truth, _, _ = scorer_read_truth(path)
+    clashes = [seq_id for seq_id in truth if SEPARATOR in seq_id]
+    if clashes:
+        sys.exit(f"ERROR: sequence id '{clashes[0]}' contains the reserved window "
+                 f"separator '{SEPARATOR}'; rename it before computing scorable truth.")
     return truth
 
 

@@ -149,7 +149,7 @@ grep -q "mash sketch" "$TMP/calls.log" || { echo "FAIL: expected mash sketch to 
 [[ -s "$TMP/results/opD/plasmid_similarity.tsv" ]] || { echo "FAIL: expected plasmid_similarity.tsv to be written" >&2; exit 1; }
 report="$TMP/results/opD/selection_report.json"
 grep -q '"plasmid_novelty"' "$report" || { echo "FAIL: expected plasmid_novelty merged into selection_report.json" >&2; cat "$report" >&2; exit 1; }
-grep -q '"cluster_membership_status": "known_cluster"' "$report" || { echo "FAIL: expected a known_cluster call from the faked mash distance" >&2; cat "$report" >&2; exit 1; }
+grep -q '"cluster_membership_status": "close_reference_match"' "$report" || { echo "FAIL: expected a close_reference_match call from the faked mash distance" >&2; cat "$report" >&2; exit 1; }
 echo "RUN_PLASMID_NOVELTY_CLASSIFICATION=1 classifies the fresh prediction and merges it into the report -> PASS"
 
 echo "ALL OPERATIONAL RECONSTRUCT TESTS PASSED"

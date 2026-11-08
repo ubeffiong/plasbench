@@ -153,20 +153,36 @@ def tool_quality(rows, statuses, total_samples, model=None, decision_profile=DEF
     output = {}
     for tool, values in by_tool.items():
         mean = lambda key, fallback=0.0: sum(number(row, key, fallback) or fallback for row in values) / len(values)
+
+        def mean_defined(key, fallback=0.0):
+            # F1, precision and recall are blank (undefined) on an isolate with no
+            # true plasmid. Averaging that blank as 0.0 over every row would pull a
+            # tool's score down for an isolate on which nothing could be recalled,
+            # contradicting the "undefined is never zero" rule the scorer and the
+            # leaderboard follow. Average only the rows where the value exists; the
+            # fallback applies only when none do.
+            defined = [value for value in (number(row, key) for row in values) if value is not None]
+            return sum(defined) / len(defined) if defined else fallback
+
         if model is not None:
             f1 = sum(model.predict("f1", row) for row in values) / len(values)
             plasmid = sum(model.predict("plasmid_recall", row) for row in values) / len(values)
         else:
-            f1 = mean("f1")
-            plasmid = mean("plasmid_recall", f1)
-        precision, recall = mean("precision"), mean("recall")
+            f1 = mean_defined("f1")
+            plasmid = mean_defined("plasmid_recall", f1)
+        precision, recall = mean_defined("precision"), mean_defined("recall")
         bin_values = [number(row, "bin_f1") for row in values if number(row, "bin_f1") is not None]
         bin_score = sum(bin_values) / len(bin_values) if bin_values else None
         amr_values = [number(row, "amr_gene_recall") for row in values if number(row, "amr_gene_recall") is not None]
         amr_gene_recall = sum(amr_values) / len(amr_values) if amr_values else None
         profile = statuses[tool]
         completed = profile["counts"]["completed"] + profile["counts"]["reused"]
-        failed = profile["counts"]["failed"] + profile["counts"]["skipped"]
+        # Only runs that were attempted and failed count against a tool. A skipped
+        # run (command not installed, database missing, no assembly graph) is a
+        # deployment gap, not the tool getting something wrong; it already lowers
+        # `coverage`, which is what gates eligibility, so counting it here as well
+        # would penalise the same absence twice.
+        failed = profile["counts"]["failed"]
         attempted = completed + failed
         failure_rate = failed / attempted if attempted else 0.0
         runtime = statistics.median(profile["runtime_seconds"]) if profile["runtime_seconds"] else None

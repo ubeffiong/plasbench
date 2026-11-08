@@ -238,15 +238,24 @@ def ratio_bootstrap(pairs, groups, iterations=1000):
 
 # -- per-tool headline fields --------------------------------------------------------
 
-def shared_values(rows, key, failed_samples=None):
-    """tool -> {sample: value} with failure-as-zero, the shared sample set, zero counts."""
+def shared_values(rows, key, failed_samples=None, known_tools=None, eligible_samples=None):
+    """tool -> {sample: value} with failure-as-zero, the shared sample set, zero counts.
+
+    known_tools: tools to count even though they have no score rows. A tool that
+    failed on every sample has none, and would otherwise be dropped here, which
+    would let total failure rank above partial failure. The caller must pass only
+    failures belonging to this group's tools.
+    eligible_samples: plasmid-bearing samples to treat as eligible for a
+    failure-as-zero entry in addition to those this group's rows define; needed
+    when no row in the group defines the metric at all.
+    """
     by_tool = defaultdict(dict)
-    eligible = set()
+    eligible = set(eligible_samples or ())
     for r in rows:
         if r.get(key) is not None:
             by_tool[r["tool"]][r["sample"]] = r[key]
             eligible.add(r["sample"])
-    tools = {r["tool"] for r in rows}
+    tools = {r["tool"] for r in rows} | set(known_tools or ())
     zeros = defaultdict(int)
     for tool, samples in (failed_samples or {}).items():
         if tool not in tools:

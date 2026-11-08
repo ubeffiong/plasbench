@@ -149,7 +149,10 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
     query_covered = defaultdict(list)
     query_off_truth = defaultdict(list)
 
-    counters = {"alignment_total": 0, "alignment_retained": 0, "filtered_alignment_count": 0}
+    # secondary_alignment_ignored is deliberately not a scores.tsv column; it only
+    # drives the warning below, so the output schema is unchanged.
+    counters = {"alignment_total": 0, "alignment_retained": 0, "filtered_alignment_count": 0,
+                "secondary_alignment_ignored": 0}
     if os.path.getsize(path) == 0:
         return covered, sum(pred_lengths.values()), 0, 0, counters, covered_by_query
 
@@ -165,6 +168,14 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
             # PAF mandatory columns (0-based indices):
             # 0 qname 1 qlen 2 qstart 3 qend 4 strand
             # 5 tname 6 tlen 7 tstart 8 tend 9 matches 10 blocklen 11 mapq
+            # The scoring PAF is produced with --secondary=no, so it should hold no
+            # secondary rows. A user-supplied PAF might; counting them would let a
+            # repeat claim bases on several replicons, which the primary-only rule
+            # exists to prevent. Primary rows (tp:A:P) and inversions (tp:A:I) are
+            # kept: a chimeric query legitimately contributes every one of its pieces.
+            if "tp:A:S" in f[12:]:
+                counters["secondary_alignment_ignored"] += 1
+                continue
             qname = f[0]
             try:
                 qlen = int(f[1])
@@ -219,6 +230,11 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
                 qstart = max(0, min(qstart, qlen))
                 qend = max(0, min(qend, qlen))
                 query_off_truth[qname].append((qstart, qend))
+
+    if counters["secondary_alignment_ignored"]:
+        sys.stderr.write(
+            f"[score_plasmids] ignored {counters['secondary_alignment_ignored']} secondary "
+            f"alignment row(s) (tp:A:S) in {path}; scoring is primary-only.\n")
 
     unmapped_pred_bp = mapped_pred_bp = off_truth_pred_bp = 0
     for qname, length in pred_lengths.items():
