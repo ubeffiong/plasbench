@@ -257,6 +257,49 @@ into unambiguous, plasmid/chromosome-ambiguous, and unmapped categories. These
 categories support interpretation but do not silently change the TP/FP/FN
 definition.
 
+Because coverage is merged, a prediction that claims the same reference bases
+more than once (duplicate records, or one record per copy of a plasmid) earns no
+extra TP but is also not penalised. `redundant_pred_bp` reports how many retained
+reference-base claims were redundant (raw retained target coverage minus merged
+coverage). It is a diagnostic and does not alter F1.
+
+**Strict precision.** `strict_precision` = TP / (TP + FP + `unmapped_pred_bp`). It
+charges predicted sequence that never produced a retained alignment, which ordinary
+precision ignores, so noisy, chimeric or contaminant output becomes visible as a
+precision drop. TP/FP are reference bases and `unmapped_pred_bp` is query bases, so this
+is an approximation. It is supplementary and never used for ranking.
+
+**Recall ceiling.** Plasmid sequence that also occurs elsewhere in the genome (an IS
+element or transposon shared with the chromosome, or a plasmid present in two identical
+copies) maps with MAPQ near 0 and is removed by the MAPQ filter, so no prediction can ever
+be credited for it. Stage 5 measures this per isolate with `python/scorable_truth.py`:
+each truth plasmid is tiled into windows (`SCORABLE_WINDOW_BP`, default 1000 bp, step
+`SCORABLE_STEP_BP`, default 250 bp), the windows are mapped back to the reference with the
+same minimap2 preset and filters as predictions, and a window counts as scorable only if
+its retained alignment lands on its own origin. The result, `DATA_DIR/<sample>/truth_scorable.tsv`,
+gives `scorable_plasmid_bp`, `recall_ceiling` (scorable / total plasmid bp, the largest
+recall any tool could reach) and `ceiling_adjusted_recall` (TP within scorable bases /
+scorable bases). A real contig spanning a repeat and its unique flanks does map uniquely,
+so the window view is conservative for repeats longer than the window and blind to much
+shorter ones. It is a diagnostic only; recall and F1 are unchanged. Disable with
+`RUN_SCORABLE_TRUTH=0`.
+
+**Reference-database overlap.** Most tools score contigs against a database of known
+plasmids, or a model trained on one, built from the same public complete genomes PlasBench
+uses as truth. A truth genome that was public before the tool's database was built may
+already be inside it, so the tool can be "recognising" rather than inferring.
+`python/flag_database_overlap.py` (stage 6) compares each truth assembly's release date
+(the sample sheet's `truth_release_date`, else NCBI's `assembly_data_report.jsonl`, which
+stage 1 now keeps) with each tool's database release date in
+`config/tool_database_releases.tsv`, and labels every sample × tool pair
+`possible_overlap`, `after_database`, `no_reference_database` or `unknown`
+(`benchmark.database_overlap.tsv`). **Fill in `database_release_date` for the database
+versions you installed**; until then every pair is `unknown`. The leaderboard reports
+`n_possible_db_overlap`, `n_after_database` and `mean_f1_after_database` (F1 on samples the
+database cannot contain). With `EXCLUDE_DATABASE_OVERLAP=1`, `possible_overlap` rows are
+dropped before ranking (and the shared-sample rule then applies). This is a date-based
+screen, not proof that a genome is in a database.
+
 ## Base-level confusion matrix (positive class = plasmid)
 Let `C` be the set of reference bases covered by predicted-plasmid alignments.
 - **TP** = |{plasmid reference bases} ∩ C|
@@ -268,10 +311,13 @@ Then:
 - **recall** (completeness) = TP / (TP + FN) — fraction of true plasmid sequence recovered;
 - **F1** = 2·precision·recall / (precision + recall).
 
-Predicted sequence that does not align to the reference at all is reported as
-`unmapped_pred_bp` and is **not** counted as FP, because it cannot be attributed to a
-chromosome or plasmid origin (it usually reflects mis-assembly or contamination). Reporting
-it separately keeps the core precision metric conservative and interpretable.
+Predicted sequence with no *retained* alignment is reported as `unmapped_pred_bp` and
+is **not** counted as FP, because it cannot be attributed to a chromosome or plasmid
+origin (it usually reflects mis-assembly or contamination). This includes sequence that
+aligns but whose every alignment fails the length, identity, MAPQ or query-coverage
+filters above — for example a chimeric or low-identity contig, or a repeat placed with
+low MAPQ. Such output therefore lowers neither precision nor F1; read `unmapped_pred_bp`
+alongside F1 rather than relying on F1 alone to expose noisy predictions.
 
 Predicted sequence that *does* align, but only to a reference sequence absent from
 `truth.tsv` (for example a contig the NCBI sequence report never classified), is a
@@ -288,6 +334,13 @@ misleading `0.0` — a `0.0` would read as total failure for a tool that in fact
 correctly abstained. Precision *is* still a real, defined number whenever something
 *was* predicted on such an isolate (TP is always 0 there, so precision is exactly
 0.0 — a genuine, meaningful "of what you predicted, none was correct").
+
+The converse case is **not** undefined. On an isolate that *has* true plasmid, a
+tool that predicts nothing (empty output, or every alignment filtered out) has
+recall 0 and therefore **F1 = 0**, even though its precision stays empty. Earlier
+versions left F1 empty there, which silently dropped exactly the samples a tool
+gave up on from its mean F1: a tool that abstained on every hard isolate could tie
+a tool that was perfect everywhere.
 
 Because such an isolate is the only kind that can directly measure a tool's
 false-positive plasmid-calling behaviour (there is nothing true to recall, so
@@ -454,8 +507,24 @@ spot patterns worth investigating, not as a ranking.
 
 ## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,
-mean recall) and ranked by mean F1 (`python/aggregate_results.py`). A
-deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
+mean recall) and ranked by mean F1 (`python/aggregate_results.py`), separately within
+each analysis track.
+
+**Every tool is ranked on the same samples.** `mean_f1`, its CI and `median_f1` are
+computed over the plasmid-bearing samples on which *every* F1-bearing tool in that
+track has a result (`n_ranking_samples`, `ranking_basis = shared_samples`). A tool
+run that itself **failed** on a plasmid-bearing sample (`status = failed` in
+`tool_status.tsv`) counts as F1 = 0 for that tool (`n_failures_scored_zero`), so one
+crashing tool cannot shrink every other tool's ranking set, and a tool cannot rise
+in the ranking by failing on hard isolates. A sample missing for any other reason
+(no status recorded, skipped, or a scoring failure) is removed from every tool's
+ranking. Each tool's mean over all the samples it was scored on is kept as
+`mean_f1_all_scored` (`n_f1_scored`) for transparency; it is never used to rank. If
+the tools share no samples at all, each falls back to its own samples and
+`ranking_basis` says so (`own_samples_no_overlap`). The paired comparisons below
+apply the same failure-as-zero rule.
+
+A deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
 and `benchmark.paired_comparisons.tsv` reports paired per-sample F1
 differences and win/tie/loss counts. These are descriptive uncertainty aids,
 not formal claims of clinical or statistical superiority.
@@ -500,6 +569,15 @@ is better in the field.
   that PlasBin-Flow failed to detect any enterococcal plasmids in their benchmark,
   despite functioning on other taxa. PlasBench's `organism`/`gram_group`
   stratification throughout the leaderboard and recommendation logic exists
+**Correlated isolates.** Isolates from one BioProject (one study, often one outbreak or
+clonal collection) are not independent. When the sample sheet has a `bioproject` column
+(else `source_study`), the bootstrap CI resamples whole clusters and the sign-flip
+permutation test flips every difference in a cluster together. At least five independent
+clusters are required; with fewer, no interval or p-value is reported. The leaderboard's
+`n_independent_clusters` and the comparisons' `paired_clusters` show how many there were.
+Without a cluster column every sample is its own cluster and the results are identical to
+plain per-sample resampling.
+
   precisely because tool performance is not taxon-independent — this is external,
   peer-reviewed confirmation of that design choice, not a hypothetical.
 

@@ -1247,6 +1247,163 @@ def interpretation(leaderboard, status_counts):
     return notes, tone
 
 
+ROBUSTNESS_TRACK_LABELS = {"short_read": "Short-read track", "long_read": "Long-read track",
+                           "hybrid": "Hybrid (long + short) track"}
+
+
+def _value_or(row, key, missing="-"):
+    value = (row.get(key) or "").strip() if isinstance(row.get(key), str) else row.get(key)
+    return esc(str(value)) if value not in (None, "") else missing
+
+
+def ceiling_chart(rows):
+    """Base recall against the recall ceiling each tool could have reached.
+
+    The pale bar is the ceiling (plasmid bases a prediction could be scored on
+    under the alignment filters); the solid bar is the recall achieved. The
+    gap between the solid bar and the pale bar is recall a tool genuinely
+    missed; the gap between the pale bar and 1.0 is unscorable sequence
+    (repeats shared with the chromosome, duplicate plasmids) that no tool can
+    be credited for.
+    """
+    rows = [r for r in rows if optional_number(r.get("mean_recall_ceiling")) is not None]
+    if not rows:
+        return ("<p class='muted'>Recall ceiling not computed in this run "
+                "(RUN_SCORABLE_TRUTH=0, or minimap2 was unavailable at stage 5).</p>")
+    row_height = 30
+    width, label_width, chart_width = 760, 145, 470
+    height = 30 + len(rows) * row_height
+    parts = [f"<svg class='performance-chart' viewBox='0 0 {width} {height}' role='img' "
+             "aria-label='Mean base recall against mean recall ceiling by tool'>",
+             f"<text x='{label_width}' y='14' class='axis'>0</text>"
+             f"<text x='{label_width + chart_width - 18}' y='14' class='axis'>1.0</text>"]
+    for index, row in enumerate(rows):
+        y = 22 + index * row_height
+        recall = optional_number(row.get("mean_recall")) or 0.0
+        ceiling = optional_number(row.get("mean_recall_ceiling")) or 0.0
+        parts.append(f"<text x='0' y='{y + 12}' class='label'>{esc(row['tool'])}</text>")
+        parts.append(f"<rect x='{label_width}' y='{y}' width='{chart_width}' height='14' fill='#e0e8e1'/>")
+        parts.append(f"<rect x='{label_width}' y='{y}' width='{chart_width * ceiling:.1f}' height='14' fill='#f1d6a8'>"
+                     f"<title>{esc(row['tool'])} recall ceiling: {ceiling:.3f}</title></rect>")
+        parts.append(f"<rect x='{label_width}' y='{y + 3}' width='{chart_width * recall:.1f}' height='8' fill='#d18b2a'>"
+                     f"<title>{esc(row['tool'])} base recall: {recall:.3f}</title></rect>")
+        parts.append(f"<text x='{label_width + chart_width + 8}' y='{y + 12}' class='axis'>"
+                     f"{recall:.2f} of {ceiling:.2f} reachable</text>")
+    legend = ("<div class='chart-legend'><span><i style='background:#d18b2a'></i>Base recall achieved</span>"
+              "<span><i style='background:#f1d6a8'></i>Recall ceiling (scorable plasmid bases)</span></div>")
+    return legend + "".join(parts) + "</svg>"
+
+
+def dumbbell_chart(rows, left_key, right_key, left_label, right_label, aria, empty_text):
+    """Per-tool pair of 0-1 values joined by a line (e.g. F1 vs F1 after DB)."""
+    rows = [r for r in rows
+            if optional_number(r.get(left_key)) is not None and optional_number(r.get(right_key)) is not None]
+    if not rows:
+        return f"<p class='muted'>{esc(empty_text)}</p>"
+    row_height = 28
+    width, label_width, chart_width = 760, 145, 470
+    height = 30 + len(rows) * row_height
+    left_color, right_color = "#174b3a", "#bd4b42"
+    parts = [f"<svg class='performance-chart' viewBox='0 0 {width} {height}' role='img' aria-label='{esc(aria)}'>",
+             f"<text x='{label_width}' y='14' class='axis'>0</text>"
+             f"<text x='{label_width + chart_width - 18}' y='14' class='axis'>1.0</text>"]
+    for index, row in enumerate(rows):
+        y = 30 + index * row_height
+        left = optional_number(row.get(left_key))
+        right = optional_number(row.get(right_key))
+        x1, x2 = label_width + chart_width * left, label_width + chart_width * right
+        parts.append(f"<text x='0' y='{y + 4}' class='label'>{esc(row['tool'])}</text>")
+        parts.append(f"<line x1='{label_width}' x2='{label_width + chart_width}' y1='{y}' y2='{y}' stroke='#e0e8e1' stroke-width='6'/>")
+        parts.append(f"<line x1='{x1:.1f}' x2='{x2:.1f}' y1='{y}' y2='{y}' stroke='#8a9a90' stroke-width='2'/>")
+        parts.append(f"<circle cx='{x1:.1f}' cy='{y}' r='6' fill='{left_color}'><title>{esc(row['tool'])} "
+                     f"{esc(left_label)}: {left:.3f}</title></circle>")
+        parts.append(f"<circle cx='{x2:.1f}' cy='{y}' r='6' fill='{right_color}'><title>{esc(row['tool'])} "
+                     f"{esc(right_label)}: {right:.3f}</title></circle>")
+        parts.append(f"<text x='{label_width + chart_width + 8}' y='{y + 4}' class='axis'>"
+                     f"{left:.2f} → {right:.2f}</text>")
+    legend = (f"<div class='chart-legend'><span><i style='background:{left_color}'></i>{esc(left_label)}</span>"
+              f"<span><i style='background:{right_color}'></i>{esc(right_label)}</span></div>")
+    return legend + "".join(parts) + "</svg>"
+
+
+def robustness_section(track_leaderboards, ordered_tracks):
+    """How much each headline number can be trusted, per analysis track."""
+    blocks = []
+    for track in ordered_tracks:
+        rows = track_leaderboards.get(track) or []
+        if not rows:
+            continue
+        heading = (f"<h3>{esc(ROBUSTNESS_TRACK_LABELS.get(track, track))}</h3>"
+                   if len(ordered_tracks) > 1 else "")
+        body = []
+        for row in rows:
+            basis = row.get("ranking_basis") or ""
+            ranked_on = _value_or(row, "n_ranking_samples")
+            ranked_on += " shared" if basis == "shared_samples" else (" own (no overlap)" if basis else "")
+            overlap = "-"
+            if row.get("n_possible_db_overlap") not in (None, ""):
+                if (optional_number(row.get("n_possible_db_overlap")) or 0) == 0 and \
+                        (optional_number(row.get("n_after_database")) or 0) == 0:
+                    overlap = "n/a (no reference database, or dates not filled)"
+                else:
+                    overlap = f"{esc(row['n_possible_db_overlap'])} possible / {_value_or(row, 'n_after_database', '0')} after"
+            redundant = optional_number(row.get("total_redundant_pred_bp"))
+            body.append(
+                "<tr><td>{tool}</td><td><strong>{f1}</strong></td><td>{ranked_on}</td><td>{clusters}</td>"
+                "<td>{f1_all}</td><td>{zeros}</td><td>{precision}</td><td>{strict}</td><td>{recall}</td>"
+                "<td>{ceiling}</td><td>{adjusted}</td><td>{redundant}</td><td>{overlap}</td><td>{f1_after}</td></tr>".format(
+                    tool=esc(row["tool"]), f1=_value_or(row, "mean_f1"), ranked_on=ranked_on,
+                    clusters=_value_or(row, "n_independent_clusters"),
+                    f1_all=_value_or(row, "mean_f1_all_scored"),
+                    zeros=_value_or(row, "n_failures_scored_zero", "0"),
+                    precision=_value_or(row, "mean_precision"),
+                    strict=_value_or(row, "mean_strict_precision"),
+                    recall=_value_or(row, "mean_recall"),
+                    ceiling=_value_or(row, "mean_recall_ceiling", "not computed"),
+                    adjusted=_value_or(row, "mean_ceiling_adjusted_recall", "not computed"),
+                    redundant=f"{int(redundant):,}" if redundant is not None else "-",
+                    overlap=overlap,
+                    f1_after=_value_or(row, "mean_f1_after_database", "not assessed"),
+                ))
+        table = ("<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Mean F1 (ranking)</th>"
+                 "<th>Ranked on samples</th><th>Independent clusters</th><th>Mean F1, all scored</th>"
+                 "<th>Failed runs scored 0</th><th>Mean precision</th><th>Strict precision</th><th>Base recall</th>"
+                 "<th>Recall ceiling</th><th>Ceiling-adjusted recall</th><th>Redundant predicted bp</th>"
+                 "<th>Database overlap (samples)</th><th>Mean F1 after database</th></tr></thead>"
+                 f"<tbody>{''.join(body)}</tbody></table></div>")
+        charts = (
+            "<div class='chart-card'><h4>Recall against what was reachable</h4>" + ceiling_chart(rows) + "</div>"
+            "<div class='chart-card'><h4>Precision vs strict precision</h4>"
+            + dumbbell_chart(rows, "mean_precision", "mean_strict_precision", "Precision", "Strict precision",
+                             "Mean precision and strict precision by tool",
+                             "Strict precision is not available for these score rows.") + "</div>"
+            "<div class='chart-card'><h4>F1 on all samples vs samples released after the tool's database</h4>"
+            + dumbbell_chart(rows, "mean_f1", "mean_f1_after_database", "Mean F1 (ranking)",
+                             "Mean F1, truth released after database",
+                             "Mean F1 overall and on samples released after the tool's database",
+                             "Not assessed: fill database_release_date in config/tool_database_releases.tsv "
+                             "and keep each sample's assembly_data_report.jsonl.") + "</div>"
+        )
+        blocks.append(heading + table + charts)
+    content = "".join(blocks) or "<p class='muted'>No leaderboard rows to assess.</p>"
+    return (
+        "<section id='robustness'><h2>Robustness diagnostics</h2>"
+        "<p class='lead'>How far each headline number can be trusted. None of these change the ranking. "
+        "<strong>Ranked on</strong>: every tool is ranked on the samples all ranked tools share, and a "
+        "failed tool run on a plasmid-bearing sample counts as F1 = 0. <strong>Independent clusters</strong>: "
+        "confidence intervals and permutation tests resample whole BioProjects, because isolates from one "
+        "study are not independent. <strong>Strict precision</strong> also charges predicted bases that "
+        "never aligned or failed the alignment filters, which ordinary precision ignores. "
+        "<strong>Recall ceiling</strong> is the largest recall any prediction could reach: plasmid sequence "
+        "repeated elsewhere in the genome cannot be placed uniquely and is never credited. "
+        "<strong>Redundant predicted bp</strong> are reference bases claimed more than once. "
+        "<strong>Database overlap</strong> counts samples whose truth genome was public before the tool's "
+        "own reference database, so the tool may already contain it; <strong>Mean F1 after database</strong> "
+        "uses only samples it cannot contain. This is a date-based screen, not proof of inclusion.</p>"
+        + content + "</section>"
+    )
+
+
 def performance_chart(leaderboard):
     if not leaderboard:
         return "<p class='muted'>No scored tools yet.</p>"
@@ -2541,7 +2698,7 @@ def main():
         return (
             "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
             "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{perfect}</td><td>{strict}</td><td>{bin_f1}</td><td>{nmi}</td><td>{vi}</td><td>{pr_auc}</td>"
-            "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span></td>"
+            "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span>{ranked_on}</td>"
             "<td><span class='sig-badge {sig_class}'>{sig_text}</span></td></tr>".format(
                 rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
                 scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
@@ -2556,6 +2713,8 @@ def main():
                 pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row["mean_f1"]),
                 f1_width=max(0, min(100, round(number(row["mean_f1"]) * 100))),
                 band=score_band(number(row["mean_f1"])),
+                ranked_on=(f"<small class='muted'> on {esc(row['n_ranking_samples'])} shared</small>"
+                           if row.get("n_ranking_samples") and row.get("ranking_basis") == "shared_samples" else ""),
                 sig_class=sig_class, sig_text=esc(sig_text),
             )
         )
@@ -2599,6 +2758,8 @@ def main():
     else:
         leaderboard_panels = leaderboard_table(
             track_leaderboards.get(ordered_tracks[0], leaderboard) if ordered_tracks else leaderboard)
+
+    robustness_html = robustness_section(track_leaderboards, ordered_tracks or list(track_leaderboards))
 
     score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
     score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
@@ -2812,7 +2973,10 @@ def main():
 
     comparison_rows = "".join(
         "<tr><td>{a}</td><td>{b}</td><td>{n}</td><td>{difference}</td><td>{ci}</td><td>{p}</td><td>{holm}</td><td>{wins}/{ties}/{losses}</td></tr>".format(
-            a=esc(row["tool_a"]), b=esc(row["tool_b"]), n=esc(row["paired_samples"]),
+            a=esc(row["tool_a"]), b=esc(row["tool_b"]),
+            n=esc(row["paired_samples"]) + (
+                f" ({esc(row['paired_clusters'])} clusters)"
+                if row.get("paired_clusters") and row.get("paired_clusters") != row.get("paired_samples") else ""),
             difference=esc(row["mean_f1_difference"]),
             ci=esc((row.get("difference_ci_low") and row.get("difference_ci_high") and
                     f"{row['difference_ci_low']} to {row['difference_ci_high']}") or "not estimated (n < 5)"),
@@ -2968,7 +3132,7 @@ def main():
 <section id='extended'><h2>Extended analyses and next steps</h2><p class='lead'>These optional analyses add decision context. They do not replace the primary benchmark ranking, and an unavailable item means it was not requested or lacked suitable evidence.</p><div class='insight neutral'>{optional_analysis}</div></section>
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
 <section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. Circular-truth recovery is not evidence that a predicted sequence is closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{tool_options}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Circular truth recovery</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
-<section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values require at least five pairs. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool A</th><th>Tool B</th><th>Pairs</th><th>Mean F1 difference</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th><th>A wins / ties / B wins</th></tr></thead><tbody>{comparison_rows}</tbody></table></div><p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
+<section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least five independent units. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool A</th><th>Tool B</th><th>Pairs</th><th>Mean F1 difference</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th><th>A wins / ties / B wins</th></tr></thead><tbody>{comparison_rows}</tbody></table></div><p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
 <section id='zero-plasmid'><h2>Zero-plasmid isolates (negative control)</h2><p class='lead'>Precision, recall, and F1 are correctly undefined on an isolate with no true plasmid at all -- there is nothing to recover, and a tool predicting nothing has made a correct abstention, not scored a zero. These isolates are still valuable: they are the only ones that directly measure false-positive behavior. Isolate specificity is 1 minus the fraction of that isolate's chromosome a tool wrongly called plasmid; chromosome FP bp is the same false call in raw bases, summed across every plasmid-free isolate a tool was scored on. A specificity below 1.0 means real chromosomal sequence was misclassified as plasmid on a sample where NO plasmid exists to justify it.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Plasmid-free isolates scored</th><th>Mean isolate specificity</th><th>Total chromosome FP bp</th></tr></thead><tbody>{zero_plasmid_html}</tbody></table></div></section>
 <section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered AND circular, the strictest per-plasmid claim this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>
@@ -2976,12 +3140,12 @@ def main():
 <section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
 <section id='replicon-recovery'><h2>Recovery by replicon and mobility type</h2><p class='lead'>Which kinds of plasmid each tool recovers, using the Inc/rep and relaxase (MOB) labels annotated on the truth references. <strong>Descriptive only: it never ranks tools and never changes the leaderboard.</strong> A plasmid with several labels counts once under each. A plasmid with no label of that type is <em>untyped</em>; plasmids in samples with no annotation are left out rather than called untyped. Groups with few plasmids are flagged, so read patterns, not ranks. Tracks are never mixed.{replicon_recovery_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Tool</th><th>Label type</th><th>Label</th><th>Plasmids</th><th>Samples</th><th>Mean completeness</th><th>Recovered fraction</th><th>Note</th></tr></thead><tbody>{replicon_recovery_html}</tbody></table></div></section>
 <section id='quast-diagnostics'><h2>QUAST structural diagnostics</h2><p class='lead'>Optional supplementary check of each tool's predicted plasmid sequence against the truth, run three ways: <em>combined</em> (all truth plasmids), <em>individual</em> (one run per truth plasmid) and <em>chromosome</em> (chromosome only). A high chromosome genome fraction means the tool's plasmid call contains chromosome sequence; misassemblies and duplication ratio flag structural problems that base-level F1 cannot see. <strong>Descriptive only: it never changes the ranking.</strong> Misassembly counts are alignment-derived and are not validated against read or graph support. Means skip blank values.{quast_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Reference</th><th>Comparisons</th><th>Mean genome fraction (%)</th><th>Total misassemblies</th><th>Mean duplication ratio</th></tr></thead><tbody>{quast_html}</tbody></table></div></section>
-<section id='health'><h2>Execution health</h2><p class='lead'>A failed or unavailable tool is excluded from F1 aggregation. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
+<section id='health'><h2>Execution health</h2><p class='lead'>A failed tool run on an isolate with true plasmid counts as F1 = 0 for that tool's ranking; a skipped or unavailable tool is left out, and samples not shared by every ranked tool are left out of everyone's ranking. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
 <section id='samples'><h2>Sample drill-down</h2><p class='lead'>Open a sample to compare every completed tool side-by-side.</p>{''.join(sample_sections) or "<p class='muted'>No samples were found.</p>"}</section>
 <section id='keys'><h2>Keys, legend, and metric definitions</h2><p class='lead'>Every term the report uses, what it measures, and why it matters. The same text appears as a tooltip wherever the term is used, so this page is a reference rather than the only place an explanation exists.</p><div class='legend'><span><i style='background:#087250'></i>High F1: &ge;0.90</span><span><i style='background:#c68221'></i>Medium F1: 0.70&ndash;0.89</span><span><i style='background:#bd4b42'></i>Low F1: &lt;0.70</span><span class='muted'>Bands are visual aids, not acceptance thresholds.</span></div><div class='term-grid'>{glossary_cards}</div></section>
 <section id='files'><h2>Artifact explorer</h2><p class='lead'>All files created or consumed by this project are listed below. Select a filename to open or download it; directory branches can be expanded independently.</p>{''.join(explorers)}</section>
-<section id='method'><h2>Scoring method and interpretation</h2><div class='method'><p><strong>Truth:</strong> sequences in each complete reference assembly are labelled plasmid or chromosome from the NCBI sequence report.</p><p><strong>Prediction:</strong> each tool’s standardized predicted-plasmid FASTA is aligned to the reference using minimap2.</p><p><strong>Metrics:</strong> covered plasmid reference bases are TP; covered chromosome reference bases are FP; uncovered plasmid bases are FN. Precision measures contamination control; recall measures plasmid completeness; F1 balances both.</p><p><strong>Run integrity:</strong> failed tool execution, failed adaptation, and mapping failure do not become zero-score observations. They appear in execution health and reduce the completed/scored counts shown in the leaderboard.</p></div></section>
+<section id='method'><h2>Scoring method and interpretation</h2><div class='method'><p><strong>Truth:</strong> sequences in each complete reference assembly are labelled plasmid or chromosome from the NCBI sequence report.</p><p><strong>Prediction:</strong> each tool’s standardized predicted-plasmid FASTA is aligned to the reference using minimap2.</p><p><strong>Metrics:</strong> covered plasmid reference bases are TP; covered chromosome reference bases are FP; uncovered plasmid bases are FN. Precision measures contamination control; recall measures plasmid completeness; F1 balances both.</p><p><strong>Run integrity:</strong> a failed tool run on an isolate with true plasmid counts as F1 = 0 for that tool, so a tool cannot rise in the ranking by failing on hard isolates. A tool that runs but predicts nothing there also scores F1 = 0. Skipped tools and scoring-stage failures are not scored; every tool is ranked only on the samples all ranked tools share. All of these appear in execution health and in the leaderboard counts.</p></div></section>
 <footer>Inputs: <a href='scores.tsv'>scores.tsv</a>, <a href='tool_status.tsv'>tool_status.tsv</a>, <a href='benchmark.leaderboard.tsv'>benchmark.leaderboard.tsv</a>. Report location: {esc(out.name)}.</footer></main>
 <script>
 const sf=document.getElementById('sample-filter'),tf=document.getElementById('tool-filter'),vf=document.getElementById('version-filter'),bf=document.getElementById('band-filter'),of=document.getElementById('organism-filter'),originf=document.getElementById('origin-filter'),cf=document.getElementById('tech-filter'),qf=document.getElementById('tier-filter'),sizef=document.getElementById('size-filter'),depthMin=document.getElementById('depth-min'),depthMax=document.getElementById('depth-max');
@@ -2994,6 +3158,9 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
 </body></html>"""
     page = page.replace("<a href='#scores'>", "<a href='#enterprise'>Interactive dashboard</a><a href='#scores'>")
     page = page.replace("<section id='scores'>", enterprise_html + "<section id='scores'>")
+    page = page.replace("<section id='recommendations'>", robustness_html + "<section id='recommendations'>", 1)
+    page = page.replace("<a href='#recommendations'>Recommendations</a>",
+                        "<a href='#robustness'>Robustness</a><a href='#recommendations'>Recommendations</a>", 1)
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")

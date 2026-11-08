@@ -11,6 +11,60 @@ below folds in every change from the tags it supersedes -- nothing from that
 history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
+## [Unreleased]
+
+### Fixed
+- **Empty predictions no longer inflate mean F1.** On an isolate with true
+  plasmid, a tool that predicts nothing now scores F1 = 0 (precision stays
+  empty). Previously F1 was left empty and the sample was dropped from the
+  tool's mean, so a tool that abstained on hard isolates could tie a perfect one.
+- **Tools are ranked on the same samples.** `mean_f1`, its CI and median now use
+  only samples shared by every ranked tool in the track; a failed tool run
+  (`tool_status.tsv`) on a plasmid-bearing sample counts as F1 = 0 for that tool,
+  in both the ranking and the paired comparisons. New leaderboard columns:
+  `analysis_track`, `n_ranking_samples`, `ranking_basis`, `mean_f1_all_scored`,
+  `n_f1_scored`, `n_failures_scored_zero`.
+- **The combined leaderboard no longer ranks across input tracks.**
+  `benchmark.leaderboard.tsv/.md` now hold each track's table ranked within that
+  track, and `benchmark.paired_comparisons.tsv` only compares tools within a
+  track (new `analysis_track` column). Previously the combined file ranked
+  short-read, long-read and hybrid tools against each other.
+- `make_truth.py` no longer claims that defaulting an unclassified sequence to
+  CHROMOSOME "only ever creates false negatives": if it is really a plasmid, correct
+  plasmid calls on it are scored as false positives. Its warnings now say so, and
+  the plasmid-free note no longer suggests excluding negative-control isolates.
+- The HTML report no longer says failed tool runs are excluded from F1 aggregation
+  or never become zero scores; it now describes the failure-as-zero ranking rule.
+- METHODS.md now states that `unmapped_pred_bp` includes predicted sequence whose
+  alignments were all removed by the alignment filters, so it lowers neither
+  precision nor F1.
+
+### Added
+- **Cluster-aware statistics.** Bootstrap CIs and paired permutation tests resample
+  whole BioProject clusters (sample-sheet `bioproject`, else `source_study`), so
+  same-study isolates are not counted as independent. New columns
+  `n_independent_clusters` (leaderboard) and `paired_clusters` (comparisons).
+  Unchanged results when no cluster column is present.
+- **Recall-ceiling diagnostic** (`python/scorable_truth.py`, stage 5, on by default):
+  `scorable_plasmid_bp`, `recall_ceiling` and `ceiling_adjusted_recall` show how much
+  plasmid sequence (shared repeats, duplicate plasmids) no prediction can be credited
+  for under the alignment filters. Config: `RUN_SCORABLE_TRUTH`,
+  `SCORABLE_WINDOW_BP`, `SCORABLE_STEP_BP`.
+- **Strict precision** (`strict_precision`, `mean_strict_precision`): also charges
+  unmapped and filter-rejected predicted bases. Supplementary, never ranking.
+- **Reference-database overlap screen** (`python/flag_database_overlap.py`, stage 6,
+  `config/tool_database_releases.tsv`): flags truth genomes public before a tool's
+  database; leaderboard adds `n_possible_db_overlap`, `n_after_database`,
+  `mean_f1_after_database`; `EXCLUDE_DATABASE_OVERLAP=1` drops flagged rows before
+  ranking. Stage 1 now keeps `assembly_data_report.jsonl` for the release date.
+- **HTML report "Robustness diagnostics" section** with a table and three charts
+  (recall vs ceiling, precision vs strict precision, F1 vs F1 after database);
+  the leaderboard shows the shared-sample basis and the comparisons table shows
+  cluster counts.
+- `redundant_pred_bp` score column: reference bases claimed more than once by
+  retained alignments (e.g. duplicate predicted records). Diagnostic only; it never
+  changes TP, FP or F1.
+
 ## [0.1.5] - 2026-09-10
 
 ### Added

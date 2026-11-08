@@ -17,7 +17,10 @@
 # The second argument is the base assembly, unused here but kept so every
 # adapter in adapters/ has one calling convention (see adapters/REGISTRY.md).
 set -euo pipefail
-OUT_DIR="$1"; BASE_ASM="${2:-}"; OUT_FASTA="$3"
+OUT_DIR="$1"
+# shellcheck disable=SC2034  # BASE_ASM: positional adapter contract, unused here
+BASE_ASM="${2:-}"
+OUT_FASTA="$3"
 
 : > "$OUT_FASTA"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"

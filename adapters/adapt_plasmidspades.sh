@@ -6,7 +6,10 @@
 #
 # Usage: adapt_plasmidspades.sh <plasmidspades_out_dir> <base_assembly_fasta> <out_fasta>
 set -euo pipefail
-OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
+OUT_DIR="$1"
+# shellcheck disable=SC2034  # BASE_ASM: positional adapter contract, unused here
+BASE_ASM="$2"
+OUT_FASTA="$3"
 : > "$OUT_FASTA"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 if [[ -s "$OUT_DIR/contigs.fasta" ]]; then

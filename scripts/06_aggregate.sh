@@ -20,10 +20,27 @@ while IFS= read -r -d '' evidence; do
 done < <(find "$RESULTS_DIR" -type f -name 'pred_*.evidence.tsv' -print0)
 # Correlated-sample detection lives in aggregate_results.py, which reads the
 # score rows themselves rather than looking for a file beside the sample sheet.
+# Reference-database overlap screen: which truth genomes may already be in
+# each tool's own database/training data (date-based; see
+# python/flag_database_overlap.py). Advisory unless EXCLUDE_DATABASE_OVERLAP=1.
+OVERLAP_ARGS=()
+DB_REGISTRY="$PROJECT_ROOT/config/tool_database_releases.tsv"
+if [[ -s "$DB_REGISTRY" ]]; then
+    if python3 "$HERE/../python/flag_database_overlap.py" \
+            --sample-sheet "$SAMPLE_SHEET" --registry "$DB_REGISTRY" --scores "$SCORES" \
+            --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.database_overlap.tsv"; then
+        OVERLAP_ARGS=(--database-overlap "$RESULTS_DIR/benchmark.database_overlap.tsv")
+        [[ "${EXCLUDE_DATABASE_OVERLAP:-0}" == "1" ]] && OVERLAP_ARGS+=(--exclude-database-overlap)
+    else
+        warn "database-overlap screen failed; leaderboard written without it"
+    fi
+fi
+
 python3 "$HERE/../python/aggregate_results.py" \
     --scores "$SCORES" \
     --tool-status "$RESULTS_DIR/tool_status.tsv" \
     --sample-sheet "$SAMPLE_SHEET" \
+    "${OVERLAP_ARGS[@]}" \
     --out-prefix "$RESULTS_DIR/benchmark"
 
 # Descriptive recovery-by-replicon/MOB breakdown (python/stratify_recovery.py).

@@ -26,7 +26,9 @@ independence rather than just a flag. §4.9 covers it in full.
 Results are never pooled across these input tracks. Aggregation writes one
 leaderboard per track — short-read, long-read and hybrid — and the HTML report
 ranks within each, so a tool given long reads is never ranked against one given
-only short reads.
+only short reads. The combined `benchmark.leaderboard.tsv` holds every track's
+table, each ranked within its own track (`analysis_track` column; rank restarts
+per track).
 
 **Metagenomics:** PlasBench also provides a separate graph-aware metagenomic
 score and report workflow for normalized community-bin outputs. It is not an
@@ -955,10 +957,14 @@ cut -f1,2,3 results/tool_status.tsv
 cat results/assembly_status.tsv
 ```
 
-Every tool should say `completed` or `reused`. `failed` or `skipped` means that tool
-produced no result for that isolate and was left out of the scoring.
+Every tool should say `completed` or `reused`. `skipped` means that tool produced no
+result for that isolate and was left out of the scoring. `failed` on a
+plasmid-bearing isolate counts as F1 = 0 for that tool's ranking — a crash is the
+tool's result, not a free pass.
 
-**How to read the leaderboard.** `mean_f1` ranks tools on plasmid *bases* recovered.
+**How to read the leaderboard.** `mean_f1` ranks tools on plasmid *bases* recovered,
+over the samples every tool in the track was scored on (`n_ranking_samples`). A tool
+that predicts nothing on an isolate with plasmids scores F1 = 0 there.
 `mean_plasmid_recall` is the fraction of *whole plasmids* recovered. These are very
 different numbers and the second is usually far lower. If your question is "do I have
 this entire resistance plasmid?", read `mean_plasmid_recall`. Also read the confidence

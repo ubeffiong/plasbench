@@ -162,6 +162,11 @@ download_sample() {
         fi
         cp "$FNA" "$REF"
         cp "$SR" "$REPORT"
+        # Keep the assembly report: its releaseDate feeds the reference-database
+        # overlap screen (python/flag_database_overlap.py). Optional.
+        local ADR
+        ADR=$(find "$SDIR/ncbi" -name 'assembly_data_report.jsonl' | head -n1)
+        [[ -s "$ADR" ]] && cp "$ADR" "$SDIR/assembly_data_report.jsonl"
         rm -f "$ZIP"
         log "  reference -> $REF"
     fi
@@ -225,7 +230,7 @@ download_sample() {
         # compress
         [[ -f "$SDIR/${SRA}_1.fastq" ]] && pigz -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || true
         [[ -f "$SDIR/${SRA}_2.fastq" ]] && pigz -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || true
-        rm -rf "$SDIR/$SRA"   # remove .sra cache dir
+        rm -rf "${SDIR:?}/${SRA:?}"   # remove .sra cache dir
         if [[ ! -s "$R1" || ! -s "$R2" ]]; then
             warn "paired FASTQ not produced for $SRA (single-end run?); skipping $SAMPLE"
             record_download "$SAMPLE" "failed" "paired FASTQ not produced for $SRA (single-end run?)"
@@ -274,7 +279,7 @@ download_sample() {
                 pigz -f "$SDIR/${LONG_READ_SRA_RUN}.fastq" 2>/dev/null || gzip -f "$SDIR/${LONG_READ_SRA_RUN}.fastq" 2>/dev/null || true
                 mv -f "$SDIR/${LONG_READ_SRA_RUN}.fastq.gz" "$LONG_READS"
             fi
-            rm -rf "$SDIR/$LONG_READ_SRA_RUN"
+            rm -rf "${SDIR:?}/${LONG_READ_SRA_RUN:?}"
             if [[ ! -s "$LONG_READS" ]]; then
                 warn "long-read FASTQ not produced for $LONG_READ_SRA_RUN; skipping $SAMPLE"
                 record_download "$SAMPLE" "failed" "long-read FASTQ not produced for $LONG_READ_SRA_RUN"

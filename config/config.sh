@@ -416,6 +416,20 @@ export MIN_ALIGNMENT_LENGTH="${MIN_ALIGNMENT_LENGTH:-200}"
 export MIN_ALIGNMENT_IDENTITY="${MIN_ALIGNMENT_IDENTITY:-0.90}"
 export MIN_ALIGNMENT_MAPQ="${MIN_ALIGNMENT_MAPQ:-20}"
 export MIN_ALIGNMENT_QUERY_COVERAGE="${MIN_ALIGNMENT_QUERY_COVERAGE:-0.20}"
+# Reference-database overlap (python/flag_database_overlap.py, stage 6): flag
+# sample x tool pairs whose truth assembly was public before the tool's own
+# database (dates in config/tool_database_releases.tsv -- fill them in). 0 =
+# report only (mean_f1_after_database); 1 = drop flagged rows before ranking.
+export EXCLUDE_DATABASE_OVERLAP="${EXCLUDE_DATABASE_OVERLAP:-0}"
+
+# Recall-ceiling diagnostic (python/scorable_truth.py): tile each truth plasmid
+# into windows and map them back with the scoring preset and filters, to find
+# plasmid bases no prediction could ever be scored on (repeats shared with the
+# chromosome, duplicate plasmids). Adds recall_ceiling/ceiling_adjusted_recall;
+# never changes F1. Cheap (plasmids only), so on by default.
+export RUN_SCORABLE_TRUTH="${RUN_SCORABLE_TRUTH:-1}"
+export SCORABLE_WINDOW_BP="${SCORABLE_WINDOW_BP:-1000}"
+export SCORABLE_STEP_BP="${SCORABLE_STEP_BP:-250}"
 # A second, all-mappings PAF exposes repeated query sequence that aligns to
 # both plasmid and chromosome. It is a diagnostic and never alters F1.
 export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"

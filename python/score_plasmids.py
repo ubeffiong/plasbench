@@ -316,6 +316,24 @@ def score(truth, total_plasmid, covered):
     return tp, fp, fn
 
 
+def redundant_bp(covered, truth):
+    """Reference bases claimed more than once by retained alignments.
+
+    score() merges overlapping coverage, so emitting the same plasmid region
+    twice (duplicate records, or one record per copy of a repeat) earns no
+    extra TP but is also never penalised. This diagnostic exposes that
+    redundancy; it never changes TP, FP, or F1.
+    """
+    total = 0
+    for seq_id, intervals in covered.items():
+        if seq_id not in truth:
+            continue
+        length = truth[seq_id][1]
+        raw = sum(max(0, min(e, length) - max(s, 0)) for s, e in intervals)
+        total += max(0, raw - min(merge_intervals(intervals)[1], length))
+    return total
+
+
 def safe_div(a, b):
     return a / b if b else 0.0
 
@@ -462,6 +480,49 @@ def read_circular_plasmids(path, truth):
     return circular
 
 
+def read_scorable_truth(path, truth):
+    """Read scorable_truth.py intervals: sequence_id, start, end (0-based, half-open)."""
+    scorable = defaultdict(list)
+    with open(path) as handle:
+        header = handle.readline().rstrip("\n").split("\t")
+        required = {"sequence_id", "start", "end"}
+        if not required.issubset(header):
+            raise ValueError("scorable truth TSV must contain sequence_id, start, end")
+        idx = {name: header.index(name) for name in required}
+        for line_number, line in enumerate(handle, start=2):
+            if not line.strip():
+                continue
+            fields = line.rstrip("\n").split("\t")
+            seq_id = fields[idx["sequence_id"]]
+            if seq_id not in truth or truth[seq_id][0] != "PLASMID":
+                raise ValueError(f"scorable truth line {line_number} is not on a labelled plasmid: {seq_id}")
+            length = truth[seq_id][1]
+            start, end = max(0, int(fields[idx["start"]])), min(length, int(fields[idx["end"]]))
+            if end > start:
+                scorable[seq_id].append((start, end))
+    return scorable
+
+
+def recall_ceiling_metrics(covered, scorable, truth, total_plasmid):
+    """(scorable_plasmid_bp, recall_ceiling, ceiling_adjusted_recall).
+
+    recall_ceiling is the largest recall any prediction could reach under the
+    scoring filters; ceiling_adjusted_recall is TP within scorable bases over
+    scorable bases. Diagnostic only -- recall and F1 are unchanged.
+    """
+    scorable_bp = tp_scorable = 0
+    for seq_id, (mol, _) in truth.items():
+        if mol != "PLASMID":
+            continue
+        merged_scorable, bp = merge_intervals(scorable.get(seq_id, []))
+        scorable_bp += bp
+        if merged_scorable:
+            tp_scorable += overlap_bp(merge_intervals(covered.get(seq_id, []))[0], merged_scorable)
+    ceiling = safe_div(scorable_bp, total_plasmid) if total_plasmid else None
+    adjusted = safe_div(tp_scorable, scorable_bp) if scorable_bp else None
+    return scorable_bp, ceiling, adjusted
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -476,6 +537,8 @@ def main():
                     help="Fraction of a true plasmid that counts as recovered (default: 0.90).")
     ap.add_argument("--amr-genes", help="Optional curated AMR truth TSV (sequence_id, start, end).")
     ap.add_argument("--amr-gene-recovery-threshold", type=float, default=0.90)
+    ap.add_argument("--scorable-truth", help="Optional scorable_truth.py intervals TSV; adds recall_ceiling "
+                                             "and ceiling_adjusted_recall diagnostics (never changes F1).")
     ap.add_argument("--circular-plasmids", help="Optional curated circular-plasmid TSV (sequence_id).")
     ap.add_argument("--min-alignment-length", type=int, default=1,
                     help="Minimum PAF block length retained for scoring (default: 1).")
@@ -617,13 +680,24 @@ def main():
     # precision=recall=f1=0.0, which reads as total failure for the tool that
     # actually did the correct thing. precision is undefined when nothing was
     # predicted at all (tp+fp == 0); recall is undefined when there was no
-    # true plasmid to recall (tp+fn == 0, i.e. total_plasmid == 0); f1 is
-    # undefined whenever either input to it is.
+    # true plasmid to recall (tp+fn == 0, i.e. total_plasmid == 0).
+    #
+    # f1 is undefined only when there was nothing to recall. When true
+    # plasmid exists but the tool claimed nothing (empty output, or every
+    # alignment filtered out), recall is 0 and f1 is 0 -- NOT undefined.
+    # Leaving it undefined there let aggregation drop exactly the samples a
+    # tool failed on from its mean F1, so a tool that abstained on every
+    # hard isolate could tie a tool that was perfect everywhere.
     precision_defined = (tp + fp) > 0
     recall_defined = (tp + fn) > 0
     precision = safe_div(tp, tp + fp) if precision_defined else None
     recall = safe_div(tp, tp + fn) if recall_defined else None          # completeness
-    f1 = safe_div(2 * precision * recall, precision + recall) if (precision is not None and recall is not None) else None
+    if recall is None:
+        f1 = None
+    elif precision is None:
+        f1 = 0.0
+    else:
+        f1 = safe_div(2 * precision * recall, precision + recall)
 
     # isolate_specificity/chromosome_fp_bp/fp_predicted_record_count are
     # always defined (every real isolate has a non-zero chromosome) and are
@@ -632,6 +706,18 @@ def main():
     # false-positive behaviour -- precision/recall/f1 above are undefined
     # there. specificity = fraction of the (all-)chromosome NOT wrongly
     # claimed as plasmid; the classic true-negative-rate definition.
+    scorable_plasmid_bp = recall_ceiling = ceiling_adjusted_recall = None
+    if args.scorable_truth:
+        try:
+            scorable = read_scorable_truth(args.scorable_truth, truth)
+        except ValueError as exc:
+            raise SystemExit(f"ERROR: {exc}")
+        scorable_plasmid_bp, recall_ceiling, ceiling_adjusted_recall = recall_ceiling_metrics(
+            covered, scorable, truth, total_plasmid)
+
+    strict_denominator = tp + fp + unmapped_pred_bp
+    strict_precision = safe_div(tp, strict_denominator) if strict_denominator > 0 else None
+
     isolate_specificity = safe_div(total_chromosome - fp, total_chromosome) if total_chromosome > 0 else None
     chromosome_fp_bp = fp
     fp_predicted_record_count = fp_record_count(covered_by_query, truth)
@@ -647,6 +733,8 @@ def main():
         "recovered_plasmid_count_ge50", "plasmid_recall_ge50",
         "recovered_plasmid_count_ge90", "plasmid_recall_ge90",
         "recovered_complete_circular_plasmid_count", "complete_circular_plasmid_recall",
+        "redundant_pred_bp", "strict_precision",
+        "scorable_plasmid_bp", "recall_ceiling", "ceiling_adjusted_recall",
     ]
     row = [
         args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
@@ -675,6 +763,19 @@ def main():
         f"{safe_div(recovered_plasmids_ge90, len(true_plasmids)):.4f}" if true_plasmids else "",
         recovered_complete_circular if recovered_complete_circular is not None else "",
         f"{safe_div(recovered_complete_circular, len(circular_plasmids)):.4f}" if recovered_complete_circular is not None else "",
+        # Diagnostic only: reference bases claimed more than once (duplicate
+        # predicted records). Never changes TP/FP/F1.
+        redundant_bp(covered, truth),
+        # Supplementary, never a ranking metric: precision that ALSO charges
+        # predicted bases with no retained alignment (unmapped, or every
+        # alignment rejected by the length/identity/MAPQ/coverage filters)
+        # as wrong. Standard precision ignores them, so noisy, chimeric or
+        # contaminant output is invisible there. Mixed units (reference bp
+        # for TP/FP, query bp for unmapped) make this an approximation.
+        f"{strict_precision:.4f}" if strict_precision is not None else "",
+        scorable_plasmid_bp if scorable_plasmid_bp is not None else "",
+        f"{recall_ceiling:.4f}" if recall_ceiling is not None else "",
+        f"{ceiling_adjusted_recall:.4f}" if ceiling_adjusted_recall is not None else "",
     ]
 
     new_file = not os.path.exists(args.out) or os.path.getsize(args.out) == 0

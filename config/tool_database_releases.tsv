@@ -1,0 +1,18 @@
+tool	uses_reference_database	database	database_release_date	note
+mob_recon	yes	MOB-suite plasmid database (RefSeq complete plasmids)		Fill database_release_date (YYYY-MM-DD) with the release date of the MOB-suite database you installed.
+platon	yes	Platon database (RefSeq plasmid/chromosome proteins)		Fill with the release date of the Platon database you installed.
+plasmidspades	no	none (de novo assembly, coverage-based)		No reference plasmid database.
+gplas2_mob	yes	gplas2 classifier + MOB-suite database		Classifier/database built from public complete plasmids; fill the release date of the version installed.
+gplas2_external	unknown	depends on the external classifier supplied		Set to yes and fill the date if the external classifier was trained on public plasmids.
+flye_mob_recon	yes	MOB-suite plasmid database		Fill with the installed MOB-suite database release date.
+plassembler	yes	Plassembler database (PLSDB-derived)		Fill with the installed Plassembler database release date.
+hybracter_long	yes	Plassembler database (PLSDB-derived)		Fill with the installed Plassembler database release date.
+hybracter_hybrid	yes	Plassembler database (PLSDB-derived)		Fill with the installed Plassembler database release date.
+trycycler_mob_recon	yes	MOB-suite plasmid database		Fill with the installed MOB-suite database release date.
+genomad	yes	geNomad database and trained model		Fill with the installed geNomad database release date.
+plasme	yes	PLASMe database (PLSDB-derived)		Fill with the installed PLASMe database release date.
+rfplasmid	yes	RFPlasmid trained models		Fill with the release date of the RFPlasmid model version installed.
+plasmidhunter	yes	PlasmidHunter trained model		Fill with the release date of the PlasmidHunter model version installed.
+plasmer	yes	Plasmer database and model		Fill with the installed Plasmer database release date.
+plascope	yes	PlaScope database		Fill with the installed PlaScope database release date.
+plasgraph2	yes	plASgraph2 trained model		Fill with the release date of the plASgraph2 model version installed.
