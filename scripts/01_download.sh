@@ -65,6 +65,18 @@ confirm_download() {
     esac
 }
 
+# Paired FASTQ for one run from ENA (python/fetch_ena_reads.py: HTTPS, MD5-verified).
+fetch_from_ena() {
+    local sample="$1" run="$2" sdir="$3"
+    log "  fetching $run from ENA ..."
+    if python3 "$HERE/../python/fetch_ena_reads.py" --run "$run" --out-dir "$sdir" \
+            > "$LOG_DIR/${sample}.ena.log" 2>&1; then
+        return 0
+    fi
+    warn "ENA download failed for $sample ($run); see $LOG_DIR/${sample}.ena.log"
+    return 1
+}
+
 download_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
     local SDIR="$DATA_DIR/$SAMPLE"
@@ -209,34 +221,47 @@ download_sample() {
         fi
     elif [[ -s "$R1" && -s "$R2" ]]; then
         log "  reads already present, skipping download"
+    elif [[ "${READ_SOURCE:-auto}" == "ena" ]] && fetch_from_ena "$SAMPLE" "$SRA" "$SDIR"; then
+        log "  reads (ENA) -> $R1 , $R2"
     else
+        local VIA_ENA=0
         log "  prefetching $SRA ..."
         if ! retry_network "prefetch $SRA" \
                 prefetch -O "$SDIR" "$SRA" > "$LOG_DIR/${SAMPLE}.prefetch.log" 2>&1; then
-            warn "prefetch failed for $SAMPLE ($SRA); skipping this sample"
-            record_download "$SAMPLE" "failed" "prefetch failed for $SRA; see $LOG_DIR/${SAMPLE}.prefetch.log"
-            return 0
+            # READ_SOURCE=auto: the same INSDC run from ENA, checksum-verified, when
+            # the SRA Toolkit cannot connect (for example an old toolkit failing TLS).
+            if [[ "${READ_SOURCE:-auto}" == "auto" ]] && fetch_from_ena "$SAMPLE" "$SRA" "$SDIR"; then
+                VIA_ENA=1
+            else
+                warn "prefetch failed for $SAMPLE ($SRA); skipping this sample"
+                record_download "$SAMPLE" "failed" "prefetch failed for $SRA; see $LOG_DIR/${SAMPLE}.prefetch.log"
+                return 0
+            fi
         fi
-        log "  extracting FASTQ (fasterq-dump) ..."
-        if ! fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" \
-                "$SDIR/$SRA/$SRA.sra" > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1 \
-             && ! retry_network "fasterq-dump $SRA" \
-                    fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" "$SRA" \
-                    > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1; then
-            warn "fasterq-dump failed for $SAMPLE ($SRA); skipping this sample"
-            record_download "$SAMPLE" "failed" "fasterq-dump failed for $SRA; see $LOG_DIR/${SAMPLE}.fasterq.log"
-            return 0
+        if [[ "$VIA_ENA" -eq 0 ]]; then
+            log "  extracting FASTQ (fasterq-dump) ..."
+            if ! fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" \
+                    "$SDIR/$SRA/$SRA.sra" > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1 \
+                 && ! retry_network "fasterq-dump $SRA" \
+                        fasterq-dump --split-files --threads "$THREADS" -O "$SDIR" "$SRA" \
+                        > "$LOG_DIR/${SAMPLE}.fasterq.log" 2>&1; then
+                warn "fasterq-dump failed for $SAMPLE ($SRA); skipping this sample"
+                record_download "$SAMPLE" "failed" "fasterq-dump failed for $SRA; see $LOG_DIR/${SAMPLE}.fasterq.log"
+                return 0
+            fi
+            # compress
+            [[ -f "$SDIR/${SRA}_1.fastq" ]] && pigz -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || true
+            [[ -f "$SDIR/${SRA}_2.fastq" ]] && pigz -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || true
+            rm -rf "${SDIR:?}/${SRA:?}"   # remove .sra cache dir
+            if [[ ! -s "$R1" || ! -s "$R2" ]]; then
+                warn "paired FASTQ not produced for $SRA (single-end run?); skipping $SAMPLE"
+                record_download "$SAMPLE" "failed" "paired FASTQ not produced for $SRA (single-end run?)"
+                return 0
+            fi
+            log "  reads -> $R1 , $R2"
+        else
+            log "  prefetch failed; reads fetched from ENA instead -> $R1 , $R2"
         fi
-        # compress
-        [[ -f "$SDIR/${SRA}_1.fastq" ]] && pigz -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_1.fastq" 2>/dev/null || true
-        [[ -f "$SDIR/${SRA}_2.fastq" ]] && pigz -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || gzip -f "$SDIR/${SRA}_2.fastq" 2>/dev/null || true
-        rm -rf "${SDIR:?}/${SRA:?}"   # remove .sra cache dir
-        if [[ ! -s "$R1" || ! -s "$R2" ]]; then
-            warn "paired FASTQ not produced for $SRA (single-end run?); skipping $SAMPLE"
-            record_download "$SAMPLE" "failed" "paired FASTQ not produced for $SRA (single-end run?)"
-            return 0
-        fi
-        log "  reads -> $R1 , $R2"
     fi
 
     # ---- (c) long reads (truth_source=self_assembled_hybrid only) ----

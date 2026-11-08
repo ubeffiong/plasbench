@@ -67,6 +67,14 @@ python3 "$HERE/../python/label_schemes.py" collect --data-dir "$DATA_DIR" \
     --summary-out "$RESULTS_DIR/benchmark.label_scheme_summary.tsv" \
     || warn "label-scheme collection failed; the report shows no scheme table"
 
+# Contig layer cross-check (python/contig_crosscheck.py compare): the minimap2-based
+# contig scores against an independent alignment-free scorer, per sample and tool.
+if [[ "${RUN_CONTIG_CROSSCHECK:-1}" == "1" ]]; then
+    python3 "$HERE/../python/contig_crosscheck.py" compare --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+        --out "$RESULTS_DIR/benchmark.contig_crosscheck.tsv" \
+        || warn "contig cross-check failed; the report shows no cross-check table"
+fi
+
 # AMR placement by gene class (python/score_amr_placement.py collect): one row per
 # tool and gene class (carbapenemase / ESBL / colistin / ... / all).
 if [[ "${RUN_AMR_PLACEMENT:-1}" -eq 1 ]]; then
@@ -312,6 +320,7 @@ python3 "$HERE/../python/build_html_report.py" \
     --warning-eval "$RESULTS_DIR/benchmark.warning_eval.tsv" \
     --leave-taxon-out "$RESULTS_DIR/benchmark.leave_taxon_out.tsv" \
     --amr-placement "$RESULTS_DIR/benchmark.amr_placement.tsv" \
+    --contig-crosscheck "$RESULTS_DIR/benchmark.contig_crosscheck.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."
