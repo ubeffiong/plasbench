@@ -239,6 +239,25 @@ NOTE: plASgraph2 is distributed as a git checkout, not a conda/bioconda
 EOF
     exit 1
     ;;
+ # Shared utilities used by default or opt-in stages, which no profile installed before:
+ #   mash     clonal grouping (stage 6), the truth-evidence plasmid sketch, difficulty
+ #            features and the reference-set build
+ #   samtools difficulty features (RUN_DIFFICULTY_FEATURES)
+ #   barrnap  rRNA genes, the chromosomal evidence used to label truth replicons
+ # They are all in env/environment.yml too; this profile is for an environment built another way.
+ utilities) PKGS=(mash samtools barrnap);;
+ # Callers of the default reference-annotation stage (python/annotate_reference.py). An absent
+ # caller is recorded as not_evaluated for its feature class and never as "no such feature", so
+ # these are advisory, but without them replicon, AMR and insertion-sequence context is empty.
+ # mob_suite supplies mob_typer; barrnap is in the 'utilities' profile above.
+ reference-annotation)
+    PKGS=(abricate ncbi-amrfinderplus isescan mob_suite)
+    cat >&2 <<'EOF'
+NOTE: ncbi-amrfinderplus needs its reference database fetched once after install:
+          amrfinder -u
+      abricate ships its own databases. See INSTALL.md section 8.
+EOF
+    ;;
  annotation) PKGS=(bakta);;
  annotation-prokka) PKGS=(prokka);;
  gplas)
@@ -278,7 +297,7 @@ EOF
     # `metagenomics` is deliberately absent: its two baseline dependencies are
     # already covered by `assembly` and `genomad` below. Keeping it out avoids
     # a redundant second solver transaction during install-tools all.
-    for installed_profile in core assembly reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast annotation annotation-prokka; do
+    for installed_profile in core assembly reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast utilities reference-annotation annotation annotation-prokka; do
         echo "[plasbench] ===== install-tools $installed_profile ====="
         "$0" --env "$ENV_NAME" "$installed_profile" || failures=1
     done

@@ -43,7 +43,22 @@ conda activate plasbench
 
 This installs: `ncbi-datasets-cli`, `sra-tools`, `entrez-direct`, `fastp`, `spades`
 (provides `spades.py` **and** `plasmidspades.py`), `unicycler`, `mob_suite`, `platon`,
-`minimap2`, `samtools`, `pigz`.
+`minimap2`, `samtools`, `barrnap`, `mash`, `pigz`.
+
+If you built the environment another way (or `bash scripts/00_setup.sh` reports one of these
+missing), two install profiles supply the rest:
+
+```bash
+plasbench install-tools utilities             # mash, samtools, barrnap
+plasbench install-tools reference-annotation  # abricate, ncbi-amrfinderplus, isescan, mob_suite
+amrfinder -u                                  # once, after reference-annotation
+```
+
+`mash` matters more than it looks: stage 6 uses it for clonal grouping, and without it the
+independence clusters fall back to BioProject or study only. The reference-annotation callers
+run in stage 2 by default (`RUN_REFERENCE_ANNOTATION=1`); a missing one leaves its feature class
+`not_evaluated` (never "absent"), so the run continues but replicon, AMR or insertion-sequence
+context is empty. `bash scripts/00_setup.sh` lists exactly which are missing.
 
 Verify:
 ```bash
@@ -270,7 +285,8 @@ plasbench install-tools quast
 **`RUN_DIFFICULTY_FEATURES`** (stage 3) needs three tools: `minimap2` and
 `samtools` are already installed as part of the core environment (step 2
 above); `mash` is a direct `env/environment.yml` dependency, also already
-installed. The third, `deadends`
+installed (`plasbench install-tools utilities` installs `mash` and `samtools` into an
+environment built another way). The third, `deadends`
 ([rrwick/GFA-dead-end-counter](https://github.com/rrwick/GFA-dead-end-counter)),
 has **no bioconda package** -- build it from source per that repo's own
 instructions, or download a prebuilt binary from its GitHub releases page,
