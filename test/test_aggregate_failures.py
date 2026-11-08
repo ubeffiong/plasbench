@@ -14,6 +14,7 @@ from collections import defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "python"))
 
+import headline_design as hd  # noqa: E402
 from aggregate_results import (  # noqa: E402
     failure_class, ranked_tracks, read_failed_samples, read_resource_failure_counts,
 )
@@ -148,6 +149,36 @@ def main():
               tracks_zero["short_read"]["big"]["n_failures_scored_zero"] == 2)
         check("exclude scores only the tool failure as 0",
               tracks_excl["short_read"]["big"]["n_failures_scored_zero"] == 1)
+
+    # 8. The per-species table (benchmark.species.tsv) must agree with the ranking: a tool
+    #    that failed on every sample has no score rows, yet the ranking scores it 0.
+    print("per-species table")
+    design = hd.Design()
+    good_rows = [row(s, "good", 0.9) for s in SAMPLES]
+    everywhere = {"crashy": set(SAMPLES)}
+    table = hd.species_table("short_read", "classification", good_rows, "f1", design, everywhere,
+                             known_tools={"crashy"}, eligible_samples=set(SAMPLES))
+    crashy = [r for r in table if r["tool"] == "crashy"]
+    check("a tool that failed on every sample is listed", bool(crashy))
+    check("with a mean of 0.0", all(r["mean_metric"] == 0.0 for r in crashy))
+    check("over every plasmid-bearing sample", sum(r["n_samples"] for r in crashy) == len(SAMPLES))
+    check("the scored tool is unchanged", all(r["mean_metric"] == 0.9 for r in table if r["tool"] == "good"))
+    legacy = hd.species_table("short_read", "classification", good_rows, "f1", design, everywhere)
+    check("without known_tools the old behaviour is kept (callers that do not pass it)",
+          {r["tool"] for r in legacy} == {"good"})
+    other = hd.species_table("short_read", "classification", good_rows, "f1", design,
+                             {"crashy": set(SAMPLES), "elsewhere": set(SAMPLES)}, known_tools={"crashy"},
+                             eligible_samples=set(SAMPLES))
+    check("a failing tool of another track or task is not pulled in", "elsewhere" not in {r["tool"] for r in other})
+    empty = hd.species_table("long_read", "reconstruction", [], "lw_bin_f1", design, everywhere,
+                             known_tools={"crashy"}, eligible_samples=set(SAMPLES))
+    check("a group in which every tool failed still shows the failures",
+          bool(empty) and all(r["mean_metric"] == 0.0 for r in empty))
+    partial = hd.species_table("short_read", "classification", good_rows, "f1", design,
+                               {"crashy": {"s0", "s1"}}, known_tools={"crashy"}, eligible_samples=set(SAMPLES))
+    check("a tool that failed on only two samples gets exactly those two zeros, no others",
+          [r["n_samples"] for r in partial if r["tool"] == "crashy"] == [2]
+          and all(r["mean_metric"] == 0.0 for r in partial if r["tool"] == "crashy"))
 
     print()
     if not ok:

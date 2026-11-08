@@ -91,6 +91,10 @@ history is lost, only the numbering is cleaner. See
   a tier-sensitivity chart.
 
 ### Fixed
+- `benchmark.species.tsv` now lists a tool that failed on every sample (mean 0 over the plasmid-bearing
+  samples), as the leaderboard already did. `species_table` called `shared_values` without the failed-only tool,
+  so the two outputs disagreed. The tool list passed in comes from the same (track, task) group, so failures of
+  other groups' tools are not counted.
 - **A tool that failed on every sample no longer vanishes from the leaderboard.** It now ranks
   last with F1 = 0 on every plasmid-bearing sample, in its own track.
 - Equal mean F1 now ranks by tool name instead of by row order in `scores.tsv`, which made the

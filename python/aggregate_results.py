@@ -1016,7 +1016,10 @@ def main():
     species_rows, tier_rows, design_rows = [], [], []
     for track, task, group_rows, track_summary, _ in per_track:
         metric = hd.TASK_METRIC.get(task, "f1")
-        species_rows.extend(hd.species_table(track, task, group_rows, metric, design, failed))
+        species_rows.extend(hd.species_table(
+            track, task, group_rows, metric, design, failed,
+            known_tools={row["tool"] for row in track_summary},
+            eligible_samples={r["sample"] for r in rows if r["f1"] is not None}))
         all_group = [r for r in all_rows if r["analysis_track"] == track and design.task(r["tool"], all_rows) == task]
         tier_rows.extend(hd.tier_table(track, task, all_group, metric, design))
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,
