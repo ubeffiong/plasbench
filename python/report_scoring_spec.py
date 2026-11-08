@@ -171,7 +171,19 @@ def label_schemes_section(summary, schemes, provenance, data_dir):
                    "analyses in the Robustness table (variants scheme:...).", "".join(parts))
 
 
-def contig_layer_section(leaderboard, scores):
+def crosscheck_summary(rows):
+    """(status text, basis) for the contig layer from contig_crosscheck.py compare rows."""
+    if not rows:
+        return "implemented, not cross-checked in this run", "no independent-scorer table (RUN_CONTIG_CROSSCHECK=0, or no contigs)"
+    deltas = [float(r["delta_f1_bp"]) for r in rows if r.get("delta_f1_bp")]
+    disagree = sum(r.get("status") == "disagree" for r in rows)
+    worst = f"max |delta F1| {max(deltas):.4f}" if deltas else "no defined F1"
+    if disagree:
+        return "cross-checked: disagreements", f"{disagree} of {len(rows)} (sample, tool) pairs differ beyond 0.02; {worst}"
+    return "cross-checked against an independent scorer", f"{len(rows)} (sample, tool) pairs agree within 0.02; {worst}"
+
+
+def contig_layer_section(leaderboard, scores, crosscheck=()):
     rows = [r for r in leaderboard if r.get("tool")]
     have = [r for r in rows if r.get("mean_contig_f1_bp")]
     if not have:
@@ -187,6 +199,16 @@ def contig_layer_section(leaderboard, scores):
                       for r in have])
         body += (f"<p class='muted'>Excluded contig length summed over scored runs: shared (AMBIGUOUS) {shared:,} bp, "
                  f"unassigned (UNPLACED) {unassigned:,} bp.</p>")
+    status, basis = crosscheck_summary(crosscheck)
+    body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
+    if crosscheck:
+        body += table(["Sample", "Tool", "Contigs", "Label agreement", "Kappa", "F1 (minimap2)", "F1 (k-mer)",
+                       "|delta F1|", "MCC (minimap2)", "MCC (k-mer)", "|delta MCC|", "Status", "Contigs labelled differently"],
+                      [(r["sample"], r["tool"], r["n_contigs"], r["label_agreement"], r["label_kappa"], r["primary_f1_bp"],
+                        r["independent_f1_bp"], r["delta_f1_bp"], r["primary_mcc_bp"], r["independent_mcc_bp"],
+                        r["delta_mcc_bp"], r["status"], r["differing_contigs"]) for r in crosscheck])
+    else:
+        body += not_run("independent contig scorer", "no benchmark.contig_crosscheck.tsv (RUN_CONTIG_CROSSCHECK=0 or no contig labels)")
     return section("contig-layer", "Contig layer beside the reference layer",
                    "A parallel layer, never the headline: assembly contigs are labelled against the reference and each "
                    "tool's calls scored per contig, weighted by length. Its recall denominator is the summed length of "
@@ -292,7 +314,7 @@ def amr_section(rows):
                    "config/amr_gene_classes.tsv.", body)
 
 
-def validity_section(leaderboard, provenance, evaluation):
+def validity_section(leaderboard, provenance, evaluation, crosscheck=()):
     tiers = Counter(r.get("reference_tier", "") for r in provenance)
     studies = max((int(r.get("n_folds") or 0) for r in evaluation), default=0)
     validated = tiers.get("1", 0) + tiers.get("2", 0)
@@ -303,14 +325,13 @@ def validity_section(leaderboard, provenance, evaluation):
                                              "stud(ies) for the recommender")
     else:
         level, why = "extrapolated", "no long-read-first (tier 1-2) truth in this run"
-    tools = len({r["tool"] for r in leaderboard if r.get("tool")})
     body = table(["Claim", "Status", "Basis"], [
         ("Tool ranking on these isolates", level, why),
         ("Recommendation for a new isolate of a species in the cohort",
          "partially validated" if studies >= 2 else "extrapolated", f"leave-one-study-out over {studies} fold(s)"),
         ("Recommendation for a species or genus not in the cohort", "extrapolated",
          "see leave-taxon-out; no claim beyond the genera evaluated"),
-        ("Contig layer", "implemented, not validated against a second scorer", f"{tools} tool(s) scored"),
+        ("Contig layer", *crosscheck_summary(crosscheck)),
     ])
     return section("validity", "What these results are valid for",
                    "Tiered from the reference tiers, the number of independent studies and the evaluation coverage. "
@@ -347,19 +368,20 @@ def inject(page, sources):
     leaderboard = read_tsv(sources.get("leaderboard"))
     provenance = read_tsv(sources.get("truth_provenance"))
     evaluation = read_tsv(sources.get("recommender_eval"))
+    crosscheck = read_tsv(sources.get("contig_crosscheck"))
     html_sections = (
         prereg_section(read_json(sources.get("manifest")))
         + scoring_additions_section(leaderboard)
         + outcomes_section(leaderboard)
         + label_schemes_section(read_tsv(sources.get("label_scheme_summary")), read_tsv(sources.get("label_schemes")),
                                 provenance, sources.get("data_dir"))
-        + contig_layer_section(leaderboard, read_tsv(sources.get("scores")))
+        + contig_layer_section(leaderboard, read_tsv(sources.get("scores")), crosscheck)
         + outcome_states_section(read_tsv(sources.get("outcome_states")), read_tsv(sources.get("tool_status")))
         + recommender_section(evaluation, read_json(sources.get("recommender_verdict")),
                               read_tsv(sources.get("warning_eval")))
         + transfer_section(read_tsv(sources.get("leave_taxon_out")), read_tsv(sources.get("comparisons")))
         + amr_section(read_tsv(sources.get("amr_placement")))
-        + validity_section(leaderboard, provenance, evaluation))
+        + validity_section(leaderboard, provenance, evaluation, crosscheck))
     anchor = "<section id='recommendations'>"
     if anchor in page:
         page = page.replace(anchor, html_sections + anchor, 1)

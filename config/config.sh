@@ -601,6 +601,11 @@ export PLASMID_REFERENCE_FASTA="${PLASMID_REFERENCE_FASTA:-$DATA_DIR/db/plasmid_
 # kind of truth; contigs aligning that well to both are AMBIGUOUS (excluded,
 # counted). Adds count-based and length-weighted P/R/F1/MCC per tool.
 export RUN_CONTIG_CLASSIFICATION="${RUN_CONTIG_CLASSIFICATION:-1}"
+# Independent second scorer for the contig layer (python/contig_crosscheck.py):
+# alignment-free k-mer containment labels (k=21, FracMinHash 1/CONTIG_CROSSCHECK_SCALED)
+# compared with the minimap2 labels; benchmark.contig_crosscheck.tsv.
+export RUN_CONTIG_CROSSCHECK="${RUN_CONTIG_CROSSCHECK:-1}"
+export CONTIG_CROSSCHECK_SCALED="${CONTIG_CROSSCHECK_SCALED:-10}"
 # Sequence-level leakage check (python/database_containment.py, stage 6): a
 # truth plasmid is "in" a tool's database when one database record covers
 # >= DATABASE_CONTAINMENT_MIN_COVERAGE of it at >= ..._MIN_IDENTITY. MOB-suite's

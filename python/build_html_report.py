@@ -2801,6 +2801,7 @@ def main():
     ap.add_argument("--warning-eval", help="benchmark.warning_eval.tsv (evaluate_warnings.py)")
     ap.add_argument("--leave-taxon-out", help="benchmark.leave_taxon_out.tsv (leave_taxon_out.py)")
     ap.add_argument("--amr-placement", help="benchmark.amr_placement.tsv (score_amr_placement.py collect)")
+    ap.add_argument("--contig-crosscheck", help="benchmark.contig_crosscheck.tsv (contig_crosscheck.py compare)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -3470,7 +3471,7 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
                     "truth_provenance": args.truth_provenance, "outcome_states": args.outcome_states,
                     "recommender_eval": args.recommender_eval, "recommender_verdict": args.recommender_verdict,
                     "warning_eval": args.warning_eval, "leave_taxon_out": args.leave_taxon_out,
-                    "amr_placement": args.amr_placement}
+                    "amr_placement": args.amr_placement, "contig_crosscheck": args.contig_crosscheck}
     page = report_scoring_spec.inject(page, spec_sources)
     out.parent.mkdir(parents=True, exist_ok=True)
     (out.parent / (out.name.split(".report")[0] + ".scoring_spec.md")).write_text(
