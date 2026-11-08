@@ -13,6 +13,7 @@ Tables read, all written beside the leaderboard as <prefix>.<name>.tsv:
 import csv
 import os
 from collections import defaultdict
+from plasbench_common import number as num  # noqa: E402
 
 TABLES = ("accuracy", "missing_regions", "feature_preservation", "ngoc", "bin_quality", "performance", "power",
           "scenarios", "scenario_performance", "composite", "composite_sensitivity", "reproducibility_tools")
@@ -23,13 +24,6 @@ def read_tsv(path):
         return []
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
-
-
-def num(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def pct(value, digits=1):

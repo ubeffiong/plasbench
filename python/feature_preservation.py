@@ -39,20 +39,12 @@ import csv
 import os
 import sys
 from collections import defaultdict
+from plasbench_common import read_plasmid_lengths as read_truth  # noqa: E402
 
 KIND_ALIASES = {"mob": "mobility", "is": "is_element", "isescan": "is_element"}
 SUMMARY_FIELDS = ("sample", "tool", "analysis_track", "feature_kind", "n_expected", "n_full_length",
                   "n_truncated", "n_missed", "full_length_rate", "mean_covered_fraction")
 NGOC_FIELDS = ("sample", "tool", "analysis_track", "ngoc_features", "n_pairs", "n_conserved", "ngoc")
-
-
-def read_truth(path):
-    plasmids = {}
-    with open(path, newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            if row["molecule_type"].upper() == "PLASMID":
-                plasmids[row["sequence_id"]] = int(row["length"])
-    return plasmids
 
 
 def read_features(paths, plasmids):

@@ -30,6 +30,8 @@ import subprocess
 import sys
 import tempfile
 
+from plasbench_common import MASH_SKETCH_SIZE, UnionFind, mash_dist_limit  # noqa: E402
+
 
 def read_rows(path):
     with open(path, newline="", encoding="utf-8") as handle:
@@ -44,11 +46,12 @@ def mash_pairs(references, max_distance, threads):
     with tempfile.TemporaryDirectory(prefix="plasbench_clonal_") as tmp:
         sketch = os.path.join(tmp, "isolates")
         paths = [references[sample] for sample in sorted(references)]
-        build = subprocess.run(["mash", "sketch", "-p", str(threads), "-s", "10000", "-o", sketch] + paths,
+        build = subprocess.run(["mash", "sketch", "-p", str(threads), "-s", str(MASH_SKETCH_SIZE), "-o", sketch] + paths,
                                text=True, capture_output=True)
         if build.returncode != 0:
             return None
-        dist = subprocess.run(["mash", "dist", "-p", str(threads), sketch + ".msh", sketch + ".msh"],
+        dist = subprocess.run(["mash", "dist", "-p", str(threads), "-d", repr(mash_dist_limit(max_distance)),
+                               sketch + ".msh", sketch + ".msh"],
                               text=True, capture_output=True)
         if dist.returncode != 0:
             return None
@@ -65,19 +68,10 @@ def mash_pairs(references, max_distance, threads):
 
 
 def single_linkage(samples, pairs):
-    parent = {sample: sample for sample in samples}
-
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
+    clusters = UnionFind(samples)
     for a, b in pairs:
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[max(ra, rb)] = min(ra, rb)
-    return {sample: find(sample) for sample in samples}
+        clusters.union(a, b)
+    return {sample: clusters.find(sample) for sample in samples}
 
 
 def main():

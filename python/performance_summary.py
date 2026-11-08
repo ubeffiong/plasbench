@@ -33,6 +33,7 @@ import re
 import statistics
 import sys
 from collections import defaultdict
+from plasbench_common import read_tsv, number  # noqa: E402
 
 EXIT_CODE = re.compile(r"exit_code=(\d+)")
 RESOURCE_EXIT_CODES = {124, 137}
@@ -40,20 +41,6 @@ FIELDS = ("tool", "n_runs", "n_completed", "n_failed", "n_resource_failures", "n
           "median_runtime_seconds", "p90_runtime_seconds", "median_peak_memory_gb", "threads",
           "recovered_plasmids", "thread_seconds_per_recovered_plasmid", "cpu_utilisation",
           "n_cpu_runs", "runtime_scaling_exponent", "memory_scaling_exponent", "n_scaling_points")
-
-
-def read_tsv(path):
-    if not path or not os.path.isfile(path):
-        return []
-    with open(path, newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle, delimiter="\t"))
-
-
-def number(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def percentile(values, fraction):

@@ -1,0 +1,71 @@
+<style>
+#vq-agree{margin:14px 0}
+#vq-agree svg{max-width:100%;height:auto}
+#vq-agree .lgd{display:flex;gap:14px;flex-wrap:wrap;font:11px Arial,sans-serif;color:#5f6d6b;margin-top:6px}
+#vq-agree .lgd i{display:inline-block;width:12px;height:12px;margin-right:5px;vertical-align:-2px}
+#vq-compare{margin:14px 0}
+#vq-compare table{width:100%;border-collapse:collapse;font:12.5px Arial,sans-serif}
+#vq-compare th{background:#edf2ec;text-align:left;padding:7px;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+#vq-compare td{border-top:1px solid #e3e9e8;padding:6px 8px;font-variant-numeric:tabular-nums}
+#vq-compare .up{color:#17805a;font-weight:600}
+#vq-compare .down{color:#b23b30;font-weight:600}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const agree=document.createElement('div');agree.id='vq-agree';
+const comp=document.createElement('div');comp.id='vq-compare';
+($('vq-summary')||$('vq-tracks')).before(agree);($('vq-tracks')).after(comp);
+function ctx(){const a=d.visualizations[$('vq-sample').value],p=$('vq-plasmid').value;
+ return a&&p&&a.truth_plasmids[p]?{a,p,len:a.truth_plasmids[p].length}:null}
+function renderAgreement(){const c=ctx();if(!c){agree.innerHTML='';return}
+ const names=Object.keys(c.a.tools),M=names.length;
+ // Sweep the interval endpoints so every change in support becomes a boundary.
+ const cuts=new Set([0,c.len]);
+ names.forEach(n=>c.a.tools[n].blocks.filter(b=>b.target===c.p).forEach(b=>{
+  cuts.add(Math.max(0,b.target_start));cuts.add(Math.min(c.len,b.target_end))}));
+ const edges=[...cuts].sort((x,y)=>x-y);
+ const bands=[];
+ for(let i=0;i<edges.length-1;i++){const s=edges[i],e=edges[i+1];if(e<=s)continue;
+  const mid=(s+e)/2;
+  const supporters=names.filter(n=>c.a.tools[n].blocks.some(b=>b.target===c.p&&b.target_start<=mid&&b.target_end>=mid));
+  bands.push({s,e,n:supporters.length,who:supporters})}
+ if(!bands.length){agree.innerHTML='';return}
+ const W=1100,L=180,PW=880,x=v=>L+v/c.len*PW;
+ const shade=n=>n===0?'#eef1ee':['#dbeadf','#a9d3ba','#6fb894','#2f9068','#12664a'][Math.min(4,Math.max(0,Math.round((n/M)*4)))];
+ const rects=bands.map((b,i)=>`<rect class="agr" data-i="${i}" x="${x(b.s).toFixed(1)}" y="16" width="${Math.max(1,x(b.e)-x(b.s)).toFixed(1)}" height="18" fill="${shade(b.n)}"><title>${b.s.toLocaleString()}-${b.e.toLocaleString()}: ${b.n}/${M} methods</title></rect>`).join('');
+ const covered=bands.filter(b=>b.n===M).reduce((s,b)=>s+(b.e-b.s),0);
+ agree.innerHTML=`<h3 style="font:600 13px Arial,sans-serif;margin:0 0 6px">Method agreement across ${pbEsc(c.p)}</h3>`
+  +`<svg viewBox="0 0 ${W} 44" role="img" aria-label="Number of methods covering each reference interval"><text x="4" y="29" font-size="12">${M} methods</text>${rects}</svg>`
+  +`<div class="lgd"><span><i style="background:${shade(0)}"></i>0 of ${M}</span><span><i style="background:${shade(M)}"></i>${M} of ${M}</span>`
+  +`<span>${(covered/c.len*100).toFixed(1)}% of the plasmid is supported by every method</span></div>`
+  +`<p class="muted" style="font:11px Arial,sans-serif;margin:6px 0 0">Agreement is shared support, not evidence of correctness: methods can share a bias. Select a band to list the supporting methods.</p>`
+  +`<div id="vq-agree-detail" class="muted" style="font:12px Arial,sans-serif"></div>`;
+ agree.querySelectorAll('.agr').forEach(r=>r.onclick=()=>{const b=bands[+r.dataset.i];
+  $('vq-agree-detail').textContent=`${b.s.toLocaleString()}-${b.e.toLocaleString()}: ${b.n}/${M} — ${b.who.join(', ')||'no method covers this interval'}`})}
+function renderComparison(){const tools=[...new Set(d.matrix.map(r=>r.tool))].sort();
+ if(tools.length<2){comp.innerHTML='';return}
+ if(!$('vq-base')){comp.innerHTML=`<h3 style="font:600 13px Arial,sans-serif;margin:0 0 6px">Method comparison</h3>`
+  +`<div style="display:flex;gap:10px;flex-wrap:wrap;font:12px Arial,sans-serif;margin-bottom:8px">`
+  +`<label>Baseline <select id="vq-base">${tools.map(t=>`<option>${t}</option>`).join('')}</select></label>`
+  +`<label>Comparator <select id="vq-comp">${tools.map((t,i)=>`<option${i===1?' selected':''}>${t}</option>`).join('')}</select></label></div>`
+  +`<div id="vq-compare-body"></div>`;
+  $('vq-base').onchange=renderComparison;$('vq-comp').onchange=renderComparison}
+ const a=$('vq-base').value,b=$('vq-comp').value;
+ const rows=[];[...new Set(d.matrix.map(r=>r.sample))].sort().forEach(s=>{
+  const ra=d.matrix.find(r=>r.sample===s&&r.tool===a),rb=d.matrix.find(r=>r.sample===s&&r.tool===b);
+  if(!ra||!rb||ra.f1==null||rb.f1==null)return;
+  rows.push({s,a:ra,b:rb,d:rb.f1-ra.f1})});
+ if(!rows.length){$('vq-compare-body').innerHTML='<p class="muted">No sample has a scored result for both methods.</p>';return}
+ const mean=rows.reduce((x,r)=>x+r.d,0)/rows.length;
+ const fmt=v=>v==null?'not measured':v.toFixed(3);
+ const dcell=v=>`<span class="${v>0?'up':v<0?'down':''}">${v>0?'+':''}${v.toFixed(3)}</span>`;
+ $('vq-compare-body').innerHTML=`<table><thead><tr><th>Sample</th><th>${a} F1</th><th>${b} F1</th><th>&Delta; F1</th><th>&Delta; contamination</th><th>&Delta; runtime (min)</th></tr></thead><tbody>`
+  +rows.map(r=>`<tr><td>${r.s}</td><td>${fmt(r.a.f1)}</td><td>${fmt(r.b.f1)}</td><td>${dcell(r.d)}</td>`
+   +`<td>${r.a.contamination==null||r.b.contamination==null?'not measured':dcell(r.b.contamination-r.a.contamination)}</td>`
+   +`<td>${r.a.runtime_min==null||r.b.runtime_min==null?'not measured':dcell(r.b.runtime_min-r.a.runtime_min)}</td></tr>`).join('')
+  +`</tbody></table><p class="muted" style="font:11px Arial,sans-serif;margin:6px 0 0">`
+  +`${b} minus ${a} on ${rows.length} shared sample(s); mean &Delta; F1 ${mean>0?'+':''}${mean.toFixed(3)}. `
+  +`Wins ${rows.filter(r=>r.d>0).length} / ties ${rows.filter(r=>r.d===0).length} / losses ${rows.filter(r=>r.d<0).length}. `
+  +`A difference on few samples is not evidence of superiority; see the paired comparison table for interval and permutation evidence.</p>`}
+['vq-sample','vq-tool','vq-plasmid'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(renderAgreement,0)));
+renderAgreement();renderComparison();})();
+</script>

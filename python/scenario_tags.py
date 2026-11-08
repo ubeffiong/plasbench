@@ -33,6 +33,7 @@ import os
 import statistics
 import sys
 from collections import defaultdict
+from plasbench_common import number  # noqa: E402
 
 SAMPLE_FIELDS = ("sample", "scenario", "tags", "n_plasmids", "largest_plasmid_bp", "smallest_plasmid_bp",
                  "read_depth_x", "is_density_per_10kb", "annotated")
@@ -46,13 +47,6 @@ def read_tsv(path, skip_comments=False):
     with open(path, newline="", encoding="utf-8") as handle:
         lines = (line for line in handle if line.strip() and not (skip_comments and line.lstrip().startswith("#")))
         return list(csv.DictReader(lines, delimiter="\t"))
-
-
-def number(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def classify(sample, data_dir, depth, args):

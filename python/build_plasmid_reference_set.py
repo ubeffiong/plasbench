@@ -62,7 +62,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plasbench_common import MASH_SKETCH_SIZE, UnionFind, mash_dist_limit  # noqa: E402
 from validate_cohort import fetch, request_interval  # noqa: E402
+from plasbench_common import fasta_lengths  # noqa: E402
 
 EFETCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
@@ -96,23 +98,14 @@ def fetch_fasta(accession, email, api_key):
     return text if text.endswith("\n") else text + "\n"
 
 
-def fasta_lengths(path):
-    lengths, current_id, current_len = {}, None, 0
-    with open(path) as handle:
-        for line in handle:
-            if line.startswith(">"):
-                if current_id is not None:
-                    lengths[current_id] = current_len
-                current_id, current_len = line[1:].strip().split()[0], 0
-            else:
-                current_len += len(line.strip())
-    if current_id is not None:
-        lengths[current_id] = current_len
-    return lengths
-
-
-def all_vs_all_distances(mash, sketch_path, threads):
-    result = subprocess.run([mash, "dist", "-p", str(threads), str(sketch_path), str(sketch_path)],
+def all_vs_all_distances(mash, sketch_path, threads, max_distance=None):
+    """All-vs-all Mash distances. With max_distance only pairs up to it (plus a safety
+    margin; the caller still filters exactly) are emitted, so output and parsing stay
+    proportional to the near pairs instead of N^2."""
+    command = [mash, "dist", "-p", str(threads)]
+    if max_distance is not None:
+        command += ["-d", repr(mash_dist_limit(max_distance))]
+    result = subprocess.run(command + [str(sketch_path), str(sketch_path)],
                             capture_output=True, text=True, timeout=300)
     if result.returncode != 0:
         raise RuntimeError(f"mash dist (all-vs-all) failed: {result.stderr[-500:]}")
@@ -129,26 +122,16 @@ def single_linkage_clusters(accessions, distances, threshold):
     accession -> (cluster_id, cluster_member_count). cluster_id is the
     lexicographically smallest accession in the cluster -- deterministic
     and stable across rebuilds without a separate counter/ordering concern."""
-    parent = {acc: acc for acc in accessions}
-
-    def find(acc):
-        while parent[acc] != acc:
-            parent[acc] = parent[parent[acc]]
-            acc = parent[acc]
-        return acc
-
-    def union(a, b):
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[max(ra, rb)] = min(ra, rb)
+    clusters = UnionFind(accessions)
+    known = set(accessions)
 
     for ref_id, query_id, distance in distances:
-        if distance <= threshold and ref_id in parent and query_id in parent:
-            union(ref_id, query_id)
+        if distance <= threshold and ref_id in known and query_id in known:
+            clusters.union(ref_id, query_id)
 
     members = {}
     for acc in accessions:
-        members.setdefault(find(acc), []).append(acc)
+        members.setdefault(clusters.find(acc), []).append(acc)
     return {acc: (root, len(members[root])) for root, group in members.items() for acc in group}
 
 
@@ -160,7 +143,7 @@ def main():
     ap.add_argument("--cluster-threshold", type=float, default=0.05,
                     help="Mash distance for single-linkage clustering (default: 0.05, matching "
                          "classify_operational_plasmid.py's own default --similarity-threshold).")
-    ap.add_argument("--sketch-size", type=int, default=10000,
+    ap.add_argument("--sketch-size", type=int, default=MASH_SKETCH_SIZE,
                     help="Mash sketch size (default: 10000, matching compute_difficulty_features.py).")
     ap.add_argument("--email", default="", help="NCBI E-utilities contact email (recommended by NCBI, not required).")
     ap.add_argument("--api-key", default="", help="NCBI API key; raises the request-rate allowance.")
@@ -205,7 +188,7 @@ def main():
         sys.exit(f"ERROR: mash sketch failed: {sketch_result.stderr[-1000:]}")
     reference_sketch = out_dir / "reference.msh"
 
-    distances = all_vs_all_distances(mash, reference_sketch, args.threads)
+    distances = all_vs_all_distances(mash, reference_sketch, args.threads, max_distance=args.cluster_threshold)
     clusters = single_linkage_clusters(accessions, distances, args.cluster_threshold)
 
     metadata_by_accession = {row["accession"]: row for row in curated}

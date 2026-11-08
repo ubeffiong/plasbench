@@ -37,6 +37,7 @@ import argparse
 import gzip
 import os
 import sys
+from plasbench_common import merge_intervals as merge  # noqa: E402
 
 SEPARATOR = "__plasbench_window__"
 
@@ -105,16 +106,6 @@ def cmd_windows(args):
                 out.write(f">{name}{SEPARATOR}{start}_{end}\n{seq[start:end]}\n")
                 written += 1
     sys.stderr.write(f"[scorable_truth] wrote {written} plasmid window(s) to {args.out}\n")
-
-
-def merge(intervals):
-    merged = []
-    for start, end in sorted(intervals):
-        if merged and start <= merged[-1][1]:
-            merged[-1][1] = max(merged[-1][1], end)
-        else:
-            merged.append([start, end])
-    return merged
 
 
 def parse_window_name(name):
