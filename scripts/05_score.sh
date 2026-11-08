@@ -335,6 +335,24 @@ score_sample() {
             rm -f "$RDIR/${tool}.bin_matches.tsv" "$RDIR/${tool}.bin_summary.tsv"
             log "  $tool: bin diagnostics not applicable to declared method class"
         fi
+        # AMR placement (python/score_amr_placement.py): is each curated AMR gene copy
+        # placed on its own plasmid (level 2) and a plasmid of the same replicon type
+        # (level 1)? Only with validated curated AMR truth (AMR_ARGS set above).
+        rm -f "$RDIR/${tool}.amr_placement.tsv"
+        if [[ "${RUN_AMR_PLACEMENT:-1}" -eq 1 && ${#AMR_ARGS[@]} -gt 0 ]]; then
+            local PLACEMENT_ARGS=()
+            [[ -s "$BINS" ]] && binning_capable "$tool" && PLACEMENT_ARGS+=(--bins "$BINS")
+            [[ -s "$CONTIG_LABELS" ]] && PLACEMENT_ARGS+=(--contig-labels "$CONTIG_LABELS")
+            [[ -s "$FEATURES" ]] && PLACEMENT_ARGS+=(--features "$FEATURES")
+            python3 "$HERE/../python/score_amr_placement.py" score --sample "$SAMPLE" --tool "$tool" \
+                --truth "$SCORE_TRUTH" --amr-truth "$AMR" --paf "$PAF" --pred-fasta "$PRED" \
+                "${PLACEMENT_ARGS[@]+"${PLACEMENT_ARGS[@]}"}" \
+                --min-alignment-length "$MIN_ALIGNMENT_LENGTH" --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
+                --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
+                --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
+                --out "$RDIR/${tool}.amr_placement.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" \
+                || warn "AMR placement failed for $SAMPLE/$tool"
+        fi
         # Further dimensions of the same run (advisory; never alter scores.tsv): nucleotide-level
         # accuracy and missing regions, feature preservation and gene-order conservation, and
         # quality-tier bins. Written as per-run shard files and merged in stage 6, so parallel

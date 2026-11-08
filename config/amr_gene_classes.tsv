@@ -1,0 +1,18 @@
+gene_prefix	gene_class	note
+blaKPC	carbapenemase
+blaNDM	carbapenemase
+blaOXA-48	carbapenemase	OXA-48-like
+blaOXA-181	carbapenemase	OXA-48-like
+blaOXA-232	carbapenemase	OXA-48-like
+blaOXA-23	carbapenemase	Acinetobacter OXA-23 group
+blaOXA-24	carbapenemase	Acinetobacter OXA-24/40 group
+blaOXA-58	carbapenemase	Acinetobacter OXA-58 group
+blaVIM	carbapenemase
+blaIMP	carbapenemase
+blaGES	carbapenemase_or_esbl	GES variants differ; check the allele
+blaCTX-M	ESBL
+blaSHV	beta_lactamase	ESBL status depends on the allele
+blaTEM	beta_lactamase	ESBL status depends on the allele
+blaCMY	AmpC
+blaDHA	AmpC
+mcr	colistin	mcr-1 to mcr-10

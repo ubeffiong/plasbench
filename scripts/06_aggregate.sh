@@ -67,6 +67,14 @@ python3 "$HERE/../python/label_schemes.py" collect --data-dir "$DATA_DIR" \
     --summary-out "$RESULTS_DIR/benchmark.label_scheme_summary.tsv" \
     || warn "label-scheme collection failed; the report shows no scheme table"
 
+# AMR placement by gene class (python/score_amr_placement.py collect): one row per
+# tool and gene class (carbapenemase / ESBL / colistin / ... / all).
+if [[ "${RUN_AMR_PLACEMENT:-1}" -eq 1 ]]; then
+    python3 "$HERE/../python/score_amr_placement.py" collect --results-dir "$RESULTS_DIR" \
+        --out "$RESULTS_DIR/benchmark.amr_placement.tsv" \
+        || warn "AMR placement collection failed; the report shows no AMR placement table"
+fi
+
 # Sequence-level leakage check (python/database_containment.py): is each truth
 # plasmid already inside a tool's own database? The installed MOB-suite
 # database is found automatically; add others via TOOL_DATABASE_FASTAS
