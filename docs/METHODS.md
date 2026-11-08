@@ -505,6 +505,9 @@ python3 python/derive_amr_truth.py --features data/<sample>/truth_features.tsv \
     --truth data/<sample>/truth.tsv --out data/<sample>/truth_amr.draft.tsv
 ```
 
+The same command is `plasbench derive-amr-truth`. Setting `DERIVE_AMR_TRUTH_DRAFT=1` makes stage 2
+write the draft for every sample automatically (default off).
+
 The draft is never written to `truth_amr.tsv`, so the scorer cannot use it by accident
 (the script refuses that output name). Every row is tagged `evidence_tier = auto_derived`.
 Annotation runs on the reference, not on any tool's predictions, so the draft is not
@@ -527,6 +530,19 @@ It never changes `scores.tsv`. `python/stratify_recovery.py` joins it to the rep
 `annotate_reference.py`. Stage 6 (`scripts/06_aggregate.sh`) runs it automatically and
 writes `benchmark.recovery_by_replicon.tsv`; a failure there only warns. It can also be
 run by hand:
+
+### Truth-label audit (advisory)
+
+Also available as `plasbench audit-truth-labels`; shown in the report's "Truth-label audit" section.
+
+`python/audit_truth_labels.py` (run by `scripts/06_aggregate.sh`) cross-checks every
+truth sequence's PLASMID/CHROMOSOME label against replicon and MOB evidence in
+`truth_features.tsv` and writes `benchmark.truth_label_audit.tsv`. Findings:
+`chromosome_with_plasmid_markers` (candidate chromid or integrated plasmid),
+`plasmid_without_markers` (candidate mislabel, or a cryptic plasmid the databases do not
+know), `consistent`, and `not_evaluated`. Absence of a marker is reported only when both
+the replicon and MOB callers ran according to `annotation_provenance.json`; otherwise the
+result is `not_evaluated`. The audit never edits `truth.tsv` and never changes a score.
 
 ```bash
 python3 python/stratify_recovery.py --results-dir results --data-dir data \
@@ -727,6 +743,64 @@ different, and more conservative test than a paired permutation test on the same
 shared samples, and the two can disagree. Like every other number in this
 benchmark, a `True` here describes this cohort, not a general claim that the tool
 is better in the field.
+
+## Further benchmark dimensions (advisory)
+
+Stage 5 and stage 6 compute further dimensions beside the headline score. None changes `scores.tsv`, the leaderboard or any
+rank; each step only warns on failure, and a table that cannot be produced is simply absent, which the report shows as *not
+evaluated* (never zero). `RUN_DIMENSION_ANALYSES=0` skips all of them. Per (sample, tool) tables are written as shards in
+`results/<sample>/` and merged in stage 6 by `python/merge_tables.py`, so parallel jobs never write one shared file. Every
+script is also available as `plasbench analysis <name>`.
+
+**Nucleotide-level accuracy and missing regions** (`python/alignment_accuracy.py`, `benchmark.accuracy.tsv`,
+`benchmark.missing_regions.tsv`). The scorer's own alignment filters are applied, then, for blocks on truth plasmids, the CIGAR
+(`minimap2 -c` writes `cg:Z:` and `NM:i:`) is decoded: alignment columns = aligned + inserted + deleted; mismatches come from
+`=`/`X` operations when present, else `NM - I - D`; identity, mismatch, insertion and deletion rates are shares of the same
+columns, so they sum to one. A block with no CIGAR is counted and never guessed. Missing regions are reference intervals no
+retained alignment covers (a circular plasmid's gap across the origin counts as two). `python/mask_accuracy.py` blanks the rates
+for samples whose truth was polished with the benchmark's own Illumina reads (`base_level_metrics_valid = no` in
+`benchmark.truth_provenance.tsv`), because the truth would carry the reads' own errors; the CPRR identity criterion uses the
+same rule. SNP concordance is not computed: it needs known variant positions.
+
+**Feature preservation and NGOC** (`python/feature_preservation.py`, `benchmark.feature_preservation.tsv`,
+`benchmark.ngoc.tsv`). Each truth feature is projected through the alignments, so the prediction needs no annotation of its own.
+Per feature kind: *full length* (at least 95% covered), *truncated* (covered, less), *missed*. NGOC is the share of adjacent
+feature pairs in the reference that are adjacent in the reconstruction, on the same record and orientation, in the order that
+orientation implies, with no other projected feature between them (the last-first pair too for circular truth). A feature
+covered less than 50% breaks its pairs. With a gene table the value is gene-order conservation; with landmark features only it is
+landmark-order conservation, and `ngoc_features` says how many features it rests on.
+
+**Bin quality** (`python/bin_quality.py`, `benchmark.bin_quality.tsv`). Each bin is matched to the truth plasmid it overlaps
+most; completeness is that plasmid's covered fraction and contamination is one minus the bin's aligned bases on it over all its
+aligned bases. High: at least 90% complete and at most 5% contaminated; medium: at least 50% and 10%; low: any other bin on a
+plasmid; spurious: a bin aligning to no plasmid. A split plasmid is judged by its best bin. Homogeneity, completeness and
+V-measure use the same base-pair weighted table as the NMI. These are secondary diagnostics: the binning endpoint remains the
+length-weighted binning F1 and CPRR.
+
+**Performance** (`python/performance_summary.py`, `benchmark.performance.tsv`). From `tool_status.tsv` and, when present, the
+CPU seconds stage 4 now records beside peak memory. Success rate is completed over attempted (a skipped run is not a failure);
+resource failures (exit code 124 or 137) are kept apart. Cost per recovered plasmid is thread-seconds over truth plasmids
+recovered. Scaling exponents are the log-log slope of runtime or memory on reference size, reported only with at least five
+distinct sizes spanning a 1.5-fold range.
+
+**Statistical power** (`python/power_analysis.py`, `benchmark.power.tsv`). Paired differences are averaged within each cluster
+(BioProject, then study), and `MDD = (z(1 - alpha/2) + z(power)) * sd / sqrt(m)` over `m` clusters (normal approximation,
+optimistic for very small `m`; a pair with fewer than five clusters gets no estimate). An observed difference below the MDD is
+*not distinguishable* at this sample size.
+
+**Scenarios** (`python/scenario_tags.py`). One primary scenario per isolate, first match wins: plasmid-free; challenging (read
+depth below 30x, when stated); complex (three or more plasmids, a plasmid of at least 100 kb, or repeat-rich by annotated
+insertion-sequence density); annotated; simple. Tags overlap, so the primary label never hides a property. Performance is then
+reported per scenario with an underpowered flag.
+
+**Composite** (`python/composite_score.py`, `config/composite_weights.tsv`). An optional, descriptive five-dimension view; see
+the README for the rules (renormalised over dimensions every tool has, gates, weight sensitivity). Component rules: identity is
+0 at 0.95 and 100 at 0.999; fractions are scaled to 100; runtime and memory are relative to the best tool in the track on a
+log scale (100 for the best, 0 at two orders of magnitude worse). It is a within-benchmark view, not an absolute grade.
+
+**Reproducibility** (`python/compare_runs.py`). Give it two or more result directories from repeated runs of the same cohort: per
+(sample, tool) it reports identical scores, the F1 range, and whether the predicted sequences are identical; per tool a verdict
+of `reproducible`, `score_stable` or `variable`. A single run proves nothing and is refused.
 
 ## Known limitations / honest caveats
 - **Base-level, not object-level, but not blind to it either.** The core metric

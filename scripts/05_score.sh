@@ -279,6 +279,43 @@ score_sample() {
             rm -f "$RDIR/${tool}.bin_matches.tsv" "$RDIR/${tool}.bin_summary.tsv"
             log "  $tool: bin diagnostics not applicable to declared method class"
         fi
+        # Further dimensions of the same run (advisory; never alter scores.tsv): nucleotide-level
+        # accuracy and missing regions, feature preservation and gene-order conservation, and
+        # quality-tier bins. Written as per-run shard files and merged in stage 6, so parallel
+        # jobs never write one shared file. RUN_DIMENSION_ANALYSES=0 skips them.
+        if [[ "${RUN_DIMENSION_ANALYSES:-1}" -eq 1 ]]; then
+            local DIM_FILTERS=(--min-alignment-length "$MIN_ALIGNMENT_LENGTH"
+                               --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY"
+                               --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ"
+                               --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE")
+            rm -f "$RDIR/${tool}.accuracy.tsv" "$RDIR/${tool}.missing_regions.tsv" \
+                  "$RDIR/${tool}.feature_preservation.tsv" "$RDIR/${tool}.ngoc.tsv" "$RDIR/${tool}.bin_quality.tsv"
+            python3 "$HERE/../python/alignment_accuracy.py" --truth "$SCORE_TRUTH" --paf "$PAF" \
+                --sample "$SAMPLE" --tool "$tool" --analysis-track "$TOOL_TRACK" "${DIM_FILTERS[@]}" \
+                --out "$RDIR/${tool}.accuracy.tsv" --regions-out "$RDIR/${tool}.missing_regions.tsv" \
+                2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || \
+                warn "accuracy analysis failed for $SAMPLE/$tool; base-level score is retained"
+            # The protein/gene table is preferred over the landmark table: using both would count the
+            # same replicon or AMR gene twice under two names.
+            local FEATURE_TABLE=""
+            if [[ -s "$TRUTH_PROTEINS" ]]; then FEATURE_TABLE="$TRUTH_PROTEINS"
+            elif [[ -s "$FEATURES" ]]; then FEATURE_TABLE="$FEATURES"; fi
+            if [[ -n "$FEATURE_TABLE" ]]; then
+                python3 "$HERE/../python/feature_preservation.py" --truth "$SCORE_TRUTH" --paf "$PAF" \
+                    --features "$FEATURE_TABLE" "${CIRCULAR_ARGS[@]}" \
+                    --sample "$SAMPLE" --tool "$tool" --analysis-track "$TOOL_TRACK" "${DIM_FILTERS[@]}" \
+                    --out "$RDIR/${tool}.feature_preservation.tsv" --ngoc-out "$RDIR/${tool}.ngoc.tsv" \
+                    2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || \
+                    warn "feature-preservation analysis failed for $SAMPLE/$tool; base-level score is retained"
+            fi
+            if [[ -s "$BINS" ]] && binning_capable "$tool"; then
+                python3 "$HERE/../python/bin_quality.py" --truth "$SCORE_TRUTH" --paf "$PAF" --bins "$BINS" \
+                    --sample "$SAMPLE" --tool "$tool" --analysis-track "$TOOL_TRACK" "${DIM_FILTERS[@]}" \
+                    --out "$RDIR/${tool}.bin_quality.tsv" \
+                    2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || \
+                    warn "bin-quality analysis failed for $SAMPLE/$tool; base-level score is retained"
+            fi
+        fi
         if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
             python3 "$HERE/../python/run_quast_diagnostics.py" --query "$PRED" --reference "$REF" --truth "$TRUTH" \
                 --sample "$SAMPLE" --tool "$tool" --out "$RDIR/${tool}.quast_diagnostics.tsv" \

@@ -1,0 +1,8 @@
+key	value	note
+weight_accuracy	30	Initial proposal, not a standard. Change and re-run; composite_sensitivity.tsv shows how much the ranking moves.
+weight_completeness	20
+weight_structure	25
+weight_biology	15
+weight_performance	10
+gate_accuracy	50	A tool whose accuracy dimension is below this is gated (shown, not ranked). Delete the row to remove the gate.
+gate_completeness	50	A fast tool that recovers little of each plasmid must not rank well. Delete the row to remove the gate.
