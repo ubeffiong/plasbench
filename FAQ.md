@@ -15,6 +15,9 @@ cannot be fixed in software.
 | **Documented** | Stated in the docs, not enforced or tested by code. |
 | **Open** | Not done. The reason is given (usually: it needs real data, not code). |
 
+A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
+cross-references the question numbers here.
+
 Evidence basis: `REVIEW.md` (independent review and audit), the source files named in
 each answer, and the test suite. A full run of `test/run_tests.sh` is the check on the
 "Verified" claims; see Q24 for its result. Nothing here has been checked against a
@@ -123,7 +126,10 @@ changed at a time, re-ranks under strict F1 and per-plasmid recovery, and writes
 `scripts/06_aggregate.sh`. Tests: `test/test_rank_sensitivity.py`,
 `test/test_scoring_adversarial.py`. The HTML report shows it in the "Ranking robustness" section
 (`test/test_report_robustness_audit.py`).
-**Status.** Fixed on audit branch (measured, not removed: ranking is still mean F1).
+**Status.** Fixed on audit branch (measured, not removed). Note that on `main` (#7) binning-capable tools are
+ranked on the length-weighted binning F1 (`ranking_score`) with CPRR as the secondary endpoint, and `mean_f1`
+remains the base-level F1 for every tool; the sensitivity analysis re-ranks under strict F1 and per-plasmid
+recovery, whichever metric is the headline.
 Whether the real-cohort ranking is stable is **Open** (no real run).
 
 ### Q10. Do large plasmids dominate the score?
@@ -199,15 +205,22 @@ sequence-level overlap screen is also Open.
 
 ## E. Stratification, AMR and structure
 
-### Q17. Can recovery be broken down by replicon type and mobility?
+### Q17. Can recovery be broken down by plasmid type, size and resistance-gene carriage?
 **Answer.** Yes: `python/stratify_recovery.py` joins per-plasmid recovery to the `replicon` and
-`mob` labels and writes `benchmark.recovery_by_replicon.tsv` (also shown in the HTML report).
-Rules, all tested:
+`mob` labels, to a size band (<10 kb, 10-50 kb, >50 kb) and to resistance-gene carriage, and writes
+`benchmark.recovery_by_replicon.tsv`, shown in the report's "Recovery by plasmid type" section. Each
+group reports the mean and the **median with interquartile range**, because per-plasmid recovery is
+heavy-tailed. Rules, all tested:
+- size needs no annotation, so it is always available;
+- ARG carriage comes from the curated `truth_amr.tsv` when present (authoritative: a plasmid absent from
+  it carries no resistance gene), otherwise from annotation callers; `no_arg_detected` is only claimed when an
+  AMR caller reported ok in `annotation_provenance.json`, never from an empty table;
 - a plasmid with no label is `untyped`; a sample with no annotation file is skipped, not called untyped;
 - groups with fewer than 5 plasmids are flagged `underpowered` (5 is a convention, not a derived threshold);
 - a plasmid with **several** replicons counts once in **each** group, so group sizes can sum to more than the number of plasmids (now pinned by `test/test_stratify_multilabel.py`).
-**Evidence.** `test/test_stratify_recovery.py`, `test/test_stratify_multilabel.py`.
-**Status.** Fixed here (multi-replicon behaviour was unstated and untested). It is
+**Evidence.** `test/test_stratify_recovery.py`, `test/test_stratify_multilabel.py`, `test/test_demo_end_to_end.py`
+(the offline demo populates every group type and the HTML section).
+**Status.** Fixed here (multi-replicon behaviour was unstated and untested; size, ARG and median/IQR are new). It is
 descriptive only: it never ranks tools.
 
 ### Q18. Is AMR gene recall meaningful?
@@ -238,11 +251,15 @@ lock files carry SHA-256; the scorer is standard-library only.
 **Gap found.** The database release dates are blank (Q16) and tool databases live inside conda environments.
 **Status.** Partly verified; database provenance is Open.
 
-### Q20b. Is every script actually reachable?
+### Q20b. Is every script, input and output actually reachable?
 **Answer.** `test/test_script_wiring.py` fails if any `python/*.py` script is referenced by no stage script, CLI
 command, adapter or module, except three documented one-offs: `compare_scoring_methods.py` (a hand-run BLASTN
 cross-check), `audit_three_class_scoring.py` (its helper) and `parse_teixeira2025_supplement.py` (a one-time cohort
-migration). It also drives `derive-amr-truth` and `audit-truth-labels` through the real CLI.
+migration). It also drives `derive-amr-truth` and `audit-truth-labels` through the real CLI, checks that stage 6 passes
+every input the report accepts, and that `plasbench analysis --list` reaches the standalone scripts
+(`stratify-recovery`, `rank-sensitivity`, `flag-database-overlap`, `flag-cohort-outliers`, `validate-truth-table`,
+`call-structural-variants`, `run-quast-diagnostics`, `compare-scoring`, `audit-three-class-scoring`).
+`test/test_demo_end_to_end.py` runs the offline demo and asserts each layer reaches its table and its HTML section.
 **Status.** Fixed here. Before this, `derive_amr_truth.py` was reachable only from tests.
 
 ### Q21. Is the per-plasmid side file safe against stale results?
