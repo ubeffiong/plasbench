@@ -639,9 +639,9 @@ export CONTIG_MIN_IDENTITY="${CONTIG_MIN_IDENTITY:-0.95}"
 export CONTIG_MIN_COVERAGE="${CONTIG_MIN_COVERAGE:-0.80}"
 export RUN_BASELINE_COVERAGE="${RUN_BASELINE_COVERAGE:-1}"
 export RUN_BASELINE_REFERENCE="${RUN_BASELINE_REFERENCE:-1}"
-# baseline_replicon: a contig is plasmid when it carries a replicon marker (plsMD's enumeration idea, with its Col-vs-Inc
+# baseline_replicon (off by default; needs Abricate): a contig is plasmid when it carries a replicon marker (plsMD's enumeration idea, with its Col-vs-Inc
 # rule). REPLICON_ABRICATE_DBS is the space-separated list of Abricate databases searched.
-export RUN_BASELINE_REPLICON="${RUN_BASELINE_REPLICON:-1}"
+export RUN_BASELINE_REPLICON="${RUN_BASELINE_REPLICON:-0}"
 export REPLICON_ABRICATE_DBS="${REPLICON_ABRICATE_DBS:-plasmidfinder}"
 export BASELINE_COVERAGE_RATIO="${BASELINE_COVERAGE_RATIO:-1.5}"
 export BASELINE_MIN_CONTIG_LENGTH="${BASELINE_MIN_CONTIG_LENGTH:-1000}"

@@ -628,7 +628,7 @@ All settings are environment variables read by `config/config.sh` (override them
 |---|---|---|
 | `RUN_MOB_RECON`, `RUN_PLATON`, `RUN_PLASMIDSPADES` | 1 | On by default. |
 | `RUN_PLSMD`, `PLSMD_CMD`, `PLSMD_DB`, `PLSMD_THREADS` | 0, plsMD, empty, `THREADS` | plsMD: command (the Docker wrapper works), PLSDB BLAST index prefix, threads. Needs `ASSEMBLER=unicycler`. |
-| `RUN_BASELINE_REPLICON`, `REPLICON_ABRICATE_DBS` | 1, plasmidfinder | Replicon-marker baseline and the Abricate databases it searches. |
+| `RUN_BASELINE_REPLICON`, `REPLICON_ABRICATE_DBS` | 0, plasmidfinder | Replicon-marker baseline and the Abricate databases it searches. |
 | `RUN_GPLAS2_MOB`, `RUN_GPLAS2_EXTERNAL`, `RUN_GENOMAD`, `RUN_PLASME`, `RUN_PLASGRAPH2`, `RUN_RFPLASMID`, `RUN_PLASMIDHUNTER`, `RUN_PLASMER`, `RUN_PLASCOPE` | 0 | Short-read tools, opt-in. |
 | `RUN_FLYE_MOB_RECON`, `RUN_PLASSEMBLER`, `RUN_HYBRACTER_LONG`, `RUN_HYBRACTER_HYBRID`, `RUN_TRYCYCLER_MOB_RECON` | 0 | Long-read and hybrid tools, opt-in, behind the circularity guard. |
 | `<TOOL>_ALLOW_CIRCULAR_TRUTH` | 0 | Override the circularity guard for one tool (recorded). |
