@@ -98,6 +98,34 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
         fi
     fi
+    # Evidence-based replicon labels (python/label_truth_evidence.py): confirm
+    # each source label with plasmid markers / rRNA / long-read support and
+    # mark conflicting replicons AMBIGUOUS. truth.tsv stays complete (the
+    # validator above requires it); scoring reads truth.scored.tsv.
+    if [[ "${RUN_TRUTH_LABEL_EVIDENCE:-1}" -eq 1 ]]; then
+        LR_DEPTH_ARGS=()
+        if [[ -s "${LONG_READS:-}" ]] && command -v minimap2 >/dev/null 2>&1; then
+            LR_PAF="$SDIR/truth_long_reads.paf"
+            if minimap2 --secondary=no -x "$TRUTH_LONG_READ_PRESET" -t "$THREADS" "$REF" "$LONG_READS" \
+                    > "$LR_PAF" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+               && python3 "$HERE/../python/long_read_support.py" --paf "$LR_PAF" --truth "$TRUTH" \
+                    --out "$SDIR/truth_long_read_depth.tsv" 2>> "$LOG_DIR/${SAMPLE}.truth.log"; then
+                LR_DEPTH_ARGS=(--long-read-depth "$SDIR/truth_long_read_depth.tsv"
+                               --min-long-read-depth "$TRUTH_MIN_LONG_READ_DEPTH")
+            else
+                warn "long-read support check failed for $SAMPLE; plasmids are not depth-checked"
+            fi
+            rm -f "$LR_PAF"
+        fi
+        SKETCH_ARGS=()
+        [[ -s "$PLASMID_REFERENCE_SKETCH" ]] && SKETCH_ARGS=(--plasmid-sketch "$PLASMID_REFERENCE_SKETCH")
+        python3 "$HERE/../python/label_truth_evidence.py" --truth "$TRUTH" --reference "$REF" \
+            --features "$FEATURES" --annotation-provenance "$SDIR/annotation_provenance.json" \
+            "${SKETCH_ARGS[@]}" "${LR_DEPTH_ARGS[@]}" \
+            --labels-out "$SDIR/truth_labels.tsv" --scored-truth-out "$SDIR/truth.scored.tsv" \
+            2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+            || { warn "evidence labelling failed for $SAMPLE; scoring uses source labels"; rm -f "$SDIR/truth.scored.tsv"; }
+    fi
 done < <(read_samples "$SAMPLE_SHEET")
 
 log "Stage 2 (truth) complete."

@@ -13,6 +13,36 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- research design (headline endpoints and reference standard)
+- **Primary endpoint is now length-weighted binning F1** for binning-capable tools
+  (`lw_bin_f1`, ungated Hungarian match; the count-based `bin_f1` is kept but not
+  ranked). **CPRR** (Correct Plasmid Reconstruction Rate) is the secondary endpoint,
+  with pre-specified `CPRR_MIN_COVERAGE`/`CPRR_MIN_SHARE`/`CPRR_MIN_IDENTITY`.
+  Classifier-only tools are ranked on a separate classification track by
+  base-level F1. Leaderboards add `task`, `ranking_metric`, `ranking_score` (+ CI),
+  `ranking_species_basis`, `cprr` (+ CI) and `mean_lw_bin_f1`.
+- **Reference standard.** `truth_provenance.py` classifies how each truth was built
+  (long-read-first vs short-read-first; polished with the benchmark's own reads or
+  not) and assigns reference tiers 1-3. Short-read-first and unknown-provenance truth
+  (tier 3) leave the headline and become a sensitivity analysis; the CPRR identity
+  criterion is dropped for truth polished with the benchmark's reads.
+- **Evidence-based truth labels.** `label_truth_evidence.py` confirms each replicon
+  with plasmid markers, rRNA genes (new barrnap caller) and long-read support;
+  conflicting replicons (chromids, marker-free or short-read-only plasmids) are
+  AMBIGUOUS and excluded from scoring via `truth.scored.tsv`. Self-built truth is no
+  longer labelled by size alone.
+- **Species balance.** The ranking score averages per-species means over species with
+  >= `MIN_SPECIES_CLUSTERS` independent clusters; clusters join shared BioProjects and
+  clonal groups (`clonal_groups.py`), and CIs/permutation tests resample whole
+  clusters within species. New `benchmark.species.tsv`,
+  `benchmark.reference_tiers.tsv`, `benchmark.headline_design.tsv`.
+- `validate_cohort.py` prints advisory composition warnings (species count, dominant
+  species, species below the minimum) and validates the new optional sheet columns
+  `truth_assembly_strategy`, `truth_polish_reads` and `clonal_group`.
+- HTML report: leaderboards per task with ranking score, CI and CPRR; new "Headline
+  design and reference standard" section with provenance, tiers, species balance and
+  a tier-sensitivity chart.
+
 ### Fixed
 - **Empty predictions no longer inflate mean F1.** On an isolate with true
   plasmid, a tool that predicts nothing now scores F1 = 0 (precision stays

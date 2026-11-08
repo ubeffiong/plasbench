@@ -419,13 +419,13 @@ def guided_findings(leaderboard, cards, scores, status_counts):
         return findings
 
     best = leaderboard[0]
-    best_f1 = optional_number(best.get("mean_f1"))
+    best_f1 = headline_value(best)
     if best_f1 is not None:
-        low = optional_number(best.get("f1_ci_low"))
-        high = optional_number(best.get("f1_ci_high"))
+        low = optional_number(best.get("ranking_ci_low") or best.get("f1_ci_low"))
+        high = optional_number(best.get("ranking_ci_high") or best.get("f1_ci_high"))
         spread = (f" Its 95% interval spans {low:.3f} to {high:.3f}"
                   if low is not None and high is not None else "")
-        second = optional_number(leaderboard[1].get("mean_f1")) if len(leaderboard) > 1 else None
+        second = headline_value(leaderboard[1]) if len(leaderboard) > 1 else None
         margin = (f", {best_f1 - second:+.3f} ahead of {esc(leaderboard[1]['tool'])}"
                   if second is not None else "")
         sig_raw = (best.get("significant_vs_runner_up") or "").strip().lower()
@@ -495,9 +495,9 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         ("Isolates", str(samples), "Samples with a truth set and at least one scored method."),
         ("Truth plasmids", str(int(plasmids)), "Reference plasmids the methods were measured against."),
         ("Leading method", esc(best["tool"]),
-         f"Highest mean Base F1 ({optional_number(best.get('mean_f1')) or 0:.3f})."),
+         f"Highest {headline_label(best)} ({headline_value(best) or 0:.3f})."),
         ("Runs not completed", str(status_counts.get("failed", 0) + status_counts.get("skipped", 0)),
-         "Excluded from every mean rather than scored as zero."),
+         "Failed runs on plasmid-bearing isolates count as zero for that tool; skipped runs are left out."),
     ]
     stat_html = "".join(
         f"<div class='sum-stat' title='{esc(hint)}'><small>{esc(label)}</small>"
@@ -1195,12 +1195,12 @@ def interpretation(leaderboard, status_counts):
         return ["No tool has a score row yet, so performance cannot be interpreted."], "neutral"
 
     winner = leaderboard[0]
-    winner_f1 = number(winner["mean_f1"])
+    winner_f1 = headline_value(winner) or 0.0
     if len(leaderboard) == 1:
-        notes.append(f"{winner['tool']} is the only scored tool (mean F1 {winner_f1:.3f}); no between-tool comparison is available.")
+        notes.append(f"{winner['tool']} is the only scored tool ({headline_label(winner)} {winner_f1:.3f}); no between-tool comparison is available.")
     else:
         runner = leaderboard[1]
-        runner_f1 = number(runner["mean_f1"])
+        runner_f1 = headline_value(runner) or 0.0
         gap = winner_f1 - runner_f1
         # Uses aggregate_results.py's own paired, shared-sample, sign-flip
         # permutation test (Holm-adjusted) -- never a raw-gap-size heuristic.
@@ -1401,6 +1401,102 @@ def robustness_section(track_leaderboards, ordered_tracks):
         "own reference database, so the tool may already contain it; <strong>Mean F1 after database</strong> "
         "uses only samples it cannot contain. This is a date-based screen, not proof of inclusion.</p>"
         + content + "</section>"
+    )
+
+
+METRIC_LABELS = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level F1"}
+TASK_LABELS = {"reconstruction": "Plasmid reconstruction", "classification": "Plasmid classification"}
+TASK_BLURBS = {
+    "reconstruction": ("Binning-capable tools, ranked by length-weighted binning F1 (primary endpoint): bases "
+                       "placed in the correct one-to-one matched bin. CPRR, the share of truth plasmids "
+                       "reconstructed correctly, is the secondary endpoint."),
+    "classification": ("Classifier-only tools, ranked by base-level plasmid/chromosome F1. They are not scored "
+                       "on binning, a task they do not attempt."),
+}
+
+
+def headline_value(row):
+    """The value a row is ranked by: ranking_score, else legacy mean_f1."""
+    value = optional_number(row.get("ranking_score"))
+    return value if value is not None else optional_number(row.get("mean_f1"))
+
+
+def headline_label(row):
+    metric = row.get("ranking_metric") or "f1"
+    return METRIC_LABELS.get(metric, metric)
+
+
+def primary_task_rows(rows):
+    """Rows of the primary task present (reconstruction first), else all rows."""
+    tasks = [row.get("task") or "" for row in rows]
+    for task in ("reconstruction", "classification"):
+        if task in tasks:
+            return [row for row in rows if (row.get("task") or "") == task]
+    return rows
+
+
+def headline_design_section(out_dir):
+    """Reference standard, provenance tiers and species balance behind the headline."""
+    design = read_tsv(out_dir / "benchmark.headline_design.tsv") if (out_dir / "benchmark.headline_design.tsv").is_file() else []
+    provenance = read_tsv(out_dir / "benchmark.truth_provenance.tsv") if (out_dir / "benchmark.truth_provenance.tsv").is_file() else []
+    species = read_tsv(out_dir / "benchmark.species.tsv") if (out_dir / "benchmark.species.tsv").is_file() else []
+    tiers = read_tsv(out_dir / "benchmark.reference_tiers.tsv") if (out_dir / "benchmark.reference_tiers.tsv").is_file() else []
+    if not (design or provenance or species or tiers):
+        return ""
+    design_rows = "".join(
+        f"<tr><td>{esc(r.get('analysis_track'))}</td><td>{esc(TASK_LABELS.get(r.get('task'), r.get('task')))}</td>"
+        f"<td>{esc(METRIC_LABELS.get(r.get('ranking_metric'), r.get('ranking_metric')))}</td>"
+        f"<td>{esc(r.get('reference_basis'))}</td><td>{esc(r.get('species_basis') or 'pooled')}</td></tr>"
+        for r in design) or "<tr><td colspan='5'>Not recorded.</td></tr>"
+    tier_counts = Counter(r.get("reference_tier") for r in provenance)
+    provenance_rows = "".join(
+        f"<tr><td>{esc(r.get('sample'))}</td><td>{esc(r.get('reference_tier'))}</td>"
+        f"<td>{esc(r.get('truth_assembly_strategy'))}</td><td>{esc(r.get('truth_polish_reads'))}</td>"
+        f"<td>{esc(r.get('base_level_metrics_valid'))}</td><td>{esc(r.get('labels_evidence_checked'))}</td>"
+        f"<td>{esc(r.get('ambiguous_plasmids') or '0')}</td><td>{esc(r.get('tier_reason'))}</td></tr>"
+        for r in provenance) or "<tr><td colspan='8'>No provenance table.</td></tr>"
+    species_rows = "".join(
+        f"<tr><td>{esc(r.get('analysis_track'))} / {esc(r.get('task'))}</td><td>{esc(r.get('tool'))}</td>"
+        f"<td><em>{esc(r.get('species'))}</em></td><td>{esc(r.get('n_samples'))}</td><td>{esc(r.get('n_clusters'))}</td>"
+        f"<td>{esc(r.get('mean_metric'))}</td><td>{'yes' if r.get('in_headline') == 'yes' else 'described only'}</td></tr>"
+        for r in species) or "<tr><td colspan='7'>No species information.</td></tr>"
+    # Sensitivity: headline tiers (1-2) versus provisional tier 3, per tool.
+    by_tool = defaultdict(lambda: {"head": [0.0, 0], "prov": [0.0, 0]})
+    for r in tiers:
+        value, n = optional_number(r.get("mean_metric")), int(optional_number(r.get("n_samples")) or 0)
+        if value is None or not n:
+            continue
+        key = "prov" if r.get("reference_tier") == "3" else "head"
+        by_tool[r.get("tool")][key][0] += value * n
+        by_tool[r.get("tool")][key][1] += n
+    chart_rows = [{"tool": tool, "head": v["head"][0] / v["head"][1], "prov": v["prov"][0] / v["prov"][1]}
+                  for tool, v in sorted(by_tool.items()) if v["head"][1] and v["prov"][1]]
+    chart = dumbbell_chart(chart_rows, "head", "prov", "Reference tiers 1-2 (headline)",
+                           "Tier 3 (provisional truth)", "Ranking metric on headline versus provisional truth",
+                           "No tool was scored on both headline-tier and tier-3 truth in this run.")
+    return (
+        "<section id='headline-design'><h2>Headline design and reference standard</h2>"
+        "<p class='lead'>Which samples and species the headline ranking rests on. Truth assemblies are graded: "
+        "<strong>Tier 1</strong> long-read-first truth independent of the benchmark reads with evidence-checked "
+        "labels; <strong>Tier 2</strong> long-read-first truth that fails a Tier-1 condition (for example, "
+        "polished with the benchmark's own Illumina reads, so identity-based criteria are not applied); "
+        "<strong>Tier 3</strong> short-read-first hybrid or unknown provenance, provisional and outside the "
+        "headline. Replicons whose plasmid/chromosome label conflicts with marker, rRNA or long-read evidence are "
+        "AMBIGUOUS and excluded from scoring. The ranking score averages per-species means over species with "
+        "enough independent (non-clonal) isolates; smaller species are described only.</p>"
+        "<div class='panel'><table><thead><tr><th>Track</th><th>Task</th><th>Ranking metric</th>"
+        f"<th>Reference standard</th><th>Species basis</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
+        f"<h3>Truth provenance</h3><p class='muted'>Tier counts: "
+        + (", ".join(f"tier {esc(t)}: {n}" for t, n in sorted(tier_counts.items()) if t) or "none")
+        + ". Derived values are heuristics from NCBI assembly metadata; set truth_assembly_strategy and "
+        "truth_polish_reads in the sample sheet to override.</p>"
+        "<div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tier</th><th>Assembly strategy</th>"
+        "<th>Polishing reads</th><th>Identity criteria valid</th><th>Labels evidence-checked</th>"
+        f"<th>AMBIGUOUS plasmids</th><th>Reason</th></tr></thead><tbody>{provenance_rows}</tbody></table></div>"
+        "<h3>Reference-tier sensitivity</h3><div class='chart-card'>" + chart + "</div>"
+        "<h3>Species balance</h3><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th>"
+        "<th>Tool</th><th>Species</th><th>Samples</th><th>Independent clusters</th><th>Mean ranking metric</th>"
+        f"<th>In headline</th></tr></thead><tbody>{species_rows}</tbody></table></div></section>"
     )
 
 
@@ -2672,6 +2768,9 @@ def main():
     headline_track = (track_counts.most_common(1)[0][0] if track_counts
                       else next(iter(track_leaderboards)))
     headline_leaderboard = track_leaderboards.get(headline_track) or leaderboard
+    # Headline claims are about the primary task present (reconstruction,
+    # ranked by length-weighted binning F1), never a mix of tasks.
+    headline_leaderboard = primary_task_rows(headline_leaderboard)
     multi_track = len(track_leaderboards) > 1
     status_counts = Counter(row["status"] for row in status)
     best = headline_leaderboard[0] if headline_leaderboard else None
@@ -2698,7 +2797,8 @@ def main():
         return (
             "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
             "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{perfect}</td><td>{strict}</td><td>{bin_f1}</td><td>{nmi}</td><td>{vi}</td><td>{pr_auc}</td>"
-            "<td><strong class='score {band}'>{f1}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span>{ranked_on}</td>"
+            "<td><strong class='score {band}'>{score}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span>{ranked_on}</td>"
+            "<td>{ci}</td><td>{cprr}</td><td>{f1}</td>"
             "<td><span class='sig-badge {sig_class}'>{sig_text}</span></td></tr>".format(
                 rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
                 scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
@@ -2710,10 +2810,16 @@ def main():
                 bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"),
                 nmi=esc(row.get("mean_nmi") or "not bin-scored"),
                 vi=esc(row.get("mean_variation_of_information") or "not bin-scored"),
-                pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row["mean_f1"]),
-                f1_width=max(0, min(100, round(number(row["mean_f1"]) * 100))),
-                band=score_band(number(row["mean_f1"])),
-                ranked_on=(f"<small class='muted'> on {esc(row['n_ranking_samples'])} shared</small>"
+                pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row.get("mean_f1") or "-"),
+                score=esc(f"{headline_value(row):.4f}" if headline_value(row) is not None else "-"),
+                f1_width=max(0, min(100, round((headline_value(row) or 0) * 100))),
+                band=score_band(headline_value(row) or 0),
+                ci=esc(f"{row['ranking_ci_low']}–{row['ranking_ci_high']}" if row.get("ranking_ci_low") else "< 5 independent units"),
+                cprr=esc(f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
+                         if row.get("cprr") else "not bin-scored"),
+                ranked_on=(f"<small class='muted'> on {esc(row['n_ranking_samples'])} shared"
+                           + (f" · {esc(row['ranking_species_basis'])}" if row.get("ranking_species_basis") else "")
+                           + "</small>"
                            if row.get("n_ranking_samples") and row.get("ranking_basis") == "shared_samples" else ""),
                 sig_class=sig_class, sig_text=esc(sig_text),
             )
@@ -2728,13 +2834,27 @@ def main():
         "hybrid": "Tools given long reads plus short reads.",
     }
 
-    def leaderboard_table(rows):
-        body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='17'>No scored tools yet.</td></tr>"
+    def single_table(rows):
+        body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='20'>No scored tools yet.</td></tr>"
         return ("<div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th>"
                 "<th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th>"
-                "<th>Mean plasmid recall</th><th>Perfect reference recovery</th><th>Strict reconstruction</th><th>Mean bin F1</th>"
-                "<th>Mean NMI</th><th>Mean VI</th><th>Mean PR-AUC</th><th>Mean F1</th><th>Significant vs runner-up</th></tr></thead>"
+                "<th>Mean plasmid recall</th><th>Perfect reference recovery</th><th>Strict reconstruction</th><th>Mean bin F1 (count-based)</th>"
+                "<th>Mean NMI</th><th>Mean VI</th><th>Mean PR-AUC</th><th>Ranking score</th><th>95% CI</th><th>CPRR</th>"
+                "<th>Mean base F1</th><th>Significant vs runner-up</th></tr></thead>"
                 f"<tbody>{body}</tbody></table></div>")
+
+    def leaderboard_table(rows):
+        """One ranked table per task within a track; never one mixed ranking."""
+        tasks = []
+        for row in rows:
+            if (row.get("task") or "") not in tasks:
+                tasks.append(row.get("task") or "")
+        if tasks == [""]:
+            return single_table(rows)
+        return "".join(
+            f"<h4>{esc(TASK_LABELS.get(task, task))}</h4><p class='muted'>{esc(TASK_BLURBS.get(task, ''))}</p>"
+            + single_table([row for row in rows if (row.get("task") or "") == task])
+            for task in tasks)
 
     # One ranking per track. Pooling them would rank a tool given long reads
     # against one given only short reads on the same isolates -- different
@@ -3072,7 +3192,8 @@ def main():
         explorers.append(f"<details class='explorer' open><summary><strong>{label}</strong><span>{count} downloadable file(s)</span></summary>{tree}</details>")
 
     best_value = esc(best["tool"]) if best else "No scored tool"
-    best_f1 = esc(best["mean_f1"]) if best else "-"
+    best_f1 = esc((best.get("ranking_score") or best.get("mean_f1") or "-") if best else "-")
+    best_metric = esc(headline_label(best) if best and best.get("ranking_score") else "mean F1")
     run_folder = out.parent.name or "results"
     cohort_label = Path(args.sample_sheet).stem if args.sample_sheet else "not recorded"
     run_label = f"{run_folder} · cohort {cohort_label}"
@@ -3121,7 +3242,7 @@ def main():
 <script>window.pbEsc=s=>String(s==null?'':s).replace(/[&<>\\u0022\\u0027]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','\\u0022':'&quot;','\\u0027':'&#39;'}}[c]));</script>
 <header><p class="eyebrow">Benchmarking plasmid reconstruction from sequence to biological function.</p><h1>PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools</h1><p><strong>Run:</strong> {esc(run_label)} · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
 <main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#isolate-difficulty'>Isolate difficulty</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#replicon-recovery'>Recovery by replicon</a><a href='#quast-diagnostics'>QUAST diagnostics</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
-<div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: mean F1</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
+<div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: {best_metric}</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 {summary_html}
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
 <section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. Where at least five shared samples exist, the statistics section adds paired confidence intervals and permutation evidence with Holm adjustment.</p><ul>{insight_html}</ul></div></section>
@@ -3158,9 +3279,13 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
 </body></html>"""
     page = page.replace("<a href='#scores'>", "<a href='#enterprise'>Interactive dashboard</a><a href='#scores'>")
     page = page.replace("<section id='scores'>", enterprise_html + "<section id='scores'>")
-    page = page.replace("<section id='recommendations'>", robustness_html + "<section id='recommendations'>", 1)
+    design_html = headline_design_section(out.parent)
+    page = page.replace("<section id='recommendations'>",
+                        robustness_html + design_html + "<section id='recommendations'>", 1)
     page = page.replace("<a href='#recommendations'>Recommendations</a>",
-                        "<a href='#robustness'>Robustness</a><a href='#recommendations'>Recommendations</a>", 1)
+                        "<a href='#robustness'>Robustness</a>"
+                        + ("<a href='#headline-design'>Headline design</a>" if design_html else "")
+                        + "<a href='#recommendations'>Recommendations</a>", 1)
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")

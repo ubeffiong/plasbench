@@ -398,6 +398,52 @@ def verify_lock(lock_path, samples_path):
     return len(evidence)
 
 
+PROVENANCE_VALUES = {
+    "truth_assembly_strategy": ("long_read_only", "long_read_first_hybrid", "short_read_first_hybrid", "unknown"),
+    "truth_polish_reads": ("none", "independent", "same_as_benchmark", "unknown"),
+}
+
+
+def provenance_errors(rows):
+    """Optional truth-provenance columns must use the documented vocabulary."""
+    errors = []
+    for number, row in enumerate(rows, start=2):
+        for column, allowed in PROVENANCE_VALUES.items():
+            value = (row.get(column) or "").strip()
+            if value and value not in allowed:
+                errors.append(f"row {number}: {column} must be one of {', '.join(allowed)} (got '{value}')")
+    return errors
+
+
+def composition_warnings(rows, max_species_share=0.30, min_species=5, min_species_isolates=20):
+    """Advisory checks of species balance (docs/METHODS.md, "Species balance").
+
+    Never fails validation: a cohort may legitimately be scoped to one genus,
+    but then its conclusions must be scoped the same way.
+    """
+    counts = {}
+    for row in rows:
+        species = " ".join((row.get("organism") or "").split()[:2])
+        if species:
+            counts[species] = counts.get(species, 0) + 1
+    total = sum(counts.values())
+    if not total:
+        return []
+    warnings = []
+    if len(counts) < min_species:
+        warnings.append(f"{len(counts)} species (< {min_species}); scope conclusions to the species present "
+                        "rather than claiming generality")
+    for species, n in sorted(counts.items(), key=lambda item: -item[1]):
+        if n / total > max_species_share:
+            warnings.append(f"{species} is {n}/{total} isolates ({n / total:.0%} > {max_species_share:.0%}); "
+                            "the species-balanced headline limits its weight, but add other species")
+    small = [f"{species} ({n})" for species, n in sorted(counts.items()) if n < min_species_isolates]
+    if small:
+        warnings.append(f"species below {min_species_isolates} isolates are described only, not in the "
+                        f"species-balanced headline: {', '.join(small)}")
+    return warnings
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--samples", required=True, help="cohort TSV")
@@ -413,6 +459,9 @@ def main():
     args = parser.parse_args()
     rows, fields = read_rows(args.samples)
     errors = schema_errors(rows, fields, ledger=read_ledger(args.ledger))
+    errors.extend(provenance_errors(rows))
+    for warning in composition_warnings(rows):
+        print(f"COHORT COMPOSITION WARNING: {warning}", file=sys.stderr)
     if args.verify_lock:
         try:
             evidence_count = verify_lock(args.verify_lock, args.samples)

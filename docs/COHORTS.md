@@ -255,6 +255,22 @@ which exits 0 if the guard applies to it and 1 if it does not.
 Set the column to `yes` when a sample's long reads are NOT the reads its truth
 assembly was built from.
 
+## truth_assembly_strategy / truth_polish_reads / clonal_group (optional)
+
+These columns feed the headline design (docs/METHODS.md, "Research design"). Leave
+them blank to let PlasBench derive them; set them to override a derived value.
+
+| Column | Values | Meaning |
+|---|---|---|
+| `truth_assembly_strategy` | `long_read_only`, `long_read_first_hybrid`, `short_read_first_hybrid`, `unknown` | How the truth's structure was resolved. Short-read-first and unknown truth is reference tier 3 (provisional, outside the headline). Derived from NCBI's assembly method when blank. |
+| `truth_polish_reads` | `none`, `independent`, `same_as_benchmark`, `unknown` | Whether the truth was polished with the same Illumina run the tools are benchmarked on. `same_as_benchmark` keeps the truth for labelling but drops identity criteria. |
+| `clonal_group` | free text, e.g. an ST or cgMLST cluster | Isolates sharing a value count as one independent unit in confidence intervals and in each species' minimum. Derived from whole-genome Mash distance when blank. |
+
+`validate_cohort.py` rejects values outside these vocabularies and prints advisory
+`COHORT COMPOSITION WARNING` lines when a cohort has fewer than five species, a
+species above 30% of isolates, or species below the species-balanced headline's
+minimum.
+
 ## truth_source / long_read_sra_run (optional): self-built hybrid truth
 
 Every cohort row so far has downloaded an existing NCBI Complete Genome

@@ -20,6 +20,7 @@ dependencies:
   # --- scoring / mapping ---
   - minimap2               # align predicted plasmids back to the reference
   - samtools               # coverage/depth (RUN_DIFFICULTY_FEATURES; also convenience if you extend)
+  - barrnap                # rRNA genes: chromosomal evidence for truth labelling
   - mash                   # plasmid-vs-chromosome k-mer distance (RUN_DIFFICULTY_FEATURES);
                             # previously only a transitive lock dependency via mob_suite
   # --- glue ---
