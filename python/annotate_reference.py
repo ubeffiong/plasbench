@@ -15,6 +15,8 @@ Supported callers (all optional):
   abricate      AMR / plasmid-replicon databases        -> amr, replicon
   amrfinder     NCBI AMRFinderPlus                      -> amr
   isescan       insertion sequences                     -> insertion_sequence
+  barrnap       ribosomal RNA genes                     -> rRNA
+                (chromosomal evidence for label_truth_evidence.py)
 
 Output is the `feature_truth` TSV the visualization already consumes:
 sequence_id, start, end, feature_type, label, source, version
@@ -33,7 +35,7 @@ from pathlib import Path
 
 
 FIELDS = ("sequence_id", "start", "end", "feature_type", "label", "source", "version")
-CALLERS = ("mob_typer", "abricate", "amrfinder", "isescan")
+CALLERS = ("mob_typer", "abricate", "amrfinder", "isescan", "barrnap")
 
 
 def tool_version(executable, flags=("--version", "-v", "version")):
@@ -131,6 +133,35 @@ def call_isescan(reference, timeout, sequences, workdir):
     return features, {"status": "ok", "version": version, "features": len(features)}
 
 
+def call_barrnap(reference, timeout, sequences):
+    """rRNA genes (barrnap GFF3, 1-based inclusive -> 0-based half-open)."""
+    executable = shutil.which("barrnap")
+    if not executable:
+        return [], {"status": "not_evaluated", "reason": "barrnap is not installed"}
+    version = tool_version(executable)
+    text, error = run([executable, "--quiet", "--kingdom", "bac", str(reference)], timeout)
+    if text is None:
+        return [], {"status": "failed", "reason": error, "version": version}
+    features = []
+    for line in text.splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) < 9 or fields[2] != "rRNA":
+            continue
+        sequence = fields[0]
+        if sequences and sequence not in sequences:
+            continue
+        name = ""
+        for attribute in fields[8].split(";"):
+            if attribute.startswith("Name="):
+                name = attribute[5:]
+        features.append({"sequence_id": sequence, "start": int(fields[3]) - 1, "end": int(fields[4]),
+                         "feature_type": "rRNA", "label": name or "rRNA",
+                         "source": "barrnap", "version": version})
+    return features, {"status": "ok", "version": version, "features": len(features)}
+
+
 def call_mob_typer(reference, timeout, sequences):
     """MOB-typer reports per-sequence typing, not coordinates."""
     executable = shutil.which("mob_typer")
@@ -202,6 +233,7 @@ def main():
         ("abricate_replicon", lambda: call_abricate(args.reference, args.replicon_database, args.timeout, sequences)),
         ("amrfinder", lambda: call_amrfinder(args.reference, args.timeout, sequences)),
         ("isescan", lambda: call_isescan(args.reference, args.timeout, sequences, workdir)),
+        ("barrnap", lambda: call_barrnap(args.reference, args.timeout, sequences)),
     ):
         found, status = call()
         features.extend(found)

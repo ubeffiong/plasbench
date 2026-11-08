@@ -36,11 +36,33 @@ if [[ -s "$DB_REGISTRY" ]]; then
     fi
 fi
 
+# Headline design inputs (python/headline_design.py): how each truth was built
+# (reference tiers; long-read-first vs short-read-first; same-read polishing)
+# and which isolates are clonal. Each is optional; without it the headline
+# falls back to the plain pooled design and says so.
+DESIGN_ARGS=(--capabilities "$PROJECT_ROOT/config/tool_capabilities.tsv"
+             --headline-max-tier "${HEADLINE_MAX_REFERENCE_TIER:-2}"
+             --min-species-clusters "${MIN_SPECIES_CLUSTERS:-20}")
+if python3 "$HERE/../python/truth_provenance.py" --sample-sheet "$SAMPLE_SHEET" --data-dir "$DATA_DIR" \
+        --out "$RESULTS_DIR/benchmark.truth_provenance.tsv"; then
+    DESIGN_ARGS+=(--truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv")
+else
+    warn "truth provenance failed; headline uses every reference tier"
+fi
+if python3 "$HERE/../python/clonal_groups.py" --sample-sheet "$SAMPLE_SHEET" --data-dir "$DATA_DIR" \
+        --max-distance "${CLONAL_MASH_DISTANCE:-0.0005}" --threads "$THREADS" \
+        --out "$RESULTS_DIR/benchmark.clonal_groups.tsv"; then
+    DESIGN_ARGS+=(--clonal-groups "$RESULTS_DIR/benchmark.clonal_groups.tsv")
+else
+    warn "clonal grouping failed; clusters use BioProject/study only"
+fi
+
 python3 "$HERE/../python/aggregate_results.py" \
     --scores "$SCORES" \
     --tool-status "$RESULTS_DIR/tool_status.tsv" \
     --sample-sheet "$SAMPLE_SHEET" \
     "${OVERLAP_ARGS[@]}" \
+    "${DESIGN_ARGS[@]}" \
     --out-prefix "$RESULTS_DIR/benchmark"
 
 # Descriptive recovery-by-replicon/MOB breakdown (python/stratify_recovery.py).

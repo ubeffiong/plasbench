@@ -53,6 +53,16 @@ tool_analysis_track() {
     python3 "$HERE/../python/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$1" --analysis-track 2>/dev/null
 }
 
+# Keep only rows of a per-plasmid truth TSV (AMR genes, circular plasmids)
+# whose sequence_id is a PLASMID in the scored truth, so a replicon that
+# evidence labelling marked AMBIGUOUS cannot fail the curated-truth checks.
+filter_to_scored_plasmids() {
+    awk -F'\t' -v OFS='\t' '
+        NR == FNR { if (FNR > 1 && $2 == "PLASMID") keep[$1] = 1; next }
+        FNR == 1 { for (i = 1; i <= NF; i++) if ($i == "sequence_id") col = i; print; next }
+        col && ($col in keep)' "$1" "$2" > "$3"
+}
+
 score_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
     local SDIR="$DATA_DIR/$SAMPLE"
@@ -66,6 +76,20 @@ score_sample() {
     local SCORE_SHARD="$SCORE_SHARDS/${SAMPLE}.tsv"
     local FAILURE_SHARD="$FAILURE_SHARDS/${SAMPLE}.tsv"
     [[ -s "$REF" && -s "$TRUTH" ]] || { warn "missing reference/truth for $SAMPLE"; return 0; }
+    # Scoring uses the evidence-checked truth when stage 2 produced one
+    # (AMBIGUOUS replicons removed); everything else keeps the full truth.
+    local SCORE_TRUTH="$TRUTH"
+    if [[ -s "$SDIR/truth.scored.tsv" && ! "$SDIR/truth.scored.tsv" -ot "$TRUTH" ]]; then
+        SCORE_TRUTH="$SDIR/truth.scored.tsv"
+        if [[ -s "$AMR" ]]; then
+            filter_to_scored_plasmids "$SCORE_TRUTH" "$AMR" "$SDIR/truth_amr.scored.tsv"
+            AMR="$SDIR/truth_amr.scored.tsv"
+        fi
+        if [[ -s "$CIRCULAR" ]]; then
+            filter_to_scored_plasmids "$SCORE_TRUTH" "$CIRCULAR" "$SDIR/truth_circular.scored.tsv"
+            CIRCULAR="$SDIR/truth_circular.scored.tsv"
+        fi
+    fi
     log "=== Score $SAMPLE ==="
 
     local preds
@@ -98,15 +122,15 @@ score_sample() {
     local SCORABLE_ARGS=()
     if [[ "${RUN_SCORABLE_TRUTH:-1}" == "1" ]]; then
         local SCORABLE_PARAMS="window=$SCORABLE_WINDOW_BP step=$SCORABLE_STEP_BP preset=$MINIMAP2_PRESET len=$MIN_ALIGNMENT_LENGTH id=$MIN_ALIGNMENT_IDENTITY mapq=$MIN_ALIGNMENT_MAPQ qcov=$MIN_ALIGNMENT_QUERY_COVERAGE"
-        if [[ ! -s "$SCORABLE" || "$SCORABLE" -ot "$REF" || "$SCORABLE" -ot "$TRUTH" \
+        if [[ ! -s "$SCORABLE" || "$SCORABLE" -ot "$REF" || "$SCORABLE" -ot "$SCORE_TRUTH" \
               || "$(cat "$SCORABLE.params" 2>/dev/null)" != "$SCORABLE_PARAMS" ]]; then
             local WINDOWS="$SDIR/truth_plasmid_windows.fa" WINDOWS_PAF="$SDIR/truth_plasmid_windows.paf"
             local SCORABLE_LOG="$LOG_DIR/${SAMPLE}.scorable_truth.log"
-            if python3 "$HERE/../python/scorable_truth.py" windows --reference "$REF" --truth "$TRUTH" \
+            if python3 "$HERE/../python/scorable_truth.py" windows --reference "$REF" --truth "$SCORE_TRUTH" \
                     --out "$WINDOWS" --window "$SCORABLE_WINDOW_BP" --step "$SCORABLE_STEP_BP" > "$SCORABLE_LOG" 2>&1 \
                 && minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$WINDOWS" \
                     > "$WINDOWS_PAF" 2>> "$SCORABLE_LOG" \
-                && python3 "$HERE/../python/scorable_truth.py" intervals --paf "$WINDOWS_PAF" --truth "$TRUTH" \
+                && python3 "$HERE/../python/scorable_truth.py" intervals --paf "$WINDOWS_PAF" --truth "$SCORE_TRUTH" \
                     --out "$SCORABLE.tmp" \
                     --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
                     --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
@@ -170,7 +194,7 @@ score_sample() {
         fi
         local AMR_ARGS=()
         if [[ -s "$AMR" ]]; then
-            if ! python3 "$HERE/../python/validate_amr_truth.py" --amr-truth "$AMR" --truth "$TRUTH" >> "$LOG_DIR/${SAMPLE}.${tool}.score.log" 2>&1; then
+            if ! python3 "$HERE/../python/validate_amr_truth.py" --amr-truth "$AMR" --truth "$SCORE_TRUTH" >> "$LOG_DIR/${SAMPLE}.${tool}.score.log" 2>&1; then
                 warn "curated AMR truth failed validation for $SAMPLE; AMR recovery omitted"
             else
                 AMR_ARGS=(--amr-genes "$AMR" --amr-gene-recovery-threshold "$AMR_GENE_RECOVERY_THRESHOLD")
@@ -209,7 +233,7 @@ score_sample() {
             fi
         fi
         if ! python3 "$HERE/../python/score_plasmids.py" \
-            --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
+            --truth "$SCORE_TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
             --plasmid-recovery-threshold "$PLASMID_RECOVERY_THRESHOLD" \
             --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
             --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
@@ -230,12 +254,16 @@ score_sample() {
         fi
         local BINS="$RDIR/pred_${tool}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$tool"; then
-            if ! python3 "$HERE/../python/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" \
+            if ! python3 "$HERE/../python/score_bins.py" --truth "$SCORE_TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" \
                 --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
                 --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
                 --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
                 --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
                 --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
+                --cprr-out "$RDIR/${tool}.cprr.tsv" \
+                --cprr-min-coverage "$CPRR_MIN_COVERAGE" \
+                --cprr-min-share "$CPRR_MIN_SHARE" \
+                --cprr-min-identity "$CPRR_MIN_IDENTITY" \
                 --summary "$RDIR/${tool}.bin_summary.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
                 warn "bin scoring failed for $SAMPLE/$tool; retaining base-level score"
                 printf '%s\t%s\tbin_score\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$FAILURE_SHARD"
