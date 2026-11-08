@@ -47,10 +47,12 @@ import sys
 STRATEGIES = ("long_read_only", "long_read_first_hybrid", "short_read_first_hybrid", "unknown")
 POLISH = ("none", "independent", "same_as_benchmark", "unknown")
 
+# "tryc(?:yc|y)ler" also matches "Trycyler", a misspelling found in real NCBI
+# assembly records (e.g. an E. coli Trycycler + Medaka + Polypolish assembly).
 LONG_READ_ASSEMBLERS = re.compile(
-    r"\b(flye|canu|raven|trycycler|autocycler|dragonflye|hybracter|miniasm|necat|nextdenovo|"
+    r"\b(flye|canu|raven|tryc(?:yc|y)ler|autocycler|dragonflye|hybracter|miniasm|necat|nextdenovo|"
     r"wtdbg2?|hifiasm|smartdenovo|hgap|falcon|ra)\b", re.IGNORECASE)
-CONSENSUS_LONG_READ = re.compile(r"\b(trycycler|autocycler|hybracter)\b", re.IGNORECASE)
+CONSENSUS_LONG_READ = re.compile(r"\b(tryc(?:yc|y)ler|autocycler|hybracter)\b", re.IGNORECASE)
 SHORT_READ_FIRST = re.compile(r"\b(unicycler|masurca|spades)\b", re.IGNORECASE)
 ILLUMINA = re.compile(r"\b(illumina|miseq|hiseq|nextseq|novaseq|iseq|bgiseq|dnbseq|mgiseq)\b", re.IGNORECASE)
 LONG_READ_TECH = re.compile(r"\b(nanopore|ont|minion|gridion|promethion|pacbio|sequel|rs ii|hifi)\b",

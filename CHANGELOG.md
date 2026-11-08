@@ -13,6 +13,28 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- reviewer question bank
+- **Trivial baselines** `baseline_coverage` and `baseline_reference`, scored like tools;
+  leaderboard columns `is_baseline` and `beats_best_baseline`.
+- **Probability calibration** for probability-exposing tools: Brier score, expected
+  calibration error and a reliability table/diagram.
+- HTML report sections **Baselines and calibration**, **Interpretation limits** and
+  **Metadata completeness**; `benchmark.metadata_completeness.tsv`.
+- `docs/FAQ_QUESTION_BANK.md` answers the 108-question reviewer bank.
+
+### Fixed
+- The run manifest now records every ranking-relevant setting added by recent releases.
+- A duplicate `PLASMID_REFERENCE_SKETCH` default ignored `DATA_DIR`.
+### Cohort and database data
+- **`public-v3` panel** (98 isolates, locked): `public-v2` plus recorded truth provenance
+  and 66 new long-read-first isolates, one per BioProject, across six species. All rows
+  verified online; `accepted_accessions.tsv` regenerated; CI checks the v3 lock.
+- `config/tool_database_releases.tsv`: release dates verified from each installed or pinned
+  database's own record (MOB-suite DB v2.0.0 2020-05-04, Platon DB v1.5.0 2020-10-05,
+  geNomad DB v1.9 2025-02-18, PlaScope 2018-07-13, RFPlasmid 0.0.18 models 2021-07-28);
+  uninstalled databases left blank with the reason.
+- New `python/collect_truth_provenance.py` and `python/discover_design_cohort.py`; the
+  assembler pattern now tolerates NCBI's "Trycyler" misspelling.
 ### Added -- further benchmark dimensions (advisory; none changes the leaderboard)
 - `python/alignment_accuracy.py`: nucleotide identity, mismatch, insertion and deletion rates decoded from the alignment CIGAR,
   and missing-region counts; `python/mask_accuracy.py` blanks the rates where the truth was polished with the benchmark's own

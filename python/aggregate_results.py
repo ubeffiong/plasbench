@@ -175,6 +175,10 @@ def read_scores(path):
                 # recovery. Gracefully absent (never 0) when undefined, matching
                 # plasmid_recall's own convention immediately above.
                 "strict_precision": float(f[idx["strict_precision"]]) if "strict_precision" in idx and f[idx["strict_precision"]] else None,
+                # Probability calibration (score_plasmids.py; probability-exposing tools only).
+                "brier_score": float(f[idx["brier_score"]]) if "brier_score" in idx and f[idx["brier_score"]] else None,
+                "expected_calibration_error": (float(f[idx["expected_calibration_error"]])
+                                               if "expected_calibration_error" in idx and f[idx["expected_calibration_error"]] else None),
                 # Headline/secondary endpoints from score_bins.py (via merge_bin_metrics.py).
                 "lw_bin_f1": float(f[idx["lw_bin_f1"]]) if "lw_bin_f1" in idx and f[idx["lw_bin_f1"]] else None,
                 "cprr_plasmids": int(f[idx["cprr_plasmids"]]) if "cprr_plasmids" in idx and f[idx["cprr_plasmids"]] else None,
@@ -455,6 +459,13 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
         row.update(hd.cprr_fields(row["tool"], rows, design))
         lw = [r["lw_bin_f1"] for r in rows if r["tool"] == row["tool"] and r.get("lw_bin_f1") is not None]
         row["mean_lw_bin_f1"] = statistics.mean(lw) if lw else None
+        brier = [r["brier_score"] for r in rows if r["tool"] == row["tool"] and r.get("brier_score") is not None]
+        ece = [r["expected_calibration_error"] for r in rows
+               if r["tool"] == row["tool"] and r.get("expected_calibration_error") is not None]
+        row["mean_brier_score"] = statistics.mean(brier) if brier else None
+        row["mean_expected_calibration_error"] = statistics.mean(ece) if ece else None
+        row["n_calibrated"] = len(ece)
+        row["is_baseline"] = "yes" if (design.is_baseline(row["tool"]) if design else row["tool"].startswith("baseline_")) else "no"
     # Rank by the ranking score (descending). A tool with no defined score
     # (e.g. scored only on zero-true-plasmid isolates) sorts last. Equal scores
     # rank by tool name, so the order never depends on row order in scores.tsv
@@ -695,6 +706,7 @@ def write_tsv(summary, path):
             "ranking_metric", "ranking_score", "ranking_ci_low", "ranking_ci_high", "ranking_species_basis",
             "n_headline_species", "n_ranking_clusters", "mean_lw_bin_f1",
             "cprr", "cprr_ci_low", "cprr_ci_high", "cprr_correct", "cprr_plasmids",
+            "mean_brier_score", "mean_expected_calibration_error", "n_calibrated", "is_baseline", "beats_best_baseline",
             "n_failed_resource", "n_unknown_overlap"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
@@ -745,6 +757,8 @@ def write_tsv(summary, path):
                 s.get("n_headline_species", ""), s.get("n_ranking_clusters", ""), fmt4(s.get("mean_lw_bin_f1")),
                 fmt4(s.get("cprr")), fmt4(s.get("cprr_ci_low")), fmt4(s.get("cprr_ci_high")),
                 s.get("cprr_correct", ""), s.get("cprr_plasmids", ""),
+                fmt4(s.get("mean_brier_score")), fmt4(s.get("mean_expected_calibration_error")),
+                s.get("n_calibrated", ""), s.get("is_baseline", "no"), s.get("beats_best_baseline", ""),
                 s.get("n_failed_resource", 0),
                 s["n_unknown_overlap"] if s.get("n_unknown_overlap") is not None else "",
             ]) + "\n")
@@ -889,8 +903,58 @@ def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overl
         for row in comparisons:
             row["analysis_track"], row["task"] = track, task
         attach_significance(summary, comparisons)
+        attach_baseline_comparison(summary)
         result.append((track, task, group_rows, summary, comparisons))
     return result
+
+
+def attach_baseline_comparison(summary):
+    """Does each tool beat the best trivial baseline ranked alongside it?
+
+    'yes'/'no' compare ranking scores within one (track, task); 'no baseline'
+    when no baseline was scored there. A tool that cannot beat a trivial rule
+    adds nothing the rule does not already give (question bank Q62/Q108).
+    """
+    baselines = [row.get("ranking_score") for row in summary
+                 if row.get("is_baseline") == "yes" and row.get("ranking_score") is not None]
+    best = max(baselines) if baselines else None
+    for row in summary:
+        if row.get("is_baseline") == "yes":
+            row["beats_best_baseline"] = "baseline"
+        elif best is None or row.get("ranking_score") is None:
+            row["beats_best_baseline"] = "no baseline"
+        else:
+            row["beats_best_baseline"] = "yes" if row["ranking_score"] > best else "no"
+    return summary
+
+
+METADATA_FIELDS = (
+    ("organism", "species unrecorded: left out of the species-balanced headline"),
+    ("bioproject", "no study recorded: treated as its own independent cluster"),
+    ("collection_country", "origin unrecorded: cannot be stratified by geography"),
+    ("sample_origin", "isolation source unrecorded: cannot be stratified by clinical/environmental origin"),
+    ("truth_assembly_strategy", "truth construction not recorded: tier derived from NCBI metadata or unknown"),
+    ("truth_polish_reads", "polishing reads not recorded: identity criteria may be unassessable"),
+)
+
+
+def metadata_completeness(sample_sheet, samples):
+    """Which consequential sample-sheet fields are missing, per scored sample."""
+    rows = hd.read_rows(sample_sheet)
+    by_sample = {row.get("sample_id"): row for row in rows if row.get("sample_id")}
+    out = []
+    for sample in sorted(samples):
+        row = by_sample.get(sample)
+        if row is None:
+            out.append({"sample": sample, "n_missing": len(METADATA_FIELDS),
+                        "missing_fields": "not in sample sheet",
+                        "consequences": "sample absent from the sheet: no species, study or provenance"})
+            continue
+        missing = [(field, why) for field, why in METADATA_FIELDS if not (row.get(field) or "").strip()]
+        out.append({"sample": sample, "n_missing": len(missing),
+                    "missing_fields": ",".join(field for field, _ in missing),
+                    "consequences": "; ".join(why for _, why in missing)})
+    return out
 
 
 def write_rows(rows, path, fields):
@@ -1034,6 +1098,14 @@ def main():
     write_rows(design_rows, args.out_prefix + ".headline_design.tsv",
                ["analysis_track", "task", "ranking_metric", "reference_basis", "species_basis",
                 "min_species_clusters"])
+    if args.sample_sheet:
+        completeness = metadata_completeness(args.sample_sheet, {r["sample"] for r in all_rows})
+        write_rows(completeness, args.out_prefix + ".metadata_completeness.tsv",
+                   ["sample", "n_missing", "missing_fields", "consequences"])
+        incomplete = sum(1 for row in completeness if row["n_missing"])
+        if incomplete:
+            print(f"[aggregate] {incomplete} of {len(completeness)} scored sample(s) lack consequential metadata; "
+                  f"see {args.out_prefix}.metadata_completeness.tsv")
 
     # Print the leaderboard to stdout so it appears in the run log.
     def fmt3(value):

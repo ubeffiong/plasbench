@@ -135,7 +135,7 @@ setup_sample s2; setup_sample s3
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\ns2\tNA\tSRR2\ns3\tNA\tSRR3\n' > "$TMP/sheet.tsv"
 
 : > "$TMP/tool_events.log"
-run_stage env RUN_MOB_RECON=1 RUN_PLATON=0 RUN_PLASMIDSPADES=0 RUN_GPLAS2_MOB=0 MAX_PARALLEL_SAMPLES=1
+run_stage env RUN_MOB_RECON=1 RUN_PLATON=0 RUN_PLASMIDSPADES=0 RUN_GPLAS2_MOB=0 RUN_BASELINE_COVERAGE=0 RUN_BASELINE_REFERENCE=0 MAX_PARALLEL_SAMPLES=1
 sequential_peak="$(peak_concurrent)"
 for s in s1 s2 s3; do
     [[ -s "$TMP/results/$s/pred_mob_recon.plasmid.fasta" ]] || {
@@ -148,7 +148,7 @@ echo "MAX_PARALLEL_SAMPLES=1 serialises samples (peak 1 concurrent sample) -> PA
 rm -rf "$TMP/results"
 
 : > "$TMP/tool_events.log"
-run_stage env RUN_MOB_RECON=1 RUN_PLATON=0 RUN_PLASMIDSPADES=0 RUN_GPLAS2_MOB=0 MAX_PARALLEL_SAMPLES=3
+run_stage env RUN_MOB_RECON=1 RUN_PLATON=0 RUN_PLASMIDSPADES=0 RUN_GPLAS2_MOB=0 RUN_BASELINE_COVERAGE=0 RUN_BASELINE_REFERENCE=0 MAX_PARALLEL_SAMPLES=3
 parallel_peak="$(peak_concurrent)"
 for s in s1 s2 s3; do
     [[ -s "$TMP/results/$s/pred_mob_recon.plasmid.fasta" ]] || {

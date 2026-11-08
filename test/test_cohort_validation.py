@@ -40,7 +40,7 @@ def main():
             os.unlink(lock)
 
     # Both shipped panels must verify against their committed locks.
-    for name in ("public-v1", "public-v2"):
+    for name in ("public-v1", "public-v2", "public-v3"):
         subprocess.run([sys.executable, VALIDATOR,
                         "--samples", os.path.join(ROOT, "cohorts", f"{name}.tsv"),
                         "--verify-lock", os.path.join(ROOT, "cohorts", f"{name}.lock.json")], check=True)

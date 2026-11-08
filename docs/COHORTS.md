@@ -127,6 +127,7 @@ apply identical evidence rules and differ only in curation grade. Read
 |---|---:|---|---|
 | [`public-v1.tsv`](../cohorts/public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](../cohorts/public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
+| [`public-v3.tsv`](../cohorts/public-v3.tsv) | 98 | 10 A + 88 B | the species-balanced headline design; recorded truth provenance |
 
 These are versioned **input cohort manifests**, not a substitute for released
 performance evidence. A public performance claim requires a reproducible run,
@@ -143,6 +144,27 @@ panel to six organisms and five African countries. Those rows are tier B: every
 deposited-evidence check passes, but no source publication has been reviewed.
 Promote one to tier A by reviewing its publication, recording it in
 `source_study`, and re-running `--online --write-lock`.
+
+`public-v3` is built for the headline design in docs/METHODS.md ("Research design"):
+
+* **Recorded truth provenance.** Every row carries `truth_assembly_strategy` and
+  `truth_polish_reads`, taken from NCBI's assembly method and sequencing technologies and
+  from the Illumina runs on each BioSample (`python/collect_truth_provenance.py`), so
+  reference tiers rest on recorded evidence rather than per-run guesses. Of the 32
+  `public-v2` truths, 13 are long-read-first or long-read-only (tiers 1-2); 15 are
+  short-read-first and 4 are genuinely ambiguous in NCBI's record, so those 19 are tier 3
+  until a curator checks their source papers.
+* **66 new isolates** (`python/discover_design_cohort.py`): newest-first complete genomes
+  built long-read-first (Flye, Hybracter, Trycycler, Canu and similar), one isolate per
+  BioProject so each is an independent cluster, and exactly one paired Illumina run on the
+  BioSample -- the benchmark run, which therefore also polished the truth
+  (`same_as_benchmark`: usable for labelling, not identity). All 98 rows passed
+  `--online` verification.
+* **Species balance.** Headline-eligible independent clusters per species: E. coli 22,
+  K. pneumoniae 13, S. enterica 12, A. baumannii 11, E. faecium 10, E. hormaechei 5,
+  S. aureus 1. Only E. coli reaches the default `MIN_SPECIES_CLUSTERS=20`; the other
+  species ran short of qualifying public genomes within the search limits, so until they
+  grow the headline remains pooled (or lower `MIN_SPECIES_CLUSTERS` and say so).
 
 ### What the shipped panels can support
 

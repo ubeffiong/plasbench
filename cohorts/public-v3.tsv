@@ -1,0 +1,104 @@
+# PlasBench public cohort v3: public-v2 (32 isolates) with truth provenance recorded from NCBI
+# evidence (python/collect_truth_provenance.py), plus isolates found by python/discover_design_cohort.py:
+# long-read-first complete genomes, one isolate per BioProject, exactly one paired Illumina run on the
+# BioSample (so truth_polish_reads = same_as_benchmark). Every row passed validate_cohort.py --online.
+# New rows are truth_quality_tier B until a curator reviews their source study.
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	assembly_plasmid_count	source_study	truth_assembly_strategy	truth_polish_reads
+upec_ecpf5	GCF_013372425.1	SRR11905454	Escherichia coli	hybrid	A	SAMN15075992	PRJNA636382	clinical_urine	75	2	Snyder_2020_recurrent_UTI	short_read_first_hybrid	same_as_benchmark
+upec_ecpf7	GCF_013372405.1	SRR11905453	Escherichia coli	hybrid	A	SAMN15075993	PRJNA636382	clinical_urine	75	3	Snyder_2020_recurrent_UTI	short_read_first_hybrid	same_as_benchmark
+upec_ecpf14	GCF_013372385.1	SRR11905452	Escherichia coli	hybrid	A	SAMN15075994	PRJNA636382	clinical_urine	83	1	Snyder_2020_recurrent_UTI	short_read_first_hybrid	same_as_benchmark
+upec_ecpf15	GCF_013372365.1	SRR11905451	Escherichia coli	hybrid	A	SAMN15075995	PRJNA636382	clinical_urine	68	2	Snyder_2020_recurrent_UTI	short_read_first_hybrid	same_as_benchmark
+upec_ecpf16	GCF_013372345.1	SRR11905450	Escherichia coli	hybrid	A	SAMN15075996	PRJNA636382	clinical_urine	218	2	Snyder_2020_recurrent_UTI	short_read_first_hybrid	same_as_benchmark
+upec_ecpf18	GCF_013372325.1	SRR11905449	Escherichia coli	hybrid	A	SAMN15075997	PRJNA636382	clinical_urine	315	4	Snyder_2020_recurrent_UTI	short_read_first_hybrid	same_as_benchmark
+upec_ecpf40	GCF_013372305.1	SRR11905448	Escherichia coli	hybrid	A	SAMN15075998	PRJNA636382	clinical_urine	65	4	Snyder_2020_recurrent_UTI	short_read_first_hybrid	same_as_benchmark
+arbank_0346	GCF_017579865.1	SRR13296941	Escherichia coli	hybrid	A	SAMN12263369	PRJNA554345	clinical_antimicrobial_resistance_bank	125	2	AR_Bank_0346_2021	long_read_first_hybrid	unknown
+arbank_0349	GCF_008152105.1	SRR10076548	Escherichia coli	hybrid	A	SAMN12272266	PRJNA554502	clinical_antimicrobial_resistance_bank	108	1	AR_Bank_0349_2019	unknown	unknown
+tahini_salmonella	GCF_022162985.1	SRR17858528	Salmonella enterica subsp. enterica serovar Tennessee	hybrid	A	SAMN25597006	PRJNA802760	food_tahini	50	1	Tahini_Salmonella_2022	short_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_007	GCF_052071855.1	SRR33156106	Acinetobacter baumannii	hybrid	B	SAMN48008035	PRJNA1128891	Egypt				long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_008	GCF_052905705.1	SRR33156114	Acinetobacter baumannii	hybrid	B	SAMN48008040	PRJNA1128891	Egypt				short_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_009	GCF_040543095.1	SRR29606790	Acinetobacter baumannii	hybrid	B	SAMN42110409	PRJNA1128891	Egypt				long_read_first_hybrid	same_as_benchmark
+escherichia_coli_016	GCF_048572705.1	SRR29213360	Escherichia coli	hybrid	B	SAMN41579897	PRJNA1117783	South Africa				long_read_first_hybrid	same_as_benchmark
+escherichia_coli_017	GCF_052063125.1	SRR29213349	Escherichia coli	hybrid	B	SAMN41579907	PRJNA1117783	South Africa				short_read_first_hybrid	same_as_benchmark
+escherichia_coli_018	GCF_052884645.1	SRR29213340	Escherichia coli	hybrid	B	SAMN41579871	PRJNA1117783	South Africa				short_read_first_hybrid	same_as_benchmark
+escherichia_coli_047	GCF_050749065.1	SRR33679773	Escherichia coli	hybrid	B	SAMN48700594	PRJNA1266646	Egypt				long_read_first_hybrid	same_as_benchmark
+escherichia_coli_048	GCF_051136175.1	SRR33679775	Escherichia coli	hybrid	B	SAMN48700602	PRJNA1266646	Egypt				long_read_first_hybrid	same_as_benchmark
+escherichia_coli_049	GCF_051136165.1	SRR33679771	Escherichia coli	hybrid	B	SAMN48700596	PRJNA1266646	Egypt				long_read_first_hybrid	same_as_benchmark
+escherichia_coli_034	GCF_052907635.1	SRR35329237	Escherichia coli	hybrid	B	SAMN51205877	PRJNA1321367	Kenya				short_read_first_hybrid	same_as_benchmark
+escherichia_coli_036	GCF_052938815.1	SRR35329238	Escherichia coli	hybrid	B	SAMN51205876	PRJNA1321367	Kenya				short_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_001	GCF_001316565.3	SRR2244244	Klebsiella pneumoniae	long_read	B	SAMN04011426	PRJNA287968	South Africa				long_read_only	none
+klebsiella_pneumoniae_006	GCF_011065365.1	SRR8175017	Klebsiella pneumoniae	long_read	B	SAMN10390469	PRJNA503964	Tanzania				unknown	unknown
+klebsiella_pneumoniae_002	GCF_017161135.1	SRR10686561	Klebsiella pneumoniae	hybrid	B	SAMN13497075	PRJNA593981	Egypt				short_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_003	GCF_017161155.1	SRR12628168	Klebsiella pneumoniae	long_read	B	SAMN14858807	PRJNA593981	Egypt				unknown	unknown
+klebsiella_pneumoniae_004	GCF_017161485.1	SRR11248994	Klebsiella pneumoniae	hybrid	B	SAMN14082726	PRJNA593981	Egypt				short_read_first_hybrid	same_as_benchmark
+salmonella_enterica_059	GCF_001359015.2	ERR331380	Salmonella enterica	long_read	B	SAMEA2055444	PRJEB3215	Tanzania				unknown	unknown
+salmonella_enterica_055	GCF_002266085.2	SRR5627240	Salmonella enterica	long_read	B	SAMN07163940	PRJNA186035	Nigeria				long_read_only	none
+salmonella_enterica_056	GCF_009729955.1	SRR9163435	Salmonella enterica	hybrid	B	SAMN11056403	PRJNA231221	Nigeria				long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_057	GCF_009729975.1	SRR9163323	Salmonella enterica	hybrid	B	SAMN11056402	PRJNA231221	Nigeria				long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_058	GCF_009730015.1	SRR9172122	Salmonella enterica	hybrid	B	SAMN11056427	PRJNA231221	Nigeria				long_read_first_hybrid	same_as_benchmark
+staphylococcus_aureus_015	GCF_033061535.1	ERR10898915	Staphylococcus aureus	hybrid	B	SAMEA112648784	PRJEB59926	Tanzania				long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn61880622	GCF_062052463.1	SRR39775181	Escherichia coli	hybrid	B	SAMN61880622	PRJNA1499451					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn60560795	GCA_058136955.2	SRR39145625	Escherichia coli	hybrid	B	SAMN60560795	PRJNA1178821					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn26796488	GCA_059230735.1	SRR18370028	Escherichia coli	hybrid	B	SAMN26796488	PRJNA799063					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn54493196	GCF_058106405.1	SRR36707277	Escherichia coli	hybrid	B	SAMN54493196	PRJNA1399404					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn53177121	GCF_057961725.1	SRR36382653	Escherichia coli	hybrid	B	SAMN53177121	PRJNA1359770					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn53300904	GCA_057812945.1	SRR36093613	Escherichia coli	hybrid	B	SAMN53300904	PRJNA1365971					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn50584027	GCA_056665935.1	SRR34970234	Escherichia coli	hybrid	B	SAMN50584027	PRJNA1305022					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn46343046	GCA_056487945.2	SRR32114682	Escherichia coli	hybrid	B	SAMN46343046	PRJNA855907					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn49035616	GCA_056269925.1	SRR33966203	Escherichia coli	hybrid	B	SAMN49035616	PRJNA1276128					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn50713119	GCF_056155585.1	SRR35156825	Escherichia coli	hybrid	B	SAMN50713119	PRJNA1308800					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn48324052	GCA_053797035.1	SRR33418199	Escherichia coli	hybrid	B	SAMN48324052	PRJNA1258574					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn51335572	GCA_053698915.1	SRR35395861	Escherichia coli	hybrid	B	SAMN51335572	PRJNA1328436					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samea120421550	GCA_977064575.1	ERR15871614	Escherichia coli	hybrid	B	SAMEA120421550	PRJEB101410					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn48185765	GCA_051609005.1	SRR33346718	Escherichia coli	hybrid	B	SAMN48185765	PRJNA1097666					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn40411719	GCA_046108985.1	SRR28309106	Escherichia coli	hybrid	B	SAMN40411719	PRJNA1086819					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn38049403	GCA_040735635.1	SRR26595507	Escherichia coli	hybrid	B	SAMN38049403	PRJNA1034027					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn39992795	GCA_038396295.1	SRR28012661	Escherichia coli	hybrid	B	SAMN39992795	PRJNA1078256					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samea115110145	GCA_963924205.1	ERR12492380	Escherichia coli	hybrid	B	SAMEA115110145	PRJEB71895					long_read_first_hybrid	same_as_benchmark
+escherichia_coli_samn40123778	GCA_037288615.1	SRR39132938	Escherichia coli	hybrid	B	SAMN40123778	PRJNA1007270					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn48633867	GCA_055661625.2	SRR33676963	Klebsiella pneumoniae	hybrid	B	SAMN48633867	PRJNA1265869					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn29512486	GCA_058119565.1	SRR19993380	Klebsiella pneumoniae	hybrid	B	SAMN29512486	PRJNA590288					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn41036205	GCA_052402505.1	SRR28760608	Klebsiella pneumoniae	hybrid	B	SAMN41036205	PRJNA1102395					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn06671973	GCA_002258015.3	SRR6958857	Klebsiella pneumoniae	hybrid	B	SAMN06671973	PRJNA353728					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn37529182	GCA_032343715.1	SRR26162848	Klebsiella pneumoniae	hybrid	B	SAMN37529182	PRJNA1020811					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn32977652	GCA_028596205.1	SRR23290086	Klebsiella pneumoniae	hybrid	B	SAMN32977652	PRJNA929966					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn15547569	GCA_023703935.1	SRR12233586	Klebsiella pneumoniae	hybrid	B	SAMN15547569	PRJNA646592					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn28546263	GCA_023572965.1	SRR19309938	Klebsiella pneumoniae	hybrid	B	SAMN28546263	PRJNA839691					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn28404989	GCA_023538995.1	SRR19213009	Klebsiella pneumoniae	hybrid	B	SAMN28404989	PRJNA838107					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samd00212274	GCA_021655415.1	DRR217705	Klebsiella pneumoniae	hybrid	B	SAMD00212274	PRJDB9461					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn22024793	GCA_020525645.1	SRR16202846	Klebsiella pneumoniae	hybrid	B	SAMN22024793	PRJNA768294					long_read_first_hybrid	same_as_benchmark
+klebsiella_pneumoniae_samn07291505	GCA_003288375.1	SRR6985666	Klebsiella pneumoniae	hybrid	B	SAMN07291505	PRJNA316321					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn50110811	GCF_054301075.1	SRR34654958	Salmonella enterica subsp. enterica serovar 4,[5],12:i:-	hybrid	B	SAMN50110811	PRJNA1294593					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn49937988	GCA_051861865.1	SRR34539401	Salmonella enterica subsp. enterica serovar 4,[5],12:i:-	hybrid	B	SAMN49937988	PRJNA1290791					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samea117852468	GCA_965318675.1	ERR15075951	Salmonella enterica subsp. enterica serovar 1,4,[5],12:i:-	hybrid	B	SAMEA117852468	PRJEB86005					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn44339505	GCA_047980805.2	SRR33422847	Salmonella enterica	hybrid	B	SAMN44339505	PRJNA1174367					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn40557412	GCA_038019735.1	SRR28604149	Salmonella enterica subsp. enterica serovar Infantis	hybrid	B	SAMN40557412	PRJNA1090139					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn40557196	GCA_045347765.1	SRR28421159	Salmonella enterica	hybrid	B	SAMN40557196	PRJNA812595					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn40213193	GCA_037099745.1	SRR28174166	Salmonella enterica subsp. enterica serovar Wandsworth	hybrid	B	SAMN40213193	PRJNA937468					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn36398945	GCA_034448035.1	SRR25229427	Salmonella enterica subsp. enterica serovar Abortusovis	hybrid	B	SAMN36398945	PRJNA993380					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn10434137	GCA_030435995.1	SRR8196858	Salmonella enterica subsp. enterica serovar Infantis	hybrid	B	SAMN10434137	PRJNA478278					long_read_first_hybrid	same_as_benchmark
+salmonella_enterica_samn34598608	GCA_030027965.1	SRR26991188	Salmonella enterica subsp. enterica serovar Enteritidis	hybrid	B	SAMN34598608	PRJNA967508					long_read_first_hybrid	same_as_benchmark
+enterobacter_hormaechei_samn38505510	GCA_050572375.1	SRR33616568	Enterobacter hormaechei subsp. xiangfangensis	hybrid	B	SAMN38505510	PRJNA450216					long_read_first_hybrid	same_as_benchmark
+enterobacter_hormaechei_samn47173571	GCA_049102985.2	SRR32535526	Enterobacter hormaechei	hybrid	B	SAMN47173571	PRJNA288601					long_read_first_hybrid	same_as_benchmark
+enterobacter_hormaechei_samn44249573	GCA_044869115.1	SRR31011300	Enterobacter hormaechei	hybrid	B	SAMN44249573	PRJNA1020684					long_read_first_hybrid	same_as_benchmark
+enterobacter_hormaechei_samn13832016	GCA_015238615.1	SRR10882608	Enterobacter hormaechei	hybrid	B	SAMN13832016	PRJNA600798					long_read_first_hybrid	same_as_benchmark
+enterobacter_hormaechei_samn12725416	GCA_008505035.1	SRR10586115	Enterobacter hormaechei	hybrid	B	SAMN12725416	PRJNA562727					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samn30692047	GCF_052828165.1	SRR21444836	Enterococcus faecium	hybrid	B	SAMN30692047	PRJNA877253					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samn49384630	GCA_052161595.1	SRR34033188	Enterococcus faecium	hybrid	B	SAMN49384630	PRJNA1279082					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samn46716619	GCA_050908935.1	SRR32263246	Enterococcus faecium	hybrid	B	SAMN46716619	PRJNA1220344					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samd00565616	GCA_040367385.1	DRR428002	Enterococcus faecium	hybrid	B	SAMD00565616	PRJDB14951					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samn38673174	GCA_034644175.1	SRR27089205	Enterococcus faecium	hybrid	B	SAMN38673174	PRJNA1049017					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samd00577372	GCA_030295785.1	DRR510783	Enterococcus faecium	hybrid	B	SAMD00577372	PRJDB15240					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samn21240068	GCA_021398505.1	SRR15725496	Enterococcus faecium	hybrid	B	SAMN21240068	PRJNA760967					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samd00324536	GCA_019977575.1	DRR305792	Enterococcus faecium	hybrid	B	SAMD00324536	PRJDB11708					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samn15566664	GCA_015999425.1	SRR12245530	Enterococcus faecium	hybrid	B	SAMN15566664	PRJNA646837					long_read_first_hybrid	same_as_benchmark
+enterococcus_faecium_samd00202474	GCA_009938285.1	DRR205461	Enterococcus faecium	hybrid	B	SAMD00202474	PRJDB9240					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn60587231	GCA_062075455.1	SRR38978462	Acinetobacter baumannii	hybrid	B	SAMN60587231	PRJNA835507					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn42506177	GCF_047301355.2	SRR40037362	Acinetobacter baumannii	hybrid	B	SAMN42506177	PRJNA1136224					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samd01945143	GCA_061232025.1	DRR1076697	Acinetobacter baumannii	hybrid	B	SAMD01945143	PRJDB42777					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn61046940	GCF_059446265.1	SRR39275918	Acinetobacter baumannii	hybrid	B	SAMN61046940	PRJNA550309					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn48993107	GCA_050971825.2	SRR33920457	Acinetobacter baumannii	hybrid	B	SAMN48993107	PRJNA893697					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn53393082	GCA_053819325.1	SRR36192522	Acinetobacter baumannii	hybrid	B	SAMN53393082	PRJNA1369536					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samd00414017	GCA_027943705.1	DRR326740	Acinetobacter baumannii	hybrid	B	SAMD00414017	PRJDB10765					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn23235066	GCA_020985285.1	SRR18919489	Acinetobacter baumannii	hybrid	B	SAMN23235066	PRJNA781087					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn17898088	GCA_016919525.2	SRR13700037	Acinetobacter baumannii	hybrid	B	SAMN17898088	PRJNA701627					long_read_first_hybrid	same_as_benchmark
+acinetobacter_baumannii_samn15437745	GCA_013403505.1	SRR12145305	Acinetobacter baumannii	hybrid	B	SAMN15437745	PRJNA643902					long_read_first_hybrid	same_as_benchmark

@@ -193,7 +193,18 @@ def main():
                 "COHORT_QC_FLAGS_ENABLED", "COHORT_QC_MIN_COHORT_SIZE", "COHORT_QC_ZSCORE_THRESHOLD",
                 "RUN_RECOMMENDATION_MODEL", "RECOMMENDATION_MODEL_MIN_STUDIES",
                 "RECOMMENDATION_MODEL_MIN_SAMPLES", "RECOMMENDATION_MODEL_MIN_IMPROVEMENT",
-                "RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES", "RECOMMENDATION_MODEL_NESTED_MIN_STUDIES", "DECISION_PROFILE")
+                "RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES", "RECOMMENDATION_MODEL_NESTED_MIN_STUDIES", "DECISION_PROFILE",
+                # Headline design, endpoints and diagnostics: every setting that changes a
+                # ranking or a reported number must be recorded, or the run cannot be
+                # reproduced from its manifest (question bank Q36/Q38).
+                "CPRR_MIN_COVERAGE", "CPRR_MIN_SHARE", "CPRR_MIN_IDENTITY",
+                "HEADLINE_MAX_REFERENCE_TIER", "MIN_SPECIES_CLUSTERS", "CLONAL_MASH_DISTANCE",
+                "RUN_TRUTH_LABEL_EVIDENCE", "TRUTH_MIN_LONG_READ_DEPTH", "TRUTH_LONG_READ_PRESET",
+                "PLASMID_REFERENCE_SKETCH", "PLASMID_REFERENCE_FASTA",
+                "RUN_SCORABLE_TRUTH", "SCORABLE_WINDOW_BP", "SCORABLE_STEP_BP",
+                "EXCLUDE_DATABASE_OVERLAP",
+                "RUN_BASELINE_COVERAGE", "RUN_BASELINE_REFERENCE", "BASELINE_COVERAGE_RATIO",
+                "BASELINE_MIN_CONTIG_LENGTH", "BASELINE_REFERENCE_MIN_QUERY_COVERAGE")
     sample_sheet = Path(args.sample_sheet)
     samples = sample_rows(sample_sheet)
     manifest_warnings = []

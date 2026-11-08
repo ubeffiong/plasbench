@@ -64,8 +64,10 @@ class Design:
         self.species = {r["sample_id"]: normalise_species(r.get("organism")) for r in sheet if r.get("sample_id")}
         self.species = {k: v for k, v in self.species.items() if v}
         self.task_of = {}
+        self.method_class = {}
         for row in read_rows(capabilities):
             if row.get("tool"):
+                self.method_class[row["tool"]] = (row.get("method_class") or "").strip()
                 capable = (row.get("binning_capable") or "").strip().lower() == "yes"
                 self.task_of[row["tool"]] = TASK_RECONSTRUCTION if capable else TASK_CLASSIFICATION
         self.provenance = {r["sample"]: r for r in read_rows(provenance) if r.get("sample")}
@@ -104,6 +106,10 @@ class Design:
             if group and not group.startswith("isolate:"):
                 union(f"s:{sample}", f"clonal:{group}")
         return {sample: find(f"s:{sample}") for sample in samples}
+
+    def is_baseline(self, tool):
+        """Built-in trivial baselines (python/baseline_predictors.py)."""
+        return self.method_class.get(tool) == "baseline" or tool.startswith("baseline_")
 
     # -- tasks -----------------------------------------------------------------
     def task(self, tool, rows):

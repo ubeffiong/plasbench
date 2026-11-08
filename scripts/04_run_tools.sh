@@ -145,6 +145,45 @@ run_gplas2_mob() {
     fi
 }
 
+# Trivial baselines (python/baseline_predictors.py): reference points every
+# tool should beat. Exit status 3 means "cannot apply to this input" (no
+# depth in contig headers / no plasmid reference set built) and is recorded
+# as skipped, never as a failed run that would be scored zero.
+run_baseline() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3" TOOL="$4" FLAG="$5"
+    tool_enabled "$FLAG" "$TOOL" || return 0
+    local PRED="$RDIR/pred_${TOOL}.plasmid.fasta" DONE="$RDIR/.${TOOL}.complete"
+    if is_complete "$DONE" "$PRED"; then
+        log "  $TOOL: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        return 0
+    fi
+    rm -f "$PRED" "$DONE" "$RDIR/pred_${TOOL}.bins.tsv" "$RDIR/pred_${TOOL}.candidates.fasta" "$RDIR/pred_${TOOL}.scores.tsv"
+    local ARGS=()
+    if [[ "$TOOL" == "baseline_coverage" ]]; then
+        ARGS=(coverage --contigs "$CONTIGS" --out-prefix "$RDIR/pred_${TOOL}"
+              --ratio "$BASELINE_COVERAGE_RATIO" --min-length "$BASELINE_MIN_CONTIG_LENGTH")
+    else
+        if [[ ! -s "$PLASMID_REFERENCE_FASTA" ]]; then
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "plasmid reference set not built (build_plasmid_reference_set.py)"
+            return 0
+        fi
+        ARGS=(reference --contigs "$CONTIGS" --reference "$PLASMID_REFERENCE_FASTA" --out-prefix "$RDIR/pred_${TOOL}"
+              --min-query-coverage "$BASELINE_REFERENCE_MIN_QUERY_COVERAGE" --threads "$THREADS")
+    fi
+    log "  $TOOL ($SAMPLE) ..."
+    local START; START=$(profile_start)
+    local status=0
+    python3 "$HERE/../python/baseline_predictors.py" "${ARGS[@]}" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 || status=$?
+    if [[ "$status" -eq 0 ]]; then
+        touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "trivial baseline" "$(profile_elapsed "$START")"
+    elif [[ "$status" -eq 3 ]]; then
+        rm -f "$PRED"; record_status "$SAMPLE" "$TOOL" "skipped" "" "baseline not applicable: see $LOG_DIR/${SAMPLE}.${TOOL}.log"
+    else
+        rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE"
+        record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+    fi
+}
+
 run_platon() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLATON platon && have platon; then
@@ -461,6 +500,8 @@ process_sample() {
         tool_enabled RUN_PLASMER plasmer && record_status "$SAMPLE" "plasmer" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASCOPE plascope && record_status "$SAMPLE" "plascope" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_PLASGRAPH2 plasgraph2 && record_status "$SAMPLE" "plasgraph2" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_BASELINE_COVERAGE baseline_coverage && record_status "$SAMPLE" "baseline_coverage" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_BASELINE_REFERENCE baseline_reference && record_status "$SAMPLE" "baseline_reference" "skipped" "" "assembly contigs unavailable"
         return 0
     fi
     log "=== Run tools on $SAMPLE ==="
@@ -477,6 +518,8 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmer "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plascope "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasgraph2 "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_coverage RUN_BASELINE_COVERAGE &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_reference RUN_BASELINE_REFERENCE &
 
     # gplas2_mob's classifier seed comes straight from mob_recon's own output
     # directory, so it must not start until that finished (successfully or
@@ -510,7 +553,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

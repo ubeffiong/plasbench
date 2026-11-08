@@ -912,3 +912,44 @@ one leaderboard per analysis track and does not mix track claims, so
 `benchmark.short_read.leaderboard.tsv` answers "what can short reads alone
 recover?" -- the same metric, on the same isolates, with the inputs kept
 separate.
+
+
+## Baselines, calibration and interpretation limits
+
+These answer reviewer questions Q62, Q66, Q68-73, Q78, Q85 and Q108
+(docs/FAQ_QUESTION_BANK.md).
+
+**Trivial baselines** (`python/baseline_predictors.py`, stage 4, on by default). Two rules
+are scored, ranked and reported exactly like tools on the classification track:
+`baseline_coverage` calls contigs whose assembler-reported depth is at least
+`BASELINE_COVERAGE_RATIO` (1.5) times the assembly's length-weighted median depth and
+`BASELINE_MIN_CONTIG_LENGTH` (1000 bp) long; `baseline_reference` calls contigs whose
+aligned fraction against `PLASMID_REFERENCE_FASTA` (minimap2 asm5, identity >= 0.95)
+reaches `BASELINE_REFERENCE_MIN_QUERY_COVERAGE` (0.8), and gives every contig that
+fraction as a probability. A baseline that cannot apply (no depth in the contig headers;
+no reference set built) is recorded as skipped, never as a failed run. Each leaderboard row
+says whether a tool's ranking score beats the best baseline in its track and task
+(`beats_best_baseline`). The bundled reference set is small (16 accessions); point
+`PLASMID_REFERENCE_FASTA` at a larger plasmid database for a stronger baseline.
+
+**Probability calibration** (`score_plasmids.py calibration()`). For tools that expose a
+per-record probability (adapters/SCORES.md), each candidate record with a truth-labelled
+alignment gets a soft label: the share of its aligned bases on PLASMID rather than
+CHROMOSOME, weighted by those bases. Brier score = weighted mean (p - y)^2; expected
+calibration error = weighted mean |mean p - mean y| over 10 equal-width bins; the
+per-bin reliability table is `<tool>.calibration.tsv`. Leaderboards report
+`mean_brier_score`, `mean_expected_calibration_error` and `n_calibrated`. Calibration is
+supplementary and never ranks tools: a tool can order contigs well and still be
+over-confident.
+
+**Interpretation limits and metadata completeness.** The HTML report
+(`python/report_question_bank.py`) states what the results support and what they do not
+show (relatedness, transmission, gene versus plasmid spread, novelty, clinical validity,
+experimental confirmation), and defines the words it uses. Aggregation writes
+`benchmark.metadata_completeness.tsv`: per scored sample, which consequential fields are
+missing (organism, bioproject, collection_country, sample_origin, truth provenance) and
+what each absence changes.
+
+**Run manifest.** `run_manifest.json` now records every setting that changes a ranking or
+a reported number (CPRR thresholds, headline tier and species minimum, clonal distance,
+truth-evidence and recall-ceiling settings, leakage exclusion, baseline settings).
