@@ -247,6 +247,12 @@ into unambiguous, plasmid/chromosome-ambiguous, and unmapped categories. These
 categories support interpretation but do not silently change the TP/FP/FN
 definition.
 
+Because coverage is merged, a prediction that claims the same reference bases
+more than once (duplicate records, or one record per copy of a plasmid) earns no
+extra TP but is also not penalised. `redundant_pred_bp` reports how many retained
+reference-base claims were redundant (raw retained target coverage minus merged
+coverage). It is a diagnostic and does not alter F1.
+
 ## Base-level confusion matrix (positive class = plasmid)
 Let `C` be the set of reference bases covered by predicted-plasmid alignments.
 - **TP** = |{plasmid reference bases} ∩ C|
@@ -258,10 +264,13 @@ Then:
 - **recall** (completeness) = TP / (TP + FN) — fraction of true plasmid sequence recovered;
 - **F1** = 2·precision·recall / (precision + recall).
 
-Predicted sequence that does not align to the reference at all is reported as
-`unmapped_pred_bp` and is **not** counted as FP, because it cannot be attributed to a
-chromosome or plasmid origin (it usually reflects mis-assembly or contamination). Reporting
-it separately keeps the core precision metric conservative and interpretable.
+Predicted sequence with no *retained* alignment is reported as `unmapped_pred_bp` and
+is **not** counted as FP, because it cannot be attributed to a chromosome or plasmid
+origin (it usually reflects mis-assembly or contamination). This includes sequence that
+aligns but whose every alignment fails the length, identity, MAPQ or query-coverage
+filters above — for example a chimeric or low-identity contig, or a repeat placed with
+low MAPQ. Such output therefore lowers neither precision nor F1; read `unmapped_pred_bp`
+alongside F1 rather than relying on F1 alone to expose noisy predictions.
 
 Predicted sequence that *does* align, but only to a reference sequence absent from
 `truth.tsv` (for example a contig the NCBI sequence report never classified), is a

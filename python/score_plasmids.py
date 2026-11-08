@@ -316,6 +316,24 @@ def score(truth, total_plasmid, covered):
     return tp, fp, fn
 
 
+def redundant_bp(covered, truth):
+    """Reference bases claimed more than once by retained alignments.
+
+    score() merges overlapping coverage, so emitting the same plasmid region
+    twice (duplicate records, or one record per copy of a repeat) earns no
+    extra TP but is also never penalised. This diagnostic exposes that
+    redundancy; it never changes TP, FP, or F1.
+    """
+    total = 0
+    for seq_id, intervals in covered.items():
+        if seq_id not in truth:
+            continue
+        length = truth[seq_id][1]
+        raw = sum(max(0, min(e, length) - max(s, 0)) for s, e in intervals)
+        total += max(0, raw - min(merge_intervals(intervals)[1], length))
+    return total
+
+
 def safe_div(a, b):
     return a / b if b else 0.0
 
@@ -647,6 +665,7 @@ def main():
         "recovered_plasmid_count_ge50", "plasmid_recall_ge50",
         "recovered_plasmid_count_ge90", "plasmid_recall_ge90",
         "recovered_complete_circular_plasmid_count", "complete_circular_plasmid_recall",
+        "redundant_pred_bp",
     ]
     row = [
         args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
@@ -675,6 +694,9 @@ def main():
         f"{safe_div(recovered_plasmids_ge90, len(true_plasmids)):.4f}" if true_plasmids else "",
         recovered_complete_circular if recovered_complete_circular is not None else "",
         f"{safe_div(recovered_complete_circular, len(circular_plasmids)):.4f}" if recovered_complete_circular is not None else "",
+        # Diagnostic only: reference bases claimed more than once (duplicate
+        # predicted records). Never changes TP/FP/F1.
+        redundant_bp(covered, truth),
     ]
 
     new_file = not os.path.exists(args.out) or os.path.getsize(args.out) == 0

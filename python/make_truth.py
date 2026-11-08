@@ -17,8 +17,11 @@ Usage:
 
 We read the FASTA to get the exact sequence ids + lengths (authoritative), then
 map each id to a molecule type using the report. Any FASTA id not resolvable
-from the report defaults to CHROMOSOME with a warning (safe: it will only ever
-create false negatives if it was really a plasmid, which the log flags).
+from the report defaults to CHROMOSOME with a warning. This is NOT neutral: if
+that sequence is really a plasmid, every tool that correctly calls it plasmid
+is charged false-positive bases (lowering precision), and its bases are
+missing from recall's denominator. Review every defaulted sequence before
+using the sample in a benchmark.
 
 Standard library only.
 """
@@ -128,8 +131,9 @@ def main():
                 mtype = "CHROMOSOME"
                 n_default += 1
                 sys.stderr.write(
-                    f"[make_truth] WARNING: '{seq_id}' not found in report; "
-                    f"defaulting to CHROMOSOME.\n"
+                    f"[make_truth] WARNING: '{seq_id}' ({length} bp) not found in report; "
+                    f"defaulting to CHROMOSOME. If it is really a plasmid, correct "
+                    f"plasmid calls on it will be scored as false positives.\n"
                 )
             if mtype == "PLASMID":
                 n_plasmid += 1
@@ -143,9 +147,10 @@ def main():
     )
     if n_plasmid == 0:
         sys.stderr.write(
-            "[make_truth] WARNING: no plasmids found for this sample. "
-            "It will contribute only to precision, not recall. Consider "
-            "excluding plasmid-free isolates from the benchmark.\n"
+            "[make_truth] NOTE: no plasmids found for this sample. Its "
+            "precision/recall/F1 are undefined and it is left out of F1 "
+            "ranking; it is scored as a negative control (isolate_specificity, "
+            "chromosome_fp_bp). If plasmids were expected, check the report.\n"
         )
 
 

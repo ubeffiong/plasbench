@@ -514,43 +514,42 @@ def write_md(summary, path):
 
 def write_md_table(fh, summary, track=None):
     """One ranked Markdown table; a heading names the track when several exist."""
-    if True:
-        if track:
-            fh.write(f"## Track: {track}\n\n")
-        fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | "
-                 "Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | **Mean F1** | Ranked on | 95% F1 CI | Median F1 | Significant vs runner-up |\n")
-        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", ":---"]) + "|\n")
-        for i, s in enumerate(summary, start=1):
-            plasmid_recall = f"{s['mean_plasmid_recall']:.3f}" if s["mean_plasmid_recall"] is not None else "not annotated"
-            ci = (f"{s['f1_ci_low']:.3f}–{s['f1_ci_high']:.3f}"
-                  if s["f1_ci_low"] is not None else "n < 5")
-            # A tool scored only on zero-true-plasmid isolates has no defined
-            # mean precision/recall/f1 at all (score_plasmids.py) -- "not
-            # applicable" rather than crashing on a None float format.
-            mean_precision = f"{s['mean_precision']:.3f}" if s["mean_precision"] is not None else "n/a"
-            mean_recall = f"{s['mean_recall']:.3f}" if s["mean_recall"] is not None else "n/a"
-            mean_f1 = f"{s['mean_f1']:.3f}" if s["mean_f1"] is not None else "n/a"
-            median_f1 = f"{s['median_f1']:.3f}" if s["median_f1"] is not None else "n/a"
-            # Only the winner (rank 1) ever carries a real value here -- see
-            # attach_significance(). Paired sign-flip permutation test on
-            # shared samples, Holm-adjusted across every pairwise comparison.
-            if s.get("ranking_basis") == "shared_samples":
-                ranked_on = f"{s.get('n_ranking_samples', '')} shared"
-            elif s.get("n_ranking_samples"):
-                ranked_on = f"{s.get('n_ranking_samples')} own (no shared samples)"
-            else:
-                ranked_on = "n/a"
-            significance = s.get("significant_vs_runner_up", "not_assessed")
-            significance_text = {True: "yes (paired permutation, Holm-adjusted)",
-                                 False: "no (paired permutation, Holm-adjusted)"}.get(significance, "not assessed")
-            fh.write(
-                f"| {s.get('rank', i)} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "
-                f"{mean_precision} | {mean_recall} | "
-                f"{plasmid_recall} | {format_rate(s['reference_perfect_recovery_rate'], s['n_reference_perfect_assessed'])} | "
-                f"{format_rate(s['strict_reference_reconstruction_rate'], s['n_strict_reconstruction_assessed'])} | "
-                f"**{mean_f1}** | {ranked_on} | {ci} | {median_f1} | {significance_text} |\n"
-            )
-        fh.write("\n")
+    if track:
+        fh.write(f"## Track: {track}\n\n")
+    fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | "
+             "Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | **Mean F1** | Ranked on | 95% F1 CI | Median F1 | Significant vs runner-up |\n")
+    fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", ":---"]) + "|\n")
+    for i, s in enumerate(summary, start=1):
+        plasmid_recall = f"{s['mean_plasmid_recall']:.3f}" if s["mean_plasmid_recall"] is not None else "not annotated"
+        ci = (f"{s['f1_ci_low']:.3f}–{s['f1_ci_high']:.3f}"
+              if s["f1_ci_low"] is not None else "n < 5")
+        # A tool scored only on zero-true-plasmid isolates has no defined
+        # mean precision/recall/f1 at all (score_plasmids.py) -- "not
+        # applicable" rather than crashing on a None float format.
+        mean_precision = f"{s['mean_precision']:.3f}" if s["mean_precision"] is not None else "n/a"
+        mean_recall = f"{s['mean_recall']:.3f}" if s["mean_recall"] is not None else "n/a"
+        mean_f1 = f"{s['mean_f1']:.3f}" if s["mean_f1"] is not None else "n/a"
+        median_f1 = f"{s['median_f1']:.3f}" if s["median_f1"] is not None else "n/a"
+        # Only the winner (rank 1) ever carries a real value here -- see
+        # attach_significance(). Paired sign-flip permutation test on
+        # shared samples, Holm-adjusted across every pairwise comparison.
+        if s.get("ranking_basis") == "shared_samples":
+            ranked_on = f"{s.get('n_ranking_samples', '')} shared"
+        elif s.get("n_ranking_samples"):
+            ranked_on = f"{s.get('n_ranking_samples')} own (no shared samples)"
+        else:
+            ranked_on = "n/a"
+        significance = s.get("significant_vs_runner_up", "not_assessed")
+        significance_text = {True: "yes (paired permutation, Holm-adjusted)",
+                             False: "no (paired permutation, Holm-adjusted)"}.get(significance, "not assessed")
+        fh.write(
+            f"| {s.get('rank', i)} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "
+            f"{mean_precision} | {mean_recall} | "
+            f"{plasmid_recall} | {format_rate(s['reference_perfect_recovery_rate'], s['n_reference_perfect_assessed'])} | "
+            f"{format_rate(s['strict_reference_reconstruction_rate'], s['n_strict_reconstruction_assessed'])} | "
+            f"**{mean_f1}** | {ranked_on} | {ci} | {median_f1} | {significance_text} |\n"
+        )
+    fh.write("\n")
 
 
 TRACK_ORDER = ("short_read", "long_read", "hybrid")

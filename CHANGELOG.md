@@ -29,6 +29,18 @@ history is lost, only the numbering is cleaner. See
   track, and `benchmark.paired_comparisons.tsv` only compares tools within a
   track (new `analysis_track` column). Previously the combined file ranked
   short-read, long-read and hybrid tools against each other.
+- `make_truth.py` no longer claims that defaulting an unclassified sequence to
+  CHROMOSOME "only ever creates false negatives": if it is really a plasmid, correct
+  plasmid calls on it are scored as false positives. Its warnings now say so, and
+  the plasmid-free note no longer suggests excluding negative-control isolates.
+- METHODS.md now states that `unmapped_pred_bp` includes predicted sequence whose
+  alignments were all removed by the alignment filters, so it lowers neither
+  precision nor F1.
+
+### Added
+- `redundant_pred_bp` score column: reference bases claimed more than once by
+  retained alignments (e.g. duplicate predicted records). Diagnostic only; it never
+  changes TP, FP or F1.
 
 ## [0.1.5] - 2026-09-10
 
