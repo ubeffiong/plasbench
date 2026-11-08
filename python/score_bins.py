@@ -29,6 +29,7 @@ import csv
 import math
 import os
 from collections import defaultdict
+from plasbench_common import merge_intervals, interval_overlap_bp as overlap  # noqa: E402
 
 
 def merge(intervals):
@@ -55,16 +56,6 @@ def read_bins(path):
                 raise ValueError("bins TSV requires unique sequence_id and nonempty bin_id")
             membership[row["sequence_id"]] = row["bin_id"]
     return membership
-
-
-def overlap(left, right):
-    """Return shared bases between two merged query-coordinate interval lists."""
-    i = j = total = 0
-    while i < len(left) and j < len(right):
-        total += max(0, min(left[i][1], right[j][1]) - max(left[i][0], right[j][0]))
-        if left[i][1] <= right[j][1]: i += 1
-        else: j += 1
-    return total
 
 
 def bin_ambiguity(path, membership, plasmids, chromosomes, min_length=1, min_identity=0.0,
@@ -98,15 +89,6 @@ def bin_ambiguity(path, membership, plasmids, chromosomes, min_length=1, min_ide
 
 def safe_div(a, b):
     return a / b if b else 0.0
-
-
-def merge_intervals(intervals):
-    ordered = sorted(intervals)
-    merged = []
-    for start, stop in ordered:
-        if merged and start <= merged[-1][1]: merged[-1][1] = max(merged[-1][1], stop)
-        else: merged.append([start, stop])
-    return merged
 
 
 def bp_entropy(weights_by_label):

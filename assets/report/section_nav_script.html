@@ -1,0 +1,48 @@
+<script>
+(()=>{
+// This fragment is emitted inside one of the sections it tracks, so at parse
+// time every later section is still unwritten. Building the lookup then
+// silently limited the bar to the sections above it.
+function setup(){
+const nav=document.querySelector('nav.nav');if(!nav)return;
+const links=[...nav.querySelectorAll('a')];
+const byId={};links.forEach(a=>{const id=a.getAttribute('href').slice(1);
+ const target=document.getElementById(id);if(target)byId[id]={a,target}});
+const ids=Object.keys(byId);if(!ids.length)return;
+
+function mark(id){links.forEach(a=>a.removeAttribute('aria-current'));
+ const hit=byId[id];if(!hit)return;hit.a.setAttribute('aria-current','true');
+ // Keep the current pill visible without dragging the page with it.
+ const bar=nav.getBoundingClientRect(),pill=hit.a.getBoundingClientRect();
+ if(pill.left<bar.left||pill.right>bar.right)
+  nav.scrollLeft+=pill.left-bar.left-16}
+
+// Ratios from an IntersectionObserver go stale on a long jump, and a tall
+// section keeps a non-zero ratio across thousands of pixels, so the mark stuck.
+// The section in view is simply the last one whose top has passed the bar.
+// A boolean latch cleared only inside requestAnimationFrame stops the tracker
+// for good if a frame is never delivered -- which a throttled or backgrounded
+// tab does. A time throttle cannot latch.
+let lastRun=0,pending=null;
+function locate(){lastRun=Date.now();
+ const line=(document.querySelector('nav.nav')||{}).getBoundingClientRect
+  ? document.querySelector('nav.nav').getBoundingClientRect().bottom+8 : 72;
+ let current=ids[0],nearest=-Infinity;
+ ids.forEach(id=>{const top=byId[id].target.getBoundingClientRect().top;
+  if(top<=line&&top>nearest){nearest=top;current=id}});
+ // At the foot of the document the last section may never reach the bar.
+ if(window.innerHeight+window.scrollY>=document.body.scrollHeight-4)current=ids[ids.length-1];
+ mark(current)}
+function schedule(){const since=Date.now()-lastRun;
+ if(since>=90){locate();return}
+ if(pending)return;
+ pending=setTimeout(()=>{pending=null;locate()},90-since)}
+addEventListener('scroll',schedule,{passive:true});
+addEventListener('resize',schedule);
+locate();
+links.forEach(a=>a.addEventListener('click',()=>mark(a.getAttribute('href').slice(1))));
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup);
+else setup();
+})();
+</script>

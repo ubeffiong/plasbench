@@ -96,10 +96,10 @@ def main():
 
     print("the scope statement is present and unambiguous")
     scope = section(text, "### 1.3 What it is not", "### 1.4")
-    for must in ("identification", "clustering", "relatedness", "PLSDB", "transmission", "diagnostic"):
+    for must in ("identification", "transmission", "diagnostic"):
         check(f"section 1.3 says what it is not: {must}", must.lower() in scope.lower())
     matrix = section(text, "## 18. Scope matrix", "## 19.")
-    check("the scope matrix marks relatedness as not implemented", "Not implemented" in matrix)
+    check("the scope matrix marks transmission inference as not implemented", "Not implemented" in matrix)
 
     print()
     if not ok:

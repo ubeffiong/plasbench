@@ -11,14 +11,14 @@ cannot be fixed in software.
 |---|---|
 | **Verified** | A test in `test/` exercises it, or the number was computed from a file in this repository. |
 | **Fixed here** | The evidence exposed a gap; the fix and its test were added alongside this FAQ. |
-| **Fixed on audit branch** | Fixed and tested on `tmp/audit-all` / `fix/audit-followthrough` (see `REVIEW.md`, "Remediation status"). Confirm it is on `main` before relying on it. |
+| **Fixed on audit branch** | Fixed and tested on `tmp/audit-all` / `fix/audit-followthrough` (see the Scientific Guide). Confirm it is on `main` before relying on it. |
 | **Documented** | Stated in the docs, not enforced or tested by code. |
 | **Open** | Not done. The reason is given (usually: it needs real data, not code). |
 
 A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
 cross-references the question numbers here.
 
-Evidence basis: `REVIEW.md` (independent review and audit), the source files named in
+Evidence basis: [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md) (independent review and audit), the source files named in
 each answer, and the test suite. A full run of `test/run_tests.sh` is the check on the
 "Verified" claims; see Q24 for its result. Nothing here has been checked against a
 real-cohort run, because none exists yet (Q22).
@@ -32,20 +32,18 @@ real-cohort run, because none exists yet (Q22).
 each tool's predicted-plasmid FASTA onto a complete reference with minimap2 and scores
 per reference base: plasmid bases covered are TP, chromosome bases covered are FP,
 plasmid bases missed are FN (`python/score_plasmids.py`, `scripts/05_score.sh`). It is
-**not** a plasmid identification, PLSDB-search, clustering, subcommunity or relatedness
-tool.
-**Evidence.** README "How scoring works (at a glance)"; `REVIEW.md` Part 1 ("What it is not").
-**Status.** Verified. The scope statement is in the docs; there is no code for the
-relatedness ambitions, and none is implied.
+**not** a plasmid identification tool.
+**Evidence.** README "How scoring works (at a glance)"; Scientific Guide section 1.3 ("What it is not").
+**Status.** Verified. The scope statement is in the docs.
 
-### Q2. Why not use Pling or a community/relatedness tool for scoring?
-**Answer.** Scoring compares a prediction with a truth genome of the same isolate. Pling
-compares plasmids with each other, needs complete plasmids and gives community-level
-results that this cohort size cannot support. It could help *cohort QC* (spotting
-near-identical plasmids that inflate apparent sample count), which is a different job.
-**Evidence.** My description of Pling is from memory and was not checked against its
-documentation; verify before citing it.
-**Status.** Open as an idea (cohort redundancy screening); not needed for scoring.
+### Q2. Is the scorer checked against an independent evaluator?
+**Answer.** Partly. PlasEval (Mane et al., *BMC Bioinformatics* 2024) is a framework for evaluating plasmid binning that is
+aware of contig length and of repeats. PlasBench can import a PlasEval run as a labelled, non-ranking cross-check
+(`plasbench import-external-benchmark`) but does not run it, and a one-off script compares the minimap2 scoring with a BLASTN
+scoring (`python/compare_scoring_methods.py`).
+**Evidence.** `docs/METHODS.md`, "External evaluator cross-checks"; `python/compare_scoring_methods.py`.
+**Status.** Cross-check import done; a first-class PlasEval adapter is **Open** (it needs the external tool and real data to
+validate).
 
 ---
 
@@ -142,7 +140,7 @@ recovery.
 ### Q11. Are duplicated or multimeric predictions rewarded?
 **Answer.** No: intervals are merged, so a duplicate earns no extra TP and no penalty.
 `redundant_pred_bp` reports it. A multimer-collapsing tool and a multimer-emitting tool tie.
-**Evidence.** `test/test_redundant_coverage.py`; `REVIEW.md` §5.2.
+**Evidence.** `test/test_redundant_coverage.py`; [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md).
 **Status.** Verified. Reported, not penalised.
 
 ### Q12. How is an isolate with no plasmids scored?
@@ -187,7 +185,7 @@ cohort can detect) has **not** been done: **Open**.
 ### Q15. How is multiple testing handled?
 **Answer.** Sign-flip permutation tests with Holm correction, applied per analysis track
 (not across every comparison in the run; the docs previously said otherwise and were corrected).
-**Evidence.** `docs/METHODS.md`; `REVIEW.md` finding D7; `test/test_leaderboard_significance.py`.
+**Evidence.** `docs/METHODS.md`; `test/test_leaderboard_significance.py`.
 **Status.** Documented and corrected on audit branch.
 
 ### Q16. Can tools be tuned to, or trained on, the truth genomes?
@@ -299,8 +297,7 @@ use a Linux checkout or CI for a full run.
 | Question | Class | Note |
 |---|---|---|
 | Could the benchmark extend to metagenomic assemblies? | Partly done | A separate metagenomic bin-scoring track exists (`docs/METAGENOMICS.md`). |
-| Could near-identical plasmids be screened out of the cohort? | Adjacent opportunity | The Pling-style redundancy idea in Q2. |
-| Plasmid relatedness, PLSDB search, communities | Outside scope | Would be a separate project with its own validation (`REVIEW.md` Part 12, item 19). |
+| Could near-identical isolates be screened out of the cohort? | Adjacent opportunity | Redundant samples inflate the apparent sample count; the clonal-group analysis already groups them for the statistics. |
 | Outbreak or surveillance inference | Outside scope | PlasBench evaluates reconstruction, not epidemiology. |
 | Phage-plasmids, virulence plasmids, host range | Outside scope | Not evaluated. |
 
@@ -309,12 +306,13 @@ use a Linux checkout or CI for a full run.
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions
-and a tracking template) was put to PlasBench. Most of its questions assume a tool that *identifies, clusters
-or relates* plasmids. PlasBench is a **benchmark of plasmid reconstruction and classification tools**
+and a tracking template) was put to PlasBench. Some of its questions assume a tool that identifies the plasmids
+in a sample. PlasBench is a **benchmark of plasmid reconstruction and classification tools**
 ([Scientific Guide section 1.3](docs/SCIENTIFIC_GUIDE.md#13-what-it-is-not)), so each answer below says
 whether the question applies, answers it where it does, and says plainly where it does not. Question numbers
 refer to the bank. For depth, follow the Scientific Guide link; for the 108-question companion, see
-[docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md).
+[docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md). Bank sections 11-13 and 27 (Q155-203 and Q417-430) ask
+about functions outside the benchmarking pipeline and are not answered here.
 
 | Status | Meaning |
 |---|---|
@@ -338,8 +336,8 @@ refer to the bank. For depth, follow the Scientific Guide link; for the 108-ques
 4. **What is the endpoint?** Per task and track: length-weighted binning F1 for binning-capable tools, base-level F1 for
    classifiers, CPRR as secondary; detection, binning, accuracy, structure and features are reported as separate dimensions
    and never folded into the headline. **Answered** (Guide 8.1-8.2; README "Metric framework").
-5. **What may it claim?** Computational recovery of a known reference by a tool. It does **not** claim relatedness, shared
-   ancestry, horizontal transfer or epidemiological spread. **Answered** (Guide 1.3, 13.5, 18).
+5. **What may it claim?** Computational recovery of a known reference by a tool. It does **not** claim transmission,
+   outbreak or horizontal-gene-transfer inference, and its outputs are not diagnostic. **Answered** (Guide 1.3, 13.5, 18).
 
 ### Part I. Research problem and novelty (Q1-28)
 
@@ -359,13 +357,11 @@ comparison **Open**.
 evidence labels do not contradict it (replicon markers, absence of rRNA, long-read support). A sequence with conflicting
 evidence (chromid, integrated plasmid, marker-free or short-read-only plasmid) is `AMBIGUOUS` and excluded from scoring
 (`python/label_truth_evidence.py`; Guide 4.3-4.5). A plasmid with several replicons counts under each in the stratified table
-(Q17). Whether a replicon implies relatedness, how families and incompatibility groups relate, and how to classify by
-backbone versus accessory regions are **out of scope**: PlasBench labels truth, it does not classify plasmids. Linear plasmids
+(Q17). Linear plasmids
 and circular topology: circularity is read from a curated list when supplied and is never inferred (Guide 7.4).
-**Answered / out of scope.**
+**Answered.**
 
-**4. Plasmid structure (Q45-58).** Backbone and accessory decomposition, mosaic and recombinant interpretation, and fusion
-versus similarity are **out of scope**. What exists: alignment-derived structural calls (inversions, relocations,
+**4. Plasmid structure (Q45-58).** What exists: alignment-derived structural calls (inversions, relocations,
 duplications, with `validated: false`), bin split and merge events, insertion-sequence landmarks from the reference annotation,
 repeat-ambiguity and recall-ceiling diagnostics, and, **implemented here**, **NGOC** (gene-order conservation, strand and
 circularity aware) and a missing-region count (`feature_preservation.py`, `alignment_accuracy.py`).
@@ -412,25 +408,15 @@ contigs mixing plasmid and chromosome are visible as ambiguity and contamination
 cross-check, not run: a first-class adapter is **Open** (it needs the external tool and real data to validate). Repeat-aware
 *matching* is not implemented; repeat effects are reported as diagnostics. **Answered / Open.**
 
-### Part V. Similarity and relatedness (Q137-168)
+### Part V. Sequence similarity (Q137-154)
 
 **10. Sequence similarity (Q137-154).** PlasBench compares a *prediction with its own truth* by local alignment (minimap2,
 `asm5`, primary alignments only), merging aligned blocks on the reference. Coverage and identity are reported separately:
 recall is coverage, and, **implemented here**, identity, mismatch, insertion and deletion rates come from the alignments'
 CIGAR. Circular rotation and strand are handled by construction (blocks are merged on the reference, so a different origin or
-the opposite strand costs nothing). Plasmid-versus-plasmid similarity, gene-content similarity and biological interpretation of
-a score are **out of scope**.
-
-**11. Relatedness (Q155-168).** **Out of scope and not claimed** (Guide 1.3, 18). PlasBench's own thresholds (identity 0.90,
-MAPQ 20, minimum length 200, query coverage 0.20) are scoring choices, not biological ones; the ranking-robustness table
-re-ranks under changed choices (`python/rank_sensitivity.py`).
-
-### Part VI. Clustering and graphs (Q169-203)
-
-**12-13. Clustering and graph analysis.** **Out of scope.** There is no plasmid clustering, community detection or network.
-The only "clusters" in PlasBench are statistical: samples from one BioProject or clonal group, resampled together so
-intervals are not too narrow. The nearest-reference Mash screen is experimental, unvalidated and off by default, and is not a
-clustering method. For clustering or relatedness use a method built and validated for it (Guide 18).
+the opposite strand costs nothing). A score measures agreement between a prediction and its own truth; it has no wider biological
+interpretation. PlasBench's own thresholds (identity 0.90, MAPQ 20, minimum length 200, query coverage 0.20) are scoring
+choices, not biological ones; the ranking-robustness table re-ranks under changed choices (`python/rank_sensitivity.py`).
 
 ### Part VII. AMR and function (Q204-232)
 
@@ -500,8 +486,7 @@ validation cohort is **Open**; a simulation that checks the nominal coverage of 
 **21. Comparison with existing tools.** The tools in the registry are the benchmark's *subjects* (mob_recon, Platon,
 plasmidSPAdes, gplas2, geNomad, PLASMe, RFPlasmid, PlasmidHunter, Plasmer, plasGraph2, PlaScope, Flye+MOB-recon, Trycycler,
 Hybracter, Plassembler; Guide 6). PlasmidFinder and MOB-typer are used to *annotate truth*, not benchmarked as reconstructors.
-COPLA and relatedness tools address a different task and are not included. Whether PlasBench "outperforms" them is not a
-meaningful question. Two trivial baselines are scored like tools (`baseline_coverage`, a depth rule, and
+Two trivial baselines are scored like tools (`baseline_coverage`, a depth rule, and
 `baseline_reference`, a match to a plasmid reference set), and each tool reports whether it beats them
 (`beats_best_baseline`). **Answered.**
 
@@ -525,7 +510,7 @@ recovery by plasmid type, QUAST diagnostics, ranking robustness, truth-label aud
 evidence and, **new**, accuracy, feature preservation, bin quality, performance, power, scenarios, the optional composite and
 reproducibility; every table can be downloaded as TSV, and each section says what it does and does not show. Alignment blocks
 are explorable per sample; selected candidates are copied out. Uncertain or unassessable values are blank or labelled
-(`not_evaluated`, `underpowered`, `unknown`), never zero. Plasmid cluster and community views do not exist (out of scope).
+(`not_evaluated`, `underpowered`, `unknown`), never zero.
 **Answered.**
 
 **25. Laboratory and public-health use (Q385-398).** PlasBench informs which tool to adopt, with an interval, and how each tool
@@ -542,11 +527,6 @@ missing databases, out-of-memory). The scorer is exercised by control prediction
 whole genome, chromosome-only, half, plasmid-free) in `test_scoring_controls.py`, and by the real aligner in
 `test_scoring_real_minimap2.py`. When PlasBench cannot answer it says so rather than forcing a value: `not_evaluated`,
 `not_assessed`, `underpowered`, `unknown`, `no_close_reference`. **Answered.**
-
-### Part XIV. Evolution and epidemiology (Q417-430)
-
-**27. Plasmid evolution and horizontal gene transfer.** **Out of scope and not claimed.** No phylogeny, recombination,
-lineage, dissemination or persistence inference is produced.
 
 ### Part XV. Reproducibility and governance (Q431-455)
 
@@ -568,8 +548,7 @@ specific institutional dataset **Open** by nature.
 
 **30. Journal reviewer questions (Q456-470).** The most likely rejections: no real-data results yet; truth is an assembly;
 cohort small and taxonomically narrow; no independent validation of intervals or against an independent scorer. These are the
-open items below. Code is accessible; reproducibility is addressed above. A resource or benchmark paper, not a methods paper on
-relatedness, is the defensible fit.
+open items below. Code is accessible; reproducibility is addressed above. A resource or benchmark paper is the defensible fit.
 
 **31. Funder and innovation questions (Q471-484).** The gap addressed is evidence-based tool choice for plasmid reconstruction,
 including in under-sampled regions; the minimum useful version is the default-tool, short-read benchmark on a diverse cohort.
@@ -585,7 +564,6 @@ intervals, filled database dates, an independent truth audit and an external coh
 | Persistence, emerging resistance patterns, change over time (488-489, 493) | Adjacent | No temporal evaluation; needs dated cohorts. |
 | Metagenomic plasmid analysis (490) | Partly done | Separate bin-scoring track exists (Guide 11). |
 | Virulence, phage-plasmid interaction (491-492) | Out of scope | Not evaluated. |
-| Plasmid evolution across species; unrecognised plasmid groups (494, 499) | Out of scope | Needs a relatedness method (Guide 18). |
 | National surveillance integration, automated reporting, collaborative surveillance (495-497) | Adjacent | The run manifest and TSV outputs are the integration surface; no connectors exist. |
 | Other mobile genetic elements (498) | Adjacent | Feature preservation is feature-kind generic, so insertion sequences are already covered as features. |
 | Discoveries from the resulting dataset (500) | Adjacent | Depends on the real-data run. |
@@ -616,4 +594,3 @@ Still open, and why:
    (count-based and length-weighted precision, recall, F1 and MCC) is done; ambiguous contigs are excluded, not multi-assigned.
 8. **A literature comparison establishing novelty** (Part 2 section 2).
 9. **Stale per-tool result files** when the tool set changes between runs (Q21): clear `results/` between such runs.
-10. **Plasmid clustering, relatedness, graph and evolutionary analysis**: out of scope, not claimed.

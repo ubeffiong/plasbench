@@ -26,6 +26,7 @@ import os
 import statistics
 import sys
 from collections import defaultdict
+from plasbench_common import number  # noqa: E402
 
 PAIR_FIELDS = ("analysis_track", "sample", "tool", "n_runs", "identical_scores", "f1_min", "f1_max", "f1_range",
                "f1_sd", "identical_predictions", "status")
@@ -41,13 +42,6 @@ def read_scores(run_dir):
         for row in csv.DictReader(handle, delimiter="\t"):
             rows[(row.get("analysis_track") or "short_read", row["sample"], row["tool"])] = row
     return rows
-
-
-def number(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def fasta_digest(run_dir, sample, tool):

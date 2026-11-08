@@ -1,0 +1,145 @@
+<style>
+#vq-nav{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:12px 0}
+#vq-nav .grp{display:flex;gap:6px;align-items:end}
+#vq-rows{display:flex;flex-wrap:wrap;gap:10px;font:12px Arial,sans-serif;margin:8px 0}
+#vq-rows label{display:flex;gap:4px;align-items:center;border:1px solid #d2dad8;padding:3px 7px;background:#fff}
+#vq-rows label.solo{outline:2px solid #12403a}
+#vq-tracks svg{cursor:grab}
+#vq-tracks svg.dragging{cursor:grabbing}
+#vq-hits{font:12px Arial,sans-serif;color:#5f6d6b}
+#vq-hits ul{margin:4px 0 0;padding-left:18px}
+#vq-hits button{font:11px Arial,sans-serif;margin-left:6px}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const nav=document.createElement('div');nav.id='vq-nav';
+nav.innerHTML=`<label>Find <input id="vq-q" type="search" placeholder="gene, contig, or 1200-3400" size="26"></label>`
+ +`<span class="grp"><button id="vq-bed" type="button" title="Download the visible interval as BED">Export BED</button></span>`
+ +`<span class="grp"><button id="vq-prev-ev" type="button">\u2190 Event</button><button id="vq-next-ev" type="button">Event \u2192</button></span>`
+ +`<span class="grp"><button id="vq-prev-p" type="button">\u2190 Plasmid</button><button id="vq-next-p" type="button">Plasmid \u2192</button></span>`
+ +`<span class="grp"><button id="vq-back" type="button">Back</button></span>`;
+$('vq-tracks').before(nav);
+const rows=document.createElement('div');rows.id='vq-rows';nav.after(rows);
+const hits=document.createElement('div');hits.id='vq-hits';rows.after(hits);
+const hidden=new Set();let solo=null,history=[],cursor=null;
+function ctx(){const a=d.visualizations[$('vq-sample').value];const p=$('vq-plasmid').value;
+ return a&&p?{a,p,len:a.truth_plasmids[p]?.length||0}:null}
+function setRange(lo,hi){const c=ctx();if(!c)return;
+ lo=Math.max(0,Math.floor(lo));hi=Math.min(c.len,Math.ceil(hi));if(hi-lo<20)hi=Math.min(c.len,lo+20);
+ history.push([$('vq-start').value,$('vq-end').value]);
+ $('vq-start').value=lo;$('vq-end').value=hi;$('vq-start').dispatchEvent(new Event('change'))}
+// --- row management -------------------------------------------------------
+function renderRows(){const c=ctx();if(!c){rows.innerHTML='';return}
+ const names=Object.keys(c.a.tools);
+ rows.innerHTML='<strong style="font:12px Arial,sans-serif">Tool rows</strong>'+names.map(n=>
+  `<label class="${solo===n?'solo':''}"><input type="checkbox" data-n="${n}" ${hidden.has(n)?'':'checked'}> ${n}`
+  +` <button type="button" data-solo="${n}">${solo===n?'all':'only'}</button></label>`).join('');
+ rows.querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?hidden.delete(i.dataset.n):hidden.add(i.dataset.n);solo=null;apply()});
+ rows.querySelectorAll('button[data-solo]').forEach(b=>b.onclick=()=>{
+  const n=b.dataset.solo;if(solo===n){solo=null;hidden.clear()}else{solo=n;hidden.clear();Object.keys(c.a.tools).forEach(x=>{if(x!==n)hidden.add(x)})}
+  renderRows();apply()})}
+function apply(){
+ // The base view draws one <text> label plus one lane per tool; hide by label.
+ const svg=$('vq-tracks').querySelector('svg');if(!svg)return;
+ svg.querySelectorAll('text').forEach(t=>{if(hidden.has(t.textContent.trim()))t.style.opacity=.25});
+ svg.querySelectorAll('.vq-block').forEach(b=>{b.style.display=hidden.has(b.dataset.n)?'none':''})}
+// --- search ---------------------------------------------------------------
+function search(){const c=ctx();const q=$('vq-q').value.trim();if(!c||!q){hits.innerHTML='';return}
+ const coord=q.match(/^(\d[\d,]*)\s*[-:.]+\s*(\d[\d,]*)$/);
+ if(coord){setRange(+coord[1].replace(/,/g,''),+coord[2].replace(/,/g,''));hits.innerHTML='<em>Jumped to coordinate range.</em>';return}
+ const needle=q.toLowerCase(),found=[];
+ (c.a.amr_features||[]).concat(c.a.context_features||[]).forEach(f=>{
+  if(f.sequence_id===c.p&&String(f.label||'').toLowerCase().includes(needle))
+   found.push({what:(f.feature_type||'AMR')+': '+f.label,lo:f.start,hi:f.end})});
+ Object.entries(c.a.tools).forEach(([n,t])=>t.blocks.forEach(b=>{
+  if(b.target===c.p&&b.record_id.toLowerCase().includes(needle))
+   found.push({what:n+' record '+b.record_id,lo:b.target_start,hi:b.target_end})}));
+ hits.innerHTML=found.length?'<strong>'+found.length+' match(es)</strong><ul>'+found.slice(0,25).map((f,i)=>
+   `<li>${pbEsc(f.what)} — ${f.lo.toLocaleString()}\u2013${f.hi.toLocaleString()}<button type="button" data-i="${i}">go</button></li>`).join('')+'</ul>'
+  :'<em>No gene, feature, or record matched on this plasmid.</em>';
+ hits.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const f=found[+b.dataset.i];
+  const pad=Math.max(50,(f.hi-f.lo));setRange(f.lo-pad,f.hi+pad)})}
+$('vq-q').addEventListener('change',search);
+$('vq-q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();search()}});
+// --- event jumping --------------------------------------------------------
+function events(){const c=ctx();if(!c)return[];const list=[];
+ Object.entries(c.a.tools).forEach(([n,t])=>{if(hidden.has(n))return;
+  const bs=t.blocks.filter(b=>b.target===c.p).sort((x,y)=>x.target_start-y.target_start);
+  bs.forEach((b,i)=>{
+   if(b.strand==='-')list.push({at:b.target_start,why:n+': reverse-orientation block'});
+   // A gap between consecutive blocks on the same reference is a breakpoint.
+   if(i&&b.target_start>bs[i-1].target_end)list.push({at:bs[i-1].target_end,why:n+': breakpoint gap'});
+   const a=b.local_alignment;
+   if(a){let off=0;for(let k=0;k<a.reference.length;k++){if(a.reference[k]!=='-')off++;
+     if(a.reference[k]!==a.prediction[k]){list.push({at:b.target_start+off,why:n+': mismatch or gap'});break}}}})});
+ return list.sort((x,y)=>x.at-y.at)}
+function jump(dir){const c=ctx();if(!c)return;const list=events();if(!list.length){hits.innerHTML='<em>No orientation, breakpoint, or mismatch event on this plasmid.</em>';return}
+ // Walk from the last visited event, not the window midpoint: fitting the whole
+ // plasmid would otherwise skip every event in the left half.
+ const lo=Number($('vq-start').value),hi=Number($('vq-end').value);
+ const from=cursor!=null?cursor:(dir>0?lo-1:hi+1);
+ let next=dir>0?list.find(e=>e.at>from):[...list].reverse().find(e=>e.at<from);
+ if(!next){next=dir>0?list[0]:list[list.length-1];
+  hits.innerHTML='<em>Wrapped to the '+(dir>0?'first':'last')+' event. </em>'}
+ else hits.innerHTML='';
+ cursor=next.at;
+ const span=Math.max(400,hi-lo);
+ setRange(next.at-span/2,next.at+span/2);
+ hits.innerHTML+='<em>'+next.why+' near '+next.at.toLocaleString()+'</em>'}
+$('vq-next-ev').onclick=()=>jump(1);$('vq-prev-ev').onclick=()=>jump(-1);
+function stepPlasmid(dir){const sel=$('vq-plasmid'),i=sel.selectedIndex+dir;
+ if(i>=0&&i<sel.options.length){sel.selectedIndex=i;sel.dispatchEvent(new Event('change'))}}
+$('vq-next-p').onclick=()=>stepPlasmid(1);$('vq-prev-p').onclick=()=>stepPlasmid(-1);
+$('vq-back').onclick=()=>{const prev=history.pop();if(!prev)return;
+ $('vq-start').value=prev[0];$('vq-end').value=prev[1];$('vq-start').dispatchEvent(new Event('change'))};
+// --- drag to pan, drag ruler to select ------------------------------------
+function bindDrag(){const svg=$('vq-tracks').querySelector('svg');if(!svg||svg.dataset.drag)return;svg.dataset.drag='1';
+ const LEFT=180,W=880;let anchor=null;
+ const at=e=>{const r=svg.getBoundingClientRect();const c=ctx();if(!c)return null;
+  const x=(e.clientX-r.left)*(1100/r.width);const lo=Number($('vq-start').value),hi=Number($('vq-end').value);
+  return lo+Math.min(1,Math.max(0,(x-LEFT)/W))*(hi-lo)};
+ svg.addEventListener('pointerdown',e=>{const v=at(e);if(v===null)return;
+  anchor={v,y:e.clientY,ruler:e.offsetY<26,moved:false};svg.setPointerCapture(e.pointerId);svg.classList.add('dragging')});
+ svg.addEventListener('pointermove',e=>{if(!anchor)return;const v=at(e);if(v===null)return;
+  anchor.moved=true;
+  if(!anchor.ruler){const lo=Number($('vq-start').value),hi=Number($('vq-end').value),shift=anchor.v-v;
+   if(Math.abs(shift)>(hi-lo)/200){$('vq-start').value=Math.round(lo+shift);$('vq-end').value=Math.round(hi+shift);
+    $('vq-start').dispatchEvent(new Event('change'));anchor.v=v}}});
+ svg.addEventListener('pointerup',e=>{if(!anchor){return}const v=at(e);svg.classList.remove('dragging');
+  if(anchor.ruler&&anchor.moved&&v!==null&&Math.abs(v-anchor.v)>10)setRange(Math.min(anchor.v,v),Math.max(anchor.v,v));
+  anchor=null});
+ svg.addEventListener('pointercancel',()=>{anchor=null;svg.classList.remove('dragging')})}
+function refresh(){renderRows();apply();bindDrag()}
+['vq-sample','vq-plasmid'].forEach(id=>$(id)?.addEventListener('change',()=>{cursor=null}));
+['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(refresh,0)));
+['vq-fit','vq-in','vq-out'].forEach(id=>$(id)?.addEventListener('click',()=>setTimeout(refresh,0)));
+document.addEventListener('keydown',e=>{if(e.target?.matches?.('input,select,textarea'))return;
+ if(e.key==='n'){jump(1)}else if(e.key==='p'){jump(-1)}});
+// BED of the visible window. Reference coordinates are already 0-based
+// half-open, which is exactly what BED expects, so nothing is converted.
+$('vq-bed').onclick=()=>{const c=ctx();if(!c)return;
+ const lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||c.len;
+ const lines=['track name="PlasBench '+c.p+'" description="visible predicted blocks"'];
+ Object.entries(c.a.tools).forEach(([n,t])=>{if(hidden.has(n))return;
+  t.blocks.filter(b=>b.target===c.p&&b.target_end>lo&&b.target_start<hi).forEach(b=>{
+   lines.push([c.p,Math.max(lo,b.target_start),Math.min(hi,b.target_end),
+               n+':'+b.record_id,b.mapq,b.strand].join('\t'))})});
+ const blob=new Blob([lines.join('\n')+'\n'],{type:'text/plain'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+ a.download=c.p+'_'+Math.round(lo)+'-'+Math.round(hi)+'.bed';a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),0)};
+// Keyboard reach for the tracks, not only the matrix.
+const tk=$('vq-tracks');
+tk.setAttribute('tabindex','0');tk.setAttribute('role','group');
+tk.setAttribute('aria-label','Predicted alignment tracks. Arrow keys pan, plus and minus zoom, Home fits the plasmid, n and p step between events.');
+tk.addEventListener('keydown',e=>{const c=ctx();if(!c)return;
+ const lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||c.len,span=hi-lo;
+ const K={ArrowLeft:()=>setRange(lo-span*0.25,hi-span*0.25),
+          ArrowRight:()=>setRange(lo+span*0.25,hi+span*0.25),
+          '+':()=>setRange(lo+span*0.25,hi-span*0.25),
+          '=':()=>setRange(lo+span*0.25,hi-span*0.25),
+          '-':()=>setRange(lo-span*0.5,hi+span*0.5),
+          Home:()=>$('vq-fit').click(),
+          n:()=>jump(1),p:()=>jump(-1)};
+ if(K[e.key]){e.preventDefault();K[e.key]()}});
+refresh();})();
+</script>

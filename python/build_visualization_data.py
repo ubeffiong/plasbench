@@ -6,6 +6,7 @@ import json
 import re
 from collections import defaultdict
 from pathlib import Path
+from plasbench_common import merge_intervals as merge  # noqa: E402
 
 
 def truth_records(path):
@@ -106,16 +107,6 @@ def bin_assignment_flows(sample_dir, tool):
         return [{"bin_id": row.get("bin_id", ""), "true_plasmid": row.get("true_plasmid", ""),
                  "aligned_bp": int(row.get("aligned_bp") or 0), "status": row.get("match_status", "")}
                 for row in csv.DictReader(handle, delimiter="\t")]
-
-
-def merge(intervals):
-    merged = []
-    for start, end in sorted(intervals):
-        if not merged or start > merged[-1][1]:
-            merged.append([start, end])
-        else:
-            merged[-1][1] = max(merged[-1][1], end)
-    return merged
 
 
 def read_amr(path, truth):

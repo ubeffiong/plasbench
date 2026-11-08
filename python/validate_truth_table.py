@@ -24,27 +24,9 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from plasbench_common import fasta_lengths  # noqa: E402
 
 VALID_TYPES = {"PLASMID", "CHROMOSOME"}
-
-
-def fasta_lengths(path: Path) -> dict:
-    lengths: dict = {}
-    seq_id = None
-    total = 0
-    with open(path, "r", encoding="utf-8", errors="replace") as handle:
-        for line in handle:
-            if line.startswith(">"):
-                if seq_id is not None:
-                    lengths[seq_id] = total
-                parts = line[1:].strip().split(None, 1)
-                seq_id = parts[0] if parts else ""
-                total = 0
-            else:
-                total += len(line.strip())
-    if seq_id is not None:
-        lengths[seq_id] = total
-    return lengths
 
 
 def main() -> int:
