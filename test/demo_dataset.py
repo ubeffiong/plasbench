@@ -351,7 +351,8 @@ def main():
             paf = sdir / f"{tool}.pred_vs_ref.paf"
             with paf.open("w", encoding="utf-8") as handle:
                 for row in rows:
-                    handle.write("\t".join(str(x) for x in row) + "\n")
+                    tags = [f"NM:i:{int(row[10]) - int(row[9])}", f"cg:Z:{int(row[10])}M"]
+                    handle.write("\t".join(str(x) for x in list(row) + tags) + "\n")
             # Prediction FASTA: one record per aligned query, padded to length.
             lengths = {}
             for row in rows:

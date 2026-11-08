@@ -478,6 +478,11 @@ export ANNOTATION_REPLICON_DB="${ANNOTATION_REPLICON_DB:-plasmidfinder}"
 # rename it to truth_amr.tsv yourself. See docs/METHODS.md, "Drafting AMR truth".
 export DERIVE_AMR_TRUTH_DRAFT="${DERIVE_AMR_TRUTH_DRAFT:-0}"
 
+# Further benchmark dimensions, computed per sample and tool in stage 5 and summarised in stage 6
+# (python/alignment_accuracy.py, feature_preservation.py, bin_quality.py). Advisory: they never
+# alter scores.tsv or the ranking. Set to 0 to skip them.
+export RUN_DIMENSION_ANALYSES="${RUN_DIMENSION_ANALYSES:-1}"
+
 # Truth-derived DIFFICULTY descriptors (python/compute_difficulty_features.py):
 # how intrinsically hard this isolate is to separate into plasmid vs.
 # chromosome, independent of any tool's own performance -- dead-end count in

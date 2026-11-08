@@ -70,9 +70,10 @@ def read_cpu(logs_dir, sample, tool):
         return None
     path = os.path.join(logs_dir, f"{sample}.{tool}.rss")
     try:
-        parts = open(path, encoding="utf-8").read().split()
+        lines = open(path, encoding="utf-8").read().strip().splitlines()
     except OSError:
         return None
+    parts = lines[-1].split() if lines else []      # /usr/bin/time's own line is the last one
     if len(parts) >= 3:
         user, system = number(parts[1]), number(parts[2])
         if user is not None and system is not None:
