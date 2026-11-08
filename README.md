@@ -402,6 +402,7 @@ scorecard is not used.
 | Base-level MCC, F2, F0.5, abstention rate | Done | MCC with chromosome bases not predicted as true negatives (blank, never 0, when undefined); F2 and F0.5; abstention rate = share of isolates where the tool returned nothing. | `mean_mcc`, `mean_f2`, `mean_f0_5`, `mean_abstention_rate` |
 | Per-plasmid outcome states | Done (binning tools) | Perfect, fragmented, merged, partial, missed per truth plasmid, with contamination of its best bin; thresholds pre-registered. | `<tool>.plasmid_outcomes.tsv`; `total_outcome_*` |
 | Contig-level binning F1; shared and unassigned contig lengths | Done (parallel layer) | Hungarian matching over PLASMID contigs; never the headline. | `contig_bin_f1_bp`; `contigs_ambiguous_bp`, `contigs_unplaced_bp` |
+| Independent second scorer (contig layer) | Done | Alignment-free k-mer labels and separately written metrics, compared per sample and tool. | `contig_crosscheck.py`; `benchmark.contig_crosscheck.tsv` |
 | AMR placement | Done (curated AMR truth) | Each gene copy on its own plasmid (level 2) and a same-replicon plasmid (level 1), per gene class. | `benchmark.amr_placement.tsv` |
 | Labelling schemes | Done | Headline on pre-registered Scheme 3 (NCBI labels); Scheme 1 and the evidence scheme re-ranked as sensitivity analyses. | `benchmark.label_schemes.tsv`; `scheme:*` rank variants |
 | Wilcoxon signed-rank and equivalence | Done | Beside the permutation test; exact for n ≤ 25; equivalence within ±0.05. | `wilcoxon_p_value_holm`, `equivalent` |
@@ -435,7 +436,7 @@ These need data, compute or an external tool, not code, or are being done elsewh
 | 6 | **A first-class PlasEval adapter and repeat-aware matching** | Needs the external tool and real data to validate. |
 | 7 | **Contig-level abstention (unclassified) rate** | No wrapped tool reports an explicit "unclassified" contig call; isolate-level abstention is reported. |
 | 7b | **Freeze the pre-registration** | Three parameters are `TO_FIX` (tool timeout, integrated-element depth, circular-path rule) and await the panel; then `plasbench analysis freeze-prereg --write`. |
-| 7c | **Recommender and contig layer on real data** | Both are verified on synthetic data only; the contig layer has not been compared with a second scorer. |
+| 7c | **Recommender on a multi-study real cohort** | `public-v1` has few independent studies; the recommender's verdict needs a broader real cohort. The contig layer is now cross-checked every run against an independent alignment-free scorer. |
 | 8 | **NGA50, AMI, and multi-membership scoring of ambiguous contigs** | NGA50 needs contig-level misassembly breaks; AMI's expected-information term is impractical over base counts; ambiguous contigs are currently excluded (the stated rule), not multi-assigned. |
 | 8b | **Stratification by plasmid copy number** | Needs per-plasmid read depth for every truth plasmid; size, ARG status, species, tier and database membership are stratified already. |
 | 9 | **Documentation split**: a short quick start plus reference documents | A 3,000-line README is hard to keep true; a larger editorial task. |
