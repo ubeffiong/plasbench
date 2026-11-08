@@ -261,7 +261,7 @@ def write_manifest(root):
     # The cohort is fabricated, but the software that produced it is not: record
     # the real checkout version, resolved by the same helper stage 6 uses.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
-    from write_manifest import tool_version
+    from write_manifest import prereg_status, tool_version
 
     manifest = {
         "schema_version": "1",
@@ -277,6 +277,8 @@ def write_manifest(root):
                      "depth": depth, "technology": technology, "country": country}
                     for sample, organism, study, depth, technology, country in SAMPLES],
         "settings": {"source": "test/demo_dataset.py"},
+        # The real pre-registration state of this checkout (config/prereg.tsv).
+        "preregistration": prereg_status(Path(__file__).resolve().parent.parent),
     }
     path = Path(root) / "run_manifest.json"
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

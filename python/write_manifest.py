@@ -164,6 +164,21 @@ def collect_selected_candidates(results_dir, warnings):
     return found
 
 
+def prereg_status(project_root):
+    """freeze_prereg.status() for config/prereg.tsv, or an error record."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        import freeze_prereg
+    except ImportError as exc:  # pragma: no cover - same directory
+        return {"error": str(exc)}
+    root = Path(project_root)
+    tsv = Path(os.environ.get("PREREG_FILE") or root / "config" / "prereg.tsv")
+    lock = Path(os.environ.get("PREREG_LOCK") or root / "config" / "prereg.lock.json")
+    record = freeze_prereg.status(tsv, lock)
+    record["PREREG_SHA256"] = record.get("sha256", "")
+    return record
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True)
@@ -199,7 +214,12 @@ def main():
                 # reproduced from its manifest (question bank Q36/Q38).
                 "CPRR_MIN_COVERAGE", "CPRR_MIN_SHARE", "CPRR_MIN_IDENTITY",
                 "HEADLINE_MAX_REFERENCE_TIER", "MIN_SPECIES_CLUSTERS", "CLONAL_MASH_DISTANCE",
-                "RUN_TRUTH_LABEL_EVIDENCE", "TRUTH_MIN_LONG_READ_DEPTH", "TRUTH_LONG_READ_PRESET",
+                "RUN_TRUTH_LABEL_EVIDENCE", "TRUTH_LABEL_SCHEME", "RUN_DIMER_DETECTION", "COLLAPSE_DIMERS", "DIMER_MIN_IDENTITY",
+                "DIMER_MIN_HALF_COVERAGE",
+                "REQUIRE_PREREG", "PERFECT_THRESHOLD", "FRAGMENT_SHARE", "MISSED_RECALL", "TOOL_RETRIES",
+                "TOOL_TIMEOUT_SECONDS", "RUN_RECOMMENDER_EVAL", "NEAR_OPTIMAL_MARGIN", "ORACLE_GAP_FLOOR",
+                "RECOMMENDATION_FAILURE_REGRET", "RECOMMENDATION_MIN_EXPECTED_SCORE", "SMALLEST_DIFFERENCE",
+                "RUN_AMR_PLACEMENT", "RUN_ASSEMBLY_QC_GATE", "ASSEMBLY_QC_MAX_SIZE_MB", "ASSEMBLY_QC_MAX_GC_SPREAD", "TRUTH_MIN_LONG_READ_DEPTH", "TRUTH_LONG_READ_PRESET",
                 "PLASMID_REFERENCE_SKETCH", "PLASMID_REFERENCE_FASTA",
                 "RUN_SCORABLE_TRUTH", "SCORABLE_WINDOW_BP", "SCORABLE_STEP_BP",
                 "EXCLUDE_DATABASE_OVERLAP",
@@ -244,6 +264,10 @@ def main():
                    "plasme": directory_identity(os.environ.get("PLASME_CHECKOUT_DIR", "")),
                    "recommendation": recommendation_model_status(args.results_dir)},
         "settings": {key: os.environ.get(key) for key in settings},
+        # Pre-registration (python/freeze_prereg.py): the frozen plan's SHA-256,
+        # whether the lock still matches, TO_FIX parameters, and every config
+        # variable that departs from its pre-registered value in this run.
+        "preregistration": prereg_status(args.project_root),
         "input_checksums": {"sample_sheet": checksum_record(
             sample_sheet, manifest_warnings, "sample sheet"), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},

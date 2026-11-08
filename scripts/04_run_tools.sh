@@ -16,10 +16,21 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 ADAPT="$HERE/../adapters"
+# Pre-registration gate (python/freeze_prereg.py): with REQUIRE_PREREG=1 no tool
+# runs until config/prereg.lock.json matches config/prereg.tsv, no parameter is
+# TO_FIX, and no config variable departs from its pre-registered value.
+if [[ "${REQUIRE_PREREG:-0}" == "1" ]]; then
+    python3 "$HERE/../python/freeze_prereg.py" --verify --require-fixed --check-env \
+        --prereg "${PREREG_FILE:-$HERE/../config/prereg.tsv}" --lock "${PREREG_LOCK:-$HERE/../config/prereg.lock.json}" \
+        || die "pre-registration check failed (REQUIRE_PREREG=1); freeze it with: plasbench analysis freeze-prereg --write"
+fi
 STATUS="$RESULTS_DIR/tool_status.tsv"
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 reset_shard_dir "run_tools"
 STATUS_SHARDS="$(shard_dir "run_tools")"
+reset_shard_dir "run_tools_outcomes"
+OUTCOME_SHARDS="$(shard_dir "run_tools_outcomes")"
+OUTCOMES="$RESULTS_DIR/tool_outcomes.tsv"
 
 # Every (sample, tool) pair gets record_status called at most once per run,
 # into its own uniquely-named file, so this needs no locking even when many
@@ -35,11 +46,72 @@ record_status() {
     # matching header), so its schema stays fixed. aggregate_results.py reads
     # "exit_code=<n>" back to tell a timeout/OOM kill (124/137) from a tool that
     # simply failed.
-    if [[ "$3" == "failed" && -s "$LOG_DIR/${sample}.${tool}.exit" ]]; then
-        reason="${reason:+$reason; }exit_code=$(tr -d '[:space:]' < "$LOG_DIR/${sample}.${tool}.exit")"
+    local status="$3" exit_code="" failure_class="" attempts=1
+    if [[ "$status" == "reused" || "$status" == "skipped" ]]; then
+        attempts=0
+    elif [[ -s "$LOG_DIR/${sample}.${tool}.attempts" ]]; then
+        attempts="$(tr -d '[:space:]' < "$LOG_DIR/${sample}.${tool}.attempts")"
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$reason" "${6:-}" "$rss" \
+    if [[ "$status" == "failed" && -s "$LOG_DIR/${sample}.${tool}.exit" ]]; then
+        exit_code="$(tr -d '[:space:]' < "$LOG_DIR/${sample}.${tool}.exit")"
+        reason="${reason:+$reason; }exit_code=$exit_code"
+    fi
+    if [[ "$status" == "failed" ]]; then
+        failure_class="$(classify_failure "$exit_code" "$LOG_DIR/${sample}.${tool}.log")"
+        # Outcome states (scoring specification WP4): an infrastructure failure
+        # (container/command could not start, disk full) says nothing about the
+        # tool; it is recorded as its own status, never scored, and rerun later.
+        if [[ "$failure_class" == "infrastructure" ]]; then
+            status="infrastructure_failure"
+            reason="${reason:+$reason; }infrastructure failure: rerun, not scored"
+        fi
+        [[ "$attempts" -gt 1 ]] && reason="${reason:+$reason; }attempts=$attempts"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$status" "$4" "$reason" "${6:-}" "$rss" \
         > "$STATUS_SHARDS/${sample}.${tool}.tsv"
+    # Side table with explicit columns (tool_status.tsv keeps its fixed schema
+    # for contribution files): sample, tool, status, exit_code, failure_class, attempts.
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$status" "$exit_code" "$failure_class" "$attempts" \
+        > "$OUTCOME_SHARDS/${sample}.${tool}.tsv"
+}
+
+# resource (124 timeout, 137 SIGKILL/OOM), infrastructure (125/126/127: the
+# container or command could not start; or the log shows the disk filled), else tool.
+classify_failure() {
+    local code="$1" log_file="$2"
+    case "$code" in
+        124|137) echo "resource"; return ;;
+        125|126|127) echo "infrastructure"; return ;;
+    esac
+    if [[ -s "$log_file" ]] && grep -qiE "no space left on device|disk quota exceeded|cannot connect to the docker daemon" "$log_file"; then
+        echo "infrastructure"; return
+    fi
+    echo "tool"
+}
+
+# Same wall-time budget for every tool (TOOL_TIMEOUT_SECONDS; blank = none) and
+# TOOL_RETRIES automatic retries of a failed run. A timeout (124) or OOM kill
+# (137) is not retried: the same budget would fail the same way.
+with_budget() {
+    if [[ -n "${TOOL_TIMEOUT_SECONDS:-}" ]] && command -v timeout >/dev/null 2>&1; then
+        timeout "$TOOL_TIMEOUT_SECONDS" "$@"
+    else
+        "$@"
+    fi
+}
+retry_exec() {
+    local attempts_file="$LOG_DIR/${SAMPLE}.${TOOL}.attempts" attempt=1 rc=0
+    local max=$(( 1 + ${TOOL_RETRIES:-1} ))
+    while true; do
+        rc=0
+        "$@" || rc=$?
+        printf '%s\n' "$attempt" > "$attempts_file"
+        if [[ "$rc" -eq 0 || "$rc" -eq 124 || "$rc" -eq 137 || "$attempt" -ge "$max" ]]; then
+            return "$rc"
+        fi
+        warn "$SAMPLE / $TOOL failed (exit $rc); retry $attempt of $(( max - 1 ))"
+        attempt=$(( attempt + 1 ))
+    done
 }
 
 profile_start() { date +%s; }
@@ -49,16 +121,16 @@ profile_elapsed() { printf '%s' "$(( $(date +%s) - $1 ))"; }
 profile_rss() { [[ -s "$1" ]] && awk 'END{printf "%s", $1}' "$1" || true; }
 profile_exec() {
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
-    local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file"
-    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" /usr/bin/time -f '%M %U %S' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" "$@" || rc=$?; fi
+    local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file" "$LOG_DIR/${SAMPLE}.${TOOL}.attempts"
+    if [[ -x /usr/bin/time ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget /usr/bin/time -f '%M %U %S' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }
 profile_exec_in_dir() {
     local run_dir="$1"; shift
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
-    local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file"
-    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && /usr/bin/time -f "%M %U %S" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
+    local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file" "$LOG_DIR/${SAMPLE}.${TOOL}.attempts"
+    if [[ -x /usr/bin/time ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && /usr/bin/time -f "%M %U %S" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }
@@ -558,6 +630,8 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
     done
 done < <(read_samples "$SAMPLE_SHEET")
 merge_shards "$STATUS" "$(printf 'sample\ttool\tstatus\tprediction_fasta\treason\truntime_seconds\tpeak_rss_kb')" "${shards[@]}"
-rm -rf "$STATUS_SHARDS"
+outcome_shards=("${shards[@]/#$STATUS_SHARDS/$OUTCOME_SHARDS}")
+merge_shards "$OUTCOMES" "$(printf 'sample\ttool\tstatus\texit_code\tfailure_class\tattempts')" "${outcome_shards[@]}"
+rm -rf "$STATUS_SHARDS" "$OUTCOME_SHARDS"
 
 log "Stage 4 (run tools) complete."

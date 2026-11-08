@@ -115,7 +115,7 @@ def main():
     # --- main(): mash not installed -> insufficient_reference rows, not a crash. ---
     with tempfile.TemporaryDirectory() as tmp:
         query = Path(tmp) / "query.fasta"
-        write_fasta(query, [("contig_1", "A" * 100)])
+        write_fasta(query, [("contig_1", "A" * 2000)])
         out = Path(tmp) / "out.tsv"
         cop.shutil.which = lambda name: None
         old_argv = sys.argv
@@ -137,7 +137,7 @@ def main():
     # --- main(): real success path, fake mash produces a known-cluster call. ---
     with tempfile.TemporaryDirectory() as tmp:
         query = Path(tmp) / "query.fasta"
-        write_fasta(query, [("contig_1", "A" * 100)])
+        write_fasta(query, [("contig_1", "A" * 2000)])
         ref_sketch = Path(tmp) / "reference.msh"
         ref_sketch.write_bytes(b"fake-sketch")
         ref_meta = Path(tmp) / "reference_metadata.tsv"
@@ -173,6 +173,24 @@ def main():
         assert row["best_reference_id"] == "CP001.1"
         assert row["mash_distance"] == "0.010000"
     print("main() end-to-end with a real (faked) mash run classifies correctly -> PASS")
+
+    # Refusal states (panel 3.3 and 2.4).
+    result = cop.classify(["short", "long"], [("CP001.1", "short", 0.01), ("CP001.1", "long", 0.01)],
+                          reference_metadata, 0.05, 1, query_lengths={"short": 400, "long": 5000}, min_query_length=1000)
+    assert result["short"]["cluster_membership_status"] == "insufficient_sequence", result["short"]
+    assert result["long"]["cluster_membership_status"] == "close_reference_match", result["long"]
+    print("classify: a 400 bp record -> insufficient_sequence (not compared) -> PASS")
+    two_clusters = {"R1": {"cluster_id": "c1", "cluster_member_count": "3"},
+                    "R2": {"cluster_id": "c2", "cluster_member_count": "3"},
+                    "R3": {"cluster_id": "c1", "cluster_member_count": "3"}}
+    result = cop.classify(["q"], [("R1", "q", 0.010), ("R2", "q", 0.012)], two_clusters, 0.05, 2,
+                          ambiguity_margin=0.005)
+    assert result["q"]["cluster_membership_status"] == "ambiguous_between_references", result["q"]
+    result = cop.classify(["q"], [("R1", "q", 0.010), ("R3", "q", 0.011), ("R2", "q", 0.030)], two_clusters, 0.05, 2,
+                          ambiguity_margin=0.005)
+    assert result["q"]["cluster_membership_status"] == "close_reference_match", result["q"]
+    print("classify: near-equidistant references in different clusters -> ambiguous_between_references; "
+          "same cluster or a clear gap -> close_reference_match -> PASS")
 
     print("\nALL CLASSIFY OPERATIONAL PLASMID TESTS PASSED")
 

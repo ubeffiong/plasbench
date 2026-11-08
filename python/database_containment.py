@@ -115,7 +115,11 @@ def main():
         with open(query, "w", encoding="utf-8") as handle:
             for sample in args.samples:
                 sample_dir = os.path.join(args.data_dir, sample)
-                truth = os.path.join(sample_dir, "truth.scored.tsv")
+                # The truth file of the scored labelling scheme (TRUTH_LABEL_SCHEME;
+                # python/label_schemes.py), falling back to truth.tsv.
+                scheme_file = {"evidence": "truth.scored.tsv", "nonchromosomal": "truth.nonchromosomal.tsv"}.get(
+                    os.environ.get("TRUTH_LABEL_SCHEME", "ncbi"), "truth.tsv")
+                truth = os.path.join(sample_dir, scheme_file)
                 if not os.path.isfile(truth):
                     truth = os.path.join(sample_dir, "truth.tsv")
                 reference = os.path.join(sample_dir, "reference.fna")

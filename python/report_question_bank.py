@@ -222,9 +222,11 @@ def excluded_replicons_section(data_dir):
                           for sample, r in rows)
                 + "</tbody></table></div>")
     marker_free = sum(1 for _, r in rows if r.get("marker_free") == "yes")
-    return ("<section id='excluded-replicons'><h2>Replicons excluded from scoring</h2>"
+    return ("<section id='excluded-replicons'><h2>Replicons the evidence scheme excludes</h2>"
             "<p class='lead'>Truth replicons whose plasmid/chromosome label conflicted with plasmid markers, rRNA "
-            "genes or long-read support are AMBIGUOUS: predictions on them are neither credited nor penalised. "
+            "genes or long-read support are AMBIGUOUS under the evidence labelling scheme, where predictions on them "
+            "are neither credited nor penalised. The pre-registered primary scheme (NCBI labels) still scores them; "
+            "the evidence scheme is a sensitivity analysis (Label schemes section). "
             f"{len(rows)} replicon(s) excluded, {marker_free} of them plasmids with no marker at all -- the stratum "
             "a marker-based labeller cannot confirm, reported here rather than hidden.</p>" + body + "</section>")
 
@@ -265,7 +267,8 @@ def metric_framework_section(leaderboard, data_dir):
         "aligns that well to both is AMBIGUOUS and excluded, not multi-assigned; one that aligns to neither is "
         f"UNPLACED and excluded. This run: {labels}. Tools that output reassembled sequences instead of assembly "
         "contigs are not scored at contig level. Abstention is not measured: no wrapped tool reports an explicit "
-        "unclassified call.</p>"
+        "unclassified call; the abstention rate in the MCC &amp; F-beta section is the share of isolates on "
+        "which a tool returned nothing.</p>"
         "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th>"
         "<th>Base F1 (macro)</th><th>Base F1 (micro)</th><th>Contig F1 (count)</th><th>Contig F1 (length)</th>"
         "<th>MCC (count)</th><th>MCC (length)</th><th>Binning F1 (length)</th><th>Binning F1 (assembly-aware)</th>"

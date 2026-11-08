@@ -76,11 +76,24 @@ score_sample() {
     local SCORE_SHARD="$SCORE_SHARDS/${SAMPLE}.tsv"
     local FAILURE_SHARD="$FAILURE_SHARDS/${SAMPLE}.tsv"
     [[ -s "$REF" && -s "$TRUTH" ]] || { warn "missing reference/truth for $SAMPLE"; return 0; }
-    # Scoring uses the evidence-checked truth when stage 2 produced one
-    # (AMBIGUOUS replicons removed); everything else keeps the full truth.
+    # TRUTH_LABEL_SCHEME picks the scored truth (python/label_schemes.py):
+    # ncbi (primary, pre-registered) = truth.tsv; nonchromosomal =
+    # truth.nonchromosomal.tsv; evidence = truth.scored.tsv (AMBIGUOUS removed).
+    # A missing or stale scheme file falls back to truth.tsv with a warning.
     local SCORE_TRUTH="$TRUTH"
-    if [[ -s "$SDIR/truth.scored.tsv" && ! "$SDIR/truth.scored.tsv" -ot "$TRUTH" ]]; then
-        SCORE_TRUTH="$SDIR/truth.scored.tsv"
+    local SCHEME_FILE=""
+    case "${TRUTH_LABEL_SCHEME:-ncbi}" in
+        ncbi) ;;
+        nonchromosomal) SCHEME_FILE="$SDIR/truth.nonchromosomal.tsv" ;;
+        evidence) SCHEME_FILE="$SDIR/truth.scored.tsv" ;;
+        *) die "TRUTH_LABEL_SCHEME must be ncbi, nonchromosomal or evidence (got '${TRUTH_LABEL_SCHEME}')" ;;
+    esac
+    if [[ -n "$SCHEME_FILE" && ! ( -s "$SCHEME_FILE" && ! "$SCHEME_FILE" -ot "$TRUTH" ) ]]; then
+        warn "$SAMPLE: no current $(basename "$SCHEME_FILE") for TRUTH_LABEL_SCHEME=${TRUTH_LABEL_SCHEME}; scoring truth.tsv (ncbi)"
+        SCHEME_FILE=""
+    fi
+    if [[ -n "$SCHEME_FILE" ]]; then
+        SCORE_TRUTH="$SCHEME_FILE"
         if [[ -s "$AMR" ]]; then
             filter_to_scored_plasmids "$SCORE_TRUTH" "$AMR" "$SDIR/truth_amr.scored.tsv"
             AMR="$SDIR/truth_amr.scored.tsv"
@@ -289,7 +302,11 @@ score_sample() {
         fi
         rm -f "$RDIR/${tool}.contig_classification.tsv"
         if [[ "$CONTIG_READY" -eq 1 ]]; then
+            local CONTIG_BIN_ARGS=()
+            [[ -s "$RDIR/pred_${tool}.bins.tsv" ]] && binning_capable "$tool" \
+                && CONTIG_BIN_ARGS=(--bins "$RDIR/pred_${tool}.bins.tsv")
             python3 "$HERE/../python/contig_classification.py" score --labels "$CONTIG_LABELS" --pred-fasta "$PRED" \
+                "${CONTIG_BIN_ARGS[@]+"${CONTIG_BIN_ARGS[@]}"}" \
                 --min-length "$CONTIG_MIN_LENGTH" --out "$RDIR/${tool}.contig_classification.tsv" \
                 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "contig-level scoring failed for $SAMPLE/$tool"
         fi
@@ -302,6 +319,9 @@ score_sample() {
                 --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
                 --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
                 --cprr-out "$RDIR/${tool}.cprr.tsv" \
+                --outcomes-out "$RDIR/${tool}.plasmid_outcomes.tsv" \
+                --perfect-threshold "${PERFECT_THRESHOLD:-0.95}" --fragment-share "${FRAGMENT_SHARE:-0.20}" \
+                --missed-recall "${MISSED_RECALL:-0.50}" \
                 --cprr-min-coverage "$CPRR_MIN_COVERAGE" \
                 --cprr-min-share "$CPRR_MIN_SHARE" \
                 --cprr-min-identity "$CPRR_MIN_IDENTITY" \
@@ -314,6 +334,24 @@ score_sample() {
             # is not evidence of a biological plasmid bin.
             rm -f "$RDIR/${tool}.bin_matches.tsv" "$RDIR/${tool}.bin_summary.tsv"
             log "  $tool: bin diagnostics not applicable to declared method class"
+        fi
+        # AMR placement (python/score_amr_placement.py): is each curated AMR gene copy
+        # placed on its own plasmid (level 2) and a plasmid of the same replicon type
+        # (level 1)? Only with validated curated AMR truth (AMR_ARGS set above).
+        rm -f "$RDIR/${tool}.amr_placement.tsv"
+        if [[ "${RUN_AMR_PLACEMENT:-1}" -eq 1 && ${#AMR_ARGS[@]} -gt 0 ]]; then
+            local PLACEMENT_ARGS=()
+            [[ -s "$BINS" ]] && binning_capable "$tool" && PLACEMENT_ARGS+=(--bins "$BINS")
+            [[ -s "$CONTIG_LABELS" ]] && PLACEMENT_ARGS+=(--contig-labels "$CONTIG_LABELS")
+            [[ -s "$FEATURES" ]] && PLACEMENT_ARGS+=(--features "$FEATURES")
+            python3 "$HERE/../python/score_amr_placement.py" score --sample "$SAMPLE" --tool "$tool" \
+                --truth "$SCORE_TRUTH" --amr-truth "$AMR" --paf "$PAF" --pred-fasta "$PRED" \
+                "${PLACEMENT_ARGS[@]+"${PLACEMENT_ARGS[@]}"}" \
+                --min-alignment-length "$MIN_ALIGNMENT_LENGTH" --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
+                --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
+                --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
+                --out "$RDIR/${tool}.amr_placement.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" \
+                || warn "AMR placement failed for $SAMPLE/$tool"
         fi
         # Further dimensions of the same run (advisory; never alter scores.tsv): nucleotide-level
         # accuracy and missing regions, feature preservation and gene-order conservation, and

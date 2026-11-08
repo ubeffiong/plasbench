@@ -44,6 +44,7 @@ Only the Python standard library is used. No third-party dependencies.
 """
 
 import argparse
+import math
 import os
 import sys
 from collections import defaultdict
@@ -120,7 +121,7 @@ def read_fasta_lengths(path):
 
 
 def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.0, min_mapq=0,
-                        min_query_coverage=0.0):
+                        min_query_coverage=0.0, min_contig_length=0):
     """
     Parse PAF, keep one row per (query, target alignment), and collect covered
     intervals ON THE TARGET (reference) as 0-based half-open [start, end).
@@ -190,6 +191,10 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
                 mapq = int(f[11])
             except ValueError as exc:
                 raise ValueError(f"PAF line {line_number} has invalid integer coordinates") from exc
+            if min_contig_length and qlen < min_contig_length:
+                # Predicted record below the minimum contig length: treated as not
+                # predicted (the caller drops it from pred_lengths too).
+                continue
             if qname not in pred_lengths:
                 raise ValueError(f"PAF query '{qname}' is absent from --pred-fasta")
             if qlen != pred_lengths[qname]:
@@ -312,6 +317,26 @@ def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_
         overlap_bp(merge_intervals(types["PLASMID"])[0], merge_intervals(types["CHROMOSOME"])[0])
         for types in by_query.values() if types["PLASMID"] and types["CHROMOSOME"]
     )
+
+
+def mcc_from_counts(tp, fp, fn, tn):
+    """Matthews correlation coefficient over reference bases; None when any
+    marginal is zero (undefined, never reported as 0)."""
+    denominator = (tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)
+    if denominator <= 0:
+        return None
+    return (tp * tn - fp * fn) / math.sqrt(denominator)
+
+
+def f_beta(precision, recall, beta):
+    """F-beta with the same undefined rules as F1: undefined without recall,
+    0 when nothing was predicted on a plasmid-bearing isolate."""
+    if recall is None:
+        return None
+    if precision is None:
+        return 0.0
+    b2 = beta * beta
+    return safe_div((1 + b2) * precision * recall, b2 * precision + recall)
 
 
 def score(truth, total_plasmid, covered):
@@ -613,6 +638,9 @@ def main():
                     help="Minimum PAF mapping quality retained for scoring (default: 0).")
     ap.add_argument("--min-alignment-query-coverage", type=float, default=0.0,
                     help="Minimum fraction of a predicted record covered by an individual PAF alignment (default: 0).")
+    ap.add_argument("--min-contig-length", type=int, default=0,
+                    help="Ignore predicted records shorter than this many bp (treated as not predicted; "
+                         "default 0 = off). Used by the rank-sensitivity min-contig axis.")
     ap.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
     ap.add_argument("--pred-scores", help="Optional adapters/SCORES.md-format TSV (record_id, probability) "
                                           "covering every record in --pred-candidates-fasta; enables a PR-curve "
@@ -632,12 +660,17 @@ def main():
     truth, total_plasmid, total_chromosome = read_truth(args.truth)
     try:
         pred_lengths = read_fasta_lengths(args.pred_fasta)
+        if args.min_contig_length < 0:
+            raise ValueError("--min-contig-length must be >= 0")
+        if args.min_contig_length:
+            pred_lengths = {k: v for k, v in pred_lengths.items() if v >= args.min_contig_length}
         if (args.min_alignment_length < 1 or not 0 <= args.min_alignment_identity <= 1
                 or args.min_alignment_mapq < 0 or not 0 <= args.min_alignment_query_coverage <= 1):
             raise ValueError("alignment thresholds must be min-length >= 1, identity/query coverage in [0, 1], and MAPQ >= 0")
         covered, unmapped_pred_bp, off_truth_pred_bp, mapped_pred_bp, alignment, covered_by_query = parse_paf_intervals(
             args.paf, truth, pred_lengths, args.min_alignment_length,
-            args.min_alignment_identity, args.min_alignment_mapq, args.min_alignment_query_coverage)
+            args.min_alignment_identity, args.min_alignment_mapq, args.min_alignment_query_coverage,
+            args.min_contig_length)
         ambiguous_bp = ambiguous_query_bp(args.ambiguity_paf, truth, pred_lengths,
                                           args.min_alignment_length, args.min_alignment_identity,
                                           args.min_alignment_mapq, args.min_alignment_query_coverage)
@@ -794,6 +827,16 @@ def main():
     strict_precision = safe_div(tp, strict_denominator) if strict_denominator > 0 else None
 
     isolate_specificity = safe_div(total_chromosome - fp, total_chromosome) if total_chromosome > 0 else None
+    # Scoring-specification additions (docs/PANEL_ALIGNMENT.md, WP1). TN is the
+    # chromosome bases not predicted as plasmid. MCC is undefined (blank) when a
+    # marginal is zero, e.g. on a plasmid-free isolate. F2 favours recall, F0.5
+    # precision. abstention_rate is 1 when the tool returned nothing at all on
+    # this isolate (averaged across isolates it is the abstention rate).
+    tn = max(0, total_chromosome - fp)
+    mcc = mcc_from_counts(tp, fp, fn, tn) if total_plasmid > 0 else None
+    f2 = f_beta(precision, recall, 2.0)
+    f0_5 = f_beta(precision, recall, 0.5)
+    abstention_rate = 1.0 if len(pred_lengths) == 0 else 0.0
     chromosome_fp_bp = fp
     fp_predicted_record_count = fp_record_count(covered_by_query, truth)
 
@@ -810,6 +853,7 @@ def main():
         "recovered_complete_circular_plasmid_count", "complete_circular_plasmid_recall",
         "redundant_pred_bp", "strict_precision",
         "scorable_plasmid_bp", "recall_ceiling", "ceiling_adjusted_recall",
+        "TN_bp", "mcc", "f2", "f0_5", "abstention_rate",
     ]
     row = [
         args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
@@ -851,6 +895,11 @@ def main():
         scorable_plasmid_bp if scorable_plasmid_bp is not None else "",
         f"{recall_ceiling:.4f}" if recall_ceiling is not None else "",
         f"{ceiling_adjusted_recall:.4f}" if ceiling_adjusted_recall is not None else "",
+        tn,
+        f"{mcc:.4f}" if mcc is not None else "",
+        f"{f2:.4f}" if f2 is not None else "",
+        f"{f0_5:.4f}" if f0_5 is not None else "",
+        f"{abstention_rate:.1f}",
     ]
 
     new_file = not os.path.exists(args.out) or os.path.getsize(args.out) == 0

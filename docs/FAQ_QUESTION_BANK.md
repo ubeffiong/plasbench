@@ -7,8 +7,9 @@ most often in more depth. Where this file says "see FAQ", the fuller answer is t
 
 ## Read this first: what PlasBench is
 
-Much of the bank assumes PlasBench is a **plasmid relatedness or clustering tool** that
-puts plasmids into communities, calls lineages or flags novel plasmids. It is not.
+Much of the bank assumes PlasBench is a plasmid relatedness or clustering tool. It is not:
+plasmid clustering, communities, database search, relatedness, backbone/accessory analysis
+and phylogeny are outside this benchmark.
 
 **PlasBench benchmarks plasmid reconstruction tools.** For each isolate it runs tools
 such as MOB-recon, Platon, plasmidSPAdes or geNomad on a short-read assembly. It then
@@ -17,8 +18,7 @@ isolate*, and scores how much true plasmid sequence was recovered, how much chro
 wrongly included, and how well contigs were grouped into plasmids. The output ranks the
 tools. It never compares one isolate's plasmids with another's.
 
-So a question about community detection or lineage gets an honest "not applicable",
-plus what PlasBench does in that place instead. Where a question exposed a real gap in
+So a question about those topics is answered in one line, "outside this benchmark". Where a question exposed a real gap in
 what PlasBench does claim, the gap was closed in software and tested; the status says so.
 
 **Status labels** (same meanings as `FAQ.md`)
@@ -60,30 +60,23 @@ more cleanly and with better grouping than tool B. No biological or surveillance
 made. *Documented.* The report's "Interpretation limits" section says so (*Fixed here*).
 
 **Q4. What does PlasBench mean by "plasmid relatedness"?**
-Nothing: it never computes relatedness between plasmids. It measures agreement between a
-prediction and the truth of the same isolate. *Not applicable.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids. It measures agreement between a prediction and the truth of the same isolate.
 
 **Q5. What is the minimum viable contribution?**
 A benchmark, meaning a scoring method, curated truth with provenance tiers, and a
 reproducible pipeline. It is not a new algorithm. *Documented.*
 
 **Q6. What evidence assigns plasmids to the same community?**
-PlasBench defines no communities. *Not applicable.* The nearest analogue is binning: which
-predicted contigs belong to the same *truth* plasmid. That is decided by one-to-one
-Hungarian matching on aligned bases (`python/score_bins.py`). *Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q7. Can a mosaic plasmid have a single evolutionary history?**
-PlasBench makes no evolutionary claim. *Not applicable.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q8. Two plasmids share a carbapenemase gene but have unrelated backbones: related?**
-Never compared with each other. *Not applicable.* Within one isolate, AMR gene recall
-reports whether the gene was recovered *inside a predicted plasmid*. It requires curated
-truth, `truth_amr.tsv`; see FAQ (AMR). *Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids. Within one isolate, AMR placement (Q-P10) checks the gene lands on its own plasmid.
 
 **Q9. Identical replicon, different backbones: same lineage?**
-No lineage calls are made. *Not applicable.* Replicon types are used only as **evidence
-that a truth replicon is a plasmid** (`python/label_truth_evidence.py`) and as a
-stratifier for recovery, never as a lineage statement. *Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q10. What does "novel plasmid" mean?**
 Benchmark scoring never calls novelty. A separate, off-by-default operational screen
@@ -151,32 +144,19 @@ Primary-only mapping plus the MAPQ filter, the ambiguity diagnostic and the reca
 *Verified.*
 
 **Q19. What clustering algorithm assigns communities?**
-None. *Not applicable.* Bin-to-plasmid matching is a Hungarian maximum-weight assignment.
-*Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q20. Are cluster boundaries statistically justified and stable?**
-No clusters are formed. *Not applicable.* The analogous question, whether *rankings* are
-stable, is answered three ways:
-- **Resampling:** cluster bootstrap intervals and paired permutation tests.
-- **Filter changes:** rank robustness re-ranks under altered alignment filters (PR #8).
-- **Truth quality:** the reference-tier sensitivity table.
-
-*Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids. Ranking stability is covered by cluster-bootstrap intervals, rank robustness and the tier tables. *Verified.*
 
 **Q21. Can a plasmid belong to two communities?**
-No communities. *Not applicable.* In binning, a truth plasmid split across bins is
-recorded as a split event; a bin holding two plasmids is a merge. *Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q22. How are spurious groupings from one shared gene avoided?**
-Not applicable to relatedness. In binning, a bin counts as correct for a plasmid only by
-aligned bases. Under CPRR the plasmid must make up ≥ 95% of the bin and be ≥ 95% covered,
-so a shared gene cannot make a bin "correct". *Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q23. What happens to plasmids that fit no cluster?**
-Not applicable to clustering. In truth, a replicon whose label conflicts with the evidence
-is **AMBIGUOUS** and is excluded from scoring rather than forced into a class. On the
-audit branch, an unlabelled sequence becomes `REVIEW` and stops the run (PR #8).
-*Verified.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q24. Which reference database and version?**
 Scoring uses the isolate's own complete genome (NCBI Complete Genome, accession pinned in
@@ -301,9 +281,7 @@ sharing.
 ## Part IV. Edge cases (levels 2–3)
 
 **Q44–Q47 (backbone versus accessory sharing, shared carbapenemase, identical replicons,
-mosaic plasmids).** These are relatedness edge cases. *Not applicable:* PlasBench never
-compares plasmids across isolates. Within an isolate, a mosaic plasmid is simply a truth
-plasmid; a tool must recover it whole to pass CPRR.
+mosaic plasmids).** *Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q48. A plasmid on five contigs, one chimeric with chromosome.**
 The chimeric contig's chromosome bases count as false positives (precision drop, bin share
@@ -328,10 +306,8 @@ length-weighted binning gives it weight in proportion to its size. *Verified.*
 See Q34. *Open* for integration calling.
 
 **Q53–Q56 (partial PLSDB matches, redundant records, misannotated references, genuinely
-novel plasmids).** These concern a database-search tool. *Not applicable* to scoring,
-which uses each isolate's own truth. For the operational screen, see Q10. Truth records
-themselves are checked: a mislabelled replicon is caught by the evidence labeller
-(AMBIGUOUS) and the truth-label audit (FAQ). *Verified.*
+novel plasmids).** *Outside this benchmark:* no database search is performed; scoring uses
+each isolate's own truth, whose labels are checked (Q-P1).
 
 **Q57. 10,000 plasmids: runtime and memory?**
 Scoring is per isolate, with no all-against-all step, so cost grows linearly with
@@ -343,8 +319,7 @@ database update changes its version and date in the registry and the manifest, a
 that tool rerun. *Documented.*
 
 **Q59. A cluster assignment changes between database versions?**
-No clusters. *Not applicable.* Ranking changes between runs are visible by comparing
-manifests and leaderboards; there is no automatic diff. *Open:* a run-to-run diff tool.
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 ## Part V. Validation and benchmarking (levels 2–3)
 
@@ -366,8 +341,8 @@ this release:
 - **Secondary:** CPRR and base-level precision, recall and F1.
 - **Supplementary:** NMI, VI, PR-AUC, and now Brier score and ECE (*Fixed here*).
 
-All rankings carry cluster-bootstrap 95% intervals. Adjusted Rand Index is not reported;
-NMI covers the same ground. *Verified.*
+All rankings carry cluster-bootstrap 95% intervals. A base-pair-weighted Adjusted Rand
+Index is reported beside NMI (#12). *Verified.*
 
 **Q62. Compared with MOB-suite, geNomad, Pling and a PLSDB BLAST/Mash baseline?**
 MOB-suite, geNomad and others are benchmarked *as tools*. Pling is not a reconstruction
@@ -388,7 +363,7 @@ exclusion. Release dates are filled for every installed database. *Verified.*
 **Q64. Negative controls?**
 Zero-plasmid isolates measure false-positive plasmid calling (isolate specificity,
 chromosome false-positive bp). The trivial baselines act as performance floors. A
-"shares only an AMR gene" control is a relatedness control; *Not applicable*.
+"shares only an AMR gene" control is outside this benchmark.
 
 **Q65. Stable across size, ARG status, species and geography?**
 - **Species:** `benchmark.species.tsv`.
@@ -422,8 +397,7 @@ results say nothing about transmission, common source or lineage. *Fixed here.*
 
 **Q69. Is genomic relatedness distinguished from epidemiological association and
 transmission?**
-PlasBench makes none of these claims, and its vocabulary avoids them. The defined terms
-are listed in the report (*Fixed here*).
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids. The report's vocabulary avoids these claims (*Fixed here*).
 
 **Q70. Can collection date, location, host or metadata be used?**
 Yes, as stratifiers and for completeness checks:
@@ -454,9 +428,8 @@ statistics and trivial baselines." That is an operational and methods contributi
 evidence that it matters needs a real-cohort run. *Documented.*
 
 **Q75. How does it differ from Pling?**
-Pling compares plasmids with each other (containment and structural distance,
-communities). PlasBench scores predictions against truth. They do different jobs. Pling
-could help cohort QC by spotting redundant plasmids (FAQ). *Documented.*
+Pling compares plasmids with each other, which is outside this benchmark. PlasBench scores
+predictions against truth. *Documented.*
 
 **Q76. How does it differ from MOB-suite?**
 MOB-suite is one of the tools PlasBench scores. PlasBench adds the measurement, not
@@ -595,7 +568,7 @@ lock checksums, and the per-plasmid tables. These are designed to localise a
 discrepancy. *Verified.*
 
 **Q105. Is clustering driven by shared AMR genes?**
-No clustering. *Not applicable.*
+*Outside this benchmark:* PlasBench does not cluster, group, relate or phylogenetically place plasmids.
 
 **Q106. Does performance on novel plasmids get reported honestly?**
 Novel or marker-free truth plasmids are AMBIGUOUS and counted, not hidden. Tools are not
@@ -620,11 +593,124 @@ Items 1 and 2 are measured on every run. *Real-data result Open.*
 
 The five opening viva questions map to Q1, Q4, Q8, Q60 and Q10/Q25 above. In short:
 - **Q1:** PlasBench's decision is method choice.
-- **Q4:** relatedness is not applicable.
-- **Q8:** not applicable, though AMR recall is measured within an isolate.
+- **Q4:** relatedness is outside this benchmark.
+- **Q8:** outside this benchmark; AMR placement is measured within an isolate.
 - **Q60:** truth is provenance-tiered.
 - **Q10/Q25:** novelty is not claimed; the screen is renamed.
 
 To track answers, use the review-record template with these status labels. The level-1
 blocking questions are all answered above, except those marked *Open* that need a
 real-cohort run (Q1, Q22 in FAQ, Q98, Q108).
+
+## Panel examination: rounds 1-5 and edge-case lab
+
+The panel's questions, with what PlasBench now does. Decisions the developer recorded are
+marked **Decision**. The implementation plan and the items not implemented are in
+[PANEL_ALIGNMENT.md](PANEL_ALIGNMENT.md); the frozen parameters in
+[PREREGISTRATION.md](PREREGISTRATION.md).
+
+**Q-P0. What is PlasBench's input, core operation and output (1.1)?**
+Reads (and optionally long reads) plus a complete reference of the same isolate in; each
+tool's plasmid prediction scored against that reference; ranked leaderboards per track and
+task, and an HTML report, out. Clustering-style questions are outside this benchmark.
+*Documented.*
+
+**Q-P1. Which labels count as truth (E.15)?**
+**Decision:** Scheme 3, NCBI labels (`assigned_molecule_location_type`), pre-registered as
+primary (`TRUTH_LABEL_SCHEME=ncbi`). The sequence report's SHA-256 and retrieval date are
+written beside every label. Scheme 1 (every non-chromosomal replicon is a plasmid) and the
+evidence scheme are re-ranked as sensitivity analyses, with Kendall's tau against the primary.
+Every replicon's three labels are in `benchmark.label_schemes.tsv` and the report. Isolates
+without an NCBI record are marked `not_applicable:<truth_source>`. In-database versus
+not-in-database recovery is reported per tool (#12). *Fixed here.*
+
+**Q-P2. A tool crashes or writes nothing (D6)?**
+**Decision:** F1 = 0, counted in the ranking. An infrastructure failure (container or
+command never started, full disk) is not the tool's fault: it is recorded as
+`infrastructure_failure`, never scored, and rerun. Failed runs get `TOOL_RETRIES` retries and
+every tool the same `TOOL_TIMEOUT_SECONDS`. *Fixed here.*
+
+**Q-P3. A truth plasmid is assembled as a tandem dimer (D2)?**
+`detect_dimers.py` compares the two halves; with `COLLAPSE_DIMERS=1` the monomer is scored and
+the change listed in `truth.corrections.tsv`. *Fixed here.*
+
+**Q-P4. A plasmid seen only in short reads is absent from the truth (D1)?**
+Predicted sequence that does not map to the truth is never a false positive
+(`unmapped_pred_bp`); plasmids without long-read support are flagged by depth. Laboratory
+confirmation needs a wet-lab step. *Verified; wet lab Open.*
+
+**Q-P5. NCBI labels conflict within an assembly (D3)?**
+Contradictory sequence-report entries become `REVIEW` and stop stage 2 (#8). *Verified.*
+
+**Q-P6. An integrated plasmid (D5)?**
+The truth-label audit flags chromosome-labelled replicons that carry plasmid markers;
+integration inside a chromosome is not called. The integrated-element stratum's thresholds
+are `TO_FIX` in the pre-registration. *Partly; Open.*
+
+**Q-P7. A region shared by two plasmids (D8)?**
+Contigs aligning equally well to both are AMBIGUOUS (excluded, counted as shared length),
+not multi-assigned. *Verified.*
+
+**Q-P8. A multi-copy AMR gene (D9)?**
+Curated AMR truth has one row per copy; placement matches copies by position. *Verified.*
+
+**Q-P9. A tool's output format changes between versions (D10)?**
+Every adapter has a fixture test and tool versions are recorded; run-time schema checks per
+version are not done. *Partly.*
+
+**Q-P10. Is an AMR gene placed on the right plasmid?**
+`score_amr_placement.py`: per gene copy, correct or wrong plasmid (one-to-one bin matching),
+shared or unassigned contig, or not recovered; replicon-type agreement as level 1; reported
+per gene class (carbapenemase, ESBL, colistin, ...). *Fixed here.*
+
+**Q-P11. No tool works on an isolate type (D11)?**
+When the best expected F1 is below `RECOMMENDATION_MIN_EXPECTED_SCORE` (0.40) no tool is
+recommended and the reason says so. *Fixed here.*
+
+**Q-P12. A mixed or contaminated assembly (D13)?**
+The advisory assembly QC gate (size, GC spread across long contigs) warns before
+recommending and is scored like every other warning. *Fixed here.*
+
+**Q-P13. Which tools were compared, and why did some not run (D15)?**
+The report's "How every run ended" section counts every outcome per tool and lists the most
+common reason for each skip or failure. *Fixed here.*
+
+**Q-P14. What are the limits of the warnings (D16)?**
+Each warning is scored by PPV, sensitivity and firing rate against failed recommendations;
+where its validity limit applies (for example a cohort too small for outlier detection) the
+report says "could not be applied". *Fixed here.*
+
+**Q-P15. A query too short, or equally close to two references (3.3, 2.4)?**
+The operational screen returns `insufficient_sequence` (under 1 kb, not compared) or
+`ambiguous_between_references`. *Fixed here.*
+
+**Q-P16. Were the scoring rules fixed before the results?**
+`config/prereg.tsv` holds every decision; `freeze-prereg --write` locks it; the manifest and
+report show the hash, the lock state, open `TO_FIX` items and any setting that departs from
+the plan; `REQUIRE_PREREG=1` refuses to run otherwise. *Fixed here; freeze Open.*
+
+**Q-P17. Does recommending per isolate beat using the single best tool?**
+`evaluate_recommender.py`: leave-one-study-out regret, near-optimal and top-1 rates, gap
+closed, and a `benchmark_only` verdict when the oracle gap is below 0.02. *Fixed here;
+real-data result Open.*
+
+**Q-P18. Is the permutation test robust to the choice of test?**
+A Wilcoxon signed-rank p-value (exact for n ≤ 25) and an equivalence flag sit beside it. *Fixed here.*
+
+**Q-P19. Does it transfer to an unseen genus, and is there a holdout?**
+Leave-one-genus/phylum-out regret; `split=holdout` isolates are evaluated once only. *Fixed here.*
+
+**Q-P20. Is a contig-level score reported?**
+Yes, as a parallel layer: contig F1 and MCC by count and length, contig-level binning F1,
+shared and unassigned lengths. Never the headline; not validated against a second scorer.
+*Fixed here.*
+
+**Q-P21. What was not adopted, and why?**
+Plasmid-free isolates scored 0 in F1 (undefined there); summed contig length as the
+headline recall denominator (contig layer only); a context model beyond the QC gate (needs
+data); more than 100 in-house isolates (data collection). *Documented.*
+
+**Q-P22. Pilot, orthogonal validation, temporal holdout, pre-registration publication
+(E.9-E.13)?**
+They need data collection and a study protocol. The database-date screen and in-database
+split support a temporal analysis; the pre-registration file is ready to freeze. *Open.*

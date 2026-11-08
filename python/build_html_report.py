@@ -1585,6 +1585,8 @@ NEAREST_REFERENCE_LABELS = {
     "close_reference_match": "Close match to a reference plasmid",
     "no_close_reference": "No close reference in the reference set",
     "insufficient_reference": "Could not be assessed",
+    "insufficient_sequence": "Not compared: record too short for a Mash distance",
+    "ambiguous_between_references": "Ambiguous: equally close to references in different clusters",
     # Labels written before the screen was renamed; reports from earlier runs
     # still open, and show the same meaning under today's wording.
     "known_cluster": "Close match to a reference plasmid (recorded as 'known_cluster')",
@@ -2789,6 +2791,16 @@ def main():
     ap.add_argument("--stratified", help="Optional evidence-gated stratified performance TSV (select_operational_method.py).")
     ap.add_argument("--orthogonal-summary", help="Optional orthogonal-validation summary JSON (validate_orthogonal_evidence.py).")
     ap.add_argument("--dimensions-prefix", help="Prefix of the stage-6 dimension tables (<prefix>.accuracy.tsv, .feature_preservation.tsv, .bin_quality.tsv, .performance.tsv, .power.tsv, .scenarios.tsv, .composite.tsv, ...); rendered by report_dimensions.py.")
+    # Scoring specification and panel sections (python/report_scoring_spec.py).
+    ap.add_argument("--label-schemes", help="benchmark.label_schemes.tsv (label_schemes.py collect)")
+    ap.add_argument("--label-scheme-summary", help="benchmark.label_scheme_summary.tsv")
+    ap.add_argument("--truth-provenance", help="benchmark.truth_provenance.tsv (reference tiers, truth grades)")
+    ap.add_argument("--outcome-states", help="benchmark.outcome_states.tsv (aggregate_results.py)")
+    ap.add_argument("--recommender-eval", help="benchmark.recommender_eval.tsv (evaluate_recommender.py)")
+    ap.add_argument("--recommender-verdict", help="benchmark.recommender_verdict.json")
+    ap.add_argument("--warning-eval", help="benchmark.warning_eval.tsv (evaluate_warnings.py)")
+    ap.add_argument("--leave-taxon-out", help="benchmark.leave_taxon_out.tsv (leave_taxon_out.py)")
+    ap.add_argument("--amr-placement", help="benchmark.amr_placement.tsv (score_amr_placement.py collect)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -3449,6 +3461,20 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # metadata completeness): python/report_question_bank.py.
     import report_question_bank
     page = report_question_bank.inject(page, out.parent, leaderboard, args.data_dir)
+    # Scoring specification and panel sections; each is fed by an explicit argument.
+    import report_scoring_spec
+    spec_sources = {"leaderboard": args.leaderboard, "manifest": args.manifest, "scores": args.scores,
+                    "tool_status": args.tool_status,
+                    "comparisons": args.comparisons, "data_dir": args.data_dir,
+                    "label_schemes": args.label_schemes, "label_scheme_summary": args.label_scheme_summary,
+                    "truth_provenance": args.truth_provenance, "outcome_states": args.outcome_states,
+                    "recommender_eval": args.recommender_eval, "recommender_verdict": args.recommender_verdict,
+                    "warning_eval": args.warning_eval, "leave_taxon_out": args.leave_taxon_out,
+                    "amr_placement": args.amr_placement}
+    page = report_scoring_spec.inject(page, spec_sources)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    (out.parent / (out.name.split(".report")[0] + ".scoring_spec.md")).write_text(
+        report_scoring_spec.markdown(spec_sources), encoding="utf-8")
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")

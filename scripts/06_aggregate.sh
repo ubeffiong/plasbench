@@ -57,6 +57,24 @@ else
     warn "clonal grouping failed; clusters use BioProject/study only"
 fi
 
+# Every truth replicon's label under the three labelling schemes (python/label_schemes.py;
+# stage 2 writes <sample>/label_schemes.tsv). The headline is scored on
+# TRUTH_LABEL_SCHEME (ncbi, pre-registered); the others are re-ranked by
+# rank_sensitivity.py below.
+python3 "$HERE/../python/label_schemes.py" collect --data-dir "$DATA_DIR" \
+    --primary "${TRUTH_LABEL_SCHEME:-ncbi}" \
+    --out "$RESULTS_DIR/benchmark.label_schemes.tsv" \
+    --summary-out "$RESULTS_DIR/benchmark.label_scheme_summary.tsv" \
+    || warn "label-scheme collection failed; the report shows no scheme table"
+
+# AMR placement by gene class (python/score_amr_placement.py collect): one row per
+# tool and gene class (carbapenemase / ESBL / colistin / ... / all).
+if [[ "${RUN_AMR_PLACEMENT:-1}" -eq 1 ]]; then
+    python3 "$HERE/../python/score_amr_placement.py" collect --results-dir "$RESULTS_DIR" \
+        --out "$RESULTS_DIR/benchmark.amr_placement.tsv" \
+        || warn "AMR placement collection failed; the report shows no AMR placement table"
+fi
+
 # Sequence-level leakage check (python/database_containment.py): is each truth
 # plasmid already inside a tool's own database? The installed MOB-suite
 # database is found automatically; add others via TOOL_DATABASE_FASTAS
@@ -150,6 +168,8 @@ fi
 if [[ "${RUN_RANK_SENSITIVITY:-1}" == "1" ]]; then
     if ! python3 "$HERE/../python/rank_sensitivity.py" \
             --scores "$SCORES" --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+            --label-scheme "${TRUTH_LABEL_SCHEME:-ncbi}" \
+            --truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv" \
             --out-prefix "$RESULTS_DIR/benchmark"; then
         warn "rank-sensitivity analysis failed; leaderboard is unaffected"
     fi
@@ -167,6 +187,37 @@ python3 "$HERE/../python/validate_recommendations.py" \
     --scores "$SCORES" --samples "$SAMPLE_SHEET" \
     --min-train-samples "$RECOMMENDATION_MIN_SAMPLES" \
     --out "$RESULTS_DIR/benchmark.recommendation_validation.tsv"
+
+# Assembly QC gate over every cohort assembly (python/assembly_qc_gate.py, D13):
+# the same check stage 8 applies before recommending, here so its warnings can be
+# scored against failed recommendations below.
+if [[ "${RUN_ASSEMBLY_QC_GATE:-1}" -eq 1 ]]; then
+    python3 "$HERE/../python/assembly_qc_gate.py" --data-dir "$DATA_DIR" \
+        --out "$RESULTS_DIR/benchmark.assembly_qc.tsv" 2>> "$LOG_DIR/aggregate.assembly_qc.log" \
+        || warn "assembly QC gate found no assemblies; benchmark.assembly_qc.tsv not written"
+fi
+
+# Recommender evaluation (python/evaluate_recommender.py; scoring specification
+# sections 9-10): leave-one-study-out regret, near-optimal and top-1 rates, gap
+# closed against the single best tool, and the oracle-gap verdict. Then every
+# existing warning is scored against failed recommendations (evaluate_warnings.py).
+# Advisory: a failure warns and never stops the run.
+if [[ "${RUN_RECOMMENDER_EVAL:-1}" -eq 1 ]]; then
+    if python3 "$HERE/../python/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLE_SHEET" \
+            --tool-status "$RESULTS_DIR/tool_status.tsv" --out-prefix "$RESULTS_DIR/benchmark" \
+            --min-train-samples "$RECOMMENDATION_MIN_SAMPLES"; then
+        python3 "$HERE/../python/evaluate_warnings.py" --regret "$RESULTS_DIR/benchmark.recommender_regret.tsv" \
+            --cohort-qc-flags "$RESULTS_DIR/benchmark.cohort_qc_flags.tsv" \
+            --assembly-qc "$RESULTS_DIR/benchmark.assembly_qc.tsv" --out-prefix "$RESULTS_DIR/benchmark" \
+            || warn "warning evaluation failed; the report shows no warning table"
+    else
+        warn "recommender evaluation failed; the report shows no recommender section"
+    fi
+    # Leave-one-genus/phylum-out transfer (python/leave_taxon_out.py). split=holdout
+    # isolates stay locked here; evaluate them once by hand with
+    # "plasbench analysis leave-taxon-out ... --confirm-holdout".
+    python3 "$HERE/../python/leave_taxon_out.py" --scores "$SCORES" --samples "$SAMPLE_SHEET"         --tool-status "$RESULTS_DIR/tool_status.tsv" --out-prefix "$RESULTS_DIR/benchmark"         --min-train-samples "$RECOMMENDATION_MIN_SAMPLES"         || warn "leave-taxon-out evaluation failed; the report shows no taxon-transfer table"
+fi
 
 # Descriptive decision-support model, off by default (see docs/USER_GUIDE.md).
 # Always writes its own JSON verdict, ready or not; select_operational_method.py
@@ -233,6 +284,15 @@ python3 "$HERE/../python/build_html_report.py" \
     --stratified "$RESULTS_DIR/benchmark.stratified.tsv" \
     --orthogonal-summary "$RESULTS_DIR/orthogonal_validation.summary.json" \
     --dimensions-prefix "$RESULTS_DIR/benchmark" \
+    --label-schemes "$RESULTS_DIR/benchmark.label_schemes.tsv" \
+    --label-scheme-summary "$RESULTS_DIR/benchmark.label_scheme_summary.tsv" \
+    --truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv" \
+    --outcome-states "$RESULTS_DIR/benchmark.outcome_states.tsv" \
+    --recommender-eval "$RESULTS_DIR/benchmark.recommender_eval.tsv" \
+    --recommender-verdict "$RESULTS_DIR/benchmark.recommender_verdict.json" \
+    --warning-eval "$RESULTS_DIR/benchmark.warning_eval.tsv" \
+    --leave-taxon-out "$RESULTS_DIR/benchmark.leave_taxon_out.tsv" \
+    --amr-placement "$RESULTS_DIR/benchmark.amr_placement.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."
@@ -250,6 +310,7 @@ log "  Truth-label audit : $RESULTS_DIR/benchmark.truth_label_audit.tsv (advisor
 log "  Further dimensions: $RESULTS_DIR/benchmark.{accuracy,missing_regions,feature_preservation,ngoc,bin_quality,performance,power,scenarios,scenario_performance,composite,composite_sensitivity}.tsv (advisory only)"
 log "  Study holdout test : $RESULTS_DIR/benchmark.recommendation_validation.tsv"
 log "  Cohort QC flags   : $RESULTS_DIR/benchmark.cohort_qc_flags.tsv (advisory only)"
+log "  Scoring spec      : $RESULTS_DIR/benchmark.{label_schemes,label_scheme_summary,outcome_states,recommender_eval,recommender_regret,warning_eval,leave_taxon_out,amr_placement,assembly_qc}.tsv and benchmark.scoring_spec.md"
 if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
     log "  Recommendation model: $RESULTS_DIR/benchmark.recommendation_model.json"
     log "  Model card           : $RESULTS_DIR/benchmark.recommendation_model.card.md"

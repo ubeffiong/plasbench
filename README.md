@@ -399,6 +399,13 @@ scorecard is not used.
 | Feature and gene recovery | Done | Full length, truncated, missed. | `benchmark.feature_preservation.tsv` |
 | Median and IQR by size band and ARG status | Done | Per-plasmid completeness within <10 kb, 10-50 kb, >50 kb and by resistance-gene carriage. | `benchmark.recovery_by_replicon.tsv` |
 | Repeat-aware matching | Partial | Repeat effects reported as diagnostics (recall ceiling, ambiguity); matching is not repeat-aware; PlasEval only as an imported cross-check. | `repeat_ambiguity_bp`; `plasbench import-external-benchmark` |
+| Base-level MCC, F2, F0.5, abstention rate | Done | MCC with chromosome bases not predicted as true negatives (blank, never 0, when undefined); F2 and F0.5; abstention rate = share of isolates where the tool returned nothing. | `mean_mcc`, `mean_f2`, `mean_f0_5`, `mean_abstention_rate` |
+| Per-plasmid outcome states | Done (binning tools) | Perfect, fragmented, merged, partial, missed per truth plasmid, with contamination of its best bin; thresholds pre-registered. | `<tool>.plasmid_outcomes.tsv`; `total_outcome_*` |
+| Contig-level binning F1; shared and unassigned contig lengths | Done (parallel layer) | Hungarian matching over PLASMID contigs; never the headline. | `contig_bin_f1_bp`; `contigs_ambiguous_bp`, `contigs_unplaced_bp` |
+| AMR placement | Done (curated AMR truth) | Each gene copy on its own plasmid (level 2) and a same-replicon plasmid (level 1), per gene class. | `benchmark.amr_placement.tsv` |
+| Labelling schemes | Done | Headline on pre-registered Scheme 3 (NCBI labels); Scheme 1 and the evidence scheme re-ranked as sensitivity analyses. | `benchmark.label_schemes.tsv`; `scheme:*` rank variants |
+| Wilcoxon signed-rank and equivalence | Done | Beside the permutation test; exact for n ≤ 25; equivalence within ±0.05. | `wilcoxon_p_value_holm`, `equivalent` |
+| Recommender regret and gap closed | Done (synthetic data only) | Leave-one-study-out regret, near-optimal and top-1 rates, gap closed, `benchmark_only` verdict; warning PPV and sensitivity; leave-taxon-out. | `benchmark.recommender_eval.tsv`, `benchmark.warning_eval.tsv`, `benchmark.leave_taxon_out.tsv` |
 | Database-dependent recovery vs novel plasmids | Done (installed databases) | Two checks. Date screen: release dates are filled for every installed or pinned database (MOB-suite, Platon, geNomad, PlaScope, RFPlasmid). Sequence check: each truth plasmid is aligned to the tool's own database FASTA (MOB-suite's found automatically; others via `TOOL_DATABASE_FASTAS`), and per-plasmid recovery is reported inside vs outside it. | `flag_database_overlap.py`, `database_containment.py`; `mean_recovery_in_tool_database` |
 
 ### The headline metric set
@@ -407,7 +414,7 @@ scorecard is not used.
 |---|---|---|
 | Classification (plasmid vs chromosome) | Length-weighted F1 and MCC, with count-based versions beside them; base-level F1 as both macro and micro averages | Report "Classification and reconstruction metrics"; leaderboard `mean_contig_f1_bp`, `mean_contig_mcc_bp`, `mean_f1`, `micro_f1` |
 | Reconstruction (which contigs form one plasmid) | Length-weighted binning F1 (the ranking endpoint) and ARI | `ranking_score`, `mean_bin_ari`, assembly-aware `mean_lw_bin_f1_assembly_aware` |
-| Error types | Perfect (CPRR), fragmented (split events), merged (merge events), chromosomal contamination, missed plasmids | `cprr`, `<tool>.bin_summary.tsv`, report "Bin diagnostics" |
+| Error types | Perfect (CPRR and per-plasmid outcomes), fragmented, merged, chromosomal contamination, missed plasmids | `cprr`, `total_outcome_*`, report "Plasmid outcomes" |
 
 Everything else is supplementary. Related metric definitions appear in the gplas/gplas2, HyAsP and
 PlasBin-flow papers and in published comparisons of MOB-recon, plasmidSPAdes and Platon; verify each source's
@@ -426,10 +433,23 @@ These need data, compute or an external tool, not code, or are being done elsewh
 | 4 | **An external validation cohort, and a simulation that the intervals have their nominal coverage under clustered sampling** | Needs data and a study design. |
 | 5 | **Plasmid-free, hard-structure and taxonomically broader isolates** | Data curation. |
 | 6 | **A first-class PlasEval adapter and repeat-aware matching** | Needs the external tool and real data to validate. |
-| 7 | **Abstention (unclassified) rate** | No wrapped tool reports an explicit "unclassified" call; adapters would need to pass it through. |
+| 7 | **Contig-level abstention (unclassified) rate** | No wrapped tool reports an explicit "unclassified" contig call; isolate-level abstention is reported. |
+| 7b | **Freeze the pre-registration** | Three parameters are `TO_FIX` (tool timeout, integrated-element depth, circular-path rule) and await the panel; then `plasbench analysis freeze-prereg --write`. |
+| 7c | **Recommender and contig layer on real data** | Both are verified on synthetic data only; the contig layer has not been compared with a second scorer. |
 | 8 | **NGA50, AMI, and multi-membership scoring of ambiguous contigs** | NGA50 needs contig-level misassembly breaks; AMI's expected-information term is impractical over base counts; ambiguous contigs are currently excluded (the stated rule), not multi-assigned. |
 | 8b | **Stratification by plasmid copy number** | Needs per-plasmid read depth for every truth plasmid; size, ARG status, species, tier and database membership are stratified already. |
 | 9 | **Documentation split**: a short quick start plus reference documents | A 3,000-line README is hard to keep true; a larger editorial task. |
+
+### Scoring specification and panel examination
+
+The pre-registered scoring specification and the panel's examination (rounds 1-5 and the
+edge-case lab) are implemented on top of the metrics above:
+[docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) lists every frozen decision,
+[docs/PANEL_ALIGNMENT.md](docs/PANEL_ALIGNMENT.md) maps each panel question to the change, and
+the [question bank](docs/FAQ_QUESTION_BANK.md#panel-examination-rounds-1-5-and-edge-case-lab)
+answers each one. Recorded decisions: the headline is scored on **NCBI labels** (Scheme 3), and a
+**tool crash or missing output scores F1 = 0**. Each addition has its own report section and an
+explicit "not run" note when it is switched off.
 
 ### Areas of expansion
 

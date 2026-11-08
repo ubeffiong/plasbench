@@ -50,14 +50,15 @@ cat > "$TMP/bin/mob_recon" <<EOF
 echo mob_recon >> "$TMP/calls.log"
 outdir=""
 while [[ \$# -gt 0 ]]; do case "\$1" in --outdir) outdir="\$2"; shift 2;; *) shift;; esac; done
-mkdir -p "\$outdir"; printf '>p1\nACGT\n' > "\$outdir/plasmid_1.fasta"
+# 2 kb: the nearest-reference screen does not compare records under 1 kb (insufficient_sequence).
+mkdir -p "\$outdir"; printf '>p1\n%s\n' "\$(printf 'ACGT%.0s' \$(seq 1 500))" > "\$outdir/plasmid_1.fasta"
 EOF
 cat > "$TMP/bin/platon" <<EOF
 #!/usr/bin/env bash
 echo platon >> "$TMP/calls.log"
 outdir="" prefix=""
 while [[ \$# -gt 0 ]]; do case "\$1" in --output) outdir="\$2"; shift 2;; --prefix) prefix="\$2"; shift 2;; *) shift;; esac; done
-mkdir -p "\$outdir"; printf '>c1\nACGT\n' > "\$outdir/\$prefix.plasmid.fasta"
+mkdir -p "\$outdir"; printf '>c1\n%s\n' "\$(printf 'ACGT%.0s' \$(seq 1 500))" > "\$outdir/\$prefix.plasmid.fasta"
 EOF
 cat > "$TMP/bin/mash_fake.py" <<'EOF'
 import os, sys

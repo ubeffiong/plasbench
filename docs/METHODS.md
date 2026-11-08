@@ -963,14 +963,15 @@ are aligned to the truth reference (`minimap2 -c --secondary=yes -N 5`). A conti
 `CONTIG_MIN_COVERAGE` (0.80) of it aligns at `CONTIG_MIN_IDENTITY` (0.95) or better to that kind of
 truth. A contig that aligns that well to both is AMBIGUOUS, and one that aligns to neither is
 UNPLACED. SHORT, AMBIGUOUS and UNPLACED contigs are excluded from contig-level scoring (not
-multi-assigned) and counted. Truth comes from `truth.scored.tsv`, so evidence-AMBIGUOUS replicons do
-not label contigs.
+multi-assigned) and counted. Truth is the file of the scored labelling scheme (`truth.tsv` under the
+primary NCBI scheme; under the evidence scheme, evidence-AMBIGUOUS replicons do not label contigs).
 
 **Contig-level metrics.** A contig counts as called plasmid when its id is in the tool's
 predicted-plasmid FASTA. Precision, recall, F1 and MCC are computed count-based (each contig once) and
 length-weighted (in base pairs). Tools whose predictions are reassembled sequences rather than assembly
-contigs are marked not applicable. Abstention is not measured: no wrapped tool reports an explicit
-unclassified call.
+contigs are marked not applicable. No wrapped tool reports an explicit unclassified call, so a contig
+not called plasmid counts as called chromosome; isolate-level abstention (`abstention_rate`) is reported
+by the base-level scorer.
 
 **Assembly-aware binning recall.** The labelling step also records, per truth plasmid, the bases
 covered by the assembly's PLASMID contigs. `score_bins.py --assembly-coverage` reports length-weighted
@@ -992,3 +993,83 @@ automatically; others are added via `TOOL_DATABASE_FASTAS`. The plasmid counts a
 one record covers `DATABASE_CONTAINMENT_MIN_COVERAGE` (0.95) of it at `DATABASE_CONTAINMENT_MIN_IDENTITY`
 (0.99). Aggregation reports each tool's mean per-plasmid recovery inside and outside its own database.
 This complements the date-based screen.
+
+## Scoring specification
+
+The pre-registered scoring decisions are listed in `config/prereg.tsv` and explained in
+[PREREGISTRATION.md](PREREGISTRATION.md); [PANEL_ALIGNMENT.md](PANEL_ALIGNMENT.md) maps each panel
+question to what was implemented. This section defines what was added.
+
+**Labelling schemes** (`python/label_schemes.py`, stages 2 and 6). The headline is scored on the
+pre-registered **Scheme 3, NCBI labels**: `truth.tsv` as `make_truth.py` builds it from the sequence
+report's `assigned_molecule_location_type`. The report's SHA-256 and retrieval date are written next to
+every label, so the snapshot is pinned. Two sensitivity schemes are re-ranked by `rank_sensitivity.py`:
+**Scheme 1** (`truth.nonchromosomal.tsv`: the largest chromosome stays CHROMOSOME, every other replicon
+is PLASMID) and the **evidence scheme** (`truth.scored.tsv`, AMBIGUOUS replicons excluded). Rule for
+isolates with no NCBI record (in-house, `self_assembled_hybrid`): Scheme 3 uses the truth builder's
+label, marked `ncbi_label_field = not_applicable:<truth_source>`, never described as database-labelled.
+`TRUTH_LABEL_SCHEME` selects the scored scheme (default `ncbi`); a missing scheme file falls back to
+`truth.tsv` with a warning.
+
+**Tandem dimers** (`python/detect_dimers.py`, stage 2). The two halves of each PLASMID replicon are
+compared (minimap2 asm5 when available, else Hamming identity). Identity ≥ 0.95 over ≥ 0.90 of the half
+length is a dimer. With `COLLAPSE_DIMERS=1` the reference and `truth.tsv` keep only the first half
+(original kept as `reference.precollapse.fna`; AMR rows on the second copy dropped); with 0 the dimer is
+flagged and AMBIGUOUS under the evidence scheme. `truth.corrections.tsv` lists every change.
+
+**Truth quality grade** (`truth_provenance.py`). A: reference tier 1 and the sample sheet declares
+`same_extraction=yes`; B: other tier-1 and tier-2; C: tier 3. Grade A is never inferred.
+
+**Base-level additions** (`score_plasmids.py`). `TN_bp` (chromosome bases not predicted), `mcc`
+(blank when a marginal is zero), `f2` and `f0_5` (same undefined rules as F1), `abstention_rate` (1 when
+the tool returned nothing), and `--min-contig-length` (records below it treated as not predicted; off by
+default, used by the rank-sensitivity axis).
+
+**Per-plasmid outcomes** (`score_bins.py --outcomes-out`). For each truth plasmid, the bin holding most
+of it: missed (recall < `MISSED_RECALL`), fragmented (another bin holds ≥ `FRAGMENT_SHARE`), merged (its
+bin holds ≥ `FRAGMENT_SHARE` of another plasmid), perfect (precision and recall ≥ `PERFECT_THRESHOLD`),
+else partial; `contamination_fraction` is the chromosome share of that bin.
+
+**Contig layer** (`contig_classification.py score --bins`). Contig-level length-weighted binning
+precision, recall and F1 (Hungarian matching over PLASMID contigs, with |P| the summed length of contigs
+assigned to each plasmid), and the lengths of shared (AMBIGUOUS) and unassigned (UNPLACED) contigs. A
+parallel layer; never the headline.
+
+**Outcome states** (`04_run_tools.sh`, `aggregate_results.py`). completed, reused, failed (tool),
+failed (resource: exit 124/137), infrastructure failure (exit 125/126/127, or a full disk in the log:
+never scored), not applicable (skipped). `TOOL_RETRIES` automatic retries (not for 124/137);
+`TOOL_TIMEOUT_SECONDS` the same budget for all tools. `tool_outcomes.tsv` carries `exit_code`,
+`failure_class` and `attempts`; `tool_status.tsv` keeps its fixed schema.
+
+**Paired tests.** Beside the sign-flip permutation test: the Wilcoxon signed-rank p-value (zeros
+dropped; average ranks for ties; exact enumeration over doubled ranks for n ≤ 25, else the normal
+approximation with tie-corrected variance and a 0.5 continuity correction), Holm-adjusted; and
+`equivalent = yes` when the mean difference and its interval lie inside ±`SMALLEST_DIFFERENCE`.
+
+**Recommender evaluation** (`evaluate_recommender.py`, `evaluate_warnings.py`, `leave_taxon_out.py`).
+Leave-one-study-out. Recommender = best training tool in the held-out isolate's organism (fallback:
+single best training tool). Per held-out isolate: regret = best F1 − recommended F1; near-optimal when
+regret ≤ `NEAR_OPTIMAL_MARGIN`; top-1; single-best regret; gap closed = 1 − recommender regret /
+single-best regret; Kendall's tau between training and held-out rankings; F2 and F0.5 profiles. Oracle gap
+(mean best − mean single best) below `ORACLE_GAP_FLOOR` gives the verdict `benchmark_only`. A
+recommendation failed when regret > `RECOMMENDATION_FAILURE_REGRET`; each warning is scored by PPV,
+sensitivity and firing rate against those failures, and "could not be applied" where its validity limit
+applies. Leave-taxon-out repeats this holding out one genus (sample-sheet `genus`, else the first word
+of `organism`) or phylum; `split=holdout` isolates are evaluated once only, with `--confirm-holdout`.
+
+**Recommendation floor (D11).** When the best eligible tool's expected F1 in a scope is below
+`RECOMMENDATION_MIN_EXPECTED_SCORE` (0.40), no tool is recommended and the reason says so.
+
+**Operational refusal states.** The nearest-reference screen adds `insufficient_sequence` (record
+shorter than 1 kb: not compared) and `ambiguous_between_references` (a reference in another cluster
+within 0.005 of the nearest distance).
+
+**Assembly QC gate (D13)** (`assembly_qc_gate.py`). Flags an assembly larger than
+`ASSEMBLY_QC_MAX_SIZE_MB` or whose long contigs (≥ 10 kb) spread more than `ASSEMBLY_QC_MAX_GC_SPREAD`
+in GC between the length-weighted 10th and 90th percentiles. Advisory: stage 8 warns before
+recommending; stage 6 writes it for every assembly so its warning can be scored.
+
+**AMR placement** (`score_amr_placement.py`). Per curated gene copy (matched by position, ≥ 90% covered
+by one predicted record): correct or wrong plasmid via one-to-one bin-to-plasmid matching, shared or
+unassigned contig, or not recovered; level 1 asks whether the matched plasmid shares a replicon type.
+Summarised per gene class from `config/amr_gene_classes.tsv` (unmatched genes: `other`).

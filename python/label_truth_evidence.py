@@ -151,6 +151,7 @@ def main():
     ap.add_argument("--plasmid-max-distance", type=float, default=0.05)
     ap.add_argument("--long-read-depth", help="long_read_support.py TSV (sequence_id, mean_depth)")
     ap.add_argument("--min-long-read-depth", type=float, default=5.0)
+    ap.add_argument("--multimers", help="detect_dimers.py truth.corrections.tsv; flagged dimers become AMBIGUOUS")
     ap.add_argument("--labels-out", required=True)
     ap.add_argument("--scored-truth-out", required=True)
     args = ap.parse_args()
@@ -165,6 +166,16 @@ def main():
         if status["markers"] else None
     depth = read_long_read_depth(args.long_read_depth)
     labelled = [label(r, largest, markers, rrna, status, hits, depth, args.min_long_read_depth) for r in rows]
+    # A plasmid detect_dimers.py flagged as an uncollapsed tandem dimer would
+    # halve every tool's recall on it: AMBIGUOUS under this scheme (D2).
+    flagged = set()
+    if args.multimers and os.path.isfile(args.multimers):
+        with open(args.multimers, newline="", encoding="utf-8") as handle:
+            flagged = {r["sequence_id"] for r in csv.DictReader(handle, delimiter="\t")
+                       if r.get("multimer") == "yes" and r.get("action") != "collapsed"}
+    for record in labelled:
+        if record["sequence_id"] in flagged and record["final_label"] == "PLASMID":
+            record.update(final_label="AMBIGUOUS", reason="uncollapsed tandem multimer (detect_dimers.py)")
 
     with open(args.labels_out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")

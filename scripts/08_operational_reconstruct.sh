@@ -84,6 +84,18 @@ log "--- stage 1: download reads only (no reference; this sample is not truth-sc
 SAMPLE_SHEET="$TMP_SHEET" bash "$HERE/01_download.sh"
 log "--- stage 3: QC + assembly ---"
 SAMPLE_SHEET="$TMP_SHEET" bash "$HERE/03_assemble.sh"
+# Pre-ranking assembly QC gate (python/assembly_qc_gate.py; panel D13): a
+# recommendation assumes one isolate. Advisory: a flagged assembly is warned
+# about and recorded, never silently ranked as if it were clean.
+if [[ "${RUN_ASSEMBLY_QC_GATE:-1}" -eq 1 && -s "$DATA_DIR/$SAMPLE/contigs.fasta" ]]; then
+    mkdir -p "$RESULTS_DIR/$SAMPLE"
+    python3 "$HERE/../python/assembly_qc_gate.py" --contigs "$DATA_DIR/$SAMPLE/contigs.fasta" --sample "$SAMPLE" \
+        --out "$RESULTS_DIR/$SAMPLE/assembly_qc.tsv" \
+        || warn "assembly QC gate failed for $SAMPLE; continuing without it"
+    if [[ -s "$RESULTS_DIR/$SAMPLE/assembly_qc.tsv" ]] && awk -F'\t' 'NR==2 && $8=="flagged" {f=1} END {exit !f}' "$RESULTS_DIR/$SAMPLE/assembly_qc.tsv"; then
+        warn "$SAMPLE assembly FLAGGED by the QC gate (see $RESULTS_DIR/$SAMPLE/assembly_qc.tsv); the recommendation assumes one isolate"
+    fi
+fi
 log "--- stage 4: reconstruct with $TOOL only ---"
 SAMPLE_SHEET="$TMP_SHEET" ONLY_TOOL="$TOOL" ANALYSIS_TRACK="$TRACK" bash "$HERE/04_run_tools.sh"
 
