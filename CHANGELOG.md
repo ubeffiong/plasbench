@@ -13,6 +13,34 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- scoring specification and panel examination
+- **Pre-registration** (`config/prereg.tsv`, `freeze_prereg.py`): freeze/verify a SHA-256 lock; the
+  manifest and report show the hash, lock state, `TO_FIX` items and departing settings;
+  `REQUIRE_PREREG=1` gates stage 4.
+- **Labelling schemes** (`label_schemes.py`, `TRUTH_LABEL_SCHEME`, default `ncbi`): the headline is
+  now scored on NCBI labels (Scheme 3, decision E.15) instead of the evidence-checked truth; Scheme 1
+  and the evidence scheme are rank-sensitivity variants. **Behaviour change:** set
+  `TRUTH_LABEL_SCHEME=evidence` for the previous scoring.
+- **Dimer collapse** (`detect_dimers.py`, `COLLAPSE_DIMERS`), **truth grades** A/B/C, optional cohort
+  columns `same_extraction`, `split`, `genus`, `phylum`, `grade_source`, `collection_date`.
+- **Scoring**: `TN_bp`, `mcc`, `f2`, `f0_5`, `abstention_rate`, `--min-contig-length`; per-plasmid
+  outcome states (`score_bins.py --outcomes-out`); contig-level binning F1 and shared/unassigned
+  lengths; AMR placement by gene class (`score_amr_placement.py`, `config/amr_gene_classes.tsv`).
+- **Outcome states**: `infrastructure_failure` (never scored), `TOOL_RETRIES`, `TOOL_TIMEOUT_SECONDS`,
+  `tool_outcomes.tsv`, `benchmark.outcome_states.tsv`; `tool_status.tsv` schema unchanged.
+- **Statistics**: Wilcoxon signed-rank (exact n ≤ 25) with Holm, equivalence flag
+  (`SMALLEST_DIFFERENCE`); new rank-sensitivity axes (schemes, min contig 500, micro, public/in-house,
+  grade C excluded, MCC/F-beta/contig metrics).
+- **Recommender evaluation** (`evaluate_recommender.py`, `evaluate_warnings.py`, `leave_taxon_out.py`):
+  regret, near-optimal, gap closed, `benchmark_only` verdict, warning PPV/sensitivity, leave-taxon-out
+  and a once-only holdout.
+- **Panel items**: recommendation floor (`RECOMMENDATION_MIN_EXPECTED_SCORE`, D11); operational states
+  `insufficient_sequence` and `ambiguous_between_references`; advisory assembly QC gate (D13); a
+  "tools compared" reason table (D15).
+- Ten new HTML report sections and `benchmark.scoring_spec.md`; the demo exercises all of them.
+- Docs: `docs/PREREGISTRATION.md`, `docs/PANEL_ALIGNMENT.md`, the scientific guide, METHODS, and
+  the question bank (clustering/relatedness answers cut to "outside this benchmark").
+
 ### Added -- metric rubric
 - **Contig-level classification** (`contig_classification.py`): contigs labelled against truth
   (>= 95% identity over >= 80% of the contig; short, ambiguous and unplaced contigs excluded and
