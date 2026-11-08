@@ -60,6 +60,7 @@ python3 "%~dp0unicycler_fake.py" %*
 EOF
 chmod +x "$TMP/bin/unicycler" "$TMP/bin/unicycler_fake.py"
 
+# shellcheck disable=SC2120  # "$@" is an optional env-override hook
 run_stage() {
     PATH="$TMP/bin:$PATH" \
     DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \

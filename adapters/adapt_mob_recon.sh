@@ -9,6 +9,7 @@
 #
 # Usage: adapt_mob_recon.sh <mob_recon_out_dir> <base_assembly_fasta> <out_fasta>
 set -euo pipefail
+# shellcheck disable=SC2034  # BASE_ASM: positional adapter contract, unused here
 OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
 : > "$OUT_FASTA"   # start empty (an empty file is a valid "predicted nothing")
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"

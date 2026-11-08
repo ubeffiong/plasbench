@@ -7,7 +7,7 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need python3
 
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r SAMPLE _ SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     SDIR="$DATA_DIR/$SAMPLE"
     REF="$SDIR/reference.fna"

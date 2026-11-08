@@ -70,7 +70,7 @@ else
 fi
 
 case "$PROFILE" in
- locked) LOCK="$HERE/environment.lock.yml"; grep -q '^@EXPLICIT$' "$LOCK" || { echo "ERROR: $LOCK is not a Conda @EXPLICIT lock. Regenerate with: bash env/lock_environment.sh" >&2; exit 2; }; "${CREATE[@]}" $(awk '!/^(@|#|$)/ {print}' "$LOCK"); exit;;
+ locked) LOCK="$HERE/environment.lock.yml"; grep -q '^@EXPLICIT$' "$LOCK" || { echo "ERROR: $LOCK is not a Conda @EXPLICIT lock. Regenerate with: bash env/lock_environment.sh" >&2; exit 2; }; mapfile -t LOCKED_PKGS < <(awk '!/^(@|#|$)/ {print}' "$LOCK"); "${CREATE[@]}" "${LOCKED_PKGS[@]}"; exit;;
  core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk unzip);;
  assembly) PKGS=(spades unicycler);;
  # The executable metagenomic scorer consumes graph/bin tables produced by

@@ -81,6 +81,7 @@ exit 1
 EOF
 chmod +x "$TMP/bin/datasets"
 
+# shellcheck disable=SC2120  # "$@" is an optional env-override hook
 run_stage() {
     rm -f "$TMP/data/s1"/*.fastq.gz "$TMP/data/s1/long_reads.fastq.gz" "$TMP/data/s1/simulation_provenance.json"
     PATH="$TMP/bin:$PATH" \

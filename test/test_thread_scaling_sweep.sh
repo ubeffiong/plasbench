@@ -38,6 +38,7 @@ printf 'ID\tType\n' > "$outdir/${prefix}.tsv"
 EOF
 chmod +x "$TMP/bin/platon"
 
+# shellcheck disable=SC2120  # "$@" is an optional env-override hook
 run_sweep() {
     PATH="$TMP/bin:$PATH" \
     DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
@@ -49,6 +50,7 @@ run_sweep() {
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tGCF_1\tSRR1\n' > "$TMP/sheet.tsv"
 
 : > "$TMP/platon_calls.log"
+# shellcheck disable=SC2054  # "1,4,8" is one comma-separated --threads value
 SWEEP_ARGS=(--tool platon --samples s1 --threads 1,4,8)
 run_sweep || { echo "FAIL: sweep should succeed" >&2; cat "$TMP/sweep.log" >&2; exit 1; }
 
@@ -82,6 +84,7 @@ grep -qi "unknown tool" "$TMP/sweep.log" || { echo "FAIL: expected a clear 'unkn
 echo "an unregistered --tool name fails clearly before touching stage 4 -> PASS"
 
 # A sample with no assembled contigs fails clearly, never silently skipped.
+# shellcheck disable=SC2054  # "s1,s_missing" is one comma-separated --samples value
 SWEEP_ARGS=(--tool platon --samples s1,s_missing)
 if run_sweep; then echo "FAIL: sweep should fail when a named sample has no assembled contigs" >&2; cat "$TMP/sweep.log" >&2; exit 1; fi
 grep -qi "no assembled contigs" "$TMP/sweep.log" || { echo "FAIL: expected a clear 'no assembled contigs' error" >&2; cat "$TMP/sweep.log" >&2; exit 1; }

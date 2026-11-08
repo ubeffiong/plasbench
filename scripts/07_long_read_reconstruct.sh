@@ -25,6 +25,16 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 
+# First raw (untrimmed) paired read file for one mate, in sorted glob order;
+# prints nothing when there is none. Replaces `ls | grep -v .trim. | head -1`.
+first_raw_read() {
+    local f
+    for f in "$1"/*_"$2".fastq.gz; do
+        [[ -e "$f" && "$f" != *.trim.* ]] && { printf '%s' "$f"; return 0; }
+    done
+    return 0
+}
+
 if [[ "${RUN_FLYE_MOB_RECON:-0}" -ne 1 && "${RUN_PLASSEMBLER:-0}" -ne 1 \
       && "${RUN_HYBRACTER_LONG:-0}" -ne 1 && "${RUN_HYBRACTER_HYBRID:-0}" -ne 1 \
       && "${RUN_TRYCYCLER_MOB_RECON:-0}" -ne 1 ]]; then
@@ -124,8 +134,8 @@ run_plassembler_for_sample() {
 
     # Short reads: whichever pair stage 1 produced for this sample.
     local r1 r2
-    r1="$(ls "$DATA_DIR/$1"/*_1.fastq.gz 2>/dev/null | grep -v '\.trim\.' | head -1 || true)"
-    r2="$(ls "$DATA_DIR/$1"/*_2.fastq.gz 2>/dev/null | grep -v '\.trim\.' | head -1 || true)"
+    r1="$(first_raw_read "$DATA_DIR/$1" 1)"
+    r2="$(first_raw_read "$DATA_DIR/$1" 2)"
 
     local eligibility
     if ! eligibility="$(long_read_truth_eligible "$tool" "$sample")"; then
@@ -212,8 +222,8 @@ run_hybracter_for_sample() {
 
     local r1="" r2=""
     if [[ "$mode" == "hybrid" ]]; then
-        r1="$(ls "$DATA_DIR/$sample"/*_1.fastq.gz 2>/dev/null | grep -v '\.trim\.' | head -1 || true)"
-        r2="$(ls "$DATA_DIR/$sample"/*_2.fastq.gz 2>/dev/null | grep -v '\.trim\.' | head -1 || true)"
+        r1="$(first_raw_read "$DATA_DIR/$sample" 1)"
+        r2="$(first_raw_read "$DATA_DIR/$sample" 2)"
         if [[ -z "$r1" || -z "$r2" ]]; then
             warn "  $tool: no paired short reads for $sample; skipped (hybracter hybrid-single needs both)"
             printf '%s\t%s\tskipped\t\tpaired short reads unavailable\t\t\n' "$sample" "$tool" >> "$STATUS"; return
@@ -413,7 +423,7 @@ run_trycycler_mob_recon_for_sample() {
     fi
 }
 
-while IFS=$'\t' read -r SAMPLE ASM SRA; do
+while IFS=$'\t' read -r SAMPLE _; do
     [[ -z "${SAMPLE:-}" ]] && continue
     [[ "${RUN_FLYE_MOB_RECON:-0}" -eq 1 ]] && for_sample "$SAMPLE"
     [[ "${RUN_PLASSEMBLER:-0}" -eq 1 ]] && run_plassembler_for_sample "$SAMPLE"

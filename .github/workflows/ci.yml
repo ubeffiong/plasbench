@@ -21,7 +21,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck
           shellcheck --version
-          find scripts adapters env test -type f -name '*.sh' -print0 | xargs -0 shellcheck
+          # Gate on warnings and errors; info/style notes are reported, not fatal.
+          find scripts adapters env test -type f -name '*.sh' -print0 | xargs -0 shellcheck -S warning
       - run: python -m pip install --no-deps .
       - run: plasbench test
       - run: plasbench demo

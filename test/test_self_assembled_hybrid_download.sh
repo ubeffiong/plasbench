@@ -46,6 +46,7 @@ fi
 EOF
 chmod +x "$TMP/bin/prefetch" "$TMP/bin/fasterq-dump"
 
+# shellcheck disable=SC2120  # "$@" is an optional env-override hook
 run_stage() {
     rm -rf "$TMP/data"; mkdir -p "$TMP/data"
     PATH="$TMP/bin:$PATH" \

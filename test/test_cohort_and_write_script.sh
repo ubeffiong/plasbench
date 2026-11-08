@@ -10,7 +10,6 @@
 # than separators and silently breaks. Runs fully offline against a fake
 # project root, no real bioinformatics tool required.
 set -euo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
