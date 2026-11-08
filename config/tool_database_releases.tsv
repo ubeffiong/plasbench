@@ -16,3 +16,5 @@ plasmidhunter	yes	PlasmidHunter trained model		Fill with the release date of the
 plasmer	yes	Plasmer database and model		Fill with the installed Plasmer database release date.
 plascope	yes	PlaScope database		Fill with the installed PlaScope database release date.
 plasgraph2	yes	plASgraph2 trained model		Fill with the release date of the plASgraph2 model version installed.
+baseline_coverage	no	none (assembly depth only)		No reference database.
+baseline_reference	yes	Local PlasBench plasmid reference set (DATA_DIR/db/plasmid_reference)		Fill with the build date of your reference set (reference_set_provenance.json written by build_plasmid_reference_set.py).

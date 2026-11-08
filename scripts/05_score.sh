@@ -219,7 +219,7 @@ score_sample() {
         local PRSCORE_ARGS=()
         local CANDIDATES="$RDIR/pred_${tool}.candidates.fasta"
         local PRED_SCORES="$RDIR/pred_${tool}.scores.tsv"
-        rm -f "$RDIR/${tool}.pr_curve.tsv" "$RDIR/${tool}.pr_summary.tsv"
+        rm -f "$RDIR/${tool}.pr_curve.tsv" "$RDIR/${tool}.pr_summary.tsv" "$RDIR/${tool}.calibration.tsv"
         if [[ -s "$CANDIDATES" && -s "$PRED_SCORES" ]]; then
             local CAND_PAF="$RDIR/${tool}.candidates_vs_ref.paf"
             if minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$CANDIDATES" \
@@ -227,7 +227,8 @@ score_sample() {
                 PRSCORE_ARGS=(--pred-scores "$PRED_SCORES" --pred-candidates-fasta "$CANDIDATES" \
                               --pred-candidates-paf "$CAND_PAF" \
                               --pr-curve-out "$RDIR/${tool}.pr_curve.tsv" \
-                              --pr-summary-out "$RDIR/${tool}.pr_summary.tsv")
+                              --pr-summary-out "$RDIR/${tool}.pr_summary.tsv" \
+                              --calibration-out "$RDIR/${tool}.calibration.tsv")
             else
                 warn "candidate-set mapping failed for $SAMPLE/$tool; PR curve omitted, point score retained"
             fi

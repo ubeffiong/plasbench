@@ -49,4 +49,6 @@ bash "$HERE/test_stage_wiring_qc_model.sh"
 bash "$HERE/test_thread_scaling_sweep.sh"
 bash "$HERE/test_quast_diagnostics_stage.sh"
 python3 "$HERE/test_materialize_bmock12_truth.py"
+# Question-bank gaps (calibration, baselines, interpretation limits, metadata completeness).
+python3 "$HERE/test_question_bank_gaps.py"
 echo "ALL PLASBENCH TESTS PASSED"

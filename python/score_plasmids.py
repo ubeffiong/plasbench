@@ -430,6 +430,55 @@ def sweep_thresholds(covered_by_query, probabilities, truth, total_plasmid):
     return points
 
 
+def calibration(covered_by_query, probabilities, truth, bins=10):
+    """Is a tool's plasmid probability right as often as it claims?
+
+    Each scored record gets a soft label: the share of its truth-aligned
+    bases that land on PLASMID (vs CHROMOSOME) reference sequence, weighted by
+    those aligned bases. Records with no truth-labelled alignment are not
+    scorable and are left out (and counted). Returns (brier, ece, n_records,
+    reliability rows). Brier = weighted mean (p - y)^2; ECE = weighted mean
+    |mean p - mean y| over `bins` equal-width probability bins.
+    """
+    plasmid_bp, chromosome_bp = defaultdict(int), defaultdict(int)
+    per_query = defaultdict(lambda: defaultdict(list))
+    for target, entries in covered_by_query.items():
+        kind = truth.get(target, (None,))[0]
+        if kind not in ("PLASMID", "CHROMOSOME"):
+            continue
+        for qname, start, end in entries:
+            per_query[qname][(target, kind)].append((start, end))
+    for qname, by_target in per_query.items():
+        for (_, kind), intervals in by_target.items():
+            bp = merge_intervals(intervals)[1]
+            if kind == "PLASMID":
+                plasmid_bp[qname] += bp
+            else:
+                chromosome_bp[qname] += bp
+    records = []
+    for qname, probability in probabilities.items():
+        weight = plasmid_bp[qname] + chromosome_bp[qname]
+        if weight > 0:
+            records.append((probability, plasmid_bp[qname] / weight, weight))
+    if not records:
+        return None, None, 0, []
+    total = sum(w for _, _, w in records)
+    brier = sum(w * (p - y) ** 2 for p, y, w in records) / total
+    table, ece = [], 0.0
+    for b in range(bins):
+        low, high = b / bins, (b + 1) / bins
+        members = [(p, y, w) for p, y, w in records if low <= p < high or (b == bins - 1 and p == 1.0)]
+        weight = sum(w for _, _, w in members)
+        if not weight:
+            continue
+        mean_p = sum(p * w for p, _, w in members) / weight
+        mean_y = sum(y * w for _, y, w in members) / weight
+        ece += weight / total * abs(mean_p - mean_y)
+        table.append({"bin_low": low, "bin_high": high, "records": len(members), "weight_bp": weight,
+                      "mean_probability": mean_p, "observed_plasmid_fraction": mean_y})
+    return brier, ece, len(records), table
+
+
 def trapezoidal_auc(points):
     ordered = sorted(points, key=lambda point: point["recall"])
     auc = 0.0
@@ -558,7 +607,8 @@ def main():
     ap.add_argument("--pred-candidates-paf", help="minimap2 PAF of --pred-candidates-fasta against the reference "
                                                    "(mapped the same way as --paf); required together with --pred-scores.")
     ap.add_argument("--pr-curve-out", help="Write the swept (threshold, precision, recall) points here.")
-    ap.add_argument("--pr-summary-out", help="Write a one-row (pr_auc, pr_n_thresholds) summary here.")
+    ap.add_argument("--pr-summary-out", help="Write a one-row (pr_auc, pr_n_thresholds, calibration) summary here.")
+    ap.add_argument("--calibration-out", help="Write the probability reliability table (one row per bin) here.")
     ap.add_argument("--per-plasmid-out", help="Optional side file: one row per true plasmid with its covered bp and "
                                               "completeness (used by stratify_recovery.py). Never alters scores.tsv.")
     args = ap.parse_args()
@@ -601,6 +651,13 @@ def main():
         else:
             points = sweep_thresholds(candidates_covered_by_query, probabilities, truth, total_plasmid)
             pr_auc = trapezoidal_auc(points)
+            brier, ece, n_calibrated, reliability = calibration(candidates_covered_by_query, probabilities, truth)
+            if args.calibration_out:
+                with open(args.calibration_out, "w") as handle:
+                    handle.write("bin_low\tbin_high\trecords\tweight_bp\tmean_probability\tobserved_plasmid_fraction\n")
+                    for row in reliability:
+                        handle.write(f"{row['bin_low']:.1f}\t{row['bin_high']:.1f}\t{row['records']}\t{row['weight_bp']}\t"
+                                     f"{row['mean_probability']:.4f}\t{row['observed_plasmid_fraction']:.4f}\n")
             if args.pr_curve_out:
                 with open(args.pr_curve_out, "w") as handle:
                     handle.write("threshold\tprecision\trecall\ttp_bp\tfp_bp\tfn_bp\n")
@@ -611,8 +668,10 @@ def main():
                         )
             if args.pr_summary_out:
                 with open(args.pr_summary_out, "w") as handle:
-                    handle.write("pr_auc\tpr_n_thresholds\n")
-                    handle.write(f"{pr_auc:.6f}\t{len(points) - 1}\n")
+                    handle.write("pr_auc\tpr_n_thresholds\tbrier_score\texpected_calibration_error\tcalibration_records\n")
+                    handle.write(f"{pr_auc:.6f}\t{len(points) - 1}\t"
+                                 f"{'' if brier is None else f'{brier:.6f}'}\t"
+                                 f"{'' if ece is None else f'{ece:.6f}'}\t{n_calibrated}\n")
 
     if not 0 < args.plasmid_recovery_threshold <= 1:
         raise SystemExit("ERROR: --plasmid-recovery-threshold must be in (0, 1].")

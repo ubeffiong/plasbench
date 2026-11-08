@@ -7,7 +7,9 @@ import argparse
 import csv
 from pathlib import Path
 
-FIELDS = ["pr_auc", "pr_n_thresholds"]
+# Calibration (score_plasmids.py calibration()): only for tools exposing a
+# per-record probability; blank, never 0, for every other tool.
+FIELDS = ["pr_auc", "pr_n_thresholds", "brier_score", "expected_calibration_error", "calibration_records"]
 
 
 def main():

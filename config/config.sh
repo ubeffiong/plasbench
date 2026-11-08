@@ -56,7 +56,8 @@ export CPRR_MIN_IDENTITY="${CPRR_MIN_IDENTITY:-0.99}"
 # (plasmid markers, rRNA genes, long-read support) are AMBIGUOUS and excluded
 # from scoring via truth.scored.tsv. Needs RUN_REFERENCE_ANNOTATION=1.
 export RUN_TRUTH_LABEL_EVIDENCE="${RUN_TRUTH_LABEL_EVIDENCE:-1}"
-export PLASMID_REFERENCE_SKETCH="${PLASMID_REFERENCE_SKETCH:-$PROJECT_ROOT/data/db/plasmid_reference/reference.msh}"
+# The plasmid-reference sketch used for marker evidence is PLASMID_REFERENCE_SKETCH,
+# defined once below (DATA_DIR/db/plasmid_reference/reference.msh).
 # Plasmids below this long-read depth are short-read-only evidence (lower
 # confidence) when the isolate's long reads are staged.
 export TRUTH_MIN_LONG_READ_DEPTH="${TRUTH_MIN_LONG_READ_DEPTH:-5}"
@@ -526,6 +527,19 @@ export PLASMID_REFERENCE_SKETCH="${PLASMID_REFERENCE_SKETCH:-$DATA_DIR/db/plasmi
 export PLASMID_REFERENCE_METADATA="${PLASMID_REFERENCE_METADATA:-$DATA_DIR/db/plasmid_reference/reference_metadata.tsv}"
 export PLASMID_NOVELTY_SIMILARITY_THRESHOLD="${PLASMID_NOVELTY_SIMILARITY_THRESHOLD:-0.05}"
 export PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS="${PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS:-2}"
+export PLASMID_REFERENCE_FASTA="${PLASMID_REFERENCE_FASTA:-$DATA_DIR/db/plasmid_reference/reference.fasta}"
+
+# Trivial baselines (python/baseline_predictors.py, stage 4): reference points
+# every tool should beat, scored and ranked like tools on the classification
+# track. Cheap, so on by default. baseline_coverage calls contigs with depth
+# >= BASELINE_COVERAGE_RATIO x the length-weighted median depth;
+# baseline_reference calls contigs whose aligned fraction against
+# PLASMID_REFERENCE_FASTA reaches BASELINE_REFERENCE_MIN_QUERY_COVERAGE.
+export RUN_BASELINE_COVERAGE="${RUN_BASELINE_COVERAGE:-1}"
+export RUN_BASELINE_REFERENCE="${RUN_BASELINE_REFERENCE:-1}"
+export BASELINE_COVERAGE_RATIO="${BASELINE_COVERAGE_RATIO:-1.5}"
+export BASELINE_MIN_CONTIG_LENGTH="${BASELINE_MIN_CONTIG_LENGTH:-1000}"
+export BASELINE_REFERENCE_MIN_QUERY_COVERAGE="${BASELINE_REFERENCE_MIN_QUERY_COVERAGE:-0.8}"
 
 # Optional standardized CDS/product annotation for truth and every predicted
 # plasmid FASTA. FASTA alone has no protein names. Bakta is preferred; Prokka

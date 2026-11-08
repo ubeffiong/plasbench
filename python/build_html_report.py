@@ -3286,6 +3286,10 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
                         "<a href='#robustness'>Robustness</a>"
                         + ("<a href='#headline-design'>Headline design</a>" if design_html else "")
                         + "<a href='#recommendations'>Recommendations</a>", 1)
+    # Question-bank sections (baselines/calibration, interpretation limits,
+    # metadata completeness): python/report_question_bank.py.
+    import report_question_bank
+    page = report_question_bank.inject(page, out.parent, leaderboard)
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
