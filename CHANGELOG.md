@@ -13,6 +13,18 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- track-specific endpoints and CPRR robustness
+- **Long-read and hybrid reconstruction are now ranked on isolate-level CPRR** (`sample_cprr`); short-read reconstruction stays on
+  length-weighted binning F1 with CPRR as the key secondary endpoint (`headline_design.ranking_metric()`; `config/prereg.tsv`
+  `primary_endpoint`, `primary_endpoint_long_read`).
+- **CPRR threshold sweep**: `score_bins.py` writes correct counts with coverage and bin share at 0.80-0.99; new
+  `benchmark.cprr_threshold_sweep.tsv` and leaderboard `cprr_auc` (normalised area under the pooled curve).
+- **Isolate-weighted CPRR** (`cprr_isolate_mean`, `cprr_isolates`) beside the pooled rate.
+- **Stratified CPRR**: `cprr` and `n_cprr_assessed` per size band, replicon, MOB and AMR carriage in
+  `benchmark.recovery_by_replicon.tsv` (identity rule via `--truth-provenance`), and pooled CPRR per reference tier.
+- README evaluation framework and workflow sections; METHODS, PREREGISTRATION and the HTML report updated to match;
+  `test/test_cprr_robustness.py` added.
+
 <<<<<<< HEAD
 ### Added -- completing the plsMD, PlasEval and GAEMR follow-ups
 - **PlasBin-flow output adapter** (`RUN_PLASBIN_FLOW`, `PLASBIN_FLOW_OUTPUTS_DIR`, `adapters/adapt_plasbin_flow.sh`): adapts the tool's own output

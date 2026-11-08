@@ -29,7 +29,7 @@ import csv
 import math
 import os
 from collections import defaultdict
-from plasbench_common import merge_intervals, interval_overlap_bp as overlap  # noqa: E402
+from plasbench_common import merge_intervals, interval_overlap_bp as overlap, CPRR_SWEEP_THRESHOLDS  # noqa: E402
 
 
 def merge(intervals):
@@ -375,8 +375,25 @@ def correct_reconstruction(matched, overlaps, plasmids, total_mapped, identity_c
             **{key: "yes" if value else "no" for key, value in checks.items()},
             "correct_without_identity": "yes" if structural else "no",
             "correct": "yes" if structural and checks["identity_ok"] else "no",
+            # Unrounded values for the threshold sweep; not written to the TSV.
+            "_coverage": coverage, "_share": share, "_identity_ok": checks["identity_ok"],
         })
     return rows
+
+
+def cprr_sweep(rows, thresholds=CPRR_SWEEP_THRESHOLDS):
+    """Correct-plasmid counts at each sweep threshold: (with identity, without identity).
+
+    At threshold t a plasmid passes when it is identified, not split, and both its
+    coverage and its bin share are >= t; the identity criterion is unchanged.
+    """
+    with_identity, without_identity = [], []
+    for t in thresholds:
+        passing = [r for r in rows if r["identified"] == "yes" and r["not_split"] == "yes"
+                   and r["_coverage"] >= t and r["_share"] >= t]
+        without_identity.append(len(passing))
+        with_identity.append(sum(1 for r in passing if r["_identity_ok"]))
+    return with_identity, without_identity
 
 
 def main():
@@ -509,20 +526,24 @@ def main():
     cprr_total = len(cprr_rows)
     cprr_correct = sum(row["correct"] == "yes" for row in cprr_rows)
     cprr_correct_no_identity = sum(row["correct_without_identity"] == "yes" for row in cprr_rows)
+    sweep_with, sweep_without = cprr_sweep(cprr_rows)
     with open(args.summary, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t")
         writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction", "nmi", "variation_of_information",
                          "lw_bin_precision", "lw_bin_recall", "lw_bin_f1",
                          "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",
                          "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware"]
-                        + [f"outcome_{name}" for name in OUTCOMES])
+                        + [f"outcome_{name}" for name in OUTCOMES]
+                        + ["cprr_sweep_correct", "cprr_sweep_correct_without_identity"])
         writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else "",
                          f"{lw['precision']:.4f}", f"{lw['recall']:.4f}", f"{lw['f1']:.4f}",
                          cprr_total, cprr_correct, cprr_correct_no_identity,
                          f"{ari:.4f}" if ari is not None else "",
                          f"{lw_recall_assembly:.4f}" if lw_recall_assembly is not None else "",
                          f"{lw_f1_assembly:.4f}" if lw_f1_assembly is not None else ""]
-                        + [outcome_counts[name] for name in OUTCOMES])
+                        + [outcome_counts[name] for name in OUTCOMES]
+                        # Comma-separated counts, one per CPRR_SWEEP_THRESHOLDS value (0.80..0.99).
+                        + [",".join(map(str, sweep_with)), ",".join(map(str, sweep_without))])
     print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)} "
           f"lw_bin_f1={lw['f1']:.4f} cprr={cprr_correct}/{cprr_total}")
 

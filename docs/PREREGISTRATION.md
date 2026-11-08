@@ -31,7 +31,10 @@ plasbench analysis freeze-prereg --verify --require-fixed --check-env
 
 | Decision | Value | Source |
 |---|---|---|
-| Primary endpoint | Length-weighted binning F1 (reconstruction); base F1 (classification); CPRR secondary | Research design (#7) |
+| Primary endpoint (short-read) | Length-weighted binning F1 (reconstruction); base F1 (classification); CPRR key secondary | Research design (#7); kept after the endpoint review |
+| Primary endpoint (long-read and hybrid) | Isolate-level CPRR (`sample_cprr`) for reconstruction tools; binning F1 secondary | Endpoint review: these tools aim to close whole plasmids |
+| CPRR threshold robustness | Coverage and bin-share criteria swept 0.80-0.99 (step 0.01), summarised as a normalised AUC; descriptive only | Endpoint review |
+| CPRR weighting | Pooled over plasmids and mean over isolates, both reported; CPRR also stratified by size, replicon, MOB, AMR carriage and reference tier | Endpoint review |
 | Primary labelling scheme | **Scheme 3, NCBI labels** (`assigned_molecule_location_type`, report pinned by SHA-256) | Panel decision E.15 |
 | Sensitivity schemes | Scheme 1 (non-chromosomal), evidence scheme | Panel E.15 |
 | A tool crash or missing output | **F1 = 0**, counted in the ranking | Panel decision D6 |

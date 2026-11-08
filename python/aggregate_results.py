@@ -131,6 +131,21 @@ def correlated_parents(rows, parents):
     return {parent: sorted(samples) for parent, samples in groups.items() if len(samples) > 1}
 
 
+def parse_sweep(text):
+    """Comma-separated CPRR sweep counts -> list of ints; None when absent or malformed.
+
+    A list whose length does not match the shared grid is treated as absent rather
+    than being aligned to the wrong thresholds.
+    """
+    if not text:
+        return None
+    try:
+        values = [int(v) for v in text.split(",")]
+    except ValueError:
+        return None
+    return values if len(values) == len(hd.CPRR_SWEEP_THRESHOLDS) else None
+
+
 def read_scores(path):
     rows = []
     with open(path) as fh:
@@ -224,6 +239,10 @@ def read_scores(path):
                 "outcome_fragmented_and_merged": int(f[idx["outcome_fragmented_and_merged"]]) if "outcome_fragmented_and_merged" in idx and f[idx["outcome_fragmented_and_merged"]] else None,
                 "outcome_partial": int(f[idx["outcome_partial"]]) if "outcome_partial" in idx and f[idx["outcome_partial"]] else None,
                 "outcome_missed": int(f[idx["outcome_missed"]]) if "outcome_missed" in idx and f[idx["outcome_missed"]] else None,
+                # CPRR threshold sweep: one correct count per CPRR_SWEEP_THRESHOLDS value.
+                "cprr_sweep_correct": parse_sweep(f[idx["cprr_sweep_correct"]]) if "cprr_sweep_correct" in idx else None,
+                "cprr_sweep_correct_without_identity": (parse_sweep(f[idx["cprr_sweep_correct_without_identity"]])
+                                                        if "cprr_sweep_correct_without_identity" in idx else None),
             })
     return rows
 
@@ -912,7 +931,8 @@ def write_tsv(summary, path):
             "mean_mcc", "mean_f2", "mean_f0_5", "mean_abstention_rate",
             "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
             "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed",
-            "n_failed_tool", "n_infrastructure_failure", "n_not_applicable", "mean_contig_bin_f1_bp"]
+            "n_failed_tool", "n_infrastructure_failure", "n_not_applicable", "mean_contig_bin_f1_bp",
+            "cprr_isolate_mean", "cprr_isolates", "cprr_auc"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -979,6 +999,9 @@ def write_tsv(summary, path):
                     "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed")),
                 s.get("n_failed_tool", ""), s.get("n_infrastructure_failure", ""), s.get("n_not_applicable", ""),
                 fmt4(s.get("mean_contig_bin_f1_bp")),
+                # Isolate-weighted CPRR (each isolate counts once) and the normalised
+                # area under the CPRR threshold-sweep curve (0.80-0.99).
+                fmt4(s.get("cprr_isolate_mean")), s.get("cprr_isolates", ""), fmt4(s.get("cprr_auc")),
             ]) + "\n")
 
 
@@ -993,8 +1016,9 @@ def write_md(summary, path, notes=()):
     with open(path, "w") as fh:
         fh.write("# Plasmid reconstruction leaderboard\n\n")
         fh.write("Tools are ranked only within their own input track and task, never across them. "
-                 "**Reconstruction** (binning-capable tools) is ranked by length-weighted binning F1, "
-                 "the primary endpoint; **classification** (classifier-only tools) by base-level F1. "
+                 "**Reconstruction** (binning-capable tools) is ranked by length-weighted binning F1 on the "
+                 "short-read track and by isolate-level CPRR on the long-read and hybrid tracks; "
+                 "**classification** (classifier-only tools) by base-level F1. "
                  "The ranking score averages per-species means when enough independent isolates exist, "
                  "over reference tiers 1-2 only, using the samples every ranked tool shares.\n\n")
         groups = []
@@ -1039,6 +1063,10 @@ def write_md_table(fh, summary, track=None, task=None):
               if s.get("ranking_ci_low") is not None else "< 5 independent units")
         cprr = (f"{s['cprr']:.1%} ({s['cprr_correct']}/{s['cprr_plasmids']})"
                 if s.get("cprr") is not None else "not bin-scored")
+        if s.get("cprr_isolate_mean") is not None:
+            cprr += f"; per isolate {s['cprr_isolate_mean']:.1%}"
+        if s.get("cprr_auc") is not None:
+            cprr += f"; AUC 0.80–0.99 {s['cprr_auc']:.3f}"
         basis = s.get("ranking_species_basis") or "pooled"
         if s.get("n_ranking_samples"):
             basis += f"; {s['n_ranking_samples']} shared sample(s), {s.get('n_ranking_clusters', '?')} cluster(s)"
@@ -1075,6 +1103,7 @@ def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overl
     in the group its tool belongs to.
     """
     design = design or hd.Design()
+    hd.attach_sample_cprr(rows, design)
     groups = defaultdict(list)
     for row in rows:
         groups[(row["analysis_track"], design.task(row["tool"], rows))].append(row)
@@ -1107,7 +1136,7 @@ def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overl
     result = []
     for track, task in ordered:
         group_rows = groups[(track, task)]
-        metric = hd.TASK_METRIC.get(task, "f1")
+        metric = hd.ranking_metric(track, task)
         group_failed = {tool: samples for tool, samples in (failed_samples or {}).items()
                         if (track, task) in groups_of(tool)}
         group_resource = {tool: n for tool, n in (resource_failures or {}).items()
@@ -1341,9 +1370,11 @@ def main():
     write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv", comparisons=comparisons)
 
     # Species balance and reference-tier sensitivity tables.
-    species_rows, tier_rows, design_rows = [], [], []
+    species_rows, tier_rows, design_rows, sweep_rows = [], [], [], []
+    hd.attach_sample_cprr(all_rows, design)
     for track, task, group_rows, track_summary, _ in per_track:
-        metric = hd.TASK_METRIC.get(task, "f1")
+        metric = hd.ranking_metric(track, task)
+        sweep_rows.extend(hd.cprr_sweep_table(track, task, group_rows, design))
         species_rows.extend(hd.species_table(
             track, task, group_rows, metric, design, failed,
             known_tools={row["tool"] for row in track_summary},
@@ -1358,7 +1389,14 @@ def main():
                ["analysis_track", "task", "tool", "species", "n_samples", "n_clusters", "metric", "mean_metric",
                 "in_headline"])
     write_rows(tier_rows, args.out_prefix + ".reference_tiers.tsv",
-               ["analysis_track", "task", "tool", "reference_tier", "n_samples", "metric", "mean_metric"])
+               ["analysis_track", "task", "tool", "reference_tier", "n_samples", "metric", "mean_metric",
+                "cprr", "cprr_plasmids"])
+    # CPRR threshold robustness: pooled and isolate-weighted CPRR with the coverage
+    # and bin-share criteria swept over 0.80-0.99; the leaderboard's cprr_auc
+    # summarises the pooled curve. Descriptive; it never changes a rank.
+    write_rows(sweep_rows, args.out_prefix + ".cprr_threshold_sweep.tsv",
+               ["analysis_track", "task", "tool", "threshold", "cprr", "cprr_isolate_mean",
+                "n_isolates", "n_plasmids"])
     write_rows(design_rows, args.out_prefix + ".headline_design.tsv",
                ["analysis_track", "task", "ranking_metric", "reference_basis", "species_basis",
                 "min_species_clusters"])
@@ -1375,7 +1413,7 @@ def main():
     def fmt3(value):
         return f"{value:.3f}" if value is not None else "n/a"
     for track, task, _, track_summary, _ in per_track:
-        metric = hd.METRIC_LABEL.get(hd.TASK_METRIC.get(task, "f1"), "")
+        metric = hd.METRIC_LABEL.get(hd.ranking_metric(track, task), "")
         print(f"\n=== LEADERBOARD [{track} / {task}] ranked by {metric} ===")
         for s in track_summary:
             print(f"{s['rank']:>2}. {s['tool']:<16} "
