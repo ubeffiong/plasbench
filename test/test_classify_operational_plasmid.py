@@ -63,24 +63,24 @@ def main():
     # --- classify: within threshold, cluster big enough -> known_cluster. ---
     dist_rows = [("CP001.1", "contig_1", 0.02), ("CP002.1", "contig_1", 0.40)]
     result = cop.classify(["contig_1"], dist_rows, reference_metadata, threshold=0.05, min_cluster_members=2)
-    assert result["contig_1"]["cluster_membership_status"] == "known_cluster"
+    assert result["contig_1"]["cluster_membership_status"] == "close_reference_match"
     assert result["contig_1"]["best_reference_id"] == "CP001.1"
-    assert float(result["contig_1"]["confidence_score"]) > 0.5
-    print("classify: nearest reference within threshold, cluster big enough -> known_cluster -> PASS")
+    assert float(result["contig_1"]["distance_margin"]) > 0.5
+    print("classify: nearest reference within threshold, cluster big enough -> close_reference_match -> PASS")
 
     # --- classify: within threshold but cluster too small -> novel. ---
     dist_rows = [("CP002.1", "contig_1", 0.01)]
     result = cop.classify(["contig_1"], dist_rows, reference_metadata, threshold=0.05, min_cluster_members=2)
-    assert result["contig_1"]["cluster_membership_status"] == "novel"
+    assert result["contig_1"]["cluster_membership_status"] == "no_close_reference"
     assert "too small" in result["contig_1"]["notes"]
-    print("classify: within threshold but cluster below --min-cluster-members -> novel -> PASS")
+    print("classify: within threshold but cluster below --min-cluster-members -> no_close_reference -> PASS")
 
     # --- classify: beyond threshold -> novel, confidence scales past 0. ---
     dist_rows = [("CP001.1", "contig_1", 0.20)]
     result = cop.classify(["contig_1"], dist_rows, reference_metadata, threshold=0.05, min_cluster_members=1)
-    assert result["contig_1"]["cluster_membership_status"] == "novel"
-    assert float(result["contig_1"]["confidence_score"]) > 0
-    print("classify: nearest reference beyond threshold -> novel -> PASS")
+    assert result["contig_1"]["cluster_membership_status"] == "no_close_reference"
+    assert float(result["contig_1"]["distance_margin"]) > 0
+    print("classify: nearest reference beyond threshold -> no_close_reference -> PASS")
 
     # --- classify: a query id with no distance row at all -> insufficient_reference. ---
     result = cop.classify(["contig_missing"], [("CP001.1", "contig_1", 0.02)], reference_metadata, 0.05, 1)
@@ -169,7 +169,7 @@ def main():
 
         with open(out, newline="", encoding="utf-8") as handle:
             row = next(csv.DictReader(handle, delimiter="\t"))
-        assert row["cluster_membership_status"] == "known_cluster", row
+        assert row["cluster_membership_status"] == "close_reference_match", row
         assert row["best_reference_id"] == "CP001.1"
         assert row["mash_distance"] == "0.010000"
     print("main() end-to-end with a real (faked) mash run classifies correctly -> PASS")

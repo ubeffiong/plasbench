@@ -52,6 +52,56 @@ annotations. These evidence layers are explicitly non-scoring. The
 [metagenomics guide](docs/METAGENOMICS.md) documents PPR-Meta, PlasmidHunter,
 EBI MAP, plsMD, and experimental Plassembler boundaries.
 
+## Scientific guide for domain experts
+
+> **Start here if you need to decide whether to trust, use, or independently check PlasBench.**
+> The **[Scientific Guide](docs/SCIENTIFIC_GUIDE.md)** explains what PlasBench does, how it does it,
+> and why, in terms a microbiologist, bioinformatician, AMR scientist, programme lead or reviewer can
+> judge without reading the code. It states the scope plainly, defines every metric, lists what has
+> and has not been validated, and tells each kind of expert how to check the claims themselves.
+
+**In one paragraph.** PlasBench benchmarks plasmid-*reconstruction* tools. For isolates that have a
+complete long-read or hybrid reference, it runs the tools on the isolate's short reads, maps each
+tool's predicted plasmid sequence onto the reference, and scores recovery per reference base, per
+plasmid and per bin. It ranks tools within separate input tracks and tasks, with uncertainty that
+respects non-independent isolates, and it reports how fragile the ranking is and whether database
+overlap could have inflated it.
+
+| PlasBench does | PlasBench does not |
+|---|---|
+| Compare plasmid-reconstruction and classification tools on a common, reproducible footing | Identify, cluster or classify the plasmids in *your* sample |
+| Show how and where each tool fails (contamination, splits, merges, missed plasmids, AMR genes) | Compare plasmids between isolates, search PLSDB, or infer relatedness |
+| Recommend a tool for a sample without truth, from benchmark evidence | Infer transmission, outbreaks or horizontal gene transfer |
+| Report what it could not assess (for example database leakage) | Diagnose, or prove a plasmid is closed or clinically meaningful |
+
+**Contents of the guide**
+
+<!-- GUIDE-TOC -->
+1. [What PlasBench is, and what it is not](docs/SCIENTIFIC_GUIDE.md#1-what-plasbench-is-and-what-it-is-not)
+2. [Concepts and vocabulary](docs/SCIENTIFIC_GUIDE.md#2-concepts-and-vocabulary)
+3. [How it works in one page](docs/SCIENTIFIC_GUIDE.md#3-how-it-works-in-one-page)
+4. [Inputs](docs/SCIENTIFIC_GUIDE.md#4-inputs)
+5. [The pipeline, stage by stage](docs/SCIENTIFIC_GUIDE.md#5-the-pipeline-stage-by-stage)
+6. [The tools evaluated](docs/SCIENTIFIC_GUIDE.md#6-the-tools-evaluated)
+7. [Scoring: what is measured, how, and why](docs/SCIENTIFIC_GUIDE.md#7-scoring-what-is-measured-how-and-why)
+8. [Ranking and statistics](docs/SCIENTIFIC_GUIDE.md#8-ranking-and-statistics)
+9. [Truth quality and leakage controls](docs/SCIENTIFIC_GUIDE.md#9-truth-quality-and-leakage-controls)
+10. [Long-read and hybrid tracks](docs/SCIENTIFIC_GUIDE.md#10-long-read-and-hybrid-tracks)
+11. [The metagenomic track](docs/SCIENTIFIC_GUIDE.md#11-the-metagenomic-track)
+12. [Operational mode: using the evidence](docs/SCIENTIFIC_GUIDE.md#12-operational-mode-using-the-evidence)
+13. [Outputs and how to read them](docs/SCIENTIFIC_GUIDE.md#13-outputs-and-how-to-read-them)
+14. [Reproducibility and provenance](docs/SCIENTIFIC_GUIDE.md#14-reproducibility-and-provenance)
+15. [Configuration reference](docs/SCIENTIFIC_GUIDE.md#15-configuration-reference)
+16. [A guide for domain experts: how to check it yourself](docs/SCIENTIFIC_GUIDE.md#16-a-guide-for-domain-experts-how-to-check-it-yourself)
+17. [Validation status and known limitations](docs/SCIENTIFIC_GUIDE.md#17-validation-status-and-known-limitations)
+18. [Scope matrix](docs/SCIENTIFIC_GUIDE.md#18-scope-matrix)
+19. [Further documentation](docs/SCIENTIFIC_GUIDE.md#19-further-documentation)
+<!-- /GUIDE-TOC -->
+
+**Reading paths.** *Microbiologist or AMR scientist:* sections 1, 4, 7, 13, 16.1, 17.
+*Bioinformatician:* sections 3, 5 to 8, 15, 16.2. *Public-health or programme lead:* sections 1, 12, 13,
+16.3, 17, 18. *Reviewer or funder:* sections 1, 17, 18, 16.4.
+
 ## How scoring works (at a glance)
 
 One metric covers every tool, whether it classifies existing contigs (Platon,
@@ -348,6 +398,8 @@ plasbench test && plasbench demo
 
 ### Where else to look
 
+- **[docs/SCIENTIFIC_GUIDE.md](docs/SCIENTIFIC_GUIDE.md)** — what PlasBench does, how, and
+  why; its scope; every metric; how to validate it; and what has and has not been shown.
 - **[Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** — every
   command, from a bare machine to a leaderboard, with what to do when a step fails.
 - **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
@@ -918,9 +970,13 @@ The run works through seven stages, printed as it goes:
 It finishes with `############ DONE ############`.
 
 **Watch stage 2.** It prints a line per isolate like
-`3 plasmid, 1 chromosome sequences (0 defaulted)`. The number in brackets must be
-**0**. Anything else means a reference sequence could not be classified and was assumed
-to be chromosome, which quietly inflates the scores.
+`3 plasmid, 1 chromosome sequences (0 unresolved)`. The number in brackets must be
+**0**. A reference sequence that cannot be labelled (absent from the sequence report,
+a location type other than Plasmid or Chromosome, or contradictory entries) is written as
+`REVIEW`, and the run stops with a message naming it rather than guessing, because a wrong
+guess would quietly bias the scores. Decide each one, edit `truth.tsv`, and re-run. Set
+`ALLOW_DEFAULTED_TRUTH=1` only to deliberately restore the old behaviour of treating them
+as chromosome.
 
 ---
 
@@ -1008,7 +1064,7 @@ None of these actions are required for a successful ordinary benchmark run.
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
 | `[MISS] Platon DB not found` | Step 7a incomplete | Redo step 7a; the `curl` resumes |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
-| `0 defaulted` is not 0 in stage 2 | A reference sequence was not classified | Inspect that reference before trusting recall |
+| Stage 2 stops: `truth table ... still says REVIEW` | A reference sequence could not be labelled plasmid or chromosome | Open `truth.tsv`, replace each `REVIEW` after inspecting that sequence, re-run |
 | Download stops partway, repeatedly | Connection drops on large transfers | Step 7c — copy the databases from another machine |
 
 To see what PlasBench is doing in more detail, every stage writes a log:
@@ -2749,8 +2805,9 @@ cat results/benchmark.leaderboard.md
 cut -f1,2,3 results/tool_status.tsv
 ```
 
-Check that stage 2 reported `(0 defaulted)` for each isolate. A non-zero count
-means a reference sequence was not classified and was assumed to be chromosome.
+Check that stage 2 reported `(0 unresolved)` for each isolate. A non-zero count
+means a reference sequence could not be labelled and was written as `REVIEW`, which stops
+the run until you decide.
 
 ---
 

@@ -9,6 +9,17 @@ reference sequence is labelled **plasmid** or **chromosome** using the
 (`python/make_truth.py`). This avoids using any tool-under-test to define truth, which would
 bias the benchmark.
 
+A reference sequence that cannot be labelled unambiguously is written as `REVIEW`, never
+guessed. That covers an id absent from the report, a location type other than Plasmid or
+Chromosome (for example Segment or Unlocalized), and a report that labels the same
+accession, or the same version-less accession, both plasmid and chromosome. `chr_name` is
+used only as a last resort and only when it is unambiguous. `validate_truth_table.py`
+rejects `REVIEW`, so stage 2 stops until a person decides. Defaulting such a sequence to
+CHROMOSOME would charge every tool that correctly calls a real plasmid with false-positive
+bases and drop those bases from recall's denominator. `ALLOW_DEFAULTED_TRUTH=1` (or
+`make_truth.py --allow-default`) restores the old guess-CHROMOSOME behaviour; use it only
+after reviewing the sequences listed in the warnings.
+
 For NCBI cohorts, PlasBench obtains `sequencing_tech` and `assembly_method`
 from NCBI Datasets v2. An assembly without explicit ONT/PacBio/SMRT evidence is
 rejected: “Complete Genome” alone is not sufficient evidence of independent
@@ -252,7 +263,15 @@ both plasmid and chromosome. It is a mapping-ambiguity diagnostic and does not
 alter F1.
 
 Retained alignments must meet configured length, identity, MAPQ, and per-record
-query-coverage thresholds. The score table separates mapped predicted bases
+query-coverage thresholds. Each threshold is applied to each alignment row, not to the
+query as a whole: a record that maps well but is split into several alignments each
+covering less than the query-coverage threshold (default 0.20) is dropped entirely. Which
+copy of a repeat minimap2 reports as primary is arbitrary at low MAPQ, so it is the MAPQ
+filter, not `--secondary=no`, that keeps repeat placements from deciding TP or FP. A
+chimeric record still contributes every one of its primary pieces, so a record that is half
+plasmid and half chromosome is charged for the chromosome half. The scorer ignores any
+secondary alignment row (`tp:A:S`) it is handed and warns, so a user-supplied PAF cannot
+claim bases on several replicons. The score table separates mapped predicted bases
 into unambiguous, plasmid/chromosome-ambiguous, and unmapped categories. These
 categories support interpretation but do not silently change the TP/FP/FN
 definition.
@@ -268,6 +287,27 @@ charges predicted sequence that never produced a retained alignment, which ordin
 precision ignores, so noisy, chimeric or contaminant output becomes visible as a
 precision drop. TP/FP are reference bases and `unmapped_pred_bp` is query bases, so this
 is an approximation. It is supplementary and never used for ranking.
+
+**Precision is optimistic by design.** Predicted bases with no retained alignment (unmapped,
+or removed by the filters above) are neither true nor false positives, so a tool that emits
+chimeric or repeat-rich records that fail the MAPQ filter pays no precision penalty. Always
+read `strict_precision` and `unmapped_pred_bp` beside precision and F1. The adversarial cases
+in `test/test_scoring_adversarial.py` pin this behaviour down: with MAPQ 20 a repeat shared
+with the chromosome leaves precision at 1.0 and strict precision at 0.71; with MAPQ 0 the
+same input costs 800 false-positive bases.
+
+**Ranking robustness.** `python/rank_sensitivity.py` (stage 6, `RUN_RANK_SENSITIVITY=0` skips
+it) writes `benchmark.rank_robustness.tsv`. Per analysis track it re-scores every PAF already on
+disk with one filter changed at a time (MAPQ 0 and 30, identity 0.80 and 0.95, query coverage 0),
+and re-ranks from the recorded columns under strict F1, per-plasmid recovery and recovery at
+90% completeness. For each variant it gives every tool's mean, rank, change from baseline,
+Kendall's tau against the baseline ordering, and whether the top tool is unchanged. Read a
+leaderboard together with this table: a first place that does not survive a defensible
+change of filter is not a finding. The analysis uses the samples that have a PAF, so the
+leaderboard's failure-as-zero rule is not applied; it measures sensitivity to scoring
+choices, not to failures. It re-computes the baseline and warns if that differs from
+`scores.tsv`, which means different filters were used. It says nothing about truth quality,
+database leakage or sample selection.
 
 **Recall ceiling.** Plasmid sequence that also occurs elsewhere in the genome (an IS
 element or transposon shared with the chromosome, or a plasmid present in two identical
@@ -640,6 +680,31 @@ the tools share no samples at all, each falls back to its own samples and
 `ranking_basis` says so (`own_samples_no_overlap`). The paired comparisons below
 apply the same failure-as-zero rule.
 
+A tool that failed on **every** sample has no score rows. It still appears on its track's
+leaderboard with F1 = 0 on every plasmid-bearing sample, ranked last, using the capability
+registry (`config/tool_capabilities.tsv`) to find its track; a failure is only ever counted
+in the failing tool's own track. Equal mean F1 ranks by tool name, so ranking never depends
+on the order of rows in `scores.tsv`.
+
+**Resource failures.** `04_run_tools.sh` records a failed run's exit code in the reason
+column (`exit_code=<n>`). Exit 124 (timeout) and 137 (SIGKILL, what the out-of-memory killer
+sends) are classed as resource failures: the machine ran out of time or memory, which says
+little about whether the tool is accurate. By default they score F1 = 0 like any failure
+(`--resource-failures score-zero`). `--resource-failures exclude` instead removes such a
+sample from every tool's ranking, so a small machine cannot push a tool down the
+leaderboard. Either way `n_failed_resource` reports how many there were. A status file
+written before exit codes were recorded has none, and its failures are treated as tool
+failures.
+
+**Correlated isolates.** Isolates from one BioProject (one study, often one outbreak or
+clonal collection) are not independent. When the sample sheet has a `bioproject` column
+(else `source_study`), the bootstrap CI resamples whole clusters and the sign-flip
+permutation test flips every difference in a cluster together. At least five independent
+clusters are required; with fewer, no interval or p-value is reported. The leaderboard's
+`n_independent_clusters` and the comparisons' `paired_clusters` show how many there were.
+Without a cluster column every sample is its own cluster and the results are identical to
+plain per-sample resampling.
+
 A deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
 and `benchmark.paired_comparisons.tsv` reports paired per-sample F1
 differences and win/tie/loss counts. These are descriptive uncertainty aids,
@@ -652,7 +717,8 @@ distinguishable from chance? This is derived from the same paired data as
 `benchmark.paired_comparisons.tsv`, using a two-sided sign-flip permutation test on
 the paired per-sample F1 differences (10,000 permutations, a deterministic seed),
 with Holm's method controlling the family-wise error rate across every pairwise
-tool comparison computed in the same run. `True` only when the Holm-adjusted
+tool comparison computed within the same analysis track (each track is a separate
+family; comparisons are never made across tracks). `True` only when the Holm-adjusted
 p-value is below 0.05 **and** there are at least 5 paired samples (the permutation
 test's own minimum — fewer than that returns no p-value at all, never a fabricated
 one); otherwise `not_assessed`. This is deliberately **not** based on whether the
@@ -685,15 +751,6 @@ is better in the field.
   that PlasBin-Flow failed to detect any enterococcal plasmids in their benchmark,
   despite functioning on other taxa. PlasBench's `organism`/`gram_group`
   stratification throughout the leaderboard and recommendation logic exists
-**Correlated isolates.** Isolates from one BioProject (one study, often one outbreak or
-clonal collection) are not independent. When the sample sheet has a `bioproject` column
-(else `source_study`), the bootstrap CI resamples whole clusters and the sign-flip
-permutation test flips every difference in a cluster together. At least five independent
-clusters are required; with fewer, no interval or p-value is reported. The leaderboard's
-`n_independent_clusters` and the comparisons' `paired_clusters` show how many there were.
-Without a cluster column every sample is its own cluster and the results are identical to
-plain per-sample resampling.
-
   precisely because tool performance is not taxon-independent — this is external,
   peer-reviewed confirmation of that design choice, not a hypothetical.
 

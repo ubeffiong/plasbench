@@ -142,51 +142,81 @@ Open `results/benchmark.report.html` and use **Operational method
 recommendations**, **Sample drill-down**, and the artifact explorer to inspect
 or download each retained candidate.
 
-## Novel-vs-known plasmid classification (optional)
+## Nearest-reference screen (experimental, optional)
 
-For a truth-unknown sample, `plasbench reconstruct` can also answer a
-different question than tool selection: is this isolate's own reconstructed
-plasmid similar to anything PlasBench has a reference for, or does it look
-genuinely novel? This independently reimplements santirdnd/COPLA's own
-known-cluster-or-novel pattern (Mash distance to a reference network, then a
-membership call with a confidence score) using Mash -- already a direct
-PlasBench dependency -- against a small, PlasBench-curated reference set,
-rather than COPLA's own code or its `graph-tool`/nested-SBM machinery; see
-`python/classify_operational_plasmid.py`'s own module docstring for exactly
-what differs and why.
+> **Experimental and unvalidated.** This reports how close each predicted plasmid
+> record is, by Mash distance, to a small curated reference set. It is **not** a
+> plasmid taxonomy, **not** a relatedness inference and **not** a test of whether
+> a plasmid is novel. It was previously labelled "novel-vs-known"; the labels were
+> renamed because they claimed more than the method supports.
+
+For a truth-unknown sample, `plasbench reconstruct` can also ask a different
+question than tool selection: is this isolate's reconstructed plasmid close to
+anything PlasBench has a reference for? It follows the pattern of COPLA (Mash
+distance to a reference set, then a membership call) using Mash, already a direct
+PlasBench dependency, against a small curated reference set, not COPLA's own code
+or its `graph-tool`/nested-SBM machinery; see `python/classify_operational_plasmid.py`'s
+docstring for exactly what differs.
 
 This is an **operational-only** signal. It is never computed for a benchmark
 isolate that has truth, and its output must never be wired into
-`recommendation_model.py`'s training features -- a genuinely unknown isolate
-has no truth reference, which is the entire reason this signal exists in the
-first place; feeding it back into the model would be leakage, not a real
-feature, exactly like `compute_difficulty_features.py`'s own fields.
+`recommendation_model.py`'s training features: a genuinely unknown isolate has no
+truth reference, which is the entire reason this signal exists, so feeding it back
+into the model would be leakage.
 
 Off by default (`RUN_PLASMID_NOVELTY_CLASSIFICATION=0`). To use it:
 
 ```bash
 # One-time setup: build the reference set from the committed, curated
 # accession list (needs mash and network access; not part of any stage):
-python3 python/build_plasmid_reference_set.py \
-    --accessions cohorts/reference_plasmids/curated_accessions.tsv \
-    --out-dir data/db/plasmid_reference
+python3 python/build_plasmid_reference_set.py     --accessions cohorts/reference_plasmids/curated_accessions.tsv     --out-dir data/db/plasmid_reference
 
 # Then enable it for reconstruction:
-RUN_PLASMID_NOVELTY_CLASSIFICATION=1 plasbench reconstruct --sample new_isolate_01 \
-  --sra SRR12345678 --organism "Klebsiella pneumoniae" --gram-group Gram_negative
+RUN_PLASMID_NOVELTY_CLASSIFICATION=1 plasbench reconstruct --sample new_isolate_01   --sra SRR12345678 --organism "Klebsiella pneumoniae" --gram-group Gram_negative
 ```
 
-The curated set currently starts small and deliberately (16 real, verified
-NCBI plasmids spanning *E. coli*, *Salmonella enterica*, *Klebsiella
-pneumoniae*, *Acinetobacter baumannii*, and *Staphylococcus aureus* --
-`cohorts/reference_plasmids/curated_accessions.tsv` records exactly which,
-with a one-line justification for each). A `known_cluster` call means the
-nearest reference is within `PLASMID_NOVELTY_SIMILARITY_THRESHOLD` (default
-Mash distance 0.05, roughly ANI >= 95%) AND that reference's own cluster has
-at least `PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS` members (default 2); anything
-else is `novel`, and a missing `mash` or reference set gives
-`insufficient_reference` rather than guessing either way. The result appears
-in `results/<sample>/plasmid_similarity.tsv` and under `plasmid_novelty` in
-`selection_report.json` -- a supplementary signal alongside tool selection,
-not a gate on it: a failed or skipped classification never blocks
-reconstruction or the rest of the report.
+The curated set is 16 real NCBI plasmids from five taxa (*E. coli*, *Salmonella
+enterica*, *Klebsiella pneumoniae*, *Acinetobacter baumannii*, *Staphylococcus
+aureus*); `cohorts/reference_plasmids/curated_accessions.tsv` records which.
+
+### What the calls mean
+
+| Call | Meaning |
+|---|---|
+| `close_reference_match` | The nearest reference is within `PLASMID_NOVELTY_SIMILARITY_THRESHOLD` (default Mash distance 0.05), the hit is statistically supported (Mash p-value at most 0.001), and that reference's cluster has at least `PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS` members (default 2). |
+| `no_close_reference` | Anything else. It means nothing in the 16-plasmid set is close. It is **not** evidence that the plasmid is novel: a fragment of a plasmid that is in the set can land here too. |
+| `insufficient_reference` | `mash` or the reference set is missing, or Mash returned nothing for the record. Never guessed either way. |
+
+`distance_margin` is a linear margin against the threshold. It is not a
+probability, not calibrated, and not comparable across plasmids of different size.
+
+### Why 0.05 is not "95% similar"
+
+Mash distance is `D = -(1/k) ln(2j/(1+j))` with `k = 21`, an estimate of a
+point-mutation rate between colinear sequences. Plasmids gain, lose and rearrange
+whole blocks, so the number does not mean what ANI means. For sequences whose
+shared k-mers are identical:
+
+| Situation | Mash distance | Result at the 0.05 threshold |
+|---|---:|---|
+| Two equal-length plasmids sharing 80% of their sequence | 0.011 | close match |
+| Two equal-length plasmids sharing 50% | 0.033 | close match |
+| Two equal-length plasmids sharing 35% | 0.050 | at the threshold |
+| An exact piece covering 25% of a reference plasmid | 0.044 | close match |
+| An exact piece covering 15% of a reference plasmid | 0.064 | `no_close_reference` |
+
+Each record is judged on its own and nothing groups records into plasmids, so a
+short-read assembly that splits a plasmid into contigs can produce a mix of calls
+for one plasmid. These are properties of the arithmetic, shown in
+`test/test_classifier_semantics.py`; the screen has not been validated against any
+independent plasmid partition. Query and reference are sketched at the same size
+(read from the reference's `reference_set_provenance.json`).
+
+The result appears in `results/<sample>/plasmid_similarity.tsv` and under
+`plasmid_novelty` in `selection_report.json`. It is a supplementary signal
+alongside tool selection, not a gate on it: a failed or skipped classification
+never blocks reconstruction or the rest of the report. The HTML report shows it
+inside each sample's selection card, under "Nearest-reference screen (experimental,
+unvalidated)", with the caveat above and the Mash p-value and shared-hash support for
+each record. Reports written before the labels were renamed still display, under the
+current wording.

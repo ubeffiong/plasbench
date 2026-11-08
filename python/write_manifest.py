@@ -138,6 +138,32 @@ def directory_identity(path):
             "identity_sha256": digest.hexdigest()}
 
 
+def collect_selected_candidates(results_dir, warnings):
+    """sample -> checksum of its selection report and the files beside it.
+
+    Two layouts exist. A benchmark run (stage 6) writes
+    selected_candidates/<sample>/<sample>.selection_report.json; an operational
+    reconstruction (stage 8) writes <sample>/selected_candidate/selection_report.json.
+    This used to look only for the second, so the manifest of an ordinary
+    benchmark run listed no selected candidates at all.
+    """
+    found = {}
+    layouts = [
+        (results_dir.glob("selected_candidates/*/*.selection_report.json"), lambda r: r.parent.name),
+        (results_dir.glob("*/selected_candidate/selection_report.json"), lambda r: r.parents[1].name),
+    ]
+    for reports, sample_of in layouts:
+        for report in sorted(reports):
+            sample = sample_of(report)
+            if sample in found:
+                continue
+            found[sample] = {
+                "selection_report": checksum_record(report, warnings, "selection report"),
+                "files": sorted(path.name for path in report.parent.iterdir() if path.is_file()),
+            }
+    return found
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True)
@@ -192,14 +218,7 @@ def main():
     for path in Path(args.results_dir).glob("benchmark*"):
         if path.is_file():
             outputs[path.name] = checksum_record(path, manifest_warnings, "output")
-    selected_candidates = {}
-    for report in Path(args.results_dir).glob("*/selected_candidate/selection_report.json"):
-        sample = report.parents[1].name
-        selected_candidates[sample] = {
-            "selection_report": checksum_record(
-                report, manifest_warnings, "selection report"),
-            "files": sorted(path.name for path in report.parent.iterdir() if path.is_file()),
-        }
+    selected_candidates = collect_selected_candidates(Path(args.results_dir), manifest_warnings)
     manifest = {
         "schema_version": "1.0", "tool": "PlasBench", "tool_version": tool_version(),
         "generated_at": datetime.now(timezone.utc).isoformat(),

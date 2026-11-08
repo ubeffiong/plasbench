@@ -73,6 +73,19 @@ if ! python3 "$HERE/../python/stratify_recovery.py" \
     warn "recovery-by-replicon breakdown failed; leaderboard is unaffected"
 fi
 
+# How much the ranking depends on scoring choices (python/rank_sensitivity.py):
+# re-scores every PAF already on disk with one filter changed at a time, and
+# re-ranks under strict F1 and per-plasmid recovery. Advisory: it writes
+# benchmark.rank_robustness.tsv and never alters the leaderboard; a failure only
+# warns. RUN_RANK_SENSITIVITY=0 skips it.
+if [[ "${RUN_RANK_SENSITIVITY:-1}" == "1" ]]; then
+    if ! python3 "$HERE/../python/rank_sensitivity.py" \
+            --scores "$SCORES" --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+            --out-prefix "$RESULTS_DIR/benchmark"; then
+        warn "rank-sensitivity analysis failed; leaderboard is unaffected"
+    fi
+fi
+
 if [[ "${COHORT_QC_FLAGS_ENABLED:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/flag_cohort_outliers.py" \
         --stats-dir "$DATA_DIR" --samples "$SAMPLE_SHEET" \

@@ -66,7 +66,9 @@ def main():
     # --- Case 2: "good2" ranks first on mean F1, but the margin is small and
     # inconsistent in sign -- a real, but not statistically significant, edge. ---
     rows = []
-    small_diffs = [0.02, -0.03, 0.01, -0.02, 0.03, -0.01, 0.02, -0.02, 0.01, -0.01]
+    # These must NOT sum to zero: a zero sum is an exact tie in mean F1, and this
+    # case once passed only because ties were ordered by input-file position.
+    small_diffs = [0.02, -0.03, 0.01, -0.02, 0.03, -0.01, 0.02, -0.02, 0.01, 0.01]
     base = 0.70
     for sample, diff in zip(samples, small_diffs):
         rows.append(make_row(sample, "good2", base + diff))

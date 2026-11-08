@@ -19,7 +19,7 @@
 #
 # All five are off by default, and none is ever ranked against a short-read-only
 # tool: aggregation writes one leaderboard per analysis track and never mixes
-# track claims (python/aggregate_results.py: write_track_leaderboards).
+# track claims (python/aggregate_results.py: main() writes one leaderboard per track).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"

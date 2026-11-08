@@ -35,6 +35,12 @@ import headline_design as hd
 # parent_sample_id column, so a copied ladder sheet still cannot be ranked.
 LADDER_SUFFIX = re.compile(r"^(?P<parent>.+)__\d+(?:\.\d+)?x$")
 
+# scripts/04_run_tools.sh appends "exit_code=<n>" to a failed run's reason.
+# 124 is `timeout`, 137 is SIGKILL (what the kernel OOM killer sends). Both say
+# the machine ran out of something, not that the tool produced a wrong answer.
+EXIT_CODE = re.compile(r"exit_code=(\d+)")
+RESOURCE_EXIT_CODES = {124, 137}
+
 
 def sample_parents(sample_sheet):
     """Map sample_id -> parent_sample_id for correlated (derived) samples."""
@@ -213,23 +219,62 @@ def read_status(path):
     return counts
 
 
-def read_failed_samples(path):
-    """tool -> samples whose tool run itself failed, from tool_status.tsv."""
-    failed = defaultdict(set)
+def failure_class(reason):
+    """'resource' when the recorded exit code is a timeout/SIGKILL, else 'tool'.
+
+    A failure with no recorded exit code (a status file from before exit codes
+    were captured) is 'tool', which is the conservative reading: it is scored as
+    the tool's failure exactly as it always was.
+    """
+    match = EXIT_CODE.search(reason or "")
+    if match and int(match.group(1)) in RESOURCE_EXIT_CODES:
+        return "resource"
+    return "tool"
+
+
+def read_failures(path):
+    """[(tool, sample, failure_class)] for every failed run in tool_status.tsv."""
+    failures = []
     if not path:
-        return failed
+        return failures
     try:
         handle = open(path, newline="", encoding="utf-8")
     except FileNotFoundError:
-        return failed
+        return failures
     with handle:
         reader = csv.DictReader(handle, delimiter="\t")
         if not reader.fieldnames or "sample" not in reader.fieldnames:
-            return failed
+            return failures
         for row in reader:
             if row.get("status") == "failed" and row.get("sample") and row.get("tool"):
-                failed[row["tool"]].add(row["sample"])
+                failures.append((row["tool"], row["sample"], failure_class(row.get("reason"))))
+    return failures
+
+
+def read_failed_samples(path, resource_policy="score-zero"):
+    """tool -> samples whose run failed and should score F1 = 0 for that tool.
+
+    resource_policy 'score-zero' (default, the long-standing behaviour) treats
+    every failure as the tool's result. 'exclude' leaves out failures whose exit
+    code says the machine ran out of time or memory; the sample then has no F1
+    for that tool and the shared-sample rule removes it from every tool's
+    ranking, so a small machine cannot push a tool down the leaderboard.
+    """
+    failed = defaultdict(set)
+    for tool, sample, kind in read_failures(path):
+        if kind == "resource" and resource_policy == "exclude":
+            continue
+        failed[tool].add(sample)
     return failed
+
+
+def read_resource_failure_counts(path):
+    """tool -> number of failed runs classified as resource failures."""
+    counts = defaultdict(int)
+    for tool, _, kind in read_failures(path):
+        if kind == "resource":
+            counts[tool] += 1
+    return counts
 
 
 def read_database_overlap(path):
@@ -244,7 +289,8 @@ def read_database_overlap(path):
     return overlap
 
 
-def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None, metric="f1"):
+def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None, metric="f1",
+              plasmid_samples=None, resource_failures=None):
     by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0,
                                    "zero_plasmid_specificity": [], "zero_plasmid_fp_bp": [], "n_zero_plasmid": 0,
                                    "nmi": [], "vi": [],
@@ -310,17 +356,23 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
     # (no status, skipped, or a scoring failure) are handled by the
     # shared-sample rule instead.
     f1_by_tool = defaultdict(dict)
-    plasmid_samples = set()
+    # Which samples carry true plasmid is a property of the sample, not of the
+    # track, so the caller may pass the set found across every track. Without it
+    # a track whose tools all crashed would have no plasmid-bearing sample here.
+    plasmid_samples = set(plasmid_samples or ())
     for r in rows:
         if r["f1"] is not None:
             f1_by_tool[r["tool"]][r["sample"]] = r["f1"]
             plasmid_samples.add(r["sample"])
     failure_zero = defaultdict(int)
     for tool, samples in (failed_samples or {}).items():
-        if tool not in by_tool:
-            continue
         for sample in samples:
             if sample in plasmid_samples and sample not in f1_by_tool[tool]:
+                # A tool that failed on EVERY sample has no score rows and so is
+                # not in by_tool yet. Touch it so it still gets a leaderboard row
+                # (F1 = 0 on every plasmid-bearing sample) instead of vanishing,
+                # which would let total failure look better than partial failure.
+                _ = by_tool[tool]
                 f1_by_tool[tool][sample] = 0.0
                 failure_zero[tool] += 1
     ranked_tools = [tool for tool, values in f1_by_tool.items() if values]
@@ -349,6 +401,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
             "mean_f1_all_scored": statistics.mean(d["f1"]) if d["f1"] else None,
             "n_f1_scored": len(d["f1"]),
             "n_failures_scored_zero": failure_zero.get(tool, 0),
+            "n_failed_resource": (resource_failures or {}).get(tool, 0),
             "f1_ci_low": f1_ci_low,
             "f1_ci_high": f1_ci_high,
             "n_independent_clusters": len(set(groups)),
@@ -397,7 +450,10 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
     # Headline endpoint (headline_design.py): the task's ranking metric over
     # the shared samples (failure-as-zero), species-balanced when enough
     # independent clusters exist, with a cluster-aware CI; plus CPRR.
-    by_metric, shared_metric, _ = hd.shared_values(rows, metric, failed_samples)
+    # known_tools / eligible_samples: a tool that failed on EVERY sample has no rows,
+    # so without them the headline path would drop it exactly as the legacy path once did.
+    by_metric, shared_metric, _ = hd.shared_values(
+        rows, metric, failed_samples, known_tools=set(failed_samples or ()), eligible_samples=plasmid_samples)
     for row in summary:
         row.update(hd.ranking_fields(row["tool"], by_metric, shared_metric, design, metric))
         row.update(hd.cprr_fields(row["tool"], rows, design))
@@ -411,8 +467,10 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
         row["n_calibrated"] = len(ece)
         row["is_baseline"] = "yes" if (design.is_baseline(row["tool"]) if design else row["tool"].startswith("baseline_")) else "no"
     # Rank by the ranking score (descending). A tool with no defined score
-    # (e.g. scored only on zero-true-plasmid isolates) sorts last.
-    summary.sort(key=lambda x: (x["ranking_score"] is None, -(x["ranking_score"] or 0.0)))
+    # (e.g. scored only on zero-true-plasmid isolates) sorts last. Equal scores
+    # rank by tool name, so the order never depends on row order in scores.tsv
+    # (which made the "runner-up" in the significance test arbitrary).
+    summary.sort(key=lambda x: (x["ranking_score"] is None, -(x["ranking_score"] or 0.0), x["tool"]))
     for rank, row in enumerate(summary, start=1):
         row["rank"] = rank
     return summary
@@ -436,7 +494,8 @@ def resampling_units(values, groups=None):
 
 def overlap_summary(tool, rows, overlap):
     if not overlap:
-        return {"n_possible_db_overlap": None, "n_after_database": None, "mean_f1_after_database": None}
+        return {"n_possible_db_overlap": None, "n_after_database": None, "mean_f1_after_database": None,
+                "n_unknown_overlap": None}
     statuses = [overlap.get((r["sample"], tool), "") for r in rows if r["tool"] == tool]
     after = [r["f1"] for r in rows if r["tool"] == tool and r["f1"] is not None
              and overlap.get((r["sample"], tool)) == "after_database"]
@@ -444,7 +503,33 @@ def overlap_summary(tool, rows, overlap):
         "n_possible_db_overlap": statuses.count("possible_overlap"),
         "n_after_database": statuses.count("after_database"),
         "mean_f1_after_database": statistics.mean(after) if after else None,
+        # Pairs the screen could not judge (database release date not filled in,
+        # or truth release date unavailable). "0 possible, 0 after" is otherwise
+        # indistinguishable from "checked and clean".
+        "n_unknown_overlap": statuses.count("unknown"),
     }
+
+
+def leakage_unassessed(overlap):
+    """True when the overlap screen ran but could not judge a single pair.
+
+    Every status is then 'unknown' (or 'no_reference_database'): the usual cause
+    is config/tool_database_releases.tsv still having blank release dates. In
+    that state the leaderboard's overlap columns read 0 / 0 / blank, which looks
+    like a clean result and is not one.
+    """
+    if not overlap:
+        return False
+    statuses = set(overlap.values())
+    return "unknown" in statuses and not (statuses & {"possible_overlap", "after_database"})
+
+
+LEAKAGE_UNASSESSED_NOTE = (
+    "Database leakage was NOT assessed. Every database-using tool/sample pair is 'unknown' because "
+    "no database release date has been filled in (config/tool_database_releases.tsv). Tools that "
+    "score contigs against a plasmid database or a model trained on one may have seen the truth "
+    "genomes, so their F1 can be inflated relative to new isolates. Treat their ranking as "
+    "provisional until the dates are filled in and the screen is re-run.")
 
 
 def bootstrap_ci(values, iterations=1000, groups=None):
@@ -501,7 +586,7 @@ def holm_adjust(pvalues):
     return adjusted
 
 
-def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", design=None):
+def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", design=None, plasmid_samples=None):
     """Paired, shared-sample, sign-flip permutation comparisons for every
     pair of tools, Holm-adjusted across all pairs computed here. Shared by
     write_comparisons() (writes benchmark.paired_comparisons.tsv) and
@@ -517,12 +602,12 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
             by_tool[row["tool"]][row["sample"]] = row[metric]
     # Same rule as summarise(): a failed tool run on a plasmid-bearing sample
     # is that tool's F1 = 0, so the test and the ranking judge the same data.
-    plasmid_samples = {sample for values in by_tool.values() for sample in values}
+    plasmid_samples = set(plasmid_samples or ()) | {
+        sample for values in by_tool.values() for sample in values}
     for tool, samples in (failed_samples or {}).items():
-        if tool in by_tool:
-            for sample in samples:
-                if sample in plasmid_samples and sample not in by_tool[tool]:
-                    by_tool[tool][sample] = 0.0
+        for sample in samples:
+            if sample in plasmid_samples and sample not in by_tool[tool]:
+                by_tool[tool][sample] = 0.0   # also adds a tool that failed everywhere
     tools = sorted(by_tool)
     comparisons = []
     for i, a in enumerate(tools):
@@ -621,7 +706,8 @@ def write_tsv(summary, path):
             "ranking_metric", "ranking_score", "ranking_ci_low", "ranking_ci_high", "ranking_species_basis",
             "n_headline_species", "n_ranking_clusters", "mean_lw_bin_f1",
             "cprr", "cprr_ci_low", "cprr_ci_high", "cprr_correct", "cprr_plasmids",
-            "mean_brier_score", "mean_expected_calibration_error", "n_calibrated", "is_baseline", "beats_best_baseline"]
+            "mean_brier_score", "mean_expected_calibration_error", "n_calibrated", "is_baseline", "beats_best_baseline",
+            "n_failed_resource", "n_unknown_overlap"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -673,6 +759,8 @@ def write_tsv(summary, path):
                 s.get("cprr_correct", ""), s.get("cprr_plasmids", ""),
                 fmt4(s.get("mean_brier_score")), fmt4(s.get("mean_expected_calibration_error")),
                 s.get("n_calibrated", ""), s.get("is_baseline", "no"), s.get("beats_best_baseline", ""),
+                s.get("n_failed_resource", 0),
+                s["n_unknown_overlap"] if s.get("n_unknown_overlap") is not None else "",
             ]) + "\n")
 
 
@@ -681,7 +769,7 @@ def format_rate(rate, assessed):
     return f"{rate:.1%} (n={assessed})" if rate is not None else "not assessed"
 
 
-def write_md(summary, path):
+def write_md(summary, path, notes=()):
     # Deliberately narrower than write_tsv(): the compact, at-a-glance ranking
     # view. Every other column lives in the TSV and the HTML report.
     with open(path, "w") as fh:
@@ -699,6 +787,8 @@ def write_md(summary, path):
         for track, task in groups:
             group_rows = [r for r in summary if (r.get("analysis_track", ""), r.get("task", "")) == (track, task)]
             write_md_table(fh, group_rows, track if len({g[0] for g in groups}) > 1 else None, task)
+        for note in notes:
+            fh.write(f"\n> **Warning:** {note}\n")
         fh.write("\n_Length-weighted binning F1: bases placed in the correct (one-to-one matched) bin, over all "
                  "truth-plasmid bases (recall) and over all bases the bins align to (precision). CPRR = share of "
                  "truth plasmids reconstructed correctly (matched, covered, uncontaminated, not split, and -- "
@@ -751,17 +841,48 @@ TRACK_ORDER = ("short_read", "long_read", "hybrid")
 TASK_ORDER = (hd.TASK_RECONSTRUCTION, hd.TASK_CLASSIFICATION)
 
 
-def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None):
+def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None,
+                  tool_tracks=None, resource_failures=None):
     """Summarise, rank and test each (input track, task) on its own.
 
     Returns [(track, task, rows, summary, comparisons)] in a stable order.
     A long-read tool is never ranked against a short-read one, and a
     classifier-only tool never against a binning tool.
+
+    tool_tracks maps tool -> declared track (the capability registry). It is only
+    consulted for a tool with no score rows at all, which is exactly the tool that
+    failed on every sample: its rows cannot say which track it is in. Such a tool
+    still gets a leaderboard row (score 0 on every plasmid-bearing sample), in the
+    (track, task) it belongs to, instead of vanishing. A failure only ever counts
+    in the group its tool belongs to.
     """
     design = design or hd.Design()
     groups = defaultdict(list)
     for row in rows:
         groups[(row["analysis_track"], design.task(row["tool"], rows))].append(row)
+
+    row_groups = defaultdict(set)
+    for key, group_rows in groups.items():
+        for row in group_rows:
+            row_groups[row["tool"]].add(key)
+
+    def groups_of(tool):
+        if row_groups.get(tool):
+            return row_groups[tool]
+        # Same default read_scores() applies to a row with no analysis_track.
+        track = (tool_tracks or {}).get(tool) or "short_read"
+        return {(track, design.task(tool, rows))}
+
+    # Which samples carry true plasmid is a property of the sample, not of a group,
+    # so it is found across every group. Without it a group whose tools all crashed
+    # would have no plasmid-bearing sample to score the crashes against.
+    plasmid_samples = {row["sample"] for row in rows if row["f1"] is not None}
+    # A group in which every tool failed everywhere has no score rows, so it would
+    # not appear at all. Create it so those failures still produce a leaderboard.
+    for tool, samples in (failed_samples or {}).items():
+        if samples & plasmid_samples:
+            for key in groups_of(tool):
+                groups.setdefault(key, [])
     ordered = sorted(groups, key=lambda key: (
         TRACK_ORDER.index(key[0]) if key[0] in TRACK_ORDER else len(TRACK_ORDER), key[0],
         TASK_ORDER.index(key[1]) if key[1] in TASK_ORDER else len(TASK_ORDER)))
@@ -769,8 +890,14 @@ def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overl
     for track, task in ordered:
         group_rows = groups[(track, task)]
         metric = hd.TASK_METRIC.get(task, "f1")
-        summary = summarise(group_rows, status_counts, failed_samples, clusters, overlap, design, metric)
-        comparisons = compute_comparisons(group_rows, failed_samples, clusters, metric, design)
+        group_failed = {tool: samples for tool, samples in (failed_samples or {}).items()
+                        if (track, task) in groups_of(tool)}
+        group_resource = {tool: n for tool, n in (resource_failures or {}).items()
+                          if (track, task) in groups_of(tool)}
+        summary = summarise(group_rows, status_counts, group_failed, clusters, overlap, design, metric,
+                            plasmid_samples=plasmid_samples, resource_failures=group_resource)
+        comparisons = compute_comparisons(group_rows, group_failed, clusters, metric, design,
+                                          plasmid_samples=plasmid_samples)
         for row in summary:
             row["analysis_track"], row["task"] = track, task
         for row in comparisons:
@@ -830,16 +957,6 @@ def metadata_completeness(sample_sheet, samples):
     return out
 
 
-def write_track_leaderboards(rows, status_counts, prefix):
-    """Emit one leaderboard per declared input track; never mix track claims."""
-    per_track = defaultdict(list)
-    for track, _, _, summary, _ in ranked_tracks(rows, status_counts):
-        per_track[track].extend(summary)
-    for track, summary in per_track.items():
-        write_tsv(summary, f"{prefix}.{track}.leaderboard.tsv")
-        write_md(summary, f"{prefix}.{track}.leaderboard.md")
-
-
 def write_rows(rows, path, fields):
     with open(path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
@@ -866,6 +983,11 @@ def main():
                     help="highest reference tier included in the headline (default 2).")
     ap.add_argument("--min-species-clusters", type=int, default=20,
                     help="independent clusters a species needs to enter the species-balanced headline.")
+    ap.add_argument("--resource-failures", choices=("score-zero", "exclude"), default="score-zero",
+                    help="how a run killed by a timeout or out-of-memory (exit code 124/137) is ranked. "
+                         "score-zero (default): scored 0 for that tool, like any failure. exclude: the "
+                         "sample drops out of every tool's ranking, so a small machine cannot penalise a tool. "
+                         "Either way the count is reported as n_failed_resource.")
     args = ap.parse_args()
 
     rows = read_scores(args.scores)
@@ -914,27 +1036,54 @@ def main():
     for row in rows:
         if row.get("true_plasmid_count") == 0 and design.ambiguous_plasmids(row["sample"]) > 0:
             row["true_plasmid_count"] = None
-    failed = read_failed_samples(args.tool_status)
-    per_track = ranked_tracks(rows, status_counts, failed, clusters, overlap, design)
+    failed = read_failed_samples(args.tool_status, args.resource_failures)
+    # A tool that failed on every sample has no score rows, so its track cannot be
+    # read from them; take it from the capability registry.
+    tool_tracks = {}
+    registry_path = (Path(args.capabilities) if args.capabilities
+                     else Path(__file__).resolve().parent.parent / "config" / "tool_capabilities.tsv")
+    if registry_path.is_file():
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from tool_capabilities import read_capabilities
+            tool_tracks = {tool: row["analysis_track"] for tool, row in read_capabilities(registry_path).items()}
+        except (ValueError, ImportError) as exc:
+            print(f"[aggregate] WARNING: could not read {registry_path}: {exc}. A tool that failed on "
+                  f"every sample will be placed in the short_read track.")
+    resource_failures = read_resource_failure_counts(args.tool_status)
+    if resource_failures:
+        verb = "scored as 0" if args.resource_failures == "score-zero" else "excluded from ranking"
+        print(f"[aggregate] {sum(resource_failures.values())} run(s) ended in a timeout or out-of-memory kill "
+              f"(exit code 124/137); {verb} (--resource-failures {args.resource_failures}).")
+    per_track = ranked_tracks(rows, status_counts, failed, clusters, overlap, design,
+                              tool_tracks=tool_tracks, resource_failures=resource_failures)
+    notes = []
+    if leakage_unassessed(overlap):
+        notes.append(LEAKAGE_UNASSESSED_NOTE)
+        print(f"{chr(10)}[aggregate] WARNING: {LEAKAGE_UNASSESSED_NOTE}{chr(10)}")
     # The combined files hold every (track, task) leaderboard, each ranked on
     # its own (rank restarts per group). They never rank across groups.
     summary = [row for *_, track_summary, _ in per_track for row in track_summary]
     comparisons = [row for *_, track_comparisons in per_track for row in track_comparisons]
     write_tsv(summary, args.out_prefix + ".leaderboard.tsv")
-    write_md(summary, args.out_prefix + ".leaderboard.md")
+    write_md(summary, args.out_prefix + ".leaderboard.md", notes=notes)
     by_track = defaultdict(list)
     for track, _, _, track_summary, _ in per_track:
         by_track[track].extend(track_summary)
     for track, track_summary in by_track.items():
         write_tsv(track_summary, f"{args.out_prefix}.{track}.leaderboard.tsv")
-        write_md(track_summary, f"{args.out_prefix}.{track}.leaderboard.md")
+        write_md(track_summary, f"{args.out_prefix}.{track}.leaderboard.md", notes=notes)
     write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv", comparisons=comparisons)
 
     # Species balance and reference-tier sensitivity tables.
     species_rows, tier_rows, design_rows = [], [], []
     for track, task, group_rows, track_summary, _ in per_track:
         metric = hd.TASK_METRIC.get(task, "f1")
-        species_rows.extend(hd.species_table(track, task, group_rows, metric, design, failed))
+        species_rows.extend(hd.species_table(
+            track, task, group_rows, metric, design, failed,
+            known_tools={row["tool"] for row in track_summary},
+            eligible_samples={r["sample"] for r in rows if r["f1"] is not None}))
         all_group = [r for r in all_rows if r["analysis_track"] == track and design.task(r["tool"], all_rows) == task]
         tier_rows.extend(hd.tier_table(track, task, all_group, metric, design))
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,

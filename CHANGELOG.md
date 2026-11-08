@@ -36,6 +36,53 @@ history is lost, only the numbering is cleaner. See
 - New `python/collect_truth_provenance.py` and `python/discover_design_cohort.py`; the
   assembler pattern now tolerates NCBI's "Trycyler" misspelling.
 
+### Changed (breaking, experimental output only)
+- **The Mash nearest-reference screen no longer claims novelty.** Its calls were renamed
+  because they promised more than a Mash distance to 16 plasmids can show:
+  `known_cluster` is now `close_reference_match`, `novel` is now `no_close_reference`, and
+  the `confidence_score` column is now `distance_margin` (a linear margin to an uncalibrated
+  threshold, not a probability). `plasmid_similarity.tsv` gains `mash_p_value` and
+  `shared_hashes`. The default threshold is unchanged, but its documentation no longer calls
+  it "roughly ANI >= 95%": for plasmids, two equal-size sequences sharing about 35% of their
+  k-mers already reach it, and an exact piece under about 21% of a reference falls outside it.
+  Anything that read the old labels or column must be updated. The feature remains off by
+  default and unvalidated.
+- **`make_truth.py` no longer guesses CHROMOSOME for a sequence it cannot label.** Such
+  sequences are written as `REVIEW`, which `validate_truth_table.py` rejects, so stage 2 stops
+  instead of silently biasing precision and recall. This now also covers location types other
+  than Plasmid/Chromosome and reports that contradict themselves. `ALLOW_DEFAULTED_TRUTH=1`
+  (or `--allow-default`) restores the old behaviour.
+- A skipped tool run (command not installed, database missing, no assembly graph) no longer
+  counts as a failure in the operational recommendation's `failure_rate`; it already lowers
+  coverage, which gates eligibility.
+
+### Added
+- **`docs/SCIENTIFIC_GUIDE.md`**, a guide for domain experts: what PlasBench does, how and why,
+  its scope, every metric and statistical procedure, the shipped cohorts, outputs and how to read
+  them, reproducibility, how each kind of expert can check the claims, what has and has not been
+  validated, and a scope matrix. It has a table of contents, a README section with its own
+  contents list, and `python/build_guide_toc.py` keeps both in step with the headings.
+  `test/test_guide_docs.py` checks the contents, every link, and that every configuration
+  variable, command and `scores.tsv` column the guide names still exists in the code.
+- `run_manifest.json` now lists selected candidates for a benchmark run. It looked only for the
+  operational layout (`<sample>/selected_candidate/`), so an ordinary benchmark run listed none.
+- `n_failed_resource` and `n_unknown_overlap` leaderboard columns; `--resource-failures
+  {score-zero,exclude}` and `--tool-capabilities` on `aggregate_results.py`.
+- A failed tool run's exit code is recorded in `tool_status.tsv`'s reason column
+  (`exit_code=<n>`; the file's header is unchanged). Exit 124/137 is classed as a resource
+  failure.
+- The HTML report now shows the nearest-reference screen result in each sample's selection card,
+  with its experimental caveat and support (p-value, shared hashes); reports from before the
+  rename still display.
+- `python/rank_sensitivity.py` and `benchmark.rank_robustness.tsv`: per-track sensitivity of the
+  ranking to alignment filters (re-scored from the PAFs on disk) and to the metric (strict F1,
+  per-plasmid recovery), with Kendall's tau and whether the top tool changes. Run from stage 6;
+  `RUN_RANK_SENSITIVITY=0` skips it. It does not change the leaderboard.
+- A leaderboard warning (stderr and the Markdown leaderboard) and a clearer HTML cell when the
+  database-overlap screen could not judge any pair because `database_release_date` is blank.
+- Tests: `test_scoring_adversarial.py`, `test_aggregate_failures.py`,
+  `test_selection_undefined_metrics.py`, `test_study_groups.py`, `test_leakage_visibility.py`,
+  `test_classifier_semantics.py`, `test_report_classifier_section.py`, `test_rank_sensitivity.py`, `test_failed_tool_exit_code.sh`.
 ### Changed -- research design (headline endpoints and reference standard)
 - **Primary endpoint is now length-weighted binning F1** for binning-capable tools
   (`lw_bin_f1`, ungated Hungarian match; the count-based `bin_f1` is kept but not
@@ -67,6 +114,27 @@ history is lost, only the numbering is cleaner. See
   a tier-sensitivity chart.
 
 ### Fixed
+- `benchmark.species.tsv` now lists a tool that failed on every sample (mean 0 over the plasmid-bearing
+  samples), as the leaderboard already did. `species_table` called `shared_values` without the failed-only tool,
+  so the two outputs disagreed. The tool list passed in comes from the same (track, task) group, so failures of
+  other groups' tools are not counted.
+- **A tool that failed on every sample no longer vanishes from the leaderboard.** It now ranks
+  last with F1 = 0 on every plasmid-bearing sample, in its own track.
+- Equal mean F1 now ranks by tool name instead of by row order in `scores.tsv`, which made the
+  "runner-up" in the significance test arbitrary.
+- The operational recommendation no longer averages an undefined F1, precision or recall (an
+  isolate with no true plasmid) as 0.0.
+- Leave-one-study-out validation no longer silently drops samples with a blank `source_study`:
+  they join the study of any sample sharing their bioproject, else use the bioproject, and
+  samples with neither are reported.
+- The mash query sketch now uses the same sketch size as the reference (it used Mash's default
+  of 1000 against a 10000-hash reference), and mash's p-value and shared-hash count are no
+  longer discarded; a close but statistically unsupported hit is no longer a match.
+- `make_truth.py`: the version-less accession fallback is no longer order-dependent, and a
+  `chr_name` shared by several records no longer silently resolves to the last one.
+- The scorer ignores secondary alignment rows (`tp:A:S`) in a supplied PAF and warns.
+- `scorable_truth.py` reads truth with the scorer's own validation.
+- Removed `write_track_leaderboards`, which nothing called.
 - **Empty predictions no longer inflate mean F1.** On an isolate with true
   plasmid, a tool that predicts nothing now scores F1 = 0 (precision stays
   empty). Previously F1 was left empty and the sample was dropped from the
