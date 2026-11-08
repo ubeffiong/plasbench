@@ -80,6 +80,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from plasbench_common import MASH_SKETCH_SIZE  # noqa: E402
+
 # Matches build_plasmid_reference_set.py's own default; used only when the
 # reference's provenance file is absent and --sketch-size is not given.
 DEFAULT_SKETCH_SIZE = 10000

@@ -24,6 +24,7 @@ from pathlib import Path
 
 from recommendation_model import (DEFAULT_DECISION_PROFILE, DECISION_PROFILES, attach_assembly_stats,
                                   decision_score, load_assembly_stats, load_model)
+from plasbench_common import merge_intervals as _merge_intervals, interval_overlap_bp as interval_overlap  # noqa: E402
 
 
 NUMERIC = ("precision", "recall", "f1", "plasmid_recall", "bin_f1", "unmapped_pred_bp",
@@ -342,20 +343,8 @@ def reference_footprint(path):
 
 
 def merge_intervals(intervals):
-    merged = []
-    for start, stop in sorted(intervals):
-        if merged and start <= merged[-1][1]: merged[-1][1] = max(merged[-1][1], stop)
-        else: merged.append([start, stop])
-    return merged, sum(stop - start for start, stop in merged)
-
-
-def interval_overlap(left, right):
-    i = j = total = 0
-    while i < len(left) and j < len(right):
-        total += max(0, min(left[i][1], right[j][1]) - max(left[i][0], right[j][0]))
-        if left[i][1] <= right[j][1]: i += 1
-        else: j += 1
-    return total
+    merged = _merge_intervals(intervals)
+    return merged, sum(end - start for start, end in merged)
 
 
 def cross_tool_agreement(results_dir, sample, selected_tool, candidates):

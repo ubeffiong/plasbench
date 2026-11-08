@@ -39,6 +39,8 @@ import os
 import re
 import sys
 from collections import defaultdict
+from plasbench_common import merge_intervals as merge  # noqa: E402
+from plasbench_common import read_plasmid_lengths as read_truth  # noqa: E402
 
 CIGAR_OP = re.compile(r"(\d+)([MIDNSHP=X])")
 SUMMARY_FIELDS = ("sample", "tool", "analysis_track", "n_blocks", "n_blocks_without_cigar",
@@ -46,15 +48,6 @@ SUMMARY_FIELDS = ("sample", "tool", "analysis_track", "n_blocks", "n_blocks_with
                   "mismatch_bp", "inserted_bp", "deleted_bp")
 REGION_FIELDS = ("sample", "tool", "sequence_id", "length", "covered_bp", "missing_regions",
                  "missing_bp", "longest_missing_bp")
-
-
-def read_truth(path):
-    plasmids = {}
-    with open(path, newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            if row["molecule_type"].upper() == "PLASMID":
-                plasmids[row["sequence_id"]] = int(row["length"])
-    return plasmids
 
 
 def decode_cigar(cigar, edit_distance):
@@ -83,16 +76,6 @@ def decode_cigar(cigar, edit_distance):
     else:
         mismatches = None
     return aligned, inserted, deleted, mismatches
-
-
-def merge(intervals):
-    merged = []
-    for start, end in sorted(intervals):
-        if merged and start <= merged[-1][1]:
-            merged[-1][1] = max(merged[-1][1], end)
-        else:
-            merged.append([start, end])
-    return merged
 
 
 def analyse(truth, paf, min_length, min_identity, min_mapq, min_qcov):

@@ -54,6 +54,56 @@ annotations. These evidence layers are explicitly non-scoring. The
 [metagenomics guide](docs/METAGENOMICS.md) documents PPR-Meta, PlasmidHunter,
 EBI MAP, plsMD, and experimental Plassembler boundaries.
 
+## Why PlasBench: merits over ad-hoc tool comparisons
+
+PlasBench does not compete with plasmid-reconstruction tools; it is the common
+yardstick for them. Its merits are measured against how tools are usually
+compared today: a one-off table in a tool's own paper, or a lab's private script
+run on whichever isolates were to hand. The statements below describe what this
+repository implements; the **Limits** list says what it does not claim.
+
+| Typical ad-hoc comparison | PlasBench |
+|---|---|
+| Each tool scored in its own way (contigs called, plasmids recovered, bins matched), so numbers cannot be lined up | One metric for every tool: the prediction is projected onto the complete reference and scored **per reference base** (TP/FP/FN, precision, recall, F1) with primary alignments only, so repeats cannot inflate a claim ([scoring](#how-scoring-works-at-a-glance)) |
+| Tools that crash or time out quietly drop out, which flatters hard-isolate performance | A failed run on a plasmid-bearing isolate scores **F1 = 0**, so a tool cannot climb the ranking by failing on hard isolates; resource kills (exit 124/137) can instead be excluded with `--resource-failures exclude`, and either way the count is reported |
+| Short-read, long-read and hybrid tools ranked in one list | Separate leaderboards per input track and per task (reconstruction vs classification); results are never pooled across tracks |
+| Isolates from one outbreak or study treated as independent, which narrows confidence intervals | Cluster bootstrap and cluster-wise sign-flip permutation tests (clonal groups from the sample sheet or Mash single-linkage), paired comparisons with Holm correction, and a species-balanced headline |
+| A rank with no sense of how fragile it is | Rank-robustness analysis, power analysis, and a significance flag for the leader against the runner-up |
+| Tools tested on genomes that were in their training or reference database | Database-overlap screen against each tool's database release date; if dates are missing, the report says leakage was **not assessed** instead of printing a clean-looking zero |
+| Truth of unknown quality | Truth tiers with provenance, truth-label audits, a negative-control (zero-plasmid) isolate guard, and an explicit rule that a tool is never scored against reads its own truth was built from |
+| "Use tool X" advice from a single average | Recommendations are evidence-gated and **withheld** when coverage of a stratum (species, size band, replicon type) is too thin ([§4.5](#45-recommendations-and-why-they-are-usually-withheld)) |
+| Results that cannot be rerun | Pinned conda lock file, container, per-run manifest with tool versions and checksums, deterministic seeds for every resampling step, and an offline synthetic demo (`test/run_demo.sh`) that exercises every stage without downloads |
+| One tool, one parser, one script | 13 tool adapters under `adapters/` behind a single contract (plus trivial baselines), a Galaxy wrapper, and a separate graph-aware metagenomic track with its own three-class truth contract |
+
+**Cost of running it.** The Python analysis stages are cheap next to assembly and
+the external tools. After the performance audit (synthetic inputs, one 12-core
+Windows machine, single timed runs, so treat as indicative): the exact base-level
+precision-recall sweep went from 4.8 s to 0.014 s at 1,600 scored records and now
+scales close to linearly; the paired bootstrap and permutation statistics run in
+parallel across tool pairs (28 pairs in about 4 s against 15 to 44 s serial before)
+and give byte-identical results to the previous implementation. Parallelism is
+bounded and checked at the shell level (`MAX_PARALLEL_SAMPLES`,
+`MAX_PARALLEL_TOOLS`, with an oversubscription warning). `PLASBENCH_STATS_WORKERS=1`
+forces the serial path.
+
+**Maintainability.** The shared scientific definitions (interval coverage and
+overlap, single-linkage clustering, Mash sketch size, tool display names) live once
+in `python/plasbench_common.py` and are pinned by `test/test_plasbench_common.py`,
+so two scorers cannot quietly disagree about what a covered base is. The test
+suite is plain scripts (`bash test/run_tests.sh`) and includes an equivalence test
+for the incremental precision-recall sweep.
+
+**Limits (what this does not claim).**
+
+- Stage timings for assembly and the external tools have not been measured on a real
+  cohort here; they depend on your hardware and cohort and will dominate wall time.
+- Scores are only as good as the reference assemblies; the truth tiers and audits
+  exist to make that visible, not to remove it.
+- Recommendations are advisory and withheld when evidence is thin; PlasBench does not
+  identify, cluster or classify the plasmids in your own sample (see the table below).
+- No claim is made here about how any named competing benchmark performs; the
+  comparison above is against common ad-hoc practice.
+
 ## Scientific guide for domain experts
 
 > **Start here if you need to decide whether to trust, use, or independently check PlasBench.**

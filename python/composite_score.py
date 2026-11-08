@@ -50,6 +50,7 @@ import random
 import statistics
 import sys
 from collections import defaultdict
+from plasbench_common import read_tsv, number  # noqa: E402
 
 DIMENSIONS = ("accuracy", "completeness", "structure", "biology", "performance")
 DEFAULT_WEIGHTS = {"accuracy": 30.0, "completeness": 20.0, "structure": 25.0, "biology": 15.0, "performance": 10.0}
@@ -57,20 +58,6 @@ DEFAULT_GATES = {"accuracy": 50.0, "completeness": 50.0}
 COMPOSITE_FIELDS = ("analysis_track", "tool", "accuracy", "completeness", "structure", "biology", "performance",
                     "composite", "rank", "status", "gates_failed", "dimensions_used", "dimensions_dropped")
 SENS_FIELDS = ("analysis_track", "tool", "variant", "rank", "mean_rank", "best_rank", "worst_rank", "share_first")
-
-
-def read_tsv(path):
-    if not path or not os.path.isfile(path):
-        return []
-    with open(path, newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle, delimiter="\t"))
-
-
-def number(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def clamp(value):

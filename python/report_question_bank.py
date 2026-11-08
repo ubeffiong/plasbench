@@ -22,6 +22,7 @@ import csv
 import html
 from collections import defaultdict
 from pathlib import Path
+from plasbench_common import number  # noqa: E402
 
 SECTIONS = (("metric-framework", "Metrics"),
             ("database-membership", "Database membership"),
@@ -33,13 +34,6 @@ SECTIONS = (("metric-framework", "Metrics"),
 
 def esc(value):
     return html.escape("" if value is None else str(value), quote=True)
-
-
-def number(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def read_tsv(path):

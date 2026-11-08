@@ -15,18 +15,12 @@ import gzip
 import shutil
 import subprocess
 from pathlib import Path
+from plasbench_common import link_or_copy  # noqa: E402
 
 
 def rows(path):
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader((line for line in handle if line.strip() and not line.startswith("#")), delimiter="\t"))
-
-
-def link_or_copy(source, destination):
-    try:
-        destination.symlink_to(source.resolve())
-    except OSError:
-        shutil.copy2(source, destination)
 
 
 def parse_rungs(value):
