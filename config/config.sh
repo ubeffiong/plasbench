@@ -69,6 +69,9 @@ export TRUTH_LONG_READ_PRESET="${TRUTH_LONG_READ_PRESET:-map-ont}"
 # replicon but the main chromosome is a plasmid) and evidence (Scheme 2,
 # evidence-confirmed labels with AMBIGUOUS replicons excluded, truth.scored.tsv).
 export TRUTH_LABEL_SCHEME="${TRUTH_LABEL_SCHEME:-ncbi}"
+# Where stage 1 gets short reads: auto (SRA Toolkit, then ENA if prefetch fails),
+# sra (SRA Toolkit only), ena (ENA only; python/fetch_ena_reads.py, MD5-verified).
+export READ_SOURCE="${READ_SOURCE:-auto}"
 # Tandem-dimer truth plasmids (python/detect_dimers.py, stage 2): halves at
 # >= DIMER_MIN_IDENTITY over >= DIMER_MIN_HALF_COVERAGE are a dimer.
 # COLLAPSE_DIMERS=1 scores the monomer; 0 only flags it (AMBIGUOUS under the
