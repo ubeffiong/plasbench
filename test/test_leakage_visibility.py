@@ -61,7 +61,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         result = ranked_tracks(rows, defaultdict(lambda: {"completed": 0, "reused": 0, "failed": 0, "skipped": 0}),
                                overlap=unknown)
-        table = [r for _, _, s, _ in result for r in s]
+        table = [r for _, _, _, s, _ in result for r in s]
         path = os.path.join(tmp, "lb.md")
         write_md(table, path, notes=[LEAKAGE_UNASSESSED_NOTE])
         text = open(path, encoding="utf-8").read()

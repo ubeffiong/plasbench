@@ -4,6 +4,25 @@
 Eligible edges require truth-plasmid completeness and predicted-bin purity. The
 one-to-one assignment maximises total aligned plasmid bases with a Hungarian
 maximum-weight bipartite match; it is not a greedy overlap heuristic.
+
+Two further outputs implement the benchmark's headline and secondary
+endpoints (docs/METHODS.md, "Endpoints"):
+
+* Length-weighted binning precision / recall / F1 (lw_bin_*). A second,
+  UNGATED Hungarian match pairs every predicted bin with at most one truth
+  plasmid, maximising aligned plasmid bases. recall = bases placed in the
+  correct (matched) bin / total truth-plasmid bases; precision = those same
+  bases / all bases the tool's bins align to the reference (chromosome,
+  other plasmids and unmatched bins all count against it). Unlike the
+  count-based bin_f1, a tiny correct bin cannot outweigh a large plasmid.
+* Correct Plasmid Reconstruction (CPRR, per truth plasmid, --cprr-out): a
+  plasmid is correctly reconstructed only if it is identified (matched to a
+  bin), covered to --cprr-min-coverage, dominates its bin to
+  --cprr-min-share (no chromosome contamination or merged plasmids), is not
+  split (no other bin holds >= --split-threshold of it), and -- only where
+  base-level comparison is valid -- its matched alignments reach
+  --cprr-min-identity. The identity criterion is reported separately so the
+  aggregate can drop it for truth polished with the benchmark's own reads.
 """
 import argparse
 import csv
@@ -224,6 +243,51 @@ def maximum_weight(edges, bins_list, plasmids_list):
     return matched
 
 
+CPRR_FIELDS = ["true_plasmid", "length", "matched_bin", "coverage", "bin_share", "identity",
+               "split", "identified", "coverage_ok", "share_ok", "not_split", "identity_ok",
+               "correct_without_identity", "correct"]
+
+
+def length_weighted_binning(overlaps, plasmids, total_mapped, all_bins):
+    """Length-weighted binning precision/recall/F1 from an ungated Hungarian match."""
+    matched = maximum_weight(dict(overlaps), sorted(all_bins), sorted(plasmids))
+    correct_bp = sum(bp for _, _, bp in matched)
+    truth_bp = sum(plasmids.values())
+    mapped_bp = sum(total_mapped.values())
+    precision = safe_div(correct_bp, mapped_bp)
+    recall = safe_div(correct_bp, truth_bp)
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return {"matched": matched, "precision": precision, "recall": recall, "f1": f1}
+
+
+def correct_reconstruction(matched, overlaps, plasmids, total_mapped, identity_counts, fragments,
+                           min_coverage, min_share, min_identity):
+    """Per truth plasmid: does it meet every pre-specified CPRR criterion?"""
+    by_plasmid = {plasmid: (bin_id, bp) for bin_id, plasmid, bp in matched}
+    rows = []
+    for plasmid in sorted(plasmids):
+        length = plasmids[plasmid]
+        bin_id, bp = by_plasmid.get(plasmid, ("", 0))
+        coverage = safe_div(bp, length)
+        share = safe_div(bp, total_mapped.get(bin_id, 0)) if bin_id else 0.0
+        matches, block = identity_counts.get((bin_id, plasmid), (0, 0)) if bin_id else (0, 0)
+        identity = safe_div(matches, block)
+        split = len(fragments.get(plasmid, set()) - {bin_id}) > 0
+        checks = {"identified": bool(bin_id), "coverage_ok": coverage >= min_coverage,
+                  "share_ok": share >= min_share, "not_split": not split,
+                  "identity_ok": identity >= min_identity}
+        structural = all(checks[key] for key in ("identified", "coverage_ok", "share_ok", "not_split"))
+        rows.append({
+            "true_plasmid": plasmid, "length": length, "matched_bin": bin_id,
+            "coverage": f"{coverage:.4f}", "bin_share": f"{share:.4f}", "identity": f"{identity:.4f}",
+            "split": "yes" if split else "no",
+            **{key: "yes" if value else "no" for key, value in checks.items()},
+            "correct_without_identity": "yes" if structural else "no",
+            "correct": "yes" if structural and checks["identity_ok"] else "no",
+        })
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("truth", "paf", "bins", "out", "summary"):
@@ -232,6 +296,13 @@ def main():
     parser.add_argument("--min-bin-purity", type=float, default=.9, help="minimum plasmid bp / mapped bin bp")
     parser.add_argument("--split-threshold", type=float, default=.1)
     parser.add_argument("--ambiguity-paf", help="Optional all-mapping PAF for repeat-associated bin ambiguity.")
+    parser.add_argument("--cprr-out", help="Per-truth-plasmid correct-reconstruction table (CPRR).")
+    parser.add_argument("--cprr-min-coverage", type=float, default=0.95,
+                        help="CPRR: minimum fraction of the plasmid covered by its matched bin.")
+    parser.add_argument("--cprr-min-share", type=float, default=0.95,
+                        help="CPRR: minimum fraction of the matched bin's aligned bases that belong to this plasmid.")
+    parser.add_argument("--cprr-min-identity", type=float, default=0.99,
+                        help="CPRR: minimum alignment identity of the matched bin on the plasmid.")
     parser.add_argument("--min-alignment-length", type=int, default=1,
                         help="Minimum PAF block length retained for bin scoring (default: 1).")
     parser.add_argument("--min-alignment-identity", type=float, default=0.0,
@@ -250,6 +321,7 @@ def main():
     plasmids, chromosomes = read_truth(args.truth)
     membership = read_bins(args.bins)
     plasmid_intervals, chromosome_intervals = defaultdict(list), defaultdict(list)
+    identity_counts = defaultdict(lambda: [0, 0])  # (bin, plasmid) -> [matches, block length]
     # Applies the same alignment-quality gate as score_plasmids.py (base-level
     # scoring), so a short, low-identity, or low-MAPQ placement that the base
     # score discards cannot still count toward bin completeness/purity.
@@ -268,6 +340,9 @@ def main():
                     or mapq < args.min_alignment_mapq or query_coverage < args.min_alignment_query_coverage):
                 continue
             target, bin_id = fields[5], membership[fields[0]]
+            if target in plasmids:
+                identity_counts[(bin_id, target)][0] += matches
+                identity_counts[(bin_id, target)][1] += block_length
             if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
             elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
     overlaps = {key: merge(value) for key, value in plasmid_intervals.items()}
@@ -304,11 +379,29 @@ def main():
     # table is empty (no true plasmid bp and nothing wrongly claimed as
     # plasmid), matching this file's existing availability-aware convention.
     nmi, vi = clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins)
+    lw = length_weighted_binning(overlaps, plasmids, total_mapped, all_bins)
+    cprr_rows = correct_reconstruction(lw["matched"], overlaps, plasmids, total_mapped, identity_counts,
+                                       fragments, args.cprr_min_coverage, args.cprr_min_share,
+                                       args.cprr_min_identity)
+    if args.cprr_out:
+        with open(args.cprr_out, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+            writer.writerow(CPRR_FIELDS)
+            for row in cprr_rows:
+                writer.writerow([row[field] for field in CPRR_FIELDS])
+    cprr_total = len(cprr_rows)
+    cprr_correct = sum(row["correct"] == "yes" for row in cprr_rows)
+    cprr_correct_no_identity = sum(row["correct_without_identity"] == "yes" for row in cprr_rows)
     with open(args.summary, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t")
-        writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction", "nmi", "variation_of_information"])
-        writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else ""])
-    print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)}")
+        writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction", "nmi", "variation_of_information",
+                         "lw_bin_precision", "lw_bin_recall", "lw_bin_f1",
+                         "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity"])
+        writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else "",
+                         f"{lw['precision']:.4f}", f"{lw['recall']:.4f}", f"{lw['f1']:.4f}",
+                         cprr_total, cprr_correct, cprr_correct_no_identity])
+    print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)} "
+          f"lw_bin_f1={lw['f1']:.4f} cprr={cprr_correct}/{cprr_total}")
 
 
 if __name__ == "__main__": main()

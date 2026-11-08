@@ -966,9 +966,17 @@ result for that isolate and was left out of the scoring. `failed` on a
 plasmid-bearing isolate counts as F1 = 0 for that tool's ranking — a crash is the
 tool's result, not a free pass.
 
-**How to read the leaderboard.** `mean_f1` ranks tools on plasmid *bases* recovered,
-over the samples every tool in the track was scored on (`n_ranking_samples`). A tool
-that predicts nothing on an isolate with plasmids scores F1 = 0 there.
+**How to read the leaderboard.** Tools are ranked within their input track *and*
+task. Binning-capable tools are ranked on **reconstruction** by `ranking_score`, the
+length-weighted binning F1 (the primary endpoint: plasmid bases placed in the
+correct bin), with **CPRR** (`cprr`, the share of truth plasmids reconstructed
+correctly) as the secondary endpoint. Classifier-only tools are ranked separately on
+**classification** by base-level F1. The ranking score is averaged per species when
+enough independent isolates exist, uses reference tiers 1-2 only, and covers the
+samples every tool in the group was scored on (`n_ranking_samples`). A tool that
+predicts nothing, or fails, on an isolate with plasmids scores 0 there. See
+[docs/METHODS.md](docs/METHODS.md#research-design-endpoints-reference-standard-and-species-balance).
+`mean_f1` remains the base-level F1 for every tool.
 `mean_plasmid_recall` is the fraction of *whole plasmids* recovered. These are very
 different numbers and the second is usually far lower. If your question is "do I have
 this entire resistance plasmid?", read `mean_plasmid_recall`. Also read the confidence

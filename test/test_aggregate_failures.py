@@ -38,7 +38,7 @@ def row(sample, tool, f1, track="short_read"):
 
 
 def by_track(result):
-    return {track: {s["tool"]: s for s in summary} for track, _, summary, _ in result}
+    return {track: {s["tool"]: s for s in summary} for track, _, _, summary, _ in result}
 
 
 def write_status(path, lines):
@@ -105,8 +105,8 @@ def main():
     # 6. Equal scores rank by tool name regardless of input order.
     forward = [row(s, t, 0.7) for s in SAMPLES for t in ("zeta", "alpha", "mid")]
     backward = list(reversed(forward))
-    order_a = [s["tool"] for _, _, summary, _ in ranked_tracks(forward, status_counts()) for s in summary]
-    order_b = [s["tool"] for _, _, summary, _ in ranked_tracks(backward, status_counts()) for s in summary]
+    order_a = [s["tool"] for _, _, _, summary, _ in ranked_tracks(forward, status_counts()) for s in summary]
+    order_b = [s["tool"] for _, _, _, summary, _ in ranked_tracks(backward, status_counts()) for s in summary]
     print("tie-break")
     check("ranking is alphabetical on an exact tie", order_a == ["alpha", "mid", "zeta"])
     check("and independent of input order", order_a == order_b)
