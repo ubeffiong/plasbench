@@ -73,6 +73,49 @@ if ! python3 "$HERE/../python/stratify_recovery.py" \
     warn "recovery-by-replicon breakdown failed; leaderboard is unaffected"
 fi
 
+# Truth-label screen (python/audit_truth_labels.py): does each PLASMID/CHROMOSOME
+# label agree with replicon/MOB evidence? Advisory; never edits truth or scores.
+if ! python3 "$HERE/../python/audit_truth_labels.py" \
+        --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.truth_label_audit.tsv"; then
+    warn "truth-label audit failed; scores are unaffected"
+fi
+
+# Further benchmark dimensions (accuracy and missing regions, feature preservation and NGOC,
+# bin quality, performance, statistical power, scenarios, and an optional composite with gates
+# and weight sensitivity). Advisory: none of it alters scores.tsv, the leaderboard or any rank,
+# and each step only warns on failure. A table that cannot be produced is simply absent, which
+# the report shows as "not evaluated". RUN_DIMENSION_ANALYSES=0 skips all of it.
+if [[ "${RUN_DIMENSION_ANALYSES:-1}" -eq 1 ]]; then
+    DIM="$RESULTS_DIR/benchmark"
+    for table in accuracy missing_regions feature_preservation ngoc bin_quality; do
+        python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix ".${table}.tsv" \
+            --out "$DIM.${table}.tsv" || warn "could not merge the ${table} shards; that table is not evaluated"
+    done
+    # Base-level accuracy is not assessable against truth polished with the benchmark's own reads
+    # (the same rule the CPRR identity criterion uses); blank those rates and say why.
+    if [[ -s "$DIM.accuracy.tsv" ]]; then
+        MASK_ARGS=(); [[ -s "$RESULTS_DIR/benchmark.truth_provenance.tsv" ]] && MASK_ARGS=(--truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv")
+        python3 "$HERE/../python/mask_accuracy.py" --accuracy "$DIM.accuracy.tsv" "${MASK_ARGS[@]}" \
+            || warn "accuracy masking failed; rates are left as computed"
+    fi
+    python3 "$HERE/../python/performance_summary.py" --tool-status "$RESULTS_DIR/tool_status.tsv" \
+        --scores "$SCORES" --logs-dir "$LOG_DIR" --data-dir "$DATA_DIR" --threads "${THREADS:-1}" \
+        --out "$DIM.performance.tsv" || warn "performance summary failed; leaderboard is unaffected"
+    python3 "$HERE/../python/power_analysis.py" --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET" \
+        --out "$DIM.power.tsv" || warn "power analysis failed; leaderboard is unaffected"
+    python3 "$HERE/../python/scenario_tags.py" --scores "$SCORES" --data-dir "$DATA_DIR" \
+        --sample-sheet "$SAMPLE_SHEET" --out "$DIM.scenarios.tsv" \
+        --performance-out "$DIM.scenario_performance.tsv" || warn "scenario tags failed; leaderboard is unaffected"
+    COMPOSITE_ARGS=()
+    for pair in "accuracy:accuracy" "feature-preservation:feature_preservation" "ngoc:ngoc" \
+                "bin-quality:bin_quality" "performance:performance"; do
+        [[ -s "$DIM.${pair#*:}.tsv" ]] && COMPOSITE_ARGS+=("--${pair%%:*}" "$DIM.${pair#*:}.tsv")
+    done
+    python3 "$HERE/../python/composite_score.py" --scores "$SCORES" "${COMPOSITE_ARGS[@]}" \
+        --out "$DIM.composite.tsv" --sensitivity-out "$DIM.composite_sensitivity.tsv" \
+        || warn "composite view failed; leaderboard is unaffected"
+fi
+
 # How much the ranking depends on scoring choices (python/rank_sensitivity.py):
 # re-scores every PAF already on disk with one filter changed at a time, and
 # re-ranks under strict F1 and per-plasmid recovery. Advisory: it writes
@@ -159,6 +202,11 @@ python3 "$HERE/../python/build_html_report.py" \
     --cohort-qc-flags "$RESULTS_DIR/benchmark.cohort_qc_flags.tsv" \
     --recovery-by-replicon "$RESULTS_DIR/benchmark.recovery_by_replicon.tsv" \
     --quast-diagnostics "$RESULTS_DIR/quast_diagnostics.tsv" \
+    --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
+    --truth-label-audit "$RESULTS_DIR/benchmark.truth_label_audit.tsv" \
+    --stratified "$RESULTS_DIR/benchmark.stratified.tsv" \
+    --orthogonal-summary "$RESULTS_DIR/orthogonal_validation.summary.json" \
+    --dimensions-prefix "$RESULTS_DIR/benchmark" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."
@@ -172,6 +220,8 @@ log "  Run manifest      : $RESULTS_DIR/run_manifest.json"
 log "  Recommendations   : $RESULTS_DIR/benchmark.recommendations.tsv"
 log "  Stratified metrics: $RESULTS_DIR/benchmark.stratified.tsv"
 log "  Recovery by replicon/MOB: $RESULTS_DIR/benchmark.recovery_by_replicon.tsv (descriptive only)"
+log "  Truth-label audit : $RESULTS_DIR/benchmark.truth_label_audit.tsv (advisory only)"
+log "  Further dimensions: $RESULTS_DIR/benchmark.{accuracy,missing_regions,feature_preservation,ngoc,bin_quality,performance,power,scenarios,scenario_performance,composite,composite_sensitivity}.tsv (advisory only)"
 log "  Study holdout test : $RESULTS_DIR/benchmark.recommendation_validation.tsv"
 log "  Cohort QC flags   : $RESULTS_DIR/benchmark.cohort_qc_flags.tsv (advisory only)"
 if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then

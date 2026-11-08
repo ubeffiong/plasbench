@@ -44,11 +44,13 @@ record_status() {
 
 profile_start() { date +%s; }
 profile_elapsed() { printf '%s' "$(( $(date +%s) - $1 ))"; }
-profile_rss() { [[ -s "$1" ]] && tr -d '[:space:]' < "$1" || true; }
+# /usr/bin/time writes 'maxrss user_cpu system_cpu' on its LAST line (a failed run adds a status line
+# before it); the memory figure is the first field, the CPU seconds are read by performance_summary.py.
+profile_rss() { [[ -s "$1" ]] && awk 'END{printf "%s", $1}' "$1" || true; }
 profile_exec() {
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
     local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file"
-    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" /usr/bin/time -f '%M' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" "$@" || rc=$?; fi
+    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" /usr/bin/time -f '%M %U %S' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }
@@ -56,7 +58,7 @@ profile_exec_in_dir() {
     local run_dir="$1"; shift
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
     local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file"
-    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && /usr/bin/time -f "%M" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
+    if [[ -x /usr/bin/time ]]; then run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && /usr/bin/time -f "%M %U %S" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else run_with_heartbeat "$SAMPLE / $TOOL" bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }

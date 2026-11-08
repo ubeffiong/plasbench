@@ -131,6 +131,12 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             2>> "$LOG_DIR/${SAMPLE}.truth.log" \
             || { warn "evidence labelling failed for $SAMPLE; scoring uses source labels"; rm -f "$SDIR/truth.scored.tsv"; }
     fi
+    # Opt-in: draft AMR truth from the AMRFinderPlus rows annotated on the reference.
+    # Written as truth_amr.draft.tsv (evidence_tier=auto_derived), never as truth_amr.tsv:
+    # a person must review it and rename it before amr_gene_recall is scored.
+    if [[ "${DERIVE_AMR_TRUTH_DRAFT:-0}" -eq 1 && -s "$FEATURES" && -s "$SDIR/truth.tsv" ]]; then
+        python3 "$HERE/../python/derive_amr_truth.py" --features "$FEATURES" --truth "$SDIR/truth.tsv"             --out "$SDIR/truth_amr.draft.tsv" >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1             || warn "AMR truth draft failed for $SAMPLE; amr_gene_recall stays blank"
+    fi
 done < <(read_samples "$SAMPLE_SHEET")
 
 log "Stage 2 (truth) complete."

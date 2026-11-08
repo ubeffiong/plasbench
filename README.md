@@ -2,6 +2,8 @@
 
 > **Benchmarking plasmid reconstruction from sequence to biological function.**
 
+**Docs:** [FAQ](FAQ.md) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
+
 PlasBench is a reproducible, Ubuntu-first framework that **benchmarks how well
 plasmid-reconstruction tools recover plasmids**, using complete (long-read)
 assemblies as ground truth.
@@ -273,9 +275,13 @@ Both are blank unless the matching curated truth file is supplied.
 **Optional diagnostics (never ranked).** Stage 6 also writes
 `benchmark.recovery_by_replicon.tsv`, which breaks per-plasmid recovery down by replicon
 (Inc/rep) and MOB type, and the HTML report shows it next to an optional QUAST structural
-summary (`RUN_QUAST_DIAGNOSTICS=1`, off by default; see [INSTALL.md](INSTALL.md)). A draft AMR
-truth can be generated from reference annotation with `python/derive_amr_truth.py`. It is
-never scored until a human reviews and promotes it. Details: [docs/METHODS.md](docs/METHODS.md).
+summary (`RUN_QUAST_DIAGNOSTICS=1`, off by default; see [INSTALL.md](INSTALL.md)). The same
+stage also writes a ranking-robustness table, a truth-label audit and the evidence-gated
+performance-by-stratum table, each shown in the report. A draft AMR truth can be generated
+from reference annotation with `plasbench derive-amr-truth` (or `DERIVE_AMR_TRUTH_DRAFT=1`);
+it is never scored until a human reviews and promotes it. Every standalone analysis is
+available as `plasbench analysis <name>` (`plasbench analysis --list`). Details:
+[docs/METHODS.md](docs/METHODS.md).
 
 **Caveats.** The metric is base-level: a plasmid split into many contigs scores the
 same as one assembled whole (bin-level, split and merge metrics are reported
@@ -298,6 +304,125 @@ For each isolate the pipeline:
 > asking, per reference base: *did the tool correctly call this base as plasmid?*
 > `recall` = completeness (fraction of true plasmid recovered); `precision` = 1 −
 > chromosomal contamination.
+
+---
+
+## Metric framework, implementation review and roadmap
+
+Benchmarking plasmid **reconstruction** is not benchmarking classification or assembly. A reconstruction tool is not only
+answering "is this contig a plasmid?"; it must group contigs into bins that each correspond to one original plasmid, recover as
+much of that plasmid as it can, keep its sequence, structure and features intact, and avoid pulling in chromosome or other
+plasmids. No single number captures that, so PlasBench reports several, at three levels and in five dimensions.
+
+| Level | Question | Typical metrics |
+|---|---|---|
+| **Base pair** | How much plasmid sequence is recovered, how pure and how accurate is it? | recall (completeness), precision, F1, identity |
+| **Contig / bin** | Were contigs grouped correctly, and are plasmids whole or fragmented? | length-weighted binning F1, CPRR, split and merge events, bin quality tiers |
+| **Structural and functional** | Are the right bases in the right order, and are the genes and features still there? | NGOC, inversions, full-length feature recovery, AMR gene recall |
+
+**Recall and precision, defined for reconstruction.** For a truth plasmid *p* matched to a bin *q*: recall = (bases of *p* covered
+by *q*) / (length of *p*), also called coverage or completeness; precision = (bases of *q* that align to *p*) / (length of *q*),
+also called query coverage or purity. F1 is their harmonic mean. These are only meaningful after an **optimal one-to-one
+matching** of bins to truth plasmids, because a bin can partly overlap several plasmids and a plasmid can be split across several
+bins. PlasBench does this with a Hungarian maximum-weight bipartite match (`python/score_bins.py`), not a greedy overlap rule.
+
+**Why clustering statistics are not the primary score.** NMI, homogeneity and completeness treat every contig equally (ignoring
+length), are inflated by the huge chromosome bin, and are not repeat-aware (an IS element can legitimately sit in several
+plasmids). PlasBench reports NMI, variation of information, homogeneity, completeness and V-measure only as **descriptive**
+secondary metrics, weighted by base pairs and with the unclaimed chromosome left out, so two of those three objections are
+addressed in the implementation. Repeat-aware *matching* is not implemented; repeat effects are reported as diagnostics.
+
+### The five dimensions
+
+Each dimension is measured, reported on its own, and shown in the HTML report. None of them changes the headline ranking
+(the length-weighted binning F1 for binning-capable tools, base-level F1 for classifiers, with CPRR as the secondary endpoint).
+
+| Dimension | Question | Status | What PlasBench reports | Script |
+|---|---|---|---|---|
+| **1. Reconstruction accuracy** | Are the aligned bases correct? | **Done** | Identity, mismatch, insertion and deletion rates (shares of alignment columns, summing to 100%), decoded from the alignment CIGAR. Blank where the truth was polished with the benchmark's own reads, because the truth would then carry the reads' errors. SNP concordance is not computed: it needs known variant positions, which a single same-isolate reference does not have. | `alignment_accuracy.py`, `mask_accuracy.py` |
+| **2. Completeness** | How much of each plasmid is recovered? | **Done** | Reference coverage (recall), missing bases, number and length of missing regions, per-plasmid completeness, plasmid recall, 50% and 90% bands, complete circular recall, CPRR. | `score_plasmids.py`, `alignment_accuracy.py` |
+| **3. Structural fidelity** | Is the structure, order and topology right? | **Done** (with limits) | NGOC (adjacent feature pairs still adjacent, same orientation, same record; strand and circularity aware), bin split and merge events, circular recall, alignment-derived inversion, relocation and duplication calls (unvalidated), bin quality tiers (high, medium) and homogeneity and completeness. | `feature_preservation.py`, `bin_quality.py`, `call_structural_variants.py` |
+| **4. Biological feature preservation** | Are genes and functional elements retained? | **Done** | Per feature kind (replicon, mobility, AMR, insertion sequence, gene): expected, full length, truncated, missed, and mean covered fraction. A truncated gene is not counted as recovered. AMR gene recall against curated truth. | `feature_preservation.py` |
+| **5. Computational performance** | Is it efficient and reliable? | **Done** | Success rate, resource failures kept apart from tool failures, median and 90th percentile runtime, peak memory, thread-seconds per recovered plasmid, CPU utilisation (where recorded), and a runtime and memory scaling exponent against reference size. | `performance_summary.py` |
+
+The same layer adds: **statistical power** (the smallest paired difference this cohort can detect, per tool pair, and the
+clusters needed for a target difference: `power_analysis.py`), **scenario tags** (simple, complex, annotated, challenging,
+plasmid-free, with performance per scenario so a tool cannot look better because it met easier isolates: `scenario_tags.py`),
+and **reproducibility across repeated runs** (`compare_runs.py`, which needs two or more result directories).
+
+### Why the composite is optional, and how it is built
+
+A weighted composite is easy to read and easy to misuse: weights are a judgement, speed can buy back missing plasmids, and
+near-duplicate metrics double-count. PlasBench therefore pre-specifies **endpoints** for the headline and offers a composite
+only as an optional, descriptive view (`python/composite_score.py`, shown in the report as "Five-dimension view"):
+
+- weights live in `config/composite_weights.tsv` (default accuracy 30, completeness 20, structure 25, biology 15,
+  performance 10, described as a proposal, not a standard);
+- each component becomes a 0-100 score and a dimension is the mean of its components;
+- a dimension is used only if **every** tool in the track has it, otherwise it is dropped for all and listed, and weights are
+  renormalised, so a composite is never compared across tools scored on different dimensions;
+- **gates**: a tool whose accuracy or completeness dimension is below its minimum (default 50) is shown but **not ranked**,
+  however fast it is;
+- **sensitivity**: the rank with each dimension left out, and over 500 random reweightings its mean, best and worst rank and
+  the share of draws in which it is first. A ranking that does not survive this should not be reported as a ranking.
+
+Raw values and dimension scores always appear next to it. The composite never changes the leaderboard.
+
+### Which task is being benchmarked?
+
+All of them, in separate tracks that are never pooled. Tools that take **reads** and tools that take an **assembly** are ranked
+within their own input track (`short_read`, `long_read`, `hybrid`). Tools that **reconstruct** plasmids (bins) are ranked apart
+from tools that only **classify** contigs. **Metagenomic** communities use a separate bin-scoring track with its own truth
+([docs/METAGENOMICS.md](docs/METAGENOMICS.md)). Evaluation metrics, truth and thresholds differ by task, so one undifferentiated
+scorecard is not used.
+
+### How PlasBench maps to the individual metrics
+
+| Metric | Status | What PlasBench does | Where |
+|---|---|---|---|
+| Base-pair recall, precision, F1 | Done | Plasmid bases covered (TP), chromosome bases covered (FP), plasmid bases missed (FN). | `score_plasmids.py`; `mean_f1` |
+| Recall / precision after optimal matching | Done (binning-capable tools) | Hungarian match; length-weighted binning F1 is the reconstruction headline. | `score_bins.py`; `ranking_score` |
+| Proportion perfectly reconstructed | Done | CPRR: truth plasmids reconstructed whole, alone and accurately. | `<tool>.cprr.tsv`; `cprr` |
+| Nucleotide identity, mismatch, indel rates | Done | Where truth is independent of the benchmark's reads. | `benchmark.accuracy.tsv` |
+| Missing regions | Done | Count, total and longest gap per truth plasmid. | `benchmark.missing_regions.tsv` |
+| Sensitivity and specificity | Partial | Base-level sensitivity equals recall; specificity is per isolate. A per-contig version is not computed (the full contig set is only known when a tool supplies its candidates). | `recall`; `isolate_specificity` |
+| NMI, variation of information, homogeneity, completeness, V-measure | Done (descriptive) | Base-pair weighted; unclaimed chromosome excluded. | `bin_summary`; `benchmark.bin_quality.tsv` |
+| Bin quality tiers (high, medium) and yield | Done | At least 90% complete and at most 5% contaminated is high; at least 50% and 10% is medium. | `benchmark.bin_quality.tsv` |
+| NGOC (gene-order conservation) | Done | Projection of truth features through the alignments; gene-order with a gene table, landmark-order with landmarks only. | `benchmark.ngoc.tsv` |
+| Feature and gene recovery | Done | Full length, truncated, missed. | `benchmark.feature_preservation.tsv` |
+| Median and IQR by size band and ARG status | Done | Per-plasmid completeness within <10 kb, 10-50 kb, >50 kb and by resistance-gene carriage. | `benchmark.recovery_by_replicon.tsv` |
+| Repeat-aware matching | Partial | Repeat effects reported as diagnostics (recall ceiling, ambiguity); matching is not repeat-aware; PlasEval only as an imported cross-check. | `repeat_ambiguity_bp`; `plasbench import-external-benchmark` |
+| Database-dependent recovery vs novel plasmids | Partial | A release-date screen exists, but every tool's database date is still blank, so every pair is `unknown`. | `flag_database_overlap.py` |
+
+### What is still open
+
+These need data, compute or an external tool, not code, or are being done elsewhere. Nothing below is claimed as done.
+
+| Priority | Gap | Why it is still open |
+|---|---|---|
+| 1 | **A real-data run on `public-v2`, published with intervals, per-sample tables and the manifest** | Needs compute and data. Every ranking and performance claim depends on it. |
+| 2 | **Tool-database release dates**, then a sequence-level overlap screen | The dates come from each tool's maintainers; the screen needs each tool's database content. |
+| 3 | **Independent audit of references, and read support for every truth replicon** | Needs the reads and curation. |
+| 4 | **An external validation cohort, and a simulation that the intervals have their nominal coverage under clustered sampling** | Needs data and a study design. |
+| 5 | **Plasmid-free, hard-structure and taxonomically broader isolates** | Data curation. |
+| 6 | **A first-class PlasEval adapter and repeat-aware matching** | Needs the external tool and real data to validate. |
+| 7 | **Calibration of per-record probabilities and trivial baselines scored like tools** | In progress on another branch. |
+| 8 | **Per-contig sensitivity and specificity** | Needs the full contig set per tool. |
+| 9 | **Documentation split**: a short quick start plus reference documents | A 3,000-line README is hard to keep true; a larger editorial task. |
+
+### Areas of expansion
+
+- **Cohort breadth**: cap *E. coli*, add *Enterococcus*, *Pseudomonas*, *Vibrio*, Gram-positive and African clinical, veterinary and environmental isolates; fill blank depth, plasmid-count and study fields.
+- **Scenario benchmarks**: a curated panel per scenario (simple, complex, annotated, challenging) once enough isolates exist ([docs/SCENARIOS.md](docs/SCENARIOS.md)).
+- **Long-read track**: a long-read depth ladder and a clear statement of which samples qualify.
+- **Metagenomic track**: more real physical-community truth, beyond the BMock12 control.
+- **Temporal and geographic hold-outs**: evaluate on isolates newer than every tool's database.
+- **Surveillance outputs**: per-tool yield of resistance-plasmid recovery by gene class (ESBL, carbapenemase, colistin), once curated AMR truth exists for enough isolates.
+- **Usability**: a pre-built container or notebook route for laboratories without Linux administration.
+
+What this benchmark does **not** do, and should not be read as doing: identify, cluster or relate plasmids, search PLSDB, infer
+outbreaks, or confirm that a candidate is a real closed plasmid. See the [FAQ](FAQ.md) for the evidence behind each statement,
+the section-by-section answers to the reviewer question bank, and the list of what is still open.
 
 ---
 
@@ -400,6 +525,9 @@ plasbench test && plasbench demo
 
 - **[docs/SCIENTIFIC_GUIDE.md](docs/SCIENTIFIC_GUIDE.md)** — what PlasBench does, how, and
   why; its scope; every metric; how to validate it; and what has and has not been shown.
+- **[`FAQ.md`](FAQ.md)** — the hard questions a reviewer or new user will ask (scope, truth,
+  scoring, statistics, leakage, reproducibility), each answered with the file or test that
+  supports it and an explicit list of what is still open.
 - **[Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** — every
   command, from a bare machine to a leaderboard, with what to do when a step fails.
 - **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
@@ -1511,6 +1639,8 @@ ones you'll actually reach for most often; every command has more than shown her
 | `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
 | `validate-cohort` | Check a cohort sheet's schema, or verify it against NCBI online. | *`--samples`*, `--online`, `--write-lock`, `--verify-lock`, `--ledger` |
 | `validate-orthogonal-evidence` | Validate optional independent laboratory/technology evidence without changing computational scores. | *`--evidence`*, `--out` |
+| `derive-amr-truth` | Draft AMR truth from reference annotation; never writes `truth_amr.tsv`. | *`--features`*, *`--truth`*, *`--out`* |
+| `audit-truth-labels` | Screen PLASMID/CHROMOSOME truth labels against replicon/MOB evidence (advisory). | `--data-dir`, `--out` |
 | `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |

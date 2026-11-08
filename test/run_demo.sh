@@ -53,7 +53,8 @@ while IFS=$'\t' read -r SAMPLE _; do
         [[ -s "$AMR" ]] && ARGS+=(--amr-genes "$AMR")
         [[ -s "$CIRCULAR" ]] && ARGS+=(--circular-plasmids "$CIRCULAR")
         python3 "$PY/score_plasmids.py" --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
-            "${ARGS[@]}" --sample "$SAMPLE" --tool "$TOOL" --out "$SCORES"
+            "${ARGS[@]}" --per-plasmid-out "$SDIR/${TOOL}.per_plasmid.tsv" \
+            --sample "$SAMPLE" --tool "$TOOL" --out "$SCORES"
 
         BINS="$SDIR/pred_${TOOL}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$TOOL"; then
@@ -90,6 +91,47 @@ fi
 
 python3 "$PY/aggregate_results.py" --scores "$SCORES" --tool-status "$STATUS" \
     --sample-sheet "$SAMPLES" --out-prefix "$DEMO/benchmark"
+# Advisory layers, same scripts and arguments as stage 6: never ranked, never alter scores.
+python3 "$PY/stratify_recovery.py" --results-dir "$DEMO" --data-dir "$DEMO" \
+    --out "$DEMO/benchmark.recovery_by_replicon.tsv"
+python3 "$PY/audit_truth_labels.py" --data-dir "$DEMO" --out "$DEMO/benchmark.truth_label_audit.tsv"
+python3 "$PY/rank_sensitivity.py" --scores "$SCORES" --results-dir "$DEMO" --data-dir "$DEMO" \
+    --out-prefix "$DEMO/benchmark" --min-alignment-length 1 --min-alignment-identity 0 \
+    --min-alignment-mapq 0 --min-alignment-query-coverage 0   # the demo scores with the scorer's own permissive filters
+# Further dimensions: the same scripts and arguments as stages 5 and 6, so the offline demo exercises them.
+for SDIR_X in "$DEMO"/*/; do
+    SAMPLE_X="$(basename "$SDIR_X")"; [[ -s "$SDIR_X/truth.tsv" ]] || continue
+    for PAF_X in "$SDIR_X"*.pred_vs_ref.paf; do
+        TOOL_X="$(basename "$PAF_X" .pred_vs_ref.paf)"
+        python3 "$PY/alignment_accuracy.py" --truth "$SDIR_X/truth.tsv" --paf "$PAF_X" --sample "$SAMPLE_X" \
+            --tool "$TOOL_X" --out "$SDIR_X/${TOOL_X}.accuracy.tsv" --regions-out "$SDIR_X/${TOOL_X}.missing_regions.tsv"
+        FEATURES_X="$SDIR_X/truth_features.tsv"; [[ -s "$SDIR_X/truth_proteins.tsv" ]] && FEATURES_X="$SDIR_X/truth_proteins.tsv"
+        CIRC_X=(); [[ -s "$SDIR_X/truth_circular.tsv" ]] && CIRC_X=(--circular-plasmids "$SDIR_X/truth_circular.tsv")
+        [[ -s "$FEATURES_X" ]] && python3 "$PY/feature_preservation.py" --truth "$SDIR_X/truth.tsv" --paf "$PAF_X" \
+            --features "$FEATURES_X" "${CIRC_X[@]}" --sample "$SAMPLE_X" --tool "$TOOL_X" \
+            --out "$SDIR_X/${TOOL_X}.feature_preservation.tsv" --ngoc-out "$SDIR_X/${TOOL_X}.ngoc.tsv"
+        BINS_X="$SDIR_X/pred_${TOOL_X}.bins.tsv"
+        if [[ -s "$BINS_X" ]] && binning_capable "$TOOL_X"; then
+            python3 "$PY/bin_quality.py" --truth "$SDIR_X/truth.tsv" --paf "$PAF_X" --bins "$BINS_X" \
+                --sample "$SAMPLE_X" --tool "$TOOL_X" --out "$SDIR_X/${TOOL_X}.bin_quality.tsv"
+        fi
+    done
+done
+DIM="$DEMO/benchmark"
+for table in accuracy missing_regions feature_preservation ngoc bin_quality; do
+    python3 "$PY/merge_tables.py" --results-dir "$DEMO" --suffix ".${table}.tsv" --out "$DIM.${table}.tsv"
+done
+python3 "$PY/mask_accuracy.py" --accuracy "$DIM.accuracy.tsv"
+python3 "$PY/performance_summary.py" --tool-status "$STATUS" --scores "$SCORES" --data-dir "$DEMO" \
+    --threads 1 --out "$DIM.performance.tsv"
+python3 "$PY/power_analysis.py" --scores "$SCORES" --sample-sheet "$SAMPLES" --out "$DIM.power.tsv"
+python3 "$PY/scenario_tags.py" --scores "$SCORES" --data-dir "$DEMO" --sample-sheet "$SAMPLES" \
+    --out "$DIM.scenarios.tsv" --performance-out "$DIM.scenario_performance.tsv"
+python3 "$PY/composite_score.py" --scores "$SCORES" --accuracy "$DIM.accuracy.tsv" \
+    --feature-preservation "$DIM.feature_preservation.tsv" --ngoc "$DIM.ngoc.tsv" \
+    --bin-quality "$DIM.bin_quality.tsv" --performance "$DIM.performance.tsv" \
+    --out "$DIM.composite.tsv" --sensitivity-out "$DIM.composite_sensitivity.tsv"
+
 python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES" \
     --out "$DEMO/benchmark.recommendation_validation.tsv" --min-train-samples 1
 python3 "$PY/select_operational_method.py" --scores "$SCORES" --sample-sheet "$SAMPLES" \
@@ -106,6 +148,12 @@ python3 "$PY/build_html_report.py" \
     --recommendations "$DEMO/benchmark.recommendations.tsv" \
     --recommendation-validation "$DEMO/benchmark.recommendation_validation.tsv" \
     --manifest "$DEMO/run_manifest.json" \
+    --recovery-by-replicon "$DEMO/benchmark.recovery_by_replicon.tsv" \
+    --truth-label-audit "$DEMO/benchmark.truth_label_audit.tsv" \
+    --dimensions-prefix "$DEMO/benchmark" \
+    --comparisons "$DEMO/benchmark.paired_comparisons.tsv" \
+    --stratified "$DEMO/benchmark.stratified.tsv" \
+    --rank-robustness "$DEMO/benchmark.rank_robustness.tsv" \
     --out "$DEMO/benchmark.report.html"
 
 echo
