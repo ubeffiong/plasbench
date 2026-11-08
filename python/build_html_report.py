@@ -2556,6 +2556,18 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # Evaluation additions learned from PlasEval, plsMD and GAEMR (python/report_learnings.py): read from the stage-6 tables.
     import report_learnings
     page = report_learnings.inject(page, str(out.parent), args.scores)
+    # Report overhaul: scorecard, circular plasmid maps, workflow figure and the "Data in this report" inventory
+    # (python/report_scorecard.py, report_maps.py, report_workflow.py, report_surfaces.py; shared helpers in report_common.py).
+    import report_common
+    import report_maps
+    import report_scorecard
+    import report_surfaces
+    import report_workflow
+    page = report_common.add_style(page)
+    page = report_scorecard.inject(page, str(out.parent), args.scores)
+    page = report_maps.inject(page, str(out.parent), args.data_dir, args.scores)
+    page = report_workflow.inject(page, str(out.parent), args.scores, args.tool_status, args.data_dir)
+    page = report_surfaces.inject(page, str(out.parent), args.data_dir)
     out.parent.mkdir(parents=True, exist_ok=True)
     (out.parent / (out.name.split(".report")[0] + ".scoring_spec.md")).write_text(
         report_scoring_spec.markdown(spec_sources), encoding="utf-8")
