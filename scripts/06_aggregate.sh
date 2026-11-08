@@ -284,6 +284,15 @@ python3 "$HERE/../python/build_html_report.py" \
     --stratified "$RESULTS_DIR/benchmark.stratified.tsv" \
     --orthogonal-summary "$RESULTS_DIR/orthogonal_validation.summary.json" \
     --dimensions-prefix "$RESULTS_DIR/benchmark" \
+    --label-schemes "$RESULTS_DIR/benchmark.label_schemes.tsv" \
+    --label-scheme-summary "$RESULTS_DIR/benchmark.label_scheme_summary.tsv" \
+    --truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv" \
+    --outcome-states "$RESULTS_DIR/benchmark.outcome_states.tsv" \
+    --recommender-eval "$RESULTS_DIR/benchmark.recommender_eval.tsv" \
+    --recommender-verdict "$RESULTS_DIR/benchmark.recommender_verdict.json" \
+    --warning-eval "$RESULTS_DIR/benchmark.warning_eval.tsv" \
+    --leave-taxon-out "$RESULTS_DIR/benchmark.leave_taxon_out.tsv" \
+    --amr-placement "$RESULTS_DIR/benchmark.amr_placement.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."
@@ -301,6 +310,7 @@ log "  Truth-label audit : $RESULTS_DIR/benchmark.truth_label_audit.tsv (advisor
 log "  Further dimensions: $RESULTS_DIR/benchmark.{accuracy,missing_regions,feature_preservation,ngoc,bin_quality,performance,power,scenarios,scenario_performance,composite,composite_sensitivity}.tsv (advisory only)"
 log "  Study holdout test : $RESULTS_DIR/benchmark.recommendation_validation.tsv"
 log "  Cohort QC flags   : $RESULTS_DIR/benchmark.cohort_qc_flags.tsv (advisory only)"
+log "  Scoring spec      : $RESULTS_DIR/benchmark.{label_schemes,label_scheme_summary,outcome_states,recommender_eval,recommender_regret,warning_eval,leave_taxon_out,amr_placement,assembly_qc}.tsv and benchmark.scoring_spec.md"
 if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
     log "  Recommendation model: $RESULTS_DIR/benchmark.recommendation_model.json"
     log "  Model card           : $RESULTS_DIR/benchmark.recommendation_model.card.md"

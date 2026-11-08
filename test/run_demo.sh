@@ -59,10 +59,23 @@ while IFS=$'\t' read -r SAMPLE _; do
         BINS="$SDIR/pred_${TOOL}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$TOOL"; then
             python3 "$PY/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
+                --outcomes-out "$SDIR/${TOOL}.plasmid_outcomes.tsv" \
                 --out "$SDIR/${TOOL}.bin_matches.tsv" --summary "$SDIR/${TOOL}.bin_summary.tsv" >/dev/null
+        fi
+        # AMR placement, as stage 5 runs it when curated AMR truth exists.
+        if [[ -s "$AMR" ]]; then
+            PLACE_ARGS=()
+            [[ -s "$BINS" ]] && binning_capable "$TOOL" && PLACE_ARGS+=(--bins "$BINS")
+            [[ -s "$FEATURES" ]] && PLACE_ARGS+=(--features "$FEATURES")
+            python3 "$PY/score_amr_placement.py" score --sample "$SAMPLE" --tool "$TOOL" --truth "$TRUTH" \
+                --amr-truth "$AMR" --paf "$PAF" --pred-fasta "$PRED" "${PLACE_ARGS[@]+"${PLACE_ARGS[@]}"}" \
+                --out "$SDIR/${TOOL}.amr_placement.tsv" 2>/dev/null
         fi
     done
     shopt -u nullglob
+    # Stage 2 equivalent: every replicon under the three labelling schemes.
+    python3 "$PY/label_schemes.py" build --sample "$SAMPLE" --truth "$TRUTH" --truth-source demo_synthetic \
+        --nonchromosomal-out "$SDIR/truth.nonchromosomal.tsv" --out "$SDIR/label_schemes.tsv" 2>/dev/null
 
     python3 "$PY/call_structural_variants.py" --truth "$TRUTH" --results-dir "$DEMO" \
         --sample "$SAMPLE" --events-out "$SDIR/structural_events.tsv" \
@@ -134,6 +147,18 @@ python3 "$PY/composite_score.py" --scores "$SCORES" --accuracy "$DIM.accuracy.ts
 
 python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES" \
     --out "$DEMO/benchmark.recommendation_validation.tsv" --min-train-samples 1
+# Scoring specification layers, same scripts as stage 6.
+python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark.label_schemes.tsv" \
+    --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"
+python3 "$PY/truth_provenance.py" --sample-sheet "$SAMPLES" --data-dir "$DEMO" \
+    --out "$DEMO/benchmark.truth_provenance.tsv" >/dev/null
+python3 "$PY/score_amr_placement.py" collect --results-dir "$DEMO" --out "$DEMO/benchmark.amr_placement.tsv"
+python3 "$PY/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
+    --out-prefix "$DEMO/benchmark" --min-train-samples 1
+python3 "$PY/evaluate_warnings.py" --regret "$DEMO/benchmark.recommender_regret.tsv" \
+    --cohort-qc-flags "$DEMO/benchmark.cohort_qc_flags.tsv" --out-prefix "$DEMO/benchmark"
+python3 "$PY/leave_taxon_out.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
+    --out-prefix "$DEMO/benchmark" --min-train-samples 1
 python3 "$PY/select_operational_method.py" --scores "$SCORES" --sample-sheet "$SAMPLES" \
     --results-dir "$DEMO" --tool-status "$STATUS" --out-prefix "$DEMO/benchmark" \
     --recommendation-validation "$DEMO/benchmark.recommendation_validation.tsv" \
@@ -154,6 +179,16 @@ python3 "$PY/build_html_report.py" \
     --comparisons "$DEMO/benchmark.paired_comparisons.tsv" \
     --stratified "$DEMO/benchmark.stratified.tsv" \
     --rank-robustness "$DEMO/benchmark.rank_robustness.tsv" \
+    --data-dir "$DEMO" \
+    --label-schemes "$DEMO/benchmark.label_schemes.tsv" \
+    --label-scheme-summary "$DEMO/benchmark.label_scheme_summary.tsv" \
+    --truth-provenance "$DEMO/benchmark.truth_provenance.tsv" \
+    --outcome-states "$DEMO/benchmark.outcome_states.tsv" \
+    --recommender-eval "$DEMO/benchmark.recommender_eval.tsv" \
+    --recommender-verdict "$DEMO/benchmark.recommender_verdict.json" \
+    --warning-eval "$DEMO/benchmark.warning_eval.tsv" \
+    --leave-taxon-out "$DEMO/benchmark.leave_taxon_out.tsv" \
+    --amr-placement "$DEMO/benchmark.amr_placement.tsv" \
     --out "$DEMO/benchmark.report.html"
 
 echo
