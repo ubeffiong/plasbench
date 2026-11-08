@@ -52,6 +52,186 @@ annotations. These evidence layers are explicitly non-scoring. The
 [metagenomics guide](docs/METAGENOMICS.md) documents PPR-Meta, PlasmidHunter,
 EBI MAP, plsMD, and experimental Plassembler boundaries.
 
+## How scoring works (at a glance)
+
+One metric covers every tool, whether it classifies existing contigs (Platon,
+mob_recon) or reassembles plasmids (plasmidSPAdes, gplas): each tool's predicted
+plasmid sequence is projected onto the complete reference, and the score is
+computed **per reference base**. Implementation: `python/score_plasmids.py`
+(called by `scripts/05_score.sh`); full details in [docs/METHODS.md](docs/METHODS.md).
+
+**Procedure (per sample and tool)**
+
+1. **Truth.** Every base of the complete long-read/hybrid reference is labelled
+   `PLASMID` or `CHROMOSOME` (`truth.tsv`: `sequence_id`, `molecule_type`, `length`).
+2. **Prediction.** The tool emits a FASTA of the sequence it believes is plasmid
+   (an empty file if it predicts nothing).
+3. **Mapping.** The FASTA is mapped to the reference with
+   `minimap2 --secondary=no`. Primary alignments only, so repeats cannot inflate
+   a claim across several replicons. Optional filters: minimum alignment length,
+   identity, MAPQ and query coverage.
+4. **Coverage.** Overlapping alignments are merged, so each reference base counts once.
+5. **Confusion matrix** (positive class = plasmid):
+
+| Term | Meaning |
+|---|---|
+| **TP** | reference **plasmid** bases covered by a prediction |
+| **FP** | reference **chromosome** bases covered by a prediction |
+| **FN** | reference **plasmid** bases not covered |
+
+### Primary metrics (F1 ranks the tools)
+
+All three are computed from the base counts TP, FP and FN above, once per
+(sample, tool) pair. They are the only metrics used to rank tools.
+
+#### Precision = TP / (TP + FP)
+
+- **What it is:** of all the reference bases the tool claimed as plasmid, the fraction
+  that really are plasmid.
+- **Example:** a tool covers 100 kb, of which 90 kb is true plasmid and 10 kb is
+  chromosome. Precision is 90 / 100 = 0.90.
+- **Why it is used:** it is the complement of chromosomal contamination. A tool can
+  recover every plasmid by calling the whole genome plasmid, and precision is what
+  punishes that. It matters to anyone who will act on the output, for example when
+  annotating resistance genes as plasmid-borne.
+- **Reading it:** 1.0 means no chromosome was claimed. Low values mean the tool is
+  pulling in chromosomal sequence.
+
+#### Recall = TP / (TP + FN)  (also called completeness)
+
+- **What it is:** of all the true plasmid bases, the fraction the tool recovered.
+- **Example:** an isolate has 200 kb of true plasmid and the tool covers 150 kb of it.
+  Recall is 150 / 200 = 0.75.
+- **Why it is used:** it is the complement of missed plasmid. A tool that predicts one
+  tiny correct contig has perfect precision but near-zero recall, and recall is what
+  exposes that.
+- **Reading it:** 1.0 means every true plasmid base was covered. Low values mean
+  plasmids were missed or only partly recovered.
+
+#### F1 = 2 · precision · recall / (precision + recall)
+
+- **What it is:** the harmonic mean of precision and recall.
+- **Why it is used:** precision and recall trade off against each other, so neither
+  alone ranks tools fairly. The harmonic mean is low if *either* is low, so a tool
+  cannot score well by maximising one at the expense of the other. It is the single
+  number the leaderboard ranks on (mean F1 across samples).
+- **Reading it:** 1.0 is perfect reconstruction at base level. 0 means no overlap with
+  the true plasmid sequence.
+
+**Edge cases (deliberate):**
+
+| Situation | Precision | Recall | F1 | Reason |
+|---|---|---|---|---|
+| Tool predicts nothing, isolate has plasmids | blank | 0 | **0** | Abstaining must be penalised. Leaving F1 blank would drop exactly the samples a tool failed on from its average. |
+| Isolate has no true plasmid, tool predicts nothing | blank | blank | blank | The tool did the right thing. Scoring it 0 would read as failure. |
+| Isolate has no true plasmid, tool predicts something | 0 (TP is always 0) | blank | blank | Recall and F1 are undefined with nothing to recall. Use the negative-control metrics below. |
+
+Undefined values are written as blank, never as `0`, so a missing value cannot be
+mistaken for a real zero.
+
+### Supplementary metrics (never replace F1)
+
+These explain *why* an F1 came out as it did. They are reported next to the primary
+metrics but never used to rank tools.
+
+#### Per-plasmid recovery (object-level view)
+
+Base-level recall pools all plasmids together, so it cannot tell "one big plasmid
+fully recovered and three small ones missed" from "all four partly recovered". These
+metrics count whole plasmids instead. For each true plasmid, `completeness` is its
+covered length divided by its total length.
+
+| Metric | Definition | Why it is used |
+|---|---|---|
+| `plasmid_recall` | Fraction of true plasmids with completeness at or above the recovery threshold (default 0.90, set with `--plasmid-recovery-threshold`). `recovered_plasmid_count` is the numerator. | A "how many plasmids did it get" answer, which is how users often think about the problem. |
+| `plasmid_recall_ge50` | Fraction of true plasmids at least 50% covered. | Separates a half-assembled plasmid from one that was barely started. |
+| `plasmid_recall_ge90` | Fraction of true plasmids at least 90% covered. | The stricter band, kept at a fixed value even if the configurable threshold changes. |
+| `complete_circular_plasmid_recall` | Fraction of circular truth plasmids that are essentially fully covered (completeness ≥ 0.99995). Only defined when circular truth is supplied with `--circular-plasmids`. | The strictest per-plasmid claim. It shows whether a plasmid was recovered whole. |
+
+Two tools can share the same `plasmid_recall` and mean F1 while one has plasmids
+50% complete and the other 100% complete. The graded bands expose that difference.
+
+#### Negative-control metrics (false-positive behaviour)
+
+On an isolate with no true plasmid, precision, recall and F1 are undefined (see the
+edge-case table), so these are the only metrics that can measure false positives there.
+
+| Metric | Definition | Why it is used |
+|---|---|---|
+| `isolate_specificity` | (chromosome bp − FP) / chromosome bp: the fraction of chromosome *not* wrongly claimed. The classic true-negative rate. | Tells you how clean a tool is on a plasmid-free genome. |
+| `chromosome_fp_bp` | Number of chromosome bases claimed as plasmid (equal to FP). | The absolute amount of contamination. |
+| `fp_predicted_record_count` | Number of distinct predicted contigs with any coverage on chromosome. | "How many separate contigs were wrongly called plasmid" can be more informative than "how many bases". |
+
+#### Prediction-side diagnostics (not counted as FP)
+
+These describe predicted bases that cannot be scored as TP or FP. They are kept out of
+the confusion matrix on purpose, so the core precision stays conservative and defensible.
+
+| Metric | Definition | Why it is used |
+|---|---|---|
+| `mapped_pred_bp` | Predicted bases that align to a truth-labelled reference sequence. | The denominator-side view of what could be scored. |
+| `unmapped_pred_bp` | Predicted bases that align nowhere. | Likely mis-assembly or contamination, a failure mode different from calling chromosome plasmid. |
+| `off_truth_pred_bp` | Predicted bases that align only to a reference sequence absent from the truth table (e.g. a contig the NCBI sequence report never classified). | A different failure from "does not align at all". Not scorable either way. |
+| `ambiguously_mapped_pred_bp` (and `unambiguously_mapped_pred_bp`) | Predicted bases with retained alignments to *both* a plasmid and a chromosome sequence, found with a secondary-alignment run. | Flags repeats and shared elements where the molecular assignment is genuinely uncertain. It never changes TP, FP or F1. |
+
+#### AMR gene recall and circular plasmid recall
+
+- **`amr_gene_recall`:** fraction of curated antimicrobial-resistance gene intervals on
+  true plasmids that are at least 90% covered (`--amr-gene-recovery-threshold`).
+  *Why:* resistance genes are the usual reason to reconstruct plasmids, so it measures
+  recovery of the sequence that matters most clinically. It needs a curated AMR truth TSV.
+- **`circular_plasmid_recall` / `circular_truth_plasmid_recovery`:** fraction of
+  circular reference plasmids recovered at the recovery threshold. *Why:* it shows
+  whether tools recover circular replicons. It only says the *reference* plasmid is
+  circular and covered. It does not claim the tool closed the circle.
+
+Both are blank unless the matching curated truth file is supplied.
+
+#### PR-AUC (threshold-free ranking quality)
+
+- **What it is:** the area under the precision-recall curve for tools that give each
+  contig a probability instead of only a yes/no call (the `adapters/SCORES.md` contract).
+  The script includes contigs in order of descending probability, recomputes precision and
+  recall at each threshold, and integrates with the trapezoid rule. The curve starts at
+  (recall 0, precision 1.0), the standard convention.
+- **Why it is used:** F1 depends on the tool's own chosen cut-off. PR-AUC shows how good
+  the underlying scores are, whatever cut-off is used. It is output only for tools that
+  supply probabilities, and the curve points go to `--pr-curve-out`.
+
+### Scoring parameters
+
+| Option | Default | Effect |
+|---|---|---|
+| `--min-alignment-length` | 1 | Drop alignments shorter than this many bases. |
+| `--min-alignment-identity` | 0.0 | Drop alignments with matches / block length below this. |
+| `--min-alignment-mapq` | 0 | Drop alignments with lower mapping quality. |
+| `--min-alignment-query-coverage` | 0.0 | Drop alignments covering less than this fraction of the predicted record. |
+| `--plasmid-recovery-threshold` | 0.90 | Completeness needed to count a plasmid as recovered. |
+| `--amr-gene-recovery-threshold` | 0.90 | Coverage needed to count an AMR gene as recovered. |
+
+**Aggregation and ranking** (`python/aggregate_results.py`)
+
+- Tools are ranked by **mean F1**, separately within each track (short-read, long-read, hybrid).
+- Ranking uses only plasmid-bearing samples that every tool in the track has a result
+  for (`ranking_basis = shared_samples`). A tool that crashed on a sample counts as
+  F1 = 0 there, so it cannot rise by failing on hard isolates.
+- Uncertainty: a deterministic 1,000-resample bootstrap CI on mean F1, paired per-sample
+  differences with win/tie/loss counts, and `significant_vs_runner_up` (sign-flip
+  permutation test, 10,000 permutations, Holm-corrected; needs at least 5 paired
+  samples, otherwise `not_assessed`).
+
+**Optional diagnostics (never ranked).** Stage 6 also writes
+`benchmark.recovery_by_replicon.tsv`, which breaks per-plasmid recovery down by replicon
+(Inc/rep) and MOB type, and the HTML report shows it next to an optional QUAST structural
+summary (`RUN_QUAST_DIAGNOSTICS=1`, off by default; see [INSTALL.md](INSTALL.md)). A draft AMR
+truth can be generated from reference annotation with `python/derive_amr_truth.py`. It is
+never scored until a human reviews and promotes it. Details: [docs/METHODS.md](docs/METHODS.md).
+
+**Caveats.** The metric is base-level: a plasmid split into many contigs scores the
+same as one assembled whole (bin-level, split and merge metrics are reported
+separately). Metagenomic bins use a different scorer (`python/score_bins.py`); see the
+[metagenomics guide](docs/METAGENOMICS.md).
+
 For each isolate the pipeline:
 
 1. downloads a **complete reference assembly** (long-read/hybrid → ground truth) and the
