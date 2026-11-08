@@ -275,25 +275,18 @@ stability, leakage or per-species performance is therefore unsupported until a `
 **Status.** **Open.** This is the largest gap, and it needs compute and data, not code.
 
 ### Q23. Is CI actually checking anything?
-**Answer.** The `test` job previously failed at the shellcheck install step, so no tests ran, and `main`
-was already red. The apt-based shellcheck install is commit `5d9e28d` (audit branch, not yet on `main`).
-This change also installs minimap2 so the golden test runs.
-**Status.** Fixed on audit branch plus here; not confirmed until a pushed run goes green.
+**Answer.** It now does. The `test` job used to fail at the shellcheck install step, so no tests ran; the apt-based install and a
+warnings-only shellcheck gate landed on `main` in #8, and this change adds a `minimap2` install so the real-aligner golden test runs
+instead of skipping. CI passed on #8 and #9, including the container job.
+**Status.** Fixed (on `main`); the new `minimap2` step is confirmed only when this change's own CI run finishes.
 
 ### Q24. Does the full test suite pass?
-**Answer.** Not yet confirmed end to end. What was actually run on this change:
-- `test/run_tests.sh` under Git Bash on Windows: every test passed up to
-  `test_update_script.sh`, which needs symlinks that Git Bash on Windows does not provide
-  (it passes when run alone under Linux/WSL). The script stops at the first failure, so
-  the tests after it did not run there.
-- `test/run_tests.sh` under WSL against the Windows checkout: stopped at
-  `test_operational_reconstruct.sh`, whose CRLF line endings (from `autocrlf=true`)
-  break `set -o pipefail` on Linux.
-- The three new tests, `test_audit_truth_labels.py`, `test_scoring_controls.py` and
-  `test_stratify_multilabel.py`, pass; `test_scoring_real_minimap2.py` passes against real
-  minimap2 2.26 in WSL.
-A clean LF checkout on Linux is the right place for a full run; CI provides it.
-**Status.** Open until CI (or a Linux run) goes green.
+**Answer.** Yes, on the final state of this change: a clean Linux (WSL, Ubuntu) export of the branch, rebased on `main` at the time,
+ran `test/run_tests.sh` to completion, exit code 0, "ALL PLASBENCH TESTS PASSED", with real minimap2 2.26 installed so
+`test_scoring_real_minimap2.py` and `test_stage_dimensions.sh` ran against the real aligner. Two environment notes: on Windows Git
+Bash the suite stops at `test_update_script.sh` (no symlinks), and a checkout with CRLF line endings breaks the shell tests on Linux;
+use a Linux checkout or CI for a full run.
+**Status.** Verified for that run. It does not say anything about real data (Q22).
 
 ---
 
