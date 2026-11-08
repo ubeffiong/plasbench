@@ -700,10 +700,10 @@ A Wilcoxon signed-rank p-value (exact for n ≤ 25) and an equivalence flag sit 
 **Q-P19. Does it transfer to an unseen genus, and is there a holdout?**
 Leave-one-genus/phylum-out regret; `split=holdout` isolates are evaluated once only. *Fixed here.*
 
-**Q-P20. Is a contig-level score reported?**
+**Q-P20. Is a contig-level score reported, and is it checked?**
 Yes, as a parallel layer: contig F1 and MCC by count and length, contig-level binning F1,
-shared and unassigned lengths. Never the headline; not validated against a second scorer.
-*Fixed here.*
+shared and unassigned lengths. Never the headline. Every run cross-checks it against an
+independent alignment-free scorer (`benchmark.contig_crosscheck.tsv`). *Fixed here.*
 
 **Q-P21. What was not adopted, and why?**
 Plasmid-free isolates scored 0 in F1 (undefined there); summed contig length as the

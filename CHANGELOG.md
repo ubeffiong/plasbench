@@ -13,6 +13,14 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- cross-check, ENA fallback, demo coverage
+- **Independent second scorer for the contig layer** (`contig_crosscheck.py`): alignment-free k-mer
+  labels and separately written metrics; per-run agreement table, report and validity statement.
+- **ENA fallback for short reads** (`fetch_ena_reads.py`, `READ_SOURCE`): when `prefetch` fails (for
+  example an old SRA Toolkit failing TLS), the same run is fetched from ENA and MD5-verified.
+- The demo now has a synthetic assembly, so the contig layer, the cross-check, assembly statistics and
+  the QC-gate warnings render with real values.
+
 ### Added -- scoring specification and panel examination
 - **Pre-registration** (`config/prereg.tsv`, `freeze_prereg.py`): freeze/verify a SHA-256 lock; the
   manifest and report show the hash, lock state, `TO_FIX` items and departing settings;
