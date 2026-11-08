@@ -23,6 +23,10 @@ FIELDS = [
     # above, never a replacement -- see score_bins.py's clustering_agreement().
     "nmi", "variation_of_information",
     "perfect_reference_recovery", "strict_reference_reconstruction",
+    # Headline and secondary endpoints (score_bins.py): length-weighted
+    # binning metrics and correct-plasmid-reconstruction counts.
+    "lw_bin_precision", "lw_bin_recall", "lw_bin_f1",
+    "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",
 ]
 
 

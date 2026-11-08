@@ -52,6 +52,56 @@ annotations. These evidence layers are explicitly non-scoring. The
 [metagenomics guide](docs/METAGENOMICS.md) documents PPR-Meta, PlasmidHunter,
 EBI MAP, plsMD, and experimental Plassembler boundaries.
 
+## Scientific guide for domain experts
+
+> **Start here if you need to decide whether to trust, use, or independently check PlasBench.**
+> The **[Scientific Guide](docs/SCIENTIFIC_GUIDE.md)** explains what PlasBench does, how it does it,
+> and why, in terms a microbiologist, bioinformatician, AMR scientist, programme lead or reviewer can
+> judge without reading the code. It states the scope plainly, defines every metric, lists what has
+> and has not been validated, and tells each kind of expert how to check the claims themselves.
+
+**In one paragraph.** PlasBench benchmarks plasmid-*reconstruction* tools. For isolates that have a
+complete long-read or hybrid reference, it runs the tools on the isolate's short reads, maps each
+tool's predicted plasmid sequence onto the reference, and scores recovery per reference base, per
+plasmid and per bin. It ranks tools within separate input tracks and tasks, with uncertainty that
+respects non-independent isolates, and it reports how fragile the ranking is and whether database
+overlap could have inflated it.
+
+| PlasBench does | PlasBench does not |
+|---|---|
+| Compare plasmid-reconstruction and classification tools on a common, reproducible footing | Identify, cluster or classify the plasmids in *your* sample |
+| Show how and where each tool fails (contamination, splits, merges, missed plasmids, AMR genes) | Compare plasmids between isolates, search PLSDB, or infer relatedness |
+| Recommend a tool for a sample without truth, from benchmark evidence | Infer transmission, outbreaks or horizontal gene transfer |
+| Report what it could not assess (for example database leakage) | Diagnose, or prove a plasmid is closed or clinically meaningful |
+
+**Contents of the guide**
+
+<!-- GUIDE-TOC -->
+1. [What PlasBench is, and what it is not](docs/SCIENTIFIC_GUIDE.md#1-what-plasbench-is-and-what-it-is-not)
+2. [Concepts and vocabulary](docs/SCIENTIFIC_GUIDE.md#2-concepts-and-vocabulary)
+3. [How it works in one page](docs/SCIENTIFIC_GUIDE.md#3-how-it-works-in-one-page)
+4. [Inputs](docs/SCIENTIFIC_GUIDE.md#4-inputs)
+5. [The pipeline, stage by stage](docs/SCIENTIFIC_GUIDE.md#5-the-pipeline-stage-by-stage)
+6. [The tools evaluated](docs/SCIENTIFIC_GUIDE.md#6-the-tools-evaluated)
+7. [Scoring: what is measured, how, and why](docs/SCIENTIFIC_GUIDE.md#7-scoring-what-is-measured-how-and-why)
+8. [Ranking and statistics](docs/SCIENTIFIC_GUIDE.md#8-ranking-and-statistics)
+9. [Truth quality and leakage controls](docs/SCIENTIFIC_GUIDE.md#9-truth-quality-and-leakage-controls)
+10. [Long-read and hybrid tracks](docs/SCIENTIFIC_GUIDE.md#10-long-read-and-hybrid-tracks)
+11. [The metagenomic track](docs/SCIENTIFIC_GUIDE.md#11-the-metagenomic-track)
+12. [Operational mode: using the evidence](docs/SCIENTIFIC_GUIDE.md#12-operational-mode-using-the-evidence)
+13. [Outputs and how to read them](docs/SCIENTIFIC_GUIDE.md#13-outputs-and-how-to-read-them)
+14. [Reproducibility and provenance](docs/SCIENTIFIC_GUIDE.md#14-reproducibility-and-provenance)
+15. [Configuration reference](docs/SCIENTIFIC_GUIDE.md#15-configuration-reference)
+16. [A guide for domain experts: how to check it yourself](docs/SCIENTIFIC_GUIDE.md#16-a-guide-for-domain-experts-how-to-check-it-yourself)
+17. [Validation status and known limitations](docs/SCIENTIFIC_GUIDE.md#17-validation-status-and-known-limitations)
+18. [Scope matrix](docs/SCIENTIFIC_GUIDE.md#18-scope-matrix)
+19. [Further documentation](docs/SCIENTIFIC_GUIDE.md#19-further-documentation)
+<!-- /GUIDE-TOC -->
+
+**Reading paths.** *Microbiologist or AMR scientist:* sections 1, 4, 7, 13, 16.1, 17.
+*Bioinformatician:* sections 3, 5 to 8, 15, 16.2. *Public-health or programme lead:* sections 1, 12, 13,
+16.3, 17, 18. *Reviewer or funder:* sections 1, 17, 18, 16.4.
+
 ## How scoring works (at a glance)
 
 One metric covers every tool, whether it classifies existing contigs (Platon,
@@ -348,6 +398,8 @@ plasbench test && plasbench demo
 
 ### Where else to look
 
+- **[docs/SCIENTIFIC_GUIDE.md](docs/SCIENTIFIC_GUIDE.md)** — what PlasBench does, how, and
+  why; its scope; every metric; how to validate it; and what has and has not been shown.
 - **[Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** — every
   command, from a bare machine to a leaderboard, with what to do when a step fails.
 - **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
@@ -966,9 +1018,17 @@ result for that isolate and was left out of the scoring. `failed` on a
 plasmid-bearing isolate counts as F1 = 0 for that tool's ranking — a crash is the
 tool's result, not a free pass.
 
-**How to read the leaderboard.** `mean_f1` ranks tools on plasmid *bases* recovered,
-over the samples every tool in the track was scored on (`n_ranking_samples`). A tool
-that predicts nothing on an isolate with plasmids scores F1 = 0 there.
+**How to read the leaderboard.** Tools are ranked within their input track *and*
+task. Binning-capable tools are ranked on **reconstruction** by `ranking_score`, the
+length-weighted binning F1 (the primary endpoint: plasmid bases placed in the
+correct bin), with **CPRR** (`cprr`, the share of truth plasmids reconstructed
+correctly) as the secondary endpoint. Classifier-only tools are ranked separately on
+**classification** by base-level F1. The ranking score is averaged per species when
+enough independent isolates exist, uses reference tiers 1-2 only, and covers the
+samples every tool in the group was scored on (`n_ranking_samples`). A tool that
+predicts nothing, or fails, on an isolate with plasmids scores 0 there. See
+[docs/METHODS.md](docs/METHODS.md#research-design-endpoints-reference-standard-and-species-balance).
+`mean_f1` remains the base-level F1 for every tool.
 `mean_plasmid_recall` is the fraction of *whole plasmids* recovered. These are very
 different numbers and the second is usually far lower. If your question is "do I have
 this entire resistance plasmid?", read `mean_plasmid_recall`. Also read the confidence

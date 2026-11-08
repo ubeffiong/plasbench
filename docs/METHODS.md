@@ -545,6 +545,122 @@ not measured. Groups smaller than `--min-plasmids` (default 5) are flagged
 `underpowered`; with the current small cohorts most will be, so treat this as a way to
 spot patterns worth investigating, not as a ranking.
 
+## Research design: endpoints, reference standard and species balance
+
+These rules are pre-specified. Set every threshold in `config/config.sh` before a run
+and do not tune it afterwards.
+
+### Endpoints
+
+Plasmid reconstruction from a fragmented assembly has three parts, scored separately
+and reported together:
+
+| Outcome | What it measures | Metric |
+|---|---|---|
+| Detection | Is plasmid sequence called plasmid? | base-level precision, recall, F1 (classification) |
+| **Binning** (primary) | Are a plasmid's contigs grouped together, and only with each other? | **length-weighted binning F1** |
+| Reconstruction | Is each truth plasmid recovered whole, alone and accurately? | Correct Plasmid Reconstruction Rate (CPRR) |
+
+**Primary endpoint: length-weighted binning F1** (`lw_bin_f1`, `python/score_bins.py`).
+Predicted bins and truth plasmids are paired one-to-one by a Hungarian match that
+maximises aligned plasmid bases. Recall = bases placed in the correct (matched) bin /
+all truth-plasmid bases; precision = those bases / all bases the tool's bins align to
+(chromosome, other plasmids and unmatched bins count against it). It is computed per
+isolate and averaged across isolates. The older count-based `bin_f1` (matched bins /
+bins) is kept for continuity but is not a headline: a tiny correct bin counts as much
+as a 200 kb plasmid there. Clustering statistics (NMI, VI) remain supplementary
+because they can ignore contig length and misrepresent repeats.
+
+**Secondary endpoint: CPRR** = correctly reconstructed truth plasmids / all truth
+plasmids. A plasmid counts only if all of these hold for its matched bin:
+identified (matched); covers >= `CPRR_MIN_COVERAGE` (0.95) of the plasmid; the plasmid
+is >= `CPRR_MIN_SHARE` (0.95) of the bin's aligned bases (no chromosome contamination or
+merged plasmids); no other bin holds a substantial part of it (not split); and, only
+for truth not polished with the benchmark's own reads, alignment identity >=
+`CPRR_MIN_IDENTITY` (0.99). Per-plasmid verdicts are in `<tool>.cprr.tsv`. CPRR is
+pooled over plasmids, with a confidence interval from resampling whole clusters,
+because plasmids from one isolate are not independent. Circular closure of the
+prediction is reported separately (`complete_circular_plasmid_recall`) and is not
+part of CPRR, since most tools do not report topology.
+
+**Task tracks.** Binning-capable tools (`binning_capable=yes` in
+`config/tool_capabilities.tsv`) are ranked on the reconstruction track by
+`lw_bin_f1`. Classifier-only tools (Platon, geNomad, plasmidSPAdes as configured, ...)
+are ranked on a separate classification track by base-level F1. They are never scored
+zero on binning, a task they do not attempt, and the two tracks are never pooled.
+Input tracks (short-read, long-read, hybrid) stay separate as before.
+
+### Reference standard
+
+**Provenance** (`python/truth_provenance.py`, stage 6) classifies each truth assembly
+as `long_read_only`, `long_read_first_hybrid`, `short_read_first_hybrid` or
+`unknown`, and records whether it was polished with the benchmark's own Illumina reads
+(`truth_polish_reads`). Values come from the sample sheet when set, else PlasBench's
+own truth source (self-built truth is Unicycler, i.e. short-read-first), else NCBI's
+recorded assembly method and sequencing technologies. Derived values are heuristics
+and are labelled as such; set the sheet columns to override them.
+
+* **Short-read-first hybrids are not headline truth.** Their structure comes from the
+  same Illumina assembly graph the tools use, so truth and tools share repeat-resolution
+  errors.
+* **Long-read-first truth polished with the benchmark's reads is acceptable for
+  labelling** (contigs are assigned at about 95% identity, so residual polishing errors
+  do not change labels), **but not for base-level accuracy.** The CPRR identity
+  criterion is dropped for such truth (`base_level_metrics_valid = no`).
+
+**Reference tiers.** Tier 1 = long-read-first or long-read-only, independent of the
+benchmark reads, cohort tier A, evidence-checked labels. Tier 2 = long-read-first but
+failing a Tier-1 condition. Tier 3 = short-read-first, unknown provenance or cohort
+tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2);
+`benchmark.reference_tiers.tsv` and the report's tier-sensitivity chart show results by
+tier. When no sample reaches tier 2, the headline falls back to all samples and says
+so in `benchmark.headline_design.tsv`.
+
+**Evidence-based labels** (`python/label_truth_evidence.py`, stage 2). Source labels
+are confirmed with evidence, never assigned by size:
+
+* CHROMOSOME: source-labelled chromosome with rRNA genes (barrnap), or the largest
+  replicon with no plasmid marker.
+* PLASMID: source-labelled plasmid with at least one plasmid marker (replicon/Inc type
+  or MOB relaxase from MOB-typer/PlasmidFinder, or a Mash match to the plasmid
+  reference sketch), no rRNA genes and, when the isolate's long reads are staged,
+  long-read depth >= `TRUTH_MIN_LONG_READ_DEPTH` (small plasmids lost in long-read size
+  selection are short-read-only evidence).
+* AMBIGUOUS: anything with conflicting or missing evidence -- chromids and secondary
+  chromosomes without rRNA, plasmid-labelled replicons with rRNA, marker-free plasmids,
+  short-read-only plasmids.
+
+AMBIGUOUS replicons are removed from `truth.scored.tsv`, which scoring reads, so
+predictions on them are neither credited nor penalised (`off_truth_pred_bp`).
+`truth.tsv` stays complete. `truth_labels.tsv` records the evidence per replicon. If
+the marker callers did not run, source labels are kept and every row says
+`evidence_status = not_evaluated`. Caveat: plasmid markers come from the same kinds of
+databases many tools use, so labelling favours known plasmids. `marker_free` counts the
+plasmids excluded for lack of a marker (`marker_free_plasmids` in the provenance
+table), so this stratum is reported rather than hidden.
+
+### Species balance and independence
+
+The ranking score is the **mean of per-species means** over species with at least
+`MIN_SPECIES_CLUSTERS` (20) independent clusters, so one over-represented species
+cannot dominate. Smaller species are described only (`benchmark.species.tsv`). When no
+species qualifies, the pooled mean is used and labelled `pooled`. A **cluster** joins
+isolates that share a BioProject/study or a clonal group (`python/clonal_groups.py`:
+the sample sheet's `clonal_group`, e.g. ST or cgMLST cluster, else single-linkage
+whole-genome Mash distance <= `CLONAL_MASH_DISTANCE`). Bootstrap CIs resample clusters
+within each species, and paired permutation tests flip whole clusters, so clonal
+isolates count once.
+
+**Cohort size.** Size the cohort by power, not convenience. For a paired comparison,
+n ~ (z_(1-alpha/2) + z_(1-beta))^2 * (sigma_d / delta)^2 non-clonal isolates per
+comparison stratum, where sigma_d is the SD of per-isolate metric differences from a
+pilot and delta the smallest difference worth detecting (about 71 for sigma_d = 0.15
+and delta = 0.05 at alpha = 0.05 and power = 0.8, plus about 15% for non-parametric
+testing). Aim for at least five species, with no species above about 30% of isolates.
+`validate_cohort.py` prints `COHORT COMPOSITION WARNING` lines when a cohort falls
+short. These are advisory: a cohort scoped to one genus is legitimate if its
+conclusions are scoped the same way.
+
 ## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,
 mean recall) and ranked by mean F1 (`python/aggregate_results.py`), separately within

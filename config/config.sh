@@ -40,6 +40,38 @@ export LOCAL_INPUTS_ONLY="${LOCAL_INPUTS_ONLY:-0}"
 # data/<sample>/truth_amr.tsv it is scored alongside base-level recovery.
 export PLASMID_RECOVERY_THRESHOLD="${PLASMID_RECOVERY_THRESHOLD:-0.90}"
 export AMR_GENE_RECOVERY_THRESHOLD="${AMR_GENE_RECOVERY_THRESHOLD:-0.90}"
+# Correct Plasmid Reconstruction Rate (CPRR, secondary endpoint; score_bins.py).
+# Pre-specify these BEFORE running a benchmark and do not tune them afterwards.
+# A truth plasmid counts as correctly reconstructed only if its matched bin
+# covers >= CPRR_MIN_COVERAGE of it, it makes up >= CPRR_MIN_SHARE of that
+# bin's aligned bases, no other bin holds a substantial part of it, and (only
+# for truth NOT polished with the benchmark's own reads) the matched
+# alignments reach CPRR_MIN_IDENTITY.
+export CPRR_MIN_COVERAGE="${CPRR_MIN_COVERAGE:-0.95}"
+export CPRR_MIN_SHARE="${CPRR_MIN_SHARE:-0.95}"
+export CPRR_MIN_IDENTITY="${CPRR_MIN_IDENTITY:-0.99}"
+
+# Evidence-based truth labels (python/label_truth_evidence.py, stage 2).
+# Replicons whose plasmid/chromosome label conflicts with the evidence
+# (plasmid markers, rRNA genes, long-read support) are AMBIGUOUS and excluded
+# from scoring via truth.scored.tsv. Needs RUN_REFERENCE_ANNOTATION=1.
+export RUN_TRUTH_LABEL_EVIDENCE="${RUN_TRUTH_LABEL_EVIDENCE:-1}"
+export PLASMID_REFERENCE_SKETCH="${PLASMID_REFERENCE_SKETCH:-$PROJECT_ROOT/data/db/plasmid_reference/reference.msh}"
+# Plasmids below this long-read depth are short-read-only evidence (lower
+# confidence) when the isolate's long reads are staged.
+export TRUTH_MIN_LONG_READ_DEPTH="${TRUTH_MIN_LONG_READ_DEPTH:-5}"
+export TRUTH_LONG_READ_PRESET="${TRUTH_LONG_READ_PRESET:-map-ont}"
+
+# Headline rules (aggregate_results.py, stage 6).
+# Reference tiers 1-2 form the headline; tier 3 (short-read-first or unknown
+# provenance) is a sensitivity analysis. The headline averages per-species
+# means over species with at least MIN_SPECIES_CLUSTERS independent
+# (non-clonal) clusters; smaller species are described only.
+export HEADLINE_MAX_REFERENCE_TIER="${HEADLINE_MAX_REFERENCE_TIER:-2}"
+export MIN_SPECIES_CLUSTERS="${MIN_SPECIES_CLUSTERS:-20}"
+# Clonal clusters (python/clonal_groups.py): isolates whose chromosomes are
+# within this Mash distance are treated as one clonal unit.
+export CLONAL_MASH_DISTANCE="${CLONAL_MASH_DISTANCE:-0.0005}"
 # Operational recommendations are withheld unless a tool has enough independent
 # benchmark evidence. Selection reports still preserve truth-set candidates.
 export RECOMMENDATION_MIN_SAMPLES="${RECOMMENDATION_MIN_SAMPLES:-5}"

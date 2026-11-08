@@ -34,6 +34,15 @@ history is lost, only the numbering is cleaner. See
   coverage, which gates eligibility.
 
 ### Added
+- **`docs/SCIENTIFIC_GUIDE.md`**, a guide for domain experts: what PlasBench does, how and why,
+  its scope, every metric and statistical procedure, the shipped cohorts, outputs and how to read
+  them, reproducibility, how each kind of expert can check the claims, what has and has not been
+  validated, and a scope matrix. It has a table of contents, a README section with its own
+  contents list, and `python/build_guide_toc.py` keeps both in step with the headings.
+  `test/test_guide_docs.py` checks the contents, every link, and that every configuration
+  variable, command and `scores.tsv` column the guide names still exists in the code.
+- `run_manifest.json` now lists selected candidates for a benchmark run. It looked only for the
+  operational layout (`<sample>/selected_candidate/`), so an ordinary benchmark run listed none.
 - `n_failed_resource` and `n_unknown_overlap` leaderboard columns; `--resource-failures
   {score-zero,exclude}` and `--tool-capabilities` on `aggregate_results.py`.
 - A failed tool run's exit code is recorded in `tool_status.tsv`'s reason column
@@ -51,6 +60,35 @@ history is lost, only the numbering is cleaner. See
 - Tests: `test_scoring_adversarial.py`, `test_aggregate_failures.py`,
   `test_selection_undefined_metrics.py`, `test_study_groups.py`, `test_leakage_visibility.py`,
   `test_classifier_semantics.py`, `test_report_classifier_section.py`, `test_rank_sensitivity.py`, `test_failed_tool_exit_code.sh`.
+### Changed -- research design (headline endpoints and reference standard)
+- **Primary endpoint is now length-weighted binning F1** for binning-capable tools
+  (`lw_bin_f1`, ungated Hungarian match; the count-based `bin_f1` is kept but not
+  ranked). **CPRR** (Correct Plasmid Reconstruction Rate) is the secondary endpoint,
+  with pre-specified `CPRR_MIN_COVERAGE`/`CPRR_MIN_SHARE`/`CPRR_MIN_IDENTITY`.
+  Classifier-only tools are ranked on a separate classification track by
+  base-level F1. Leaderboards add `task`, `ranking_metric`, `ranking_score` (+ CI),
+  `ranking_species_basis`, `cprr` (+ CI) and `mean_lw_bin_f1`.
+- **Reference standard.** `truth_provenance.py` classifies how each truth was built
+  (long-read-first vs short-read-first; polished with the benchmark's own reads or
+  not) and assigns reference tiers 1-3. Short-read-first and unknown-provenance truth
+  (tier 3) leave the headline and become a sensitivity analysis; the CPRR identity
+  criterion is dropped for truth polished with the benchmark's reads.
+- **Evidence-based truth labels.** `label_truth_evidence.py` confirms each replicon
+  with plasmid markers, rRNA genes (new barrnap caller) and long-read support;
+  conflicting replicons (chromids, marker-free or short-read-only plasmids) are
+  AMBIGUOUS and excluded from scoring via `truth.scored.tsv`. Self-built truth is no
+  longer labelled by size alone.
+- **Species balance.** The ranking score averages per-species means over species with
+  >= `MIN_SPECIES_CLUSTERS` independent clusters; clusters join shared BioProjects and
+  clonal groups (`clonal_groups.py`), and CIs/permutation tests resample whole
+  clusters within species. New `benchmark.species.tsv`,
+  `benchmark.reference_tiers.tsv`, `benchmark.headline_design.tsv`.
+- `validate_cohort.py` prints advisory composition warnings (species count, dominant
+  species, species below the minimum) and validates the new optional sheet columns
+  `truth_assembly_strategy`, `truth_polish_reads` and `clonal_group`.
+- HTML report: leaderboards per task with ranking score, CI and CPRR; new "Headline
+  design and reference standard" section with provenance, tiers, species balance and
+  a tier-sensitivity chart.
 
 ### Fixed
 - **A tool that failed on every sample no longer vanishes from the leaderboard.** It now ranks
