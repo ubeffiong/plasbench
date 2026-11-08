@@ -985,7 +985,8 @@ def database_recovery(summary, containment_path, results_dir):
         for tool in (row.get("tools") or "").split(","):
             if tool:
                 key = (row["sample"], row["sequence_id"])
-                contained[tool][key] = contained[tool].get(key) == "yes" or row.get("in_database") == "yes"
+                # A truth plasmid is "in" a tool's database if ANY of that tool's databases holds it.
+                contained[tool][key] = bool(contained[tool].get(key)) or row.get("in_database") == "yes"
     for row in summary:
         membership = contained.get(row["tool"])
         if not membership:

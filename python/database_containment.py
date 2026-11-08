@@ -106,34 +106,41 @@ def main():
             databases.append((tools, path))
         else:
             sys.stderr.write(f"[database_containment] skipping unusable --database {spec!r}\n")
+    # Gather every sample's truth plasmids into ONE query file, so each database is indexed and
+    # aligned once instead of once per sample (a database such as MOB-suite's is gigabytes).
+    queries = []                       # (synthetic id, sample, sequence id, length)
     rows = []
     with tempfile.TemporaryDirectory(prefix="plasbench_containment_") as tmp:
-        for sample in args.samples:
-            sample_dir = os.path.join(args.data_dir, sample)
-            truth = os.path.join(sample_dir, "truth.scored.tsv")
-            if not os.path.isfile(truth):
-                truth = os.path.join(sample_dir, "truth.tsv")
-            reference = os.path.join(sample_dir, "reference.fna")
-            if not (os.path.isfile(truth) and os.path.isfile(reference)):
-                continue
-            plasmids = set(truth_plasmids(truth))
-            if not plasmids:
-                continue
-            sequences = read_fasta(reference)
-            query = os.path.join(tmp, f"{sample}.plasmids.fa")
-            with open(query, "w", encoding="utf-8") as handle:
+        query = os.path.join(tmp, "truth_plasmids.fa")
+        with open(query, "w", encoding="utf-8") as handle:
+            for sample in args.samples:
+                sample_dir = os.path.join(args.data_dir, sample)
+                truth = os.path.join(sample_dir, "truth.scored.tsv")
+                if not os.path.isfile(truth):
+                    truth = os.path.join(sample_dir, "truth.tsv")
+                reference = os.path.join(sample_dir, "reference.fna")
+                if not (os.path.isfile(truth) and os.path.isfile(reference)):
+                    continue
+                plasmids = set(truth_plasmids(truth))
+                if not plasmids:
+                    continue
+                sequences = read_fasta(reference)
                 for seq_id in sorted(plasmids):
                     if seq_id in sequences:
-                        handle.write(f">{seq_id}\n{sequences[seq_id]}\n")
+                        synthetic = f"q{len(queries)}"
+                        handle.write(f">{synthetic}\n{sequences[seq_id]}\n")
+                        queries.append((synthetic, sample, seq_id, len(sequences[seq_id])))
+        if queries:
             for tools, path in databases:
                 best = containment(query, path, args.threads)
-                for seq_id in sorted(plasmids):
-                    record, coverage, identity = best.get(seq_id, ("", 0.0, 0.0))
+                for synthetic, sample, seq_id, length in queries:
+                    record, coverage, identity = best.get(synthetic, ("", 0.0, 0.0))
                     inside = coverage >= args.min_coverage and identity >= args.min_identity
-                    rows.append({"sample": sample, "sequence_id": seq_id, "length": len(sequences.get(seq_id, "")),
+                    rows.append({"sample": sample, "sequence_id": seq_id, "length": length,
                                  "tools": tools, "database": os.path.basename(path), "best_record": record,
                                  "coverage": f"{coverage:.4f}", "identity": f"{identity:.4f}",
                                  "in_database": "yes" if inside else "no"})
+    rows.sort(key=lambda r: (r["sample"], r["sequence_id"], r["database"]))
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")
         writer.writeheader()

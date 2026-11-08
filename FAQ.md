@@ -193,13 +193,17 @@ cohort can detect) has **not** been done: **Open**.
 ### Q16. Can tools be tuned to, or trained on, the truth genomes?
 **Answer.** Possibly: most database-based tools ship databases built from the same public
 plasmids that serve as truth. `python/flag_database_overlap.py` compares truth release date
-with each tool's database release date, but `config/tool_database_releases.tsv` has
-**15 rows marked `uses_reference_database = yes` and 0 filled dates**, so every pair is currently `unknown`.
-**Evidence.** The registry file itself; `test/test_leakage_visibility.py` pins that the
-report now says so (stderr, Markdown warning, `n_unknown_overlap`) instead of showing "0".
-**Status.** Visibility fixed on audit branch. The dates themselves are **Open**: they come from
-each tool's maintainers, and inventing them would be worse than leaving them blank. A
-sequence-level overlap screen is also Open.
+with each tool's database release date. `config/tool_database_releases.tsv` now has dates for the databases that are
+installed or pinned (8 of its 19 rows); the rest, for tools whose databases are not installed here, are still blank
+and are reported as `unknown` rather than guessed. A sequence-level screen now exists as well:
+`python/database_containment.py` aligns each truth plasmid to a tool's own database FASTA (MOB-suite's is found
+automatically; others via `TOOL_DATABASE_FASTAS`) and the leaderboard splits recovery into plasmids inside and outside
+that database.
+**Evidence.** The registry file itself; `test/test_leakage_visibility.py` (the report says "not assessed" instead of
+showing "0"); `test/test_metric_rubric.py` and `test/test_stage_contig_metrics.sh` for the containment split.
+**Status.** Date screen: done for installed databases, **Open** for the rest (the dates come from each tool's
+maintainers, and inventing them would be worse than leaving them blank). Sequence screen: done where a database FASTA is
+on disk; a tool whose database is not installed is not checked.
 
 ---
 
@@ -248,8 +252,8 @@ None affect the ranking.
 ### Q20. Can someone reproduce a run?
 **Answer.** A run manifest records inputs, versions and hashes (`python/write_manifest.py`); cohort
 lock files carry SHA-256; the scorer is standard-library only.
-**Gap found.** The database release dates are blank (Q16) and tool databases live inside conda environments.
-**Status.** Partly verified; database provenance is Open.
+**Gap found.** Database release dates are still blank for tools whose databases are not installed (Q16), and tool databases live inside conda environments.
+**Status.** Partly verified; database provenance is Open for those tools.
 
 ### Q20b. Is every script, input and output actually reachable?
 **Answer.** `test/test_script_wiring.py` fails if any `python/*.py` script is referenced by no stage script, CLI
@@ -379,8 +383,8 @@ and `validate_local_inputs.py`. **Answered.**
 (Guide 6) and scores their output. The default assembler is SPAdes and results depend on it (Guide 17.4). Evidence for a
 tool's contig assignment, its repeat resolution and its circularity call are the tool's to supply; PlasBench measures the
 outcome (bin purity, split and merge events, complete circular recall against curated circular truth). A confidence score
-exists only for tools that emit per-record probabilities (PR-AUC); calibration of those probabilities is **Open** pending
-the calibration work on another branch. **Answered / Open.**
+exists only for tools that emit per-record probabilities: PR-AUC, and their calibration (Brier score, expected
+calibration error, reliability diagram: `<tool>.calibration.tsv`). **Answered.**
 
 **7. Reference assembly and ground truth (Q93-110).** Truth is tiered 1 to 3 by independence from the benchmark
 (`python/truth_provenance.py`): long-read-first truth is preferred; short-read-first or unknown-provenance truth (tier 3) leaves
@@ -396,8 +400,9 @@ labels self-built truth. A sample has one reference; conflicting references and 
 **8. Plasmid detection (Q111-120).** Detection is a tool's task. PlasBench reports each tool's base-level precision and
 recall, chromosome bases wrongly claimed, plasmid bases missed and per-plasmid recovery, so false-positive and
 false-negative behaviour is measured per tool and per isolate. Performance on plasmids absent from a tool's own database is
-the leakage question: a date-based screen exists but every database release date is blank, so it is `unknown`; a
-sequence-level screen is **Open** (it needs each tool's database content).
+the leakage question: a date-based screen (dates filled for installed databases, `unknown` otherwise) and a
+sequence-level check of each truth plasmid against the tool's own database FASTA, with recovery reported inside versus
+outside it. A tool whose database is not installed is not checked: **Open** for those tools.
 
 **9. Binning (Q121-136).** Binning is part of the primary reconstruction endpoint for binning-capable tools: the length-weighted
 binning F1 from an ungated one-to-one Hungarian match, with CPRR per plasmid (Guide 7.5, 8.2). Conventional clustering
@@ -447,11 +452,11 @@ not covered. **Answered / Implemented here.**
 ### Part VIII. Databases (Q233-249)
 
 **16. Databases and reference resources.** PlasBench has no reference database of its own for scoring; truth is the
-sample's complete assembly. Tool databases are recorded in `config/tool_database_releases.tsv`, **but every release date is
-blank**, so leakage is reported as not assessed; filling the dates needs each tool's maintainers and is **Open**, as is a
-sequence-level overlap screen. Cohorts are staged locally, so a run can proceed offline once databases are installed; tool and
+sample's complete assembly. Tool databases are recorded in `config/tool_database_releases.tsv`: release dates are filled
+for the installed or pinned databases and blank for the rest, which are then reported as not assessed, and
+`database_containment.py` checks truth plasmids against any database FASTA on disk. Cohorts are staged locally, so a run can proceed offline once databases are installed; tool and
 cohort versions go into the run manifest, and cohort lock files pin SHA-256 checksums. Taxonomic and geographic bias of public
-records is a stated limit (Guide 4.7, 17.2). **Partly answered; Open.**
+records is a stated limit (Guide 4.7, 17.2). **Answered for installed databases; Open for the others.**
 
 ### Part IX. Benchmark design and statistics (Q250-321)
 
@@ -496,8 +501,9 @@ validation cohort is **Open**; a simulation that checks the nominal coverage of 
 plasmidSPAdes, gplas2, geNomad, PLASMe, RFPlasmid, PlasmidHunter, Plasmer, plasGraph2, PlaScope, Flye+MOB-recon, Trycycler,
 Hybracter, Plassembler; Guide 6). PlasmidFinder and MOB-typer are used to *annotate truth*, not benchmarked as reconstructors.
 COPLA and relatedness tools address a different task and are not included. Whether PlasBench "outperforms" them is not a
-meaningful question. Trivial baselines scored like tools (a length rule, a Mash match) are **Open** here and in progress on
-another branch.
+meaningful question. Two trivial baselines are scored like tools (`baseline_coverage`, a depth rule, and
+`baseline_reference`, a match to a plasmid reference set), and each tool reports whether it beats them
+(`beats_best_baseline`). **Answered.**
 
 ### Part XI. Software engineering (Q339-368)
 
@@ -525,8 +531,8 @@ are explorable per sample; selected candidates are copied out. Uncertain or unas
 **25. Laboratory and public-health use (Q385-398).** PlasBench informs which tool to adopt, with an interval, and how each tool
 fails (Guide 1.4). It is research software, not a diagnostic; it produces no epidemiological output, and similarity, a shared
 resistance gene or replicon is not evidence of transmission (Guide 1.3, 13.5). Cross-hospital comparison, longitudinal
-surveillance and interspecies-transfer investigation are **out of scope**. Metadata completeness flags are in progress on
-another branch.
+surveillance and interspecies-transfer investigation are **out of scope**. A per-sample table of missing consequential
+metadata (`benchmark.metadata_completeness.tsv`) is written and shown in the report.
 
 ### Part XIII. Failure modes (Q399-416)
 
@@ -592,19 +598,22 @@ test or computed number supports it; otherwise *Answered*, *Unresolved* or *Out 
 
 ## What is still open (summary)
 
-Closed in software by this work (each with a test): nucleotide-level accuracy (not assessable where truth is not independent),
+Closed in software (each with a test): contig-level classification, ARI and assembly-aware binning recall, micro versus macro averages, a sequence-level database check, probability calibration, trivial baselines, nucleotide-level accuracy (not assessable where truth is not independent),
 missing regions, feature preservation and NGOC, bin quality tiers and homogeneity/completeness, performance and scaling,
 power analysis, scenario tags, an optional gated composite with weight sensitivity, and a repeated-run comparison.
 
 Still open, and why:
 
 1. **No real-data run** (Q22): needs compute and data. Everything about ranking stability and generalisation depends on it.
-2. **Database release dates** (Q16) and a sequence-level leakage screen: the dates come from each tool's maintainers.
+2. **Database release dates and database FASTAs for tools whose databases are not installed** (Q16): the dates come from each
+   tool's maintainers; the sequence-level screen needs the database on disk.
 3. **Independent audit of references, and read support for every truth replicon** (Q3, Q4): needs reads and curation.
 4. **External validation cohort and a coverage simulation for the intervals** (Q14).
 5. **Plasmid-free, hard-structure and taxonomically broader isolates** in the released cohorts (Q12, Part 2 section 18): data curation.
 6. **A first-class PlasEval adapter** (Part 2 section 9): needs the external tool and real data to validate.
-7. **Calibration and trivial baselines** (Part 2 sections 6 and 21): in progress on another branch.
+7. **Abstention rate, NGA50 and AMI**: no wrapped tool reports an explicit "unclassified" call, NGA50 needs contig-level
+   misassembly breaks, and AMI's expected-information term is impractical over base counts. Contig-level classification
+   (count-based and length-weighted precision, recall, F1 and MCC) is done; ambiguous contigs are excluded, not multi-assigned.
 8. **A literature comparison establishing novelty** (Part 2 section 2).
 9. **Stale per-tool result files** when the tool set changes between runs (Q21): clear `results/` between such runs.
 10. **Plasmid clustering, relatedness, graph and evolutionary analysis**: out of scope, not claimed.

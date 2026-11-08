@@ -127,7 +127,9 @@ def aggregate_checks(ok):
           "completeness\trecovered\ns2\tmob_recon\tshort_read\tpB\t1000\t300\t0.3000\t0\n")
     write("results/containment.tsv", "sample\tsequence_id\tlength\ttools\tdatabase\tbest_record\tcoverage\tidentity\t"
           "in_database\ns1\tpA\t1000\tmob_recon,flye_mob_recon\tdb.fas\tNZ_1\t0.99\t0.999\tyes\n"
-          "s2\tpB\t1000\tmob_recon,flye_mob_recon\tdb.fas\t\t0.10\t0.90\tno\n")
+          "s2\tpB\t1000\tmob_recon,flye_mob_recon\tdb.fas\t\t0.10\t0.90\tno\n"
+          # a second database for the same tool does not hold pA: membership is "in ANY database"
+          "s1\tpA\t1000\tmob_recon\tother.fas\t\t0.20\t0.90\tno\n")
     run([os.path.join(PY, "aggregate_results.py"), "--scores", "results/scores.tsv",
          "--database-containment", "results/containment.tsv", "--out-prefix", "results/benchmark"])
     board = {r["tool"]: r for r in read("results/benchmark.leaderboard.tsv")}["mob_recon"]
