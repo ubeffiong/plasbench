@@ -46,6 +46,51 @@ def sample_parents(sample_sheet):
     return parents
 
 
+CLUSTER_COLUMNS = ("bioproject", "source_study")
+
+
+def sample_clusters(sample_sheet):
+    """Map sample_id -> independence cluster label from the sample sheet.
+
+    Isolates from one BioProject (one study, often one outbreak or clonal
+    collection) are not independent observations. Resampling them one by one
+    makes bootstrap intervals and permutation p-values look more certain than
+    the data allow. The cluster is the row's bioproject, falling back to
+    source_study; a sample with neither is its own cluster. Returns
+    (mapping, column_used) -- column_used is "" when no cluster column was
+    found, in which case every sample is its own cluster and the statistics
+    are identical to plain per-sample resampling.
+    """
+    clusters = {}
+    used = ""
+    if not sample_sheet:
+        return clusters, used
+    path = Path(sample_sheet)
+    if not path.is_file():
+        return clusters, used
+    with open(path, newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(
+            (line for line in handle if line.strip() and not line.lstrip().startswith("#")),
+            delimiter="\t")
+        for row in reader:
+            sample = (row.get("sample_id") or "").strip()
+            if not sample:
+                continue
+            for column in CLUSTER_COLUMNS:
+                value = (row.get(column) or "").strip()
+                if value:
+                    clusters[sample] = f"{column}:{value}"
+                    used = used or column
+                    break
+    return clusters, used
+
+
+def cluster_labels(samples, clusters):
+    """One cluster label per sample (the sample itself when unclustered)."""
+    clusters = clusters or {}
+    return [clusters.get(sample, f"sample:{sample}") for sample in samples]
+
+
 def correlated_parents(rows, parents):
     """Return parent -> scored sample ids, for parents covering several samples."""
     groups = defaultdict(set)
@@ -112,6 +157,10 @@ def read_scores(path):
                 # above, an intermediate view between "any recall" and perfect
                 # recovery. Gracefully absent (never 0) when undefined, matching
                 # plasmid_recall's own convention immediately above.
+                "strict_precision": float(f[idx["strict_precision"]]) if "strict_precision" in idx and f[idx["strict_precision"]] else None,
+                "recall_ceiling": float(f[idx["recall_ceiling"]]) if "recall_ceiling" in idx and f[idx["recall_ceiling"]] else None,
+                "ceiling_adjusted_recall": float(f[idx["ceiling_adjusted_recall"]]) if "ceiling_adjusted_recall" in idx and f[idx["ceiling_adjusted_recall"]] else None,
+                "redundant_pred_bp": int(f[idx["redundant_pred_bp"]]) if "redundant_pred_bp" in idx and f[idx["redundant_pred_bp"]] else None,
                 "plasmid_recall_ge50": float(f[idx["plasmid_recall_ge50"]]) if "plasmid_recall_ge50" in idx and f[idx["plasmid_recall_ge50"]] else None,
                 "plasmid_recall_ge90": float(f[idx["plasmid_recall_ge90"]]) if "plasmid_recall_ge90" in idx and f[idx["plasmid_recall_ge90"]] else None,
                 "complete_circular_plasmid_recall": float(f[idx["complete_circular_plasmid_recall"]]) if "complete_circular_plasmid_recall" in idx and f[idx["complete_circular_plasmid_recall"]] else None,
@@ -153,7 +202,7 @@ def read_failed_samples(path):
     except FileNotFoundError:
         return failed
     with handle:
-        reader = csv.DictReader(handle, delimiter="	")
+        reader = csv.DictReader(handle, delimiter="\t")
         if not reader.fieldnames or "sample" not in reader.fieldnames:
             return failed
         for row in reader:
@@ -162,11 +211,25 @@ def read_failed_samples(path):
     return failed
 
 
-def summarise(rows, status_counts, failed_samples=None):
+def read_database_overlap(path):
+    """(sample, tool) -> overlap_status from flag_database_overlap.py output."""
+    overlap = {}
+    if not path or not Path(path).is_file():
+        return overlap
+    with open(path, newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle, delimiter="\t"):
+            if row.get("sample") and row.get("tool"):
+                overlap[(row["sample"], row["tool"])] = row.get("overlap_status", "")
+    return overlap
+
+
+def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=None):
     by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0,
                                    "zero_plasmid_specificity": [], "zero_plasmid_fp_bp": [], "n_zero_plasmid": 0,
                                    "nmi": [], "vi": [],
-                                   "plasmid_recall_ge50": [], "plasmid_recall_ge90": [], "complete_circular_plasmid_recall": []})
+                                   "plasmid_recall_ge50": [], "plasmid_recall_ge90": [], "complete_circular_plasmid_recall": [],
+                                   "strict_precision": [], "redundant_pred_bp": [],
+                                   "recall_ceiling": [], "ceiling_adjusted_recall": []})
     for r in rows:
         t = by_tool[r["tool"]]
         # Undefined (score_plasmids.py) on a zero-true-plasmid isolate or one
@@ -177,6 +240,14 @@ def summarise(rows, status_counts, failed_samples=None):
         if r["f1"] is not None: t["f1"].append(r["f1"])
         if r["plasmid_recall"] is not None:
             t["plasmid_recall"].append(r["plasmid_recall"])
+        if r.get("strict_precision") is not None:
+            t["strict_precision"].append(r["strict_precision"])
+        if r.get("recall_ceiling") is not None:
+            t["recall_ceiling"].append(r["recall_ceiling"])
+        if r.get("ceiling_adjusted_recall") is not None:
+            t["ceiling_adjusted_recall"].append(r["ceiling_adjusted_recall"])
+        if r.get("redundant_pred_bp") is not None:
+            t["redundant_pred_bp"].append(r["redundant_pred_bp"])
         if r["plasmid_recall_ge50"] is not None:
             t["plasmid_recall_ge50"].append(r["plasmid_recall_ge50"])
         if r["plasmid_recall_ge90"] is not None:
@@ -239,10 +310,13 @@ def summarise(rows, status_counts, failed_samples=None):
     summary = []
     for tool, d in by_tool.items():
         if shared and tool in f1_by_tool:
-            ranking_f1 = [f1_by_tool[tool][sample] for sample in sorted(shared)]
+            ranking_samples = sorted(shared)
+            ranking_f1 = [f1_by_tool[tool][sample] for sample in ranking_samples]
         else:
+            ranking_samples = [r["sample"] for r in rows if r["tool"] == tool and r["f1"] is not None]
             ranking_f1 = list(d["f1"])
-        f1_ci_low, f1_ci_high = bootstrap_ci(ranking_f1)
+        groups = cluster_labels(ranking_samples, clusters)
+        f1_ci_low, f1_ci_high = bootstrap_ci(ranking_f1, groups=groups)
         summary.append({
             "tool": tool,
             "n_samples": d["n"],
@@ -256,8 +330,18 @@ def summarise(rows, status_counts, failed_samples=None):
             "n_failures_scored_zero": failure_zero.get(tool, 0),
             "f1_ci_low": f1_ci_low,
             "f1_ci_high": f1_ci_high,
+            "n_independent_clusters": len(set(groups)),
             "median_f1": statistics.median(ranking_f1) if ranking_f1 else None,
             "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]) if d["plasmid_recall"] else None,
+            # Supplementary robustness diagnostics (never ranking metrics).
+            "mean_strict_precision": statistics.mean(d["strict_precision"]) if d["strict_precision"] else None,
+            "total_redundant_pred_bp": sum(d["redundant_pred_bp"]) if d["redundant_pred_bp"] else None,
+            "mean_recall_ceiling": statistics.mean(d["recall_ceiling"]) if d["recall_ceiling"] else None,
+            # Reference-database overlap screen (flag_database_overlap.py):
+            # how many of this tool's samples may already be inside its own
+            # database, and its mean F1 on samples that cannot be.
+            **overlap_summary(tool, rows, overlap),
+            "mean_ceiling_adjusted_recall": statistics.mean(d["ceiling_adjusted_recall"]) if d["ceiling_adjusted_recall"] else None,
             # Graded plasmid-recovery completeness bands (score_plasmids.py):
             # supplementary breakdowns between "any recall" (mean_plasmid_recall
             # above, at its own configured threshold) and perfect recovery
@@ -298,25 +382,71 @@ def summarise(rows, status_counts, failed_samples=None):
     return summary
 
 
-def bootstrap_ci(values, iterations=1000):
-    """Deterministic percentile CI for the mean F1; descriptive, not a p-value."""
+def resampling_units(values, groups=None):
+    """Group values into independent resampling units (clusters).
+
+    Without groups every value is its own unit, which reproduces plain
+    per-sample resampling exactly (same RNG draws, same results).
+    """
+    if groups is None:
+        return [[value] for value in values]
+    if len(groups) != len(values):
+        raise ValueError("groups must align one-to-one with values")
+    units = {}
+    for value, group in zip(values, groups):
+        units.setdefault(group, []).append(value)
+    return list(units.values())
+
+
+def overlap_summary(tool, rows, overlap):
+    if not overlap:
+        return {"n_possible_db_overlap": None, "n_after_database": None, "mean_f1_after_database": None}
+    statuses = [overlap.get((r["sample"], tool), "") for r in rows if r["tool"] == tool]
+    after = [r["f1"] for r in rows if r["tool"] == tool and r["f1"] is not None
+             and overlap.get((r["sample"], tool)) == "after_database"]
+    return {
+        "n_possible_db_overlap": statuses.count("possible_overlap"),
+        "n_after_database": statuses.count("after_database"),
+        "mean_f1_after_database": statistics.mean(after) if after else None,
+    }
+
+
+def bootstrap_ci(values, iterations=1000, groups=None):
+    """Deterministic percentile CI for the mean F1; descriptive, not a p-value.
+
+    With groups, whole clusters are resampled (cluster bootstrap), so
+    correlated isolates from one study widen the interval instead of
+    narrowing it. At least 5 independent units are required.
+    """
+    units = resampling_units(values, groups)
     # Intervals from very small cohorts imply a precision the data do not have.
-    if len(values) < 5:
+    if len(values) < 5 or len(units) < 5:
         return None, None
     rng = random.Random(20260831)
-    means = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(iterations))
+    means = sorted(statistics.mean([value for unit in rng.choices(units, k=len(units)) for value in unit])
+                   for _ in range(iterations))
     return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
 
 
-def paired_permutation_pvalue(differences, iterations=10000):
-    """Two-sided sign-flip permutation p-value for paired mean differences."""
-    if len(differences) < 5:
+def paired_permutation_pvalue(differences, iterations=10000, groups=None):
+    """Two-sided sign-flip permutation p-value for paired mean differences.
+
+    With groups, every difference in a cluster is flipped together, which is
+    the valid null when isolates within a study are correlated. At least 5
+    independent units are required.
+    """
+    units = resampling_units(differences, groups)
+    if len(differences) < 5 or len(units) < 5:
         return None
     observed = abs(statistics.mean(differences))
     rng = random.Random(20260901)
     extreme = 0
     for _ in range(iterations):
-        value = abs(statistics.mean(item if rng.randrange(2) else -item for item in differences))
+        signed = []
+        for unit in units:
+            sign = 1 if rng.randrange(2) else -1
+            signed.extend(sign * item for item in unit)
+        value = abs(statistics.mean(signed))
         extreme += value >= observed
     return (extreme + 1) / (iterations + 1)
 
@@ -335,7 +465,7 @@ def holm_adjust(pvalues):
     return adjusted
 
 
-def compute_comparisons(rows, failed_samples=None):
+def compute_comparisons(rows, failed_samples=None, clusters=None):
     """Paired, shared-sample, sign-flip permutation comparisons for every
     pair of tools, Holm-adjusted across all pairs computed here. Shared by
     write_comparisons() (writes benchmark.paired_comparisons.tsv) and
@@ -365,11 +495,14 @@ def compute_comparisons(rows, failed_samples=None):
             diffs = [by_tool[a][sample] - by_tool[b][sample] for sample in shared]
             if not diffs:
                 continue
-            low, high = bootstrap_ci(diffs)
+            groups = cluster_labels(shared, clusters)
+            low, high = bootstrap_ci(diffs, groups=groups)
             comparisons.append({
                 "tool_a": a, "tool_b": b, "paired_samples": len(shared),
+                "paired_clusters": len(set(groups)),
                 "mean_f1_difference": statistics.mean(diffs), "difference_ci_low": low,
-                "difference_ci_high": high, "permutation_p_value": paired_permutation_pvalue(diffs),
+                "difference_ci_high": high,
+                "permutation_p_value": paired_permutation_pvalue(diffs, groups=groups),
                 "wins_a": sum(x > 0 for x in diffs), "ties": sum(x == 0 for x in diffs),
                 "wins_b": sum(x < 0 for x in diffs),
             })
@@ -407,7 +540,7 @@ def write_comparisons(rows, path, comparisons=None):
     if comparisons is None:
         comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
-        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\n")
+        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\tpaired_clusters\n")
         for row in comparisons:
             low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
             high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
@@ -419,7 +552,7 @@ def write_comparisons(rows, path, comparisons=None):
                 f"{row['tool_a']}\t{row['tool_b']}\t{row['paired_samples']}\t"
                 f"{row['mean_f1_difference']:.4f}\t{low}\t{high}\t{pvalue_text}\t"
                 f"{adjusted_text}\t{row['wins_a']}\t{row['ties']}\t{row['wins_b']}\t"
-                f"{row.get('analysis_track', '')}\n"
+                f"{row.get('analysis_track', '')}\t{row.get('paired_clusters', '')}\n"
             )
 
 
@@ -430,8 +563,10 @@ def write_tsv(summary, path):
             "n_complete_circular_assessed", "mean_complete_circular_plasmid_recall",
             "n_bin_scored", "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "n_pr_scored", "mean_pr_auc",
             "n_reference_perfect_assessed", "reference_perfect_recovery_rate", "n_strict_reconstruction_assessed", "strict_reference_reconstruction_rate",
-            "mean_f1", "n_ranking_samples", "ranking_basis", "f1_ci_low", "f1_ci_high", "median_f1",
+            "mean_f1", "n_ranking_samples", "ranking_basis", "f1_ci_low", "f1_ci_high", "n_independent_clusters", "median_f1",
             "mean_f1_all_scored", "n_f1_scored", "n_failures_scored_zero", "significant_vs_runner_up",
+            "mean_strict_precision", "total_redundant_pred_bp", "mean_recall_ceiling", "mean_ceiling_adjusted_recall",
+            "n_possible_db_overlap", "n_after_database", "mean_f1_after_database",
             "n_zero_plasmid_isolates", "mean_zero_plasmid_specificity", "total_zero_plasmid_chromosome_fp_bp"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
@@ -455,6 +590,7 @@ def write_tsv(summary, path):
                 s.get("n_ranking_samples", ""), s.get("ranking_basis", ""),
                 f"{s['f1_ci_low']:.4f}" if s["f1_ci_low"] is not None else "",
                 f"{s['f1_ci_high']:.4f}" if s["f1_ci_high"] is not None else "",
+                s.get("n_independent_clusters", ""),
                 f"{s['median_f1']:.4f}" if s["median_f1"] is not None else "",
                 f"{s['mean_f1_all_scored']:.4f}" if s.get("mean_f1_all_scored") is not None else "",
                 s.get("n_f1_scored", ""), s.get("n_failures_scored_zero", 0),
@@ -463,6 +599,13 @@ def write_tsv(summary, path):
                 # benchmark.paired_comparisons.tsv -- see attach_significance().
                 # Never a bootstrap-CI-overlap heuristic.
                 s.get("significant_vs_runner_up", "not_assessed"),
+                f"{s['mean_strict_precision']:.4f}" if s.get("mean_strict_precision") is not None else "",
+                s["total_redundant_pred_bp"] if s.get("total_redundant_pred_bp") is not None else "",
+                f"{s['mean_recall_ceiling']:.4f}" if s.get("mean_recall_ceiling") is not None else "",
+                f"{s['mean_ceiling_adjusted_recall']:.4f}" if s.get("mean_ceiling_adjusted_recall") is not None else "",
+                s["n_possible_db_overlap"] if s.get("n_possible_db_overlap") is not None else "",
+                s["n_after_database"] if s.get("n_after_database") is not None else "",
+                f"{s['mean_f1_after_database']:.4f}" if s.get("mean_f1_after_database") is not None else "",
                 # Negative-control summary: only meaningful for isolates with
                 # zero true plasmids (score_plasmids.py's isolate_specificity/
                 # chromosome_fp_bp), never blended into the ranking metrics above.
@@ -521,8 +664,10 @@ def write_md_table(fh, summary, track=None):
     fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", ":---"]) + "|\n")
     for i, s in enumerate(summary, start=1):
         plasmid_recall = f"{s['mean_plasmid_recall']:.3f}" if s["mean_plasmid_recall"] is not None else "not annotated"
+        clusters_n = s.get("n_independent_clusters")
         ci = (f"{s['f1_ci_low']:.3f}–{s['f1_ci_high']:.3f}"
-              if s["f1_ci_low"] is not None else "n < 5")
+              + (f" ({clusters_n} clusters)" if clusters_n and clusters_n < s.get("n_ranking_samples", 0) else "")
+              if s["f1_ci_low"] is not None else "< 5 independent units")
         # A tool scored only on zero-true-plasmid isolates has no defined
         # mean precision/recall/f1 at all (score_plasmids.py) -- "not
         # applicable" rather than crashing on a None float format.
@@ -555,7 +700,7 @@ def write_md_table(fh, summary, track=None):
 TRACK_ORDER = ("short_read", "long_read", "hybrid")
 
 
-def ranked_tracks(rows, status_counts, failed_samples=None):
+def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overlap=None):
     """Summarise, rank and test each declared input track on its own.
 
     Returns [(track, rows, summary, comparisons)] in a stable order. Tools are
@@ -569,8 +714,8 @@ def ranked_tracks(rows, status_counts, failed_samples=None):
     result = []
     for track in ordered:
         track_rows = tracks[track]
-        summary = summarise(track_rows, status_counts, failed_samples)
-        comparisons = compute_comparisons(track_rows, failed_samples)
+        summary = summarise(track_rows, status_counts, failed_samples, clusters, overlap)
+        comparisons = compute_comparisons(track_rows, failed_samples, clusters)
         for row in summary:
             row["analysis_track"] = track
         for row in comparisons:
@@ -595,6 +740,10 @@ def main():
     ap.add_argument("--out-prefix", required=True)
     ap.add_argument("--tool-status", help="optional status TSV from stage 4")
     ap.add_argument("--sample-sheet", help="sample sheet used for the run; read for parent_sample_id.")
+    ap.add_argument("--database-overlap", help="flag_database_overlap.py output; adds per-tool overlap counts "
+                                               "and mean_f1_after_database.")
+    ap.add_argument("--exclude-database-overlap", action="store_true",
+                    help="drop sample x tool rows flagged possible_overlap before ranking.")
     args = ap.parse_args()
 
     rows = read_scores(args.scores)
@@ -618,7 +767,21 @@ def main():
         status_counts = read_status(args.tool_status)
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}")
-    per_track = ranked_tracks(rows, status_counts, read_failed_samples(args.tool_status))
+    clusters, cluster_column = sample_clusters(args.sample_sheet)
+    if cluster_column:
+        print(f"[aggregate] CIs and permutation tests resample by {cluster_column} "
+              f"cluster ({len(set(clusters.values()))} cluster(s) in the sample sheet).")
+    overlap = read_database_overlap(args.database_overlap)
+    if args.exclude_database_overlap:
+        if not overlap:
+            raise SystemExit("ERROR: --exclude-database-overlap needs a non-empty --database-overlap file")
+        before = len(rows)
+        rows = [r for r in rows if overlap.get((r["sample"], r["tool"])) != "possible_overlap"]
+        print(f"[aggregate] excluded {before - len(rows)} sample x tool row(s) flagged possible_overlap "
+              f"with the tool's own reference database.")
+        if not rows:
+            raise SystemExit("ERROR: every score row was excluded as a possible database overlap")
+    per_track = ranked_tracks(rows, status_counts, read_failed_samples(args.tool_status), clusters, overlap)
     # The combined files hold every track's leaderboard, each ranked within
     # its own track (rank restarts per track; analysis_track says which).
     # They never rank tools across tracks.

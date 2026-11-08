@@ -253,6 +253,43 @@ extra TP but is also not penalised. `redundant_pred_bp` reports how many retaine
 reference-base claims were redundant (raw retained target coverage minus merged
 coverage). It is a diagnostic and does not alter F1.
 
+**Strict precision.** `strict_precision` = TP / (TP + FP + `unmapped_pred_bp`). It
+charges predicted sequence that never produced a retained alignment, which ordinary
+precision ignores, so noisy, chimeric or contaminant output becomes visible as a
+precision drop. TP/FP are reference bases and `unmapped_pred_bp` is query bases, so this
+is an approximation. It is supplementary and never used for ranking.
+
+**Recall ceiling.** Plasmid sequence that also occurs elsewhere in the genome (an IS
+element or transposon shared with the chromosome, or a plasmid present in two identical
+copies) maps with MAPQ near 0 and is removed by the MAPQ filter, so no prediction can ever
+be credited for it. Stage 5 measures this per isolate with `python/scorable_truth.py`:
+each truth plasmid is tiled into windows (`SCORABLE_WINDOW_BP`, default 1000 bp, step
+`SCORABLE_STEP_BP`, default 250 bp), the windows are mapped back to the reference with the
+same minimap2 preset and filters as predictions, and a window counts as scorable only if
+its retained alignment lands on its own origin. The result, `DATA_DIR/<sample>/truth_scorable.tsv`,
+gives `scorable_plasmid_bp`, `recall_ceiling` (scorable / total plasmid bp, the largest
+recall any tool could reach) and `ceiling_adjusted_recall` (TP within scorable bases /
+scorable bases). A real contig spanning a repeat and its unique flanks does map uniquely,
+so the window view is conservative for repeats longer than the window and blind to much
+shorter ones. It is a diagnostic only; recall and F1 are unchanged. Disable with
+`RUN_SCORABLE_TRUTH=0`.
+
+**Reference-database overlap.** Most tools score contigs against a database of known
+plasmids, or a model trained on one, built from the same public complete genomes PlasBench
+uses as truth. A truth genome that was public before the tool's database was built may
+already be inside it, so the tool can be "recognising" rather than inferring.
+`python/flag_database_overlap.py` (stage 6) compares each truth assembly's release date
+(the sample sheet's `truth_release_date`, else NCBI's `assembly_data_report.jsonl`, which
+stage 1 now keeps) with each tool's database release date in
+`config/tool_database_releases.tsv`, and labels every sample × tool pair
+`possible_overlap`, `after_database`, `no_reference_database` or `unknown`
+(`benchmark.database_overlap.tsv`). **Fill in `database_release_date` for the database
+versions you installed**; until then every pair is `unknown`. The leaderboard reports
+`n_possible_db_overlap`, `n_after_database` and `mean_f1_after_database` (F1 on samples the
+database cannot contain). With `EXCLUDE_DATABASE_OVERLAP=1`, `possible_overlap` rows are
+dropped before ranking (and the shared-sample rule then applies). This is a date-based
+screen, not proof that a genome is in a database.
+
 ## Base-level confusion matrix (positive class = plasmid)
 Let `C` be the set of reference bases covered by predicted-plasmid alignments.
 - **TP** = |{plasmid reference bases} ∩ C|
@@ -472,6 +509,15 @@ is better in the field.
   that PlasBin-Flow failed to detect any enterococcal plasmids in their benchmark,
   despite functioning on other taxa. PlasBench's `organism`/`gram_group`
   stratification throughout the leaderboard and recommendation logic exists
+**Correlated isolates.** Isolates from one BioProject (one study, often one outbreak or
+clonal collection) are not independent. When the sample sheet has a `bioproject` column
+(else `source_study`), the bootstrap CI resamples whole clusters and the sign-flip
+permutation test flips every difference in a cluster together. At least five independent
+clusters are required; with fewer, no interval or p-value is reported. The leaderboard's
+`n_independent_clusters` and the comparisons' `paired_clusters` show how many there were.
+Without a cluster column every sample is its own cluster and the results are identical to
+plain per-sample resampling.
+
   precisely because tool performance is not taxon-independent — this is external,
   peer-reviewed confirmation of that design choice, not a hypothetical.
 

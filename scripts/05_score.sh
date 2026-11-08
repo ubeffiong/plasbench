@@ -90,6 +90,38 @@ score_sample() {
         fi
     fi
 
+    # Recall ceiling (python/scorable_truth.py): which true-plasmid bases can a
+    # prediction be scored on at all under the alignment filters? Built once
+    # per sample, rebuilt when the reference, truth or filters change. A
+    # failure only drops the diagnostic; scores are unaffected.
+    local SCORABLE="$SDIR/truth_scorable.tsv"
+    local SCORABLE_ARGS=()
+    if [[ "${RUN_SCORABLE_TRUTH:-1}" == "1" ]]; then
+        local SCORABLE_PARAMS="window=$SCORABLE_WINDOW_BP step=$SCORABLE_STEP_BP preset=$MINIMAP2_PRESET len=$MIN_ALIGNMENT_LENGTH id=$MIN_ALIGNMENT_IDENTITY mapq=$MIN_ALIGNMENT_MAPQ qcov=$MIN_ALIGNMENT_QUERY_COVERAGE"
+        if [[ ! -s "$SCORABLE" || "$SCORABLE" -ot "$REF" || "$SCORABLE" -ot "$TRUTH" \
+              || "$(cat "$SCORABLE.params" 2>/dev/null)" != "$SCORABLE_PARAMS" ]]; then
+            local WINDOWS="$SDIR/truth_plasmid_windows.fa" WINDOWS_PAF="$SDIR/truth_plasmid_windows.paf"
+            local SCORABLE_LOG="$LOG_DIR/${SAMPLE}.scorable_truth.log"
+            if python3 "$HERE/../python/scorable_truth.py" windows --reference "$REF" --truth "$TRUTH" \
+                    --out "$WINDOWS" --window "$SCORABLE_WINDOW_BP" --step "$SCORABLE_STEP_BP" > "$SCORABLE_LOG" 2>&1 \
+                && minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$WINDOWS" \
+                    > "$WINDOWS_PAF" 2>> "$SCORABLE_LOG" \
+                && python3 "$HERE/../python/scorable_truth.py" intervals --paf "$WINDOWS_PAF" --truth "$TRUTH" \
+                    --out "$SCORABLE.tmp" \
+                    --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
+                    --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
+                    --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" \
+                    --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" >> "$SCORABLE_LOG" 2>&1; then
+                mv "$SCORABLE.tmp" "$SCORABLE"
+                printf '%s' "$SCORABLE_PARAMS" > "$SCORABLE.params"
+            else
+                rm -f "$SCORABLE.tmp" "$SCORABLE" "$SCORABLE.params"
+                warn "recall-ceiling diagnostic failed for $SAMPLE (see $SCORABLE_LOG); scores are unaffected"
+            fi
+        fi
+        [[ -s "$SCORABLE" ]] && SCORABLE_ARGS=(--scorable-truth "$SCORABLE")
+    fi
+
     local PRED
     for PRED in "${preds[@]}"; do
         local base tool DONE
@@ -187,6 +219,7 @@ score_sample() {
             "${AMBIGUITY_ARGS[@]}" \
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
+            "${SCORABLE_ARGS[@]}" \
             "${PRSCORE_ARGS[@]}" \
             --sample "$SAMPLE" --tool "$tool" --out "$SCORE_SHARD" \
             2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then

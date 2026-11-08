@@ -162,6 +162,11 @@ download_sample() {
         fi
         cp "$FNA" "$REF"
         cp "$SR" "$REPORT"
+        # Keep the assembly report: its releaseDate feeds the reference-database
+        # overlap screen (python/flag_database_overlap.py). Optional.
+        local ADR
+        ADR=$(find "$SDIR/ncbi" -name 'assembly_data_report.jsonl' | head -n1)
+        [[ -s "$ADR" ]] && cp "$ADR" "$SDIR/assembly_data_report.jsonl"
         rm -f "$ZIP"
         log "  reference -> $REF"
     fi
