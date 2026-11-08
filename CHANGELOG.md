@@ -13,6 +13,19 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- reviewer question bank
+- **Trivial baselines** `baseline_coverage` and `baseline_reference`, scored like tools;
+  leaderboard columns `is_baseline` and `beats_best_baseline`.
+- **Probability calibration** for probability-exposing tools: Brier score, expected
+  calibration error and a reliability table/diagram.
+- HTML report sections **Baselines and calibration**, **Interpretation limits** and
+  **Metadata completeness**; `benchmark.metadata_completeness.tsv`.
+- `docs/FAQ_QUESTION_BANK.md` answers the 108-question reviewer bank.
+
+### Fixed
+- The run manifest now records every ranking-relevant setting added by recent releases.
+- A duplicate `PLASMID_REFERENCE_SKETCH` default ignored `DATA_DIR`.
+
 ### Changed -- research design (headline endpoints and reference standard)
 - **Primary endpoint is now length-weighted binning F1** for binning-capable tools
   (`lw_bin_f1`, ungated Hungarian match; the count-based `bin_f1` is kept but not
