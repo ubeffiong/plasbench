@@ -36,25 +36,44 @@ def file_report(run, timeout=60):
     return dict(zip(header, values))
 
 
-def download(url, path, expected_md5, expected_bytes=None, retries=3, timeout=120):
+def download(url, path, expected_md5, expected_bytes=None, retries=5, timeout=120):
+    """Fetch url to path, verifying MD5. A transfer that ends early resumes from the
+    bytes already on disk (HTTP Range) on the next attempt; a completed file whose
+    MD5 is wrong is discarded and fetched again from the start."""
+    tmp = path + ".part"
+    total = int(expected_bytes) if expected_bytes else None
     for attempt in range(1, retries + 1):
-        tmp = path + ".part"
-        digest = hashlib.md5()
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as response, open(tmp, "wb") as handle:
-                for block in iter(lambda: response.read(1 << 20), b""):
-                    handle.write(block)
+            have = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+            if total and have > total:
+                os.remove(tmp)
+                have = 0
+            request = urllib.request.Request(url)
+            if have and (not total or have < total):
+                request.add_header("Range", f"bytes={have}-")
+            if not total or have < total:
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    if have and getattr(response, "status", 206) != 206:
+                        have = 0  # server ignored the range: start again
+                    with open(tmp, "ab" if have else "wb") as handle:
+                        for block in iter(lambda: response.read(1 << 20), b""):
+                            handle.write(block)
+            size = os.path.getsize(tmp)
+            if total and size < total:
+                raise OSError(f"transfer ended early for {url} ({size} of {total} bytes); will resume")
+            digest = hashlib.md5()
+            with open(tmp, "rb") as handle:
+                for block in iter(lambda: handle.read(1 << 20), b""):
                     digest.update(block)
             if digest.hexdigest() != expected_md5:
+                os.remove(tmp)
                 raise ValueError(f"MD5 mismatch for {url}: {digest.hexdigest()} != {expected_md5}")
-            if expected_bytes and os.path.getsize(tmp) != int(expected_bytes):
-                raise ValueError(f"size mismatch for {url}")
             os.replace(tmp, path)
             return
         except (OSError, ValueError) as exc:
-            if os.path.exists(tmp):
-                os.remove(tmp)
             if attempt == retries:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
                 raise
             sys.stderr.write(f"[fetch_ena_reads] {exc}; retry {attempt}/{retries - 1}\n")
             time.sleep(15 * attempt)

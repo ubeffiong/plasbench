@@ -19,6 +19,8 @@ R1, R2 = b"@r1\nACGT\n+\nIIII\n" * 10, b"@r1\nTGCA\n+\nIIII\n" * 10
 
 
 class Response(io.BytesIO):
+    status = 200
+
     def __enter__(self):
         return self
 
@@ -28,15 +30,32 @@ class Response(io.BytesIO):
 
 def server(layout="PAIRED", md5_1=None):
     m1, m2 = md5_1 or hashlib.md5(R1).hexdigest(), hashlib.md5(R2).hexdigest()
+    shown = "PAIRED" if layout == "FLAKY" else layout
     report = ("run_accession\tfastq_ftp\tfastq_md5\tfastq_bytes\tlibrary_layout\n"
               f"SRR1\tftp.sra.ebi.ac.uk/x/SRR1_1.fastq.gz;ftp.sra.ebi.ac.uk/x/SRR1_2.fastq.gz\t{m1};{m2}\t"
-              f"{len(R1)};{len(R2)}\t{layout}\n")
+              f"{len(R1)};{len(R2)}\t{shown}\n")
+
+    calls = {"r1": 0}
 
     def urlopen(url, timeout=None):
+        url = getattr(url, "full_url", url)
         if "filereport" in url:
             return Response(report.encode())
         return Response(R1 if url.endswith("_1.fastq.gz") else R2)
-    return urlopen
+
+    def flaky(request, timeout=None):
+        """Read 1 is cut off half way the first time, then served from the Range offset."""
+        url = getattr(request, "full_url", request)
+        if url.endswith("_1.fastq.gz"):
+            calls["r1"] += 1
+            if calls["r1"] == 1:
+                return Response(R1[: len(R1) // 2])
+            start = int(request.get_header("Range").split("=")[1].rstrip("-"))
+            response = Response(R1[start:])
+            response.status = 206
+            return response
+        return urlopen(request, timeout)
+    return flaky if layout == "FLAKY" else urlopen
 
 
 def run(tmp, urlopen):
@@ -53,6 +72,11 @@ def main():
         prov = json.loads((tmp / "SRR1.ena_provenance.json").read_text())
         assert prov["source"] == "ENA" and len(prov["files"]) == 2
         print("  PASS: paired run downloaded, MD5-verified, provenance written")
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        run(tmp, server(layout="FLAKY"))
+        assert (tmp / "SRR1_1.fastq.gz").read_bytes() == R1
+        print("  PASS: a transfer cut off half way resumes from the partial file (HTTP Range) and verifies")
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         try:
