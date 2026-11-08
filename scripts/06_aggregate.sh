@@ -205,6 +205,10 @@ if [[ "${RUN_RECOMMENDER_EVAL:-1}" -eq 1 ]]; then
     else
         warn "recommender evaluation failed; the report shows no recommender section"
     fi
+    # Leave-one-genus/phylum-out transfer (python/leave_taxon_out.py). split=holdout
+    # isolates stay locked here; evaluate them once by hand with
+    # "plasbench analysis leave-taxon-out ... --confirm-holdout".
+    python3 "$HERE/../python/leave_taxon_out.py" --scores "$SCORES" --samples "$SAMPLE_SHEET"         --tool-status "$RESULTS_DIR/tool_status.tsv" --out-prefix "$RESULTS_DIR/benchmark"         --min-train-samples "$RECOMMENDATION_MIN_SAMPLES"         || warn "leave-taxon-out evaluation failed; the report shows no taxon-transfer table"
 fi
 
 # Descriptive decision-support model, off by default (see docs/USER_GUIDE.md).

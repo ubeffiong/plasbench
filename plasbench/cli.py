@@ -210,6 +210,7 @@ ANALYSES = {
     "detect-dimers": ("detect_dimers.py", "Find (and optionally collapse) tandem-dimer truth plasmids"),
     "recommender-eval": ("evaluate_recommender.py", "Leave-one-study-out regret, gap closed and oracle-gap verdict"),
     "warning-eval": ("evaluate_warnings.py", "PPV, sensitivity and firing rate of each operational warning"),
+    "leave-taxon-out": ("leave_taxon_out.py", "Leave-one-genus/phylum-out regret; --confirm-holdout evaluates the holdout once"),
     "assembly-qc": ("assembly_qc_gate.py", "Flag mixed or contaminated assemblies before ranking (advisory)"),
     "flag-database-overlap": ("flag_database_overlap.py", "Screen truth genomes that may already be in a tool's database"),
     "flag-cohort-outliers": ("flag_cohort_outliers.py", "Advisory outlier flags for cohort assembly statistics"),

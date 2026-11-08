@@ -22,6 +22,7 @@ Standard library only.
 """
 
 import argparse
+import math
 import os
 import csv
 import random
@@ -699,6 +700,57 @@ def holm_adjust(pvalues):
     return adjusted
 
 
+def wilcoxon_signed_rank(differences, exact_max_n=25):
+    """Two-sided paired Wilcoxon signed-rank p-value, pure Python.
+
+    Zero differences are dropped (Wilcoxon's method). Tied |d| get average
+    ranks. For n <= exact_max_n the p-value is exact: the null distribution of
+    W+ is enumerated over doubled ranks (integers even with half-rank ties, so
+    the exact test is conditional on the observed ties). Above that, the normal
+    approximation with tie-corrected variance and a 0.5 continuity correction.
+    Reported beside the primary sign-flip permutation test, never replacing it.
+    Returns None when every difference is zero or there are none.
+    """
+    nonzero = [d for d in differences if d != 0]
+    n = len(nonzero)
+    if n == 0:
+        return None
+    order = sorted(range(n), key=lambda i: abs(nonzero[i]))
+    ranks = [0.0] * n
+    i = 0
+    tie_term = 0
+    while i < n:
+        j = i
+        while j + 1 < n and abs(nonzero[order[j + 1]]) == abs(nonzero[order[i]]):
+            j += 1
+        average = (i + j) / 2 + 1
+        for k in range(i, j + 1):
+            ranks[order[k]] = average
+        t = j - i + 1
+        tie_term += t ** 3 - t
+        i = j + 1
+    w_plus = sum(r for r, d in zip(ranks, nonzero) if d > 0)
+    if n <= exact_max_n:
+        doubled = [int(round(2 * r)) for r in ranks]
+        total = sum(doubled)
+        counts = [0] * (total + 1)
+        counts[0] = 1
+        for r in doubled:
+            for s in range(total, r - 1, -1):
+                counts[s] += counts[s - r]
+        observed = int(round(2 * w_plus))
+        all_ways = 2 ** n
+        lower = sum(counts[: observed + 1]) / all_ways
+        upper = sum(counts[observed:]) / all_ways
+        return min(1.0, 2 * min(lower, upper))
+    mean = n * (n + 1) / 4
+    variance = n * (n + 1) * (2 * n + 1) / 24 - tie_term / 48
+    if variance <= 0:
+        return None
+    z = max(0.0, abs(w_plus - mean) - 0.5) / math.sqrt(variance)
+    return min(1.0, math.erfc(z / math.sqrt(2)))
+
+
 def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", design=None, plasmid_samples=None):
     """Paired, shared-sample, sign-flip permutation comparisons for every
     pair of tools, Holm-adjusted across all pairs computed here. Shared by
@@ -748,9 +800,22 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
                 "permutation_p_value": hd.stratified_permutation(diffs, groups, strata),
                 "wins_a": sum(x > 0 for x in diffs), "ties": sum(x == 0 for x in diffs),
                 "wins_b": sum(x < 0 for x in diffs),
+                "wilcoxon_p_value": wilcoxon_signed_rank(diffs),
             })
     for row, adjusted in zip(comparisons, holm_adjust([x["permutation_p_value"] for x in comparisons])):
         row["permutation_p_value_holm"] = adjusted
+    for row, adjusted in zip(comparisons, holm_adjust([x["wilcoxon_p_value"] for x in comparisons])):
+        row["wilcoxon_p_value_holm"] = adjusted
+    smallest = float(os.environ.get("SMALLEST_DIFFERENCE", 0.05))
+    for row in comparisons:
+        # Equivalence flag: the mean difference AND its interval lie inside
+        # +/- SMALLEST_DIFFERENCE, the pre-registered smallest difference of interest.
+        low, high = row.get("difference_ci_low"), row.get("difference_ci_high")
+        inside = abs(row["mean_f1_difference"]) < smallest
+        if low is not None and high is not None:
+            inside = inside and -smallest < low and high < smallest
+        row["equivalent"] = "yes" if inside else "no"
+        row["smallest_difference"] = smallest
     return comparisons
 
 
@@ -783,7 +848,8 @@ def write_comparisons(rows, path, comparisons=None):
     if comparisons is None:
         comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
-        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\tpaired_clusters\ttask\tmetric\n")
+        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\tpaired_clusters\ttask\tmetric"
+                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\n")
         for row in comparisons:
             low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
             high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
@@ -796,8 +862,14 @@ def write_comparisons(rows, path, comparisons=None):
                 f"{row['mean_f1_difference']:.4f}\t{low}\t{high}\t{pvalue_text}\t"
                 f"{adjusted_text}\t{row['wins_a']}\t{row['ties']}\t{row['wins_b']}\t"
                 f"{row.get('analysis_track', '')}\t{row.get('paired_clusters', '')}\t"
-                f"{row.get('task', '')}\t{row.get('metric', 'f1')}\n"
+                f"{row.get('task', '')}\t{row.get('metric', 'f1')}\t"
+                f"{fmt6(row.get('wilcoxon_p_value'))}\t{fmt6(row.get('wilcoxon_p_value_holm'))}\t"
+                f"{row.get('equivalent', '')}\t{row.get('smallest_difference', '')}\n"
             )
+
+
+def fmt6(value):
+    return f"{value:.6f}" if value is not None else ""
 
 
 def fmt4(value):
