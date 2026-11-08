@@ -1045,12 +1045,16 @@ def robustness_section(track_leaderboards, ordered_tracks):
     )
 
 
-METRIC_LABELS = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level F1"}
+METRIC_LABELS = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level F1",
+                 "sample_cprr": "isolate-level CPRR"}
 TASK_LABELS = {"reconstruction": "Plasmid reconstruction", "classification": "Plasmid classification"}
 TASK_BLURBS = {
-    "reconstruction": ("Binning-capable tools, ranked by length-weighted binning F1 (primary endpoint): bases "
-                       "placed in the correct one-to-one matched bin. CPRR, the share of truth plasmids "
-                       "reconstructed correctly, is the secondary endpoint."),
+    "reconstruction": ("Binning-capable tools. On the short-read track they are ranked by length-weighted "
+                       "binning F1 (primary endpoint): bases placed in the correct one-to-one matched bin, with "
+                       "CPRR, the share of truth plasmids reconstructed correctly, as the key secondary endpoint. "
+                       "On the long-read and hybrid tracks, whose tools aim to close whole plasmids, the "
+                       "primary endpoint is isolate-level CPRR and binning F1 is secondary. The CPRR cell also "
+                       "gives the per-isolate rate and the area under the CPRR curve over thresholds 0.80-0.99."),
     "classification": ("Classifier-only tools, ranked by base-level plasmid/chromosome F1. They are not scored "
                        "on binning, a task they do not attempt."),
 }
@@ -1984,7 +1988,10 @@ def main():
                 f1_width=max(0, min(100, round((headline_value(row) or 0) * 100))),
                 band=score_band(headline_value(row) or 0),
                 ci=esc(f"{row['ranking_ci_low']}–{row['ranking_ci_high']}" if row.get("ranking_ci_low") else "< 5 independent units"),
-                cprr=esc(f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
+                cprr=esc((f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
+                          + (f"; per isolate {number(row['cprr_isolate_mean']):.1%}"
+                             if row.get("cprr_isolate_mean") else "")
+                          + (f"; AUC {number(row['cprr_auc']):.3f}" if row.get("cprr_auc") else ""))
                          if row.get("cprr") else "not bin-scored"),
                 ranked_on=(f"<small class='muted'> on {esc(row['n_ranking_samples'])} shared"
                            + (f" · {esc(row['ranking_species_basis'])}" if row.get("ranking_species_basis") else "")
@@ -2188,7 +2195,7 @@ def main():
     # Recovery by replicon / MOB type (descriptive only; never ranks tools).
     replicon_recovery_html = "".join(
         "<tr><td>{track}</td><td>{tool}</td><td>{kind}</td><td>{label}</td><td>{n}</td><td>{samples}</td>"
-        "<td>{mean}</td><td>{median}</td><td>{recovered}</td><td>{flag}</td></tr>".format(
+        "<td>{mean}</td><td>{median}</td><td>{recovered}</td><td>{cprr}</td><td>{flag}</td></tr>".format(
             track=esc(row.get("analysis_track", "-")), tool=esc(row.get("tool", "-")),
             kind=esc(row.get("feature_type", "-")), label=esc(row.get("label", "-")),
             n=esc(row.get("n_plasmids", "-")), samples=esc(row.get("n_samples", "-")),
@@ -2196,9 +2203,11 @@ def main():
             median=("{} ({}-{})".format(esc(row["median_completeness"]), esc(row.get("q1_completeness", "-")),
                                       esc(row.get("q3_completeness", "-")))
                     if row.get("median_completeness") else "-"),
+            cprr=("{} (n={})".format(esc(row["cprr"]), esc(row.get("n_cprr_assessed", "-")))
+                  if row.get("cprr") else "not bin-scored"),
             flag="underpowered (small n)" if row.get("underpowered") == "true" else "",
         ) for row in recovery_by_replicon
-    ) or ("<tr><td colspan='10'>No recovery-by-replicon table was available. It needs per-plasmid "
+    ) or ("<tr><td colspan='11'>No recovery-by-replicon table was available. It needs per-plasmid "
           "scoring output and replicon/MOB annotation of the truth references.</td></tr>")
     replicon_recovery_download = ""
     if args.recovery_by_replicon and Path(args.recovery_by_replicon).is_file():
@@ -2506,7 +2515,7 @@ def main():
 <section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered AND circular, the strictest per-plasmid claim this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>
 <section id='isolate-difficulty'><h2>Isolate difficulty</h2><p class='lead'>Truth-derived signals for how intrinsically hard THIS isolate is to correctly separate into plasmid vs. chromosome, independent of any tool's own performance on it -- never a tool-performance measure, and never wired into the recommendation model (see docs/METHODS.md). Off by default (RUN_DIFFICULTY_FEATURES); each field is independently optional and shown as "not available" rather than a guessed value when its own prerequisite (an assembly graph, short reads, or the external tool) was missing.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>GFA dead-end count</th><th>Plasmid/chromosome depth ratio</th><th>Plasmid/chromosome Mash distance</th></tr></thead><tbody>{difficulty_html}</tbody></table></div></section>
 <section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
-<section id='replicon-recovery'><h2>Recovery by plasmid type</h2><p class='lead'>Which kinds of plasmid each tool recovers, by Inc/rep and relaxase (MOB) label annotated on the truth references, by plasmid size band, and by antimicrobial-resistance-gene carriage. Per-plasmid recovery is skewed, so the median and interquartile range sit beside the mean. <strong>Descriptive only: it never ranks tools and never changes the leaderboard.</strong> A plasmid with several labels counts once under each. A plasmid with no label of that type is <em>untyped</em>; plasmids in samples with no annotation are left out rather than called untyped. Groups with few plasmids are flagged, so read patterns, not ranks. Tracks are never mixed.{replicon_recovery_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Tool</th><th>Label type</th><th>Label</th><th>Plasmids</th><th>Samples</th><th>Mean completeness</th><th>Median (IQR)</th><th>Recovered fraction</th><th>Note</th></tr></thead><tbody>{replicon_recovery_html}</tbody></table></div></section>
+<section id='replicon-recovery'><h2>Recovery by plasmid type</h2><p class='lead'>Which kinds of plasmid each tool recovers, by Inc/rep and relaxase (MOB) label annotated on the truth references, by plasmid size band, and by antimicrobial-resistance-gene carriage. Per-plasmid recovery is skewed, so the median and interquartile range sit beside the mean. <strong>Descriptive only: it never ranks tools and never changes the leaderboard.</strong> A plasmid with several labels counts once under each. A plasmid with no label of that type is <em>untyped</em>; plasmids in samples with no annotation are left out rather than called untyped. Groups with few plasmids are flagged, so read patterns, not ranks. <strong>CPRR</strong> is the share of the group's plasmids reconstructed correctly (whole, alone and accurately), so a tool cannot look good only on small, simple plasmids. Tracks are never mixed.{replicon_recovery_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Tool</th><th>Label type</th><th>Label</th><th>Plasmids</th><th>Samples</th><th>Mean completeness</th><th>Median (IQR)</th><th>Recovered fraction</th><th>CPRR</th><th>Note</th></tr></thead><tbody>{replicon_recovery_html}</tbody></table></div></section>
 <section id='quast-diagnostics'><h2>QUAST structural diagnostics</h2><p class='lead'>Optional supplementary check of each tool's predicted plasmid sequence against the truth, run three ways: <em>combined</em> (all truth plasmids), <em>individual</em> (one run per truth plasmid) and <em>chromosome</em> (chromosome only). A high chromosome genome fraction means the tool's plasmid call contains chromosome sequence; misassemblies and duplication ratio flag structural problems that base-level F1 cannot see. <strong>Descriptive only: it never changes the ranking.</strong> Misassembly counts are alignment-derived and are not validated against read or graph support. Means skip blank values.{quast_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Reference</th><th>Comparisons</th><th>Mean genome fraction (%)</th><th>Total misassemblies</th><th>Mean duplication ratio</th></tr></thead><tbody>{quast_html}</tbody></table></div></section>
 <section id='rank-robustness'><h2>Ranking robustness</h2><p class='lead'>How much the order of tools depends on scoring choices: each row re-scores the saved alignments with one filter changed (or ranks by strict precision or per-plasmid recovery) and reports Kendall tau against the baseline order and whether the top tool holds. <strong>Advisory only: it never changes the leaderboard.</strong> A low tau or a changed top tool means the ranking is sensitive to that choice.{rank_robustness_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Variant</th><th>Kendall tau vs baseline</th><th>Top tool</th><th>Top tool unchanged</th></tr></thead><tbody>{rank_robustness_html}</tbody></table></div></section>
 <section id='truth-label-audit'><h2>Truth-label audit</h2><p class='lead'>Does each PLASMID or CHROMOSOME label agree with replicon and MOB evidence on the reference? Findings: {audit_summary}. Only sequences to review are listed. A flagged sequence may be a chromid, an integrated plasmid, a cryptic plasmid the databases do not know, or a database false positive. <strong>Advisory only: it never edits truth or changes a score.</strong> <em>not_evaluated</em> means the annotation callers did not run, which is not the same as consistent.{truth_label_audit_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Sequence</th><th>Truth label</th><th>Length</th><th>Replicon</th><th>MOB</th><th>Finding</th></tr></thead><tbody>{truth_label_audit_html}</tbody></table></div></section>

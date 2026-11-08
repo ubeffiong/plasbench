@@ -1,5 +1,8 @@
 parameter	value	config_variable	spec_section	revise_after_pilot	status	note
-primary_endpoint	binning F1 (lw_bin_f1) for reconstruction; base F1 for classification		7	no	fixed	Decided before the panel round (#7); CPRR secondary
+primary_endpoint	binning F1 (lw_bin_f1) for short-read reconstruction; base F1 for classification; CPRR key secondary		7	no	fixed	Decided before the panel round (#7); kept after the endpoint review because complete recovery from short reads is rare (floor effect) and the regret and power framework is per-isolate F1
+primary_endpoint_long_read	isolate-level CPRR (sample_cprr) for long_read and hybrid reconstruction; lw_bin_f1 secondary		7	no	fixed	These tools aim to close whole plasmids, so the floor effect does not apply; per-isolate CPRR reuses the per-isolate bootstrap and paired tests (headline_design.ranking_metric)
+cprr_threshold_sweep	0.80-0.99 step 0.01 on coverage and bin share; normalised AUC		7	no	fixed	Descriptive robustness view (benchmark.cprr_threshold_sweep.tsv, leaderboard cprr_auc); identity and not-split criteria unchanged; never changes a rank
+cprr_isolate_weighting	pooled over plasmids and mean over isolates, both reported		7	no	fixed	Pooled CPRR (cprr) is the reported rate; cprr_isolate_mean stops isolates with many plasmids dominating
 primary_label_scheme	ncbi	TRUTH_LABEL_SCHEME	9	no	fixed	Decision E.15: Scheme 3, NCBI sequence-report labels (assigned_molecule_location_type)
 sensitivity_label_schemes	nonchromosomal,evidence		9	no	fixed	Re-ranked by rank_sensitivity.py; Kendall tau vs primary
 truth_construction	long-read-first only for the headline		9	no	fixed	Tier 3 (short-read-first) is sensitivity only

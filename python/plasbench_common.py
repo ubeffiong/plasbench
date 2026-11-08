@@ -98,6 +98,26 @@ class UnionFind:
             self.parent[max(root_a, root_b)] = min(root_a, root_b)
 
 
+# --- CPRR threshold robustness -------------------------------------------------
+# One shared grid, so score_bins.py (which counts correct plasmids at each value)
+# and aggregate_results.py (which reads those counts back) cannot drift apart.
+# At each value t the coverage and bin-share criteria both require >= t; the
+# identification, not-split and identity criteria stay at their configured values.
+CPRR_SWEEP_THRESHOLDS = tuple(round(0.80 + 0.01 * i, 2) for i in range(20))   # 0.80 .. 0.99
+
+
+def cprr_sweep_auc(rates, thresholds=CPRR_SWEEP_THRESHOLDS):
+    """Normalised area under CPRR(t) over the sweep (trapezoid rule), in [0, 1].
+
+    None when any rate is undefined, so a partial curve is never summarised.
+    """
+    if len(rates) != len(thresholds) or len(rates) < 2 or any(r is None for r in rates):
+        return None
+    area = sum((rates[i] + rates[i + 1]) / 2 * (thresholds[i + 1] - thresholds[i])
+               for i in range(len(rates) - 1))
+    return area / (thresholds[-1] - thresholds[0])
+
+
 # --- Mash ----------------------------------------------------------------------
 # The sketch size is a scientific parameter: a query sketched at a different size
 # than the reference silently lowers sensitivity, so every Mash user shares this.

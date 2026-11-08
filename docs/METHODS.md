@@ -599,6 +599,31 @@ because plasmids from one isolate are not independent. Circular closure of the
 prediction is reported separately (`complete_circular_plasmid_recall`) and is not
 part of CPRR, since most tools do not report topology.
 
+**Track-specific primary endpoint.** On the **long-read** and **hybrid** input tracks,
+reconstruction tools are ranked by **isolate-level CPRR** (`sample_cprr` = correct
+plasmids / truth plasmids for each isolate, with the same identity rule), averaged
+across isolates like any other ranking metric, so the species macro-average, cluster
+bootstrap and paired tests apply unchanged; `lw_bin_f1` is secondary there. Those tools
+are built to close whole plasmids, so CPRR does not sit at a floor. Short-read
+reconstruction stays on `lw_bin_f1`, where complete recovery is rare and a pass/fail
+endpoint would cost power (`headline_design.ranking_metric()`; `config/prereg.tsv`,
+`primary_endpoint_long_read`).
+
+**CPRR robustness and weighting** (descriptive; never change a rank):
+
+- *Threshold sweep.* `score_bins.py` counts correct plasmids with the coverage and
+  bin-share criteria both set to each value from 0.80 to 0.99 (step 0.01;
+  identification, not-split and identity unchanged). `benchmark.cprr_threshold_sweep.tsv`
+  gives pooled and isolate-weighted CPRR at each threshold; the leaderboard's
+  `cprr_auc` is the normalised trapezoid area under the pooled curve, so no single
+  cut-off decides how a tool reads.
+- *Isolate weighting.* `cprr` pools plasmids; `cprr_isolate_mean` averages per-isolate
+  rates, so isolates with many plasmids cannot dominate. Both are reported.
+- *Strata.* `benchmark.recovery_by_replicon.tsv` adds `cprr` and `n_cprr_assessed` per
+  size band, replicon, MOB type and AMR carriage, and `benchmark.reference_tiers.tsv`
+  adds pooled CPRR per reference tier, so a tool cannot look strong only on small,
+  simple plasmids.
+
 **Task tracks.** Binning-capable tools (`binning_capable=yes` in
 `config/tool_capabilities.tsv`) are ranked on the reconstruction track by
 `lw_bin_f1`. Classifier-only tools (Platon, geNomad, plasmidSPAdes as configured, ...)

@@ -12,7 +12,17 @@ Inputs
 
 Output: one row per (analysis_track, tool, feature_type, label):
   n_plasmids, n_samples, mean_completeness, recovered_fraction, underpowered,
-  median_completeness, q1_completeness, q3_completeness
+  median_completeness, q1_completeness, q3_completeness, n_cprr_assessed, cprr
+
+CPRR by stratum
+---------------
+  results/<sample>/<tool>.cprr.tsv (score_bins.py --cprr-out) gives each truth
+  plasmid's correct-reconstruction verdict. `cprr` is the share of the stratum's
+  assessed plasmids that are correct; `n_cprr_assessed` counts them. Both are blank
+  for a classification-only tool (no bins, so no CPRR file). With --truth-provenance,
+  a sample whose truth was polished with the benchmark's own reads
+  (base_level_metrics_valid != yes) uses `correct_without_identity`, the same
+  identity rule as the leaderboard CPRR.
 
 Per-plasmid recovery is heavy-tailed (many small plasmids recovered fully, a few large
 ones missed), so the median and interquartile range sit next to the mean.
@@ -58,7 +68,8 @@ SIZE_BANDS = ((10_000, "<10kb"), (50_000, "10-50kb"))   # upper bounds; the rest
 AMR_CALLERS = ("amrfinder", "abricate_amr")
 OUT_FIELDS = ("analysis_track", "tool", "feature_type", "label", "n_plasmids",
               "n_samples", "mean_completeness", "recovered_fraction", "underpowered",
-              "median_completeness", "q1_completeness", "q3_completeness")
+              "median_completeness", "q1_completeness", "q3_completeness",
+              "n_cprr_assessed", "cprr")
 
 
 def size_band(length):
@@ -118,15 +129,41 @@ def read_labels(path):
     return labels
 
 
-def stratify(results_dir, data_dir, min_plasmids):
-    groups = defaultdict(list)          # (track, tool, type, label) -> [(sample, completeness, recovered)]
+def read_identity_validity(path):
+    """sample -> True when base-level identity is valid (truth_provenance.py); {} without a file."""
+    if not path or not os.path.isfile(path):
+        return {}
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {row["sample"]: row.get("base_level_metrics_valid") == "yes"
+                for row in csv.DictReader(handle, delimiter="\t") if row.get("sample")}
+
+
+def read_cprr_verdicts(path):
+    """true_plasmid -> (correct, correct_without_identity) booleans; None when no CPRR file."""
+    if not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return None
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {row["true_plasmid"]: (row.get("correct") == "yes", row.get("correct_without_identity") == "yes")
+                for row in csv.DictReader(handle, delimiter="\t") if row.get("true_plasmid")}
+
+
+def stratify(results_dir, data_dir, min_plasmids, identity_valid=None):
+    # (track, tool, type, label) -> [(sample, completeness, recovered, cprr_correct or None)]
+    groups = defaultdict(list)
     skipped_unannotated = 0
     label_cache, amr_cache, curated_cache = {}, {}, {}
+    identity_valid = identity_valid or {}
     for path in sorted(glob.glob(os.path.join(results_dir, "*", "*.per_plasmid.tsv"))):
+        tool_prefix = os.path.basename(path)[:-len(".per_plasmid.tsv")]
+        verdicts = read_cprr_verdicts(os.path.join(os.path.dirname(path), f"{tool_prefix}.cprr.tsv"))
         with open(path, newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle, delimiter="\t"):
                 sample = row["sample"]
-                item = (sample, float(row["completeness"]), int(row["recovered"]))
+                verdict = (verdicts or {}).get(row["sequence_id"])
+                cprr_correct = None
+                if verdict is not None:
+                    cprr_correct = verdict[0] if identity_valid.get(sample, True) else verdict[1]
+                item = (sample, float(row["completeness"]), int(row["recovered"]), cprr_correct)
                 track, tool = row["analysis_track"], row["tool"]
                 # Size needs no annotation, so it is always available.
                 try:
@@ -158,16 +195,19 @@ def stratify(results_dir, data_dir, min_plasmids):
     rows = []
     for (track, tool, kind, label), items in sorted(groups.items()):
         n = len(items)
-        completeness = sorted(c for _, c, _ in items)
+        completeness = sorted(c for _, c, _, _ in items)
+        assessed = [v for _, _, _, v in items if v is not None]
         rows.append({
             "analysis_track": track, "tool": tool, "feature_type": kind, "label": label,
-            "n_plasmids": n, "n_samples": len({s for s, _, _ in items}),
+            "n_plasmids": n, "n_samples": len({s for s, _, _, _ in items}),
             "mean_completeness": f"{sum(completeness) / n:.4f}",
-            "recovered_fraction": f"{sum(r for _, _, r in items) / n:.4f}",
+            "recovered_fraction": f"{sum(r for _, _, r, _ in items) / n:.4f}",
             "underpowered": "true" if n < min_plasmids else "false",
             "median_completeness": f"{quantile(completeness, 0.5):.4f}",
             "q1_completeness": f"{quantile(completeness, 0.25):.4f}",
             "q3_completeness": f"{quantile(completeness, 0.75):.4f}",
+            "n_cprr_assessed": len(assessed),
+            "cprr": f"{sum(assessed) / len(assessed):.4f}" if assessed else "",
         })
     return rows, skipped_unannotated
 
@@ -180,8 +220,11 @@ def main():
     parser.add_argument("--out", required=True)
     parser.add_argument("--min-plasmids", type=int, default=5,
                         help="groups smaller than this are flagged underpowered (default: 5)")
+    parser.add_argument("--truth-provenance",
+                        help="truth_provenance.py output; drops the CPRR identity criterion where it is invalid")
     args = parser.parse_args()
-    rows, skipped = stratify(args.results_dir, args.data_dir, args.min_plasmids)
+    rows, skipped = stratify(args.results_dir, args.data_dir, args.min_plasmids,
+                             read_identity_validity(args.truth_provenance))
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=OUT_FIELDS, delimiter="\t")
         writer.writeheader()
