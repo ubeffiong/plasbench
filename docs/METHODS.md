@@ -124,6 +124,16 @@ position, since QUAST only emits fields applicable to a given run. Real per-tool
 sample compute cost (up to `2 + n_truth_plasmids` QUAST invocations), so off by default
 like every other optional diagnostic in this project.
 
+**Enabling and reading it.** Install QUAST with `plasbench install-tools quast`, then set
+`RUN_QUAST_DIAGNOSTICS=1` in `config/config.sh` and re-run stage 5. Stage 5 merges the
+per-tool files into `results/quast_diagnostics.tsv` (sample, tool, reference_type,
+reference_id, genome_fraction_pct, misassembly_count, duplication_ratio), and the HTML
+report summarises it per tool and reference type under "QUAST structural diagnostics"
+(mean genome fraction, total misassemblies, mean duplication ratio; blank values are
+skipped, never counted as zero). It is descriptive only. Misassembly counts are
+alignment-derived, not validated against read or graph support, and they never change
+the ranking. For typed per-record structural calls see `python/call_structural_variants.py`.
+
 ### Equal CPU allocation across tools (fairness policy)
 
 Every registered tool gets its own `<TOOL>_THREADS` config variable, defaulting to the
@@ -391,6 +401,56 @@ AMR recovery runs only after `truth_amr.tsv` passes
 `python/validate_amr_truth.py`. Curators must supply plasmid coordinates,
 normalized gene and database identifiers, unique gene-copy identifiers, and a
 database version. This preserves AMR context as independent truth evidence.
+
+**Drafting AMR truth from reference annotation (opt-in).** Without a curated
+`truth_amr.tsv`, `amr_gene_recall` is blank. `python/derive_amr_truth.py` turns the
+AMRFinderPlus rows that `python/annotate_reference.py` already writes for each truth
+reference into a **draft**, `truth_amr.draft.tsv`:
+
+```bash
+python3 python/derive_amr_truth.py --features data/<sample>/truth_features.tsv \
+    --truth data/<sample>/truth.tsv --out data/<sample>/truth_amr.draft.tsv
+```
+
+The draft is never written to `truth_amr.tsv`, so the scorer cannot use it by accident
+(the script refuses that output name). Every row is tagged `evidence_tier = auto_derived`.
+Annotation runs on the reference, not on any tool's predictions, so the draft is not
+circular with the tools being scored. Limitations: the annotation table has no gene
+accession (`gene_id` is the gene symbol) and records the caller's version rather than
+the AMR database version (`database_version` holds that caller version), so review the
+draft and correct those fields before promoting it. Promotion is a deliberate step:
+copy or rename the reviewed file to `truth_amr.tsv`, which must still pass
+`validate_amr_truth.py`. Only AMRFinderPlus rows on PLASMID-labelled sequences are kept
+by default (`--source` widens this), so overlapping databases are not counted as
+separate gene copies.
+
+### Recovery by replicon and mobility type (descriptive, non-ranking)
+
+Pooled F1 cannot say *which kinds* of plasmid a tool misses. `score_plasmids.py`
+writes an additive side file, `results/<sample>/<tool>.per_plasmid.tsv` (one row per
+true plasmid: length, covered bp, completeness, recovered at the configured threshold).
+It never changes `scores.tsv`. `python/stratify_recovery.py` joins it to the replicon
+(Inc/rep) and relaxase (MOB) labels in `data/<sample>/truth_features.tsv` written by
+`annotate_reference.py`. Stage 6 (`scripts/06_aggregate.sh`) runs it automatically and
+writes `benchmark.recovery_by_replicon.tsv`; a failure there only warns. It can also be
+run by hand:
+
+```bash
+python3 python/stratify_recovery.py --results-dir results --data-dir data \
+    --out results/benchmark.recovery_by_replicon.tsv
+```
+
+It appears in the HTML report as "Recovery by replicon and mobility type". Runs scored
+before the side file existed produce no rows until they are re-scored.
+
+One row per (analysis track, tool, label type, label): `n_plasmids`, `n_samples`,
+`mean_completeness`, `recovered_fraction`, `underpowered`. Tracks are never mixed. A
+plasmid with several labels counts once in each. A plasmid in an annotated sample with
+no label of that type is `untyped`. A plasmid in a sample with **no** annotation file is
+skipped rather than called `untyped`, because its callers never ran and an absence was
+not measured. Groups smaller than `--min-plasmids` (default 5) are flagged
+`underpowered`; with the current small cohorts most will be, so treat this as a way to
+spot patterns worth investigating, not as a ranking.
 
 ## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,

@@ -188,6 +188,7 @@ score_sample() {
             "${AMR_ARGS[@]}" \
             "${CIRCULAR_ARGS[@]}" \
             "${PRSCORE_ARGS[@]}" \
+            --per-plasmid-out "$RDIR/${tool}.per_plasmid.tsv" \
             --sample "$SAMPLE" --tool "$tool" --out "$SCORE_SHARD" \
             2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
             warn "scoring failed for $SAMPLE/$tool; excluded from aggregation"

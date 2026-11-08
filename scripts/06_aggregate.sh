@@ -26,6 +26,14 @@ python3 "$HERE/../python/aggregate_results.py" \
     --sample-sheet "$SAMPLE_SHEET" \
     --out-prefix "$RESULTS_DIR/benchmark"
 
+# Descriptive recovery-by-replicon/MOB breakdown (python/stratify_recovery.py).
+# Never ranks tools and never alters the leaderboard; a failure only warns.
+if ! python3 "$HERE/../python/stratify_recovery.py" \
+        --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+        --out "$RESULTS_DIR/benchmark.recovery_by_replicon.tsv"; then
+    warn "recovery-by-replicon breakdown failed; leaderboard is unaffected"
+fi
+
 if [[ "${COHORT_QC_FLAGS_ENABLED:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/flag_cohort_outliers.py" \
         --stats-dir "$DATA_DIR" --samples "$SAMPLE_SHEET" \
@@ -97,6 +105,8 @@ python3 "$HERE/../python/build_html_report.py" \
     --recommendations "$RESULTS_DIR/benchmark.recommendations.tsv" \
     --recommendation-validation "$RESULTS_DIR/benchmark.recommendation_validation.tsv" \
     --cohort-qc-flags "$RESULTS_DIR/benchmark.cohort_qc_flags.tsv" \
+    --recovery-by-replicon "$RESULTS_DIR/benchmark.recovery_by_replicon.tsv" \
+    --quast-diagnostics "$RESULTS_DIR/quast_diagnostics.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."
@@ -109,6 +119,7 @@ log "  HTML dashboard    : $RESULTS_DIR/benchmark.report.html"
 log "  Run manifest      : $RESULTS_DIR/run_manifest.json"
 log "  Recommendations   : $RESULTS_DIR/benchmark.recommendations.tsv"
 log "  Stratified metrics: $RESULTS_DIR/benchmark.stratified.tsv"
+log "  Recovery by replicon/MOB: $RESULTS_DIR/benchmark.recovery_by_replicon.tsv (descriptive only)"
 log "  Study holdout test : $RESULTS_DIR/benchmark.recommendation_validation.tsv"
 log "  Cohort QC flags   : $RESULTS_DIR/benchmark.cohort_qc_flags.tsv (advisory only)"
 if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then

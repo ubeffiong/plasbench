@@ -496,6 +496,8 @@ def main():
                                                    "(mapped the same way as --paf); required together with --pred-scores.")
     ap.add_argument("--pr-curve-out", help="Write the swept (threshold, precision, recall) points here.")
     ap.add_argument("--pr-summary-out", help="Write a one-row (pr_auc, pr_n_thresholds) summary here.")
+    ap.add_argument("--per-plasmid-out", help="Optional side file: one row per true plasmid with its covered bp and "
+                                              "completeness (used by stratify_recovery.py). Never alters scores.tsv.")
     args = ap.parse_args()
 
     truth, total_plasmid, total_chromosome = read_truth(args.truth)
@@ -567,6 +569,15 @@ def main():
         seq_id: safe_div(merge_intervals(covered.get(seq_id, []))[1], truth[seq_id][1])
         for seq_id in true_plasmids
     }
+    if args.per_plasmid_out:
+        with open(args.per_plasmid_out, "w") as handle:
+            handle.write("sample\ttool\tanalysis_track\tsequence_id\tlength\tcovered_bp\tcompleteness\trecovered\n")
+            for seq_id in true_plasmids:
+                length = truth[seq_id][1]
+                frac = completeness[seq_id]
+                handle.write(f"{args.sample}\t{args.tool}\t{args.analysis_track}\t{seq_id}\t{length}\t"
+                             f"{int(round(frac * length))}\t{frac:.4f}\t"
+                             f"{int(frac >= args.plasmid_recovery_threshold)}\n")
     recovered_plasmids = sum(1 for frac in completeness.values() if frac >= args.plasmid_recovery_threshold)
     recovered_plasmids_ge50 = sum(1 for frac in completeness.values() if frac >= 0.5)
     recovered_plasmids_ge90 = sum(1 for frac in completeness.values() if frac >= 0.9)
