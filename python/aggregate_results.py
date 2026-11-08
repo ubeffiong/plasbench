@@ -213,6 +213,7 @@ def read_scores(path):
                 "mcc": float(f[idx["mcc"]]) if "mcc" in idx and f[idx["mcc"]] else None,
                 "f2": float(f[idx["f2"]]) if "f2" in idx and f[idx["f2"]] else None,
                 "f0_5": float(f[idx["f0_5"]]) if "f0_5" in idx and f[idx["f0_5"]] else None,
+                "contig_bin_f1_bp": float(f[idx["contig_bin_f1_bp"]]) if "contig_bin_f1_bp" in idx and f[idx["contig_bin_f1_bp"]] else None,
                 "abstention_rate": float(f[idx["abstention_rate"]]) if "abstention_rate" in idx and f[idx["abstention_rate"]] else None,
                 "outcome_perfect": int(f[idx["outcome_perfect"]]) if "outcome_perfect" in idx and f[idx["outcome_perfect"]] else None,
                 "outcome_fragmented": int(f[idx["outcome_fragmented"]]) if "outcome_fragmented" in idx and f[idx["outcome_fragmented"]] else None,
@@ -560,7 +561,8 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
         row["is_baseline"] = "yes" if (design.is_baseline(row["tool"]) if design else row["tool"].startswith("baseline_")) else "no"
         tool_rows = [r for r in rows if r["tool"] == row["tool"]]
         for key in ("contig_f1_count", "contig_mcc_count", "contig_f1_bp", "contig_mcc_bp",
-                    "bin_ari", "lw_bin_f1_assembly_aware", "mcc", "f2", "f0_5", "abstention_rate"):
+                    "bin_ari", "lw_bin_f1_assembly_aware", "mcc", "f2", "f0_5", "abstention_rate",
+                    "contig_bin_f1_bp"):
             values = [r[key] for r in tool_rows if r.get(key) is not None]
             row[f"mean_{key}"] = statistics.mean(values) if values else None
         for key in ("outcome_perfect", "outcome_fragmented", "outcome_merged", "outcome_fragmented_and_merged",
@@ -826,7 +828,7 @@ def write_tsv(summary, path):
             "mean_mcc", "mean_f2", "mean_f0_5", "mean_abstention_rate",
             "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
             "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed",
-            "n_failed_tool", "n_infrastructure_failure", "n_not_applicable"]
+            "n_failed_tool", "n_infrastructure_failure", "n_not_applicable", "mean_contig_bin_f1_bp"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -892,6 +894,7 @@ def write_tsv(summary, path):
                     "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
                     "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed")),
                 s.get("n_failed_tool", ""), s.get("n_infrastructure_failure", ""), s.get("n_not_applicable", ""),
+                fmt4(s.get("mean_contig_bin_f1_bp")),
             ]) + "\n")
 
 

@@ -53,7 +53,13 @@ SCORE_FIELDS = ["contig_min_length", "contigs_evaluable", "contigs_short", "cont
                 "contig_precision_count", "contig_recall_count", "contig_f1_count", "contig_mcc_count",
                 "contig_tp_bp", "contig_fp_bp", "contig_fn_bp", "contig_tn_bp",
                 "contig_precision_bp", "contig_recall_bp", "contig_f1_bp", "contig_mcc_bp",
-                "contig_classification_status"]
+                "contig_classification_status",
+                # Scoring specification (WP3): lengths of the excluded categories, and
+                # contig-level binning (length-weighted, Hungarian one-to-one matching
+                # over PLASMID contigs; |P| = summed PLASMID-contig length per plasmid,
+                # a contig-layer-only denominator).
+                "contigs_ambiguous_bp", "contigs_unplaced_bp",
+                "contig_bin_precision_bp", "contig_bin_recall_bp", "contig_bin_f1_bp"]
 
 
 def read_fasta_lengths(path):
@@ -187,6 +193,14 @@ def cmd_score(args):
             index = (0 if is_called else 2) if kind == "PLASMID" else (1 if is_called else 3)
             tallies["n"][index] += 1
             tallies["bp"][index] += length
+        excluded_bp = defaultdict(int)
+        for label in labels:
+            if label["label"] in ("AMBIGUOUS", "UNPLACED"):
+                excluded_bp[label["label"]] += int(label["length"])
+        row.update({"contigs_ambiguous_bp": excluded_bp["AMBIGUOUS"], "contigs_unplaced_bp": excluded_bp["UNPLACED"]})
+        if args.bins and os.path.isfile(args.bins) and os.path.getsize(args.bins):
+            p, r, f1 = contig_binning(labels, args.bins)
+            row.update({"contig_bin_precision_bp": fmt(p), "contig_bin_recall_bp": fmt(r), "contig_bin_f1_bp": fmt(f1)})
         row.update({"contigs_evaluable": sum(tallies["n"]), "contigs_short": excluded["SHORT"],
                     "contigs_ambiguous": excluded["AMBIGUOUS"], "contigs_unplaced": excluded["UNPLACED"]})
         for key, suffix, fields in (("n", "count", ("contig_tp", "contig_fp", "contig_fn", "contig_tn")),
@@ -201,6 +215,33 @@ def cmd_score(args):
         writer = csv.DictWriter(handle, fieldnames=SCORE_FIELDS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         writer.writerow(row)
+
+
+def contig_binning(labels, bins_path):
+    """Length-weighted binning P/R/F1 at contig level (score_bins.length_weighted_binning).
+    A PLASMID contig belongs to its best_plasmid; a CHROMOSOME contig placed in a
+    bin is wrongly binned material; contigs in no bin are not predicted."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import score_bins
+    membership = score_bins.read_bins(bins_path)
+    overlaps, plasmids, total_mapped = defaultdict(int), defaultdict(int), defaultdict(int)
+    for label in labels:
+        kind, length, contig = label["label"], int(label["length"]), label["contig"]
+        if kind == "PLASMID" and label.get("best_plasmid"):
+            plasmids[label["best_plasmid"]] += length
+        bin_id = membership.get(contig)
+        if bin_id is None or kind not in ("PLASMID", "CHROMOSOME"):
+            continue
+        total_mapped[bin_id] += length
+        if kind == "PLASMID" and label.get("best_plasmid"):
+            overlaps[(bin_id, label["best_plasmid"])] += length
+    if not plasmids:
+        return None, None, None
+    all_bins = set(membership.values())
+    for bin_id in all_bins:
+        total_mapped.setdefault(bin_id, 0)
+    lw = score_bins.length_weighted_binning(dict(overlaps), dict(plasmids), dict(total_mapped), all_bins)
+    return lw["precision"], lw["recall"], lw["f1"]
 
 
 def cmd_merge(args):
@@ -243,6 +284,7 @@ def main():
     sco.add_argument("--pred-fasta", required=True)
     sco.add_argument("--out", required=True)
     sco.add_argument("--min-length", type=int, default=1000)
+    sco.add_argument("--bins", help="the tool's bins TSV (sequence_id, bin_id): adds contig-level binning F1")
     sco.set_defaults(func=cmd_score)
     mer = sub.add_parser("merge", help="join per-tool rows into scores.tsv")
     mer.add_argument("--scores", required=True)

@@ -302,7 +302,11 @@ score_sample() {
         fi
         rm -f "$RDIR/${tool}.contig_classification.tsv"
         if [[ "$CONTIG_READY" -eq 1 ]]; then
+            local CONTIG_BIN_ARGS=()
+            [[ -s "$RDIR/pred_${tool}.bins.tsv" ]] && binning_capable "$tool" \
+                && CONTIG_BIN_ARGS=(--bins "$RDIR/pred_${tool}.bins.tsv")
             python3 "$HERE/../python/contig_classification.py" score --labels "$CONTIG_LABELS" --pred-fasta "$PRED" \
+                "${CONTIG_BIN_ARGS[@]+"${CONTIG_BIN_ARGS[@]}"}" \
                 --min-length "$CONTIG_MIN_LENGTH" --out "$RDIR/${tool}.contig_classification.tsv" \
                 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "contig-level scoring failed for $SAMPLE/$tool"
         fi

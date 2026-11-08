@@ -69,7 +69,7 @@ SETTING_VARIANTS = (
     ("identity=0.95", {"min_identity": 0.95}),
     ("query_coverage=0", {"min_query_coverage": 0.0}),
 )
-METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "contig_f1_bp")
+METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "contig_f1_bp", "contig_bin_f1_bp")
 SCHEME_FILES = {"ncbi": "truth.tsv", "nonchromosomal": "truth.nonchromosomal.tsv", "evidence": "truth.scored.tsv"}
 MIN_CONTIG_VARIANT = ("min_contig=500", 500)
 COHORT_VARIANTS = ("public_only", "in_house_only", "grade_c_excluded")
