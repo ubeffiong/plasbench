@@ -32,7 +32,7 @@ for dir in /usr/bin /bin; do
     for exe in "$dir"/*; do
         name="$(basename "$exe")"
         case "$name" in
-            datasets|prefetch|fasterq-dump|fastp|minimap2|unzip|conda|mamba|micromamba|spades.py|plasmidspades.py|mob_recon|mob_init|mob_typer|mob_cluster|platon|gplas) continue ;;
+            datasets|prefetch|fasterq-dump|fastp|minimap2|unzip|conda|mamba|micromamba|spades.py|plasmidspades.py|mob_recon|mob_init|mob_typer|mob_cluster|platon|gplas|mash|samtools|barrnap|abricate|amrfinder|isescan.py) continue ;;
         esac
         # `|| true`: some directories on a real machine's PATH (e.g. a
         # protected Windows system directory under Git Bash) refuse symlink
@@ -47,7 +47,7 @@ done
 mkdir -p "$TMP/bin_full" "$TMP/bin_partial" "$TMP/data/db/platon/db" "$TMP/results" "$TMP/logs" "$TMP/tmp"
 touch "$TMP/data/db/platon/db/marker"
 
-for t in datasets prefetch fasterq-dump fastp minimap2 unzip python3 conda spades.py plasmidspades.py mob_recon platon; do
+for t in datasets prefetch fasterq-dump fastp minimap2 unzip python3 conda spades.py plasmidspades.py mob_recon platon mash samtools barrnap abricate amrfinder isescan.py mob_typer; do
     printf '#!/usr/bin/env bash\ntrue\n' > "$TMP/bin_full/$t"; chmod +x "$TMP/bin_full/$t"
 done
 for t in datasets prefetch fasterq-dump fastp minimap2 unzip python3 conda spades.py plasmidspades.py; do
@@ -99,7 +99,7 @@ echo "declining consent never touches conda -> PASS"
 # actually invokes conda. gplas is otherwise not needed, so bin_full (which
 # lacks it) plus a logging conda is enough to isolate this one gap. ---
 mkdir -p "$TMP/bin_gplas"
-for t in datasets prefetch fasterq-dump fastp minimap2 unzip spades.py plasmidspades.py mob_recon platon; do
+for t in datasets prefetch fasterq-dump fastp minimap2 unzip spades.py plasmidspades.py mob_recon platon mash samtools barrnap abricate amrfinder isescan.py mob_typer; do
     printf '#!/usr/bin/env bash\ntrue\n' > "$TMP/bin_gplas/$t"; chmod +x "$TMP/bin_gplas/$t"
 done
 cat > "$TMP/bin_gplas/conda" <<EOF

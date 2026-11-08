@@ -213,15 +213,29 @@ if [[ "${RUN_PLASGRAPH2:-0}" -eq 1 ]]; then
         log "  [ok]   plASgraph2 model dir at $PLASGRAPH2_MODEL_DIR"
     fi
 fi
+# mash is used by default stages, not only the opt-in difficulty features: clonal grouping
+# (stage 6), the truth-evidence plasmid sketch and the reference-set build. Without it clonal
+# groups silently fall back to BioProject/study only, which can change the headline's
+# independence clusters, so a missing mash is worth saying out loud. Advisory (required=0).
+check_tool mash utilities 0
+# The default reference-annotation stage (RUN_REFERENCE_ANNOTATION) calls these. Each absent
+# caller leaves its feature class not_evaluated, never "absent", so they are advisory too.
+if [[ "${RUN_REFERENCE_ANNOTATION:-0}" -eq 1 ]]; then
+    check_tool barrnap utilities 0
+    check_tool abricate reference-annotation 0
+    check_tool amrfinder reference-annotation 0
+    check_tool isescan.py reference-annotation 0
+    check_tool mob_typer reference-annotation 0
+fi
 if [[ "${RUN_DIFFICULTY_FEATURES:-0}" -eq 1 ]]; then
     # Each of the three difficulty fields is independently optional by
     # design (a missing tool leaves that one field empty, never a guessed
     # value, per python/compute_difficulty_features.py) -- these checks are
     # therefore advisory only (required=0: warn, never CORE_OK=0), so
     # enabling this never blocks a run over a supplementary diagnostic.
-    # minimap2/samtools are unconditionally required elsewhere already, so
-    # not re-checked here.
-    check_tool mash "" 0
+    # minimap2 is checked with the core tools above. samtools is checked here because
+    # only this feature uses it; mash is checked for every run (just above).
+    check_tool samtools utilities 0
     check_tool deadends "" 0
 fi
 if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then

@@ -51,6 +51,7 @@ bash "$HERE/test_thread_scaling_sweep.sh"
 bash "$HERE/test_quast_diagnostics_stage.sh"
 bash "$HERE/test_stage_dimensions.sh"
 bash "$HERE/test_stage_contig_metrics.sh"
+python3 "$HERE/test_install_wiring.py"
 python3 "$HERE/test_materialize_bmock12_truth.py"
 # Question-bank gaps (calibration, baselines, interpretation limits, metadata completeness).
 python3 "$HERE/test_question_bank_gaps.py"
