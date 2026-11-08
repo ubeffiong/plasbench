@@ -88,8 +88,6 @@ Plasmids carry much of the antimicrobial-resistance (AMR) burden, but they are h
 | PlasBench is not | What to use instead, or what is true |
 |---|---|
 | A plasmid **identification** tool for your sample | Run a reconstruction tool (PlasBench can recommend one). PlasBench scores tools; it is not itself a caller. |
-| A plasmid **clustering, taxonomy, community or relatedness** tool | Not implemented. See [section 18](#18-scope-matrix). |
-| A **PLSDB search** or reference-comparison tool | Not implemented. PLSDB appears only as the source of some tools' own databases. |
 | A **surveillance, outbreak or transmission** system | It produces no epidemiological output. Genomic similarity, a shared resistance gene and a shared replicon are not evidence of transmission, and PlasBench makes no such claim. |
 | A **diagnostic** or clinical-validation tool | It is research software. Its outputs are computational candidates and are never a substitute for laboratory confirmation. |
 | A way to prove a plasmid is **closed, circular or biologically intact** | Base-level and plasmid-level recovery against a reference do not prove closure. Closure needs separate evidence. |
@@ -504,7 +502,7 @@ Operational mode helps a laboratory apply benchmark evidence to a **sample that 
 - **Decision profiles** change only the ranking, never eligibility: `accuracy_first` (default), `amr_surveillance`, `rapid_screening`, `amr_context` (needs curated AMR truth, and falls back visibly otherwise).
 - **Recommendation model** (`RUN_RECOMMENDATION_MODEL`, off by default): a small ridge regression of F1 and plasmid recall from isolate features. It runs only when leave-one-study-out validation shows at least 5% improvement over a per-tool baseline, with at least 3 studies and 20 samples; otherwise every script behaves as if it did not exist. Truth-derived features are barred from it. It is not meaningful on the shipped public cohorts.
 
-**Nearest-reference screen (experimental, unvalidated; off by default).** `RUN_PLASMID_NOVELTY_CLASSIFICATION=1` reports how close each predicted record is, by Mash distance, to a 16-plasmid curated set. Calls are `close_reference_match`, `no_close_reference`, `insufficient_reference`. It is **not** a taxonomy, **not** a relatedness inference and **not** a test of novelty, and a Mash distance of 0.05 is not "95% similar" for plasmids: two equal-size sequences sharing about 35% of their k-mers reach it, and an exact piece under about 21% of a reference falls outside it. The result is shown in the report with its caveat. See [docs/OPERATIONAL_SELECTION.md](OPERATIONAL_SELECTION.md).
+**Nearest-reference screen (experimental, unvalidated; off by default).** `RUN_PLASMID_NOVELTY_CLASSIFICATION=1` reports how close each predicted record is, by Mash distance, to a 16-plasmid curated set. Calls are `close_reference_match`, `no_close_reference`, `insufficient_reference`. It is **not** a test of whether a plasmid is novel, and a Mash distance of 0.05 is not "95% similar" for plasmids: two equal-size sequences sharing about 35% of their k-mers reach it, and an exact piece under about 21% of a reference falls outside it. The result is shown in the report with its caveat. See [docs/OPERATIONAL_SELECTION.md](OPERATIONAL_SELECTION.md).
 
 ---
 
@@ -805,12 +803,8 @@ This section records what has and has not been shown, so that a reader can judge
 | Recommender regret, warning PPV, leave-taxon-out | **Implemented**; tested on synthetic data only. |
 | AMR placement by gene class | **Implemented**; needs curated `truth_amr.tsv`. |
 | Plasmid identification for a user's sample | **Not a PlasBench function.** |
-| Plasmid clustering, communities or subcommunities | **Not implemented.** |
-| PLSDB comparison, most-similar reference, relatedness, backbone versus accessory analysis | **Not implemented.** |
 | Transmission, outbreak or horizontal-gene-transfer inference | **Not implemented and not claimed.** |
 | Clinical or diagnostic use | **Out of scope.** |
-
-If you need plasmid relatedness, clustering or database comparison, use a method designed and validated for it (for example MOB-typer's cluster codes, COPLA, or PLSDB's own search) and cite that tool; do not infer these from PlasBench's output.
 
 ---
 
@@ -832,6 +826,6 @@ If you need plasmid relatedness, clustering or database comparison, use a method
 | [docs/CONCEPT_NOTE.md](CONCEPT_NOTE.md) | A non-technical overview for partners and funders. |
 | [CHANGELOG.md](../CHANGELOG.md), [docs/RELEASES.md](RELEASES.md) | What changed, and how to choose and verify a release. |
 
-**Background reading** (check the original papers before citing): Ondov et al. 2016, *Genome Biology* (Mash); Arredondo-Alonso et al. 2017, *Microbial Genomics* (limits of plasmid reconstruction from short reads); Robertson and Nash 2018, *Microbial Genomics* (MOB-suite); Galata et al. 2019 and Schmartz et al. 2022, *Nucleic Acids Research* (PLSDB); Redondo-Salvo et al. 2020, *Nature Communications* (COPLA); Schwengers et al. 2020, *Microbial Genomics* (Platon); Camargo et al. 2023, *Nature Biotechnology* (geNomad); Teixeira et al. 2025, *Briefings in Bioinformatics* (benchmarking plasmid detection and reconstruction from short reads, cited in `docs/METHODS.md`).
+**Background reading** (check the original papers before citing): Ondov et al. 2016, *Genome Biology* (Mash); Arredondo-Alonso et al. 2017, *Microbial Genomics* (limits of plasmid reconstruction from short reads); Robertson and Nash 2018, *Microbial Genomics* (MOB-suite); Galata et al. 2019 and Schmartz et al. 2022, *Nucleic Acids Research* (PLSDB); Schwengers et al. 2020, *Microbial Genomics* (Platon); Camargo et al. 2023, *Nature Biotechnology* (geNomad); Teixeira et al. 2025, *Briefings in Bioinformatics* (benchmarking plasmid detection and reconstruction from short reads, cited in `docs/METHODS.md`).
 
 To cite PlasBench, use the version and cohort you ran and the metadata in `CITATION.cff`.
