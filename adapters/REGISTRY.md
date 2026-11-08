@@ -24,6 +24,7 @@ rather than assigning an artificial zero score.
 | PlasmidHunter | ml_classification | not applicable | short-read assembly | `adapt_plasmidhunter.sh` | optional |
 | Plasmer | ml_classification | not applicable | short-read assembly | `adapt_plasmer.sh` | optional |
 | PlaScope | classification | not applicable | short-read assembly (E. coli/Klebsiella only) | `adapt_plascope.sh` | optional |
+| PlasBin-flow | binning | applicable | assembly graph; PlasBench adapts the tool's own output | `adapt_plasbin_flow.sh` | optional |
 | plsMD | reassembly | applicable | short-read Unicycler assembly plus a PLSDB BLAST index | `adapt_plsmd.sh` | optional |
 
 The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
@@ -323,7 +324,7 @@ plsMD needs a Unicycler assembly (it reads `circular=` and `depth=` headers), so
 `ASSEMBLER=spades`; it also skips when `PLSMD_DB` (the PLSDB BLAST index prefix) or the `plsMD` command is missing. A skip is
 not a failure. plsMD reconstructs against PLSDB, so set its release date in `config/tool_database_releases.tsv` and list the PLSDB
 FASTA in `TOOL_DATABASE_FASTAS` (`plsmd=/path/plsdb.fasta`) to see recovery inside versus outside its database. `env/download_plsdb.sh`
-downloads a PLSDB FASTA you name with `PLSDB_URL` and records its provenance; it is used only as a tool's database and as an optional
+downloads a PLSDB FASTA you name with `PLSDB_URL` and records its provenance (the URL in plsMD's Dockerfile redirects to an HTML page, so the script refuses anything that is not a FASTA); it is used only as a tool's database and as an optional
 reference for the trivial baseline, never as a search feature.
 
 ## baseline_replicon
@@ -332,3 +333,19 @@ A contig is called plasmid when it carries a replicon marker (Abricate `REPLICON
 coverage thresholds in `baseline_predictors.py replicon`). plsMD's Col-versus-Inc rule is the default: a Col hit is dropped when an Inc hit
 is on the same contig, because that signals a co-integrate rather than a separate plasmid (`--keep-col-with-inc` disables it).
 Not applicable, not failed, when Abricate or its database is missing.
+
+## adapt_plasbin_flow.sh
+
+PlasBin-flow bins contigs of an assembly graph with a flow-based mixed-integer program. It needs a Gurobi licence (free for academics), a
+gzipped GFA with `dp` (Unicycler) or `KC` (SKESA) tags, a contig plasmid-score file and a GC-probability file, so PlasBench does not run it;
+like `gplas2_external` it adapts the tool's own output. Set `RUN_PLASBIN_FLOW=1` and `PLASBIN_FLOW_OUTPUTS_DIR`; the file for a sample is
+`PLASBIN_FLOW_OUTPUTS_DIR/<sample>.tsv`, the output of `plasbin_flow.py -outfile`, made from **the same assembly** PlasBench uses.
+
+The output has the header `#Pls_ID  Flow  GC_bin  Contigs` and one plasmid bin per line; `Contigs` is `contig:multiplicity,...`. The adapter writes
+the sequences of the listed contigs (each once) to `pred_plasbin_flow.plasmid.fasta` and one bin per PlasBin-flow plasmid to
+`pred_plasbin_flow.bins.tsv`. PlasBin-flow may list one contig in several bins; the contract needs each contig exactly once, so the contig stays
+in the first bin it is listed in and the others are recorded under `contigs_in_multiple_bins` in `pred_plasbin_flow.plasbin_flow.provenance.json`,
+with the bin count, per-bin flow and GC bin, and the sha256 of the output. An empty or header-only output is a valid completed prediction. A
+contig id the assembly does not have means the output came from a different assembly: stage 4 records a skip with the reason and never relabels.
+Its plasmid scores usually come from a classifier such as plASgraph2; if that classifier is database-trained, record its release date separately
+in `config/tool_database_releases.tsv`.

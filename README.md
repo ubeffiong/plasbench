@@ -193,7 +193,8 @@ cannot match. This table states only what was verified in their repositories and
 - **No benchmark result on real data ships with PlasBench.** The bundled leaderboards come from a synthetic demo. plsMD and PlasEval
   report results on real data in their publications; PlasBench provides the instrument, and the run is still to be done.
 - **PlasEval handles repeated contigs** by pairing copies across bins (branch and bound) and has a peer-reviewed description. PlasBench's
-  re-implementation excludes shared contigs and counts them, and has not been cross-checked against the original program.
+  re-implementation excludes shared contigs and counts them. It matches the original program on best-match precision, recall and F1 and on the
+  dissimilarity where no contig repeats (`test/test_plaseval_crosscheck.py`, run against a PlasEval checkout), but not on real data.
 - **plsMD reconstructs** ordered, overlap-trimmed plasmids from references and reports copy number and mob-typing for each; PlasBench only
   evaluates such output, and its plsMD wrapper has been tested with a stand-in binary, not the real tool.
 - **GAEMR is broader as assembly QC** (contamination screening by BLAST taxonomy, gap analysis, insert sizes). PlasBench takes a few of its

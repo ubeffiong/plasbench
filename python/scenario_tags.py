@@ -59,7 +59,7 @@ def classify(sample, data_dir, depth, args):
     is_density = None
     if features:                                    # annotation exists, so IS absence is meaningful
         total_bp = sum(plasmids.values())
-        is_count = sum(1 for f in on_plasmid if (f.get("feature_type") or "").lower() in ("is", "isescan"))
+        is_count = sum(1 for f in on_plasmid if (f.get("feature_type") or "").lower() in ("is", "isescan", "insertion_sequence"))
         is_density = is_count / (total_bp / 10_000) if total_bp else None
     tags = []
     if len(plasmids) >= args.complex_plasmids:
