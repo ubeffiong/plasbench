@@ -16,7 +16,7 @@ from pathlib import Path
 
 TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycler",
          "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3",
-         "plassembler", "flye", "hybracter", "trycycler", "genomad", "PLASMe.py",
+         "plassembler", "plsMD", "flye", "hybracter", "trycycler", "genomad", "PLASMe.py",
          "plASgraph2_classify.py", "rfplasmid", "plasmidhunter", "Plasmer", "plaScope.sh")
 
 
@@ -223,8 +223,11 @@ def main():
                 "PLASMID_REFERENCE_SKETCH", "PLASMID_REFERENCE_FASTA",
                 "RUN_SCORABLE_TRUTH", "SCORABLE_WINDOW_BP", "SCORABLE_STEP_BP",
                 "EXCLUDE_DATABASE_OVERLAP",
-                "RUN_BASELINE_COVERAGE", "RUN_BASELINE_REFERENCE", "BASELINE_COVERAGE_RATIO",
+                "RUN_BASELINE_COVERAGE", "RUN_BASELINE_REFERENCE", "RUN_BASELINE_REPLICON", "REPLICON_ABRICATE_DBS", "BASELINE_COVERAGE_RATIO",
                 "BASELINE_MIN_CONTIG_LENGTH", "BASELINE_REFERENCE_MIN_QUERY_COVERAGE",
+                "RUN_PLSMD", "PLSMD_DB", "RUN_BIN_AGREEMENT", "DISSIMILARITY_ALPHA", "RUN_COPY_NUMBER",
+                "RUN_ASSEMBLY_ADEQUACY", "MIN_ASSEMBLY_ADEQUACY", "RUN_REPEAT_CONTENT", "REPEAT_KMER",
+                "RUN_TRUTH_DEPTH_ANOMALIES", "DEPTH_WINDOW_BP", "DEPTH_ANOMALY_Z",
                 "RUN_CONTIG_CLASSIFICATION", "CONTIG_MIN_LENGTH", "CONTIG_MIN_IDENTITY", "CONTIG_MIN_COVERAGE",
                 "RUN_DATABASE_CONTAINMENT", "DATABASE_CONTAINMENT_MIN_COVERAGE",
                 "DATABASE_CONTAINMENT_MIN_IDENTITY", "TOOL_DATABASE_FASTAS")

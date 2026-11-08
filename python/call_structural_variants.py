@@ -26,6 +26,16 @@ reference_deletion       reference advances far more than the query
 reference_insertion      query advances far more than the reference
 tandem_duplication       one record covers the same reference interval twice
 
+Origin wrap
+-----------
+A circular replicon has no fixed start, so a faithful reconstruction can begin anywhere on the circle. Its alignment then
+has two blocks that are contiguous on the query and meet across the reference origin: the first ends at the reference
+end and the second starts at the reference start (mirrored on the reverse strand). That is a rotation, not a discordance,
+so it is not reported as a tandem duplication or a relocation and counts as collinear; it is tallied in `origin_wraps`.
+Every truth replicon is treated as circular for this purpose (bacterial chromosomes and plasmids almost always are); a
+linear replicon whose two ends were joined by a misassembly would be read as a wrap, which the validated:false
+convention already says is a candidate, not a confirmed misassembly.
+
 Collinearity
 ------------
 `collinear_fraction` is the share of a record's aligned bases lying in its
@@ -93,13 +103,36 @@ def read_paf(path, truth, thresholds):
     return blocks
 
 
-def longest_collinear_run(blocks):
-    """Longest chain of blocks that advances on both query and reference."""
+def is_origin_wrap(left, right, truth, tolerance):
+    """Two query-adjacent blocks of one record that meet across the reference origin (a rotation)."""
+    if not truth or left["target"] != right["target"] or left["strand"] != right["strand"]:
+        return False
+    length = truth.get(left["target"], {}).get("length")
+    if not length or abs(right["query_start"] - left["query_end"]) > tolerance:
+        return False
+    if left["strand"] == "+":
+        return left["target_end"] >= length - tolerance and right["target_start"] <= tolerance
+    return left["target_start"] <= tolerance and right["target_end"] >= length - tolerance
+
+
+def count_origin_wraps(blocks, truth, tolerance):
+    by_record = defaultdict(list)
+    for block in blocks:
+        by_record[block["record_id"]].append(block)
+    total = 0
+    for items in by_record.values():
+        ordered = sorted(items, key=lambda x: (x["query_start"], x["query_end"]))
+        total += sum(is_origin_wrap(a, b, truth, tolerance) for a, b in zip(ordered, ordered[1:]))
+    return total
+
+
+def longest_collinear_run(blocks, truth=None, tolerance=100):
+    """Longest chain of blocks that advances on both query and reference (an origin wrap counts as advancing)."""
     if not blocks:
         return 0
     best = current = blocks[0]["block_length"]
     for left, right in zip(blocks, blocks[1:]):
-        collinear = (
+        collinear = is_origin_wrap(left, right, truth, tolerance) or (
             left["target"] == right["target"]
             and left["strand"] == right["strand"]
             and (right["target_start"] >= left["target_start"] if right["strand"] == "+"
@@ -110,7 +143,7 @@ def longest_collinear_run(blocks):
     return best
 
 
-def call_record(record_id, blocks, thresholds):
+def call_record(record_id, blocks, thresholds, truth=None):
     """Classify adjacent-block discordances along one predicted record."""
     ordered = sorted(blocks, key=lambda item: (item["query_start"], item["query_end"]))
     events = []
@@ -135,6 +168,8 @@ def call_record(record_id, blocks, thresholds):
             add("inversion_junction", left, right, right["block_length"],
                 "alignment orientation flips within one record")
             continue
+        if is_origin_wrap(left, right, truth, thresholds["indel_tolerance"]):
+            continue   # a rotation of a circular replicon, not a discordance
         query_gap = right["query_start"] - left["query_end"]
         target_gap = (right["target_start"] - left["target_end"] if left["strand"] == "+"
                       else left["target_start"] - right["target_end"])
@@ -156,12 +191,13 @@ def call_record(record_id, blocks, thresholds):
     return events
 
 
-def summarise(blocks, events, thresholds):
+def summarise(blocks, events, thresholds, truth=None):
     aligned = sum(block["block_length"] for block in blocks)
     by_record = defaultdict(list)
     for block in blocks:
         by_record[block["record_id"]].append(block)
-    collinear = sum(longest_collinear_run(sorted(items, key=lambda x: x["query_start"]))
+    collinear = sum(longest_collinear_run(sorted(items, key=lambda x: x["query_start"]), truth,
+                                          thresholds["indel_tolerance"])
                     for items in by_record.values())
     counts = defaultdict(int)
     for event in events:
@@ -172,6 +208,7 @@ def summarise(blocks, events, thresholds):
         "collinear_fraction": round(collinear / aligned, 6) if aligned else 0.0,
         "records": len(by_record),
         "events_total": len(events),
+        "origin_wraps": count_origin_wraps(blocks, truth, thresholds["indel_tolerance"]),
         **{key: counts.get(key, 0) for key in (
             "inter_replicon_junction", "inversion_junction", "relocation",
             "reference_deletion", "reference_insertion", "tandem_duplication")},
@@ -208,10 +245,10 @@ def main():
             by_record[block["record_id"]].append(block)
         events = []
         for record_id, items in sorted(by_record.items()):
-            events.extend(call_record(record_id, items, thresholds))
+            events.extend(call_record(record_id, items, thresholds, truth))
         for event in events:
             all_events.append({"tool": tool, **event})
-        summary = summarise(blocks, events, thresholds)
+        summary = summarise(blocks, events, thresholds, truth)
         summaries.append({"tool": tool, **{k: v for k, v in summary.items()
                                            if k not in ("thresholds",)}})
         payload[tool] = {"summary": summary, "events": events}
@@ -225,7 +262,7 @@ def main():
         writer.writeheader()
         writer.writerows(all_events)
     summary_fields = ["tool", "aligned_bp", "collinear_bp", "collinear_fraction", "records",
-                      "events_total", "inter_replicon_junction", "inversion_junction", "relocation",
+                      "events_total", "origin_wraps", "inter_replicon_junction", "inversion_junction", "relocation",
                       "reference_deletion", "reference_insertion", "tandem_duplication",
                       "validated", "meaning"]
     args.summary_out.parent.mkdir(parents=True, exist_ok=True)

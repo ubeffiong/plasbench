@@ -104,6 +104,54 @@ overlap could have inflated it.
 *Bioinformatician:* sections 3, 5 to 8, 15, 16.2. *Public-health or programme lead:* sections 1, 12, 13,
 16.3, 17, 18. *Reviewer or funder:* sections 1, 17, 18, 16.4.
 
+## Why PlasBench: what it does that other tools do not
+
+PlasBench compares plasmid-reconstruction tools. Three neighbouring projects were reviewed in detail while building it
+([plsMD](https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD), [PlasEval](https://github.com/cchauve/PlasEval) and
+[GAEMR](https://github.com/broadinstitute/GAEMR)); they do different jobs, and each does something well that PlasBench borrowed or
+cannot match. This table states only what was verified in their repositories and in this one.
+
+| | PlasBench | plsMD | PlasEval | GAEMR |
+|---|---|---|---|---|
+| Main job | Benchmark many reconstruction and classification tools | Reconstruct plasmids from a Unicycler assembly using PLSDB | Score plasmid bins against truth bins | Evaluate a genome assembly in general |
+| Runs and compares several tools on one footing | Yes: a registry of 23 tools and three trivial baselines, with separate short-read, long-read and hybrid tracks | One tool | No (scores bin files you supply) | No |
+| Builds its own truth | Yes: complete long-read or hybrid references with evidence labels, reference tiers, labelling schemes, a dimer check, ambiguous replicons set aside | No: validated on the authors' own samples | No: truth bins must be supplied | No |
+| Scores against the reference rather than the assembly | Yes (per reference base), plus a contig layer and PlasEval-style bin agreement | Contig-level BLAST validation | Contig-level only | Reference comparison of an assembly |
+| Statistics across isolates | Cluster bootstrap, sign-flip permutation, Wilcoxon, Holm, species-balanced headline, rank-robustness variants | No significance testing in its validation scripts | Per-sample values only | None (single-assembly report) |
+| Treats failures honestly | A failed run scores 0, an undefined metric is blank, infrastructure failures are rerun and never scored | Not applicable | Not applicable | Not applicable |
+| Screens for database leakage | Date screen and sequence-level containment for each tool's database | No overlap check in the validation scripts, although it reconstructs against PLSDB | Not applicable | Not applicable |
+| Pre-registered, reproducible | Frozen parameter table, run manifest, cohort locks, pinned container | Docker image | Python script | Python 2.7 package (GPL-2.0) |
+| Tells you what is not established | Yes: validity tier, "not assessed" and "Not run" notes, a limitations section | Not provided | Not provided | Not provided |
+
+**What PlasBench offers a user that the others do not**
+
+1. **A fair comparison.** Every tool is scored on the same truth, the same alignment filters and the same failure rule, and a tool must
+   beat three one-line baselines (depth, reference alignment, replicon marker) to count as adding anything.
+2. **Truth you can audit.** Labels are checked against replicon, MOB, rRNA and long-read evidence; uncertain replicons are set aside
+   rather than guessed; each reference carries a tier that says how it was built.
+3. **Uncertainty that respects the data.** Isolates from one study or clone are not treated as independent, so intervals are wide
+   when the cohort is thin, and a ranking is reported with how fragile it is.
+4. **Failure modes, not just a score.** Perfect, fragmented, merged and missed plasmids; chromosome contamination; AMR genes on the
+   right plasmid; plasmid copy number; assembly adequacy; and whether tools agree with each other.
+5. **Leakage made visible.** A tool that searches a database is judged separately on plasmids inside and outside it.
+6. **A recommendation with its evidence.** The operational mode recommends a tool for a sample only when the evidence gates are met, and
+   states whether that recommendation has been tested on held-out studies.
+
+**Where the others are better, or PlasBench is weaker**
+
+- **No benchmark result on real data ships with PlasBench.** The bundled leaderboards come from a synthetic demo. plsMD and PlasEval
+  report results on real data in their publications; PlasBench provides the instrument, and the run is still to be done.
+- **PlasEval handles repeated contigs** by pairing copies across bins (branch and bound) and has a peer-reviewed description. PlasBench's
+  re-implementation excludes shared contigs and counts them, and has not been cross-checked against the original program.
+- **plsMD reconstructs** ordered, overlap-trimmed plasmids from references and reports copy number and mob-typing for each; PlasBench only
+  evaluates such output, and its plsMD wrapper has been tested with a stand-in binary, not the real tool.
+- **GAEMR is broader as assembly QC** (contamination screening by BLAST taxonomy, gap analysis, insert sizes). PlasBench takes a few of its
+  ideas (chimeric contigs, depth anomalies, repeat content) and nothing more.
+- The shipped cohorts are small and taxonomically narrow, there is no laboratory confirmation, and PlasBench does not identify, cluster or
+  relate the plasmids in your own sample; it benchmarks the tools that do reconstruct them.
+
+See sections 7.9 and 17 of the [Scientific Guide](docs/SCIENTIFIC_GUIDE.md) for the definitions and the limits.
+
 ## How scoring works (at a glance)
 
 One metric covers every tool, whether it classifies existing contigs (Platon,

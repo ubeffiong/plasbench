@@ -77,6 +77,20 @@ while IFS=$'\t' read -r SAMPLE _; do
     python3 "$PY/label_schemes.py" build --sample "$SAMPLE" --truth "$TRUTH" --truth-source demo_synthetic \
         --nonchromosomal-out "$SDIR/truth.nonchromosomal.tsv" --out "$SDIR/label_schemes.tsv" 2>/dev/null
 
+    # Truth QC and the contig-layer additions (same scripts as stages 2 and 5). The contig-dependent ones run only when the
+    # demo carries an assembly with contig labels; otherwise their report sections say "Not run".
+    python3 "$PY/repeat_content.py" --reference "$SDIR/reference.fna" --truth "$TRUTH" --sample "$SAMPLE" \
+        --out "$SDIR/truth_repeat_content.tsv" 2>/dev/null || true
+    if [[ -s "$SDIR/contig_labels.tsv" ]]; then
+        for BINS_FILE in "$SDIR"/pred_*.bins.tsv; do
+            [[ -f "$BINS_FILE" ]] || continue
+            TOOL_NAME="$(basename "$BINS_FILE" .bins.tsv)"; TOOL_NAME="${TOOL_NAME#pred_}"
+            python3 "$PY/bin_agreement.py" eval --labels "$SDIR/contig_labels.tsv" --bins "$BINS_FILE" --sample "$SAMPLE" \
+                --tool "$TOOL_NAME" --out "$SDIR/${TOOL_NAME}.bestmatch.tsv" 2>/dev/null || true
+            python3 "$PY/bin_agreement.py" dissim --labels "$SDIR/contig_labels.tsv" --bins "$BINS_FILE" --sample "$SAMPLE" \
+                --tool "$TOOL_NAME" --out "$SDIR/${TOOL_NAME}.dissim.tsv" 2>/dev/null || true
+        done
+    fi
     python3 "$PY/call_structural_variants.py" --truth "$TRUTH" --results-dir "$DEMO" \
         --sample "$SAMPLE" --events-out "$SDIR/structural_events.tsv" \
         --summary-out "$SDIR/structural_summary.tsv" \
@@ -93,6 +107,7 @@ while IFS=$'\t' read -r SAMPLE _; do
 done < "$SAMPLES"
 
 python3 "$PY/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$DEMO"
+python3 "$PY/bin_agreement.py" merge --scores "$SCORES" --results-dir "$DEMO"
 
 echo
 echo "===== per-sample scores ($SCORES) ====="
@@ -147,6 +162,11 @@ python3 "$PY/composite_score.py" --scores "$SCORES" --accuracy "$DIM.accuracy.ts
 
 python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES" \
     --out "$DEMO/benchmark.recommendation_validation.tsv" --min-train-samples 1
+# Evaluation additions learned from PlasEval, plsMD and GAEMR, same scripts as stage 6 (each says "Not run" without its input).
+python3 "$PY/repeat_content.py" summary --data-dir "$DEMO" --out "$DEMO/benchmark.repeat_content.tsv" || true
+python3 "$PY/assembly_adequacy.py" merge --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_adequacy.tsv" || true
+python3 "$PY/copy_number.py" merge --results-dir "$DEMO" --out "$DEMO/benchmark.copy_number.tsv" || true
+python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" --out "$DEMO/benchmark.tool_agreement.tsv" || true
 # Scoring specification layers, same scripts as stage 6.
 python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark.label_schemes.tsv" \
     --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"

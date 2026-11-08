@@ -22,6 +22,9 @@ import gzip
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from read_pairing import pair_fastq_files  # noqa: E402
+
 GZIP_MAGIC = b"\x1f\x8b"
 
 
@@ -105,6 +108,21 @@ def check_sample(row, data_dir: Path, problems, warnings):
 
     # --- reads -------------------------------------------------------------
     r1, r2 = sdir / f"{sra}_1.fastq.gz", sdir / f"{sra}_2.fastq.gz"
+    if not (r1.is_file() and r2.is_file()):
+        # Other common pair names (_R1/_R2, _R1_001/_R2_001, .fq.gz). The run
+        # stages locate reads as <sra_run>_1/_2.fastq.gz, so a pair found under
+        # another name is checked in full but still reported as a naming problem.
+        pairs = pair_fastq_files(sdir, warn=lambda m: warnings.append(f"{where} {m}"))
+        chosen = [p for p in pairs if p[0] == sra] or (pairs if len(pairs) == 1 else [])
+        if chosen:
+            _, alt1, alt2 = chosen[0]
+            problems.append(
+                f"{where} reads are named {alt1.name} / {alt2.name}, but the run expects "
+                f"'{sra}_1.fastq.gz' / '{sra}_2.fastq.gz'.\n"
+                f"      Re-stage them under the standard names:\n"
+                f"      plasbench init-local --sample {sample} --reads-dir {sdir} "
+                f"--prefix {sra} --data-dir {data_dir}")
+            r1, r2 = alt1, alt2
     for path, side in ((r1, "forward"), (r2, "reverse")):
         if not path.is_file():
             found = sorted(p.name for p in sdir.glob("*.fastq.gz"))

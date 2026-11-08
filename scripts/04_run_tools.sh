@@ -234,6 +234,27 @@ run_baseline() {
     if [[ "$TOOL" == "baseline_coverage" ]]; then
         ARGS=(coverage --contigs "$CONTIGS" --out-prefix "$RDIR/pred_${TOOL}"
               --ratio "$BASELINE_COVERAGE_RATIO" --min-length "$BASELINE_MIN_CONTIG_LENGTH")
+    elif [[ "$TOOL" == "baseline_replicon" ]]; then
+        # Replicon-seeded baseline (plsMD's enumeration idea): contigs carrying a replicon marker. The markers come from
+        # Abricate databases named in REPLICON_ABRICATE_DBS (default plasmidfinder; add a second, for example a
+        # rep.mob.typer database built from MOB-suite's rep.dna.fas, by listing it too). Missing Abricate or database
+        # means not applicable, never a failure.
+        if ! have abricate; then
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "abricate not installed"
+            return 0
+        fi
+        local HITS="$RDIR/${TOOL}.replicon_hits.tsv" HITS_TMP db first=1
+        : > "$HITS"
+        for db in $REPLICON_ABRICATE_DBS; do
+            if abricate --db "$db" --threads "$THREADS" "$CONTIGS" > "$HITS.tmp" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                if [[ "$first" -eq 1 ]]; then cat "$HITS.tmp" >> "$HITS"; first=0; else tail -n +2 "$HITS.tmp" >> "$HITS"; fi
+            else
+                warn "abricate database '$db' failed for $SAMPLE; the replicon baseline uses the others"
+            fi
+            rm -f "$HITS.tmp"
+        done
+        ARGS=(replicon --contigs "$CONTIGS" --replicon-hits "$HITS" --out-prefix "$RDIR/pred_${TOOL}"
+              --min-length "$BASELINE_MIN_CONTIG_LENGTH")
     else
         if [[ ! -s "$PLASMID_REFERENCE_FASTA" ]]; then
             record_status "$SAMPLE" "$TOOL" "skipped" "" "plasmid reference set not built (build_plasmid_reference_set.py)"
@@ -253,6 +274,42 @@ run_baseline() {
     else
         rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE"
         record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+    fi
+}
+
+# plsMD (reference-guided reconstruction against PLSDB; see adapters/REGISTRY.md). It reads a Unicycler assembly
+# (circular= and depth= headers) and a PLSDB BLAST index, in two steps: --preprocessing then --processing. The
+# reconstructed plasmids are plasmid_files/<sample>_plasmid_contigs.fasta in the processing output directory.
+# Skipped, with the reason recorded, when the command, the database or a Unicycler assembly is missing: a missing
+# prerequisite is not the tool's failure.
+run_plsmd() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    if tool_enabled RUN_PLSMD plsmd; then
+        local TOOL="plsmd" OUT="$RDIR/plsmd" PRED="$RDIR/pred_plsmd.plasmid.fasta" DONE="$RDIR/.plsmd.complete"
+        if ! have "$PLSMD_CMD"; then
+            warn "plsmd is enabled but '$PLSMD_CMD' is not installed; skipped for $SAMPLE"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "command unavailable"
+        elif [[ -z "${PLSMD_DB:-}" ]]; then
+            warn "plsmd needs PLSMD_DB (the PLSDB BLAST index prefix); skipped for $SAMPLE"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "PLSMD_DB not set"
+        elif [[ "${ASSEMBLER:-spades}" != "unicycler" ]]; then
+            warn "plsmd needs a Unicycler assembly (ASSEMBLER=unicycler); skipped for $SAMPLE"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "assembly is not from Unicycler (set ASSEMBLER=unicycler)"
+        elif is_complete "$DONE" "$PRED"; then
+            log "  plsmd: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        else
+            rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT/input"
+            cp "$CONTIGS" "$OUT/input/${SAMPLE}.fasta"
+            log "  plsmd ($SAMPLE) ..."
+            local START; START=$(profile_start)
+            if profile_exec "$PLSMD_CMD" --preprocessing --input fasta --dir "$OUT/input" --output "$OUT/preprocessing" --threads "$PLSMD_THREADS" --db "$PLSMD_DB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                profile_exec "$PLSMD_CMD" --processing --dir "$OUT/preprocessing" --output "$OUT/processing" >> "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_plsmd.sh" "$OUT/processing" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLSMD_DB" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "plsmd failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+        fi
     fi
 }
 
@@ -574,6 +631,7 @@ process_sample() {
         tool_enabled RUN_PLASGRAPH2 plasgraph2 && record_status "$SAMPLE" "plasgraph2" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_BASELINE_COVERAGE baseline_coverage && record_status "$SAMPLE" "baseline_coverage" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_BASELINE_REFERENCE baseline_reference && record_status "$SAMPLE" "baseline_reference" "skipped" "" "assembly contigs unavailable"
+        tool_enabled RUN_BASELINE_REPLICON baseline_replicon && record_status "$SAMPLE" "baseline_replicon" "skipped" "" "assembly contigs unavailable"
         return 0
     fi
     log "=== Run tools on $SAMPLE ==="
@@ -581,6 +639,7 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_mob_recon "$SAMPLE" "$RDIR" "$CONTIGS" &
     local mob_recon_pid=$!
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_platon "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plsmd "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmidspades "$SAMPLE" "$RDIR" "$CONTIGS" "$T1" "$T2" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_gplas2_external "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_genomad "$SAMPLE" "$RDIR" "$CONTIGS" &
@@ -592,6 +651,7 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasgraph2 "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_coverage RUN_BASELINE_COVERAGE &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_reference RUN_BASELINE_REFERENCE &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_replicon RUN_BASELINE_REPLICON &
 
     # gplas2_mob's classifier seed comes straight from mob_recon's own output
     # directory, so it must not start until that finished (successfully or
@@ -625,7 +685,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

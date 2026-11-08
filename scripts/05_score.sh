@@ -310,6 +310,19 @@ score_sample() {
                 --min-length "$CONTIG_MIN_LENGTH" --out "$RDIR/${tool}.contig_classification.tsv" \
                 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "contig-level scoring failed for $SAMPLE/$tool"
         fi
+        # PlasEval-style bin agreement (python/bin_agreement.py, reimplemented from the published definitions): best-match
+        # (not one-to-one) precision/recall/F1 and the split/join dissimilarity, on the contig labels. Shards are merged
+        # into scores.tsv below; a tool that outputs reassembled sequences is recorded as not applicable.
+        rm -f "$RDIR/${tool}.bestmatch.tsv" "$RDIR/${tool}.dissim.tsv"
+        if [[ "$CONTIG_READY" -eq 1 && "${RUN_BIN_AGREEMENT:-1}" == "1" && -s "$RDIR/pred_${tool}.bins.tsv" ]]; then
+            python3 "$HERE/../python/bin_agreement.py" eval --labels "$CONTIG_LABELS" --bins "$RDIR/pred_${tool}.bins.tsv" \
+                --sample "$SAMPLE" --tool "$tool" --min-length "$CONTIG_MIN_LENGTH" --out "$RDIR/${tool}.bestmatch.tsv" \
+                2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "best-match bin scoring failed for $SAMPLE/$tool"
+            python3 "$HERE/../python/bin_agreement.py" dissim --labels "$CONTIG_LABELS" --bins "$RDIR/pred_${tool}.bins.tsv" \
+                --sample "$SAMPLE" --tool "$tool" --min-length "$CONTIG_MIN_LENGTH" --alpha "$DISSIMILARITY_ALPHA" \
+                --export-prefix "$RDIR/${tool}.plaseval" --out "$RDIR/${tool}.dissim.tsv" \
+                2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "bin dissimilarity failed for $SAMPLE/$tool"
+        fi
         local BINS="$RDIR/pred_${tool}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$tool"; then
             if ! python3 "$HERE/../python/score_bins.py" --truth "$SCORE_TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" "${ASM_COV_ARGS[@]}" \
@@ -352,6 +365,18 @@ score_sample() {
                 --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
                 --out "$RDIR/${tool}.amr_placement.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" \
                 || warn "AMR placement failed for $SAMPLE/$tool"
+        fi
+        # Plasmid copy-number concordance (python/copy_number.py): the tool's depth-based copy number for each matched
+        # bin against the truth copy number. Needs SPAdes/Unicycler depth headers and a per-replicon truth depth table
+        # (truth_long_read_depth.tsv, written when long reads are staged); otherwise the row says why. Descriptive only.
+        rm -f "$RDIR/${tool}.copy_number.tsv"
+        if [[ "${RUN_COPY_NUMBER:-1}" == "1" && -s "$RDIR/${tool}.bin_matches.tsv" && -s "$CONTIGS" ]]; then
+            local CN_ARGS=()
+            [[ -s "$SDIR/truth_long_read_depth.tsv" ]] && CN_ARGS=(--truth-depth "$SDIR/truth_long_read_depth.tsv")
+            python3 "$HERE/../python/copy_number.py" --truth "$SCORE_TRUTH" --bins "$BINS" --matches "$RDIR/${tool}.bin_matches.tsv" \
+                --contigs-fasta "$CONTIGS" "${CN_ARGS[@]+"${CN_ARGS[@]}"}" \
+                --sample "$SAMPLE" --tool "$tool" --analysis-track "$TOOL_TRACK" --out "$RDIR/${tool}.copy_number.tsv" \
+                2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "copy-number analysis failed for $SAMPLE/$tool"
         fi
         # Further dimensions of the same run (advisory; never alter scores.tsv): nucleotide-level
         # accuracy and missing regions, feature preservation and gene-order conservation, and
@@ -450,6 +475,7 @@ rm -rf "$SCORE_SHARDS" "$FAILURE_SHARDS"
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_pr_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/contig_classification.py" merge --scores "$SCORES" --results-dir "$RESULTS_DIR"
+[[ -s "$SCORES" ]] && python3 "$HERE/../python/bin_agreement.py" merge --scores "$SCORES" --results-dir "$RESULTS_DIR"
 
 # Merge every per-sample-per-tool QUAST diagnostics file into one combined
 # TSV, same "first non-empty file's header, then every file's data rows"

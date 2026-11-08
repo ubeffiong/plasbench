@@ -23,3 +23,5 @@ gplas_like	binning	yes	assembly_graph	Demo graph binner that splits and merges.	
 weak_like	classification	no	assembly	Demo weak classifier; partial, ambiguous output.	short_read	no
 baseline_coverage	baseline	no	assembly	Trivial baseline: contigs with depth >= 1.5x the median called plasmid.	short_read	no
 baseline_reference	baseline	no	assembly	Trivial baseline: contigs aligning >= 80% to the local plasmid reference set called plasmid.	short_read	no
+plsmd	reassembly	yes	assembly	Reference-guided reconstruction: BLAST to PLSDB plus replicon typing; each output record is one plasmid.	short_read	no
+baseline_replicon	baseline	no	assembly	Trivial baseline: contigs carrying a replicon marker (PlasmidFinder), Col dropped when Inc is on the same contig.	short_read	no
