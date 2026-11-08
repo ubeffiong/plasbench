@@ -14,6 +14,18 @@ history is lost, only the numbering is cleaner. See
 ## [Unreleased]
 
 <<<<<<< HEAD
+### Added -- completing the plsMD, PlasEval and GAEMR follow-ups
+- **PlasBin-flow output adapter** (`RUN_PLASBIN_FLOW`, `PLASBIN_FLOW_OUTPUTS_DIR`, `adapters/adapt_plasbin_flow.sh`): adapts the tool's own output
+  (it needs a Gurobi licence, so PlasBench does not run it); a contig listed in several bins stays in the first and the rest are recorded.
+- **Cross-check against the original PlasEval** (`test/test_plaseval_crosscheck.py`, optional, `PLASEVAL_SRC`): best-match precision, recall and F1
+  agree on every case, and the normalised dissimilarity agrees on every case without repeated contigs.
+- **Optional label evidence**: several Abricate replicon databases (`ANNOTATION_REPLICON_DB`) and BLAST-based ISFinder annotation (`ISFINDER_FASTA`).
+- `env/download_plsdb.sh` now has an offline test and refuses a download that is not FASTA: the PLSDB address in plsMD's Dockerfile redirects to an HTML page.
+
+### Fixed
+- The `repeat_rich` scenario tag never fired on real annotation: it counted feature types `is` and `isescan`, while `annotate_reference.py` writes
+  `insertion_sequence`.
+
 ### Added -- lessons from plsMD, PlasEval and GAEMR
 - **plsMD wrapper** (`RUN_PLSMD`, `adapters/adapt_plsmd.sh`): an optional benchmarked reassembly tool, skipped with a recorded reason when
   its command, PLSDB index or Unicycler assembly is missing; PLSDB listed as its database for the leakage screens.

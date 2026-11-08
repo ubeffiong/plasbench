@@ -20,3 +20,4 @@ baseline_coverage	baseline	builtin	yes	plasbench	none	python3 python/baseline_pr
 baseline_reference	baseline	builtin	yes	plasbench	manual	python3 python/baseline_predictors.py reference --help	Built-in trivial baseline; needs minimap2 and the local plasmid reference set (build_plasmid_reference_set.py).
 plsmd	plsmd	container_pinned	planned	docker	manual	plsMD --help	Docker-packaged upstream. Needs a PLSDB BLAST index (PLSMD_DB) and a Unicycler assembly.
 baseline_replicon	baseline	builtin	yes	plasbench	manual	python3 python/baseline_predictors.py replicon --help	Built in; needs Abricate and its plasmidfinder database.
+plasbin_flow	plasbin_flow	isolated_source	planned	plasbin_flow	manual	python plasbin_flow.py --help	MIT-licensed; needs a Gurobi licence (free for academics), a gzipped GFA with dp or KC tags, a plasmid-score file and a GC-probability file. Run it yourself; PlasBench adapts its output.

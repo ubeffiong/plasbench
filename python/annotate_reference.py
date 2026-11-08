@@ -14,7 +14,10 @@ Supported callers (all optional):
   mob_typer     replicon and relaxase/MOB typing        -> replicon, mob
   abricate      AMR / plasmid-replicon databases        -> amr, replicon
   amrfinder     NCBI AMRFinderPlus                      -> amr
-  isescan       insertion sequences                     -> insertion_sequence
+  isescan       insertion sequences (de novo)           -> insertion_sequence
+  isfinder      insertion sequences by BLAST against a curated ISFinder FASTA (--isfinder-fasta,
+                optional; the FASTA is downloaded from ISFinder by the user, never shipped)
+                                                          -> insertion_sequence
   barrnap       ribosomal RNA genes                     -> rRNA
                 (chromosomal evidence for label_truth_evidence.py)
 
@@ -35,7 +38,11 @@ from pathlib import Path
 
 
 FIELDS = ("sequence_id", "start", "end", "feature_type", "label", "source", "version")
-CALLERS = ("mob_typer", "abricate", "amrfinder", "isescan", "barrnap")
+CALLERS = ("mob_typer", "abricate", "amrfinder", "isescan", "isfinder", "barrnap")
+# ISFinder BLAST thresholds: a hit counts as an IS copy when it aligns at least this identity over at least this share of
+# the curated IS sequence (a partial hit is a fragment, not an element).
+ISFINDER_MIN_IDENTITY = 90.0
+ISFINDER_MIN_SUBJECT_COVERAGE = 0.80
 
 
 def tool_version(executable, flags=("--version", "-v", "version")):
@@ -85,7 +92,7 @@ def parse_tabular(text, mapping, feature_type, source, version, sequence_filter=
     return features
 
 
-def call_abricate(reference, database, timeout, sequences):
+def call_abricate(reference, database, timeout, sequences, kind=None):
     executable = shutil.which("abricate")
     if not executable:
         return [], {"status": "not_evaluated", "reason": "abricate is not installed"}
@@ -93,7 +100,7 @@ def call_abricate(reference, database, timeout, sequences):
     text, error = run([executable, "--nopath", "--db", database, str(reference)], timeout)
     if text is None:
         return [], {"status": "failed", "reason": error, "version": version}
-    kind = "replicon" if database in ("plasmidfinder", "PlasmidFinder") else "amr"
+    kind = kind or ("replicon" if database in ("plasmidfinder", "PlasmidFinder") else "amr")
     features = parse_tabular(text, {"sequence": "SEQUENCE", "start": "START", "end": "END",
                                     "label": "GENE"}, kind, f"abricate:{database}", version, sequences)
     return features, {"status": "ok", "version": version, "database": database, "features": len(features)}
@@ -131,6 +138,51 @@ def call_isescan(reference, timeout, sequences, workdir):
                                        "label": "family"}, "insertion_sequence", "isescan",
                                       version, sequences))
     return features, {"status": "ok", "version": version, "features": len(features)}
+
+
+def parse_isfinder_blast(text, sequences, version, min_identity=ISFINDER_MIN_IDENTITY,
+                         min_subject_coverage=ISFINDER_MIN_SUBJECT_COVERAGE):
+    """blastn -outfmt '6 qseqid sseqid pident length qstart qend sstart send slen' rows -> insertion_sequence features.
+    Keeps hits of at least min_identity percent covering at least min_subject_coverage of the curated IS sequence."""
+    features = []
+    for line in text.splitlines():
+        fields = line.split("\t")
+        if len(fields) < 9:
+            continue
+        try:
+            identity, length = float(fields[2]), int(fields[3])
+            qstart, qend = int(fields[4]), int(fields[5])
+            slen = int(fields[8])
+        except ValueError:
+            continue
+        sequence = fields[0].split()[0]
+        if sequences and sequence not in sequences:
+            continue
+        if identity < min_identity or slen <= 0 or length / slen < min_subject_coverage:
+            continue
+        start, end = min(qstart, qend), max(qstart, qend)
+        features.append({"sequence_id": sequence, "start": max(0, start - 1), "end": end,
+                         "feature_type": "insertion_sequence", "label": fields[1].split()[0],
+                         "source": "isfinder", "version": version})
+    return features
+
+
+def call_isfinder(reference, fasta, timeout, sequences):
+    if not fasta:
+        return [], {"status": "not_evaluated", "reason": "no --isfinder-fasta given (ISFINDER_FASTA)"}
+    if not Path(fasta).is_file():
+        return [], {"status": "not_evaluated", "reason": f"ISFinder FASTA not found: {fasta}"}
+    executable = shutil.which("blastn")
+    if not executable:
+        return [], {"status": "not_evaluated", "reason": "blastn is not installed"}
+    version = tool_version(executable)
+    text, error = run([executable, "-query", str(reference), "-subject", str(fasta), "-task", "blastn",
+                       "-evalue", "1e-10", "-perc_identity", str(ISFINDER_MIN_IDENTITY),
+                       "-outfmt", "6 qseqid sseqid pident length qstart qend sstart send slen"], timeout)
+    if text is None:
+        return [], {"status": "failed", "reason": error, "version": version}
+    features = parse_isfinder_blast(text, sequences, version)
+    return features, {"status": "ok", "version": version, "database": Path(fasta).name, "features": len(features)}
 
 
 def call_barrnap(reference, timeout, sequences):
@@ -215,7 +267,11 @@ def main():
     parser.add_argument("--out", required=True, type=Path, help="feature_truth TSV")
     parser.add_argument("--provenance", type=Path, help="JSON record of caller status and versions")
     parser.add_argument("--amr-database", default="ncbi", help="abricate AMR database (default: ncbi)")
-    parser.add_argument("--replicon-database", default="plasmidfinder")
+    parser.add_argument("--replicon-database", default="plasmidfinder",
+                        help="Abricate replicon database(s), comma or space separated (default plasmidfinder); the first is "
+                             "recorded as abricate_replicon, further ones as abricate_replicon_<name>")
+    parser.add_argument("--isfinder-fasta", default="",
+                        help="optional curated ISFinder FASTA; adds IS annotation by BLAST (blastn -subject, no database build)")
     parser.add_argument("--timeout", type=int, default=1800)
     parser.add_argument("--workdir", type=Path)
     args = parser.parse_args()
@@ -230,9 +286,13 @@ def main():
     for name, call in (
         ("mob_typer", lambda: call_mob_typer(args.reference, args.timeout, sequences)),
         ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, args.timeout, sequences)),
-        ("abricate_replicon", lambda: call_abricate(args.reference, args.replicon_database, args.timeout, sequences)),
+        *[("abricate_replicon" if index == 0 else f"abricate_replicon_{name}",
+           lambda name=name: call_abricate(args.reference, name, args.timeout, sequences, kind="replicon"))
+          for index, name in enumerate([n for n in args.replicon_database.replace(",", " ").split() if n]
+                                       or ["plasmidfinder"])],
         ("amrfinder", lambda: call_amrfinder(args.reference, args.timeout, sequences)),
         ("isescan", lambda: call_isescan(args.reference, args.timeout, sequences, workdir)),
+        ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, args.timeout, sequences)),
         ("barrnap", lambda: call_barrnap(args.reference, args.timeout, sequences)),
     ):
         found, status = call()
