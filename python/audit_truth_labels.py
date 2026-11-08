@@ -103,8 +103,13 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     rows = []
-    for sample_dir in sorted(p for p in args.data_dir.iterdir() if p.is_dir()):
-        rows.extend(audit_sample(sample_dir.name, sample_dir))
+    if args.data_dir.is_dir():
+        for sample_dir in sorted(p for p in args.data_dir.iterdir() if p.is_dir()):
+            rows.extend(audit_sample(sample_dir.name, sample_dir))
+    else:
+        sys.stderr.write(f"[audit_truth_labels] data directory not found: {args.data_dir}; "
+                         "nothing audited
+")
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t")
         writer.writeheader()

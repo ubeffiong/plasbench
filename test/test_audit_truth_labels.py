@@ -71,6 +71,14 @@ def main():
         print(f"  flagged sequences are announced as advisory -> {flagged_msg}")
         ok &= flagged_msg
         ok &= not os.path.exists(os.path.join(data, "full", "truth.tsv.bak"))
+        # A missing data directory is reported, not a traceback, and still writes a header-only table.
+        missing_out = os.path.join(tmp, "missing.tsv")
+        gone = subprocess.run([sys.executable, SCRIPT, "--data-dir", os.path.join(tmp, "nope"),
+                               "--out", missing_out], text=True, capture_output=True)
+        clean = gone.returncode == 0 and "Traceback" not in gone.stderr and "not found" in gone.stderr
+        clean &= os.path.isfile(missing_out) and len(open(missing_out).read().splitlines()) == 1
+        print(f"  missing data directory is handled without a traceback -> {clean}")
+        ok &= clean
     print("ALL AUDIT TRUTH LABEL TESTS PASSED" if ok else "AUDIT TRUTH LABEL TESTS FAILED")
     return 0 if ok else 1
 
