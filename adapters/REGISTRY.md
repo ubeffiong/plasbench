@@ -24,6 +24,7 @@ rather than assigning an artificial zero score.
 | PlasmidHunter | ml_classification | not applicable | short-read assembly | `adapt_plasmidhunter.sh` | optional |
 | Plasmer | ml_classification | not applicable | short-read assembly | `adapt_plasmer.sh` | optional |
 | PlaScope | classification | not applicable | short-read assembly (E. coli/Klebsiella only) | `adapt_plascope.sh` | optional |
+| plsMD | reassembly | applicable | short-read Unicycler assembly plus a PLSDB BLAST index | `adapt_plsmd.sh` | optional |
 
 The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
 computes bin metrics for declared binning methods; the report labels all other
@@ -309,3 +310,25 @@ into one assembly FASTA, then runs `mob_recon` on that assembly exactly as
 `adapt_mob_recon.sh` completely unchanged. A cluster that fails to reconcile
 is dropped rather than failing the whole sample; see `docs/USER_GUIDE.md`'s
 Long-Read Reconstruction section for the exact policy.
+
+## adapt_plsmd.sh
+
+`plsMD --preprocessing` then `--processing` write `plasmid_files/<sample>_plasmid_contigs.fasta`: one record per reconstructed
+plasmid (`<sample>_plsMD<N>`), the contigs of one PLSDB-guided reconstruction concatenated in reference order with assembly
+overlaps trimmed. Like Plassembler, each record is its own bin. The per-sample `report.tsv` (replicon type, coverage, copy number,
+mob-typer columns) is kept beside the prediction as `pred_plsmd.plsmd_report.tsv`. An empty output is a valid completed prediction;
+the adapter exits non-zero only for a record without an id, duplicate ids across files, or non-nucleotide characters.
+
+plsMD needs a Unicycler assembly (it reads `circular=` and `depth=` headers), so stage 4 skips it, with the reason recorded, under
+`ASSEMBLER=spades`; it also skips when `PLSMD_DB` (the PLSDB BLAST index prefix) or the `plsMD` command is missing. A skip is
+not a failure. plsMD reconstructs against PLSDB, so set its release date in `config/tool_database_releases.tsv` and list the PLSDB
+FASTA in `TOOL_DATABASE_FASTAS` (`plsmd=/path/plsdb.fasta`) to see recovery inside versus outside its database. `env/download_plsdb.sh`
+downloads a PLSDB FASTA you name with `PLSDB_URL` and records its provenance; it is used only as a tool's database and as an optional
+reference for the trivial baseline, never as a search feature.
+
+## baseline_replicon
+
+A contig is called plasmid when it carries a replicon marker (Abricate `REPLICON_ABRICATE_DBS`, default `plasmidfinder`; identity and
+coverage thresholds in `baseline_predictors.py replicon`). plsMD's Col-versus-Inc rule is the default: a Col hit is dropped when an Inc hit
+is on the same contig, because that signals a co-integrate rather than a separate plasmid (`--keep-col-with-inc` disables it).
+Not applicable, not failed, when Abricate or its database is missing.

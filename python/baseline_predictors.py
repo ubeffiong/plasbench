@@ -4,7 +4,7 @@ baseline_predictors.py -- trivial reference points that every benchmarked
 tool should beat.
 
 A benchmark without baselines cannot say whether a tool adds anything over
-the obvious (question bank Q62, Q78, Q108). Two baselines run like tools on
+the obvious (question bank Q62, Q78, Q108). Three baselines run like tools on
 each isolate's short-read assembly and are scored exactly like them, on the
 classification track (they never group contigs into plasmids):
 
@@ -22,7 +22,18 @@ classification track (they never group contigs into plasmids):
                       probability (its best aligned fraction), so this
                       baseline feeds the PR-curve and calibration outputs.
 
-Both write the standard adapter outputs: <out>.plasmid.fasta, a one-contig-
+  baseline_replicon   a contig is called plasmid when it carries a replicon
+                      marker hit (Abricate-style TSV from e.g. `abricate --db
+                      plasmidfinder`, given with --replicon-hits) of identity >=
+                      --min-identity and coverage >= --min-coverage (percent).
+                      plsMD's Col-vs-Inc rule is the default: a Col* hit is
+                      dropped when an Inc* hit is on the same contig (it points
+                      to a co-integrate, not a separate plasmid); disable with
+                      --keep-col-with-inc. Contigs shorter than --min-length
+                      are never called. A missing or empty hits file exits 3
+                      (not applicable).
+
+All write the standard adapter outputs: <out>.plasmid.fasta, a one-contig-
 per-bin <out>.bins.tsv, and (reference only) <out>.candidates.fasta and
 <out>.scores.tsv (adapters/SCORES.md contract).
 
@@ -130,6 +141,60 @@ def reference_baseline(args):
                      f"reference over >= {args.min_query_coverage:.0%}\n")
 
 
+def read_replicon_hits(path, min_identity, min_coverage):
+    """{contig: [gene, ...]} for Abricate-style hits passing the thresholds, or None if no data rows."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = [ln.rstrip("\r\n") for ln in handle if ln.strip()]
+    except OSError:
+        return None
+    if not lines:
+        return None
+    header = [c.lstrip("#").strip().upper() for c in lines[0].split("\t")]
+    try:
+        i_seq, i_gene = header.index("SEQUENCE"), header.index("GENE")
+        i_cov, i_id = header.index("%COVERAGE"), header.index("%IDENTITY")
+    except ValueError:
+        sys.exit("ERROR: --replicon-hits is not an Abricate-style TSV (need SEQUENCE, GENE, "
+                 "%COVERAGE, %IDENTITY columns)")
+    rows = [ln.split("\t") for ln in lines[1:]]
+    if not rows:
+        return None
+    hits = {}
+    for f in rows:
+        try:
+            if float(f[i_id]) < min_identity or float(f[i_cov]) < min_coverage:
+                continue
+            hits.setdefault(f[i_seq], []).append(f[i_gene])
+        except (ValueError, IndexError):
+            continue
+    return hits
+
+
+def replicon_baseline(args):
+    records = read_fasta(args.contigs)
+    hits = read_replicon_hits(args.replicon_hits, args.min_identity, args.min_coverage)
+    if hits is None:
+        sys.stderr.write("NOT APPLICABLE: no replicon hits file or no hit rows; the replicon baseline "
+                         "cannot run on this assembly\n")
+        sys.exit(NOT_APPLICABLE)
+    chosen, dropped = set(), 0
+    for name, _, seq in records:
+        genes = hits.get(name, [])
+        if len(seq) < args.min_length or not genes:
+            continue
+        if not args.keep_col_with_inc:
+            has_inc = any(g.lower().startswith("inc") for g in genes)
+            kept = [g for g in genes if not (has_inc and g.lower().startswith("col"))]
+            dropped += len(genes) - len(kept)
+            genes = kept
+        if genes:
+            chosen.add(name)
+    write_outputs(args.out_prefix, records, chosen)
+    sys.stderr.write(f"[baseline_replicon] {len(chosen)} contig(s) carry a replicon marker "
+                     f"({dropped} Col hit(s) dropped by the Col-vs-Inc rule)\n")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="command", required=True)
@@ -147,6 +212,16 @@ def main():
     r.add_argument("--min-identity", type=float, default=0.95)
     r.add_argument("--threads", type=int, default=1)
     r.set_defaults(func=reference_baseline)
+    p = sub.add_parser("replicon")
+    p.add_argument("--contigs", required=True)
+    p.add_argument("--replicon-hits", required=True, help="Abricate-style TSV of replicon hits on the contigs")
+    p.add_argument("--out-prefix", required=True)
+    p.add_argument("--min-identity", type=float, default=90.0, help="percent (default 90)")
+    p.add_argument("--min-coverage", type=float, default=60.0, help="percent (default 60)")
+    p.add_argument("--min-length", type=int, default=1000)
+    p.add_argument("--keep-col-with-inc", action="store_true",
+                   help="disable the default rule that drops Col* hits on contigs that also carry an Inc* hit")
+    p.set_defaults(func=replicon_baseline)
     args = ap.parse_args()
     args.func(args)
 

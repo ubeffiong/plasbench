@@ -2553,6 +2553,9 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
                     "warning_eval": args.warning_eval, "leave_taxon_out": args.leave_taxon_out,
                     "amr_placement": args.amr_placement, "contig_crosscheck": args.contig_crosscheck}
     page = report_scoring_spec.inject(page, spec_sources)
+    # Evaluation additions learned from PlasEval, plsMD and GAEMR (python/report_learnings.py): read from the stage-6 tables.
+    import report_learnings
+    page = report_learnings.inject(page, str(out.parent), args.scores)
     out.parent.mkdir(parents=True, exist_ok=True)
     (out.parent / (out.name.split(".report")[0] + ".scoring_spec.md")).write_text(
         report_scoring_spec.markdown(spec_sources), encoding="utf-8")

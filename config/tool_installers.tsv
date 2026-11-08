@@ -18,3 +18,5 @@ plascope	plascope	conda	yes	plasbench	automated	plaScope.sh --help	Species-speci
 plasgraph2	plasgraph2	isolated_source	planned	plasgraph2	none	plASgraph2_classify.py --help	Pinned source runtime and shipped pretrained model required.
 baseline_coverage	baseline	builtin	yes	plasbench	none	python3 python/baseline_predictors.py coverage --help	Built-in trivial baseline; no install or database.
 baseline_reference	baseline	builtin	yes	plasbench	manual	python3 python/baseline_predictors.py reference --help	Built-in trivial baseline; needs minimap2 and the local plasmid reference set (build_plasmid_reference_set.py).
+plsmd	plsmd	container_pinned	planned	docker	manual	plsMD --help	Docker-packaged upstream. Needs a PLSDB BLAST index (PLSMD_DB) and a Unicycler assembly.
+baseline_replicon	baseline	builtin	yes	plasbench	manual	python3 python/baseline_predictors.py replicon --help	Built in; needs Abricate and its plasmidfinder database.

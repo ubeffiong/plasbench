@@ -205,6 +205,11 @@ VALID_STAGES = frozenset(str(i) for i in range(8))
 ANALYSES = {
     "stratify-recovery": ("stratify_recovery.py", "Per-plasmid recovery by replicon, MOB, size band and AMR carriage"),
     "rank-sensitivity": ("rank_sensitivity.py", "How much the ranking depends on scoring choices"),
+    "bin-agreement": ("bin_agreement.py", "PlasEval-style best-match scores and split/join dissimilarity between bin sets"),
+    "assembly-adequacy": ("assembly_adequacy.py", "Whether each short-read assembly contains the plasmids it is judged against"),
+    "copy-number": ("copy_number.py", "Tool versus truth plasmid copy number per matched bin"),
+    "repeat-content": ("repeat_content.py", "K-mer repeat content of the truth replicons"),
+    "truth-depth-anomalies": ("truth_depth_anomalies.py", "Windows of unusual read depth on the truth reference"),
     "freeze-prereg": ("freeze_prereg.py", "Freeze (--write) or verify (--verify) the pre-registered scoring parameters"),
     "label-schemes": ("label_schemes.py", "Truth labels under the three labelling schemes (NCBI primary)"),
     "detect-dimers": ("detect_dimers.py", "Find (and optionally collapse) tandem-dimer truth plasmids"),

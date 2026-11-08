@@ -31,6 +31,7 @@ This guide is for the people who must decide whether to trust and use the tool: 
   - [7.6 Threshold-free ranking quality](#76-threshold-free-ranking-quality)
   - [7.7 Structural evidence](#77-structural-evidence)
   - [7.8 Scoring-specification additions](#78-scoring-specification-additions)
+  - [7.9 Bin agreement, assembly adequacy, copy number and truth quality](#79-bin-agreement-assembly-adequacy-copy-number-and-truth-quality)
 - [8. Ranking and statistics](#8-ranking-and-statistics)
   - [8.1 Tracks and tasks](#81-tracks-and-tasks)
   - [8.2 The headline](#82-the-headline)
@@ -269,6 +270,7 @@ The registry is `config/tool_capabilities.tsv`. Only `mob_recon`, `platon` and `
 | flye_mob_recon, trycycler_mob_recon | binning | yes | long reads | long_read | yes |
 | hybracter_long | reassembly | yes | long reads | long_read | yes |
 | plassembler, hybracter_hybrid | reassembly | yes | hybrid reads | hybrid | yes |
+| plsmd | reassembly | yes | assembly (Unicycler) | short_read | no |
 
 **How each is run** (details in `scripts/04_run_tools.sh` and `07_long_read_reconstruct.sh`):
 
@@ -278,6 +280,9 @@ The registry is `config/tool_capabilities.tsv`. Only `mob_recon`, `platon` and `
 - **gplas2_mob** converts MOB hard labels into a seed classifier and runs `gplas`; **gplas2_external** takes a user-supplied classifier table.
 - **geNomad** (`end-to-end`), **PLASMe** (probability threshold 0.5), **RFPlasmid** (species model, default Enterobacteriaceae), **PlasmidHunter**, **Plasmer**, **PlaScope** (E. coli and Klebsiella databases only), **plASgraph2** (CPU).
 - **Long-read and hybrid:** Flye then MOB-recon; Plassembler; Hybracter (long or hybrid); Trycycler (subsample, Flye, cluster, reconcile, consensus, then MOB-recon; Medaka optional).
+
+- **plsMD** (opt-in, `RUN_PLSMD=1`) reconstructs each plasmid by BLASTing contigs against a PLSDB index (`PLSMD_DB`) and typing replicons, then orders the contigs and trims assembly overlaps. It needs a Unicycler assembly (`ASSEMBLER=unicycler`), is Docker-packaged upstream (`PLSMD_CMD`), and is skipped with a recorded reason, not failed, when the command, the index or a Unicycler assembly is missing. Each reconstructed plasmid is one bin. Because it reconstructs *against PLSDB*, which probably contains the truth genomes, read its score with the database-overlap and containment tables.
+- **Trivial baselines.** `baseline_coverage` (depth), `baseline_reference` (alignment to a plasmid reference set) and `baseline_replicon` (a replicon marker from Abricate `REPLICON_ABRICATE_DBS`; a Col hit is dropped when an Inc hit is on the same contig, the rule plsMD uses) are scored like tools. A tool that does not beat them adds nothing a one-line rule does not already give.
 
 **Databases and leakage.** Many tools score contigs against a database of public plasmids or a model trained on one. Those sources overlap the public complete genomes PlasBench uses as truth. `config/tool_database_releases.tsv` records, per tool, which database it uses and (when you fill it in) its release date. Plassembler, Hybracter and PLASMe use PLSDB-derived data. PlasmidSPAdes uses no reference database.
 
@@ -383,6 +388,21 @@ These were added for the pre-registered scoring specification ([PREREGISTRATION.
 | Per-plasmid outcomes | Per truth plasmid, judged on the bin holding most of it (`score_bins.py --outcomes-out`): *perfect* (that bin's precision and recall ≥ `PERFECT_THRESHOLD`), *fragmented* (another bin holds ≥ `FRAGMENT_SHARE`), *merged* (its bin also holds that share of another plasmid), *missed* (best-bin recall < `MISSED_RECALL`), else *partial*. Counted as `outcome_*` columns. |
 | Contig layer | A parallel layer, never the headline: `contig_classification.py` labels assembly contigs against the reference and scores each tool per contig (count and length), with MCC, contig-level binning F1 (`contig_bin_f1_bp`), and the lengths of shared (`contigs_ambiguous_bp`) and unassigned (`contigs_unplaced_bp`) contigs. Its recall denominator is the summed length of contigs assigned to each plasmid, a contig-layer-only definition. |
 | AMR placement | `score_amr_placement.py`: each curated AMR gene copy is matched by position; level 2 asks whether the bin holding it is matched to the gene's own plasmid, level 1 whether that plasmid shares a replicon type. Reported per gene class (`config/amr_gene_classes.tsv`) in `benchmark.amr_placement.tsv`. |
+
+### 7.9 Bin agreement, assembly adequacy, copy number and truth quality
+
+Added after reviewing three other repositories (PlasEval, plsMD, GAEMR). All are descriptive and none changes a ranking. PlasEval and plsMD have no licence file visible and GAEMR is GPL-2.0, so every item is reimplemented from the published definition or the idea; no code was copied.
+
+| Item | Definition and where it comes from |
+|---|---|
+| `bestmatch_f1_bp`, `bestmatch_f1_count` (and precision, recall) | PlasEval's evaluation: each predicted bin is credited to the truth bin it overlaps most, each truth bin to the predicted bin that overlaps it most, **not one-to-one**; contig-weighted and base-weighted. It is the "best match" sensitivity analysis the scoring specification asks for and a cross-check of the one-to-one bin score. Shared (`AMBIGUOUS`) and misjoined (`CHIMERIC`) contigs are excluded and counted (`bestmatch_contigs_excluded`). |
+| `bin_dissimilarity`, `dissim_split_cost`, `dissim_join_cost` | PlasEval's comparison: contig cost is length^`DISSIMILARITY_ALPHA` (0.5); extra and missing contigs, plus the cost of splitting each predicted bin into the cells it shares with truth bins and of joining cells into truth bins; normalised to [0, 1]. A **split** is a predicted bin spanning several plasmids (over-merging); a **join** is a plasmid spread over several bins (over-splitting). Repeated contigs are excluded (PlasEval pairs them by branch and bound; this layer does not). `benchmark.tool_agreement.tsv` gives the same dissimilarity between every pair of tools, so you can see whether tools agree with each other. `<tool>.plaseval.truth_bins.tsv` and `.pred_bins.tsv` are exported in PlasEval's input format (`plasmid`, `contig`, `contig_len`) so you can cross-check with the original. |
+| `CHIMERIC` contig label | From GAEMR's scaffold-accuracy idea: a contig with a plasmid segment and a chromosome segment (each at least `--chimeric-min-segment`, 0.20, of it) that together cover it is an assembly misjoin, counted apart from `UNPLACED`. `contigs_chimeric` and `contigs_chimeric_bp` are in `scores.tsv`. The label table also gains `plasmids`, every truth plasmid a contig meets the coverage threshold on. |
+| Assembly adequacy (`benchmark.assembly_adequacy.tsv`) | From plsMD's dataset gate: the share of truth plasmid bases the isolate's own short-read assembly contains (`plasmid_adequacy`), flagged below `MIN_ASSEMBLY_ADEQUACY` (0.90), with chimeric and unplaced shares and the assembly's N50 and GC. Report-only: a tool cannot recover what the assembler never built, which the recall ceiling and assembly-aware recall already handle. |
+| Copy number (`benchmark.copy_number.tsv`) | From plsMD's plasmid copy number: for each matched bin, the length-weighted contig depth over the chromosomal depth estimate (long assembly contigs outside any bin), against the truth plasmid-to-chromosome long-read depth ratio. Reports `log2(predicted / truth)`. Needs SPAdes or Unicycler depth headers and `truth_long_read_depth.tsv` (written only when long reads are staged); otherwise the row says why. Matters for resistance-gene dosage. |
+| Repeat content (`benchmark.repeat_content.tsv`) | From GAEMR's k-mer repeat statistics (k = `REPEAT_KMER`, 29): per truth replicon, the share of canonical k-mers repeated inside it, and for plasmids the share shared with the chromosome or other plasmids. `repeat_rich` marks 5% or more. It explains why contigs are shared and plasmids are hard to separate. |
+| Truth depth anomalies (`RUN_TRUTH_DEPTH_ANOMALIES`, off) | From GAEMR's coverage-anomaly windows: windows of benchmark-read depth beyond `DEPTH_ANOMALY_Z` (3) robust SD of the replicon median, clustered by distance. A high region can be a collapsed repeat or an integrated element, a low one a deletion or misjoin in the truth. Needs minimap2 and samtools. Never edits the truth. |
+| Origin-wrap handling | A circular replicon has no fixed start. Two query-adjacent alignment blocks that meet across the reference origin are a rotation, not a tandem duplication: `call_structural_variants.py` no longer calls one and tallies `origin_wraps`. Every truth replicon is assumed circular for this purpose. |
 
 ---
 
@@ -542,6 +562,7 @@ Operational mode helps a laboratory apply benchmark evidence to a **sample that 
 - **Diagnostics**: `redundant_pred_bp`, `strict_precision`, `scorable_plasmid_bp`, `recall_ceiling`, `ceiling_adjusted_recall`.
 - **Binning**: `bin_precision`, `bin_recall`, `bin_f1`, `matched_bins`, `unmatched_bins`, `missed_plasmids`, `split_events`, `merge_events`, `contaminated_bins`, `chromosome_aligned_bp`, `repeat_ambiguity_bp`, `bin_total_mapped_bp`, `contamination_fraction`, `nmi`, `variation_of_information`, `perfect_reference_recovery`, `strict_reference_reconstruction`, `lw_bin_precision`, `lw_bin_recall`, `lw_bin_f1`, `cprr_plasmids`, `cprr_correct`, `cprr_correct_without_identity`.
 - **Threshold-free**: `pr_auc`, `pr_n_thresholds`.
+- **Bin agreement and contig misjoins** (section 7.9): `bestmatch_precision_bp`, `bestmatch_recall_bp`, `bestmatch_f1_bp`, `bestmatch_f1_count`, `bestmatch_contigs_excluded`, `bin_dissimilarity`, `dissim_split_cost`, `dissim_join_cost`, `contigs_chimeric`, `contigs_chimeric_bp`.
 
 Blank always means "not defined or not assessed", never zero.
 
@@ -604,6 +625,8 @@ All settings are environment variables read by `config/config.sh` (override them
 | Variable | Default | Meaning |
 |---|---|---|
 | `RUN_MOB_RECON`, `RUN_PLATON`, `RUN_PLASMIDSPADES` | 1 | On by default. |
+| `RUN_PLSMD`, `PLSMD_CMD`, `PLSMD_DB`, `PLSMD_THREADS` | 0, plsMD, empty, `THREADS` | plsMD: command (the Docker wrapper works), PLSDB BLAST index prefix, threads. Needs `ASSEMBLER=unicycler`. |
+| `RUN_BASELINE_REPLICON`, `REPLICON_ABRICATE_DBS` | 0, plasmidfinder | Replicon-marker baseline and the Abricate databases it searches. |
 | `RUN_GPLAS2_MOB`, `RUN_GPLAS2_EXTERNAL`, `RUN_GENOMAD`, `RUN_PLASME`, `RUN_PLASGRAPH2`, `RUN_RFPLASMID`, `RUN_PLASMIDHUNTER`, `RUN_PLASMER`, `RUN_PLASCOPE` | 0 | Short-read tools, opt-in. |
 | `RUN_FLYE_MOB_RECON`, `RUN_PLASSEMBLER`, `RUN_HYBRACTER_LONG`, `RUN_HYBRACTER_HYBRID`, `RUN_TRYCYCLER_MOB_RECON` | 0 | Long-read and hybrid tools, opt-in, behind the circularity guard. |
 | `<TOOL>_ALLOW_CIRCULAR_TRUTH` | 0 | Override the circularity guard for one tool (recorded). |
@@ -627,6 +650,11 @@ All settings are environment variables read by `config/config.sh` (override them
 | `CPRR_MIN_COVERAGE`, `CPRR_MIN_SHARE`, `CPRR_MIN_IDENTITY` | 0.95, 0.95, 0.99 | Pre-specified; do not tune. |
 | `RUN_SCORABLE_TRUTH`, `SCORABLE_WINDOW_BP`, `SCORABLE_STEP_BP` | 1, 1000, 250 | Recall-ceiling diagnostic. |
 | `REPORT_MAPPING_AMBIGUITY` | 1 | Second, secondary-mapping PAF for the ambiguity diagnostic. |
+| `RUN_BIN_AGREEMENT`, `DISSIMILARITY_ALPHA` | 1, 0.5 | Best-match scores and split/join dissimilarity (section 7.9); alpha 0 ignores contig length, 1 weights fully. |
+| `RUN_COPY_NUMBER` | 1 | Tool versus truth plasmid copy number where depth headers and truth depth exist. |
+| `RUN_ASSEMBLY_ADEQUACY`, `MIN_ASSEMBLY_ADEQUACY` | 1, 0.90 | Share of truth plasmids the assembly contains, and the flag threshold. |
+| `RUN_REPEAT_CONTENT`, `REPEAT_KMER` | 1, 29 | K-mer repeat content of the truth. |
+| `RUN_TRUTH_DEPTH_ANOMALIES`, `DEPTH_WINDOW_BP`, `DEPTH_ANOMALY_Z` | 0, 1000, 3 | Read-depth anomaly windows on the truth (needs minimap2 and samtools). |
 
 **Truth and design**
 
@@ -680,6 +708,7 @@ All settings are environment variables read by `config/config.sh` (override them
 | Cohorts | `init-local`, `validate-cohort`, `curate-cohort`, `discover-cohort`, `review-candidates`, `build-ledger`, `prepare-contribution` |
 | Experiments | `depth-ladder`, `depth-report`, `read-quality-ladder`, `read-quality-report` |
 | Evidence | `validate-orthogonal-evidence`, `import-external-benchmark`, `candidate-dataset` |
+| Evaluation additions (run as `plasbench analysis <name>`) | `bin-agreement`, `assembly-adequacy`, `copy-number`, `repeat-content`, `truth-depth-anomalies` |
 | Metagenomics | `metagenomics` (aliases `meta`, `beta`), `audit-meta-cohort`, `design-meta-synthetic`, `validate-meta-intake`, `materialize-meta-bmock12`, `normalize-meta-classifier`, `import-mobilome-evidence` |
 
 ---
@@ -746,6 +775,10 @@ This section records what has and has not been shown, so that a reader can judge
 | Pre-registered values marked `TO_FIX` (tool timeout, integrated-element depth, circular-path requirement) await the panel. | The plan is not frozen; `REQUIRE_PREREG=1` will refuse to run until they are fixed. |
 | The contig layer's independent cross-check agrees on synthetic data; real-data agreement is read per run in `benchmark.contig_crosscheck.tsv`. | Check that table before citing contig-level numbers. |
 | The recommender evaluation has run only on synthetic data. | Its verdict on a real cohort is unknown. |
+| The plsMD wrapper has been tested only with a fake binary, and its PLSDB release date is blank. | Run it on a real cohort with the real tool before reading its score; until the date is entered leakage for plsMD is *not assessed*. |
+| Bin agreement (best match, dissimilarity) was reimplemented from PlasEval's published definitions and never cross-checked against the original program on shared data. | Treat the numbers as implemented, not validated; the export files let you run the original PlasEval yourself. |
+| Copy number needs truth long-read depth and assembly depth headers, which most short-read cohorts lack. | Expect `no_truth_depth` or `no_depth_headers` rows outside the long-read and hybrid cohorts. |
+| Repeated contigs are excluded, not paired, in the dissimilarity, and every replicon is assumed circular for origin-wrap handling. | A linear replicon whose ends were joined by a misassembly would read as a wrap. |
 
 ### 17.3 What would establish the claims
 

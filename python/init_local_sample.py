@@ -28,6 +28,9 @@ import shutil
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from read_pairing import pair_fastq_files  # noqa: E402
+
 SHEET_COLUMNS = ("sample_id", "assembly_accession", "sra_run")
 SAFE_SAMPLE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -106,8 +109,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sample", required=True, help="Sample id; becomes the directory name.")
-    ap.add_argument("--reads-1", required=True, help="Forward reads (FASTQ, gzipped).")
-    ap.add_argument("--reads-2", required=True, help="Reverse reads (FASTQ, gzipped).")
+    ap.add_argument("--reads-1", help="Forward reads (FASTQ, gzipped; .fastq.gz or .fq.gz).")
+    ap.add_argument("--reads-2", help="Reverse reads (FASTQ, gzipped).")
+    ap.add_argument("--reads-dir", help="Instead of --reads-1/--reads-2: a directory holding one pair named "
+                                        "_1/_2, _R1/_R2 or _R1_001/_R2_001 (.fastq.gz or .fq.gz). With several "
+                                        "pairs, the one named like --prefix or --sample is used.")
     ap.add_argument("--reference", help="Complete assembly FASTA for this isolate (the ground truth). "
                                         "Omit only for operational reconstruction, which is not scored.")
     ap.add_argument("--sequence-report", help="NCBI sequence_report.jsonl, if you have one. "
@@ -131,7 +137,22 @@ def main() -> int:
         sys.exit(f"ERROR: --prefix '{prefix}' must not end in _1 or _2; "
                  "those are added for you.")
 
-    reads1, reads2 = Path(args.reads_1), Path(args.reads_2)
+    if args.reads_dir:
+        if args.reads_1 or args.reads_2:
+            sys.exit("ERROR: give either --reads-dir or --reads-1/--reads-2, not both.")
+        if not Path(args.reads_dir).is_dir():
+            sys.exit(f"ERROR: no such directory: {args.reads_dir}")
+        pairs = pair_fastq_files(args.reads_dir)
+        chosen = [p for p in pairs if p[0] in (prefix, args.sample)] or (pairs if len(pairs) == 1 else [])
+        if not chosen:
+            names = ", ".join(p[0] for p in pairs) or "none"
+            sys.exit(f"ERROR: could not pick one read pair in {args.reads_dir} (pairs found: {names}). "
+                     "Name one with --prefix or --sample, or pass --reads-1/--reads-2.")
+        _, reads1, reads2 = chosen[0]
+    elif args.reads_1 and args.reads_2:
+        reads1, reads2 = Path(args.reads_1), Path(args.reads_2)
+    else:
+        sys.exit("ERROR: give --reads-1 and --reads-2, or --reads-dir.")
     for path in (reads1, reads2):
         if not path.is_file():
             sys.exit(f"ERROR: no such file: {path}")

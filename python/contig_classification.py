@@ -20,8 +20,19 @@ contigs against the truth reference (minimap2 -x asm5 -c --secondary=yes):
   CHROMOSOME the same, for CHROMOSOME truth.
   AMBIGUOUS  aligns that well to BOTH (IS elements, transposons, rRNA repeats):
              excluded from scoring -- not multi-membership -- and counted.
+  CHIMERIC   a plasmid segment and a chromosome segment, each at least
+             --chimeric-min-segment (0.20) of the contig, together covering
+             >= --min-coverage, but neither alone reaching it: an assembly
+             misjoin of two replicons, not a repeat. Excluded, counted
+             separately from UNPLACED so assembly-induced loss can be told
+             apart from sequence the truth does not contain (idea from
+             GAEMR's scaffold-accuracy check; GAEMR is GPL-2, no code used).
   UNPLACED   aligns well to neither (misassembly, contamination, truth gap):
              excluded, counted.
+
+`plasmids` (label table) lists every truth plasmid the contig meets
+--min-coverage on, so a contig shared by several plasmids is visible; the
+single-valued `best_plasmid` is unchanged.
 
 Truth is the file of the scored labelling scheme (stage 5 passes the same
 TRUTH_LABEL_SCHEME truth it scores against; truth.tsv under the primary NCBI
@@ -49,8 +60,10 @@ import os
 import sys
 from collections import defaultdict
 
-LABEL_FIELDS = ["contig", "length", "label", "plasmid_fraction", "chromosome_fraction", "best_plasmid", "reason"]
+LABEL_FIELDS = ["contig", "length", "label", "plasmid_fraction", "chromosome_fraction", "best_plasmid", "reason",
+                "plasmids"]
 SCORE_FIELDS = ["contig_min_length", "contigs_evaluable", "contigs_short", "contigs_ambiguous", "contigs_unplaced",
+                "contigs_chimeric", "contigs_chimeric_bp",
                 "contig_tp", "contig_fp", "contig_fn", "contig_tn",
                 "contig_precision_count", "contig_recall_count", "contig_f1_count", "contig_mcc_count",
                 "contig_tp_bp", "contig_fp_bp", "contig_fn_bp", "contig_tn_bp",
@@ -106,6 +119,7 @@ def cmd_label(args):
     truth = read_truth(args.truth)
     query_intervals = defaultdict(lambda: defaultdict(list))   # contig -> kind -> query intervals
     plasmid_bp = defaultdict(lambda: defaultdict(int))          # contig -> plasmid -> aligned bp
+    plasmid_query = defaultdict(list)                           # (contig, plasmid) -> query intervals
     target_intervals = defaultdict(list)                        # (contig, plasmid) -> target intervals
     with open(args.paf, encoding="utf-8") as handle:
         for line in handle:
@@ -122,11 +136,16 @@ def cmd_label(args):
             if kind == "PLASMID":
                 plasmid_bp[f[0]][f[5]] += q[1] - q[0]
                 target_intervals[(f[0], f[5])].append(t)
+                plasmid_query[(f[0], f[5])].append(q)
     rows, covered = [], defaultdict(list)
     for contig, length in lengths.items():
         p_frac = merged_length(query_intervals[contig]["PLASMID"]) / length if length else 0.0
         c_frac = merged_length(query_intervals[contig]["CHROMOSOME"]) / length if length else 0.0
         best = max(plasmid_bp[contig], key=plasmid_bp[contig].get) if plasmid_bp[contig] else ""
+        union_frac = (merged_length(query_intervals[contig]["PLASMID"] + query_intervals[contig]["CHROMOSOME"]) / length
+                      if length else 0.0)
+        member_plasmids = sorted(pl for pl in plasmid_bp[contig]
+                                 if length and merged_length(plasmid_query[(contig, pl)]) / length >= args.min_coverage)
         if length < args.min_length:
             label, reason = "SHORT", f"shorter than {args.min_length} bp"
         elif p_frac >= args.min_coverage and c_frac >= args.min_coverage:
@@ -135,13 +154,17 @@ def cmd_label(args):
             label, reason = "PLASMID", f"{p_frac:.0%} aligned to plasmid truth"
         elif c_frac >= args.min_coverage:
             label, reason = "CHROMOSOME", f"{c_frac:.0%} aligned to chromosome truth"
+        elif (min(p_frac, c_frac) >= args.chimeric_min_segment and union_frac >= args.min_coverage):
+            label, reason = "CHIMERIC", (f"{p_frac:.0%} plasmid + {c_frac:.0%} chromosome segments: "
+                                         "assembly misjoin of two replicons")
         else:
             label, reason = "UNPLACED", f"aligned fraction below {args.min_coverage:.0%} to either"
         if label == "PLASMID":
             for plasmid in plasmid_bp[contig]:
                 covered[plasmid].extend(target_intervals[(contig, plasmid)])
         rows.append({"contig": contig, "length": length, "label": label, "plasmid_fraction": f"{p_frac:.4f}",
-                     "chromosome_fraction": f"{c_frac:.4f}", "best_plasmid": best, "reason": reason})
+                     "chromosome_fraction": f"{c_frac:.4f}", "best_plasmid": best, "reason": reason,
+                     "plasmids": ",".join(member_plasmids) if label == "PLASMID" else ""})
     with open(args.labels_out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=LABEL_FIELDS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
@@ -197,14 +220,16 @@ def cmd_score(args):
             tallies["bp"][index] += length
         excluded_bp = defaultdict(int)
         for label in labels:
-            if label["label"] in ("AMBIGUOUS", "UNPLACED"):
+            if label["label"] in ("AMBIGUOUS", "UNPLACED", "CHIMERIC"):
                 excluded_bp[label["label"]] += int(label["length"])
-        row.update({"contigs_ambiguous_bp": excluded_bp["AMBIGUOUS"], "contigs_unplaced_bp": excluded_bp["UNPLACED"]})
+        row.update({"contigs_ambiguous_bp": excluded_bp["AMBIGUOUS"], "contigs_unplaced_bp": excluded_bp["UNPLACED"],
+                    "contigs_chimeric_bp": excluded_bp["CHIMERIC"]})
         if args.bins and os.path.isfile(args.bins) and os.path.getsize(args.bins):
             p, r, f1 = contig_binning(labels, args.bins)
             row.update({"contig_bin_precision_bp": fmt(p), "contig_bin_recall_bp": fmt(r), "contig_bin_f1_bp": fmt(f1)})
         row.update({"contigs_evaluable": sum(tallies["n"]), "contigs_short": excluded["SHORT"],
-                    "contigs_ambiguous": excluded["AMBIGUOUS"], "contigs_unplaced": excluded["UNPLACED"]})
+                    "contigs_ambiguous": excluded["AMBIGUOUS"], "contigs_unplaced": excluded["UNPLACED"],
+                    "contigs_chimeric": excluded["CHIMERIC"]})
         for key, suffix, fields in (("n", "count", ("contig_tp", "contig_fp", "contig_fn", "contig_tn")),
                                     ("bp", "bp", ("contig_tp_bp", "contig_fp_bp", "contig_fn_bp", "contig_tn_bp"))):
             for field, value in zip(fields, tallies[key]):
@@ -280,6 +305,9 @@ def main():
     lab.add_argument("--min-length", type=int, default=1000)
     lab.add_argument("--min-identity", type=float, default=0.95)
     lab.add_argument("--min-coverage", type=float, default=0.80)
+    lab.add_argument("--chimeric-min-segment", type=float, default=0.20,
+                     help="each of the plasmid and chromosome segments must cover at least this fraction of the "
+                          "contig for it to be called CHIMERIC (an assembly misjoin)")
     lab.set_defaults(func=cmd_label)
     sco = sub.add_parser("score", help="count-based and length-weighted metrics for one tool")
     sco.add_argument("--labels", required=True)

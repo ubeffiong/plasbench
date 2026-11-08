@@ -159,6 +159,38 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
     EVIDENCE_ARGS=()
     [[ -s "$SDIR/truth_labels.tsv" ]] && EVIDENCE_ARGS=(--evidence-labels "$SDIR/truth_labels.tsv")
     python3 "$HERE/../python/label_schemes.py" build --sample "$SAMPLE" --truth "$TRUTH"         --report "$REPORT" --truth-source "${TRUTH_SOURCE:-}"         "${EVIDENCE_ARGS[@]+"${EVIDENCE_ARGS[@]}"}" "${MULTIMER_ARGS[@]+"${MULTIMER_ARGS[@]}"}"         --nonchromosomal-out "$SDIR/truth.nonchromosomal.tsv" --out "$SDIR/label_schemes.tsv"         2>> "$LOG_DIR/${SAMPLE}.truth.log"         || warn "label-scheme table failed for $SAMPLE; scheme sensitivity analyses will skip it"
+    # Repeat content of the truth (python/repeat_content.py, k-mer idea from GAEMR): the share of each replicon's
+    # canonical k-mers that repeat inside it or are shared with the chromosome. A difficulty descriptor and the
+    # repeat_rich scenario tag; it never edits truth. RUN_REPEAT_CONTENT=0 skips it.
+    if [[ "${RUN_REPEAT_CONTENT:-1}" == "1" && -s "$REF" ]]; then
+        python3 "$HERE/../python/repeat_content.py" --reference "$REF" --truth "$TRUTH" --sample "$SAMPLE" \
+            --k "$REPEAT_KMER" --out "$SDIR/truth_repeat_content.tsv" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+            || warn "repeat-content analysis failed for $SAMPLE; the repeat_rich tag is unavailable"
+    fi
+    # Opt-in truth depth anomalies (python/truth_depth_anomalies.py, coverage-anomaly idea from GAEMR): map the
+    # benchmark short reads to the truth reference and flag windows whose depth departs from the replicon median by
+    # more than DEPTH_ANOMALY_Z robust SD (collapsed repeats, misjoins, integrated elements). Needs minimap2 and samtools.
+    if [[ "${RUN_TRUTH_DEPTH_ANOMALIES:-0}" == "1" && -s "$R1" && -s "$R2" && -s "$REF" ]]; then
+        if command -v minimap2 >/dev/null 2>&1 && command -v samtools >/dev/null 2>&1; then
+            DEPTH_TSV="$SDIR/truth_depth.tsv"
+            if minimap2 -ax sr -t "$THREADS" "$REF" "$R1" "$R2" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+                    | samtools sort -@ 2 -o "$SDIR/truth_reads.bam" - 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+               && samtools depth -a "$SDIR/truth_reads.bam" > "$DEPTH_TSV" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+               && python3 "$HERE/../python/truth_depth_anomalies.py" windows --depth-tsv "$DEPTH_TSV" \
+                    --window "$DEPTH_WINDOW_BP" --out "$SDIR/truth_depth_windows.tsv" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+               && python3 "$HERE/../python/truth_depth_anomalies.py" --depth-table "$SDIR/truth_depth_windows.tsv" \
+                    --truth "$TRUTH" --sample "$SAMPLE" --z "$DEPTH_ANOMALY_Z" \
+                    --out "$SDIR/truth_depth_anomalies.tsv" --summary-out "$SDIR/truth_depth_anomaly_summary.tsv" \
+                    2>> "$LOG_DIR/${SAMPLE}.truth.log"; then
+                :
+            else
+                warn "truth depth-anomaly analysis failed for $SAMPLE (see $LOG_DIR/${SAMPLE}.truth.log)"
+            fi
+            rm -f "$SDIR/truth_reads.bam" "$DEPTH_TSV"
+        else
+            warn "RUN_TRUTH_DEPTH_ANOMALIES=1 needs minimap2 and samtools; skipped for $SAMPLE"
+        fi
+    fi
     # Opt-in: draft AMR truth from the AMRFinderPlus rows annotated on the reference.
     # Written as truth_amr.draft.tsv (evidence_tier=auto_derived), never as truth_amr.tsv:
     # a person must review it and rename it before amr_gene_recall is scored.

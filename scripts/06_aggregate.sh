@@ -132,6 +132,25 @@ if ! python3 "$HERE/../python/audit_truth_labels.py" \
     warn "truth-label audit failed; scores are unaffected"
 fi
 
+# Assembly adequacy (was the short-read assembly good enough to blame a tool?), plasmid copy-number concordance, truth
+# repeat content and truth depth anomalies, and tool-vs-tool bin agreement (PlasEval-style dissimilarity). All advisory:
+# none alters scores.tsv or a rank. A table that cannot be produced is absent and the report says "Not run".
+if [[ "${RUN_ASSEMBLY_ADEQUACY:-1}" == "1" ]]; then
+    python3 "$HERE/../python/assembly_adequacy.py" merge --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.assembly_adequacy.tsv" \
+        --min-adequacy "$MIN_ASSEMBLY_ADEQUACY" || warn "assembly-adequacy table failed; the leaderboard is unaffected"
+fi
+python3 "$HERE/../python/copy_number.py" merge --results-dir "$RESULTS_DIR" --out "$RESULTS_DIR/benchmark.copy_number.tsv" \
+    || warn "could not merge copy-number shards; that table is not evaluated"
+python3 "$HERE/../python/repeat_content.py" summary --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.repeat_content.tsv" \
+    || warn "could not merge repeat-content tables; that table is not evaluated"
+python3 "$HERE/../python/merge_tables.py" --results-dir "$DATA_DIR" --suffix "truth_depth_anomaly_summary.tsv" \
+    --out "$RESULTS_DIR/benchmark.truth_depth_anomalies.tsv" || warn "could not merge truth depth-anomaly tables"
+if [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]]; then
+    python3 "$HERE/../python/bin_agreement.py" matrix --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+        --alpha "$DISSIMILARITY_ALPHA" --out "$RESULTS_DIR/benchmark.tool_agreement.tsv" \
+        || warn "tool agreement matrix failed; the leaderboard is unaffected"
+fi
+
 # Further benchmark dimensions (accuracy and missing regions, feature preservation and NGOC,
 # bin quality, performance, statistical power, scenarios, and an optional composite with gates
 # and weight sensitivity). Advisory: none of it alters scores.tsv, the leaderboard or any rank,

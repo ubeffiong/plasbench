@@ -1082,3 +1082,40 @@ recommending; stage 6 writes it for every assembly so its warning can be scored.
 by one predicted record): correct or wrong plasmid via one-to-one bin-to-plasmid matching, shared or
 unassigned contig, or not recovered; level 1 asks whether the matched plasmid shares a replicon type.
 Summarised per gene class from `config/amr_gene_classes.tsv` (unmatched genes: `other`).
+
+
+## Bin agreement, assembly adequacy, copy number and truth quality (PlasEval, plsMD, GAEMR)
+
+All supplementary; none changes `f1`, `lw_bin_f1` or a rank. Reimplemented from published definitions and ideas (no code copied).
+
+**Best-match scores.** Truth bins are the plasmid contigs of the contig labels, grouped by plasmid; shared (`AMBIGUOUS`) and misjoined
+(`CHIMERIC`) contigs are excluded and counted. With predicted bins A and truth bins B, precision = sum over P in A of max over T in B of
+o(P,T), divided by sum over P of L(P); recall is the mirror image; o is the summed length (or count) of shared contigs; F1 is their
+harmonic mean. The match is per bin and not one-to-one. A defined recall with no predicted bin gives precision blank, recall 0.
+
+**Dissimilarity.** Contig cost is len^alpha (`DISSIMILARITY_ALPHA`, 0.5). Extra and missing contigs each cost len^alpha. The non-empty
+cells P and T are the intermediate bins; a predicted bin cut into k cells costs the sum of the cell costs minus the largest (split), and a
+truth bin built from k cells costs the same way (join), a cell costing L(cell)^alpha over its summed length. The sum is divided by the
+sum over both bin sets of the contig costs, giving a value in [0, 1] (0 identical, 1 disjoint; both sets empty is 0, one empty is 1).
+Repeated contigs are excluded rather than paired.
+
+**CHIMERIC.** A contig whose plasmid-aligned and chromosome-aligned segments are each at least `--chimeric-min-segment` (0.20) of it, and
+jointly at least `--min-coverage` (0.80), while neither alone reaches 0.80.
+
+**Assembly adequacy.** plasmid_adequacy = assembly-covered truth plasmid bases over truth plasmid bases (the table `label` writes with
+`--coverage-out`); adequate when it reaches `MIN_ASSEMBLY_ADEQUACY`.
+
+**Copy number.** Tool copy number of a matched bin = length-weighted mean contig depth (SPAdes `cov_`, Unicycler `depth=`) over the
+length-weighted median depth of assembly contigs of at least 10 kb that are in no bin. Truth copy number = plasmid depth over the
+length-weighted median chromosome depth of the per-replicon truth depth table. Reported as log2(tool / truth).
+
+**Repeat content.** For canonical k-mers (the smaller of a k-mer and its reverse complement, k = `REPEAT_KMER`) of a replicon:
+internal repeat fraction = positions whose k-mer occurs more than once in the replicon; chromosome shared fraction = plasmid k-mers also in
+any chromosome replicon (the plasmid k-mers are hashed first and the chromosome streamed, so memory stays bounded by plasmid size).
+
+**Depth anomalies.** Window means of read depth per replicon; centre = median, spread = 1.4826 x MAD (SD when MAD is 0); windows beyond
+`DEPTH_ANOMALY_Z` spreads high or low, same-direction windows closer than the cluster distance merged into regions.
+
+**Origin wrap.** Two query-adjacent same-strand blocks of one record on one replicon, the first ending within the indel tolerance of the
+reference end and the second starting within it of the reference start (mirrored on the reverse strand), are a rotation. They are counted as
+`origin_wraps`, not as a tandem duplication or relocation, and count as collinear.

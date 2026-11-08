@@ -13,6 +13,20 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+<<<<<<< HEAD
+### Added -- lessons from plsMD, PlasEval and GAEMR
+- **plsMD wrapper** (`RUN_PLSMD`, `adapters/adapt_plsmd.sh`): an optional benchmarked reassembly tool, skipped with a recorded reason when
+  its command, PLSDB index or Unicycler assembly is missing; PLSDB listed as its database for the leakage screens.
+- **`baseline_replicon`**: a third trivial baseline (a replicon marker, with plsMD's Col-versus-Inc rule).
+- **Bin agreement** (`python/bin_agreement.py`, PlasEval's published definitions reimplemented): best-match (non-one-to-one) precision, recall
+  and F1, a split/join dissimilarity, a tool-vs-tool agreement matrix and a PlasEval-format export.
+- **`CHIMERIC` contig label** and a `plasmids` column in the contig labels (GAEMR's misjoin idea).
+- **Assembly adequacy**, **plasmid copy-number concordance**, **truth repeat content** and opt-in **truth depth anomalies**.
+- **Origin-wrap fix**: a rotated circular plasmid is no longer reported as a tandem duplication by `call_structural_variants.py`.
+- Local read pairing for `init-local --reads-dir` (`_1`, `_R1`, `_R1_001`), `env/download_plsdb.sh`, report sections for all of the above, and a README
+  section on what PlasBench offers over the three projects, with where each is better.
+
+=======
 ### Added -- cross-check, ENA fallback, demo coverage
 - **Independent second scorer for the contig layer** (`contig_crosscheck.py`): alignment-free k-mer
   labels and separately written metrics; per-run agreement table, report and validity statement.
@@ -20,6 +34,7 @@ history is lost, only the numbering is cleaner. See
   example an old SRA Toolkit failing TLS), the same run is fetched from ENA and MD5-verified.
 - The demo now has a synthetic assembly, so the contig layer, the cross-check, assembly statistics and
   the QC-gate warnings render with real values.
+>>>>>>> origin/main
 
 ### Added -- scoring specification and panel examination
 - **Pre-registration** (`config/prereg.tsv`, `freeze_prereg.py`): freeze/verify a SHA-256 lock; the
