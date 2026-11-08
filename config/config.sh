@@ -74,6 +74,40 @@ export TRUTH_LABEL_SCHEME="${TRUTH_LABEL_SCHEME:-ncbi}"
 # COLLAPSE_DIMERS=1 scores the monomer; 0 only flags it (AMBIGUOUS under the
 # evidence scheme). Every change is in <sample>/truth.corrections.tsv.
 export RUN_DIMER_DETECTION="${RUN_DIMER_DETECTION:-1}"
+# --- Scoring specification (docs/PREREGISTRATION.md, config/prereg.tsv) ------
+# Every value below is pre-registered in config/prereg.tsv; freeze_prereg.py
+# --verify --check-env reports a run that departs from the plan.
+# REQUIRE_PREREG=1 makes stage 4 refuse to run tools unless config/prereg.lock.json
+# matches prereg.tsv and no parameter is still TO_FIX.
+export REQUIRE_PREREG="${REQUIRE_PREREG:-0}"
+# Per-plasmid outcome states (score_bins.py --outcomes-out): perfect when the
+# matched bin has precision and recall >= PERFECT_THRESHOLD; fragmented when a
+# second bin holds >= FRAGMENT_SHARE of it; missed when best-bin recall <
+# MISSED_RECALL; merged when its best bin also matches another plasmid.
+export PERFECT_THRESHOLD="${PERFECT_THRESHOLD:-0.95}"
+export FRAGMENT_SHARE="${FRAGMENT_SHARE:-0.20}"
+export MISSED_RECALL="${MISSED_RECALL:-0.50}"
+# Outcome states (stage 4): a failed run is retried TOOL_RETRIES times; an
+# infrastructure failure (exit 125/126/127, out of disk) is never scored.
+# TOOL_TIMEOUT_SECONDS (blank = no limit) is the same wall-time budget for
+# every tool; a run that exceeds it fails with exit 124 (resource failure).
+export TOOL_RETRIES="${TOOL_RETRIES:-1}"
+export TOOL_TIMEOUT_SECONDS="${TOOL_TIMEOUT_SECONDS:-}"
+# Recommender evaluation (python/evaluate_recommender.py, stage 6).
+export RUN_RECOMMENDER_EVAL="${RUN_RECOMMENDER_EVAL:-1}"
+export NEAR_OPTIMAL_MARGIN="${NEAR_OPTIMAL_MARGIN:-0.05}"
+export ORACLE_GAP_FLOOR="${ORACLE_GAP_FLOOR:-0.02}"
+export RECOMMENDATION_FAILURE_REGRET="${RECOMMENDATION_FAILURE_REGRET:-0.10}"
+# Decision D11: when the best expected score is below this, no tool is named.
+export RECOMMENDATION_MIN_EXPECTED_SCORE="${RECOMMENDATION_MIN_EXPECTED_SCORE:-0.40}"
+# Paired comparisons: |mean delta F1| below this is reported as equivalent.
+export SMALLEST_DIFFERENCE="${SMALLEST_DIFFERENCE:-0.05}"
+# AMR placement (python/score_amr_placement.py; needs <sample>/truth_amr.tsv).
+export RUN_AMR_PLACEMENT="${RUN_AMR_PLACEMENT:-1}"
+# Pre-ranking assembly QC gate (python/assembly_qc_gate.py, stage 8; D13).
+export RUN_ASSEMBLY_QC_GATE="${RUN_ASSEMBLY_QC_GATE:-1}"
+export ASSEMBLY_QC_MAX_SIZE_MB="${ASSEMBLY_QC_MAX_SIZE_MB:-8.5}"
+export ASSEMBLY_QC_MAX_GC_SPREAD="${ASSEMBLY_QC_MAX_GC_SPREAD:-0.12}"
 export COLLAPSE_DIMERS="${COLLAPSE_DIMERS:-1}"
 export DIMER_MIN_IDENTITY="${DIMER_MIN_IDENTITY:-0.95}"
 export DIMER_MIN_HALF_COVERAGE="${DIMER_MIN_HALF_COVERAGE:-0.90}"

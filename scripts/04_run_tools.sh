@@ -16,6 +16,14 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 ADAPT="$HERE/../adapters"
+# Pre-registration gate (python/freeze_prereg.py): with REQUIRE_PREREG=1 no tool
+# runs until config/prereg.lock.json matches config/prereg.tsv, no parameter is
+# TO_FIX, and no config variable departs from its pre-registered value.
+if [[ "${REQUIRE_PREREG:-0}" == "1" ]]; then
+    python3 "$HERE/../python/freeze_prereg.py" --verify --require-fixed --check-env \
+        --prereg "${PREREG_FILE:-$HERE/../config/prereg.tsv}" --lock "${PREREG_LOCK:-$HERE/../config/prereg.lock.json}" \
+        || die "pre-registration check failed (REQUIRE_PREREG=1); freeze it with: plasbench analysis freeze-prereg --write"
+fi
 STATUS="$RESULTS_DIR/tool_status.tsv"
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 reset_shard_dir "run_tools"

@@ -205,6 +205,9 @@ VALID_STAGES = frozenset(str(i) for i in range(8))
 ANALYSES = {
     "stratify-recovery": ("stratify_recovery.py", "Per-plasmid recovery by replicon, MOB, size band and AMR carriage"),
     "rank-sensitivity": ("rank_sensitivity.py", "How much the ranking depends on scoring choices"),
+    "freeze-prereg": ("freeze_prereg.py", "Freeze (--write) or verify (--verify) the pre-registered scoring parameters"),
+    "label-schemes": ("label_schemes.py", "Truth labels under the three labelling schemes (NCBI primary)"),
+    "detect-dimers": ("detect_dimers.py", "Find (and optionally collapse) tandem-dimer truth plasmids"),
     "flag-database-overlap": ("flag_database_overlap.py", "Screen truth genomes that may already be in a tool's database"),
     "flag-cohort-outliers": ("flag_cohort_outliers.py", "Advisory outlier flags for cohort assembly statistics"),
     "validate-truth-table": ("validate_truth_table.py", "Check a truth table against its reference before scoring"),
