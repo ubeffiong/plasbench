@@ -190,10 +190,10 @@ def main():
     with open(out3) as fh:
         r3 = dict(zip(header, fh.read().splitlines()[1].split("\t")))
     ok &= (int(r3["TP_bp"]) == 0 and int(r3["FN_bp"]) == 3000
-           and r3["precision"] == "" and float(r3["recall"]) == 0.0 and r3["f1"] == "")
-    print(f"  empty pred -> TP=0 FN=3000, precision/f1 undefined, recall=0 ? "
+           and r3["precision"] == "" and float(r3["recall"]) == 0.0 and r3["f1"] == "0.0000")
+    print(f"  empty pred -> TP=0 FN=3000, precision undefined, recall=0, f1=0 ? "
           f"precision={r3['precision']!r} recall={r3['recall']} f1={r3['f1']!r} -> "
-          f"{int(r3['TP_bp'])==0 and int(r3['FN_bp'])==3000 and r3['precision']=='' and float(r3['recall'])==0.0 and r3['f1']==''}")
+          f"{int(r3['TP_bp'])==0 and int(r3['FN_bp'])==3000 and r3['precision']=='' and float(r3['recall'])==0.0 and r3['f1']=='0.0000'}")
 
     # Coordinates supplied by external callers are bounded to the reference;
     # a malformed overhang must not inflate a base-level score.

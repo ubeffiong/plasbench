@@ -279,6 +279,13 @@ correctly abstained. Precision *is* still a real, defined number whenever someth
 *was* predicted on such an isolate (TP is always 0 there, so precision is exactly
 0.0 — a genuine, meaningful "of what you predicted, none was correct").
 
+The converse case is **not** undefined. On an isolate that *has* true plasmid, a
+tool that predicts nothing (empty output, or every alignment filtered out) has
+recall 0 and therefore **F1 = 0**, even though its precision stays empty. Earlier
+versions left F1 empty there, which silently dropped exactly the samples a tool
+gave up on from its mean F1: a tool that abstained on every hard isolate could tie
+a tool that was perfect everywhere.
+
 Because such an isolate is the only kind that can directly measure a tool's
 false-positive plasmid-calling behaviour (there is nothing true to recall, so
 anything predicted is by construction a false positive), `score_plasmids.py` also
@@ -394,8 +401,24 @@ database version. This preserves AMR context as independent truth evidence.
 
 ## Aggregation and uncertainty
 Per-sample (sample, tool) rows are averaged per tool (mean and median F1, mean precision,
-mean recall) and ranked by mean F1 (`python/aggregate_results.py`). A
-deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
+mean recall) and ranked by mean F1 (`python/aggregate_results.py`), separately within
+each analysis track.
+
+**Every tool is ranked on the same samples.** `mean_f1`, its CI and `median_f1` are
+computed over the plasmid-bearing samples on which *every* F1-bearing tool in that
+track has a result (`n_ranking_samples`, `ranking_basis = shared_samples`). A tool
+run that itself **failed** on a plasmid-bearing sample (`status = failed` in
+`tool_status.tsv`) counts as F1 = 0 for that tool (`n_failures_scored_zero`), so one
+crashing tool cannot shrink every other tool's ranking set, and a tool cannot rise
+in the ranking by failing on hard isolates. A sample missing for any other reason
+(no status recorded, skipped, or a scoring failure) is removed from every tool's
+ranking. Each tool's mean over all the samples it was scored on is kept as
+`mean_f1_all_scored` (`n_f1_scored`) for transparency; it is never used to rank. If
+the tools share no samples at all, each falls back to its own samples and
+`ranking_basis` says so (`own_samples_no_overlap`). The paired comparisons below
+apply the same failure-as-zero rule.
+
+A deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
 and `benchmark.paired_comparisons.tsv` reports paired per-sample F1
 differences and win/tie/loss counts. These are descriptive uncertainty aids,
 not formal claims of clinical or statistical superiority.

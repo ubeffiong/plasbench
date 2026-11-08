@@ -606,13 +606,24 @@ def main():
     # precision=recall=f1=0.0, which reads as total failure for the tool that
     # actually did the correct thing. precision is undefined when nothing was
     # predicted at all (tp+fp == 0); recall is undefined when there was no
-    # true plasmid to recall (tp+fn == 0, i.e. total_plasmid == 0); f1 is
-    # undefined whenever either input to it is.
+    # true plasmid to recall (tp+fn == 0, i.e. total_plasmid == 0).
+    #
+    # f1 is undefined only when there was nothing to recall. When true
+    # plasmid exists but the tool claimed nothing (empty output, or every
+    # alignment filtered out), recall is 0 and f1 is 0 -- NOT undefined.
+    # Leaving it undefined there let aggregation drop exactly the samples a
+    # tool failed on from its mean F1, so a tool that abstained on every
+    # hard isolate could tie a tool that was perfect everywhere.
     precision_defined = (tp + fp) > 0
     recall_defined = (tp + fn) > 0
     precision = safe_div(tp, tp + fp) if precision_defined else None
     recall = safe_div(tp, tp + fn) if recall_defined else None          # completeness
-    f1 = safe_div(2 * precision * recall, precision + recall) if (precision is not None and recall is not None) else None
+    if recall is None:
+        f1 = None
+    elif precision is None:
+        f1 = 0.0
+    else:
+        f1 = safe_div(2 * precision * recall, precision + recall)
 
     # isolate_specificity/chromosome_fp_bp/fp_predicted_record_count are
     # always defined (every real isolate has a non-zero chromosome) and are

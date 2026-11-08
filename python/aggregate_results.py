@@ -143,7 +143,26 @@ def read_status(path):
     return counts
 
 
-def summarise(rows, status_counts):
+def read_failed_samples(path):
+    """tool -> samples whose tool run itself failed, from tool_status.tsv."""
+    failed = defaultdict(set)
+    if not path:
+        return failed
+    try:
+        handle = open(path, newline="", encoding="utf-8")
+    except FileNotFoundError:
+        return failed
+    with handle:
+        reader = csv.DictReader(handle, delimiter="	")
+        if not reader.fieldnames or "sample" not in reader.fieldnames:
+            return failed
+        for row in reader:
+            if row.get("status") == "failed" and row.get("sample") and row.get("tool"):
+                failed[row["tool"]].add(row["sample"])
+    return failed
+
+
+def summarise(rows, status_counts, failed_samples=None):
     by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0,
                                    "zero_plasmid_specificity": [], "zero_plasmid_fp_bp": [], "n_zero_plasmid": 0,
                                    "nmi": [], "vi": [],
@@ -184,18 +203,60 @@ def summarise(rows, status_counts):
                 t["zero_plasmid_fp_bp"].append(r["chromosome_fp_bp"])
         t["n"] += 1
 
+    # Rank every tool on the SAME samples. A sample a tool crashed, timed out
+    # or was not scored on has no row for that tool; averaging each tool over
+    # its own surviving samples would let a tool that fails on hard isolates
+    # outrank one that attempted them. The ranking F1 (mean_f1, its CI and
+    # median) is therefore computed over the samples every F1-bearing tool in
+    # this leaderboard was scored on. The per-tool own-sample mean is kept as
+    # mean_f1_all_scored for transparency, never for ranking.
+    #
+    # A sample on which a tool's own run FAILED (tool_status.tsv) is not an
+    # infrastructure gap but the tool's result: on a plasmid-bearing sample
+    # it counts as F1 = 0 for that tool's ranking, so one crashing tool
+    # cannot shrink every other tool's ranking set. Samples merely missing
+    # (no status, skipped, or a scoring failure) are handled by the
+    # shared-sample rule instead.
+    f1_by_tool = defaultdict(dict)
+    plasmid_samples = set()
+    for r in rows:
+        if r["f1"] is not None:
+            f1_by_tool[r["tool"]][r["sample"]] = r["f1"]
+            plasmid_samples.add(r["sample"])
+    failure_zero = defaultdict(int)
+    for tool, samples in (failed_samples or {}).items():
+        if tool not in by_tool:
+            continue
+        for sample in samples:
+            if sample in plasmid_samples and sample not in f1_by_tool[tool]:
+                f1_by_tool[tool][sample] = 0.0
+                failure_zero[tool] += 1
+    ranked_tools = [tool for tool, values in f1_by_tool.items() if values]
+    shared = (set.intersection(*(set(f1_by_tool[tool]) for tool in ranked_tools))
+              if ranked_tools else set())
+    ranking_basis = "shared_samples" if shared else "own_samples_no_overlap"
+
     summary = []
     for tool, d in by_tool.items():
-        f1_ci_low, f1_ci_high = bootstrap_ci(d["f1"])
+        if shared and tool in f1_by_tool:
+            ranking_f1 = [f1_by_tool[tool][sample] for sample in sorted(shared)]
+        else:
+            ranking_f1 = list(d["f1"])
+        f1_ci_low, f1_ci_high = bootstrap_ci(ranking_f1)
         summary.append({
             "tool": tool,
             "n_samples": d["n"],
             "mean_precision": statistics.mean(d["precision"]) if d["precision"] else None,
             "mean_recall": statistics.mean(d["recall"]) if d["recall"] else None,
-            "mean_f1": statistics.mean(d["f1"]) if d["f1"] else None,
+            "mean_f1": statistics.mean(ranking_f1) if ranking_f1 else None,
+            "n_ranking_samples": len(ranking_f1),
+            "ranking_basis": ranking_basis if ranking_f1 else "",
+            "mean_f1_all_scored": statistics.mean(d["f1"]) if d["f1"] else None,
+            "n_f1_scored": len(d["f1"]),
+            "n_failures_scored_zero": failure_zero.get(tool, 0),
             "f1_ci_low": f1_ci_low,
             "f1_ci_high": f1_ci_high,
-            "median_f1": statistics.median(d["f1"]) if d["f1"] else None,
+            "median_f1": statistics.median(ranking_f1) if ranking_f1 else None,
             "mean_plasmid_recall": statistics.mean(d["plasmid_recall"]) if d["plasmid_recall"] else None,
             # Graded plasmid-recovery completeness bands (score_plasmids.py):
             # supplementary breakdowns between "any recall" (mean_plasmid_recall
@@ -228,10 +289,12 @@ def summarise(rows, status_counts):
             "n_failed": status_counts[tool]["failed"],
             "n_skipped": status_counts[tool]["skipped"],
         })
-    # Rank by mean F1 (descending). A tool scored only on zero-true-plasmid
-    # isolates has no defined mean_f1 at all -- sort it last rather than
-    # crashing the comparison against a real float.
+    # Rank by shared-sample mean F1 (descending). A tool scored only on
+    # zero-true-plasmid isolates has no defined mean_f1 at all -- sort it last
+    # rather than crashing the comparison against a real float.
     summary.sort(key=lambda x: (x["mean_f1"] is None, -(x["mean_f1"] or 0.0)))
+    for rank, row in enumerate(summary, start=1):
+        row["rank"] = rank
     return summary
 
 
@@ -272,7 +335,7 @@ def holm_adjust(pvalues):
     return adjusted
 
 
-def compute_comparisons(rows):
+def compute_comparisons(rows, failed_samples=None):
     """Paired, shared-sample, sign-flip permutation comparisons for every
     pair of tools, Holm-adjusted across all pairs computed here. Shared by
     write_comparisons() (writes benchmark.paired_comparisons.tsv) and
@@ -286,6 +349,14 @@ def compute_comparisons(rows):
         # letting a None reach the subtraction below.
         if row["f1"] is not None:
             by_tool[row["tool"]][row["sample"]] = row["f1"]
+    # Same rule as summarise(): a failed tool run on a plasmid-bearing sample
+    # is that tool's F1 = 0, so the test and the ranking judge the same data.
+    plasmid_samples = {sample for values in by_tool.values() for sample in values}
+    for tool, samples in (failed_samples or {}).items():
+        if tool in by_tool:
+            for sample in samples:
+                if sample in plasmid_samples and sample not in by_tool[tool]:
+                    by_tool[tool][sample] = 0.0
     tools = sorted(by_tool)
     comparisons = []
     for i, a in enumerate(tools):
@@ -336,7 +407,7 @@ def write_comparisons(rows, path, comparisons=None):
     if comparisons is None:
         comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
-        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\n")
+        handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\n")
         for row in comparisons:
             low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
             high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
@@ -347,24 +418,26 @@ def write_comparisons(rows, path, comparisons=None):
             handle.write(
                 f"{row['tool_a']}\t{row['tool_b']}\t{row['paired_samples']}\t"
                 f"{row['mean_f1_difference']:.4f}\t{low}\t{high}\t{pvalue_text}\t"
-                f"{adjusted_text}\t{row['wins_a']}\t{row['ties']}\t{row['wins_b']}\n"
+                f"{adjusted_text}\t{row['wins_a']}\t{row['ties']}\t{row['wins_b']}\t"
+                f"{row.get('analysis_track', '')}\n"
             )
 
 
 def write_tsv(summary, path):
-    cols = ["rank", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
+    cols = ["rank", "analysis_track", "tool", "n_samples", "n_completed", "n_failed", "n_skipped", "mean_precision",
             "mean_recall", "mean_plasmid_recall",
             "mean_plasmid_recall_ge50", "mean_plasmid_recall_ge90",
             "n_complete_circular_assessed", "mean_complete_circular_plasmid_recall",
             "n_bin_scored", "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "n_pr_scored", "mean_pr_auc",
             "n_reference_perfect_assessed", "reference_perfect_recovery_rate", "n_strict_reconstruction_assessed", "strict_reference_reconstruction_rate",
-            "mean_f1", "f1_ci_low", "f1_ci_high", "median_f1", "significant_vs_runner_up",
+            "mean_f1", "n_ranking_samples", "ranking_basis", "f1_ci_low", "f1_ci_high", "median_f1",
+            "mean_f1_all_scored", "n_f1_scored", "n_failures_scored_zero", "significant_vs_runner_up",
             "n_zero_plasmid_isolates", "mean_zero_plasmid_specificity", "total_zero_plasmid_chromosome_fp_bp"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
             fh.write("\t".join(str(x) for x in [
-                i, s["tool"], s["n_samples"], s["n_completed"], s["n_failed"], s["n_skipped"],
+                s.get("rank", i), s.get("analysis_track", ""), s["tool"], s["n_samples"], s["n_completed"], s["n_failed"], s["n_skipped"],
                 f"{s['mean_precision']:.4f}" if s["mean_precision"] is not None else "",
                 f"{s['mean_recall']:.4f}" if s["mean_recall"] is not None else "",
                 f"{s['mean_plasmid_recall']:.4f}" if s["mean_plasmid_recall"] is not None else "",
@@ -379,9 +452,12 @@ def write_tsv(summary, path):
                 s['n_reference_perfect_assessed'], f"{s['reference_perfect_recovery_rate']:.4f}" if s['reference_perfect_recovery_rate'] is not None else "",
                 s['n_strict_reconstruction_assessed'], f"{s['strict_reference_reconstruction_rate']:.4f}" if s['strict_reference_reconstruction_rate'] is not None else "",
                 f"{s['mean_f1']:.4f}" if s["mean_f1"] is not None else "",
+                s.get("n_ranking_samples", ""), s.get("ranking_basis", ""),
                 f"{s['f1_ci_low']:.4f}" if s["f1_ci_low"] is not None else "",
                 f"{s['f1_ci_high']:.4f}" if s["f1_ci_high"] is not None else "",
                 f"{s['median_f1']:.4f}" if s["median_f1"] is not None else "",
+                f"{s['mean_f1_all_scored']:.4f}" if s.get("mean_f1_all_scored") is not None else "",
+                s.get("n_f1_scored", ""), s.get("n_failures_scored_zero", 0),
                 # Derived from the SAME paired, shared-sample, sign-flip
                 # permutation test (Holm-adjusted) as
                 # benchmark.paired_comparisons.tsv -- see attach_significance().
@@ -413,11 +489,37 @@ def write_md(summary, path):
     # not just because write_tsv()/build_html_report.py gained one.
     with open(path, "w") as fh:
         fh.write("# Plasmid reconstruction leaderboard\n\n")
-        fh.write("Ranked by mean base-level F1 across samples "
-                 "(positive class = plasmid).\n\n")
+        fh.write("Ranked by mean base-level F1 over the samples every ranked tool was "
+                 "scored on (positive class = plasmid). Tools are ranked only within "
+                 "their own input track, never across tracks.\n\n")
+        tracks = []
+        for row in summary:
+            track = row.get("analysis_track", "")
+            if track not in tracks:
+                tracks.append(track)
+        for track in tracks:
+            track_rows = [row for row in summary if row.get("analysis_track", "") == track]
+            write_md_table(fh, track_rows, track if len(tracks) > 1 else None)
+        fh.write("\n_Recall = completeness (fraction of true plasmid bases "
+                 "recovered). Plasmid recall = fraction of truth plasmids meeting the configured "
+                 "recovery threshold; it is not available for legacy score rows. Precision = 1 - "
+                 "chromosomal contamination. A tool that predicts nothing on a plasmid-bearing "
+                 "sample scores F1 = 0 there. Mean F1, its CI and median use only the samples shared by "
+                 "every ranked tool in the track (\"Ranked on\"). A tool run that failed on a "
+                 "plasmid-bearing sample counts as F1 = 0 for that tool; a sample missing for any "
+                 "other reason is removed from every tool's ranking. Perfect reference recovery requires F1/plasmid recall of 1 "
+                 "and zero ambiguous, unmapped, and off-truth predicted bases. Strict reconstruction also "
+                 "requires perfect available bin diagnostics; neither measure proves nucleotide identity or closure._\n")
+
+
+def write_md_table(fh, summary, track=None):
+    """One ranked Markdown table; a heading names the track when several exist."""
+    if True:
+        if track:
+            fh.write(f"## Track: {track}\n\n")
         fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | "
-                 "Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | **Mean F1** | 95% F1 CI | Median F1 | Significant vs runner-up |\n")
-        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", ":---"]) + "|\n")
+                 "Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | **Mean F1** | Ranked on | 95% F1 CI | Median F1 | Significant vs runner-up |\n")
+        fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", ":---"]) + "|\n")
         for i, s in enumerate(summary, start=1):
             plasmid_recall = f"{s['mean_plasmid_recall']:.3f}" if s["mean_plasmid_recall"] is not None else "not annotated"
             ci = (f"{s['f1_ci_low']:.3f}–{s['f1_ci_high']:.3f}"
@@ -432,35 +534,56 @@ def write_md(summary, path):
             # Only the winner (rank 1) ever carries a real value here -- see
             # attach_significance(). Paired sign-flip permutation test on
             # shared samples, Holm-adjusted across every pairwise comparison.
+            if s.get("ranking_basis") == "shared_samples":
+                ranked_on = f"{s.get('n_ranking_samples', '')} shared"
+            elif s.get("n_ranking_samples"):
+                ranked_on = f"{s.get('n_ranking_samples')} own (no shared samples)"
+            else:
+                ranked_on = "n/a"
             significance = s.get("significant_vs_runner_up", "not_assessed")
             significance_text = {True: "yes (paired permutation, Holm-adjusted)",
                                  False: "no (paired permutation, Holm-adjusted)"}.get(significance, "not assessed")
             fh.write(
-                f"| {i} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "
+                f"| {s.get('rank', i)} | {s['tool']} | {s['n_samples']} | {s['n_completed']} | {s['n_failed']} | {s['n_skipped']} | "
                 f"{mean_precision} | {mean_recall} | "
                 f"{plasmid_recall} | {format_rate(s['reference_perfect_recovery_rate'], s['n_reference_perfect_assessed'])} | "
                 f"{format_rate(s['strict_reference_reconstruction_rate'], s['n_strict_reconstruction_assessed'])} | "
-                f"**{mean_f1}** | {ci} | {median_f1} | {significance_text} |\n"
+                f"**{mean_f1}** | {ranked_on} | {ci} | {median_f1} | {significance_text} |\n"
             )
-        fh.write("\n_Recall = completeness (fraction of true plasmid bases "
-                 "recovered). Plasmid recall = fraction of truth plasmids meeting the configured "
-                 "recovery threshold; it is not available for legacy score rows. Precision = 1 - "
-                 "chromosomal contamination. Perfect reference recovery requires F1/plasmid recall of 1 "
-                 "and zero ambiguous, unmapped, and off-truth predicted bases. Strict reconstruction also "
-                 "requires perfect available bin diagnostics; neither measure proves nucleotide identity or closure._\n")
+        fh.write("\n")
+
+
+TRACK_ORDER = ("short_read", "long_read", "hybrid")
+
+
+def ranked_tracks(rows, status_counts, failed_samples=None):
+    """Summarise, rank and test each declared input track on its own.
+
+    Returns [(track, rows, summary, comparisons)] in a stable order. Tools are
+    ranked, and significance is tested, only against tools in the same track
+    -- a long-read tool is never ranked against a short-read one.
+    """
+    tracks = defaultdict(list)
+    for row in rows:
+        tracks[row["analysis_track"]].append(row)
+    ordered = sorted(tracks, key=lambda t: (TRACK_ORDER.index(t) if t in TRACK_ORDER else len(TRACK_ORDER), t))
+    result = []
+    for track in ordered:
+        track_rows = tracks[track]
+        summary = summarise(track_rows, status_counts, failed_samples)
+        comparisons = compute_comparisons(track_rows, failed_samples)
+        for row in summary:
+            row["analysis_track"] = track
+        for row in comparisons:
+            row["analysis_track"] = track
+        attach_significance(summary, comparisons)
+        result.append((track, track_rows, summary, comparisons))
+    return result
 
 
 def write_track_leaderboards(rows, status_counts, prefix):
     """Emit one leaderboard per declared input track; never mix track claims."""
-    tracks = defaultdict(list)
-    for row in rows:
-        tracks[row["analysis_track"]].append(row)
-    for track, track_rows in tracks.items():
-        summary = summarise(track_rows, status_counts)
-        # Significance is computed against this track's OWN shared samples,
-        # not the global comparison -- a tool's runner-up, and how many
-        # samples they actually share, can differ per track.
-        attach_significance(summary, compute_comparisons(track_rows))
+    for track, _, summary, _ in ranked_tracks(rows, status_counts):
         track_prefix = f"{prefix}.{track}"
         write_tsv(summary, track_prefix + ".leaderboard.tsv")
         write_md(summary, track_prefix + ".leaderboard.md")
@@ -496,24 +619,33 @@ def main():
         status_counts = read_status(args.tool_status)
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}")
-    summary = summarise(rows, status_counts)
-    comparisons = compute_comparisons(rows)
-    attach_significance(summary, comparisons)
+    per_track = ranked_tracks(rows, status_counts, read_failed_samples(args.tool_status))
+    # The combined files hold every track's leaderboard, each ranked within
+    # its own track (rank restarts per track; analysis_track says which).
+    # They never rank tools across tracks.
+    summary = [row for _, _, track_summary, _ in per_track for row in track_summary]
+    comparisons = [row for _, _, _, track_comparisons in per_track for row in track_comparisons]
     write_tsv(summary, args.out_prefix + ".leaderboard.tsv")
     write_md(summary, args.out_prefix + ".leaderboard.md")
-    write_track_leaderboards(rows, status_counts, args.out_prefix)
+    for track, _, track_summary, _ in per_track:
+        write_tsv(track_summary, f"{args.out_prefix}.{track}.leaderboard.tsv")
+        write_md(track_summary, f"{args.out_prefix}.{track}.leaderboard.md")
     write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv", comparisons=comparisons)
 
     # Print the leaderboard to stdout so it appears in the run log.
-    print("\n=== LEADERBOARD (mean F1, descending) ===")
     def fmt3(value):
         return f"{value:.3f}" if value is not None else "n/a"
-    for i, s in enumerate(summary, start=1):
-        print(f"{i:>2}. {s['tool']:<16} "
-              f"F1={fmt3(s['mean_f1'])}  "
-              f"P={fmt3(s['mean_precision'])}  R={fmt3(s['mean_recall'])}  "
-              f"(scored={s['n_samples']}, completed={s['n_completed']}, failed={s['n_failed']}, skipped={s['n_skipped']})")
-
+    for track, _, track_summary, _ in per_track:
+        print(f"\n=== LEADERBOARD [{track}] (shared-sample mean F1, descending) ===")
+        for s in track_summary:
+            print(f"{s['rank']:>2}. {s['tool']:<16} "
+                  f"F1={fmt3(s['mean_f1'])} on {s['n_ranking_samples']} sample(s)  "
+                  f"P={fmt3(s['mean_precision'])}  R={fmt3(s['mean_recall'])}  "
+                  f"(scored={s['n_samples']}, completed={s['n_completed']}, failed={s['n_failed']}, skipped={s['n_skipped']})")
+            if s["n_f1_scored"] > s["n_ranking_samples"]:
+                print(f"    note: {s['tool']} has F1 on {s['n_f1_scored']} sample(s); only the "
+                      f"{s['n_ranking_samples']} shared by every ranked tool count toward rank "
+                      f"(own-sample mean F1={fmt3(s['mean_f1_all_scored'])}).")
 
 if __name__ == "__main__":
     main()
