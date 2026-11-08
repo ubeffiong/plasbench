@@ -8,6 +8,7 @@ the `derive-amr-truth` and `audit-truth-labels` commands through the real CLI, a
 the stage-2 and stage-6 hooks.
 """
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,32 @@ def main():
     for needle in ("audit_truth_labels.py", "--truth-label-audit", "--rank-robustness"):
         assert needle in stage6, needle
     print("stage 2 and stage 6 hooks present, and the draft never targets truth_amr.tsv -> PASS")
+
+    # Parity: every optional input the report accepts is passed by stage 6, except the ones
+    # that are genuinely produced elsewhere or per run (listed with the reason).
+    report = (ROOT / "python" / "build_html_report.py").read_text(encoding="utf-8")
+    accepted = set(re.findall(r'ap\.add_argument\("--([a-z-]+)"', report))
+    not_from_stage6 = {"out", "project-root", "data-dir", "scores", "tool-status", "sample-sheet",
+                       "leaderboard", "manifest", "comparisons", "score-failures", "recommendations",
+                       "recommendation-validation", "cohort-qc-flags"}   # core inputs, asserted by stage 6 itself
+    missing = sorted(a for a in accepted if f"--{a}" not in stage6)
+    assert not missing, f"report inputs stage 6 never passes: {missing}"
+    print("every report input is passed by stage 6 -> PASS")
+
+    # Every standalone analysis is reachable through one CLI entry point and its script exists.
+    import importlib
+    sys.path.insert(0, str(ROOT))
+    cli_module = importlib.import_module("plasbench.cli")
+    for name, (script, _summary) in cli_module.ANALYSES.items():
+        assert (ROOT / "python" / script).is_file(), (name, script)
+    listing = subprocess.run([sys.executable, "-m", "plasbench", "--project-root", str(ROOT), "analysis", "--list"],
+                             cwd=ROOT, env={**os.environ, "PYTHONPATH": str(ROOT)}, capture_output=True, text=True)
+    assert listing.returncode == 0 and "stratify-recovery" in listing.stdout, listing.stderr
+    helped = subprocess.run([sys.executable, "-m", "plasbench", "--project-root", str(ROOT), "analysis",
+                             "stratify-recovery", "--help"], cwd=ROOT,
+                            env={**os.environ, "PYTHONPATH": str(ROOT)}, capture_output=True, text=True)
+    assert helped.returncode == 0 and "--results-dir" in helped.stdout, helped.stderr
+    print("plasbench analysis lists and runs the standalone scripts -> PASS")
 
     env = {**os.environ, "PYTHONPATH": str(ROOT)}
 

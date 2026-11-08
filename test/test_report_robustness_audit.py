@@ -14,6 +14,7 @@ def main():
         html = build(paths, os.path.join(d, "empty.html"))
         assert "id='rank-robustness'" in html and "No ranking-robustness table" in html
         assert "id='truth-label-audit'" in html and "no audit table was available" in html
+        assert "No stratified table" in html and "No orthogonal evidence was supplied" in html
         assert "href='#rank-robustness'" in html and "href='#truth-label-audit'" in html
 
         robust = os.path.join(d, "r.tsv")
@@ -30,8 +31,19 @@ def main():
                      "s1\tpB\tPLASMID\t800\t\t\tplasmid_without_markers\n"
                      "s1\tpA\tPLASMID\t1000\tIncX1\t\tconsistent\n"
                      "s2\tchr\tCHROMOSOME\t5000\t\t\tnot_evaluated\n")
+        strat = os.path.join(d, "s.tsv")
+        with open(strat, "w") as fh:
+            fh.write("scope\tgroup\ttool\teligible\tapplicability\trecommendation\treason\tn_scored\tcoverage\tmean_f1\n"
+                     "organism\tK<p>\ttoolA\ttrue\tmoderate\tprimary\tcoverage-gated\t2\t1.0000\t0.9000\n")
+        ortho = os.path.join(d, "o.json")
+        with open(ortho, "w") as fh:
+            fh.write('{"records": 3, "by_evidence_type": {"pcr<x>": 3}, "by_status": {"confirmed": 2, "refuted": 1}, '
+                     '"claim_boundary": "Supplementary only."}')
         html = build(paths, os.path.join(d, "full.html"), "--rank-robustness", robust,
-                     "--truth-label-audit", audit)
+                     "--truth-label-audit", audit, "--stratified", strat, "--orthogonal-summary", ortho)
+        assert "K&lt;p&gt;" in html and "K<p>" not in html and "coverage-gated" in html
+        assert "Records: 3" in html and "pcr&lt;x&gt;" in html and "Supplementary only." in html
+        assert "No stratified table" not in html
         assert html.count("<td>mapq_30</td>") == 1, "one row per track and variant"
         assert "strict&lt;F1&gt;" in html and "strict<F1>" not in html
         assert "<td>0.1000</td><td>toolB</td><td>false</td>" in html

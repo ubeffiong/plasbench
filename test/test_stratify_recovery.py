@@ -20,6 +20,13 @@ def read(path):
         return list(csv.DictReader(handle, delimiter="\t"))
 
 
+def _run_strat(d, out):
+    result = run(STRAT, "--results-dir", os.path.join(d, "results"), "--data-dir",
+                 os.path.join(d, "data"), "--out", out)
+    assert result.returncode == 0, result.stderr
+    return out
+
+
 def main():
     with tempfile.TemporaryDirectory() as d:
         # Reference: p1 (1000, fully predicted), p2 (1000, half predicted), chr.
@@ -71,8 +78,26 @@ def main():
             "s2\ttoolA\tshort_read\tx1\t100\t100\t1.0000\t1\n")
         result = run(STRAT, "--results-dir", os.path.join(d, "results"), "--data-dir",
                      os.path.join(d, "data"), "--out", out)
-        assert "1 plasmid row(s) skipped" in result.stderr, result.stderr
+        assert "1 plasmid row(s) not stratified by replicon/MOB/AMR" in result.stderr, result.stderr
         assert strat[("replicon", "untyped")]["n_plasmids"] == "1"
+        later = {(r["feature_type"], r["label"]): r for r in read(out)}
+        assert ("replicon", "untyped") in later and later[("replicon", "untyped")]["n_plasmids"] == "1"
+        assert later[("size_band", "<10kb")]["n_plasmids"] == "3", "size needs no annotation: x1 counts"
+
+        # Size band, median/IQR and AMR carriage.
+        sb = later[("size_band", "<10kb")]
+        assert (sb["median_completeness"], sb["q1_completeness"], sb["q3_completeness"]) == ("1.0000", "0.7500", "1.0000"), sb
+        # p1 carries an AMR gene; p2 does not. Without a successful AMR caller, absence is NOT claimed.
+        open(os.path.join(data, "truth_features.tsv"), "a").write("p1\t10\t200\tamr\tblaCTX-M-15\tamrfinderplus\t4\n")
+        no_prov = {(r["feature_type"], r["label"]): r for r in read(_run_strat(d, out))}
+        assert no_prov[("amr", "arg_carrying")]["n_plasmids"] == "1"
+        assert ("amr", "no_arg_detected") not in no_prov, "no provenance: absence was never measured"
+        import json
+        open(os.path.join(data, "annotation_provenance.json"), "w").write(
+            json.dumps({"callers": {"amrfinder": {"status": "ok"}}}))
+        with_prov = {(r["feature_type"], r["label"]): r for r in read(_run_strat(d, out))}
+        assert with_prov[("amr", "no_arg_detected")]["n_plasmids"] == "1"
+        assert with_prov[("amr", "no_arg_detected")]["mean_completeness"] == "0.5000"
     print("ALL STRATIFY RECOVERY TESTS PASSED")
 
 

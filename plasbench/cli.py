@@ -200,6 +200,21 @@ def print_concept_note(root):
 VALID_STAGES = frozenset(str(i) for i in range(8))
 
 
+# Standalone analysis scripts reachable through `plasbench analysis <name>`. Each keeps its own
+# argument parser, so there is one place that defines its options. Stage scripts call the same files.
+ANALYSES = {
+    "stratify-recovery": ("stratify_recovery.py", "Per-plasmid recovery by replicon, MOB, size band and AMR carriage"),
+    "rank-sensitivity": ("rank_sensitivity.py", "How much the ranking depends on scoring choices"),
+    "flag-database-overlap": ("flag_database_overlap.py", "Screen truth genomes that may already be in a tool's database"),
+    "flag-cohort-outliers": ("flag_cohort_outliers.py", "Advisory outlier flags for cohort assembly statistics"),
+    "validate-truth-table": ("validate_truth_table.py", "Check a truth table against its reference before scoring"),
+    "call-structural-variants": ("call_structural_variants.py", "Alignment-derived structural discordance calls"),
+    "run-quast-diagnostics": ("run_quast_diagnostics.py", "Optional QUAST structural diagnostics"),
+    "compare-scoring": ("compare_scoring_methods.py", "One-off BLASTN versus minimap2 scoring cross-check"),
+    "audit-three-class-scoring": ("audit_three_class_scoring.py", "Check whether binary scoring hides a third class"),
+}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="plasbench",
@@ -285,6 +300,15 @@ def main(argv=None):
     orthogonal_parser = sub.add_parser("validate-orthogonal-evidence", help="Validate optional laboratory or independent-technology evidence without changing computational scores.")
     orthogonal_parser.add_argument("--evidence", type=Path, required=True, help="TSV described in docs/ORTHOGONAL_VALIDATION.md.")
     orthogonal_parser.add_argument("--out", type=Path, help="Optional summary JSON, normally results/orthogonal_validation.summary.json.")
+    analysis_parser = sub.add_parser(
+        "analysis",
+        help="Run one standalone analysis script on a completed run (see 'plasbench analysis --list').",
+        description="Run a standalone analysis script with its own options, e.g. "
+                    "'plasbench analysis stratify-recovery --results-dir results --data-dir data --out out.tsv'. "
+                    "Use 'plasbench analysis <name> --help' for that script's options.")
+    analysis_parser.add_argument("name", nargs="?", choices=sorted(ANALYSES), help="Analysis to run.")
+    analysis_parser.add_argument("--list", action="store_true", help="List the available analyses and exit.")
+    analysis_parser.add_argument("analysis_args", nargs=argparse.REMAINDER, help="Arguments passed to the script.")
     amr_draft_parser = sub.add_parser("derive-amr-truth", help="Draft AMR truth from reference annotation (never writes truth_amr.tsv).")
     amr_draft_parser.add_argument("--features", type=Path, required=True, help="truth_features.tsv from annotate_reference.py.")
     amr_draft_parser.add_argument("--truth", type=Path, required=True, help="truth.tsv for the same reference.")
@@ -659,6 +683,13 @@ def main(argv=None):
         if args.out:
             command.extend(["--out", str(args.out)])
         code = run(command, root)
+    elif args.command == "analysis":
+        if args.list or not args.name:
+            for name, (script, summary) in sorted(ANALYSES.items()):
+                print(f"{name:26s} {summary}  [{script}]")
+            code = 0
+        else:
+            code = run([sys.executable, f"python/{ANALYSES[args.name][0]}", *args.analysis_args], root)
     elif args.command == "derive-amr-truth":
         code = run([sys.executable, "python/derive_amr_truth.py", "--features", str(args.features),
                     "--truth", str(args.truth), "--out", str(args.out)], root)

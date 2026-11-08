@@ -168,6 +168,8 @@ python3 "$HERE/../python/build_html_report.py" \
     --quast-diagnostics "$RESULTS_DIR/quast_diagnostics.tsv" \
     --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
     --truth-label-audit "$RESULTS_DIR/benchmark.truth_label_audit.tsv" \
+    --stratified "$RESULTS_DIR/benchmark.stratified.tsv" \
+    --orthogonal-summary "$RESULTS_DIR/orthogonal_validation.summary.json" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."

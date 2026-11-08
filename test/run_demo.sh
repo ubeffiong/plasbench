@@ -53,7 +53,8 @@ while IFS=$'\t' read -r SAMPLE _; do
         [[ -s "$AMR" ]] && ARGS+=(--amr-genes "$AMR")
         [[ -s "$CIRCULAR" ]] && ARGS+=(--circular-plasmids "$CIRCULAR")
         python3 "$PY/score_plasmids.py" --truth "$TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
-            "${ARGS[@]}" --sample "$SAMPLE" --tool "$TOOL" --out "$SCORES"
+            "${ARGS[@]}" --per-plasmid-out "$SDIR/${TOOL}.per_plasmid.tsv" \
+            --sample "$SAMPLE" --tool "$TOOL" --out "$SCORES"
 
         BINS="$SDIR/pred_${TOOL}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$TOOL"; then
@@ -90,6 +91,12 @@ fi
 
 python3 "$PY/aggregate_results.py" --scores "$SCORES" --tool-status "$STATUS" \
     --sample-sheet "$SAMPLES" --out-prefix "$DEMO/benchmark"
+# Advisory layers, same scripts and arguments as stage 6: never ranked, never alter scores.
+python3 "$PY/stratify_recovery.py" --results-dir "$DEMO" --data-dir "$DEMO" \
+    --out "$DEMO/benchmark.recovery_by_replicon.tsv"
+python3 "$PY/audit_truth_labels.py" --data-dir "$DEMO" --out "$DEMO/benchmark.truth_label_audit.tsv"
+python3 "$PY/rank_sensitivity.py" --scores "$SCORES" --results-dir "$DEMO" --data-dir "$DEMO" \
+    --out-prefix "$DEMO/benchmark"
 python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES" \
     --out "$DEMO/benchmark.recommendation_validation.tsv" --min-train-samples 1
 python3 "$PY/select_operational_method.py" --scores "$SCORES" --sample-sheet "$SAMPLES" \
@@ -106,6 +113,11 @@ python3 "$PY/build_html_report.py" \
     --recommendations "$DEMO/benchmark.recommendations.tsv" \
     --recommendation-validation "$DEMO/benchmark.recommendation_validation.tsv" \
     --manifest "$DEMO/run_manifest.json" \
+    --recovery-by-replicon "$DEMO/benchmark.recovery_by_replicon.tsv" \
+    --truth-label-audit "$DEMO/benchmark.truth_label_audit.tsv" \
+    --comparisons "$DEMO/benchmark.paired_comparisons.tsv" \
+    --stratified "$DEMO/benchmark.stratified.tsv" \
+    --rank-robustness "$DEMO/benchmark.rank_robustness.tsv" \
     --out "$DEMO/benchmark.report.html"
 
 echo
