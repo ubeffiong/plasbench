@@ -97,6 +97,14 @@ def main():
         row = rows(out)[0]
         assert row["status"] == "disagree" and "c_chr2" in row["differing_contigs"], row
         print("  PASS: a planted labelling error in the primary scorer is caught as a disagreement")
+
+        (data / "contigs.fasta").write_text(fasta + ">c_repeat\n" + "ACGT" * 1000 + "\n")
+        subprocess.run([sys.executable, str(XC), "label", "--contigs", str(data / "contigs.fasta"), "--reference",
+                        str(data / "reference.fna"), "--truth", str(data / "truth.tsv"), "--out",
+                        str(data / "contig_labels.kmer.tsv"), "--scaled", "4"], check=True, capture_output=True)
+        low = {r["contig"]: r["label"] for r in rows(data / "contig_labels.kmer.tsv")}["c_repeat"]
+        assert low == "LOW_INFORMATION", low
+        print("  PASS: a 4 kb tandem repeat has too few distinct k-mers -> LOW_INFORMATION, not UNPLACED")
     print("ALL CONTIG CROSS-CHECK TESTS PASSED")
 
 

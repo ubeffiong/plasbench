@@ -15,7 +15,11 @@ disagreement:
               purpose (>= --min-length bp; containment >= --min-containment in
               one kind only; in both -> AMBIGUOUS; in neither -> UNPLACED), so
               the two differ only in how "the contig matches that truth" is
-              measured: shared k-mers here, alignment coverage there.
+              measured: shared k-mers here, alignment coverage there. A contig
+              with fewer than --min-sampled-kmers (20) distinct sampled k-mers
+              (very low complexity, or too short for the sampling rate) is
+              LOW_INFORMATION: excluded from the comparison and counted, never
+              given a label it cannot support.
   scoring     written separately: TP/FP/FN/TN over evaluable contigs, by count
               and by length, precision/recall/F1/MCC.
 
@@ -46,7 +50,7 @@ from collections import Counter
 from pathlib import Path
 
 LABEL_FIELDS = ["contig", "length", "label", "plasmid_containment", "chromosome_containment", "sampled_kmers"]
-COMPARE_FIELDS = ["sample", "tool", "n_contigs", "n_label_agree", "label_agreement", "label_kappa",
+COMPARE_FIELDS = ["sample", "tool", "n_contigs", "n_low_information", "n_label_agree", "label_agreement", "label_kappa",
                   "primary_f1_bp", "independent_f1_bp", "delta_f1_bp", "primary_mcc_bp", "independent_mcc_bp",
                   "delta_mcc_bp", "recorded_f1_bp", "status", "differing_contigs"]
 COMPLEMENT = str.maketrans("ACGTacgt", "TGCAtgca")
@@ -108,6 +112,8 @@ def cmd_label(args):
         c = len(kmers & chromosome) / len(kmers) if kmers else 0.0
         if len(seq) < args.min_length:
             label = "SHORT"
+        elif len(kmers) < args.min_sampled_kmers:
+            label = "LOW_INFORMATION"
         elif p >= args.min_containment and c >= args.min_containment:
             label = "AMBIGUOUS"
         elif p >= args.min_containment:
@@ -181,7 +187,8 @@ def cmd_compare(args):
         independent = read_labels(primary_path.with_name("contig_labels.kmer.tsv"))
         if not independent:
             continue
-        shared = sorted(set(primary) & set(independent))
+        low_information = {c for c, (label, _) in independent.items() if label == "LOW_INFORMATION"}
+        shared = sorted((set(primary) & set(independent)) - low_information)
         pairs = [(primary[c][0], independent[c][0]) for c in shared]
         differing = [c for c in shared if primary[c][0] != independent[c][0]]
         for pred in sorted((results / sample).glob("pred_*.plasmid.fasta")):
@@ -200,6 +207,7 @@ def cmd_compare(args):
             d_mcc = None if mcc_a is None or mcc_b is None else abs(mcc_a - mcc_b)
             agree = all(d is None or d <= args.tolerance for d in (d_f1, d_mcc)) and (f1_a is None) == (f1_b is None)
             rows.append({"sample": sample, "tool": tool, "n_contigs": len(shared),
+                         "n_low_information": len(low_information & set(primary)),
                          "n_label_agree": len(shared) - len(differing),
                          "label_agreement": fmt((len(shared) - len(differing)) / len(shared) if shared else None),
                          "label_kappa": fmt(kappa(pairs)), "primary_f1_bp": fmt(f1_a), "independent_f1_bp": fmt(f1_b),
@@ -226,6 +234,7 @@ def main():
     lab.add_argument("--k", type=int, default=21)
     lab.add_argument("--scaled", type=int, default=int(os.environ.get("CONTIG_CROSSCHECK_SCALED", 10)))
     lab.add_argument("--min-length", type=int, default=int(os.environ.get("CONTIG_MIN_LENGTH", 1000)))
+    lab.add_argument("--min-sampled-kmers", type=int, default=20)
     lab.add_argument("--min-containment", type=float, default=float(os.environ.get("CONTIG_MIN_COVERAGE", 0.80)))
     cmp_ = sub.add_parser("compare")
     cmp_.add_argument("--results-dir", required=True)

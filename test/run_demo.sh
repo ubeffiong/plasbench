@@ -45,6 +45,15 @@ while IFS=$'\t' read -r SAMPLE _; do
     FEATURES="$SDIR/truth_features.tsv"
     PROTEINS="$SDIR/truth_proteins.tsv"
 
+    # Contig layer (stage 5 equivalent), on the synthetic assembly, plus the
+    # independent alignment-free cross-check and the assembly statistics.
+    python3 "$PY/contig_classification.py" label --contigs "$SDIR/contigs.fasta" --paf "$SDIR/contigs_vs_ref.paf" \
+        --truth "$TRUTH" --labels-out "$SDIR/contig_labels.tsv" --coverage-out "$SDIR/plasmid_assembly_coverage.tsv" \
+        2>/dev/null
+    python3 "$PY/contig_crosscheck.py" label --contigs "$SDIR/contigs.fasta" --reference "$SDIR/reference.full.fna" \
+        --truth "$TRUTH" --out "$SDIR/contig_labels.kmer.tsv" --scaled 50 2>/dev/null
+    python3 "$PY/compute_assembly_stats.py" --fasta "$SDIR/reference.full.fna" --truth "$TRUTH" \
+        --sample-id "$SAMPLE" --out "$SDIR/assembly_stats.tsv" 2>/dev/null
     shopt -s nullglob
     for PAF in "$SDIR"/*.pred_vs_ref.paf; do
         TOOL="$(basename "$PAF" .pred_vs_ref.paf)"
@@ -57,6 +66,10 @@ while IFS=$'\t' read -r SAMPLE _; do
             --sample "$SAMPLE" --tool "$TOOL" --out "$SCORES"
 
         BINS="$SDIR/pred_${TOOL}.bins.tsv"
+        CONTIG_BIN_ARGS=()
+        [[ -s "$BINS" ]] && binning_capable "$TOOL" && CONTIG_BIN_ARGS=(--bins "$BINS")
+        python3 "$PY/contig_classification.py" score --labels "$SDIR/contig_labels.tsv" --pred-fasta "$PRED" \
+            "${CONTIG_BIN_ARGS[@]+"${CONTIG_BIN_ARGS[@]}"}" --out "$SDIR/${TOOL}.contig_classification.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$TOOL"; then
             python3 "$PY/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
                 --outcomes-out "$SDIR/${TOOL}.plasmid_outcomes.tsv" \
@@ -93,6 +106,7 @@ while IFS=$'\t' read -r SAMPLE _; do
 done < "$SAMPLES"
 
 python3 "$PY/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$DEMO"
+python3 "$PY/contig_classification.py" merge --scores "$SCORES" --results-dir "$DEMO"
 
 echo
 echo "===== per-sample scores ($SCORES) ====="
@@ -155,8 +169,14 @@ python3 "$PY/truth_provenance.py" --sample-sheet "$SAMPLES" --data-dir "$DEMO" \
 python3 "$PY/score_amr_placement.py" collect --results-dir "$DEMO" --out "$DEMO/benchmark.amr_placement.tsv"
 python3 "$PY/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
     --out-prefix "$DEMO/benchmark" --min-train-samples 1
+python3 "$PY/flag_cohort_outliers.py" --stats-dir "$DEMO" --samples "$SAMPLES" \
+    --out "$DEMO/benchmark.cohort_qc_flags.tsv"
+python3 "$PY/assembly_qc_gate.py" --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_qc.tsv" 2>/dev/null
 python3 "$PY/evaluate_warnings.py" --regret "$DEMO/benchmark.recommender_regret.tsv" \
-    --cohort-qc-flags "$DEMO/benchmark.cohort_qc_flags.tsv" --out-prefix "$DEMO/benchmark"
+    --cohort-qc-flags "$DEMO/benchmark.cohort_qc_flags.tsv" --assembly-qc "$DEMO/benchmark.assembly_qc.tsv" \
+    --out-prefix "$DEMO/benchmark"
+python3 "$PY/contig_crosscheck.py" compare --results-dir "$DEMO" --data-dir "$DEMO" \
+    --out "$DEMO/benchmark.contig_crosscheck.tsv"
 python3 "$PY/leave_taxon_out.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
     --out-prefix "$DEMO/benchmark" --min-train-samples 1
 python3 "$PY/select_operational_method.py" --scores "$SCORES" --sample-sheet "$SAMPLES" \
@@ -189,6 +209,7 @@ python3 "$PY/build_html_report.py" \
     --warning-eval "$DEMO/benchmark.warning_eval.tsv" \
     --leave-taxon-out "$DEMO/benchmark.leave_taxon_out.tsv" \
     --amr-placement "$DEMO/benchmark.amr_placement.tsv" \
+    --contig-crosscheck "$DEMO/benchmark.contig_crosscheck.tsv" \
     --out "$DEMO/benchmark.report.html"
 
 echo

@@ -202,9 +202,9 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
     status, basis = crosscheck_summary(crosscheck)
     body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
     if crosscheck:
-        body += table(["Sample", "Tool", "Contigs", "Label agreement", "Kappa", "F1 (minimap2)", "F1 (k-mer)",
+        body += table(["Sample", "Tool", "Contigs", "Low-information (excluded)", "Label agreement", "Kappa", "F1 (minimap2)", "F1 (k-mer)",
                        "|delta F1|", "MCC (minimap2)", "MCC (k-mer)", "|delta MCC|", "Status", "Contigs labelled differently"],
-                      [(r["sample"], r["tool"], r["n_contigs"], r["label_agreement"], r["label_kappa"], r["primary_f1_bp"],
+                      [(r["sample"], r["tool"], r["n_contigs"], r.get("n_low_information"), r["label_agreement"], r["label_kappa"], r["primary_f1_bp"],
                         r["independent_f1_bp"], r["delta_f1_bp"], r["primary_mcc_bp"], r["independent_mcc_bp"],
                         r["delta_mcc_bp"], r["status"], r["differing_contigs"]) for r in crosscheck])
     else:
