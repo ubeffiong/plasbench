@@ -212,6 +212,16 @@ ANALYSES = {
     "run-quast-diagnostics": ("run_quast_diagnostics.py", "Optional QUAST structural diagnostics"),
     "compare-scoring": ("compare_scoring_methods.py", "One-off BLASTN versus minimap2 scoring cross-check"),
     "audit-three-class-scoring": ("audit_three_class_scoring.py", "Check whether binary scoring hides a third class"),
+    "alignment-accuracy": ("alignment_accuracy.py", "Identity, mismatch and indel rates and missing regions for one sample and tool"),
+    "feature-preservation": ("feature_preservation.py", "Gene, replicon, mobility and AMR preservation and NGOC for one sample and tool"),
+    "bin-quality": ("bin_quality.py", "High and medium quality bin yield, homogeneity and completeness for one sample and tool"),
+    "mask-accuracy": ("mask_accuracy.py", "Blank accuracy rates where truth was polished with the benchmark's reads"),
+    "merge-tables": ("merge_tables.py", "Merge per-run shard tables into one"),
+    "performance-summary": ("performance_summary.py", "Runtime, memory, reliability, cost per plasmid and scaling per tool"),
+    "power-analysis": ("power_analysis.py", "Minimum detectable difference and clusters needed per tool pair"),
+    "scenario-tags": ("scenario_tags.py", "Tag isolates by scenario and report performance per scenario"),
+    "composite-score": ("composite_score.py", "Optional five-dimension composite with gates and weight sensitivity"),
+    "compare-runs": ("compare_runs.py", "Compare repeated runs for reproducibility"),
 }
 
 

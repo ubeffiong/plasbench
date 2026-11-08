@@ -62,9 +62,24 @@ def main():
     assert "No stratified table" not in section(html, "stratified")
     assert "id='orthogonal-evidence'" in html
 
+    # Further dimensions: tables written, sections populated (not the empty-state message).
+    for table in ("accuracy", "missing_regions", "feature_preservation", "ngoc", "bin_quality", "performance",
+                  "power", "scenarios", "scenario_performance", "composite", "composite_sensitivity"):
+        assert len(rows(DEMO / f"benchmark.{table}.tsv")) > 0, table
+    for sid, empty_text in (("accuracy-dimension", "No accuracy table"), ("feature-preservation", "No feature-preservation"),
+                            ("bin-quality", "No bin-quality table"), ("performance", "No performance table"),
+                            ("power", "No power table"), ("scenarios", "No scenario table"),
+                            ("composite", "No composite table")):
+        assert empty_text not in section(html, sid), sid
+    assert all(r["accuracy_status"] for r in rows(DEMO / "benchmark.accuracy.tsv")), "accuracy_status missing"
+    composite = rows(DEMO / "benchmark.composite.tsv")
+    assert all(r["status"] in ("ranked", "gated", "not_evaluated") for r in composite)
+    assert "id='reproducibility'" in html and "Run the benchmark twice" in section(html, "reproducibility")
+
     # Every section is reachable from the nav.
     for name in ("replicon-recovery", "rank-robustness", "truth-label-audit", "stratified",
-                 "orthogonal-evidence", "quast-diagnostics"):
+                 "orthogonal-evidence", "quast-diagnostics", "accuracy-dimension", "feature-preservation",
+                 "bin-quality", "performance", "power", "scenarios", "composite", "reproducibility"):
         assert f"href='#{name}'" in html, name
     print("demo run -> per-plasmid files -> stratification, robustness, audit, strata -> HTML: PASS")
     print("ALL DEMO END-TO-END TESTS PASSED")

@@ -21,6 +21,7 @@ ONE_OFF = {
     "compare_scoring_methods",     # BLASTN-vs-minimap2 cross-check, "never wired into any stage script"
     "audit_three_class_scoring",   # imported by compare_scoring_methods; METHODS.md documents it
     "parse_teixeira2025_supplement",  # one-time cohort migration, docs/FINDING_DATA.md
+    "build_guide_toc",             # regenerates the table of contents of docs/SCIENTIFIC_GUIDE.md; test_guide_docs.py runs it
 }
 
 

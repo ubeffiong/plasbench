@@ -91,6 +91,13 @@ if [[ "${RUN_DIMENSION_ANALYSES:-1}" -eq 1 ]]; then
         python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix ".${table}.tsv" \
             --out "$DIM.${table}.tsv" || warn "could not merge the ${table} shards; that table is not evaluated"
     done
+    # Base-level accuracy is not assessable against truth polished with the benchmark's own reads
+    # (the same rule the CPRR identity criterion uses); blank those rates and say why.
+    if [[ -s "$DIM.accuracy.tsv" ]]; then
+        MASK_ARGS=(); [[ -s "$RESULTS_DIR/benchmark.truth_provenance.tsv" ]] && MASK_ARGS=(--truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv")
+        python3 "$HERE/../python/mask_accuracy.py" --accuracy "$DIM.accuracy.tsv" "${MASK_ARGS[@]}" \
+            || warn "accuracy masking failed; rates are left as computed"
+    fi
     python3 "$HERE/../python/performance_summary.py" --tool-status "$RESULTS_DIR/tool_status.tsv" \
         --scores "$SCORES" --logs-dir "$LOG_DIR" --data-dir "$DATA_DIR" --threads "${THREADS:-1}" \
         --out "$DIM.performance.tsv" || warn "performance summary failed; leaderboard is unaffected"

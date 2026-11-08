@@ -89,24 +89,27 @@ def render(prefix, esc, link):
     rows = []
     miss = group(data["missing_regions"], "analysis_track", "tool")
     for (track, tool), items in group(data["accuracy"], "analysis_track", "tool").items():
-        cols = total(items, "aligned_columns")
+        assessable = [i for i in items if i.get("identity")]
+        not_assessable = len([i for i in items if i.get("accuracy_status", "").startswith("not_assessable")])
+        cols = total(assessable, "aligned_columns")
         m = miss.get((track, tool), [])
         plasmids = len(m)
         rows.append([track, tool, len(items), pct(ratio(total([{"v": (num(i["identity"]) or 0) * (num(i["aligned_columns"]) or 0)}
-                                                                for i in items if i.get("identity")], "v"),
-                                                        total([i for i in items if i.get("identity")], "aligned_columns")), 2),
-                     pct(ratio(total(items, "mismatch_bp"), cols), 2), pct(ratio(total(items, "inserted_bp"), cols), 2),
-                     pct(ratio(total(items, "deleted_bp"), cols), 2), int(total(items, "n_blocks_without_cigar") or 0),
+                                                                for i in assessable], "v"), cols), 2),
+                     pct(ratio(total(assessable, "mismatch_bp"), cols), 2), pct(ratio(total(assessable, "inserted_bp"), cols), 2),
+                     pct(ratio(total(assessable, "deleted_bp"), cols), 2), not_assessable,
+                     int(total(items, "n_blocks_without_cigar") or 0),
                      plasmids, flt(ratio(total(m, "missing_regions"), plasmids), 2),
                      int(total(m, "missing_bp") or 0), int(max([num(x["longest_missing_bp"]) or 0 for x in m] or [0]))])
     add("accuracy-dimension", "Sequence accuracy and missing regions",
         "Coverage says how much of a plasmid was recovered; this says whether the recovered bases are right. Identity, "
         "mismatch, insertion and deletion are shares of the alignment columns of the retained blocks on truth plasmids, "
-        "so they sum to 100%. Blocks without a CIGAR cannot be decoded and are counted, never guessed. Missing regions "
+        "so they sum to 100%. They are blank for samples whose truth was polished with the benchmark's own reads (not assessable: "
+        "the truth would carry the reads' own errors), the same rule the CPRR identity criterion uses. Blocks without a CIGAR cannot be decoded and are counted, never guessed. Missing regions "
         "are reference stretches no retained alignment covers (a circular plasmid's gap across the origin counts as two). "
         "<strong>Descriptive only: it never changes the leaderboard.</strong> SNP concordance is not computed: it needs "
         "known variant positions, which a single same-isolate reference does not have.",
-        table(esc, ["Track", "Tool", "Samples", "Identity", "Mismatch", "Insertion", "Deletion", "Blocks without CIGAR",
+        table(esc, ["Track", "Tool", "Samples", "Identity", "Mismatch", "Insertion", "Deletion", "Samples not assessable", "Blocks without CIGAR",
                     "Plasmids", "Missing regions per plasmid", "Missing bp", "Longest gap (bp)"], rows)
         if rows else empty("No accuracy table was available. It needs a PAF with CIGAR tags (<code>minimap2 -c</code>); "
                            "stage 5 writes it when <code>RUN_DIMENSION_ANALYSES=1</code>."),
@@ -156,7 +159,7 @@ def render(prefix, esc, link):
                      pct(ratio(total(items, "plasmids_with_medium_or_better_bin"), plasmids)),
                      flt(mean("homogeneity")), flt(mean("completeness")), flt(mean("v_measure"))])
     add("bin-quality", "Bin quality tiers",
-        "Would a surveillance laboratory trust the bin? Each bin is matched to its best truth plasmid: <em>high</em> is at "
+        "Would a surveillance laboratory trust the bin? <strong>These are secondary diagnostics: the binning endpoint is the length-weighted binning F1 and CPRR in the leaderboard, and nothing here competes with it.</strong> Each bin is matched to its best truth plasmid: <em>high</em> is at "
         "least 90% complete and at most 5% contaminated, <em>medium</em> at least 50% and at most 10%, <em>low</em> is any "
         "other bin on a plasmid, <em>spurious</em> aligns to no plasmid. Yield is the share of truth plasmids with such a "
         "bin (a split plasmid is judged by its best bin). Homogeneity, completeness and V-measure use the same "

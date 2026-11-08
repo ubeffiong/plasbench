@@ -121,6 +121,7 @@ DIM="$DEMO/benchmark"
 for table in accuracy missing_regions feature_preservation ngoc bin_quality; do
     python3 "$PY/merge_tables.py" --results-dir "$DEMO" --suffix ".${table}.tsv" --out "$DIM.${table}.tsv"
 done
+python3 "$PY/mask_accuracy.py" --accuracy "$DIM.accuracy.tsv"
 python3 "$PY/performance_summary.py" --tool-status "$STATUS" --scores "$SCORES" --data-dir "$DEMO" \
     --threads 1 --out "$DIM.performance.tsv"
 python3 "$PY/power_analysis.py" --scores "$SCORES" --sample-sheet "$SAMPLES" --out "$DIM.power.tsv"

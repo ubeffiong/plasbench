@@ -25,6 +25,10 @@ for most of a genome, not a clustering decision). Homogeneity = 1 - H(truth|bin)
 completeness = 1 - H(bin|truth)/H(bin); V-measure is their harmonic mean. They are descriptive
 secondary statistics: base-pair weighted, so contig length is not ignored, but not repeat-aware.
 
+These are secondary diagnostics. The binning endpoint is the length-weighted binning F1 (ungated one-to-one
+match) and CPRR from score_bins.py; nothing here is a competing headline, and this script does not re-match
+bins to plasmids, it only reads which truth plasmid each bin overlaps most.
+
 Blank means not evaluated (for example, no plasmid or no bin), never zero. Descriptive only;
 never changes scores.tsv. Standard library only.
 """
