@@ -1,0 +1,44 @@
+<style>
+#vq-sankey svg{max-width:100%;height:auto}
+#vq-sankey .lnk{fill-opacity:.45;cursor:pointer}
+#vq-sankey .lnk:hover,#vq-sankey .lnk.on{fill-opacity:.85}
+#vq-sankey .nd{fill:#2f4f45}
+#vq-sankey text{font:11px Arial,sans-serif;fill:#26332d}
+#vq-sankey-detail{font:12px Arial,sans-serif;color:#3b4746;margin-top:6px}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+// ---- alluvial flow ----
+const host=document.createElement('div');host.id='vq-sankey';
+const detail=document.createElement('div');detail.id='vq-sankey-detail';
+($('vq-flow')||$('vq-tracks')).after(host);host.after(detail);
+function render(){const a=d.visualizations[$('vq-sample').value],t=$('vq-tool').value;
+ if(!a||!a.tools[t]){host.innerHTML='';detail.textContent='';return}
+ const flows=(a.tools[t].bin_assignment_flows||[]).filter(f=>f.bin_id&&f.true_plasmid&&f.aligned_bp>0);
+ if(!flows.length){host.innerHTML='<h3>Bin-to-truth flow</h3><p class="muted">No scored bin assignments for this method; contig-level classifiers do not declare bins.</p>';detail.textContent='';return}
+ const bins=[...new Set(flows.map(f=>f.bin_id))],truths=[...new Set(flows.map(f=>f.true_plasmid))];
+ const total=flows.reduce((s,f)=>s+f.aligned_bp,0);
+ const H=Math.max(160,Math.max(bins.length,truths.length)*46),W=760,gap=6;
+ const lay=(names,x)=>{let y=20,m={};const tot=names.reduce((s,n)=>s+flows.filter(f=>(x?f.true_plasmid:f.bin_id)===n).reduce((q,f)=>q+f.aligned_bp,0),0)||1;
+  names.forEach(n=>{const bp=flows.filter(f=>(x?f.true_plasmid:f.bin_id)===n).reduce((q,f)=>q+f.aligned_bp,0);
+   const h=Math.max(12,(H-40)*bp/tot-gap);m[n]={y,h,bp,cursor:y};y+=h+gap});return m};
+ const L=lay(bins,0),R=lay(truths,1);
+ let paths='';flows.sort((a2,b2)=>b2.aligned_bp-a2.aligned_bp).forEach((f,i)=>{
+  const l=L[f.bin_id],r=R[f.true_plasmid];const lh=Math.max(2,l.h*f.aligned_bp/l.bp),rh=Math.max(2,r.h*f.aligned_bp/r.bp);
+  const y1=l.cursor,y2=r.cursor;l.cursor+=lh;r.cursor+=rh;
+  paths+=`<path class="lnk" data-i="${i}" fill="${f.status==='matched'?'#16805a':'#9a5a05'}" d="M150 ${y1} C 380 ${y1}, 380 ${y2}, 610 ${y2} L610 ${y2+rh} C 380 ${y2+rh}, 380 ${y1+lh}, 150 ${y1+lh} Z"><title>${pbEsc(f.bin_id)} → ${pbEsc(f.true_plasmid)}: ${f.aligned_bp.toLocaleString()} bp (${f.status})</title></path>`});
+ const nodes=bins.map(n=>`<rect class="nd" x="140" y="${L[n].y}" width="10" height="${L[n].h}"/><text x="134" y="${L[n].y+12}" text-anchor="end">${pbEsc(n)}</text>`).join('')
+  +truths.map(n=>`<rect class="nd" x="610" y="${R[n].y}" width="10" height="${R[n].h}"/><text x="626" y="${R[n].y+12}">${pbEsc(n)}</text>`).join('');
+ host.innerHTML=`<h3>Bin-to-truth flow: ${t}</h3><p class="muted">Ribbon width is aligned bases. Left is predicted bins, right is truth plasmids. Amber ribbons are assignments the scorer did not accept as a one-to-one match. Only observed assignments are drawn.</p>`
+  +`<svg viewBox="0 0 ${W} ${H+20}" role="img" aria-label="Bin to truth assignment flow">${paths}${nodes}</svg>`;
+ const splits=truths.filter(n=>new Set(flows.filter(f=>f.true_plasmid===n).map(f=>f.bin_id)).size>1);
+ const merges=bins.filter(n=>new Set(flows.filter(f=>f.bin_id===n).map(f=>f.true_plasmid)).size>1);
+ detail.textContent=`${flows.length} assignment(s), ${total.toLocaleString()} aligned bp. `
+  +(splits.length?`Split across bins: ${splits.join(', ')}. `:'')+(merges.length?`Bins spanning several truth plasmids: ${merges.join(', ')}.`:'')
+  +(!splits.length&&!merges.length?'Every assignment is one-to-one.':'');
+ host.querySelectorAll('.lnk').forEach(p=>p.onclick=()=>{
+  host.querySelectorAll('.lnk').forEach(x=>x.classList.remove('on'));p.classList.add('on');
+  const f=flows[+p.dataset.i];detail.textContent=`${f.bin_id} → ${f.true_plasmid}: ${f.aligned_bp.toLocaleString()} aligned bp, status ${f.status}.`;
+  if([...$('vq-plasmid').options].some(o=>o.value===f.true_plasmid)){$('vq-plasmid').value=f.true_plasmid;$('vq-plasmid').dispatchEvent(new Event('change'))}})}
+['vq-sample','vq-tool'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(render,0)));
+render();})();
+</script>

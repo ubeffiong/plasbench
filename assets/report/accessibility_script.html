@@ -1,0 +1,88 @@
+<style>
+#pb-prefs{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 18px;
+  font:13px Arial,sans-serif}
+#pb-prefs button{font:13px Arial,sans-serif;padding:7px 13px;border:1px solid var(--line);
+  background:#fff;border-radius:6px;cursor:pointer;color:var(--ink)}
+#pb-prefs button:hover{background:#eef4ef;border-color:var(--green)}
+#pb-prefs button[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green)}
+#pb-prefs .note{color:var(--muted);font-size:12.5px}
+/* Blue against orange: separable for deuteranopia and protanopia. */
+:root[data-cvd="1"]{--green:#0b62a4;--lime:#d8e7f3;--amber:#a85a00;--red:#8a4500}
+:root[data-cvd="1"] .score.high{color:#0b62a4}
+:root[data-cvd="1"] .score.medium{color:#a85a00}
+:root[data-cvd="1"] .score.low{color:#7a3c00}
+:root[data-cvd="1"] .f1-bar i{background:#0b62a4}
+:root[data-cvd="1"] .f1-bar.medium i{background:#c07000}
+:root[data-cvd="1"] .f1-bar.low i{background:#7a3c00}
+:root[data-cvd="1"] .grade-a{background:#dbe9f5;color:#08436f;border-color:#0b62a4}
+:root[data-cvd="1"] .grade-b{background:#e6eef6;color:#0b4d7d;border-color:#3f87bd}
+:root[data-cvd="1"] .grade-c{background:#f7e8d5;color:#7a3c00;border-color:#a85a00}
+:root[data-cvd="1"] .grade-d{background:#f2ddc4;color:#63300a;border-color:#8a4500}
+:root[data-cvd="1"] .grade-e{background:#e8d6c4;color:#4a2408;border-color:#63300a}
+:root[data-cvd="1"] .completed,:root[data-cvd="1"] .reused{background:#dbe9f5;color:#08436f}
+:root[data-cvd="1"] .failed{background:#f2ddc4;color:#63300a}
+:root[data-cvd="1"] .skipped{background:#f7e8d5;color:#7a3c00}
+:root[data-cvd="1"] .finding.good{border-left-color:#0b62a4}
+:root[data-cvd="1"] .finding.caution{border-left-color:#a85a00}
+@media print{
+  #pb-prefs,.nav,.controls,#pb-tabs{display:none!important}
+  body{background:#fff}
+  header{background:#fff!important;color:#000!important;border-bottom:2px solid #000}
+  header p{color:#333!important}
+  main{max-width:none;padding:0}
+  section{break-inside:avoid-page;page-break-inside:avoid;margin:0 0 18px}
+  h2{break-after:avoid-page;page-break-after:avoid}
+  .panel,.chart-card,.term-card,.sum-stat,.finding{border:1px solid #999!important;box-shadow:none!important}
+  table{font-size:10pt} th{background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Every pane of a tabbed group prints, or the export loses six of seven. */
+  .pb-tab[hidden]{display:block!important}
+  .pb-tab{break-before:page;page-break-before:always}
+  details{display:block} details>summary{font-weight:bold}
+  details:not([open])>*:not(summary){display:block!important}
+  iframe{break-inside:avoid;page-break-inside:avoid}
+  a[href^="#"]::after{content:""}
+  .muted,.lead{color:#333!important}
+}
+</style><script>
+(()=>{const root=document.documentElement;
+const bar=document.createElement('div');bar.id='pb-prefs';
+bar.innerHTML='<button type="button" id="pb-cvd" aria-pressed="false" '
+ +'title="Swap the green/red status palette for blue/orange, which stays separable with '
+ +'deuteranopia or protanopia. Every value is also printed as text, so nothing depends on colour.">'
+ +'Colour-blind safe palette</button>'
+ +'<button type="button" id="pb-print" title="Open the print dialogue. Every tab, every collapsed '
+ +'section and every table is expanded first, so the printed copy carries what the screen hides.">'
+ +'Print / save as PDF</button>'
+ +'<span class="note">Colour is never the only channel: cells print their value, grades print a letter.</span>';
+const main=document.querySelector('main');
+const first=main.querySelector('section');
+if(first)main.insertBefore(bar,first);
+
+function tellFrames(on){document.querySelectorAll('iframe').forEach(f=>{
+ try{f.contentWindow.postMessage({pbPalette:on?'cvd':'default'},'*')}catch(e){}})}
+
+function setCvd(on){root.dataset.cvd=on?'1':'';
+ const b=document.getElementById('pb-cvd');b.setAttribute('aria-pressed',String(on));
+ try{localStorage.setItem('pb-cvd',on?'1':'0')}catch(e){}
+ tellFrames(on)}
+
+document.getElementById('pb-cvd').addEventListener('click',function(){
+ setCvd(root.dataset.cvd!=='1')});
+let saved=null;try{saved=localStorage.getItem('pb-cvd')}catch(e){}
+if(saved==='1')setCvd(true);
+// A frame that loads after the preference was restored still has to hear it.
+document.querySelectorAll('iframe').forEach(f=>f.addEventListener('load',
+ ()=>setTimeout(()=>tellFrames(root.dataset.cvd==='1'),150)));
+
+document.getElementById('pb-print').addEventListener('click',function(){
+ // Print CSS can reveal a hidden pane, but a canvas drawn at zero width stays
+ // blank, so the panes are shown and given a frame to lay out and redraw.
+ document.querySelectorAll('.pb-tab[hidden]').forEach(p=>{p.dataset.wasHidden='1';p.hidden=false});
+ document.querySelectorAll('details:not([open])').forEach(d=>{d.dataset.wasShut='1';d.open=true});
+ window.dispatchEvent(new Event('resize'));
+ setTimeout(()=>{window.print();
+  document.querySelectorAll('.pb-tab[data-was-hidden]').forEach(p=>{p.hidden=true;delete p.dataset.wasHidden});
+  document.querySelectorAll('details[data-was-shut]').forEach(d=>{d.open=false;delete d.dataset.wasShut});
+  window.dispatchEvent(new Event('resize'))},400)});
+})();
+</script>

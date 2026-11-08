@@ -15,29 +15,10 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
+from plasbench_common import TOOL_DISPLAY_NAMES, display_tool_name  # noqa: E402,F401
 
 
 STATUSES = ["completed", "reused", "warning", "failed", "skipped"]
-
-
-TOOL_DISPLAY_NAMES = {
-    "mob_recon": "MOB-recon",
-    "plasmidspades": "plasmidSPAdes",
-    "gplas2_mob": "gplas2-MOB",
-    "gplas2_external": "gplas2 external",
-    "mob_like": "MOB-like",
-    "platon_like": "Platon-like",
-    "spades_like": "SPAdes-like",
-    "gplas_like": "gplas-like",
-    "weak_like": "Weak-like",
-}
-
-
-def display_tool_name(tool):
-    """Return a research-facing tool label without changing its stable ID."""
-    if tool in TOOL_DISPLAY_NAMES:
-        return TOOL_DISPLAY_NAMES[tool]
-    return str(tool).replace("_", " ").replace("-", " ").capitalize()
 
 
 def read_tsv(path):

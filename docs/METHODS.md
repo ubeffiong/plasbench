@@ -944,7 +944,7 @@ over-confident.
 
 **Interpretation limits and metadata completeness.** The HTML report
 (`python/report_question_bank.py`) states what the results support and what they do not
-show (relatedness, transmission, gene versus plasmid spread, novelty, clinical validity,
+show (transmission, gene versus plasmid spread, novelty, clinical validity,
 experimental confirmation), and defines the words it uses. Aggregation writes
 `benchmark.metadata_completeness.tsv`: per scored sample, which consequential fields are
 missing (organism, bioproject, collection_country, sample_origin, truth provenance) and

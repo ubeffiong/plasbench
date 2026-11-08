@@ -1,0 +1,225 @@
+<style>
+/* One status palette, shared with the explorer above and the dashboard
+   below it: green recovered, red wrong, amber uncertain, blue context. */
+#pb-analyses{--pb-line:#d3ddd6;--pb-soft:#eef2ef;--pb-ink:#16211c;--pb-dim:#5d6b63;
+  --pb-green:#17805a;--pb-amber:#a35c05;--pb-red:#b3261e;--pb-blue:#2563c9;
+  font:14px/1.55 Arial,sans-serif;color:var(--pb-ink);margin:16px 0}
+#pb-context{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 16px;
+  background:#fff;border:1px solid var(--pb-line);border-radius:10px;margin-bottom:12px}
+#pb-context .controls{display:contents;margin:0}
+#pb-context label{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--pb-dim)}
+#pb-context select,#pb-context input{padding:5px 8px;border:1px solid var(--pb-line);
+  border-radius:6px;background:#fff;font:13px Arial,sans-serif;color:var(--pb-ink)}
+#pb-context select:focus-visible,#pb-context input:focus-visible{outline:2px solid var(--pb-green);outline-offset:1px}
+#pb-context button,#pb-context .download-button{font:13px Arial,sans-serif;padding:6px 12px;
+  border:1px solid var(--pb-line);background:#fff;border-radius:6px;cursor:pointer;color:var(--pb-ink);
+  text-decoration:none;white-space:nowrap}
+#pb-context button:hover,#pb-context .download-button:hover{background:var(--pb-soft);border-color:var(--pb-green)}
+#pb-context .download-button{background:var(--pb-green);color:#fff!important;border-color:var(--pb-green);font-weight:600}
+#pb-tabs{display:flex;gap:3px;padding:4px;background:#fff;border:1px solid var(--pb-line);
+  border-radius:10px;overflow-x:auto;margin-bottom:12px}
+#pb-tabs button{flex:0 0 auto;padding:9px 17px;border:0;background:transparent;color:var(--pb-dim);
+  font:600 13.5px Arial,sans-serif;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px;
+  white-space:nowrap;transition:background .15s,color .15s}
+#pb-tabs button:hover{background:var(--pb-soft);color:var(--pb-ink)}
+#pb-tabs button[aria-selected="true"]{background:var(--pb-green);color:#fff}
+#pb-tabs button:focus-visible{outline:2px solid var(--pb-ink);outline-offset:-2px}
+#pb-tabs .count{font:600 11px Arial,sans-serif;background:var(--pb-soft);color:var(--pb-dim);
+  padding:1px 7px;border-radius:10px}
+#pb-tabs button[aria-selected="true"] .count{background:rgba(255,255,255,.24);color:#fff}
+.pb-tab[hidden]{display:none}
+.pb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;align-items:start}
+.pb-card{background:#fff;border:1px solid var(--pb-line);border-radius:10px;overflow:hidden;
+  display:flex;flex-direction:column;min-width:0}
+.pb-card>header{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 16px;background:#f7faf8;border-bottom:1px solid var(--pb-line)}
+.pb-card>header h4{margin:0;font:600 14.5px Arial,sans-serif;color:var(--pb-ink)}
+.pb-card>header .sub{font:12.5px Arial,sans-serif;color:var(--pb-dim)}
+.pb-card>header button{font:12px Arial,sans-serif;padding:4px 10px;border:1px solid var(--pb-line);
+  background:#fff;border-radius:5px;cursor:pointer;color:var(--pb-ink)}
+.pb-card>header button:hover{background:var(--pb-soft);border-color:var(--pb-green)}
+.pb-body{padding:14px 16px;overflow:auto;min-width:0}
+.pb-card.expanded{position:fixed;inset:16px;z-index:60;margin:0}
+.pb-card.expanded .pb-body{max-height:calc(100vh - 96px)}
+#pb-scrim{position:fixed;inset:0;background:rgba(18,28,23,.5);z-index:55;display:none}
+#pb-scrim.on{display:block}
+#pb-analyses table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:0}
+#pb-analyses th{text-align:left;font:600 11.5px Arial,sans-serif;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--pb-dim);padding:7px 9px;border-bottom:1px solid var(--pb-line);
+  background:var(--pb-soft);white-space:nowrap}
+#pb-analyses td{padding:7px 9px;border-bottom:1px solid #eef2ef;color:var(--pb-ink)}
+#pb-analyses tbody tr:hover td{background:#f5faf6}
+#pb-analyses h3,#pb-analyses h4:not(.pb-card>header h4){font:600 14px Arial,sans-serif;margin:0 0 8px}
+#pb-analyses p{margin:0 0 10px;color:var(--pb-dim);font-size:13.5px}
+#pb-analyses svg{max-width:100%;height:auto}
+@media (max-width:760px){.pb-grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){#pb-tabs button{transition:none}}
+</style><script>
+(()=>{const $=id=>document.getElementById(id);
+if(!$('vq-tracks'))return;
+// Tab, title, hint, and the panels it owns. A panel with no data still gets its
+// card: an empty analysis is a finding, not a reason to hide the heading.
+const TABS=[
+ ['recovery','Plasmid recovery',[['vq-summary','Truth plasmids','one row per truth plasmid for the selected method']]],
+ ['agreement','Method agreement',[['vq-agree','Method agreement','how many methods support each reference interval']]],
+ ['comparison','Method comparison',[['vq-compare','Method comparison','baseline against comparator on shared samples']]],
+ ['dotplot','Dot plot',[['vq-dotplot','Dot plot','reference against predicted-record coordinates']]],
+ ['context','Context and circular',[['vq-context','Context and circular view','curated features and circular truth']]],
+ ['bins','Bin assignment',[['vq-sankey','Bin-to-truth flow','which predicted bin carries which truth plasmid'],
+                           ['vq-flow','Bin assignments','scored bin membership']]],
+ ['features','Proteins and structure',[['vq-proteins','Protein recovery','coordinate recovery of named coding sequences'],
+                                       ['vq-structural','Structural diagnostics','alignment-derived discordance']]]];
+
+const shell=document.createElement('div');shell.id='pb-analyses';
+const anchor=$('vq-summary')||$('vq-agree')||$('vq-tracks');
+anchor.parentElement.insertBefore(shell,anchor);
+
+// The shared selection row becomes the context bar, still the same controls.
+const context=document.createElement('div');context.id='pb-context';
+const controls=document.querySelector('#cohort-evidence-explorer .controls');
+if(controls)context.append(controls);
+shell.append(context);
+
+const tabbar=document.createElement('div');tabbar.id='pb-tabs';
+tabbar.setAttribute('role','tablist');
+tabbar.setAttribute('aria-label','Analyses that share the explorer selection');
+shell.append(tabbar);
+const scrim=document.createElement('div');scrim.id='pb-scrim';document.body.append(scrim);
+
+function makeCard(id,title,hint){const el=$(id);if(!el)return null;
+ const card=document.createElement('section');card.className='pb-card';
+ card.innerHTML='<header><div><h4>'+title+'</h4><span class="sub">'+hint+'</span></div>'
+  +'<button type="button" class="pb-expand" aria-expanded="false">Expand</button>'
+  +'</header><div class="pb-body"></div>';
+ card.querySelector('.pb-body').append(el);
+ const button=card.querySelector('.pb-expand');
+ button.addEventListener('click',()=>{const on=card.classList.toggle('expanded');
+  scrim.classList.toggle('on',on);button.textContent=on?'Close':'Expand';
+  button.setAttribute('aria-expanded',String(on));
+  requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))});
+ return card}
+
+const panes=[];
+TABS.forEach((entry,index)=>{
+ const [key,title,members]=entry;
+ const cards=members.map(m=>makeCard(m[0],m[1],m[2])).filter(Boolean);
+ if(!cards.length)return;
+ const pane=document.createElement('div');pane.className='pb-tab';pane.id='pb-tab-'+key;
+ pane.setAttribute('role','tabpanel');
+ // A panel has to name the tab that controls it, and vice versa, or a screen
+ // reader announces seven unlabelled regions.
+ pane.setAttribute('aria-labelledby','pb-tabbtn-'+key);
+ pane.tabIndex=0;
+ const grid=document.createElement('div');grid.className='pb-grid';
+ cards.forEach(c=>grid.append(c));pane.append(grid);shell.append(pane);
+ const button=document.createElement('button');button.type='button';
+ button.setAttribute('role','tab');button.id='pb-tabbtn-'+key;
+ button.innerHTML=title+(cards.length>1?' <span class="count">'+cards.length+'</span>':'');
+ button.setAttribute('aria-controls','pb-tab-'+key);
+ button.addEventListener('click',()=>select(key));
+ tabbar.append(button);
+ panes.push({key,pane,button})});
+
+function select(key){panes.forEach(p=>{const on=p.key===key;
+ p.pane.hidden=!on;p.button.setAttribute('aria-selected',String(on));
+ // Roving tabindex: one stop for the whole strip, arrows move within it.
+ p.button.setAttribute('tabindex',on?'0':'-1')});
+ // A pane is laid out at zero width while hidden. Every panel here draws into
+ // a viewBox SVG and rescales on its own, but any panel that measures its box
+ // at draw time would need telling -- after layout has settled, not before.
+ requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))}
+if(panes.length)select(panes[0].key);
+
+// Every control explains itself. These are read by people who did not build
+// the pipeline, and a control whose effect is unclear will be mistrusted.
+const HELP={
+ 'vq-sample':'Isolate to analyse. Drives the explorer above and every panel here.',
+ 'vq-tool':'Reconstruction method whose output these panels describe.',
+ 'vq-plasmid':'Truth plasmid these panels are measured against.',
+ 'vq-start':'Left edge of the reference interval to restrict the panels to.',
+ 'vq-end':'Right edge of the reference interval to restrict the panels to.',
+ 'vq-fit':'Show the whole plasmid again.',
+ 'vq-in':'Narrow the reference interval.',
+ 'vq-out':'Widen the reference interval.',
+ 'vq-download':'Download the full visualization payload for this sample as JSON.',
+ 'vq-svg':'Download the current track drawing as SVG.',
+ 'vq-png':'Download the current track drawing as PNG.',
+ 'vq-back':'Return to the previous selection.',
+ 'vq-base':'Baseline method. The comparison reports comparator minus baseline.',
+ 'vq-comp':'Comparator method, measured against the baseline on the samples both completed.',
+ 'vq-protein-category':'Limit the table to one annotation category.',
+ 'vq-protein-search':'Find a coding sequence by gene name or product.'};
+function describe(){
+ Object.keys(HELP).forEach(id=>{const el=$(id);if(!el)return;el.title=HELP[id];
+  const label=el.closest('label');if(label)label.title=HELP[id]});
+ // Some controls are built by other fragments after this runs and carry no id,
+ // so they are described by what they sit next to rather than by name.
+ const scope=document.getElementById('pb-explorer-view')||shell;
+ scope.querySelectorAll('label').forEach(label=>{
+  const text=(label.textContent||'').trim();
+  const control=label.querySelector('select,input,button');
+  if(!control||control.title)return;
+  if(text.startsWith('Predicted record'))
+   control.title=label.title='Which predicted record to plot against the reference. One coordinate system at a time.';
+  else if(/ only$/.test(text)&&control.type==='checkbox')
+   control.title=label.title='Include this method in the comparison.';
+ });
+ scope.querySelectorAll('button').forEach(b=>{
+  if(b.title)return;
+  if(b.textContent.trim()==='only')b.title='Show this method alone, hiding the others from the comparison.';
+ });
+}
+describe();
+// The panels rebuild their own controls whenever the selection changes, and
+// some are built after this script runs. Watching the container describes them
+// whenever they appear, instead of racing them with a timer.
+if(window.MutationObserver){let queued=false;
+ new MutationObserver(()=>{if(queued)return;queued=true;
+  requestAnimationFrame(()=>{queued=false;describe()})})
+ .observe(document.getElementById('pb-explorer-view')||shell,{childList:true,subtree:true})}
+
+const TAB_HELP={
+ recovery:'Per truth plasmid: how much of it this method recovered, from how many records, and whether any of those records also align elsewhere.',
+ agreement:'How many methods independently support each reference interval. Shared support is not proof of correctness.',
+ comparison:'One method minus another on the samples both completed.',
+ dotplot:'Reference coordinate against one predicted record’s own coordinate. Forward diagonals support collinearity.',
+ context:'Curated features on the reference, and the circular truth view.',
+ bins:'Which predicted bin carries which truth plasmid, and the scored membership behind it.',
+ features:'Coordinate recovery of named coding sequences, and alignment-derived structural discordance.'};
+panes.forEach(p=>{if(TAB_HELP[p.key]){p.button.title=TAB_HELP[p.key];p.pane.title=''}});
+shell.querySelectorAll('.pb-expand').forEach(b=>{b.title='Open this panel full screen.'});
+
+
+
+tabbar.addEventListener('keydown',e=>{
+ const order=panes.map(p=>p.button);const at=order.indexOf(document.activeElement);
+ if(at<0)return;
+ let next=null;
+ if(e.key==='ArrowRight')next=order[(at+1)%order.length];
+ if(e.key==='ArrowLeft')next=order[(at-1+order.length)%order.length];
+ if(e.key==='Home')next=order[0];
+ if(e.key==='End')next=order[order.length-1];
+ if(next){e.preventDefault();next.focus();next.click()}});
+
+scrim.addEventListener('click',()=>{shell.querySelectorAll('.pb-card.expanded').forEach(c=>{
+ c.classList.remove('expanded');const b=c.querySelector('.pb-expand');
+ if(b){b.textContent='Expand';b.setAttribute('aria-expanded','false')}});
+ scrim.classList.remove('on');
+ requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&scrim.classList.contains('on'))scrim.click()});
+
+// Replaced by the adopted explorer above: kept as anchors, not drawn twice.
+// A [hidden] attribute loses to the display rules on these, so hide by style.
+['vq-tracks','vq-detail'].forEach(id=>{const e=$(id);if(e)e.style.display='none'});
+// The search, BED export, event stepping and plasmid stepping all exist in the
+// explorer above. Selection history does not, so that one control stays.
+['vq-q','vq-bed','vq-prev-ev','vq-next-ev','vq-prev-p','vq-next-p'].forEach(id=>{
+ const e=$(id);if(!e)return;const owner=e.closest('label')||e;owner.style.display='none'});
+const nav=$('vq-nav');
+if(nav&&$('vq-back')){context.append(nav);nav.style.marginLeft='auto';
+ const tag=document.createElement('span');
+ tag.style.cssText='font:11px Arial,sans-serif;color:#5d6b63;margin-right:6px';
+ tag.textContent='Selection history';nav.prepend(tag)}
+else if(nav){nav.style.display='none'}
+})();
+</script>

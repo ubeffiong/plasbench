@@ -1,0 +1,58 @@
+<style>
+.vq-block.vq-impure{stroke:#a53028;stroke-width:2;stroke-dasharray:3 2}
+#vq-summary table{width:100%;border-collapse:collapse;font:13px Arial,sans-serif}
+#vq-summary th{background:#edf2ec;text-align:left;padding:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em}
+#vq-summary td{border-top:1px solid #d2dad8;padding:7px 8px;white-space:nowrap}
+#vq-summary tr.sel td{background:#eef5ee;font-weight:bold}
+#vq-summary tbody tr{cursor:pointer}
+</style><script>
+(()=>{const $=id=>document.getElementById(id),d=JSON.parse($('vq-data').textContent);
+const host=document.createElement('div');host.id='vq-summary';$('vq-tracks').before(host);
+// Thresholds are display bands for triage, not acceptance criteria; they mirror
+// the recovery threshold documented in the scoring method.
+function classify(c,records,impure){if(impure&&c>=.9)return'Complete, contaminated record';
+ if(c>=.99)return'Complete';if(c>=.9)return'Near complete';if(c>=.5)return records>2?'Partial, fragmented':'Partial';
+ if(c>0)return'Minimal';return'Not recovered'}
+function render(){const a=d.visualizations[$('vq-sample').value],t=$('vq-tool').value;
+ if(!a||!a.tools[t]){host.innerHTML='';return}
+ const tool=a.tools[t],circ=new Set(a.circular_truth_plasmids||[]);
+ // A record that also aligns to the chromosome or to another truth plasmid is
+ // evidence of contamination or a merge, even where this plasmid looks complete.
+ const elsewhere={};tool.blocks.forEach(b=>{(elsewhere[b.record_id]??=new Set()).add(b.molecule_type==='CHROMOSOME'?'chromosome':b.target)});
+ const rows=Object.entries(a.truth_plasmids).map(([id,info])=>{
+  const rec=tool.plasmid_recovery[id]||{completeness:0};
+  const records=[...new Set(tool.blocks.filter(b=>b.target===id).map(b=>b.record_id))];
+  const impure=records.filter(r=>[...elsewhere[r]].some(x=>x!==id));
+  return {id,len:info.length,circular:circ.has(id),c:rec.completeness||0,n:records.length,impure};});
+ rows.sort((x,y)=>y.c-x.c);
+ host.innerHTML='<h3>Truth plasmids for '+t+'</h3><p class="muted">One row per truth plasmid. “Impure records” are predicted records that also align to the chromosome or another truth plasmid; completeness alone cannot reveal them. Select a row to load its tracks.</p>'
+  +'<div class="panel"><table><thead><tr><th>Truth plasmid</th><th>Length</th><th>Circular truth</th><th>Completeness</th><th>Contributing records</th><th>Impure records</th><th>Classification</th></tr></thead><tbody>'
+  +rows.map(r=>`<tr data-p="${pbEsc(r.id)}" class="${r.id===$('vq-plasmid').value?'sel':''}"><td>${pbEsc(r.id)}</td><td>${r.len.toLocaleString()} bp</td><td>${r.circular?'yes':'not declared'}</td><td>${(r.c*100).toFixed(1)}%</td><td>${r.n}</td><td>${r.impure.length||'0'}</td><td>${classify(r.c,r.n,r.impure.length>0)}</td></tr>`).join('')
+  +'</tbody></table></div>';
+ const bad=rows.filter(r=>r.impure.length&&r.c>=.9);
+ if(bad.length)host.insertAdjacentHTML('beforeend','<div class="vq-warn"><strong>High completeness with impure records:</strong> '+bad.map(r=>pbEsc(r.id)).join(', ')+'. High recovery does not imply a clean reconstruction.</div>');
+ // Contamination usually arrives as a whole chromosomal record called plasmid,
+ // which no per-plasmid row can show. Report it against the tool instead.
+ const chrRecords=[...new Set(tool.blocks.filter(b=>b.molecule_type==='CHROMOSOME').map(b=>b.record_id))];
+ const chrBp=tool.chromosome_aligned_bp||0;
+ if(chrRecords.length)host.insertAdjacentHTML('beforeend','<div class="vq-warn"><strong>Chromosomal contamination for '+t+':</strong> '
+  +chrBp.toLocaleString()+' bp across '+chrRecords.length+' predicted record(s) — '+chrRecords.map(pbEsc).join(', ')
+  +'. These are counted as false positives and are not attributable to any truth plasmid, so they do not appear in the rows above.</div>');
+ const mean=rows.length?rows.reduce((s,r)=>s+r.c,0)/rows.length:0;
+ if(!chrRecords.length&&!bad.length&&rows.length)host.insertAdjacentHTML('beforeend',
+  '<p class="muted">No chromosomal or cross-plasmid record contamination among retained blocks (mean completeness '+(mean*100).toFixed(1)+'%).</p>');
+ host.querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{$('vq-plasmid').value=tr.dataset.p;$('vq-plasmid').dispatchEvent(new Event('change'))});
+ markTracks(tool,elsewhere)}
+function markTracks(tool,elsewhere){const p=$('vq-plasmid').value;
+ document.querySelectorAll('#vq-tracks .vq-block').forEach(el=>{
+  const name=el.dataset.n;if(!name||!d.visualizations[$('vq-sample').value]?.tools[name])return;
+  const lo=Number($('vq-start').value)||0,hi=Number($('vq-end').value)||Infinity;
+  const list=d.visualizations[$('vq-sample').value].tools[name].blocks.filter(b=>b.target===p&&b.target_end>lo&&b.target_start<hi);
+  const b=list[Number(el.dataset.i)];if(!b)return;
+  const others=[...(elsewhere[b.record_id]||[])].filter(x=>x!==p);
+  if(others.length){el.classList.add('vq-impure');
+   const title=el.querySelector('title');if(title)title.textContent=b.record_id+' — also aligns to '+others.join(', ')}})}
+['vq-sample','vq-tool','vq-plasmid','vq-start','vq-end'].forEach(id=>$(id)?.addEventListener('change',()=>setTimeout(render,0)));
+['vq-fit','vq-in','vq-out'].forEach(id=>$(id)?.addEventListener('click',()=>setTimeout(render,0)));
+render();})();
+</script>

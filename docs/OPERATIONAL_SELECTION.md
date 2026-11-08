@@ -146,17 +146,15 @@ or download each retained candidate.
 
 > **Experimental and unvalidated.** This reports how close each predicted plasmid
 > record is, by Mash distance, to a small curated reference set. It is **not** a
-> plasmid taxonomy, **not** a relatedness inference and **not** a test of whether
-> a plasmid is novel. It was previously labelled "novel-vs-known"; the labels were
+> test of whether a plasmid is novel. It was previously labelled "novel-vs-known"; the labels were
 > renamed because they claimed more than the method supports.
 
 For a truth-unknown sample, `plasbench reconstruct` can also ask a different
 question than tool selection: is this isolate's reconstructed plasmid close to
-anything PlasBench has a reference for? It follows the pattern of COPLA (Mash
-distance to a reference set, then a membership call) using Mash, already a direct
-PlasBench dependency, against a small curated reference set, not COPLA's own code
-or its `graph-tool`/nested-SBM machinery; see `python/classify_operational_plasmid.py`'s
-docstring for exactly what differs.
+anything PlasBench has a reference for? It uses Mash, already a direct PlasBench
+dependency, against a small curated reference set (a distance to the nearest
+reference, then a membership call); see `python/classify_operational_plasmid.py`'s
+docstring for exactly what it does and does not do.
 
 This is an **operational-only** signal. It is never computed for a benchmark
 isolate that has truth, and its output must never be wired into

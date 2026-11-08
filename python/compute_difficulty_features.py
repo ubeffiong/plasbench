@@ -62,6 +62,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from plasbench_common import MASH_SKETCH_SIZE  # noqa: E402
+
 
 def read_truth(path):
     """sequence_id -> molecule_type ("CHROMOSOME"/"PLASMID"), from truth.tsv."""
@@ -187,8 +189,8 @@ def mash_distance(fasta_path, truth_path, tmp_dir):
         # plasmid rather than one distance for the concatenated plasmid
         # content -- the MINIMUM across them (the plasmid most similar to
         # the chromosome) is the harder case worth flagging.
-        subprocess.run([mash, "sketch", "-s", "10000", str(chrom_path)], capture_output=True, timeout=300)
-        subprocess.run([mash, "sketch", "-i", "-s", "10000", str(plasmid_path)], capture_output=True, timeout=300)
+        subprocess.run([mash, "sketch", "-s", str(MASH_SKETCH_SIZE), str(chrom_path)], capture_output=True, timeout=300)
+        subprocess.run([mash, "sketch", "-i", "-s", str(MASH_SKETCH_SIZE), str(plasmid_path)], capture_output=True, timeout=300)
         result = subprocess.run([mash, "dist", f"{chrom_path}.msh", f"{plasmid_path}.msh"],
                                 capture_output=True, text=True, timeout=300)
         if result.returncode != 0 or not result.stdout.strip():

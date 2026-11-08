@@ -44,10 +44,13 @@ Only the Python standard library is used. No third-party dependencies.
 """
 
 import argparse
+import bisect
 import math
 import os
 import sys
 from collections import defaultdict
+
+from plasbench_common import interval_overlap_bp as overlap_bp, merge_intervals as _merge_intervals  # noqa: E402
 
 
 def read_truth(path):
@@ -254,31 +257,8 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
 
 
 def merge_intervals(intervals):
-    """Merge overlapping [start, end) intervals; return list + total length."""
-    if not intervals:
-        return [], 0
-    intervals = sorted(intervals)
-    merged = [list(intervals[0])]
-    for s, e in intervals[1:]:
-        if s <= merged[-1][1]:
-            merged[-1][1] = max(merged[-1][1], e)
-        else:
-            merged.append([s, e])
-    total = sum(e - s for s, e in merged)
-    return merged, total
-
-
-def overlap_bp(left, right):
-    """Return the number of bases shared by two merged interval lists."""
-    i = j = total = 0
-    while i < len(left) and j < len(right):
-        start, end = max(left[i][0], right[j][0]), min(left[i][1], right[j][1])
-        total += max(0, end - start)
-        if left[i][1] <= right[j][1]:
-            i += 1
-        else:
-            j += 1
-    return total
+    merged = _merge_intervals(intervals)
+    return merged, sum(end - start for start, end in merged)
 
 
 def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_mapq, min_query_coverage):
@@ -462,10 +442,51 @@ def sweep_thresholds(covered_by_query, probabilities, truth, total_plasmid):
     thresholds = sorted(set(probabilities.values()), reverse=True)
     points = [{"threshold": "inf", "precision": 1.0, "recall": 0.0,
                "tp_bp": 0, "fp_bp": 0, "fn_bp": total_plasmid}]
+    # Incremental form of "rebuild coverage for every included record and call
+    # score()": records are admitted in descending probability, and each target
+    # keeps a sorted list of disjoint merged intervals plus its covered length,
+    # so a threshold costs only the intervals of the records it admits
+    # (O(E log E) overall instead of O(T * E log E)). Touching intervals merge
+    # exactly as merge_intervals does (start <= end), and coverage is clipped to
+    # the target length exactly as score() does, so every point is identical.
+    by_record = defaultdict(list)
+    for tname, entries in covered_by_query.items():
+        if tname not in truth:
+            continue
+        for qname, start, end in entries:
+            by_record[qname].append((tname, start, end))
+    by_probability = defaultdict(list)
+    for qname, probability in probabilities.items():
+        by_probability[probability].append(qname)
+    starts = defaultdict(list)    # target -> sorted start of each merged interval
+    ends = defaultdict(list)      # target -> end of each merged interval (same order)
+    covered_bp = defaultdict(int)  # target -> merged covered length (unclipped)
+    tp = fp = 0
     for threshold in thresholds:
-        included = {qname for qname, probability in probabilities.items() if probability >= threshold}
-        covered_subset = filter_covered_by_qname(covered_by_query, included)
-        tp, fp, fn = score(truth, total_plasmid, covered_subset)
+        for qname in by_probability[threshold]:
+            for tname, start, end in by_record.get(qname, ()):
+                mol, length = truth[tname]
+                tstarts, tends = starts[tname], ends[tname]
+                # Merged intervals overlapping or touching [start, end]: those with
+                # their end >= start and their start <= end.
+                low = bisect.bisect_left(tends, start)
+                high = bisect.bisect_right(tstarts, end)
+                if low < high:
+                    new_start = min(start, tstarts[low])
+                    new_end = max(end, tends[high - 1])
+                    removed = sum(tends[k] - tstarts[k] for k in range(low, high))
+                else:
+                    new_start, new_end, removed = start, end, 0
+                before = min(covered_bp[tname], length)
+                covered_bp[tname] += (new_end - new_start) - removed
+                tstarts[low:high] = [new_start]
+                tends[low:high] = [new_end]
+                delta = min(covered_bp[tname], length) - before
+                if mol == "PLASMID":
+                    tp += delta
+                else:
+                    fp += delta
+        fn = max(total_plasmid - tp, 0)
         points.append({"threshold": threshold, "precision": safe_div(tp, tp + fp),
                        "recall": safe_div(tp, tp + fn), "tp_bp": tp, "fp_bp": fp, "fn_bp": fn})
     return points

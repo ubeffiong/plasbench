@@ -5,17 +5,10 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from plasbench_common import sha256  # noqa: E402
 
 
 REQUIRED = ("Prob_Chromosome", "Prob_Plasmid", "Prediction", "Contig_name", "Contig_length")
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def graph_nodes(path, minimum_length):

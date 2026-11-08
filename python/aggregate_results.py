@@ -33,6 +33,8 @@ from pathlib import Path
 
 import headline_design as hd
 
+fast_mean = hd.exact_mean  # bit-identical to statistics.mean, faster (see headline_design.exact_mean)
+
 # Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
 # parent_sample_id column, so a copied ladder sheet still cannot be ranked.
 LADDER_SUFFIX = re.compile(r"^(?P<parent>.+)__\d+(?:\.\d+)?x$")
@@ -658,7 +660,7 @@ def bootstrap_ci(values, iterations=1000, groups=None):
     if len(values) < 5 or len(units) < 5:
         return None, None
     rng = random.Random(20260831)
-    means = sorted(statistics.mean([value for unit in rng.choices(units, k=len(units)) for value in unit])
+    means = sorted(fast_mean([value for unit in rng.choices(units, k=len(units)) for value in unit])
                    for _ in range(iterations))
     return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
 
@@ -673,15 +675,21 @@ def paired_permutation_pvalue(differences, iterations=10000, groups=None):
     units = resampling_units(differences, groups)
     if len(differences) < 5 or len(units) < 5:
         return None
-    observed = abs(statistics.mean(differences))
+    observed = abs(fast_mean(differences))
     rng = random.Random(20260901)
+    getrandbits = rng.getrandbits
+    negated = [[-item for item in unit] for unit in units]
+    pairs = list(zip(units, negated))
     extreme = 0
     for _ in range(iterations):
         signed = []
-        for unit in units:
-            sign = 1 if rng.randrange(2) else -1
-            signed.extend(sign * item for item in unit)
-        value = abs(statistics.mean(signed))
+        for unit, flipped in pairs:
+            # Same bit stream as rng.randrange(2) (2 bits, reject >= 2), minus the call overhead.
+            bits = getrandbits(2)
+            while bits >= 2:
+                bits = getrandbits(2)
+            signed.extend(unit if bits else flipped)
+        value = abs(fast_mean(signed))
         extreme += value >= observed
     return (extreme + 1) / (iterations + 1)
 
@@ -774,7 +782,7 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
             if sample in plasmid_samples and sample not in by_tool[tool]:
                 by_tool[tool][sample] = 0.0   # also adds a tool that failed everywhere
     tools = sorted(by_tool)
-    comparisons = []
+    comparisons, jobs = [], []
     for i, a in enumerate(tools):
         for b in tools[i + 1:]:
             shared = sorted(set(by_tool[a]) & set(by_tool[b]))
@@ -791,17 +799,21 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
                 strata = None
                 groups = ([design.cluster(sample) for sample in shared] if design and design.clusters
                           else cluster_labels(shared, clusters))
-            low, high = hd.stratified_bootstrap(diffs, groups, strata)
+            jobs.append((diffs, groups, strata))
             comparisons.append({
                 "tool_a": a, "tool_b": b, "paired_samples": len(shared),
                 "paired_clusters": len(set(groups)), "metric": metric,
-                "mean_f1_difference": hd.macro_mean(diffs, strata), "difference_ci_low": low,
-                "difference_ci_high": high,
-                "permutation_p_value": hd.stratified_permutation(diffs, groups, strata),
+                "mean_f1_difference": hd.macro_mean(diffs, strata),
                 "wins_a": sum(x > 0 for x in diffs), "ties": sum(x == 0 for x in diffs),
                 "wins_b": sum(x < 0 for x in diffs),
                 "wilcoxon_p_value": wilcoxon_signed_rank(diffs),
             })
+    # The bootstrap CI and permutation test dominate runtime and are independent
+    # per pair (each seeds its own RNG), so they run in parallel; order is kept.
+    for row, (low, high, pvalue) in zip(comparisons, hd.map_pair_statistics(jobs)):
+        row["difference_ci_low"] = low
+        row["difference_ci_high"] = high
+        row["permutation_p_value"] = pvalue
     for row, adjusted in zip(comparisons, holm_adjust([x["permutation_p_value"] for x in comparisons])):
         row["permutation_p_value_holm"] = adjusted
     for row, adjusted in zip(comparisons, holm_adjust([x["wilcoxon_p_value"] for x in comparisons])):

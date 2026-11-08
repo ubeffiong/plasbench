@@ -35,6 +35,7 @@ from recommendation_model import (  # noqa: E402
 )
 from select_operational_method import annotate, number, read_tsv, sample_metadata  # noqa: E402
 from study_groups import group_samples_by_study  # noqa: E402
+from plasbench_common import sha256  # noqa: E402
 
 LAMBDA_GRID = (0.1, 1.0, 10.0)
 
@@ -144,14 +145,6 @@ def nested_leave_one_study_out(rows, studies, target):
         return None, None, None, []
     return (mean_absolute_error(predicted, actual),
             mean_absolute_error(baseline_predicted, actual), None, selected_lambdas)
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def write_model_card(path, payload, score_path, sample_sheet, rows):
