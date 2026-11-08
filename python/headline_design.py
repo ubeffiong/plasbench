@@ -316,9 +316,15 @@ def cprr_fields(tool, rows, design):
             "cprr_plasmids": total, "cprr_correct": correct}
 
 
-def species_table(track, task, rows, metric, design, failed_samples):
-    """Per tool x species: n, clusters, mean ranking metric, headline membership."""
-    by_tool, shared, _ = shared_values(rows, metric, failed_samples)
+def species_table(track, task, rows, metric, design, failed_samples, known_tools=None, eligible_samples=None):
+    """Per tool x species: n, clusters, mean ranking metric, headline membership.
+
+    known_tools and eligible_samples are passed to shared_values: without them a tool
+    that failed on every sample (no score rows) is missing from this table although the
+    ranking scores it 0 on every plasmid-bearing sample. The caller passes only the
+    tools of this (track, task), so failures of other groups' tools are not counted.
+    """
+    by_tool, shared, _ = shared_values(rows, metric, failed_samples, known_tools, eligible_samples)
     samples = sorted(shared) if shared else sorted({s for v in by_tool.values() for s in v})
     qualifying = set(design.qualifying_species(samples)) if design else set()
     out = []
