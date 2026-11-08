@@ -16,13 +16,18 @@ jobs:
       - uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: 'scripts adapters env test'
+          # Pinned: the action's default "stable" download currently fails to
+          # extract, which skips shellcheck entirely.
+          version: v0.10.0
       - run: python -m pip install --no-deps .
       - run: plasbench test
       - run: plasbench demo
       - run: python -m compileall -q python plasbench
       - run: python -m pip install build twine
       - run: python -m build
-      - run: python -m twine check dist/*
+      # Only distributions: `plasbench test` leaves a release-archive .sha256
+      # in dist/, which twine rejects as an unknown distribution format.
+      - run: python -m twine check dist/*.whl dist/*.tar.gz
   container:
     runs-on: ubuntu-latest
     steps:
