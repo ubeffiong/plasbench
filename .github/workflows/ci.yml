@@ -23,6 +23,9 @@ jobs:
           shellcheck --version
           # Gate on warnings and errors; info/style notes are reported, not fatal.
           find scripts adapters env test -type f -name '*.sh' -print0 | xargs -0 shellcheck -S warning
+      # minimap2 on PATH so test_scoring_real_minimap2.py runs the real aligner
+      # instead of skipping (the --no-deps install provides no aligner).
+      - run: sudo apt-get install -y -qq minimap2
       - run: python -m pip install --no-deps .
       - run: plasbench test
       - run: plasbench demo

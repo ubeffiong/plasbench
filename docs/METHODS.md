@@ -528,6 +528,17 @@ It never changes `scores.tsv`. `python/stratify_recovery.py` joins it to the rep
 writes `benchmark.recovery_by_replicon.tsv`; a failure there only warns. It can also be
 run by hand:
 
+### Truth-label audit (advisory)
+
+`python/audit_truth_labels.py` (run by `scripts/06_aggregate.sh`) cross-checks every
+truth sequence's PLASMID/CHROMOSOME label against replicon and MOB evidence in
+`truth_features.tsv` and writes `benchmark.truth_label_audit.tsv`. Findings:
+`chromosome_with_plasmid_markers` (candidate chromid or integrated plasmid),
+`plasmid_without_markers` (candidate mislabel, or a cryptic plasmid the databases do not
+know), `consistent`, and `not_evaluated`. Absence of a marker is reported only when both
+the replicon and MOB callers ran according to `annotation_provenance.json`; otherwise the
+result is `not_evaluated`. The audit never edits `truth.tsv` and never changes a score.
+
 ```bash
 python3 python/stratify_recovery.py --results-dir results --data-dir data \
     --out results/benchmark.recovery_by_replicon.tsv

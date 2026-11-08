@@ -73,6 +73,12 @@ if ! python3 "$HERE/../python/stratify_recovery.py" \
     warn "recovery-by-replicon breakdown failed; leaderboard is unaffected"
 fi
 
+# Truth-label screen (python/audit_truth_labels.py): does each PLASMID/CHROMOSOME
+# label agree with replicon/MOB evidence? Advisory; never edits truth or scores.
+if ! python3 "$HERE/../python/audit_truth_labels.py"         --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.truth_label_audit.tsv"; then
+    warn "truth-label audit failed; scores are unaffected"
+fi
+
 # How much the ranking depends on scoring choices (python/rank_sensitivity.py):
 # re-scores every PAF already on disk with one filter changed at a time, and
 # re-ranks under strict F1 and per-plasmid recovery. Advisory: it writes
@@ -172,6 +178,7 @@ log "  Run manifest      : $RESULTS_DIR/run_manifest.json"
 log "  Recommendations   : $RESULTS_DIR/benchmark.recommendations.tsv"
 log "  Stratified metrics: $RESULTS_DIR/benchmark.stratified.tsv"
 log "  Recovery by replicon/MOB: $RESULTS_DIR/benchmark.recovery_by_replicon.tsv (descriptive only)"
+log "  Truth-label audit : $RESULTS_DIR/benchmark.truth_label_audit.tsv (advisory only)"
 log "  Study holdout test : $RESULTS_DIR/benchmark.recommendation_validation.tsv"
 log "  Cohort QC flags   : $RESULTS_DIR/benchmark.cohort_qc_flags.tsv (advisory only)"
 if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then

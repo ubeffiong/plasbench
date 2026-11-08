@@ -2,6 +2,8 @@
 
 > **Benchmarking plasmid reconstruction from sequence to biological function.**
 
+**Docs:** [FAQ](FAQ.md) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
+
 PlasBench is a reproducible, Ubuntu-first framework that **benchmarks how well
 plasmid-reconstruction tools recover plasmids**, using complete (long-read)
 assemblies as ground truth.
@@ -400,6 +402,9 @@ plasbench test && plasbench demo
 
 - **[docs/SCIENTIFIC_GUIDE.md](docs/SCIENTIFIC_GUIDE.md)** — what PlasBench does, how, and
   why; its scope; every metric; how to validate it; and what has and has not been shown.
+- **[`FAQ.md`](FAQ.md)** — the hard questions a reviewer or new user will ask (scope, truth,
+  scoring, statistics, leakage, reproducibility), each answered with the file or test that
+  supports it and an explicit list of what is still open.
 - **[Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** — every
   command, from a bare machine to a leaderboard, with what to do when a step fails.
 - **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
