@@ -231,6 +231,38 @@ def predictions(sample, tool, chrom_len, plasmids):
     return rows
 
 
+def write_assembly(sdir, sample, chrom_len, plasmids):
+    """A synthetic short-read assembly for the contig layer.
+
+    reference.full.fna adds a random chromosome to the plasmid records (the demo's
+    reference.fna holds plasmids only, for the nucleotide viewer). The assembly has
+    one contig per plasmid, named as mob_like reports them (so that method is scored
+    at contig level), two chromosome contigs, and an exact contigs_vs_ref.paf -- a
+    stand-in for minimap2, which the demo does not run.
+    """
+    import random
+    rng = random.Random(sum(map(ord, sample)))
+    chromosome = "".join(rng.choice("ACGT") for _ in range(chrom_len))
+    # Random, not dna(): the viewer's cyclic sequence has too few distinct k-mers
+    # for the alignment-free cross-check (it would be LOW_INFORMATION).
+    plasmid_seqs = {pname: "".join(rng.choice("ACGT") for _ in range(plen)) for pname, plen, _ in plasmids}
+    with (sdir / "reference.full.fna").open("w", encoding="utf-8") as handle:
+        handle.write(f">chr_{sample}\n{chromosome}\n")
+        for pname, seq in plasmid_seqs.items():
+            handle.write(f">{pname}\n{seq}\n")
+    half = chrom_len // 2
+    contigs = [(f"mob_ctg{i}", pname, 0, plen) for i, (pname, plen, _) in enumerate(plasmids, start=1)]
+    contigs += [("chr_contig_1", f"chr_{sample}", 0, half), ("chr_contig_2", f"chr_{sample}", half, chrom_len)]
+    with (sdir / "contigs.fasta").open("w", encoding="utf-8") as fasta, \
+            (sdir / "contigs_vs_ref.paf").open("w", encoding="utf-8") as paf:
+        for name, target, start, end in contigs:
+            seq = chromosome[start:end] if target.startswith("chr_") else plasmid_seqs[target][start:end]
+            tlen = chrom_len if target.startswith("chr_") else len(plasmid_seqs[target])
+            fasta.write(f">{name}\n{seq}\n")
+            n = end - start
+            paf.write(f"{name}\t{n}\t0\t{n}\t+\t{target}\t{tlen}\t{start}\t{end}\t{n}\t{n}\t60\n")
+
+
 def write_tsv(path, header, rows):
     with open(path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t")
@@ -314,6 +346,8 @@ def main():
                 sequence = dna(plen, seed=0)
                 for start in range(0, plen, 60):
                     handle.write(sequence[start:start + 60] + "\n")
+
+        write_assembly(sdir, sample, chrom_len, plasmids)
 
         write_tsv(sdir / "truth.tsv", ["sequence_id", "molecule_type", "length"],
                   [[f"chr_{sample}", "CHROMOSOME", chrom_len]]

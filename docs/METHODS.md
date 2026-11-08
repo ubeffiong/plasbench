@@ -1035,6 +1035,15 @@ precision, recall and F1 (Hungarian matching over PLASMID contigs, with |P| the 
 assigned to each plasmid), and the lengths of shared (AMBIGUOUS) and unassigned (UNPLACED) contigs. A
 parallel layer; never the headline.
 
+**Independent second scorer for the contig layer** (`python/contig_crosscheck.py`). The same contig
+labels and contig-level F1/MCC are recomputed by a route that shares no code with
+`contig_classification.py`: labels from alignment-free k-mer containment (canonical 21-mers sampled by
+hash, 1 in `CONTIG_CROSSCHECK_SCALED`; containment ≥ `CONTIG_MIN_COVERAGE` in plasmid or chromosome
+truth, both → AMBIGUOUS, neither → UNPLACED, fewer than 20 sampled k-mers → LOW_INFORMATION and
+excluded), and metrics from a separate implementation. Per sample and tool it reports label agreement,
+Cohen's kappa and both scorers' length-weighted F1 and MCC; "agree" when both differences are ≤ 0.02.
+`benchmark.contig_crosscheck.tsv`; the report's contig-layer and validity sections cite it.
+
 **Outcome states** (`04_run_tools.sh`, `aggregate_results.py`). completed, reused, failed (tool),
 failed (resource: exit 124/137), infrastructure failure (exit 125/126/127, or a full disk in the log:
 never scored), not applicable (skipped). `TOOL_RETRIES` automatic retries (not for 124/137);

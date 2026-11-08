@@ -133,6 +133,17 @@ score_sample() {
         fi
         [[ -s "$CONTIG_LABELS" ]] && CONTIG_READY=1
         [[ -s "$ASM_COVERAGE" ]] && ASM_COV_ARGS=(--assembly-coverage "$ASM_COVERAGE")
+        # Independent second scorer for the contig layer (python/contig_crosscheck.py):
+        # alignment-free k-mer labels, compared with the minimap2 labels in stage 6.
+        local KMER_LABELS="$SDIR/contig_labels.kmer.tsv"
+        if [[ "${RUN_CONTIG_CROSSCHECK:-1}" == "1" && "$CONTIG_READY" -eq 1 ]] \
+                && [[ ! -s "$KMER_LABELS" || "$KMER_LABELS" -ot "$CONTIGS" || "$KMER_LABELS" -ot "$SCORE_TRUTH" ]]; then
+            python3 "$HERE/../python/contig_crosscheck.py" label --contigs "$CONTIGS" --reference "$REF" \
+                --truth "$SCORE_TRUTH" --out "$KMER_LABELS" --min-length "$CONTIG_MIN_LENGTH" \
+                --min-containment "$CONTIG_MIN_COVERAGE" --scaled "${CONTIG_CROSSCHECK_SCALED:-10}" \
+                2>> "$LOG_DIR/${SAMPLE}.contig_classification.log" \
+                || { rm -f "$KMER_LABELS"; warn "contig cross-check labelling failed for $SAMPLE"; }
+        fi
     fi
 
     local preds

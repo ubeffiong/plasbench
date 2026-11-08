@@ -658,6 +658,8 @@ All settings are environment variables read by `config/config.sh` (override them
 | `SMALLEST_DIFFERENCE` | 0.05 | Equivalence margin for paired comparisons. |
 | `RUN_AMR_PLACEMENT` | 1 | AMR gene placement, when curated AMR truth exists. |
 | `RUN_ASSEMBLY_QC_GATE`, `ASSEMBLY_QC_MAX_SIZE_MB`, `ASSEMBLY_QC_MAX_GC_SPREAD` | 1, 8.5, 0.12 | Advisory assembly QC gate. |
+| `RUN_CONTIG_CROSSCHECK`, `CONTIG_CROSSCHECK_SCALED` | 1, 10 | Independent alignment-free second scorer for the contig layer. |
+| `READ_SOURCE` | auto | Short reads from the SRA Toolkit, falling back to ENA (HTTPS, MD5-verified) if `prefetch` fails; `sra` or `ena` to force one. |
 
 **Operational mode and optional diagnostics**
 
@@ -742,7 +744,7 @@ This section records what has and has not been shown, so that a reader can judge
 | The nearest-reference Mash screen has not been validated against any independent plasmid partition and uses a 16-plasmid reference set. | Use it only as a distance report. |
 | No laboratory (PCR, long-read confirmation) evidence is bundled. | Computational concordance is not biological confirmation. |
 | Pre-registered values marked `TO_FIX` (tool timeout, integrated-element depth, circular-path requirement) await the panel. | The plan is not frozen; `REQUIRE_PREREG=1` will refuse to run until they are fixed. |
-| The contig layer has not been compared with a second, independent scorer. | Treat it as implemented, not validated. |
+| The contig layer's independent cross-check agrees on synthetic data; real-data agreement is read per run in `benchmark.contig_crosscheck.tsv`. | Check that table before citing contig-level numbers. |
 | The recommender evaluation has run only on synthetic data. | Its verdict on a real cohort is unknown. |
 
 ### 17.3 What would establish the claims
@@ -799,7 +801,7 @@ This section records what has and has not been shown, so that a reader can judge
 | Learned recommendation model | **Implemented, off by default**, gated by validation. |
 | Nearest-reference Mash screen | **Experimental, unvalidated, off by default.** |
 | Pre-registration freeze, label schemes, dimer collapse, outcome states | **Implemented**; tested on synthetic data. |
-| Contig-level scoring layer | **Implemented, parallel to the reference layer, not validated** against a second scorer. |
+| Contig-level scoring layer | **Implemented, parallel to the reference layer**, cross-checked every run against an independent alignment-free scorer (`benchmark.contig_crosscheck.tsv`). |
 | Recommender regret, warning PPV, leave-taxon-out | **Implemented**; tested on synthetic data only. |
 | AMR placement by gene class | **Implemented**; needs curated `truth_amr.tsv`. |
 | Plasmid identification for a user's sample | **Not a PlasBench function.** |

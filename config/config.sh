@@ -69,6 +69,9 @@ export TRUTH_LONG_READ_PRESET="${TRUTH_LONG_READ_PRESET:-map-ont}"
 # replicon but the main chromosome is a plasmid) and evidence (Scheme 2,
 # evidence-confirmed labels with AMBIGUOUS replicons excluded, truth.scored.tsv).
 export TRUTH_LABEL_SCHEME="${TRUTH_LABEL_SCHEME:-ncbi}"
+# Where stage 1 gets short reads: auto (SRA Toolkit, then ENA if prefetch fails),
+# sra (SRA Toolkit only), ena (ENA only; python/fetch_ena_reads.py, MD5-verified).
+export READ_SOURCE="${READ_SOURCE:-auto}"
 # Tandem-dimer truth plasmids (python/detect_dimers.py, stage 2): halves at
 # >= DIMER_MIN_IDENTITY over >= DIMER_MIN_HALF_COVERAGE are a dimer.
 # COLLAPSE_DIMERS=1 scores the monomer; 0 only flags it (AMBIGUOUS under the
@@ -601,6 +604,11 @@ export PLASMID_REFERENCE_FASTA="${PLASMID_REFERENCE_FASTA:-$DATA_DIR/db/plasmid_
 # kind of truth; contigs aligning that well to both are AMBIGUOUS (excluded,
 # counted). Adds count-based and length-weighted P/R/F1/MCC per tool.
 export RUN_CONTIG_CLASSIFICATION="${RUN_CONTIG_CLASSIFICATION:-1}"
+# Independent second scorer for the contig layer (python/contig_crosscheck.py):
+# alignment-free k-mer containment labels (k=21, FracMinHash 1/CONTIG_CROSSCHECK_SCALED)
+# compared with the minimap2 labels; benchmark.contig_crosscheck.tsv.
+export RUN_CONTIG_CROSSCHECK="${RUN_CONTIG_CROSSCHECK:-1}"
+export CONTIG_CROSSCHECK_SCALED="${CONTIG_CROSSCHECK_SCALED:-10}"
 # Sequence-level leakage check (python/database_containment.py, stage 6): a
 # truth plasmid is "in" a tool's database when one database record covers
 # >= DATABASE_CONTAINMENT_MIN_COVERAGE of it at >= ..._MIN_IDENTITY. MOB-suite's
