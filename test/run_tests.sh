@@ -56,7 +56,7 @@ python3 "$HERE/test_materialize_bmock12_truth.py"
 python3 "$HERE/test_question_bank_gaps.py"
 python3 "$HERE/test_metric_rubric.py"
 # Panel alignment and scoring specification (docs/PANEL_ALIGNMENT.md).
-for test in test_label_schemes.py test_dimer_collapse.py test_mcc_abstention.py test_prereg_freeze.py test_bin_outcomes.py test_contig_scoring.py; do
+for test in test_label_schemes.py test_dimer_collapse.py test_mcc_abstention.py test_prereg_freeze.py test_bin_outcomes.py test_contig_scoring.py test_recommender_eval.py; do
     python3 "$HERE/$test"
 done
 bash "$HERE/test_outcome_states.sh"
