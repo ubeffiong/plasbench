@@ -78,13 +78,18 @@ def truth_bins(labels, min_length=0):
 
 
 def is_assembly(bins, labels):
-    return all(s in labels for members in bins.values() for s in members)
+    """Same rule as contig_classification.py score: a tool whose predicted ids share nothing with the assembly contigs
+    emits reassembled sequences (not applicable); one with at least one matching id is scored on the matching ids, and
+    records that are not assembly contigs (a graph binner's synthetic records, say) are ignored. An empty prediction is
+    scored: it predicts no plasmid contigs."""
+    members = [s for ms in bins.values() for s in ms]
+    return not members or any(s in labels for s in members)
 
 
 def _filter_pred(bins, labels, min_length):
     out = {}
     for b, members in bins.items():
-        keep = {s for s in members if labels[s]["label"] not in EXCLUDED_LABELS
+        keep = {s for s in members if s in labels and labels[s]["label"] not in EXCLUDED_LABELS
                 and labels[s]["length"] >= min_length}
         if keep:
             out[b] = keep

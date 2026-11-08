@@ -81,6 +81,24 @@ def main():
                  "orthogonal-evidence", "quast-diagnostics", "accuracy-dimension", "feature-preservation",
                  "bin-quality", "performance", "power", "scenarios", "composite", "reproducibility"):
         assert f"href='#{name}'" in html, name
+    # Additions learned from PlasEval, plsMD and GAEMR: output files and populated sections. The demo carries an assembly
+    # with contig labels, so bin agreement (for the tool whose bins are assembly contigs), assembly adequacy and repeat
+    # content hold values; copy number needs truth depth the demo lacks and must say so; plsMD is not run in the demo.
+    scores = rows(DEMO / "scores.tsv")
+    agree = [r for r in scores if r.get("bestmatch_status") == "ok"]
+    assert agree and all(r["bestmatch_f1_bp"] and r["bin_dissimilarity"] != "" for r in agree), "bin agreement not scored"
+    assert any(r.get("bestmatch_status", "").startswith("not_applicable") for r in scores), \
+        "a reassembling tool must be recorded as not applicable, not scored"
+    assert len(rows(DEMO / "benchmark.assembly_adequacy.tsv")) > 0
+    assert len(rows(DEMO / "benchmark.repeat_content.tsv")) > 0
+    assert len(rows(DEMO / "benchmark.tool_agreement.tsv")) > 0
+    for sid in ("learn-agreement", "learn-adequacy", "learn-copynumber", "learn-truthqc", "learn-plsmd"):
+        assert f"href='#{sid}'" in html, sid
+    assert "Best-match F1" in section(html, "learn-agreement") and "Not run: scores.tsv" not in section(html, "learn-agreement")
+    assert "Plasmid adequacy" in section(html, "learn-adequacy") and "Not run" not in section(html, "learn-adequacy")
+    assert "repeat-rich" in section(html, "learn-truthqc")
+    assert "Not run" in section(html, "learn-copynumber"), "no truth depth in the demo: the section must say so"
+    assert "plsMD was not run" in section(html, "learn-plsmd")
     print("demo run -> per-plasmid files -> stratification, robustness, audit, strata -> HTML: PASS")
     print("ALL DEMO END-TO-END TESTS PASSED")
     return 0

@@ -105,9 +105,14 @@ def main():
         r = ba.eval_bestmatch({"P": ["a"]}, nolab)
         check("no truth", r["status"] == "no_truth_plasmid_contigs" and r["f1_count"] is None)
         # reassembled sequences
-        r = ba.eval_bestmatch({"P": ["a", "novel_seq"]}, labels)
+        r = ba.eval_bestmatch({"P": ["novel_seq", "other_seq"]}, labels)
         check("not assembly", r["status"] == "not_applicable_not_assembly_contigs"
               and r["precision_bp"] is None)
+        # a mix: ids that are not assembly contigs are ignored, the matching ones are scored (contig_classification rule)
+        mixed = ba.eval_bestmatch({"P": ["a", "novel_seq"]}, labels)
+        only = ba.eval_bestmatch({"P": ["a"]}, labels)
+        check("a record that is not an assembly contig is ignored when others match",
+              mixed["status"] == only["status"] == "ok" and mixed["f1_bp"] == only["f1_bp"])
         # fallback to best_plasmid when plasmids column absent
         lab3 = tmp / "labels_noplasmids.tsv"
         write_labels(lab3, [("a", 100, "PLASMID", "T1")], with_plasmids=False)
