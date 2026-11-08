@@ -50,7 +50,7 @@ explicit and defaults to Scheme 3. Setting `TRUTH_LABEL_SCHEME=evidence` restore
 | P5 | D15 transparency | "Tools compared" reasons in the run-outcome section | report |
 | P6 | 3.3, 2.4 refusal states | `insufficient_sequence`, `ambiguous_between_references` | operational screen, report labels |
 | P7 | D13 pre-ranking gate | `assembly_qc_gate.py` (advisory) | stage 8 warning; stage 6 `benchmark.assembly_qc.tsv`, scored as a warning |
-| WP8 | Report, docs, tests | `report_scoring_spec.py` (ten sections, explicit not-run notes, Markdown summary); guide, METHODS, PREREGISTRATION, FAQ, README; 15 new tests | demo, `test/run_tests.sh` |
+| WP8 | Report, docs, tests | `report_scoring_spec.py` (ten sections, explicit not-run notes, Markdown summary); guide, METHODS, PREREGISTRATION, FAQ, README; 14 new tests | demo, `test/run_tests.sh` |
 
 ## 4. Not implemented, and why
 
