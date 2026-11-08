@@ -203,6 +203,57 @@ def clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins):
     return nmi, vi
 
 
+def adjusted_rand(overlaps, plasmids, chromosome_bp):
+    """Base-pair-weighted Adjusted Rand Index over the same contingency table
+    clustering_agreement() uses (bins + unassigned plasmid bp as rows; truth
+    plasmids + wrongly claimed chromosome as columns). Each base is an item, so
+    pair counts are C(n, 2) of base counts. None when undefined (fewer than two
+    bases, or a degenerate table where expected == maximum)."""
+    rows = defaultdict(lambda: defaultdict(int))
+    claimed = defaultdict(int)
+    for (bin_id, plasmid), bp in overlaps.items():
+        if bp > 0:
+            rows[bin_id][plasmid] += bp
+            claimed[plasmid] += bp
+    for bin_id, bp in chromosome_bp.items():
+        if bp > 0:
+            rows[bin_id]["CHROMOSOME"] += bp
+    for plasmid, length in plasmids.items():
+        if length - claimed.get(plasmid, 0) > 0:
+            rows["__unassigned__"][plasmid] += length - claimed.get(plasmid, 0)
+
+    def pairs(n):
+        return n * (n - 1) / 2
+
+    total = sum(sum(c.values()) for c in rows.values())
+    if total < 2:
+        return None
+    col_totals = defaultdict(int)
+    for cols in rows.values():
+        for col, bp in cols.items():
+            col_totals[col] += bp
+    index = sum(pairs(bp) for cols in rows.values() for bp in cols.values())
+    row_sum = sum(pairs(sum(cols.values())) for cols in rows.values())
+    col_sum = sum(pairs(bp) for bp in col_totals.values())
+    expected = row_sum * col_sum / pairs(total)
+    maximum = (row_sum + col_sum) / 2
+    if maximum == expected:
+        return None
+    return (index - expected) / (maximum - expected)
+
+
+def read_assembly_coverage(path, plasmids):
+    """sequence_id -> bases of the plasmid covered by the assembly's plasmid contigs."""
+    covered = {}
+    if not path:
+        return covered
+    with open(path, encoding="utf-8") as handle:
+        for row in csv.DictReader(handle, delimiter="\t"):
+            if row.get("sequence_id") in plasmids:
+                covered[row["sequence_id"]] = min(plasmids[row["sequence_id"]], int(row["assembly_covered_bp"]))
+    return covered
+
+
 def maximum_weight(edges, bins_list, plasmids_list):
     """Return a maximum-weight one-to-one assignment using Hungarian O(n^3)."""
     n = max(len(bins_list), len(plasmids_list))
@@ -297,6 +348,8 @@ def main():
     parser.add_argument("--split-threshold", type=float, default=.1)
     parser.add_argument("--ambiguity-paf", help="Optional all-mapping PAF for repeat-associated bin ambiguity.")
     parser.add_argument("--cprr-out", help="Per-truth-plasmid correct-reconstruction table (CPRR).")
+    parser.add_argument("--assembly-coverage", help="contig_classification.py coverage table: per truth plasmid, bases "
+                                                    "the assembly covers (assembly-aware binning recall).")
     parser.add_argument("--cprr-min-coverage", type=float, default=0.95,
                         help="CPRR: minimum fraction of the plasmid covered by its matched bin.")
     parser.add_argument("--cprr-min-share", type=float, default=0.95,
@@ -380,6 +433,18 @@ def main():
     # plasmid), matching this file's existing availability-aware convention.
     nmi, vi = clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins)
     lw = length_weighted_binning(overlaps, plasmids, total_mapped, all_bins)
+    ari = adjusted_rand(overlaps, plasmids, chromosome_bp)
+    # Assembly-aware recall: the denominator is the plasmid length the assembly
+    # actually covers, so a tool is not blamed for bases no contig contains.
+    assembly_covered = read_assembly_coverage(args.assembly_coverage, plasmids)
+    lw_recall_assembly = lw_f1_assembly = None
+    if assembly_covered:
+        reachable = sum(assembly_covered.values())
+        correct_bp = sum(bp for _, _, bp in lw["matched"])
+        lw_recall_assembly = min(1.0, safe_div(correct_bp, reachable)) if reachable else None
+        if lw_recall_assembly is not None:
+            p = lw["precision"]
+            lw_f1_assembly = 2 * p * lw_recall_assembly / (p + lw_recall_assembly) if p + lw_recall_assembly else 0.0
     cprr_rows = correct_reconstruction(lw["matched"], overlaps, plasmids, total_mapped, identity_counts,
                                        fragments, args.cprr_min_coverage, args.cprr_min_share,
                                        args.cprr_min_identity)
@@ -396,10 +461,14 @@ def main():
         writer = csv.writer(handle, delimiter="\t")
         writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction", "nmi", "variation_of_information",
                          "lw_bin_precision", "lw_bin_recall", "lw_bin_f1",
-                         "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity"])
+                         "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",
+                         "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware"])
         writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else "",
                          f"{lw['precision']:.4f}", f"{lw['recall']:.4f}", f"{lw['f1']:.4f}",
-                         cprr_total, cprr_correct, cprr_correct_no_identity])
+                         cprr_total, cprr_correct, cprr_correct_no_identity,
+                         f"{ari:.4f}" if ari is not None else "",
+                         f"{lw_recall_assembly:.4f}" if lw_recall_assembly is not None else "",
+                         f"{lw_f1_assembly:.4f}" if lw_f1_assembly is not None else ""])
     print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)} "
           f"lw_bin_f1={lw['f1']:.4f} cprr={cprr_correct}/{cprr_total}")
 

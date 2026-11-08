@@ -22,6 +22,7 @@ Standard library only.
 """
 
 import argparse
+import os
 import csv
 import random
 import re
@@ -175,6 +176,18 @@ def read_scores(path):
                 # recovery. Gracefully absent (never 0) when undefined, matching
                 # plasmid_recall's own convention immediately above.
                 "strict_precision": float(f[idx["strict_precision"]]) if "strict_precision" in idx and f[idx["strict_precision"]] else None,
+                # Metric-rubric additions: contig-level classification (count-based and
+                # length-weighted F1/MCC), bp-weighted ARI, assembly-aware binning F1, and
+                # raw base counts for micro (pooled) averaging.
+                "contig_f1_count": float(f[idx["contig_f1_count"]]) if "contig_f1_count" in idx and f[idx["contig_f1_count"]] else None,
+                "contig_mcc_count": float(f[idx["contig_mcc_count"]]) if "contig_mcc_count" in idx and f[idx["contig_mcc_count"]] else None,
+                "contig_f1_bp": float(f[idx["contig_f1_bp"]]) if "contig_f1_bp" in idx and f[idx["contig_f1_bp"]] else None,
+                "contig_mcc_bp": float(f[idx["contig_mcc_bp"]]) if "contig_mcc_bp" in idx and f[idx["contig_mcc_bp"]] else None,
+                "bin_ari": float(f[idx["bin_ari"]]) if "bin_ari" in idx and f[idx["bin_ari"]] else None,
+                "lw_bin_f1_assembly_aware": float(f[idx["lw_bin_f1_assembly_aware"]]) if "lw_bin_f1_assembly_aware" in idx and f[idx["lw_bin_f1_assembly_aware"]] else None,
+                "TP_bp": int(f[idx["TP_bp"]]) if "TP_bp" in idx and f[idx["TP_bp"]] else None,
+                "FP_bp": int(f[idx["FP_bp"]]) if "FP_bp" in idx and f[idx["FP_bp"]] else None,
+                "FN_bp": int(f[idx["FN_bp"]]) if "FN_bp" in idx and f[idx["FN_bp"]] else None,
                 # Probability calibration (score_plasmids.py; probability-exposing tools only).
                 "brier_score": float(f[idx["brier_score"]]) if "brier_score" in idx and f[idx["brier_score"]] else None,
                 "expected_calibration_error": (float(f[idx["expected_calibration_error"]])
@@ -466,6 +479,21 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
         row["mean_expected_calibration_error"] = statistics.mean(ece) if ece else None
         row["n_calibrated"] = len(ece)
         row["is_baseline"] = "yes" if (design.is_baseline(row["tool"]) if design else row["tool"].startswith("baseline_")) else "no"
+        tool_rows = [r for r in rows if r["tool"] == row["tool"]]
+        for key in ("contig_f1_count", "contig_mcc_count", "contig_f1_bp", "contig_mcc_bp",
+                    "bin_ari", "lw_bin_f1_assembly_aware"):
+            values = [r[key] for r in tool_rows if r.get(key) is not None]
+            row[f"mean_{key}"] = statistics.mean(values) if values else None
+        # Micro average: TP/FP/FN bases pooled over every sample the tool was
+        # scored on (large isolates weigh more). mean_precision/recall/f1 are the
+        # macro average: per isolate, then averaged.
+        pooled = [r for r in tool_rows if r.get("TP_bp") is not None]
+        tp = sum(r["TP_bp"] for r in pooled)
+        fp = sum(r.get("FP_bp") or 0 for r in pooled)
+        fn = sum(r.get("FN_bp") or 0 for r in pooled)
+        row["micro_precision"] = tp / (tp + fp) if tp + fp else None
+        row["micro_recall"] = tp / (tp + fn) if tp + fn else None
+        row["micro_f1"] = 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else None
     # Rank by the ranking score (descending). A tool with no defined score
     # (e.g. scored only on zero-true-plasmid isolates) sorts last. Equal scores
     # rank by tool name, so the order never depends on row order in scores.tsv
@@ -707,7 +735,11 @@ def write_tsv(summary, path):
             "n_headline_species", "n_ranking_clusters", "mean_lw_bin_f1",
             "cprr", "cprr_ci_low", "cprr_ci_high", "cprr_correct", "cprr_plasmids",
             "mean_brier_score", "mean_expected_calibration_error", "n_calibrated", "is_baseline", "beats_best_baseline",
-            "n_failed_resource", "n_unknown_overlap"]
+            "n_failed_resource", "n_unknown_overlap",
+            "micro_precision", "micro_recall", "micro_f1",
+            "mean_contig_f1_count", "mean_contig_mcc_count", "mean_contig_f1_bp", "mean_contig_mcc_bp",
+            "mean_bin_ari", "mean_lw_bin_f1_assembly_aware",
+            "n_plasmids_in_tool_database", "mean_recovery_in_tool_database", "mean_recovery_not_in_tool_database"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -761,6 +793,12 @@ def write_tsv(summary, path):
                 s.get("n_calibrated", ""), s.get("is_baseline", "no"), s.get("beats_best_baseline", ""),
                 s.get("n_failed_resource", 0),
                 s["n_unknown_overlap"] if s.get("n_unknown_overlap") is not None else "",
+                fmt4(s.get("micro_precision")), fmt4(s.get("micro_recall")), fmt4(s.get("micro_f1")),
+                fmt4(s.get("mean_contig_f1_count")), fmt4(s.get("mean_contig_mcc_count")),
+                fmt4(s.get("mean_contig_f1_bp")), fmt4(s.get("mean_contig_mcc_bp")),
+                fmt4(s.get("mean_bin_ari")), fmt4(s.get("mean_lw_bin_f1_assembly_aware")),
+                s.get("n_plasmids_in_tool_database", ""), fmt4(s.get("mean_recovery_in_tool_database")),
+                fmt4(s.get("mean_recovery_not_in_tool_database")),
             ]) + "\n")
 
 
@@ -938,6 +976,34 @@ METADATA_FIELDS = (
 )
 
 
+def database_recovery(summary, containment_path, results_dir):
+    """Per tool: mean per-plasmid completeness for truth plasmids inside vs
+    outside that tool's own database (database_containment.py). A large gap
+    means the tool recognises known plasmids better than it infers new ones."""
+    contained = defaultdict(dict)  # tool -> (sample, plasmid) -> in_database
+    for row in hd.read_rows(containment_path):
+        for tool in (row.get("tools") or "").split(","):
+            if tool:
+                key = (row["sample"], row["sequence_id"])
+                # A truth plasmid is "in" a tool's database if ANY of that tool's databases holds it.
+                contained[tool][key] = bool(contained[tool].get(key)) or row.get("in_database") == "yes"
+    for row in summary:
+        membership = contained.get(row["tool"])
+        if not membership:
+            row["n_plasmids_in_tool_database"] = ""
+            continue
+        inside, outside = [], []
+        for path in Path(results_dir).glob(f"*/{row['tool']}.per_plasmid.tsv"):
+            for record in hd.read_rows(path):
+                key = (path.parent.name, record.get("sequence_id"))
+                if key in membership and record.get("completeness") not in (None, ""):
+                    (inside if membership[key] else outside).append(float(record["completeness"]))
+        row["n_plasmids_in_tool_database"] = len(inside)
+        row["mean_recovery_in_tool_database"] = statistics.mean(inside) if inside else None
+        row["mean_recovery_not_in_tool_database"] = statistics.mean(outside) if outside else None
+    return summary
+
+
 def metadata_completeness(sample_sheet, samples):
     """Which consequential sample-sheet fields are missing, per scored sample."""
     rows = hd.read_rows(sample_sheet)
@@ -979,6 +1045,7 @@ def main():
     ap.add_argument("--capabilities", help="config/tool_capabilities.tsv; binning_capable decides the task track.")
     ap.add_argument("--truth-provenance", help="truth_provenance.py output (reference tiers).")
     ap.add_argument("--clonal-groups", help="clonal_groups.py output.")
+    ap.add_argument("--database-containment", help="database_containment.py output (truth plasmids in tool databases).")
     ap.add_argument("--headline-max-tier", type=int, default=2,
                     help="highest reference tier included in the headline (default 2).")
     ap.add_argument("--min-species-clusters", type=int, default=20,
@@ -1065,6 +1132,8 @@ def main():
     # The combined files hold every (track, task) leaderboard, each ranked on
     # its own (rank restarts per group). They never rank across groups.
     summary = [row for *_, track_summary, _ in per_track for row in track_summary]
+    if args.database_containment:
+        database_recovery(summary, args.database_containment, os.path.dirname(os.path.abspath(args.out_prefix)))
     comparisons = [row for *_, track_comparisons in per_track for row in track_comparisons]
     write_tsv(summary, args.out_prefix + ".leaderboard.tsv")
     write_md(summary, args.out_prefix + ".leaderboard.md", notes=notes)

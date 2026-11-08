@@ -385,14 +385,33 @@ scorecard is not used.
 | Proportion perfectly reconstructed | Done | CPRR: truth plasmids reconstructed whole, alone and accurately. | `<tool>.cprr.tsv`; `cprr` |
 | Nucleotide identity, mismatch, indel rates | Done | Where truth is independent of the benchmark's reads. | `benchmark.accuracy.tsv` |
 | Missing regions | Done | Count, total and longest gap per truth plasmid. | `benchmark.missing_regions.tsv` |
-| Sensitivity and specificity | Partial | Base-level sensitivity equals recall; specificity is per isolate. A per-contig version is not computed (the full contig set is only known when a tool supplies its candidates). | `recall`; `isolate_specificity` |
+| Sensitivity and specificity | Done | Base-level sensitivity equals recall; specificity is per isolate. Contig-level versions are below. | `recall`; `isolate_specificity` |
+| Contig-level classification (count-based and length-weighted) | Done | Assembly contigs labelled against truth (≥ 95% identity over ≥ 80% of the contig; contigs < 1 kb excluded; contigs matching both plasmid and chromosome are AMBIGUOUS and excluded, not multi-assigned; unplaced contigs excluded); each counted and excluded group is reported. Precision, recall and F1 per contig and per base. Tools that output reassembled sequences are marked not applicable. | `contig_classification.py`; `mean_contig_f1_count`, `mean_contig_f1_bp` |
+| Matthews correlation coefficient | Done | Count-based and length-weighted, because plasmid contigs are a small minority. | `mean_contig_mcc_count`, `mean_contig_mcc_bp` |
+| Micro versus macro averaging | Done | `mean_*` and the ranking score are macro (per isolate, then averaged; species-balanced when possible); `micro_precision/recall/f1` pool bases over all isolates. The two can rank tools differently, so both are reported. | `micro_f1`; `mean_f1` |
+| Adjusted Rand Index | Done (descriptive) | Base-pair weighted, over the same contingency table as NMI. AMI is not computed. | `bin_ari`; `mean_bin_ari` |
+| Completeness against the assembled length | Done | Binning recall also measured against the plasmid bases the assembly's plasmid contigs cover, so tools are not blamed for assembly gaps. | `lw_bin_recall_assembly_aware`, `mean_lw_bin_f1_assembly_aware` |
+| Probability calibration | Done (probability tools) | Brier score, expected calibration error, reliability diagram. | `<tool>.calibration.tsv`; `mean_brier_score` |
+| Trivial baselines | Done | `baseline_coverage` and `baseline_reference` scored like tools; each tool says whether it beats them. | `baseline_predictors.py`; `beats_best_baseline` |
 | NMI, variation of information, homogeneity, completeness, V-measure | Done (descriptive) | Base-pair weighted; unclaimed chromosome excluded. | `bin_summary`; `benchmark.bin_quality.tsv` |
 | Bin quality tiers (high, medium) and yield | Done | At least 90% complete and at most 5% contaminated is high; at least 50% and 10% is medium. | `benchmark.bin_quality.tsv` |
 | NGOC (gene-order conservation) | Done | Projection of truth features through the alignments; gene-order with a gene table, landmark-order with landmarks only. | `benchmark.ngoc.tsv` |
 | Feature and gene recovery | Done | Full length, truncated, missed. | `benchmark.feature_preservation.tsv` |
 | Median and IQR by size band and ARG status | Done | Per-plasmid completeness within <10 kb, 10-50 kb, >50 kb and by resistance-gene carriage. | `benchmark.recovery_by_replicon.tsv` |
 | Repeat-aware matching | Partial | Repeat effects reported as diagnostics (recall ceiling, ambiguity); matching is not repeat-aware; PlasEval only as an imported cross-check. | `repeat_ambiguity_bp`; `plasbench import-external-benchmark` |
-| Database-dependent recovery vs novel plasmids | Partial | A release-date screen exists, but every tool's database date is still blank, so every pair is `unknown`. | `flag_database_overlap.py` |
+| Database-dependent recovery vs novel plasmids | Done (installed databases) | Two checks. Date screen: release dates are filled for every installed or pinned database (MOB-suite, Platon, geNomad, PlaScope, RFPlasmid). Sequence check: each truth plasmid is aligned to the tool's own database FASTA (MOB-suite's found automatically; others via `TOOL_DATABASE_FASTAS`), and per-plasmid recovery is reported inside vs outside it. | `flag_database_overlap.py`, `database_containment.py`; `mean_recovery_in_tool_database` |
+
+### The headline metric set
+
+| Task | Headline numbers | Where to read them |
+|---|---|---|
+| Classification (plasmid vs chromosome) | Length-weighted F1 and MCC, with count-based versions beside them; base-level F1 as both macro and micro averages | Report "Classification and reconstruction metrics"; leaderboard `mean_contig_f1_bp`, `mean_contig_mcc_bp`, `mean_f1`, `micro_f1` |
+| Reconstruction (which contigs form one plasmid) | Length-weighted binning F1 (the ranking endpoint) and ARI | `ranking_score`, `mean_bin_ari`, assembly-aware `mean_lw_bin_f1_assembly_aware` |
+| Error types | Perfect (CPRR), fragmented (split events), merged (merge events), chromosomal contamination, missed plasmids | `cprr`, `<tool>.bin_summary.tsv`, report "Bin diagnostics" |
+
+Everything else is supplementary. Related metric definitions appear in the gplas/gplas2, HyAsP and
+PlasBin-flow papers and in published comparisons of MOB-recon, plasmidSPAdes and Platon; verify each source's
+exact definitions before citing them alongside PlasBench's.
 
 ### What is still open
 
@@ -400,14 +419,16 @@ These need data, compute or an external tool, not code, or are being done elsewh
 
 | Priority | Gap | Why it is still open |
 |---|---|---|
-| 1 | **A real-data run on `public-v2`, published with intervals, per-sample tables and the manifest** | Needs compute and data. Every ranking and performance claim depends on it. |
-| 2 | **Tool-database release dates**, then a sequence-level overlap screen | The dates come from each tool's maintainers; the screen needs each tool's database content. |
+| 1 | **A real-data run on `public-v3` (98 isolates), published with intervals, per-sample tables and the manifest** | Needs compute and data. Every ranking and performance claim depends on it. |
+| 2 | **More species reaching the species-balanced minimum** | `public-v3` has 22 independent long-read-first *E. coli* clusters but only 5-13 for each other species; NCBI ran short of qualifying genomes within the search limits. |
+| 2b | **Database dates and sequence checks for tools not yet installed** | Plassembler/Hybracter, PLASMe, PlasmidHunter, Plasmer and plASgraph2 databases are not installed here, so their dates are blank with the reason. |
 | 3 | **Independent audit of references, and read support for every truth replicon** | Needs the reads and curation. |
 | 4 | **An external validation cohort, and a simulation that the intervals have their nominal coverage under clustered sampling** | Needs data and a study design. |
 | 5 | **Plasmid-free, hard-structure and taxonomically broader isolates** | Data curation. |
 | 6 | **A first-class PlasEval adapter and repeat-aware matching** | Needs the external tool and real data to validate. |
-| 7 | **Calibration of per-record probabilities and trivial baselines scored like tools** | In progress on another branch. |
-| 8 | **Per-contig sensitivity and specificity** | Needs the full contig set per tool. |
+| 7 | **Abstention (unclassified) rate** | No wrapped tool reports an explicit "unclassified" call; adapters would need to pass it through. |
+| 8 | **NGA50, AMI, and multi-membership scoring of ambiguous contigs** | NGA50 needs contig-level misassembly breaks; AMI's expected-information term is impractical over base counts; ambiguous contigs are currently excluded (the stated rule), not multi-assigned. |
+| 8b | **Stratification by plasmid copy number** | Needs per-plasmid read depth for every truth plasmid; size, ARG status, species, tier and database membership are stratified already. |
 | 9 | **Documentation split**: a short quick start plus reference documents | A 3,000-line README is hard to keep true; a larger editorial task. |
 
 ### Areas of expansion

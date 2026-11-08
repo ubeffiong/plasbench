@@ -57,6 +57,32 @@ else
     warn "clonal grouping failed; clusters use BioProject/study only"
 fi
 
+# Sequence-level leakage check (python/database_containment.py): is each truth
+# plasmid already inside a tool's own database? The installed MOB-suite
+# database is found automatically; add others via TOOL_DATABASE_FASTAS
+# ("tool1,tool2=/path.fasta;tool3=/other.fasta"). Advisory: never re-ranks.
+if [[ "${RUN_DATABASE_CONTAINMENT:-1}" == "1" ]] && command -v minimap2 >/dev/null 2>&1; then
+    CONTAINMENT_DBS=()
+    MOB_DB_FASTA="$(python3 -c 'import os, mob_suite; print(os.path.join(os.path.dirname(mob_suite.__file__), "databases", "ncbi_plasmid_full_seqs.fas"))' 2>/dev/null || true)"
+    [[ -s "$MOB_DB_FASTA" ]] && CONTAINMENT_DBS+=(--database "mob_recon,flye_mob_recon,trycycler_mob_recon,gplas2_mob=$MOB_DB_FASTA")
+    IFS=';' read -r -a EXTRA_DBS <<< "${TOOL_DATABASE_FASTAS:-}"
+    for spec in "${EXTRA_DBS[@]}"; do
+        [[ -n "$spec" ]] && CONTAINMENT_DBS+=(--database "$spec")
+    done
+    if [[ "${#CONTAINMENT_DBS[@]}" -gt 0 ]]; then
+        mapfile -t CONTAINMENT_SAMPLES < <(read_samples "$SAMPLE_SHEET" | cut -f1)
+        if python3 "$HERE/../python/database_containment.py" --data-dir "$DATA_DIR" \
+                --samples "${CONTAINMENT_SAMPLES[@]}" "${CONTAINMENT_DBS[@]}" \
+                --min-coverage "${DATABASE_CONTAINMENT_MIN_COVERAGE:-0.95}" \
+                --min-identity "${DATABASE_CONTAINMENT_MIN_IDENTITY:-0.99}" --threads "$THREADS" \
+                --out "$RESULTS_DIR/benchmark.database_containment.tsv"; then
+            DESIGN_ARGS+=(--database-containment "$RESULTS_DIR/benchmark.database_containment.tsv")
+        else
+            warn "database containment check failed; recovery is not split by database membership"
+        fi
+    fi
+fi
+
 python3 "$HERE/../python/aggregate_results.py" \
     --scores "$SCORES" \
     --tool-status "$RESULTS_DIR/tool_status.tsv" \

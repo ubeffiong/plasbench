@@ -27,6 +27,8 @@ FIELDS = [
     # binning metrics and correct-plasmid-reconstruction counts.
     "lw_bin_precision", "lw_bin_recall", "lw_bin_f1",
     "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",
+    # Clustering agreement (bp-weighted ARI) and assembly-aware binning recall.
+    "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware",
 ]
 
 

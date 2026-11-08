@@ -546,6 +546,23 @@ export PLASMID_REFERENCE_FASTA="${PLASMID_REFERENCE_FASTA:-$DATA_DIR/db/plasmid_
 # >= BASELINE_COVERAGE_RATIO x the length-weighted median depth;
 # baseline_reference calls contigs whose aligned fraction against
 # PLASMID_REFERENCE_FASTA reaches BASELINE_REFERENCE_MIN_QUERY_COVERAGE.
+# Contig-level classification (python/contig_classification.py, stage 5):
+# assembly contigs >= CONTIG_MIN_LENGTH are labelled PLASMID/CHROMOSOME when
+# >= CONTIG_MIN_COVERAGE of the contig aligns at >= CONTIG_MIN_IDENTITY to that
+# kind of truth; contigs aligning that well to both are AMBIGUOUS (excluded,
+# counted). Adds count-based and length-weighted P/R/F1/MCC per tool.
+export RUN_CONTIG_CLASSIFICATION="${RUN_CONTIG_CLASSIFICATION:-1}"
+# Sequence-level leakage check (python/database_containment.py, stage 6): a
+# truth plasmid is "in" a tool's database when one database record covers
+# >= DATABASE_CONTAINMENT_MIN_COVERAGE of it at >= ..._MIN_IDENTITY. MOB-suite's
+# database is found automatically; add others as "tools=/path.fasta;..." here.
+export RUN_DATABASE_CONTAINMENT="${RUN_DATABASE_CONTAINMENT:-1}"
+export DATABASE_CONTAINMENT_MIN_COVERAGE="${DATABASE_CONTAINMENT_MIN_COVERAGE:-0.95}"
+export DATABASE_CONTAINMENT_MIN_IDENTITY="${DATABASE_CONTAINMENT_MIN_IDENTITY:-0.99}"
+export TOOL_DATABASE_FASTAS="${TOOL_DATABASE_FASTAS:-}"
+export CONTIG_MIN_LENGTH="${CONTIG_MIN_LENGTH:-1000}"
+export CONTIG_MIN_IDENTITY="${CONTIG_MIN_IDENTITY:-0.95}"
+export CONTIG_MIN_COVERAGE="${CONTIG_MIN_COVERAGE:-0.80}"
 export RUN_BASELINE_COVERAGE="${RUN_BASELINE_COVERAGE:-1}"
 export RUN_BASELINE_REFERENCE="${RUN_BASELINE_REFERENCE:-1}"
 export BASELINE_COVERAGE_RATIO="${BASELINE_COVERAGE_RATIO:-1.5}"
