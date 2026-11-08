@@ -38,7 +38,7 @@
 2. It is **not yet demonstrated**. There is no real-data result; the shipped leaderboards are synthetic. The statistics have never been checked by simulation, no plasmid tool is exercised by any test, and the truth the benchmark depends on is, for 91 of 98 shipped isolates, polished with the same Illumina reads the tools are scored on.
 3. Several **choices are not justified**: the alignment filters, the binning gates, and the CPRR thresholds have no derivation or sensitivity test, and the minimum of five clusters makes a conventional significance level unreachable.
 4. The **leakage control is weak on `main`**: a release-date screen cannot show that a plasmid is novel to a tool's database; a sequence-level check exists only for databases on disk.
-5. The **install pipeline was inconsistent** (fixed in a pending PR): samtools, mash and barrnap, used by default or opt-in stages, were not wired like minimap2.
+5. The **install pipeline was inconsistent** (fixed in PR #15): samtools, mash and barrnap, used by default or opt-in stages, were not wired like minimap2.
 
 **Most important findings, ranked.**
 1. No real-data evidence (Part 8).
