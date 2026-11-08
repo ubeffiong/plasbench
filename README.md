@@ -60,6 +60,7 @@ EBI MAP, plsMD, and experimental Plassembler boundaries.
 > The **[Scientific Guide](docs/SCIENTIFIC_GUIDE.md)** explains what PlasBench does, how it does it,
 > and why, in terms a microbiologist, bioinformatician, AMR scientist, programme lead or reviewer can
 > judge without reading the code. It states the scope plainly, defines every metric, lists what has
+> A sceptical outside assessment, with every claim tied to a file and line, is in the [independent review](docs/INDEPENDENT_REVIEW.md).
 > and has not been validated, and tells each kind of expert how to check the claims themselves.
 
 **In one paragraph.** PlasBench benchmarks plasmid-*reconstruction* tools. For isolates that have a
