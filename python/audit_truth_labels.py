@@ -108,8 +108,7 @@ def main():
             rows.extend(audit_sample(sample_dir.name, sample_dir))
     else:
         sys.stderr.write(f"[audit_truth_labels] data directory not found: {args.data_dir}; "
-                         "nothing audited
-")
+                         "nothing audited\n")
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t")
         writer.writeheader()
