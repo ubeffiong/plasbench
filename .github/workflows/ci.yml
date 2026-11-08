@@ -13,12 +13,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - uses: ludeeus/action-shellcheck@2.0.0
-        with:
-          scandir: 'scripts adapters env test'
-          # Pinned: the action's default "stable" download currently fails to
-          # extract, which skips shellcheck entirely.
-          version: v0.10.0
+      # shellcheck from the runner's package manager: ludeeus/action-shellcheck's
+      # release download returns a non-archive on the current runner image, so
+      # the job failed before any check ran.
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck --version
+          find scripts adapters env test -type f -name '*.sh' -print0 | xargs -0 shellcheck
       - run: python -m pip install --no-deps .
       - run: plasbench test
       - run: plasbench demo
