@@ -16,6 +16,7 @@ import argparse
 import csv
 import json
 import math
+import os
 import statistics
 import shutil
 from collections import Counter, defaultdict
@@ -239,7 +240,14 @@ def applicability_tier(summary, min_samples, min_coverage):
 
 
 def write_recommendations(rows, statuses, total_samples, out_path, min_samples, min_coverage, validation_ready=True,
-                          model=None, decision_profile=DEFAULT_DECISION_PROFILE):
+                          model=None, decision_profile=DEFAULT_DECISION_PROFILE, min_expected_score=0.0):
+    """Write benchmark.recommendations.tsv: one primary tool per scope, or none.
+
+    min_expected_score (decision D11, RECOMMENDATION_MIN_EXPECTED_SCORE): when the
+    best eligible tool's expected F1 (its mean F1 in the scope) is below it, no tool
+    is recommended; the row says "no tool expected to reconstruct plasmids
+    reliably" instead of naming a winner that would mislead a user.
+    """
     scopes = [("overall", "all", rows)]
     for field in ("organism", "gram_group", "truth_technology", "sample_origin", "collection_country",
                   "plasmid_size_band", "plasmid_count_band", "read_depth_band", "amr_status",
@@ -257,10 +265,16 @@ def write_recommendations(rows, statuses, total_samples, out_path, min_samples, 
                                  model=model, decision_profile=decision_profile)
         candidates = [item for item in summaries.values() if eligible(item, min_samples, min_coverage)] if validation_ready else []
         winner = max(candidates, key=lambda item: (item["decision_score"], item["mean_f1"], item["tool"])) if candidates else None
+        below_floor = winner if winner and winner["mean_f1"] < min_expected_score else None
+        if below_floor:
+            winner = None
         recommendations[(scope, group)] = winner["tool"] if winner else None
         for item in sorted(summaries.values(), key=lambda value: (-value["decision_score"], value["tool"])):
             item = dict(item)
             reason = ("coverage-gated multi-objective recommendation" if winner and item["tool"] == winner["tool"]
+                      else (f"no tool expected to reconstruct plasmids reliably: best expected F1 "
+                            f"{below_floor['mean_f1']:.2f} < {min_expected_score:.2f}")
+                      if below_floor and item["tool"] == below_floor["tool"]
                       else "independent-study validation unavailable" if not validation_ready
                       else "insufficient coverage or not the highest eligible decision score")
             if item.get("model_used"):
@@ -438,6 +452,9 @@ def main():
     parser.add_argument("--recommendation-model", help="Optional fitted recommendation-model JSON (fit_recommendation_model.py). Used only when model_ready is true; otherwise behaves exactly as if omitted.")
     parser.add_argument("--min-samples", type=int, default=5)
     parser.add_argument("--min-coverage", type=float, default=0.80)
+    parser.add_argument("--min-expected-score", type=float,
+                        default=float(os.environ.get("RECOMMENDATION_MIN_EXPECTED_SCORE", 0.40)),
+                        help="Decision D11: below this expected F1 no tool is recommended (default 0.40).")
     parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
     parser.add_argument("--decision-profile", choices=tuple(DECISION_PROFILES), default=DEFAULT_DECISION_PROFILE,
                         help="Named decision_score weight set (recommendation_model.py). The default reproduces "
@@ -477,7 +494,7 @@ def main():
     recommendations_path = out_prefix.with_name(out_prefix.name + ".recommendations.tsv")
     recommendations, recommendation_rows = write_recommendations(
         rows, statuses, len(metadata), recommendations_path, args.min_samples, args.min_coverage, validation_ready,
-        model=model, decision_profile=args.decision_profile)
+        model=model, decision_profile=args.decision_profile, min_expected_score=args.min_expected_score)
     stratified_path = out_prefix.with_name(out_prefix.name + ".stratified.tsv")
     with open(stratified_path, "w", newline="", encoding="utf-8") as handle:
         columns = ["scope", "group", "tool", "eligible", "applicability", "recommendation", "reason", "n_scored", "coverage",

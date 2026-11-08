@@ -1585,6 +1585,8 @@ NEAREST_REFERENCE_LABELS = {
     "close_reference_match": "Close match to a reference plasmid",
     "no_close_reference": "No close reference in the reference set",
     "insufficient_reference": "Could not be assessed",
+    "insufficient_sequence": "Not compared: record too short for a Mash distance",
+    "ambiguous_between_references": "Ambiguous: equally close to references in different clusters",
     # Labels written before the screen was renamed; reports from earlier runs
     # still open, and show the same meaning under today's wording.
     "known_cluster": "Close match to a reference plasmid (recorded as 'known_cluster')",

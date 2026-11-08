@@ -23,8 +23,10 @@ contigs against the truth reference (minimap2 -x asm5 -c --secondary=yes):
   UNPLACED   aligns well to neither (misassembly, contamination, truth gap):
              excluded, counted.
 
-Truth comes from truth.scored.tsv when present, so replicons evidence labelling
-marked AMBIGUOUS do not label contigs either. `label` also writes, per truth
+Truth is the file of the scored labelling scheme (stage 5 passes the same
+TRUTH_LABEL_SCHEME truth it scores against; truth.tsv under the primary NCBI
+scheme, truth.scored.tsv under the evidence scheme, where AMBIGUOUS replicons do
+not label contigs either). `label` also writes, per truth
 plasmid, how many of its bases the assembly's PLASMID contigs cover -- the
 assembly-aware denominator for binning recall (score_bins.py
 --assembly-coverage), so tools are not blamed for gaps in the assembly itself.

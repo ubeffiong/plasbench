@@ -45,6 +45,13 @@ CALLS (per query record)
   insufficient_reference -- mash is not installed, the reference sketch/metadata
                      is missing, or mash returned nothing for the record. Never
                      guessed either way.
+  insufficient_sequence -- the record is shorter than --min-query-length
+                     (1000 bp): too few k-mers for a meaningful distance, so it
+                     is not compared at all (panel question 3.3).
+  ambiguous_between_references -- the nearest reference is within the
+                     threshold, but a reference in a DIFFERENT cluster is within
+                     --ambiguity-margin (0.005) of the same distance: the screen
+                     cannot say which one the record is close to (panel 2.4).
 distance_margin is a transparent linear margin against the threshold, NOT a
 probability and NOT calibrated:
   close_reference_match: 1 - (distance / threshold), clipped to [0, 1]
@@ -152,7 +159,8 @@ def run_mash_dist(mash, reference_sketch, query_fasta, tmp_dir, threads, sketch_
         return None
 
 
-def classify(query_ids, dist_rows, reference_metadata, threshold, min_cluster_members, max_p_value=1.0):
+def classify(query_ids, dist_rows, reference_metadata, threshold, min_cluster_members, max_p_value=1.0,
+             query_lengths=None, min_query_length=0, ambiguity_margin=0.0):
     """query_record_id -> classification dict (see HEADER, minus sample_id).
 
     dist_rows holds (ref_id, query_id, distance) or, as run_mash_dist returns,
@@ -160,16 +168,27 @@ def classify(query_ids, dist_rows, reference_metadata, threshold, min_cluster_me
     dist_rows (mash dropped it, or mash never ran) still gets a row --
     'insufficient_reference', never silently omitted."""
     by_query = {}
+    all_hits = {}
     if dist_rows:
         for row in dist_rows:
             ref_id, query_id, distance = row[0], row[1], row[2]
             p_value = row[3] if len(row) > 3 else None
             shared = row[4] if len(row) > 4 else ""
+            all_hits.setdefault(query_id, []).append((distance, ref_id, p_value))
             if query_id not in by_query or distance < by_query[query_id][1]:
                 by_query[query_id] = (ref_id, distance, p_value, shared)
 
     results = {}
     for query_id in query_ids:
+        length = (query_lengths or {}).get(query_id)
+        # Only when a comparison was possible: with no reference every record is
+        # insufficient_reference, whatever its length.
+        if dist_rows is not None and min_query_length and length is not None and length < min_query_length:
+            results[query_id] = dict(
+                BLANK, cluster_membership_status="insufficient_sequence",
+                notes=f"record is {length} bp, shorter than {min_query_length} bp: too short for a meaningful "
+                      "Mash distance, so it was not compared.")
+            continue
         if query_id not in by_query:
             results[query_id] = dict(
                 BLANK, cluster_membership_status="insufficient_reference",
@@ -181,7 +200,22 @@ def classify(query_ids, dist_rows, reference_metadata, threshold, min_cluster_me
         cluster_size = int(ref_meta["cluster_member_count"]) if ref_meta.get("cluster_member_count", "").isdigit() else 0
         supported = p_value is None or p_value <= max_p_value
         is_close = distance <= threshold and cluster_size >= min_cluster_members and supported
-        if is_close:
+        rival = None
+        if is_close and ambiguity_margin > 0:
+            for other_distance, other_ref, other_p in sorted(all_hits.get(query_id, [])):
+                other_cluster = reference_metadata.get(other_ref, {}).get("cluster_id", "")
+                if (other_ref != ref_id and other_cluster and other_cluster != cluster_id
+                        and other_distance - distance <= ambiguity_margin
+                        and (other_p is None or other_p <= max_p_value)):
+                    rival = (other_ref, other_cluster, other_distance)
+                    break
+        if rival:
+            margin = 0.0
+            status = "ambiguous_between_references"
+            note = (f"Nearest reference (cluster {cluster_id}) and {rival[0]} (cluster {rival[1]}, distance "
+                    f"{rival[2]:.6f}) are within {ambiguity_margin} of each other: the screen cannot say which "
+                    f"reference this record is close to.")
+        elif is_close:
             margin = max(0.0, 1.0 - (distance / threshold)) if threshold > 0 else 0.0
             status = "close_reference_match"
             note = (f"Nearest reference is within the Mash threshold and its cluster has {cluster_size} "
@@ -209,6 +243,20 @@ def classify(query_ids, dist_rows, reference_metadata, threshold, min_cluster_me
     return results
 
 
+def query_lengths(path):
+    """record id -> length for the query FASTA."""
+    lengths, name = {}, None
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if line.startswith(">"):
+                name = line[1:].split()[0]
+                lengths[name] = 0
+            elif name is not None:
+                lengths[name] += len(line)
+    return lengths
+
+
 def write_header_only(out_path):
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
@@ -233,6 +281,11 @@ def main():
                     help="Mash sketch size for the query. Default: the size recorded in the reference's "
                          "reference_set_provenance.json, else 10000. It must match the reference.")
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--min-query-length", type=int, default=1000,
+                    help="Records shorter than this are insufficient_sequence and not compared (default 1000).")
+    ap.add_argument("--ambiguity-margin", type=float, default=0.005,
+                    help="A second reference in another cluster within this distance of the nearest makes the "
+                         "call ambiguous_between_references (default 0.005; 0 disables).")
     args = ap.parse_args()
 
     if not Path(args.query).is_file() or Path(args.query).stat().st_size == 0:
@@ -244,12 +297,14 @@ def main():
     if not mash:
         sys.stderr.write("[classify_operational_plasmid] mash is not installed (or not on PATH); no classification performed\n")
         query_ids = read_fasta_ids(args.query)
-        rows = classify(query_ids, None, {}, args.similarity_threshold, args.min_cluster_members, args.max_p_value)
+        rows = classify(query_ids, None, {}, args.similarity_threshold, args.min_cluster_members, args.max_p_value,
+                        query_lengths(args.query), args.min_query_length, args.ambiguity_margin)
     elif not Path(args.reference_sketch).is_file() or not Path(args.reference_metadata).is_file():
         sys.stderr.write(f"[classify_operational_plasmid] reference sketch/metadata not found "
                          f"({args.reference_sketch}, {args.reference_metadata}); no classification performed\n")
         query_ids = read_fasta_ids(args.query)
-        rows = classify(query_ids, None, {}, args.similarity_threshold, args.min_cluster_members, args.max_p_value)
+        rows = classify(query_ids, None, {}, args.similarity_threshold, args.min_cluster_members, args.max_p_value,
+                        query_lengths(args.query), args.min_query_length, args.ambiguity_margin)
     else:
         query_ids = read_fasta_ids(args.query)
         reference_metadata = read_reference_metadata(args.reference_metadata)
@@ -257,7 +312,8 @@ def main():
         with tempfile.TemporaryDirectory(prefix="classify_operational_plasmid_") as tmp:
             dist_rows = run_mash_dist(mash, args.reference_sketch, args.query, tmp, args.threads, sketch_size)
         rows = classify(query_ids, dist_rows, reference_metadata, args.similarity_threshold,
-                        args.min_cluster_members, args.max_p_value)
+                        args.min_cluster_members, args.max_p_value,
+                        query_lengths(args.query), args.min_query_length, args.ambiguity_margin)
 
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
