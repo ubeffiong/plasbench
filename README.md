@@ -73,7 +73,7 @@ repository implements; the **Limits** list says what it does not claim.
 | Truth of unknown quality | Truth tiers with provenance, truth-label audits, a negative-control (zero-plasmid) isolate guard, and an explicit rule that a tool is never scored against reads its own truth was built from |
 | "Use tool X" advice from a single average | Recommendations are evidence-gated and **withheld** when coverage of a stratum (species, size band, replicon type) is too thin ([§4.5](#45-recommendations-and-why-they-are-usually-withheld)) |
 | Results that cannot be rerun | Pinned conda lock file, container, per-run manifest with tool versions and checksums, deterministic seeds for every resampling step, and an offline synthetic demo (`test/run_demo.sh`) that exercises every stage without downloads |
-| One tool, one parser, one script | 13 tool adapters under `adapters/` behind a single contract (plus trivial baselines), a Galaxy wrapper, and a separate graph-aware metagenomic track with its own three-class truth contract |
+| One tool, one parser, one script | A registry of 23 tools and three trivial baselines (`config/tool_capabilities.tsv`) behind a single contract, a Galaxy wrapper, and a separate graph-aware metagenomic track with its own three-class truth contract |
 
 **Cost of running it.** The Python analysis stages are cheap next to assembly and
 the external tools. After the performance audit (synthetic inputs, one 12-core
@@ -155,7 +155,7 @@ overlap could have inflated it.
 *Bioinformatician:* sections 3, 5 to 8, 15, 16.2. *Public-health or programme lead:* sections 1, 12, 13,
 16.3, 17, 18. *Reviewer or funder:* sections 1, 17, 18, 16.4.
 
-## Why PlasBench: what it does that other tools do not
+## How PlasBench compares with plsMD, PlasEval and GAEMR
 
 PlasBench compares plasmid-reconstruction tools. Three neighbouring projects were reviewed in detail while building it
 ([plsMD](https://github.com/Genomics-and-Metagenomics-Unit-57357/plsMD), [PlasEval](https://github.com/cchauve/PlasEval) and
