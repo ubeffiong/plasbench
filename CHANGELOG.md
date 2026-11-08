@@ -35,6 +35,28 @@ history is lost, only the numbering is cleaner. See
   uninstalled databases left blank with the reason.
 - New `python/collect_truth_provenance.py` and `python/discover_design_cohort.py`; the
   assembler pattern now tolerates NCBI's "Trycyler" misspelling.
+### Added -- further benchmark dimensions (advisory; none changes the leaderboard)
+- `python/alignment_accuracy.py`: nucleotide identity, mismatch, insertion and deletion rates decoded from the alignment CIGAR,
+  and missing-region counts; `python/mask_accuracy.py` blanks the rates where the truth was polished with the benchmark's own
+  reads (the same rule as the CPRR identity criterion). SNP concordance is not computed (no variant truth exists).
+- `python/feature_preservation.py`: full-length, truncated and missed recovery per feature kind, and NGOC (gene or
+  landmark-order conservation, strand and circularity aware), by projecting truth features through the alignments.
+- `python/bin_quality.py`: high and medium quality-bin yield, homogeneity, completeness and V-measure, as secondary diagnostics.
+- `python/performance_summary.py`: success rate, resource failures, runtime, memory, thread-seconds per recovered plasmid,
+  CPU utilisation and scaling exponents. Stage 4 now records user and system CPU seconds beside peak memory.
+- `python/power_analysis.py`, `python/scenario_tags.py`, `python/compare_runs.py`, and an optional gated composite with weight
+  sensitivity (`python/composite_score.py`, `config/composite_weights.tsv`). The composite never changes the leaderboard.
+- `python/stratify_recovery.py` also stratifies by size band and resistance-gene carriage and reports median and IQR;
+  `python/audit_truth_labels.py` screens truth labels against replicon and MOB evidence; `plasbench derive-amr-truth`,
+  `plasbench audit-truth-labels` and `plasbench analysis <name>` expose the standalone scripts.
+- The HTML report gains sections for each of the above, with explicit empty states. `RUN_DIMENSION_ANALYSES=0` skips them.
+- Tests: `test_alignment_accuracy.py`, `test_mask_accuracy.py`, `test_feature_preservation.py`, `test_bin_quality.py`,
+  `test_performance_summary.py`, `test_power_analysis.py`, `test_scenario_tags.py`, `test_composite_score.py`,
+  `test_compare_runs.py`, `test_audit_truth_labels.py`, `test_scoring_controls.py`, `test_scoring_real_minimap2.py`,
+  `test_stratify_multilabel.py`, `test_script_wiring.py`, `test_demo_end_to_end.py`, `test_stage_dimensions.sh`.
+- Docs: `FAQ.md` (evidence-backed answers, and the reviewer question bank answered section by section),
+  `docs/REVIEW_TRACKER.tsv`, a METHODS section for the new dimensions, and the README metric-framework and roadmap section.
+- CI installs minimap2 so the real-aligner golden test runs.
 
 ### Changed (breaking, experimental output only)
 - **The Mash nearest-reference screen no longer claims novelty.** Its calls were renamed
