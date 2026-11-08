@@ -53,4 +53,5 @@ bash "$HERE/test_stage_dimensions.sh"
 python3 "$HERE/test_materialize_bmock12_truth.py"
 # Question-bank gaps (calibration, baselines, interpretation limits, metadata completeness).
 python3 "$HERE/test_question_bank_gaps.py"
+python3 "$HERE/test_metric_rubric.py"
 echo "ALL PLASBENCH TESTS PASSED"

@@ -13,6 +13,17 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- metric rubric
+- **Contig-level classification** (`contig_classification.py`): contigs labelled against truth
+  (>= 95% identity over >= 80% of the contig; short, ambiguous and unplaced contigs excluded and
+  counted); count-based and length-weighted precision, recall, F1 and **MCC** per tool.
+- **ARI** (base-pair weighted) and **assembly-aware binning recall/F1** in `score_bins.py`.
+- **Micro** (pooled-base) precision/recall/F1 beside the macro means.
+- **Sequence-level database membership** (`database_containment.py`): truth plasmids checked against
+  each tool's own database; recovery reported inside vs outside it.
+- HTML sections "Classification and reconstruction metrics" and "Truth plasmids in tool databases";
+  README metric tables updated, with a headline metric set.
+
 ### Added -- reviewer question bank
 - **Trivial baselines** `baseline_coverage` and `baseline_reference`, scored like tools;
   leaderboard columns `is_baseline` and `beats_best_baseline`.

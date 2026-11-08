@@ -953,3 +953,42 @@ what each absence changes.
 **Run manifest.** `run_manifest.json` now records every setting that changes a ranking or
 a reported number (CPRR thresholds, headline tier and species minimum, clonal distance,
 truth-evidence and recall-ceiling settings, leakage exclusion, baseline settings).
+
+
+## Contig-level classification, ARI, micro averaging and database membership
+
+**Contig labels** (`python/contig_classification.py`, stage 5). The short-read assembly contigs
+are aligned to the truth reference (`minimap2 -c --secondary=yes -N 5`). A contig shorter than
+`CONTIG_MIN_LENGTH` (1 kb) is SHORT. A contig is PLASMID or CHROMOSOME when at least
+`CONTIG_MIN_COVERAGE` (0.80) of it aligns at `CONTIG_MIN_IDENTITY` (0.95) or better to that kind of
+truth. A contig that aligns that well to both is AMBIGUOUS, and one that aligns to neither is
+UNPLACED. SHORT, AMBIGUOUS and UNPLACED contigs are excluded from contig-level scoring (not
+multi-assigned) and counted. Truth comes from `truth.scored.tsv`, so evidence-AMBIGUOUS replicons do
+not label contigs.
+
+**Contig-level metrics.** A contig counts as called plasmid when its id is in the tool's
+predicted-plasmid FASTA. Precision, recall, F1 and MCC are computed count-based (each contig once) and
+length-weighted (in base pairs). Tools whose predictions are reassembled sequences rather than assembly
+contigs are marked not applicable. Abstention is not measured: no wrapped tool reports an explicit
+unclassified call.
+
+**Assembly-aware binning recall.** The labelling step also records, per truth plasmid, the bases
+covered by the assembly's PLASMID contigs. `score_bins.py --assembly-coverage` reports length-weighted
+binning recall and F1 against that reachable length, so a tool is not penalised for bases no contig
+contains.
+
+**ARI.** A base-pair-weighted Adjusted Rand Index over the same contingency table as NMI: bins plus
+unassigned plasmid bases as rows, truth plasmids plus wrongly claimed chromosome as columns, and each
+base as one item. It is descriptive and never ranks tools.
+
+**Micro versus macro.** Ranking scores and `mean_*` columns are macro averages: per isolate, then
+averaged, and species-balanced when possible. `micro_precision/recall/f1` pool TP, FP and FN bases over
+every isolate a tool was scored on, so large isolates weigh more. Both are reported because they can
+rank tools differently.
+
+**Database membership** (`python/database_containment.py`, stage 6). Each truth plasmid is aligned to
+the database FASTA a tool actually uses. MOB-suite's `ncbi_plasmid_full_seqs.fas` is found
+automatically; others are added via `TOOL_DATABASE_FASTAS`. The plasmid counts as in the database when
+one record covers `DATABASE_CONTAINMENT_MIN_COVERAGE` (0.95) of it at `DATABASE_CONTAINMENT_MIN_IDENTITY`
+(0.99). Aggregation reports each tool's mean per-plasmid recovery inside and outside its own database.
+This complements the date-based screen.

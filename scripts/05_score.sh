@@ -92,6 +92,36 @@ score_sample() {
     fi
     log "=== Score $SAMPLE ==="
 
+    # Contig-level classification (python/contig_classification.py): label each
+    # short-read assembly contig against truth once per sample, then score every
+    # tool on those contigs (count-based and length-weighted P/R/F1/MCC). The
+    # same step records how much of each truth plasmid the assembly covers,
+    # which score_bins.py uses for assembly-aware binning recall.
+    local CONTIGS="$SDIR/contigs.fasta" CONTIG_LABELS="$SDIR/contig_labels.tsv"
+    local ASM_COVERAGE="$SDIR/plasmid_assembly_coverage.tsv"
+    local CONTIG_READY=0 ASM_COV_ARGS=()
+    if [[ "${RUN_CONTIG_CLASSIFICATION:-1}" == "1" && -s "$CONTIGS" ]]; then
+        local CONTIG_PARAMS="len=$CONTIG_MIN_LENGTH id=$CONTIG_MIN_IDENTITY cov=$CONTIG_MIN_COVERAGE preset=$MINIMAP2_PRESET"
+        if [[ ! -s "$CONTIG_LABELS" || "$CONTIG_LABELS" -ot "$CONTIGS" || "$CONTIG_LABELS" -ot "$SCORE_TRUTH" \
+              || "$(cat "$CONTIG_LABELS.params" 2>/dev/null)" != "$CONTIG_PARAMS" ]]; then
+            local CONTIG_LOG="$LOG_DIR/${SAMPLE}.contig_classification.log"
+            if minimap2 -c --secondary=yes -N 5 -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$CONTIGS" \
+                    > "$SDIR/contigs_vs_ref.paf" 2> "$CONTIG_LOG" \
+               && python3 "$HERE/../python/contig_classification.py" label --contigs "$CONTIGS" \
+                    --paf "$SDIR/contigs_vs_ref.paf" --truth "$SCORE_TRUTH" --labels-out "$CONTIG_LABELS" \
+                    --coverage-out "$ASM_COVERAGE" --min-length "$CONTIG_MIN_LENGTH" \
+                    --min-identity "$CONTIG_MIN_IDENTITY" --min-coverage "$CONTIG_MIN_COVERAGE" >> "$CONTIG_LOG" 2>&1; then
+                printf '%s' "$CONTIG_PARAMS" > "$CONTIG_LABELS.params"
+            else
+                rm -f "$CONTIG_LABELS" "$CONTIG_LABELS.params" "$ASM_COVERAGE"
+                warn "contig labelling failed for $SAMPLE (see $CONTIG_LOG); contig-level metrics omitted"
+            fi
+            rm -f "$SDIR/contigs_vs_ref.paf"
+        fi
+        [[ -s "$CONTIG_LABELS" ]] && CONTIG_READY=1
+        [[ -s "$ASM_COVERAGE" ]] && ASM_COV_ARGS=(--assembly-coverage "$ASM_COVERAGE")
+    fi
+
     local preds
     shopt -s nullglob
     preds=("$RDIR"/pred_*.plasmid.fasta)
@@ -257,9 +287,15 @@ score_sample() {
             printf '%s\t%s\tscore\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$FAILURE_SHARD"
             continue
         fi
+        rm -f "$RDIR/${tool}.contig_classification.tsv"
+        if [[ "$CONTIG_READY" -eq 1 ]]; then
+            python3 "$HERE/../python/contig_classification.py" score --labels "$CONTIG_LABELS" --pred-fasta "$PRED" \
+                --min-length "$CONTIG_MIN_LENGTH" --out "$RDIR/${tool}.contig_classification.tsv" \
+                2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "contig-level scoring failed for $SAMPLE/$tool"
+        fi
         local BINS="$RDIR/pred_${tool}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$tool"; then
-            if ! python3 "$HERE/../python/score_bins.py" --truth "$SCORE_TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" \
+            if ! python3 "$HERE/../python/score_bins.py" --truth "$SCORE_TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" "${ASM_COV_ARGS[@]}" \
                 --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
                 --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
                 --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
@@ -375,6 +411,7 @@ rm -rf "$SCORE_SHARDS" "$FAILURE_SHARDS"
 
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_pr_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"
+[[ -s "$SCORES" ]] && python3 "$HERE/../python/contig_classification.py" merge --scores "$SCORES" --results-dir "$RESULTS_DIR"
 
 # Merge every per-sample-per-tool QUAST diagnostics file into one combined
 # TSV, same "first non-empty file's header, then every file's data rows"

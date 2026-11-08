@@ -23,7 +23,9 @@ import html
 from collections import defaultdict
 from pathlib import Path
 
-SECTIONS = (("baselines-calibration", "Baselines &amp; calibration"),
+SECTIONS = (("metric-framework", "Metrics"),
+            ("database-membership", "Database membership"),
+            ("baselines-calibration", "Baselines &amp; calibration"),
             ("interpretation-limits", "Interpretation limits"),
             ("metadata-completeness", "Metadata completeness"),
             ("excluded-replicons", "Excluded replicons"))
@@ -227,9 +229,83 @@ def excluded_replicons_section(data_dir):
             "a marker-based labeller cannot confirm, reported here rather than hidden.</p>" + body + "</section>")
 
 
+def metric_framework_section(leaderboard, data_dir):
+    """The headline metric set, per tool, with how contigs were labelled."""
+    rows = [r for r in leaderboard if r.get("tool")]
+
+    def cell(row, key):
+        value = row.get(key)
+        return esc(value) if value not in (None, "") else "-"
+
+    body = "".join(
+        f"<tr><td>{esc(r.get('analysis_track'))} / {esc(r.get('task'))}</td><td>{esc(r['tool'])}</td>"
+        f"<td>{cell(r, 'mean_f1')}</td><td>{cell(r, 'micro_f1')}</td>"
+        f"<td>{cell(r, 'mean_contig_f1_count')}</td><td>{cell(r, 'mean_contig_f1_bp')}</td>"
+        f"<td>{cell(r, 'mean_contig_mcc_count')}</td><td>{cell(r, 'mean_contig_mcc_bp')}</td>"
+        f"<td>{cell(r, 'mean_lw_bin_f1')}</td><td>{cell(r, 'mean_lw_bin_f1_assembly_aware')}</td>"
+        f"<td>{cell(r, 'mean_bin_ari')}</td><td>{cell(r, 'cprr')}</td></tr>" for r in rows)
+    label_counts = defaultdict(int)
+    if data_dir and Path(data_dir).is_dir():
+        for path in Path(data_dir).glob("*/contig_labels.tsv"):
+            for row in read_tsv(path):
+                label_counts[row.get("label", "")] += 1
+    labels = (", ".join(f"{esc(k)} {v}" for k, v in sorted(label_counts.items()))
+              if label_counts else "contig labels not computed in this run")
+    return (
+        "<section id='metric-framework'><h2>Classification and reconstruction metrics</h2>"
+        "<p class='lead'>Two tasks, scored separately. <strong>Classification</strong> (is a contig plasmid?): "
+        "base-level F1 as the <em>macro</em> average (per isolate, then averaged) and the <em>micro</em> average "
+        "(bases pooled over all isolates), plus contig-level precision/recall/F1/MCC counted per contig and "
+        "weighted by contig length. MCC is shown because plasmid contigs are a small minority. <strong>"
+        "Reconstruction</strong> (which contigs form one plasmid?): length-weighted binning F1 from a one-to-one "
+        "Hungarian match, the same with recall measured against the plasmid length the assembly actually covers, "
+        "base-pair-weighted Adjusted Rand Index, and CPRR (share of truth plasmids reconstructed correctly).</p>"
+        "<p class='muted'>Contig labels: contigs shorter than CONTIG_MIN_LENGTH (default 1 kb) are excluded; a contig "
+        "is PLASMID or CHROMOSOME when at least 80% of it aligns to that kind of truth at 95% identity; one that "
+        "aligns that well to both is AMBIGUOUS and excluded, not multi-assigned; one that aligns to neither is "
+        f"UNPLACED and excluded. This run: {labels}. Tools that output reassembled sequences instead of assembly "
+        "contigs are not scored at contig level. Abstention is not measured: no wrapped tool reports an explicit "
+        "unclassified call.</p>"
+        "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th>"
+        "<th>Base F1 (macro)</th><th>Base F1 (micro)</th><th>Contig F1 (count)</th><th>Contig F1 (length)</th>"
+        "<th>MCC (count)</th><th>MCC (length)</th><th>Binning F1 (length)</th><th>Binning F1 (assembly-aware)</th>"
+        "<th>ARI</th><th>CPRR</th></tr></thead><tbody>"
+        + (body or "<tr><td colspan='12'>No scored tools.</td></tr>") + "</tbody></table></div></section>")
+
+
+def database_membership_section(leaderboard, out_dir):
+    """Recovery of truth plasmids inside vs outside each tool's own database."""
+    rows = [r for r in leaderboard if r.get("n_plasmids_in_tool_database") not in (None, "")]
+    containment = read_tsv(Path(out_dir) / "benchmark.database_containment.tsv")
+    if not rows:
+        note = ("No tool database was checked in this run (RUN_DATABASE_CONTAINMENT, minimap2, or no installed "
+                "database such as MOB-suite's). The date-based screen in Robustness diagnostics still applies.")
+        body = f"<p class='muted'>{esc(note)}</p>"
+    else:
+        def gap(r):
+            a, b = number(r.get("mean_recovery_in_tool_database")), number(r.get("mean_recovery_not_in_tool_database"))
+            return f"{a - b:+.3f}" if a is not None and b is not None else "-"
+        body = ("<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Truth plasmids in its "
+                "database</th><th>Mean recovery, in database</th><th>Mean recovery, not in database</th>"
+                "<th>Gap</th></tr></thead><tbody>"
+                + "".join(f"<tr><td>{esc(r['tool'])}</td><td>{esc(r['n_plasmids_in_tool_database'])}</td>"
+                          f"<td>{esc(r.get('mean_recovery_in_tool_database') or '-')}</td>"
+                          f"<td>{esc(r.get('mean_recovery_not_in_tool_database') or '-')}</td>"
+                          f"<td><strong>{esc(gap(r))}</strong></td></tr>" for r in rows)
+                + "</tbody></table></div>")
+    inside = sum(1 for r in containment if r.get("in_database") == "yes")
+    return ("<section id='database-membership'><h2>Truth plasmids in tool databases</h2>"
+            "<p class='lead'>Sequence-level leakage check: a truth plasmid is <em>in</em> a tool's database when one "
+            "database record covers at least 95% of it at 99% identity. A tool that recovers in-database plasmids "
+            "far better than novel ones is partly recognising rather than inferring, so its score overstates "
+            f"performance on new isolates. {inside} of {len(containment)} truth plasmid x database pair(s) were "
+            "contained.</p>" + body + "</section>")
+
+
 def inject(page, out_dir, leaderboard, data_dir=None):
     """Insert the question-bank sections before Recommendations, and their nav links."""
-    sections = (baselines_section(out_dir, leaderboard) + interpretation_section() + metadata_section(out_dir)
+    sections = (metric_framework_section(leaderboard, data_dir) + database_membership_section(leaderboard, out_dir)
+                + baselines_section(out_dir, leaderboard) + interpretation_section() + metadata_section(out_dir)
                 + excluded_replicons_section(data_dir))
     anchor = "<section id='recommendations'>"
     if anchor in page:
