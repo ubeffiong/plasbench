@@ -1,6 +1,6 @@
 # PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools
 
-> **Benchmarking plasmid reconstruction from sequence to biological function.**
+> **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
 
 **Docs:** [FAQ](FAQ.md) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
 
@@ -72,7 +72,7 @@ overlap could have inflated it.
 | PlasBench does | PlasBench does not |
 |---|---|
 | Compare plasmid-reconstruction and classification tools on a common, reproducible footing | Identify, cluster or classify the plasmids in *your* sample |
-| Show how and where each tool fails (contamination, splits, merges, missed plasmids, AMR genes) | Compare plasmids between isolates, search PLSDB, or infer relatedness |
+| Show how and where each tool fails (contamination, splits, merges, missed plasmids, AMR genes) | Annotate or interpret the plasmids in *your* sample |
 | Recommend a tool for a sample without truth, from benchmark evidence | Infer transmission, outbreaks or horizontal gene transfer |
 | Report what it could not assess (for example database leakage) | Diagnose, or prove a plasmid is closed or clinically meaningful |
 
@@ -461,8 +461,8 @@ explicit "not run" note when it is switched off.
 - **Surveillance outputs**: per-tool yield of resistance-plasmid recovery by gene class (ESBL, carbapenemase, colistin), once curated AMR truth exists for enough isolates.
 - **Usability**: a pre-built container or notebook route for laboratories without Linux administration.
 
-What this benchmark does **not** do, and should not be read as doing: identify, cluster or relate plasmids, search PLSDB, infer
-outbreaks, or confirm that a candidate is a real closed plasmid. See the [FAQ](FAQ.md) for the evidence behind each statement,
+What this benchmark does **not** do, and should not be read as doing: identify the plasmids in your sample, infer
+outbreaks or transmission, or confirm that a candidate is a real closed plasmid. See the [FAQ](FAQ.md) for the evidence behind each statement,
 the section-by-section answers to the reviewer question bank, and the list of what is still open.
 
 ---

@@ -2,7 +2,7 @@
 
 ## PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools
 
-**Tagline:** *Benchmarking plasmid reconstruction from sequence to biological function.*
+**Tagline:** *Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.*
 
 ## A reproducible benchmark for trustworthy plasmid research and antimicrobial-resistance surveillance
 
