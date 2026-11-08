@@ -401,7 +401,15 @@ def verify_lock(lock_path, samples_path):
 PROVENANCE_VALUES = {
     "truth_assembly_strategy": ("long_read_only", "long_read_first_hybrid", "short_read_first_hybrid", "unknown"),
     "truth_polish_reads": ("none", "independent", "same_as_benchmark", "unknown"),
+    # Scoring-specification columns (docs/PANEL_ALIGNMENT.md, WP2/WP6). All
+    # optional and blank-allowed: same_extraction gates truth grade A; split
+    # marks the locked holdout (python/leave_taxon_out.py --confirm-holdout).
+    "same_extraction": ("yes", "no", "unknown"),
+    "split": ("pilot", "development", "holdout"),
 }
+# Optional free-text columns, accepted and carried through: grade_source,
+# genus, phylum. collection_date must be YYYY, YYYY-MM or YYYY-MM-DD.
+DATE_PATTERN = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
 
 
 def provenance_errors(rows):
@@ -412,6 +420,9 @@ def provenance_errors(rows):
             value = (row.get(column) or "").strip()
             if value and value not in allowed:
                 errors.append(f"row {number}: {column} must be one of {', '.join(allowed)} (got '{value}')")
+        date = (row.get("collection_date") or "").strip()
+        if date and not DATE_PATTERN.match(date):
+            errors.append(f"row {number}: collection_date must be YYYY, YYYY-MM or YYYY-MM-DD (got '{date}')")
     return errors
 
 

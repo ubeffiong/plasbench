@@ -57,6 +57,16 @@ else
     warn "clonal grouping failed; clusters use BioProject/study only"
 fi
 
+# Every truth replicon's label under the three labelling schemes (python/label_schemes.py;
+# stage 2 writes <sample>/label_schemes.tsv). The headline is scored on
+# TRUTH_LABEL_SCHEME (ncbi, pre-registered); the others are re-ranked by
+# rank_sensitivity.py below.
+python3 "$HERE/../python/label_schemes.py" collect --data-dir "$DATA_DIR" \
+    --primary "${TRUTH_LABEL_SCHEME:-ncbi}" \
+    --out "$RESULTS_DIR/benchmark.label_schemes.tsv" \
+    --summary-out "$RESULTS_DIR/benchmark.label_scheme_summary.tsv" \
+    || warn "label-scheme collection failed; the report shows no scheme table"
+
 # Sequence-level leakage check (python/database_containment.py): is each truth
 # plasmid already inside a tool's own database? The installed MOB-suite
 # database is found automatically; add others via TOOL_DATABASE_FASTAS
@@ -150,6 +160,8 @@ fi
 if [[ "${RUN_RANK_SENSITIVITY:-1}" == "1" ]]; then
     if ! python3 "$HERE/../python/rank_sensitivity.py" \
             --scores "$SCORES" --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+            --label-scheme "${TRUTH_LABEL_SCHEME:-ncbi}" \
+            --truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv" \
             --out-prefix "$RESULTS_DIR/benchmark"; then
         warn "rank-sensitivity analysis failed; leaderboard is unaffected"
     fi

@@ -153,6 +153,25 @@ def tier(strategy, polish, quality, labels_evaluated):
     return "1", "long-read-first, independent of benchmark reads, tier A, evidence-checked labels"
 
 
+def grade(reference_tier, same_extraction):
+    """Truth quality grade A/B/C (scoring specification, WP2).
+
+    A  reference tier 1 AND the sample sheet declares that the truth and the
+       benchmark reads come from the same DNA extraction (same_extraction=yes).
+    B  tier 1 without that declaration, or tier 2.
+    C  tier 3 (short-read-first or unknown provenance, or cohort tier C).
+    Grade A is never inferred: without the explicit field an isolate is at most B.
+    """
+    same = (same_extraction or "").strip().lower()
+    if reference_tier == "3":
+        return "C", "reference tier 3"
+    if reference_tier == "1" and same == "yes":
+        return "A", "tier 1 and same DNA extraction declared"
+    if reference_tier == "1":
+        return "B", "tier 1, same extraction not declared" if same != "no" else "tier 1, different extraction"
+    return "B", "reference tier 2"
+
+
 def derive(row, data_dir):
     sample = row["sample_id"]
     strategy = (row.get("truth_assembly_strategy") or "").strip()
@@ -179,6 +198,7 @@ def derive(row, data_dir):
     polish = polish or "unknown"
     evaluated, ambiguous, marker_free = label_summary(data_dir, sample)
     reference_tier, tier_reason = tier(strategy, polish, row.get("truth_quality_tier"), evaluated)
+    quality_grade, grade_reason = grade(reference_tier, row.get("same_extraction"))
     return {
         "sample": sample, "truth_assembly_strategy": strategy, "truth_polish_reads": polish,
         "provenance_source": source,
@@ -186,12 +206,13 @@ def derive(row, data_dir):
         "labels_evidence_checked": "yes" if evaluated else "no",
         "reference_tier": reference_tier, "tier_reason": tier_reason, "provenance_reason": reason,
         "ambiguous_plasmids": ambiguous, "marker_free_plasmids": marker_free,
+        "truth_quality_grade": quality_grade, "grade_reason": grade_reason,
     }
 
 
 FIELDS = ["sample", "truth_assembly_strategy", "truth_polish_reads", "provenance_source",
           "base_level_metrics_valid", "labels_evidence_checked", "reference_tier", "tier_reason",
-          "provenance_reason", "ambiguous_plasmids", "marker_free_plasmids"]
+          "provenance_reason", "ambiguous_plasmids", "marker_free_plasmids", "truth_quality_grade", "grade_reason"]
 
 
 def main():

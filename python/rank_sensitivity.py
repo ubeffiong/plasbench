@@ -17,7 +17,18 @@ Two kinds of variant, per analysis track:
   metrics            Re-rank from the recorded scores.tsv columns: strict F1
                      (precision charged for unmapped predicted bases), per-
                      plasmid recovery at the configured threshold, and
-                     per-plasmid recovery at >= 90% completeness.
+                     per-plasmid recovery at >= 90% completeness, MCC, F2,
+                     F0.5, and the contig-level length-weighted F1 (the
+                     parallel contig layer; never the headline).
+  label schemes      Re-score every PAF against each other labelling scheme's
+                     truth (python/label_schemes.py): the primary is
+                     TRUTH_LABEL_SCHEME (ncbi, pre-registered); the others are
+                     scheme:nonchromosomal and scheme:evidence.
+  cohort axes        min_contig=500 (predicted records < 500 bp ignored),
+                     micro_f1 (pooled TP/FP/FN instead of per-isolate mean),
+                     public_only / in_house_only (isolates with / without an
+                     NCBI sequence report), grade_c_excluded (truth quality
+                     grade C dropped; needs --truth-provenance).
 
 For each variant it reports every tool's mean over the samples all tools in
 the track share, its rank (ties broken by tool name), the change from baseline,
@@ -58,7 +69,11 @@ SETTING_VARIANTS = (
     ("identity=0.95", {"min_identity": 0.95}),
     ("query_coverage=0", {"min_query_coverage": 0.0}),
 )
-METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge90")
+METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "contig_f1_bp")
+SCHEME_FILES = {"ncbi": "truth.tsv", "nonchromosomal": "truth.nonchromosomal.tsv", "evidence": "truth.scored.tsv"}
+MIN_CONTIG_VARIANT = ("min_contig=500", 500)
+COHORT_VARIANTS = ("public_only", "in_house_only", "grade_c_excluded")
+MICRO = "micro_f1"
 BASELINE = "baseline"
 # scores.tsv writes F1 to four decimals, so a faithful re-computation can differ
 # from it by up to 5e-5. Anything larger means different scoring options.
@@ -77,17 +92,19 @@ def read_score_rows(path):
         return list(csv.DictReader(handle, delimiter="\t"))
 
 
-def f1_from_paf(truth_cache, results_dir, data_dir, sample, tool, settings):
-    """Base-level F1 for one (sample, tool) from its PAF, or None when it has no
-    PAF or the isolate has no true plasmid (F1 is undefined there)."""
+def counts_from_paf(truth_cache, results_dir, data_dir, sample, tool, settings, truth_name="truth.tsv",
+                    min_contig_length=0):
+    """(TP, FP, FN) bp for one (sample, tool) from its PAF against one truth file,
+    or None when there is no PAF, no such truth file, or no true plasmid."""
     paf = results_dir / sample / f"{tool}.pred_vs_ref.paf"
     if not paf.is_file():
         return None
-    if sample not in truth_cache:
-        truth_path = next((p for p in (data_dir / sample / "truth.tsv" if data_dir else None,
-                                       results_dir / sample / "truth.tsv") if p and p.is_file()), None)
-        truth_cache[sample] = sp.read_truth(str(truth_path)) if truth_path else None
-    loaded = truth_cache[sample]
+    key = (sample, truth_name)
+    if key not in truth_cache:
+        truth_path = next((p for p in (data_dir / sample / truth_name if data_dir else None,
+                                       results_dir / sample / truth_name) if p and p.is_file()), None)
+        truth_cache[key] = sp.read_truth(str(truth_path)) if truth_path else None
+    loaded = truth_cache[key]
     if loaded is None:
         return None
     truth, total_plasmid, _ = loaded
@@ -95,12 +112,28 @@ def f1_from_paf(truth_cache, results_dir, data_dir, sample, tool, settings):
         return None
     pred = results_dir / sample / f"pred_{tool}.plasmid.fasta"
     pred_lengths = sp.read_fasta_lengths(str(pred)) if pred.is_file() and pred.stat().st_size else {}
-    covered = sp.parse_paf_intervals(str(paf), truth, pred_lengths, **settings)[0]
-    tp, fp, fn = sp.score(truth, total_plasmid, covered)
+    if min_contig_length:
+        pred_lengths = {k: v for k, v in pred_lengths.items() if v >= min_contig_length}
+    covered = sp.parse_paf_intervals(str(paf), truth, pred_lengths, **settings,
+                                     min_contig_length=min_contig_length)[0]
+    return sp.score(truth, total_plasmid, covered)
+
+
+def f1_of(counts):
+    tp, fp, fn = counts
     if tp == 0:
         return 0.0
     precision, recall = tp / (tp + fp), tp / (tp + fn)
     return 2 * precision * recall / (precision + recall)
+
+
+def f1_from_paf(truth_cache, results_dir, data_dir, sample, tool, settings, truth_name="truth.tsv",
+                min_contig_length=0):
+    """Base-level F1 for one (sample, tool) from its PAF, or None when it has no
+    PAF or the isolate has no true plasmid (F1 is undefined there)."""
+    counts = counts_from_paf(truth_cache, results_dir, data_dir, sample, tool, settings, truth_name,
+                             min_contig_length)
+    return None if counts is None else f1_of(counts)
 
 
 def strict_f1(row):
@@ -118,7 +151,14 @@ def ranked(values_by_tool):
     shared = set.intersection(*(set(values_by_tool[tool]) for tool in tools))
     if not shared:
         return []
-    means = {tool: sum(values_by_tool[tool][s] for s in shared) / len(shared) for tool in tools}
+    means = {}
+    for tool in tools:
+        values = [values_by_tool[tool][s] for s in sorted(shared)]
+        if isinstance(values[0], tuple):
+            # micro_f1 stores (TP, FP, FN) per sample: pool, then take one F1.
+            means[tool] = f1_of(tuple(sum(v[i] for v in values) for i in range(3)))
+        else:
+            means[tool] = sum(values) / len(values)
     order = sorted(tools, key=lambda tool: (-means[tool], tool))
     return [(tool, means[tool], len(shared), rank) for rank, tool in enumerate(order, start=1)]
 
@@ -137,31 +177,79 @@ def kendall_tau(rank_a, rank_b):
     return (concordant - discordant) / (len(tools) * (len(tools) - 1) / 2)
 
 
-def build_variants(rows, results_dir, data_dir, base_settings):
-    """{variant: {track: {tool: {sample: value}}}} plus baseline-vs-recorded drift."""
+def sample_groups(data_dir, results_dir, samples, truth_provenance=None):
+    """{variant: set of samples kept} for the cohort axes. An isolate is public when
+    its NCBI sequence report is on disk; grade C comes from truth_provenance.py."""
+    public = set()
+    for sample in samples:
+        if any((d / sample / "sequence_report.jsonl").is_file() for d in (data_dir, results_dir) if d):
+            public.add(sample)
+    groups = {"public_only": public, "in_house_only": set(samples) - public}
+    if truth_provenance and Path(truth_provenance).is_file():
+        with open(truth_provenance, newline="", encoding="utf-8") as handle:
+            grade = {r["sample"]: (r.get("truth_quality_grade") or "")
+                     for r in csv.DictReader(handle, delimiter="\t")}
+        groups["grade_c_excluded"] = {s for s in samples if grade.get(s) != "C"}
+    return groups
+
+
+def build_variants(rows, results_dir, data_dir, base_settings, primary_scheme="ncbi", truth_provenance=None):
+    """{variant: {track: {tool: {sample: value}}}} plus baseline-vs-recorded drift.
+    The baseline is scored against the primary labelling scheme's truth."""
     variants = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
     truth_cache = {}
     drift = []
+    primary_file = SCHEME_FILES.get(primary_scheme, "truth.tsv")
+    other_schemes = [s for s in SCHEME_FILES if s != primary_scheme]
     for row in rows:
         sample, tool = row.get("sample"), row.get("tool")
         track = row.get("analysis_track") or "short_read"
         if not sample or not tool:
             continue
-        baseline = f1_from_paf(truth_cache, results_dir, data_dir, sample, tool, base_settings)
-        if baseline is not None:
+        counts = counts_from_paf(truth_cache, results_dir, data_dir, sample, tool, base_settings, primary_file)
+        if counts is None and primary_file != "truth.tsv":
+            counts = counts_from_paf(truth_cache, results_dir, data_dir, sample, tool, base_settings)
+        if counts is not None:
+            baseline = f1_of(counts)
             variants[BASELINE][track][tool][sample] = baseline
+            variants[MICRO][track][tool][sample] = counts
             recorded = number(row.get("f1"))
             if recorded is not None:
                 drift.append((abs(recorded - baseline), sample, tool))
             for name, change in SETTING_VARIANTS:
-                value = f1_from_paf(truth_cache, results_dir, data_dir, sample, tool, dict(base_settings, **change))
+                value = f1_from_paf(truth_cache, results_dir, data_dir, sample, tool,
+                                    dict(base_settings, **change), primary_file)
                 if value is not None:
                     variants[name][track][tool][sample] = value
+            name, min_len = MIN_CONTIG_VARIANT
+            value = f1_from_paf(truth_cache, results_dir, data_dir, sample, tool, base_settings, primary_file, min_len)
+            if value is not None:
+                variants[name][track][tool][sample] = value
+            for scheme in other_schemes:
+                value = f1_from_paf(truth_cache, results_dir, data_dir, sample, tool, base_settings,
+                                    SCHEME_FILES[scheme])
+                if value is not None:
+                    variants[f"scheme:{scheme}"][track][tool][sample] = value
         for metric in METRIC_VARIANTS:
             value = strict_f1(row) if metric == "strict_f1" else number(row.get(metric))
             if value is not None:
                 variants[f"metric:{metric}"][track][tool][sample] = value
+    samples = {s for per_track in variants[BASELINE].values() for per_tool in per_track.values() for s in per_tool}
+    for name, keep in sample_groups(data_dir, results_dir, samples, truth_provenance).items():
+        if not keep or keep == samples:
+            continue
+        for track, per_tool in variants[BASELINE].items():
+            for tool, per_sample in per_tool.items():
+                for sample, value in per_sample.items():
+                    if sample in keep:
+                        variants[name][track][tool][sample] = value
     return variants, drift
+
+
+def variant_order():
+    return ([BASELINE] + [name for name, _ in SETTING_VARIANTS] + [MIN_CONTIG_VARIANT[0], MICRO]
+            + [f"scheme:{s}" for s in SCHEME_FILES] + list(COHORT_VARIANTS)
+            + [f"metric:{m}" for m in METRIC_VARIANTS])
 
 
 def analyse(variants):
@@ -170,7 +258,7 @@ def analyse(variants):
     for track in sorted({t for per_track in variants.values() for t in per_track}):
         baseline = {tool: rank for tool, _, _, rank in ranked(variants[BASELINE].get(track, {}))}
         baseline_top = min(baseline, key=baseline.get) if baseline else None
-        for variant in [BASELINE] + [name for name, _ in SETTING_VARIANTS] + [f"metric:{m}" for m in METRIC_VARIANTS]:
+        for variant in variant_order():
             result = ranked(variants.get(variant, {}).get(track, {}))
             if not result:
                 continue
@@ -219,6 +307,9 @@ def main():
     ap.add_argument("--results-dir", required=True)
     ap.add_argument("--data-dir", help="per-sample data dir holding <sample>/truth.tsv (else results/<sample>/truth.tsv)")
     ap.add_argument("--out-prefix", required=True, help="writes <prefix>.rank_robustness.tsv")
+    ap.add_argument("--label-scheme", default=os.environ.get("TRUTH_LABEL_SCHEME", "ncbi"),
+                    choices=tuple(SCHEME_FILES), help="primary labelling scheme the baseline is scored on")
+    ap.add_argument("--truth-provenance", help="truth_provenance.py TSV (truth_quality_grade) for grade_c_excluded")
     ap.add_argument("--min-alignment-length", type=int, default=int(os.environ.get("MIN_ALIGNMENT_LENGTH", 200)))
     ap.add_argument("--min-alignment-identity", type=float, default=float(os.environ.get("MIN_ALIGNMENT_IDENTITY", 0.90)))
     ap.add_argument("--min-alignment-mapq", type=int, default=int(os.environ.get("MIN_ALIGNMENT_MAPQ", 20)))
@@ -230,7 +321,8 @@ def main():
             "min_mapq": args.min_alignment_mapq, "min_query_coverage": args.min_alignment_query_coverage}
     rows = read_score_rows(args.scores)
     variants, drift = build_variants(rows, Path(args.results_dir),
-                                     Path(args.data_dir) if args.data_dir else None, base)
+                                     Path(args.data_dir) if args.data_dir else None, base,
+                                     args.label_scheme, args.truth_provenance)
     if not variants.get(BASELINE):
         raise SystemExit("ERROR: no (sample, tool) pair had a PAF and a truth table with plasmid under "
                          f"{args.results_dir}; nothing to re-score. Expected "

@@ -53,6 +53,24 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             log "  truth -> $TRUTH"
         fi
     fi
+    # Tandem-dimer truth plasmids (python/detect_dimers.py; panel edge case D2):
+    # with COLLAPSE_DIMERS=1 a plasmid closed as two head-to-tail copies is
+    # replaced by its monomer in reference.fna and truth.tsv before anything is
+    # scored (original kept as reference.precollapse.fna); with 0 it is only
+    # flagged. Every change is listed in truth.corrections.tsv.
+    CORRECTIONS="$SDIR/truth.corrections.tsv"
+    if [[ "${RUN_DIMER_DETECTION:-1}" -eq 1 && -s "$REF" && -s "$TRUTH" ]]; then
+        if [[ -f "$CORRECTIONS" && ! "$CORRECTIONS" -ot "$REF" && ! "$CORRECTIONS" -ot "$TRUTH" ]]; then
+            log "  dimer check already done for $SAMPLE"
+        else
+            DIMER_ARGS=(--min-identity "${DIMER_MIN_IDENTITY:-0.95}" --min-half-coverage "${DIMER_MIN_HALF_COVERAGE:-0.90}")
+            [[ "${COLLAPSE_DIMERS:-1}" -eq 1 ]] && DIMER_ARGS+=(--collapse)
+            [[ -s "$SDIR/truth_amr.tsv" ]] && DIMER_ARGS+=(--amr-truth "$SDIR/truth_amr.tsv")
+            python3 "$HERE/../python/detect_dimers.py" --reference "$REF" --truth "$TRUTH" \
+                --out "$CORRECTIONS" "${DIMER_ARGS[@]}" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+                || warn "dimer check failed for $SAMPLE; truth is scored as built"
+        fi
+    fi
     # Validate however the table arrived. A hand-written one is retained as-is,
     # and every way it can be wrong is silent: an id absent from the reference
     # scores as an unrecovered plasmid, a reference sequence absent from the
@@ -124,13 +142,23 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
         fi
         SKETCH_ARGS=()
         [[ -s "$PLASMID_REFERENCE_SKETCH" ]] && SKETCH_ARGS=(--plasmid-sketch "$PLASMID_REFERENCE_SKETCH")
+        CORRECTION_ARGS=()
+        [[ -s "$SDIR/truth.corrections.tsv" ]] && CORRECTION_ARGS=(--multimers "$SDIR/truth.corrections.tsv")
         python3 "$HERE/../python/label_truth_evidence.py" --truth "$TRUTH" --reference "$REF" \
             --features "$FEATURES" --annotation-provenance "$SDIR/annotation_provenance.json" \
-            "${SKETCH_ARGS[@]}" "${LR_DEPTH_ARGS[@]}" \
+            "${SKETCH_ARGS[@]}" "${LR_DEPTH_ARGS[@]}" "${CORRECTION_ARGS[@]+"${CORRECTION_ARGS[@]}"}" \
             --labels-out "$SDIR/truth_labels.tsv" --scored-truth-out "$SDIR/truth.scored.tsv" \
             2>> "$LOG_DIR/${SAMPLE}.truth.log" \
             || { warn "evidence labelling failed for $SAMPLE; scoring uses source labels"; rm -f "$SDIR/truth.scored.tsv"; }
     fi
+    # Every replicon's label under the three schemes (python/label_schemes.py):
+    # writes truth.nonchromosomal.tsv (Scheme 1) and label_schemes.tsv, pinning
+    # the NCBI field and the sequence report's SHA-256 behind Scheme 3 labels.
+    MULTIMER_ARGS=()
+    [[ -s "$SDIR/truth.corrections.tsv" ]] && MULTIMER_ARGS=(--multimers "$SDIR/truth.corrections.tsv")
+    EVIDENCE_ARGS=()
+    [[ -s "$SDIR/truth_labels.tsv" ]] && EVIDENCE_ARGS=(--evidence-labels "$SDIR/truth_labels.tsv")
+    python3 "$HERE/../python/label_schemes.py" build --sample "$SAMPLE" --truth "$TRUTH"         --report "$REPORT" --truth-source "${TRUTH_SOURCE:-}"         "${EVIDENCE_ARGS[@]+"${EVIDENCE_ARGS[@]}"}" "${MULTIMER_ARGS[@]+"${MULTIMER_ARGS[@]}"}"         --nonchromosomal-out "$SDIR/truth.nonchromosomal.tsv" --out "$SDIR/label_schemes.tsv"         2>> "$LOG_DIR/${SAMPLE}.truth.log"         || warn "label-scheme table failed for $SAMPLE; scheme sensitivity analyses will skip it"
     # Opt-in: draft AMR truth from the AMRFinderPlus rows annotated on the reference.
     # Written as truth_amr.draft.tsv (evidence_tier=auto_derived), never as truth_amr.tsv:
     # a person must review it and rename it before amr_gene_recall is scored.

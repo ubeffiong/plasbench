@@ -62,6 +62,21 @@ export RUN_TRUTH_LABEL_EVIDENCE="${RUN_TRUTH_LABEL_EVIDENCE:-1}"
 # confidence) when the isolate's long reads are staged.
 export TRUTH_MIN_LONG_READ_DEPTH="${TRUTH_MIN_LONG_READ_DEPTH:-5}"
 export TRUTH_LONG_READ_PRESET="${TRUTH_LONG_READ_PRESET:-map-ont}"
+# Labelling scheme the headline is scored on (python/label_schemes.py;
+# docs/PANEL_ALIGNMENT.md, decision E.15). Pre-registered primary: ncbi
+# (Scheme 3, NCBI sequence-report labels, truth.tsv). Sensitivity schemes,
+# always re-ranked by rank_sensitivity.py: nonchromosomal (Scheme 1, every
+# replicon but the main chromosome is a plasmid) and evidence (Scheme 2,
+# evidence-confirmed labels with AMBIGUOUS replicons excluded, truth.scored.tsv).
+export TRUTH_LABEL_SCHEME="${TRUTH_LABEL_SCHEME:-ncbi}"
+# Tandem-dimer truth plasmids (python/detect_dimers.py, stage 2): halves at
+# >= DIMER_MIN_IDENTITY over >= DIMER_MIN_HALF_COVERAGE are a dimer.
+# COLLAPSE_DIMERS=1 scores the monomer; 0 only flags it (AMBIGUOUS under the
+# evidence scheme). Every change is in <sample>/truth.corrections.tsv.
+export RUN_DIMER_DETECTION="${RUN_DIMER_DETECTION:-1}"
+export COLLAPSE_DIMERS="${COLLAPSE_DIMERS:-1}"
+export DIMER_MIN_IDENTITY="${DIMER_MIN_IDENTITY:-0.95}"
+export DIMER_MIN_HALF_COVERAGE="${DIMER_MIN_HALF_COVERAGE:-0.90}"
 
 # Headline rules (aggregate_results.py, stage 6).
 # Reference tiers 1-2 form the headline; tier 3 (short-read-first or unknown
