@@ -271,6 +271,7 @@ The registry is `config/tool_capabilities.tsv`. Only `mob_recon`, `platon` and `
 | hybracter_long | reassembly | yes | long reads | long_read | yes |
 | plassembler, hybracter_hybrid | reassembly | yes | hybrid reads | hybrid | yes |
 | plsmd | reassembly | yes | assembly (Unicycler) | short_read | no |
+| plasbin_flow | binning | yes | assembly graph (output adapted) | short_read | no |
 
 **How each is run** (details in `scripts/04_run_tools.sh` and `07_long_read_reconstruct.sh`):
 
@@ -282,6 +283,7 @@ The registry is `config/tool_capabilities.tsv`. Only `mob_recon`, `platon` and `
 - **Long-read and hybrid:** Flye then MOB-recon; Plassembler; Hybracter (long or hybrid); Trycycler (subsample, Flye, cluster, reconcile, consensus, then MOB-recon; Medaka optional).
 
 - **plsMD** (opt-in, `RUN_PLSMD=1`) reconstructs each plasmid by BLASTing contigs against a PLSDB index (`PLSMD_DB`) and typing replicons, then orders the contigs and trims assembly overlaps. It needs a Unicycler assembly (`ASSEMBLER=unicycler`), is Docker-packaged upstream (`PLSMD_CMD`), and is skipped with a recorded reason, not failed, when the command, the index or a Unicycler assembly is missing. Each reconstructed plasmid is one bin. Because it reconstructs *against PLSDB*, which probably contains the truth genomes, read its score with the database-overlap and containment tables.
+- **PlasBin-flow** (opt-in, `RUN_PLASBIN_FLOW=1`) bins contigs of an assembly graph with a flow-based mixed-integer program (MIT licence; it needs a Gurobi licence, a gzipped GFA with `dp` or `KC` tags, a contig plasmid-score file and a GC-probability file). PlasBench therefore does **not** run it: like `gplas2_external` it adapts the tool's own output, `PLASBIN_FLOW_OUTPUTS_DIR/<sample>.tsv`, made from the same assembly. A contig that PlasBin-flow lists in several bins is placed in the first (the others are recorded in the provenance JSON). An output naming contigs this assembly lacks is a skip with the reason, never relabelled.
 - **Trivial baselines.** `baseline_coverage` (depth), `baseline_reference` (alignment to a plasmid reference set) and `baseline_replicon` (a replicon marker from Abricate `REPLICON_ABRICATE_DBS`; a Col hit is dropped when an Inc hit is on the same contig, the rule plsMD uses) are scored like tools. A tool that does not beat them adds nothing a one-line rule does not already give.
 
 **Databases and leakage.** Many tools score contigs against a database of public plasmids or a model trained on one. Those sources overlap the public complete genomes PlasBench uses as truth. `config/tool_database_releases.tsv` records, per tool, which database it uses and (when you fill it in) its release date. Plassembler, Hybracter and PLASMe use PLSDB-derived data. PlasmidSPAdes uses no reference database.
@@ -626,6 +628,7 @@ All settings are environment variables read by `config/config.sh` (override them
 |---|---|---|
 | `RUN_MOB_RECON`, `RUN_PLATON`, `RUN_PLASMIDSPADES` | 1 | On by default. |
 | `RUN_PLSMD`, `PLSMD_CMD`, `PLSMD_DB`, `PLSMD_THREADS` | 0, plsMD, empty, `THREADS` | plsMD: command (the Docker wrapper works), PLSDB BLAST index prefix, threads. Needs `ASSEMBLER=unicycler`. |
+| `RUN_PLASBIN_FLOW`, `PLASBIN_FLOW_OUTPUTS_DIR` | 0, empty | Adapt PlasBin-flow output files, one `<sample>.tsv` per sample, from the same assembly. |
 | `RUN_BASELINE_REPLICON`, `REPLICON_ABRICATE_DBS` | 0, plasmidfinder | Replicon-marker baseline and the Abricate databases it searches. |
 | `RUN_GPLAS2_MOB`, `RUN_GPLAS2_EXTERNAL`, `RUN_GENOMAD`, `RUN_PLASME`, `RUN_PLASGRAPH2`, `RUN_RFPLASMID`, `RUN_PLASMIDHUNTER`, `RUN_PLASMER`, `RUN_PLASCOPE` | 0 | Short-read tools, opt-in. |
 | `RUN_FLYE_MOB_RECON`, `RUN_PLASSEMBLER`, `RUN_HYBRACTER_LONG`, `RUN_HYBRACTER_HYBRID`, `RUN_TRYCYCLER_MOB_RECON` | 0 | Long-read and hybrid tools, opt-in, behind the circularity guard. |
@@ -662,6 +665,8 @@ All settings are environment variables read by `config/config.sh` (override them
 |---|---|---|
 | `RUN_REFERENCE_ANNOTATION` | 1 | Annotate the reference (replicon, MOB, AMR, rRNA, IS). |
 | `RUN_TRUTH_LABEL_EVIDENCE` | 1 | Evidence labels; ambiguous replicons set aside. |
+| `ANNOTATION_REPLICON_DB` | plasmidfinder | Abricate replicon database(s), comma or space separated; extra ones (for example one built from MOB-suite's `rep.dna.fas`) add replicon evidence. |
+| `ISFINDER_FASTA` | empty | A curated ISFinder FASTA you downloaded from ISFinder under its terms (never shipped); adds BLAST-based IS annotation beside ISEScan and feeds the `repeat_rich` tag. |
 | `ALLOW_DEFAULTED_TRUTH` | 0 | Restore guess-chromosome for unresolved sequences. |
 | `HEADLINE_MAX_REFERENCE_TIER` | 2 | Highest tier in the headline. |
 | `MIN_SPECIES_CLUSTERS` | 20 | Clusters a species needs to enter the species-balanced headline. |
@@ -776,7 +781,9 @@ This section records what has and has not been shown, so that a reader can judge
 | The contig layer's independent cross-check agrees on synthetic data; real-data agreement is read per run in `benchmark.contig_crosscheck.tsv`. | Check that table before citing contig-level numbers. |
 | The recommender evaluation has run only on synthetic data. | Its verdict on a real cohort is unknown. |
 | The plsMD wrapper has been tested only with a fake binary, and its PLSDB release date is blank. | Run it on a real cohort with the real tool before reading its score; until the date is entered leakage for plsMD is *not assessed*. |
-| Bin agreement (best match, dissimilarity) was reimplemented from PlasEval's published definitions and never cross-checked against the original program on shared data. | Treat the numbers as implemented, not validated; the export files let you run the original PlasEval yourself. |
+| Bin agreement (best match, dissimilarity) was reimplemented from PlasEval's published definitions. It agrees with the original program (best-match precision, recall and F1, contig- and base-weighted, on 15 cases; dissimilarity on 9 cases without repeated contigs) in `test/test_plaseval_crosscheck.py`, which runs only when you point `PLASEVAL_SRC` at a PlasEval checkout. | Agreement is shown on small hand-built cases and PlasEval's own examples, not on real data. Repeated contigs are excluded here, so the dissimilarity is not compared where either side repeats a contig. |
+| The PLSDB address in plsMD's Dockerfile (`.../plsdb2025/download_fasta`) answers a redirect to an HTML download page, not a FASTA file. | `env/download_plsdb.sh` refuses anything that does not start with `>`; take the direct link from PLSDB's download page and pass it as `PLSDB_URL`. |
+| PlasBin-flow is adapted from its own output and has not been run end to end (it needs a Gurobi licence). | The adapter is tested on synthetic output; compare a real output file before relying on it. |
 | Copy number needs truth long-read depth and assembly depth headers, which most short-read cohorts lack. | Expect `no_truth_depth` or `no_depth_headers` rows outside the long-read and hybrid cohorts. |
 | Repeated contigs are excluded, not paired, in the dissimilarity, and every replicon is assumed circular for origin-wrap handling. | A linear replicon whose ends were joined by a misassembly would read as a wrap. |
 

@@ -118,7 +118,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
         if [[ -s "$FEATURES" && "$FEATURES" -nt "$REF" ]]; then
             log "  reference annotation already present for $SAMPLE"
         else
-            python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
+            python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB" --isfinder-fasta "${ISFINDER_FASTA:-}"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
         fi
     fi
     # Evidence-based replicon labels (python/label_truth_evidence.py): confirm

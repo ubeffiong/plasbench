@@ -6,10 +6,14 @@
 # (TOOL_DATABASE_FASTAS) and (b) a reference for the trivial reference baseline
 # (PLASMID_REFERENCE_FASTA). It is never a search feature and never a truth source.
 #
-# No URL is trusted by default: you must supply PLSDB_URL. For example, the
-# plsMD Dockerfile uses
+# No URL is trusted by default: you must supply PLSDB_URL. The plsMD Dockerfile uses
 #     https://ccb-microbe.cs.uni-saarland.de/plsdb2025/download_fasta
-# (an example only; it was NOT verified here -- confirm the release and licence).
+# CHECKED 2026-11-08: that address answers HTTP 302 to /plsdb2025/download, which is an
+# HTML page (about 12 KB), not a FASTA file. This script refuses any download that does
+# not start with '>', so it would stop there instead of treating a web page as a
+# database. Open the download page, take the direct link to the sequence FASTA, confirm
+# the release and licence, and pass that link as PLSDB_URL (a file:// URL also works,
+# for a copy you already hold).
 #
 #     PLSDB_URL=<url> [PLSDB_SHA256=<sha256>] bash env/download_plsdb.sh
 #
@@ -36,7 +40,7 @@ fi
 TMP="$DEST.part"
 rm -f "$TMP"
 echo "[plsdb] downloading from $PLSDB_URL ..."
-if command -v wget >/dev/null 2>&1; then
+if command -v wget >/dev/null 2>&1 && [[ "$PLSDB_URL" != file://* ]]; then
     wget -O "$TMP" "$PLSDB_URL"
 else
     curl -fL -o "$TMP" "$PLSDB_URL"
@@ -57,7 +61,7 @@ else
     warn "PLSDB_SHA256 not set; recording the observed checksum ($SHA) without verifying it"
 fi
 
-head -c 1 "$TMP" | grep -q '>' || { rm -f "$TMP"; die "download is not FASTA (does not start with '>')"; }
+head -c 1 "$TMP" | grep -q '>' || { rm -f "$TMP"; die "download is not FASTA (does not start with '>'): the URL probably returned a web page, not the sequence file"; }
 RECORDS="$(grep -c '^>' "$TMP" || true)"
 BYTES="$(wc -c < "$TMP" | tr -d ' ')"
 mv "$TMP" "$DEST"
