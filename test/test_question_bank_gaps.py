@@ -145,7 +145,27 @@ def aggregate_and_report_checks(ok):
     ok = check(ok, "weak tool verdict shown", "does NOT beat baseline" in html_out)
     empty = rq.inject(page, "no_such_dir", [])
     ok = check(ok, "empty states render instead of disappearing",
-               "No scored tools." in empty and "No metadata-completeness table" in empty)
+               "No scored tools." in empty and "No metadata-completeness table" in empty
+               and "No replicon was excluded" in empty)
+    os.makedirs(os.path.join("data", "s1"), exist_ok=True)
+    write(os.path.join("data", "s1", "truth_labels.tsv"),
+          "sequence_id\tlength\tsource_label\tfinal_label\tevidence_status\tplasmid_markers\tplasmid_reference_match\t"
+          "rrna_genes\tlong_read_depth\tmarker_free\treason\n"
+          "p9\t3000\tPLASMID\tAMBIGUOUS\tevaluated\t\t\t0\t\tyes\tno plasmid marker\n"
+          "p1\t90000\tPLASMID\tPLASMID\tevaluated\treplicon:IncFII\t\t0\t\tno\tplasmid marker present\n")
+    with_data = rq.inject(page, "results", leaderboard, "data")
+    ok = check(ok, "excluded replicons listed with their reason",
+               "id='excluded-replicons'" in with_data and "p9" in with_data and "no plasmid marker" in with_data
+               and ">p1<" not in with_data)
+    return ok
+
+
+def cli_checks(ok):
+    root = os.path.join(HERE, "..")
+    for command in ("collect-truth-provenance", "discover-design-cohort"):
+        result = subprocess.run([sys.executable, "-m", "plasbench", "--project-root", root, command, "--help"],
+                                cwd=root, capture_output=True, text=True)
+        ok = check(ok, f"`plasbench {command}` is reachable from the CLI", result.returncode == 0)
     return ok
 
 
@@ -154,7 +174,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="question_bank_") as tmp:
         try:
             os.chdir(tmp)
-            for step in (calibration_checks, baseline_checks, aggregate_and_report_checks):
+            for step in (calibration_checks, baseline_checks, aggregate_and_report_checks, cli_checks):
                 print(f"[{step.__name__}]")
                 ok = step(ok)
         finally:

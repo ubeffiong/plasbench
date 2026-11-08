@@ -327,6 +327,25 @@ def main(argv=None):
     discover_parser.add_argument("--max-assemblies", type=int, default=30)
     discover_parser.add_argument("--email")
     discover_parser.add_argument("--api-key")
+    provenance_parser = sub.add_parser(
+        "collect-truth-provenance",
+        help="Record each truth assembly's construction (long-read-first/short-read-first) and polishing reads from NCBI evidence.")
+    provenance_parser.add_argument("--samples", type=Path, required=True, help="Cohort TSV.")
+    provenance_parser.add_argument("--evidence-out", type=Path, required=True)
+    provenance_parser.add_argument("--sheet-out", type=Path, help="Copy of --samples with the provenance columns filled.")
+    provenance_parser.add_argument("--api-key")
+    design_parser = sub.add_parser(
+        "discover-design-cohort",
+        help="Find long-read-first, one-per-BioProject NCBI isolates until each species reaches a cluster target.")
+    design_parser.add_argument("--species", action="append", required=True, help="Taxon name; repeat per species.")
+    design_parser.add_argument("--existing", type=Path, help="Current cohort TSV with provenance columns.")
+    design_parser.add_argument("--ledger", type=Path, default=Path("cohorts/accepted_accessions.tsv"))
+    design_parser.add_argument("--target-clusters", type=int, default=22)
+    design_parser.add_argument("--max-reports", type=int, default=4000)
+    design_parser.add_argument("--max-checks", type=int, default=300)
+    design_parser.add_argument("--out", type=Path, required=True)
+    design_parser.add_argument("--evidence-out", type=Path, required=True)
+    design_parser.add_argument("--api-key")
     review_parser = sub.add_parser("review-candidates", help="Create an additive, non-release balanced shortlist from NCBI candidates.")
     review_parser.add_argument("--candidates", type=Path, required=True)
     review_parser.add_argument("--out-dir", type=Path, required=True)
@@ -688,6 +707,26 @@ def main(argv=None):
             command.extend(["--country", country])
         if args.email:
             command.extend(["--email", args.email])
+        if args.api_key:
+            command.extend(["--api-key", args.api_key])
+        code = run(command, root)
+    elif args.command == "collect-truth-provenance":
+        command = [sys.executable, "python/collect_truth_provenance.py", "--samples", str(args.samples),
+                   "--evidence-out", str(args.evidence_out)]
+        if args.sheet_out:
+            command.extend(["--sheet-out", str(args.sheet_out)])
+        if args.api_key:
+            command.extend(["--api-key", args.api_key])
+        code = run(command, root)
+    elif args.command == "discover-design-cohort":
+        command = [sys.executable, "python/discover_design_cohort.py", "--out", str(args.out),
+                   "--evidence-out", str(args.evidence_out), "--ledger", str(args.ledger),
+                   "--target-clusters", str(args.target_clusters), "--max-reports", str(args.max_reports),
+                   "--max-checks", str(args.max_checks)]
+        for species in args.species:
+            command.extend(["--species", species])
+        if args.existing:
+            command.extend(["--existing", str(args.existing)])
         if args.api_key:
             command.extend(["--api-key", args.api_key])
         code = run(command, root)

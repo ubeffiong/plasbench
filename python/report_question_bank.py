@@ -25,7 +25,8 @@ from pathlib import Path
 
 SECTIONS = (("baselines-calibration", "Baselines &amp; calibration"),
             ("interpretation-limits", "Interpretation limits"),
-            ("metadata-completeness", "Metadata completeness"))
+            ("metadata-completeness", "Metadata completeness"),
+            ("excluded-replicons", "Excluded replicons"))
 
 
 def esc(value):
@@ -197,9 +198,39 @@ def metadata_section(out_dir):
             f"{len(incomplete)} of {len(rows)} scored sample(s) are affected.</p>{body}</section>")
 
 
-def inject(page, out_dir, leaderboard):
-    """Insert the three sections before Recommendations, and their nav links."""
-    sections = baselines_section(out_dir, leaderboard) + interpretation_section() + metadata_section(out_dir)
+def excluded_replicons_section(data_dir):
+    """Replicons evidence labelling removed from scoring (AMBIGUOUS), with the reason."""
+    rows = []
+    if data_dir and Path(data_dir).is_dir():
+        for path in sorted(Path(data_dir).glob("*/truth_labels.tsv")):
+            for row in read_tsv(path):
+                if row.get("final_label") == "AMBIGUOUS":
+                    rows.append((path.parent.name, row))
+    if not rows:
+        body = ("<p class='muted'>No replicon was excluded: either every source label was confirmed by evidence, "
+                "or evidence labelling did not run (RUN_TRUTH_LABEL_EVIDENCE / RUN_REFERENCE_ANNOTATION).</p>")
+    else:
+        body = ("<div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Replicon</th>"
+                "<th>Length</th><th>Source label</th><th>Plasmid markers</th><th>rRNA genes</th>"
+                "<th>Long-read depth</th><th>Marker-free</th><th>Why excluded</th></tr></thead><tbody>"
+                + "".join(f"<tr><td>{esc(sample)}</td><td>{esc(r.get('sequence_id'))}</td><td>{esc(r.get('length'))}</td>"
+                          f"<td>{esc(r.get('source_label'))}</td><td>{esc(r.get('plasmid_markers') or '-')}</td>"
+                          f"<td>{esc(r.get('rrna_genes') or '-')}</td><td>{esc(r.get('long_read_depth') or '-')}</td>"
+                          f"<td>{esc(r.get('marker_free') or '-')}</td><td>{esc(r.get('reason'))}</td></tr>"
+                          for sample, r in rows)
+                + "</tbody></table></div>")
+    marker_free = sum(1 for _, r in rows if r.get("marker_free") == "yes")
+    return ("<section id='excluded-replicons'><h2>Replicons excluded from scoring</h2>"
+            "<p class='lead'>Truth replicons whose plasmid/chromosome label conflicted with plasmid markers, rRNA "
+            "genes or long-read support are AMBIGUOUS: predictions on them are neither credited nor penalised. "
+            f"{len(rows)} replicon(s) excluded, {marker_free} of them plasmids with no marker at all -- the stratum "
+            "a marker-based labeller cannot confirm, reported here rather than hidden.</p>" + body + "</section>")
+
+
+def inject(page, out_dir, leaderboard, data_dir=None):
+    """Insert the question-bank sections before Recommendations, and their nav links."""
+    sections = (baselines_section(out_dir, leaderboard) + interpretation_section() + metadata_section(out_dir)
+                + excluded_replicons_section(data_dir))
     anchor = "<section id='recommendations'>"
     if anchor in page:
         page = page.replace(anchor, sections + anchor, 1)
