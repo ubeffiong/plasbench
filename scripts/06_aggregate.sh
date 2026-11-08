@@ -180,6 +180,33 @@ python3 "$HERE/../python/validate_recommendations.py" \
     --min-train-samples "$RECOMMENDATION_MIN_SAMPLES" \
     --out "$RESULTS_DIR/benchmark.recommendation_validation.tsv"
 
+# Assembly QC gate over every cohort assembly (python/assembly_qc_gate.py, D13):
+# the same check stage 8 applies before recommending, here so its warnings can be
+# scored against failed recommendations below.
+if [[ "${RUN_ASSEMBLY_QC_GATE:-1}" -eq 1 ]]; then
+    python3 "$HERE/../python/assembly_qc_gate.py" --data-dir "$DATA_DIR" \
+        --out "$RESULTS_DIR/benchmark.assembly_qc.tsv" 2>> "$LOG_DIR/aggregate.assembly_qc.log" \
+        || warn "assembly QC gate found no assemblies; benchmark.assembly_qc.tsv not written"
+fi
+
+# Recommender evaluation (python/evaluate_recommender.py; scoring specification
+# sections 9-10): leave-one-study-out regret, near-optimal and top-1 rates, gap
+# closed against the single best tool, and the oracle-gap verdict. Then every
+# existing warning is scored against failed recommendations (evaluate_warnings.py).
+# Advisory: a failure warns and never stops the run.
+if [[ "${RUN_RECOMMENDER_EVAL:-1}" -eq 1 ]]; then
+    if python3 "$HERE/../python/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLE_SHEET" \
+            --tool-status "$RESULTS_DIR/tool_status.tsv" --out-prefix "$RESULTS_DIR/benchmark" \
+            --min-train-samples "$RECOMMENDATION_MIN_SAMPLES"; then
+        python3 "$HERE/../python/evaluate_warnings.py" --regret "$RESULTS_DIR/benchmark.recommender_regret.tsv" \
+            --cohort-qc-flags "$RESULTS_DIR/benchmark.cohort_qc_flags.tsv" \
+            --assembly-qc "$RESULTS_DIR/benchmark.assembly_qc.tsv" --out-prefix "$RESULTS_DIR/benchmark" \
+            || warn "warning evaluation failed; the report shows no warning table"
+    else
+        warn "recommender evaluation failed; the report shows no recommender section"
+    fi
+fi
+
 # Descriptive decision-support model, off by default (see docs/USER_GUIDE.md).
 # Always writes its own JSON verdict, ready or not; select_operational_method.py
 # below only appends --recommendation-model when this guard is on, so a
