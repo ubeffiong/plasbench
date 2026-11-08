@@ -285,6 +285,13 @@ def main(argv=None):
     orthogonal_parser = sub.add_parser("validate-orthogonal-evidence", help="Validate optional laboratory or independent-technology evidence without changing computational scores.")
     orthogonal_parser.add_argument("--evidence", type=Path, required=True, help="TSV described in docs/ORTHOGONAL_VALIDATION.md.")
     orthogonal_parser.add_argument("--out", type=Path, help="Optional summary JSON, normally results/orthogonal_validation.summary.json.")
+    amr_draft_parser = sub.add_parser("derive-amr-truth", help="Draft AMR truth from reference annotation (never writes truth_amr.tsv).")
+    amr_draft_parser.add_argument("--features", type=Path, required=True, help="truth_features.tsv from annotate_reference.py.")
+    amr_draft_parser.add_argument("--truth", type=Path, required=True, help="truth.tsv for the same reference.")
+    amr_draft_parser.add_argument("--out", type=Path, required=True, help="Draft TSV, e.g. data/<sample>/truth_amr.draft.tsv.")
+    audit_labels_parser = sub.add_parser("audit-truth-labels", help="Screen PLASMID/CHROMOSOME truth labels against replicon/MOB evidence (advisory).")
+    audit_labels_parser.add_argument("--data-dir", type=Path, default=Path("data"), help="Directory of per-sample truth folders.")
+    audit_labels_parser.add_argument("--out", type=Path, default=Path("results/benchmark.truth_label_audit.tsv"))
     curate_parser = sub.add_parser(
         "curate-cohort",
         help="Strictly screen candidate assembly/SRA pairs and write accepted/rejected tables.",
@@ -652,6 +659,12 @@ def main(argv=None):
         if args.out:
             command.extend(["--out", str(args.out)])
         code = run(command, root)
+    elif args.command == "derive-amr-truth":
+        code = run([sys.executable, "python/derive_amr_truth.py", "--features", str(args.features),
+                    "--truth", str(args.truth), "--out", str(args.out)], root)
+    elif args.command == "audit-truth-labels":
+        code = run([sys.executable, "python/audit_truth_labels.py", "--data-dir", str(args.data_dir),
+                    "--out", str(args.out)], root)
     elif args.command == "curate-cohort":
         command = [sys.executable, "python/curate_cohort.py", "--candidates", str(args.candidates),
                    "--out-dir", str(args.out_dir)]

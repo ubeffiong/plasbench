@@ -1516,6 +1516,8 @@ ones you'll actually reach for most often; every command has more than shown her
 | `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
 | `validate-cohort` | Check a cohort sheet's schema, or verify it against NCBI online. | *`--samples`*, `--online`, `--write-lock`, `--verify-lock`, `--ledger` |
 | `validate-orthogonal-evidence` | Validate optional independent laboratory/technology evidence without changing computational scores. | *`--evidence`*, `--out` |
+| `derive-amr-truth` | Draft AMR truth from reference annotation; never writes `truth_amr.tsv`. | *`--features`*, *`--truth`*, *`--out`* |
+| `audit-truth-labels` | Screen PLASMID/CHROMOSOME truth labels against replicon/MOB evidence (advisory). | `--data-dir`, `--out` |
 | `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |

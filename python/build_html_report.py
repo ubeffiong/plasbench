@@ -2784,6 +2784,8 @@ def main():
     ap.add_argument("--cohort-qc-flags", help="Optional advisory cohort outlier-flagging TSV (flag_cohort_outliers.py).")
     ap.add_argument("--recovery-by-replicon", help="Optional descriptive recovery-by-replicon/MOB TSV (stratify_recovery.py).")
     ap.add_argument("--quast-diagnostics", help="Optional QUAST supplementary diagnostics TSV (run_quast_diagnostics.py, RUN_QUAST_DIAGNOSTICS=1).")
+    ap.add_argument("--rank-robustness", help="Optional ranking-robustness TSV (rank_sensitivity.py).")
+    ap.add_argument("--truth-label-audit", help="Optional advisory truth-label audit TSV (audit_truth_labels.py).")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -2807,6 +2809,10 @@ def main():
                             if args.recovery_by_replicon and Path(args.recovery_by_replicon).is_file() else [])
     quast_diagnostics = (read_tsv(args.quast_diagnostics)
                          if args.quast_diagnostics and Path(args.quast_diagnostics).is_file() else [])
+    rank_robustness = (read_tsv(args.rank_robustness)
+                       if args.rank_robustness and Path(args.rank_robustness).is_file() else [])
+    truth_label_audit = (read_tsv(args.truth_label_audit)
+                         if args.truth_label_audit and Path(args.truth_label_audit).is_file() else [])
     generated = dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
     tools = sorted({row["tool"] for row in scores} | {row["tool"] for row in status})
@@ -3092,6 +3098,49 @@ def main():
         replicon_recovery_download = " <a href='{}' download>Download the table</a>.".format(
             relative_link(Path(args.recovery_by_replicon), out))
 
+    # Ranking robustness (advisory; never alters the leaderboard). One row per
+    # track and scoring variant: how far the order moves and whether the top tool holds.
+    robustness_seen, robustness_rows = set(), []
+    for row in rank_robustness:
+        key = (row.get("analysis_track", ""), row.get("variant", ""))
+        if key in robustness_seen:
+            continue
+        robustness_seen.add(key)
+        robustness_rows.append(
+            "<tr><td>{track}</td><td>{variant}</td><td>{tau}</td><td>{top}</td><td>{same}</td></tr>".format(
+                track=esc(key[0] or "-"), variant=esc(key[1] or "-"),
+                tau=esc(row.get("kendall_tau_vs_baseline") or "-"), top=esc(row.get("top_tool") or "-"),
+                same=esc(row.get("top_matches_baseline") or "-")))
+    rank_robustness_html = "".join(robustness_rows) or (
+        "<tr><td colspan='5'>No ranking-robustness table was available "
+        "(rank_sensitivity.py writes benchmark.rank_robustness.tsv during stage 6).</td></tr>")
+    rank_robustness_download = ""
+    if args.rank_robustness and Path(args.rank_robustness).is_file():
+        rank_robustness_download = " <a href='{}' download>Download the table</a>.".format(
+            relative_link(Path(args.rank_robustness), out))
+
+    # Truth-label audit (advisory): counts per finding, then only the sequences to review.
+    audit_counts = {}
+    for row in truth_label_audit:
+        audit_counts[row.get("finding", "")] = audit_counts.get(row.get("finding", ""), 0) + 1
+    audit_summary = ", ".join("{}: {}".format(esc(k), v) for k, v in sorted(audit_counts.items())) or "no audit table"
+    audit_flagged = [r for r in truth_label_audit
+                     if r.get("finding") in ("chromosome_with_plasmid_markers", "plasmid_without_markers")]
+    truth_label_audit_html = "".join(
+        "<tr><td>{sample}</td><td>{seq}</td><td>{mol}</td><td>{length}</td><td>{rep}</td><td>{mob}</td>"
+        "<td>{finding}</td></tr>".format(
+            sample=esc(r.get("sample", "-")), seq=esc(r.get("sequence_id", "-")),
+            mol=esc(r.get("molecule_type", "-")), length=esc(r.get("length", "-")),
+            rep=esc(r.get("replicon_labels") or "-"), mob=esc(r.get("mob_labels") or "-"),
+            finding=esc(r.get("finding", "-"))) for r in audit_flagged
+    ) or ("<tr><td colspan='7'>No truth sequence was flagged"
+          + (" (sequences with no annotation are not evaluated, not cleared)." if truth_label_audit
+             else "; no audit table was available.") + "</td></tr>")
+    truth_label_audit_download = ""
+    if args.truth_label_audit and Path(args.truth_label_audit).is_file():
+        truth_label_audit_download = " <a href='{}' download>Download the full audit</a>.".format(
+            relative_link(Path(args.truth_label_audit), out))
+
     # QUAST supplementary diagnostics (descriptive only): summarised per tool and
     # reference type; the full per-sample table stays downloadable. Blank or
     # non-numeric QUAST fields are left out of a mean, never counted as zero.
@@ -3300,7 +3349,7 @@ def main():
 </style></head><body>
 <script>window.pbEsc=s=>String(s==null?'':s).replace(/[&<>\\u0022\\u0027]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','\\u0022':'&quot;','\\u0027':'&#39;'}}[c]));</script>
 <header><p class="eyebrow">Benchmarking plasmid reconstruction from sequence to biological function.</p><h1>PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools</h1><p><strong>Run:</strong> {esc(run_label)} · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
-<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#isolate-difficulty'>Isolate difficulty</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#replicon-recovery'>Recovery by replicon</a><a href='#quast-diagnostics'>QUAST diagnostics</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
+<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#isolate-difficulty'>Isolate difficulty</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#replicon-recovery'>Recovery by replicon</a><a href='#quast-diagnostics'>QUAST diagnostics</a><a href='#rank-robustness'>Ranking robustness</a><a href='#truth-label-audit'>Truth-label audit</a><a href='#stratified'>Performance by stratum</a><a href='#orthogonal-evidence'>Orthogonal evidence</a><a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
 <div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: {best_metric}</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 {summary_html}
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
@@ -3320,6 +3369,8 @@ def main():
 <section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
 <section id='replicon-recovery'><h2>Recovery by replicon and mobility type</h2><p class='lead'>Which kinds of plasmid each tool recovers, using the Inc/rep and relaxase (MOB) labels annotated on the truth references. <strong>Descriptive only: it never ranks tools and never changes the leaderboard.</strong> A plasmid with several labels counts once under each. A plasmid with no label of that type is <em>untyped</em>; plasmids in samples with no annotation are left out rather than called untyped. Groups with few plasmids are flagged, so read patterns, not ranks. Tracks are never mixed.{replicon_recovery_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Tool</th><th>Label type</th><th>Label</th><th>Plasmids</th><th>Samples</th><th>Mean completeness</th><th>Recovered fraction</th><th>Note</th></tr></thead><tbody>{replicon_recovery_html}</tbody></table></div></section>
 <section id='quast-diagnostics'><h2>QUAST structural diagnostics</h2><p class='lead'>Optional supplementary check of each tool's predicted plasmid sequence against the truth, run three ways: <em>combined</em> (all truth plasmids), <em>individual</em> (one run per truth plasmid) and <em>chromosome</em> (chromosome only). A high chromosome genome fraction means the tool's plasmid call contains chromosome sequence; misassemblies and duplication ratio flag structural problems that base-level F1 cannot see. <strong>Descriptive only: it never changes the ranking.</strong> Misassembly counts are alignment-derived and are not validated against read or graph support. Means skip blank values.{quast_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Reference</th><th>Comparisons</th><th>Mean genome fraction (%)</th><th>Total misassemblies</th><th>Mean duplication ratio</th></tr></thead><tbody>{quast_html}</tbody></table></div></section>
+<section id='rank-robustness'><h2>Ranking robustness</h2><p class='lead'>How much the order of tools depends on scoring choices: each row re-scores the saved alignments with one filter changed (or ranks by strict precision or per-plasmid recovery) and reports Kendall tau against the baseline order and whether the top tool holds. <strong>Advisory only: it never changes the leaderboard.</strong> A low tau or a changed top tool means the ranking is sensitive to that choice.{rank_robustness_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Variant</th><th>Kendall tau vs baseline</th><th>Top tool</th><th>Top tool unchanged</th></tr></thead><tbody>{rank_robustness_html}</tbody></table></div></section>
+<section id='truth-label-audit'><h2>Truth-label audit</h2><p class='lead'>Does each PLASMID or CHROMOSOME label agree with replicon and MOB evidence on the reference? Findings: {audit_summary}. Only sequences to review are listed. A flagged sequence may be a chromid, an integrated plasmid, a cryptic plasmid the databases do not know, or a database false positive. <strong>Advisory only: it never edits truth or changes a score.</strong> <em>not_evaluated</em> means the annotation callers did not run, which is not the same as consistent.{truth_label_audit_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Sequence</th><th>Truth label</th><th>Length</th><th>Replicon</th><th>MOB</th><th>Finding</th></tr></thead><tbody>{truth_label_audit_html}</tbody></table></div></section>
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed tool run on an isolate with true plasmid counts as F1 = 0 for that tool's ranking; a skipped or unavailable tool is left out, and samples not shared by every ranked tool are left out of everyone's ranking. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
 <section id='samples'><h2>Sample drill-down</h2><p class='lead'>Open a sample to compare every completed tool side-by-side.</p>{''.join(sample_sections) or "<p class='muted'>No samples were found.</p>"}</section>

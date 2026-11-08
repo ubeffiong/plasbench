@@ -473,6 +473,10 @@ export REPORT_MAPPING_AMBIGUITY="${REPORT_MAPPING_AMBIGUITY:-1}"
 export RUN_REFERENCE_ANNOTATION="${RUN_REFERENCE_ANNOTATION:-1}"
 export ANNOTATION_AMR_DB="${ANNOTATION_AMR_DB:-ncbi}"
 export ANNOTATION_REPLICON_DB="${ANNOTATION_REPLICON_DB:-plasmidfinder}"
+# Opt-in (default off): stage 2 also writes data/<sample>/truth_amr.draft.tsv from the
+# AMRFinderPlus rows (python/derive_amr_truth.py). A draft is never scored: review it and
+# rename it to truth_amr.tsv yourself. See docs/METHODS.md, "Drafting AMR truth".
+export DERIVE_AMR_TRUTH_DRAFT="${DERIVE_AMR_TRUTH_DRAFT:-0}"
 
 # Truth-derived DIFFICULTY descriptors (python/compute_difficulty_features.py):
 # how intrinsically hard this isolate is to separate into plasmid vs.

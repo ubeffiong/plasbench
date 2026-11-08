@@ -505,6 +505,9 @@ python3 python/derive_amr_truth.py --features data/<sample>/truth_features.tsv \
     --truth data/<sample>/truth.tsv --out data/<sample>/truth_amr.draft.tsv
 ```
 
+The same command is `plasbench derive-amr-truth`. Setting `DERIVE_AMR_TRUTH_DRAFT=1` makes stage 2
+write the draft for every sample automatically (default off).
+
 The draft is never written to `truth_amr.tsv`, so the scorer cannot use it by accident
 (the script refuses that output name). Every row is tagged `evidence_tier = auto_derived`.
 Annotation runs on the reference, not on any tool's predictions, so the draft is not
@@ -529,6 +532,8 @@ writes `benchmark.recovery_by_replicon.tsv`; a failure there only warns. It can 
 run by hand:
 
 ### Truth-label audit (advisory)
+
+Also available as `plasbench audit-truth-labels`; shown in the report's "Truth-label audit" section.
 
 `python/audit_truth_labels.py` (run by `scripts/06_aggregate.sh`) cross-checks every
 truth sequence's PLASMID/CHROMOSOME label against replicon and MOB evidence in

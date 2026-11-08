@@ -75,7 +75,8 @@ fi
 
 # Truth-label screen (python/audit_truth_labels.py): does each PLASMID/CHROMOSOME
 # label agree with replicon/MOB evidence? Advisory; never edits truth or scores.
-if ! python3 "$HERE/../python/audit_truth_labels.py"         --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.truth_label_audit.tsv"; then
+if ! python3 "$HERE/../python/audit_truth_labels.py" \
+        --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.truth_label_audit.tsv"; then
     warn "truth-label audit failed; scores are unaffected"
 fi
 
@@ -165,6 +166,8 @@ python3 "$HERE/../python/build_html_report.py" \
     --cohort-qc-flags "$RESULTS_DIR/benchmark.cohort_qc_flags.tsv" \
     --recovery-by-replicon "$RESULTS_DIR/benchmark.recovery_by_replicon.tsv" \
     --quast-diagnostics "$RESULTS_DIR/quast_diagnostics.tsv" \
+    --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
+    --truth-label-audit "$RESULTS_DIR/benchmark.truth_label_audit.tsv" \
     --out "$RESULTS_DIR/benchmark.report.html"
 
 log "Stage 6 complete."

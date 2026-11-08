@@ -54,7 +54,8 @@ documentation; verify before citing it.
 treated as certain. Until now nothing cross-checked the label.
 **Fix.** `python/audit_truth_labels.py` compares each truth sequence with replicon/MOB
 evidence in `truth_features.tsv` and writes `benchmark.truth_label_audit.tsv`
-(wired into `scripts/06_aggregate.sh`). Findings: `consistent`,
+(run by `scripts/06_aggregate.sh`, shown in the HTML report's "Truth-label audit" section, and available as
+`plasbench audit-truth-labels`). Findings: `consistent`,
 `chromosome_with_plasmid_markers`, `plasmid_without_markers`, `not_evaluated`. It never edits
 `truth.tsv` and never changes a score.
 **Evidence.** `test/test_audit_truth_labels.py`. The test checks the part that matters
@@ -120,7 +121,8 @@ scorer's own CLI defaults are permissive (0 / 0 / 1 / 0).
 changed at a time, re-ranks under strict F1 and per-plasmid recovery, and writes
 `benchmark.rank_robustness.tsv` (Kendall tau, top-tool change); it is called by
 `scripts/06_aggregate.sh`. Tests: `test/test_rank_sensitivity.py`,
-`test/test_scoring_adversarial.py`.
+`test/test_scoring_adversarial.py`. The HTML report shows it in the "Ranking robustness" section
+(`test/test_report_robustness_audit.py`).
 **Status.** Fixed on audit branch (measured, not removed: ranking is still mean F1).
 Whether the real-cohort ranking is stable is **Open** (no real run).
 
@@ -212,8 +214,9 @@ descriptive only: it never ranks tools.
 **Answer.** Only against independent truth. `python/derive_amr_truth.py` can draft AMR truth from
 AMRFinderPlus calls on the *reference* (not on predictions, so it is not circular for the
 prediction), with database name and version recorded and `evidence_tier = auto_derived`. It refuses to
-write `truth_amr.tsv`; a person must review and promote it.
-**Evidence.** `test/test_derive_amr_truth.py`, `test/test_amr_truth.py`.
+write `truth_amr.tsv`; a person must review and promote it. It is reachable as `plasbench derive-amr-truth` and,
+opt-in, from stage 2 (`DERIVE_AMR_TRUTH_DRAFT=1` writes `data/<sample>/truth_amr.draft.tsv`; default off).
+**Evidence.** `test/test_derive_amr_truth.py`, `test/test_amr_truth.py`, `test/test_script_wiring.py`.
 **Status.** Verified. AMR recall is still blank on any cohort without curated truth. A tool
 that uses the same database as the truth caller would still be favoured; that is stated, not removed.
 
@@ -234,6 +237,13 @@ None affect the ranking.
 lock files carry SHA-256; the scorer is standard-library only.
 **Gap found.** The database release dates are blank (Q16) and tool databases live inside conda environments.
 **Status.** Partly verified; database provenance is Open.
+
+### Q20b. Is every script actually reachable?
+**Answer.** `test/test_script_wiring.py` fails if any `python/*.py` script is referenced by no stage script, CLI
+command, adapter or module, except three documented one-offs: `compare_scoring_methods.py` (a hand-run BLASTN
+cross-check), `audit_three_class_scoring.py` (its helper) and `parse_teixeira2025_supplement.py` (a one-time cohort
+migration). It also drives `derive-amr-truth` and `audit-truth-labels` through the real CLI.
+**Status.** Fixed here. Before this, `derive_amr_truth.py` was reachable only from tests.
 
 ### Q21. Is the per-plasmid side file safe against stale results?
 **Answer.** It is rewritten on each scoring run, but a tool removed from a later run leaves its old
