@@ -79,10 +79,12 @@ def main():
                                 "n_wrong_plasmid", "n_shared_contig", "n_unassigned_contig", "correct_plasmid_rate",
                                 "replicon_type_correct_rate", "n_samples"],
               [["toolA", "carbapenemase", 3, 3, 2, 1, 0, 0, "0.6667", "1.0000", 2]])
+        write(tmp / "status.tsv", ["sample", "tool", "status", "prediction_fasta", "reason"],
+              [["S1", "toolA", "skipped", "", "assembly graph unavailable"], ["S2", "toolA", "completed", "x", ""]])
         write(tmp / "scores.tsv", ["sample", "tool", "contigs_ambiguous_bp", "contigs_unplaced_bp"],
               [["S1", "toolA", 1500, 1200]])
         sources = {"leaderboard": tmp / "lb.tsv", "manifest": tmp / "manifest.json", "scores": tmp / "scores.tsv",
-                   "comparisons": tmp / "pc.tsv", "data_dir": tmp / "data", "label_schemes": tmp / "schemes.tsv",
+                   "comparisons": tmp / "pc.tsv", "tool_status": tmp / "status.tsv", "data_dir": tmp / "data", "label_schemes": tmp / "schemes.tsv",
                    "label_scheme_summary": tmp / "summary.tsv", "truth_provenance": tmp / "prov.tsv",
                    "outcome_states": tmp / "states.tsv", "recommender_eval": tmp / "eval.tsv",
                    "recommender_verdict": tmp / "verdict.json", "warning_eval": tmp / "warn.tsv",
@@ -93,7 +95,7 @@ def main():
                   "plasmid-outcomes": [">7<", ">2<", "0.6500"],
                   "label-schemes": ["nonchromosomal", "chromid1", "chromid-like", "B 1, C 1", "collapsed", "8000"],
                   "contig-layer": ["0.8100", "0.6600", "1,500 bp", "1,200 bp"],
-                  "outcome-states": ["Infrastructure failure", ">10<", ">2<"],
+                  "outcome-states": ["Infrastructure failure", ">10<", ">2<", "assembly graph unavailable"],
                   "recommender-eval": ["0.8333", "0.6667", "recommender_adds_value", "cohort_outlier:n50", "0.3333"],
                   "taxon-transfer": ["Klebsiella", "0.380000", ">yes<"],
                   "amr-placement": ["carbapenemase", "0.6667"],

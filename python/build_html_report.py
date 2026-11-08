@@ -3464,6 +3464,7 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # Scoring specification and panel sections; each is fed by an explicit argument.
     import report_scoring_spec
     spec_sources = {"leaderboard": args.leaderboard, "manifest": args.manifest, "scores": args.scores,
+                    "tool_status": args.tool_status,
                     "comparisons": args.comparisons, "data_dir": args.data_dir,
                     "label_schemes": args.label_schemes, "label_scheme_summary": args.label_scheme_summary,
                     "truth_provenance": args.truth_provenance, "outcome_states": args.outcome_states,

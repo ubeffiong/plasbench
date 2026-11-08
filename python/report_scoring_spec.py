@@ -193,7 +193,7 @@ def contig_layer_section(leaderboard, scores):
                    "the contigs assigned to each plasmid, a contig-layer-only definition.", body)
 
 
-def outcome_states_section(states):
+def outcome_states_section(states, status_rows=()):
     if not states:
         body = not_run("run outcome states", "no tool_status.tsv was given to aggregation")
     else:
@@ -202,6 +202,18 @@ def outcome_states_section(states):
                      [(r.get("analysis_track"), r["tool"], r["n_runs"], r["completed"], r["reused"], r["failed_tool"],
                        r["failed_resource"], r["infrastructure_failure"], r["not_applicable"], r["retried"])
                       for r in states])
+        # Tools compared (panel D15): why each tool did not run or did not finish.
+        reasons = {}
+        for row in status_rows:
+            if row.get("status") not in ("completed", "reused") and row.get("tool"):
+                reason = (row.get("reason") or "no reason recorded").split("; exit_code")[0]
+                reasons.setdefault((row["tool"], row.get("status")), Counter())[reason] += 1
+        if reasons:
+            body += "<h3>Tools compared: why runs were skipped or failed</h3>" + table(
+                ["Tool", "Status", "Runs", "Reason (most common)"],
+                [(tool, status, sum(c.values()), c.most_common(1)[0][0]) for (tool, status), c in sorted(reasons.items())])
+        else:
+            body += "<p class='muted'>Every run of every tool completed.</p>"
     return section("outcome-states", "How every run ended",
                    "Decision D6: a tool crash or missing output scores F1 = 0 and counts in the ranking. A resource "
                    "failure (timeout 124, out-of-memory 137) is scored 0 by default. An infrastructure failure (the "
@@ -342,7 +354,7 @@ def inject(page, sources):
         + label_schemes_section(read_tsv(sources.get("label_scheme_summary")), read_tsv(sources.get("label_schemes")),
                                 provenance, sources.get("data_dir"))
         + contig_layer_section(leaderboard, read_tsv(sources.get("scores")))
-        + outcome_states_section(read_tsv(sources.get("outcome_states")))
+        + outcome_states_section(read_tsv(sources.get("outcome_states")), read_tsv(sources.get("tool_status")))
         + recommender_section(evaluation, read_json(sources.get("recommender_verdict")),
                               read_tsv(sources.get("warning_eval")))
         + transfer_section(read_tsv(sources.get("leave_taxon_out")), read_tsv(sources.get("comparisons")))

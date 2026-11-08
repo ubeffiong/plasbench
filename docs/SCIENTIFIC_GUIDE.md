@@ -30,12 +30,14 @@ This guide is for the people who must decide whether to trust and use the tool: 
   - [7.5 Bin-level metrics (binning-capable tools only)](#75-bin-level-metrics-binning-capable-tools-only)
   - [7.6 Threshold-free ranking quality](#76-threshold-free-ranking-quality)
   - [7.7 Structural evidence](#77-structural-evidence)
+  - [7.8 Scoring-specification additions](#78-scoring-specification-additions)
 - [8. Ranking and statistics](#8-ranking-and-statistics)
   - [8.1 Tracks and tasks](#81-tracks-and-tasks)
   - [8.2 The headline](#82-the-headline)
   - [8.3 Failures](#83-failures)
   - [8.4 Uncertainty](#84-uncertainty)
   - [8.5 How fragile is the ranking?](#85-how-fragile-is-the-ranking)
+  - [8.6 Does per-isolate recommendation add anything?](#86-does-per-isolate-recommendation-add-anything)
 - [9. Truth quality and leakage controls](#9-truth-quality-and-leakage-controls)
 - [10. Long-read and hybrid tracks](#10-long-read-and-hybrid-tracks)
 - [11. The metagenomic track](#11-the-metagenomic-track)
@@ -371,6 +373,19 @@ For tools that give per-record probabilities, **PR-AUC** is the area under the p
 
 `python/call_structural_variants.py` reads each predicted record's alignment blocks and reports alignment-derived discordances (inter-replicon junction, inversion, relocation, reference deletion or insertion, tandem duplication) and a `collinear_fraction`. Every call is marked `validated: false`: these are candidate misassemblies, not confirmed ones. They never change scores. Replicon and MOB-type breakdowns of recovery (`stratify_recovery.py`) are descriptive only; groups under five plasmids are flagged underpowered.
 
+### 7.8 Scoring-specification additions
+
+These were added for the pre-registered scoring specification ([PREREGISTRATION.md](PREREGISTRATION.md)). None of them changes the ranking metric.
+
+| Measure | Definition |
+|---|---|
+| `mcc` | Matthews correlation over reference bases; true negatives (`TN_bp`) are chromosome bases not predicted as plasmid. Blank, never 0, when a marginal is zero (for example a plasmid-free isolate). |
+| `f2`, `f0_5` | F-beta weighting recall (F2) or precision (F0.5), with the same undefined rules as F1. |
+| `abstention_rate` | 1 when the tool returned nothing on the isolate; averaged over isolates it is the abstention rate. |
+| Per-plasmid outcomes | Per truth plasmid, judged on the bin holding most of it (`score_bins.py --outcomes-out`): *perfect* (that bin's precision and recall ≥ `PERFECT_THRESHOLD`), *fragmented* (another bin holds ≥ `FRAGMENT_SHARE`), *merged* (its bin also holds that share of another plasmid), *missed* (best-bin recall < `MISSED_RECALL`), else *partial*. Counted as `outcome_*` columns. |
+| Contig layer | A parallel layer, never the headline: `contig_classification.py` labels assembly contigs against the reference and scores each tool per contig (count and length), with MCC, contig-level binning F1 (`contig_bin_f1_bp`), and the lengths of shared (`contigs_ambiguous_bp`) and unassigned (`contigs_unplaced_bp`) contigs. Its recall denominator is the summed length of contigs assigned to each plasmid, a contig-layer-only definition. |
+| AMR placement | `score_amr_placement.py`: each curated AMR gene copy is matched by position; level 2 asks whether the bin holding it is matched to the gene's own plasmid, level 1 whether that plasmid shares a replicon type. Reported per gene class (`config/amr_gene_classes.tsv`) in `benchmark.amr_placement.tsv`. |
+
 ---
 
 ## 8. Ranking and statistics
@@ -397,6 +412,8 @@ A tool run that failed (`tool_status.tsv`) on a plasmid-bearing sample scores 0 
 
 Exit codes 124 (timeout) and 137 (SIGKILL, the usual out-of-memory kill) are classed as **resource failures**: the machine ran out of time or memory, which says little about accuracy. By default they score 0 like any failure. `aggregate_results.py --resource-failures exclude` drops such samples from every tool's ranking instead. Either way `n_failed_resource` is reported.
 
+**Outcome states.** Every run ends in one state, counted per tool in `benchmark.outcome_states.tsv` and the report: completed, reused, failed (tool), failed (resource), infrastructure failure, or not applicable (skipped). An **infrastructure failure** (exit 125, 126 or 127: the container or command never started; or a full disk) says nothing about the tool, so it is recorded as `infrastructure_failure`, never scored, and should be rerun. A failed run is retried `TOOL_RETRIES` times (default 1; timeouts and out-of-memory kills are not retried), and `TOOL_TIMEOUT_SECONDS` gives every tool the same wall-time budget. Exit code, failure class and attempts are columns of `tool_outcomes.tsv`; `tool_status.tsv` keeps its fixed schema, and aggregation falls back to the exit code in its `reason` text for older results.
+
 ### 8.4 Uncertainty
 
 | Procedure | Detail |
@@ -404,6 +421,8 @@ Exit codes 124 (timeout) and 137 (SIGKILL, the usual out-of-memory kill) are cla
 | Interval | Percentile interval from a 1,000-resample bootstrap (fixed seed), resampling whole clusters within each species, then macro-averaging. Reported only with at least 5 values and 5 independent clusters. |
 | Pairwise comparison | Two-sided sign-flip permutation test on paired per-sample differences (10,000 permutations, fixed seed), flipping whole clusters together; at least 5 paired clusters. |
 | Multiplicity | Holm correction across all pairs within one (track, task). |
+| Wilcoxon signed-rank | Reported beside the permutation test, never replacing it: exact for up to 25 non-zero differences (conditional on ties), normal approximation with continuity correction above; zero differences dropped; Holm-adjusted (`wilcoxon_p_value_holm`). |
+| Equivalence | `equivalent = yes` when the mean difference and its interval lie inside ±`SMALLEST_DIFFERENCE` (0.05). |
 | `significant_vs_runner_up` | Whether the top tool's Holm-adjusted p-value against the runner-up is below 0.05. It describes the cohort, not the field. |
 | Guard | Aggregation refuses to rank samples derived from the same genome (for example depth-ladder runs), because that would shrink the interval falsely. |
 
@@ -412,6 +431,12 @@ With few independent clusters the output is `not_assessed`, by design. Treat bla
 ### 8.5 How fragile is the ranking?
 
 `python/rank_sensitivity.py` (stage 6; `RUN_RANK_SENSITIVITY=0` skips it) writes `benchmark.rank_robustness.tsv`. Per track it re-scores every PAF already on disk with one filter changed at a time (MAPQ 0 and 30, identity 0.80 and 0.95, query coverage 0) and re-ranks under strict F1, per-plasmid recovery and recovery at 90% completeness. For each variant it reports each tool's mean, rank, change from baseline, **Kendall's tau** against the baseline order, and whether the top tool is unchanged. A first place that does not survive a defensible change of filter is not a finding. It uses the samples that have a PAF, so failure-as-zero is not applied, and it warns if its recomputed baseline differs from `scores.tsv`.
+
+Further axes: the two non-primary **labelling schemes** (`scheme:nonchromosomal`, `scheme:evidence`, each re-scored against its own truth file), `min_contig=500` (predicted records under 500 bp ignored), `micro_f1` (bases pooled), `public_only` and `in_house_only` (isolates with or without an NCBI sequence report), `grade_c_excluded`, and the metrics MCC, F2, F0.5 and the contig-layer F1s.
+
+### 8.6 Does per-isolate recommendation add anything?
+
+`python/evaluate_recommender.py` (stage 6, `RUN_RECOMMENDER_EVAL`) uses the leave-one-study-out folds. In each fold the recommender picks the best training tool in the held-out isolate's organism (falling back to the single best training tool). On each held-out isolate it reports **regret** (best tool's F1 minus the recommended tool's), the near-optimal rate (regret ≤ `NEAR_OPTIMAL_MARGIN`), top-1 rate, Kendall's tau between training and held-out rankings, the single best tool's regret and the **gap closed** (1 − recommender regret / single-best regret), for F1, F2 and F0.5. When the oracle gap (mean best score − mean single-best score) is below `ORACLE_GAP_FLOOR` the verdict is `benchmark_only`: report the leaderboard and do not recommend per isolate. `evaluate_warnings.py` scores every existing warning (cohort QC outliers, the assembly QC gate) by PPV, sensitivity and firing rate against failed recommendations (regret > `RECOMMENDATION_FAILURE_REGRET`); where a warning's validity limit applies it says *could not be applied*. `leave_taxon_out.py` repeats the regret analysis holding out one genus or phylum at a time; isolates with `split=holdout` stay locked until they are evaluated once with `--confirm-holdout`.
 
 ---
 
@@ -428,6 +453,10 @@ With few independent clusters the output is `not_assessed`, by design. Treat bla
 | Reads used to polish the truth | `base_level_metrics_valid`; CPRR identity criterion applied only where valid. | Section 4.4 |
 | Isolate difficulty confounds the comparison | Benchmark-only descriptors: assembly-graph dead ends, plasmid-to-chromosome depth ratio, plasmid-to-chromosome Mash distance (`RUN_DIFFICULTY_FEATURES`, off by default). | `compute_difficulty_features.py` |
 | Cohort outliers | Robust z-score flags (advisory). | `benchmark.cohort_qc_flags.tsv` |
+| Which labels count as truth | Pre-registered Scheme 3 (NCBI `assigned_molecule_location_type`, pinned by the sequence report's SHA-256) scores the headline (`TRUTH_LABEL_SCHEME=ncbi`); Scheme 1 (non-chromosomal) and the evidence scheme are re-ranked as sensitivity analyses. Isolates without an NCBI record are marked `not_applicable:<truth_source>`. | `benchmark.label_schemes.tsv`, `benchmark.label_scheme_summary.tsv` |
+| Truth plasmid closed as a tandem dimer | `detect_dimers.py` compares the two halves; with `COLLAPSE_DIMERS=1` the monomer is scored (original kept as `reference.precollapse.fna`), otherwise it is flagged and AMBIGUOUS under the evidence scheme. | `<sample>/truth.corrections.tsv` |
+| Truth quality | Grade A (tier 1 and `same_extraction=yes` declared), B (other tier 1 and tier 2), C (tier 3); `grade_c_excluded` is a rank-sensitivity axis. | `benchmark.truth_provenance.tsv` |
+| A mixed or contaminated assembly | Assembly QC gate (size, GC spread across long contigs), advisory, before operational ranking and for every cohort assembly. | `benchmark.assembly_qc.tsv`, `<sample>/assembly_qc.tsv` |
 
 **The database-overlap screen is only as good as its inputs.** It needs `database_release_date` filled in for each tool in `config/tool_database_releases.tsv`; until then every database-using pair is `unknown`. When no pair can be judged, the leaderboard (stderr, Markdown and HTML) says explicitly that **leakage was not assessed**, instead of showing 0 / 0 / blank. It is a date-based screen, not proof that a genome is or is not in a database, and it does not measure sequence-level similarity to a tool's training data.
 
@@ -554,6 +583,7 @@ A single self-contained file. Its main sections are: Summary (report card and "s
 | **Container** | `Dockerfile` pins its base image by digest and builds from the lock. MOB-suite and gplas2 get separate environments. Databases are not baked in; `scripts/docker_run.sh` records the image digest. |
 | **Release archives** | `make_release.sh` builds a checksummed archive; the release workflow verifies it; a Zenodo upload workflow and citation metadata are provided. |
 | **Determinism** | The scorer uses only the Python standard library; bootstrap and permutation use fixed seeds. |
+| **Pre-registration** | `config/prereg.tsv` lists every scoring decision; `plasbench analysis freeze-prereg --write` locks its SHA-256 in `config/prereg.lock.json`. The manifest records the hash, whether the lock matches, the parameters still `TO_FIX`, and every setting that departs from the plan. `REQUIRE_PREREG=1` makes stage 4 refuse to run until the lock matches and nothing is `TO_FIX`. |
 
 **Gaps to know about:** database release dates are blank until you fill them in, the manifest's database identity hashes names, sizes and times (not contents), the allow-list of settings omits some newer variables, and the MOB-suite database lives inside the conda environment (copy it with the environment).
 
@@ -613,6 +643,23 @@ All settings are environment variables read by `config/config.sh` (override them
 | `EXCLUDE_DATABASE_OVERLAP` | 0 | 1 drops possible-overlap rows before ranking (default is report only). |
 | `RUN_RANK_SENSITIVITY` | 1 | Write `benchmark.rank_robustness.tsv`. |
 | `COHORT_QC_FLAGS_ENABLED` | 1 | Advisory outlier flags. |
+| `TRUTH_LABEL_SCHEME` | ncbi | Scored labelling scheme: `ncbi` (pre-registered primary), `nonchromosomal` or `evidence`. |
+| `RUN_DIMER_DETECTION`, `COLLAPSE_DIMERS` | 1, 1 | Detect tandem-dimer truth plasmids; score the monomer. |
+| `DIMER_MIN_IDENTITY`, `DIMER_MIN_HALF_COVERAGE` | 0.95, 0.90 | Dimer test on the two halves. |
+
+**Scoring specification**
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `REQUIRE_PREREG` | 0 | 1: stage 4 refuses to run unless the pre-registration lock matches and nothing is `TO_FIX`. |
+| `PERFECT_THRESHOLD`, `FRAGMENT_SHARE`, `MISSED_RECALL` | 0.95, 0.20, 0.50 | Per-plasmid outcome thresholds. |
+| `TOOL_RETRIES`, `TOOL_TIMEOUT_SECONDS` | 1, blank | Automatic retries of a failed run; the same wall-time budget for every tool (blank = none). |
+| `RUN_RECOMMENDER_EVAL` | 1 | Recommender, warning and leave-taxon-out evaluation in stage 6. |
+| `NEAR_OPTIMAL_MARGIN`, `ORACLE_GAP_FLOOR`, `RECOMMENDATION_FAILURE_REGRET` | 0.05, 0.02, 0.10 | Recommender evaluation thresholds. |
+| `RECOMMENDATION_MIN_EXPECTED_SCORE` | 0.40 | Below this expected F1 no tool is recommended (decision D11). |
+| `SMALLEST_DIFFERENCE` | 0.05 | Equivalence margin for paired comparisons. |
+| `RUN_AMR_PLACEMENT` | 1 | AMR gene placement, when curated AMR truth exists. |
+| `RUN_ASSEMBLY_QC_GATE`, `ASSEMBLY_QC_MAX_SIZE_MB`, `ASSEMBLY_QC_MAX_GC_SPREAD` | 1, 8.5, 0.12 | Advisory assembly QC gate. |
 
 **Operational mode and optional diagnostics**
 
@@ -685,6 +732,7 @@ This section records what has and has not been shown, so that a reader can judge
 - The ranking rules guard against known benchmark-gaming routes: abstention and failure score zero, shared-sample ranking, cluster-aware resampling, a circularity guard for long-read truth, and an explicit refusal to rank correlated samples.
 - Failure handling, tie-breaking, undefined-metric handling, study grouping and the leakage warning are covered by tests.
 - The Continuous Integration job runs the full offline suite, the demo and a container build.
+- The scoring-specification additions (MCC, F-beta, outcome states, label schemes, dimer collapse, recommender regret, Wilcoxon, AMR placement) are checked against hand calculations in their tests. They are verified mechanically on synthetic data only.
 
 ### 17.2 What has not been shown yet
 
@@ -695,6 +743,9 @@ This section records what has and has not been shown, so that a reader can judge
 | The shipped cohorts are small and taxonomically narrow: 17 of 32 `public-v2` isolates are *E. coli*, `public-v1` is mostly one study, and the added rows lack depth and plasmid counts. | A headline can rarely reach the 20-cluster species minimum, so the pooled fallback often applies, and intervals are often unavailable. Do not generalise to other taxa. |
 | The nearest-reference Mash screen has not been validated against any independent plasmid partition and uses a 16-plasmid reference set. | Use it only as a distance report. |
 | No laboratory (PCR, long-read confirmation) evidence is bundled. | Computational concordance is not biological confirmation. |
+| Pre-registered values marked `TO_FIX` (tool timeout, integrated-element depth, circular-path requirement) await the panel. | The plan is not frozen; `REQUIRE_PREREG=1` will refuse to run until they are fixed. |
+| The contig layer has not been compared with a second, independent scorer. | Treat it as implemented, not validated. |
+| The recommender evaluation has run only on synthetic data. | Its verdict on a real cohort is unknown. |
 
 ### 17.3 What would establish the claims
 
@@ -749,6 +800,10 @@ This section records what has and has not been shown, so that a reader can judge
 | Operational method recommendation for a sample without truth | **Implemented**; evidence-gated and needs confirmation. |
 | Learned recommendation model | **Implemented, off by default**, gated by validation. |
 | Nearest-reference Mash screen | **Experimental, unvalidated, off by default.** |
+| Pre-registration freeze, label schemes, dimer collapse, outcome states | **Implemented**; tested on synthetic data. |
+| Contig-level scoring layer | **Implemented, parallel to the reference layer, not validated** against a second scorer. |
+| Recommender regret, warning PPV, leave-taxon-out | **Implemented**; tested on synthetic data only. |
+| AMR placement by gene class | **Implemented**; needs curated `truth_amr.tsv`. |
 | Plasmid identification for a user's sample | **Not a PlasBench function.** |
 | Plasmid clustering, communities or subcommunities | **Not implemented.** |
 | PLSDB comparison, most-similar reference, relatedness, backbone versus accessory analysis | **Not implemented.** |
