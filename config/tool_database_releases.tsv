@@ -1,20 +1,20 @@
 tool	uses_reference_database	database	database_release_date	note
-mob_recon	yes	MOB-suite plasmid database (RefSeq complete plasmids)		Fill database_release_date (YYYY-MM-DD) with the release date of the MOB-suite database you installed.
-platon	yes	Platon database (RefSeq plasmid/chromosome proteins)		Fill with the release date of the Platon database you installed.
+mob_recon	yes	MOB-suite database v2.0.0 (Zenodo 10.5281/zenodo.3786915)	2020-05-04	Installed: MOB-suite 3.0.0's mob_init downloads https://zenodo.org/record/3786915/files/data.tar.gz; Zenodo publication_date 2020-05-04 (verified 2026-11-08). Local copy downloaded 2026-09-03 (databases/status.txt). Re-check if MOB-suite is upgraded.
+platon	yes	Platon database v1.5.0 (Zenodo 10.5281/zenodo.4066768)	2020-10-05	Platon 1.7 (installed) points to https://zenodo.org/record/4066768/files/db.tar.gz; Zenodo publication_date 2020-10-05 (verified 2026-11-08). The database itself is not installed yet; update if a different db.tar.gz is installed.
 plasmidspades	no	none (de novo assembly, coverage-based)		No reference plasmid database.
-gplas2_mob	yes	gplas2 classifier + MOB-suite database		Classifier/database built from public complete plasmids; fill the release date of the version installed.
+gplas2_mob	yes	MOB-suite database v2.0.0 via mob_recon classification	2020-05-04	Plasmid/chromosome evidence comes from MOB-suite (same database as mob_recon). gplas2 itself is not installed yet.
 gplas2_external	unknown	depends on the external classifier supplied		Set to yes and fill the date if the external classifier was trained on public plasmids.
-flye_mob_recon	yes	MOB-suite plasmid database		Fill with the installed MOB-suite database release date.
-plassembler	yes	Plassembler database (PLSDB-derived)		Fill with the installed Plassembler database release date.
-hybracter_long	yes	Plassembler database (PLSDB-derived)		Fill with the installed Plassembler database release date.
-hybracter_hybrid	yes	Plassembler database (PLSDB-derived)		Fill with the installed Plassembler database release date.
-trycycler_mob_recon	yes	MOB-suite plasmid database		Fill with the installed MOB-suite database release date.
-genomad	yes	geNomad database and trained model		Fill with the installed geNomad database release date.
-plasme	yes	PLASMe database (PLSDB-derived)		Fill with the installed PLASMe database release date.
-rfplasmid	yes	RFPlasmid trained models		Fill with the release date of the RFPlasmid model version installed.
-plasmidhunter	yes	PlasmidHunter trained model		Fill with the release date of the PlasmidHunter model version installed.
-plasmer	yes	Plasmer database and model		Fill with the installed Plasmer database release date.
-plascope	yes	PlaScope database		Fill with the installed PlaScope database release date.
-plasgraph2	yes	plASgraph2 trained model		Fill with the release date of the plASgraph2 model version installed.
+flye_mob_recon	yes	MOB-suite database v2.0.0 (Zenodo 10.5281/zenodo.3786915)	2020-05-04	Same installed MOB-suite database as mob_recon.
+plassembler	yes	Plassembler database (PLSDB-derived)		Installed Plassembler is 0.1.3, which has no reference database and fails to start; Plassembler >= 1.0 uses a PLSDB-derived database. Fill after installing a working Plassembler and its database.
+hybracter_long	yes	Plassembler database (PLSDB-derived)		Hybracter 0.14.0 (installed) needs the Plassembler database, which is not installed. Fill after installing it.
+hybracter_hybrid	yes	Plassembler database (PLSDB-derived)		Hybracter 0.14.0 (installed) needs the Plassembler database, which is not installed. Fill after installing it.
+trycycler_mob_recon	yes	MOB-suite database v2.0.0 (Zenodo 10.5281/zenodo.3786915)	2020-05-04	Same installed MOB-suite database as mob_recon.
+genomad	yes	geNomad database v1.9 (portal.nersc.gov/genomad/__data__/genomad_db_v1.9.tar.gz)	2025-02-18	geNomad 1.12.0 (installed) accepts database v1.8 or v1.9 (releases.txt); `genomad download-database` fetches the newest compatible, v1.9, whose file is dated 2025-02-18 (verified 2026-11-08). The database itself is not installed yet.
+plasme	yes	PLASMe database (PLSDB-derived)		PLASMe is not installed. Fill after installing it.
+rfplasmid	yes	RFPlasmid 0.0.18 bundled trained models	2021-07-28	Models ship inside the installed rfplasmid 0.0.18 conda package, built 2021-07-28 (conda-meta timestamp 1627466463). Training data predate that date.
+plasmidhunter	yes	PlasmidHunter trained model		PlasmidHunter is not installed. Fill after installing it.
+plasmer	yes	Plasmer database and model		Plasmer is not installed. Fill after installing it.
+plascope	yes	PlaScope E. coli database v1.1 (Zenodo 10.5281/zenodo.1311641)	2018-07-13	PlasBench's download script pins Zenodo 1311641 (E. coli, published 2018-07-13) and 1311647 (Klebsiella, published 2018-06-04); verified 2026-11-08. Use 2018-06-04 if running the Klebsiella database.
+plasgraph2	yes	plASgraph2 trained model		plASgraph2 is not installed. Fill after installing it.
 baseline_coverage	no	none (assembly depth only)		No reference database.
 baseline_reference	yes	Local PlasBench plasmid reference set (DATA_DIR/db/plasmid_reference)		Fill with the build date of your reference set (reference_set_provenance.json written by build_plasmid_reference_set.py).

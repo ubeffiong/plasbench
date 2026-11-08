@@ -25,6 +25,16 @@ history is lost, only the numbering is cleaner. See
 ### Fixed
 - The run manifest now records every ranking-relevant setting added by recent releases.
 - A duplicate `PLASMID_REFERENCE_SKETCH` default ignored `DATA_DIR`.
+### Cohort and database data
+- **`public-v3` panel** (98 isolates, locked): `public-v2` plus recorded truth provenance
+  and 66 new long-read-first isolates, one per BioProject, across six species. All rows
+  verified online; `accepted_accessions.tsv` regenerated; CI checks the v3 lock.
+- `config/tool_database_releases.tsv`: release dates verified from each installed or pinned
+  database's own record (MOB-suite DB v2.0.0 2020-05-04, Platon DB v1.5.0 2020-10-05,
+  geNomad DB v1.9 2025-02-18, PlaScope 2018-07-13, RFPlasmid 0.0.18 models 2021-07-28);
+  uninstalled databases left blank with the reason.
+- New `python/collect_truth_provenance.py` and `python/discover_design_cohort.py`; the
+  assembler pattern now tolerates NCBI's "Trycyler" misspelling.
 
 ### Changed -- research design (headline endpoints and reference standard)
 - **Primary endpoint is now length-weighted binning F1** for binning-capable tools
