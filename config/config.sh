@@ -72,6 +72,9 @@ export TRUTH_LABEL_SCHEME="${TRUTH_LABEL_SCHEME:-ncbi}"
 # Where stage 1 gets short reads: auto (SRA Toolkit, then ENA if prefetch fails),
 # sra (SRA Toolkit only), ena (ENA only; python/fetch_ena_reads.py, MD5-verified).
 export READ_SOURCE="${READ_SOURCE:-auto}"
+# Keep downloads for future runs: SHA-256 manifest per sample (downloads.sha256),
+# read files made read-only, verified instead of re-downloaded next time.
+export PRESERVE_DOWNLOADS="${PRESERVE_DOWNLOADS:-1}"
 # Tandem-dimer truth plasmids (python/detect_dimers.py, stage 2): halves at
 # >= DIMER_MIN_IDENTITY over >= DIMER_MIN_HALF_COVERAGE are a dimer.
 # COLLAPSE_DIMERS=1 scores the monomer; 0 only flags it (AMBIGUOUS under the
