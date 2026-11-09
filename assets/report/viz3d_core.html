@@ -1,0 +1,361 @@
+<script>
+/* PlasBench 3D engine: vanilla JS, SVG output, no libraries. The projection math below is mirrored in
+   python/report_3d.py (the static no-JS/print fallback); test/test_report_3d.py checks both agree. */
+(function (root) {
+'use strict';
+var RAD = Math.PI / 180, TAU = Math.PI * 2;
+
+var ESC_RE = new RegExp('[&<>\u0022\u0027]', 'g'), ESC_MAP = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\u0022': '&quot;', '\u0027': '&#39;'};
+function esc(s) { return String(s == null ? '' : s).replace(ESC_RE, function (c) { return ESC_MAP[c]; }); }
+function num(x) { var t = (Math.round(x * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); return (t === '-0' || t === '') ? '0' : t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+/* ---------------------------------------------------------------- camera and projection */
+function makeCam(o) {
+  o = o || {};
+  return {yaw: o.yaw == null ? -32 : o.yaw, pitch: o.pitch == null ? 26 : o.pitch, zoom: o.zoom || 1,
+          persp: o.persp == null ? 1 : o.persp, dist: o.dist || 10, target: o.target || [0, 0, 0],
+          scale: o.scale || 50, cx: o.cx || 0, cy: o.cy || 0};
+}
+function viewXYZ(p, cam) {
+  var t = cam.target, x = p[0] - t[0], y = p[1] - t[1], z = p[2] - t[2];
+  var cy = Math.cos(cam.yaw * RAD), sy = Math.sin(cam.yaw * RAD), cp = Math.cos(cam.pitch * RAD), sp = Math.sin(cam.pitch * RAD);
+  var x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
+  return [x1, cp * y - sp * z1, sp * y + cp * z1];
+}
+function project(p, cam) {
+  var v = viewXYZ(p, cam), s = 1;
+  if (cam.persp) { var den = cam.dist - v[2]; if (den < 1e-6) den = 1e-6; s = cam.dist / den; }
+  var k = cam.scale * cam.zoom * s;
+  return [cam.cx + k * v[0], cam.cy - k * v[1], v[2], s];
+}
+function faceVisible(pts, cam) {
+  var a = viewXYZ(pts[0], cam), b = viewXYZ(pts[1], cam), c = viewXYZ(pts[2], cam);
+  var u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  var n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+  var v = cam.persp ? [-a[0], -a[1], cam.dist - a[2]] : [0, 0, 1];
+  return n[0] * v[0] + n[1] * v[1] + n[2] * v[2] > 0;
+}
+/* outward-wound box faces: [name, points, shade] (top lighter, sides darker) */
+function boxFaces(x0, x1, y0, y1, z0, z1) {
+  return [
+    ['top', [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], 0.28],
+    ['front', [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], 0],
+    ['right', [[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], -0.22],
+    ['back', [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], -0.12],
+    ['left', [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], -0.3],
+    ['bottom', [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], -0.4]
+  ];
+}
+function shadeHex(hex, t) {
+  var m = /^#([0-9a-f]{6})$/i.exec(hex || ''); if (!m || !t) return hex;
+  var v = parseInt(m[1], 16), c = [v >> 16 & 255, v >> 8 & 255, v & 255], tgt = t > 0 ? 255 : 0, a = Math.abs(t);
+  return '#' + c.map(function (x) { var y = Math.round(x + (tgt - x) * a); return (y < 16 ? '0' : '') + y.toString(16); }).join('');
+}
+
+/* ---------------------------------------------------------------- circular geometry (rings) */
+function bpToDeg(pos, len) { if (!(len > 0)) return 0; return (((pos % len) + len) % len) / len * 360; }
+function ringXZ(R, deg) { var a = deg * RAD; return [R * Math.sin(a), -R * Math.cos(a)]; }   /* 0 deg at the back (top of a top view), clockwise */
+function geneSpan(start, end, len) {
+  /* {mid, span}: a gene whose end is before its start wraps through the origin of the circular molecule */
+  var span = end >= start ? end - start : end - start + len;
+  if (!(len > 0)) return {mid: 0, span: 0};
+  if (span >= len) return {mid: ((start % len) + len) % len, span: len};
+  var mid = start + span / 2; mid = ((mid % len) + len) % len;
+  return {mid: mid, span: span};
+}
+function niceStep(len, want) {
+  var raw = len / (want || 8); if (!(raw > 0)) return 1;
+  var p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p, m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return Math.max(1, m * p);
+}
+function bpLabel(p) { return p >= 1000 ? num(p / 1000) + ' kb' : num(p) + ' bp'; }
+
+/* ---------------------------------------------------------------- scene -> sorted SVG */
+function primDepth(p, cam) {
+  if (p.pts) { var s = 0; for (var i = 0; i < p.pts.length; i++) s += viewXYZ(p.pts[i], cam)[2]; return s / p.pts.length; }
+  return viewXYZ(p.p, cam)[2] + (p.bias || 0);
+}
+function sortPrims(prims, cam) {
+  var rows = prims.map(function (p, i) { return {p: p, d: Math.round(primDepth(p, cam) * 1e7) / 1e7, i: i, l: p.layer == null ? 1 : p.layer}; });
+  rows.sort(function (a, b) { return a.l - b.l || a.d - b.d || a.i - b.i; });
+  return rows;
+}
+function sceneBounds(prims) {
+  var lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+  function add(q) { for (var k = 0; k < 3; k++) { if (q[k] < lo[k]) lo[k] = q[k]; if (q[k] > hi[k]) hi[k] = q[k]; } }
+  prims.forEach(function (p) { if (p.pts) p.pts.forEach(add); else if (p.p) add(p.p); });
+  if (lo[0] > hi[0]) return {center: [0, 0, 0], radius: 1, lo: [0, 0, 0], hi: [0, 0, 0]};
+  var c = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+  var r = Math.sqrt(Math.pow(hi[0] - lo[0], 2) + Math.pow(hi[1] - lo[1], 2) + Math.pow(hi[2] - lo[2], 2)) / 2;
+  return {center: c, radius: Math.max(r, 1e-6), lo: lo, hi: hi};
+}
+function fitCamera(scene, cam, W, H, margin) {
+  var b = sceneBounds(scene.prims), c = makeCam(cam);
+  c.target = b.center; c.dist = b.radius * 4.2; c.zoom = 1; c.scale = 1; c.cx = 0; c.cy = 0;
+  var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  scene.prims.forEach(function (p) {
+    (p.pts || [p.p]).forEach(function (q) { var s = project(q, c); if (s[0] < x0) x0 = s[0]; if (s[0] > x1) x1 = s[0]; if (s[1] < y0) y0 = s[1]; if (s[1] > y1) y1 = s[1]; });
+  });
+  if (x0 > x1) { x0 = x1 = y0 = y1 = 0; }
+  var m = margin == null ? 48 : margin, bw = Math.max(x1 - x0, 1e-6), bh = Math.max(y1 - y0, 1e-6);
+  c.scale = Math.min((W - 2 * m) / bw, (H - 2 * m) / bh);
+  c.cx = W / 2 - c.scale * (x0 + x1) / 2; c.cy = H / 2 - c.scale * (y0 + y1) / 2;
+  return c;
+}
+function markerSVG(m, x, y, s, attr) {
+  var r = Math.max(2.5, (m.r || 5) * Math.min(Math.max(s, 0.6), 1.6)), f = m.fill || '#000', st = m.stroke || '#fff', sw = m.sw || 1.2, a = attr || '';
+  switch (m.shape) {
+    case 'square': return '<rect x="' + num(x - r) + '" y="' + num(y - r) + '" width="' + num(2 * r) + '" height="' + num(2 * r) + '" fill="' + f + '" stroke="' + st + '" stroke-width="' + sw + '"' + a + '/>';
+    case 'diamond': return '<polygon points="' + [[x, y - r * 1.3], [x + r * 1.3, y], [x, y + r * 1.3], [x - r * 1.3, y]].map(function (q) { return num(q[0]) + ',' + num(q[1]); }).join(' ') + '" fill="' + f + '" stroke="' + st + '" stroke-width="' + sw + '"' + a + '/>';
+    case 'triangle': return '<polygon points="' + [[x, y - r * 1.25], [x + r * 1.2, y + r * 0.95], [x - r * 1.2, y + r * 0.95]].map(function (q) { return num(q[0]) + ',' + num(q[1]); }).join(' ') + '" fill="' + f + '" stroke="' + st + '" stroke-width="' + sw + '"' + a + '/>';
+    case 'cross': return '<path d="M' + num(x - r) + ',' + num(y - r) + 'L' + num(x + r) + ',' + num(y + r) + 'M' + num(x - r) + ',' + num(y + r) + 'L' + num(x + r) + ',' + num(y - r) + '" fill="none" stroke="' + f + '" stroke-width="3" stroke-linecap="round"' + a + '/>';
+    case 'ring': return '<circle cx="' + num(x) + '" cy="' + num(y) + '" r="' + num(r) + '" fill="' + (m.bg || '#ffffff') + '" fill-opacity="0.85" stroke="' + f + '" stroke-width="2"' + a + '/>';
+    default: return '<circle cx="' + num(x) + '" cy="' + num(y) + '" r="' + num(r) + '" fill="' + f + '" stroke="' + st + '" stroke-width="' + sw + '"' + a + '/>';
+  }
+}
+function dataAttrs(p, opt) {
+  var a = '';
+  if (p.id != null) a += ' data-id="' + esc(p.id) + '"';
+  if (p.grp != null) a += ' data-grp="' + esc(p.grp) + '"';
+  if (p.focus) a += ' tabindex="0" role="button" aria-label="' + esc(p.label || p.id) + '"';
+  return a;
+}
+function renderPrims(scene, cam, opt) {
+  opt = opt || {};
+  var out = [], rows = sortPrims(scene.prims, cam);
+  rows.forEach(function (r) {
+    var p = r.p, cls = (p.cls || '') + (p.id != null ? ' v3-hit' : '') + (opt.sel != null && p.grp === opt.sel ? ' v3-sel' : ''), attrs = dataAttrs(p, opt);
+    if (p.k === 'poly') {
+      if (p.cull && !faceVisible(p.pts, cam)) return;
+      var pts = p.pts.map(function (q) { var s = project(q, cam); return num(s[0]) + ',' + num(s[1]); }).join(' ');
+      var fill = p.fill ? shadeHex(p.fill, p.shade || 0) : null;
+      out.push('<polygon class="v3-f ' + cls + '" points="' + pts + '"' + (fill ? ' fill="' + fill + '"' : '') + (p.stroke ? ' stroke="' + p.stroke + '"' : '') + (p.op != null ? ' fill-opacity="' + p.op + '"' : '') + (p.dash ? ' stroke-dasharray="' + p.dash + '"' : '') + attrs + '/>');
+    } else if (p.k === 'line') {
+      var lp = p.pts.map(function (q) { var s = project(q, cam); return num(s[0]) + ',' + num(s[1]); }).join(' ');
+      out.push('<polyline class="' + cls + '" points="' + lp + '" fill="none"' + (p.stroke ? ' stroke="' + p.stroke + '"' : '') + (p.w ? ' stroke-width="' + p.w + '"' : '') + (p.dash ? ' stroke-dasharray="' + p.dash + '"' : '') + (p.op != null ? ' stroke-opacity="' + p.op + '"' : '') + (p.cap ? ' stroke-linecap="round"' : '') + attrs + '/>');
+    } else if (p.k === 'mark') {
+      var s = project(p.p, cam);
+      out.push(markerSVG(p, s[0], s[1], s[3], (cls.trim() ? ' class="' + cls.trim() + '"' : '') + attrs));
+    } else if (p.k === 'text') {
+      var t = project(p.p, cam), x = t[0] + (p.dx || 0), y = t[1] + (p.dy || 0);
+      out.push('<text class="v3-t ' + (p.cls || '') + '" x="' + num(x) + '" y="' + num(y) + '" text-anchor="' + (p.anchor || 'middle') + '"' + (p.size ? ' font-size="' + p.size + '"' : '') + (p.rot ? ' transform="rotate(' + p.rot + ' ' + num(x) + ' ' + num(y) + ')"' : '') + '>' + esc(p.t) + '</text>');
+    }
+  });
+  return out.join('');
+}
+function svgDoc(scene, cam, W, H, opt) {
+  opt = opt || {};
+  return '<svg xmlns="http://www.w3.org/2000/svg" class="v3-svg" viewBox="0 0 ' + W + ' ' + H + '" role="group" aria-label="' + esc(scene.title || '3D view') + '">' +
+    '<title>' + esc(scene.title || '') + '</title><desc>' + esc(scene.desc || '') + '</desc>' + renderPrims(scene, cam, opt) + '</svg>';
+}
+function csvText(header, rows) {
+  function q(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  return [header].concat(rows).map(function (r) { return r.map(q).join(','); }).join('\n') + '\n';
+}
+function fmt(v, d) { return v == null || v === '' || isNaN(v) ? '-' : Number(v).toFixed(d == null ? 3 : d); }
+function tableHTML(header, rows, cls) {
+  return '<div class="v3-tablewrap"><table class="v3-table ' + (cls || '') + '"><thead><tr>' + header.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + esc(c == null || c === '' ? '-' : c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+}
+function glyph(shape, color) {
+  var c = color || '#555', f = shape === 'ring' ? 'none' : c, st = shape === 'ring' ? c : '#fff', body;
+  switch (shape) {
+    case 'square': body = '<rect x="2" y="2" width="10" height="10"'; break;
+    case 'diamond': body = '<polygon points="7,0.5 13.5,7 7,13.5 0.5,7"'; break;
+    case 'triangle': body = '<polygon points="7,1 13.5,12.5 0.5,12.5"'; break;
+    case 'cross': return '<svg class="v3-glyph" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M2,2L12,12M2,12L12,2" stroke="' + c + '" stroke-width="3" stroke-linecap="round"/></svg>';
+    case 'line': return '<svg class="v3-glyph" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M2,7H12" stroke="' + c + '" stroke-width="3" stroke-dasharray="3 1.5"/></svg>';
+    case 'ring': body = '<circle cx="7" cy="7" r="5"'; st = c; break;
+    default: body = '<circle cx="7" cy="7" r="5.5"';
+  }
+  return '<svg class="v3-glyph" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">' + body + ' fill="' + f + '" stroke="' + (shape === 'ring' ? c : '#0003') + '" stroke-width="' + (shape === 'ring' ? 2 : 1) + '"/></svg>';
+}
+
+/* ---------------------------------------------------------------- DOM glue (thin) */
+var PROPS = ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'opacity', 'fill-opacity', 'stroke-opacity', 'font-family', 'font-size', 'font-weight', 'paint-order', 'stroke-linejoin', 'stroke-linecap'];
+function exportSVG(svg, bg) {
+  var clone = svg.cloneNode(true), live = svg.querySelectorAll('*'), cl = clone.querySelectorAll('*');
+  for (var i = 0; i < live.length; i++) {
+    var cs = getComputedStyle(live[i]), st = '';
+    PROPS.forEach(function (p) { var v = cs.getPropertyValue(p); if (v) st += p + ':' + v + ';'; });
+    cl[i].setAttribute('style', st); cl[i].removeAttribute('class');
+  }
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  var vb = svg.viewBox.baseVal, rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('width', vb.width); rect.setAttribute('height', vb.height); rect.setAttribute('fill', bg || '#fff');
+  clone.insertBefore(rect, clone.firstChild);
+  return new XMLSerializer().serializeToString(clone);
+}
+function download(name, blob) {
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+}
+
+function mount(host, spec) {
+  var W = 900, H = 580, reduce = false;
+  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  var st = {vals: spec.defaults ? Object.assign({}, spec.defaults(spec.data)) : {}, hidden: {}, sel: null, auto: false, cam: null, scene: null, tab: 0, moved: false};
+  var uid = 'v3' + Math.floor(Math.random() * 1e6);
+  host.innerHTML =
+    '<div class="v3-wrap">' + '<div class="v3-banner"></div>' +
+    '<div class="v3-toolbar"><div class="v3-controls"></div><div class="v3-buttons" role="toolbar" aria-label="3D view controls">' +
+    '<button type="button" data-act="reset">Reset view</button><button type="button" data-act="top">Top</button><button type="button" data-act="front">Front</button><button type="button" data-act="side">Side</button>' +
+    '<button type="button" data-act="persp" aria-pressed="true" title="Switch between perspective and orthographic projection">Perspective</button>' +
+    '<button type="button" data-act="auto" aria-pressed="false">Auto-rotate</button>' +
+    '<button type="button" data-act="in" aria-label="Zoom in">+</button><button type="button" data-act="out" aria-label="Zoom out">&minus;</button>' +
+    '<button type="button" data-act="svg">Export SVG</button><button type="button" data-act="png">Export PNG</button></div></div>' +
+    '<div class="v3-main"><div class="v3-stagewrap"><div class="v3-stage" tabindex="0" aria-describedby="' + uid + 'h"><div class="v3-svgbox"></div><div class="v3-tip" role="status" hidden></div></div>' +
+    '<p class="v3-hint" id="' + uid + 'h">Drag to rotate, wheel or +/&minus; to zoom, arrow keys to rotate, R to reset. Hover or focus a mark for exact values; click or press Enter to open details.</p>' +
+    '<div class="v3-legend" role="group" aria-label="Legend (click an entry to show or hide it)"></div></div>' +
+    '<aside class="v3-side"><div class="v3-summary"></div><div class="v3-detail" aria-live="polite"></div></aside></div></div>';
+  var $ = function (c) { return host.querySelector(c); };
+  var box = $('.v3-svgbox'), tip = $('.v3-tip'), stage = $('.v3-stage'), legend = $('.v3-legend'), controls = $('.v3-controls');
+  var autoBtn = $('[data-act=auto]');
+  if (reduce) { autoBtn.disabled = true; autoBtn.title = 'Disabled because your system asks for reduced motion'; }
+
+  function rebuild(refit) {
+    st.scene = spec.build(spec.data, st.vals, st.hidden);
+    if (refit || !st.cam) st.cam = fitCamera(st.scene, Object.assign({}, spec.camera || {}, st.cam ? {yaw: st.cam.yaw, pitch: st.cam.pitch, persp: st.cam.persp} : {}), W, H);
+    else { var b = sceneBounds(st.scene.prims); st.cam.target = b.center; st.cam.dist = b.radius * 4.2; }
+    drawControls(); drawLegend(); drawSide(); paint(); drawDetail();
+  }
+  function paint() {
+    var focusId = document.activeElement && box.contains(document.activeElement) ? document.activeElement.getAttribute('data-id') : null;
+    box.innerHTML = svgDoc(st.scene, st.cam, W, H, {sel: st.sel});
+    if (focusId) { var el = box.querySelector('[data-id="' + (window.CSS && CSS.escape ? CSS.escape(focusId) : focusId) + '"]'); if (el && el.focus) el.focus({preventScroll: true}); }
+  }
+  function drawControls() {
+    var list = spec.controls ? spec.controls(spec.data, st.vals) : [];
+    controls.innerHTML = list.map(function (c) {
+      return '<label>' + esc(c.label) + ' <select data-key="' + esc(c.key) + '">' + c.options.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(st.vals[c.key]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>';
+    }).join('');
+    var banner = spec.banner ? spec.banner(spec.data, st.vals) : '';
+    $('.v3-banner').innerHTML = banner;
+  }
+  function drawLegend() {
+    var groups = {}, order = [];
+    (st.scene.legend || []).forEach(function (e) { var g = e.group || ''; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(e); });
+    legend.innerHTML = order.map(function (g) {
+      return '<div class="v3-lgroup">' + (g ? '<span class="v3-ltitle">' + esc(g) + '</span>' : '') + groups[g].map(function (e) {
+        var off = st.hidden[e.key];
+        if (e.static) return '<span class="v3-lbtn v3-lstatic">' + glyph(e.shape, e.color) + ' ' + esc(e.label) + '</span>';
+        return '<button type="button" class="v3-lbtn' + (off ? ' v3-off' : '') + '" data-key="' + esc(e.key) + '" aria-pressed="' + (off ? 'false' : 'true') + '" title="' + esc(e.title || e.label) + '">' + glyph(e.shape, e.color) + ' ' + esc(e.label) + '</button>';
+      }).join('') + '</div>';
+    }).join('');
+  }
+  function drawSide() { $('.v3-summary').innerHTML = spec.side ? spec.side(spec.data, st.vals, st.scene, st.hidden) : ''; }
+  function drawDetail() {
+    var d = $('.v3-detail'), info = (st.sel != null ? spec.panel(spec.data, st.vals, st.sel, st.scene) : null) || (spec.panelDefault ? spec.panelDefault(spec.data, st.vals, st.scene) : null);
+    if (!info) { d.innerHTML = ''; return; }
+    st.tabs = info.tabs || [];
+    if (st.tab >= st.tabs.length) st.tab = 0;
+    d.innerHTML = '<h3 class="v3-dtitle">' + esc(info.title) + '</h3>' + (info.html || '') +
+      '<div class="v3-tabs" role="tablist">' + st.tabs.map(function (t, i) { return '<button type="button" role="tab" data-tab="' + i + '" aria-selected="' + (i === st.tab ? 'true' : 'false') + '">' + esc(t.name) + '</button>'; }).join('') + '</div>' +
+      st.tabs.map(function (t, i) { return '<div class="v3-tabpanel" role="tabpanel"' + (i === st.tab ? '' : ' hidden') + '>' + t.html + (t.csv ? '<p><button type="button" data-csv="' + i + '">Download CSV</button></p>' : '') + '</div>'; }).join('');
+  }
+  function showTip(id, x, y) {
+    var t = st.scene.tips && st.scene.tips[id]; if (!t) { tip.hidden = true; return; }
+    tip.innerHTML = '<strong>' + esc(t.t) + '</strong>' + (t.rows || []).map(function (r) { return '<div><span>' + esc(r[0]) + '</span> ' + esc(r[1]) + '</div>'; }).join('') + (t.note ? '<em>' + esc(t.note) + '</em>' : '');
+    tip.hidden = false;
+    var sb = stage.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    var lx = clamp(x - sb.left + 14, 4, Math.max(4, sb.width - tw - 4)), ly = clamp(y - sb.top + 14, 4, Math.max(4, sb.height - th - 4));
+    tip.style.left = lx + 'px'; tip.style.top = ly + 'px';
+  }
+  function hl(grp, on) {
+    box.querySelectorAll('[data-grp]').forEach(function (e) { e.classList.toggle('v3-dim', on && e.getAttribute('data-grp') !== grp); e.classList.toggle('v3-hl', on && e.getAttribute('data-grp') === grp); });
+  }
+  function setView(yaw, pitch) { st.cam = fitCamera(st.scene, {yaw: yaw, pitch: pitch, persp: st.cam.persp}, W, H); paint(); }
+  function select(grp) { st.sel = grp; st.tab = 0; paint(); drawDetail(); }
+  function render() { paint(); }
+
+  // ---- controls
+  host.addEventListener('change', function (e) {
+    var k = e.target.getAttribute && e.target.getAttribute('data-key');
+    if (k && e.target.tagName === 'SELECT') { st.vals[k] = e.target.value; if (spec.normalize) spec.normalize(spec.data, st.vals, k); st.sel = null; st.hidden = spec.resetHidden ? spec.resetHidden(st.hidden, k) : st.hidden; rebuild(true); }
+    else if (e.target.matches && e.target.matches('[data-flt]')) { st.hidden[e.target.getAttribute('data-flt')] = !e.target.checked; st.sel = null; rebuild(false); }
+  });
+  host.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (b && host.contains(b)) {
+      if (b.hasAttribute('data-act')) {
+        var a = b.getAttribute('data-act');
+        if (a === 'reset') setView(spec.camera && spec.camera.yaw != null ? spec.camera.yaw : -32, spec.camera && spec.camera.pitch != null ? spec.camera.pitch : 26);
+        else if (a === 'top') setView(0, 88); else if (a === 'front') setView(0, 3); else if (a === 'side') setView(90, 3);
+        else if (a === 'persp') { st.cam.persp = st.cam.persp ? 0 : 1; b.setAttribute('aria-pressed', String(!!st.cam.persp)); b.textContent = st.cam.persp ? 'Perspective' : 'Orthographic'; st.cam = fitCamera(st.scene, st.cam, W, H); paint(); }
+        else if (a === 'auto') { st.auto = !st.auto; b.setAttribute('aria-pressed', String(st.auto)); if (st.auto) spin(); }
+        else if (a === 'in') { st.cam.zoom = clamp(st.cam.zoom * 1.2, 0.4, 5); paint(); }
+        else if (a === 'out') { st.cam.zoom = clamp(st.cam.zoom / 1.2, 0.4, 5); paint(); }
+        else if (a === 'svg') download((spec.name || 'plasbench-3d') + '.svg', new Blob([exportSVG(box.querySelector('svg'), getComputedStyle(stage).backgroundColor)], {type: 'image/svg+xml'}));
+        else if (a === 'png') {
+          var txt = exportSVG(box.querySelector('svg'), getComputedStyle(stage).backgroundColor), img = new Image();
+          img.onload = function () { var c = document.createElement('canvas'); c.width = W * 2; c.height = H * 2; var g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height); c.toBlob(function (bl) { download((spec.name || 'plasbench-3d') + '.png', bl); }, 'image/png'); };
+          img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(txt);
+        }
+        return;
+      }
+      if (b.hasAttribute('data-key') && b.classList.contains('v3-lbtn')) { var k = b.getAttribute('data-key'); st.hidden[k] = !st.hidden[k]; st.sel = null; rebuild(false); return; }
+      if (b.hasAttribute('data-tab')) { st.tab = +b.getAttribute('data-tab'); drawDetail(); return; }
+      if (b.hasAttribute('data-csv')) { var t = st.tabs[+b.getAttribute('data-csv')].csv; download(t.name, new Blob([csvText(t.header, t.rows)], {type: 'text/csv'})); return; }
+      if (b.hasAttribute('data-sel')) { select(b.getAttribute('data-sel')); return; }
+    }
+    var el = e.target.closest ? e.target.closest('[data-grp]') : null;
+    if (el && box.contains(el) && !st.moved) select(el.getAttribute('data-grp'));
+  });
+
+  // ---- hover, focus, tooltip
+  box.addEventListener('mouseover', function (e) { var el = e.target.closest('[data-id]'); if (!el) return; hl(el.getAttribute('data-grp'), true); showTip(el.getAttribute('data-id'), e.clientX, e.clientY); });
+  box.addEventListener('mousemove', function (e) { var el = e.target.closest('[data-id]'); if (el) showTip(el.getAttribute('data-id'), e.clientX, e.clientY); });
+  box.addEventListener('mouseout', function (e) { var el = e.target.closest('[data-id]'); if (el) { hl(null, false); tip.hidden = true; } });
+  box.addEventListener('focusin', function (e) { var el = e.target.closest('[data-id]'); if (!el) return; var r = el.getBoundingClientRect(); hl(el.getAttribute('data-grp'), true); showTip(el.getAttribute('data-id'), r.left + r.width / 2, r.top); });
+  box.addEventListener('focusout', function () { hl(null, false); tip.hidden = true; });
+  box.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('data-grp') != null) { e.preventDefault(); select(e.target.getAttribute('data-grp')); } });
+
+  // ---- drag / pinch / wheel / keyboard
+  var ptrs = {}, last = null, pinch = 0;
+  box.addEventListener('pointerdown', function (e) {
+    ptrs[e.pointerId] = [e.clientX, e.clientY]; st.moved = false; last = [e.clientX, e.clientY];
+    var ids = Object.keys(ptrs); if (ids.length === 2) pinch = Math.hypot(ptrs[ids[0]][0] - ptrs[ids[1]][0], ptrs[ids[0]][1] - ptrs[ids[1]][1]);
+  });
+  window.addEventListener('pointermove', function (e) {
+    if (!ptrs[e.pointerId]) return;
+    var ids = Object.keys(ptrs);
+    if (ids.length >= 2) {
+      ptrs[e.pointerId] = [e.clientX, e.clientY];
+      var d = Math.hypot(ptrs[ids[0]][0] - ptrs[ids[1]][0], ptrs[ids[0]][1] - ptrs[ids[1]][1]);
+      if (pinch > 0) { st.cam.zoom = clamp(st.cam.zoom * d / pinch, 0.4, 5); paint(); } pinch = d; st.moved = true; return;
+    }
+    var dx = e.clientX - last[0], dy = e.clientY - last[1];
+    if (!st.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    st.moved = true; last = [e.clientX, e.clientY]; ptrs[e.pointerId] = last;
+    st.cam.yaw += dx * 0.4; st.cam.pitch = clamp(st.cam.pitch + dy * 0.4, -80, 89); tip.hidden = true;
+    if (!st.raf) st.raf = requestAnimationFrame(function () { st.raf = 0; paint(); });
+  });
+  function up(e) { delete ptrs[e.pointerId]; pinch = 0; setTimeout(function () { st.moved = false; }, 0); }
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  box.addEventListener('wheel', function (e) { e.preventDefault(); st.cam.zoom = clamp(st.cam.zoom * Math.exp(-e.deltaY * 0.0015), 0.4, 5); paint(); }, {passive: false});
+  stage.addEventListener('keydown', function (e) {
+    var k = e.key, used = true;
+    if (k === 'ArrowLeft') st.cam.yaw -= 6; else if (k === 'ArrowRight') st.cam.yaw += 6;
+    else if (k === 'ArrowUp') st.cam.pitch = clamp(st.cam.pitch - 5, -80, 89); else if (k === 'ArrowDown') st.cam.pitch = clamp(st.cam.pitch + 5, -80, 89);
+    else if (k === '+' || k === '=') st.cam.zoom = clamp(st.cam.zoom * 1.15, 0.4, 5); else if (k === '-' || k === '_') st.cam.zoom = clamp(st.cam.zoom / 1.15, 0.4, 5);
+    else if (k === 'r' || k === 'R' || k === '0') { st.sel = null; setView(spec.camera && spec.camera.yaw != null ? spec.camera.yaw : -32, spec.camera && spec.camera.pitch != null ? spec.camera.pitch : 26); drawDetail(); return; }
+    else if (k === 'Escape') { st.sel = null; paint(); drawDetail(); return; }
+    else used = false;
+    if (used) { e.preventDefault(); paint(); }
+  });
+  function spin() { if (!st.auto) return; st.cam.yaw += 0.35; paint(); requestAnimationFrame(spin); }
+
+  rebuild(true);
+  host.setAttribute('data-v3-live', '1');
+  return {state: st, rebuild: rebuild, select: select};
+}
+
+var api = {RAD: RAD, esc: esc, num: num, clamp: clamp, makeCam: makeCam, viewXYZ: viewXYZ, project: project, faceVisible: faceVisible,
+  boxFaces: boxFaces, shadeHex: shadeHex, bpToDeg: bpToDeg, ringXZ: ringXZ, geneSpan: geneSpan, niceStep: niceStep, bpLabel: bpLabel,
+  sortPrims: sortPrims, sceneBounds: sceneBounds, fitCamera: fitCamera, renderPrims: renderPrims, svgDoc: svgDoc, csvText: csvText,
+  fmt: fmt, tableHTML: tableHTML, glyph: glyph, mount: mount};
+root.PB3D = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

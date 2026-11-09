@@ -275,8 +275,9 @@ def regret_html(results_dir):
               r.get("floor_flag") or rc.missing("not judged"), dash(r.get("basis"))] for r in rows]
     return ("<h3>Regret per isolate</h3><p class='muted'>Regret is the score of the best tool minus the score of the recommended tool "
             f"on that isolate. Mean regret over the <strong>{len(rows)}</strong> rows is <strong>{rc.fmt(mean_regret, 4)}</strong>.</p>"
+            + "<details class='rpt-collapsible'><summary>Show the regret table (the 3D view above draws the same rows)</summary>"
             + str(rc.panel(["Profile", "Sample", "Recommended", "Best tool", "Regret", "Near-optimal", "Single best tool",
-                            "Single-best regret", "Floor flag", "Basis"], table)))
+                            "Single-best regret", "Floor flag", "Basis"], table)) + "</details>")
 
 
 # ------------------------------------------------------------------------------------------------ truth depth strip
