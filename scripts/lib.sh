@@ -329,6 +329,8 @@ mobsuite_db_complete() {
 #   * both, or already linked: nothing.
 # Nothing is deleted: a folder set aside keeps its contents under *.pre-store.
 mobsuite_db_preserve() {
+    # PLASBENCH_DB_PRESERVE=0 (the test suite) never moves or links a real database.
+    [[ "${PLASBENCH_DB_PRESERVE:-1}" == "0" ]] && return 0
     local env_db store="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/mob_suite/databases"
     env_db="$(mobsuite_db_dir)"
     [[ -n "$env_db" ]] || return 0

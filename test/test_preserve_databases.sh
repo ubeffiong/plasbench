@@ -14,6 +14,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export DATA_DIR="$TMP/data" PLASBENCH_DB_DIR="$TMP/store" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp"
 export SAMPLE_SHEET="$TMP/sheet.tsv"; : > "$SAMPLE_SHEET"
+# This test works on its own fake MOB-suite environment, so it turns preservation back on.
+export PLASBENCH_DB_PRESERVE=1
 
 cfg() { bash -c "source '$ROOT/config/config.sh' >/dev/null 2>&1; printf '%s' \"\$$1\""; }
 
@@ -54,4 +56,9 @@ PATH="$TMP/bin:$PATH" bash "$ROOT/env/preserve_databases.sh" --from "$TMP/old/db
 grep -q "\[dup\]" "$TMP/run4.log" && [[ -f "$TMP/old/db/platon/db/refs.fna" && ! -L "$TMP/old/db/platon/db" ]] \
     || { echo "FAIL: a duplicate copy should be left in place and reported" >&2; cat "$TMP/run4.log" >&2; exit 1; }
 echo "a duplicate copy elsewhere is reported, never deleted -> PASS"
+# The suite's guard: with PLASBENCH_DB_PRESERVE=0 nothing is moved or linked.
+mv "$DBD" "$TMP/old-link2"; mkdir -p "$DBD"
+PLASBENCH_DB_PRESERVE=0 PATH="$TMP/bin:$PATH" bash -c "source '$ROOT/config/config.sh' >/dev/null 2>&1; source '$ROOT/scripts/lib.sh'; mobsuite_db_preserve"
+[[ -d "$DBD" && ! -L "$DBD" ]] || { echo "FAIL: PLASBENCH_DB_PRESERVE=0 still linked a database" >&2; exit 1; }
+echo "PLASBENCH_DB_PRESERVE=0 (the test suite) never moves or links a database -> PASS"
 echo "ALL PRESERVE-DATABASES TESTS PASSED"
