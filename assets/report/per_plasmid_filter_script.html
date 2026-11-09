@@ -1,0 +1,16 @@
+<script>
+(()=>{
+function setup(){
+const table=document.getElementById('pp-table'),box=document.getElementById('pp-controls');
+if(!table||!box||box.dataset.ready)return;box.dataset.ready='1';box.hidden=false;
+const sel={sample:document.getElementById('pp-sample'),tool:document.getElementById('pp-tool'),
+ outcome:document.getElementById('pp-outcome'),repeat:document.getElementById('pp-repeat-rich')};
+const count=document.getElementById('pp-count');
+function apply(){const rows=[...table.tBodies[0].rows];let shown=0;
+ rows.forEach(r=>{const ok=Object.keys(sel).every(k=>!sel[k]||!sel[k].value||r.dataset[k]===sel[k].value);
+  r.hidden=!ok;if(ok)shown++});
+ if(count)count.textContent=shown+' of '+rows.length+' rows'}
+Object.values(sel).forEach(s=>s&&s.addEventListener('change',apply));apply()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup);else setup();
+})();
+</script>

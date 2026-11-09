@@ -111,6 +111,18 @@ for the incremental precision-recall sweep.
 - No claim is made here about how any named competing benchmark performs; the
   comparison above is against common ad-hoc practice.
 
+## What the HTML report adds
+
+The report is one self-contained file. Besides the leaderboard it contains:
+
+- **A weighted scorecard** of 17 metrics (A1-E3) with grade bands, shown beside the leaderboard and never replacing it. Scores are piecewise linear
+  (100/85/60/0), the overall is renormalised over the metrics that could be scored, and scenario views (simple, complex, annotated, challenging) flag
+  fewer than 5 samples as underpowered. Only the identity bands are fixed; the others are proposed. SNP concordance and structural variant F1 are
+  not available because no truth variant set exists. See section 7.10 of the [scientific guide](docs/SCIENTIFIC_GUIDE.md).
+- **Circular plasmid maps**, one per truth plasmid: truth genes, one ring per tool, GC content and GC skew.
+- **A workflow figure** showing what actually ran in this results directory, and a **data inventory** listing every output and where the report shows it.
+- Grouped, collapsible navigation, per-plasmid detail, an assembly-quality section and links to `leaderboard.md` and `scoring_spec.md`.
+
 ## Scientific guide for domain experts
 
 > **Start here if you need to decide whether to trust, use, or independently check PlasBench.**

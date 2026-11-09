@@ -35,3 +35,21 @@ smallest_difference	0.05	SMALLEST_DIFFERENCE	8	yes	fixed	|delta F1| below this i
 paired_test	sign-flip permutation (primary) and Wilcoxon signed-rank		8	no	fixed	Holm-adjusted
 no_close_reference_mash_distance	0.01		12	yes	fixed	Operational screen; wording "no close reference"
 holdout_split	locked; evaluated once with --confirm-holdout		11	no	fixed	leave_taxon_out.py writes a one-time marker
+scorecard_weights	A1=10 A2=5 A3=5 A4=10 B1=10 B2=5 B3=5 C1=8 C2=7 C3=5 C4=5 D1=5 D2=5 D3=5 E1=4 E2=3 E3=3 (sum 100)		7.10	yes	TO_FIX	Proposed default, panel to confirm. config/scorecard.tsv; an additional view, never the ranking
+scorecard_overall_bands	excellent>=90 good>=75 moderate>=55 else poor		7.10	yes	TO_FIX	Proposed default, panel to confirm. Overall score bands, weights renormalised over scored metrics
+scorecard_bands_A1	excellent>=99.9 good>=99.0 moderate>=95.0 floor=90 (percent)		7.10	no	fixed	The stated identity definition
+scorecard_bands_A2	excellent<=0.1 good<=0.5 moderate<=2.0 floor=10 (per 100 aligned columns)		7.10	yes	TO_FIX	Proposed default, panel to confirm. Mismatch rate, lower is better
+scorecard_bands_A3	excellent>=99.9 good>=99.5 moderate>=98 floor=90 (percent)		7.10	yes	TO_FIX	Proposed default, panel to confirm. Insertion/deletion accuracy
+scorecard_bands_A4_C2	no bands defined (status undefined)		7.10	yes	TO_FIX	Proposed default, panel to confirm. No truth variant set exists; metrics not available and excluded from the overall; no thresholds invented
+scorecard_bands_B1	excellent>=0.99 good>=0.95 moderate>=0.8 floor=0.5		7.10	yes	TO_FIX	Proposed default, panel to confirm. Reference coverage
+scorecard_bands_B2_B3	excellent>=0.95 good>=0.85 moderate>=0.6 floor=0.2		7.10	yes	TO_FIX	Proposed default, panel to confirm. Reconstruction completeness (B2) and plasmid recovery rate (B3)
+scorecard_bands_C1	excellent>=0.95 good>=0.85 moderate>=0.7 floor=0.4		7.10	yes	TO_FIX	Proposed default, panel to confirm. Structural accuracy, alignment-derived and unvalidated
+scorecard_bands_C3	excellent>=0.9 good>=0.7 moderate>=0.4 floor=0		7.10	yes	TO_FIX	Proposed default, panel to confirm. Circularization accuracy
+scorecard_bands_C4	excellent>=0.95 good>=0.85 moderate>=0.6 floor=0.2		7.10	yes	TO_FIX	Proposed default, panel to confirm. Repeat resolution
+scorecard_bands_D1	excellent>=0.99 good>=0.95 moderate>=0.85 floor=0.5		7.10	yes	TO_FIX	Proposed default, panel to confirm. Gene recovery
+scorecard_bands_D2_D3	excellent>=0.95 good>=0.85 moderate>=0.7 floor=0.4		7.10	yes	TO_FIX	Proposed default, panel to confirm. Annotation concordance (coordinate-based) and functional element completeness
+scorecard_bands_E1	excellent<=60 good<=300 moderate<=1800 floor=14400 (seconds)		7.10	yes	TO_FIX	Proposed default, panel to confirm. Runtime; hardware-dependent
+scorecard_bands_E2	excellent<=2 good<=8 moderate<=32 floor=256 (GB)		7.10	yes	TO_FIX	Proposed default, panel to confirm. Peak memory; hardware-dependent
+scorecard_bands_E3	excellent>=0.99 good>=0.95 moderate>=0.8 floor=0.5		7.10	yes	TO_FIX	Proposed default, panel to confirm. Reconstruction success rate
+scorecard_min_samples	5	SCORECARD_MIN_SAMPLES	7.10	yes	TO_FIX	Proposed default, panel to confirm. Scenario scorecards with fewer samples are flagged underpowered
+map_max_bp	600000		13.3	yes	TO_FIX	Proposed default, panel to confirm. Plasmids longer than this are not drawn as a circular map (constant in python/report_maps.py)

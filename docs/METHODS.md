@@ -1144,3 +1144,29 @@ any chromosome replicon (the plasmid k-mers are hashed first and the chromosome 
 **Origin wrap.** Two query-adjacent same-strand blocks of one record on one replicon, the first ending within the indel tolerance of the
 reference end and the second starting within it of the reference start (mirrored on the reverse strand), are a rotation. They are counted as
 `origin_wraps`, not as a tandem duplication or relocation, and count as collinear.
+
+## Weighted scorecard and circular maps (`report_scorecard.py`, `report_maps.py`)
+
+An additional report view; it never changes a ranking. Thresholds and weights are in `config/scorecard.tsv` (weights sum to 100).
+
+**Score transform.** Per metric, four thresholds (excellent, good, moderate, floor) and a direction. The score is piecewise linear through
+(excellent, 100), (good, 85), (moderate, 60), (floor, 0), clamped to [0, 100]; lower-is-better metrics are the mirror image. A1 example: 99.45 percent
+lies halfway between good (99.0, 85) and excellent (99.9, 100), so it scores 92.5.
+
+**Band thresholds.** Metric band: excellent, good, moderate or poor by the thresholds, an edge value taking the better band. Overall band: score >= 90
+excellent, >= 75 good, >= 55 moderate, else poor. Only the A1 identity thresholds (99.9, 99.0, 95.0, floor 90) are `fixed`; all others are `proposed`
+and registered in `config/prereg.tsv`. A4 (SNP concordance) and C2 (structural variant F1) are `undefined`: no thresholds exist because no truth variant
+set exists, and none were invented.
+
+**Renormalisation.** `overall = sum(w_i x s_i) / sum(w_i)` over the metrics that could be scored; `scored weight share = sum(w_i scored) / sum(w_i all)`.
+An unscorable metric is excluded with its reason, never scored as zero. A share below 0.5 is marked provisional.
+
+**Scenario membership** (non-exclusive, from `benchmark.scenarios.tsv`). complex: tag `multi_plasmid`, `large_plasmid` or `repeat_rich`; annotated: tag
+`annotated`; challenging: tag `low_depth` or `read_quality_band` = low; simple: has plasmids, no complex tag, and `read_x` >= 30. A scenario with fewer than
+`SCORECARD_MIN_SAMPLES` (5) samples is flagged underpowered. Runtime, memory and success rate are per-tool and not scored per scenario.
+
+**Circular maps.** One per truth plasmid, position 0 at the top, clockwise. Ring order from the outside: kb scale, truth genes (forward strand), truth genes
+(reverse strand), features of unknown strand (replicon, mobility, IS, AMR), one ring per tool (at most `MAP_MAX_TOOLS` = 8, in leaderboard order), GC content
+(deviation from the replicon mean), GC skew. **GC windows:** `window = max(200, length // 300)` bp; GC is the G+C fraction of each window and skew is
+(G-C)/(G+C), 0 for a window without G or C. Plasmids longer than `MAP_MAX_BP` (600,000 bp) are not drawn. The maps show the truth annotation and each tool's
+coverage of truth bases, not per-base wrong-replicon placement.

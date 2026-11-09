@@ -32,6 +32,7 @@ This guide is for the people who must decide whether to trust and use the tool: 
   - [7.7 Structural evidence](#77-structural-evidence)
   - [7.8 Scoring-specification additions](#78-scoring-specification-additions)
   - [7.9 Bin agreement, assembly adequacy, copy number and truth quality](#79-bin-agreement-assembly-adequacy-copy-number-and-truth-quality)
+  - [7.10 Weighted scorecard and grade bands](#710-weighted-scorecard-and-grade-bands)
 - [8. Ranking and statistics](#8-ranking-and-statistics)
   - [8.1 Tracks and tasks](#81-tracks-and-tasks)
   - [8.2 The headline](#82-the-headline)
@@ -406,6 +407,40 @@ Added after reviewing three other repositories (PlasEval, plsMD, GAEMR). All are
 | Truth depth anomalies (`RUN_TRUTH_DEPTH_ANOMALIES`, off) | From GAEMR's coverage-anomaly windows: windows of benchmark-read depth beyond `DEPTH_ANOMALY_Z` (3) robust SD of the replicon median, clustered by distance. A high region can be a collapsed repeat or an integrated element, a low one a deletion or misjoin in the truth. Needs minimap2 and samtools. Never edits the truth. |
 | Origin-wrap handling | A circular replicon has no fixed start. Two query-adjacent alignment blocks that meet across the reference origin are a rotation, not a tandem duplication: `call_structural_variants.py` no longer calls one and tallies `origin_wraps`. Every truth replicon is assumed circular for this purpose. |
 
+### 7.10 Weighted scorecard and grade bands
+
+The report shows a weighted scorecard beside the leaderboard. It is another view of the same results, never the ranking: the pre-specified endpoints and the leaderboard are unchanged. Its metrics, weights and thresholds are in `config/scorecard.tsv`. The weights sum to 100.
+
+| Id | Metric | Weight | Source |
+|---|---|---|---|
+| A1 | Nucleotide identity | 10 | `benchmark.accuracy.tsv`, weighted by aligned columns |
+| A2 | Mismatch rate | 5 | `benchmark.accuracy.tsv` |
+| A3 | Insertion/deletion accuracy (1 minus insertion and deletion rate) | 5 | `benchmark.accuracy.tsv` |
+| A4 | SNP concordance | 10 | needs a truth variant set |
+| B1 | Reference coverage | 10 | `scores.tsv` `recall` |
+| B2 | Reconstruction completeness | 5 | `scores.tsv` `plasmid_recall_ge90` |
+| B3 | Plasmid recovery rate | 5 | `scores.tsv` `plasmid_recall` |
+| C1 | Structural accuracy (alignment-derived, unvalidated) | 8 | `benchmark.ngoc.tsv`, else the collinear fraction |
+| C2 | Structural variant F1 | 7 | needs a truth variant set |
+| C3 | Circularization accuracy | 5 | `scores.tsv` `complete_circular_plasmid_recall` |
+| C4 | Repeat resolution | 5 | per-plasmid completeness of repeat-rich truth plasmids |
+| D1 | Gene recovery | 5 | `scores.tsv` `amr_gene_recall` |
+| D2 | Annotation concordance (coordinate-based, not orthology) | 5 | `alignment_blocks.json` |
+| D3 | Functional element completeness | 5 | `benchmark.feature_preservation.tsv` |
+| E1 | Runtime | 4 | `benchmark.performance.tsv` |
+| E2 | Memory consumption | 3 | `benchmark.performance.tsv` |
+| E3 | Reconstruction success rate | 3 | `benchmark.performance.tsv` |
+
+**Score transform.** Each metric has four thresholds (excellent, good, moderate, floor) and a direction. The score is piecewise linear through excellent = 100, good = 85, moderate = 60, floor = 0, clamped to 0-100. For a higher-is-better metric a value at or above `excellent` scores 100 and a value at or below `floor` scores 0; a lower-is-better metric is the mirror image. Example for A1: 99.9 scores 100, 99.0 scores 85, 95.0 scores 60, 90 scores 0, and 99.45 scores 92.5.
+
+**Grade bands.** A metric's band is excellent, good, moderate or poor by the thresholds themselves; a value on an edge takes the better band. The overall score is the weighted mean of the scores of the metrics that could be scored, with the weights renormalised: `overall = sum(w x score) / sum(w)` over scored metrics. The **scored weight share** is the weight of the scored metrics over the total weight; a share below 0.5 is marked provisional. Overall bands are 90 or more excellent, 75 or more good, 55 or more moderate, otherwise poor. A metric that cannot be scored is listed with the reason and its weight is left out, never counted as zero.
+
+**Fixed and proposed.** Only the identity bands (A1: 99.9, 99.0, 95.0 percent, the stated definition) have status `fixed`. Every other threshold is `proposed`, a changeable default registered in `config/prereg.tsv` and open to revision by the panel.
+
+**A4 and C2 are `undefined`.** SNP concordance and structural variant F1 would need a truth variant set that the benchmark does not carry. No thresholds were invented for them: they have no bands, are shown as not available, and their weight (17 of 100) is excluded from the overall. The bands should be set once real values exist.
+
+**Scenarios.** The scorecard can be restricted to subsets of samples, taken from `benchmark.scenarios.tsv`. They are not exclusive: one sample can be in several. *complex* is a sample tagged `multi_plasmid`, `large_plasmid` or `repeat_rich`; *annotated* is tagged `annotated`; *challenging* is tagged `low_depth` or has `read_quality_band` low; *simple* has plasmids, none of the complex tags, and read depth of at least 30x (a blank depth does not qualify). Each scenario scorecard states its number of samples, and fewer than `SCORECARD_MIN_SAMPLES` (5) is flagged *underpowered*: read it as an illustration. Runtime, memory and success rate are per-tool summaries and are not scored inside a scenario.
+
 ---
 
 ## 8. Ranking and statistics
@@ -570,7 +605,17 @@ Blank always means "not defined or not assessed", never zero.
 
 ### 13.3 The HTML report
 
-A single self-contained file. Its main sections are: Summary (report card and "start here" findings), Run metadata, Insights, Chart, **Leaderboard**, Robustness (ranked-on samples, independent clusters, strict precision, recall ceiling, database overlap), **Headline design** (reference standard, tier sensitivity, species balance), Recommendations, Validation, Selected reconstructions (with the experimental nearest-reference block when present), an interactive cohort dashboard and reconstruction-evidence explorer, All scores, Statistics, Bin diagnostics, Zero-plasmid controls, Graded recovery, Isolate difficulty, Cohort QC, Replicon recovery, QUAST diagnostics, Execution health, Tool and sample drill-downs, Legend, Artifact explorer and Method. It offers sortable tables, filters, CSV and BED export, a colour-blind-safe palette and a print view. Unmeasured values are shown as "not measured", never zero, and read coverage is never displayed because it is not measured.
+A single self-contained file. Its main sections are: Summary (report card and "start here" findings), Run metadata, Insights, Chart, **Leaderboard**, Robustness (ranked-on samples, independent clusters, strict precision, recall ceiling, database overlap), **Headline design** (reference standard, tier sensitivity, species balance), Recommendations, Validation, Selected reconstructions (with the experimental nearest-reference block when present), an interactive cohort dashboard and reconstruction-evidence explorer, All scores, Statistics, Bin diagnostics, Zero-plasmid controls, Graded recovery, Isolate difficulty, Cohort QC, Replicon recovery, QUAST diagnostics, Execution health, Tool and sample drill-downs, Legend, Artifact explorer and Method. This release adds, as part of the same report:
+
+- a **weighted scorecard** (with its definitions and a per-scenario view; section 7.10) and a column-group switch for the scores table;
+- **circular plasmid maps**, one per truth plasmid per sample: rings from the outside are a kb scale, truth genes on the forward and reverse strand, features of unknown strand (replicon, mobility, insertion sequences, AMR), one ring per tool (filled where truth bases are covered, pale and dashed where not, black ticks for structural events), GC content and GC skew. At most `MAP_MAX_TOOLS` (8) tools are drawn and plasmids longer than `MAP_MAX_BP` (600,000 bp) are not drawn;
+- a **workflow figure** whose boxes carry what ran in this results directory (sample count, tool runs by status, and for each scoring layer whether it exists, with a row count, or "Not run");
+- a **per-plasmid detail section**, an **assembly-quality section** and a **depth strip**;
+- a **data inventory** appendix ("Data in this report") listing every output file the pipeline wrote and where the report shows it, so nothing is silently missing;
+- **grouped, collapsible navigation**, and links to `leaderboard.md` and `scoring_spec.md`;
+- a corrected paired-comparison table and corrected overlap wording.
+
+The report offers sortable tables, filters, CSV and BED export, a colour-blind-safe palette and a print view. Unmeasured values are shown as "not measured", never zero, and read coverage is never displayed because it is not measured.
 
 ### 13.4 How to read a leaderboard
 
@@ -704,6 +749,14 @@ All settings are environment variables read by `config/config.sh` (override them
 | `RUN_PLASMID_NOVELTY_CLASSIFICATION` | 0 | Experimental nearest-reference screen. |
 | `RUN_DIFFICULTY_FEATURES`, `RUN_QUAST_DIAGNOSTICS`, `RUN_PROTEIN_ANNOTATION` | 0 | Optional diagnostics. |
 
+**Report build** (the scorecard thresholds and weights are in `config/scorecard.tsv`, not here)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SCORECARD_MIN_SAMPLES` | 5 | A scenario scorecard with fewer samples is flagged underpowered (section 7.10). |
+| `MAP_MAX_BP` | 600000 | Plasmids longer than this get a one-line note instead of a circular map. A constant in `python/report_maps.py`, not read from the environment. |
+| `MAP_MAX_TOOLS` | 8 | Most tool rings drawn on one map (the top tools of the leaderboard). A constant in `python/report_maps.py`, not read from the environment. |
+
 **Command-line reference** (`plasbench --help` lists all):
 
 | Group | Commands |
@@ -808,6 +861,8 @@ This section records what has and has not been shown, so that a reader can judge
 | **Long-read independence is scarce.** | Few samples qualify for the long-read track. | Use held-out reads or simulation. |
 | **Database leakage is date-based.** | It cannot prove inclusion or absence. | Fill the dates; interpret as a screen. |
 | **Short-read assembly parameters** use SPAdes defaults and a trimmed-read length filter; results depend on the assembler. | A different assembler changes what tools receive. | Compare `ASSEMBLER` settings. |
+
+**Limits of the maps and the scorecard.** The static maps show the truth annotation and which truth bases each tool covers; they do not show per-base wrong-replicon placement. Truth features and AMR rows carry no strand, so they are drawn on a separate ring. D2 (annotation concordance) is coordinate-based, not orthology. C1 (structural accuracy) is derived from alignments and is not validated against reads or an assembly graph. E1 and E2 depend on the hardware and thread count, so compare them only between runs on the same machine. A4 and C2 are not available (section 7.10).
 
 ### 17.5 Behaviour in difficult cases
 
