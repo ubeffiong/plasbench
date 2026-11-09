@@ -60,6 +60,8 @@ import os
 import sys
 from collections import defaultdict
 
+from plasbench_common import merge_intervals as merge  # noqa: E402  (was an identical local copy)
+
 LABEL_FIELDS = ["contig", "length", "label", "plasmid_fraction", "chromosome_fraction", "best_plasmid", "reason",
                 "plasmids"]
 SCORE_FIELDS = ["contig_min_length", "contigs_evaluable", "contigs_short", "contigs_ambiguous", "contigs_unplaced",
@@ -77,6 +79,14 @@ SCORE_FIELDS = ["contig_min_length", "contigs_evaluable", "contigs_short", "cont
                 "contig_bin_precision_bp", "contig_bin_recall_bp", "contig_bin_f1_bp"]
 
 
+from plasbench_common import read_truth_table  # noqa: E402
+
+
+def read_truth(path):
+    """sequence_id -> (molecule_type, length), validated as the scorer validates it."""
+    return read_truth_table(path)[0]
+
+
 def read_fasta_lengths(path):
     lengths, name = {}, None
     with open(path, encoding="utf-8") as handle:
@@ -90,28 +100,12 @@ def read_fasta_lengths(path):
     return lengths
 
 
-def read_truth(path):
-    with open(path, newline="", encoding="utf-8") as handle:
-        return {row["sequence_id"]: (row["molecule_type"].strip().upper(), int(row["length"]))
-                for row in csv.DictReader(handle, delimiter="\t")}
-
-
 def merged_length(intervals):
     total, end = 0, -1
     for start, stop in sorted(intervals):
         total += max(0, stop - max(end, start))
         end = max(end, stop)
     return total
-
-
-def merge(intervals):
-    out = []
-    for start, stop in sorted(intervals):
-        if out and start <= out[-1][1]:
-            out[-1][1] = max(out[-1][1], stop)
-        else:
-            out.append([start, stop])
-    return out
 
 
 def cmd_label(args):

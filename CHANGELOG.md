@@ -13,6 +13,49 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- performance audit fixes ([docs/PERFORMANCE_AUDIT.md](docs/PERFORMANCE_AUDIT.md))
+- **Bin matching is rectangular** (`python/matching.py`, shared by `score_bins.py`, `score_amr_placement.py` and
+  `metagenomics.py`): O(r²c) instead of a padded O(max(B,P)³) square. Same optimal total weight; the same pairs
+  wherever the optimum is unique (`test/test_matching.py`); 400 bins × 20 plasmids in 0.02 s.
+- **Exact statistics without `Fraction` objects** (`python/resampling.py`): every mean, bootstrap interval and
+  permutation p-value is bit-identical to before (`test/test_resampling_equivalence.py`), and resampling adds
+  precomputed per-cluster integer sums. `headline_design` and `aggregate_results` no longer import each other.
+- **Stage 4 reuses a tool result only when its fingerprint matches**: installed executable, adapter, database row,
+  `<TOOL>_*` settings (thread counts excluded) and inputs are written into `.<tool>.complete`. An upgrade, a
+  changed setting or a new assembly re-runs that tool. Markers from earlier releases re-run once
+  (`REUSE_UNFINGERPRINTED=1` reuses them unchecked).
+- **Capability registry read once per stage** (`tool_capabilities.py --dump`, `lib.sh load_capabilities`) instead
+  of one `python3` launch per lookup (12.5% of the demo's wall time).
+- **One minimap2 index per sample** in stage 5 (`.reference.<preset>.mmi`, deleted afterwards); byte-identical
+  PAF across all 105 call shapes checked on the demo.
+- **Stage 6 advisory analyses run as a bounded parallel group** (`STAGE6_PARALLEL_JOBS`, default 4; 1 restores
+  the serial order).
+- **`plasbench-score` applies the pre-registered alignment filters** the caller omits (`MIN_ALIGNMENT_*` when
+  exported); a direct `score_plasmids.py` run without filters prints a note.
+- **Shared, validated readers** in `plasbench_common.py` (`read_truth_table`, `read_bin_membership`, `iter_fasta`,
+  `open_maybe_gz`, `union_length`) replace 20 local copies. `bin_quality.py` now applies the bin scorer's rules
+  (a non-`PLASMID`/`CHROMOSOME` truth row, or a contig in two bins, is an error) instead of reading them differently.
+- The leaderboard writer refuses a column/value count mismatch; `test/bench/` holds the timing harnesses.
+- **Data-structure upgrades, results unchanged** (every output hash identical before and after,
+  `test/bench/bench_dsa.py`): hash-map indexing in `bin_agreement.per_bin_rows` (64×) and hash-set dedup in
+  `read_bins` (86×); hash sets for the matcher's live rows (6.8×); a bounded heap for the visualization top-k;
+  a sliding window between N positions with bytes encoded once in `contig_crosscheck.sampled_kmers`; binary
+  search in calibration bucketing; a `Counter` for duplicate checks; the permutation tests' fair-bit draw
+  inlined (a bulk bit-decoding variant was measured slower and not kept).
+- **Streaming reads**: `iter_fasta(path, wanted)` skips unwanted records without joining them; the database
+  containment check no longer holds the chromosome (peak 12.7 → 0.4 MiB on a 5 Mb reference).
+- **Parallel ENA downloads**: both mates at once and `ENA_DOWNLOAD_CONNECTIONS` (default 4) byte ranges per
+  file of at least `ENA_SEGMENT_MIN_BYTES` (aria2c when installed; `ENA_USE_ARIA2=0` disables it), falling back
+  to the resumable single stream and always MD5-verified (`test/test_fetch_ena_parallel.py`). 8.6 → 1.6 s for
+  2 × 16 MiB at 4 MiB/s per connection.
+- **Thread budget**: with `THREADS` unset, the cores are divided across `MAX_PARALLEL_SAMPLES × MAX_PARALLEL_TOOLS`
+  instead of every job requesting every core (`test/test_thread_budget.sh`).
+- Stage-4 fingerprints identify a tool's executable by path, size and modification time and never run it to ask
+  its version (a tool that does not parse `--version` could otherwise start a real run).
+
+### Fixed
+- Leftover merge-conflict markers in this changelog.
+
 ### Changed -- track-specific endpoints and CPRR robustness
 - **Long-read and hybrid reconstruction are now ranked on isolate-level CPRR** (`sample_cprr`); short-read reconstruction stays on
   length-weighted binning F1 with CPRR as the key secondary endpoint (`headline_design.ranking_metric()`; `config/prereg.tsv`
@@ -25,7 +68,6 @@ history is lost, only the numbering is cleaner. See
 - README evaluation framework and workflow sections; METHODS, PREREGISTRATION and the HTML report updated to match;
   `test/test_cprr_robustness.py` added.
 
-<<<<<<< HEAD
 ### Added -- completing the plsMD, PlasEval and GAEMR follow-ups
 - **PlasBin-flow output adapter** (`RUN_PLASBIN_FLOW`, `PLASBIN_FLOW_OUTPUTS_DIR`, `adapters/adapt_plasbin_flow.sh`): adapts the tool's own output
   (it needs a Gurobi licence, so PlasBench does not run it); a contig listed in several bins stays in the first and the rest are recorded.
@@ -50,7 +92,6 @@ history is lost, only the numbering is cleaner. See
 - Local read pairing for `init-local --reads-dir` (`_1`, `_R1`, `_R1_001`), `env/download_plsdb.sh`, report sections for all of the above, and a README
   section on what PlasBench offers over the three projects, with where each is better.
 
-=======
 ### Added -- cross-check, ENA fallback, demo coverage
 - **Independent second scorer for the contig layer** (`contig_crosscheck.py`): alignment-free k-mer
   labels and separately written metrics; per-run agreement table, report and validity statement.
@@ -58,7 +99,6 @@ history is lost, only the numbering is cleaner. See
   example an old SRA Toolkit failing TLS), the same run is fetched from ENA and MD5-verified.
 - The demo now has a synthetic assembly, so the contig layer, the cross-check, assembly statistics and
   the QC-gate warnings render with real values.
->>>>>>> origin/main
 
 ### Added -- scoring specification and panel examination
 - **Pre-registration** (`config/prereg.tsv`, `freeze_prereg.py`): freeze/verify a SHA-256 lock; the

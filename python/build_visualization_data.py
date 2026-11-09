@@ -2,11 +2,33 @@
 """Create bounded, reference-coordinate data for the offline visual explorer."""
 import argparse
 import csv
+import heapq
 import json
 import re
 from collections import defaultdict
 from pathlib import Path
 from plasbench_common import merge_intervals as merge  # noqa: E402
+from plasbench_common import iter_fasta  # noqa: E402
+
+
+# Compiled once at import, not looked up per alignment block.
+CIGAR_OPS = re.compile(r"(\d+)([MID=X])")
+
+
+def top_blocks(blocks, limit):
+    """The `limit` longest alignment blocks (ties by target, start, record), in that order.
+
+    heapq.nsmallest keeps a bounded heap: O(n log limit) time and O(limit) extra space,
+    instead of sorting every block (O(n log n), O(n)). It is documented to return exactly
+    sorted(blocks, key=key)[:limit], tie order included.
+    """
+    return heapq.nsmallest(limit, blocks, key=lambda row: (-row["block_length"], row["target"],
+                                                            row["target_start"], row["record_id"]))
+
+
+def read_fasta(path, wanted=None):
+    """name -> sequence (shared FASTA reader); only `wanted` names when given."""
+    return {name: seq for name, _, seq in iter_fasta(path, wanted)}
 
 
 def truth_records(path):
@@ -20,22 +42,6 @@ def truth_records(path):
                 "molecule_type": fields[index["molecule_type"]].upper(),
                 "length": int(fields[index["length"]]),
             }
-    return records
-
-
-def read_fasta(path):
-    records, name, sequence = {}, None, []
-    with open(path, encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if line.startswith(">"):
-                if name is not None:
-                    records[name] = "".join(sequence)
-                name, sequence = line[1:].split()[0], []
-            elif name is not None:
-                sequence.append(line)
-    if name is not None:
-        records[name] = "".join(sequence)
     return records
 
 
@@ -61,7 +67,7 @@ def local_alignment(block, reference, prediction, max_bp):
     if not query or not target:
         return None
     left, right, qpos, tpos = [], [], 0, 0
-    for size, op in re.findall(r"(\d+)([MID=X])", block["cigar"]):
+    for size, op in CIGAR_OPS.findall(block["cigar"]):
         size = int(size)
         if op in "M=X":
             left.append(target[tpos:tpos + size]); right.append(query[qpos:qpos + size]); qpos += size; tpos += size
@@ -254,9 +260,11 @@ def main():
         all_blocks_for_tool = paf_blocks(paf, truth)
         # The display cap never changes analytical recovery or structural
         # diagnostics. It only bounds SVG/HTML payload size.
-        retained = sorted(all_blocks_for_tool, key=lambda row: (-row["block_length"], row["target"], row["target_start"], row["record_id"]))[:args.max_blocks_per_tool]
+        retained = top_blocks(all_blocks_for_tool, args.max_blocks_per_tool)
         prediction_path = sample_dir / f"pred_{tool}.plasmid.fasta"
-        prediction = read_fasta(prediction_path) if prediction_path.is_file() else {}
+        # Only the records behind the retained blocks are shown; stream the rest past.
+        prediction = (read_fasta(prediction_path, {block["record_id"] for block in retained})
+                      if prediction_path.is_file() else {})
         for block in retained:
             alignment = local_alignment(block, reference, prediction, args.max_nucleotide_bp)
             if alignment:

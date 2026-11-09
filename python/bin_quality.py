@@ -44,22 +44,18 @@ FIELDS = ("sample", "tool", "analysis_track", "n_truth_plasmids", "n_bins", "n_h
           "medium_or_better_yield", "homogeneity", "completeness", "v_measure")
 
 
+from plasbench_common import read_truth_split, read_bin_membership  # noqa: E402
+
+
+# Shared validated readers. Before, this script filed every non-PLASMID row as
+# chromosome and let a contig listed in two bins silently keep its last bin; it now
+# applies the bin scorer's rules, so both scripts read the same tables the same way.
 def read_truth(path):
-    plasmids, chromosomes = {}, {}
-    with open(path, newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            target = plasmids if row["molecule_type"].upper() == "PLASMID" else chromosomes
-            target[row["sequence_id"]] = int(row["length"])
-    return plasmids, chromosomes
+    return read_truth_split(path)
 
 
 def read_bins(path):
-    membership = {}
-    with open(path, newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            if row.get("bin_id") and row.get("sequence_id"):
-                membership[row["sequence_id"]] = row["bin_id"]
-    return membership
+    return read_bin_membership(path)
 
 
 def union_bp(intervals):

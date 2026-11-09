@@ -40,8 +40,11 @@ reset_shard_dir "score_failures"
 SCORE_SHARDS="$(shard_dir "score")"
 FAILURE_SHARDS="$(shard_dir "score_failures")"
 
+# Registry answers come from one validated load (lib.sh load_capabilities), loaded
+# here so every background score_sample job inherits it.
+load_capabilities "$CAPABILITIES"
 binning_capable() {
-    python3 "$HERE/../python/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$1" --binning-capable >/dev/null
+    capability_binning "$CAPABILITIES" "$1"
 }
 
 # Each tool's own declared track (config/tool_capabilities.tsv), not one value
@@ -50,7 +53,7 @@ binning_capable() {
 # single global --analysis-track re-stamped every already-scored tool's rows
 # on each stage-5 rebuild, not just the tool it was intended for.
 tool_analysis_track() {
-    python3 "$HERE/../python/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$1" --analysis-track 2>/dev/null
+    capability_track "$CAPABILITIES" "$1"
 }
 
 # Keep only rows of a per-plasmid truth TSV (AMR genes, circular plasmids)
@@ -76,6 +79,20 @@ score_sample() {
     local SCORE_SHARD="$SCORE_SHARDS/${SAMPLE}.tsv"
     local FAILURE_SHARD="$FAILURE_SHARDS/${SAMPLE}.tsv"
     [[ -s "$REF" && -s "$TRUTH" ]] || { warn "missing reference/truth for $SAMPLE"; return 0; }
+    # One minimap2 index of the reference per sample, built with the scoring preset, instead
+    # of re-indexing the FASTA in every call (up to four per tool). minimap2 reads indexing
+    # parameters from the .mmi, which is built with the same -x, so alignments are unchanged
+    # (byte-identical PAF on the demo across every call shape used here; see
+    # docs/PERFORMANCE_AUDIT.md). If indexing fails, calls fall back to the FASTA.
+    mkdir -p "$RDIR"
+    local REF_MMI="$RDIR/.reference.${MINIMAP2_PRESET}.mmi" MM2_TARGET="$REF"
+    if minimap2 -x "$MINIMAP2_PRESET" -d "$REF_MMI.tmp" "$REF" 2>> "$LOG_DIR/${SAMPLE}.minimap2_index.log" \
+            && mv -f "$REF_MMI.tmp" "$REF_MMI"; then
+        MM2_TARGET="$REF_MMI"
+    else
+        rm -f "$REF_MMI.tmp"
+        warn "  minimap2 index build failed for $SAMPLE; aligning against the FASTA"
+    fi
     # TRUTH_LABEL_SCHEME picks the scored truth (python/label_schemes.py):
     # ncbi (primary, pre-registered) = truth.tsv; nonchromosomal =
     # truth.nonchromosomal.tsv; evidence = truth.scored.tsv (AMBIGUOUS removed).
@@ -118,7 +135,7 @@ score_sample() {
         if [[ ! -s "$CONTIG_LABELS" || "$CONTIG_LABELS" -ot "$CONTIGS" || "$CONTIG_LABELS" -ot "$SCORE_TRUTH" \
               || "$(cat "$CONTIG_LABELS.params" 2>/dev/null)" != "$CONTIG_PARAMS" ]]; then
             local CONTIG_LOG="$LOG_DIR/${SAMPLE}.contig_classification.log"
-            if minimap2 -c --secondary=yes -N 5 -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$CONTIGS" \
+            if minimap2 -c --secondary=yes -N 5 -x "$MINIMAP2_PRESET" -t "$THREADS" "$MM2_TARGET" "$CONTIGS" \
                     > "$SDIR/contigs_vs_ref.paf" 2> "$CONTIG_LOG" \
                && python3 "$HERE/../python/contig_classification.py" label --contigs "$CONTIGS" \
                     --paf "$SDIR/contigs_vs_ref.paf" --truth "$SCORE_TRUTH" --labels-out "$CONTIG_LABELS" \
@@ -152,6 +169,7 @@ score_sample() {
     shopt -u nullglob
     if [[ ${#preds[@]} -eq 0 ]]; then
         warn "  no predictions found for $SAMPLE (did stage 4 run?)"
+        rm -f "$REF_MMI"
         return 0
     fi
 
@@ -182,7 +200,7 @@ score_sample() {
             local SCORABLE_LOG="$LOG_DIR/${SAMPLE}.scorable_truth.log"
             if python3 "$HERE/../python/scorable_truth.py" windows --reference "$REF" --truth "$SCORE_TRUTH" \
                     --out "$WINDOWS" --window "$SCORABLE_WINDOW_BP" --step "$SCORABLE_STEP_BP" > "$SCORABLE_LOG" 2>&1 \
-                && minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$WINDOWS" \
+                && minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$MM2_TARGET" "$WINDOWS" \
                     > "$WINDOWS_PAF" 2>> "$SCORABLE_LOG" \
                 && python3 "$HERE/../python/scorable_truth.py" intervals --paf "$WINDOWS_PAF" --truth "$SCORE_TRUTH" \
                     --out "$SCORABLE.tmp" \
@@ -236,11 +254,11 @@ score_sample() {
             # primary pieces; the scorer also drops any tp:A:S row it is handed. Which
             # copy of a repeat is "primary" is minimap2's arbitrary choice at low MAPQ,
             # which is why the MAPQ filter below, not this flag, protects precision.
-            if ! minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
+            if ! minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$MM2_TARGET" "$PRED" > "$PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.log"; then
                 rm -f "$PAF"; warn "minimap2 failed for $SAMPLE/$tool; excluded from scoring"; continue
             fi
             if [[ "$REPORT_MAPPING_AMBIGUITY" == "1" ]]; then
-                if minimap2 --secondary=yes -N 20 -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$PRED" > "$AMBIGUITY_PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.all.log"; then
+                if minimap2 --secondary=yes -N 20 -x "$MINIMAP2_PRESET" -t "$THREADS" "$MM2_TARGET" "$PRED" > "$AMBIGUITY_PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.minimap2.all.log"; then
                     AMBIGUITY_ARGS=(--ambiguity-paf "$AMBIGUITY_PAF")
                 else
                     rm -f "$AMBIGUITY_PAF"
@@ -280,7 +298,7 @@ score_sample() {
         rm -f "$RDIR/${tool}.pr_curve.tsv" "$RDIR/${tool}.pr_summary.tsv" "$RDIR/${tool}.calibration.tsv"
         if [[ -s "$CANDIDATES" && -s "$PRED_SCORES" ]]; then
             local CAND_PAF="$RDIR/${tool}.candidates_vs_ref.paf"
-            if minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$REF" "$CANDIDATES" \
+            if minimap2 --secondary=no -c -x "$MINIMAP2_PRESET" -t "$THREADS" "$MM2_TARGET" "$CANDIDATES" \
                     > "$CAND_PAF" 2> "$LOG_DIR/${SAMPLE}.${tool}.candidates.minimap2.log"; then
                 PRSCORE_ARGS=(--pred-scores "$PRED_SCORES" --pred-candidates-fasta "$CANDIDATES" \
                               --pred-candidates-paf "$CAND_PAF" \
@@ -449,6 +467,7 @@ score_sample() {
         --sample "$SAMPLE" --amr-truth "$AMR" --feature-truth "$FEATURES" --protein-truth "$TRUTH_PROTEINS" --circular-truth "$CIRCULAR" --max-blocks-per-tool "$VISUALIZATION_MAX_BLOCKS_PER_TOOL" --max-nucleotide-bp "$VISUALIZATION_MAX_NUCLEOTIDE_ALIGNMENT_BP" \
         --out "$RDIR/visualization/alignment_blocks.json" --structural-out "$RDIR/visualization/structural_metrics.tsv" >> "$LOG_DIR/${SAMPLE}.visualization.log" 2>&1 || \
         warn "visualization data generation failed for $SAMPLE; scores are retained"
+    rm -f "$REF_MMI"
 }
 
 while IFS=$'\t' read -r SAMPLE ASM SRA; do

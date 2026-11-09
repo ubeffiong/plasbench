@@ -30,14 +30,17 @@ Standard library only.
 """
 
 import csv
-import math
-import random
 import statistics
 from collections import defaultdict
-from fractions import Fraction
 from pathlib import Path
 
 from plasbench_common import UnionFind, CPRR_SWEEP_THRESHOLDS, cprr_sweep_auc  # noqa: E402
+# Resampling primitives live in resampling.py (shared with aggregate_results.py,
+# which used to be imported back from here, a circular dependency). Re-exported so
+# existing `headline_design.exact_mean` / `hd.stratified_bootstrap` callers keep working.
+from resampling import (  # noqa: E402,F401
+    exact_mean, macro_mean, resampling_units, stratified_bootstrap, stratified_permutation, ratio_bootstrap,
+)
 
 TASK_RECONSTRUCTION = "reconstruction"
 TASK_CLASSIFICATION = "classification"
@@ -172,98 +175,6 @@ class Design:
 
 # -- statistics -------------------------------------------------------------------
 
-def exact_mean(values):
-    """Bit-identical to statistics.mean(values) for floats, ~10x faster.
-
-    statistics.mean sums every element as an exact Fraction. Here math.fsum gives
-    the correctly rounded sum, further fsum passes collect the exact remainder as
-    a few doubles, and a single Fraction division rounds once -- the same single
-    rounding statistics.mean performs, so bootstrap/permutation results (and
-    permutation ties) do not change. Plain fsum/len rounds twice and was seen to
-    shift a tie-heavy stratified p-value, so it is deliberately not used.
-    """
-    values = list(values)
-    if not values:
-        return statistics.mean(values)  # raises StatisticsError like before
-    total = math.fsum(values)
-    if not math.isfinite(total):
-        return statistics.mean(values)
-    terms = [total]
-    while True:
-        remainder = math.fsum(values + [-term for term in terms])
-        if remainder == 0.0:
-            break
-        terms.append(remainder)
-        if len(terms) > 8:
-            return statistics.mean(values)
-    return float(sum(map(Fraction, terms)) / len(values))
-
-
-def macro_mean(values, strata):
-    """Mean of per-stratum means (plain mean when strata is None)."""
-    if strata is None:
-        return exact_mean(values)
-    by = defaultdict(list)
-    for value, stratum in zip(values, strata):
-        by[stratum].append(value)
-    return exact_mean([exact_mean(v) for v in by.values()])
-
-
-def stratified_bootstrap(values, groups, strata, iterations=1000):
-    """Percentile CI of macro_mean, resampling clusters within each stratum.
-
-    With strata None this is exactly aggregate_results.bootstrap_ci(values,
-    groups=groups) -- same units, same RNG draws.
-    """
-    from aggregate_results import bootstrap_ci, resampling_units
-    if strata is None:
-        return bootstrap_ci(values, iterations=iterations, groups=groups)
-    by_stratum = defaultdict(lambda: ([], []))
-    for value, group, stratum in zip(values, groups, strata):
-        by_stratum[stratum][0].append(value)
-        by_stratum[stratum][1].append(group)
-    units = {s: resampling_units(v, g) for s, (v, g) in by_stratum.items()}
-    if len(values) < 5 or sum(len(u) for u in units.values()) < 5:
-        return None, None
-    rng = random.Random(20260831)
-    order = sorted(units)
-    means = []
-    for _ in range(iterations):
-        stratum_means = []
-        for stratum in order:
-            drawn = rng.choices(units[stratum], k=len(units[stratum]))
-            stratum_means.append(exact_mean([v for unit in drawn for v in unit]))
-        means.append(exact_mean(stratum_means))
-    means.sort()
-    return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
-
-
-def stratified_permutation(differences, groups, strata, iterations=10000):
-    """Sign-flip p-value for macro_mean(differences), flipping whole clusters."""
-    from aggregate_results import paired_permutation_pvalue, resampling_units
-    if strata is None:
-        return paired_permutation_pvalue(differences, iterations=iterations, groups=groups)
-    units = resampling_units(list(zip(differences, strata)), groups)
-    if len(differences) < 5 or len(units) < 5:
-        return None
-    observed = abs(macro_mean(differences, strata))
-    rng = random.Random(20260901)
-    getrandbits = rng.getrandbits
-    labelled = [([value for value, _ in unit], [-value for value, _ in unit], [stratum for _, stratum in unit])
-                for unit in units]
-    extreme = 0
-    for _ in range(iterations):
-        values, labels = [], []
-        for positive, negative, unit_strata in labelled:
-            # Same bit stream as rng.randrange(2); see aggregate_results.paired_permutation_pvalue.
-            bits = getrandbits(2)
-            while bits >= 2:
-                bits = getrandbits(2)
-            values.extend(positive if bits else negative)
-            labels.extend(unit_strata)
-        extreme += abs(macro_mean(values, labels)) >= observed
-    return (extreme + 1) / (iterations + 1)
-
 
 PARALLEL_MIN_PAIRED_SAMPLES = 2000
 
@@ -296,24 +207,6 @@ def map_pair_statistics(jobs, workers=None):
     with ProcessPoolExecutor(max_workers=min(workers, len(jobs))) as pool:
         return list(pool.map(pair_statistics, *zip(*jobs), chunksize=1))
 
-
-def ratio_bootstrap(pairs, groups, iterations=1000):
-    """Percentile CI of sum(correct)/sum(total), resampling clusters."""
-    from aggregate_results import resampling_units
-    units = resampling_units(pairs, groups)
-    if len(pairs) < 5 or len(units) < 5:
-        return None, None
-    rng = random.Random(20260902)
-    ratios = []
-    for _ in range(iterations):
-        drawn = [p for unit in rng.choices(units, k=len(units)) for p in unit]
-        total = sum(t for _, t in drawn)
-        ratios.append(sum(c for c, _ in drawn) / total if total else 0.0)
-    ratios.sort()
-    return ratios[int(0.025 * iterations)], ratios[int(0.975 * iterations) - 1]
-
-
-# -- per-tool headline fields --------------------------------------------------------
 
 def shared_values(rows, key, failed_samples=None, known_tools=None, eligible_samples=None):
     """tool -> {sample: value} with failure-as-zero, the shared sample set, zero counts.

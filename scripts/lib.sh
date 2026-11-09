@@ -229,6 +229,34 @@ sample_column() {
     ' "$sheet"
 }
 
+# -------- tool-capability registry, read once per process --------
+# config/tool_capabilities.tsv is static for a run, but it used to be queried by
+# launching python3 per question (up to five times per sample x tool in stage 5:
+# 12.5% of the demo's wall time in docs/PERFORMANCE_AUDIT.md). It is now validated
+# and loaded once into associative arrays; background jobs inherit them. A tool
+# missing from the registry, or a registry that fails validation, answers exactly
+# as the per-call lookups did: not binning-capable, no track, not applicable.
+declare -gA PB_CAP_BINNING=() PB_CAP_TRACK=() PB_CAP_LR_TRUTH=()
+PB_CAP_LOADED=""
+load_capabilities() {
+    local registry="$1" tool binning track lr
+    [[ "$PB_CAP_LOADED" == "$registry" ]] && return 0
+    PB_CAP_BINNING=(); PB_CAP_TRACK=(); PB_CAP_LR_TRUTH=()
+    while IFS=$'\t' read -r tool binning track lr; do
+        [[ -n "$tool" ]] || continue
+        lr="${lr%$'\r'}"   # a Windows python3 ends lines with \r\n
+        PB_CAP_BINNING[$tool]="$binning"; PB_CAP_TRACK[$tool]="$track"; PB_CAP_LR_TRUTH[$tool]="$lr"
+    done < <(python3 "$PROJECT_ROOT/python/tool_capabilities.py" --registry "$registry" --dump 2>/dev/null)
+    PB_CAP_LOADED="$registry"
+}
+capability_binning() { load_capabilities "$1"; [[ "${PB_CAP_BINNING[$2]:-}" == "yes" ]]; }
+capability_track() {
+    load_capabilities "$1"
+    [[ -n "${PB_CAP_TRACK[$2]:-}" ]] || return 1
+    printf '%s\n' "${PB_CAP_TRACK[$2]}"
+}
+capability_requires_lr_truth() { load_capabilities "$1"; [[ "${PB_CAP_LR_TRUTH[$2]:-}" == "yes" ]]; }
+
 # long_read_truth_eligible TOOL SAMPLE
 # Prints the eligibility reason on stdout; returns 0 if the sample is
 # eligible for TOOL, 1 otherwise. Generalizes what used to be a single
@@ -254,8 +282,7 @@ sample_column() {
 long_read_truth_eligible() {
     local tool="$1" sample="$2"
     local registry="$PROJECT_ROOT/config/tool_capabilities.tsv"
-    if ! python3 "$PROJECT_ROOT/python/tool_capabilities.py" --registry "$registry" \
-            --tool "$tool" --requires-independent-long-read-truth >/dev/null 2>&1; then
+    if ! capability_requires_lr_truth "$registry" "$tool"; then
         printf 'not-applicable'
         return 0
     fi

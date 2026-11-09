@@ -179,7 +179,18 @@ plasbench_detect_memory_gb() {
     echo $(( kb / 1024 / 1024 ))
 }
 
-export THREADS="${THREADS:-$(plasbench_detect_cores)}"
+# Thread budget. When THREADS is not set, the detected cores are divided across the
+# concurrent job slots (MAX_PARALLEL_SAMPLES x MAX_PARALLEL_TOOLS, below), so raising
+# the slots cannot make every job ask for every core at once (oversubscription:
+# context switching and cache thrashing, slower than fewer jobs). With the default
+# single slot this is all cores, as before; an explicit THREADS always wins.
+if [[ -z "${THREADS:-}" ]]; then
+    PLASBENCH_JOB_SLOTS=$(( ${MAX_PARALLEL_SAMPLES:-1} * ${MAX_PARALLEL_TOOLS:-1} ))
+    [[ "$PLASBENCH_JOB_SLOTS" -ge 1 ]] || PLASBENCH_JOB_SLOTS=1
+    THREADS=$(( $(plasbench_detect_cores) / PLASBENCH_JOB_SLOTS ))
+    [[ "$THREADS" -ge 1 ]] || THREADS=1
+fi
+export THREADS
 
 # Keep headroom: the OS, the other tools in the stage, and SPAdes overshooting
 # its own budget all need room. 80% of what is actually available, never below
@@ -197,6 +208,11 @@ export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memo
 # samples x 2 parallel tools x THREADS=4 wants 16 CPU threads at once.
 export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 1, 3, 4, 5
 export MAX_PARALLEL_TOOLS="${MAX_PARALLEL_TOOLS:-1}"       # independent tools within one sample, stage 4
+# Stage 6's advisory analyses (stratified recovery, truth audits, copy number, repeat
+# content, bin agreement, the dimension tables, rank sensitivity) are independent
+# light-weight Python jobs; this many run at once. 1 restores the serial order (and a
+# strictly ordered log). The leaderboard itself is always computed first, alone.
+export STAGE6_PARALLEL_JOBS="${STAGE6_PARALLEL_JOBS:-4}"
 # Per-tool thread counts. Each defaults to $THREADS (today's behavior: every
 # tool gets the same value); set these independently once you run tools
 # concurrently, so N concurrent tools don't each ask for all of $THREADS.
@@ -439,9 +455,16 @@ export RECOMMENDATION_MODEL_NESTED_MIN_STUDIES="${RECOMMENDATION_MODEL_NESTED_MI
 # changes which tool is ranked highest; it never changes eligibility.
 export DECISION_PROFILE="${DECISION_PROFILE:-accuracy_first}"
 
-# Reuse a completed tool result by default. Set FORCE_RERUN_TOOLS=1 to discard
-# completed per-tool output and run it again (for example after a tool upgrade).
+# Reuse a completed tool result by default, but only when its fingerprint still
+# matches: the tool's installed executable (path, size, mtime), its adapter, its database registry row, its
+# <TOOL>_* settings (thread counts excluded) and its input files are recorded in
+# results/<sample>/.<tool>.complete, and any change re-runs that tool. Set
+# FORCE_RERUN_TOOLS=1 to re-run every tool regardless.
 export FORCE_RERUN_TOOLS="${FORCE_RERUN_TOOLS:-0}"
+# Results from releases before fingerprints have an empty marker, so their inputs
+# cannot be checked and they re-run once. REUSE_UNFINGERPRINTED=1 reuses them
+# unchecked instead (with a warning), e.g. to avoid re-running a long finished cohort.
+export REUSE_UNFINGERPRINTED="${REUSE_UNFINGERPRINTED:-0}"
 
 # --- Tool databases (set after INSTALL step) ---------------------------------
 # Platon needs its DB downloaded once; point to it here.

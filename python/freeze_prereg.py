@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,8 +37,7 @@ STATUSES = ("fixed", "TO_FIX")
 UNSET = ("", "unset")
 
 
-def sha256(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+from plasbench_common import sha256  # noqa: E402,F401
 
 
 def read_rows(path):
@@ -49,7 +49,7 @@ def read_rows(path):
         if row.get("status") not in STATUSES:
             raise ValueError(f"{path} row {number}: status must be fixed or TO_FIX (got '{row.get('status')}')")
     names = [r["parameter"] for r in rows]
-    duplicates = sorted({n for n in names if names.count(n) > 1})
+    duplicates = sorted(n for n, seen in Counter(names).items() if seen > 1)   # one counting pass
     if duplicates:
         raise ValueError(f"{path}: duplicate parameter(s) {', '.join(duplicates)}")
     return rows
