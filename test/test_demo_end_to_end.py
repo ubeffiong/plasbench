@@ -100,7 +100,7 @@ def main():
     assert len(rows(DEMO / "benchmark.repeat_content.tsv")) > 0
     assert len(rows(DEMO / "benchmark.tool_agreement.tsv")) > 0
     for sid in ("learn-agreement", "learn-adequacy", "learn-copynumber", "learn-truthqc", "learn-plsmd"):
-        assert f"href='#{sid}'" in html, sid
+        assert f"id='{sid}'" in html, sid   # merged into a container: the old id is its panel id (and the old link still works)
     assert "Best-match F1" in section(html, "learn-agreement") and "Not run: scores.tsv" not in section(html, "learn-agreement")
     assert "Plasmid adequacy" in section(html, "learn-adequacy") and "Not run" not in section(html, "learn-adequacy")
     assert "repeat-rich" in section(html, "learn-truthqc")

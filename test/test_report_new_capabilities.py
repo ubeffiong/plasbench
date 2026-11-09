@@ -200,7 +200,7 @@ with tempfile.TemporaryDirectory() as tmp:
                    mean_plasmid_recall_ge90="0.700", n_complete_circular_assessed="4",
                    mean_complete_circular_plasmid_recall="0.5000"),
     ])
-    check("the nav bar links the new Graded plasmid recovery section", "href='#graded-tiers'" in html)
+    check("the report has the Graded plasmid recovery panel (a tab of Method ranking)", "id='graded-tiers'" in html)
     check("the section header names all three graded bands",
           "id='graded-tiers'" in html and "Recall ≥50% complete" in html
           and "Recall ≥90% complete" in html and "Complete + circular recall" in html)

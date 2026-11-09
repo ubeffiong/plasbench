@@ -173,7 +173,7 @@ def scenario(ok):
          "--comparisons", "full.paired_comparisons.tsv", "--out", "report.html"])
     page = open("report.html", encoding="utf-8").read()
     ok = check(ok, "report has robustness section and nav link",
-               "<section id='robustness'>" in page and "href='#robustness'" in page)
+               "<section id='robustness'" in page and "href='#robustness'" in page)   # the container carries a class now
     return ok
 
 
