@@ -13,6 +13,12 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the two explorers load when first shown
+- The interactive cohort dashboard and the reconstruction evidence explorer (7 to 8 MB each) were written into their iframes at page load even though they sit in the
+  Appendix, which opens hidden. They are now written only when the frame first becomes visible (with a 400 px margin), when the reader presses *Load now*, or at once
+  when printing or exporting a PDF (`?print=1`, `beforeprint`) or where `IntersectionObserver` is missing. The documents stay in the page (it is still one offline file).
+  On the demo report the page finishes loading in about 1.5 s instead of 4.5 s. `test/test_lazy_frames.py` runs the loader in node against a stub DOM.
+
 ### Changed -- report layout, condensed analytics, full PDF
 - **Page shell** (`python/report_layout.py`): fixed top bar and left rail, one view at a time (Overview, Scorecard, Figures, Plasmid maps, Diagnostics, Data quality,
   Recommendation, Methods, Appendix) in story order, compact title band, status-chip accordion for data quality, hash routing for every old id, no-JavaScript fallback
