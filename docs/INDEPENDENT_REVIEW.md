@@ -426,8 +426,8 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:304` | `def length_weighted_binning` |
 | E16 | Ungated one-to-one Hungarian match | `python/score_bins.py:53` | `def maximum_weight` |
 | E17 | CPRR is computed after the match | `python/score_bins.py:316` | `def correct_reconstruction` |
-| E18 | CPRR minimum coverage 0.95 | `config/config.sh:50` | `CPRR_MIN_COVERAGE` |
-| E19 | CPRR minimum identity 0.99 | `config/config.sh:52` | `CPRR_MIN_IDENTITY` |
+| E18 | CPRR minimum coverage 0.95 | `config/config.sh:64` | `CPRR_MIN_COVERAGE` |
+| E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
 | E20 | Interval requires at least five clusters | `python/resampling.py:118` | `len(values) < 5 or len(units) < 5` |
 | E21 | Permutation test requires at least five clusters | `python/resampling.py:199` | `len(differences) < 5 or len(units) < 5` |
 | E22 | Holm adjustment across pairs | `python/aggregate_results.py:657` | `def holm_adjust` |
