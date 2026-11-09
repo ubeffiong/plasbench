@@ -21,6 +21,22 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from matching import max_weight_matching  # noqa: E402
+
+
+def hungarian_max(weights: list[list[float]]) -> list[tuple[int, int]]:
+    """Maximum-weight one-to-one matching of matrix rows (bins) to columns (plasmids).
+
+    Delegates to the shared rectangular solver (matching.py), which also matches the
+    isolate track's bins; this used to be a second, square O(max(n, m)^3) copy.
+    """
+    if not weights or not weights[0]:
+        return []
+    edges = {(i, j): value for i, row in enumerate(weights) for j, value in enumerate(row) if value > 0}
+    return [(i, j) for i, j, _ in max_weight_matching(edges, range(len(weights)), range(len(weights[0])))]
+
+
 MANIFEST_REQUIRED = {"community_id", "sample_id", "information_regime", "truth_status"}
 MANIFEST_OPTIONAL = {
     "reads_1", "reads_2", "assembly_fasta", "assembly_graph_gfa", "graph_paths",
@@ -221,38 +237,6 @@ def validate_truth(path: Path) -> dict[str, dict[str, str]]:
             raise ValueError(f"{path}: row {index} has invalid biological_class")
         truth[row["contig_id"]] = row
     return truth
-
-
-def hungarian_max(weights: list[list[float]]) -> list[tuple[int, int]]:
-    """Maximum-weight one-to-one matching using the Hungarian algorithm."""
-    if not weights or not weights[0]:
-        return []
-    n, m = len(weights), len(weights[0])
-    size = max(n, m)
-    maximum = max((value for row in weights for value in row), default=0.0)
-    cost = [[maximum - (weights[i][j] if i < n and j < m else 0.0) for j in range(size)] for i in range(size)]
-    u, v = [0.0] * (size + 1), [0.0] * (size + 1)
-    p, way = [0] * (size + 1), [0] * (size + 1)
-    for i in range(1, size + 1):
-        p[0], j0 = i, 0
-        minv, used = [math.inf] * (size + 1), [False] * (size + 1)
-        while True:
-            used[j0] = True
-            i0, delta, j1 = p[j0], math.inf, 0
-            for j in range(1, size + 1):
-                if not used[j]:
-                    cur = cost[i0 - 1][j - 1] - u[i0] - v[j]
-                    if cur < minv[j]: minv[j], way[j] = cur, j0
-                    if minv[j] < delta: delta, j1 = minv[j], j
-            for j in range(size + 1):
-                if used[j]: u[p[j]] += delta; v[j] -= delta
-                else: minv[j] -= delta
-            j0 = j1
-            if p[j0] == 0: break
-        while True:
-            j1, p[j0], j0 = j0, p[way[j0]], way[j0]
-            if j0 == 0: break
-    return [(p[j] - 1, j - 1) for j in range(1, size + 1) if p[j] and p[j] - 1 < n and j - 1 < m and weights[p[j] - 1][j - 1] > 0]
 
 
 def score_prediction(predictions: list[dict[str, str]], truth: dict[str, dict[str, str]], community: str, tool: str) -> tuple[list[dict[str, object]], dict[str, object]]:

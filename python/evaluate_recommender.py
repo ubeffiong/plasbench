@@ -61,18 +61,14 @@ REGRET_FIELDS = ["profile", "sample", "held_out_study", "organism", "recommended
                  "single_best_score", "single_best_regret", "floor_flag", "basis"]
 
 
+from plasbench_common import number  # noqa: E402,F401
+
+
 def read_tsv(path):
     if not path or not os.path.isfile(path):
         return []
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader((l for l in handle if l.strip() and not l.lstrip().startswith("#")), delimiter="\t"))
-
-
-def number(value):
-    try:
-        return float(value) if value not in (None, "") else None
-    except ValueError:
-        return None
 
 
 def ranks(means):

@@ -34,20 +34,12 @@ FIELDS = ["sample", "sequence_id", "length", "tools", "database", "best_record",
           "in_database"]
 
 
-def read_fasta(path):
-    records, name, chunks = {}, None, []
-    with open(path, encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if line.startswith(">"):
-                if name is not None:
-                    records[name] = "".join(chunks)
-                name, chunks = line[1:].split()[0], []
-            elif line:
-                chunks.append(line)
-    if name is not None:
-        records[name] = "".join(chunks)
-    return records
+from plasbench_common import iter_fasta  # noqa: E402
+
+
+def read_fasta(path, wanted=None):
+    """name -> sequence (shared FASTA reader); only `wanted` names when given."""
+    return {name: seq for name, _, seq in iter_fasta(path, wanted)}
 
 
 def truth_plasmids(truth_path):
@@ -128,7 +120,9 @@ def main():
                 plasmids = set(truth_plasmids(truth))
                 if not plasmids:
                     continue
-                sequences = read_fasta(reference)
+                # Stream the reference and keep only the truth plasmids: the chromosome is
+                # never held in memory (peak memory follows the plasmids, not the genome).
+                sequences = read_fasta(reference, wanted=plasmids)
                 for seq_id in sorted(plasmids):
                     if seq_id in sequences:
                         synthetic = f"q{len(queries)}"

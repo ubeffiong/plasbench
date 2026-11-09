@@ -91,9 +91,38 @@ def _exec(relative: str, argv=None) -> int:
         return 130
 
 
+# Pre-registered alignment filters (config/prereg.tsv; config/config.sh exports the
+# same values as MIN_ALIGNMENT_*). The pipeline and the Galaxy wrapper always pass
+# them; a bare `plasbench-score` call used to fall back to score_plasmids.py's
+# unfiltered script defaults instead, silently scoring against a different rule.
+PREREGISTERED_FILTERS = (
+    ("--min-alignment-length", "MIN_ALIGNMENT_LENGTH", "200"),
+    ("--min-alignment-identity", "MIN_ALIGNMENT_IDENTITY", "0.90"),
+    ("--min-alignment-mapq", "MIN_ALIGNMENT_MAPQ", "20"),
+    ("--min-alignment-query-coverage", "MIN_ALIGNMENT_QUERY_COVERAGE", "0.20"),
+)
+
+
+def with_preregistered_filters(argv):
+    """argv plus every alignment filter it does not set, at its pre-registered value."""
+    argv = list(argv)
+    given = {arg.split("=", 1)[0] for arg in argv if arg.startswith("--")}
+    if "-h" in argv or "--help" in given:
+        return argv
+    for flag, variable, default in PREREGISTERED_FILTERS:
+        if flag not in given:
+            argv += [flag, os.environ.get(variable) or default]
+    return argv
+
+
 def score_main(argv=None) -> int:
-    """`plasbench-score`: score one predicted-plasmid FASTA against truth."""
-    return _exec("python/score_plasmids.py", argv)
+    """`plasbench-score`: score one predicted-plasmid FASTA against truth.
+
+    Alignment filters the caller does not set take their pre-registered values
+    (MIN_ALIGNMENT_* when exported), the same filters the pipeline applies.
+    """
+    argv = sys.argv[1:] if argv is None else list(argv)
+    return _exec("python/score_plasmids.py", with_preregistered_filters(argv))
 
 
 def aggregate_main(argv=None) -> int:

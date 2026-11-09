@@ -41,6 +41,15 @@ FIELDS = ("sample", "sequence_id", "molecule_type", "length", "n_kmers",
 _CODE = {"A": 0, "C": 1, "G": 2, "T": 3}
 
 
+from plasbench_common import iter_fasta  # noqa: E402
+
+
+def read_fasta(path):
+    """Yield (id, sequence) streaming; id is the first header token."""
+    for name, _, seq in iter_fasta(path):
+        yield name, seq
+
+
 def canonical_kmers(seq, k):
     """Yield the canonical (2-bit packed) k-mer at each ACGT-only position."""
     if k > 32 or k < 1:
@@ -60,23 +69,6 @@ def canonical_kmers(seq, k):
         valid += 1
         if valid >= k:
             yield fwd if fwd < rev else rev
-
-
-def read_fasta(path):
-    """Yield (id, sequence) streaming; id is the first header token."""
-    name, parts = None, []
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if line.startswith(">"):
-                if name is not None:
-                    yield name, "".join(parts)
-                name = line[1:].split()[0] if line[1:].split() else ""
-                parts = []
-            elif name is not None:
-                parts.append(line)
-    if name is not None:
-        yield name, "".join(parts)
 
 
 def read_truth(path):

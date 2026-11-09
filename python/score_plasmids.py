@@ -53,43 +53,7 @@ from collections import defaultdict
 from plasbench_common import interval_overlap_bp as overlap_bp, merge_intervals as _merge_intervals  # noqa: E402
 
 
-def read_truth(path):
-    """Return dict sequence_id -> (molecule_type, length), total plasmid bp,
-    and total chromosome bp."""
-    truth = {}
-    total_plasmid = 0
-    total_chromosome = 0
-    with open(path) as fh:
-        header = fh.readline().rstrip("\n").split("\t")
-        # Be tolerant of column order as long as names are present.
-        try:
-            i_id = header.index("sequence_id")
-            i_type = header.index("molecule_type")
-            i_len = header.index("length")
-        except ValueError:
-            sys.exit(
-                "ERROR: truth file must have a header row with columns "
-                "'sequence_id', 'molecule_type', 'length'."
-            )
-        for line in fh:
-            if not line.strip():
-                continue
-            f = line.rstrip("\n").split("\t")
-            seq_id = f[i_id]
-            mol = f[i_type].strip().upper()
-            length = int(f[i_len])
-            if mol not in ("PLASMID", "CHROMOSOME"):
-                sys.exit(f"ERROR: molecule_type must be PLASMID/CHROMOSOME, got '{mol}'")
-            if length <= 0:
-                sys.exit(f"ERROR: truth sequence '{seq_id}' has non-positive length {length}.")
-            if seq_id in truth:
-                sys.exit(f"ERROR: duplicate sequence_id '{seq_id}' in truth file.")
-            truth[seq_id] = (mol, length)
-            if mol == "PLASMID":
-                total_plasmid += length
-            else:
-                total_chromosome += length
-    return truth, total_plasmid, total_chromosome
+from plasbench_common import read_truth_table as read_truth  # noqa: E402,F401  (moved to the shared module)
 
 
 def read_fasta_lengths(path):
@@ -527,9 +491,19 @@ def calibration(covered_by_query, probabilities, truth, bins=10):
     total = sum(w for _, _, w in records)
     brier = sum(w * (p - y) ** 2 for p, y, w in records) / total
     table, ece = [], 0.0
+    # One pass, one binary search per record over the bin edges (O(n log bins)), instead
+    # of a full scan of the records for every bin (O(n * bins)). The edges are the same
+    # floats as the half-open bins [b/bins, (b+1)/bins), with 1.0 in the last bin.
+    lows = [b / bins for b in range(bins)]
+    members_by_bin = [[] for _ in range(bins)]
+    for record in records:
+        p = record[0]
+        b = bisect.bisect_right(lows, p) - 1
+        if 0 <= b < bins and (p < (b + 1) / bins or (b == bins - 1 and p == 1.0)):
+            members_by_bin[b].append(record)
     for b in range(bins):
         low, high = b / bins, (b + 1) / bins
-        members = [(p, y, w) for p, y, w in records if low <= p < high or (b == bins - 1 and p == 1.0)]
+        members = members_by_bin[b]
         weight = sum(w for _, _, w in members)
         if not weight:
             continue
@@ -677,6 +651,13 @@ def main():
     ap.add_argument("--per-plasmid-out", help="Optional side file: one row per true plasmid with its covered bp and "
                                               "completeness (used by stratify_recovery.py). Never alters scores.tsv.")
     args = ap.parse_args()
+    # The script defaults keep every alignment (a pure function of its inputs, which the
+    # tests rely on); the pipeline, the Galaxy wrapper and `plasbench-score` all pass the
+    # pre-registered filters. Say so when a direct run passes none of them.
+    if not any(arg.startswith("--min-alignment-") for arg in sys.argv[1:]):
+        sys.stderr.write("[score_plasmids] note: no --min-alignment-* filters given, so every alignment is "
+                         "kept. The pre-registered filters (length 200, identity 0.90, MAPQ 20, query "
+                         "coverage 0.20) are applied by the pipeline and by `plasbench-score`.\n")
 
     truth, total_plasmid, total_chromosome = read_truth(args.truth)
     try:

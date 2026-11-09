@@ -80,11 +80,7 @@ BASELINE = "baseline"
 BASELINE_TOLERANCE = 1e-4
 
 
-def number(text):
-    try:
-        return float(text) if text not in (None, "") else None
-    except ValueError:
-        return None
+from plasbench_common import number  # noqa: E402,F401
 
 
 def read_score_rows(path):

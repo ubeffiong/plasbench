@@ -43,21 +43,12 @@ FIELDS = ["sequence_id", "original_length", "corrected_length", "identity", "hal
           "multimer", "action"]
 
 
+from plasbench_common import iter_fasta  # noqa: E402
+
+
 def read_fasta(path):
-    opener = gzip.open if path.endswith(".gz") else open
-    records, name, chunks = [], None, []
-    with opener(path, "rt") as handle:
-        for line in handle:
-            line = line.rstrip("\r\n")
-            if line.startswith(">"):
-                if name is not None:
-                    records.append((name, "".join(chunks)))
-                name, chunks = line[1:], []
-            elif line:
-                chunks.append(line)
-    if name is not None:
-        records.append((name, "".join(chunks)))
-    return records
+    """[(full header, sequence)]: dimer records are keyed by the whole header line."""
+    return [(header, seq) for _, header, seq in iter_fasta(path)]
 
 
 def read_tsv(path):

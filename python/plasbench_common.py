@@ -1,15 +1,20 @@
 """Small helpers shared by the python/ scripts.
 
-Only byte-identical duplicates live here (verified by AST comparison), so moving a
-script onto these cannot change its behaviour. Scripts are run as
-`python python/<script>.py`, which puts this directory on sys.path, so a plain
-`from plasbench_common import ...` works. Standard library only.
+Most helpers here started as byte-identical duplicates (verified by AST comparison),
+so moving a script onto them cannot change its behaviour. The readers in the
+"validated readers" section are the exceptions: they carry the scorer's own input
+validation, so a script moved onto one now rejects a table the scorer would reject,
+instead of silently reading it a different way. Each such move is noted at the call
+site. Scripts are run as `python python/<script>.py`, which puts this directory on
+sys.path, so a plain `from plasbench_common import ...` works. Standard library only.
 """
 
 import csv
+import gzip
 import hashlib
 import os
 import shutil
+import sys
 
 
 def number(value):
@@ -186,3 +191,118 @@ def read_plasmid_lengths(path):
             if row["molecule_type"].upper() == "PLASMID":
                 plasmids[row["sequence_id"]] = int(row["length"])
     return plasmids
+
+
+# --- validated readers and shared parsing ----------------------------------------
+
+def open_maybe_gz(path, mode="rt"):
+    """open(), or gzip.open() for a path ending in .gz."""
+    return gzip.open(path, mode) if str(path).endswith(".gz") else open(path, mode)
+
+
+def iter_fasta(path, wanted=None):
+    """Yield (name, header, sequence) per FASTA record, streaming; gzip-aware.
+
+    header is the text after '>' with surrounding whitespace removed; name is its
+    first token ("" for an empty header). Blank lines and any sequence before the
+    first header are ignored, as every earlier per-script reader did.
+
+    wanted: an optional set of names. Other records are skipped as they stream past,
+    without their sequence lines ever being joined, so a caller that needs a few
+    records out of a genome never holds the rest in memory.
+    """
+    name = header = None
+    keep = False
+    chunks = []
+    with open_maybe_gz(path, "rt") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                if keep:
+                    yield name, header, "".join(chunks)
+                header = line[1:].strip()
+                tokens = header.split()
+                name, chunks = (tokens[0] if tokens else ""), []
+                keep = wanted is None or name in wanted
+            elif keep:
+                chunks.append(line)
+    if keep:
+        yield name, header, "".join(chunks)
+
+
+def read_truth_table(path):
+    """The scorer's validated truth reader: (sequence_id -> (molecule_type, length),
+    total plasmid bp, total chromosome bp).
+
+    Exits with an error for a missing column, a molecule type other than
+    PLASMID/CHROMOSOME, a non-positive length or a duplicate id, so every script
+    reading truth.tsv agrees with score_plasmids.py about what the table means.
+    """
+    truth = {}
+    total_plasmid = 0
+    total_chromosome = 0
+    with open(path) as fh:
+        header = fh.readline().rstrip("\n").split("\t")
+        # Be tolerant of column order as long as names are present.
+        try:
+            i_id = header.index("sequence_id")
+            i_type = header.index("molecule_type")
+            i_len = header.index("length")
+        except ValueError:
+            sys.exit(
+                "ERROR: truth file must have a header row with columns "
+                "'sequence_id', 'molecule_type', 'length'."
+            )
+        for line in fh:
+            if not line.strip():
+                continue
+            f = line.rstrip("\n").split("\t")
+            seq_id = f[i_id]
+            mol = f[i_type].strip().upper()
+            length = int(f[i_len])
+            if mol not in ("PLASMID", "CHROMOSOME"):
+                sys.exit(f"ERROR: molecule_type must be PLASMID/CHROMOSOME, got '{mol}'")
+            if length <= 0:
+                sys.exit(f"ERROR: truth sequence '{seq_id}' has non-positive length {length}.")
+            if seq_id in truth:
+                sys.exit(f"ERROR: duplicate sequence_id '{seq_id}' in truth file.")
+            truth[seq_id] = (mol, length)
+            if mol == "PLASMID":
+                total_plasmid += length
+            else:
+                total_chromosome += length
+    return truth, total_plasmid, total_chromosome
+
+
+def read_truth_split(path):
+    """Validated truth as (plasmid id -> length, chromosome id -> length)."""
+    truth, _, _ = read_truth_table(path)
+    plasmids = {k: n for k, (mol, n) in truth.items() if mol == "PLASMID"}
+    chromosomes = {k: n for k, (mol, n) in truth.items() if mol == "CHROMOSOME"}
+    return plasmids, chromosomes
+
+
+def read_bin_membership(path):
+    """sequence_id -> bin_id from a bins TSV; every row needs both, and each sequence one bin.
+
+    The bin scorer's rule: a contig in two bins, or a row missing an id, is an
+    invalid bins table (ValueError), not something to resolve silently.
+    """
+    membership = {}
+    with open(path, encoding="utf-8") as handle:
+        for row in csv.DictReader(handle, delimiter="\t"):
+            if not row.get("bin_id") or not row.get("sequence_id") or row["sequence_id"] in membership:
+                raise ValueError("bins TSV requires unique sequence_id and nonempty bin_id")
+            membership[row["sequence_id"]] = row["bin_id"]
+    return membership
+
+
+def union_length(intervals):
+    """Covered length of the union of [start, stop) intervals; empty or reversed ones count 0."""
+    total, end = 0, -1
+    for start, stop in sorted((start, stop) for start, stop in intervals if stop > start):
+        total += max(0, stop - max(end, start))
+        end = max(end, stop)
+    return total

@@ -50,8 +50,7 @@ import sys
 REVIEW = "REVIEW"
 
 
-def open_maybe_gz(path, mode="rt"):
-    return gzip.open(path, mode) if path.endswith(".gz") else open(path, mode)
+from plasbench_common import open_maybe_gz  # noqa: E402,F401
 
 
 def read_fasta_lengths(path):

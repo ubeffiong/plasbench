@@ -17,8 +17,7 @@ import gzip
 PHRED_OFFSET = 33  # Phred+33: standard for ONT/PacBio and Illumina 1.8+
 
 
-def open_maybe_gz(path, mode="rt"):
-    return gzip.open(path, mode) if path.endswith(".gz") else open(path, mode)
+from plasbench_common import open_maybe_gz  # noqa: E402,F401
 
 
 def mean_phred_quality(path):

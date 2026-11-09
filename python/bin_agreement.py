@@ -53,13 +53,13 @@ def read_labels(path):
 
 def read_bins(path):
     """bin_id -> list of unique sequence ids (first-seen order)."""
-    bins = {}
+    # A dict per bin is an insertion-ordered hash set: O(1) duplicate checks instead of
+    # a linear scan of the bin's list for every row (quadratic for large bins).
+    members = {}
     with open(path, newline="", encoding="utf-8") as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
-            lst = bins.setdefault(row["bin_id"], [])
-            if row["sequence_id"] not in lst:
-                lst.append(row["sequence_id"])
-    return bins
+            members.setdefault(row["bin_id"], {})[row["sequence_id"]] = None
+    return {bin_id: list(seen) for bin_id, seen in members.items()}
 
 
 def lengths_of(labels):
@@ -159,17 +159,25 @@ def per_bin_rows(pred_bins, labels, min_length=0):
     pred = _filter_pred(pred_bins, labels, min_length)
     ws = {"count": lambda c: 1, "bp": lambda c: labels[c]["length"]}
     ov = {k: _overlaps(pred, truth, w) for k, w in ws.items()}
+    # Index every overlap by the bin on each side once (hash map), instead of scanning
+    # all overlaps for every bin: O(overlaps) rather than O(bins x overlaps).
+    by_bin = {}
+    for k, cells in ov.items():
+        for (pb, tb), v in cells.items():
+            by_bin.setdefault(("pred", k, pb), []).append((v, tb))
+            by_bin.setdefault(("truth", k, tb), []).append((v, pb))
     rows = []
     for side, bins in (("pred", pred), ("truth", truth)):
         for b in sorted(bins):
             row = {"side": side, "bin_id": b, "size_count": len(bins[b]),
                    "size_bp": sum(labels[c]["length"] for c in bins[b])}
             for k in ("count", "bp"):
-                cand = [(v, (o[1] if side == "pred" else o[0])) for o, v in ov[k].items()
-                        if o[0 if side == "pred" else 1] == b]
+                cand = by_bin.get((side, k, b))
                 size = row["size_" + k]
                 if cand:
-                    v, other = sorted(cand, key=lambda t: (-t[0], t[1]))[0]
+                    # Best = largest overlap, ties to the smallest id: a linear min() gives
+                    # the same element as sorting and taking the first, without the sort.
+                    v, other = min(cand, key=lambda t: (-t[0], t[1]))
                     row["best_match_" + k], row["overlap_" + k] = other, v
                     row["frac_" + k] = v / size if size else None
                 else:
