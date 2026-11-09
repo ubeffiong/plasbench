@@ -358,7 +358,16 @@ if [[ ${#OTHER_PKGS[@]} -gt 0 ]]; then
     run_with_heartbeat "Conda is solving/linking dependency tools: ${OTHER_PKGS[*]}" "${SOLVER[@]}" "${OTHER_PKGS[@]}"
 fi
 if [[ "$NEEDS_MOBSUITE" -eq 1 ]]; then
-    TARGET_PREFIX="${TARGET_PREFIX:-$(resolve_prefix)}" \
-        || { echo "ERROR: create the main environment first (bash env/setup_conda.sh)" >&2; exit 1; }
-    install_mobsuite "$TARGET_PREFIX"
+    TARGET_PREFIX="${TARGET_PREFIX:-$(resolve_prefix || true)}"
+    if [[ -n "$TARGET_PREFIX" ]]; then
+        install_mobsuite "$TARGET_PREFIX"
+    else
+        # No main environment to put wrappers in: still create MOB-suite's own
+        # environment by name, and say how to finish once the main one exists.
+        echo "[plasbench] main environment '$ENV_NAME' not found; creating ${ENV_NAME}-mobsuite on its own"
+        run_with_heartbeat "Conda is solving/linking MOB-suite's own environment" \
+            "$SOLVER_BIN" create -y -n "${ENV_NAME}-mobsuite" "${CHANNELS[@]}" "${MOBSUITE_SPEC[@]}"
+        echo "[plasbench] after creating '$ENV_NAME' (bash env/setup_conda.sh), run: bash env/install_tools.sh mobsuite" >&2
+        exit 1
+    fi
 fi
