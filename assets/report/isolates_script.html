@@ -23,8 +23,17 @@ wrap.appendChild(caption);
 wrap.appendChild(sel);
 
 var slot = document.getElementById('rpt-isolate-slot');
-if (slot) { slot.appendChild(wrap); }
-else {   // no page shell: a small bar above the first section
+if (slot) {
+  // wide screens: in the top bar; narrow screens (the bar has no room): at the top of the actions menu, so the search keeps the full width
+  var narrow = window.matchMedia ? window.matchMedia('(max-width: 820px)') : null;
+  var place = function () {
+    var acts = document.getElementById('rpt-actions');
+    if (narrow && narrow.matches && acts) { acts.insertBefore(wrap, acts.firstChild); }
+    else { slot.appendChild(wrap); }
+  };
+  place();
+  if (narrow && narrow.addEventListener) narrow.addEventListener('change', place);
+} else {   // no page shell: a small bar above the first section
   var host = document.createElement('div');
   host.className = 'pb-iso-float';
   host.appendChild(wrap);

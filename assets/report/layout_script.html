@@ -103,6 +103,16 @@ if(rail)rail.addEventListener('keydown',function(e){
  var n=k==='Home'?0:k==='End'?items.length-1:Math.max(0,Math.min(items.length-1,i+(k==='ArrowDown'?1:-1)));
  items[n].focus()});
 
+/* ---------- narrow screens: the actions menu (palette, collapse all, print) behind one button ---------- */
+var more=document.getElementById('rpt-more'),topbar=document.querySelector('.rpt-topbar');
+function setMenu(open){if(!more||!topbar)return;topbar.classList.toggle('pb-menu-open',open);more.setAttribute('aria-expanded',String(open))}
+if(more){
+ more.addEventListener('click',function(e){e.stopPropagation();setMenu(!topbar.classList.contains('pb-menu-open'))});
+ document.addEventListener('click',function(e){if(topbar.classList.contains('pb-menu-open')&&!e.target.closest('#rpt-actions'))setMenu(false)});
+ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&topbar.classList.contains('pb-menu-open')){setMenu(false);more.focus()}});
+ var acts=document.getElementById('rpt-actions');
+ if(acts)acts.addEventListener('click',function(e){if(e.target.closest('button')&&window.innerWidth<=820)setMenu(false)})}
+
 /* ---------- search: jump to a section by title ---------- */
 var q=document.getElementById('rpt-q'),list=document.getElementById('rpt-results');
 var index=[];

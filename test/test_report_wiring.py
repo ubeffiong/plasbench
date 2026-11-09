@@ -241,8 +241,8 @@ def main():
                   "fig-landscape" not in html or html.index("PBLandscapeUI") > html.index("PBLandscape = ") and "P = P || root.PB3D" in html)
             ids_now = re.findall(r"<section id='([a-z-]+)'", html)
             check("every figure section is on the page in the Figures order, after the maps",
-                  [i for i in ids_now if i.startswith("fig-")] == [i for i in ("fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr") if i in ids_now]
-                  and ids_now.index("fig-ladder") < ids_now.index("plasmid-maps"))   # story order: figures, then maps
+                  [i for i in ids_now if i.startswith("fig-")] == [i for i in ("fig-forest", "fig-distributions", "fig-heatmap", "fig-pr", "fig-ladder", "fig-landscape") if i in ids_now]
+                  and ids_now.index("fig-forest") < ids_now.index("plasmid-maps"))   # the figures that answer the main question first, the exploratory 3D view last; figures before maps
             for sid, marker in (("headline-design", "<table"), ("metric-framework", "<table"), ("scorecard-definitions", "<table"),
                                 ("interpretation-limits", "These results do NOT show"),
                                 ("per-plasmid-detail", "<table")):
@@ -255,8 +255,9 @@ def main():
             check("rail links every section exactly once",
                   sorted(i for i in re.findall(r"href='#([a-z-]+)'", nav) if not i.startswith("view-")) == sorted(ids))
             views_in_rail = re.findall(r"href='#view-([a-z]+)'", nav)
-            check("the views lead the rail in story order", views_in_rail[:3] == ["overview", "scorecard", "figures"] and len(views_in_rail) >= 6, views_in_rail)
-            check("scorecard opens the view that follows the overview", ids.index("scorecard") == ids.index("metadata") + 1, ids[:10])
+            check("the views lead the rail in story order", views_in_rail[:3] == ["overview", "recommendation", "figures"] and len(views_in_rail) >= 6, views_in_rail)
+            check("the Recommendation view follows the Overview, and the exploratory Scorecard comes after Methods and limits",
+                  ids.index("recommendations") == ids.index("metadata") + 1 and ids.index("scorecard") > ids.index("method"), ids[:10])
             check("inventory no longer lists the wired outputs as not shown", "Not shown yet" not in sec("data-inventory"))
 
     print()

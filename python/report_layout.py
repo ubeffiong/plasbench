@@ -39,35 +39,33 @@ MARKER = "class='rpt-shell'"
 
 # id, title, rail label, icon, blurb, cards?, section ids in story order. Cards: each section a closed accordion card (the first `open` ids start open).
 VIEWS = [
-    ("overview", "Overview", "Overview", "grid",
-     "The headline result: who leads, by how much, and how stable the ranking is.", False,
-     "summary insights leaderboard chart robustness metadata"),
-    ("scorecard", "Scorecard", "Scorecard", "list",
-     "Every tool against every metric, by scenario, with the definitions and the statistical power behind them.", False,
-     "scorecard scorecard-scenarios scorecard-definitions composite power"),
-    ("figures", "Figures", "Figures", "chart",
-     "The comparison drawn: reconstruction ladder, 3D landscape, heatmap, distributions, differences and precision-recall.", True,
-     "fig-ladder fig-landscape fig-heatmap fig-distributions fig-forest fig-pr"),
-    ("maps", "Plasmid maps", "Plasmid maps", "ring",
-     "Reconstructions drawn back onto the truth plasmids: per plasmid, antimicrobial-resistance gene placement and contig layer.", True,
-     "plasmid-maps per-plasmid-detail plasmid-outcomes amr-placement contig-layer selected"),
-    ("diagnostics", "Statistical diagnostics", "Diagnostics", "pulse",
-     "Paired tests, ranking robustness, recovery by stratum and replicon, accuracy, features, bins and runtime. Open a card for the detail.", True,
-     "statistics rank-robustness stratified scenarios replicon-recovery graded-tiers accuracy-dimension feature-preservation bin-diagnostics "
-     "bin-quality learn-agreement learn-copynumber learn-plsmd performance baselines-calibration scores"),
-    ("quality", "Data quality", "Data quality", "shield",
-     "Checks on the inputs and the runs: assemblies, cohort outliers, labels, metadata and run health. Each card carries a status; open it for the detail.", True,
-     "assembly-quality learn-adequacy learn-truthqc cohort-qc isolate-difficulty truth-label-audit label-schemes metadata-completeness "
-     "database-membership excluded-replicons quast-diagnostics zero-plasmid orthogonal-evidence outcome-states health samples tools"),
-    ("recommendation", "Recommendation", "Recommend", "star",
-     "Which method to use where, how well that advice held up on held-out data, and how it transfers.", True,
-     "recommendations recommender-eval taxon-transfer validation validity"),
-    ("methods", "Methods and limits", "Methods", "book",
-     "What is measured, how it is scored, and what the numbers do not mean.", True,
-     "metric-framework headline-design interpretation-limits prereg scoring-additions keys method scoring-spec"),
-    ("appendix", "Appendix", "Appendix", "folder",
-     "The interactive explorer, every file the run produced, and what was reproduced.", True,
-     "enterprise appendix-reference extended reproducibility data-inventory files"),
+    ('overview', 'Overview', 'Overview', 'grid',
+     'The headline result: who leads, by how much, and how stable the ranking is.', False,
+     'summary insights leaderboard chart robustness metadata'),
+    ('recommendation', 'Recommendation', 'Recommendation', 'star',
+     'Which method to use where, how well that advice held up on held-out data, and how it transfers.', True,
+     'recommendations recommender-eval taxon-transfer validation validity'),
+    ('figures', 'Figures', 'Figures', 'chart',
+     'The comparison drawn: CPRR differences and distributions, the tool heatmap, precision-recall, the reconstruction ladder, the 3D landscape and the interactive cohort dashboard.', True,
+     'fig-forest fig-distributions fig-heatmap fig-pr fig-ladder fig-landscape enterprise'),
+    ('maps', 'Plasmid maps', 'Plasmid maps', 'ring',
+     'Reconstructions drawn back onto the truth plasmids: the maps, the evidence explorer, per-plasmid results, antimicrobial-resistance gene placement and the contig layer.', True,
+     'plasmid-maps evidence-explorer per-plasmid-detail plasmid-outcomes amr-placement contig-layer selected'),
+    ('diagnostics', 'Detailed results', 'Detailed results', 'pulse',
+     'The full score tables and the diagnostics behind the headline: scores by tool and sample, recovery by stratum and replicon, bins, accuracy, features and runtime. Open a card for the detail.', True,
+     'statistics rank-robustness stratified scenarios replicon-recovery graded-tiers accuracy-dimension feature-preservation bin-diagnostics bin-quality learn-agreement learn-copynumber learn-plsmd performance baselines-calibration scores'),
+    ('quality', 'Data quality', 'Data quality', 'shield',
+     'Checks on the inputs and the runs: assemblies, cohort outliers, labels, metadata and run health. Each card carries a status; open it for the detail.', True,
+     'assembly-quality learn-adequacy learn-truthqc cohort-qc isolate-difficulty truth-label-audit label-schemes metadata-completeness database-membership excluded-replicons quast-diagnostics zero-plasmid orthogonal-evidence outcome-states health samples tools'),
+    ('methods', 'Methods and limits', 'Methods and limits', 'book',
+     'What is measured, how it is scored, and what the numbers do not mean.', True,
+     'metric-framework headline-design interpretation-limits prereg scoring-additions keys method scoring-spec'),
+    ('scorecard', 'Scorecard (exploratory)', 'Scorecard (exploratory)', 'list',
+     'An exploratory view of every tool against every metric, by scenario, with the definitions and the statistical power behind them. It is not the ranking: the leaderboard is.', False,
+     'scorecard scorecard-scenarios scorecard-definitions composite power'),
+    ('appendix', 'Appendix', 'Appendix', 'folder',
+     'Reference tables, every file the run produced, and what was reproduced.', True,
+     'appendix-reference extended reproducibility data-inventory files'),
 ]
 MORE = ("more", "More", "More", "dots", "Sections that no view lists, kept here so nothing disappears.", True, "")
 OPEN_CARDS = {"figures": ("fig-ladder",), "maps": ("plasmid-maps",), "recommendation": ("recommendations",), "appendix": ("enterprise",),
@@ -86,6 +84,21 @@ ICONS = {
     "dots": "<circle cx='5' cy='12' r='1.5'/><circle cx='12' cy='12' r='1.5'/><circle cx='19' cy='12' r='1.5'/>",
     "chev": "<path d='M15 6l-6 6 6 6'/>",
 }
+
+
+SHORT_LABELS = {
+    "fig-landscape": "3D landscape", "fig-ladder": "Reconstruction ladder", "fig-forest": "CPRR differences", "fig-distributions": "CPRR distributions",
+    "fig-heatmap": "Tool heatmap", "fig-pr": "Precision-recall", "per-plasmid-detail": "Per-plasmid detail", "assembly-quality": "Assembly quality",
+    "appendix-reference": "Reference tables", "enterprise": "Interactive dashboard", "evidence-explorer": "Evidence explorer",
+}
+
+
+def short_label(sid, text):
+    """A menu label of two to four words: a known override, else the text before a colon, else the text itself."""
+    if sid in SHORT_LABELS:
+        return SHORT_LABELS[sid]
+    text = (text or "").strip()
+    return text.split(":", 1)[0].strip() if ":" in text else text
 
 
 def asset(name):
@@ -392,7 +405,9 @@ def build_topbar(run_name, first_view_title):
             "<input id='rpt-q' type='search' placeholder='Jump to section  ( / )' autocomplete='off' role='combobox' "
             "aria-expanded='false' aria-controls='rpt-results' aria-autocomplete='list'>"
             "<ul class='rpt-results' id='rpt-results' role='listbox' aria-label='Matching sections' hidden></ul></div>"
-            "<div class='rpt-actions' data-needs-js>"
+            "<button type='button' class='rpt-more' id='rpt-more' aria-haspopup='true' aria-expanded='false' aria-controls='rpt-actions' data-needs-js "
+            "title='Palette, collapse all, print or save as PDF'><span aria-hidden='true'>&#8943;</span><span class='rpt-sr'>More actions</span></button>"
+            "<div class='rpt-actions' id='rpt-actions' data-needs-js>"
             "<button type='button' id='pb-cvd' aria-pressed='false' title='Swap the green/red status palette for blue/orange, which stays "
             "separable with deuteranopia or protanopia. Every value is also printed as text.'>Colour-blind <span class='rpt-btn-long'>palette</span></button>"
             "<button type='button' id='rpt-expand' aria-pressed='true' title='Collapse or expand every fold in the view that is shown'><span>Collapse all</span></button>"
@@ -402,7 +417,7 @@ def build_topbar(run_name, first_view_title):
 
 
 def build_band(title, eyebrow, run_html, kpis_html):
-    kpis = f"<div class='rpt-kpis'>{kpis_html}</div>" if kpis_html else ""
+    kpis = ""    # the headline numbers (samples, tools, leader, issues) are in the Summary; repeating them in the banner doubled every figure
     eyebrow_html = f"<p class='rpt-eyebrow'>{eyebrow}</p>" if eyebrow else "<p class='rpt-eyebrow'>PlasBench report</p>"
     # The run line (run folder, cohort, generation time, "offline HTML...") is not repeated under the title: the run folder is in the top bar and the
     # full run details are in the Run metadata section. `run_html` is kept in the signature for callers.
@@ -497,7 +512,7 @@ def transform(page):
         order.append(sid)
         blocks[sid] = page[start:stop]
         sections[sid] = page[start:end]
-        labels[sid] = old_labels.get(sid) or heading_html(page[start:end]) or sid.replace("-", " ").capitalize()
+        labels[sid] = short_label(sid, old_labels.get(sid) or heading_html(page[start:end]) or sid.replace("-", " ").capitalize())
     plan = layout_plan(order)
     views = [view for view, _ids in plan]
     # chrome pieces from the old header / metrics strip

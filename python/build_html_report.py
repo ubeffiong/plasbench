@@ -586,7 +586,7 @@ def grade_rows_html(cards):
         for c in cards)
 
 
-def summary_section(leaderboard, cards, findings, scores, status_counts, metadata):
+def summary_section(leaderboard, cards, findings, scores, status_counts, metadata, scope=""):
     """The headline numbers, the grades, and what to look at first."""
     if not leaderboard:
         return ""
@@ -599,8 +599,9 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         ("Methods compared", str(len(leaderboard)), "Tools with at least one scored run."),
         ("Isolates", str(samples), "Samples with a truth set and at least one scored method."),
         ("Truth plasmids", str(int(plasmids)), "Reference plasmids the methods were measured against."),
+        # `scope` names the analysis track when several were scored (" · Short-read track"): the leader belongs to one track, never to a pooled ranking
         ("Leading method", esc(best["tool"]),
-         f"Highest {headline_label(best)} ({headline_value(best) or 0:.3f})."),
+         f"Highest {headline_label(best)} ({headline_value(best) or 0:.3f}){scope} · method ranking only."),
         ("Runs not completed", str(status_counts.get("failed", 0) + status_counts.get("skipped", 0)),
          "Failed runs on plasmid-bearing isolates count as zero for that tool; skipped runs are left out."),
     ]
@@ -621,6 +622,8 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         "Every figure here is repeated in full further down; this is the entry point, not a "
         "second source.</p>"
         f"<div class='sum-stats'>{stat_html}</div>"
+        "<h3>Start here</h3>"
+        f"<ul class='findings'>{find_html}</ul>"
         "<h3>Report card <span class='pb-scope' data-iso-scope>All isolates</span></h3>"
         "<p class='lead'>A reading aid, not an acceptance threshold. The grade is a weighted "
         "composite of Base F1 (40%), plasmid recall (25%), freedom from chromosomal "
@@ -630,8 +633,7 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         "<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Grade</th>"
         "<th>Base F1</th><th>Plasmid recall</th><th>Chromosomal contamination</th>"
         f"<th>Runs completed</th></tr></thead><tbody data-iso-slot='summary-card'>{grade_html}</tbody></table></div>"
-        "<h3>Start here</h3>"
-        f"<ul class='findings'>{find_html}</ul>"
+        "<!--pb-after-report-card-->"
         "</section>")
 
 
@@ -1717,6 +1719,14 @@ def evidence_explorer_section(project_root, scores, results_dir, vendor_html, pa
             + panels_html + "</div>")
 
 
+def evidence_section(evidence_html):
+    """The reconstruction evidence explorer (and the panels that follow it) as its own section, `evidence-explorer`, listed with the plasmid maps."""
+    if not evidence_html:
+        return ""
+    return "<section id='evidence-explorer'>" + evidence_html.replace(
+        "<h3>Reconstruction evidence explorer</h3>", "<h2>Reconstruction evidence explorer</h2>", 1) + "</section>"
+
+
 def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
                             results_dir, vendor_html, evidence_html=""):
     """Embed the vendored enterprise dashboard, driven by measured results.
@@ -1791,7 +1801,7 @@ def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
             "const value=event.data;if(!value||value.type!=='plasbench-enterprise-height')return;"
             "const height=Number(value.height);if(!Number.isFinite(height)||height<1)return;"
             "f.style.height=Math.max(900,Math.min(50000,Math.ceil(height)+24))+'px';});})();</script>"
-            + evidence_html + "</section>")
+            + "</section>" + evidence_section(evidence_html))
 
 
 def vendor_assets(project_root):
@@ -2593,7 +2603,7 @@ def main():
     cards = report_cards(headline_leaderboard, scores)
     optional_analysis = optional_analysis_html(args.manifest, results_dir, out)
     findings = guided_findings(headline_leaderboard, cards, scores, status_counts)
-    summary_html = summary_section(headline_leaderboard, cards, findings, scores, status_counts, metadata)
+    summary_html = summary_section(headline_leaderboard, cards, findings, scores, status_counts, metadata, scope=best_scope)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(headline_leaderboard)
     glossary_cards = glossary_section()
@@ -2736,6 +2746,8 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # Last step: move the explanatory notes into info popovers (python/report_info.py), then add their positioning script.
     import report_info
     page = report_info.transform(page, info_script())
+    import report_names   # tool ids -> display names in the page text, so print, PDF and no-JavaScript readers see them too
+    page = report_names.humanise(page, {tool: display_tool_name(tool) for tool in tools})
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")

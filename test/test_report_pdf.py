@@ -84,7 +84,7 @@ def main():
         if doc is not None:
             texts = [p.get_text() for p in doc]
             text = norm(" ".join(texts))
-            check("the cover lists the contents", "contents" in norm(texts[0]) and norm("Statistical diagnostics") in norm(texts[0]))
+            check("the cover lists the contents", "contents" in norm(texts[0]) and norm("Detailed results") in norm(texts[0]))
             titles = [v[1] for v, _m in rl.layout_plan([s for s, _a, _b in rl.find_sections(page)])]
             check("every view title is in the PDF", all(norm(t) in text for t in titles), [t for t in titles if norm(t) not in text])
             missing = []

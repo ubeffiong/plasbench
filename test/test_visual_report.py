@@ -362,11 +362,11 @@ def main():
     # One explorer, not two. The adopted design and the analysis panels that
     # share its selection live in a single container under a single heading.
     # (the heading now carries an info icon before its closing tag, so match the opening tag and text)
-    assert page.count("<h3>Reconstruction evidence explorer<") == 1,        "the evidence explorer heading must appear exactly once"
+    assert page.count("<h2>Reconstruction evidence explorer<") == 1,        "the evidence explorer heading must appear exactly once"
     start = page.index("id='pb-explorer-view'")
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'python'))
     import report_layout   # the dashboard section ends where its own </section> does (the views are laid out in the story order)
-    end = next(e for sid, a, e in report_layout.find_sections(page) if sid == "enterprise")
+    end = next(e for sid, a, e in report_layout.find_sections(page) if sid == "evidence-explorer")   # the explorer is its own section, listed with the plasmid maps
     container = page[start:end]
     assert "id='cohort-evidence-explorer'" in container,         "the analysis panels must sit inside the explorer container"
     for panel in ("vq-summary", "vq-agree", "vq-sankey", "vq-flow", "vq-compare",

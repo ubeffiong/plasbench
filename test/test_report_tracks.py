@@ -15,6 +15,7 @@ renders one ranking per track plus an explicit note, with the headline
 "winner" metric naming the track it belongs to.
 """
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -125,9 +126,9 @@ with tempfile.TemporaryDirectory() as tmp:
     # The hero metric specifically -- the per-sample drill-down below it still
     # lists every tool that ran on the sample, across tracks, which is a
     # factual listing rather than a ranking claim.
-    check("the headline winner is the headline track's leader, not the pooled top",
-          "Benchmark winner: mean F1</small><strong>0.910</strong>" in html,
-          "0.960 is the hybrid tool's F1; pooling would have crowned it overall")
+    check("the headline winner is the headline track's leader, not the pooled top (the Summary's Leading method card)",
+          "Highest base-level F1 (0.910) · Short-read track · method ranking only." in html,
+          "0.960 is the hybrid tool's F1; pooling would have crowned it overall: " + " | ".join(re.findall(r"Highest[^<]*", html)[:2]))
 
 # --- no per-track files (older results dir): falls back, still renders -------
 with tempfile.TemporaryDirectory() as tmp:
