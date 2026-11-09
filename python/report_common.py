@@ -131,6 +131,9 @@ STYLE = """
 .rpt-navgroups details{background:#fff;border:1px solid var(--line);border-radius:8px;padding:2px 10px}
 .rpt-navgroups summary{cursor:pointer;font-weight:bold;padding:4px 0}
 .rpt-navgroups a{display:block;padding:2px 0;color:var(--muted);text-decoration:none}
+.rpt-collapsible{margin:8px 0}
+.rpt-collapsible>summary{cursor:pointer;font:bold 13px Arial,sans-serif;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;list-style-position:inside}
+.rpt-collapsible[open]>summary{margin-bottom:8px}
 @media print{.rpt-chips,.rpt-navgroups{display:none}.rpt-figure{break-inside:avoid}}
 """
 
