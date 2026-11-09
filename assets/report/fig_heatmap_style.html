@@ -1,0 +1,72 @@
+<style>
+/* Tool heatmap. The static SVG (.hm-static) is the no-JavaScript and print fallback; the live view replaces it once the script starts. */
+.hm{margin:12px 0;font:13px/1.45 Arial,Helvetica,sans-serif;color:var(--ink,#17231d)}
+.hm *{box-sizing:border-box}
+.hm-static svg{display:block;max-width:100%;height:auto;margin:6px 0}
+.hm-static-block{overflow-x:auto;border:1px solid var(--line,#d9e1da);background:var(--card,#fff);border-radius:8px;padding:6px;margin:8px 0}
+.hm-static-note{margin:6px 0 0;color:var(--muted,#627067);font-size:12px}
+.hm.hm-on .hm-static{display:none}
+.hm.hm-on .hm-live[hidden]{display:block}
+.hm-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--card,#fff);border:1px solid var(--line,#d9e1da);border-radius:10px 10px 0 0;padding:8px 12px}
+.hm-seg{display:inline-flex;gap:0}
+.hm-seg .hm-btn{border-radius:0;margin-left:-1px}
+.hm-seg .hm-btn:first-child{border-radius:6px 0 0 6px;margin-left:0}
+.hm-seg .hm-btn:last-child{border-radius:0 6px 6px 0}
+.hm-btn{border:1px solid #b9c5bd;background:#fff;color:var(--ink,#17231d);border-radius:6px;padding:5px 10px;cursor:pointer;font:600 12px Arial,sans-serif;line-height:1.2}
+.hm-btn:hover{background:#eef4ef}
+.hm-btn[aria-pressed=true],.hm-tab[aria-selected=true]{background:var(--green,#0c6b4f);color:#fff;border-color:var(--green,#0c6b4f)}
+.hm-spacer{flex:1}
+.hm :focus-visible{outline:3px solid #0072B2;outline-offset:2px}
+.hm-main{display:grid;grid-template-columns:minmax(0,1fr) 340px;border:1px solid var(--line,#d9e1da);border-top:0;background:#fff;border-radius:0 0 10px 10px;overflow:hidden}
+.hm-main.hm-nopanel{grid-template-columns:minmax(0,1fr)}
+.hm-main.hm-nopanel .hm-panel{display:none}
+.hm-stage{min-width:0;padding:8px 12px 10px;position:relative}
+.hm-legend{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-bottom:6px;font-size:12px}
+.hm-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #b9c5bd;border-radius:14px;background:#fff;padding:3px 10px;font:12px Arial,sans-serif;cursor:pointer;color:var(--ink,#17231d)}
+.hm-chip i{display:inline-block;width:12px;height:12px;border:1px solid #0004;border-radius:2px}
+.hm-chip[aria-pressed=false]{background:#f2f2f2;color:#6b6b6b;text-decoration:line-through}
+.hm-chip[aria-pressed=false] i{opacity:.35}
+.hm-scroll{overflow:auto;border:1px solid var(--line,#d9e1da);background:#fff;border-radius:6px;margin:6px 0;max-height:84vh}
+.hm-scroll svg{display:block}
+.hm-scroll.hm-fit svg{width:100%!important;height:auto!important}
+.hm-scroll [data-cell]:hover rect:first-child{stroke:#000;stroke-width:1.5}
+.hm-scroll [data-cell]:focus rect:first-child,.hm-scroll [data-cell]:focus-visible rect:first-child{stroke:#0072B2;stroke-width:3}
+.hm-hint{margin:6px 0 0;color:var(--muted,#627067);font-size:12px}
+.hm-tip{position:absolute;z-index:6;max-width:310px;pointer-events:none;background:var(--ink,#17231d);color:#fff;border-radius:6px;padding:8px 10px;font:12px/1.4 Arial,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hm-tip[hidden]{display:none}
+.hm-tip b{display:block;font-size:12.5px}
+.hm-tip span{color:#c9e3d3}
+.hm-tip em{display:block;margin-top:4px;color:#d9e7de;font-size:11px;font-style:normal}
+.hm-panel{border-left:1px solid var(--line,#d9e1da);background:#fbfcfb;min-width:0;display:flex;flex-direction:column;max-height:84vh}
+.hm-tabs{display:flex;flex-wrap:wrap;gap:3px;padding:6px;border-bottom:1px solid var(--line,#d9e1da);background:#f1f5f1}
+.hm-tab{border:1px solid transparent;background:transparent;border-radius:6px;padding:5px 9px;cursor:pointer;font:600 12px Arial,sans-serif;color:var(--ink,#17231d)}
+.hm-tab:hover{background:#e3ece5}
+.hm-tabbody{overflow:auto;padding:10px 12px 14px;flex:1;min-height:0}
+.hm-tabbody h4{margin:12px 0 6px;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#627067)}
+.hm-tabbody h4:first-child{margin-top:0}
+.hm-tabbody h5{margin:0 0 4px;font:700 14px Arial,sans-serif}
+.hm-row{display:flex;align-items:center;gap:6px;margin:3px 0;flex-wrap:wrap}
+.hm-row label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.hm-list{max-height:200px;overflow:auto;border:1px solid var(--line,#d9e1da);border-radius:6px;padding:4px 8px;background:#fff}
+.hm-muted{color:var(--muted,#627067);font-size:12px}
+.hm-tabbody input[type=search]{width:100%;border:1px solid #b9c5bd;border-radius:6px;padding:5px 8px;font:13px Arial,sans-serif;margin-bottom:6px}
+.hm table{min-width:0!important;width:100%;font-size:11.5px;border-collapse:collapse}
+.hm th,.hm td{white-space:normal;padding:3px 6px;text-align:left;vertical-align:top;border-top:1px solid var(--line,#d9e1da);font-size:11.5px}
+.hm th{background:#edf2ec;font-size:10.5px;text-transform:none;letter-spacing:0;position:sticky;top:0}
+.hm th button{all:unset;cursor:pointer;font-weight:700}
+.hm th button:focus-visible{outline:2px solid #0072B2}
+.hm th[aria-sort=ascending] button::after{content:" \25B2";font-size:9px}
+.hm th[aria-sort=descending] button::after{content:" \25BC";font-size:9px}
+.hm tr[data-pick]{cursor:pointer}
+.hm tr[data-pick]:hover{background:#eef4ef}
+.hm-big{margin:2px 0 6px;font:700 22px Arial,sans-serif}.hm-big small{font:600 12px Arial,sans-serif;color:var(--muted,#627067)}
+.hm-bar{display:inline-block;height:8px;background:#0072B2;border-radius:2px;vertical-align:middle}
+.hm-tag{display:inline-block;border:1px solid #7b8a80;border-radius:10px;padding:0 7px;font:700 10.5px Arial,sans-serif}
+.hm-tag.hm-fixed{background:#dcefdc;border-color:#17805a;color:#07573e}
+.hm-tag.hm-proposed{background:#f6ead1;border-color:#a35c05;color:#765000}
+.hm-tag.hm-undefined{background:#eee;color:#555}
+.hm-na{border:1px dashed #8a8a84;background:repeating-linear-gradient(45deg,#f4f4f0,#f4f4f0 4px,#dcdcd6 4px,#dcdcd6 5px);padding:6px 8px;border-radius:6px;font-size:12px}
+@media (max-width:900px){.hm-main{grid-template-columns:minmax(0,1fr)}.hm-panel{border-left:0;border-top:1px solid var(--line,#d9e1da);max-height:none}}
+@media (prefers-reduced-motion:no-preference){.hm-btn,.hm-tab,.hm-chip{transition:background-color .12s,color .12s}}
+@media print{.hm.hm-on .hm-static{display:block}.hm.hm-on .hm-live{display:none}}
+</style>

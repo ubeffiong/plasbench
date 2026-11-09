@@ -1,0 +1,105 @@
+<script>
+/* Reconstruction ladder, pure functions (no DOM): formatting, layer filter, panel HTML, CSV. Tested with node by test/test_report_fig_ladder.py.
+   Exposed as window.PBLadder and, under node, module.exports. */
+(function (root) {
+'use strict';
+var ESC = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
+var ESC_RE = new RegExp('[&<>\u0022\u0027]', 'g');
+function esc(s) { return String(s == null ? '' : s).replace(ESC_RE, function (c) { return ESC[c]; }); }
+function isNum(v) { return typeof v === 'number' && isFinite(v); }
+
+/* A blank is "not available", never 0. */
+function fmtValue(item) {
+  var v = item.v;
+  if (v === null || v === undefined || (typeof v === 'number' && !isFinite(v))) return 'not available';
+  if (typeof v === 'string') return v;
+  if (item.f === 'int') return String(Math.round(v));
+  if (item.f === 'pct') return (v * 100).toFixed(1) + '%';
+  return v.toFixed(3);
+}
+function ratioText(d) {
+  if (!d || d.den === null || d.den === undefined || !isNum(d.den) || d.den <= 0) return 'not computable: ' + ((d && d.reason) || 'no data');
+  return d.num + ' of ' + d.den + ' (' + (d.num / d.den * 100).toFixed(1) + '%)';
+}
+function stepById(p, id) { for (var i = 0; i < p.steps.length; i++) if (p.steps[i].id === id) return p.steps[i]; return null; }
+function stepLayers(step) { var s = {}; step.judged.forEach(function (j) { s[j.layer] = 1; }); return Object.keys(s); }
+/* Step ids judged by at least one active layer; no active layer means every step. */
+function stepsForLayers(p, active) {
+  var on = Object.keys(active || {}).filter(function (k) { return active[k]; });
+  return p.steps.filter(function (s) { return !on.length || stepLayers(s).some(function (l) { return on.indexOf(l) >= 0; }); })
+    .map(function (s) { return s.id; });
+}
+function layerById(p, id) { for (var i = 0; i < p.layers.length; i++) if (p.layers[i].id === id) return p.layers[i]; return null; }
+function link(sec, label, exists) {
+  if (exists && exists(sec)) return '<a href="#' + esc(sec) + '">' + esc(label || sec) + '</a>';
+  return '';
+}
+function stepHtml(p, id, exists) {
+  var s = stepById(p, id);
+  if (!s) return '<p class="lad-na">Select a step in the figure.</p>';
+  var h = '<h3>' + id + '. ' + esc(s.title) + '</h3><p>' + esc(s.what) + '</p><h4>Judged by</h4><ul class="lad-judged">';
+  s.judged.forEach(function (j) {
+    var l = layerById(p, j.layer) || {glyph: '', label: j.layer};
+    h += '<li><span class="lad-glyph" title="' + esc(l.label) + '">' + esc(l.glyph) + '</span>' + esc(j.text) + '</li>';
+  });
+  h += '</ul><h4>In this run</h4><table><thead><tr><th>Value</th><th>Result</th><th>Where</th></tr></thead><tbody>';
+  s.values.forEach(function (v) {
+    var res = (v.v === null || v.v === undefined)
+      ? '<span class="lad-na">not available' + (v.why ? ' (' + esc(v.why) + ')' : '') + '</span>'
+      : esc(fmtValue(v)) + (v.n ? ' <span class="lad-na">' + esc(v.n) + '</span>' : '') + (v.unvalidated ? ' <em>(unvalidated)</em>' : '');
+    var lab = v.sec ? link(v.sec, labelOf(p, v.sec), exists) : '';
+    h += '<tr><td>' + esc(v.k) + '</td><td>' + res + '</td><td>' + lab + '</td></tr>';
+  });
+  return h + '</tbody></table>';
+}
+function labelOf(p, sec) {
+  for (var i = 0; i < p.steps.length; i++) for (var j = 0; j < p.steps[i].where.length; j++) if (p.steps[i].where[j].id === sec) return p.steps[i].where[j].label;
+  return sec;
+}
+function distinctionsHtml(p) {
+  var h = '';
+  p.notes.forEach(function (n) {
+    h += '<h4>' + n.id + '. ' + esc(n.title) + '</h4><p>' + esc(n.text) + '</p>';
+    var d = null;
+    p.distinctions.forEach(function (x) { if (x.id === n.id) d = x; });
+    if (n.id === 3) h += '<p class="lad-na">Not a count: a statement about what the picture is.</p>';
+    else if (!d) h += '<p class="lad-na">not computable: not attempted</p>';
+    else if (d.den) h += '<div class="lad-warn"><span class="lad-big">' + d.num + ' of ' + d.den + '</span><br>' + esc(d.line) + '<br><small>' + esc(d.detail) + '</small></div>';
+    else h += '<div class="lad-warn">not computable: ' + esc(d.reason) + '</div>';
+  });
+  return h + '<p class="lad-na">' + esc(p.synthetic_note) + '</p>';
+}
+function linksHtml(p, exists) {
+  var seen = {}, rows = '';
+  p.steps.forEach(function (s) {
+    s.where.forEach(function (w) {
+      if (seen[w.id]) { seen[w.id].steps.push(s.id); return; }
+      seen[w.id] = {label: w.label, steps: [s.id]};
+    });
+    s.values.forEach(function (v) { if (v.sec && !seen[v.sec]) seen[v.sec] = {label: labelOf(p, v.sec), steps: [s.id]}; });
+  });
+  Object.keys(seen).forEach(function (id) {
+    var a = link(id, seen[id].label, exists);
+    rows += '<tr><td>' + (a || '<span class="lad-na">' + esc(seen[id].label) + ' (not in this report)</span>') + '</td><td>' + seen[id].steps.join(', ') + '</td></tr>';
+  });
+  return '<h4>Report sections</h4><table><thead><tr><th>Section</th><th>Step</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+var DQ = String.fromCharCode(34);
+function csvCell(x) { x = String(x == null ? '' : x); return /[,\n\r\u0022]/.test(x) ? DQ + x.split(DQ).join(DQ + DQ) + DQ : x; }
+function csvText(p) {
+  var rows = [['kind', 'step', 'step_title', 'name', 'value', 'note', 'report_section']];
+  p.steps.forEach(function (s) {
+    s.judged.forEach(function (j) { rows.push(['judged_by', s.id, s.title, j.text, j.layer, '', '']); });
+    s.values.forEach(function (v) {
+      rows.push(['live_value', s.id, s.title, v.k, fmtValue(v), (v.n || '') + (v.unvalidated ? ' unvalidated' : '') + (v.v == null && v.why ? ' ' + v.why : ''), v.sec || '']);
+    });
+  });
+  p.distinctions.forEach(function (d) { rows.push(['distinction', d.id, '', p.notes[d.id - 1].title, ratioText(d), d.detail || '', '']); });
+  return rows.map(function (r) { return r.map(csvCell).join(','); }).join('\n') + '\n';
+}
+var api = {esc: esc, fmtValue: fmtValue, ratioText: ratioText, stepsForLayers: stepsForLayers, stepLayers: stepLayers, stepHtml: stepHtml,
+  distinctionsHtml: distinctionsHtml, linksHtml: linksHtml, csvText: csvText, stepById: stepById};
+root.PBLadder = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

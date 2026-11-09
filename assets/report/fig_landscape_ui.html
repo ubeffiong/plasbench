@@ -1,0 +1,364 @@
+<script>
+/* PlasBench landscape figure: DOM glue. A large 3D stage on the left and a collapsible setup container (tabs: Axes, Points, View, Data, Detail,
+   Export) on the right, stacked under the stage on narrow screens. State lives in the URL hash (keys prefixed ls); panel collapse is
+   remembered in localStorage. The scene comes from PBLandscape.build() and is drawn by the shared PB3D engine (projection, depth sort). */
+(function (root) {
+'use strict';
+var SEQ = 0, L = root.PBLandscape, P = root.PB3D, esc = L.esc, W = 900, H = 580, LS_KEY = 'pb-ls-panel';
+var TAB_NAMES = {axes: 'Axes', points: 'Points', view: 'View', data: 'Data', detail: 'Detail', export: 'Export'};
+var PRESETS = {front: [0, 3, null], side: [-90, 3, null], top: [0, 88, null], flat: [0, 90, 0]};
+
+function opts(list, cur) { return list.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join(''); }
+function download(name, blob) {
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+}
+var PROPS = ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'opacity', 'fill-opacity', 'stroke-opacity', 'font-family', 'font-size', 'font-weight', 'paint-order', 'stroke-linejoin', 'stroke-linecap'];
+function exportSVG(svg, bg) {
+  var clone = svg.cloneNode(true), live = svg.querySelectorAll('*'), cl = clone.querySelectorAll('*');
+  for (var i = 0; i < live.length; i++) {
+    var cs = getComputedStyle(live[i]), st = '';
+    PROPS.forEach(function (p) { var v = cs.getPropertyValue(p); if (v) st += p + ':' + v + ';'; });
+    cl[i].setAttribute('style', st); cl[i].removeAttribute('class');
+  }
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  var vb = svg.viewBox.baseVal, rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('width', vb.width); rect.setAttribute('height', vb.height); rect.setAttribute('fill', bg || '#fff');
+  clone.insertBefore(rect, clone.firstChild);
+  return new XMLSerializer().serializeToString(clone);
+}
+function table(header, rows, o) {
+  o = o || {};
+  return '<div class="ls-tw"><table><thead><tr>' + header.map(function (h, i) {
+    return '<th' + (o.sort && o.sort.col === i ? ' aria-sort="' + (o.sort.dir > 0 ? 'ascending' : 'descending') + '"' : '') + '>' + (o.sortable ? '<button type="button" data-sort="' + i + '">' + esc(h) + '</button>' : esc(h)) + '</th>';
+  }).join('') + '</tr></thead><tbody>' + rows.map(function (r, i) {
+    return '<tr' + (o.ids ? ' class="ls-r" tabindex="0" data-row="' + esc(o.ids[i]) + '"' + (o.sel === o.ids[i] ? ' aria-selected="true"' : '') : '') + '>' + r.map(function (c) { return '<td>' + esc(c == null || c === '' ? '-' : c) + '</td>'; }).join('') + '</tr>';
+  }).join('') + '</tbody></table></div>';
+}
+
+function mount(host, data) {
+  /* the shared 3D engine may be defined by a script later in the page (the section is moved up in the report), so resolve it now, not when this script runs */
+  P = P || root.PB3D;
+  if (!P) throw new Error('the shared 3D engine (PB3D) is not loaded');
+  var reduce = false;
+  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  var hs = L.decodeHash(location.hash);
+  var S = {vals: Object.assign(L.defaults(), hs.vals), hidden: hs.hidden || L.defaultHidden(), tab: hs.tab || 'axes', sel: null, cam: hs.cam || {yaw: -32, pitch: 26, zoom: 1, persp: 1}, scene: null,
+    open: true, sort: {col: 0, dir: 1}, filter: '', auto: false, touched: false, moved: false};
+  try { if (localStorage.getItem(LS_KEY) === '0') S.open = false; } catch (e) { /* storage blocked */ }
+  var uid = 'lsx' + (++SEQ);
+  host.innerHTML =
+    '<div class="ls-head"><div class="ls-sum" role="status" aria-live="polite"></div><button type="button" class="ls-btn" data-act="panel" aria-expanded="true" aria-controls="' + uid + 'p">Setup panel</button></div>' +
+    '<div class="ls-main"><div class="ls-stage-wrap"><div class="ls-quick" role="toolbar" aria-label="Camera presets">' +
+    '<button type="button" class="ls-btn" data-preset="front" title="Looking along the depth axis: accuracy across, structural fidelity up">Front</button>' +
+    '<button type="button" class="ls-btn" data-preset="side" title="Completeness across, structural fidelity up">Side</button>' +
+    '<button type="button" class="ls-btn" data-preset="top" title="Looking down: accuracy across, completeness up">Top</button>' +
+    '<button type="button" class="ls-btn" data-preset="flat" title="Flat orthographic accuracy by completeness view (structural fidelity hidden)">Flat: accuracy x completeness</button>' +
+    '<button type="button" class="ls-btn" data-act="reset">Reset view</button></div>' +
+    '<div class="ls-banner"></div><div class="ls-stage" tabindex="0" aria-label="3D scatter of accuracy, completeness and structural fidelity. Arrow keys rotate, plus and minus zoom, R resets."><div class="ls-svgbox"></div><div class="ls-tip" role="status" hidden></div></div>' +
+    '<div class="ls-legend" role="group" aria-label="Legend (click an entry to show or hide it)"></div><div class="ls-key"></div>' +
+    '<p class="ls-note">Illustrative 3D projection of metrics: the axes are metrics, not a physical structure. * Alignment-derived, unvalidated.</p></div>' +
+    '<aside class="ls-panel" id="' + uid + 'p"><div class="ls-tabs" role="tablist" aria-label="Setup panels"></div><div class="ls-tabbody" role="tabpanel" tabindex="-1"></div></aside></div>';
+  var $ = function (c) { return host.querySelector(c); };
+  var box = $('.ls-svgbox'), tip = $('.ls-tip'), stage = $('.ls-stage'), legend = $('.ls-legend'), tabs = $('.ls-tabs'), body = $('.ls-tabbody'), main = $('.ls-main');
+  var hashTimer = 0, raf = 0;
+
+  function sync() { main.classList.toggle('ls-nopanel', !S.open); var b = $('[data-act=panel]'); b.setAttribute('aria-expanded', String(S.open)); }
+  function writeHash() {
+    if (!S.touched) return;
+    try { var h = L.encodeHash(S.vals, S.hidden, S.tab, S.cam); if (location.hash !== h) history.replaceState(null, '', h); } catch (e) { /* file: pages may refuse */ }
+  }
+  function schedule() { S.touched = true; if (hashTimer) clearTimeout(hashTimer); hashTimer = setTimeout(writeHash, 250); }
+
+  function rebuild(refit) {
+    S.scene = L.build(data, S.vals, S.hidden); L.buildTips(S.scene);
+    var keep = {yaw: S.cam.yaw, pitch: S.cam.pitch, persp: S.cam.persp, zoom: S.cam.zoom};
+    S.cam = P.fitCamera(S.scene, keep, W, H); S.cam.zoom = keep.zoom;
+    if (S.sel && !selValid()) S.sel = null;
+    drawAll();
+  }
+  function selValid() { var m = S.scene.model; return m.pts.some(function (p) { return p.grp === S.sel; }) || m.cents.some(function (c) { return c.grp === S.sel; }); }
+  function drawAll() { paint(); drawLegend(); drawHead(); drawKey(); drawTabs(); drawPanel(); schedule(); }
+  function paint() {
+    var fid = document.activeElement && box.contains(document.activeElement) ? document.activeElement.getAttribute('data-id') : null;
+    box.innerHTML = P.svgDoc(S.scene, S.cam, W, H, {sel: S.sel});
+    stage.style.setProperty('--lsop', String(S.vals.op));
+    if (fid) { var el = box.querySelector('[data-id="' + (root.CSS && CSS.escape ? CSS.escape(fid) : fid) + '"]'); if (el && el.focus) el.focus({preventScroll: true}); }
+  }
+  function drawHead() {
+    var m = S.scene.model, np = m.notPlotted.length;
+    $('.ls-sum').innerHTML = '<strong>' + m.pts.length + '</strong> ' + (S.vals.mode === 'tools' ? 'tool mean(s)' : 'point(s)') + ' plotted of ' + m.visible + ' visible run(s)' +
+      (np ? ' &middot; <a href="#" data-goto="data">' + np + ' not plotted (reason in Data)</a>' : '') + ' &middot; Pareto front ' + m.nFront +
+      (m.nStack ? ' &middot; ' + m.nStack + ' stacked position(s), see count badges' : '');
+    $('.ls-banner').innerHTML = (L.UNVAL[S.vals.z] ? '<p class="ls-warn"><strong>*</strong> Structural fidelity here (' + esc(L.AXN[S.vals.z]) + ') is derived from alignments and is not validated against reads or graphs.</p>' : '') +
+      (m.clamped ? '<p class="ls-warn">' + m.clamped + ' point coordinate(s) lie outside the chosen axis range and are drawn on its edge.</p>' : '') +
+      (!m.pts.length ? '<p class="ls-warn">Nothing to plot with these settings. See the Data tab for the reasons.</p>' : '');
+  }
+  function drawLegend() {
+    var groups = {}, order = [];
+    S.scene.legend.forEach(function (e) { if (!groups[e.group]) { groups[e.group] = []; order.push(e.group); } groups[e.group].push(e); });
+    legend.innerHTML = order.map(function (g) {
+      return '<div class="ls-lg"><span class="ls-lt">' + esc(g) + '</span>' + groups[g].map(function (e) {
+        var off = !!S.hidden[e.key];
+        return '<button type="button" class="ls-chip" data-key="' + esc(e.key) + '" aria-pressed="' + (off ? 'false' : 'true') + '" title="' + esc(e.label) + '">' + P.glyph(e.shape, e.color) + ' ' + esc(e.label) + '</button>';
+      }).join('') + '</div>';
+    }).join('');
+  }
+  function drawKey() {
+    var m = S.scene.model, v = S.vals, h = '';
+    if (L.CONT[v.colour]) {
+      h += '<div class="ls-bar"><span class="ls-lt">' + esc(L.CONTN[v.colour]) + '</span><i style="background:linear-gradient(90deg,' + L.RAMP.join(',') + ')"></i>' +
+        (m.cvr ? '<span>' + L.f4(m.cvr[0]).replace(/\.?0+$/, '') + '</span><span>to</span><span>' + L.f4(m.cvr[1]).replace(/\.?0+$/, '') + '</span>' : '<span>not available for any plotted point</span>') +
+        '<span class="ls-na"><i></i> grey: not available (still plotted, since colour is not an axis)</span></div>';
+    }
+    if (v.size !== 'none') h += '<div class="ls-bar"><span class="ls-lt">Size</span><span>' + (v.size === 'runtime' ? 'runtime (s)' : 'truth plasmids') + ': small to large = ' +
+      (m.szr ? esc(L.f4(m.szr[0]).replace(/\.?0+$/, '')) + ' to ' + esc(L.f4(m.szr[1]).replace(/\.?0+$/, '')) : 'not available') + '</span></div>';
+    if (!m.ideal && !S.hidden['O:ideal']) h += '<div class="ls-bar"><span class="ls-muted">The ideal corner is not drawn: it lies outside the chosen axis range or the axes are rank-scaled.</span></div>';
+    $('.ls-key').innerHTML = h;
+  }
+
+  /* ---------------------------------------------------------------- panel */
+  function drawTabs() {
+    tabs.innerHTML = L.TABS.map(function (t) {
+      return '<button type="button" role="tab" class="ls-tab" data-tab="' + t + '" id="' + uid + 't' + t + '" aria-selected="' + (S.tab === t) + '" tabindex="' + (S.tab === t ? '0' : '-1') + '">' + TAB_NAMES[t] + '</button>';
+    }).join('');
+    body.setAttribute('aria-labelledby', uid + 't' + S.tab);
+  }
+  function chk(attr, key, label, on, f) { return '<label class="ls-row"><input type="checkbox" ' + attr + '="' + esc(key) + '"' + (on ? ' checked' : '') + ' data-f="' + esc(f || key) + '"> ' + label + '</label>'; }
+  function sel(key, label, list, cur) { return '<label class="ls-row">' + label + ' <select data-v="' + key + '" data-f="v' + key + '">' + opts(list, cur) + '</select></label>'; }
+  function lists(items, pre, title) {
+    return '<h4>' + title + '</h4><div class="ls-list">' + items.map(function (t) { return chk('data-h', pre + t, esc(t.replace(/_/g, ' ')), !S.hidden[pre + t], 'h' + pre + t); }).join('') + '</div>';
+  }
+  function tabAxes(m, v) {
+    var rg = function (a, lab) {
+      return '<div class="ls-row">' + lab + ': <input type="number" step="any" data-c="' + a + '0" data-f="c' + a + '0" value="' + v['c' + a][0] + '" aria-label="' + lab + ' axis minimum"' + (v.range === 'custom' && v.scale === 'linear' ? '' : ' disabled') + '> to ' +
+        '<input type="number" step="any" data-c="' + a + '1" data-f="c' + a + '1" value="' + v['c' + a][1] + '" aria-label="' + lab + ' axis maximum"' + (v.range === 'custom' && v.scale === 'linear' ? '' : ' disabled') + '></div>';
+    };
+    return '<h4>Metric per axis</h4>' + sel('x', 'X, accuracy', L.XOPTS, v.x) + sel('y', 'Depth, completeness', L.YOPTS, v.y) + sel('z', 'Up, structural fidelity', L.ZOPTS, v.z) +
+      '<p class="ls-muted">NGOC, collinear fraction and events per Mb are derived from alignments and are not validated. A run missing a chosen metric is not plotted (listed under Data), never drawn at zero. Accuracy uses alignment identity and falls back to precision where identity is not available (ringed marker).</p>' +
+      '<h4>Scale and range</h4>' + sel('scale', 'Scale', [['linear', 'Linear'], ['rank', 'Rank (percentile among plotted points)']], v.scale) +
+      sel('range', 'Axis range', [['full', 'Full, 0 to 1'], ['zoom', 'Zoom to the data'], ['custom', 'Custom']], v.range) +
+      rg('x', 'X') + rg('y', 'Depth') + rg('z', 'Up') +
+      '<h4>Direction</h4><div class="ls-row">' + chk('data-fl', 'x', 'Flip X', v.fx, 'flx') + chk('data-fl', 'y', 'Flip depth', v.fy, 'fly') + chk('data-fl', 'z', 'Flip up', v.fz, 'flz') + '</div>' +
+      '<p class="ls-muted">Rank scale spreads points evenly by order: it shows who beats whom, not by how much. Ties share a position.</p>';
+  }
+  function tabPoints(m, v) {
+    return '<h4>Points</h4>' + sel('mode', 'Show', [['runs', 'Each run (tool x isolate)'], ['tools', 'Tool means with SD whiskers']], v.mode) +
+      sel('colour', 'Colour by', L.COLOPTS, v.colour) + chk('data-b', 'shape', 'Shape by track (circle short read, triangle long read, square hybrid, diamond other)', v.shape, 'bshape') +
+      sel('size', 'Size by', L.SIZEOPTS, v.size) + chk('data-b', 'labels', 'Label points with the tool name', v.labels, 'blabels') +
+      chk('data-b', 'pareto_only', 'Show only the Pareto front', v.pareto_only, 'bpareto_only') +
+      '<h4>Overlays</h4>' + chk('data-h', 'O:drop', 'Drop lines to the floor', !S.hidden['O:drop']) + chk('data-h', 'O:floor', 'Floor projection (accuracy x completeness plane)', !S.hidden['O:floor']) +
+      chk('data-h', 'O:pareto', 'Pareto front rings', !S.hidden['O:pareto']) + chk('data-h', 'O:ideal', 'Ideal corner (1, 1, 1)', !S.hidden['O:ideal']) +
+      chk('data-h', 'O:cent', 'Tool centroids (each run view)', !S.hidden['O:cent']) + chk('data-h', 'O:sd', 'SD whiskers on centroids and tool means', !S.hidden['O:sd']) +
+      '<p class="ls-muted">Points at the same position are stacked with a count badge (x2, x3 ...), never jittered. A point is on the Pareto front when no other plotted point is at least as good on all three axes and better on one.</p>' +
+      lists(m.tools, 'T:', 'Tools') + lists(m.tracks, 'K:', 'Tracks') + lists(m.species, 'S:', 'Species') +
+      '<div class="ls-row"><button type="button" class="ls-btn" data-act="showall">Show all</button></div>';
+  }
+  function tabView(m, v) {
+    return '<h4>Camera</h4><div class="ls-row"><button type="button" class="ls-btn" data-preset="front">Front</button><button type="button" class="ls-btn" data-preset="side">Side</button>' +
+      '<button type="button" class="ls-btn" data-preset="top">Top</button><button type="button" class="ls-btn" data-preset="flat">Flat 2D</button><button type="button" class="ls-btn" data-act="reset">Reset</button></div>' +
+      '<div class="ls-row">Projection <select data-act-sel="persp" data-f="persp"><option value="1"' + (S.cam.persp ? ' selected' : '') + '>Perspective</option><option value="0"' + (S.cam.persp ? '' : ' selected') + '>Orthographic</option></select>' +
+      '<button type="button" class="ls-btn" data-act="auto" aria-pressed="' + S.auto + '"' + (reduce ? ' disabled title="Disabled because your system asks for reduced motion"' : '') + '>Auto-rotate</button>' +
+      '<button type="button" class="ls-btn" data-act="in" aria-label="Zoom in">+</button><button type="button" class="ls-btn" data-act="out" aria-label="Zoom out">&minus;</button></div>' +
+      '<h4>Scene</h4>' + chk('data-b', 'grid', 'Grid lines', v.grid, 'bgrid') + chk('data-b', 'floor', 'Floor and back walls', v.floor, 'bfloor') + chk('data-b', 'axlab', 'Axis labels and ticks', v.axlab, 'baxlab') +
+      '<label class="ls-row">Point size <input type="range" min="0.5" max="2.5" step="0.1" value="' + v.ps + '" data-n="ps" data-f="nps"> <span>' + v.ps + 'x</span></label>' +
+      '<label class="ls-row">Opacity <input type="range" min="0.2" max="1" step="0.05" value="' + v.op + '" data-n="op" data-f="nop"> <span>' + v.op + '</span></label>' +
+      '<p class="ls-muted">Drag to rotate, wheel or +/&minus; to zoom, arrow keys rotate, R resets, Escape clears the selection. Hold the pointer or focus a point to read exact values.</p>';
+  }
+  function dataRows(m) {
+    var f = S.filter.toLowerCase(), v = S.vals;
+    var rows = m.pts.map(function (p) {
+      return {id: p.grp, c: [p.kind === 'run' ? p.r.sample : '(' + p.n + ' runs)', p.tool, p.track, L.f4(p.x) + (p.xs === 'precision' ? ' (precision)' : ''), L.f4(p.y), L.f4(p.z), p.front ? 'yes' : 'no', p.stack ? p.stack.length : 1], k: [p.kind === 'run' ? p.r.sample : '', p.tool, p.track, p.x, p.y, p.z, p.front ? 1 : 0, p.stack ? p.stack.length : 1]};
+    }).filter(function (r) { return !f || r.c.join(' ').toLowerCase().indexOf(f) >= 0; });
+    var s = S.sort;
+    rows.sort(function (a, b) { var x = a.k[s.col], y = b.k[s.col]; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * s.dir; });
+    return rows;
+  }
+  function tabData(m, v) {
+    var rows = dataRows(m), shown = rows.slice(0, 400), head = ['Sample', 'Tool', 'Track', L.AXT[v.x].replace('*', ''), L.AXT[v.y], L.AXT[v.z], 'Pareto front', 'Stack'];
+    var why = {};
+    m.notPlotted.forEach(function (n) { (why[n.why] = why[n.why] || []).push(n); });
+    return '<h4>Plotted points (' + rows.length + ')</h4><label class="ls-row">Filter <input type="search" data-filter data-f="filter" value="' + esc(S.filter) + '" placeholder="sample, tool, track"></label>' +
+      table(head, shown.map(function (r) { return r.c; }), {sortable: true, sort: S.sort, ids: shown.map(function (r) { return r.id; }), sel: S.sel}) +
+      (rows.length > shown.length ? '<p class="ls-muted">Showing the first ' + shown.length + ' rows; use the filter or export the CSV for all.</p>' : '') +
+      '<h4>Not plotted: reason (' + m.notPlotted.length + ')</h4>' + (m.notPlotted.length ? Object.keys(why).map(function (k) {
+        return '<details class="ls-np"><summary><strong>' + why[k].length + '</strong> not plotted: ' + esc(k) + '</summary><p>' + why[k].slice(0, 60).map(function (n) { return esc(n.r ? n.r.sample + ' / ' + n.r.tool : n.tool); }).join(', ') + (why[k].length > 60 ? ', ...' : '') + '</p></details>';
+      }).join('') + '<p class="ls-muted">A missing value is never drawn at zero. Runs hidden by the tool, track or species toggles are not counted here.</p>' : '<p class="ls-muted">Every visible run has all three chosen metrics.</p>');
+  }
+  function dl(rows) { return '<dl class="ls-dl">' + rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>'; }
+  function runDetailRows(r) {
+    function g(k, d) { return r[k] == null ? 'not available' : (d == null ? String(r[k]) : Number(r[k]).toFixed(d)); }
+    return [['Sample', r.sample], ['Tool', r.tool], ['Track', r.track], ['Species', r.org], ['Alignment identity', g('identity', 4)], ['Precision', g('precision', 4)], ['Reference-base recall', g('recall', 4)], ['Reference-base F1', g('f1', 4)],
+      ['Per-plasmid recall', g('plasmid_recall', 4)], ['CPRR', g('cprr', 4)], ['NGOC (alignment-derived, unvalidated)', g('ngoc', 4)], ['Collinear fraction (alignment-derived, unvalidated)', g('collinear', 4)],
+      ['Structural events (alignment-derived, unvalidated)', g('events')], ['Aligned bp', g('aligned_bp')], ['Runtime (s)', g('runtime')], ['Truth plasmids', g('n_truth')]];
+  }
+  function tabDetail(m, v) {
+    if (S.sel == null) return '<p class="ls-muted">Click a point (or press Enter on a focused point, or a row in the Data tab) to see its run here.</p>';
+    var p = null, c = null;
+    m.pts.forEach(function (q) { if (q.grp === S.sel) p = q; }); m.cents.forEach(function (q) { if (q.grp === S.sel) c = q; });
+    if (!p && !c) return '<p class="ls-muted">The selected point is not in the current view.</p>';
+    if (p && p.kind === 'run') {
+      var links = '<p><a href="#plasmid-maps">Open the plasmid maps section</a> for ' + esc(p.r.sample) + '.</p>';
+      var others = p.stack && p.stack.length > 1 ? '<h4>Stacked at this position (' + p.stack.length + ')</h4><p>' + p.stack.map(function (q) { return esc(q.tool + ' / ' + q.r.sample); }).join(', ') + '</p>' : '';
+      return '<h3 class="ls-dh">' + esc(p.tool) + ' on ' + esc(p.r.sample) + '</h3>' + dl(runDetailRows(p.r)) + '<p class="ls-muted">On the Pareto front: <strong>' + (p.front ? 'yes' : 'no') + '</strong>' + (p.xs === 'precision' ? '. Accuracy shown is precision: identity is not available.' : '.') + '</p>' + others + links;
+    }
+    var q = p || c, runs = p ? p.runs : m.pts.filter(function (x) { return x.tool === c.tool; }).map(function (x) { return {r: x.r, x: x.x, y: x.y, z: x.z}; });
+    return '<h3 class="ls-dh">' + esc(q.tool) + (p ? ' (mean of ' + q.n + ' runs)' : ' centroid') + '</h3>' + dl([['Accuracy', L.f4(q.x)], ['Completeness', L.f4(q.y)], ['Structure', L.f4(q.z)], ['SD (x / y / z)', q.sd ? [L.f4(q.sd.x), L.f4(q.sd.y), L.f4(q.sd.z)].join(' / ') : 'not defined (one run)']]) +
+      '<h4>Runs</h4>' + table(['Sample', 'Accuracy', 'Completeness', 'Structure'], runs.map(function (u) { return [u.r.sample, L.f4(u.x), L.f4(u.y), L.f4(u.z)]; }));
+  }
+  function tabExport() {
+    return '<h4>Figure</h4><div class="ls-row"><button type="button" class="ls-btn" data-act="svg">Export SVG</button><button type="button" class="ls-btn" data-act="png">Export PNG</button></div>' +
+      '<h4>Data</h4><div class="ls-row"><button type="button" class="ls-btn" data-act="csv">CSV: plotted points</button><button type="button" class="ls-btn" data-act="csvnp">CSV: not plotted with reasons</button></div>' +
+      '<h4>Share</h4><div class="ls-row"><button type="button" class="ls-btn" data-act="link">Copy link to this view</button><span class="ls-muted ls-copied" aria-live="polite"></span></div>' +
+      '<p class="ls-muted">The exports contain exactly what is plotted under the current settings. Structural columns are alignment-derived and unvalidated.</p>';
+  }
+  function drawPanel() {
+    var fid = document.activeElement && body.contains(document.activeElement) ? document.activeElement.getAttribute('data-f') : null, pos = body.scrollTop;
+    var m = S.scene.model, v = S.vals;
+    body.innerHTML = {axes: tabAxes, points: tabPoints, view: tabView, data: tabData, detail: tabDetail, export: tabExport}[S.tab](m, v);
+    body.scrollTop = pos;
+    if (fid) { var e = body.querySelector('[data-f="' + fid + '"]'); if (e) { e.focus({preventScroll: true}); if (e.setSelectionRange && e.type === 'search') { try { e.setSelectionRange(e.value.length, e.value.length); } catch (x) {} } } }
+  }
+  function setTab(t, focus) { S.tab = t; drawTabs(); drawPanel(); schedule(); if (focus) { var b = host.querySelector('[data-tab="' + t + '"]'); if (b) b.focus(); } }
+  function openPanel() { if (!S.open) { S.open = true; sync(); try { localStorage.setItem(LS_KEY, '1'); } catch (e) {} } }
+  function select(grp) { tip.hidden = true; S.sel = grp; paint(); if (grp != null) { openPanel(); S.tab = 'detail'; drawTabs(); } drawPanel(); schedule(); }
+  function setView(yaw, pitch, persp) { tip.hidden = true; S.cam = P.fitCamera(S.scene, {yaw: yaw, pitch: pitch, persp: persp == null ? S.cam.persp : persp}, W, H); S.cam.zoom = 1; paint(); schedule(); if (S.tab === 'view') drawPanel(); }
+
+  /* ---------------------------------------------------------------- events */
+  function csvName(n) { return 'plasbench-landscape-' + n; }
+  function act(a, b) {
+    var m = S.scene.model;
+    if (a === 'panel') { S.open = !S.open; sync(); try { localStorage.setItem(LS_KEY, S.open ? '1' : '0'); } catch (e) {} }
+    else if (a === 'reset') { S.sel = null; setView(-32, 26, 1); drawPanel(); }
+    else if (a === 'in') { S.cam.zoom = Math.min(5, S.cam.zoom * 1.2); paint(); schedule(); }
+    else if (a === 'out') { S.cam.zoom = Math.max(0.4, S.cam.zoom / 1.2); paint(); schedule(); }
+    else if (a === 'auto') { S.auto = !S.auto; b.setAttribute('aria-pressed', String(S.auto)); if (S.auto) spin(); }
+    else if (a === 'showall') { Object.keys(S.hidden).forEach(function (k) { if (/^[TKS]:/.test(k)) delete S.hidden[k]; }); rebuild(false); }
+    else if (a === 'svg') download(csvName('3d.svg'), new Blob([exportSVG(box.querySelector('svg'), getComputedStyle(stage).backgroundColor)], {type: 'image/svg+xml'}));
+    else if (a === 'png') {
+      var img = new Image(), txt = exportSVG(box.querySelector('svg'), getComputedStyle(stage).backgroundColor);
+      img.onload = function () { var c = document.createElement('canvas'); c.width = W * 2; c.height = H * 2; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); c.toBlob(function (bl) { download(csvName('3d.png'), bl); }, 'image/png'); };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(txt);
+    }
+    else if (a === 'csv') download(csvName('plotted.csv'), new Blob([L.csvText(L.CSV_HEADER, L.plottedRows(m))], {type: 'text/csv'}));
+    else if (a === 'csvnp') download(csvName('not-plotted.csv'), new Blob([L.csvText(['sample', 'tool', 'track', 'reason'], L.notPlottedRows(m))], {type: 'text/csv'}));
+    else if (a === 'link') {
+      var url = location.href.split('#')[0] + L.encodeHash(S.vals, S.hidden, S.tab, S.cam), out = host.querySelector('.ls-copied');
+      try { navigator.clipboard.writeText(url).then(function () { out.textContent = 'Copied.'; }, function () { out.textContent = url; }); } catch (e) { out.textContent = url; }
+    }
+  }
+  host.addEventListener('click', function (e) {
+    var t = e.target, bt = t.closest ? t.closest('button, a[data-goto], tr[data-row]') : null;
+    if (bt && host.contains(bt)) {
+      if (bt.hasAttribute('data-goto')) { e.preventDefault(); openPanel(); sync(); setTab(bt.getAttribute('data-goto')); return; }
+      if (bt.hasAttribute('data-row')) { select(bt.getAttribute('data-row')); return; }
+      if (bt.hasAttribute('data-preset')) { var pr = PRESETS[bt.getAttribute('data-preset')]; setView(pr[0], pr[1], pr[2]); return; }
+      if (bt.hasAttribute('data-act')) { act(bt.getAttribute('data-act'), bt); return; }
+      if (bt.hasAttribute('data-tab')) { setTab(bt.getAttribute('data-tab')); return; }
+      if (bt.hasAttribute('data-sort')) { var c = +bt.getAttribute('data-sort'); S.sort = {col: c, dir: S.sort.col === c ? -S.sort.dir : 1}; drawPanel(); return; }
+      if (bt.hasAttribute('data-key') && bt.classList.contains('ls-chip')) { var k = bt.getAttribute('data-key'); S.hidden[k] = !S.hidden[k]; rebuild(false); return; }
+    }
+    var el = t.closest ? t.closest('[data-grp]') : null;
+    if (el && box.contains(el) && !S.moved) select(el.getAttribute('data-grp'));
+  });
+  host.addEventListener('change', function (e) {
+    var t = e.target, v = S.vals, k;
+    if (t.hasAttribute('data-v')) { k = t.getAttribute('data-v'); v[k] = t.value; if (k === 'colour' || k === 'mode') S.sel = null; rebuild(true); }
+    else if (t.hasAttribute('data-b')) { v[t.getAttribute('data-b')] = t.checked ? 1 : 0; rebuild(false); }
+    else if (t.hasAttribute('data-fl')) { v['f' + t.getAttribute('data-fl')] = t.checked ? 1 : 0; rebuild(false); }
+    else if (t.hasAttribute('data-h')) { S.hidden[t.getAttribute('data-h')] = !t.checked; rebuild(false); }
+    else if (t.hasAttribute('data-c')) {
+      var a = t.getAttribute('data-c'), ax = a[0], i = +a[1], n = parseFloat(t.value);
+      if (isFinite(n)) { var arr = (v['c' + ax] || [0, 1]).slice(); arr[i] = n; v['c' + ax] = arr; rebuild(false); }
+    }
+    else if (t.hasAttribute('data-act-sel')) { S.cam.persp = +t.value; S.cam = P.fitCamera(S.scene, S.cam, W, H); paint(); schedule(); }
+  });
+  host.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.hasAttribute('data-n')) {
+      var k = t.getAttribute('data-n'), n = parseFloat(t.value); if (!isFinite(n)) return;
+      S.vals[k] = n; t.parentNode.querySelector('span').textContent = n + (k === 'ps' ? 'x' : '');
+      if (k === 'op') { stage.style.setProperty('--lsop', String(n)); schedule(); } else { S.scene = L.build(data, S.vals, S.hidden); L.buildTips(S.scene); paint(); schedule(); }
+    } else if (t.hasAttribute('data-filter')) { S.filter = t.value; drawPanel(); }
+  });
+  tabs.addEventListener('keydown', function (e) {
+    var i = L.TABS.indexOf(S.tab), d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (d) { e.preventDefault(); setTab(L.TABS[(i + d + L.TABS.length) % L.TABS.length], true); }
+  });
+  body.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.hasAttribute && e.target.hasAttribute('data-row')) select(e.target.getAttribute('data-row')); });
+
+  function showTip(id, x, y) {
+    var t = S.scene.tips[id]; if (!t) { tip.hidden = true; return; }
+    tip.innerHTML = '<strong>' + esc(t.t) + '</strong>' + t.rows.map(function (r) { return '<div><span>' + esc(r[0]) + '</span> ' + esc(r[1]) + '</div>'; }).join('') + (t.note ? '<em>' + esc(t.note) + '</em>' : '');
+    tip.hidden = false;
+    var sb = stage.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.max(4, Math.min(x - sb.left + 14, sb.width - tw - 4)) + 'px'; tip.style.top = Math.max(4, Math.min(y - sb.top + 14, sb.height - th - 4)) + 'px';
+  }
+  function hl(grp, on) { box.querySelectorAll('[data-grp]').forEach(function (e) { e.classList.toggle('v3-dim', on && e.getAttribute('data-grp') !== grp); }); }
+  box.addEventListener('mouseover', function (e) { var el = e.target.closest('[data-id]'); if (!el) return; hl(el.getAttribute('data-grp'), true); showTip(el.getAttribute('data-id'), e.clientX, e.clientY); });
+  box.addEventListener('mousemove', function (e) { var el = e.target.closest('[data-id]'); if (el) showTip(el.getAttribute('data-id'), e.clientX, e.clientY); });
+  box.addEventListener('mouseout', function (e) { if (e.target.closest('[data-id]')) { hl(null, false); tip.hidden = true; } });
+  box.addEventListener('focusin', function (e) { var el = e.target.closest('[data-id]'); if (!el) return; var r = el.getBoundingClientRect(); hl(el.getAttribute('data-grp'), true); showTip(el.getAttribute('data-id'), r.left + r.width / 2, r.top); });
+  box.addEventListener('focusout', function () { hl(null, false); tip.hidden = true; });
+  box.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('data-grp') != null) { e.preventDefault(); select(e.target.getAttribute('data-grp')); } });
+
+  var ptrs = {}, last = null, pinch = 0;
+  box.addEventListener('pointerdown', function (e) {
+    ptrs[e.pointerId] = [e.clientX, e.clientY]; S.moved = false; last = [e.clientX, e.clientY];
+    var ids = Object.keys(ptrs); if (ids.length === 2) pinch = Math.hypot(ptrs[ids[0]][0] - ptrs[ids[1]][0], ptrs[ids[0]][1] - ptrs[ids[1]][1]);
+  });
+  root.addEventListener('pointermove', function (e) {
+    if (!ptrs[e.pointerId]) return;
+    var ids = Object.keys(ptrs);
+    if (ids.length >= 2) {
+      ptrs[e.pointerId] = [e.clientX, e.clientY];
+      var d = Math.hypot(ptrs[ids[0]][0] - ptrs[ids[1]][0], ptrs[ids[0]][1] - ptrs[ids[1]][1]);
+      if (pinch > 0) { S.cam.zoom = Math.max(0.4, Math.min(5, S.cam.zoom * d / pinch)); paint(); } pinch = d; S.moved = true; return;
+    }
+    var dx = e.clientX - last[0], dy = e.clientY - last[1];
+    if (!S.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    S.moved = true; last = [e.clientX, e.clientY]; ptrs[e.pointerId] = last;
+    S.cam.yaw += dx * 0.4; S.cam.pitch = Math.max(-80, Math.min(90, S.cam.pitch + dy * 0.4)); tip.hidden = true;
+    if (!raf) raf = requestAnimationFrame(function () { raf = 0; paint(); schedule(); });
+  });
+  function up(e) { delete ptrs[e.pointerId]; pinch = 0; setTimeout(function () { S.moved = false; }, 0); }
+  root.addEventListener('pointerup', up); root.addEventListener('pointercancel', up);
+  box.addEventListener('wheel', function (e) { e.preventDefault(); S.cam.zoom = Math.max(0.4, Math.min(5, S.cam.zoom * Math.exp(-e.deltaY * 0.0015))); paint(); schedule(); }, {passive: false});
+  stage.addEventListener('keydown', function (e) {
+    var k = e.key, used = true;
+    if (k === 'ArrowLeft') S.cam.yaw -= 6; else if (k === 'ArrowRight') S.cam.yaw += 6;
+    else if (k === 'ArrowUp') S.cam.pitch = Math.max(-80, S.cam.pitch - 5); else if (k === 'ArrowDown') S.cam.pitch = Math.min(90, S.cam.pitch + 5);
+    else if (k === '+' || k === '=') S.cam.zoom = Math.min(5, S.cam.zoom * 1.15); else if (k === '-' || k === '_') S.cam.zoom = Math.max(0.4, S.cam.zoom / 1.15);
+    else if (k === 'r' || k === 'R' || k === '0') { S.sel = null; setView(-32, 26, 1); drawPanel(); return; }
+    else if (k === 'Escape') { select(null); return; }
+    else used = false;
+    if (used) { e.preventDefault(); paint(); schedule(); }
+  });
+  function spin() { if (!S.auto) return; S.cam.yaw += 0.35; paint(); requestAnimationFrame(spin); }
+
+  root.addEventListener('hashchange', function () {
+    if (location.hash.indexOf('#fig-landscape?') !== 0) return;
+    var h = L.decodeHash(location.hash);
+    S.vals = Object.assign(L.defaults(), h.vals); S.hidden = h.hidden || L.defaultHidden(); if (h.tab) S.tab = h.tab; if (h.cam) S.cam = h.cam;
+    rebuild(true); host.scrollIntoView({block: 'start'});
+  });
+  sync(); rebuild(true);
+  S.touched = false;
+  host.setAttribute('data-ls-live', '1'); host.classList.add('ls-live');
+  if (location.hash.indexOf('#fig-landscape?') === 0) { try { host.scrollIntoView({block: 'start'}); } catch (e) {} }
+  return {state: S, rebuild: rebuild, select: select, setTab: setTab};
+}
+
+function init() {
+  Array.prototype.forEach.call(document.querySelectorAll('.ls[data-ls]'), function (host) {
+    if (host.getAttribute('data-ls-live')) return;
+    try {
+      var tag = document.getElementById('ls-data');
+      root.PBLandscapeApp = mount(host, JSON.parse(tag.textContent));
+    } catch (e) { if (root.console) console.warn('PlasBench landscape not started:', e); }
+  });
+}
+root.PBLandscapeUI = {mount: mount, init: init};
+if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init(); }
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

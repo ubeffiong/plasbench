@@ -120,6 +120,13 @@ The report is one self-contained file. Besides the leaderboard it contains:
   fewer than 5 samples as underpowered. Only the identity bands are fixed; the others are proposed. SNP concordance and structural variant F1 are
   not available because no truth variant set exists. See section 7.10 of the [scientific guide](docs/SCIENTIFIC_GUIDE.md).
 - **Circular plasmid maps**, one per truth plasmid: truth genes, one ring per tool, GC content and GC skew.
+- **A figure gallery**, each figure with a side setup panel (layers, filters, the plotted data as a table, drilldown, SVG / PNG / CSV export):
+  the **reconstruction ladder** ([docs/images/reconstruction_ladder.svg](docs/images/reconstruction_ladder.svg)) shows which score layer judges each step from contigs to a
+  verified plasmid and keeps three distinctions explicit (binning is not reconstruction, circular is not correct, 3D appearance is illustrative); a **3D landscape** of
+  accuracy, completeness and structural fidelity; a **tool-by-metric heatmap** with clustering; **CPRR distributions** (violin or box with every isolate) and a **forest plot**
+  of CPRR differences by species, plasmid size and reference tier; and an interactive **precision-recall** plot with iso-F1 lines and false positives per recovered plasmid.
+  The plasmid viewer also draws each tool's alignment blocks against the truth plasmid in a linear **Reference versus reconstruction** pane linked to the circular map.
+  Tables that a figure now draws are folded until opened; nothing is removed.
 - **A data inventory** ("Data in this report") listing every output and where the report shows it.
 - Grouped, collapsible navigation, per-plasmid detail, an assembly-quality section and links to `leaderboard.md` and `scoring_spec.md`.
 

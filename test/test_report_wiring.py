@@ -241,6 +241,12 @@ def main():
             hrefs = [h for h in re.findall(r"href='([^#'][^']*\.md)'", sec("files"))]
             check("Run files links exist and include the leaderboard and the spec",
                   hrefs and all(os.path.isfile(p(h)) for h in hrefs) and "benchmark.leaderboard.md" in hrefs and "benchmark.scoring_spec.md" in hrefs, hrefs)
+            check("the landscape figure resolves the shared 3D engine when it mounts (it can sit before the script that defines it)",
+                  "fig-landscape" not in html or html.index("PBLandscapeUI") > html.index("PBLandscape = ") and "P = P || root.PB3D" in html)
+            ids_now = re.findall(r"<section id='([a-z-]+)'", html)
+            check("every figure section is on the page in the Figures order, after the maps",
+                  [i for i in ids_now if i.startswith("fig-")] == [i for i in ("fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr") if i in ids_now]
+                  and ids_now.index("plasmid-maps") < ids_now.index("fig-ladder"))
             for sid, marker in (("headline-design", "<table"), ("metric-framework", "<table"), ("scorecard-definitions", "<table"),
                                 ("interpretation-limits", "These results do NOT show"),
                                 ("per-plasmid-detail", "<table")):

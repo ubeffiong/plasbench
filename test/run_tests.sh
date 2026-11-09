@@ -61,7 +61,7 @@ python3 "$HERE/test_materialize_bmock12_truth.py"
 python3 "$HERE/test_question_bank_gaps.py"
 python3 "$HERE/test_metric_rubric.py"
 # Panel alignment and scoring specification (docs/PANEL_ALIGNMENT.md).
-for test in test_label_schemes.py test_dimer_collapse.py test_mcc_abstention.py test_prereg_freeze.py test_bin_outcomes.py test_contig_scoring.py test_recommender_eval.py test_panel_operational.py test_wilcoxon.py test_leave_taxon_out.py test_rank_axes_new.py test_amr_placement.py test_report_scoring_spec.py test_contig_crosscheck.py test_fetch_ena_reads.py test_report_svg.py test_report_maps.py test_plasmid_viewer.py test_report_3d.py test_report_scorecard.py test_report_workflow.py test_report_surfaces.py test_report_wiring.py test_report_info.py test_demo_dataset_views.py; do
+for test in test_label_schemes.py test_dimer_collapse.py test_mcc_abstention.py test_prereg_freeze.py test_bin_outcomes.py test_contig_scoring.py test_recommender_eval.py test_panel_operational.py test_wilcoxon.py test_leave_taxon_out.py test_rank_axes_new.py test_amr_placement.py test_report_scoring_spec.py test_contig_crosscheck.py test_fetch_ena_reads.py test_report_svg.py test_report_maps.py test_plasmid_viewer.py test_report_3d.py test_report_scorecard.py test_report_workflow.py test_report_surfaces.py test_report_wiring.py test_report_collapse.py test_report_fig_ladder.py test_report_fig_landscape.py test_report_fig_heatmap.py test_report_fig_stats.py test_report_fig_pr.py test_report_info.py test_demo_dataset_views.py; do
     python3 "$HERE/$test"
 done
 bash "$HERE/test_outcome_states.sh"

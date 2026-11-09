@@ -1,0 +1,408 @@
+<script>
+/* DOM glue of the two statistical figures: setup panel (tabs), legend filter, tooltips on hover and focus, drilldown, export, URL hash (keys prefixed st).
+   Needs PBSTAT (fig_stats_core.html) and the JSON payload #st-data. If anything fails the static SVG stays on screen. */
+(function () {
+'use strict';
+var P = window.PBSTAT, dataEl = document.getElementById('st-data');
+if (!P || !dataEl) return;
+var D;
+try { D = JSON.parse(dataEl.textContent); } catch (e) { return; }
+var LS_KEY = 'plasbench.st.panel';
+var reduce = false; try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* no matchMedia */ }
+
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') n.textContent = attrs[k]; else if (k === 'html') n.innerHTML = attrs[k]; else n.setAttribute(k, attrs[k]); });
+  (kids || []).forEach(function (c) { if (c) n.appendChild(c); });
+  return n;
+}
+function lsGet() { try { return localStorage.getItem(LS_KEY); } catch (e) { return null; } }
+function lsSet(v) { try { localStorage.setItem(LS_KEY, v); } catch (e) { /* storage blocked */ } }
+function hashParams(id) {
+  var h = location.hash || '', pre = '#' + id + '?', out = {};
+  if (h.indexOf(pre) !== 0) return out;
+  h.slice(pre.length).split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) out[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+  return out;
+}
+function writeHash(id, obj) {
+  try { history.replaceState(null, '', '#' + id + '?' + Object.keys(obj).map(function (k) { return k + '=' + encodeURIComponent(obj[k]); }).join('&')); } catch (e) { /* file: pages may refuse */ }
+}
+function download(name, mime, text) {
+  var blob = new Blob([text], {type: mime}), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function pngFrom(svgText, name) {
+  var m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svgText), w = parseFloat(m[1]), h = parseFloat(m[2]), img = new Image();
+  img.onload = function () {
+    var c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2; var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(img, 0, 0, c.width, c.height);
+    try { c.toBlob(function (b) { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }); } catch (e) { /* tainted canvas */ }
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+}
+function table(headers, rows, onRow) {
+  var st = {col: -1, dir: 1}, wrap = el('div', {'class': 'st-tw'}), t = el('table'), head = el('tr'), body = el('tbody');
+  function paint() {
+    body.innerHTML = '';
+    var order = rows.map(function (r, i) { return i; });
+    if (st.col >= 0) order.sort(function (a, b) {
+      var x = rows[a][st.col], y = rows[b][st.col], nx = parseFloat(x), ny = parseFloat(y);
+      var c = (!isNaN(nx) && !isNaN(ny) && String(nx) === String(x).trim()) ? nx - ny : String(x).localeCompare(String(y));
+      return c * st.dir;
+    });
+    order.forEach(function (i) {
+      var tr = el('tr'); rows[i].forEach(function (v) { tr.appendChild(el('td', {text: v == null ? 'not available' : String(v)})); });
+      if (onRow) { tr.style.cursor = 'pointer'; tr.addEventListener('click', function () { onRow(i); }); }
+      body.appendChild(tr);
+    });
+    Array.prototype.forEach.call(head.children, function (th, i) { if (i === st.col) th.setAttribute('aria-sort', st.dir > 0 ? 'ascending' : 'descending'); else th.removeAttribute('aria-sort'); });
+  }
+  headers.forEach(function (h, i) {
+    var b = el('button', {type: 'button', text: h}); b.addEventListener('click', function () { st.dir = st.col === i ? -st.dir : 1; st.col = i; paint(); });
+    head.appendChild(el('th', {scope: 'col'}, [b]));
+  });
+  t.appendChild(el('thead', {}, [head])); t.appendChild(body); wrap.appendChild(t); paint();
+  return wrap;
+}
+function dl(pairs) {
+  var d = el('dl', {'class': 'st-dl'});
+  pairs.forEach(function (p) { d.appendChild(el('dt', {text: p[0]})); d.appendChild(el('dd', {text: p[1] == null ? 'not available' : String(p[1])})); });
+  return d;
+}
+function f3(x) { return x == null ? 'not available' : x.toFixed(3); }
+
+/* shared chrome: returns {root, stage pieces, panel pieces} */
+function chrome(host, tabs, state, rerender) {
+  var root = el('div', {'class': 'st-root'}), main = el('div', {'class': 'st-main'});
+  var stage = el('div', {'class': 'st-stage'}), toolbar = el('div', {'class': 'st-toolbar'}), sum = el('div', {'class': 'st-sum', role: 'status', 'aria-live': 'polite'});
+  var legend = el('div', {'class': 'st-legend', role: 'group'}), plot = el('div', {'class': 'st-plot'}), foot = el('div', {'class': 'st-shapes'});
+  var panel = el('aside', {'class': 'st-panel', 'aria-label': 'Setup panel'}), tabsEl = el('div', {'class': 'st-tabs', role: 'tablist'});
+  var body = el('div', {'class': 'st-tabbody', role: 'tabpanel', tabindex: '-1'});
+  var pb = el('button', {type: 'button', 'class': 'st-btn', 'aria-expanded': 'true', text: 'Setup panel'});
+  var open = lsGet() !== '0';
+  function applyPanel() { main.classList.toggle('st-nopanel', !open); pb.setAttribute('aria-expanded', String(open)); }
+  pb.addEventListener('click', function () { open = !open; lsSet(open ? '1' : '0'); applyPanel(); });
+  applyPanel();
+  toolbar.appendChild(pb); toolbar.appendChild(sum);
+  stage.appendChild(toolbar); stage.appendChild(plot); stage.appendChild(legend); stage.appendChild(foot);
+  panel.appendChild(tabsEl); panel.appendChild(body); main.appendChild(stage); main.appendChild(panel); root.appendChild(main);
+  var tip = el('div', {'class': 'st-tip', role: 'tooltip', hidden: ''}); root.appendChild(tip);
+  tabs.forEach(function (t) {
+    var b = el('button', {type: 'button', role: 'tab', 'class': 'st-tab', text: t[1], 'data-tab': t[0]});
+    b.addEventListener('click', function () { state.tab = t[0]; rerender(true); });
+    b.addEventListener('keydown', function (e) {
+      var i = tabs.map(function (x) { return x[0]; }).indexOf(t[0]), j = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
+      if (j == null) return; j = (j + tabs.length) % tabs.length; state.tab = tabs[j][0]; rerender(true); tabsEl.children[j].focus(); e.preventDefault();
+    });
+    tabsEl.appendChild(b);
+  });
+  function paintTabs() { Array.prototype.forEach.call(tabsEl.children, function (b) { var on = b.getAttribute('data-tab') === state.tab; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; }); }
+  function showTip(target, x, y, html) {
+    tip.innerHTML = html; tip.hidden = false;
+    var r = tip.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    var left = Math.min(Math.max(8, x + 14), vw - r.width - 8), top = y + 16 + r.height > vh ? Math.max(8, y - r.height - 12) : y + 16;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  function hideTip() { tip.hidden = true; }
+  host.innerHTML = ''; host.appendChild(root); host.classList.add('st-on');
+  return {root: root, sum: sum, legend: legend, plot: plot, foot: foot, body: body, paintTabs: paintTabs, showTip: showTip, hideTip: hideTip};
+}
+function wireTips(plot, ui, tipFor, activate, keyNav) {
+  function at(t) { while (t && t !== plot) { if (t.getAttribute && t.getAttribute('data-k')) return t; t = t.parentNode; } return null; }
+  plot.addEventListener('mousemove', function (e) { var t = at(e.target); if (!t) { ui.hideTip(); return; } var h = tipFor(t); if (h) ui.showTip(t, e.clientX, e.clientY, h); else ui.hideTip(); });
+  plot.addEventListener('mouseleave', ui.hideTip);
+  plot.addEventListener('focusin', function (e) { var t = at(e.target); if (!t) return; var h = tipFor(t); if (h) { var r = t.getBoundingClientRect(); ui.showTip(t, r.left + r.width / 2, r.top + r.height / 2, h); } });
+  plot.addEventListener('focusout', ui.hideTip);
+  plot.addEventListener('click', function (e) { var t = at(e.target); if (t) activate(t); });
+  plot.addEventListener('keydown', function (e) {
+    var t = at(e.target); if (!t) return;
+    if (e.key === 'Escape') { ui.hideTip(); return; }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(t); return; }
+    if (keyNav) keyNav(t, e);
+  });
+}
+function exportTab(body, svgNow, csvNow, base) {
+  body.appendChild(el('h4', {text: 'Export what is on screen'}));
+  var r = el('div', {'class': 'st-row'});
+  [['SVG', function () { download(base + '.svg', 'image/svg+xml', svgNow()); }], ['PNG', function () { pngFrom(svgNow(), base + '.png'); }],
+   ['CSV of the plotted data', function () { download(base + '.csv', 'text/csv', csvNow()); }]].forEach(function (b) {
+    var x = el('button', {type: 'button', 'class': 'st-btn', text: b[0]}); x.addEventListener('click', b[1]); r.appendChild(x);
+  });
+  body.appendChild(r);
+  body.appendChild(el('p', {'class': 'st-muted', text: 'The CSV holds one row per plotted isolate (distributions) or per stratum (forest), with counts, so every plotted number can be rebuilt.'}));
+}
+function select(label, opts, value, onChange) {
+  var s = el('select', {'aria-label': label});
+  opts.forEach(function (o) { var op = el('option', {value: o[0], text: o[1]}); if (String(o[0]) === String(value)) op.selected = true; s.appendChild(op); });
+  s.addEventListener('change', function () { onChange(s.value); }); return s;
+}
+function check(label, on, onChange) {
+  var i = el('input', {type: 'checkbox'}); i.checked = on; i.addEventListener('change', function () { onChange(i.checked); });
+  return el('label', {}, [i, el('span', {text: label})]);
+}
+function radio(name, label, on, onChange) {
+  var i = el('input', {type: 'radio', name: name}); i.checked = on; i.addEventListener('change', function () { if (i.checked) onChange(); });
+  return el('label', {}, [i, el('span', {text: label})]);
+}
+function uniq(a) { return a.filter(function (v, i) { return a.indexOf(v) === i; }); }
+
+/* ------------------------------------------------------------------ distributions */
+function mountDist(host) {
+  var S = {tab: 'group', group: 'species', mode: 'violin', points: true, lb: true, hidden: [], tiers: ['1', '2', '3', 'unrecorded'], species: null, tracks: null, sel: null, slot: null};
+  var allSpecies = uniq(D.samples.map(function (s) { return s[1]; })).sort(), allTracks = uniq(D.tools.map(function (t) { return t[1]; })).sort();
+  S.species = allSpecies.slice(); S.tracks = allTracks.slice();
+  var hp = hashParams('fig-distributions');
+  if (hp.stg && ['species', 'track', 'content', 'tier'].indexOf(hp.stg) >= 0) S.group = hp.stg;
+  if (hp.stm === 'box') S.mode = 'box';
+  if (hp.stp === '0') S.points = false;
+  if (hp.sttab && ['group', 'filters', 'data', 'detail', 'export'].indexOf(hp.sttab) >= 0) S.tab = hp.sttab;
+  if (hp.stx) S.hidden = hp.stx.split(',').map(Number).filter(function (n) { return !isNaN(n); });
+  if (hp.sts != null && hp.sts !== '' && D.samples[+hp.sts]) S.sel = +hp.sts;
+  var ui, model, dataF, focusKey = null, touched = false;
+  var multi = P.multiTrack(D);
+  function filtered() {
+    var okS = function (si) { var s = D.samples[si]; return S.tiers.indexOf(s[3]) >= 0 && S.species.indexOf(s[1]) >= 0; };
+    var okT = function (t) { return S.tracks.indexOf(D.tools[t][1]) >= 0; };
+    return {samples: D.samples, tools: D.tools, lb: D.lb, pts: D.pts.filter(function (p) { return okS(p[1]) && okT(p[0]); }), excl: D.excl.filter(function (p) { return okS(p[1]) && okT(p[0]); })};
+  }
+  function svgNow(inter) { return P.distSvg(dataF, model, {mode: S.mode, points: S.points, sel: S.sel, lb: S.lb, interactive: inter}); }
+  function persist() {
+    if (!touched) return;
+    var o = {stg: S.group, stm: S.mode, stp: S.points ? 1 : 0, sttab: S.tab}; if (S.hidden.length) o.stx = S.hidden.join(','); if (S.sel != null) o.sts = S.sel;
+    writeHash('fig-distributions', o);
+  }
+  function tipFor(t) {
+    var k = t.getAttribute('data-k'), tool = +t.getAttribute('data-t'), name = P.toolName(D, tool, multi);
+    if (k === 'p') {
+      var si = +t.getAttribute('data-s'), s = D.samples[si], q = null;
+      model.facets[+t.getAttribute('data-f')].slots.forEach(function (sl) { if (sl.tool === tool) sl.pts.forEach(function (p) { if (p.si === si) q = p; }); });
+      return '<strong>' + P.esc(s[0]) + '</strong><br>' + P.esc(name) + '<br>' + P.esc(s[1]) + '<br>' + P.esc(P.TIER_NAME[s[3]] || s[3]) + '<br>' + q.c + ' of ' + q.t + ' plasmids correct: CPRR ' + q.v.toFixed(3) + '<br><span class="st-muted">Click to follow this isolate across tools.</span>';
+    }
+    var sl = model.facets[+t.getAttribute('data-f')].slots.filter(function (x) { return x.tool === tool; })[0];
+    var h = '<strong>' + P.esc(name) + '</strong> in ' + P.esc(model.facets[+t.getAttribute('data-f')].label) + '<br>' + sl.n + ' isolate' + (sl.n === 1 ? '' : 's') + (sl.excl ? ', ' + sl.excl + ' excluded (no assessable plasmid)' : '');
+    if (sl.full) h += '<br>median ' + sl.stat.med.toFixed(3) + ', IQR ' + sl.stat.q1.toFixed(3) + ' to ' + sl.stat.q3.toFixed(3) + (S.mode === 'violin' ? '<br>bandwidth ' + sl.bw.toFixed(3) : '');
+    else h += '<br>fewer than ' + P.MIN_VIOLIN + ' isolates: points only, no density or box';
+    return h;
+  }
+  function activate(t) {
+    var k = t.getAttribute('data-k');
+    if (k === 'p') { var si = +t.getAttribute('data-s'); S.sel = S.sel === si ? null : si; S.slot = null; focusKey = 'p|' + t.getAttribute('data-t') + '|' + si + '|' + t.getAttribute('data-f'); }
+    else { S.slot = {t: +t.getAttribute('data-t'), f: +t.getAttribute('data-f')}; focusKey = 'slot|' + S.slot.t + '|' + S.slot.f; }
+    S.tab = 'detail'; render(true);
+  }
+  function keyNav(t, e) {
+    var k = t.getAttribute('data-k');
+    if (k === 'slot' && (e.key === 'ArrowDown' || e.key === 'ArrowRight')) { var p = t.querySelector('[data-k=p]'); if (p) { p.focus(); e.preventDefault(); } }
+    if (k === 'p') {
+      var pts = Array.prototype.slice.call(t.parentNode.querySelectorAll('[data-k=p]')), i = pts.indexOf(t), j = null;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') j = Math.min(i + 1, pts.length - 1); else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
+      if (j != null) { pts[j].focus(); e.preventDefault(); } else if (e.key === 'Escape') t.parentNode.focus();
+    }
+  }
+  function legend() {
+    ui.legend.innerHTML = '';
+    var withPts = uniq(D.pts.map(function (p) { return p[0]; })).sort(function (a, b) { return a - b; });
+    withPts.forEach(function (t) {
+      var b = el('button', {type: 'button', 'class': 'st-chip', 'aria-pressed': String(S.hidden.indexOf(t) < 0)}, [el('i', {style: 'background:' + P.colour(t)}), el('span', {text: P.toolName(D, t, multi)})]);
+      b.addEventListener('click', function () { var i = S.hidden.indexOf(t); if (i < 0) S.hidden.push(t); else S.hidden.splice(i, 1); render(false); });
+      ui.legend.appendChild(b);
+    });
+  }
+  function statRows() {
+    var rows = [];
+    model.facets.forEach(function (f) { f.slots.forEach(function (s) {
+      var st = s.stat;
+      rows.push([f.label, D.tools[s.tool][2], D.tools[s.tool][1], s.n, s.excl, s.n ? f3(quantileOf(s)) : null, s.n ? f3(s.mean) : null, st ? f3(st.q1) : null, st ? f3(st.q3) : null, s.full ? S.mode : 'points only']);
+    }); });
+    return rows;
+  }
+  function quantileOf(s) { return P.quantile7(s.pts.map(function (q) { return q.v; }), 0.5); }
+  function panelBody() {
+    var b = ui.body; b.innerHTML = '';
+    if (S.tab === 'group') {
+      b.appendChild(el('h4', {text: 'Group isolates by'}));
+      b.appendChild(select('Group by', D.groups, S.group, function (v) { S.group = v; S.slot = null; render(false); }));
+      b.appendChild(el('h4', {text: 'Plot type'}));
+      var r = el('div', {'class': 'st-row'}); r.appendChild(radio('stm', 'Violin', S.mode === 'violin', function () { S.mode = 'violin'; render(false); })); r.appendChild(radio('stm', 'Box', S.mode === 'box', function () { S.mode = 'box'; render(false); })); b.appendChild(r);
+      b.appendChild(el('h4', {text: 'Layers'}));
+      b.appendChild(el('div', {'class': 'st-row'}, [check('Every isolate as a point', S.points, function (v) { S.points = v; render(false); })]));
+      b.appendChild(el('div', {'class': 'st-row'}, [check('Cluster-bootstrap CI bar (when the leaderboard has one)', S.lb, function (v) { S.lb = v; render(false); })]));
+      b.appendChild(el('p', {'class': 'st-muted', html: 'Violin: Gaussian kernel density, Silverman bandwidth (floor 0.02), clipped to 0 to 1, every violin scaled to the same maximum width. Box: median, quartiles (linear interpolation), whiskers to the most extreme isolate within 1.5 IQR. Groups with fewer than ' + P.MIN_VIOLIN + ' isolates show points only.'}));
+    } else if (S.tab === 'filters') {
+      function setBox(title, all, key, labelFn) {
+        b.appendChild(el('h4', {text: title}));
+        var list = el('div', {'class': 'st-list'});
+        all.forEach(function (v) { list.appendChild(el('div', {'class': 'st-row'}, [check(labelFn ? labelFn(v) : v, S[key].indexOf(v) >= 0, function (on) { var i = S[key].indexOf(v); if (on && i < 0) S[key].push(v); if (!on && i >= 0) S[key].splice(i, 1); render(false); })])); });
+        b.appendChild(list);
+      }
+      setBox('Tracks', allTracks, 'tracks');
+      setBox('Reference tiers', ['1', '2', '3', 'unrecorded'], 'tiers', function (v) { return P.TIER_NAME[v]; });
+      setBox('Species', allSpecies, 'species');
+      b.appendChild(el('p', {'class': 'st-muted', text: 'Tools are filtered with the chips under the figure.'}));
+    } else if (S.tab === 'data') {
+      b.appendChild(el('h4', {text: 'Plotted groups'}));
+      b.appendChild(table(['Group', 'Tool', 'Track', 'Isolates', 'Excluded', 'Median', 'Mean', 'Q1', 'Q3', 'Drawn as'], statRows()));
+      b.appendChild(el('p', {'class': 'st-muted', text: 'Excluded = isolates with no assessable plasmid (blank CPRR): counted, never plotted as 0. Click a column heading to sort.'}));
+    } else if (S.tab === 'detail') {
+      detail(b);
+    } else {
+      exportTab(b, function () { return svgNow(false); }, function () { return P.distCsv(dataF, model); }, 'plasbench_cprr_distributions');
+    }
+  }
+  function detail(b) {
+    if (S.sel != null) {
+      var s = D.samples[S.sel];
+      b.appendChild(el('h4', {text: 'Isolate ' + s[0]}));
+      b.appendChild(dl([['Species', s[1]], ['Reference tier', P.TIER_NAME[s[3]] || s[3]], ['Plasmid content (total bp)', s[2]]]));
+      var rows = D.tools.map(function (t, ti) {
+        var p = D.pts.filter(function (x) { return x[0] === ti && x[1] === S.sel; })[0];
+        return [t[2], t[1], p ? p[2] + ' of ' + p[3] : null, p ? f3(p[2] / p[3]) : null];
+      }).filter(function (r) { return true; });
+      b.appendChild(table(['Tool', 'Track', 'Correct / plasmids', 'CPRR'], rows));
+      b.appendChild(el('p', {'class': 'st-muted', text: 'A dashed line joins this isolate across tools in each group. Click the same point again to clear it. "not available" means the isolate has no assessable plasmid for that tool (blank, not zero).'}));
+      var c = el('button', {type: 'button', 'class': 'st-btn', text: 'Clear isolate trace'}); c.addEventListener('click', function () { S.sel = null; render(false); }); b.appendChild(c);
+    } else if (S.slot) {
+      var f = model.facets[S.slot.f], sl = f && f.slots.filter(function (x) { return x.tool === S.slot.t; })[0];
+      if (sl) {
+        b.appendChild(el('h4', {text: D.tools[sl.tool][2] + ' in ' + f.label}));
+        b.appendChild(dl([['Track', D.tools[sl.tool][1]], ['Isolates drawn', sl.n], ['Excluded (no assessable plasmid)', sl.excl], ['Mean CPRR', sl.n ? f3(sl.mean) : null], ['Median CPRR', sl.n ? f3(quantileOf(sl)) : null],
+          ['Drawn as', sl.full ? S.mode : 'points only (fewer than ' + P.MIN_VIOLIN + ' isolates)']]));
+        b.appendChild(table(['Isolate', 'Species', 'Tier', 'Correct / plasmids', 'CPRR'], sl.pts.map(function (q) { var s = D.samples[q.si]; return [s[0], s[1], s[3], q.c + ' of ' + q.t, f3(q.v)]; }), function (i) { S.sel = sl.pts[i].si; render(false); }));
+      }
+    } else b.appendChild(el('p', {'class': 'st-muted', text: 'Click an isolate to follow it across tools, or click a violin or box for its group. Keyboard: Tab to a group, Arrow Down to enter its isolates, Enter to select.'}));
+  }
+  function render(keepFocus) {
+    dataF = filtered(); model = P.distModel(dataF, S.group, S.hidden);
+    var anyLb = Object.keys(D.lb).some(function (k) { return D.lb[k][1] != null && D.lb[k][2] != null; });
+    var nIso = uniq(dataF.pts.map(function (p) { return p[1]; })).length;
+    ui.sum.textContent = nIso + ' isolates with an assessable plasmid; ' + dataF.excl.length + ' tool-isolate pairs excluded (blank CPRR, not zero). ' + (anyLb ? '' : 'No cluster-bootstrap CI in the leaderboard. ') + 'Demo data are synthetic and flat.';
+    ui.plot.innerHTML = svgNow(true);
+    ui.foot.textContent = 'Marker shape = reference tier: circle tier 1, square tier 2, dashed triangle tier 3 (provisional), diamond not recorded. * = fewer than ' + P.MIN_VIOLIN + ' isolates: points only. Bar beside a group = cluster-bootstrap CI of pooled CPRR (circle = pooled CPRR).';
+    legend(); ui.paintTabs(); panelBody(); persist();
+    if (focusKey) {
+      var q = focusKey.split('|'), sel = q[0] === 'p' ? '[data-k=p][data-t="' + q[1] + '"][data-s="' + q[2] + '"][data-f="' + q[3] + '"]' : '[data-k=slot][data-t="' + q[1] + '"][data-f="' + q[2] + '"]';
+      var n = ui.plot.querySelector(sel); if (n && keepFocus) n.focus({preventScroll: true}); focusKey = null;
+    }
+  }
+  ui = chrome(host, [['group', 'Group'], ['filters', 'Filters'], ['data', 'Data'], ['detail', 'Detail'], ['export', 'Export']], S, render);
+  wireTips(ui.plot, ui, tipFor, activate, keyNav);
+  render(false);
+  touched = true;
+}
+
+/* ------------------------------------------------------------------ forest */
+function mountForest(host) {
+  var tools = Object.keys(D.strata).map(Number).sort(function (a, b) { return a - b; });
+  var S = {tab: 'contrast', tool: D.best.length ? D.best[0] : tools[0], toolB: null, contrast: 'diff', fams: D.defaultFamilies.slice(), minN: D.minN, hideUnder: false, hideNA: false, sel: null};
+  S.toolB = tools.filter(function (t) { return t !== S.tool; })[0];
+  var hp = hashParams('fig-forest');
+  if (hp.stt != null && D.strata[hp.stt]) S.tool = +hp.stt;
+  if (hp.stb != null && D.strata[hp.stb]) S.toolB = +hp.stb;
+  if (['diff', 'abs', 'tools'].indexOf(hp.stc) >= 0) S.contrast = hp.stc;
+  if (hp.stf != null) S.fams = hp.stf.split(',').filter(Boolean);
+  if (hp.stn && +hp.stn >= 1) S.minN = +hp.stn;
+  if (hp.stu === '1') S.hideUnder = true;
+  if (hp.sthna === '1') S.hideNA = true;
+  if (hp.sttab && ['contrast', 'filters', 'data', 'detail', 'export'].indexOf(hp.sttab) >= 0) S.tab = hp.sttab;
+  var ui, rows, lay, multi = P.multiTrack(D), focusKey = null, touched = false;
+  function toolOpt(t) { return [t, P.toolName(D, t, multi) + (D.best.indexOf(t) >= 0 ? ' (best in track)' : '')]; }
+  function compute() {
+    var all = P.forestRows(D, S.tool, S.contrast, S.toolB, S.fams, S.minN);
+    var keep = all.filter(function (r) { return !(r.kind === 'row' && ((S.hideUnder && r.under) || (S.hideNA && !r.avail))); });
+    rows = keep.filter(function (r, i) { return r.kind !== 'head' || (keep[i + 1] && keep[i + 1].kind === 'row'); });
+    var oc = D.overall[String(S.tool)]; lay = P.forestLayout(rows, S.contrast, oc && oc[1] ? oc[0] / oc[1] : null);
+  }
+  function svgNow(inter) { return P.forestSvg(rows, lay, S.contrast, {interactive: inter, sel: S.sel, colourIndex: S.tool}); }
+  function persist() {
+    if (!touched) return;
+    var o = {stt: S.tool, stc: S.contrast, stf: S.fams.join(','), stn: S.minN, sttab: S.tab}; if (S.contrast === 'tools' && S.toolB != null) o.stb = S.toolB; if (S.hideUnder) o.stu = 1; if (S.hideNA) o.sthna = 1;
+    writeHash('fig-forest', o);
+  }
+  function methodName(r) { return {W: 'Wilson (plasmids pooled, not cluster-aware)', B: 'cluster bootstrap (leaderboard)', N: 'Newcombe hybrid score (difference of two Wilson intervals, plasmids pooled)'}[r.ci]; }
+  function tipFor(t) {
+    var r = rows[+t.getAttribute('data-i')];
+    return '<strong>' + P.esc(r.label) + '</strong><br>' + (r.t ? r.c + ' of ' + r.t + ' plasmids correct' : 'no assessable plasmids') + ', ' + r.units + ' ' + (r.src === 'isolates' ? 'isolate' : 'sample') + (r.units === 1 ? '' : 's') +
+      '<br>' + P.esc(P.rowText(r, S.contrast)) + (r.avail ? '<br><span class="st-muted">' + P.esc(methodName(r)) + '</span>' : '') + (r.avail && r.under ? '<br><strong>Underpowered</strong> (fewer than ' + S.minN + ')' : '');
+  }
+  function activate(t) { S.sel = +t.getAttribute('data-i'); S.tab = 'detail'; focusKey = S.sel; render(true); }
+  function keyNav(t, e) {
+    var all = Array.prototype.slice.call(ui.plot.querySelectorAll('[data-k=r]')), i = all.indexOf(t), j = null;
+    if (e.key === 'ArrowDown') j = Math.min(i + 1, all.length - 1); else if (e.key === 'ArrowUp') j = Math.max(i - 1, 0);
+    if (j != null) { all[j].focus(); e.preventDefault(); }
+  }
+  function dataRows() {
+    return rows.filter(function (r) { return r.kind !== 'head'; }).map(function (r) { return [r.label, r.fam || 'overall', r.c == null ? null : r.c, r.t, r.units, r.est == null ? null : f3(r.est), r.lo == null ? null : f3(r.lo), r.hi == null ? null : f3(r.hi), r.avail ? r.ci : null, r.avail ? (r.under ? 'underpowered' : 'ok') : 'not available']; });
+  }
+  function panelBody() {
+    var b = ui.body; b.innerHTML = '';
+    if (S.tab === 'contrast') {
+      b.appendChild(el('h4', {text: 'Tool'}));
+      b.appendChild(select('Tool', tools.map(toolOpt), S.tool, function (v) { S.tool = +v; S.sel = null; render(false); }));
+      b.appendChild(el('h4', {text: 'Contrast'}));
+      [['diff', 'Stratum CPRR minus the tool’s overall CPRR'], ['abs', 'Stratum CPRR (absolute, 0 to 1)'], ['tools', 'Tool A minus tool B, stratum by stratum']].forEach(function (c) {
+        b.appendChild(el('div', {'class': 'st-row'}, [radio('stc', c[1], S.contrast === c[0], function () { S.contrast = c[0]; render(false); })]));
+      });
+      if (S.contrast === 'tools') {
+        b.appendChild(el('h4', {text: 'Tool B (subtracted)'}));
+        b.appendChild(select('Tool B', tools.map(toolOpt), S.toolB, function (v) { S.toolB = +v; render(false); }));
+        var A = D.tools[S.tool], B = D.tools[S.toolB], pr = D.pairs.filter(function (p) { return (p[1] === A[2] && p[2] === B[2]) || (p[1] === B[2] && p[2] === A[2]); })[0];
+        b.appendChild(el('p', {'class': 'st-muted', text: pr ? 'Leaderboard paired comparison (' + pr[3] + ', not CPRR; ' + pr[1] + ' minus ' + pr[2] + '): difference ' + (pr[4] == null ? 'not available' : pr[4]) + ', CI ' + (pr[5] == null ? 'not available' : pr[5] + ' to ' + pr[6]) + ', Holm p ' + (pr[7] == null ? 'not available' : pr[7]) + ' over ' + (pr[8] == null ? 'not available' : pr[8]) + ' clusters.' : 'No leaderboard paired comparison exists for this pair. Strata are compared on pooled CPRR; tools from different tracks use different isolates.'}));
+      }
+      b.appendChild(el('h4', {text: 'Strata shown'}));
+      D.families.forEach(function (f) { b.appendChild(el('div', {'class': 'st-row'}, [check(f[1], S.fams.indexOf(f[0]) >= 0, function (on) { var i = S.fams.indexOf(f[0]); if (on && i < 0) S.fams.push(f[0]); if (!on && i >= 0) S.fams.splice(i, 1); render(false); })])); });
+      b.appendChild(el('p', {'class': 'st-muted', text: 'Plasmid size, MOB type, replicon and AMR rows come from the replicon-recovery table; they are blank where that table has no CPRR, and shown as not available, never as 0.'}));
+    } else if (S.tab === 'filters') {
+      b.appendChild(el('h4', {text: 'Underpowered strata'}));
+      var ni = el('input', {type: 'number', min: '1', max: '100', value: String(S.minN), 'aria-label': 'Minimum isolates'});
+      ni.addEventListener('change', function () { var v = Math.max(1, Math.min(100, parseInt(ni.value, 10) || D.minN)); S.minN = v; render(false); });
+      b.appendChild(el('div', {'class': 'st-row'}, [el('label', {}, [el('span', {text: 'Hollow below this many isolates: '}), ni])]));
+      b.appendChild(el('div', {'class': 'st-row'}, [check('Hide underpowered strata', S.hideUnder, function (v) { S.hideUnder = v; render(false); })]));
+      b.appendChild(el('div', {'class': 'st-row'}, [check('Hide strata with no CPRR (not available)', S.hideNA, function (v) { S.hideNA = v; render(false); })]));
+      b.appendChild(el('p', {'class': 'st-muted', text: 'The default floor of ' + D.minN + ' isolates follows the report’s scorecard convention.'}));
+    } else if (S.tab === 'data') {
+      b.appendChild(el('h4', {text: 'Plotted strata'}));
+      b.appendChild(table(['Stratum', 'Family', 'Correct', 'Plasmids', 'Units', 'Estimate', 'CI low', 'CI high', 'CI', 'Status'], dataRows(), function (i) {
+        var vis = rows.map(function (r, k) { return r.kind !== 'head' ? k : -1; }).filter(function (k) { return k >= 0; }); S.sel = vis[i]; S.tab = 'detail'; render(false);
+      }));
+      b.appendChild(el('p', {'class': 'st-muted', text: 'CI: W = Wilson (plasmids pooled, not cluster-aware), B = cluster bootstrap, N = Newcombe. Units = isolates (or samples for table strata).'}));
+    } else if (S.tab === 'detail') {
+      detail(b);
+    } else exportTab(b, function () { return svgNow(false); }, function () { return P.forestCsv(rows, S.contrast); }, 'plasbench_cprr_forest');
+  }
+  function detail(b) {
+    var r = S.sel != null ? rows[S.sel] : null;
+    if (!r || r.kind === 'head') { b.appendChild(el('p', {'class': 'st-muted', text: 'Click a row (or press Enter on it) to see the isolates and plasmids behind it.'})); return; }
+    b.appendChild(el('h4', {text: r.label}));
+    b.appendChild(dl([['Tool', P.toolName(D, S.tool, multi)], ['Correct / assessed plasmids', r.t ? r.c + ' of ' + r.t : null], ['CPRR', r.t ? f3(r.c / r.t) : null], ['Estimate (' + S.contrast + ')', r.avail ? P.rowText(r, S.contrast) : null],
+      ['Interval', r.avail ? methodName(r) : 'not available'], [r.src === 'isolates' ? 'Isolates' : 'Samples', r.units], ['Status', r.avail ? (r.under ? 'underpowered (fewer than ' + S.minN + ')' : 'adequately powered') : 'not available']]));
+    if (r.src === 'isolates' || r.kind === 'overall') {
+      var pos = {species: 1, content: 2, tier: 3}[r.fam], list = D.pts.filter(function (p) {
+        if (p[0] !== S.tool) return false; if (r.kind === 'overall') return true; var s = D.samples[p[1]]; return (r.fam === 'tier' ? (P.TIER_NAME[s[3]] || s[3]) : s[pos]) === r.label;
+      });
+      b.appendChild(table(['Isolate', 'Species', 'Tier', 'Correct / plasmids', 'CPRR'], list.map(function (p) { var s = D.samples[p[1]]; return [s[0], s[1], s[3], p[2] + ' of ' + p[3], f3(p[2] / p[3])]; })));
+    } else b.appendChild(el('p', {'class': 'st-muted', text: 'This stratum is plasmid-level and comes from the replicon-recovery table (benchmark.recovery_by_replicon.tsv): per-plasmid rows are in that table, not in this figure’s payload.'}));
+  }
+  function render(keepFocus) {
+    compute();
+    var A = P.toolName(D, S.tool, multi), what = S.contrast === 'tools' ? A + ' minus ' + P.toolName(D, S.toolB, multi) : A;
+    ui.sum.textContent = what + ': ' + ({diff: 'stratum CPRR minus the tool’s overall CPRR', abs: 'stratum CPRR', tools: 'CPRR difference'}[S.contrast]) + '. Demo data are synthetic and flat.';
+    ui.plot.innerHTML = svgNow(true);
+    ui.legend.innerHTML = '';
+    ui.legend.appendChild(el('span', {'class': 'st-key', text: 'Square = stratum, sized by plasmids; hollow dashed = underpowered; line = 95% CI; arrow = CI runs past the axis; diamond = overall. W = Wilson (plasmids pooled, not cluster-aware); B = cluster bootstrap; N = Newcombe.'}));
+    ui.paintTabs(); panelBody(); persist();
+    if (focusKey != null) { var n = ui.plot.querySelector('[data-k=r][data-i="' + focusKey + '"]'); if (n && keepFocus) n.focus({preventScroll: true}); focusKey = null; }
+  }
+  ui = chrome(host, [['contrast', 'Contrast'], ['filters', 'Filters'], ['data', 'Data'], ['detail', 'Detail'], ['export', 'Export']], S, render);
+  wireTips(ui.plot, ui, tipFor, activate, keyNav);
+  render(false);
+  touched = true;
+}
+
+function start() {
+  Array.prototype.forEach.call(document.querySelectorAll('.st[data-st]'), function (host) {
+    try { if (host.getAttribute('data-st') === 'dist') mountDist(host); else mountForest(host); } catch (e) { if (window.console) console.error('PlasBench stats figure failed; the static figure stays', e); }
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>

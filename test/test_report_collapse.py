@@ -42,15 +42,15 @@ def main():
         ok &= bool(condition)
         print(f"  {'PASS' if condition else 'FAIL'}: {label}" + (f"  {detail}" if detail and not condition else ""))
 
-    plan = {"s1": ("the table", "fig-a")}
+    plan = {"s1": ("the table", "fig-a", "all of it is in the figure")}
     base = page_of(sec("s1", P1), sec("fig-a", "<p>figure</p>"))
     out = rcl.collapse(base, plan)
     print("folding")
     check("the panel is wrapped in a closed details", "<details class='rpt-collapsible'><summary>Show the table" in out and P1 in out)
     check("the details holds the whole panel", out.count("<details") == 1 and out.index("<details") < out.index(P1) < out.index("</details>"))
-    check("the summary says the numbers are drawn in the Figures group", "Figures group" in out)
+    check("the summary says what the figure covers", "all of it is in the figure" in out)
     check("every byte outside the wrapped panel is unchanged",
-          out.replace("<details class='rpt-collapsible'><summary>Show the table (the same numbers are drawn in the Figures group)</summary>", "")
+          out.replace("<details class='rpt-collapsible'><summary>Show the table (all of it is in the figure)</summary>", "")
           .replace("</details>", "") == base)
     two = rcl.collapse(page_of(sec("s1", P1 + "<p>x</p>" + P2), sec("fig-a", "<p>f</p>")), plan)
     check("two panels get (1 of 2) and (2 of 2)", "(1 of 2)" in two and "(2 of 2)" in two and two.count("<details") == 2)
@@ -73,12 +73,12 @@ def main():
 
     print("idempotence and the real plan")
     check("running twice changes nothing", rcl.collapse(out, plan) == out)
-    check("the real plan only names known figure sections", all(f in rf.FIGURE_SECTIONS for _, f in rcl.COLLAPSE.values() if f),
-          [f for _, f in rcl.COLLAPSE.values() if f and f not in rf.FIGURE_SECTIONS])
+    check("the real plan only names known figure sections", all(f in rf.FIGURE_SECTIONS for _, f, _c in rcl.COLLAPSE.values() if f),
+          [f for _, f, _c in rcl.COLLAPSE.values() if f and f not in rf.FIGURE_SECTIONS])
     report = os.path.join(HERE, "..", "results_demo", "benchmark.report.html")
     if os.path.isfile(report):
         html = open(report, encoding="utf-8").read()
-        for sid, (what, fig) in rcl.COLLAPSE.items():
+        for sid, (what, fig, covers) in rcl.COLLAPSE.items():
             b = rcl.section_bounds(html, sid)
             if not b:
                 continue

@@ -37,17 +37,20 @@ import test_report_maps as tm  # noqa: E402  (its model / gene / tool builders)
 NODE = shutil.which("node")
 CORE = os.path.join(ROOT, "assets", "report", "plasmid_viewer_core.html")
 UI = os.path.join(ROOT, "assets", "report", "plasmid_viewer_ui.html")
+ALIGN = os.path.join(ROOT, "assets", "report", "plasmid_viewer_align.html")
 STYLE = os.path.join(ROOT, "assets", "report", "plasmid_viewer_style.html")
 SVG_NS = "{http://www.w3.org/2000/svg}"
 
 RUNNER = r"""
 const fs = require('fs'), vm = require('vm');
-const html = fs.readFileSync(process.argv[2], 'utf8');
-const body = html.replace(/^\s*<script>/, '').replace(/<\/script>\s*$/, '');
 const sandbox = {module: {exports: {}}, console: console};
 sandbox.globalThis = sandbox; sandbox.window = undefined;
 vm.createContext(sandbox);
-vm.runInContext(body, sandbox, {filename: 'plasmid_viewer_core.js'});
+process.argv.slice(2).forEach(function (file) {
+  const html = fs.readFileSync(file, 'utf8');
+  const body = html.replace(/^\s*<script>/, '').replace(/<\/script>\s*$/, '');
+  vm.runInContext(body, sandbox, {filename: file});
+});
 const PV = sandbox.module.exports;
 const job = JSON.parse(fs.readFileSync(0, 'utf8'));
 PV.configure(job.config || {});
@@ -63,7 +66,7 @@ def js(code, input=None, config=None):
         with open(runner, "w", encoding="utf-8") as handle:
             handle.write(RUNNER)
         job = json.dumps({"code": code, "input": input, "config": config or rm.viewer_config()["core"]})
-        done = subprocess.run([NODE, runner, CORE], input=job, capture_output=True, text=True, encoding="utf-8")
+        done = subprocess.run([NODE, runner, CORE, ALIGN], input=job, capture_output=True, text=True, encoding="utf-8")
     if done.returncode != 0:
         raise RuntimeError(done.stderr.strip()[-1500:])
     return json.loads(done.stdout)
@@ -123,10 +126,10 @@ def main():
         print(f"  {'PASS' if condition else 'FAIL'}: {label}")
 
     print("fragments")
-    for path in (CORE, UI, STYLE):
+    for path in (CORE, ALIGN, UI, STYLE):
         check(f"{os.path.basename(path)} exists and is a single block", os.path.isfile(path) and open(path, encoding="utf-8").read().count("</script>") <= 1)
     check("no fragment contains a closing script tag inside its code",
-          all(open(p, encoding="utf-8").read().strip().endswith(("</script>", "</style>")) for p in (CORE, UI, STYLE)))
+          all(open(p, encoding="utf-8").read().strip().endswith(("</script>", "</style>")) for p in (CORE, ALIGN, UI, STYLE)))
     if not NODE:
         print("  SKIP: node not found; the JS parity tests need it")
         print("ALL PLASMID VIEWER TESTS PASSED (python checks only)")
@@ -385,6 +388,120 @@ def main():
     payload = data_blocks[0][1]
     check("the payload is compact: genes, tools, gc windows and defaults", set(payload) >= {"id", "sample", "plasmid", "length", "genes", "tools", "gc"} and payload["tools"][0].get("d") == 1
           and len(json.dumps(payload)) < 8000)
+    print("(h) reference versus reconstruction (linear alignment pane)")
+    L = 10000
+    bl = lambda rec, qlen, qs, qe, st, ts, te, ident=1.0: [rec, qlen, qs, qe, st, ts, te, ident, 60]  # noqa: E731
+    atools = [
+        dict(tm.tool("fwd_tool", [(0, 10000)], 1.0, "perfect", 1), blocks=[dict(record="c1", qlen=10000, qs=0, qe=10000, strand="+", ts=0, te=10000, identity=1.0, mapq=60)],
+             collinear_fraction=1.0, order_conflicts=0),
+        dict(tm.tool("inv_tool", [(0, 6000)], 0.6, "fragmented", 2, [{"pos": 3000, "type": "inversion_junction", "record": "c2", "detail": "x"}]),
+             blocks=[dict(record="c2", qlen=6000, qs=0, qe=3000, strand="+", ts=0, te=3000, identity=0.99, mapq=60),
+                     dict(record="c2", qlen=6000, qs=3000, qe=6000, strand="-", ts=3000, te=6000, identity=0.98, mapq=60)], collinear_fraction=0.5, order_conflicts=1),
+        dict(tm.tool("wrap_tool", [(0, 1000), (7000, 10000)], 0.4, "fragmented", 3),
+             blocks=[dict(record="w1", qlen=4000, qs=0, qe=3000, strand="+", ts=7000, te=10000, identity=1.0, mapq=60),
+                     dict(record="w1", qlen=4000, qs=3000, qe=4000, strand="+", ts=0, te=1000, identity=1.0, mapq=60),
+                     dict(record="w2", qlen=900, qs=0, qe=900, strand="+", ts=9500, te=10000, identity=0.9, mapq=60)], collinear_fraction=1.0, order_conflicts=0),
+        tm.tool("noblock_tool", [], 0.0, "missed", 4)]
+    amodel = tm.model(tools=atools, seq=seq)
+    apay = rm.viewer_payload(amodel)
+    check("payload: blocks travel as compact arrays with identity, collinear fraction and order conflicts", apay["tools"][0]["bl"][0][:7] == ["c1", 10000, 0, 10000, "+", 0, 10000]
+          and apay["tools"][1]["cf"] == 0.5 and apay["tools"][1]["oc"] == 1 and "bl" not in apay["tools"][3])
+    AL = """const m = PV.normalize(input.payload); const A = PV.align; const st = Object.assign(PV.defaultState(), input.state || {});
+        if (input.state && input.state.layers) { st.layers = Object.assign(PV.defaultState().layers, input.state.layers); }
+        """ + "%s"
+    def al(code, state=None, payload=None):
+        return js(AL % code, {"payload": payload or apay, "state": state or {}})
+    pk = js("return {a: PV.align.packRows([{s: 0, e: 100}, {s: 50, e: 150}, {s: 100, e: 200}, {s: 60, e: 70}], 0), b: PV.align.packRows([{s: 0, e: 100}, {s: 100, e: 200}], 10), c: PV.align.packRows([], 0)};")
+    check("lane packing: overlapping blocks take different rows, touching ones share a row, a gap forces a new row, an empty lane has one row",
+          pk["a"]["rows"] == [0, 1, 0, 2] and pk["a"]["n"] == 3 and pk["b"]["rows"] == [0, 1] and pk["c"]["n"] == 1)
+    rp = js("""const p = PV.align.ribbonPath(10, 50, 0, 110, 150, 40), q = PV.align.ribbonPath(50, 10, 0, 110, 150, 40);
+        const nums = s => s.match(/-?[0-9]+(?:[.][0-9]+)?/g).map(Number);
+        return {p: p, q: q, np: nums(p), nq: nums(q), fs: PV.align.blockStyle('+'), rs: PV.align.blockStyle('-'), bp: PV.align.blockPath(0, 20, 0, 10, 1), bn: PV.align.blockPath(0, 20, 0, 10, -1)};""")
+    check("ribbon path: closed band from the ruler to the block; a reverse alignment (reference ends swapped) twists, a forward one does not",
+          rp["p"].startswith("M10 0C") and rp["p"].endswith("Z") and rp["np"][0] < rp["np"][-2] and rp["nq"][0] > rp["nq"][-2])
+    check("strand style: forward is orange, solid, arrow right; reverse is blue, hatched, arrow left; the arrowhead tip sits on the matching side",
+          rp["fs"]["colour"] != rp["rs"]["colour"] and rp["fs"]["pattern"] == "solid" and rp["rs"]["pattern"] == "hatch" and rp["fs"]["arrow"] == 1 and rp["rs"]["arrow"] == -1
+          and "L20 5" in rp["bp"] and "L0 5" in rp["bn"])
+    lay = al("""const t = m.tools[2]; const w = A.wrapLinks(m, t); const ov = A.overlaps(m);
+        const nowrap = JSON.parse(JSON.stringify(input.payload)); nowrap.circ = false; const m2 = PV.normalize(nowrap);
+        const lr = A.layoutLane(m, m.tools[1], 'ref'), lc = A.layoutLane(m, m.tools[2], 'contig');
+        return {wrap: w, wrapLinear: A.wrapLinks(m2, m2.tools[2]), ov: ov.map(o => [o.tool, o.start, o.end, o.same]), gaps: A.gaps(m, t),
+                lr: lr.items.map(i => [i.x0, i.x1, i.rx0, i.rx1, i.row]), lc: lc.items.map(i => [i.b.record, i.x0, i.x1, i.rx0, i.rx1]), lcSpan: lc.span, recs: lc.records.map(r => [r.id, r.x0, r.x1]),
+                ev: A.eventMarkers(m, m.tools[1], lr).map(e => [e.refBp, e.laneBp, e.kind.letter, !!e.item]), noItems: A.layoutLane(m, m.tools[3], 'ref').items.length};""")
+    check("origin wrap: the block that ends at the reference end links to the block of the same contig that starts at 0 (query coordinates join); a linear plasmid has no wrap",
+          len(lay["wrap"]) == 1 and lay["wrap"][0]["record"] == "w1" and lay["wrapLinear"] == [])
+    check("overlaps: two contigs covering 9,500-10,000 are reported once; gaps are the complement of the covered intervals", lay["ov"] == [[2, 9500, 10000, False]] and lay["gaps"] == [[1000, 7000]])
+    check("reference layout: x equals the reference position, ribbons attach to the same ends, blocks closer than 0.4% of the plasmid are stacked in another row", lay["lr"] == [[0, 3000, 0, 3000, 0], [3000, 6000, 3000, 6000, 1]])
+    check("contig layout: contigs end to end in reference order, a reverse block attaches its ribbon the other way round",
+          [r[0] for r in lay["lc"]] == ["w1", "w1", "w2"] and lay["lc"][0][1:3] == [3000, 4000] and lay["lc"][1][1:5] == [0, 3000, 7000, 10000] and lay["recs"][1][1] > lay["recs"][0][2] and lay["lcSpan"] >= 4900)
+    check("event markers: the call is attached to a block of its own contig, with its letter; an empty lane has no items", lay["ev"] == [[3000, 3000, "I", True]] and lay["noItems"] == 0)
+    rd = al("return m.tools.map(t => { const r = A.readout(m, t); return [r.code, r.answer, r.blocks, r.contigs, r.reverseBlocks, r.events, r.text, r.caveat]; });")
+    check("readout answers come only from the blocks and calls: forward and collinear -> Yes; an event -> No; no blocks -> not assessable",
+          rd[0][:2] == ["ok", "Yes"] and rd[1][:2] == ["discordant", "No"] and rd[1][4] == 1 and rd[3][:2] == ["none", "Not assessable"] and rd[2][0] == "ok")
+    check("readout always carries the unvalidated caveat and names the event", all("unvalidated" in r[7] for r in rd) and "inversion junction" in rd[1][6])
+    rv = al("""const p = JSON.parse(JSON.stringify(input.payload)); p.tools[0].bl[0][4] = '-'; const q = JSON.parse(JSON.stringify(input.payload)); q.tools[0].cf = 0.8;
+        const a = PV.normalize(p), b = PV.normalize(q);
+        return [A.readout(a, a.tools[0]).code, A.readout(b, b.tools[0]).code];""")
+    check("a fully reverse-oriented contig with no event is 'Yes, reverse-oriented'; a tool-wide collinear fraction below 1 gives 'Partly'", rv == ["reversed", "partial"])
+    nav = js("""const o = [{i: 0, lane: 0, cx: 100}, {i: 1, lane: 0, cx: 300}, {i: 2, lane: 1, cx: 120}, {i: 3, lane: 1, cx: 500}];
+        const N = PV.align.navigate; return [N(o, {i: 0}, 'right').i, N(o, {i: 1}, 'right').i, N(o, {i: 0}, 'left').i, N(o, {i: 0}, 'down').i, N(o, {i: 3}, 'up').i, N(o, null, 'right').i, N(o, {i: 2}, 'down').i];""")
+    check("keyboard navigation: left/right walk a lane and wrap, up/down jump to the nearest block of the next lane, no current block starts at the first", nav == [1, 0, 1, 2, 1, 0, 2])
+    sc = al("const s = A.scene(m, st); return {counts: s.counts, h: s.height, n: s.order.length, lanes: s.lanes, svg: s.svg.length, hasPat: s.svg.indexOf('pvl-rev') >= 0, wrapArrows: (s.svg.match(/pvl-wrap/g) || []).length, flags: (s.svg.match(/pvl-ev/g) || []).length};")
+    check("scene: one block per alignment block, ribbons, the structural flag, the overlap and the gaps are drawn; the origin wrap draws an arrow off the right edge and one in at the left",
+          sc["counts"]["blocks"] == 6 and sc["counts"]["ribbons"] == 6 and sc["counts"]["events"] == 1 and sc["counts"]["overlaps"] >= 1 and sc["counts"]["gaps"] >= 3
+          and sc["wrapArrows"] == 2 and sc["hasPat"] and sc["n"] == 6 and len(sc["lanes"]) == 4)
+    off = al("const s = A.scene(m, st); return s.counts;", {"alRibbons": False, "alGenes": False, "layers": {"events": False}})
+    check("ribbons, genes and event flags can be switched off", off["ribbons"] == 0 and off["events"] == 0 and off["genes"] == 0 and off["blocks"] == 6)
+    zoom = al("""const a = A.scene(m, Object.assign(PV.defaultState(), {view: {start: 9000, span: 2000}})); const P = a.proj;
+        return {zoomed: P.zoomed, copies: P.copies(0, 500), copies2: P.copies(9500, 10000), mid: P.x(0, 1000) - (P.X0 + P.PW / 2), bpAt: P.bpAt(P.X0), blocks: a.counts.blocks};""")
+    check("zoom sync: a window that wraps the origin shows blocks at both ends, positions are relative to the window start",
+          zoom["zoomed"] and zoom["copies"] == [1000] and zoom["copies2"] == [-9000] and abs(zoom["mid"]) < 1e-6 and zoom["bpAt"] == 9000 and zoom["blocks"] >= 3)
+    sel = al("""const s = A.scene(m, Object.assign(PV.defaultState(), {sel: {k: 'b', i: 2}})); const t = A.scene(m, Object.assign(PV.defaultState(), {sel: {k: 'e', i: 0}}));
+        return {a: (s.svg.match(/stroke-width=.3[.]2./g) || []).length, b: (t.svg.match(/r=.11./g) || []).length, info: A.blockInfo(m, m.blocks[2]).rows.map(r => r[0] + ':' + r[1]), rel: A.relatedBlock(m, {k: 'b', i: 2})};""")
+    check("a selected block is outlined, a selected event is ringed; the block tooltip has contig, coordinates, strand, identity",
+          sel["a"] >= 1 and sel["b"] == 1 and any(r.startswith("Strand:reverse") for r in sel["info"]) and any(r.startswith("Identity:98.0%") for r in sel["info"]) and len(sel["rel"]["events"]) == 1)
+    svgx = js("""const m = PV.normalize(input.payload); return PV.align.standalone(m, PV.defaultState());""", {"payload": apay})
+    root_el = ET.fromstring(svgx)
+    check("the exported linear SVG is well-formed, self-describing (title, desc, legend) and carries the caveat",
+          root_el.tag == SVG_NS + "svg" and "unvalidated" in svgx and "uncovered truth" in svgx and root_el.find(SVG_NS + "title") is not None)
+    hh = js("""const m = PV.normalize(input.payload); const st = PV.defaultState(); st.sample = 's'; st.plasmid = 'p'; st.alMode = 'contig'; st.alRibbons = false; st.sel = {k: 'b', i: 2}; st.layers.align = false;
+        const h = PV.encodeHash(st, m); const back = PV.stateFromHash(PV.decodeHash(h), m); return {h: h, mode: back.alMode, rib: back.alRibbons, gen: back.alGenes, sel: back.sel, align: back.layers.align};""", {"payload": apay})
+    check("hash: the lane layout, ribbons, pane switch and a selected block survive encode -> decode", hh["mode"] == "contig" and hh["rib"] is False and hh["gen"] is True and hh["sel"] == {"k": "b", "i": 2} and hh["align"] is False)
+
+    print("(i) the DOM glue only calls functions that exist, and the fragments load in dependency order")
+    ui_src = open(UI, encoding="utf-8").read()
+    ui_src = re.sub(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"", "''", ui_src)      # string literals
+    ui_src = re.sub(r"/[*].*?[*]/|(?<![:'\"])//[^\n]*", "", ui_src, flags=re.S)          # comments
+    declared = set(re.findall(r"\bfunction\s+([A-Za-z_$][\w$]*)", ui_src)) | set(re.findall(r"\b(?:var|let|const)\s+([A-Za-z_$][\w$]*)", ui_src))
+    for params in re.findall(r"function\s*[A-Za-z_$\w]*\s*\(([^)]*)\)", ui_src):
+        declared |= {p.strip() for p in params.split(",") if p.strip()}
+    for chain in re.findall(r"\bvar\s+([^;=]+(?:=[^;]*?)?(?:,\s*[A-Za-z_$][\w$]*\s*=)[^;]*);", ui_src):
+        declared |= set(re.findall(r"(?:^|,)\s*([A-Za-z_$][\w$]*)\s*=", chain))
+    called = set(re.findall(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(", ui_src))
+    keywords = {"if", "for", "while", "switch", "catch", "function", "return", "typeof", "new", "else", "do", "try", "void", "in", "of"}
+    globals_ = {"parseInt", "parseFloat", "isNaN", "setTimeout", "clearTimeout", "Date", "String", "Number", "Array", "Object", "Math", "JSON", "Error", "Boolean", "RegExp", "encodeURIComponent",
+                "decodeURIComponent", "MutationObserver", "PointerEvent", "Image", "Blob", "URL", "Promise", "Set", "Map", "Symbol", "isFinite", "requestAnimationFrame", "XMLSerializer"}
+    missing = sorted(n for n in called - declared - keywords - globals_)
+    check(f"every bare function the viewer UI calls is declared in it (undefined: {missing})", not missing)
+    check("the pane functions the UI relies on are all defined (drawLinear, linkLinear, linkCircle, clearLinks, blockAt, exportAlign, tabAlignment)",
+          all(re.search(r"function\s+" + n + r"\s*\(", ui_src) for n in ("drawLinear", "linkLinear", "linkCircle", "clearLinks", "blockAt", "exportAlign", "tabAlignment", "focusTool", "paintReadout")))
+    ua = set(re.findall(r"PV\.align\.([A-Za-z_]+)", ui_src))
+    have = js("return Object.keys(PV.align);")
+    check(f"every PV.align function the UI calls exists in plasmid_viewer_align.html (missing: {sorted(ua - set(have))})", ua <= set(have))
+    order = [rm.VIEWER_ASSETS.index(n) for n in ("plasmid_viewer_style.html", "plasmid_viewer_core.html", "plasmid_viewer_align.html", "plasmid_viewer_ui.html")]
+    check("fragment order: style, core, align, ui (the UI needs the core and align objects at start-up)", order == sorted(order))
+    demo2 = os.path.join(ROOT, "results_demo")
+    if os.path.isfile(os.path.join(demo2, "ecoli_a", "visualization", "alignment_blocks.json")):
+        built = str(rm.build_section(demo2, None, os.path.join(demo2, "scores.tsv")))
+        pos = [built.find(m) for m in ("root.PlasmidViewerCore = PV", "var A = PV.align = {}", "var PV = window.PlasmidViewerCore, root = document.getElementById('pv-root')")]
+        check("in the built section the core is defined before the align module, which is defined before the UI script runs", all(p >= 0 for p in pos) and pos == sorted(pos))
+        check("the built section carries blocks for the demo tools (alignment payload present)", '"bl":[[' in built)
+        dp = re.findall(r"<script type='application/json' class='pv-data' id='pv-data-[^']+'>(.*?)</script>", built, re.S)
+        total = sum(len(t) for t in dp)
+        with_bl = sum(len(t) for t in dp if '"bl":' in t)
+        print(f"  INFO: demo payloads total {total:,} bytes ({len(dp)} plasmids); the alignment part adds about {sum(len(json.dumps(b, separators=(',', ':'))) for t in dp for tl in json.loads(t)['tools'] for b in [tl.get('bl') or []]):,} bytes")
+        check("the alignment payload keeps the viewer within its budget", total < rm.VIEWER_BUDGET_BYTES and with_bl > 0)
+
     demo = os.path.join(ROOT, "results_demo")
     if os.path.isfile(os.path.join(demo, "ecoli_a", "visualization", "alignment_blocks.json")):
         out = rm.inject(tm.PAGE, demo, None, os.path.join(demo, "scores.tsv"))

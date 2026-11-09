@@ -254,6 +254,10 @@ def load_sample(results_dir, data_dir, sample, scores=None, leaderboard=None):
             "outcomes": {r.get("true_plasmid"): r for r in (rc.read_tsv(d("plasmid_outcomes")) or [])},
             "amr": rc.read_tsv(d("amr_placement")),
             "events": ((calls.get("tools") or {}).get(tool) or {}).get("events") or [],
+            "blocks": payload.get("blocks") or [],
+            "collinear": rc.number((((calls.get("tools") or {}).get(tool) or {}).get("summary") or {}).get("collinear_fraction")),
+            "order_conflicts": _int((payload.get("structural_diagnostics") or {}).get("order_conflicts")),
+            "blocks_omitted": _int(payload.get("blocks_omitted"), 0) or 0,
         }
     for pid, info in plasmids.items():
         length = _int(info.get("length"), 0)
@@ -317,9 +321,28 @@ def load_sample(results_dir, data_dir, sample, scores=None, leaderboard=None):
                               "placement": r.get("placement", ""), "replicon_ok": r.get("replicon_type_correct", ""),
                               "record": r.get("covering_record", ""), "bin": r.get("assigned_bin", "")} for r in amr_rows],
                 "outcome_detail": _outcome_detail(data["outcomes"].get(pid)),
+                "blocks": _plasmid_blocks(data["blocks"], pid), "collinear_fraction": data["collinear"],
+                "order_conflicts": data["order_conflicts"], "blocks_omitted": data["blocks_omitted"],
             })
         models.append(model)
     return models
+
+
+def _plasmid_blocks(blocks, pid):
+    """The retained alignment blocks of one tool that land on truth plasmid `pid`, as plain dicts (identity = matches / block length)."""
+    out = []
+    for b in blocks or []:
+        if b.get("target") != pid:
+            continue
+        ts, te, qs, qe = _int(b.get("target_start")), _int(b.get("target_end")), _int(b.get("query_start")), _int(b.get("query_end"))
+        if None in (ts, te, qs, qe) or te <= ts:
+            continue
+        length = rc.number(b.get("block_length")) or 0
+        matches = rc.number(b.get("matches"))
+        out.append({"record": str(b.get("record_id", "")), "qlen": _int(b.get("query_length"), qe), "qs": qs, "qe": qe,
+                    "strand": "-" if b.get("strand") == "-" else "+", "ts": ts, "te": te,
+                    "identity": (matches / length) if (matches is not None and length > 0) else None, "mapq": _int(b.get("mapq"))})
+    return out
 
 
 # ------------------------------------------------------------------------------------------------------------------------------
@@ -677,7 +700,7 @@ def render_map(model, map_id=None):
 # interactive viewer: payload, configuration and assets
 
 VIEWER_BUDGET_BYTES = 1_500_000      # all plasmid payloads together; the whole report budget is build_html_report.INLINE_VISUALIZATION_BUDGET
-VIEWER_ASSETS = ("plasmid_viewer_style.html", "plasmid_viewer_core.html", "plasmid_viewer_ui.html")
+VIEWER_ASSETS = ("plasmid_viewer_style.html", "plasmid_viewer_core.html", "plasmid_viewer_align.html", "plasmid_viewer_ui.html")
 # Colour-blind-safe alternative (Okabe-Ito and Tol), switched on with the report's palette toggle or in the viewer's Appearance tab.
 CVD_COLOURS = {"replication": "#332288", "amr": "#D55E00", "mobile": "#88CCEE", "transfer": "#0072B2", "metal": "#DDCC77",
                "integrase": "#CC79A7", "maintenance": "#117733", "other": "#999999", "cover": "#0072B2", "skewPos": "#0072B2", "skewNeg": "#D55E00"}
@@ -721,12 +744,23 @@ def _r(value, digits):
     return None if value is None else round(value, digits)
 
 
+VIEWER_MAX_BLOCKS = 300     # alignment blocks kept per tool and plasmid in the viewer payload (the longest ones; the rest are counted, not drawn)
+
+
+def _payload_blocks(blocks):
+    """[[record, query length, query start, query end, strand, ref start, ref end, identity (4 dp) or null, mapq or null]] longest first, in reference order."""
+    keep = sorted(blocks, key=lambda b: (-(b["te"] - b["ts"]), b["ts"]))[:VIEWER_MAX_BLOCKS]
+    keep.sort(key=lambda b: (b["ts"], b["te"], b["record"]))
+    return [[b["record"], b["qlen"], b["qs"], b["qe"], b["strand"], b["ts"], b["te"], _r(b.get("identity"), 4), b.get("mapq")] for b in keep]
+
+
 def viewer_payload(model, map_id=None):
     """The model of one plasmid as compact JSON-ready data (short keys; the viewer's PV.normalize expands them).
 
     id, sample, plasmid, length, circ (bool, absent when unknown), rr (repeat-rich), rg [[start,end]] repeat regions,
     genes [{s,e,t strand,n name,p product,c class,k kind,f ftype}], tools [{n,dn display name (when it differs),tr track,rk rank,cm completeness,oc outcome,iv [[a,b]],
-    at AMR total,ar AMR recovered names,ev [{p,t,r,d}],am [{g,c,s,e,pl,rc,r,b}],od outcome detail {b,r,p,n,m,c},d 1 = drawn by default}],
+    at AMR total,ar AMR recovered names,ev [{p,t,r,d}],bl alignment blocks [[record,qlen,qs,qe,strand,ref start,ref end,identity,mapq]],
+    bo blocks not sent,cf collinear fraction (tool-wide, structural_calls.json),oc order conflicts,am [{g,c,s,e,pl,rc,r,b}],od outcome detail {b,r,p,n,m,c},d 1 = drawn by default}],
     gc {w window,m mean,g [GC per window],k [skew per window]}. Every tool is included (the static map caps at MAP_MAX_TOOLS; the
     viewer starts with the same tools switched on and lets the reader switch the others on).
     """
@@ -775,6 +809,14 @@ def viewer_payload(model, map_id=None):
         if od:
             item["od"] = {k: v for k, v in (("b", od.get("bin")), ("r", _r(od.get("recall"), 4)), ("p", _r(od.get("precision"), 4)), ("n", od.get("bins")),
                                            ("m", od.get("merged_with")), ("c", _r(od.get("contamination"), 4))) if v not in (None, "")}
+        if t.get("blocks"):
+            item["bl"] = _payload_blocks(t["blocks"])
+            if len(t["blocks"]) > VIEWER_MAX_BLOCKS:
+                item["bo"] = len(t["blocks"]) - VIEWER_MAX_BLOCKS
+        if t.get("collinear_fraction") is not None:
+            item["cf"] = _r(t["collinear_fraction"], 5)
+        if t.get("order_conflicts") is not None:
+            item["oc"] = t["order_conflicts"]
         if t["name"] in drawn_names:
             item["d"] = 1
         tools.append(item)
@@ -858,7 +900,7 @@ def build_section(results_dir, data_dir, scores_path):
     if not payloads:
         return rc.section("plasmid-maps", "Plasmid maps", LEAD, style + index_html + fallback)
     viewer = f"<div class='pv-root' id='pv-root' hidden data-plasmids='{len(payloads)}'></div>" + viewer_script_blocks(payloads)
-    body = style + viewer + index_html + fallback + viewer_asset(VIEWER_ASSETS[1]) + viewer_asset(VIEWER_ASSETS[2])
+    body = style + viewer + index_html + fallback + viewer_asset(VIEWER_ASSETS[1]) + viewer_asset(VIEWER_ASSETS[2]) + viewer_asset(VIEWER_ASSETS[3])
     return rc.section("plasmid-maps", "Plasmid maps", LEAD, body)
 
 

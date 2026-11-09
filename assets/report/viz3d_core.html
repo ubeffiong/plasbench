@@ -150,7 +150,8 @@ function svgDoc(scene, cam, W, H, opt) {
     '<title>' + esc(scene.title || '') + '</title><desc>' + esc(scene.desc || '') + '</desc>' + renderPrims(scene, cam, opt) + '</svg>';
 }
 function csvText(header, rows) {
-  function q(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  var DQ = String.fromCharCode(34), special = new RegExp('[",\\n\\r]');
+  function q(v) { v = v == null ? '' : String(v); return special.test(v) ? DQ + v.split(DQ).join(DQ + DQ) + DQ : v; }
   return [header].concat(rows).map(function (r) { return r.map(q).join(','); }).join('\n') + '\n';
 }
 function fmt(v, d) { return v == null || v === '' || isNaN(v) ? '-' : Number(v).toFixed(d == null ? 3 : d); }
@@ -192,11 +193,12 @@ function download(name, blob) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
 }
 
+var mountSeq = 0;
 function mount(host, spec) {
   var W = 900, H = 580, reduce = false;
   try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   var st = {vals: spec.defaults ? Object.assign({}, spec.defaults(spec.data)) : {}, hidden: {}, sel: null, auto: false, cam: null, scene: null, tab: 0, moved: false};
-  var uid = 'v3' + Math.floor(Math.random() * 1e6);
+  var uid = 'v3m' + (++mountSeq);
   host.innerHTML =
     '<div class="v3-wrap">' + '<div class="v3-banner"></div>' +
     '<div class="v3-toolbar"><div class="v3-controls"></div><div class="v3-buttons" role="toolbar" aria-label="3D view controls">' +

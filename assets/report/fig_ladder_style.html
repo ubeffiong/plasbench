@@ -1,0 +1,60 @@
+<style>
+/* Reconstruction ladder (python/report_fig_ladder.py). The server-drawn SVG is the no-JavaScript and print fallback; the script adds
+   the side panel, tooltips, layer filter and exports. Layout mirrors the plasmid viewer: figure left, collapsible panel right. */
+.lad{margin:12px 0;font:13px/1.45 Arial,Helvetica,sans-serif;color:var(--ink,#17231d)}
+.lad *{box-sizing:border-box}
+.lad-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+.lad-bar .lad-sp{flex:1}
+.lad-btn{border:1px solid #b9c5bd;background:#fff;color:var(--ink,#17231d);border-radius:6px;padding:5px 10px;cursor:pointer;font:600 12px Arial,sans-serif;line-height:1.2}
+.lad-btn:hover{background:#eef4ef}
+.lad-btn[aria-pressed=true],.lad-btn[aria-expanded=true].lad-primary{background:var(--green,#1f6f55);color:#fff;border-color:var(--green,#1f6f55)}
+.lad :focus-visible{outline:3px solid #1a5fb4;outline-offset:2px}
+.lad-main{display:grid;grid-template-columns:minmax(0,1fr) 340px;border:1px solid var(--line,#d9e1da);background:#fff;border-radius:10px;overflow:hidden}
+.lad-main.lad-nopanel{grid-template-columns:minmax(0,1fr)}
+.lad-main.lad-nopanel .lad-panel{display:none}
+.lad-stage{min-width:0;padding:8px 12px 10px;position:relative}
+.lad-fig{overflow-x:auto}
+.lad-fig svg{display:block;width:100%;min-width:760px;height:auto;background:#fff;border-radius:6px}
+.lad-keybar{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:8px}
+.lad-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #b9c5bd;border-radius:14px;background:#fff;padding:3px 10px;font:12px Arial,sans-serif;cursor:pointer;color:var(--ink,#17231d)}
+.lad-chip b{font-size:13px}
+.lad-chip[aria-pressed=true]{background:#e6f0ff;border-color:#1a5fb4;box-shadow:0 0 0 1px #1a5fb4 inset}
+.lad-panel{border-left:1px solid var(--line,#d9e1da);background:#fbfcfb;min-width:0;display:flex;flex-direction:column}
+.lad-tabs{display:flex;flex-wrap:wrap;gap:3px;padding:6px;border-bottom:1px solid var(--line,#d9e1da);background:#f1f5f1}
+.lad-tab{border:1px solid transparent;background:transparent;border-radius:6px;padding:5px 9px;cursor:pointer;font:600 12px Arial,sans-serif;color:var(--ink,#17231d)}
+.lad-tab:hover{background:#e3ece5}
+.lad-tab[aria-selected=true]{background:var(--green,#1f6f55);color:#fff}
+.lad-body{overflow:auto;padding:10px 12px 14px;max-height:760px;min-height:240px}
+.lad-body h4{margin:12px 0 6px;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#627067)}
+.lad-body h4:first-child{margin-top:0}
+.lad-body h3{margin:0 0 6px;font:700 15px Arial,sans-serif}
+.lad-body table{width:100%;border-collapse:collapse;min-width:0}
+.lad-body th,.lad-body td{white-space:normal;padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid var(--line,#d9e1da);font-size:12px}
+.lad-body th{background:#edf2ec;font-size:11px}
+.lad-body a{color:#0a5a41}
+.lad-judged{list-style:none;margin:0;padding:0}
+.lad-judged li{margin:3px 0}
+.lad-glyph{display:inline-block;width:1.3em;font-weight:700}
+.lad-na{color:var(--muted,#627067)}
+.lad-warn{border-left:4px solid #7a1d16;background:#fff8f6;padding:6px 10px;margin:8px 0;border-radius:0 6px 6px 0}
+.lad-big{font:700 20px Arial,sans-serif}
+.lad-limits{font:12px Arial,sans-serif;color:var(--muted,#627067);margin:8px 2px 0}
+.lad-tip{position:absolute;z-index:5;max-width:280px;background:#fff;color:#17231d;border:1px solid #9fb0a5;border-radius:8px;box-shadow:0 6px 22px rgba(21,36,28,.22);padding:7px 10px;font:12px/1.4 Arial,sans-serif;pointer-events:none}
+.lad-tip[hidden]{display:none}
+.lad-static .panel{margin:8px 0}
+.lad-on .lad-static{display:none}
+.lad-step{cursor:pointer}
+.lad-step .lad-selring{pointer-events:none}
+.lad-step.lad-sel .lad-selring{stroke:#1a5fb4;stroke-dasharray:7 4}
+.lad-step:hover .lad-selring,.lad-step:focus .lad-selring{stroke:#7aa6e0}
+.lad-step:focus{outline:none}
+.lad-step:focus-visible .lad-selring{stroke:#1a5fb4;stroke-width:4}
+.lad-note{cursor:pointer}
+.lad-note.lad-sel rect:first-of-type{stroke-width:3}
+.lad-dim{opacity:.3}
+.lad-judge.lad-hit text{font-weight:700}
+.lad-judge.lad-hit{opacity:1}
+@media (prefers-reduced-motion:no-preference){.lad-step,.lad-judge{transition:opacity .15s}}
+@media (max-width:900px){.lad-main{grid-template-columns:minmax(0,1fr)}.lad-panel{border-left:0;border-top:1px solid var(--line,#d9e1da)}.lad-body{max-height:none}}
+@media print{.lad-bar,.lad-keybar,.lad-tabs,.lad-tip{display:none!important}.lad-main{display:block;border:0}.lad-panel{border:0}.lad-on .lad-static{display:block}.lad-body{display:none}}
+</style>

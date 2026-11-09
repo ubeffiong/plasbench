@@ -1,0 +1,150 @@
+<script>
+/* Reconstruction ladder, DOM layer: wires the server-drawn SVG (hover/focus tooltip, click/Enter select, layer filter), builds the
+   side panel (Step, Distinctions, Links, Export) and the exports. Needs PBLadder from fig_ladder_core. */
+(function () {
+'use strict';
+var L = window.PBLadder, host = document.getElementById('lad-root'), dataEl = document.getElementById('lad-data');
+if (!L || !host || !dataEl) return;
+var P;
+try { P = JSON.parse(dataEl.textContent); } catch (e) { return; }
+var svg = host.querySelector('.lad-fig svg'), panel = document.getElementById('lad-panel'), keyEl = document.getElementById('lad-key'),
+    tip = document.getElementById('lad-tip'), main = host.querySelector('.lad-main'), stage = host.querySelector('.lad-stage');
+if (!svg || !panel) return;
+var S = {step: 0, tab: 'step', layers: {}};
+function exists(id) { return !!document.getElementById(id); }
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') n.textContent = attrs[k]; else n.setAttribute(k, attrs[k]); });
+  (kids || []).forEach(function (c) { n.appendChild(c); });
+  return n;
+}
+
+/* ---------- chrome ---------- */
+var bar = el('div', {'class': 'lad-bar'});
+var panelBtn = el('button', {type: 'button', 'class': 'lad-btn lad-primary', 'aria-expanded': 'true', 'aria-controls': 'lad-panel', text: 'Panel'});
+var resetBtn = el('button', {type: 'button', 'class': 'lad-btn', text: 'Clear selection'});
+bar.appendChild(panelBtn); bar.appendChild(resetBtn); bar.appendChild(el('span', {'class': 'lad-sp'}));
+host.insertBefore(bar, main);
+panelBtn.addEventListener('click', function () {
+  var open = panelBtn.getAttribute('aria-expanded') !== 'true';
+  panelBtn.setAttribute('aria-expanded', String(open)); main.classList.toggle('lad-nopanel', !open);
+});
+var tabsEl = el('div', {'class': 'lad-tabs', role: 'tablist', 'aria-label': 'Ladder panels'}), body = el('div', {'class': 'lad-body', role: 'tabpanel', id: 'lad-tabpanel', tabindex: '-1'});
+panel.appendChild(tabsEl); panel.appendChild(body);
+host.classList.add('lad-on');
+
+/* ---------- figure ---------- */
+var stepEls = [].slice.call(svg.querySelectorAll('.lad-step')), noteEls = [].slice.call(svg.querySelectorAll('.lad-note'));
+function showTip(node, text) {
+  tip.textContent = text; tip.hidden = false;
+  var sb = stage.getBoundingClientRect(), nb = node.getBoundingClientRect();
+  tip.style.left = Math.max(4, Math.min(sb.width - 290, nb.left - sb.left + 10)) + 'px';
+  tip.style.top = Math.max(4, nb.top - sb.top + 66) + 'px';
+}
+function hideTip() { tip.hidden = true; }
+stepEls.forEach(function (g) {
+  var id = +g.getAttribute('data-step'), s = L.stepById(P, id);
+  g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button'); g.setAttribute('aria-pressed', 'false');
+  g.setAttribute('aria-label', 'Step ' + id + ': ' + s.title + '. Press Enter for the metrics that judge it.');
+  var tt = 'Step ' + id + ': ' + s.title + '. Judged by: ' + s.judged.map(function (j) { return j.text; }).join('; ') + '. Click for details.';
+  g.addEventListener('mouseenter', function () { showTip(g, tt); }); g.addEventListener('mouseleave', hideTip);
+  g.addEventListener('focus', function () { showTip(g, tt); }); g.addEventListener('blur', hideTip);
+  g.addEventListener('click', function () { select(id); });
+  g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(id); } });
+});
+noteEls.forEach(function (g) {
+  var id = +g.getAttribute('data-note');
+  g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button');
+  g.setAttribute('aria-label', 'Distinction ' + id + ': ' + P.notes[id - 1].title + '. Press Enter for the numbers.');
+  function go() { S.tab = 'dist'; renderTabs(); renderBody(); noteEls.forEach(function (n) { n.classList.toggle('lad-sel', n === g); }); }
+  g.addEventListener('click', go);
+  g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+});
+function select(id) {
+  hideTip(); S.step = S.step === id ? 0 : id; S.tab = 'step';
+  paint(); renderTabs(); renderBody();
+}
+function paint() {
+  var shown = L.stepsForLayers(P, S.layers), any = Object.keys(S.layers).some(function (k) { return S.layers[k]; });
+  stepEls.forEach(function (g) {
+    var id = +g.getAttribute('data-step'), sel = S.step === id, hit = shown.indexOf(id) >= 0;
+    g.classList.toggle('lad-sel', sel); g.setAttribute('aria-pressed', String(sel));
+    g.classList.toggle('lad-dim', !hit || (S.step && !sel && false));
+    [].forEach.call(g.querySelectorAll('.lad-judge'), function (j) {
+      var on = !any || S.layers[j.getAttribute('data-layer')];
+      j.classList.toggle('lad-hit', any && on); j.style.opacity = on ? '' : '0.3';
+    });
+  });
+}
+P.layers.forEach(function (l) {
+  var b = el('button', {type: 'button', 'class': 'lad-chip', 'aria-pressed': 'false', title: 'Highlight the steps judged by: ' + l.label});
+  var g = el('b', {text: l.glyph}); g.style.color = l.colour; b.appendChild(g); b.appendChild(document.createTextNode(l.label));
+  b.addEventListener('click', function () { S.layers[l.id] = !S.layers[l.id]; b.setAttribute('aria-pressed', String(!!S.layers[l.id])); paint(); });
+  keyEl.appendChild(b);
+});
+resetBtn.addEventListener('click', function () {
+  S.step = 0; S.layers = {}; [].forEach.call(keyEl.children, function (b) { b.setAttribute('aria-pressed', 'false'); });
+  noteEls.forEach(function (n) { n.classList.remove('lad-sel'); }); paint(); renderBody();
+});
+
+/* ---------- panel ---------- */
+var TABS = [['step', 'Step'], ['dist', 'Distinctions'], ['links', 'Links'], ['export', 'Export']];
+function renderTabs() {
+  tabsEl.textContent = '';
+  TABS.forEach(function (t, i) {
+    var b = el('button', {type: 'button', role: 'tab', 'class': 'lad-tab', id: 'lad-tab-' + t[0], 'aria-selected': String(S.tab === t[0]), 'aria-controls': 'lad-tabpanel',
+      tabindex: S.tab === t[0] ? '0' : '-1', text: t[1]});
+    b.addEventListener('click', function () { S.tab = t[0]; renderTabs(); renderBody(); });
+    b.addEventListener('keydown', function (e) {
+      var j = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (j) { e.preventDefault(); S.tab = TABS[(i + j + TABS.length) % TABS.length][0]; renderTabs(); renderBody(); document.getElementById('lad-tab-' + S.tab).focus(); }
+    });
+    tabsEl.appendChild(b);
+  });
+}
+function download(name, type, data) {
+  var a = el('a', {download: name}), url = URL.createObjectURL(new Blob([data], {type: type}));
+  a.href = url; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+}
+function cleanSvg() {
+  var c = svg.cloneNode(true);
+  [].forEach.call(c.querySelectorAll('*'), function (n) {
+    ['tabindex', 'role', 'aria-pressed', 'aria-label', 'style'].forEach(function (a) { if (n !== c || a !== 'role') n.removeAttribute(a); });
+    var k = n.getAttribute('class');
+    if (k) { k = k.split(/\s+/).filter(function (x) { return x.indexOf('lad-') !== 0; }).join(' '); if (k) n.setAttribute('class', k); else n.removeAttribute('class'); }
+  });
+  c.setAttribute('role', 'img');
+  [].forEach.call(c.querySelectorAll('.lad-selring'), function (n) { n.parentNode.removeChild(n); });
+  return new XMLSerializer().serializeToString(c);
+}
+function exportPng() {
+  var xml = cleanSvg(), vb = svg.viewBox.baseVal, img = new Image();
+  img.onload = function () {
+    var cv = document.createElement('canvas'); cv.width = vb.width * 2; cv.height = vb.height * 2;
+    var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+    try { cv.toBlob(function (b) { if (b) download('reconstruction_ladder.png', 'image/png', b); }, 'image/png'); } catch (e) { body.appendChild(el('p', {'class': 'lad-na', text: 'PNG export is blocked by this browser; use SVG.'})); }
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+}
+function renderBody() {
+  body.setAttribute('aria-labelledby', 'lad-tab-' + S.tab);
+  if (S.tab === 'step') {
+    body.innerHTML = S.step ? L.stepHtml(P, S.step, exists)
+      : '<p class="lad-na">Click a step in the figure (or press Enter on it) to see the metrics that judge it and this run\'s values. Use the layer key under the figure to highlight which steps a score layer judges.</p>'
+        + '<h4>All steps, in this run</h4>' + P.steps.map(function (s) { return '<p><b>' + s.id + '. ' + L.esc(s.title) + '</b></p>'; }).join('');
+    if (!S.step) { body.querySelectorAll('p b').forEach(function (b, i) { b.style.cursor = 'pointer'; b.addEventListener('click', function () { select(i + 1); }); }); }
+  } else if (S.tab === 'dist') body.innerHTML = L.distinctionsHtml(P);
+  else if (S.tab === 'links') body.innerHTML = L.linksHtml(P, exists);
+  else {
+    body.innerHTML = '<h4>Export the figure</h4><p>SVG and PNG carry the schematic with this run\'s counts; CSV carries the values plotted in the panel.</p>';
+    [['Download SVG', function () { download('reconstruction_ladder.svg', 'image/svg+xml', cleanSvg()); }],
+     ['Download PNG', exportPng],
+     ['Download CSV', function () { download('reconstruction_ladder.csv', 'text/csv', L.csvText(P)); }]].forEach(function (b) {
+      var x = el('button', {type: 'button', 'class': 'lad-btn', text: b[0]}); x.style.marginRight = '6px'; x.addEventListener('click', b[1]); body.appendChild(x);
+    });
+  }
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { hideTip(); } });
+paint(); renderTabs(); renderBody();
+})();
+</script>

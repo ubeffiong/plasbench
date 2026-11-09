@@ -11,7 +11,7 @@ Nothing is deleted: the table stays in the page (searchable, printable once open
 until someone asks for it. A panel that is already inside a <details>, inside a status box (.insight), or inside an info popover is left
 alone, and a section whose id is not on the page is skipped. Running it twice changes nothing.
 
-  COLLAPSE        {section id: (summary text, figure section id or '')}; the summary names the figure that shows the same data
+  COLLAPSE        {section id: (what the table is, figure section id or '', what the figure covers)}; the summary says which figure shows it
   collapse(page, plan=None)   the page with the panels of the planned sections folded
 
 The page is scanned with a small tokenizer (comments and script/style bodies skipped whole) and edited by splicing.
@@ -20,9 +20,17 @@ Standard library only.
 """
 import re
 
-# section id -> (what the folded table is, the figure section that draws the same numbers). Kept short and literal: each entry is a
-# claim that the figure carries the data, and test_report_collapse.py checks that the named figure section exists on a built report.
-COLLAPSE = {}
+# section id -> (what the folded table is, the figure section that draws it, what the figure covers). Each entry is a claim about what the
+# figure carries, so the note says "all of it" or names the part; test_report_collapse.py checks that the named figure section exists on a
+# built report and that the figure is a real section id.
+COLLAPSE = {
+    "scorecard": ("the tools-by-metrics scorecard table", "fig-heatmap", "every cell is drawn in the tool heatmap, with values, scores and bands in its Data tab"),
+    "accuracy-dimension": ("the alignment-accuracy table", "fig-heatmap", "identity, mismatch and indel rates are the A1-A3 columns of the tool heatmap"),
+    "performance": ("the runtime and memory table", "fig-heatmap", "runtime, memory and success rate are the E1-E3 columns of the tool heatmap"),
+    "stratified": ("the stratified recovery table", "fig-forest", "CPRR by stratum is plotted in the forest plot; other metrics stay in this table"),
+    "replicon-recovery": ("the recovery-by-replicon table", "fig-forest", "CPRR by replicon, size and tier is plotted in the forest plot; other metrics stay in this table"),
+    "graded-tiers": ("the graded-recovery by reference tier table", "fig-forest", "CPRR by reference tier is plotted in the forest plot"),
+}
 
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 RAW_TEXT = {"script", "style", "textarea", "title"}
@@ -100,13 +108,13 @@ def _fold(text, summary):
 def collapse(page, plan=None):
     """The page with the table panels of every planned section folded into closed <details>."""
     plan = COLLAPSE if plan is None else plan
-    for sid, (what, figure) in plan.items():
+    for sid, (what, figure, covers) in plan.items():
         bounds = section_bounds(page, sid)
         if not bounds:
             continue
         if figure and section_bounds(page, figure) is None:
             continue          # the figure is not on this page (not run): the table stays visible, it is then the only view
-        where = " (the same numbers are drawn in the Figures group)" if figure else ""
+        where = f" ({covers})" if figure else ""
         text = page[bounds[0]:bounds[1]]
         folded, n = _fold(text, f"Show {what}{where}")
         if n:
