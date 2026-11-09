@@ -33,6 +33,7 @@ from collections import Counter
 from pathlib import Path
 
 import report_3d
+import report_aliases
 
 SECTIONS = (("prereg", "Pre-registration"), ("scoring-additions", "MCC &amp; F-beta"),
             ("plasmid-outcomes", "Plasmid outcomes"), ("label-schemes", "Label schemes"),
@@ -175,7 +176,7 @@ def label_schemes_section(summary, schemes, provenance, data_dir):
                    "The headline is scored on the pre-registered Scheme 3, NCBI sequence-report labels. Scheme 1 "
                    "(every replicon but the main chromosome is a plasmid) and the evidence scheme (labels confirmed by "
                    "plasmid markers, rRNA genes and long reads; conflicts excluded) are re-ranked as sensitivity "
-                   "analyses in the Robustness table (variants scheme:...).", "".join(parts))
+                   "analyses in the " + report_aliases.link("rank-robustness", "ranking robustness") + " table (variants scheme:...).", "".join(parts))
 
 
 def crosscheck_summary(rows):

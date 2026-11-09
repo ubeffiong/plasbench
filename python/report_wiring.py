@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-report_wiring.py -- wires pipeline outputs that the report did not show into HTML, and groups the navigation.
+report_wiring.py -- wires pipeline outputs that the report did not show into HTML, and used to group the navigation (now python/report_layout.py).
 
   per-plasmid-detail   one row per truth plasmid and tool (per_plasmid.tsv + plasmid_outcomes.tsv + truth_repeat_content.tsv)
                        with client-side filters; without JavaScript the whole table is shown
@@ -10,7 +10,7 @@ report_wiring.py -- wires pipeline outputs that the report did not show into HTM
   truth depth strip    appended to learn-truthqc (<sample>/truth_depth_windows.tsv, anomalies marked)
   score column groups  all columns of scores.tsv / the leaderboard behind group switches (unregistered columns: "Other")
   Run files            links to the Markdown outputs that exist (leaderboards, scoring specification), appended to `files`
-  grouped navigation   the flat nav replaced by collapsible groups; every section id appears once; unknown ids go to "More"
+  (navigation        retired here: the page shell, rail of views and ordering are python/report_layout.py)
   overlap_cell         tells "tool uses no reference database" from "checked, no overlap found"
 
 Every section says "Not run: <reason>" when its input is absent. Standard library only.
@@ -39,24 +39,13 @@ WIRING_STYLE = """
 .rpt-colgroups [data-cg][hidden]{display:none}
 .rpt-allcols>summary{cursor:pointer;font:bold 14px Arial,sans-serif;padding:8px 0}
 .rpt-trackrow{margin:14px 0 4px;font:bold 14px Arial,sans-serif}
-.nav[data-grouped]{overflow:visible}
-.nav[data-grouped] .rpt-navgroups{width:100%}
-.rpt-navgroups details{position:relative}
-.rpt-navgroups details[data-current] summary{color:var(--green)}
-.rpt-navgroups details[open]>summary{border-bottom:1px solid var(--line)}
-.rpt-navlist{position:absolute;left:0;top:100%;z-index:40;min-width:230px;max-height:60vh;overflow:auto;background:#fff;
- border:1px solid var(--line);border-radius:8px;padding:6px 10px;box-shadow:0 4px 12px rgba(21,36,28,.15)}
-.rpt-navgroups a{padding:4px 6px;border-radius:5px}
-.rpt-navgroups a:hover{background:#eef4ef;color:var(--ink)}
-.rpt-navgroups a[aria-current='true']{background:var(--green);color:#fff}
 .rpt-strip text{font-family:Arial,sans-serif}
-@media print{.nav{display:none}.rpt-controls{display:none}}
 """
 
 
 def add_style(page):
     page = rc.add_style(page)
-    if "rpt-navlist" in page.split("</style>", 1)[0]:
+    if "rpt-trackrow" in page.split("</style>", 1)[0]:
         return page
     return page.replace("</style>", WIRING_STYLE + "</style>", 1)
 
@@ -444,73 +433,6 @@ def overlap_cell(possible, after, unknown, statuses):
     return None
 
 
-# ------------------------------------------------------------------------------------------------ navigation
-NAV_GROUP_ORDER = ["Results", "Scorecard and maps", "Figures", "Evidence and quality", "Recommendation", "Methods and limits", "Appendix"]
-_G = {
-    "Results": "summary metadata insights chart leaderboard robustness scores statistics stratified scenarios enterprise selected "
-               "tools samples",
-    "Scorecard and maps": "scorecard scorecard-definitions scorecard-scenarios plasmid-maps per-plasmid-detail "
-                          "plasmid-outcomes bin-diagnostics bin-quality graded-tiers replicon-recovery zero-plasmid contig-layer "
-                          "amr-placement learn-agreement learn-copynumber accuracy-dimension feature-preservation",
-    "Figures": "fig-ladder fig-landscape fig-heatmap fig-distributions fig-forest fig-pr",
-    "Evidence and quality": "database-membership baselines-calibration excluded-replicons label-schemes validity learn-adequacy "
-                            "learn-truthqc learn-plsmd assembly-quality cohort-qc isolate-difficulty quast-diagnostics "
-                            "rank-robustness truth-label-audit orthogonal-evidence metadata-completeness health outcome-states "
-                            "reproducibility performance power composite",
-    "Recommendation": "recommendations recommender-eval taxon-transfer validation",
-    "Methods and limits": "metric-framework headline-design interpretation-limits prereg scoring-additions keys method scoring-spec",
-    "Appendix": "data-inventory files extended",
-}
-GROUP_OF = {sid: group for group, ids in _G.items() for sid in ids.split()}
-NAV_LABELS = {"per-plasmid-detail": "Per-plasmid detail", "assembly-quality": "Assembly quality"}
-
-
-def nav_group(sid):
-    return GROUP_OF.get(sid, "More")
-
-
-def grouped_nav(ids, labels):
-    """Return {group: [(id, label)]} in document order within each group, only for groups that have sections."""
-    groups = {}
-    for sid in ids:
-        groups.setdefault(nav_group(sid), []).append((sid, labels.get(sid) or NAV_LABELS.get(sid) or sid.replace("-", " ").capitalize()))
-    ordered = [g for g in NAV_GROUP_ORDER if g in groups] + [g for g in groups if g not in NAV_GROUP_ORDER]
-    return {g: groups[g] for g in ordered}
-
-
-def nav_html(groups):
-    parts = []
-    for name, links in groups.items():
-        items = "".join(f"<a href='#{rc.esc(sid)}'>{label}</a>" for sid, label in links)
-        parts.append(f"<details data-navgroup='{rc.esc(name)}'><summary>{rc.esc(name)} <span class='muted'>({len(links)})</span></summary>"
-                     f"<div class='rpt-navlist'>{items}</div></details>")
-    return "<nav class='nav' data-grouped aria-label='Report sections'><div class='rpt-navgroups'>" + "".join(parts) + "</div></nav>"
-
-
-def group_navigation(page):
-    """Replace the flat nav by grouped collapsible groups built from the section ids in document order."""
-    start = page.find("<nav class='nav'")
-    if start < 0:
-        return page
-    end = page.find("</nav>", start)
-    if end < 0:
-        return page
-    old = page[start:end]
-    labels = dict(re.findall(r"href='#([a-z-]+)'>([^<]*)<", old))
-    ids, seen = [], set()
-    for sid in section_ids(page):
-        if sid not in seen:
-            seen.add(sid)
-            ids.append(sid)
-    for sid in ids:                       # a section whose nav link is missing takes its heading
-        if sid not in labels and sid not in NAV_LABELS:
-            m = re.search(rf"<section id='{sid}'[^>]*><h2>(.*?)</h2>", page)
-            if m:
-                labels[sid] = m.group(1)
-    page = page[:start] + nav_html(grouped_nav(ids, labels)) + page[end + len("</nav>"):]
-    return page.replace("</nav>", "</nav>" + asset("nav_groups_script.html"), 1) if "nav_groups_script" not in page else page
-
-
 # ------------------------------------------------------------------------------------------------ entry points
 def inject(page, results_dir, data_dir=None, scores_path=None):
     """Add every wired section and block to the page (call before report_surfaces.inject so the inventory sees them)."""
@@ -530,7 +452,7 @@ def inject(page, results_dir, data_dir=None, scores_path=None):
 
 
 def finish(page):
-    """After every section exists: move the scorecard and maps up, then group the navigation."""
+    """After every section exists: move the scorecard and maps up. (The navigation is now the view rail of report_layout.py.)"""
     page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps", "fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr"],
                       ["robustness", "leaderboard"])
-    return group_navigation(page)
+    return page

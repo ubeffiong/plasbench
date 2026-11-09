@@ -58,7 +58,7 @@ const READINGS={
  distribution:[
   'Each column is one method. The box spans the interquartile range, the heavy line is the median, the whiskers reach the extremes, and every sample is drawn behind them.',
   'A tight box means the method behaves consistently across isolates. A wide box, or a median far from the mean, means performance depends on the sample -- which matters more than the average for deciding whether to trust it on a new isolate.',
-  'Failed and skipped runs are excluded rather than plotted as zero, so a short column can mean few completed runs, not poor scores. The count under each column says how many.']
+  'Only runs that produced a score are drawn: failed and skipped runs have no score to plot, so a short column can mean few completed runs, not poor scores (the ranking itself scores a failed run on a plasmid-bearing isolate as 0). The count under each column says how many.']
 };
 
 function reading(kind,extra){

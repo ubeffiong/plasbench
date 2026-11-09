@@ -1,0 +1,132 @@
+<script id='rpt-condense-script'>
+(function () {
+  'use strict';
+  var LIMIT = 12;
+
+  // ---- pure functions (also run under node by test/test_report_condense.py) ----
+  // rows: [{off: bool (hidden by another filter), text: string}] in current DOM order.
+  // opt: {limit, expanded, query}. A row is shown when it is not 'off', matches every query word, and is within the first `limit`
+  // matches (the cap is lifted while a query is typed or the table is expanded). The search looks at ALL rows, hidden ones included.
+  function windowRows(rows, opt) {
+    var limit = opt.limit == null ? LIMIT : opt.limit;
+    var words = String(opt.query || '').toLowerCase().split(/\s+/).filter(Boolean);
+    var show = [], eligible = 0, matched = 0, shown = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.off) { show.push(false); continue; }
+      eligible++;
+      var text = String(r.text || '').toLowerCase(), ok = true;
+      for (var w = 0; w < words.length; w++) if (text.indexOf(words[w]) < 0) { ok = false; break; }
+      if (!ok) { show.push(false); continue; }
+      var visible = words.length > 0 || opt.expanded || matched < limit;
+      matched++;
+      if (visible) shown++;
+      show.push(visible);
+    }
+    return {show: show, eligible: eligible, matched: matched, shown: shown, total: rows.length};
+  }
+
+  // The tab index a key moves to (automatic activation, wrapping), or -1 when the key is not a tab key.
+  function nextTab(current, count, key) {
+    if (key === 'ArrowRight' || key === 'Right') return (current + 1) % count;
+    if (key === 'ArrowLeft' || key === 'Left') return (current - 1 + count) % count;
+    if (key === 'Home') return 0;
+    if (key === 'End') return count - 1;
+    return -1;
+  }
+
+  var core = {windowRows: windowRows, nextTab: nextTab, LIMIT: LIMIT};
+  if (typeof window !== 'undefined') window.__rptCondense = core;
+  if (typeof document === 'undefined') return;
+
+  // ---- windowed tables ----
+  function bindTable(bar) {
+    var table = document.querySelector('table[data-rpt-table="' + bar.getAttribute('data-rpt-bar') + '"]');
+    if (!table || !table.tBodies[0] || bar.getAttribute('data-ready')) return;
+    bar.setAttribute('data-ready', '1');
+    var body = table.tBodies[0], input = bar.querySelector('input'), button = bar.querySelector('button'), readout = bar.querySelector('.rpt-win-n');
+    var wrap = table.parentNode && table.parentNode.classList && table.parentNode.classList.contains('panel') ? table.parentNode : null;
+    var open = false;
+    function apply() {
+      var rows = Array.prototype.slice.call(body.rows);
+      var info = rows.map(function (r) { if (r._rptText === undefined) r._rptText = r.textContent; return {off: r.hidden, text: r._rptText}; });
+      var res = windowRows(info, {limit: LIMIT, expanded: open, query: input ? input.value : ''});
+      for (var i = 0; i < rows.length; i++) {
+        var off = !res.show[i] && !rows[i].hidden;
+        if (rows[i].classList.contains('rpt-wh') !== off) rows[i].classList.toggle('rpt-wh', off);
+      }
+      var q = input && input.value.trim();
+      if (readout) readout.textContent = 'Showing ' + res.shown + ' of ' + res.eligible + ' rows' + (res.eligible < res.total ? ' (' + res.total + ' in table)' : '') + (q ? ' matching "' + q + '"' : '');
+      if (button) {
+        button.textContent = open ? 'Show first ' + LIMIT + ' rows' : 'Show all ' + res.eligible + ' rows';
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        button.disabled = !!q || res.eligible <= LIMIT;
+      }
+      if (wrap) wrap.classList.toggle('rpt-win-open', open && !q);
+    }
+    if (button) button.addEventListener('click', function () { open = !open; apply(); });
+    if (input) {
+      input.addEventListener('input', apply);
+      input.addEventListener('keydown', function (e) { if (e.key === 'Escape' && input.value) { input.value = ''; apply(); } });
+    }
+    // Sorting (the page's sortable-table script re-appends every row in the new order) and other filters (they set row.hidden) both
+    // end up here, so the window is re-applied to the new order / the rows that pass.
+    new MutationObserver(apply).observe(body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
+    bar.hidden = false;
+    apply();
+  }
+
+  // ---- sub-tabs ----
+  function bindTabs(box) {
+    var list = box.querySelector(':scope > .rpt-tablist');
+    if (!list || box.getAttribute('data-ready')) return;
+    box.setAttribute('data-ready', '1');
+    var tabs = Array.prototype.slice.call(list.querySelectorAll('[role=tab]'));
+    var panels = Array.prototype.slice.call(box.querySelectorAll(':scope > .rpt-tabpanel'));
+    if (!tabs.length || tabs.length !== panels.length) return;
+    function select(i, focus) {
+      tabs.forEach(function (t, j) {
+        t.setAttribute('aria-selected', j === i ? 'true' : 'false');
+        t.tabIndex = j === i ? 0 : -1;
+        panels[j].hidden = j !== i;
+      });
+      if (focus) tabs[i].focus();
+    }
+    tabs.forEach(function (t, i) { t.addEventListener('click', function () { select(i, false); }); });
+    list.addEventListener('keydown', function (e) {
+      var current = tabs.indexOf(document.activeElement);
+      if (current < 0) return;
+      var to = nextTab(current, tabs.length, e.key);
+      if (to < 0) return;
+      e.preventDefault();
+      select(to, true);
+    });
+    list.hidden = false;
+    box.classList.add('rpt-on');
+    select(0, false);
+  }
+
+  // A link or address to something inside a hidden tab opens that tab first.
+  function revealTarget(id) {
+    if (!id) return;
+    var el = document.getElementById(id);
+    var panel = el && el.closest ? el.closest('.rpt-tabpanel') : null;
+    if (!panel || !panel.hidden) return;
+    var tab = document.getElementById(panel.getAttribute('aria-labelledby'));
+    if (tab) { tab.click(); el.scrollIntoView(); }
+  }
+  function hashId() { try { return decodeURIComponent(location.hash.slice(1)); } catch (e) { return ''; } }
+
+  function setup() {
+    Array.prototype.forEach.call(document.querySelectorAll('.rpt-win-bar[data-rpt-bar]'), bindTable);
+    Array.prototype.forEach.call(document.querySelectorAll('.rpt-tabs[data-rpt-tabs]'), bindTabs);
+    revealTarget(hashId());
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (a) setTimeout(function () { revealTarget(decodeURIComponent(a.getAttribute('href').slice(1))); }, 0);
+  });
+  window.addEventListener('hashchange', function () { revealTarget(hashId()); });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup); else setup();
+})();
+</script>

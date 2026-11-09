@@ -1,0 +1,171 @@
+<script id="rpt-layout-script">
+(function(){
+'use strict';
+var root=document.documentElement;
+var views=[].slice.call(document.querySelectorAll('.rpt-view'));
+if(!views.length)return;
+var byId={};views.forEach(function(v){byId[v.getAttribute('data-view')]=v});
+var rail=document.querySelector('.rpt-rail');
+var nameEl=document.getElementById('rpt-view-name');
+var DEFAULT=views[0].getAttribute('data-view');
+var current=null,observer=null;
+function safe(fn){try{return fn()}catch(e){return null}}
+function viewOf(el){return el&&el.closest?el.closest('.rpt-view'):null}
+function openAncestors(el){
+ for(var d=el.closest('details');d;d=d.parentElement&&d.parentElement.closest('details'))d.open=true}
+function nudge(v){
+ // Widgets that measure themselves at load were laid out at zero width while their view was hidden: tell them to re-fit.
+ safe(function(){v.dispatchEvent(new CustomEvent('pb-view-shown',{bubbles:true,detail:{view:v.getAttribute('data-view')}}))});
+ safe(function(){window.dispatchEvent(new Event('resize'))});
+ setTimeout(function(){safe(function(){window.dispatchEvent(new Event('resize'))})},150)}
+
+/* ---------- on this page (right strip) + current-section tracking ---------- */
+function units(v){return [].slice.call(v.querySelectorAll('.rpt-body>section[id],.rpt-body>.rpt-card[data-card]'))}
+function unitId(u){return u.getAttribute('data-card')||u.id}
+function markCurrent(id){
+ [].forEach.call(document.querySelectorAll('.rpt-toc a[aria-current],.rpt-rail-sub a[aria-current]'),function(a){a.removeAttribute('aria-current')});
+ if(!id)return;
+ [].forEach.call(document.querySelectorAll('.rpt-toc a[href="#'+id+'"],.rpt-rail-sub a[href="#'+id+'"]'),function(a){a.setAttribute('aria-current','true')})}
+function track(v){
+ if(observer){observer.disconnect();observer=null}
+ var us=units(v);if(!us.length||!('IntersectionObserver' in window))return;
+ var seen={};
+ observer=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){seen[unitId(e.target)]=e.isIntersecting});
+  for(var i=0;i<us.length;i++){if(seen[unitId(us[i])]){markCurrent(unitId(us[i]));return}}
+ },{rootMargin:'-70px 0px -55% 0px',threshold:0});
+ us.forEach(function(u){observer.observe(u)});
+ markCurrent(unitId(us[0]))}
+
+/* ---------- show one view ---------- */
+function show(v){
+ if(!v)return false;
+ var changed=v!==current;
+ if(changed){
+  views.forEach(function(x){var on=x===v;x.classList.toggle('rpt-active',on)});
+  var id=v.getAttribute('data-view');
+  [].forEach.call(document.querySelectorAll('.rpt-rail-item'),function(li){
+   var on=li.getAttribute('data-view')===id;li.classList.toggle('rpt-active',on);
+   var a=li.querySelector('.rpt-rail-link');if(a){if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')}});
+  if(nameEl)nameEl.textContent=(v.querySelector('.rpt-view-title')||{}).textContent||id;
+  var cap=exp&&exp.querySelector('span');if(exp){exp.setAttribute('aria-pressed','false');if(cap)cap.textContent='Expand all'}
+  current=v;
+  nudge(v);track(v)}
+ return changed}
+function scrollToEl(el){
+ requestAnimationFrame(function(){requestAnimationFrame(function(){safe(function(){el.scrollIntoView({block:'start'})})})})}
+function route(initial){
+ var raw=location.hash.slice(1),h=raw;
+ try{h=decodeURIComponent(raw)}catch(e){}
+ if(!h){show(byId[DEFAULT]);if(!initial)window.scrollTo(0,0);return}
+ if(h.indexOf('view-')===0&&byId[h.slice(5)]){show(byId[h.slice(5)]);window.scrollTo(0,0);return}
+ var el=document.getElementById(h);
+ var v=viewOf(el);
+ if(el&&v){show(v);openAncestors(el);nudge(v);scrollToEl(el);return}
+ show(byId[DEFAULT])}
+window.addEventListener('hashchange',function(){route(false)});
+
+/* ---------- build the on-this-page strip from the units of the view (the rail already lists them without JS) ---------- */
+views.forEach(function(v){
+ var us=units(v);if(us.length<2)return;
+ var toc=document.createElement('nav');toc.className='rpt-toc';toc.setAttribute('aria-label','On this page: '+((v.querySelector('.rpt-view-title')||{}).textContent||''));
+ var p=document.createElement('p');p.textContent='On this page';toc.appendChild(p);
+ us.forEach(function(u){
+  var id=unitId(u);var link=rail&&rail.querySelector('.rpt-rail-sub a[href="#'+id+'"]');
+  var a=document.createElement('a');a.href='#'+id;a.textContent=link?link.textContent:id;toc.appendChild(a)});
+ var body=v.querySelector('.rpt-body');v.insertBefore(toc,body)});
+
+/* ---------- rail: collapse to icons, remembered; arrow keys move between items ---------- */
+var tog=document.querySelector('.rpt-rail-toggle');
+function setMin(min,save){
+ root.classList.toggle('pb-rail-min',min);
+ if(tog){tog.setAttribute('aria-expanded',String(!min));tog.setAttribute('aria-label',min?'Expand the view menu':'Collapse the view menu');
+  var t=tog.querySelector('span');if(t)t.textContent=min?'Expand':'Collapse'}
+ if(save)safe(function(){localStorage.setItem('pb-rail',min?'min':'open')});
+ setTimeout(function(){safe(function(){window.dispatchEvent(new Event('resize'))})},180)}
+var saved=safe(function(){return localStorage.getItem('pb-rail')});
+setMin(saved?saved==='min':window.innerWidth<1100,false);
+if(tog)tog.addEventListener('click',function(){setMin(!root.classList.contains('pb-rail-min'),true)});
+if(rail)rail.addEventListener('keydown',function(e){
+ var k=e.key;if(['ArrowDown','ArrowUp','Home','End'].indexOf(k)<0)return;
+ var items=[].filter.call(rail.querySelectorAll('a,button'),function(x){return x.offsetParent!==null});
+ var i=items.indexOf(document.activeElement);if(i<0)return;
+ e.preventDefault();
+ var n=k==='Home'?0:k==='End'?items.length-1:Math.max(0,Math.min(items.length-1,i+(k==='ArrowDown'?1:-1)));
+ items[n].focus()});
+
+/* ---------- search: jump to a section by title ---------- */
+var q=document.getElementById('rpt-q'),list=document.getElementById('rpt-results');
+var index=[];
+if(rail){
+ [].forEach.call(rail.querySelectorAll('.rpt-rail-item'),function(li){
+  var vt=(li.querySelector('.rpt-rail-label')||{}).textContent||'';
+  var va=li.querySelector('.rpt-rail-link');
+  index.push({href:va.getAttribute('href'),label:vt,where:'view',key:vt.toLowerCase()});
+  [].forEach.call(li.querySelectorAll('.rpt-rail-sub a'),function(a){
+   var id=a.getAttribute('href').slice(1);
+   index.push({href:a.getAttribute('href'),label:a.textContent,where:vt,key:(a.textContent+' '+id.replace(/-/g,' ')+' '+vt).toLowerCase()})})})}
+var active=-1,hits=[];
+function closeResults(){if(!list)return;list.hidden=true;active=-1;if(q)q.setAttribute('aria-expanded','false');q&&q.removeAttribute('aria-activedescendant')}
+function paint(){
+ list.innerHTML='';
+ if(!hits.length){var li=document.createElement('li');li.className='rpt-none';li.textContent='No section matches';list.appendChild(li)}
+ hits.forEach(function(h,i){
+  var li=document.createElement('li');li.setAttribute('role','presentation');
+  var a=document.createElement('a');a.href=h.href;a.id='rpt-r'+i;a.setAttribute('role','option');a.setAttribute('aria-selected',String(i===active));
+  var s=document.createElement('span');s.textContent=h.label;var sm=document.createElement('small');sm.textContent=h.where==='view'?'view':h.where;
+  a.appendChild(s);a.appendChild(sm);a.addEventListener('click',closeResults);li.appendChild(a);list.appendChild(li)});
+ list.hidden=false;q.setAttribute('aria-expanded','true');
+ if(active>=0)q.setAttribute('aria-activedescendant','rpt-r'+active);else q.removeAttribute('aria-activedescendant')}
+function search(){
+ var t=q.value.trim().toLowerCase();if(!t){closeResults();return}
+ var words=t.split(/\s+/);
+ hits=index.filter(function(x){return words.every(function(w){return x.key.indexOf(w)>=0})}).slice(0,12);
+ active=hits.length?0:-1;paint()}
+if(q&&list){
+ q.addEventListener('input',search);
+ q.addEventListener('focus',function(){if(q.value.trim())search()});
+ q.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){if(list.hidden&&q.value){q.value=''}closeResults();return}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(list.hidden)search();if(!hits.length)return;e.preventDefault();
+   active=(active+(e.key==='ArrowDown'?1:-1)+hits.length)%hits.length;paint();return}
+  if(e.key==='Enter'&&active>=0&&hits[active]){e.preventDefault();var h=hits[active].href;closeResults();q.blur();
+   if(location.hash==h)route(false);else location.hash=h}});
+ document.addEventListener('click',function(e){if(!e.target.closest||!e.target.closest('.rpt-search'))closeResults()});
+ document.addEventListener('keydown',function(e){
+  if(e.key==='/'&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName||'')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();q.focus();q.select()}
+  else if(e.key==='Escape'&&!list.hidden)closeResults()})}
+
+/* ---------- expand / collapse every details of the shown view ---------- */
+var exp=document.getElementById('rpt-expand');
+if(exp)exp.addEventListener('click',function(){
+ var on=exp.getAttribute('aria-pressed')!=='true';
+ [].forEach.call(current.querySelectorAll('details'),function(d){d.open=on});
+ exp.setAttribute('aria-pressed',String(on));var s=exp.querySelector('span');if(s)s.textContent=on?'Collapse all':'Expand all';
+ nudge(current)});
+// A details that opens (a card, a folded table) may hold a widget that was laid out at zero width.
+document.addEventListener('toggle',function(e){if(e.target&&e.target.open){var v=viewOf(e.target);if(v){safe(function(){e.target.dispatchEvent(new CustomEvent('pb-view-shown',{bubbles:true}))});
+ setTimeout(function(){safe(function(){window.dispatchEvent(new Event('resize'))})},30)}}},true);
+
+/* ---------- print and PDF: every view, every details open ---------- */
+var printing=false,wasShut=[];
+function preparePrint(){
+ if(printing)return;printing=true;
+ [].forEach.call(document.querySelectorAll('details:not([open])'),function(d){wasShut.push(d);d.open=true});
+ views.forEach(function(v){safe(function(){v.dispatchEvent(new CustomEvent('pb-view-shown',{bubbles:true,detail:{print:true}}))})});
+ safe(function(){window.dispatchEvent(new Event('resize'))})}
+function endPrint(){
+ if(!printing)return;printing=false;
+ wasShut.forEach(function(d){d.open=false});wasShut=[];
+ safe(function(){window.dispatchEvent(new Event('resize'))})}
+window.addEventListener('beforeprint',preparePrint);
+window.addEventListener('afterprint',endPrint);
+var pbtn=document.getElementById('pb-print');
+if(pbtn)pbtn.addEventListener('click',function(){preparePrint();setTimeout(function(){window.print()},350)});
+// ?print=1 is what python/export_report_pdf.py opens: prepare once and keep it prepared.
+if(/[?&]print(=|&|$)/.test(location.search))preparePrint();
+
+/* ---------- start ---------- */
+route(true);
+})();
+</script>

@@ -364,7 +364,9 @@ def main():
     # (the heading now carries an info icon before its closing tag, so match the opening tag and text)
     assert page.count("<h3>Reconstruction evidence explorer<") == 1,        "the evidence explorer heading must appear exactly once"
     start = page.index("id='pb-explorer-view'")
-    end = page.index("<section id='scores'>")
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'python'))
+    import report_layout   # the dashboard section ends where its own </section> does (the views are laid out in the story order)
+    end = next(e for sid, a, e in report_layout.find_sections(page) if sid == "enterprise")
     container = page[start:end]
     assert "id='cohort-evidence-explorer'" in container,         "the analysis panels must sit inside the explorer container"
     for panel in ("vq-summary", "vq-agree", "vq-sankey", "vq-flow", "vq-compare",
@@ -480,19 +482,20 @@ def main():
     # Section navigation is a real tab bar, in document order, covering every
     # section. The stylesheet targeted .nav while the markup emitted a bare
     # <nav>, so none of it applied.
-    assert "<nav class='nav'" in page, "the navigation carries no class, so it is unstyled"
-    nav_start = page.index("<nav class='nav'")
+    assert "<nav class='rpt-rail'" in page, "the view rail (python/report_layout.py) is missing"
+    nav_start = page.index("<nav class='rpt-rail'")
     nav_html = page[nav_start:page.index("</nav>", nav_start)]
     nav_ids = re.findall(r"href='#([a-z-]+)'", nav_html)
     section_ids = re.findall(r"<section id='([a-z-]+)'", page)
-    # The nav is grouped: every section appears in exactly one group, and within a group in document order.
-    assert sorted(nav_ids) == sorted(section_ids) and len(set(nav_ids)) == len(nav_ids), (
+    view_links = re.findall(r"href='#view-([a-z]+)'", nav_html)
+    # The rail lists each view once and every section once, under its view; the views come in the story order and the sections follow the
+    # document order (the page is laid out view by view, so the rail order IS the document order).
+    section_links = [i for i in nav_ids if not i.startswith("view-")]
+    assert sorted(section_links) == sorted(section_ids) and len(set(section_links)) == len(section_links), (
         "the navigation must link every section exactly once; "
-        f"nav={nav_ids} sections={section_ids}")
-    for group_html in nav_html.split("<details")[1:]:
-        in_group = re.findall(r"href='#([a-z-]+)'", group_html)
-        assert in_group == [i for i in section_ids if i in in_group], (
-            f"within a navigation group the sections must follow document order: {in_group}")
+        f"nav={section_links} sections={section_ids}")
+    assert section_links == section_ids, "the rail must list the sections in document order"
+    assert len(view_links) == len(set(view_links)) and view_links[0] == "overview", view_links
     assert "aria-current" in page, "the bar never says which section you are in"
     # The tracker is emitted inside a section, so it must wait for the rest.
     assert "DOMContentLoaded" in page,         "section tracking must be built after the document is parsed, not mid-page"

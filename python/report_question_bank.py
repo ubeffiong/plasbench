@@ -23,6 +23,7 @@ import html
 from collections import defaultdict
 from pathlib import Path
 from plasbench_common import number  # noqa: E402
+import report_aliases  # noqa: E402
 
 SECTIONS = (("metric-framework", "Metrics"),
             ("database-membership", "Database membership"),
@@ -110,6 +111,7 @@ def baselines_section(out_dir, leaderboard):
             points = pooled_reliability(out_dir, r["tool"])
             if points:
                 charts.append(reliability_chart(r["tool"], points))
+    calibrated = any(number(r.get("n_calibrated")) for r in rows)
     note = ("" if has_baseline else
             "<p class='muted'>No trivial baseline was scored in this run (RUN_BASELINE_COVERAGE / "
             "RUN_BASELINE_REFERENCE, or the assembly had no depth headers and no plasmid reference set was "
@@ -124,10 +126,12 @@ def baselines_section(out_dir, leaderboard):
         "0.8 is right about 80% of the time: <strong>Brier score</strong> (lower is better, 0 is perfect) and "
         "<strong>expected calibration error</strong> (ECE, weighted gap between predicted and observed). "
         "Calibration is not accuracy: a tool can rank contigs well and still be over-confident.</p>" + note
-        + "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th>"
-          "<th>Ranking score</th><th>Versus best baseline</th><th>Mean Brier score</th><th>Mean ECE</th>"
-          "<th>Samples calibrated</th></tr></thead><tbody>"
-        + ("".join(body) or "<tr><td colspan='7'>No scored tools.</td></tr>") + "</tbody></table></div>"
+        # With no baseline scored and no probabilities, every row would be empty beside the sentence above that says so.
+        + (("<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th>"
+            "<th>Ranking score</th><th>Versus best baseline</th><th>Mean Brier score</th><th>Mean ECE</th>"
+            "<th>Samples calibrated</th></tr></thead><tbody>"
+            + ("".join(body) or "<tr><td colspan='7'>No scored tools.</td></tr>") + "</tbody></table></div>")
+           if (has_baseline or calibrated) else "")
         + ("<div class='pr-grid'>" + "".join(charts) + "</div>" if charts else
            "<p class='muted'>No tool exposed per-contig probabilities, so no reliability diagram is shown.</p>")
         + "</section>")
@@ -221,7 +225,7 @@ def excluded_replicons_section(data_dir):
             "<p class='lead'>Truth replicons whose plasmid/chromosome label conflicted with plasmid markers, rRNA "
             "genes or long-read support are AMBIGUOUS under the evidence labelling scheme, where predictions on them "
             "are neither credited nor penalised. The pre-registered primary scheme (NCBI labels) still scores them; "
-            "the evidence scheme is a sensitivity analysis (Label schemes section). "
+            "the evidence scheme is a sensitivity analysis (see " + report_aliases.link("label-schemes", "labelling schemes") + "). "
             f"{len(rows)} replicon(s) excluded, {marker_free} of them plasmids with no marker at all -- the stratum "
             "a marker-based labeller cannot confirm, reported here rather than hidden.</p>" + body + "</section>")
 
@@ -263,7 +267,7 @@ def metric_framework_section(leaderboard, data_dir):
         "aligns that well to both is AMBIGUOUS and excluded, not multi-assigned; one that aligns to neither is "
         f"UNPLACED and excluded. This run: {labels}. Tools that output reassembled sequences instead of assembly "
         "contigs are not scored at contig level. Abstention is not measured: no wrapped tool reports an explicit "
-        "unclassified call; the abstention rate in the MCC &amp; F-beta section is the share of isolates on "
+        "unclassified call; the abstention rate (see " + report_aliases.link("scoring-additions", "MCC, F2, F0.5 and abstention") + ") is the share of isolates on "
         "which a tool returned nothing.</p>"
         "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th>"
         "<th>Base F1 (macro)</th><th>Base F1 (micro)</th><th>Contig F1 (count)</th><th>Contig F1 (length)</th>"

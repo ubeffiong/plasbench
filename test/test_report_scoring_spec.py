@@ -106,7 +106,8 @@ def main():
             for needle in needles:
                 assert needle in body, f"{sid}: '{needle}' not in section"
             assert "Not run" not in body or sid == "contig-layer", f"{sid} unexpectedly not run"
-        assert page.count("<a href='#") == len(rss.SECTIONS) + 1
+        # one nav link per section, the page's own nav link, and the label-schemes prose link to the ranking-robustness table
+        assert page.count("<a href='#") == len(rss.SECTIONS) + 2
         print(f"  PASS: all {len(checks)} sections render their values, with nav links")
 
         # The three views are 3D scenes with the raw table kept in a collapsed details block.

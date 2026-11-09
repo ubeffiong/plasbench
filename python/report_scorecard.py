@@ -37,11 +37,13 @@ Standard library only.
 import json
 import os
 import sys
+from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
+import report_aliases  # noqa: E402
 import report_common as rc  # noqa: E402
 import report_svg as sv  # noqa: E402
 
@@ -353,6 +355,62 @@ def scenario_membership(rows, quality=None, min_depth=30.0):
     return members
 
 
+EXCLUSIVE_ORDER = ("plasmid_free", "challenging", "complex", "annotated", "simple")
+
+
+def exclusive_scenarios(rows, members):
+    """{sample: one scenario}: the partition derived from the SAME overlapping membership.
+
+    First match wins: no plasmid -> plasmid_free, then challenging, complex, annotated; whatever is left is simple
+    (plasmids, none of the other properties). `members` is scenario_membership() of the same rows, so a tag count
+    in the scorecard and a group count here can never disagree about who has the tag."""
+    out = {}
+    for r in rows or []:
+        sample = r.get("sample")
+        if (rc.number(r.get("n_plasmids")) or 0) <= 0:
+            out[sample] = "plasmid_free"
+        elif sample in members["challenging"]:
+            out[sample] = "challenging"
+        elif sample in members["complex"]:
+            out[sample] = "complex"
+        elif sample in members["annotated"]:
+            out[sample] = "annotated"
+        else:
+            out[sample] = "simple"
+    return out
+
+
+def exclusive_groups(exclusive):
+    groups = {name: set() for name in EXCLUSIVE_ORDER}
+    for sample, name in exclusive.items():
+        groups[name].add(sample)
+    return groups
+
+
+def scenario_performance(scores, samples):
+    """{(track, tool): {'n', 'mean_f1', 'mean_plasmid_recall'}} over the score rows of `samples`."""
+    cells = {}
+    for r in scores or []:
+        if r.get("sample") not in samples or not r.get("tool"):
+            continue
+        cells.setdefault((_track(r), r["tool"]), []).append(r)
+    out = {}
+    for key, rows in cells.items():
+        out[key] = {"n": len({r["sample"] for r in rows}),
+                    "mean_f1": rc.mean([v for v in (rc.number(r.get("f1")) for r in rows) if v is not None]),
+                    "mean_plasmid_recall": rc.mean([v for v in (rc.number(r.get("plasmid_recall")) for r in rows)
+                                                    if v is not None])}
+    return out
+
+
+def tag_counts_text(members):
+    return ", ".join(f"{name} {len(members[name])}" for name in SCENARIOS)
+
+
+def exclusive_counts_text(groups):
+    return ", ".join(f"{name.replace('_', '-')} {len(groups[name])}" for name in EXCLUSIVE_ORDER)
+
+
 def underpowered(n, minimum=None):
     return n < (SCORECARD_MIN_SAMPLES if minimum is None else minimum)
 
@@ -426,13 +484,31 @@ def profile_strip(specs, tool, res, values):
     return "".join(parts)
 
 
-def _intro(page):
+def weight_cap(specs):
+    """Largest scored weight share any tool can reach: metrics with no bands (A4, C2) are never scored."""
+    total = sum(s["weight"] for s in specs)
+    fixed = [s for s in specs if s["id"] in NOT_AVAILABLE or s.get("excellent") is None]
+    if not total or not fixed:
+        return None
+    return 1 - sum(s["weight"] for s in fixed) / total, [s["id"] for s in fixed], sum(s["weight"] for s in fixed)
+
+
+def _intro(page, specs=None):
     links = "See <a href='#rank-robustness'>ranking robustness</a>"
     if "id='composite'" in page:
         links += " and the <a href='#composite'>five-dimension composite</a>"
     return ("<strong>Another view, never the ranking.</strong> A weighted scorecard of 17 metrics, each turned into a 0-100 score "
             "by example thresholds that are mostly proposed, not standards. The leaderboard and the pre-specified endpoints are "
-            f"unchanged. {links}.")
+            f"unchanged. {links}." + _cap_sentence(specs))
+
+
+def _cap_sentence(specs):
+    cap = weight_cap(specs) if specs else None
+    if not cap:
+        return ""
+    share, ids, weight = cap
+    return (f" {' and '.join(ids)} have no bands ({weight:g} of {sum(s['weight'] for s in specs):g} weight points) and are never "
+            f"scored, so the scored weight share is at most {share:.2f} for every tool.")
 
 
 def _tool_table(specs, per_tool, order, results):
@@ -447,7 +523,7 @@ def _tool_table(specs, per_tool, order, results):
 
 def scorecard_section(page, specs, per_tool):
     if not per_tool:
-        return rc.section("scorecard", "Benchmark scorecard", _intro(page),
+        return rc.section("scorecard", "Benchmark scorecard", _intro(page, specs),
                           rc.not_run("scores.tsv has no scored tool, so no scorecard can be computed."), group="Scoring")
     body = ""
     for track in sorted({k[0] for k in per_tool}):
@@ -470,7 +546,31 @@ def scorecard_section(page, specs, per_tool):
                     "left out, never counted as zero); the scored weight share says how much of the 100 weights it rests on. "
                     "Structural accuracy is alignment-derived and unvalidated; annotation concordance is coordinate-based, not "
                     "orthology; runtime is hardware-dependent.", "")
-    return rc.section("scorecard", "Benchmark scorecard", _intro(page), body, group="Scoring")
+    return rc.section("scorecard", "Benchmark scorecard", _intro(page, specs), body, group="Scoring")
+
+
+def summary_block(specs, per_tool):
+    """The scorecard overall beside the Summary's report-card grade (never replacing it), with which view is which."""
+    if not per_tool:
+        return ""
+    rows = []
+    for track in sorted({k[0] for k in per_tool}):
+        sub = {k: v for k, v in per_tool.items() if k[0] == track}
+        order, results = _ranked(specs, sub)
+        for k in order:
+            res = results[k]
+            band = rc.band_chip(res["band"]) if res["band"] else rc.missing("no metric could be scored")
+            rows.append([k[0], k[1], "-" if res["score"] is None else f"{res['score']:.1f}", band,
+                         f"{res['scored_share']:.2f}"])
+    table = rc.panel(["Track", "Tool", "Scorecard overall", "Scorecard band", "Scored weight share"], rows)
+    return ("<h3 id='summary-scorecard'>Scorecard overall</h3>"
+            "<p class='lead'>These are three different views and they will not match number for number. The grade above is an "
+            "A-D reading of four components (Base F1, plasmid recall, chromosomal contamination, completed runs); the scorecard "
+            "overall here is a 0-100 score over the metrics that could be scored, each scaled by its own thresholds, with the "
+            "bands excellent, good, moderate and poor and the share of the 100 weight points it rests on; the "
+            f"{report_aliases.link('composite', 'five-dimension composite')} uses a third transform with accuracy and completeness "
+            "gates. The leaderboard rank is the only ranking. See "
+            f"{report_aliases.link('scorecard', 'the scorecard')}.</p>" + str(table))
 
 
 def definitions_section(specs, error=None):
@@ -490,37 +590,67 @@ def definitions_section(specs, error=None):
     return rc.section("scorecard-definitions", "Scorecard definitions", lead, body, group="Scoring")
 
 
-def scenarios_section(specs, inp, quality):
+def download_links(inp, link, names):
+    """Download anchors for benchmark.<name>.tsv files that exist; `link(path)` gives the href relative to the report."""
+    parts = []
+    for name in names:
+        path = os.path.join(inp.dir, f"benchmark.{name}.tsv")
+        if os.path.isfile(path):
+            parts.append(f"<a href='{rc.esc(link(path))}' download>{rc.esc(name.replace('_', ' '))} table</a>")
+    return (" Download: " + ", ".join(parts) + ".") if parts else ""
+
+
+def scenarios_section(specs, inp, quality, link=None):
     lead = ("The scorecard restricted to isolates of one scenario. Scenarios overlap, so an isolate can appear in several. "
             f"Fewer than {SCORECARD_MIN_SAMPLES} isolates is flagged underpowered: read it as an illustration, not a result. "
             "Runtime, memory and success rate are per-tool summaries and are not scored here.")
     if inp.scenarios is None:
         return rc.section("scorecard-scenarios", "Scorecard by scenario", lead,
-                          rc.not_run("benchmark.scenarios.tsv was not produced, so isolates cannot be assigned to scenarios."), group="Scoring")
+                          rc.not_run("benchmark.scenarios.tsv was not produced, so isolates cannot be assigned to scenarios "
+                                     "(stage 6 writes it with scenario_tags.py when RUN_DIMENSION_ANALYSES=1)."), group="Scoring")
     members = scenario_membership(inp.scenarios, quality)
-    body = ""
+    groups = exclusive_groups(exclusive_scenarios(inp.scenarios, members))
+    if link:
+        lead += download_links(inp, link, ("scenarios", "scenario_performance"))
+    body = rc.Raw("<div class='insight'><p>Same definition as " + report_aliases.link("scenarios", "Performance by scenario")
+                   + ", which counts each isolate once (first match of plasmid-free, challenging, complex, annotated, simple): "
+                   + rc.esc(exclusive_counts_text(groups)) + ". Overlapping tags here: " + rc.esc(tag_counts_text(members)) + ".</p></div>")
     for name in SCENARIOS:
         samples = members[name]
         n = len(samples)
         flag = " <span class='rpt-band rpt-band-moderate'>underpowered</span>" if underpowered(n) else ""
-        body += f"<h3>{rc.esc(name.capitalize())}: {n} isolate{'s' if n != 1 else ''}{flag}</h3>"
+        body += (f"<h3 data-scenario='{name}' data-n='{n}'>{rc.esc(name.capitalize())}: {n} isolate{'s' if n != 1 else ''}{flag}</h3>")
         if not samples:
             body += rc.note(f"No isolate is tagged {name} in this cohort.")
             continue
         per_tool = metric_values(inp.dir, None, samples, inputs=inp)
         order, results = _ranked(specs, per_tool)
-        rows = [[k[0], k[1], _overall_cell(results[k]), f"{results[k]['scored_share']:.2f}", n] for k in order]
-        body += rc.panel(["Track", "Tool", "Overall", "Scored weight share", "Isolates (n)"], rows, "No tool was scored here.")
+        perf = scenario_performance(inp.scores, samples)
+        rows = []
+        for k in order:
+            p = perf.get(k, {})
+            rows.append([k[0], k[1], _overall_cell(results[k]), f"{results[k]['scored_share']:.2f}", n,
+                         rc.fmt(p.get("mean_f1")), rc.fmt(p.get("mean_plasmid_recall"))])
+        body += rc.panel(["Track", "Tool", "Overall", "Scored weight share", "Isolates (n)", "Mean F1",
+                          "Mean per-plasmid recall"], rows, "No tool was scored here.")
     return rc.section("scorecard-scenarios", "Scorecard by scenario", lead, body, group="Scoring")
 
 
-def inject(page, results_dir, scores_path, config_path=None, samples_path=None):
+def inject(page, results_dir, scores_path, config_path=None, samples_path=None, report_path=None):
     """Add the scorecard sections before Recommendations (and nav links); every failure is a visible 'Not run'."""
     try:
         specs, error = load_config(config_path), None
     except ValueError as exc:
         specs, error = [], str(exc)
     inp = Inputs(results_dir, scores_path)
+    base = os.path.dirname(os.path.abspath(report_path)) if report_path else os.path.abspath(results_dir)
+
+    def link(path):
+        try:
+            return quote(os.path.relpath(path, base).replace(os.sep, "/"), safe="/._-~")
+        except ValueError:
+            return "file:///" + os.path.abspath(path).replace(os.sep, "/")
+
     if error:
         reason = f"the scorecard configuration is invalid: {error}"
         sections = [rc.section("scorecard", "Benchmark scorecard", _intro(page), rc.not_run(reason), group="Scoring"),
@@ -533,7 +663,9 @@ def inject(page, results_dir, scores_path, config_path=None, samples_path=None):
             scen = rc.section("scorecard-scenarios", "Scorecard by scenario", "", rc.not_run(reason), group="Scoring")
         else:
             samples_path = samples_path or os.path.join(results_dir, "samples.tsv")
-            scen = scenarios_section(specs, inp, _quality_bands(samples_path))
+            scen = scenarios_section(specs, inp, _quality_bands(samples_path), link)
         sections = [scorecard_section(page, specs, per_tool), definitions_section(specs), scen]
     page = rc.add_style(page)
+    if not error and inp.scores and "<h3>Start here</h3>" in page:
+        page = page.replace("<h3>Start here</h3>", summary_block(specs, per_tool) + "<h3>Start here</h3>", 1)
     return rc.inject_sections(page, "".join(sections), SECTIONS)

@@ -11,6 +11,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import report_regions  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 DEMO = ROOT / "results_demo"
 
@@ -21,9 +24,13 @@ def rows(path):
 
 
 def section(html, name):
+    """A section's markup; a merged analysis is found through its panel id or python/report_aliases.LEGACY_IDS."""
     match = re.search(r"<section id='%s'>(.*?)</section>" % name, html, re.S)
-    assert match, f"report has no #{name} section"
-    return match.group(1)
+    if match:
+        return match.group(1)
+    block = report_regions.region(html, name)
+    assert block, f"report has no #{name} section"
+    return block
 
 
 def main():

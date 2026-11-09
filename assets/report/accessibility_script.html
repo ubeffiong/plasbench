@@ -47,8 +47,10 @@
 }
 </style><script>
 (()=>{const root=document.documentElement;
+// With the page shell (python/report_layout.py) the buttons live in the top bar; without it they are added above the first section.
+const own=!document.getElementById('pb-cvd');
 const bar=document.createElement('div');bar.id='pb-prefs';
-bar.innerHTML='<button type="button" id="pb-cvd" aria-pressed="false" '
+if(own)bar.innerHTML='<button type="button" id="pb-cvd" aria-pressed="false" '
  +'title="Swap the green/red status palette for blue/orange, which stays separable with '
  +'deuteranopia or protanopia. Every value is also printed as text, so nothing depends on colour.">'
  +'Colour-blind safe palette</button>'
@@ -59,7 +61,7 @@ bar.innerHTML='<button type="button" id="pb-cvd" aria-pressed="false" '
  +'<span role="tooltip" id="pb-prefs-note" class="rpt-info-pop">Colour is never the only channel: cells print their value, grades print a letter.</span></span>';
 const main=document.querySelector('main');
 const first=main.querySelector('section');
-if(first)main.insertBefore(bar,first);
+if(own&&first)main.insertBefore(bar,first);
 
 function tellFrames(on){document.querySelectorAll('iframe').forEach(f=>{
  try{f.contentWindow.postMessage({pbPalette:on?'cvd':'default'},'*')}catch(e){}})}
@@ -77,7 +79,7 @@ if(saved==='1')setCvd(true);
 document.querySelectorAll('iframe').forEach(f=>f.addEventListener('load',
  ()=>setTimeout(()=>tellFrames(root.dataset.cvd==='1'),150)));
 
-document.getElementById('pb-print').addEventListener('click',function(){
+if(own)document.getElementById('pb-print').addEventListener('click',function(){
  // Print CSS can reveal a hidden pane, but a canvas drawn at zero width stays
  // blank, so the panes are shown and given a frame to lay out and redraw.
  document.querySelectorAll('.pb-tab[hidden]').forEach(p=>{p.dataset.wasHidden='1';p.hidden=false});

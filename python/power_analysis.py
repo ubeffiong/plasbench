@@ -33,21 +33,21 @@ import sys
 from collections import defaultdict
 from statistics import NormalDist
 
-FIELDS = ("analysis_track", "metric", "tool_a", "tool_b", "paired_samples", "clusters", "mean_difference",
+FIELDS = ("analysis_track", "task", "metric", "tool_a", "tool_b", "paired_samples", "clusters", "mean_difference",
           "sd_cluster_differences", "alpha", "power", "min_detectable_difference", "target_difference",
           "clusters_needed_for_target", "observed_vs_mdd", "status")
 
 
-def read_scores(path, metric):
-    values = defaultdict(dict)             # (track, tool) -> sample -> value
+def read_scores(path, metric, ranking=None):
+    """{(track, task, metric, tool): {sample: value}}; with `ranking` each tool uses its (track, task) ranking metric."""
+    # keys keep the (track, task, metric) group so that only comparable tools are ever paired
+    values = defaultdict(dict)
     with open(path, newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            try:
-                value = float(row[metric])
-            except (KeyError, ValueError, TypeError):
-                continue
-            values[(row.get("analysis_track") or "short_read", row["tool"])][row["sample"]] = value
-    return values
+        for row in csv.DictReader(handle, delimiter="	"):
+            key, value = row_value(row, metric, ranking)
+            if value is not None:
+                values[key][row["sample"]] = value
+    return values  # (pairs are formed only inside one key's (track, task, metric))
 
 
 def read_clusters(path):
@@ -67,20 +67,20 @@ def read_clusters(path):
 
 def analyse(values, clusters, alpha, power, target, min_clusters, metric):
     z = NormalDist().inv_cdf(1 - alpha / 2) + NormalDist().inv_cdf(power)
-    by_track = defaultdict(list)
-    for (track, tool) in values:
-        by_track[track].append(tool)
+    by_group = defaultdict(list)
+    for (track, task, used, tool) in values:
+        by_group[(track, task, used)].append(tool)
     rows = []
-    for track, tools in sorted(by_track.items()):
+    for (track, task, metric), tools in sorted(by_group.items()):
         for index, tool_a in enumerate(sorted(tools)):
             for tool_b in sorted(tools)[index + 1:]:
-                a, b = values[(track, tool_a)], values[(track, tool_b)]
+                a, b = values[(track, task, metric, tool_a)], values[(track, task, metric, tool_b)]
                 shared = sorted(set(a) & set(b))
                 groups = defaultdict(list)
                 for sample in shared:
                     groups[clusters.get(sample, f"sample:{sample}")].append(a[sample] - b[sample])
                 means = [statistics.mean(v) for v in groups.values()]
-                row = {"analysis_track": track, "metric": metric, "tool_a": tool_a, "tool_b": tool_b,
+                row = {"analysis_track": track, "task": task, "metric": metric, "tool_a": tool_a, "tool_b": tool_b,
                        "paired_samples": len(shared), "clusters": len(means), "alpha": alpha, "power": power,
                        "target_difference": target}
                 if means:
@@ -103,6 +103,39 @@ def analyse(values, clusters, alpha, power, target, min_clusters, metric):
     return rows
 
 
+def read_ranking_groups(path):
+    """{(track, tool): (task, ranking metric)} from a leaderboard TSV, so a pair is compared on the metric
+    the leaderboard ranks that (track, task) by, exactly as aggregate_results.compute_comparisons does."""
+    groups = {}
+    with open(path, newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle, delimiter="\t"):
+            if row.get("tool") and row.get("ranking_metric"):
+                groups[(row.get("analysis_track") or "short_read", row["tool"])] = (row.get("task") or "",
+                                                                                   row["ranking_metric"])
+    return groups
+
+
+def sample_value(row, metric):
+    """One score row's value of `metric`; sample_cprr (isolate-level CPRR) is correct / truth plasmids."""
+    if metric == "sample_cprr":
+        correct, total = float(row["cprr_correct"]), float(row["cprr_plasmids"])
+        if total <= 0:
+            raise ValueError("no plasmids")
+        return correct / total
+    return float(row[metric])
+
+
+def row_value(row, metric, ranking=None):
+    """((track, task, metric, tool), value) for one score row; value is None when the metric is absent."""
+    track = row.get("analysis_track") or "short_read"
+    task, used = ranking.get((track, row["tool"]), ("", metric)) if ranking else ("", metric)
+    try:
+        value = sample_value(row, used)
+    except (KeyError, ValueError, TypeError):
+        value = None
+    return (track, task, used, row["tool"]), value
+
+
 def fmt(value):
     return "" if value is None else (f"{value:.6f}" if isinstance(value, float) else str(value))
 
@@ -112,6 +145,9 @@ def main():
     ap.add_argument("--scores", required=True)
     ap.add_argument("--sample-sheet", help="for the bioproject / source_study clusters")
     ap.add_argument("--metric", default="f1", help="scores.tsv column to compare (default f1)")
+    ap.add_argument("--leaderboard", help="benchmark.leaderboard.tsv: compare each (track, task) on its own ranking "
+                                          "metric (lw_bin_f1, f1 or sample_cprr), the metric the paired-comparison "
+                                          "table uses; --metric is then only the fallback")
     ap.add_argument("--alpha", type=float, default=0.05)
     ap.add_argument("--power", type=float, default=0.80)
     ap.add_argument("--target-difference", type=float, default=0.05)
@@ -120,7 +156,8 @@ def main():
     args = ap.parse_args()
     if not (0 < args.alpha < 1 and 0.5 <= args.power < 1):
         raise SystemExit("ERROR: alpha must be in (0, 1) and power in [0.5, 1)")
-    rows = analyse(read_scores(args.scores, args.metric), read_clusters(args.sample_sheet), args.alpha,
+    ranking = read_ranking_groups(args.leaderboard) if args.leaderboard and os.path.isfile(args.leaderboard) else None
+    rows = analyse(read_scores(args.scores, args.metric, ranking), read_clusters(args.sample_sheet), args.alpha,
                    args.power, args.target_difference, args.min_clusters, args.metric)
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")

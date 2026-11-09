@@ -248,7 +248,7 @@ def main():
         sec_pre = re.findall(r"<section id='([^']+)'", pre)
         sec_post = re.findall(r"<section id='([^']+)'", post)
         check("section ids and order unchanged", sec_pre == sec_post and len(sec_post) >= 60, (len(sec_pre), len(sec_post)))
-        nav = lambda s: re.findall(r"href='#([^']+)'", re.search(r"<nav class='nav'.*?</nav>", s, re.S).group(0))  # noqa: E731
+        nav = lambda s: [i for i in re.findall(r"href='#([^']+)'", re.search(r"<nav class='(?:nav|rpt-rail)'.*?</nav>", s, re.S).group(0)) if not i.startswith("view-")]  # noqa: E731
         check("navigation ids unchanged and all are sections", nav(pre) == nav(post) and set(nav(post)) <= set(sec_post))
         text = lambda s: [html.unescape(re.sub(r"<[^>]+>", "", strip_infos(h))).strip()  # noqa: E731
                           for h in re.findall(r"<h2[^>]*>(.*?)</h2>", s, re.S)]
