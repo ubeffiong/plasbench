@@ -2614,6 +2614,8 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     page = report_maps.inject(page, str(out.parent), args.data_dir, args.scores)
     import report_figures   # the figure gallery: ladder, 3D landscape, heatmap, distributions, forest, precision-recall
     page = report_figures.inject(page, str(out.parent), args.data_dir, args.scores)
+    import report_collapse   # fold the tables that a figure now draws (nothing is deleted)
+    page = report_collapse.collapse(page)
     # Outputs the report did not show before (per-plasmid detail, assembly quality, clonal groups, regret, truth depth, column
     # groups, Run files) and the grouped navigation (python/report_wiring.py). Before the inventory so it lists them as shown.
     page = report_wiring.inject(page, str(out.parent), args.data_dir, args.scores)
