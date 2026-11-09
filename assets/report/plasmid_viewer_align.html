@@ -1,0 +1,482 @@
+<script>
+/* PlasBench plasmid viewer, linear alignment pane: reference versus reconstruction. Pure functions (no DOM): lane packing, ribbon paths, strand
+   styling, origin-wrap links, overlaps, structural-event markers, the "ordered / oriented correctly?" readout and the SVG scene. Extends
+   PlasmidViewerCore, so it is loaded after plasmid_viewer_core.html (by node in test/test_plasmid_viewer.py, by the browser in the report).
+   Everything drawn comes from the stored alignment blocks and structural calls; nothing is inferred. The drawing is an illustrative map of
+   alignment-derived structure, not a validated assembly comparison. */
+(function (root) {
+'use strict';
+var PV = root.PlasmidViewerCore;
+if (!PV) { return; }
+var C = PV.cfg, mod = PV.mod, num = PV.num, esc = PV.esc;
+var A = PV.align = {};
+
+A.W = 860; A.PADL = 104; A.PADR = 24;
+A.ROW_H = 18; A.ROW_STEP = 22; A.OVERLAP_MIN = 20; A.WRAP_QTOL = 250;
+A.COL = {fwd: '#E69F00', fwdLine: '#8a5a00', rev: '#0072B2', revLine: '#003f63', gap: '#5a6670', overlap: '#7b1fa2', ref: '#4d5b66'};
+A.EVENT_KINDS = {
+  inter_replicon_junction: {letter: 'J', name: 'junction between replicons'}, inversion_junction: {letter: 'I', name: 'inversion junction'},
+  relocation: {letter: 'R', name: 'relocation'}, reference_deletion: {letter: 'D', name: 'deletion relative to the reference'},
+  reference_insertion: {letter: '+', name: 'insertion relative to the reference'}, tandem_duplication: {letter: '2', name: 'tandem duplication'}
+};
+A.eventKind = function (type) { return A.EVENT_KINDS[type] || {letter: '?', name: String(type || 'event').replace(/_/g, ' ')}; };
+A.CAVEAT = 'Alignment-derived and unvalidated: no read or assembly-graph support was checked, and a contig that differs from the reference may be a misassembly, a real rearrangement or a reference error.';
+
+/* strand -> colour, pattern and arrowhead direction (colour AND pattern, so the code survives greyscale and colour-blind viewing) */
+A.blockStyle = function (strand) {
+  return strand === '-' ? {name: 'reverse', colour: A.COL.rev, line: A.COL.revLine, pattern: 'hatch', arrow: -1, text: 'reverse strand (-)'}
+                        : {name: 'forward', colour: A.COL.fwd, line: A.COL.fwdLine, pattern: 'solid', arrow: 1, text: 'forward strand (+)'};
+};
+
+function fmtLen(bp) {
+  if (bp >= 1000000) { return (bp / 1000000).toFixed(2).replace(/0+$/, '').replace(/\.$/, '') + ' Mb'; }
+  if (bp >= 1000) { return (bp / 1000).toFixed(bp >= 100000 ? 0 : 1).replace(/\.0$/, '') + ' kb'; }
+  return Math.round(bp) + ' bp';
+}
+A.fmtLen = fmtLen;
+function idText(v) { return v === null || v === undefined ? 'n/a' : (v * 100).toFixed(1) + '%'; }
+
+/* ---------- lane packing ---------- */
+/* items [{s, e}] -> {rows: row index per item, n: number of rows}; greedy interval colouring, earliest start first, `gap` bp kept between neighbours */
+A.packRows = function (items, gap) {
+  var order = items.map(function (it, i) { return i; }).sort(function (a, b) { return (items[a].s - items[b].s) || (items[b].e - items[a].e) || (a - b); });
+  var ends = [], rows = new Array(items.length), g = gap || 0;
+  order.forEach(function (i) {
+    var r = 0;
+    while (r < ends.length && ends[r] + g > items[i].s) { r++; }
+    if (r === ends.length) { ends.push(items[i].e); } else { ends[r] = items[i].e; }
+    rows[i] = r;
+  });
+  return {rows: rows, n: Math.max(1, ends.length)};
+};
+
+/* ---------- ribbon path ---------- */
+/* a band from the reference ruler (y0, x from ra to rb) to a block edge (y1, x from la to lb); when ra > rb relative to la < lb the band twists (reverse alignment) */
+A.ribbonPath = function (ra, rb, y0, la, lb, y1) {
+  var ym = (y0 + y1) / 2, n = function (v) { return num(v, 1); };
+  return 'M' + n(ra) + ' ' + n(y0) + 'C' + n(ra) + ' ' + n(ym) + ' ' + n(la) + ' ' + n(ym) + ' ' + n(la) + ' ' + n(y1) + 'L' + n(lb) + ' ' + n(y1) +
+    'C' + n(lb) + ' ' + n(ym) + ' ' + n(rb) + ' ' + n(ym) + ' ' + n(rb) + ' ' + n(y0) + 'Z';
+};
+/* a block as an arrow-ended bar (head on the right for forward, on the left for reverse) */
+A.blockPath = function (x0, x1, y, h, dir) {
+  var w = x1 - x0, hw = Math.min(7, Math.max(0, w / 2)), n = function (v) { return num(v, 1); }, m = y + h / 2;
+  if (dir < 0) { return 'M' + n(x1) + ' ' + n(y) + 'L' + n(x0 + hw) + ' ' + n(y) + 'L' + n(x0) + ' ' + n(m) + 'L' + n(x0 + hw) + ' ' + n(y + h) + 'L' + n(x1) + ' ' + n(y + h) + 'Z'; }
+  return 'M' + n(x0) + ' ' + n(y) + 'L' + n(x1 - hw) + ' ' + n(y) + 'L' + n(x1) + ' ' + n(m) + 'L' + n(x1 - hw) + ' ' + n(y + h) + 'L' + n(x0) + ' ' + n(y + h) + 'Z';
+};
+
+/* ---------- gaps, overlaps, origin wrap ---------- */
+A.gaps = function (model, tool) {
+  var L = model.length, out = [], pos = 0;
+  tool.intervals.forEach(function (iv) {
+    var s = Math.max(0, iv[0]), e = Math.min(L, iv[1]);
+    if (s > pos) { out.push([pos, s]); }
+    pos = Math.max(pos, e);
+  });
+  if (pos < L) { out.push([pos, L]); }
+  return out;
+};
+/* pairs of blocks of one tool that overlap on the reference by at least OVERLAP_MIN bp (different contigs: contig overlap; same contig: a repeated segment) */
+A.overlaps = function (model) {
+  if (model._ov) { return model._ov; }
+  var out = [];
+  model.tools.forEach(function (t) {
+    var bl = t.blocks.slice().sort(function (a, b) { return (a.start - b.start) || (a.end - b.end) || (a.i - b.i); }), i, j;
+    for (i = 0; i < bl.length; i++) {
+      for (j = i + 1; j < bl.length && bl[j].start < bl[i].end; j++) {
+        var s = Math.max(bl[i].start, bl[j].start), e = Math.min(bl[i].end, bl[j].end);
+        if (e - s >= A.OVERLAP_MIN) { out.push({i: out.length, tool: t.i, a: bl[i].i, b: bl[j].i, start: s, end: e, bp: e - s, same: bl[i].record === bl[j].record}); }
+      }
+    }
+  });
+  model._ov = out;
+  return out;
+};
+A.overlapInfo = function (model, ov) {
+  var a = model.blocks[ov.a], b = model.blocks[ov.b], t = model.tools[ov.tool];
+  return {title: ov.same ? 'Repeated segment within one contig' : 'Overlap between two contigs', rows: [
+    ['Tool', t.label], ['Contigs', ov.same ? a.record : a.record + ' and ' + b.record], ['Reference overlap', PV.fmtBp(ov.start) + '-' + PV.fmtBp(ov.end) + ' bp (' + PV.fmtBp(ov.bp) + ' bp)'],
+    ['Reading', ov.same ? 'Two parts of one contig align to overlapping reference positions (a duplication-like pattern or a repeat).' : 'Neighbouring contigs cover the same reference stretch (an assembly overlap, or a repeat aligned twice).']]};
+};
+A.gapInfo = function (model, toolIdx, s, e) {
+  var t = model.tools[toolIdx], genes = model.genes.filter(function (g) { return g.start < e && g.end > s && g.start <= g.end; }).length;
+  return {title: 'Uncovered truth', rows: [['Tool', t.label], ['Reference interval', PV.fmtBp(s) + '-' + PV.fmtBp(e) + ' bp (' + PV.fmtBp(e - s) + ' bp)'],
+    ['Truth features touching it', String(genes)], ['Reading', 'No retained alignment block of this tool covers this stretch of the reference.']]};
+};
+/* a block touching the end of the reference continues, through the origin, in a block of the same contig that touches position 0 (query coordinates join up) */
+A.wrapLinks = function (model, tool) {
+  var L = model.length, tol = Math.max(25, Math.round(L * 0.001)), out = [];
+  if (model.circular === false) { return out; }
+  tool.blocks.forEach(function (a) {
+    if (a.end < L - tol) { return; }
+    tool.blocks.forEach(function (b) {
+      if (b === a || b.record !== a.record || b.strand !== a.strand || b.start > tol) { return; }
+      var joined = a.strand === '+' ? Math.abs(a.qEnd - b.qStart) <= A.WRAP_QTOL : Math.abs(a.qStart - b.qEnd) <= A.WRAP_QTOL;
+      if (joined) { out.push({from: a.i, to: b.i, record: a.record}); }
+    });
+  });
+  return out;
+};
+
+/* ---------- lane layout ---------- */
+/* mode 'ref': every block at its reference position, overlapping blocks stacked in rows.
+   mode 'contig': contigs laid end to end (ordered by their first reference position) at their own query coordinates, so a ribbon to the reference ruler crosses
+   when order or orientation differs. Each item carries the lane x range (x0, x1) and the reference ends the ribbon attaches to (rx0 pairs with x0). */
+A.layoutLane = function (model, tool, mode) {
+  var L = model.length, items = [], recs = [], span = L, nRows = 1;
+  if (mode === 'contig') {
+    var byRec = {}, order = [], off = 0, spacer = Math.max(1, Math.round(L * 0.004));
+    tool.blocks.forEach(function (b) {
+      var r = byRec[b.record];
+      if (!r) { r = byRec[b.record] = {id: b.record, qLen: 0, first: b.start, blocks: []}; order.push(r); }
+      r.blocks.push(b); r.first = Math.min(r.first, b.start); r.qLen = Math.max(r.qLen, b.qLen || 0, b.qEnd);
+    });
+    order.sort(function (p, q) { return (p.first - q.first) || (p.id < q.id ? -1 : (p.id > q.id ? 1 : 0)); });
+    order.forEach(function (r) {
+      recs.push({id: r.id, x0: off, x1: off + r.qLen, qLen: r.qLen});
+      r.blocks.forEach(function (b) {
+        var fwd = b.strand === '+';
+        items.push({b: b, x0: off + b.qStart, x1: off + b.qEnd, rx0: fwd ? b.start : b.end, rx1: fwd ? b.end : b.start, row: 0});
+      });
+      off += r.qLen + spacer;
+    });
+    span = Math.max(1, off - spacer);
+  } else {
+    var pk = A.packRows(tool.blocks.map(function (b) { return {s: b.start, e: b.end}; }), Math.max(1, Math.round(L * 0.004)));
+    tool.blocks.forEach(function (b, k) { items.push({b: b, x0: b.start, x1: b.end, rx0: b.start, rx1: b.end, row: pk.rows[k]}); });
+    nRows = pk.n;
+  }
+  return {mode: mode, items: items, records: recs, span: span, rows: nRows};
+};
+
+/* ---------- structural events as flags on the ribbons ---------- */
+A.eventMarkers = function (model, tool, lay) {
+  var out = [];
+  tool.events.forEach(function (ev) {
+    var best = null, bestD = Infinity, edge = 'end';
+    lay.items.forEach(function (it) {
+      if (it.b.record !== ev.record) { return; }
+      var de = Math.abs(ev.pos - it.b.end), ds = Math.abs(ev.pos - it.b.start), d = Math.min(de, ds);
+      if (d < bestD) { bestD = d; best = it; edge = de <= ds ? 'end' : 'start'; }
+    });
+    var lx = null;
+    if (best) { lx = lay.mode === 'contig' ? ((edge === 'end') === (best.b.strand === '+') ? best.x1 : best.x0) : ev.pos; }
+    out.push({ev: ev, item: best, refBp: ev.pos, laneBp: lx, kind: A.eventKind(ev.type)});
+  });
+  return out;
+};
+
+/* ---------- tooltips, details ---------- */
+A.blockInfo = function (model, b) {
+  var t = model.tools[b.tool], st = A.blockStyle(b.strand), sameRec = t.blocks.filter(function (o) { return o.record === b.record; }).length;
+  var rows = [['Tool', t.label], ['Contig', b.record + (b.qLen ? ' (' + PV.fmtBp(b.qLen) + ' bp)' : '')], ['Contig coordinates', PV.fmtBp(b.qStart) + '-' + PV.fmtBp(b.qEnd)],
+    ['Reference', PV.fmtBp(b.start) + '-' + PV.fmtBp(b.end) + ' bp (' + PV.fmtBp(b.end - b.start) + ' bp)'], ['Strand', st.text + (b.strand === '-' ? ': the contig runs against the reference' : '')],
+    ['Identity', idText(b.identity)]];
+  if (b.mapq !== null) { rows.push(['Mapping quality', String(b.mapq)]); }
+  if (sameRec > 1) { rows.push(['Blocks of this contig', String(sameRec)]); }
+  var ovs = A.overlaps(model).filter(function (o) { return o.a === b.i || o.b === b.i; });
+  if (ovs.length) { rows.push(['Overlaps', ovs.map(function (o) { var other = model.blocks[o.a === b.i ? o.b : o.a]; return PV.fmtBp(o.bp) + ' bp with ' + (o.same ? 'another block of the same contig' : other.record); }).join('; ')]); }
+  var wl = A.wrapLinks(model, t).filter(function (w) { return w.from === b.i || w.to === b.i; });
+  if (wl.length) { rows.push(['Origin', wl[0].from === b.i ? 'continues across the origin (end of the reference to position 0)' : 'continues from the end of the reference across the origin']); }
+  var evs = t.events.filter(function (e) { return e.record === b.record; });
+  if (evs.length) { rows.push(['Structural events on this contig', evs.map(function (e) { return A.eventKind(e.type).name + ' at ' + PV.fmtBp(e.pos); }).join('; ')]); }
+  return {title: b.record + ' (' + t.label + ')', rows: rows};
+};
+/* detail-tab content for a selected block */
+A.relatedBlock = function (model, sel) {
+  var b = model.blocks[sel.i], out = {kind: 'b', info: null, siblings: [], genes: [], events: [], overlaps: []};
+  if (!b) { return out; }
+  var t = model.tools[b.tool];
+  out.info = A.blockInfo(model, b);
+  out.siblings = t.blocks.filter(function (o) { return o.record === b.record && o.i !== b.i; });
+  out.events = t.events.filter(function (e) { return e.record === b.record; });
+  out.overlaps = A.overlaps(model).filter(function (o) { return o.a === b.i || o.b === b.i; });
+  model.genes.forEach(function (g) {
+    var s = Math.max(g.start, b.start), e = Math.min(g.end, b.end), len = g.end - g.start;
+    if (g.start <= g.end && e > s) { out.genes.push({gene: g, fraction: len > 0 ? (e - s) / len : 1}); }
+  });
+  return out;
+};
+
+/* ---------- "ordered / oriented correctly?" from the existing calls only ---------- */
+A.readout = function (model, tool) {
+  var recs = {}, rev = 0, types = {}, nb = tool.blocks.length, gaps = A.gaps(model, tool), gapBp = 0;
+  tool.blocks.forEach(function (b) { recs[b.record] = true; if (b.strand === '-') { rev++; } });
+  tool.events.forEach(function (e) { var k = A.eventKind(e.type).name; types[k] = (types[k] || 0) + 1; });
+  gaps.forEach(function (g) { gapBp += g[1] - g[0]; });
+  var names = Object.keys(types).map(function (k) { return types[k] > 1 ? types[k] + ' x ' + k : k; });
+  var cf = tool.collinear, oc = tool.orderConflicts, answer, code, text;
+  if (!nb) { code = 'none'; answer = 'Not assessable'; text = 'No alignment block of this tool lands on this plasmid.'; }
+  else if (tool.events.length) { code = 'discordant'; answer = 'No'; text = tool.events.length + ' structural event' + (tool.events.length === 1 ? '' : 's') + ' called on this plasmid: ' + names.join(', ') + '.'; }
+  else if ((cf !== null && cf < 0.999) || (oc !== null && oc > 0)) {
+    code = 'partial'; answer = 'Partly';
+    text = 'No event was called on this plasmid, but the tool-wide alignment is not fully collinear' + (cf !== null ? ' (collinear fraction ' + (cf * 100).toFixed(1) + '%)' : '') + (oc ? ', ' + oc + ' order conflict' + (oc === 1 ? '' : 's') : '') + '.';
+  }
+  else if (rev) { code = 'reversed'; answer = 'Yes, reverse-oriented'; text = rev + ' of ' + nb + ' block' + (nb === 1 ? '' : 's') + ' align to the reverse strand (the contig runs against the reference); no inversion, relocation or junction event was called.'; }
+  else { code = 'ok'; answer = 'Yes'; text = 'Every block is forward and collinear with the reference, and no structural event was called.'; }
+  return {tool: tool, blocks: nb, contigs: Object.keys(recs).length, reverseBlocks: rev, forwardBlocks: nb - rev, events: tool.events.length, eventNames: names, collinear: cf, orderConflicts: oc,
+          gaps: gaps.length, gapBp: gapBp, omitted: tool.blocksOmitted, code: code, answer: answer, text: text, caveat: A.CAVEAT};
+};
+
+A.shortAnswer = function (rd) { return {none: 'n/a', discordant: 'no', partial: 'partly', reversed: 'yes (reverse)', ok: 'yes'}[rd.code] || 'n/a'; };
+
+/* ---------- keyboard navigation between blocks ---------- */
+/* order: [{i, lane, cx}]; dir 'left' | 'right' | 'up' | 'down' */
+A.navigate = function (order, cur, dir) {
+  if (!order.length) { return null; }
+  var at = -1, n;
+  for (n = 0; n < order.length; n++) { if (cur && order[n].i === cur.i) { at = n; break; } }
+  if (at < 0) { return order[0]; }
+  var c = order[at], pool = order.filter(function (o) { return o.i !== c.i; });
+  if (dir === 'left' || dir === 'right') {
+    var same = order.filter(function (o) { return o.lane === c.lane; }).sort(function (a, b) { return (a.cx - b.cx) || (a.i - b.i); }), k = same.indexOf(c);
+    return same[mod(k + (dir === 'right' ? 1 : -1), same.length)];
+  }
+  var want = c.lane + (dir === 'down' ? 1 : -1), cand = pool.filter(function (o) { return o.lane === want; });
+  while (!cand.length && want >= 0 && want < 1000 && pool.some(function (o) { return o.lane === (want += dir === 'down' ? 1 : -1); })) { cand = pool.filter(function (o) { return o.lane === want; }); }
+  if (!cand.length) { return c; }
+  cand.sort(function (a, b) { return Math.abs(a.cx - c.cx) - Math.abs(b.cx - c.cx); });
+  return cand[0];
+};
+
+/* ---------- projection of reference positions onto the pane ---------- */
+A.makeProj = function (model, state, mode, spanMax) {
+  var L = model.length, v = PV.makeView(L, state.view.start, state.view.span || L), X0 = A.PADL, PW = A.W - A.PADL - A.PADR;
+  var p = {mode: mode, L: L, X0: X0, PW: PW, zoomed: false, vstart: 0, vspan: L};
+  if (mode === 'contig') { p.vspan = Math.max(1, spanMax); }
+  else if (!v.full) { p.zoomed = true; p.vstart = v.start; p.vspan = v.span; }
+  /* shifts d so that bp + d lies in the window (two candidates for a window that wraps the origin) */
+  p.copies = function (s, e) {
+    if (mode === 'contig') { return [0]; }
+    var r0 = mod(s - p.vstart, L), out = [], i, c = [r0 - s, r0 - s - L];
+    for (i = 0; i < c.length; i++) { if (e + c[i] > 0 && s + c[i] < p.vspan) { out.push(c[i]); } }
+    return out;
+  };
+  p.x = function (bp, d) { return X0 + (bp + (d || 0)) / p.vspan * PW; };
+  p.bpAt = function (x) { var rel = (x - X0) / PW * p.vspan; return mode === 'contig' ? rel : mod(p.vstart + rel, L); };
+  return p;
+};
+
+/* ---------- the scene ---------- */
+function tx(x, y, text, size, anchor, weight, fill, extra) {
+  return "<text x='" + num(x, 1) + "' y='" + num(y, 1) + "' font-size='" + num(size, 1) + "' text-anchor='" + anchor + "' font-weight='" + weight + "' fill='" + fill +
+    "' font-family='Arial,Helvetica,sans-serif' " + (extra || '') + '>' + esc(text) + '</text>';
+}
+function halo(x, y, text, size, anchor, weight, fill, haloColour, extra) {
+  return tx(x, y, text, size, anchor, weight, fill, "stroke='" + haloColour + "' stroke-width='2.4' stroke-linejoin='round' paint-order='stroke' " + (extra || ''));
+}
+function geneArrow(x0, x1, y, h, strand) {
+  var w = x1 - x0, hw = Math.min(5, Math.max(0, w / 2)), n = function (v) { return num(v, 1); }, m = y + h / 2;
+  if (strand === '-') { return 'M' + n(x1) + ' ' + n(y) + 'L' + n(x0 + hw) + ' ' + n(y) + 'L' + n(x0) + ' ' + n(m) + 'L' + n(x0 + hw) + ' ' + n(y + h) + 'L' + n(x1) + ' ' + n(y + h) + 'Z'; }
+  if (strand === '+') { return 'M' + n(x0) + ' ' + n(y) + 'L' + n(x1 - hw) + ' ' + n(y) + 'L' + n(x1) + ' ' + n(m) + 'L' + n(x1 - hw) + ' ' + n(y + h) + 'L' + n(x0) + ' ' + n(y + h) + 'Z'; }
+  return 'M' + n(x0) + ' ' + n(y) + 'H' + n(x1) + 'V' + n(y + h) + 'H' + n(x0) + 'Z';
+}
+function minW(x0, x1, m) { if (x1 - x0 >= m) { return [x0, x1]; } var c = (x0 + x1) / 2; return [c - m / 2, c + m / 2]; }
+
+A.scene = function (model, state, opts) {
+  opts = opts || {};
+  var L = model.length, pal = C.palettes[state.cvd ? 'cvd' : 'default'], mode = state.alMode === 'contig' ? 'contig' : 'ref', ribbons = state.alRibbons !== false;
+  var tools = PV.visibleTools(model, state), W = A.W, ov = A.overlaps(model), sel = state.sel || null, cur = opts.cur || null;
+  var lanes = tools.map(function (t) { return {tool: t, lay: A.layoutLane(model, t, mode)}; }), spanMax = L;
+  lanes.forEach(function (l) { spanMax = Math.max(spanMax, l.lay.span); });
+  var P = A.makeProj(model, state, mode, spanMax), X0 = P.X0, XR = P.X0 + P.PW;
+  var defs = [], back = [], top = [], body = [], edge = [], over = [], order = [], shapes = {}, ribs = {}, markers = {}, laneBox = {}, geneShapes = {};
+  var counts = {blocks: 0, ribbons: 0, events: 0, overlaps: 0, gaps: 0, genes: 0, wraps: 0};
+  defs.push("<pattern id='pvl-rev' width='6' height='6' patternUnits='userSpaceOnUse' patternTransform='rotate(45)'><rect width='6' height='6' fill='" + A.COL.rev + "'/><line x1='0' y1='0' x2='0' y2='6' stroke='#d6eaf7' stroke-width='2.2'/></pattern>");
+  defs.push("<pattern id='pvl-revr' width='6' height='6' patternUnits='userSpaceOnUse' patternTransform='rotate(45)'><rect width='6' height='6' fill='" + A.COL.rev + "' fill-opacity='0.3'/><line x1='0' y1='0' x2='0' y2='6' stroke='" + A.COL.rev + "' stroke-width='1.6' stroke-opacity='0.75'/></pattern>");
+  defs.push("<pattern id='pvl-ov' width='5' height='5' patternUnits='userSpaceOnUse' patternTransform='rotate(-45)'><rect width='5' height='5' fill='#ffffff' fill-opacity='0.55'/><line x1='0' y1='0' x2='0' y2='5' stroke='" + A.COL.overlap + "' stroke-width='1.8'/></pattern>");
+  defs.push("<clipPath id='pvl-clip'><rect x='" + num(X0) + "' y='-6' width='" + num(P.PW) + "' height='20000'/></clipPath>");
+
+  /* ---- top: scale, truth bar, truth annotations ---- */
+  var y = 0, step, first, pos, tickBoxes = [];
+  step = PV.niceTicks(P.vspan, 10).step;
+  first = Math.ceil((mode === 'contig' ? 0 : P.vstart) / step) * step;
+  for (pos = first; pos <= (mode === 'contig' ? 0 : P.vstart) + P.vspan + 1e-6; pos += step) {
+    var rel = pos - (mode === 'contig' ? 0 : P.vstart), xx = X0 + rel / P.vspan * P.PW, label = P.zoomed ? PV.stepLabel(mod(pos, L), step) : PV.kbLabel(pos);
+    if (pos > L && !P.zoomed && mode !== 'contig') { break; }
+    if (mode === 'contig' && pos > spanMax) { break; }
+    var bx = PV.textBox(label, 9, xx, 12, 'middle');
+    top.push("<line x1='" + num(xx, 1) + "' y1='15' x2='" + num(xx, 1) + "' y2='20' stroke='#555' stroke-width='1'/>");
+    if (!tickBoxes.some(function (b) { return PV.overlap(b, bx, 2); })) { tickBoxes.push(bx); top.push(tx(xx, 12, label, 9, 'middle', 'normal', '#333')); }
+  }
+  var refY = 22, refH = 10;
+  var refPieces = P.copies(0, L), refDraw = [];
+  refPieces.forEach(function (d) { refDraw.push("<rect x='" + num(P.x(0, d), 1) + "' y='" + refY + "' width='" + num(P.x(L, d) - P.x(0, d), 1) + "' height='" + refH + "' fill='" + A.COL.ref + "'/>"); });
+  top.push("<g clip-path='url(#pvl-clip)'>" + refDraw.join('') + '</g>');
+  top.push(tx(X0 - 8, refY + 8, 'Truth ' + String(model.plasmid).slice(0, 10), 10, 'end', 'bold', '#222'));
+  y = refY + refH + 4;
+  /* repeat shading on the truth bar; it is carried through the lanes below as pale bands (reference layout only) */
+  var rep = state.layers.repeat ? (model.repeatRegions || []) : [], repBands = [];
+  rep.forEach(function (r) {
+    P.copies(r[0], r[1]).forEach(function (d) { repBands.push([P.x(r[0], d), P.x(r[1], d)]); });
+  });
+  if (repBands.length) { top.push("<g clip-path='url(#pvl-clip)'>" + repBands.map(function (b) { return "<rect x='" + num(b[0], 1) + "' y='" + (refY - 1) + "' width='" + num(Math.max(1, b[1] - b[0]), 1) + "' height='" + (refH + 2) + "' fill='#ffffff' fill-opacity='0.45'/>"; }).join('') + '</g>'); }
+  /* genes: forward row, reverse row, feature row */
+  var ids = state.alGenes === false ? [] : PV.filterGenes(model, state), rowsUsed = {fwd: false, rev: false, feat: false}, gparts = [], labelCands = [];
+  ids.forEach(function (gi) { rowsUsed[PV.geneRing(model.genes[gi])] = true; });
+  var rowIdx = {}, rn = 0;
+  ['fwd', 'rev', 'feat'].forEach(function (k) { if (rowsUsed[k]) { rowIdx[k] = rn++; } });
+  var gTop = y, GH = 9;
+  ids.forEach(function (gi) {
+    var g = model.genes[gi], ring = PV.geneRing(g), gy = gTop + rowIdx[ring] * (GH + 2), fill = pal[g.cls] || '#888';
+    PV.splitWrapped(g.start, g.end, L).forEach(function (pc) {
+      P.copies(pc[0], pc[1]).forEach(function (d) {
+        var w = minW(P.x(pc[0], d), P.x(pc[1], d), 1.4), dpath = geneArrow(w[0], w[1], gy, GH, g.strand);
+        gparts.push("<path d='" + dpath + "' fill='" + fill + "' stroke='#00000055' stroke-width='0.5' data-k='g' data-i='" + g.i + "'/>");
+        (geneShapes[g.i] = geneShapes[g.i] || []).push(dpath);
+        if (state.layers.labels && g.name && (g.cls === 'amr' || g.cls === 'replication' || g.cls === 'mobile' || g.cls === 'transfer') && w[1] > X0 && w[0] < XR) { labelCands.push({g: g, x: (w[0] + w[1]) / 2, pr: C.priority[g.cls] || 0}); }
+      });
+    });
+    counts.genes++;
+  });
+  top.push("<g clip-path='url(#pvl-clip)'>" + gparts.join('') + '</g>');
+  var gTopEnd = gTop + Math.max(0, rn * (GH + 2) - 2);
+  [['fwd', '+'], ['rev', '-'], ['feat', 'feat']].forEach(function (p) { if (rowIdx[p[0]] !== undefined) { top.push(tx(X0 - 8, gTop + rowIdx[p[0]] * (GH + 2) + 8, p[1] === 'feat' ? 'features' : (p[1] === '+' ? 'genes +' : 'genes -'), 8, 'end', 'normal', '#666')); } });
+  y = gTopEnd + (rn ? 4 : 0);
+  if (labelCands.length) {
+    var placed = [];
+    labelCands.sort(function (a, b) { return (b.pr - a.pr) || (a.x - b.x); });
+    labelCands.forEach(function (c) {
+      var nm = c.g.name.slice(0, 14), box = PV.textBox(nm, 8, c.x, y + 8, 'middle');
+      if (box[0] < X0 - 4 || box[2] > XR + 4 || placed.some(function (b) { return PV.overlap(b, box, 2); })) { return; }
+      placed.push(box); top.push(tx(c.x, y + 8, nm, 8, 'middle', 'normal', '#333', "pointer-events='none'"));
+    });
+    y += 12;
+  }
+  y += 8;
+
+  /* ---- lanes ---- */
+  var rulerH = 7, rh = ribbons ? (mode === 'contig' ? 46 : 16) : 15, ROW = A.ROW_STEP;
+  lanes.forEach(function (ln, laneNo) {
+    var t = ln.tool, lay = ln.lay, ly = y, ry = ly + rulerH + rh, laneH = rulerH + rh + lay.rows * ROW + 6, gaps = A.gaps(model, t), rd = A.readout(model, t);
+    laneBox[t.i] = [ly - 3, ly + laneH];
+    back.push("<rect x='0' y='" + num(ly - 3, 1) + "' width='" + W + "' height='" + num(laneH + 3, 1) + "' fill='" + (laneNo % 2 ? '#f6f8f6' : '#ffffff') + "'/>");
+    var lab = [halo(8, ly + 11, t.label.slice(0, 16), 10, 'start', 'bold', '#1a1a1a', '#ffffff', "data-k='t' data-i='" + t.i + "'"),
+      tx(8, ly + 23, t.completeness === null ? 'completeness n/a' : (t.completeness * 100).toFixed(0) + '% complete', 8.5, 'start', 'normal', '#555', "pointer-events='none'"),
+      tx(8, ly + 34, rd.blocks + ' block' + (rd.blocks === 1 ? '' : 's') + (rd.events ? ', ' + rd.events + ' event' + (rd.events === 1 ? '' : 's') : ''), 8.5, 'start', 'normal', '#555', "pointer-events='none'"),
+      tx(8, ly + 45, 'ordered: ' + A.shortAnswer(rd), 8.5, 'start', 'bold', rd.code === 'discordant' ? '#9c2a00' : '#2d4d2d', "pointer-events='none'")];
+    edge.push(lab.join(''));
+    /* reference ruler of this lane: covered solid, uncovered dashed outline */
+    var rul = [];
+    P.copies(0, L).forEach(function (d) { rul.push("<rect x='" + num(P.x(0, d), 1) + "' y='" + ly + "' width='" + num(P.x(L, d) - P.x(0, d), 1) + "' height='" + rulerH + "' fill='" + A.COL.ref + "'/>"); });
+    gaps.forEach(function (g) {
+      P.copies(g[0], g[1]).forEach(function (d) {
+        var gx0 = P.x(g[0], d), gx1 = P.x(g[1], d);
+        rul.push("<rect x='" + num(gx0 + 0.5, 1) + "' y='" + num(ly + 0.5, 1) + "' width='" + num(Math.max(1, gx1 - gx0 - 1), 1) + "' height='" + (rulerH - 1) + "' fill='#ffffff' stroke='" + A.COL.gap + "' stroke-width='1' stroke-dasharray='3 2' data-k='gap' data-i='" + t.i + "' data-s='" + g[0] + "' data-e='" + g[1] + "'/>");
+        counts.gaps++;
+        if (gx1 - gx0 > 60 && (g[1] - g[0]) >= L * 0.02) { rul.push(tx((Math.max(gx0, X0) + Math.min(gx1, XR)) / 2, ly + rulerH + 9, 'uncovered ' + fmtLen(g[1] - g[0]), 8, 'middle', 'normal', '#444', "pointer-events='none'")); }
+      });
+    });
+    body.push("<g clip-path='url(#pvl-clip)'>" + rul.join('') + '</g>');
+    if (!lay.items.length) { body.push(tx((X0 + XR) / 2, ry + 12, 'no alignment block of this tool lands on this plasmid', 9, 'middle', 'normal', '#666', "font-style='italic'")); }
+    /* contig outlines (contig layout: shows the unaligned part of each contig) */
+    var outl = [];
+    lay.records.forEach(function (r) { outl.push("<rect x='" + num(P.x(r.x0), 1) + "' y='" + num(ry, 1) + "' width='" + num(Math.max(1, P.x(r.x1) - P.x(r.x0)), 1) + "' height='" + A.ROW_H + "' fill='#ffffff' stroke='#7d8a97' stroke-width='0.8'/>"); });
+    if (outl.length) { body.push("<g clip-path='url(#pvl-clip)'>" + outl.join('') + '</g>'); }
+    var rib = [], blk = [], txts = [], wraps = A.wrapLinks(model, t), wrapOut = {}, wrapIn = {};
+    if (mode === 'ref') { wraps.forEach(function (w) { wrapOut[w.from] = true; wrapIn[w.to] = true; }); }
+    lay.items.forEach(function (it) {
+      var b = it.b, st = A.blockStyle(b.strand), by = ry + it.row * ROW;
+      var ref0 = Math.min(it.rx0, it.rx1), ref1 = Math.max(it.rx0, it.rx1);
+      var copies = mode === 'contig' ? [0] : P.copies(b.start, b.end);
+      copies.forEach(function (d) {
+        var lx = minW(P.x(it.x0, d), P.x(it.x1, d), 2), dpath = A.blockPath(lx[0], lx[1], by, A.ROW_H, st.arrow);
+        if (ribbons) {
+          var rpath = A.ribbonPath(P.x(it.rx0, d), P.x(it.rx1, d), ly + rulerH, P.x(it.x0, d), P.x(it.x1, d), by);
+          rib.push("<path d='" + rpath + "' fill='" + (st.pattern === 'hatch' ? 'url(#pvl-revr)' : A.COL.fwd) + "' fill-opacity='" + (st.pattern === 'hatch' ? '1' : '0.34') + "' stroke='" + st.colour + "' stroke-opacity='0.7' stroke-width='0.7' class='pvl-rib' data-k='b' data-i='" + b.i + "'/>");
+          (ribs[b.i] = ribs[b.i] || []).push(rpath);
+          counts.ribbons++;
+        }
+        blk.push("<path d='" + dpath + "' fill='" + (st.pattern === 'hatch' ? 'url(#pvl-rev)' : st.colour) + "' stroke='" + st.line + "' stroke-width='1' class='pvl-blk' data-k='b' data-i='" + b.i + "'/>");
+        (shapes[b.i] = shapes[b.i] || []).push(dpath);
+        var vis0 = Math.max(lx[0], X0), vis1 = Math.min(lx[1], XR), avail = vis1 - vis0 - (st.arrow > 0 ? 9 : 9);
+        var variants = [b.record + ' · ' + fmtLen(b.end - b.start) + ' · ' + idText(b.identity), b.record + ' · ' + idText(b.identity), b.record, idText(b.identity)], chosen = '';
+        variants.some(function (v) { if (v.length * 5.2 + 4 <= avail) { chosen = v; return true; } return false; });
+        if (chosen) { txts.push(halo((vis0 + vis1) / 2 + (st.arrow > 0 ? -2 : 2), by + A.ROW_H / 2 + 3, chosen, 9, 'middle', 'bold', st.pattern === 'hatch' ? '#ffffff' : '#1d1400', st.pattern === 'hatch' ? A.COL.revLine : '#ffe9bd', "pointer-events='none'")); }
+        if (wrapOut[b.i] && lx[1] >= XR - 1 && lx[1] <= XR + 1) { edge.push(wrapArrow(XR, by + A.ROW_H / 2, 1, st)); counts.wraps++; }
+        if (wrapIn[b.i] && lx[0] <= X0 + 1 && lx[0] >= X0 - 1) { edge.push(wrapArrow(X0, by + A.ROW_H / 2, -1, st)); counts.wraps++; }
+        var cx = (Math.max(lx[0], X0) + Math.min(lx[1], XR)) / 2;
+        if (copies.length === 1 || cx === cx) { order.push({i: b.i, lane: laneNo, cx: cx, x0: lx[0], x1: lx[1], y0: by, y1: by + A.ROW_H, vis: vis1 > vis0}); }
+      });
+      counts.blocks++;
+    });
+    body.push("<g clip-path='url(#pvl-clip)'>" + rib.join('') + blk.join('') + txts.join('') + '</g>');
+    /* overlaps of this lane: hatched on the ruler (and across the stacked rows in the reference layout) */
+    var ovParts = [];
+    ov.forEach(function (o) {
+      if (o.tool !== t.i) { return; }
+      P.copies(o.start, o.end).forEach(function (d) {
+        var ox0 = P.x(o.start, d), ox1 = P.x(o.end, d), w = Math.max(2, ox1 - ox0);
+        ovParts.push("<rect x='" + num(ox0, 1) + "' y='" + (ly - 1) + "' width='" + num(w, 1) + "' height='" + (rulerH + 2) + "' fill='url(#pvl-ov)' stroke='" + A.COL.overlap + "' stroke-width='1' data-k='ov' data-i='" + o.i + "'/>");
+        if (mode === 'ref') {
+          var ra = 0, rb = 0;
+          lay.items.forEach(function (it) { if (it.b.i === o.a) { ra = it.row; } if (it.b.i === o.b) { rb = it.row; } });
+          ovParts.push("<rect x='" + num(ox0, 1) + "' y='" + num(ry + Math.min(ra, rb) * ROW - 1, 1) + "' width='" + num(w, 1) + "' height='" + num((Math.abs(ra - rb) + 1) * ROW - 2, 1) + "' fill='url(#pvl-ov)' fill-opacity='0.85' stroke='" + A.COL.overlap + "' stroke-width='1' stroke-dasharray='3 2' data-k='ov' data-i='" + o.i + "'/>");
+        }
+        counts.overlaps++;
+      });
+    });
+    if (ovParts.length) { body.push("<g clip-path='url(#pvl-clip)'>" + ovParts.join('') + '</g>'); }
+    /* structural events: flags on the ribbons */
+    if (state.layers.events) {
+      var mk = [];
+      A.eventMarkers(model, t, lay).forEach(function (m) {
+        var d0 = P.copies(m.refBp, m.refBp + 1)[0];
+        if (d0 === undefined) { return; }
+        var xr = P.x(m.refBp, d0), xl = m.laneBp === null ? xr : P.x(m.laneBp, mode === 'contig' ? 0 : d0), xm = (xr + xl) / 2, ym = ly + rulerH + (ribbons ? rh * 0.5 : rh * 0.5);
+        if (xm < X0 - 8 || xm > XR + 8) { return; }
+        mk.push("<g class='pvl-ev' data-k='e' data-i='" + m.ev.i + "'><path d='M" + num(xm, 1) + ' ' + num(ym - 8, 1) + 'L' + num(xm + 8, 1) + ' ' + num(ym, 1) + 'L' + num(xm, 1) + ' ' + num(ym + 8, 1) + 'L' + num(xm - 8, 1) + ' ' + num(ym, 1) +
+          "Z' fill='#111111' stroke='#ffffff' stroke-width='1.4'/>" + tx(xm, ym + 3.2, m.kind.letter, 9, 'middle', 'bold', '#ffffff', "pointer-events='none'") + '</g>');
+        markers[m.ev.i] = [xm, ym];
+        counts.events++;
+      });
+      if (mk.length) { body.push("<g clip-path='url(#pvl-clip)'>" + mk.join('') + '</g>'); }
+    }
+    y = ly + laneH + 4;
+  });
+
+  /* ---- legend (inside the SVG so an exported figure explains itself) ---- */
+  var ly2 = y + 6, lx = X0, keys = [];
+  function put(fn, text) {
+    var w = 28 + text.length * 4.7 + 14;
+    if (lx + w > A.W - 8) { lx = X0; ly2 += 16; }
+    keys.push("<g transform='translate(" + num(lx) + ' ' + num(ly2) + ")'>" + fn() + '</g>'); keys.push(tx(lx + 28, ly2 + 8, text, 8.5, 'start', 'normal', '#333')); lx += w;
+  }
+  put(function () { return "<path d='" + A.blockPath(0, 22, -1, 11, 1) + "' fill='" + A.COL.fwd + "' stroke='" + A.COL.fwdLine + "'/>"; }, 'forward (+), arrow right');
+  put(function () { return "<path d='" + A.blockPath(0, 22, -1, 11, -1) + "' fill='url(#pvl-rev)' stroke='" + A.COL.revLine + "'/>"; }, 'reverse (-), hatched, arrow left');
+  put(function () { return "<rect x='0' y='-1' width='22' height='11' fill='#ffffff' stroke='" + A.COL.gap + "' stroke-dasharray='3 2'/>"; }, 'uncovered truth');
+  put(function () { return "<rect x='0' y='-1' width='22' height='11' fill='url(#pvl-ov)' stroke='" + A.COL.overlap + "'/>"; }, 'overlap');
+  put(function () { return "<path d='M11 -3L18 4.5L11 12L4 4.5Z' fill='#111' stroke='#fff'/>"; }, 'event flag: J junction, I inversion, R relocation, D deletion, 2 duplication');
+  var legendH = 20;
+  var heightTotal = ly2 + legendH + 4;
+
+  /* ---- overlays: selection and keyboard cursor ---- */
+  function addOutline(list, stroke, width, dash) { list.forEach(function (d) { over.push("<path d='" + d + "' fill='none' stroke='" + stroke + "' stroke-width='" + width + "'" + (dash ? " stroke-dasharray='" + dash + "'" : '') + " pointer-events='none'/>"); }); }
+  if (sel) {
+    if (sel.k === 'b' && shapes[sel.i]) {
+      var sb = model.blocks[sel.i];
+      sb && model.tools[sb.tool].blocks.forEach(function (o) { if (o.record === sb.record && o.i !== sel.i && shapes[o.i]) { addOutline(shapes[o.i], '#000000', 1.4, '4 2'); } });
+      addOutline(ribs[sel.i] || [], '#000000', 1.6); addOutline(shapes[sel.i], '#000000', 3.2); addOutline(shapes[sel.i], '#ffffff', 1.2);
+    } else if (sel.k === 'g' && geneShapes[sel.i]) { addOutline(geneShapes[sel.i], '#000000', 2.4); addOutline(geneShapes[sel.i], '#ffffff', 0.8); }
+    else if (sel.k === 't' && laneBox[sel.i]) { back.push("<rect x='0' y='" + num(laneBox[sel.i][0], 1) + "' width='" + W + "' height='" + num(laneBox[sel.i][1] - laneBox[sel.i][0], 1) + "' fill='#fff3cf' stroke='#d98100' stroke-width='1.2' pointer-events='none'/>"); }
+    else if (sel.k === 'e' && markers[sel.i]) { var mp = markers[sel.i]; over.push("<circle cx='" + num(mp[0], 1) + "' cy='" + num(mp[1], 1) + "' r='11' fill='none' stroke='#d98100' stroke-width='2.4' pointer-events='none'/>"); }
+  }
+  if (cur && cur.k === 'b' && shapes[cur.i]) { addOutline(shapes[cur.i], '#1a1a1a', 2, '4 2'); }
+  var hasTop = top.join('');
+  var svgInner = '<defs>' + defs.join('') + '</defs><rect x="0" y="0" width="' + W + '" height="' + num(heightTotal, 1) + '" fill="#ffffff"/>' + back.join('') + hasTop + body.join('') + "<g class='pvl-edge'>" + edge.join('') + '</g>' +
+    "<g class='pvl-overlay'>" + over.join('') + '</g><g class="pvl-legend">' + keys.join('') + '</g>';
+  return {svg: svgInner, width: W, height: heightTotal, proj: P, order: order, counts: counts, mode: mode, lanes: lanes.map(function (l) { return l.tool.i; }), laneBox: laneBox};
+};
+/* an arrow that leaves the plot at one side: the contig carries on across the origin (right edge: leaves, left edge: re-enters) */
+function wrapArrow(x, y, dir, st) {
+  /* both arrows point to the right: one leaves the plot at the right edge, the other comes in at the left edge */
+  var n = function (v) { return num(v, 1); }, a = dir > 0 ? x : x - 22, tip = dir > 0 ? x + 21 : x, bx = tip - 7;
+  return "<g class='pvl-wrap' pointer-events='none'><path d='M" + n(a) + ' ' + n(y) + 'L' + n(bx) + ' ' + n(y) + "' stroke='" + st.line + "' stroke-width='2' stroke-dasharray='3 2' fill='none'/>" +
+    "<path d='M" + n(bx) + ' ' + n(y - 5) + 'L' + n(tip) + ' ' + n(y) + 'L' + n(bx) + ' ' + n(y + 5) + "Z' fill='" + st.line + "'/></g>";
+}
+A.standalone = function (model, state, opts) {
+  var sc = A.scene(model, state, opts);
+  return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 " + sc.width + ' ' + num(sc.height, 1) + "' width='" + sc.width + "' height='" + num(sc.height, 1) + "' role='img'><title>" + esc('Reference versus reconstruction, ' + model.plasmid + ' (' + model.length + ' bp), sample ' + model.sample) +
+    '</title><desc>' + esc('Linear alignment of the truth plasmid against each tool: blocks at their aligned reference position, ribbons to the reference, orange forward and blue hatched reverse. ' + A.CAVEAT) + '</desc>' + sc.svg + '</svg>';
+};
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+</script>

@@ -123,13 +123,28 @@ for the incremental precision-recall sweep.
 
 ## What the HTML report adds
 
-The report is one self-contained file. Besides the leaderboard it contains:
+The report is one self-contained file that opens on an **Overview** and shows **one view at a time**, chosen from a fixed left rail (Overview, Scorecard,
+Figures, Plasmid maps, Diagnostics, Data quality, Recommendation, Methods, Appendix) beside a slim top bar with a jump-to-section search. The analyses are
+ordered as a story (headline, scorecard, figures, maps, diagnostics, data quality, recommendation, methods, appendix), and related analyses are merged into one
+tabbed section (for example *Ranking confidence* holds the paired tests, rank sensitivity, power, database leakage and reproducibility; *Cohort and truth quality*
+holds eight data-quality checks; *Method ranking* holds the metric chart, graded recovery, negative control and baselines). Old section links still work: each merged
+section keeps its id as a tab. Long tables show their first 12 rows with a filter and *Show all*. Nothing is removed: a feature manifest test checks that every
+table, chart, control, download and definition of the earlier report is still present. **Full PDF**: the *Print / Save PDF* button, or
+`plasbench report-pdf --report results/benchmark.report.html [--out report.pdf]`, writes every view in order (cover and contents, then each view on a new
+page with every fold open and every note printed in full). Besides the leaderboard it contains:
 
 - **A weighted scorecard** of 17 metrics (A1-E3) with grade bands, shown beside the leaderboard and never replacing it. Scores are piecewise linear
   (100/85/60/0), the overall is renormalised over the metrics that could be scored, and scenario views (simple, complex, annotated, challenging) flag
   fewer than 5 samples as underpowered. Only the identity bands are fixed; the others are proposed. SNP concordance and structural variant F1 are
   not available because no truth variant set exists. See section 7.10 of the [scientific guide](docs/SCIENTIFIC_GUIDE.md).
 - **Circular plasmid maps**, one per truth plasmid: truth genes, one ring per tool, GC content and GC skew.
+- **A figure gallery**, each figure with a side setup panel (layers, filters, the plotted data as a table, drilldown, SVG / PNG / CSV export):
+  the **reconstruction ladder** ([docs/images/reconstruction_ladder.svg](docs/images/reconstruction_ladder.svg)) shows which score layer judges each step from contigs to a
+  verified plasmid and keeps three distinctions explicit (binning is not reconstruction, circular is not correct, 3D appearance is illustrative); a **3D landscape** of
+  accuracy, completeness and structural fidelity; a **tool-by-metric heatmap** with clustering; **CPRR distributions** (violin or box with every isolate) and a **forest plot**
+  of CPRR differences by species, plasmid size and reference tier; and an interactive **precision-recall** plot with iso-F1 lines and false positives per recovered plasmid.
+  The plasmid viewer also draws each tool's alignment blocks against the truth plasmid in a linear **Reference versus reconstruction** pane linked to the circular map.
+  Tables that a figure now draws are folded until opened; nothing is removed.
 - **A data inventory** ("Data in this report") listing every output and where the report shows it.
 - Grouped, collapsible navigation, per-plasmid detail, an assembly-quality section and links to `leaderboard.md` and `scoring_spec.md`.
 

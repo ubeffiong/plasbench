@@ -9,6 +9,9 @@
 .v3-buttons{display:flex;flex-wrap:wrap;gap:4px}
 .v3 button{font:600 12px Arial,sans-serif;border:1px solid var(--line,#d9e1da);background:var(--paper,#f6f8f4);color:var(--ink,#17231d);border-radius:6px;padding:5px 9px;cursor:pointer}
 .v3 button:hover:not(:disabled){background:var(--lime,#dcefdc)}
+.v3 .rpt-info-btn{width:17px;height:17px;padding:0;border:1px solid #7b8a80;border-radius:50%;background:transparent;color:#4f5f55;font:italic 700 11px/15px Georgia,serif}
+.v3 .rpt-info-btn:hover:not(:disabled),.v3 .rpt-info.rpt-show .rpt-info-btn{background:var(--ink,#17231d);border-color:var(--ink,#17231d);color:#fff}
+.v3 .v3-buttons .rpt-info{align-self:center;margin-left:4px}
 .v3 .v3-lbtn[aria-pressed=true]{background:var(--card,#fff);color:var(--ink,#17231d);border-color:var(--muted,#627067)}
 .v3 button[aria-pressed=true]:not(.v3-lbtn),.v3 button[aria-selected=true]{background:var(--green,#0c6b4f);color:#fff;border-color:var(--green,#0c6b4f)}
 .v3 button:disabled{opacity:.5;cursor:not-allowed}

@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "python"))
 import report_common as rc  # noqa: E402
 import report_surfaces as rs  # noqa: E402
 import report_wiring as rw  # noqa: E402
+from report_regions import region  # noqa: E402
 
 TAB = chr(9)
 ok = True
@@ -162,24 +163,19 @@ def main():
               not [c for c in rs.SCORE_COLUMN_GROUPS["Core"] if c in header and c in
                    dict(rw.group_columns(header, rs.SCORE_COLUMN_GROUPS)).get("Other", [])])
 
-    print("navigation")
+    print("navigation (now report_layout)")
+    check("the old grouped navigation is retired from report_wiring", not hasattr(rw, "group_navigation") and not hasattr(rw, "grouped_nav"))
+    import report_layout as rl
     ids = ["summary", "leaderboard", "mystery-section", "scorecard", "files", "recommendations"]
-    groups = rw.grouped_nav(ids, {})
-    flat = [i for links in groups.values() for i, _ in links]
+    plan = rl.layout_plan(ids)
+    flat = [i for _v, members in plan for i in members]
     check("every id appears exactly once", sorted(flat) == sorted(ids), flat)
-    check("an unknown id goes to More", [i for i, _ in groups.get("More", [])] == ["mystery-section"])
-    check("More comes last", list(groups)[-1] == "More")
-    check("known ids go to their groups", [i for i, _ in groups["Results"]] == ["summary", "leaderboard"]
-          and [i for i, _ in groups["Appendix"]] == ["files"])
-    page = rw.group_navigation(stub(*ids))
-    nav = page[page.index("<nav class='nav'"):page.index("</nav>")]
-    check("grouped nav keeps class nav and has collapsible groups", "<details" in nav and "rpt-navgroups" in nav)
-    check("every section is linked once", sorted(re.findall(r"href='#([a-z-]+)'", nav)) == sorted(ids))
-    check("nav scripts attached (current-group highlight)", "data-navgroup" in page and "MutationObserver" in page)
-    check("print CSS hides the nav", "@media print{.nav{display:none}" in rw.WIRING_STYLE.replace("\n", ""))
-    allgrouped = {i for g in rw._G.values() for i in g.split()}
-    check("group table has no id in two groups",
-          sum(len(g.split()) for g in rw._G.values()) == len(allgrouped))
+    check("an unknown id goes to More, which comes last", plan[-1][0][0] == "more" and plan[-1][1] == ["mystery-section"])
+    check("known ids go to their views", dict((v[0], m) for v, m in plan)["overview"] == ["summary", "leaderboard"]
+          and dict((v[0], m) for v, m in plan)["appendix"] == ["files"])
+    page = rl.transform(stub(*ids))
+    nav = page[page.index("<nav class='rpt-rail'"):page.index("</nav>")]
+    check("every section is linked once in the rail", sorted(i for i in re.findall(r"href='#([a-z-]+)'", nav) if not i.startswith("view-")) == sorted(ids))
     page2 = rw.finish(stub("summary", "leaderboard", "recommendations", "scorecard", "plasmid-maps"))
     order = re.findall(r"<section id='([a-z-]+)'", page2)
     check("scorecard and maps move up behind the leaderboard",
@@ -216,7 +212,7 @@ def main():
             done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", cwd=ROOT)
             check("the report builds", done.returncode == 0, done.stderr[-800:])
             html = open(p("benchmark.report.html"), encoding="utf-8").read()
-            sec = lambda sid: html[html.index(f"<section id='{sid}'"):html.index("</section>", html.index(f"<section id='{sid}'"))]  # noqa: E731
+            sec = lambda sid: region(html, sid)   # a section, or a panel of a merged container (old ids resolve through report_aliases)  # noqa: E731
             pp = sec("per-plasmid-detail")
             n_rows = sum(len(rows) for rows in [list(csv.DictReader(open(f, encoding="utf-8"), delimiter=TAB))
                                                 for f in __import__("glob").glob(os.path.join(work, "*", "*.per_plasmid.tsv"))])
@@ -241,18 +237,26 @@ def main():
             hrefs = [h for h in re.findall(r"href='([^#'][^']*\.md)'", sec("files"))]
             check("Run files links exist and include the leaderboard and the spec",
                   hrefs and all(os.path.isfile(p(h)) for h in hrefs) and "benchmark.leaderboard.md" in hrefs and "benchmark.scoring_spec.md" in hrefs, hrefs)
+            check("the landscape figure resolves the shared 3D engine when it mounts (it can sit before the script that defines it)",
+                  "fig-landscape" not in html or html.index("PBLandscapeUI") > html.index("PBLandscape = ") and "P = P || root.PB3D" in html)
+            ids_now = re.findall(r"<section id='([a-z-]+)'", html)
+            check("every figure section is on the page in the Figures order, after the maps",
+                  [i for i in ids_now if i.startswith("fig-")] == [i for i in ("fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr") if i in ids_now]
+                  and ids_now.index("fig-ladder") < ids_now.index("plasmid-maps"))   # story order: figures, then maps
             for sid, marker in (("headline-design", "<table"), ("metric-framework", "<table"), ("scorecard-definitions", "<table"),
                                 ("interpretation-limits", "These results do NOT show"),
                                 ("per-plasmid-detail", "<table")):
                 block = sec(sid)
-                check(f"{sid}: its detail is collapsed in a closed <details> until clicked",
-                      "<details class='rpt-collapsible'>" in block and "<details class='rpt-collapsible' open" not in block
+                check(f"{sid}: its detail sits in a collapsible <details> that starts open (the reader can fold it)",
+                      re.search(r"<details open class='rpt-collapsible'>", block) is not None
                       and block.index("<details") < block.index(marker) < block.index("</details>"))
-            nav = html[html.index("<nav class='nav'"):html.index("</nav>")]
+            nav = html[html.index("<nav class='rpt-rail'"):html.index("</nav>")]
             ids = re.findall(r"<section id='([a-z-]+)'", html)
-            check("nav links every section exactly once", sorted(re.findall(r"href='#([a-z-]+)'", nav)) == sorted(ids))
-            check("the six named groups lead the nav", re.findall(r"data-navgroup='([^']+)'", nav)[:6] == rw.NAV_GROUP_ORDER, re.findall(r"data-navgroup='([^']+)'", nav))
-            check("scorecard sits right after the robustness section", ids.index("scorecard") == ids.index("robustness") + 1, ids[:10])
+            check("rail links every section exactly once",
+                  sorted(i for i in re.findall(r"href='#([a-z-]+)'", nav) if not i.startswith("view-")) == sorted(ids))
+            views_in_rail = re.findall(r"href='#view-([a-z]+)'", nav)
+            check("the views lead the rail in story order", views_in_rail[:3] == ["overview", "scorecard", "figures"] and len(views_in_rail) >= 6, views_in_rail)
+            check("scorecard opens the view that follows the overview", ids.index("scorecard") == ids.index("metadata") + 1, ids[:10])
             check("inventory no longer lists the wired outputs as not shown", "Not shown yet" not in sec("data-inventory"))
 
     print()

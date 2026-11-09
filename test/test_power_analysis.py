@@ -75,6 +75,26 @@ def main():
         # Fewer than min clusters.
         r = run(tmp, rows[:6])[0]
         check("3 samples: too few clusters", r["status"] == "too_few_clusters")
+        # With the leaderboard the pair is compared on the (track, task) ranking metric, the metric the paired-comparison
+        # table (aggregate_results.compute_comparisons) uses, so the same pair gives the same mean difference.
+        scores, board, out = (os.path.join(tmp, n) for n in ("rs.tsv", "lb.tsv", "rp.tsv"))
+        lw = {"A": [0.9, 0.8, 0.7, 0.95, 0.6, 0.85], "B": [0.5, 0.6, 0.4, 0.7, 0.3, 0.65]}
+        with open(scores, "w") as fh:
+            fh.write("sample\ttool\tanalysis_track\tf1\tlw_bin_f1\n")
+            for tool, values in lw.items():
+                for i, v in enumerate(values):
+                    fh.write(f"s{i}\t{tool}\tshort_read\t0.99\t{v}\n")
+        with open(board, "w") as fh:
+            fh.write("analysis_track\ttask\ttool\tranking_metric\n")
+            for tool in lw:
+                fh.write(f"short_read\treconstruction\t{tool}\tlw_bin_f1\n")
+        done = subprocess.run([sys.executable, SCRIPT, "--scores", scores, "--leaderboard", board, "--out", out],
+                              capture_output=True, text=True)
+        assert done.returncode == 0, done.stderr
+        r = list(csv.DictReader(open(out, newline=""), delimiter="\t"))[0]
+        want = statistics.mean(a - b for a, b in zip(lw["A"], lw["B"]))
+        check("ranking metric named in the table and its mean difference equals the paired mean of that metric",
+              r["metric"] == "lw_bin_f1" and r["task"] == "reconstruction" and abs(float(r["mean_difference"]) - want) < 1e-5)
     print("ALL POWER ANALYSIS TESTS PASSED" if ok else "POWER ANALYSIS TESTS FAILED")
     return 0 if ok else 1
 

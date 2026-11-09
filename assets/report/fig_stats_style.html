@@ -1,0 +1,61 @@
+<style>
+/* CPRR distributions and forest plot (python/report_fig_stats.py). The static SVG (.st-static) is the no-JavaScript and print fallback; the live figure replaces it. */
+.st{margin:12px 0;font:13px/1.4 Arial,Helvetica,sans-serif;color:var(--ink)}
+.st *{box-sizing:border-box}
+.st.st-on .st-static{display:none}
+.st-static svg{display:block;width:100%;height:auto;max-width:1100px;margin:auto;background:#fff}
+.st-note{font:12px Arial,sans-serif;color:var(--muted);margin:6px 0}
+.st-key{display:inline-flex;align-items:center;gap:5px;font:12px Arial,sans-serif;margin-right:12px}
+.st-key i{display:inline-block;width:12px;height:12px;border:1px solid #0004;border-radius:2px}
+.st-main{display:grid;grid-template-columns:minmax(0,1fr) 360px;border:1px solid var(--line);background:#fff;border-radius:10px;overflow:hidden}
+.st-main.st-nopanel{grid-template-columns:minmax(0,1fr)}
+.st-main.st-nopanel .st-panel{display:none}
+.st-stage{min-width:0;padding:8px 12px 10px}
+.st-toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+.st-sum{color:var(--muted);flex:1 1 220px;min-width:180px;font-size:12px}
+.st-btn{border:1px solid #b9c5bd;background:#fff;color:var(--ink);border-radius:6px;padding:5px 10px;cursor:pointer;font:600 12px Arial,sans-serif;line-height:1.2}
+.st-btn:hover{background:#eef4ef}
+.st-btn[aria-pressed=true],.st-btn[aria-expanded=true]{background:var(--green);color:#fff;border-color:var(--green)}
+.st :focus-visible{outline:3px solid #1a5fb4;outline-offset:2px}
+.st-plot{overflow:auto;max-height:86vh;border:1px solid var(--line);border-radius:6px;background:#fff}
+.st-plot svg{display:block;max-width:none;height:auto}
+.st-plot svg [data-k]{cursor:pointer}
+.st-plot svg [data-k]:focus{outline:none}
+.st-plot svg [data-k=p]:focus,.st-plot svg [data-k=p]:hover{stroke:#000;stroke-width:2}
+.st-plot svg [data-k=slot]:focus>rect:first-child{stroke:#1a5fb4;stroke-width:2;stroke-dasharray:4 2}
+.st-plot svg [data-k=r]:focus>rect:first-child,.st-plot svg [data-k=r]:hover>rect:first-child{fill:#e3ece5;fill-opacity:1}
+.st-legend{display:flex;flex-wrap:wrap;gap:4px 8px;margin:8px 0 4px}
+.st-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #b9c5bd;border-radius:14px;background:#fff;padding:3px 10px;font:12px Arial,sans-serif;cursor:pointer;color:var(--ink)}
+.st-chip i{display:inline-block;width:12px;height:12px;border:1px solid #0004;border-radius:2px}
+.st-chip[aria-pressed=false]{background:#f2f2f2;color:#6b6b6b;text-decoration:line-through}
+.st-chip[aria-pressed=false] i{opacity:.35}
+.st-shapes{font:12px Arial,sans-serif;color:var(--muted);margin:2px 0}
+.st-panel{border-left:1px solid var(--line);background:#fbfcfb;display:flex;flex-direction:column;min-height:0;max-height:86vh}
+.st-tabs{display:flex;flex-wrap:wrap;gap:3px;padding:6px;border-bottom:1px solid var(--line);background:#f1f5f1}
+.st-tab{border:1px solid transparent;background:transparent;border-radius:6px;padding:5px 9px;cursor:pointer;font:600 12px Arial,sans-serif;color:var(--ink)}
+.st-tab:hover{background:#e3ece5}
+.st-tab[aria-selected=true]{background:var(--green);color:#fff}
+.st-tabbody{overflow:auto;padding:10px 12px 14px;flex:1;min-height:0}
+.st-tabbody h4{margin:12px 0 6px;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.st-tabbody h4:first-child{margin-top:0}
+.st-row{display:flex;align-items:center;gap:6px;margin:4px 0;flex-wrap:wrap}
+.st-row label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.st-root select,.st-root input[type=number]{border:1px solid #b9c5bd;border-radius:6px;padding:5px 8px;font:13px Arial,sans-serif;background:#fff;color:var(--ink);max-width:100%}
+.st-list{max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:#fff}
+.st-root table{min-width:0;width:100%;font-size:11.5px;border-collapse:collapse}
+.st-root th,.st-root td{white-space:normal;padding:4px 6px;text-align:left;vertical-align:top;border-top:1px solid var(--line);font-size:11.5px}
+.st-root th{background:#edf2ec;position:sticky;top:0;z-index:1}
+.st-root th button{all:unset;cursor:pointer;font-weight:700}
+.st-root th button:focus-visible{outline:2px solid #1a5fb4}
+.st-root th[aria-sort=ascending] button::after{content:" \25B2";font-size:9px}
+.st-root th[aria-sort=descending] button::after{content:" \25BC";font-size:9px}
+.st-tw{overflow:auto;max-height:380px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.st-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:6px 0;font-size:12.5px}
+.st-dl dt{color:var(--muted);font-weight:600}
+.st-dl dd{margin:0;word-break:break-word}
+.st-muted{color:var(--muted)}
+.st-tip{position:fixed;z-index:1000;max-width:300px;background:#fff;color:#17231d;border:1px solid #9fb0a5;border-radius:8px;box-shadow:0 6px 22px rgba(21,36,28,.22);padding:7px 10px;font:12px/1.45 Arial,sans-serif;pointer-events:none}
+.st-tip[hidden]{display:none}
+@media (max-width:900px){.st-main{grid-template-columns:minmax(0,1fr)}.st-panel{border-left:0;border-top:1px solid var(--line);max-height:none}}
+@media print{.st-root{display:none}.st.st-on .st-static{display:block}}
+</style>

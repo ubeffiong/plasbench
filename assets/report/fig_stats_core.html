@@ -1,0 +1,319 @@
+<script>
+/* PlasBench statistical figures (CPRR distributions and forest plot): pure functions, vanilla JS, no libraries.
+   Every statistic below is mirrored in python/report_fig_stats.py (static no-JS fallback); test/test_report_fig_stats.py checks both agree. */
+(function (root) {
+'use strict';
+var MIN_VIOLIN = 5, GRID = 41, BW_FLOOR = 0.02, Z = 1.959963984540054;
+var RH = 22, FX0 = 250, FXW = 330, SW = 34, FG = 22, LM = 56, TOP = 26, PH = 300, BOT = 130;
+var COLOURS = ['#0072B2', '#D55E00', '#009E73', '#E69F00', '#CC79A7', '#56B4E9', '#882255', '#117733'];
+var FAMILIES = [['species', 'Species'], ['content', 'Isolate plasmid content (total bp)'], ['tier', 'Reference tier'], ['size', 'Plasmid size'],
+                ['mob', 'MOB type'], ['replicon', 'Replicon'], ['amr', 'AMR carriage']];
+var CONTENT_ORDER = ['<10 kb', '10-100 kb', '>100 kb'], TIERS = ['1', '2', '3', 'unrecorded'];
+var TIER_NAME = {'1': 'Tier 1', '2': 'Tier 2', '3': 'Tier 3 (provisional)', 'unrecorded': 'Tier not recorded'};
+
+var ESC_MAP = {'&': '&amp;', '<': '&lt;', '>': '&gt;'};
+ESC_MAP[String.fromCharCode(34)] = '&quot;'; ESC_MAP[String.fromCharCode(39)] = '&#39;';
+var ESC_RE = new RegExp('[&<>' + String.fromCharCode(34, 39) + ']', 'g');
+function esc(s) { return String(s == null ? '' : s).replace(ESC_RE, function (c) { return ESC_MAP[c]; }); }
+function n2(x) { var t = (Math.round(x * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); return (t === '-0' || t === '') ? '0' : t; }
+function g(x) { return String(parseFloat(x.toPrecision(6))); }
+
+/* ------------------------------------------------------------------ statistics */
+function quantile7(xs, p) {
+  var s = xs.slice().sort(function (a, b) { return a - b; }), h = (s.length - 1) * p, lo = Math.floor(h), hi = Math.min(lo + 1, s.length - 1);
+  return s[lo] + (h - lo) * (s[hi] - s[lo]);
+}
+function boxStats(vals) {
+  var s = vals.slice().sort(function (a, b) { return a - b; }), q1 = quantile7(s, 0.25), med = quantile7(s, 0.5), q3 = quantile7(s, 0.75), iqr = q3 - q1;
+  var wlo = Infinity, whi = -Infinity, sum = 0;
+  s.forEach(function (v) { sum += v; if (v >= q1 - 1.5 * iqr && v < wlo) wlo = v; if (v <= q3 + 1.5 * iqr && v > whi) whi = v; });
+  return {n: s.length, q1: q1, med: med, q3: q3, wlo: wlo, whi: whi, mean: sum / s.length};
+}
+function bandwidth(vals) {
+  var n = vals.length, mu = vals.reduce(function (a, b) { return a + b; }, 0) / n, ss = 0;
+  vals.forEach(function (v) { ss += (v - mu) * (v - mu); });
+  var sd = n > 1 ? Math.sqrt(ss / (n - 1)) : 0, iqr = quantile7(vals, 0.75) - quantile7(vals, 0.25), a = iqr > 0 ? Math.min(sd, iqr / 1.34) : sd;
+  return Math.max(0.9 * a * Math.pow(n, -0.2), BW_FLOOR);
+}
+function kde(vals, bw) {
+  var n = vals.length, c = 1 / (n * bw * Math.sqrt(2 * Math.PI)), out = [];
+  for (var i = 0; i < GRID; i++) { var s = 0; for (var k = 0; k < n; k++) { var z = (i / (GRID - 1) - vals[k]) / bw; s += Math.exp(-0.5 * z * z); } out.push(c * s); }
+  return out;
+}
+function jitter(items) {
+  var order = items.map(function (_, i) { return i; }).sort(function (a, b) {
+    return items[a][0] - items[b][0] || (String(items[a][1]) < String(items[b][1]) ? -1 : String(items[a][1]) > String(items[b][1]) ? 1 : 0);
+  }), out = new Array(items.length), start = 0;
+  while (start < order.length) {
+    var end = start;
+    while (end + 1 < order.length && Math.abs(items[order[end + 1]][0] - items[order[start]][0]) < 1e-9) end++;
+    var k = end - start + 1;
+    for (var i = 0; i < k; i++) out[order[start + i]] = [i - (k - 1) / 2, k];
+    start = end + 1;
+  }
+  return out;
+}
+function wilson(c, n) {
+  if (!n) return null;
+  var p = c / n, d = 1 + Z * Z / n, centre = (p + Z * Z / (2 * n)) / d, half = Z * Math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / d;
+  return [Math.max(0, centre - half), Math.min(1, centre + half)];
+}
+function newcombe(c1, n1, c2, n2_) {
+  if (!n1 || !n2_) return null;
+  var p1 = c1 / n1, p2 = c2 / n2_, a = wilson(c1, n1), b = wilson(c2, n2_), d = p1 - p2;
+  return [d - Math.sqrt(Math.pow(p1 - a[0], 2) + Math.pow(b[1] - p2, 2)), d + Math.sqrt(Math.pow(a[1] - p1, 2) + Math.pow(p2 - b[0], 2))];
+}
+
+/* ------------------------------------------------------------------ distribution model */
+function orderGroups(kind, labels) {
+  var base = kind === 'content' ? CONTENT_ORDER : kind === 'tier' ? TIERS : [];
+  return base.filter(function (k) { return labels.indexOf(k) >= 0; }).concat(labels.filter(function (k) { return base.indexOf(k) < 0; }).sort());
+}
+function groupLabel(kind, key) { return kind === 'tier' ? (TIER_NAME[key] || key) : key; }
+function uniq(a) { return a.filter(function (v, i) { return a.indexOf(v) === i; }); }
+function distModel(data, group, hidden) {
+  hidden = hidden || [];
+  var withPts = uniq(data.pts.map(function (p) { return p[0]; })).sort(function (a, b) { return a - b; });
+  var vis = withPts.filter(function (t) { return hidden.indexOf(t) < 0; }), S = data.samples;
+  var pos = {species: 1, content: 2, tier: 3}[group], facets = [];
+  if (group === 'track') {
+    uniq(vis.map(function (t) { return data.tools[t][1]; })).sort().forEach(function (tr) {
+      facets.push({label: tr, key: tr, all: false, tools: vis.filter(function (t) { return data.tools[t][1] === tr; })});
+    });
+  } else {
+    facets.push({label: 'All isolates', key: '*', all: true, tools: vis});
+    var labs = uniq(data.pts.map(function (p) { return S[p[1]][pos]; }).concat(data.excl.map(function (e) { return S[e[1]][pos]; })));
+    orderGroups(group, labs).forEach(function (k) { facets.push({label: groupLabel(group, k), key: k, all: false, tools: vis}); });
+  }
+  facets.forEach(function (f) {
+    f.slots = f.tools.map(function (t) {
+      function inside(si) { return f.all || group === 'track' || S[si][pos] === f.key; }
+      var mine = data.pts.filter(function (p) { return p[0] === t && inside(p[1]); });
+      var vals = mine.map(function (p) { return p[2] / p[3]; }), ids = mine.map(function (p) { return S[p[1]][0]; });
+      var offs = mine.length ? jitter(vals.map(function (v, i) { return [v, ids[i]]; })) : [];
+      var slot = {tool: t, n: mine.length, excl: data.excl.filter(function (e) { return e[0] === t && inside(e[1]); }).length,
+        full: mine.length >= MIN_VIOLIN, stat: null, bw: null, dens: null,
+        pts: mine.map(function (p, i) { return {si: p[1], v: vals[i], c: p[2], t: p[3], j: offs[i][0], k: offs[i][1]}; })};
+      slot.pts.sort(function (a, b) { return a.v - b.v || (S[a.si][0] < S[b.si][0] ? -1 : S[a.si][0] > S[b.si][0] ? 1 : 0); });
+      if (mine.length) slot.mean = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+      if (slot.full) { slot.stat = boxStats(vals); slot.bw = bandwidth(vals); slot.dens = kde(vals, slot.bw); }
+      return slot;
+    });
+  });
+  return {facets: facets, excluded: data.excl.length};
+}
+
+/* ------------------------------------------------------------------ forest model */
+function forestRows(data, tool, contrast, toolB, families, minN) {
+  var key = String(tool);
+  if (!data.overall[key]) return [];
+  var oc = data.overall[key][0], on = data.overall[key][1], oi = data.overall[key][2], lbrow = data.lb[key], pAll = on ? oc / on : null;
+  var other = null, bc = 0, bn = 0;
+  if (contrast === 'tools' && toolB != null && data.overall[String(toolB)]) {
+    other = {}; (data.strata[String(toolB)] || []).forEach(function (r) { other[r[0] + '\u0001' + r[1]] = r; });
+    bc = data.overall[String(toolB)][0]; bn = data.overall[String(toolB)][1];
+  } else if (contrast === 'tools') contrast = 'diff';
+  var rows = [];
+  FAMILIES.forEach(function (fam) {
+    if (families.indexOf(fam[0]) < 0) return;
+    var mine = (data.strata[key] || []).filter(function (r) { return r[0] === fam[0]; });
+    if (!mine.length) return;
+    rows.push({kind: 'head', label: fam[1], fam: fam[0]});
+    mine.forEach(function (r) {
+      var c = r[2], n = r[3], units = r[4];
+      var row = {kind: 'row', fam: fam[0], label: r[1], c: c, t: n, units: units, src: r[5], est: null, lo: null, hi: null, ci: 'W', avail: false, under: units < minN, nm: n || 0};
+      if (contrast === 'tools') {
+        var o = other[fam[0] + '\u0001' + r[1]];
+        if (n && o && o[3] && pAll !== null) {
+          var ci = newcombe(c, n, o[2], o[3]);
+          row.est = c / n - o[2] / o[3]; row.lo = ci[0]; row.hi = ci[1]; row.avail = true; row.ci = 'N'; row.nm = Math.min(n, o[3]); row.under = Math.min(units, o[4]) < minN;
+        }
+      } else if (n) {
+        var w = wilson(c, n); row.avail = true;
+        if (contrast === 'abs') { row.est = c / n; row.lo = w[0]; row.hi = w[1]; }
+        else if (pAll !== null) { row.est = c / n - pAll; row.lo = w[0] - pAll; row.hi = w[1] - pAll; }
+      }
+      rows.push(row);
+    });
+  });
+  var ov = {kind: 'overall', label: 'Overall (all isolates)', c: oc, t: on, units: oi, src: 'isolates', avail: !!on, under: oi < minN, nm: on, est: null, lo: null, hi: null, ci: 'W'};
+  if (on) {
+    var w2;
+    if (lbrow && lbrow[1] != null && lbrow[2] != null) { w2 = [lbrow[1], lbrow[2]]; ov.ci = 'B'; } else w2 = wilson(oc, on);
+    if (contrast === 'abs') { ov.est = pAll; ov.lo = w2[0]; ov.hi = w2[1]; }
+    else if (contrast === 'tools') { var c2 = newcombe(oc, on, bc, bn); ov.est = pAll - bc / bn; ov.lo = c2[0]; ov.hi = c2[1]; ov.ci = 'N'; }
+    else { ov.est = 0; ov.lo = w2[0] - pAll; ov.hi = w2[1] - pAll; }
+  }
+  rows.push(ov);
+  return rows;
+}
+function forestLayout(rows, contrast, pAll) {
+  var vals = [], a0, a1, ticks;
+  rows.forEach(function (r) { if (r.kind !== 'head' && r.est != null) vals.push(r.est); });
+  if (contrast === 'abs') { a0 = 0; a1 = 1; ticks = [0, 0.25, 0.5, 0.75, 1]; }
+  else {
+    var m = Math.max.apply(null, vals.map(Math.abs).concat([0])), lim = Math.min(1, Math.max(0.25, Math.ceil(m * 1.5 / 0.25 - 1e-9) * 0.25));
+    a0 = -lim; a1 = lim; ticks = [-lim, -lim / 2, 0, lim / 2, lim];
+  }
+  function x(v) { return FX0 + (v - a0) / (a1 - a0) * FXW; }
+  var tmax = Math.max.apply(null, rows.filter(function (r) { return r.kind !== 'head' && r.avail; }).map(function (r) { return r.nm; }).concat([1]));
+  var items = rows.map(function (r, i) {
+    var it = {i: i, y: 40 + i * RH};
+    if (r.kind !== 'head' && r.avail && r.est != null) {
+      var lo = Math.min(r.lo, r.hi), hi = Math.max(r.lo, r.hi);
+      it.x = x(r.est); it.xl = x(Math.max(lo, a0)); it.xr = x(Math.min(hi, a1)); it.cl = lo < a0; it.cr = hi > a1; it.size = 5 + 9 * Math.sqrt(r.nm / tmax);
+    }
+    return it;
+  });
+  return {a0: a0, a1: a1, ticks: ticks, null: contrast === 'abs' && pAll != null ? x(pAll) : x(0), items: items, height: 40 + rows.length * RH + 56};
+}
+
+/* ------------------------------------------------------------------ SVG drawing */
+function colour(t) { return COLOURS[t % COLOURS.length]; }
+function multiTrack(data) { var s = {}; data.tools.forEach(function (t) { s[t[1]] = 1; }); return Object.keys(s).length > 1; }
+function toolName(data, t, multi) { return multi ? data.tools[t][2] + ' (' + data.tools[t][1] + ')' : data.tools[t][2]; }
+function pointSvg(x, y, tier, col, r, sel, attrs) {
+  var stroke = sel ? '#17231d' : '#ffffff', sw = sel ? 2 : 0.9;
+  if (tier === '2') return '<rect ' + attrs + ' x="' + n2(x - r) + '" y="' + n2(y - r) + '" width="' + n2(2 * r) + '" height="' + n2(2 * r) + '" fill="' + col + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+  if (tier === '3') return '<path ' + attrs + ' d="M' + n2(x) + ' ' + n2(y - r * 1.25) + ' L' + n2(x + r * 1.15) + ' ' + n2(y + r * 0.9) + ' L' + n2(x - r * 1.15) + ' ' + n2(y + r * 0.9) + ' Z" fill="' + col + '" stroke="#17231d" stroke-width="' + (sel ? 2 : 1.1) + '" stroke-dasharray="2 1.2"/>';
+  if (tier === '1') return '<circle ' + attrs + ' cx="' + n2(x) + '" cy="' + n2(y) + '" r="' + n2(r) + '" fill="' + col + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+  return '<path ' + attrs + ' d="M' + n2(x) + ' ' + n2(y - r * 1.3) + ' L' + n2(x + r * 1.3) + ' ' + n2(y) + ' L' + n2(x) + ' ' + n2(y + r * 1.3) + ' L' + n2(x - r * 1.3) + ' ' + n2(y) + ' Z" fill="' + col + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+}
+/* opts: mode 'violin'|'box', points bool, sel sample index or null, lb (leaderboard CI bars) bool, interactive bool */
+function facetWidth(f) { return Math.max(f.slots.length * SW, Math.ceil(f.label.length * 6.8) + 8); }
+function distSvg(data, model, opts) {
+  opts = opts || {};
+  var S = data.samples, multi = multiTrack(data), mode = opts.mode || 'violin', inter = !!opts.interactive;
+  var fwSum = 0; model.facets.forEach(function (f) { fwSum += facetWidth(f); });
+  var width = LM + fwSum + FG * (model.facets.length - 1) + 28, height = TOP + PH + BOT;
+  function yv(v) { return TOP + (1 - v) * PH; }
+  var o = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + n2(width) + ' ' + height + '" width="' + n2(width) + '" height="' + height + '" role="img" aria-label="CPRR distributions by tool" font-family="Arial,sans-serif"><title>CPRR distributions by tool</title><rect width="' + n2(width) + '" height="' + height + '" fill="#fff"/>'];
+  [0, 0.25, 0.5, 0.75, 1].forEach(function (v) {
+    o.push('<line x1="' + (LM - 4) + '" x2="' + (width - 14) + '" y1="' + n2(yv(v)) + '" y2="' + n2(yv(v)) + '" stroke="#d9e0da" stroke-width="1"/><text x="' + (LM - 8) + '" y="' + n2(yv(v) + 4) + '" text-anchor="end" font-size="11" fill="#4f5f55">' + g(v) + '</text>');
+  });
+  o.push('<text transform="translate(14 ' + (TOP + PH / 2) + ') rotate(-90)" text-anchor="middle" font-size="12" fill="#17231d">CPRR (correct / assessable plasmids)</text>');
+  var x0 = LM, traces = {};
+  model.facets.forEach(function (f, fi) {
+    var fw = facetWidth(f), pad = (fw - f.slots.length * SW) / 2;
+    if (fi % 2 === 1) o.push('<rect x="' + x0 + '" y="' + (TOP - 8) + '" width="' + fw + '" height="' + (PH + 16) + '" fill="#f3f6f3"/>');
+    o.push('<text x="' + n2(x0 + fw / 2) + '" y="' + (TOP + PH + BOT - 8) + '" text-anchor="middle" font-size="12" font-weight="700" fill="#17231d">' + esc(f.label) + '</text>');
+    f.slots.forEach(function (s, k) {
+      var cx = x0 + pad + k * SW + SW / 2, col = colour(s.tool), hw = 13, nm = toolName(data, s.tool, multi);
+      var label = data.tools[s.tool][2] + ' in ' + f.label + ': ' + s.n + ' isolate' + (s.n === 1 ? '' : 's') + (s.excl ? ', ' + s.excl + ' excluded' : '');
+      o.push('<g' + (inter ? ' data-k="slot" data-t="' + s.tool + '" data-f="' + fi + '" tabindex="0" role="button" aria-label="' + esc(label) + '"' : '') + '>');
+      o.push('<rect x="' + n2(cx - SW / 2) + '" y="' + (TOP - 8) + '" width="' + SW + '" height="' + (PH + 16) + '" fill="#fff" fill-opacity="0"/>');
+      if (s.full && mode === 'violin') {
+        var dmax = Math.max.apply(null, s.dens) || 1, right = [], left = [];
+        s.dens.forEach(function (d, i) { right.push([cx + hw * d / dmax, yv(i / (GRID - 1))]); left.unshift([cx - hw * d / dmax, yv(i / (GRID - 1))]); });
+        o.push('<path d="M' + right.concat(left).map(function (p) { return n2(p[0]) + ' ' + n2(p[1]); }).join(' L') + ' Z" fill="' + col + '" fill-opacity=".28" stroke="' + col + '" stroke-width="1.2"/>');
+        o.push('<line x1="' + n2(cx - hw * 0.6) + '" x2="' + n2(cx + hw * 0.6) + '" y1="' + n2(yv(s.stat.med)) + '" y2="' + n2(yv(s.stat.med)) + '" stroke="#17231d" stroke-width="2"/>');
+      } else if (s.full) {
+        var b = s.stat;
+        o.push('<line x1="' + n2(cx) + '" x2="' + n2(cx) + '" y1="' + n2(yv(b.wlo)) + '" y2="' + n2(yv(b.whi)) + '" stroke="' + col + '" stroke-width="1.4"/>' +
+          '<rect x="' + n2(cx - hw * 0.8) + '" y="' + n2(yv(b.q3)) + '" width="' + n2(hw * 1.6) + '" height="' + n2(Math.max(yv(b.q1) - yv(b.q3), 0.5)) + '" fill="' + col + '" fill-opacity=".28" stroke="' + col + '" stroke-width="1.4"/>' +
+          '<line x1="' + n2(cx - hw * 0.8) + '" x2="' + n2(cx + hw * 0.8) + '" y1="' + n2(yv(b.med)) + '" y2="' + n2(yv(b.med)) + '" stroke="#17231d" stroke-width="2.2"/>' +
+          '<line x1="' + n2(cx - hw * 0.4) + '" x2="' + n2(cx + hw * 0.4) + '" y1="' + n2(yv(b.wlo)) + '" y2="' + n2(yv(b.wlo)) + '" stroke="' + col + '" stroke-width="1.4"/>' +
+          '<line x1="' + n2(cx - hw * 0.4) + '" x2="' + n2(cx + hw * 0.4) + '" y1="' + n2(yv(b.whi)) + '" y2="' + n2(yv(b.whi)) + '" stroke="' + col + '" stroke-width="1.4"/>');
+      }
+      if (opts.points !== false) s.pts.forEach(function (q) {
+        var step = Math.min(6, 0.9 * 2 * hw / Math.max(q.k, 1)), px = cx + q.j * step, py = yv(q.v), isSel = opts.sel != null && q.si === opts.sel;
+        var a = inter ? 'data-k="p" data-t="' + s.tool + '" data-s="' + q.si + '" data-f="' + fi + '" tabindex="-1" role="button" aria-label="' + esc(S[q.si][0] + ', ' + data.tools[s.tool][2] + ', CPRR ' + q.v.toFixed(3) + ' (' + q.c + ' of ' + q.t + ' plasmids)') + '"' : '';
+        o.push(pointSvg(px, py, S[q.si][3], col, isSel ? 4.4 : 3.2, isSel, a));
+        if (isSel) { (traces[fi] = traces[fi] || []).push([cx + q.j * step, py, k]); }
+      });
+      var lb = data.lb[String(s.tool)];
+      if (opts.lb !== false && lb && lb[1] != null && lb[2] != null && (f.all || model.facets[0].all === false)) {
+        o.push('<line x1="' + n2(cx + hw + 4) + '" x2="' + n2(cx + hw + 4) + '" y1="' + n2(yv(lb[2])) + '" y2="' + n2(yv(lb[1])) + '" stroke="#17231d" stroke-width="3" stroke-linecap="butt"/>');
+        if (lb[0] != null) o.push('<circle cx="' + n2(cx + hw + 4) + '" cy="' + n2(yv(lb[0])) + '" r="2.6" fill="#fff" stroke="#17231d" stroke-width="1.2"/>');
+      }
+      var lab = nm.length <= 18 ? nm : nm.slice(0, 17) + '…';
+      lab += ' (n=' + s.n + (s.n < MIN_VIOLIN ? '*' : '') + ')';
+      o.push('<text transform="translate(' + n2(cx + 3) + ' ' + (TOP + PH + 14) + ') rotate(-50)" text-anchor="end" font-size="10.5" fill="#17231d">' + esc(lab) + '</text></g>');
+    });
+    var tr = traces[fi];
+    if (tr && tr.length > 1) {
+      tr.sort(function (a, b) { return a[2] - b[2]; });
+      o.push('<path d="M' + tr.map(function (p) { return n2(p[0]) + ' ' + n2(p[1]); }).join(' L') + '" fill="none" stroke="#17231d" stroke-width="1.2" stroke-dasharray="4 3" pointer-events="none"/>');
+    }
+    x0 += fw + FG;
+  });
+  o.push('</svg>');
+  return o.join('');
+}
+function fnum(x) { return x == null ? 'n/a' : (x >= 0 ? '+' : '') + x.toFixed(3); }
+function rowText(r, contrast) {
+  if (!r.avail || r.est == null) return 'not available';
+  if (contrast === 'abs') return r.est.toFixed(3) + ' [' + r.lo.toFixed(3) + ', ' + r.hi.toFixed(3) + '] ' + r.ci;
+  return fnum(r.est) + ' [' + fnum(r.lo) + ', ' + fnum(r.hi) + '] ' + r.ci;
+}
+function rowN(r) {
+  var s = (r.t ? r.t : '-') + ' / ' + r.units;
+  return r.avail && r.under ? s + ' underpowered' : s;
+}
+function forestSvg(rows, lay, contrast, opts) {
+  opts = opts || {};
+  var width = FX0 + FXW + 330, height = lay.height, inter = !!opts.interactive, x = function (v) { return FX0 + (v - lay.a0) / (lay.a1 - lay.a0) * FXW; }, col = colour(opts.colourIndex || 0);
+  var heads = {diff: 'CPRR difference vs overall', abs: 'CPRR', tools: 'CPRR difference, A minus B'};
+  var o = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + width + ' ' + height + '" width="' + width + '" height="' + height + '" role="img" aria-label="Forest plot of CPRR by stratum" font-family="Arial,sans-serif"><title>Forest plot of CPRR by stratum</title><rect width="' + width + '" height="' + height + '" fill="#fff"/>'];
+  o.push('<text x="8" y="24" font-size="11" font-weight="700">Stratum</text><text x="' + (FX0 + FXW / 2) + '" y="24" font-size="11" font-weight="700" text-anchor="middle">' + heads[contrast] + '</text><text x="' + (FX0 + FXW + 14) + '" y="24" font-size="11" font-weight="700">plasmids / isolates</text><text x="' + (FX0 + FXW + 150) + '" y="24" font-size="11" font-weight="700">estimate [95% CI]</text>');
+  o.push('<line x1="' + n2(lay.null) + '" x2="' + n2(lay.null) + '" y1="34" y2="' + (height - 44) + '" stroke="#17231d" stroke-dasharray="4 3"/>');
+  rows.forEach(function (r, i) {
+    var it = lay.items[i], y = it.y;
+    if (r.kind === 'head') { o.push('<text x="8" y="' + (y + 4) + '" font-size="11.5" font-weight="700" fill="#17231d">' + esc(r.label) + '</text>'); return; }
+    var sel = opts.sel === i;
+    o.push('<g' + (inter ? ' data-k="r" data-i="' + i + '" tabindex="0" role="button" aria-label="' + esc(r.label + ': ' + rowText(r, contrast) + ', ' + rowN(r)) + '"' : '') + '>');
+    o.push('<rect x="0" y="' + (y - RH / 2) + '" width="' + width + '" height="' + RH + '" fill="' + (sel ? '#dcefdc' : '#fff') + '" fill-opacity="' + (sel ? 1 : 0) + '"/>');
+    o.push('<text x="' + (r.kind === 'row' ? 18 : 8) + '" y="' + (y + 4) + '" font-size="11"' + (r.kind === 'overall' ? ' font-weight="700"' : '') + ' fill="#17231d">' + esc(r.label) + '</text>');
+    if (it.x != null) {
+      if (r.kind === 'overall') {
+        o.push('<path d="M' + n2(x(r.lo)) + ' ' + y + ' L' + n2(it.x) + ' ' + (y - 7) + ' L' + n2(x(r.hi)) + ' ' + y + ' L' + n2(it.x) + ' ' + (y + 7) + ' Z" fill="#17231d"/>');
+      } else {
+        o.push('<line x1="' + n2(it.xl) + '" x2="' + n2(it.xr) + '" y1="' + y + '" y2="' + y + '" stroke="' + col + '" stroke-width="1.6"/>');
+        if (it.cl) o.push('<path d="M' + n2(it.xl) + ' ' + y + ' l6 -4 v8 z" fill="' + col + '"/>');
+        if (it.cr) o.push('<path d="M' + n2(it.xr) + ' ' + y + ' l-6 -4 v8 z" fill="' + col + '"/>');
+        o.push('<rect x="' + n2(it.x - it.size / 2) + '" y="' + n2(y - it.size / 2) + '" width="' + n2(it.size) + '" height="' + n2(it.size) + '" fill="' + (r.under ? '#fff' : col) + '" stroke="' + col + '" stroke-width="1.6"' + (r.under ? ' stroke-dasharray="2 1.5"' : '') + '/>');
+      }
+    }
+    o.push('<text x="' + (FX0 + FXW + 14) + '" y="' + (y + 4) + '" font-size="10.5" fill="#17231d">' + esc(rowN(r)) + '</text><text x="' + (FX0 + FXW + 150) + '" y="' + (y + 4) + '" font-size="10.5" fill="#17231d">' + esc(rowText(r, contrast)) + '</text></g>');
+  });
+  var yb = height - 44;
+  o.push('<line x1="' + FX0 + '" x2="' + (FX0 + FXW) + '" y1="' + yb + '" y2="' + yb + '" stroke="#17231d"/>');
+  lay.ticks.forEach(function (t) { o.push('<line x1="' + n2(x(t)) + '" x2="' + n2(x(t)) + '" y1="' + yb + '" y2="' + (yb + 4) + '" stroke="#17231d"/><text x="' + n2(x(t)) + '" y="' + (yb + 16) + '" font-size="10.5" text-anchor="middle">' + g(t) + '</text>'); });
+  o.push('</svg>');
+  return o.join('');
+}
+
+/* ------------------------------------------------------------------ CSV */
+function csvCell(v) {
+  var s = v == null ? '' : String(v), Q = String.fromCharCode(34);
+  return (s.indexOf(',') >= 0 || s.indexOf(String.fromCharCode(10)) >= 0 || s.indexOf(String.fromCharCode(9)) >= 0 || s.indexOf(Q) >= 0) ? Q + s.split(Q).join(Q + Q) + Q : s;
+}
+function csvText(header, rows) { return [header].concat(rows).map(function (r) { return r.map(csvCell).join(','); }).join('\n') + '\n'; }
+function distCsv(data, model) {
+  var rows = [];
+  model.facets.forEach(function (f) {
+    f.slots.forEach(function (s) {
+      s.pts.forEach(function (q) {
+        var sm = data.samples[q.si];
+        rows.push([f.label, data.tools[s.tool][2], data.tools[s.tool][1], sm[0], sm[1], sm[2], TIER_NAME[sm[3]] || sm[3], q.c, q.t, q.v.toFixed(6)]);
+      });
+    });
+  });
+  return csvText(['group', 'tool', 'track', 'isolate', 'species', 'plasmid_content_band', 'reference_tier', 'cprr_correct', 'cprr_plasmids', 'cprr'], rows);
+}
+function forestCsv(rows, contrast) {
+  return csvText(['family', 'stratum', 'contrast', 'estimate', 'ci_low', 'ci_high', 'ci_method', 'correct_plasmids', 'assessed_plasmids', 'units', 'underpowered', 'available'],
+    rows.filter(function (r) { return r.kind !== 'head'; }).map(function (r) {
+      return [r.fam || 'overall', r.label, contrast, r.est == null ? '' : r.est.toFixed(6), r.lo == null ? '' : r.lo.toFixed(6), r.hi == null ? '' : r.hi.toFixed(6),
+        {W: 'Wilson (plasmids pooled, not cluster-aware)', B: 'cluster bootstrap (leaderboard)', N: 'Newcombe hybrid score'}[r.ci], r.c == null ? '' : r.c, r.t == null ? '' : r.t, r.units, r.under ? 'yes' : 'no', r.avail ? 'yes' : 'no'];
+    }));
+}
+
+var api = {MIN_VIOLIN: MIN_VIOLIN, GRID: GRID, COLOURS: COLOURS, FAMILIES: FAMILIES, TIER_NAME: TIER_NAME, esc: esc, n2: n2, quantile7: quantile7, boxStats: boxStats,
+  bandwidth: bandwidth, kde: kde, jitter: jitter, wilson: wilson, newcombe: newcombe, distModel: distModel, forestRows: forestRows, forestLayout: forestLayout,
+  colour: colour, multiTrack: multiTrack, toolName: toolName, distSvg: distSvg, forestSvg: forestSvg, rowText: rowText, rowN: rowN, csvText: csvText,
+  distCsv: distCsv, forestCsv: forestCsv, groupLabel: groupLabel, facetWidth: facetWidth};
+root.PBSTAT = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

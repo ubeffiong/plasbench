@@ -1,0 +1,53 @@
+<script id="pb-iso-script">
+/* Isolate filter (python/report_isolates.py). The page ships the cohort-wide content ("All isolates"); this copies the pre-rendered per-isolate
+   content from <template> elements into the slots marked data-iso-slot when the filter changes. Nothing is computed here. */
+(function () {
+'use strict';
+var dataEl = document.getElementById('pb-iso-data');
+if (!dataEl) return;
+var data;
+try { data = JSON.parse(dataEl.textContent); } catch (e) { return; }
+if (!data || !data.isolates || !data.isolates.length) return;
+
+var wrap = document.createElement('label');
+wrap.className = 'pb-iso';
+var caption = document.createElement('span');
+caption.textContent = 'Isolate';
+var sel = document.createElement('select');
+sel.id = 'pb-iso-select';
+sel.setAttribute('aria-label', 'Filter the Summary and the Scorecard to one isolate (default: all isolates)');
+function option(value, text) { var o = document.createElement('option'); o.value = value; o.textContent = text; sel.appendChild(o); }
+option('all', 'All isolates');
+data.isolates.forEach(function (iso) { option(iso.id, iso.id + ' (' + iso.plasmids + ' plasmid' + (iso.plasmids === 1 ? '' : 's') + ')'); });
+wrap.appendChild(caption);
+wrap.appendChild(sel);
+
+var slot = document.getElementById('rpt-isolate-slot');
+if (slot) { slot.appendChild(wrap); }
+else {   // no page shell: a small bar above the first section
+  var host = document.createElement('div');
+  host.className = 'pb-iso-float';
+  host.appendChild(wrap);
+  var main = document.querySelector('main') || document.body;
+  main.insertBefore(host, main.firstChild);
+}
+
+function apply(id) {
+  // the slots on the page, not the <template> elements that hold the per-isolate content (they carry the same attribute)
+  [].forEach.call(document.querySelectorAll('[data-iso-slot]:not(template)'), function (el) {
+    var name = el.getAttribute('data-iso-slot');
+    if (el.__pbIsoOrig === undefined) el.__pbIsoOrig = el.innerHTML;          // the all-isolates content, as the page was built
+    if (id === 'all') { el.innerHTML = el.__pbIsoOrig; return; }
+    var t = null, ts = document.querySelectorAll('template[data-iso-slot="' + name + '"]');
+    for (var i = 0; i < ts.length; i++) { if (ts[i].getAttribute('data-iso-for') === id) { t = ts[i]; break; } }
+    if (t) { el.innerHTML = ''; el.appendChild(t.content.cloneNode(true)); }
+  });
+  [].forEach.call(document.querySelectorAll('[data-iso-scope]'), function (c) { c.textContent = id === 'all' ? 'All isolates' : 'Isolate ' + id; });
+  document.documentElement.classList.toggle('pb-iso-on', id !== 'all');
+  sel.value = id;
+  try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+}
+sel.addEventListener('change', function () { apply(sel.value); });
+window.PBIsolate = {apply: apply, isolates: data.isolates.map(function (i) { return i.id; })};
+})();
+</script>

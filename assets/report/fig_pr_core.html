@@ -1,0 +1,202 @@
+<script>
+/* PlasBench precision-recall figure, pure core: the maths (mirrored in python/report_fig_pr.py and parity-tested), layout, hash state.
+   No DOM access. Loaded by node in test/test_report_fig_pr.py (module.exports) and by the browser (window.PRCore).
+   A curve is a list of rows [threshold|null, tp, fp, fn] in bases, threshold descending; threshold null = "above every score"
+   (nothing called), the standard precision_recall_curve start (precision 1, recall 0). */
+(function (root) {
+'use strict';
+var PR = {};
+
+PR.f1 = function (p, r) { return (p === null || r === null || p + r <= 0) ? null : 2 * p * r / (p + r); };
+/* conv=true: nothing called gives precision 1 (curve start convention); conv=false: undefined (null) for an operating point. */
+PR.prec = function (tp, fp, conv) { return tp + fp > 0 ? tp / (tp + fp) : (conv ? 1 : null); };
+PR.rec = function (tp, fn) { return tp + fn > 0 ? tp / (tp + fn) : null; };
+
+PR.point = function (t, tp, fp, fn, conv) {
+  var p = PR.prec(tp, fp, conv), r = PR.rec(tp, fn);
+  return {t: t, tp: tp, fp: fp, fn: fn, p: p, r: r, f: PR.f1(p, r)};
+};
+PR.curvePoints = function (rows) {
+  return rows.map(function (x) { return PR.point(x[0], x[1], x[2], x[3], true); }).filter(function (q) { return q.r !== null; });
+};
+/* Average precision, the standard step sum: AP = sum_k (R_k - R_{k-1}) * P_k with R_{-1} = 0, points in descending-threshold order. */
+PR.apStep = function (pts) {
+  var s = 0, prev = 0;
+  pts.forEach(function (q) { s += (q.r - prev) * q.p; prev = q.r; });
+  return s;
+};
+/* Trapezoid area (what the pipeline pr_auc column uses): sum_k (R_k - R_{k-1}) * (P_k + P_{k-1}) / 2. */
+PR.aucTrapz = function (pts) {
+  var s = 0;
+  for (var k = 1; k < pts.length; k++) { s += (pts[k].r - pts[k - 1].r) * (pts[k].p + pts[k - 1].p) / 2; }
+  return s;
+};
+/* Index of the first point of maximal F1 (highest threshold on a tie), or -1 when no F1 is defined. */
+PR.fOptimal = function (pts) {
+  var best = -1;
+  pts.forEach(function (q, i) { if (q.f !== null && (best < 0 || q.f > pts[best].f + 1e-12)) { best = i; } });
+  return best;
+};
+/* Iso-F1 contour: P = f R / (2R - f) for R from f/(2-f) (P = 1) to 1 (P = f/(2-f)). */
+PR.isoF1 = function (f, n) {
+  var lo = f / (2 - f), out = [];
+  for (var i = 0; i <= n; i++) { var r = lo + (1 - lo) * i / n; out.push([r, f * r / (2 * r - f)]); }
+  return out;
+};
+/* Vertices of the step drawing: the rectangle tops of the AP sum, (R_{k-1}, P_k) -> (R_k, P_k) -> (R_k, P_{k+1}). */
+PR.stepVertices = function (pts) {
+  var v = [];
+  for (var k = 1; k < pts.length; k++) {
+    v.push([pts[k - 1].r, pts[k].p]); v.push([pts[k].r, pts[k].p]);
+  }
+  return v;
+};
+/* State of a per-sample curve at threshold t: the last row whose threshold is >= t (null threshold counts as +inf);
+   before the first row: nothing called, all truth missed. */
+PR.stateAt = function (rows, t) {
+  var best = null;
+  for (var i = 0; i < rows.length; i++) { if (rows[i][0] === null || rows[i][0] >= t) { best = rows[i]; } else { break; } }
+  if (best) { return [best[1], best[2], best[3]]; }
+  var first = rows[0];
+  return [0, 0, first[1] + first[3]];
+};
+PR.unionThresholds = function (samples) {
+  var seen = {}, out = [];
+  Object.keys(samples).forEach(function (s) { samples[s].forEach(function (x) { if (x[0] !== null && !seen[x[0]]) { seen[x[0]] = 1; out.push(x[0]); } }); });
+  return out.sort(function (a, b) { return b - a; });
+};
+function total(rows) { return rows[0][1] + rows[0][3]; }
+/* Micro: pool tp/fp/fn over samples at each threshold. Samples without truth plasmid bases are skipped. */
+PR.microCurve = function (samples) {
+  var names = Object.keys(samples).filter(function (s) { return samples[s].length && total(samples[s]) > 0; });
+  var ts = [null].concat(PR.unionThresholds(samples)), out = [];
+  ts.forEach(function (t) {
+    var tp = 0, fp = 0, fn = 0;
+    names.forEach(function (s) { var st = t === null ? [0, 0, total(samples[s])] : PR.stateAt(samples[s], t); tp += st[0]; fp += st[1]; fn += st[2]; });
+    var q = PR.point(t, tp, fp, fn, true); q.n = names.length; out.push(q);
+  });
+  return out.filter(function (q) { return q.r !== null; });
+};
+/* Macro: mean of the per-sample precision and recall at each threshold; F1 is computed from those two means. */
+PR.macroCurve = function (samples) {
+  var names = Object.keys(samples).filter(function (s) { return samples[s].length && total(samples[s]) > 0; });
+  var ts = [null].concat(PR.unionThresholds(samples)), out = [];
+  if (!names.length) { return out; }
+  ts.forEach(function (t) {
+    var sp = 0, sr = 0, tp = 0, fp = 0, fn = 0;
+    names.forEach(function (s) {
+      var st = t === null ? [0, 0, total(samples[s])] : PR.stateAt(samples[s], t);
+      sp += PR.prec(st[0], st[1], true); sr += PR.rec(st[0], st[2]); tp += st[0]; fp += st[1]; fn += st[2];
+    });
+    var p = sp / names.length, r = sr / names.length;
+    out.push({t: t, tp: tp, fp: fp, fn: fn, p: p, r: r, f: PR.f1(p, r), n: names.length});
+  });
+  return out;
+};
+PR.sampleCurve = function (rows) { return PR.curvePoints(rows); };
+/* Operating point of a hard call from per-sample [tp, fp, fn] (null where the unit was not scored). */
+PR.opPoint = function (perSample, mode) {
+  var rows = perSample.filter(function (x) { return x && x[0] !== null && x[1] !== null && x[2] !== null; });
+  if (!rows.length) { return null; }
+  if (mode === 'micro') {
+    var tp = 0, fp = 0, fn = 0;
+    rows.forEach(function (x) { tp += x[0]; fp += x[1]; fn += x[2]; });
+    var q = PR.point(null, tp, fp, fn, false); q.n = rows.length; return q.p === null || q.r === null ? null : q;
+  }
+  var ps = [], rs = [], a = 0, b = 0, c = 0;
+  rows.forEach(function (x) { var p = PR.prec(x[0], x[1], false), r = PR.rec(x[0], x[2]); if (p !== null && r !== null) { ps.push(p); rs.push(r); } a += x[0]; b += x[1]; c += x[2]; });
+  if (!ps.length) { return null; }
+  var mp = ps.reduce(function (x, y) { return x + y; }, 0) / ps.length, mr = rs.reduce(function (x, y) { return x + y; }, 0) / rs.length;
+  return {t: null, tp: a, fp: b, fn: c, p: mp, r: mr, f: PR.f1(mp, mr), n: ps.length};
+};
+/* Prevalence baseline: the precision of a call that picks bases at random = plasmid bases / reference bases. */
+PR.prevalence = function (perSample, mode) {
+  var rows = perSample.filter(function (x) { return x && x[1] > 0; });
+  if (!rows.length) { return null; }
+  if (mode === 'micro') { var a = 0, b = 0; rows.forEach(function (x) { a += x[0]; b += x[1]; }); return a / b; }
+  return rows.reduce(function (s, x) { return s + x[0] / x[1]; }, 0) / rows.length;
+};
+/* False-positive predicted records per recovered plasmid at the default call: sum(fp records) / sum(recovered plasmids); null when none recovered. */
+PR.fpPerRecovered = function (fpRecords, recovered) { return recovered > 0 ? fpRecords / recovered : null; };
+
+PR.niceTicks = function (lo, hi) {
+  var span = hi - lo, step = Math.pow(10, Math.floor(Math.log(span / 5) / Math.LN10)), m = span / 5 / step;
+  step *= m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10;
+  var out = [], v = Math.ceil(lo / step - 1e-9) * step;
+  for (; v <= hi + 1e-9; v += step) { out.push(parseFloat((Math.round(v / step) * step).toFixed(10))); }
+  return out;
+};
+PR.fmt = function (v, d) { return (v === null || v === undefined || !isFinite(v)) ? 'not available' : v.toFixed(d === undefined ? 3 : d); };
+PR.csvEscape = function (v) { var s = v === null || v === undefined ? '' : String(v); var Q = String.fromCharCode(34); return (s.indexOf(',') >= 0 || s.indexOf(String.fromCharCode(10)) >= 0 || s.indexOf(Q) >= 0) ? Q + s.split(Q).join(Q + Q) + Q : s; };
+PR.csvText = function (header, rows) { return [header].concat(rows).map(function (r) { return r.map(PR.csvEscape).join(','); }).join('\n') + '\n'; };
+
+/* Layout shared with the static SVG: viewBox 760 x 640, plot area inside the margins. */
+PR.L = {W: 760, H: 640, ml: 62, mr: 20, mt: 18, mb: 56};
+PR.scale = function (view) {
+  var L = PR.L, pw = L.W - L.ml - L.mr, ph = L.H - L.mt - L.mb;
+  return {
+    x: function (r) { return L.ml + (r - view[0]) / (view[1] - view[0]) * pw; },
+    y: function (p) { return L.mt + (1 - (p - view[2]) / (view[3] - view[2])) * ph; },
+    rx: function (px) { return view[0] + (px - L.ml) / pw * (view[1] - view[0]); },
+    ry: function (py) { return view[2] + (1 - (py - L.mt) / ph) * (view[3] - view[2]); },
+    pw: pw, ph: ph
+  };
+};
+PR.clampView = function (v) {
+  var x0 = Math.max(0, Math.min(v[0], v[1])), x1 = Math.min(1, Math.max(v[0], v[1])), y0 = Math.max(0, Math.min(v[2], v[3])), y1 = Math.min(1, Math.max(v[2], v[3]));
+  if (x1 - x0 < 0.01) { x1 = Math.min(1, x0 + 0.01); x0 = x1 - 0.01; }
+  if (y1 - y0 < 0.01) { y1 = Math.min(1, y0 + 0.01); y0 = y1 - 0.01; }
+  return [x0, x1, y0, y1];
+};
+PR.MARKERS = ['circle', 'square', 'triangle', 'diamond', 'cross', 'plus', 'invtriangle', 'star'];
+PR.markerPath = function (shape, x, y, s) {
+  switch (shape) {
+    case 'square': return 'M' + (x - s) + ',' + (y - s) + 'h' + 2 * s + 'v' + 2 * s + 'h' + (-2 * s) + 'z';
+    case 'triangle': return 'M' + x + ',' + (y - s * 1.15) + 'L' + (x + s * 1.1) + ',' + (y + s * 0.85) + 'L' + (x - s * 1.1) + ',' + (y + s * 0.85) + 'z';
+    case 'invtriangle': return 'M' + x + ',' + (y + s * 1.15) + 'L' + (x + s * 1.1) + ',' + (y - s * 0.85) + 'L' + (x - s * 1.1) + ',' + (y - s * 0.85) + 'z';
+    case 'diamond': return 'M' + x + ',' + (y - s * 1.3) + 'L' + (x + s * 1.3) + ',' + y + 'L' + x + ',' + (y + s * 1.3) + 'L' + (x - s * 1.3) + ',' + y + 'z';
+    case 'cross': return 'M' + (x - s) + ',' + (y - s) + 'L' + (x + s) + ',' + (y + s) + 'M' + (x - s) + ',' + (y + s) + 'L' + (x + s) + ',' + (y - s);
+    case 'plus': return 'M' + (x - s * 1.2) + ',' + y + 'h' + 2.4 * s + 'M' + x + ',' + (y - s * 1.2) + 'v' + 2.4 * s;
+    case 'star': var d = ''; for (var i = 0; i < 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? s * 0.55 : s * 1.4; d += (i ? 'L' : 'M') + (x + rr * Math.cos(a)).toFixed(2) + ',' + (y + rr * Math.sin(a)).toFixed(2); } return d + 'z';
+    default: return 'M' + (x - s) + ',' + y + 'a' + s + ',' + s + ' 0 1,0 ' + 2 * s + ',0a' + s + ',' + s + ' 0 1,0 ' + (-2 * s) + ',0z';
+  }
+};
+PR.DASHES = ['', '7 3', '2 3', '9 3 2 3', '5 2', '1 3 6 3', '', '7 3'];
+PR.PALETTES = {
+  'default': ['#0072B2', '#D55E00', '#009E73', '#E69F00', '#CC79A7', '#56B4E9', '#444444', '#9A8700'],
+  cvd: ['#0072B2', '#D55E00', '#117733', '#DDCC77', '#CC79A7', '#88CCEE', '#332288', '#999999']
+};
+
+/* URL hash state, keys prefixed "pr": #fig-pr?prt=track&pru=unit&pra=avg&prs=1&prl=0&pri=1&prb=1&prx=x0,x1,y0,y1&prh=a,b&pro=tool&prtab=curves */
+PR.encodeHash = function (S) {
+  var q = [];
+  function add(k, v) { q.push(k + '=' + encodeURIComponent(v)); }
+  add('prt', S.track); add('pru', S.unit); add('pra', S.avg);
+  add('prs', S.samples ? 1 : 0); add('prl', S.linear ? 1 : 0); add('pri', S.iso ? 1 : 0); add('prb', S.base ? 1 : 0); add('prp', S.ops ? 1 : 0);
+  add('prx', S.view.map(function (v) { return Math.round(v * 1e4) / 1e4; }).join(','));
+  if (S.hidden.length) { add('prh', S.hidden.join(',')); }
+  if (S.only) { add('pro', S.only); }
+  add('prtab', S.tab);
+  return '#fig-pr?' + q.join('&');
+};
+PR.decodeHash = function (hash) {
+  var out = {};
+  if (!hash || hash.indexOf('#fig-pr?') !== 0) { return out; }
+  hash.slice(8).split('&').forEach(function (kv) {
+    var i = kv.indexOf('='); if (i < 1) { return; }
+    var k = kv.slice(0, i), v; try { v = decodeURIComponent(kv.slice(i + 1)); } catch (e) { return; }
+    if (k === 'prt') { out.track = v; } else if (k === 'pru' && (v === 'bases' || v === 'contigs')) { out.unit = v; }
+    else if (k === 'pra' && (v === 'micro' || v === 'macro')) { out.avg = v; }
+    else if (k === 'prs') { out.samples = v === '1'; } else if (k === 'prl') { out.linear = v === '1'; } else if (k === 'pri') { out.iso = v === '1'; }
+    else if (k === 'prb') { out.base = v === '1'; } else if (k === 'prp') { out.ops = v === '1'; }
+    else if (k === 'prx') { var n = v.split(',').map(Number); if (n.length === 4 && n.every(isFinite)) { out.view = PR.clampView(n); } }
+    else if (k === 'prh') { out.hidden = v ? v.split(',') : []; } else if (k === 'pro') { out.only = v; }
+    else if (k === 'prtab' && /^(curves|axes|tools|detail|export)$/.test(v)) { out.tab = v; }
+  });
+  return out;
+};
+PR.VERSION = 1;
+if (typeof module !== 'undefined' && module.exports) { module.exports = PR; }
+root.PRCore = PR;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+</script>

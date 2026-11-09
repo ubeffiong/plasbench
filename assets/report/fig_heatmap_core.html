@@ -1,0 +1,321 @@
+<script>
+/* PlasBench tool heatmap, core: pure functions (colour scales, display modes, average-linkage clustering, layout, SVG, CSV, hash state).
+   Mirrored in python/report_fig_heatmap.py (the static fallback and the tests); test/test_report_fig_heatmap.py checks both agree.
+   Vanilla JS, no libraries; works from file://. */
+(function (root) {
+'use strict';
+var EPS = 1e-12;
+var G = {CELL_W: 40, CELL_H: 30, PAD: 8, ROW_LABEL_W: 150, ROW_DENDRO_W: 56, COL_DENDRO_H: 50, COL_LABEL_H: 118, STRIP_H: 16, FAM_GAP: 8, TITLE_H: 22, LEGEND_H: 40};
+var TINT = {A: '#cfe6f5', B: '#cfeadd', C: '#f6e0b8', D: '#ead7e4', E: '#dedede', L: '#e6e6c8'};
+var BAND_GLYPH = {excellent: '●', good: '◐', moderate: '▲', poor: '■'};
+var BAND_LABEL = {excellent: 'Excellent', good: 'Good', moderate: 'Moderate', poor: 'Poor'};
+var MODES = ['raw', 'score', 'rank', 'z'];
+var MODE_LABEL = {raw: 'Raw value', score: 'Score 0-100', rank: 'Rank', z: 'Z-score'};
+
+var ESC_RE = new RegExp('[&<>\u0022\u0027]', 'g'), ESC_MAP = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\u0022': '&quot;', '\u0027': '&#39;'};
+function esc(s) { return String(s == null ? '' : s).replace(ESC_RE, function (c) { return ESC_MAP[c]; }); }
+function num(x) { var t = (Math.round(x * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); return (t === '-0' || t === '') ? '0' : t; }
+function hexRgb(h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
+function hex2(n) { var s = n.toString(16); return s.length < 2 ? '0' + s : s; }
+
+/* ---------------------------------------------------------------- colour */
+function ramp(stops, t) {
+  t = (t !== t) ? 0 : Math.max(0, Math.min(1, t));
+  var pos = t * (stops.length - 1), i = Math.min(Math.floor(pos), stops.length - 2), f = pos - i;
+  var a = hexRgb(stops[i]), b = hexRgb(stops[i + 1]), out = '#';
+  for (var k = 0; k < 3; k++) { out += hex2(Math.round(a[k] + (b[k] - a[k]) * f)); }
+  return out;
+}
+function colourFor(pal, mode, t, cvd) { return ramp(mode === 'z' ? pal.diverging : (cvd ? pal.cividis : pal.viridis), t); }
+function textOn(hex) {
+  function lin(c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  var c = hexRgb(hex), lum = 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  return (lum + 0.05) / 0.05 >= 1.05 / (lum + 0.05) ? '#111111' : '#ffffff';
+}
+
+/* ---------------------------------------------------------------- display modes */
+function avgRanks(vals, higher) {
+  var idx = [], i;
+  for (i = 0; i < vals.length; i++) { if (vals[i] != null) idx.push(i); }
+  idx.sort(function (a, b) { var d = higher ? vals[b] - vals[a] : vals[a] - vals[b]; return d !== 0 ? d : a - b; });
+  var out = vals.map(function () { return null; }), pos = 0;
+  while (pos < idx.length) {
+    var end = pos;
+    while (end + 1 < idx.length && Math.abs(vals[idx[end + 1]] - vals[idx[pos]]) <= EPS) end++;
+    var rank = (pos + end) / 2 + 1;
+    for (var k = pos; k <= end; k++) out[idx[k]] = rank;
+    pos = end + 1;
+  }
+  return out;
+}
+/* [t, shown, flat] per row, or null for "not available in this mode" */
+function columnView(mode, higher, values, scores) {
+  var n = values.length, out = [], ok = [], i;
+  for (i = 0; i < n; i++) { out.push(null); if (values[i] != null) ok.push(i); }
+  if (mode === 'raw') {
+    if (!ok.length) return out;
+    var lo = Infinity, hi = -Infinity;
+    ok.forEach(function (j) { lo = Math.min(lo, values[j]); hi = Math.max(hi, values[j]); });
+    ok.forEach(function (j) { out[j] = (hi - lo <= EPS) ? [0.5, values[j], true] : [((higher ? values[j] - lo : hi - values[j]) / (hi - lo)), values[j], false]; });
+  } else if (mode === 'score') {
+    for (i = 0; i < n; i++) { if (scores[i] != null) out[i] = [scores[i] / 100, scores[i], false]; }
+  } else if (mode === 'rank') {
+    var ranks = avgRanks(values, higher), m = ok.length;
+    ok.forEach(function (j) { out[j] = m < 2 ? [0.5, ranks[j], true] : [(m - ranks[j]) / (m - 1), ranks[j], false]; });
+  } else if (mode === 'z') {
+    if (ok.length >= 2) {
+      var mean = 0, ss = 0;
+      ok.forEach(function (j) { mean += values[j]; }); mean /= ok.length;
+      ok.forEach(function (j) { ss += (values[j] - mean) * (values[j] - mean); });
+      var sd = Math.sqrt(ss / ok.length);
+      ok.forEach(function (j) { var z = sd <= EPS ? 0 : (values[j] - mean) / sd * (higher ? 1 : -1); out[j] = [(Math.max(-2, Math.min(2, z)) + 2) / 4, z, sd <= EPS]; });
+    }
+  }
+  return out;
+}
+/* grid[r][c] = [t, shown, flat] | null for the given row indices and column objects of a block */
+function matrixView(block, rowIdx, cols, mode) {
+  var grid = rowIdx.map(function () { return new Array(cols.length); });
+  cols.forEach(function (col, c) {
+    var vals = rowIdx.map(function (i) { return block.cells[i][col.i][0]; }), scs = rowIdx.map(function (i) { return block.cells[i][col.i][1]; });
+    columnView(mode, col.dir === 'higher', vals, scs).forEach(function (cell, r) { grid[r][c] = cell; });
+  });
+  return grid;
+}
+
+/* ---------------------------------------------------------------- clustering (average linkage) */
+function rms(a, b, need) {
+  var s = 0, n = 0;
+  for (var k = 0; k < a.length; k++) { if (a[k] != null && b[k] != null) { s += (a[k] - b[k]) * (a[k] - b[k]); n++; } }
+  return n < need ? null : Math.sqrt(s / n);
+}
+function cluster(dist) {
+  var n = dist.length, i, j;
+  if (!n) return {order: [], merges: []};
+  var defined = [];
+  for (i = 0; i < n; i++) for (j = i + 1; j < n; j++) if (dist[i][j] != null) defined.push(dist[i][j]);
+  var fill = defined.length ? Math.max.apply(null, defined) : 1, d = {};
+  function key(x, y) { return x < y ? x + ',' + y : y + ',' + x; }
+  for (i = 0; i < n; i++) for (j = i + 1; j < n; j++) d[i + ',' + j] = dist[i][j] == null ? fill : dist[i][j];
+  var ids = [], size = {}, merges = [], nxt = n;
+  for (i = 0; i < n; i++) { ids.push(i); size[i] = 1; }
+  while (ids.length > 1) {
+    var best = null;
+    for (var ai = 0; ai < ids.length; ai++) for (var bi = ai + 1; bi < ids.length; bi++) {
+      var v = d[ids[ai] + ',' + ids[bi]];
+      if (best === null || v < best[0]) best = [v, ids[ai], ids[bi]];
+    }
+    var a = best[1], b = best[2];
+    ids.forEach(function (k) { if (k !== a && k !== b) d[key(k, nxt)] = (size[a] * d[key(a, k)] + size[b] * d[key(b, k)]) / (size[a] + size[b]); });
+    size[nxt] = size[a] + size[b];
+    ids = ids.filter(function (k) { return k !== a && k !== b; }); ids.push(nxt);
+    merges.push([a, b, best[0], size[nxt]]); nxt++;
+  }
+  var kids = {}; merges.forEach(function (m, k) { kids[n + k] = [m[0], m[1]]; });
+  var order = [], stack = [ids[0]];
+  while (stack.length) {
+    var node = stack.pop();
+    if (kids[node]) { stack.push(kids[node][1]); stack.push(kids[node][0]); } else order.push(node);
+  }
+  return {order: order, merges: merges};
+}
+/* axis 0 = rows, 1 = columns of a t-grid; returns {order (all items), nElig, tree} */
+function clusterAxis(grid, axis) {
+  var rows = grid.length, cols = rows ? grid[0].length : 0, vec = [], i, j;
+  if (axis === 0) { for (i = 0; i < rows; i++) { vec.push([]); for (j = 0; j < cols; j++) vec[i].push(grid[i][j] ? grid[i][j][0] : null); } }
+  else { for (j = 0; j < cols; j++) { vec.push([]); for (i = 0; i < rows; i++) vec[j].push(grid[i][j] ? grid[i][j][0] : null); } }
+  var need = axis === 0 ? 1 : 2, elig = [], rest = [];
+  vec.forEach(function (v, k) { var c = 0; v.forEach(function (x) { if (x != null) c++; }); (c >= need ? elig : rest).push(k); });
+  var sub = elig.map(function (p, a) { return elig.map(function (q, b) { return a === b ? null : rms(vec[p], vec[q], need); }); });
+  var tree = cluster(sub);
+  return {order: tree.order.map(function (p) { return elig[p]; }).concat(rest), nElig: elig.length, tree: tree};
+}
+function dendroSegments(tree) {
+  var n = tree.order.length;
+  if (n < 2) return [];
+  var pos = {}, height = {}, top = 0, segs = [];
+  tree.order.forEach(function (leaf, p) { pos[leaf] = p; height[leaf] = 0; });
+  tree.merges.forEach(function (m) { top = Math.max(top, m[2]); }); top = top || 1;
+  tree.merges.forEach(function (m, k) {
+    var node = n + k; pos[node] = (pos[m[0]] + pos[m[1]]) / 2; height[node] = m[2] / top;
+    segs.push([[pos[m[0]], height[m[0]]], [pos[m[0]], height[node]], [pos[m[1]], height[node]], [pos[m[1]], height[m[1]]]]);
+  });
+  return segs;
+}
+
+/* ---------------------------------------------------------------- state */
+function defaults() { return {mode: 'raw', rc: 1, cc: 1, ov: 0, zoom: 'natural', fam: [], cols: [], rows: [], trk: [], sort: '', sel: '', tab: 'layout'}; }
+function withIndex(data) { data.cols.forEach(function (c, i) { c.i = i; }); return data; }
+function inList(list, x) { return list.indexOf(x) >= 0; }
+function visibleCols(data, st) { return data.cols.filter(function (c) { return !inList(st.fam, c.fam) && !inList(st.cols, c.id); }); }
+function visibleRows(block, st) { var r = []; block.rows.forEach(function (row, i) { if (!inList(st.rows, row.id)) r.push(i); }); return r; }
+function fmtValue(col, v) { return v == null ? '' : Number(v).toFixed(col.digits); }
+function fmtShown(mode, col, s) {
+  if (mode === 'raw') return fmtValue(col, s);
+  if (mode === 'score') return Number(s).toFixed(0);
+  if (mode === 'rank') return Math.abs(s - Math.round(s)) < 1e-9 ? String(Math.round(s)) : Number(s).toFixed(1);
+  var z = Number(Number(s).toFixed(1));
+  return z === 0 ? '0.0' : (z > 0 ? '+' : '') + z.toFixed(1);
+}
+function reasonFor(data, b, i, j, mode) {
+  var cell = data.blocks[b].cells[i][j], col = data.cols[j];
+  if (cell[0] == null) return cell[3] || 'no value';
+  if (mode === 'score' && cell[1] == null) return col.src === 'leaderboard' ? 'a leaderboard metric has no scorecard bands, so it has no 0-100 score' : 'no bands are defined for this metric yet (status undefined), so it has no 0-100 score';
+  if (mode === 'z') return 'a z-score needs at least two tools with a value in this column';
+  return 'not available';
+}
+
+/* the arrangement of one block: row order, column order, grid, trees */
+function arrange(data, b, st) {
+  var block = data.blocks[b], rowIdx = visibleRows(block, st), cols = visibleCols(data, st);
+  var grid = matrixView(block, rowIdx, cols, st.mode), rowOrder = rowIdx.map(function (_, k) { return k; }), colOrder = cols.map(function (_, k) { return k; });
+  var rowTree = {order: [], merges: []}, colTree = {order: [], merges: []};
+  var sortCol = null, dir = 'desc';
+  if (st.sort) { var sp = st.sort.split(':'); dir = sp[1] === 'asc' ? 'asc' : 'desc'; cols.forEach(function (c, k) { if (c.id === sp[0]) sortCol = k; }); }
+  if (st.rc) { var r = clusterAxis(grid, 0); rowOrder = r.order; rowTree = r.tree; }
+  if (st.cc) { var c = clusterAxis(grid, 1); colOrder = c.order; colTree = c.tree; }
+  if (sortCol != null) {
+    var base = rowOrder.slice();
+    rowOrder = base.slice().sort(function (x, y) {
+      var tx = grid[x][sortCol] ? grid[x][sortCol][0] : null, ty = grid[y][sortCol] ? grid[y][sortCol][0] : null;
+      if (tx == null || ty == null) return (tx == null ? 1 : 0) - (ty == null ? 1 : 0) || base.indexOf(x) - base.indexOf(y);
+      return (dir === 'desc' ? ty - tx : tx - ty) || base.indexOf(x) - base.indexOf(y);
+    });
+    rowTree = {order: [], merges: []};
+  }
+  var xs = [], x = 0, prev = null;
+  colOrder.forEach(function (k) {
+    if (!st.cc && prev !== null && cols[k].fam !== prev) x += G.FAM_GAP;
+    xs[k] = x; x += G.CELL_W; prev = cols[k].fam;
+  });
+  return {block: block, rowIdx: rowIdx, cols: cols, grid: grid, rowOrder: rowOrder, colOrder: colOrder, rowTree: rowTree, colTree: colTree, xs: xs, gridW: x, sortCol: sortCol, dir: dir};
+}
+function interpX(A, p) { var lo = Math.floor(p), hi = Math.min(lo + 1, A.colOrder.length - 1), f = p - lo; var a = A.xs[A.colOrder[lo]] + G.CELL_W / 2, b = A.xs[A.colOrder[hi]] + G.CELL_W / 2; return a + (b - a) * f; }
+
+function cellLabel(data, b, i, j, mode, shown) {
+  var row = data.blocks[b].rows[i], col = data.cols[j], cell = data.blocks[b].cells[i][j];
+  if (shown == null) return row.label + ', ' + col.id + ' ' + col.name + ': not available (' + reasonFor(data, b, i, j, mode) + ')';
+  var s = row.label + ', ' + col.id + ' ' + col.name + ': ' + fmtValue(col, cell[0]) + (col.unit && col.src === 'scorecard' ? ' ' + col.unit : '');
+  if (cell[1] != null) s += ', score ' + cell[1].toFixed(0) + (cell[2] ? ' (' + BAND_LABEL[cell[2]] + ')' : '');
+  return s;
+}
+
+/* one block as a self-contained SVG string (attributes only) with data-i / data-j hooks for the UI */
+function renderBlock(data, b, st, uid, opts) {
+  opts = opts || {};
+  var A = arrange(data, b, st), block = A.block, n = A.rowOrder.length, nc = A.colOrder.length, cvd = !!opts.cvd, pal = data.notes.palette;
+  var xd = G.PAD + (st.rc && A.rowTree.merges.length ? G.ROW_DENDRO_W : 0), x0 = xd + G.ROW_LABEL_W, top = G.TITLE_H + (st.cc && A.colTree.merges.length ? G.COL_DENDRO_H : 0), y0 = top + G.STRIP_H;
+  var W = x0 + A.gridW + G.PAD, H = y0 + n * G.CELL_H + G.COL_LABEL_H + G.LEGEND_H, p = [], k, r, c;
+  if (!n || !nc) {
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 60" width="520" height="60" font-family="Arial,Helvetica,sans-serif"><text x="8" y="30" font-size="13" fill="#627067">Nothing to draw for ' + esc(block.track) + ': every row or column is hidden.</text></svg>';
+  }
+  p.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="grid" aria-label="Heatmap of ' + n + ' tools by ' + nc + ' metrics, track ' + esc(block.track) + '" font-family="Arial,Helvetica,sans-serif">');
+  p.push('<defs><pattern id="' + uid + '-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#f4f4f0"/><line x1="0" y1="0" x2="0" y2="6" stroke="#8a8a84" stroke-width="1.6"/></pattern><linearGradient id="' + uid + '-grad" x1="0" x2="1" y1="0" y2="0">');
+  for (k = 0; k <= 10; k++) p.push('<stop offset="' + (k / 10) + '" stop-color="' + colourFor(pal, st.mode, k / 10, cvd) + '"/>');
+  p.push('</linearGradient></defs>');
+  p.push('<text x="' + G.PAD + '" y="14" font-size="12" font-weight="bold" fill="#17231d">Analysis track: ' + esc(block.track) + '</text>');
+  if (st.cc && A.colTree.merges.length) dendroSegments(A.colTree).forEach(function (seg) {
+    p.push('<polyline points="' + seg.map(function (q) { return num(x0 + interpX(A, q[0])) + ',' + num(top - 2 - q[1] * (G.COL_DENDRO_H - 6)); }).join(' ') + '" fill="none" stroke="#6c7a72" stroke-width="1"/>');
+  });
+  if (st.rc && A.rowTree.merges.length) dendroSegments(A.rowTree).forEach(function (seg) {
+    p.push('<polyline points="' + seg.map(function (q) { return num(xd - 2 - q[1] * (G.ROW_DENDRO_W - 6)) + ',' + num(y0 + q[0] * G.CELL_H + G.CELL_H / 2); }).join(' ') + '" fill="none" stroke="#6c7a72" stroke-width="1"/>');
+  });
+  var sel = st.sel ? st.sel.split('.') : null;
+  for (k = 0; k < nc; k++) {
+    var col = A.cols[A.colOrder[k]], x = x0 + A.xs[A.colOrder[k]], isSel = sel && sel[0] === 'c' && sel[2] === col.id;
+    var mark = (col.dir === 'lower' ? ' ▼' : '') + (col.unval ? ' †' : '') + (A.sortCol === A.colOrder[k] ? (A.dir === 'desc' ? ' ↓' : ' ↑') : '');
+    p.push('<g data-colhead="' + col.i + '" data-b="' + b + '" style="cursor:pointer"><title>' + esc(col.id + ' ' + col.name + ' (' + (col.dir === 'lower' ? 'lower is better' : 'higher is better') + '). Click to select.') + '</title>' +
+      '<rect x="' + x + '" y="' + top + '" width="' + G.CELL_W + '" height="' + (G.STRIP_H - 2) + '" fill="' + TINT[col.fam] + '" stroke="' + (isSel ? '#0072B2' : '#fff') + '" stroke-width="' + (isSel ? 2 : 1) + '"/>' +
+      '<text x="' + (x + G.CELL_W / 2) + '" y="' + (top + G.STRIP_H - 5) + '" font-size="10" text-anchor="middle" fill="#17231d">' + esc(col.fam) + '</text>' +
+      '<text transform="translate(' + (x + G.CELL_W / 2 + 4) + ',' + (y0 + n * G.CELL_H + 8) + ') rotate(90)" font-size="11" fill="#17231d"' + (isSel ? ' font-weight="bold"' : '') + '>' + esc((col.id === col.short ? col.id : col.id + ' ' + col.short) + mark) + '</text></g>');
+  }
+  for (r = 0; r < n; r++) {
+    var i = A.rowIdx[A.rowOrder[r]], y = y0 + r * G.CELL_H, row = block.rows[i], rsel = sel && sel[0] === 'r' && +sel[1] === b && +sel[2] === i;
+    p.push('<text data-rowhead="' + i + '" data-b="' + b + '" x="' + (x0 - 8) + '" text-anchor="end" y="' + (y + G.CELL_H / 2 + 4) + '" font-size="12" fill="#17231d" style="cursor:pointer"' + (rsel ? ' font-weight="bold" text-decoration="underline"' : '') + '><title>' + esc(row.label + ' (click to select)') + '</title>' + esc(row.label) + '</text>');
+    for (k = 0; k < nc; k++) {
+      var cj = A.cols[A.colOrder[k]], j = cj.i, cx = x0 + A.xs[A.colOrder[k]], cellv = A.grid[A.rowOrder[r]][A.colOrder[k]], t = cellv ? cellv[0] : null;
+      var first = (r === 0 && k === 0);
+      p.push('<g data-cell="1" data-b="' + b + '" data-i="' + i + '" data-j="' + j + '" data-r="' + r + '" data-c="' + k + '" role="gridcell" tabindex="' + (first ? 0 : -1) + '" aria-label="' + esc(cellLabel(data, b, i, j, st.mode, cellv ? cellv[1] : null)) + '" style="cursor:pointer;outline:none">');
+      if (t == null) {
+        p.push('<rect x="' + cx + '" y="' + y + '" width="' + G.CELL_W + '" height="' + G.CELL_H + '" fill="url(#' + uid + '-hatch)" stroke="#fff"/><text x="' + (cx + G.CELL_W / 2) + '" y="' + (y + G.CELL_H / 2 + 3) + '" font-size="8" text-anchor="middle" fill="#6b6b66">n/a</text>');
+      } else {
+        var fill = colourFor(pal, st.mode, t, cvd);
+        p.push('<rect x="' + cx + '" y="' + y + '" width="' + G.CELL_W + '" height="' + G.CELL_H + '" fill="' + fill + '" stroke="#fff"/><text x="' + (cx + G.CELL_W / 2) + '" y="' + (y + G.CELL_H / 2 + 4) + '" font-size="10.5" text-anchor="middle" fill="' + textOn(fill) + '">' + esc(fmtShown(st.mode, cj, cellv[1])) + '</text>');
+        var band = block.cells[i][j][2];
+        if (st.mode === 'score' && band) p.push('<text x="' + (cx + 3) + '" y="' + (y + 10) + '" font-size="8" fill="' + textOn(fill) + '">' + BAND_GLYPH[band] + '</text>');
+        if (st.ov && block.sig && block.sig[cj.id]) {
+          var sg = block.sig[cj.id];
+          if (inList(sg.best, i)) p.push('<rect x="' + (cx + 2) + '" y="' + (y + 2) + '" width="' + (G.CELL_W - 4) + '" height="' + (G.CELL_H - 4) + '" fill="none" stroke="#fff" stroke-width="3.4"/><rect x="' + (cx + 2) + '" y="' + (y + 2) + '" width="' + (G.CELL_W - 4) + '" height="' + (G.CELL_H - 4) + '" fill="none" stroke="#000" stroke-width="1.6"/>');
+          if (inList(sg.tied, i)) p.push('<circle cx="' + (cx + G.CELL_W - 8) + '" cy="' + (y + 8) + '" r="3.6" fill="#fff" stroke="#000" stroke-width="1.4"/>');
+        }
+      }
+      if (sel && sel[0] === 'x' && +sel[1] === b && +sel[2] === i && +sel[3] === j) p.push('<rect x="' + (cx + 1) + '" y="' + (y + 1) + '" width="' + (G.CELL_W - 2) + '" height="' + (G.CELL_H - 2) + '" fill="none" stroke="#0072B2" stroke-width="3"/>');
+      p.push('</g>');
+    }
+  }
+  var ly = y0 + n * G.CELL_H + G.COL_LABEL_H + 8;
+  p.push('<rect x="' + x0 + '" y="' + ly + '" width="140" height="10" fill="url(#' + uid + '-grad)" stroke="#8a8a84"/><text x="' + x0 + '" y="' + (ly + 23) + '" font-size="10" fill="#17231d">worse</text><text x="' + (x0 + 140) + '" y="' + (ly + 23) + '" font-size="10" text-anchor="end" fill="#17231d">better</text>');
+  p.push('<rect x="' + (x0 + 170) + '" y="' + ly + '" width="14" height="10" fill="url(#' + uid + '-hatch)" stroke="#8a8a84"/><text x="' + (x0 + 190) + '" y="' + (ly + 9) + '" font-size="10" fill="#17231d">not available</text>');
+  p.push('<text x="' + (x0 + 280) + '" y="' + (ly + 9) + '" font-size="10" fill="#17231d">▼ lower is better (colour flipped)   † alignment-derived, unvalidated   family letters A-E scorecard, L leaderboard</text>');
+  p.push('</svg>');
+  return p.join('');
+}
+
+/* ---------------------------------------------------------------- export and hash */
+function csvCell(s) {
+  s = s == null ? '' : String(s);
+  return (s.indexOf('\u0022') >= 0 || s.indexOf(',') >= 0 || s.indexOf('\n') >= 0) ? '\u0022' + s.split('\u0022').join('\u0022\u0022') + '\u0022' : s;
+}
+function csvText(data, st) {
+  var head = ['track', 'tool', 'metric_id', 'metric', 'family', 'direction', 'unit', 'status', 'raw_value', 'score_0_100', 'band', 'rank_in_track', 'z_score', 'shown_in_mode_' + st.mode, 'reason_if_not_available'];
+  var out = [head.join(',')];
+  data.blocks.forEach(function (block, b) {
+    var rowIdx = visibleRows(block, st), cols = visibleCols(data, st);
+    var views = {};
+    ['raw', 'rank', 'z', st.mode].forEach(function (m) { if (!views[m]) views[m] = matrixView(block, rowIdx, cols, m); });
+    rowIdx.forEach(function (i, r) {
+      cols.forEach(function (col, c) {
+        var cell = block.cells[i][col.i], rk = views.rank[r][c], z = views.z[r][c], sh = views[st.mode][r][c];
+        out.push([block.track, block.rows[i].tool, col.id, col.name, col.fam, col.dir, col.unit, col.status, cell[0] == null ? '' : cell[0], cell[1] == null ? '' : cell[1], cell[2] || '',
+          rk ? rk[1] : '', z ? Number(z[1].toFixed(4)) : '', sh ? sh[1] : '', sh ? '' : reasonFor(data, b, i, col.i, st.mode)].map(csvCell).join(','));
+      });
+    });
+  });
+  return out.join('\n') + '\n';
+}
+var KEYS = ['mode', 'rc', 'cc', 'ov', 'zoom', 'fam', 'cols', 'rows', 'trk', 'sort', 'sel', 'tab'];
+function encodeHash(st) {
+  var d = defaults(), parts = [];
+  KEYS.forEach(function (k) {
+    var v = st[k], dv = d[k], s = Array.isArray(v) ? v.join(',') : String(v), ds = Array.isArray(dv) ? dv.join(',') : String(dv);
+    if (s !== ds) parts.push('hm' + k + '=' + encodeURIComponent(s));
+  });
+  return parts.length ? '#fig-heatmap?' + parts.join('&') : '#fig-heatmap';
+}
+function decodeHash(hash) {
+  var st = defaults(), q = String(hash || '').split('?')[1];
+  if (!q) return st;
+  q.split('&').forEach(function (kv) {
+    var eq = kv.indexOf('='), k = kv.slice(0, eq), v;
+    try { v = decodeURIComponent(kv.slice(eq + 1)); } catch (e) { return; }
+    if (k.indexOf('hm') !== 0) return;
+    k = k.slice(2);
+    if (KEYS.indexOf(k) < 0) return;
+    if (Array.isArray(st[k])) st[k] = v ? v.split(',') : [];
+    else if (k === 'rc' || k === 'cc' || k === 'ov') st[k] = v === '1' ? 1 : 0;
+    else if (k === 'mode') st[k] = MODES.indexOf(v) >= 0 ? v : 'raw';
+    else if (k === 'zoom') st[k] = v === 'fit' ? 'fit' : 'natural';
+    else if (k === 'tab') st[k] = ['layout', 'filters', 'data', 'detail', 'export'].indexOf(v) >= 0 ? v : 'layout';
+    else st[k] = v;
+  });
+  return st;
+}
+
+var api = {G: G, esc: esc, num: num, ramp: ramp, colourFor: colourFor, textOn: textOn, avgRanks: avgRanks, columnView: columnView, matrixView: matrixView, rms: rms,
+  cluster: cluster, clusterAxis: clusterAxis, dendroSegments: dendroSegments, defaults: defaults, withIndex: withIndex, visibleCols: visibleCols, visibleRows: visibleRows,
+  fmtValue: fmtValue, fmtShown: fmtShown, reasonFor: reasonFor, arrange: arrange, cellLabel: cellLabel, renderBlock: renderBlock, csvText: csvText,
+  encodeHash: encodeHash, decodeHash: decodeHash, MODES: MODES, MODE_LABEL: MODE_LABEL, BAND_GLYPH: BAND_GLYPH, BAND_LABEL: BAND_LABEL, TINT: TINT};
+root.PBHM = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

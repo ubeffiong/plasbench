@@ -1,0 +1,427 @@
+<script>
+/* PlasBench accuracy / completeness / structural-fidelity landscape: pure functions (scene builder, hash state, CSV rows), testable in node.
+   The scene builder is mirrored in python/report_fig_landscape.py (static no-JS/print fallback); test/test_report_fig_landscape.py
+   checks both agree. The 3D view is an illustrative projection of metrics: the axes are metrics, not a physical structure. */
+(function (root) {
+'use strict';
+var S = 6, STACK = 0.02;
+var FIELDS = ['sample', 'tool', 'track', 'org', 'identity', 'precision', 'recall', 'f1', 'plasmid_recall', 'cprr', 'ngoc', 'collinear', 'events', 'aligned_bp', 'runtime', 'n_truth'];
+var SHAPE = {short_read: 'circle', long_read: 'triangle', hybrid: 'square'};
+var TOOL_COLOURS = ['#0072B2', '#E69F00', '#009E73', '#D55E00', '#CC79A7', '#56B4E9', '#555555'];
+var RAMP = ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'];
+var XOPTS = [['identity', 'Alignment identity (precision where absent)'], ['precision', 'Precision']];
+var YOPTS = [['recall', 'Reference-base recall'], ['plasmid_recall', 'Per-plasmid recall'], ['cprr', 'CPRR']];
+var ZOPTS = [['ngoc', 'NGOC (alignment-derived, unvalidated)'], ['collinear', 'Collinear fraction (alignment-derived, unvalidated)'],
+  ['events', '1/(1+structural events per Mb) (alignment-derived, unvalidated)']];
+var AXN = {identity: 'accuracy (identity, or precision)', precision: 'precision', recall: 'reference-base recall', plasmid_recall: 'per-plasmid recall', cprr: 'CPRR',
+  ngoc: 'NGOC', collinear: 'collinear fraction', events: 'structural events per Mb'};
+var AXT = {identity: 'Accuracy (identity)', precision: 'Accuracy (precision)', recall: 'Completeness (recall)', plasmid_recall: 'Completeness (plasmid recall)',
+  cprr: 'Completeness (CPRR)', ngoc: 'Structure: NGOC*', collinear: 'Structure: collinear*', events: 'Structure: 1/(1+events/Mb)*'};
+var UNVAL = {ngoc: 1, collinear: 1, events: 1};
+var SIZEOPTS = [['none', 'No size encoding'], ['runtime', 'Runtime (seconds)'], ['n_truth', 'Truth plasmids']];
+var COLOPTS = [['tool', 'Tool'], ['track', 'Track'], ['species', 'Species'], ['runtime', 'Runtime (seconds)'], ['n_truth', 'Truth plasmids'], ['f1', 'Reference-base F1']];
+var CONT = {runtime: 'runtime', n_truth: 'n_truth', f1: 'f1'};
+var CONTN = {runtime: 'Runtime (s)', n_truth: 'Truth plasmids', f1: 'F1'};
+
+var ESC_RE = new RegExp('[&<>\u0022\u0027]', 'g'), ESC_MAP = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\u0022': '&quot;', '\u0027': '&#39;'};
+function esc(s) { return String(s == null ? '' : s).replace(ESC_RE, function (c) { return ESC_MAP[c]; }); }
+function fin(v) { return typeof v === 'number' && isFinite(v); }
+function f4(v) { return fin(v) ? Number(v).toFixed(4) : 'not available'; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function defaults() {
+  return {mode: 'runs', x: 'identity', y: 'recall', z: 'ngoc', scale: 'linear', range: 'full', cx: [0, 1], cy: [0, 1], cz: [0, 1], fx: 0, fy: 0, fz: 0,
+    size: 'none', colour: 'tool', shape: 1, ps: 1, op: 1, labels: 0, pareto_only: 0, grid: 1, floor: 1, axlab: 1};
+}
+function defaultHidden() { return {'O:cent': true}; }
+
+function rowsOf(data) {
+  var f = data.f || FIELDS;
+  return data.rows.map(function (a, i) {
+    var o = {i: i};
+    f.forEach(function (k, j) { o[k] = a[j] === undefined ? null : a[j]; });
+    if (!o.org) o.org = 'unknown';
+    return o;
+  });
+}
+function uniq(rows, key) {
+  var seen = {}, out = [];
+  rows.forEach(function (r) { if (!seen[r[key]]) { seen[r[key]] = 1; out.push(r[key]); } });
+  return out.sort();
+}
+function metric(r, key) {
+  var v;
+  if (key === 'identity') {
+    if (fin(r.identity)) return {v: r.identity, src: 'identity'};
+    if (fin(r.precision)) return {v: r.precision, src: 'precision'};
+    return null;
+  }
+  if (key === 'events') {
+    if (fin(r.events) && fin(r.aligned_bp) && r.aligned_bp > 0) return {v: 1 / (1 + r.events / (r.aligned_bp / 1e6)), src: 'events'};
+    return null;
+  }
+  v = r[key];
+  return fin(v) ? {v: v, src: key} : null;
+}
+function reason(data, key) {
+  var a = data.absent && data.absent[key];
+  return AXN[key] + ' not available' + (a ? ' (' + a + ' not found)' : '');
+}
+function dominates(a, b) {
+  return a.x >= b.x && a.y >= b.y && a.z >= b.z && (a.x > b.x || a.y > b.y || a.z > b.z);
+}
+function mean(a) { var s = 0; a.forEach(function (v) { s += v; }); return a.length ? s / a.length : null; }
+function sd(a) {
+  if (a.length < 2) return null;
+  var m = mean(a), s = 0;
+  a.forEach(function (v) { s += (v - m) * (v - m); });
+  return Math.sqrt(s / (a.length - 1));
+}
+function modeOf(list) {
+  var cnt = {}, best = null, bc = 0;
+  list.forEach(function (v) { cnt[v] = (cnt[v] || 0) + 1; });
+  list.forEach(function (v) { if (cnt[v] > bc) { bc = cnt[v]; best = v; } });
+  return best;
+}
+function rampColour(t) {
+  t = clamp(t, 0, 1);
+  var n = RAMP.length - 1, i = Math.min(n - 1, Math.floor(t * n)), u = t * n - i;
+  function c(h) { var v = parseInt(h.slice(1), 16); return [v >> 16 & 255, v >> 8 & 255, v & 255]; }
+  var a = c(RAMP[i]), b = c(RAMP[i + 1]);
+  return '#' + [0, 1, 2].map(function (k) { var y = Math.floor(a[k] + (b[k] - a[k]) * u + 0.5); return (y < 16 ? '0' : '') + y.toString(16); }).join('');
+}
+function niceTicks(lo, hi) {
+  var span = hi - lo, steps = [0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001, 0.00005, 0.00002, 0.00001], step = steps[steps.length - 1], i;
+  for (i = 0; i < steps.length; i++) { if (span / steps[i] >= 4 - 1e-9) { step = steps[i]; break; } }
+  var d = step >= 1 ? 0 : Math.ceil(-Math.log10(step) - 1e-9), k0 = Math.ceil(lo / step - 1e-9), k1 = Math.floor(hi / step + 1e-9), out = [];
+  for (var k = k0; k <= k1; k++) out.push(k * step);
+  return {ticks: out, d: d};
+}
+function axisRange(vs, mode, custom) {
+  var lo, hi;
+  if (mode === 'custom') {
+    lo = custom && fin(custom[0]) ? custom[0] : 0; hi = custom && fin(custom[1]) ? custom[1] : 1;
+    return hi > lo ? [lo, hi] : [0, 1];
+  }
+  if (mode === 'zoom' && vs.length) {
+    var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs), pad = (mx - mn) * 0.08;
+    lo = Math.max(0, mn - pad); hi = Math.min(1, mx + pad);
+    if (hi - lo < 1e-9) { lo = Math.max(0, hi - 0.1); if (hi - lo < 1e-9) hi = lo + 0.1; }
+    return [lo, hi];
+  }
+  return [0, 1];
+}
+function rankPos(vs) {
+  var idx = vs.map(function (v, i) { return i; }).sort(function (a, b) { return vs[a] - vs[b] || a - b; }), out = new Array(vs.length), n = vs.length, i = 0;
+  while (i < n) {
+    var j = i;
+    while (j + 1 < n && vs[idx[j + 1]] === vs[idx[i]]) j++;
+    var avg = (i + j) / 2;
+    for (var k = i; k <= j; k++) out[idx[k]] = n > 1 ? avg / (n - 1) : 0.5;
+    i = j + 1;
+  }
+  return out;
+}
+function sizeOf(r, key) { return key === 'runtime' ? r.runtime : key === 'n_truth' ? r.n_truth : null; }
+
+function build(data, vals, hidden) {
+  vals = Object.assign(defaults(), vals || {}); hidden = hidden || {};
+  var rows = rowsOf(data), tools = uniq(rows, 'tool'), tracks = uniq(rows, 'track'), species = uniq(rows, 'org');
+  var visible = rows.filter(function (r) { return !hidden['T:' + r.tool] && !hidden['K:' + r.track] && !hidden['S:' + r.org]; });
+  var plotted = [], notPlotted = [];
+  visible.forEach(function (r) {
+    var m = [metric(r, vals.x), metric(r, vals.y), metric(r, vals.z)], why = [], k = [vals.x, vals.y, vals.z];
+    for (var a = 0; a < 3; a++) if (!m[a]) why.push(reason(data, k[a]));
+    if (why.length) notPlotted.push({r: r, why: why.join('; ')});
+    else plotted.push({r: r, x: m[0].v, y: m[1].v, z: m[2].v, xs: m[0].src});
+  });
+  var pts = [];
+  if (vals.mode === 'tools') {
+    tools.forEach(function (t, ti) {
+      var g = plotted.filter(function (p) { return p.r.tool === t; });
+      if (!g.length) { if (!hidden['T:' + t]) notPlotted.push({r: null, tool: t, why: 'no run of this tool has all three metrics'}); return; }
+      var xs = g.map(function (p) { return p.x; }), ys = g.map(function (p) { return p.y; }), zs = g.map(function (p) { return p.z; });
+      var sz = g.map(function (p) { return sizeOf(p.r, vals.size); }).filter(fin), cv = g.map(function (p) { return CONT[vals.colour] ? p.r[CONT[vals.colour]] : null; }).filter(fin);
+      pts.push({id: 'c' + ti, grp: 'c' + ti, kind: 'tool', tool: t, track: modeOf(g.map(function (p) { return p.r.track; })), sp: modeOf(g.map(function (p) { return p.r.org; })),
+        x: mean(xs), y: mean(ys), z: mean(zs), xs: g.some(function (p) { return p.xs === 'precision'; }) ? 'precision' : 'identity', n: g.length,
+        sd: g.length > 1 ? {x: sd(xs), y: sd(ys), z: sd(zs)} : null, sizeV: mean(sz), colV: mean(cv), runs: g});
+    });
+  } else {
+    plotted.forEach(function (p) {
+      var cv = CONT[vals.colour] ? p.r[CONT[vals.colour]] : null;
+      pts.push({id: 'r' + p.r.i, grp: 'r' + p.r.i, kind: 'run', r: p.r, tool: p.r.tool, track: p.r.track, sp: p.r.org, x: p.x, y: p.y, z: p.z, xs: p.xs, n: 1, sd: null,
+        sizeV: fin(sizeOf(p.r, vals.size)) ? sizeOf(p.r, vals.size) : null, colV: fin(cv) ? cv : null});
+    });
+  }
+  pts.forEach(function (p) {
+    p.front = true;
+    for (var j = 0; j < pts.length; j++) if (pts[j] !== p && dominates(pts[j], p)) { p.front = false; break; }
+  });
+  var nFront = pts.filter(function (p) { return p.front; }).length;
+  if (vals.pareto_only) pts = pts.filter(function (p) { return p.front; });
+
+  var keys = ['x', 'y', 'z'], cust = {x: vals.cx, y: vals.cy, z: vals.cz}, flip = {x: vals.fx, y: vals.fy, z: vals.fz}, ax = {}, clamped = 0;
+  keys.forEach(function (a) {
+    var vs = pts.map(function (p) { return p[a]; }), rk = vals.scale === 'rank';
+    var rg = rk ? [0, 1] : axisRange(vs, vals.range, cust[a]), pos = [];
+    if (rk) pos = rankPos(vs);
+    else vs.forEach(function (v) { if (v < rg[0] - 1e-12 || v > rg[1] + 1e-12) clamped++; pos.push(clamp((v - rg[0]) / (rg[1] - rg[0]), 0, 1)); });
+    if (flip[a]) pos = pos.map(function (u) { return 1 - u; });
+    ax[a] = {rg: rg, pos: pos, rank: rk, flip: !!flip[a], key: vals[a]};
+  });
+  function posOf(a, v) {
+    var g = ax[a]; if (g.rank) return null;
+    var u = clamp((v - g.rg[0]) / (g.rg[1] - g.rg[0]), 0, 1);
+    return g.flip ? 1 - u : u;
+  }
+  function W(px, py, pz) { return [S * px, S * pz, -S * py]; }
+
+  var scene = {prims: [], legend: [], tips: {}, title: 'Accuracy, completeness and structural fidelity: 3D scatter (illustrative projection of metrics)',
+    desc: 'Each point is one tool run (or a tool mean). Horizontal axis accuracy, depth axis completeness, vertical axis structural fidelity. The axes are metrics, not a physical structure.'};
+  var prims = scene.prims;
+  // frame
+  if (vals.floor) {
+    prims.push({k: 'poly', role: 'floor', layer: 0, cls: 'v3-floor', pts: [[0, 0, 0], [S, 0, 0], [S, 0, -S], [0, 0, -S]]});
+    prims.push({k: 'poly', role: 'wall', layer: 0, cls: 'ls-wall', pts: [[0, 0, -S], [S, 0, -S], [S, S, -S], [0, S, -S]]});
+    prims.push({k: 'poly', role: 'wall', layer: 0, cls: 'ls-wall', pts: [[0, 0, 0], [0, 0, -S], [0, S, -S], [0, S, 0]]});
+  }
+  var tk = {};
+  keys.forEach(function (a) {
+    var g = ax[a], list = [];
+    if (g.rank) [0, 0.25, 0.5, 0.75, 1].forEach(function (f) { list.push({u: g.flip ? 1 - f : f, t: Math.round(f * 100) + '%'}); });
+    else { var nt = niceTicks(g.rg[0], g.rg[1]); nt.ticks.forEach(function (v) { list.push({u: posOf(a, v), t: v.toFixed(nt.d)}); }); }
+    tk[a] = list;
+  });
+  if (vals.grid) {
+    tk.x.forEach(function (t) {
+      prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[S * t.u, 0, 0], [S * t.u, 0, -S]]});
+      prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[S * t.u, 0, -S], [S * t.u, S, -S]]});
+    });
+    tk.y.forEach(function (t) {
+      prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[0, 0, -S * t.u], [S, 0, -S * t.u]]});
+      prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[0, 0, -S * t.u], [0, S, -S * t.u]]});
+    });
+    tk.z.forEach(function (t) {
+      prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[0, S * t.u, -S], [S, S * t.u, -S]]});
+      prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[0, S * t.u, 0], [0, S * t.u, -S]]});
+    });
+  }
+  prims.push({k: 'line', role: 'axis', layer: 0, cls: 'v3-axis', pts: [[0, 0, 0], [S, 0, 0]]});
+  prims.push({k: 'line', role: 'axis', layer: 0, cls: 'v3-axis', pts: [[S, 0, 0], [S, 0, -S]]});
+  prims.push({k: 'line', role: 'axis', layer: 0, cls: 'v3-axis', pts: [[0, 0, 0], [0, S, 0]]});
+  if (vals.axlab) {
+    tk.x.forEach(function (t) { prims.push({k: 'text', role: 'xtick', layer: 2, cls: 'v3-t-m', p: [S * t.u, 0, 0], t: t.t, dy: 15}); });
+    tk.y.forEach(function (t) { prims.push({k: 'text', role: 'ytick', layer: 2, cls: 'v3-t-m', p: [S, 0, -S * t.u], t: t.t, anchor: 'start', dx: 8, dy: 4}); });
+    tk.z.forEach(function (t) { prims.push({k: 'text', role: 'ztick', layer: 2, cls: 'v3-t-m', p: [0, S * t.u, 0], t: t.t, anchor: 'end', dx: -7, dy: 4}); });
+    var sfx = function (a) { return (ax[a].rank ? ' (rank)' : '') + (ax[a].flip ? ' (flipped)' : ''); };
+    prims.push({k: 'text', role: 'xtitle', layer: 2, cls: 'v3-t-b', p: [S / 2, 0, 0], t: AXT[vals.x] + sfx('x'), dy: 42});
+    prims.push({k: 'text', role: 'ytitle', layer: 2, cls: 'v3-t-b', p: [S, 0, -S / 2], t: AXT[vals.y] + sfx('y'), anchor: 'start', dx: 40, dy: 4});
+    prims.push({k: 'text', role: 'ztitle', layer: 2, cls: 'v3-t-b', p: [0, S, 0], t: AXT[vals.z] + sfx('z'), anchor: 'start', dx: -20, dy: -14});
+  }
+  // stacking
+  var groups = [], gmap = {};
+  pts.forEach(function (p, i) {
+    p.w = W(ax.x.pos[i], ax.y.pos[i], ax.z.pos[i]);
+    var key = Math.floor(p.w[0] / STACK + 0.5) + '|' + Math.floor(p.w[1] / STACK + 0.5) + '|' + Math.floor(p.w[2] / STACK + 0.5);
+    if (!gmap[key]) { gmap[key] = {key: key, w: p.w, members: []}; groups.push(gmap[key]); }
+    gmap[key].members.push(p);
+    p.group = gmap[key];
+  });
+  // size and colour
+  var szv = pts.map(function (p) { return p.sizeV; }).filter(fin), cvv = pts.map(function (p) { return p.colV; }).filter(fin);
+  var szr = szv.length ? [Math.min.apply(null, szv), Math.max.apply(null, szv)] : null, cvr = cvv.length ? [Math.min.apply(null, cvv), Math.max.apply(null, cvv)] : null;
+  var catKey = vals.colour === 'tool' ? 'tool' : vals.colour === 'track' ? 'track' : vals.colour === 'species' ? 'sp' : null;
+  var catList = vals.colour === 'tool' ? tools : vals.colour === 'track' ? tracks : species;
+  function colourOf(p) {
+    if (catKey) { var ci = catList.indexOf(p[catKey]); return TOOL_COLOURS[(ci < 0 ? 0 : ci) % TOOL_COLOURS.length]; }
+    if (!fin(p.colV)) return '#9a9a9a';
+    return rampColour(cvr[1] > cvr[0] ? (p.colV - cvr[0]) / (cvr[1] - cvr[0]) : 0.5);
+  }
+  function radiusOf(p) {
+    var base = 5.5;
+    if (vals.size !== 'none' && fin(p.sizeV) && szr) base = szr[1] > szr[0] ? 4.5 + 5.5 * (p.sizeV - szr[0]) / (szr[1] - szr[0]) : 5.5;
+    return base * vals.ps;
+  }
+  function shapeOf(p) { return vals.shape ? (SHAPE[p.track] || 'diamond') : 'circle'; }
+  // sd whiskers need the mean positions
+  var cents = [];
+  if (vals.mode === 'tools') cents = pts.slice();
+  else if (!hidden['O:cent']) {
+    tools.forEach(function (t, ti) {
+      var g = pts.filter(function (p) { return p.tool === t; });
+      if (!g.length) return;
+      var xs = g.map(function (p) { return p.x; }), ys = g.map(function (p) { return p.y; }), zs = g.map(function (p) { return p.z; });
+      var gi = g.map(function (p) { return pts.indexOf(p); });
+      function mp(a, arr) { var s = 0; gi.forEach(function (j) { s += ax[a].pos[j]; }); return s / gi.length; }
+      cents.push({id: 'c' + ti, grp: 'c' + ti, kind: 'cent', tool: t, track: modeOf(g.map(function (p) { return p.track; })), n: g.length,
+        x: mean(xs), y: mean(ys), z: mean(zs), pos: [mp('x'), mp('y'), mp('z')], sd: g.length > 1 ? {x: sd(xs), y: sd(ys), z: sd(zs)} : null});
+    });
+  }
+  // drop lines and floor projection
+  if (!hidden['O:drop']) groups.forEach(function (g) { prims.push({k: 'line', role: 'drop', layer: 1, cls: 'v3-conn', pts: [[g.w[0], g.w[1], g.w[2]], [g.w[0], 0, g.w[2]]]}); });
+  if (!hidden['O:floor']) groups.forEach(function (g) { prims.push({k: 'mark', role: 'shadow', shape: 'circle', r: 2.6, fill: '#8c8c8c', stroke: '#ffffff', sw: 0.8, p: [g.w[0], 0, g.w[2]], bias: -0.01}); });
+  // whiskers
+  if (!hidden['O:sd']) {
+    cents.forEach(function (c) {
+      if (!c.sd) return;
+      var cpos = c.pos || (function () { var i = pts.indexOf(c); return [ax.x.pos[i], ax.y.pos[i], ax.z.pos[i]]; })(), col = vals.colour === 'tool' ? colourOf(c) : '#17231d';
+      keys.forEach(function (a, ai) {
+        var g = ax[a], d = c.sd[a] / (g.rg[1] - g.rg[0]);
+        if (g.rank || !fin(d)) return;
+        var lo = clamp(cpos[ai] - d, 0, 1), hi = clamp(cpos[ai] + d, 0, 1), p0 = cpos.slice(), p1 = cpos.slice();
+        p0[ai] = lo; p1[ai] = hi;
+        prims.push({k: 'line', role: 'sd', layer: 1, cls: 'ls-sd', pts: [W(p0[0], p0[1], p0[2]), W(p1[0], p1[1], p1[2])], stroke: col, w: 2.4, op: 0.9, cap: true});
+      });
+    });
+  }
+  // points
+  var nStack = 0;
+  groups.forEach(function (g) {
+    var ms = g.members.slice().sort(function (a, b) { return radiusOf(b) - radiusOf(a) || 0; });
+    if (ms.length > 1) nStack++;
+    ms.forEach(function (p, i) {
+      var r = Math.max(2.6, radiusOf(p) - 2.2 * i);
+      if (!hidden['O:pareto'] && p.front && pts.length > 0 && nFront < pts.length) prims.push({k: 'mark', role: 'pareto', shape: 'ring', r: r + 5, fill: '#17231d', bg: 'none', p: g.w, bias: -0.02});
+      if (p.xs === 'precision') prims.push({k: 'mark', role: 'fallback', shape: 'ring', r: r + 2.5, fill: '#777777', bg: 'none', p: g.w, bias: -0.01});
+      prims.push({k: 'mark', role: 'pt', cls: 'ls-pt', id: p.id, grp: p.grp, focus: true, label: p.tool + (p.kind === 'run' ? ' ' + p.r.sample : ' mean'),
+        p: g.w, bias: 0.02 + 0.001 * i, shape: shapeOf(p), r: r, fill: colourOf(p), stroke: '#ffffff', sw: 1.2});
+    });
+    if (ms.length > 1) prims.push({k: 'text', role: 'badge', layer: 2, cls: 'v3-t-b ls-badge', size: 10, p: g.w, t: '\u00d7' + ms.length, anchor: 'start', dx: 9, dy: -9});
+    if (vals.labels) prims.push({k: 'text', role: 'label', layer: 2, cls: 'v3-t-m', size: 10, p: g.w, t: ms[0].tool, anchor: 'start', dx: 9, dy: 14});
+    g.members.forEach(function (p) { p.stack = g.members; });
+  });
+  // centroids (runs mode)
+  if (vals.mode !== 'tools') cents.forEach(function (c) {
+    var w = W(c.pos[0], c.pos[1], c.pos[2]);
+    prims.push({k: 'mark', role: 'centroid', cls: 'ls-pt', id: c.id, grp: c.grp, focus: true, label: c.tool + ' centroid', p: w, bias: 0.05, shape: 'cross', r: 7,
+      fill: vals.colour === 'tool' ? colourOf(c) : '#17231d', stroke: '#ffffff'});
+    prims.push({k: 'text', role: 'clabel', layer: 2, cls: 'v3-t-b', size: 10, p: w, t: c.tool, anchor: 'start', dx: 10, dy: 3});
+  });
+  // ideal corner
+  var ideal = false;
+  if (!hidden['O:ideal']) {
+    var iu = [posOf('x', 1), posOf('y', 1), posOf('z', 1)];
+    if (iu[0] != null && iu[1] != null && iu[2] != null && ax.x.rg[1] >= 1 - 1e-9 && ax.y.rg[1] >= 1 - 1e-9 && ax.z.rg[1] >= 1 - 1e-9) {
+      ideal = true;
+      var wi = W(iu[0], iu[1], iu[2]);
+      prims.push({k: 'mark', role: 'ideal', shape: 'cross', r: 7, fill: '#17231d', stroke: '#ffffff', p: wi, bias: 0.04});
+      prims.push({k: 'text', role: 'ideallabel', layer: 2, cls: 'v3-t-b', size: 10, p: wi, t: 'Ideal (1, 1, 1)', anchor: 'start', dx: 10, dy: -8});
+    }
+  }
+  // legend
+  var colList = catKey ? catList : tools;
+  colList.forEach(function (c, i) {
+    var pre = catKey === 'tool' || !catKey ? 'T:' : catKey === 'track' ? 'K:' : 'S:';
+    scene.legend.push({group: catKey ? (vals.colour === 'tool' ? 'Tool (colour)' : vals.colour === 'track' ? 'Track (colour)' : 'Species (colour)') : 'Tool (filter)', key: pre + c, label: c,
+      color: catKey ? TOOL_COLOURS[i % TOOL_COLOURS.length] : '#777777', shape: 'circle'});
+  });
+  if (vals.shape) tracks.forEach(function (t) { scene.legend.push({group: 'Track (shape)', key: 'K:' + t, label: t.replace(/_/g, ' '), color: '#555555', shape: SHAPE[t] || 'diamond'}); });
+  scene.legend.push({group: 'Overlays', key: 'O:drop', label: 'Drop lines', color: '#555555', shape: 'line'});
+  scene.legend.push({group: 'Overlays', key: 'O:floor', label: 'Floor projection', color: '#777777', shape: 'circle'});
+  scene.legend.push({group: 'Overlays', key: 'O:pareto', label: 'Pareto front', color: '#17231d', shape: 'ring'});
+  scene.legend.push({group: 'Overlays', key: 'O:ideal', label: 'Ideal corner', color: '#17231d', shape: 'cross'});
+  if (vals.mode !== 'tools') scene.legend.push({group: 'Overlays', key: 'O:cent', label: 'Tool centroids', color: '#17231d', shape: 'cross'});
+  scene.legend.push({group: 'Overlays', key: 'O:sd', label: 'SD whiskers', color: '#555555', shape: 'line'});
+  scene.model = {rows: rows, tools: tools, tracks: tracks, species: species, visible: visible.length, total: rows.length, pts: pts, groups: groups, plotted: plotted, notPlotted: notPlotted,
+    nFront: nFront, nStack: nStack, ax: ax, clamped: clamped, ideal: ideal, szr: szr, cvr: cvr, catKey: catKey, colourOf: colourOf, vals: vals, cents: cents};
+  return scene;
+}
+
+/* ---------------------------------------------------------------- tooltips and tables */
+function axRow(vals, key, p) { return [AXT[key].replace('*', ''), f4(key === vals.x ? p.x : key === vals.y ? p.y : p.z)]; }
+function tipOf(p, vals, model) {
+  var rows = [];
+  if (p.kind === 'run') { rows.push(['Sample', p.r.sample]); rows.push(['Tool', p.tool]); rows.push(['Track', p.track]); rows.push(['Species', p.sp]); }
+  else { rows.push(['Tool', p.tool]); rows.push(['Track', p.track]); rows.push(['Runs averaged', String(p.n)]); }
+  rows.push([AXT[vals.x], f4(p.x) + (p.xs === 'precision' ? ' (precision: identity not available)' : '')]);
+  rows.push([AXT[vals.y], f4(p.y)]);
+  rows.push([AXT[vals.z], f4(p.z)]);
+  if (vals.size !== 'none') rows.push([vals.size === 'runtime' ? 'Runtime (s)' : 'Truth plasmids', fin(p.sizeV) ? f4(p.sizeV) : 'not available']);
+  if (CONT[vals.colour]) rows.push([CONTN[vals.colour], fin(p.colV) ? f4(p.colV) : 'not available']);
+  rows.push(['On the Pareto front', p.front ? 'yes' : 'no']);
+  var notes = [];
+  if (p.stack && p.stack.length > 1) notes.push('Stacked with ' + (p.stack.length - 1) + ' other point(s) at the same position: ' + p.stack.filter(function (q) { return q !== p; }).slice(0, 6).map(function (q) { return q.tool + (q.kind === 'run' ? ' / ' + q.r.sample : ''); }).join(', ') + (p.stack.length > 7 ? ', ...' : ''));
+  if (UNVAL[vals.z]) notes.push('Structural fidelity is alignment-derived and unvalidated.');
+  notes.push('Click or press Enter for details.');
+  return {t: p.tool + (p.kind === 'run' ? ' on ' + p.r.sample : ' (tool mean)'), rows: rows, note: notes.join(' ')};
+}
+function tipOfCent(c, vals) {
+  return {t: c.tool + ' centroid', rows: [['Runs', String(c.n)], [AXT[vals.x], f4(c.x)], [AXT[vals.y], f4(c.y)], [AXT[vals.z], f4(c.z)],
+    ['Standard deviation', c.sd ? [f4(c.sd.x), f4(c.sd.y), f4(c.sd.z)].join(' / ') : 'not defined (one run)']], note: 'Mean of the plotted runs; whiskers are one standard deviation per axis.'};
+}
+function buildTips(scene) {
+  var m = scene.model, v = m.vals;
+  m.pts.forEach(function (p) { scene.tips[p.id] = tipOf(p, v, m); });
+  m.cents.forEach(function (c) { if (c.kind === 'cent') scene.tips[c.id] = tipOfCent(c, v); });
+  return scene.tips;
+}
+var CSV_HEADER = ['sample', 'tool', 'track', 'species', 'n_runs', 'accuracy', 'accuracy_source', 'completeness', 'completeness_metric', 'structural', 'structural_metric',
+  'size_metric', 'size_value', 'colour_metric', 'colour_value', 'pareto_front', 'stack_size'];
+function plottedRows(model) {
+  var v = model.vals;
+  return model.pts.map(function (p) {
+    return [p.kind === 'run' ? p.r.sample : '', p.tool, p.track, p.sp, p.n, f4(p.x), p.xs, f4(p.y), v.y, f4(p.z), v.z, v.size === 'none' ? '' : v.size, fin(p.sizeV) ? p.sizeV : '',
+      CONT[v.colour] ? v.colour : '', fin(p.colV) ? p.colV : '', p.front ? 'yes' : 'no', p.stack ? p.stack.length : 1];
+  });
+}
+function notPlottedRows(model) {
+  return model.notPlotted.map(function (n) { return [n.r ? n.r.sample : '', n.r ? n.r.tool : n.tool, n.r ? n.r.track : '', n.why]; });
+}
+var CSV_SPECIAL = new RegExp('[\u0022,\n\r]'), DQ = String.fromCharCode(34);
+function csvCell(v) { v = v == null ? '' : String(v); return CSV_SPECIAL.test(v) ? DQ + v.split(DQ).join(DQ + DQ) + DQ : v; }
+function csvText(header, rows) { return [header].concat(rows).map(function (r) { return r.map(csvCell).join(','); }).join('\n') + '\n'; }
+
+/* ---------------------------------------------------------------- URL hash state (keys prefixed ls) */
+var HASH_PREFIX = 'fig-landscape?';
+var ENUM = {lsm: ['runs', 'tools'], lsx: XOPTS.map(function (o) { return o[0]; }), lsy: YOPTS.map(function (o) { return o[0]; }), lsz: ZOPTS.map(function (o) { return o[0]; }),
+  lss: ['linear', 'rank'], lsr: ['full', 'zoom', 'custom'], lssz: SIZEOPTS.map(function (o) { return o[0]; }), lsc: COLOPTS.map(function (o) { return o[0]; })};
+var KEYMAP = {lsm: 'mode', lsx: 'x', lsy: 'y', lsz: 'z', lss: 'scale', lsr: 'range', lssz: 'size', lsc: 'colour'};
+var BOOLMAP = {lsh: 'shape', lsl: 'labels', lspo: 'pareto_only', lsg: 'grid', lsfl: 'floor', lsa: 'axlab'};
+var NUMMAP = {lsp: ['ps', 0.5, 2.5], lso: ['op', 0.2, 1]};
+var TABS = ['axes', 'points', 'view', 'data', 'detail', 'export'];
+function encodeHash(vals, hidden, tab, cam) {
+  var d = defaults(), dh = defaultHidden(), q = [];
+  Object.keys(KEYMAP).forEach(function (k) { if (vals[KEYMAP[k]] !== d[KEYMAP[k]]) q.push(k + '=' + encodeURIComponent(vals[KEYMAP[k]])); });
+  Object.keys(BOOLMAP).forEach(function (k) { if (+vals[BOOLMAP[k]] !== +d[BOOLMAP[k]]) q.push(k + '=' + (vals[BOOLMAP[k]] ? 1 : 0)); });
+  Object.keys(NUMMAP).forEach(function (k) { if (fin(vals[NUMMAP[k][0]]) && vals[NUMMAP[k][0]] !== d[NUMMAP[k][0]]) q.push(k + '=' + vals[NUMMAP[k][0]]); });
+  ['x', 'y', 'z'].forEach(function (a) { if (vals.range === 'custom') q.push('lsc' + a + '=' + vals['c' + a].join(',')); });
+  var fl = ['x', 'y', 'z'].filter(function (a) { return vals['f' + a]; }).join('');
+  if (fl) q.push('lsf=' + fl);
+  var off = [], on = [];
+  Object.keys(hidden).forEach(function (k) { if (hidden[k] && !dh[k]) off.push(k); });
+  Object.keys(dh).forEach(function (k) { if (!hidden[k]) on.push(k); });
+  if (off.length) q.push('lshide=' + encodeURIComponent(off.sort().join('|')));
+  if (on.length) q.push('lsshow=' + encodeURIComponent(on.sort().join('|')));
+  if (tab && tab !== 'axes') q.push('lstab=' + tab);
+  if (cam) q.push('lscam=' + [cam.yaw, cam.pitch, cam.zoom, cam.persp].map(function (n) { return Math.round(n * 100) / 100; }).join(','));
+  return '#' + HASH_PREFIX + q.join('&');
+}
+function decodeHash(h) {
+  var out = {vals: {}, hidden: null, tab: null, cam: null};
+  if (typeof h !== 'string' || h.indexOf('#' + HASH_PREFIX) !== 0) return out;
+  var hid = defaultHidden(), touched = false;
+  h.slice(('#' + HASH_PREFIX).length).split('&').forEach(function (kv) {
+    var i = kv.indexOf('='), k = i < 0 ? kv : kv.slice(0, i), v = i < 0 ? '' : kv.slice(i + 1);
+    try { v = decodeURIComponent(v); } catch (e) { return; }
+    if (ENUM[k] && KEYMAP[k]) { if (ENUM[k].indexOf(v) >= 0) out.vals[KEYMAP[k]] = v; }
+    else if (BOOLMAP[k]) { if (v === '0' || v === '1') out.vals[BOOLMAP[k]] = +v; }
+    else if (NUMMAP[k]) { var n = parseFloat(v); if (fin(n)) out.vals[NUMMAP[k][0]] = clamp(n, NUMMAP[k][1], NUMMAP[k][2]); }
+    else if (k === 'lsf') { ['x', 'y', 'z'].forEach(function (a) { out.vals['f' + a] = v.indexOf(a) >= 0 ? 1 : 0; }); }
+    else if (/^lsc[xyz]$/.test(k)) { var p = v.split(',').map(parseFloat); if (p.length === 2 && fin(p[0]) && fin(p[1])) out.vals['c' + k[3]] = p; }
+    else if (k === 'lshide') { v.split('|').forEach(function (x) { if (/^[TKSO]:/.test(x)) { hid[x] = true; touched = true; } }); }
+    else if (k === 'lsshow') { v.split('|').forEach(function (x) { if (/^O:/.test(x)) { delete hid[x]; touched = true; } }); }
+    else if (k === 'lstab') { if (TABS.indexOf(v) >= 0) out.tab = v; }
+    else if (k === 'lscam') { var c = v.split(',').map(parseFloat); if (c.length === 4 && c.every(fin)) out.cam = {yaw: c[0], pitch: c[1], zoom: clamp(c[2], 0.4, 5), persp: c[3] ? 1 : 0}; }
+  });
+  if (touched) out.hidden = hid;
+  return out;
+}
+
+var api = {S: S, STACK: STACK, FIELDS: FIELDS, SHAPE: SHAPE, TOOL_COLOURS: TOOL_COLOURS, RAMP: RAMP, XOPTS: XOPTS, YOPTS: YOPTS, ZOPTS: ZOPTS, SIZEOPTS: SIZEOPTS, COLOPTS: COLOPTS,
+  AXN: AXN, AXT: AXT, UNVAL: UNVAL, CONT: CONT, CONTN: CONTN, TABS: TABS, CSV_HEADER: CSV_HEADER, esc: esc, f4: f4, defaults: defaults, defaultHidden: defaultHidden, rowsOf: rowsOf,
+  metric: metric, dominates: dominates, rampColour: rampColour, niceTicks: niceTicks, axisRange: axisRange, rankPos: rankPos, build: build, buildTips: buildTips, tipOf: tipOf,
+  plottedRows: plottedRows, notPlottedRows: notPlottedRows, csvText: csvText, encodeHash: encodeHash, decodeHash: decodeHash, mean: mean, sd: sd};
+root.PBLandscape = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

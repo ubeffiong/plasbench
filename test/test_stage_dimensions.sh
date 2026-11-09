@@ -83,10 +83,10 @@ done
 echo "stage 6 merges the shards and writes every dimension table -> PASS"
 HTML="$TMP/results/benchmark.report.html"
 for section in accuracy-dimension feature-preservation bin-quality performance power scenarios composite reproducibility; do
-    grep -q "<section id='${section}'>" "$HTML" || { echo "FAIL: report has no #${section} section" >&2; exit 1; }
-    grep -q "href='#${section}'" "$HTML" || { echo "FAIL: report nav has no #${section} link" >&2; exit 1; }
+    # Most of these are tabs of a merged container now: the old id is the panel id, so the old link still lands on it.
+    grep -q "id='${section}'" "$HTML" || { echo "FAIL: report has no #${section} section" >&2; exit 1; }
 done
-grep -q "Sequence accuracy and missing regions" "$HTML" && ! sed -n "/<section id='accuracy-dimension'>/,/<\/section>/p" "$HTML" | grep -q "No accuracy table was available" \
+grep -q "Sequence accuracy and missing regions" "$HTML" && ! sed -n "/id='accuracy-dimension'/,/<\/section>/p" "$HTML" | grep -q "No accuracy table was available" \
     || { echo "FAIL: the accuracy section is empty although its table exists" >&2; exit 1; }
 echo "the report shows every new section, populated where its table exists -> PASS"
 echo "ALL STAGE DIMENSION TESTS PASSED"

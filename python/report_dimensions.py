@@ -64,7 +64,7 @@ def section(esc, sid, title, lead, body, link_html=""):
     return (f"<section id='{sid}'><h2>{esc(title)}</h2><p class='lead'>{lead}{link_html}</p>{body}</section>")
 
 
-def render(prefix, esc, link):
+def render(prefix, esc, link, scores_path=None, samples_path=None):
     """(nav_html, sections_html). `link(path)` returns a relative href for a downloadable table."""
     data = {name: read_tsv(f"{prefix}.{name}.tsv") for name in TABLES}
 
@@ -186,7 +186,9 @@ def render(prefix, esc, link):
         "performance")
 
     # 5. Statistical power --------------------------------------------------------------------
-    rows = [[r["analysis_track"], f"{r['tool_a']} vs {r['tool_b']}", r.get("paired_samples", ""), r.get("clusters", ""),
+    metric_names = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level F1", "sample_cprr": "isolate-level CPRR"}
+    rows = [[r["analysis_track"], f"{r['tool_a']} vs {r['tool_b']}", metric_names.get(r.get("metric"), r.get("metric") or "f1"),
+             r.get("paired_samples", ""), r.get("clusters", ""),
              flt(num(r.get("mean_difference")), 3), flt(num(r.get("min_detectable_difference")), 3),
              r.get("clusters_needed_for_target", ""), r.get("status", "").replace("_", " ")] for r in data["power"]]
     add("power", "Statistical power",
@@ -195,25 +197,49 @@ def render(prefix, esc, link):
         "minimum detectable difference is the smallest true mean difference detected with 80% power at the 5% level; "
         "an observed difference below it is <em>not distinguishable</em> at this sample size however different the means "
         "look. A pair with fewer than 5 clusters gets no estimate. Normal approximation, optimistic for very small "
-        "samples. <strong>A planning aid; it never changes a ranking.</strong>",
-        table(esc, ["Track", "Pair", "Paired samples", "Clusters", "Mean difference", "Minimum detectable difference",
+        "samples. The Metric column names what is compared: the ranking metric of the pair's track and task when the table was "
+        "built with the leaderboard (the same metric as the paired-comparison table), otherwise base-level F1. Completed runs "
+        "only, so a failed run is not counted as 0 here. <strong>A planning aid; it never changes a ranking.</strong>",
+        table(esc, ["Track", "Pair", "Metric", "Paired samples", "Clusters", "Mean difference", "Minimum detectable difference",
                     "Clusters needed for a 0.05 difference", "Status"], rows)
         if rows else empty("No power table was available. It needs at least two tools scored on shared samples."),
         "power")
 
     # 6. Scenarios ----------------------------------------------------------------------------
-    counts = defaultdict(int)
-    for r in data["scenarios"]:
-        counts[r["scenario"]] += 1
-    summary = ", ".join(f"{esc(k)}: {v}" for k, v in sorted(counts.items())) or "no scenario table"
-    rows = [[r["analysis_track"], r["scenario"], r["tool"], r.get("n_samples", ""), flt(num(r.get("mean_f1"))),
-             flt(num(r.get("mean_plasmid_recall"))), "underpowered (small n)" if r.get("underpowered") == "true" else ""]
-            for r in data["scenario_performance"]]
+    # One definition: the tags in benchmark.scenarios.tsv, read through report_scorecard (the scorecard's scenario
+    # views use the same function). This table counts each isolate once (a partition of those tags); the scorecard
+    # counts every isolate under every tag it has.
+    import report_scorecard as sc
+    import report_common as rc
+    note_text, rows, derived = "", [], False
+    scores = rc.read_tsv(scores_path) if scores_path and os.path.isfile(scores_path) else None
+    if data["scenarios"] and scores:
+        quality = sc._quality_bands(samples_path) if samples_path and os.path.isfile(samples_path) else {}
+        members = sc.scenario_membership(data["scenarios"], quality)
+        groups = sc.exclusive_groups(sc.exclusive_scenarios(data["scenarios"], members))
+        derived = True
+        for name in sc.EXCLUSIVE_ORDER:
+            for (track, tool), cell in sorted(sc.scenario_performance(scores, groups[name]).items()):
+                rows.append([track, name, tool, cell["n"], flt(cell["mean_f1"]), flt(cell["mean_plasmid_recall"]),
+                             "underpowered (small n)" if sc.underpowered(cell["n"]) else ""])
+        summary = sc.exclusive_counts_text(groups)
+        note_text = (f" The <a href='#scorecard-scenarios'>scorecard by scenario</a> uses the same tags but lets an isolate "
+                     f"count under every tag it has (<span data-tag-counts='{esc(sc.tag_counts_text(members))}'>"
+                     f"{esc(sc.tag_counts_text(members))}</span>).")
+    else:
+        counts = defaultdict(int)
+        for r in data["scenarios"]:
+            counts[r["scenario"]] += 1
+        summary = ", ".join(f"{esc(k)}: {v}" for k, v in sorted(counts.items())) or "no scenario table"
+        rows = [[r["analysis_track"], r["scenario"], r["tool"], r.get("n_samples", ""), flt(num(r.get("mean_f1"))),
+                 flt(num(r.get("mean_plasmid_recall"))), "underpowered (small n)" if r.get("underpowered") == "true" else ""]
+                for r in data["scenario_performance"]]
     add("scenarios", "Performance by scenario",
-        f"A tool should not look better because it met easier isolates. Each isolate is tagged simple, complex (three or "
-        f"more plasmids, a plasmid of at least 100 kb, or repeat-rich), annotated, challenging (low read depth) or "
-        f"plasmid-free, from facts on disk. Isolates per scenario: {summary}. Scenarios with few isolates are flagged; "
-        f"read patterns, not ranks. <strong>Descriptive only.</strong>",
+        f"A tool should not look better because it met easier isolates. Each isolate is counted once, in the first of: "
+        f"plasmid-free, challenging (low read depth or low read quality), complex (three or more plasmids, a plasmid of at "
+        f"least 100 kb, or repeat-rich), annotated, or simple (the rest), from facts on disk. Isolates per scenario: "
+        f"{summary}.{note_text} Scenarios with few isolates are flagged; read patterns, not ranks. "
+        f"<strong>Descriptive only.</strong>",
         table(esc, ["Track", "Scenario", "Tool", "Isolates", "Mean F1", "Mean per-plasmid recall", "Note"], rows)
         if rows else empty("No scenario table was available."),
         "scenarios", "scenario_performance")

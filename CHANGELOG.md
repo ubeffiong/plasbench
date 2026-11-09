@@ -13,6 +13,40 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- report layout, condensed analytics, full PDF
+- **Page shell** (`python/report_layout.py`): fixed top bar and left rail, one view at a time (Overview, Scorecard, Figures, Plasmid maps, Diagnostics, Data quality,
+  Recommendation, Methods, Appendix) in story order, compact title band, status-chip accordion for data quality, hash routing for every old id, no-JavaScript fallback
+  (the full linear page). 73 top-level sections become 34.
+- **Merged analyses** (`python/report_merge.py`): related sections become tabs of one container and keep their old id as the panel id (`python/report_aliases.py`
+  resolves old links): Ranking confidence, Method ranking (chart, metric framework, MCC and F-beta, graded recovery, negative control, baselines), Cohort and truth
+  quality, Run outcomes and cost, Bin diagnostics, Scorecard (composite as *Weights and sensitivity*), Recommendations, Recommender, All scores (by tool, by sample) and
+  a Reference tables appendix. The duplicate paired-comparison table in the unseen-taxa section is gone (it was a second copy of the Paired tests table).
+- **Isolate filter and plasmid matrix** (`python/report_isolates.py`): the Summary and the Scorecard used to show cohort-wide numbers only. The Summary now has a
+  *Which tool recovered which plasmid* matrix (one row per truth plasmid, one column per tool, coverage with a tick, half circle or cross, the best tool starred, and
+  per-tool counts of plasmids recovered and plasmids on which the tool was best; one table per analysis track). An **Isolate** filter in the top bar (default *All
+  isolates*) swaps the report card, the scorecard overall, the whole Scorecard (every metric re-scored on that isolate alone) and the matrix to one isolate's own
+  numbers; a scope label next to each heading says which isolate is shown, and the no-JavaScript and print views show all isolates. The run line under the title is
+  removed (the run folder is in the top bar and the full run details are in *Run metadata*).
+- **Content uses the full width; folds start open**: the right-hand "On this page" strip is gone and the list now sits at the bottom of the left rail (it follows the
+  view on show and highlights the current section). Every fold (cards, folded tables, drill-downs) starts expanded and can be collapsed; the top-bar button reads
+  *Collapse all* / *Expand all* according to the state of the view. Summaries written as "Show the X" read "The X".
+- **Condensed tables** (`python/report_condense.py`): tables over 15 rows show 12 rows with a filter and *Show all*; consistent table typography.
+- **Full PDF export** (the browser sandbox stays on; where it cannot start, e.g. a container, set `PLASBENCH_BROWSER_FLAGS=--no-sandbox` for that run): print stylesheet with cover and contents, one view per page, every fold open; `python/export_report_pdf.py` and `plasbench report-pdf`.
+- **No feature lost**: `test/fixtures/report_feature_manifest.tsv` (254 features of the earlier report) is checked by `test/test_report_feature_manifest.py`.
+- **Corrected statements**: the ranking metric is named where the ranking score is quoted; the claim that failed runs are excluded from means is replaced by the real rule
+  (F1 = 0 for a failed run on a plasmid-bearing isolate); robustness column renamed; power table names its metric (`power_analysis.py --leaderboard`); scenario views share
+  one definition; scorecard overall beside the report card; glossary covers CPRR, MCC, F2, scorecard terms and NGOC; `--scores` folder is the results directory.
+
+### Added -- figure gallery
+- **Reconstruction ladder** (`fig-ladder`, `docs/images/reconstruction_ladder.svg`): the five steps from contigs to a verified plasmid, the score layer that judges
+  each, live values from the run, and three explicit distinctions (binning is not reconstruction, circular is not correct, 3D is illustrative), two of them quantified.
+- **3D landscape** of accuracy, completeness and structural fidelity (`fig-landscape`), **tool-by-metric heatmap** with clustering (`fig-heatmap`), **CPRR distributions**
+  and **forest plot** (`fig-distributions`, `fig-forest`), and an interactive **precision-recall** plot (`fig-pr`). Each has a side setup panel, tooltips, drilldown,
+  a no-JavaScript fallback and SVG / PNG / CSV export. The shared 3D engine no longer uses `Math.random`.
+- Plasmid viewer: linear **Reference versus reconstruction** pane and Alignment tab, linked to the circular map; per-tool alignment blocks in the payload.
+- `python/report_collapse.py` folds the scorecard, accuracy, performance, stratified, replicon-recovery and graded-tier tables that a figure now draws into closed details
+  (nothing is removed). `python/report_figures.py` wires the figure modules; a module that raises fails the build instead of leaving a silent gap.
+
 ### Added -- databases kept once per machine
 - **`PLASBENCH_DB_DIR`** (default `~/.plasbench/databases`): every tool database default points
   there instead of `DATA_DIR/db`, so new checkouts, new `DATA_DIR`s and rebuilt environments reuse
@@ -42,6 +76,11 @@ history is lost, only the numbering is cleaner. See
 - Download tests force `READ_SOURCE=sra`, so they never reach ENA over the network.
 
 ### Added -- interactive report views
+- **Info popovers for explanatory notes** (`python/report_info.py`, `assets/report/info_script.html`): one post-processing step on the finished
+  page moves section leads, "how to read" notes and figure captions into a circled "i" beside the heading that opens on hover, keyboard focus
+  or tap (click pins, Esc closes, links inside stay usable, works inside collapsed sections). The plasmid viewer, the 3D views and the colour
+  palette bar use the same icon for their hint lines. "Not run" notices, caution boxes, notes that carry a status or a value, and the Summary
+  section stay on the page; the print view shows every note inline. Notes keep their original HTML and the page is shorter to read.
 - **Interactive plasmid map viewer** (`assets/report/plasmid_viewer_*.html`, `python/report_maps.py`): one viewer with a side panel replaces the
   stack of static maps. Hover tooltips, click drilldown into a Detail tab, wheel zoom and drag rotate with labels re-laid out, region inputs,
   search, layer, class and tool filters, Tools / Features / Events tables as tabs, SVG, PNG and TSV export, shareable URL-hash state, keyboard

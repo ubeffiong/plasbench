@@ -1,0 +1,40 @@
+<style id='rpt-condense-style'>
+/* report_condense: sub-tabs inside a section, windowed long tables, consistent table typography (.rpt-t). */
+.rpt-tabs{margin:14px 0 0}
+.rpt-tablist{display:flex;gap:2px;flex-wrap:wrap;border-bottom:2px solid var(--line,#d5ddd6);margin:0 0 14px;font-family:Arial,sans-serif}
+.rpt-tablist[hidden]{display:none}
+.rpt-tablist [role=tab]{appearance:none;background:transparent;border:0;border-bottom:3px solid transparent;margin:0 0 -2px;padding:8px 14px;font:600 13px/1.3 Arial,sans-serif;color:var(--muted,#536158);cursor:pointer;border-radius:6px 6px 0 0}
+.rpt-tablist [role=tab]:hover{background:rgba(23,75,58,.06);color:var(--ink,#15241c)}
+.rpt-tablist [role=tab][aria-selected=true]{color:var(--ink,#15241c);border-bottom-color:var(--green,#174b3a);background:rgba(23,75,58,.05)}
+.rpt-tablist [role=tab]:focus-visible{outline:2px solid var(--ink,#15241c);outline-offset:-2px}
+.rpt-tabpanel[hidden]{display:none}
+/* the tab already names the subsection: hide the repeated heading unless it carries an info popover */
+.rpt-tabs.rpt-on>.rpt-tabpanel>h3:first-child:not(:has(.rpt-info)){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rpt-tabs.rpt-on>.rpt-tabpanel>h3:first-child:has(.rpt-info){margin-top:0}
+
+.rpt-win-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--line,#d5ddd6);background:#f7faf6;font:12px Arial,sans-serif;color:var(--muted,#536158);position:sticky;left:0}
+.rpt-win-bar[hidden]{display:none}
+.rpt-win-bar input[type=search]{padding:4px 8px;min-width:180px;border:1px solid var(--line,#d5ddd6);border-radius:4px;font:12px Arial,sans-serif}
+.rpt-win-bar button{padding:4px 10px;border:1px solid var(--green,#174b3a);background:#fff;color:var(--green,#174b3a);border-radius:4px;font:600 12px Arial,sans-serif;cursor:pointer}
+.rpt-win-bar button:hover{background:var(--green,#174b3a);color:#fff}
+.rpt-win-bar button:disabled{opacity:.45;cursor:default;background:#fff;color:var(--green,#174b3a)}
+.rpt-win-bar .rpt-win-n{margin-left:auto}
+tr.rpt-wh{display:none}
+.panel.rpt-win-open{max-height:min(78vh,900px);overflow:auto}
+
+table.rpt-t{font-variant-numeric:tabular-nums lining-nums;font-feature-settings:'tnum' 1}
+table.rpt-t th{background:#edf2ec;color:var(--ink,#15241c);font-weight:700;padding:8px 10px;border-bottom:2px solid var(--line,#d5ddd6);position:sticky;top:0;z-index:2}
+table.rpt-t td{padding:6px 10px;border-top:1px solid var(--line,#d5ddd6)}
+table.rpt-t tbody tr:nth-child(even) td{background:rgba(23,75,58,.03)}
+table.rpt-t tbody tr:hover td{background:rgba(23,75,58,.08)}
+table.rpt-t .rpt-num{text-align:right}
+
+@media print{
+ .rpt-tablist,.rpt-win-bar{display:none!important}
+ .rpt-tabpanel,.rpt-tabpanel[hidden]{display:block!important}
+ .rpt-tabs.rpt-on>.rpt-tabpanel>h3:first-child{position:static!important;width:auto!important;height:auto!important;clip:auto!important;overflow:visible!important;white-space:normal!important}
+ tr.rpt-wh:not([hidden]){display:table-row!important}
+ .panel.rpt-win-open{max-height:none!important;overflow:visible!important}
+ table.rpt-t th{position:static}
+}
+</style>

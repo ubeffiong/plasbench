@@ -1,0 +1,25 @@
+<style id="pb-iso-style">
+/* Isolate filter (python/report_isolates.py): the control in the top bar, the scope label, and the plasmid matrix. */
+.rpt-iso-slot{display:none}
+html.pb-js .rpt-iso-slot{display:flex;align-items:center}
+.pb-iso{display:flex;align-items:center;gap:6px;font:600 12px Arial,sans-serif;color:#fff}
+.pb-iso select{max-width:210px;min-height:30px;border-radius:15px;border:1px solid rgba(255,255,255,.55);background:#fff;color:#14231c;font:600 12px Arial,sans-serif;padding:3px 10px;cursor:pointer}
+.pb-iso select:focus-visible{outline:2px solid #ffe08a;outline-offset:2px}
+html.pb-iso-on .pb-iso select{background:#ffe9a8;border-color:#ffe9a8}
+.pb-iso-float{margin:0 0 12px;display:flex;justify-content:flex-end}
+.pb-iso-float .pb-iso{color:#14231c}
+.pb-scope{display:inline-block;margin-left:8px;padding:1px 9px;border-radius:11px;background:#e6ece7;color:#314238;font:600 11px Arial,sans-serif;letter-spacing:0;vertical-align:2px;white-space:nowrap}
+html.pb-iso-on .pb-scope{background:#ffe9a8;color:#5a3d00}
+.pb-matrix{border-collapse:collapse;width:100%}
+.pb-matrix th,.pb-matrix td{padding:6px 10px;border-bottom:1px solid var(--line,#d5ddd6);text-align:left;font:13px Arial,sans-serif}
+.pb-matrix thead th{background:#eef4ef;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.pb-matrix tfoot th,.pb-matrix tfoot td{background:#f6f8f6;font-weight:600}
+.pb-matrix .pb-c{white-space:nowrap;font-variant-numeric:tabular-nums;min-width:84px}
+.pb-good{background:#dcefdc;color:#07573e}
+.pb-part{background:#f6ead1;color:#765000}
+.pb-miss{background:#f7ddda;color:#8c2018}
+.pb-none{background:#eceeed;color:#5c6660}
+.pb-matrix td:last-child{white-space:normal;min-width:170px}
+.pb-star{margin-left:5px;color:#a35c05;font-weight:700}
+@media print{.pb-iso,.rpt-iso-slot{display:none!important}}
+</style>

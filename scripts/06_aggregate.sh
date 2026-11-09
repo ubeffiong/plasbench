@@ -203,7 +203,7 @@ job_dimension_analyses() {
         --scores "$SCORES" --logs-dir "$LOG_DIR" --data-dir "$DATA_DIR" --threads "${THREADS:-1}" \
         --out "$DIM.performance.tsv" || warn "performance summary failed; leaderboard is unaffected" &
     python3 "$HERE/../python/power_analysis.py" --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET" \
-        --out "$DIM.power.tsv" || warn "power analysis failed; leaderboard is unaffected" &
+        --leaderboard "$RESULTS_DIR/benchmark.leaderboard.tsv" --out "$DIM.power.tsv" || warn "power analysis failed; leaderboard is unaffected" &
     python3 "$HERE/../python/scenario_tags.py" --scores "$SCORES" --data-dir "$DATA_DIR" \
         --sample-sheet "$SAMPLE_SHEET" --out "$DIM.scenarios.tsv" \
         --performance-out "$DIM.scenario_performance.tsv" || warn "scenario tags failed; leaderboard is unaffected" &

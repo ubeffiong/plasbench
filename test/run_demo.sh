@@ -166,7 +166,7 @@ done
 python3 "$PY/mask_accuracy.py" --accuracy "$DIM.accuracy.tsv"
 python3 "$PY/performance_summary.py" --tool-status "$STATUS" --scores "$SCORES" --data-dir "$DEMO" \
     --threads 1 --out "$DIM.performance.tsv"
-python3 "$PY/power_analysis.py" --scores "$SCORES" --sample-sheet "$SAMPLES" --out "$DIM.power.tsv"
+python3 "$PY/power_analysis.py" --scores "$SCORES" --sample-sheet "$SAMPLES" --leaderboard "$DEMO/benchmark.leaderboard.tsv" --out "$DIM.power.tsv"
 python3 "$PY/scenario_tags.py" --scores "$SCORES" --data-dir "$DEMO" --sample-sheet "$SAMPLES" \
     --out "$DIM.scenarios.tsv" --performance-out "$DIM.scenario_performance.tsv"
 python3 "$PY/composite_score.py" --scores "$SCORES" --accuracy "$DIM.accuracy.tsv" \

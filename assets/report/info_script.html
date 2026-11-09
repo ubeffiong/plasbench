@@ -1,0 +1,98 @@
+<script id='rpt-info-script'>
+/* Info popovers (python/report_info.py, and the icons the plasmid viewer and 3D views build): open on hover and on keyboard
+   focus, stay open while the pointer is over them, click or tap pins one, Esc closes. The script only positions and toggles;
+   without it the CSS alone shows the note on hover and focus. */
+(function () {
+  'use strict';
+  var root = document.documentElement, openInfo = null, pinned = null, MARGIN = 8, GAP = 6;
+  root.classList.add('rpt-js');
+  function infoOf(node) { return node && node.closest ? node.closest('.rpt-info') : null; }
+  function popOf(info) { return info.querySelector('.rpt-info-pop'); }
+  function btnOf(info) { return info.querySelector('.rpt-info-btn'); }
+  function place(info) {
+    var pop = popOf(info), b = btnOf(info);
+    if (!pop || !b) { return; }
+    var r = b.getBoundingClientRect(), vw = root.clientWidth, vh = window.innerHeight;
+    pop.style.left = '0px'; pop.style.top = '0px';
+    var w = pop.offsetWidth, h = pop.offsetHeight;
+    var left = Math.max(MARGIN, Math.min(r.left, vw - w - MARGIN));
+    var below = r.bottom + GAP, up = below + h > vh - MARGIN && r.top - GAP - h >= MARGIN;
+    pop.classList.toggle('rpt-up', up);
+    pop.style.left = left + 'px';
+    pop.style.top = Math.max(MARGIN, up ? r.top - GAP - h : below) + 'px';
+  }
+  function show(info) {
+    if (openInfo && openInfo !== info && openInfo !== pinned) { hide(openInfo); }
+    clearTimeout(info.rptTimer);
+    info.classList.add('rpt-show');
+    var b = btnOf(info);
+    if (b) { b.setAttribute('aria-expanded', 'true'); }
+    openInfo = info;
+    place(info);
+  }
+  function hide(info) {
+    if (!info) { return; }
+    info.classList.remove('rpt-show', 'rpt-pin');
+    var b = btnOf(info);
+    if (b) { b.setAttribute('aria-expanded', 'false'); }
+    if (pinned === info) { pinned = null; }
+    if (openInfo === info) { openInfo = null; }
+  }
+  function hideSoon(info) {
+    clearTimeout(info.rptTimer);
+    info.rptTimer = setTimeout(function () {
+      if (info !== pinned && !info.contains(document.activeElement) && !info.matches(':hover')) { hide(info); }
+    }, 140);
+  }
+  document.addEventListener('mouseover', function (e) {
+    var info = infoOf(e.target);
+    if (info) { show(info); }
+  });
+  document.addEventListener('mouseout', function (e) {
+    var info = infoOf(e.target);
+    if (info && !info.contains(e.relatedTarget)) { hideSoon(info); }
+  });
+  document.addEventListener('focusin', function (e) {
+    var info = infoOf(e.target);
+    if (info) { show(info); }
+  });
+  document.addEventListener('focusout', function (e) {
+    var info = infoOf(e.target);
+    if (info && !info.contains(e.relatedTarget)) { hideSoon(info); }
+  });
+  /* capture phase: an icon inside a <summary> must not toggle the <details>, and a click in a popover there must not either */
+  document.addEventListener('click', function (e) {
+    var info = infoOf(e.target);
+    if (!info) {
+      if (pinned) { hide(pinned); }
+      return;
+    }
+    if (e.target.closest('.rpt-info-btn')) {
+      e.preventDefault(); e.stopPropagation();
+      if (pinned === info) { hide(info); return; }
+      if (pinned) { hide(pinned); }
+      pinned = info; info.classList.add('rpt-pin'); show(info);
+    } else if (e.target.closest('summary')) {
+      e.stopPropagation();
+      if (!e.target.closest('a')) { e.preventDefault(); }
+    }
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && (openInfo || pinned)) {
+      var a = pinned, o = openInfo;
+      hide(a); hide(o);
+    }
+    /* Space or Enter on the icon is a click; inside a <summary> keep it from toggling the section */
+    if ((e.key === ' ' || e.key === 'Enter') && e.target.closest && e.target.closest('.rpt-info-btn') && e.target.closest('summary')) {
+      e.stopPropagation();
+    }
+  }, true);
+  window.addEventListener('resize', function () { if (openInfo) { place(openInfo); } });
+  /* scrolling the page moves the icon away from a fixed popover: a pinned one closes, a hovered one follows its icon */
+  window.addEventListener('scroll', function (e) {
+    if (e.target && e.target.nodeType === 1 && e.target.closest('.rpt-info-pop')) { return; }
+    if (pinned) { hide(pinned); }
+    if (openInfo) { place(openInfo); }
+  }, {passive: true, capture: true});
+})();
+</script>

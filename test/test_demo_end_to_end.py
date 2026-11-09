@@ -11,6 +11,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import report_regions  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 DEMO = ROOT / "results_demo"
 
@@ -21,9 +24,13 @@ def rows(path):
 
 
 def section(html, name):
+    """A section's markup; a merged analysis is found through its panel id or python/report_aliases.LEGACY_IDS."""
     match = re.search(r"<section id='%s'>(.*?)</section>" % name, html, re.S)
-    assert match, f"report has no #{name} section"
-    return match.group(1)
+    if match:
+        return match.group(1)
+    block = report_regions.region(html, name)
+    assert block, f"report has no #{name} section"
+    return block
 
 
 def main():
@@ -93,7 +100,7 @@ def main():
     assert len(rows(DEMO / "benchmark.repeat_content.tsv")) > 0
     assert len(rows(DEMO / "benchmark.tool_agreement.tsv")) > 0
     for sid in ("learn-agreement", "learn-adequacy", "learn-copynumber", "learn-truthqc", "learn-plsmd"):
-        assert f"href='#{sid}'" in html, sid
+        assert f"id='{sid}'" in html, sid   # merged into a container: the old id is its panel id (and the old link still works)
     assert "Best-match F1" in section(html, "learn-agreement") and "Not run: scores.tsv" not in section(html, "learn-agreement")
     assert "Plasmid adequacy" in section(html, "learn-adequacy") and "Not run" not in section(html, "learn-adequacy")
     assert "repeat-rich" in section(html, "learn-truthqc")

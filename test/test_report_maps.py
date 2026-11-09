@@ -243,6 +243,26 @@ def main():
         check("data_dir may be falsy (truth is then read from the results dir): still a section, with maps drawn without annotation",
               "id='plasmid-maps'" in again and len(svgs(fallback(again))) == 2 and "No truth annotation" in again)
 
+    print("alignment blocks in the viewer payload")
+    raw = [{"target": "pS", "record_id": "c1", "query_length": 500, "query_start": 0, "query_end": 400, "strand": "-", "target_start": 100, "target_end": 500, "matches": 396, "block_length": 400, "mapq": 60},
+           {"target": "other", "record_id": "c9", "query_length": 50, "query_start": 0, "query_end": 50, "strand": "+", "target_start": 0, "target_end": 50, "matches": 50, "block_length": 50, "mapq": 60},
+           {"target": "pS", "record_id": "bad", "query_length": 50, "query_start": 0, "query_end": 50, "strand": "+", "target_start": 70, "target_end": 70, "matches": 1, "block_length": 1}]
+    got = rm._plasmid_blocks(raw, "pS")
+    check("only blocks of this plasmid with a positive reference span are kept; identity is matches / block length; strand is + or -",
+          len(got) == 1 and got[0]["record"] == "c1" and abs(got[0]["identity"] - 0.99) < 1e-9 and got[0]["strand"] == "-" and (got[0]["ts"], got[0]["te"]) == (100, 500))
+    tl = dict(tool("t1", [(0, 500)], 0.5), blocks=got, collinear_fraction=0.97191, order_conflicts=2)
+    pay = rm.viewer_payload(model(tools=[tl]))
+    check("the payload carries [record, query length, query start/end, strand, reference start/end, identity, mapq], collinear fraction and order conflicts",
+          pay["tools"][0]["bl"] == [["c1", 500, 0, 400, "-", 100, 500, 0.99, 60]] and pay["tools"][0]["cf"] == 0.97191 and pay["tools"][0]["oc"] == 2 and "bo" not in pay["tools"][0])
+    many = [dict(got[0], ts=i * 10, te=i * 10 + 5 + (i % 7), record="r%d" % i) for i in range(rm.VIEWER_MAX_BLOCKS + 40)]
+    pay2 = rm.viewer_payload(model(tools=[dict(tool("t1", [(0, 500)], 0.5), blocks=many)]))
+    kept = pay2["tools"][0]["bl"]
+    check("more blocks than VIEWER_MAX_BLOCKS: the longest are kept, in reference order, and the rest are counted in 'bo' instead of silently dropped",
+          len(kept) == rm.VIEWER_MAX_BLOCKS and pay2["tools"][0]["bo"] == 40 and [b[5] for b in kept] == sorted(b[5] for b in kept))
+    check("a tool without blocks adds no alignment keys", "bl" not in rm.viewer_payload(model())["tools"][0] and "cf" not in rm.viewer_payload(model())["tools"][0])
+    check("the viewer loads its fragments in dependency order (core, then the alignment module, then the DOM glue)",
+          list(rm.VIEWER_ASSETS) == ["plasmid_viewer_style.html", "plasmid_viewer_core.html", "plasmid_viewer_align.html", "plasmid_viewer_ui.html"])
+
     print("the demo cohort")
     demo = os.path.join(HERE, "..", "results_demo")
     if os.path.isfile(os.path.join(demo, "ecoli_a", "visualization", "alignment_blocks.json")):

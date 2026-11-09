@@ -1,0 +1,329 @@
+<script>
+/* PlasBench tool heatmap, DOM glue: toolbar, figure, legend, tooltip, side panel (Layout, Filters, Data, Detail, Export), URL hash, export.
+   The pure functions are in fig_heatmap_core.html (PBHM). Vanilla JS; keys of the URL hash are prefixed hm. */
+(function () {
+'use strict';
+var P = window.PBHM, host = document.getElementById('hm-root'), src = document.getElementById('hm-data');
+if (!P || !host || !src) return;
+var data;
+try { data = P.withIndex(JSON.parse(src.textContent)); } catch (e) { return; }
+var live = host.querySelector('.hm-live'), esc = P.esc, st = P.decodeHash(location.hash);
+var LS = 'pb-hm-panel', panelOpen = true, cvd = false, lastA = {}, dataSort = {k: 'track', dir: 1}, dataQ = '', pending = null;
+try { if (localStorage.getItem(LS) === '0') panelOpen = false; } catch (e) { /* storage blocked */ }
+var TABS = [['layout', 'Layout'], ['filters', 'Filters'], ['data', 'Data'], ['detail', 'Detail'], ['export', 'Export']];
+var STATUS_WORD = {fixed: 'fixed (a stated definition)', proposed: 'proposed (a changeable default, not a standard)', undefined: 'undefined (no bands yet)'};
+
+function fmtNum(v, d) { return v == null ? 'not available' : Number(v).toFixed(d == null ? 3 : d); }
+function colById(id) { for (var k = 0; k < data.cols.length; k++) if (data.cols[k].id === id) return data.cols[k]; return null; }
+function toggle(list, x, on) { var i = list.indexOf(x); if (on && i >= 0) list.splice(i, 1); if (!on && i < 0) list.push(x); }   /* on = shown */
+
+/* ---------------------------------------------------------------- skeleton */
+live.innerHTML = '<div class="hm-head"><div class="hm-seg" role="group" aria-label="Value shown in the cells" id="hm-modes"></div>' +
+  '<button type="button" class="hm-btn" id="hm-rc" aria-pressed="true" title="Order the tools by similarity (average linkage on the colour values) and draw the dendrogram">Cluster tools</button>' +
+  '<button type="button" class="hm-btn" id="hm-cc" aria-pressed="true" title="Order the metrics by similarity and draw the dendrogram; off = grouped by family in scorecard order">Cluster metrics</button>' +
+  '<button type="button" class="hm-btn" id="hm-ov" aria-pressed="false" title="Ring = best tool of the column; dot = declared equivalent to the best by the paired comparison table">Best and tied</button>' +
+  '<span class="hm-spacer"></span><button type="button" class="hm-btn" id="hm-pt" aria-expanded="true" aria-controls="hm-panel">Setup panel</button></div>' +
+  '<div class="hm-main" id="hm-main"><div class="hm-stage" id="hm-stage"><div class="hm-legend" id="hm-legend" role="group" aria-label="Metric families: click to collapse or expand"></div>' +
+  '<div id="hm-blocks"></div><p class="hm-hint">Hover or focus a cell for its numbers; click or press Enter for the per-isolate drilldown. Arrow keys move between cells; c selects the column, r the row, s sorts by the column. Click a column letter or a tool name to select it.</p>' +
+  '<div class="hm-tip" id="hm-tip" role="tooltip" hidden></div></div>' +
+  '<aside class="hm-panel" id="hm-panel" aria-label="Heatmap setup"><div class="hm-tabs" role="tablist" id="hm-tabs"></div><div class="hm-tabbody" id="hm-body" role="tabpanel"></div></aside></div>';
+host.classList.add('hm-on'); live.hidden = false;
+var $ = function (id) { return document.getElementById(id); };
+var blocksEl = $('hm-blocks'), tipEl = $('hm-tip'), bodyEl = $('hm-body'), stageEl = $('hm-stage');
+$('hm-modes').innerHTML = P.MODES.map(function (m) { return '<button type="button" class="hm-btn" data-mode="' + m + '" aria-pressed="false">' + P.MODE_LABEL[m] + '</button>'; }).join('');
+$('hm-tabs').innerHTML = TABS.map(function (t) { return '<button type="button" class="hm-tab" role="tab" data-tab="' + t[0] + '" aria-selected="false">' + t[1] + '</button>'; }).join('');
+
+/* ---------------------------------------------------------------- state and hash */
+function writeHash() { try { var h = P.encodeHash(st); if (location.hash !== h) history.replaceState(null, '', h); } catch (e) { /* file: pages may refuse */ } }
+function setPanel(open) { panelOpen = open; $('hm-main').classList.toggle('hm-nopanel', !open); $('hm-pt').setAttribute('aria-expanded', String(open)); try { localStorage.setItem(LS, open ? '1' : '0'); } catch (e) { /* storage blocked */ } }
+function trackHidden(b) { return st.trk.indexOf(data.blocks[b].track) >= 0; }
+
+/* ---------------------------------------------------------------- figure */
+function renderFigure() {
+  var out = [];
+  data.blocks.forEach(function (block, b) {
+    if (trackHidden(b)) return;
+    var svg = P.renderBlock(data, b, st, 'hm-l' + b, {cvd: cvd});
+    lastA[b] = P.arrange(data, b, st);
+    out.push('<div class="hm-scroll' + (st.zoom === 'fit' ? ' hm-fit' : '') + '" data-block="' + b + '">' + svg + '</div>');
+  });
+  blocksEl.innerHTML = out.length ? out.join('') : '<p class="hm-muted">Every track is hidden (Filters tab).</p>';
+  if (pending) { var el = blocksEl.querySelector('[data-cell][data-b="' + pending.b + '"][data-i="' + pending.i + '"][data-j="' + pending.j + '"]'); pending = null; if (el) { el.setAttribute('tabindex', '0'); el.focus(); } }
+}
+function renderLegend() {
+  var cnt = {}; data.cols.forEach(function (c) { cnt[c.fam] = (cnt[c.fam] || 0) + 1; });
+  $('hm-legend').innerHTML = '<b>Families</b> ' + data.fams.map(function (f) {
+    var on = st.fam.indexOf(f[0]) < 0;
+    return '<button type="button" class="hm-chip" data-fam="' + f[0] + '" aria-pressed="' + on + '" title="Click to ' + (on ? 'collapse' : 'expand') + ' ' + esc(f[1]) + '"><i style="background:' + P.TINT[f[0]] + '"></i>' + f[0] + ' ' + esc(f[1]) + ' (' + cnt[f[0]] + ')</button>';
+  }).join('') + '<span class="hm-muted">Bright end = good in every column; ▼ marks lower-is-better metrics (colour flipped); hatched = not available; † unvalidated.</span>';
+}
+function renderToolbar() {
+  [].forEach.call(document.querySelectorAll('#hm-modes .hm-btn'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === st.mode)); });
+  $('hm-rc').setAttribute('aria-pressed', String(!!st.rc)); $('hm-cc').setAttribute('aria-pressed', String(!!st.cc)); $('hm-ov').setAttribute('aria-pressed', String(!!st.ov));
+  [].forEach.call(document.querySelectorAll('#hm-tabs .hm-tab'), function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-tab') === st.tab)); });
+}
+
+/* ---------------------------------------------------------------- cell facts */
+function cellFacts(b, i, j) {
+  var block = data.blocks[b], col = data.cols[j], cell = block.cells[i][j], A = lastA[b] || P.arrange(data, b, st);
+  var rowIdx = A.rowIdx, vals = rowIdx.map(function (r) { return block.cells[r][j][0]; }), scs = rowIdx.map(function (r) { return block.cells[r][j][1]; });
+  var pos = rowIdx.indexOf(i), hi = col.dir === 'higher';
+  var rk = pos >= 0 ? P.columnView('rank', hi, vals, scs)[pos] : null, z = pos >= 0 ? P.columnView('z', hi, vals, scs)[pos] : null;
+  var n = vals.filter(function (v) { return v != null; }).length, fl = pos >= 0 ? P.columnView('z', hi, vals, scs)[pos] : null;
+  return {flat: !!(fl && fl[2]), block: block, col: col, cell: cell, rank: rk ? rk[1] : null, z: z ? z[1] : null, n: n};
+}
+function sigText(b, i, j) {
+  var sg = data.blocks[b].sig && data.blocks[b].sig[data.cols[j].id];
+  if (!sg) return '';
+  if (sg.best.indexOf(i) >= 0) return 'Best in this column' + (sg.tested ? ' (within its task)' : '') + '.';
+  var s = [];
+  if (sg.tied.indexOf(i) >= 0) s.push('Declared equivalent to the best');
+  if (sg.info[i]) s.push(sg.info[i]);
+  return s.length ? s.join('; ') + '.' : '';
+}
+function tipHTML(b, i, j) {
+  var f = cellFacts(b, i, j), row = f.block.rows[i], col = f.col, cell = f.cell, h = '<b>' + esc(row.label) + ' <span>(' + esc(f.block.track) + (row.task ? ', ' + esc(row.task) : '') + ')</span></b>';
+  h += '<span>' + esc(col.id + ' ' + col.name) + '</span><br>';
+  if (cell[0] == null) return h + 'Not available: ' + esc(cell[3] || 'no value') + '<em>Never drawn as 0.</em>';
+  h += 'Value: <b style="display:inline">' + esc(P.fmtValue(col, cell[0])) + '</b> ' + esc(col.src === 'scorecard' ? col.unit : '') + ' (' + (col.dir === 'lower' ? 'lower is better' : 'higher is better') + ')<br>';
+  h += cell[1] != null ? 'Score ' + cell[1].toFixed(0) + '/100, ' + (cell[2] ? P.BAND_GLYPH[cell[2]] + ' ' + P.BAND_LABEL[cell[2]] : '') + ' <span>[' + esc(col.status) + ']</span><br>' : '<span>No 0-100 score: ' + esc(P.reasonFor(data, b, i, j, 'score')) + '</span><br>';
+  h += 'Rank ' + (f.rank == null ? 'n/a' : P.fmtShown('rank', col, f.rank)) + ' of ' + f.n + (f.z != null ? ', z ' + P.fmtShown('z', col, f.z) : '');
+  if (cell[4]) h += '<br><span>' + cell[4] + ' isolate' + (cell[4] === 1 ? '' : 's') + '</span>';
+  var sg = sigText(b, i, j); if (sg) h += '<em>' + esc(sg) + '</em>';
+  if (f.flat) h += '<em>No spread: every tool with a value has the same number here, so the colour is neutral, not "good".</em>';
+  if (col.unval) h += '<em>Alignment-derived and unvalidated.</em>';
+  return h;
+}
+function showTip(el) {
+  var b = +el.getAttribute('data-b'), i = +el.getAttribute('data-i'), j = +el.getAttribute('data-j');
+  tipEl.innerHTML = tipHTML(b, i, j); tipEl.hidden = false;
+  var sr = stageEl.getBoundingClientRect(), er = el.getBoundingClientRect(), tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+  var x = er.left - sr.left + er.width / 2 - tw / 2, y = er.top - sr.top - th - 6;
+  if (y < 0) y = er.bottom - sr.top + 6;
+  tipEl.style.left = Math.max(4, Math.min(sr.width - tw - 4, x)) + 'px'; tipEl.style.top = Math.max(0, y) + 'px';
+}
+function hideTip() { tipEl.hidden = true; }
+
+/* ---------------------------------------------------------------- panel tabs */
+function chk(id, label, on, extra) { return '<div class="hm-row"><label><input type="checkbox" ' + id + (on ? ' checked' : '') + '> ' + label + '</label>' + (extra || '') + '</div>'; }
+function layoutTab() {
+  var modeText = {raw: 'Cells show the value in its own unit. Colour is the min-max position inside each column of the track, so it is relative: a flat column is neutral, not good, and tiny differences can look large.',
+    score: 'Cells show the scorecard 0-100 score (piecewise linear through the thresholds of config/scorecard.tsv; the bands are mostly proposed). Colour is absolute. Metrics without bands (A4, C2, the leaderboard metrics) have no score and are hatched.',
+    rank: 'Cells show the rank inside the track (1 = best; ties share the average rank). Colour = (n - rank) / (n - 1).',
+    z: 'Cells show the z-score of each metric across the tools shown (population sd), sign flipped for lower-is-better so positive is better; diverging colour clamped to -2..2. A column with no spread is 0; fewer than two tools is not available.'};
+  return '<h4>Value shown</h4>' + P.MODES.map(function (m) { return '<div class="hm-row"><label><input type="radio" name="hm-mode" value="' + m + '"' + (st.mode === m ? ' checked' : '') + '> ' + P.MODE_LABEL[m] + '</label></div>'; }).join('') +
+    '<p class="hm-muted">' + esc(modeText[st.mode]) + '</p><h4>Clustering</h4>' +
+    chk('data-opt="rc"', 'Cluster tools (dendrogram at the left)', st.rc) + chk('data-opt="cc"', 'Cluster metrics (dendrogram on top)', st.cc) +
+    '<p class="hm-muted">Average linkage on the colour values (root-mean-square distance over the cells two items share; fewer than two shared cells for metrics, none for tools = undefined, filled with the largest defined distance). With five or so tools the trees are a layout aid, not evidence of structure. Off = scorecard order, metrics grouped by family. Sorting by a column overrides the tool order.</p>' +
+    '<h4>Overlay and size</h4>' + chk('data-opt="ov"', 'Mark the best tool (ring) and tools equivalent to it (dot)', st.ov) +
+    '<p class="hm-muted">' + (data.notes.comparisons ? 'Dots come from benchmark.paired_comparisons.tsv (equivalent == yes) and only for metrics that were tested (F1 and the bin F1 of the leaderboard tasks); no dot means not shown equivalent, not different.' : 'No paired-comparison table was written, so only the best tool is marked.') + '</p>' +
+    '<div class="hm-row"><label><input type="radio" name="hm-zoom" value="natural"' + (st.zoom !== 'fit' ? ' checked' : '') + '> Natural size (scrolls)</label><label><input type="radio" name="hm-zoom" value="fit"' + (st.zoom === 'fit' ? ' checked' : '') + '> Fit to width</label></div>' +
+    '<h4>Colour scale</h4><p class="hm-muted">Sequential: viridis (perceptually uniform, colour-blind safe; the palette toggle of the report switches to cividis). Z-score: vermillion to blue through white. The number in the cell, the hatch and the markers carry the same information as the colour.</p>' +
+    '<div class="hm-row"><button type="button" class="hm-btn" data-act="reset">Reset the view</button></div>';
+}
+function filtersTab() {
+  var h = '<h4>Tracks (never pooled)</h4>' + data.blocks.map(function (bl, b) { return chk('data-trk="' + esc(bl.track) + '"', esc(bl.track) + ' (' + bl.rows.length + ' tools)', !trackHidden(b)); }).join('');
+  h += '<h4>Metric families (click a chip above too)</h4>' + data.fams.map(function (f) { return chk('data-fam-cb="' + f[0] + '"', f[0] + ' ' + esc(f[1]), st.fam.indexOf(f[0]) < 0); }).join('');
+  h += '<h4>Metrics</h4><div class="hm-list">' + data.cols.map(function (c) { return chk('data-colcb="' + c.id + '"', esc(c.id + ' ' + c.short) + (c.dir === 'lower' ? ' ▼' : ''), st.cols.indexOf(c.id) < 0); }).join('') + '</div>';
+  h += '<h4>Tools</h4><div class="hm-list">' + data.blocks.map(function (bl) { return '<div class="hm-muted">' + esc(bl.track) + '</div>' + bl.rows.map(function (r) { return chk('data-rowcb="' + esc(r.id) + '"', esc(r.label), st.rows.indexOf(r.id) < 0); }).join(''); }).join('') + '</div>';
+  return h + '<p class="hm-muted">Rank, z-score and the min-max colour are recomputed over the tools shown.</p><div class="hm-row"><button type="button" class="hm-btn" data-act="showall">Show everything</button></div>';
+}
+function dataRows() {
+  var rows = [];
+  data.blocks.forEach(function (block, b) {
+    if (trackHidden(b)) return;
+    var A = lastA[b] || P.arrange(data, b, st), vr = {}, vz = {};
+    A.cols.forEach(function (col) {
+      var vals = A.rowIdx.map(function (r) { return block.cells[r][col.i][0]; }), scs = A.rowIdx.map(function (r) { return block.cells[r][col.i][1]; });
+      vr[col.id] = P.columnView('rank', col.dir === 'higher', vals, scs); vz[col.id] = P.columnView('z', col.dir === 'higher', vals, scs);
+    });
+    A.rowIdx.forEach(function (i, r) { A.cols.forEach(function (col) {
+      var c = block.cells[i][col.i], rk = vr[col.id][r], z = vz[col.id][r];
+      rows.push({b: b, i: i, j: col.i, track: block.track, tool: block.rows[i].label, metric: col.id, name: col.short, value: c[0], score: c[1], band: c[2], rank: rk ? rk[1] : null, z: z ? z[1] : null, reason: c[3]});
+    }); });
+  });
+  return rows;
+}
+function dataTab() {
+  var rows = dataRows(), q = dataQ.toLowerCase();
+  if (q) rows = rows.filter(function (r) { return (r.track + ' ' + r.tool + ' ' + r.metric + ' ' + r.name).toLowerCase().indexOf(q) >= 0; });
+  var k = dataSort.k, d = dataSort.dir;
+  rows.sort(function (a, b) {
+    var x = a[k], y = b[k];
+    if (x == null || y == null) return (x == null ? 1 : 0) - (y == null ? 1 : 0);
+    return (x < y ? -1 : x > y ? 1 : 0) * d;
+  });
+  var heads = [['track', 'Track'], ['tool', 'Tool'], ['metric', 'Metric'], ['value', 'Value'], ['score', 'Score'], ['rank', 'Rank'], ['z', 'z']];
+  var h = '<input type="search" id="hm-q" placeholder="Filter by tool or metric" aria-label="Filter the table" value="' + esc(dataQ) + '"><p class="hm-muted">' + rows.length + ' cells. Click a header to sort, a row for its drilldown. A blank value is not available, never 0.</p>';
+  h += '<table><thead><tr>' + heads.map(function (c) { return '<th scope="col" aria-sort="' + (k === c[0] ? (d > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sortk="' + c[0] + '">' + c[1] + '</button></th>'; }).join('') + '</tr></thead><tbody>';
+  rows.slice(0, 500).forEach(function (r) {
+    var col = data.cols[r.j];
+    h += '<tr data-pick="1" tabindex="0" data-b="' + r.b + '" data-i="' + r.i + '" data-j="' + r.j + '"><td>' + esc(r.track) + '</td><td>' + esc(r.tool) + '</td><td title="' + esc(col.name) + '">' + esc(r.metric) + '</td><td>' + (r.value == null ? '<span title="' + esc(r.reason) + '">n/a</span>' : esc(P.fmtValue(col, r.value))) + '</td><td>' + (r.score == null ? '-' : r.score.toFixed(0) + ' ' + (P.BAND_GLYPH[r.band] || '')) + '</td><td>' + (r.rank == null ? '-' : P.fmtShown('rank', col, r.rank)) + '</td><td>' + (r.z == null ? '-' : P.fmtShown('z', col, r.z)) + '</td></tr>';
+  });
+  return h + '</tbody></table>' + (rows.length > 500 ? '<p class="hm-muted">First 500 rows shown; the CSV holds all.</p>' : '');
+}
+function bandsTable(col) {
+  if (!col.bands) return '<p class="hm-muted">No threshold bands: ' + (col.src === 'leaderboard' ? 'a leaderboard metric, ranked as it is.' : 'none defined yet (needs a truth variant set and a panel decision).') + '</p>';
+  var b = col.bands, hi = col.dir === 'higher', op = hi ? '≥' : '≤';
+  return '<table><thead><tr><th>Band</th><th>Threshold</th><th>Score</th></tr></thead><tbody>' + [['excellent', 100], ['good', 85], ['moderate', 60], ['floor', 0]].map(function (r) {
+    return '<tr><td>' + (P.BAND_GLYPH[r[0]] || '□') + ' ' + (r[0] === 'floor' ? 'Floor' : P.BAND_LABEL[r[0]]) + '</td><td>' + op + ' ' + b[r[0]] + ' ' + esc(col.unit) + '</td><td>' + r[1] + '</td></tr>'; }).join('') + '</tbody></table>';
+}
+function defText(col) {
+  var h = '<p><b>' + esc(col.id + ' ' + col.name) + '</b></p><p class="hm-muted">' + esc(col.def) + '</p>';
+  h += '<p class="hm-muted">' + (col.dir === 'lower' ? '▼ Lower is better (colour flipped).' : 'Higher is better.') + ' Unit: ' + esc(col.unit || '-') + '. ';
+  if (col.src === 'scorecard') h += 'Weight ' + col.weight + '. Status <span class="hm-tag hm-' + col.status + '">' + esc(col.status) + '</span> ' + esc(STATUS_WORD[col.status] || '') + '.';
+  else h += 'From benchmark.leaderboard.tsv.';
+  if (col.unval) h += ' <b>Alignment-derived and unvalidated.</b>';
+  return h + '</p>';
+}
+function sampleTable(b, i, j) {
+  var block = data.blocks[b], col = data.cols[j], ps = block.ps && block.ps[i] && block.ps[i][j];
+  if (!block.ps) return '<p class="hm-muted">Per-isolate values are not embedded (more than 80 isolates); see scores.tsv.</p>';
+  if (col.id.charAt(0) === 'E' && col.src === 'scorecard') return '<p class="hm-muted">A per-tool summary from benchmark.performance.tsv, not a per-isolate value.</p>';
+  if (!ps) return '<p class="hm-muted">No isolate has a value for this cell.</p>';
+  var vals = ps.filter(function (x) { return x != null; }), mx = Math.max.apply(null, vals.map(Math.abs).concat([1e-12]));
+  return '<table><thead><tr><th>Isolate</th><th>Value</th><th></th></tr></thead><tbody>' + data.samples.map(function (s, k) {
+    var v = ps[k]; return '<tr><td>' + esc(s) + '</td><td>' + (v == null ? '<span title="undefined for this isolate, not zero">n/a</span>' : esc(P.fmtValue(col, v))) + '</td><td>' + (v == null ? '' : '<span class="hm-bar" style="width:' + Math.max(2, Math.round(60 * Math.abs(v) / mx)) + 'px"></span>') + '</td></tr>'; }).join('') + '</tbody></table>' +
+    '<p class="hm-muted">The aggregate is computed from these (scorecard weighting rules), not simply their mean.</p>';
+}
+function detailTab() {
+  var s = st.sel ? st.sel.split('.') : null;
+  if (!s) return '<p class="hm-muted">Click a cell, a column letter or a tool name to see its drilldown here: the value, the definition, the threshold bands (fixed or proposed) and the per-isolate values behind the aggregate.</p>';
+  var b = +s[1];
+  if (!data.blocks[b]) return '<p class="hm-muted">That selection is not in this report.</p>';
+  if (s[0] === 'x') {
+    var i = +s[2], j = +s[3], f = cellFacts(b, i, j), row = data.blocks[b].rows[i], col = data.cols[j], cell = f.cell;
+    var h = '<h5>' + esc(row.label) + ' <span class="hm-muted">' + esc(data.blocks[b].track) + '</span></h5>';
+    if (cell[0] == null) h += '<div class="hm-na"><b>' + esc(col.id + ' ' + col.name) + ': not available.</b> ' + esc(cell[3] || 'no value') + ' It is never drawn as 0 or coloured.</div>';
+    else h += '<div class="hm-big">' + esc(P.fmtValue(col, cell[0])) + ' <small>' + esc(col.src === 'scorecard' ? col.unit : '') + '</small></div><p>' + (cell[1] != null ? 'Score <b>' + cell[1].toFixed(0) + '</b>/100, ' + P.BAND_GLYPH[cell[2]] + ' <b>' + P.BAND_LABEL[cell[2]] + '</b>. ' : 'No 0-100 score (' + esc(P.reasonFor(data, b, i, j, 'score')) + '). ') + 'Rank ' + (f.rank == null ? 'n/a' : P.fmtShown('rank', col, f.rank)) + ' of ' + f.n + (f.z != null ? ', z ' + P.fmtShown('z', col, f.z) : '') + '.</p>';
+    var sg = sigText(b, i, j); if (sg) h += '<p class="hm-muted">' + esc(sg) + '</p>';
+    return h + '<h4>Definition</h4>' + defText(col) + '<h4>Threshold bands</h4>' + bandsTable(col) + '<h4>Per-isolate values</h4>' + sampleTable(b, i, j) +
+      '<div class="hm-row"><button type="button" class="hm-btn" data-act="selcol" data-j="' + j + '" data-b="' + b + '">Select the column</button><button type="button" class="hm-btn" data-act="selrow" data-i="' + i + '" data-b="' + b + '">Select the tool</button></div>';
+  }
+  if (s[0] === 'c') {
+    var cc = colById(s[2]); if (!cc) return '<p class="hm-muted">That metric is not in this report.</p>';
+    var A = lastA[b] || P.arrange(data, b, st), block = data.blocks[b];
+    var vals = block.rows.map(function (_, i2) { return block.cells[i2][cc.i][0]; }), scs = block.rows.map(function (_, i2) { return block.cells[i2][cc.i][1]; });
+    var rk = P.columnView('rank', cc.dir === 'higher', vals, scs);
+    var hh = '<h5>' + esc(cc.id + ' ' + cc.name) + '</h5>' + defText(cc) + '<h4>Threshold bands</h4>' + bandsTable(cc) + '<h4>' + esc(block.track) + ': tools</h4><table><thead><tr><th>Tool</th><th>Value</th><th>Score</th><th>Rank</th></tr></thead><tbody>';
+    block.rows.forEach(function (r, i2) { hh += '<tr data-pick="1" tabindex="0" data-b="' + b + '" data-i="' + i2 + '" data-j="' + cc.i + '"><td>' + esc(r.label) + '</td><td>' + (vals[i2] == null ? '<span title="' + esc(block.cells[i2][cc.i][3]) + '">n/a</span>' : esc(P.fmtValue(cc, vals[i2]))) + '</td><td>' + (scs[i2] == null ? '-' : scs[i2].toFixed(0)) + '</td><td>' + (rk[i2] ? P.fmtShown('rank', cc, rk[i2][1]) : '-') + '</td></tr>'; });
+    return hh + '</tbody></table><div class="hm-row"><button type="button" class="hm-btn" data-act="sort" data-d="desc" data-id="' + cc.id + '">Sort tools best first</button><button type="button" class="hm-btn" data-act="sort" data-d="asc" data-id="' + cc.id + '">Worst first</button><button type="button" class="hm-btn" data-act="sort" data-d="" data-id="">Clear sort</button><button type="button" class="hm-btn" data-act="hidecol" data-id="' + cc.id + '">Hide column</button></div>';
+  }
+  var ri = +s[2], rw = data.blocks[b].rows[ri]; if (!rw) return '<p class="hm-muted">That tool is not in this report.</p>';
+  var r2 = '<h5>' + esc(rw.label) + ' <span class="hm-muted">' + esc(data.blocks[b].track) + (rw.task ? ', ' + esc(rw.task) : '') + '</span></h5><p>' + (rw.overall == null ? 'No scorecard overall (no metric could be scored).' : 'Scorecard overall <b>' + rw.overall + '</b>, scored weight share ' + rw.share + '.') + (rw.nsamples ? ' ' + rw.nsamples + ' isolates in the leaderboard.' : '') + '</p><table><thead><tr><th>Metric</th><th>Value</th><th>Score</th></tr></thead><tbody>';
+  data.cols.forEach(function (c) { var cl = data.blocks[b].cells[ri][c.i]; r2 += '<tr data-pick="1" tabindex="0" data-b="' + b + '" data-i="' + ri + '" data-j="' + c.i + '"><td>' + esc(c.id + ' ' + c.short) + '</td><td>' + (cl[0] == null ? '<span title="' + esc(cl[3]) + '">n/a</span>' : esc(P.fmtValue(c, cl[0]))) + '</td><td>' + (cl[1] == null ? '-' : cl[1].toFixed(0)) + '</td></tr>'; });
+  return r2 + '</tbody></table><div class="hm-row"><button type="button" class="hm-btn" data-act="hiderow" data-id="' + esc(rw.id) + '">Hide this tool</button></div>';
+}
+function exportTab() {
+  return '<h4>Export the current view</h4><div class="hm-row"><button type="button" class="hm-btn" data-act="svg">SVG</button><button type="button" class="hm-btn" data-act="png">PNG</button><button type="button" class="hm-btn" data-act="csv">CSV of the matrix</button></div>' +
+    '<p class="hm-muted">SVG and PNG draw what is on screen (mode, order, hidden rows and columns, overlay). The CSV is long-form: one line per tool and metric with the raw value, score, band, rank, z-score, the value shown in the current mode, and the reason when a cell is not available. Nothing is exported as 0 when it is missing.</p>' +
+    '<h4>Link to this view</h4><p class="hm-muted">The address bar carries the setup (keys beginning hm), so the link reproduces the view.</p>';
+}
+function renderPanel() {
+  var keep = bodyEl.scrollTop, fn = {layout: layoutTab, filters: filtersTab, data: dataTab, detail: detailTab, export: exportTab}[st.tab] || layoutTab;
+  bodyEl.innerHTML = fn(); bodyEl.scrollTop = keep;
+  var q = $('hm-q'); if (q && document.activeElement && document.activeElement.id === 'hm-q') { /* keep typing focus below */ }
+}
+function renderAll(keepQ) { renderToolbar(); renderLegend(); renderFigure(); if (!keepQ) renderPanel(); writeHash(); }
+function select(sel, openDetail) { st.sel = sel; if (openDetail) { st.tab = 'detail'; if (!panelOpen) setPanel(true); } renderAll(); }
+
+/* ---------------------------------------------------------------- export */
+function download(name, blob) { var a = document.createElement('a'), url = URL.createObjectURL(blob); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 500); }
+function combinedSvg() {
+  var parts = [], y = 0, w = 0;
+  data.blocks.forEach(function (bl, b) {
+    if (trackHidden(b)) return;
+    var s = P.renderBlock(data, b, st, 'hm-x' + b, {cvd: cvd}), m = /viewBox="0 0 (\d+) (\d+)"/.exec(s);
+    if (!m) return; w = Math.max(w, +m[1]);
+    parts.push('<svg x="0" y="' + y + '" width="' + m[1] + '" height="' + m[2] + '" viewBox="0 0 ' + m[1] + ' ' + m[2] + '">' + s.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') + '</svg>'); y += +m[2] + 10;
+  });
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + y + '" width="' + w + '" height="' + y + '" font-family="Arial,Helvetica,sans-serif"><rect width="' + w + '" height="' + y + '" fill="#fff"/>' + parts.join('') + '</svg>';
+}
+function exportPng() {
+  var svg = combinedSvg(), m = /viewBox="0 0 (\d+) (\d+)"/.exec(svg), img = new Image(), scale = 2;
+  img.onload = function () {
+    try { var c = document.createElement('canvas'); c.width = m[1] * scale; c.height = m[2] * scale; var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(function (bl) { if (bl) download('tool_heatmap.png', bl); }, 'image/png'); } catch (e) { alert('PNG export is blocked by this browser here; use SVG.'); }
+  };
+  img.onerror = function () { alert('PNG export failed; use SVG.'); };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/* ---------------------------------------------------------------- events */
+function cellOf(t) { while (t && t !== blocksEl) { if (t.getAttribute && t.getAttribute('data-cell')) return t; t = t.parentNode; } return null; }
+function closestAttr(t, a) { while (t && t !== host) { if (t.getAttribute && t.getAttribute(a) !== null) return t; t = t.parentNode; } return null; }
+blocksEl.addEventListener('mouseover', function (e) { var c = cellOf(e.target); if (c) showTip(c); });
+blocksEl.addEventListener('mouseout', function (e) { if (cellOf(e.target)) hideTip(); });
+blocksEl.addEventListener('focusin', function (e) { var c = cellOf(e.target); if (c) showTip(c); });
+blocksEl.addEventListener('focusout', hideTip);
+blocksEl.addEventListener('click', function (e) {
+  var c = cellOf(e.target), h;
+  if (c) { select('x.' + c.getAttribute('data-b') + '.' + c.getAttribute('data-i') + '.' + c.getAttribute('data-j'), true); return; }
+  if ((h = closestAttr(e.target, 'data-colhead'))) { select('c.' + h.getAttribute('data-b') + '.' + data.cols[+h.getAttribute('data-colhead')].id, true); return; }
+  if ((h = closestAttr(e.target, 'data-rowhead'))) { select('r.' + h.getAttribute('data-b') + '.' + h.getAttribute('data-rowhead'), true); }
+});
+blocksEl.addEventListener('keydown', function (e) {
+  var c = cellOf(e.target); if (!c) return;
+  var b = c.getAttribute('data-b'), r = +c.getAttribute('data-r'), k = +c.getAttribute('data-c'), key = e.key, dr = 0, dc = 0;
+  if (key === 'Escape') { hideTip(); return; }
+  if (key === 'ArrowRight') dc = 1; else if (key === 'ArrowLeft') dc = -1; else if (key === 'ArrowDown') dr = 1; else if (key === 'ArrowUp') dr = -1;
+  if (dr || dc) {
+    e.preventDefault();
+    var nx = blocksEl.querySelector('[data-cell][data-b="' + b + '"][data-r="' + (r + dr) + '"][data-c="' + (k + dc) + '"]');
+    if (nx) { c.setAttribute('tabindex', '-1'); nx.setAttribute('tabindex', '0'); nx.focus(); }
+    return;
+  }
+  var i = c.getAttribute('data-i'), j = c.getAttribute('data-j');
+  pending = {b: b, i: i, j: j};
+  if (key === 'Enter' || key === ' ') { e.preventDefault(); select('x.' + b + '.' + i + '.' + j, true); }
+  else if (key === 'c') select('c.' + b + '.' + data.cols[+j].id, true);
+  else if (key === 'r') select('r.' + b + '.' + i, true);
+  else if (key === 's') { var id = data.cols[+j].id, cur = st.sort; st.sort = cur === id + ':desc' ? id + ':asc' : (cur === id + ':asc' ? '' : id + ':desc'); renderAll(); }
+  else pending = null;
+});
+host.addEventListener('click', function (e) {
+  var t = e.target, el;
+  if ((el = closestAttr(t, 'data-mode'))) { st.mode = el.getAttribute('data-mode'); renderAll(); return; }
+  if (t.id === 'hm-rc') { st.rc = st.rc ? 0 : 1; renderAll(); return; }
+  if (t.id === 'hm-cc') { st.cc = st.cc ? 0 : 1; renderAll(); return; }
+  if (t.id === 'hm-ov') { st.ov = st.ov ? 0 : 1; renderAll(); return; }
+  if (t.id === 'hm-pt') { setPanel(!panelOpen); return; }
+  if ((el = closestAttr(t, 'data-tab'))) { st.tab = el.getAttribute('data-tab'); renderToolbar(); renderPanel(); writeHash(); return; }
+  if ((el = closestAttr(t, 'data-fam')) && el.className.indexOf('hm-chip') >= 0) { var f = el.getAttribute('data-fam'); toggle(st.fam, f, st.fam.indexOf(f) >= 0); renderAll(); return; }
+  if ((el = closestAttr(t, 'data-sortk'))) { var k = el.getAttribute('data-sortk'); dataSort = {k: k, dir: dataSort.k === k ? -dataSort.dir : 1}; renderPanel(); return; }
+  if ((el = closestAttr(t, 'data-pick'))) { select('x.' + el.getAttribute('data-b') + '.' + el.getAttribute('data-i') + '.' + el.getAttribute('data-j'), false); return; }
+  if ((el = closestAttr(t, 'data-act'))) {
+    var a = el.getAttribute('data-act');
+    if (a === 'reset') { st = P.defaults(); renderAll(); }
+    else if (a === 'showall') { st.fam = []; st.cols = []; st.rows = []; st.trk = []; renderAll(); }
+    else if (a === 'selcol') select('c.' + el.getAttribute('data-b') + '.' + data.cols[+el.getAttribute('data-j')].id, false);
+    else if (a === 'selrow') select('r.' + el.getAttribute('data-b') + '.' + el.getAttribute('data-i'), false);
+    else if (a === 'sort') { st.sort = el.getAttribute('data-d') ? el.getAttribute('data-id') + ':' + el.getAttribute('data-d') : ''; renderAll(); }
+    else if (a === 'hidecol') { toggle(st.cols, el.getAttribute('data-id'), false); st.sel = ''; renderAll(); }
+    else if (a === 'hiderow') { toggle(st.rows, el.getAttribute('data-id'), false); st.sel = ''; renderAll(); }
+    else if (a === 'svg') download('tool_heatmap.svg', new Blob([combinedSvg()], {type: 'image/svg+xml'}));
+    else if (a === 'png') exportPng();
+    else if (a === 'csv') download('tool_heatmap_matrix.csv', new Blob([P.csvText(data, st)], {type: 'text/csv'}));
+  }
+});
+host.addEventListener('change', function (e) {
+  var t = e.target, v;
+  if (t.name === 'hm-mode') { st.mode = t.value; renderAll(); }
+  else if (t.name === 'hm-zoom') { st.zoom = t.value; renderAll(); }
+  else if ((v = t.getAttribute('data-opt'))) { st[v] = t.checked ? 1 : 0; renderAll(); }
+  else if ((v = t.getAttribute('data-trk'))) { toggle(st.trk, v, t.checked); renderAll(); }
+  else if ((v = t.getAttribute('data-fam-cb'))) { toggle(st.fam, v, t.checked); renderAll(); }
+  else if ((v = t.getAttribute('data-colcb'))) { toggle(st.cols, v, t.checked); renderAll(); }
+  else if ((v = t.getAttribute('data-rowcb'))) { toggle(st.rows, v, t.checked); renderAll(); }
+});
+host.addEventListener('input', function (e) { if (e.target.id === 'hm-q') { dataQ = e.target.value; var pos = e.target.selectionStart; renderPanel(); var q = $('hm-q'); q.focus(); try { q.setSelectionRange(pos, pos); } catch (x) { /* ignore */ } } });
+host.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('data-pick') !== null) { e.preventDefault(); e.target.click(); } });
+window.addEventListener('hashchange', function () { if (location.hash.indexOf('#fig-heatmap?') === 0) { st = P.decodeHash(location.hash); renderAll(); host.scrollIntoView({block: 'start'}); } });
+try { new MutationObserver(function () { var on = document.documentElement.getAttribute('data-cvd') === '1'; if (on !== cvd) { cvd = on; renderFigure(); } }).observe(document.documentElement, {attributes: true, attributeFilter: ['data-cvd']}); } catch (e) { /* no observer */ }
+
+cvd = document.documentElement.getAttribute('data-cvd') === '1';
+setPanel(panelOpen);
+renderAll();
+host.setAttribute('data-hm-live', '1');
+})();
+</script>

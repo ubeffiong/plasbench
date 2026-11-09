@@ -92,7 +92,7 @@ for column in ("micro_f1", "mean_contig_f1_count", "mean_contig_mcc_bp", "mean_b
     assert board[column] != "", (column, board)
 assert board["mean_contig_f1_count"] == "1.0000" and board["mean_lw_bin_f1_assembly_aware"] != "", board
 html = open(f"{tmp}/results/benchmark.report.html", encoding="utf-8").read()
-assert "id='metric-framework'" in html and "href='#metric-framework'" in html
+assert "id='metric-framework'" in html   # a panel of the Method ranking container; the old link still resolves
 assert "PLASMID 1" in html and "CHROMOSOME 2" in html and "SHORT 1" in html, "report must show the contig label counts"
 assert "id='database-membership'" in html
 print("stage 6 puts the contig, ARI, assembly-aware and micro columns in the leaderboard and the report -> PASS")

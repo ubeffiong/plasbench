@@ -282,6 +282,11 @@ def main(argv=None):
     open_report_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
     open_report_group.add_argument("--results-dir", type=Path,
                                    help="Results directory containing benchmark.report.html.")
+    report_pdf_parser = sub.add_parser("report-pdf", help="Export a completed HTML report to a PDF with headless Edge or Chrome.")
+    report_pdf_group = report_pdf_parser.add_mutually_exclusive_group(required=True)
+    report_pdf_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
+    report_pdf_group.add_argument("--results-dir", type=Path, help="Results directory containing benchmark.report.html.")
+    report_pdf_parser.add_argument("--out", type=Path, help="PDF to write (default: next to the report, same name with .pdf).")
     sub.add_parser("test", help="Run the complete offline regression suite.")
     upgrade_parser = sub.add_parser(
         "upgrade",
@@ -673,6 +678,12 @@ def main(argv=None):
         open_report_in_browser(report)
         print(f"[plasbench] Opening report: {Path(report).resolve()}")
         code = 0
+    elif args.command == "report-pdf":
+        report = args.report or (args.results_dir / "benchmark.report.html")
+        command = [sys.executable, str(root / "python" / "export_report_pdf.py"), "--report", str(report)]
+        if args.out:
+            command += ["--out", str(args.out)]
+        code = run(command, root)
     elif args.command == "test":
         code = run([bash_command(), "test/run_tests.sh"], root)
     elif args.command == "upgrade":

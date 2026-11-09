@@ -318,7 +318,7 @@ PV.geneLength = function (g, len) { return g.start <= g.end ? g.end - g.start : 
 /* compact payload -> model. See report_maps.viewer_payload for the key legend. */
 PV.normalize = function (raw) {
   var m = {id: raw.id, sample: raw.sample, plasmid: raw.plasmid, length: raw.length, circular: raw.circ === undefined ? null : raw.circ,
-           repeatRich: raw.rr === undefined ? null : raw.rr, repeatRegions: raw.rg || [], notes: raw.notes || [], genes: [], tools: [], events: [], gc: null,
+           repeatRich: raw.rr === undefined ? null : raw.rr, repeatRegions: raw.rg || [], notes: raw.notes || [], genes: [], tools: [], events: [], blocks: [], gc: null,
            toolsNotDrawn: raw.nd || []};
   (raw.genes || []).forEach(function (g, i) {
     m.genes.push({i: i, start: g.s, end: g.e, strand: g.t || '', name: g.n || '', product: g.p || '', cls: g.c || 'other', kind: g.k || 'gene', ftype: g.f || ''});
@@ -330,7 +330,12 @@ PV.normalize = function (raw) {
                 amr: (t.am || []).map(function (a) { return {gene: a.g, cls: a.c || '', start: a.s, end: a.e, placement: a.pl || '', repOk: a.rc || '', record: a.r || '', bin: a.b || ''}; }),
                 outcomeDetail: t.od ? {bin: t.od.b || '', recall: t.od.r === undefined ? null : t.od.r, precision: t.od.p === undefined ? null : t.od.p, bins: t.od.n === undefined ? null : t.od.n,
                                        mergedWith: t.od.m || '', contamination: t.od.c === undefined ? null : t.od.c} : null,
-                def: !!t.d, events: []};
+                def: !!t.d, events: [], blocks: [], blocksOmitted: t.bo || 0, collinear: t.cf === undefined ? null : t.cf, orderConflicts: t.oc === undefined ? null : t.oc};
+    (t.bl || []).forEach(function (b) {
+      var bk = {i: m.blocks.length, tool: i, toolName: t.n, record: String(b[0]), qLen: b[1], qStart: b[2], qEnd: b[3], strand: b[4] === '-' ? '-' : '+', start: b[5], end: b[6],
+                identity: b[7] === null || b[7] === undefined ? null : b[7], mapq: b[8] === null || b[8] === undefined ? null : b[8]};
+      m.blocks.push(bk); tool.blocks.push(bk);
+    });
     (t.ev || []).forEach(function (ev) {
       var e = {i: m.events.length, tool: i, toolName: t.n, toolLabel: t.dn || t.n, pos: ev.p, type: ev.t || 'event', record: ev.r || '', detail: ev.d || ''};
       m.events.push(e); tool.events.push(e);
@@ -344,12 +349,13 @@ PV.normalize = function (raw) {
 /* ---------- state ---------- */
 PV.defaultState = function () {
   return {sample: '', plasmid: '', view: {start: 0, span: 0}, sel: null, tab: 'layers',
-    layers: {fwd: true, rev: true, feat: true, repeat: true, gc: true, skew: true, events: true, scale: true, labels: true},
+    layers: {fwd: true, rev: true, feat: true, repeat: true, gc: true, skew: true, events: true, scale: true, labels: true, align: true},
+    alMode: 'ref', alRibbons: true, alGenes: true,
     toolsOn: null, toolSort: 'default', order: 'gtc', thGene: 1, thTool: 1, hideCls: {}, minBp: 0, labelMode: 'key', q: '',
     cvd: false, labelSize: 1, legend: true, hl: null};
 };
-PV.LAYER_KEYS = ['fwd', 'rev', 'feat', 'repeat', 'gc', 'skew', 'events', 'scale', 'labels'];
-PV.TABS = ['layers', 'filters', 'tools', 'features', 'events', 'detail', 'appearance', 'export'];
+PV.LAYER_KEYS = ['fwd', 'rev', 'feat', 'repeat', 'gc', 'skew', 'events', 'scale', 'labels', 'align'];
+PV.TABS = ['layers', 'filters', 'tools', 'alignment', 'features', 'events', 'detail', 'appearance', 'export'];
 PV.sortTools = function (model, mode) {
   var a = model.tools.slice();
   if (mode === 'completeness') { a.sort(function (p, q) { return ((q.completeness === null ? -1 : q.completeness) - (p.completeness === null ? -1 : p.completeness)) || p.i - q.i; }); }
@@ -653,6 +659,12 @@ PV.buildScene = function (model, state, opts) {
     } else if (k === 't') {
       var b2 = rings['t' + i];
       if (b2) { ov.push(pathEl(PV.ringPath(cx, cy, b2[0], b2[1]), 'none', stroke, width, ex)); }
+    } else if (k === 'b') {
+      var bk = model.blocks[i], b3 = bk ? rings['t' + bk.tool] : null;
+      if (!bk || !b3) { return; }
+      PV.clipPiece(view, Math.max(0, bk.start), Math.min(L, bk.end)).forEach(function (f) {
+        ov.push(pathEl(PV.sectorPath(cx, cy, b3[0] - 1, b3[1] + 1, PV.relAngle(view, f.rel0), PV.relAngle(view, f.rel1)), 'none', stroke, width, ex));
+      });
     } else if (k === 'e') {
       var ev = model.events[i];
       if (!ev) { return; }
@@ -876,6 +888,9 @@ PV.encodeHash = function (st, model) {
   if (st.labelSize !== d.labelSize) { q.push('ls=' + st.labelSize); }
   if (!st.legend) { q.push('legend=0'); }
   if (st.hl !== null && st.hl !== undefined) { q.push('hl=' + st.hl); }
+  if (st.alMode !== d.alMode) { q.push('alm=' + st.alMode); }
+  if (st.alRibbons !== d.alRibbons) { q.push('alr=' + (st.alRibbons ? 1 : 0)); }
+  if (st.alGenes !== d.alGenes) { q.push('alg=' + (st.alGenes ? 1 : 0)); }
   if (st.tab !== d.tab) { q.push('tab=' + st.tab); }
   return '#' + HASH_ID + '?' + q.join('&');
 };
@@ -890,7 +905,7 @@ PV.decodeHash = function (hash) {
     var eq = pair.indexOf('='), k = eq < 0 ? pair : pair.slice(0, eq), v = eq < 0 ? '' : pair.slice(eq + 1), m;
     if (k === 'msample') { st.sample = dec(v); }
     else if (k === 'mplasmid') { st.plasmid = dec(v); }
-    else if (k === 'sel') { m = /^([gte])(\d+)$/.exec(v); if (m) { st.sel = {k: m[1], i: parseInt(m[2], 10)}; } }
+    else if (k === 'sel') { m = /^([gteb])(\d+)$/.exec(v); if (m) { st.sel = {k: m[1], i: parseInt(m[2], 10)}; } }
     else if (k === 'view') {
       m = /^(\d+)-(\d+)(w?)$/.exec(v);
       if (m) { st.viewRaw = {start: parseInt(m[1], 10), end: parseInt(m[2], 10), wrapZero: m[3] === 'w'}; }
@@ -910,6 +925,9 @@ PV.decodeHash = function (hash) {
     else if (k === 'ls') { st.labelSize = parseFloat(v) || 1; }
     else if (k === 'legend') { st.legend = v !== '0'; }
     else if (k === 'hl') { st.hl = parseInt(v, 10); if (isNaN(st.hl)) { delete st.hl; } }
+    else if (k === 'alm') { if (v === 'ref' || v === 'contig') { st.alMode = v; } }
+    else if (k === 'alr') { st.alRibbons = v !== '0'; }
+    else if (k === 'alg') { st.alGenes = v !== '0'; }
     else if (k === 'tab') { if (PV.TABS.indexOf(v) >= 0) { st.tab = v; } }
   });
   return st;

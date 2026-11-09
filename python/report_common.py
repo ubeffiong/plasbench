@@ -135,6 +135,24 @@ STYLE = """
 .rpt-collapsible>summary{cursor:pointer;font:bold 13px Arial,sans-serif;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;list-style-position:inside}
 .rpt-collapsible[open]>summary{margin-bottom:8px}
 @media print{.rpt-chips,.rpt-navgroups{display:none}.rpt-figure{break-inside:avoid}}
+/* info popovers (python/report_info.py, assets/report/info_script.html): a quiet circled i that carries a note */
+.rpt-info{position:relative;display:inline-block;margin-left:.45em;vertical-align:middle;font-weight:400;font-style:normal;text-transform:none;letter-spacing:normal;float:none!important}
+.rpt-info-btn{box-sizing:border-box;width:17px;height:17px;min-width:17px;padding:0;margin:0;border:1px solid #7b8a80;border-radius:50%;background:transparent;color:#4f5f55;font:italic 700 11px/15px Georgia,'Times New Roman',serif;text-align:center;cursor:help;vertical-align:1px}
+.rpt-info-btn:hover,.rpt-info-btn:focus-visible,.rpt-info.rpt-show .rpt-info-btn{background:var(--ink,#17231d);border-color:var(--ink,#17231d);color:#fff}
+.rpt-info-btn:focus-visible{outline:2px solid #0072B2;outline-offset:2px}
+.rpt-info-pop{float:none;position:absolute;left:0;top:calc(100% + 6px);z-index:1000;box-sizing:border-box;width:max-content;max-width:min(420px,90vw);padding:10px 13px;background:#fff;color:#17231d;border:1px solid #9fb0a5;border-radius:8px;box-shadow:0 6px 22px rgba(21,36,28,.22);font:400 13px/1.5 Arial,Helvetica,sans-serif;font-style:normal;text-align:left;text-transform:none;letter-spacing:normal;white-space:normal;visibility:hidden;opacity:0;pointer-events:none}
+.rpt-info-pop::before{content:'';position:absolute;left:0;right:0;top:-9px;height:9px}
+.rpt-info-pop.rpt-up::before{top:auto;bottom:-9px}
+.rpt-info-pop a{color:#0a5a41;text-decoration:underline}
+.rpt-info-pop code{font:12px Consolas,Menlo,monospace;background:#eef2ee;padding:0 3px;border-radius:3px}
+.rpt-info-para{display:block}.rpt-info-para+.rpt-info-para{margin-top:8px}
+.rpt-info:hover>.rpt-info-pop,.rpt-info:focus-within>.rpt-info-pop,.rpt-info.rpt-show>.rpt-info-pop{visibility:visible;opacity:1;pointer-events:auto}
+:root.rpt-js .rpt-info-pop{position:fixed;left:0;top:0}
+:root.rpt-js .rpt-info:not(.rpt-show)>.rpt-info-pop{visibility:hidden;opacity:0;pointer-events:none}
+details summary .rpt-info{float:none;font-size:13px}
+figcaption .rpt-info{margin-left:0}
+@media (prefers-reduced-motion:no-preference){.rpt-info-pop{transition:opacity .12s ease-out}.rpt-info-btn{transition:background-color .12s,color .12s}}
+@media print{.rpt-info{display:block;margin:2px 0 0}.rpt-info-btn{display:none!important}.rpt-info-pop,:root.rpt-js .rpt-info-pop{position:static!important;visibility:visible!important;opacity:1!important;pointer-events:auto;width:auto;max-width:none;padding:0;border:0;box-shadow:none;background:none;color:var(--muted,#627067);font:400 13px/1.5 Georgia,'Times New Roman',serif}.rpt-info-pop::before{display:none}}
 """
 
 

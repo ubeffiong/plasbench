@@ -17,6 +17,11 @@ from urllib.parse import quote
 from plasbench_common import display_tool_name  # noqa: E402
 
 
+def info_script():
+    """Positions the info popovers (hover, focus, click to pin, Esc); see python/report_info.py."""
+    return report_asset("info_script.html")
+
+
 def report_asset(name):
     """Static CSS/JS/HTML fragment shipped in assets/report/ (kept out of the code so this
     module holds logic, not 1,000+ lines of embedded web assets)."""
@@ -313,6 +318,57 @@ GLOSSARY = {
                "reconstruction labels in the main table, which score every "
                "predicted base across the whole sample, not one plasmid at a time.",
     },
+    "CPRR": {
+        "what": "Correct plasmid reconstruction rate: the share of truth plasmids reconstructed correctly, meaning matched to a bin, "
+                "coverage at least 0.95, that bin at least 95% from this plasmid, not split, and (where base-level metrics are valid) "
+                "alignment identity at least 0.99. Pooled over plasmids with a cluster bootstrap interval; the isolate-level form "
+                "(correct plasmids over truth plasmids of each isolate) is the ranking metric on the long-read and hybrid tracks.",
+        "why": "It asks the question a laboratory asks: did the tool give me the whole plasmid, cleanly? Base F1 can stay high "
+               "while a small plasmid is missed or a bin is split. The thresholds are pre-specified and not tuned.",
+    },
+    "Length-weighted binning F1": {
+        "what": "F1 of bases placed in the correct bin, after a one-to-one match between predicted bins and truth plasmids; "
+                "precision and recall are weighted by sequence length.",
+        "why": "It is the short-read reconstruction ranking score (primary endpoint), so it differs from Base F1, which only asks "
+               "whether a base is called plasmid at all.",
+    },
+    "MCC": {
+        "what": "Matthews correlation coefficient of the plasmid versus chromosome call, -1 to 1, counted per contig or weighted by contig length.",
+        "why": "Plasmid contigs are a small minority, so accuracy and F1 can look good for a tool that calls almost nothing; "
+               "MCC stays near 0 for a rule that does no better than chance.",
+    },
+    "F2 and F0.5": {
+        "what": "F-beta scores at the base level: F2 weights recall twice as much as precision, F0.5 weights precision twice as much as recall.",
+        "why": "Which error is worse depends on the use: missing a resistance plasmid (favour F2) or reporting chromosome as plasmid (favour F0.5).",
+    },
+    "Scorecard score": {
+        "what": "A 0 to 100 score for one metric, piecewise linear through the thresholds of config/scorecard.tsv (excellent 100, good 85, "
+                "moderate 60, floor 0), clamped; the overall is the weighted mean of the metrics that could be scored, with the weights renormalised.",
+        "why": "It is another view of the same results, never the ranking, and its thresholds are mostly proposed rather than standards.",
+    },
+    "Scorecard band": {
+        "what": "Excellent, good, moderate or poor, by the metric's own thresholds (a value on an edge takes the better band); "
+                "overall bands are 90 or more excellent, 75 or more good, 55 or more moderate, otherwise poor.",
+        "why": "It is the one band vocabulary of the scorecard. The grade A to D in the Summary and the High, Medium and Low "
+               "F1 colours are separate, simpler readings and are not the same bands.",
+    },
+    "Scored weight share": {
+        "what": "The weight of the scorecard metrics that could be scored, divided by the total weight of 100. A share below 0.5 is marked provisional.",
+        "why": "A metric that cannot be scored is left out, never counted as zero, so the overall says how much of the scorecard it rests on. "
+               "SNP concordance and structural variant F1 have no bands, so the share is at most 0.83.",
+    },
+    "NGOC": {
+        "what": "Neighbouring gene order conservation: the share of adjacent feature pairs in the reference that are still adjacent, "
+                "in the same orientation, on the same predicted record.",
+        "why": "It shows whether genes and landmarks stay in order, which base-level scores cannot. With landmark features only it is "
+               "landmark-order conservation; the feature count says which. Alignment-derived and not validated.",
+    },
+    "Outcome states": {
+        "what": "How every run ended: completed, reused, failed (tool), failed (resource: timeout or out-of-memory kill), "
+                "infrastructure failure (the container or command never started, or the disk was full) or not applicable (skipped).",
+        "why": "A failed run on a plasmid-bearing isolate scores F1 = 0 for that tool; resource failures score 0 by default; an infrastructure "
+               "failure says nothing about the tool, is never scored and should be rerun.",
+    },
 }
 
 # Terms whose label in the interface differs from the glossary key.
@@ -446,9 +502,9 @@ def guided_findings(leaderboard, cards, scores, status_counts):
         }.get(sig_raw, " Too few samples are shared with the runner-up for a paired "
                        "significance test yet, so this lead is not statistically assessed.")
         findings.append({
-            "tone": "good" if sig_raw == "true" else "caution", "label": "Highest Base F1",
-            "text": f"{esc(best['tool'])} leads on mean Base F1 at {best_f1:.3f}{margin}."
-                    f"{spread}.{sig_clause}",
+            "tone": "good" if sig_raw == "true" else "caution", "label": f"Highest {headline_label(best)}",
+            "text": f"{esc(best['tool'])} leads on {esc(headline_label(best))} at {best_f1:.3f}{margin}."
+                    f"{spread + '.' if spread else ''}{sig_clause}",
             "target": "#statistics", "action": "See the paired evidence",
         })
 
@@ -482,12 +538,52 @@ def guided_findings(leaderboard, cards, scores, status_counts):
     if failed:
         findings.append({
             "tone": "caution", "label": "Runs that did not complete",
-            "text": f"{failed} run(s) failed and are excluded from every mean rather than "
-                    "counted as zero. A method that fails often can still rank well on the "
-                    "runs it finished.",
+            "text": f"{failed} run(s) failed. In the ranking a failed run on a plasmid-bearing isolate "
+                    "scores 0 for that tool, so a method that fails often is penalised for it "
+                    "(timeouts and out-of-memory kills score 0 by default; a run that never "
+                    "started because of the infrastructure is never scored; a skipped run is "
+                    "left out of the ranking).",
             "target": "#health", "action": "Open execution health",
         })
     return findings
+
+
+def recommendation_note(recommendations, headline):
+    """One line saying why the overall primary method differs from the headline leader, when it does."""
+    overall = [r for r in recommendations if r.get("scope") == "overall" and r.get("recommendation") == "primary"]
+    if not overall or not headline:
+        return ""
+    primary = overall[0]
+    leader = headline.get("tool")
+    if primary.get("tool") == leader:
+        return ""
+    other = next((r for r in recommendations if r.get("scope") == "overall" and r.get("tool") == leader), None)
+    score = optional_number(primary.get("decision_score"))
+    other_score = optional_number(other.get("decision_score")) if other else None
+    both = (f" (decision score {score:.3f} against {other_score:.3f} for {esc(leader)})"
+            if score is not None and other_score is not None else "")
+    f1 = optional_number(primary.get("mean_f1"))
+    other_f1 = optional_number(other.get("mean_f1")) if other else None
+    tie = (f" Their mean F1 is {f1:.3f} and {other_f1:.3f}." if f1 is not None and other_f1 is not None else "")
+    return ("<p class='lead'><strong>Why this is not always the headline leader.</strong> The method recommended overall is "
+            f"{esc(primary.get('tool'))}, chosen by the decision score{both}, which puts accuracy first and then counts failure "
+            "rate, structural diagnostics, runtime and memory; the leaderboard leader "
+            f"({esc(leader)}) is ranked by {esc(headline_label(headline))} alone.{tie}</p>")
+
+
+def grade_rows_html(cards):
+    """The report-card table rows (tool, grade, Base F1, plasmid recall, contamination, runs completed) for `cards` from report_cards()."""
+    return "".join(
+        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
+        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
+            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
+            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
+            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
+                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
+            contam=("not measured" if c["parts"]["contamination"] is None
+                    else f"{c['parts']['contamination']:.1%}"),
+            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
+        for c in cards)
 
 
 def summary_section(leaderboard, cards, findings, scores, status_counts, metadata):
@@ -512,27 +608,7 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         f"<div class='sum-stat' title='{esc(hint)}'><small>{esc(label)}</small>"
         f"<strong>{value}</strong></div>" for label, value, hint in stats)
 
-    grade_html = "".join(
-        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
-        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
-            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
-            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
-            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
-                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
-            contam=("not measured" if c["parts"]["contamination"] is None
-                    else f"{c['parts']['contamination']:.1%}"),
-            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
-        for c in cards) if False else "".join(
-        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
-        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
-            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
-            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
-            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
-                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
-            contam=("not measured" if c["parts"]["contamination"] is None
-                    else f"{c['parts']['contamination']:.1%}"),
-            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
-        for c in cards)
+    grade_html = grade_rows_html(cards)
 
     find_html = "".join(
         f"<li class='finding {f['tone']}'><span class='flabel'>{esc(f['label'])}</span>"
@@ -545,7 +621,7 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         "Every figure here is repeated in full further down; this is the entry point, not a "
         "second source.</p>"
         f"<div class='sum-stats'>{stat_html}</div>"
-        "<h3>Report card</h3>"
+        "<h3>Report card <span class='pb-scope' data-iso-scope>All isolates</span></h3>"
         "<p class='lead'>A reading aid, not an acceptance threshold. The grade is a weighted "
         "composite of Base F1 (40%), plasmid recall (25%), freedom from chromosomal "
         "contamination (20%) and completed runs (15%); A &ge;0.90, B &ge;0.80, C &ge;0.65, "
@@ -553,7 +629,7 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         "never counted as zero. The components are shown so the grade can be taken apart.</p>"
         "<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Grade</th>"
         "<th>Base F1</th><th>Plasmid recall</th><th>Chromosomal contamination</th>"
-        f"<th>Runs completed</th></tr></thead><tbody>{grade_html}</tbody></table></div>"
+        f"<th>Runs completed</th></tr></thead><tbody data-iso-slot='summary-card'>{grade_html}</tbody></table></div>"
         "<h3>Start here</h3>"
         f"<ul class='findings'>{find_html}</ul>"
         "</section>")
@@ -841,21 +917,21 @@ def interpretation(leaderboard, status_counts):
         sig_raw = (winner.get("significant_vs_runner_up") or "").strip().lower()
         if sig_raw in ("true", "1"):
             notes.append(
-                f"{winner['tool']} leads {runner['tool']} by {gap:.3f} mean F1 "
+                f"{winner['tool']} leads {runner['tool']} by {gap:.3f} {headline_label(winner)} "
                 f"({winner_f1:.3f} versus {runner_f1:.3f}), and this margin is statistically "
                 "significant against its closest competitor (paired sign-flip permutation "
                 "test, Holm-adjusted p<0.05 -- see Significant vs runner-up)."
             )
         elif sig_raw in ("false", "0"):
             notes.append(
-                f"{winner['tool']} ranks above {runner['tool']} by {gap:.3f} mean F1 "
+                f"{winner['tool']} ranks above {runner['tool']} by {gap:.3f} {headline_label(winner)} "
                 f"({winner_f1:.3f} versus {runner_f1:.3f}), but this margin is NOT "
                 "statistically significant (paired permutation test) -- this run alone "
                 "does not establish a real difference between the two."
             )
         else:
             notes.append(
-                f"{winner['tool']} ranks above {runner['tool']} by {gap:.3f} mean F1 "
+                f"{winner['tool']} ranks above {runner['tool']} by {gap:.3f} {headline_label(winner)} "
                 f"({winner_f1:.3f} versus {runner_f1:.3f}); too few samples are shared "
                 "between them for the paired significance test to run, so this margin "
                 "is not yet statistically assessed either way."
@@ -1012,7 +1088,7 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
                     overlap=overlap,
                     f1_after=_value_or(row, "mean_f1_after_database", "not assessed"),
                 ))
-        table = ("<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Mean F1 (ranking)</th>"
+        table = ("<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Mean base F1 (shared samples)</th>"
                  "<th>Ranked on samples</th><th>Independent clusters</th><th>Mean F1, all scored</th>"
                  "<th>Failed runs scored 0</th><th>Mean precision</th><th>Strict precision</th><th>Base recall</th>"
                  "<th>Recall ceiling</th><th>Ceiling-adjusted recall</th><th>Redundant predicted bp</th>"
@@ -1025,7 +1101,7 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
                              "Mean precision and strict precision by tool",
                              "Strict precision is not available for these score rows.") + "</div>"
             "<div class='chart-card'><h4>F1 on all samples vs samples released after the tool's database</h4>"
-            + dumbbell_chart(rows, "mean_f1", "mean_f1_after_database", "Mean F1 (ranking)",
+            + dumbbell_chart(rows, "mean_f1", "mean_f1_after_database", "Mean base F1 (shared samples)",
                              "Mean F1, truth released after database",
                              "Mean F1 overall and on samples released after the tool's database",
                              "Not assessed: fill database_release_date in config/tool_database_releases.tsv "
@@ -1036,6 +1112,8 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
     return (
         "<section id='robustness'><h2>Robustness diagnostics</h2>"
         "<p class='lead'>How far each headline number can be trusted. None of these change the ranking. "
+        "<strong>Mean base F1 (shared samples)</strong> is the base-level F1 on those shared samples; it is not the "
+        "leaderboard's ranking score, which is length-weighted binning F1 or CPRR depending on the track. "
         "<strong>Ranked on</strong>: every tool is ranked on the samples all ranked tools share, and a "
         "failed tool run on a plasmid-bearing sample counts as F1 = 0. <strong>Independent clusters</strong>: "
         "confidence intervals and permutation tests resample whole BioProjects, because isolates from one "
@@ -1860,6 +1938,26 @@ function overlay(){const x=state(),svg=$('vq-tracks').querySelector('svg');if(!x
 </script>"""
 
 
+def resolve_results_dir(scores_path, out):
+    """The results directory is the folder that holds --scores, not the parent of --out.
+
+    Every per-sample file (bin matches, selected candidates, maps, visualisations) and every
+    benchmark.*.tsv table the report reads lives beside scores.tsv. Taking the folder from --out
+    silently turned about ten sections into 'Not run' whenever the report was written elsewhere."""
+    scores_dir = Path(scores_path).resolve().parent
+    results_dir = scores_dir
+    if not scores_dir.is_dir():
+        results_dir = out.parent
+        print(f"WARNING: the folder of --scores ({scores_dir}) does not exist; "
+              f"reading results from the parent of --out: {results_dir}", file=sys.stderr)
+    if not any(results_dir.glob("benchmark.*.tsv")):
+        print(f"WARNING: {results_dir} contains no benchmark.*.tsv tables; sections that read them "
+              f"will show 'Not run'. Point --scores at the results folder.", file=sys.stderr)
+    if out.parent != results_dir:
+        print(f"Note: report written to {out.parent}; results are read from {results_dir}", file=sys.stderr)
+    return results_dir
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--project-root", required=True)
@@ -1898,6 +1996,7 @@ def main():
 
     project = Path(args.project_root).resolve()
     out = Path(args.out).resolve()
+    results_dir = resolve_results_dir(args.scores, out)
     scores = read_tsv(args.scores)
     status = read_tsv(args.tool_status) if Path(args.tool_status).is_file() else []
     leaderboard = read_tsv(args.leaderboard)
@@ -2064,7 +2163,7 @@ def main():
 
     import report_wiring
     robustness_html = robustness_section(track_leaderboards, ordered_tracks or list(track_leaderboards),
-                                         report_wiring.overlap_statuses(str(out.parent)))
+                                         report_wiring.overlap_statuses(str(results_dir)))
 
     score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
     score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
@@ -2074,7 +2173,7 @@ def main():
         if not row.get("bin_f1"):
             continue
         sample, tool = row["sample"], row["tool"]
-        matches = out.parent / sample / f"{tool}.bin_matches.tsv"
+        matches = results_dir / sample / f"{tool}.bin_matches.tsv"
         detail = "-"
         if matches.is_file():
             detail = f"<a href='{relative_link(matches, out)}' download>Download matches TSV</a>"
@@ -2116,7 +2215,8 @@ def main():
                 fp_bp=int(number(fp_bp)) if fp_bp else 0,
             )
         )
-    zero_plasmid_html = "".join(zero_plasmid_rows) or "<tr><td colspan='4'>No plasmid-free isolate was scored in this run.</td></tr>"
+    zero_plasmid_html = "".join(zero_plasmid_rows) or ("<tr><td colspan='4'>No plasmid-free isolate was scored in this run. There is no switch for this: the "
+        "section fills when the cohort contains an isolate whose truth has no plasmid and a tool was run on it.</td></tr>")
 
     # Graded plasmid-recovery completeness tiers: a supplementary breakdown
     # between "any recall" (Mean plasmid recall, at its own configured
@@ -2189,7 +2289,8 @@ def main():
         ) for row in cohort_qc_flagged
     )
     if not cohort_qc_flags:
-        cohort_qc_html = "<tr><td colspan='7'>No cohort QC flags file was available for this run.</td></tr>"
+        cohort_qc_html = ("<tr><td colspan='7'>No cohort QC flags file was available for this run. Stage 6 writes it when "
+                         "COHORT_QC_FLAGS_ENABLED=1 and the cohort has at least COHORT_QC_MIN_COHORT_SIZE isolates.</td></tr>")
     elif not cohort_qc_flagged:
         withheld = next((row for row in cohort_qc_flags if row.get("note", "").startswith("cohort has")), None)
         cohort_qc_html = ("<tr><td colspan='7'>{}</td></tr>".format(esc(withheld["note"])) if withheld
@@ -2260,7 +2361,8 @@ def main():
             finding=esc(r.get("finding", "-"))) for r in audit_flagged
     ) or ("<tr><td colspan='7'>No truth sequence was flagged"
           + (" (sequences with no annotation are not evaluated, not cleared)." if truth_label_audit
-             else "; no audit table was available.") + "</td></tr>")
+             else "; no audit table was available (stage 6 writes it from the truth annotation: RUN_TRUTH_LABEL_EVIDENCE=1 "
+                                   "or RUN_REFERENCE_ANNOTATION=1).") + "</td></tr>")
     truth_label_audit_download = ""
     if args.truth_label_audit and Path(args.truth_label_audit).is_file():
         truth_label_audit_download = " <a href='{}' download>Download the full audit</a>.".format(
@@ -2290,7 +2392,10 @@ def main():
         + "<tr><th colspan='2'>By evidence type</th></tr>" + _count_rows(orthogonal_summary.get("by_evidence_type"))
         + "<tr><th colspan='2'>By status</th></tr>" + _count_rows(orthogonal_summary.get("by_status"))
     ) if orthogonal_summary else ("<tr><td colspan='2'>No orthogonal evidence was supplied. This is the normal "
-                                  "case: laboratory confirmation is optional and never changes a score.</td></tr>")
+                                  "case: laboratory confirmation is optional and never changes a score. To add some, run "
+                                  "<code>plasbench validate-orthogonal-evidence --evidence evidence.tsv --out "
+                                  "results/orthogonal_validation.summary.json</code> and rebuild the report "
+                                  "(docs/ORTHOGONAL_VALIDATION.md).</td></tr>")
     orthogonal_boundary = esc(orthogonal_summary.get("claim_boundary", "Evidence is supplementary and does not change benchmark scores."))
 
     # QUAST supplementary diagnostics (descriptive only): summarised per tool and
@@ -2330,7 +2435,7 @@ def main():
 
     recommendation_rows = "".join(
         "<tr><td>{scope}</td><td>{group}</td><td>{tool}</td><td>{state}</td><td>{n}</td><td>{coverage}</td>"
-        "<td>{f1}</td><td>{plasmid}</td><td>{runtime}</td><td>{memory}</td><td>{reason}</td></tr>".format(
+        "<td>{f1}</td><td>{plasmid}</td><td>{runtime}</td><td>{memory}</td><td>{reason}</td><td>{decision}</td></tr>".format(
             scope=esc(row.get("scope", "-")), group=esc(row.get("group", "-")),
             tool=esc(row.get("tool", "-")),
             state="Eligible operational method" if row.get("recommendation") == "primary" else "Candidate only",
@@ -2339,8 +2444,11 @@ def main():
             runtime=esc(row.get("median_runtime_seconds") or "not recorded"),
             memory=esc(row.get("median_peak_rss_kb") or "not recorded"),
             reason=esc(row.get("reason", "-")),
+            decision=esc(row.get("decision_score") or "-"),
         ) for row in recommendations if row.get("recommendation") == "primary"
-    ) or "<tr><td colspan='11'>No coverage-gated recommendation was produced for this cohort or stratum.</td></tr>"
+    ) or "<tr><td colspan='12'>No coverage-gated recommendation was produced for this cohort or stratum.</td></tr>"
+
+    recommendation_why = recommendation_note(recommendations, headline_leaderboard[0] if headline_leaderboard else None)
 
     validation_rows = "".join(
         "<tr><td>{study}</td><td>{held}</td><td>{tool}</td><td>{train}</td><td>{f1}</td><td>{status}</td><td>{note}</td></tr>".format(
@@ -2411,18 +2519,18 @@ def main():
                 pr_auc=esc(row.get("pr_auc") or "-"),
             ) for row in rows
         ) or "<tr><td colspan='7'>No completed tool was scored for this sample.</td></tr>"
-        selection = out.parent / "selected_candidates" / sample / f"{sample}.selection_report.json"
+        selection = results_dir / "selected_candidates" / sample / f"{sample}.selection_report.json"
         if not selection.is_file():
-            selection = out.parent / sample / "selected_candidate" / "selection_report.json"
+            selection = results_dir / sample / "selected_candidate" / "selection_report.json"
         selection_link = (f" <a href='{relative_link(selection, out)}' download>Download selected-candidate report</a>"
                           if selection.is_file() else "")
-        selection_cards.append(selection_card(sample, out.parent, out))
+        selection_cards.append(selection_card(sample, results_dir, out))
         # PR-curve charts: only for tools that exposed a per-record probability
         # (adapters/SCORES.md) and were actually scored for this sample.
         pr_cards = "".join(
             "<div class='chart-card pr-chart-card'><h3>{tool}</h3>{chart}</div>".format(
                 tool=esc(row["tool"]),
-                chart=pr_curve_chart(read_pr_curve(out.parent, sample, row["tool"]), row.get("pr_auc")),
+                chart=pr_curve_chart(read_pr_curve(results_dir, sample, row["tool"]), row.get("pr_auc")),
             ) for row in rows if row.get("pr_auc")
         )
         pr_section = f"<div class='pr-chart-grid'>{pr_cards}</div>" if pr_cards else ""
@@ -2457,7 +2565,7 @@ def main():
             "</tr></thead><tbody>{}</tbody></table></details>".format(esc(tool), esc(summary), body)
         )
 
-    roots = [("Results", out.parent), ("Logs", project / "logs"), ("Data", project / "data")]
+    roots = [("Results", results_dir), ("Logs", project / "logs"), ("Data", project / "data")]
     explorers = []
     artifact_count = 0
     artifact_bytes = 0
@@ -2474,7 +2582,7 @@ def main():
     best_value = esc(best["tool"]) if best else "No scored tool"
     best_f1 = esc((best.get("ranking_score") or best.get("mean_f1") or "-") if best else "-")
     best_metric = esc(headline_label(best) if best and best.get("ranking_score") else "mean F1")
-    run_folder = out.parent.name or "results"
+    run_folder = results_dir.name or "results"
     cohort_label = Path(args.sample_sheet).stem if args.sample_sheet else "not recorded"
     run_label = f"{run_folder} · cohort {cohort_label}"
     # With more than one track scored, this headline is about ONE of them --
@@ -2483,7 +2591,7 @@ def main():
                   if best and multi_track else "")
     insight_notes, insight_tone = interpretation(headline_leaderboard, status_counts)
     cards = report_cards(headline_leaderboard, scores)
-    optional_analysis = optional_analysis_html(args.manifest, out.parent, out)
+    optional_analysis = optional_analysis_html(args.manifest, results_dir, out)
     findings = guided_findings(headline_leaderboard, cards, scores, status_counts)
     summary_html = summary_section(headline_leaderboard, cards, findings, scores, status_counts, metadata)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
@@ -2494,7 +2602,7 @@ def main():
         f"<option value='{esc(tool)}'>{esc(display_tool_name(tool))}</option>"
         for tool in tools
     )
-    visual_html = (visual_quality_section(scores, status, out.parent, out) + advanced_visual_script()
+    visual_html = (visual_quality_section(scores, status, results_dir, out) + advanced_visual_script()
                    + record_dotplot_script() + context_visual_script() + evidence_selection_script()
                    + plasmid_summary_script() + structural_and_feature_tracks_script() + protein_annotation_script()
                    + bin_flow_script() + explorer_navigation_script()
@@ -2506,15 +2614,16 @@ def main():
                    + section_nav_script()
                    + agreement_pointer_script()
                    + lazy_visualization_script())
-    explorer_html = evidence_explorer_section(args.project_root, scores, out.parent,
+    explorer_html = evidence_explorer_section(args.project_root, scores, results_dir,
                                               vendor_html, visual_html)
     enterprise_html = enterprise_view_section(args.project_root, scores, status, leaderboard,
-                                              metadata, out.parent, vendor_html, explorer_html)
+                                              metadata, results_dir, vendor_html, explorer_html)
     # Further benchmark dimensions (accuracy, feature preservation, bin quality, performance, power,
     # scenarios, composite, reproducibility): one module renders them all; missing tables show empty states.
     import report_dimensions
     dimension_nav_html, dimension_sections_html = report_dimensions.render(
-        args.dimensions_prefix or str(out.with_suffix("")) + ".absent", esc, lambda path: relative_link(Path(path), out))
+        args.dimensions_prefix or str(out.with_suffix("")) + ".absent", esc, lambda path: relative_link(Path(path), out),
+        scores_path=args.scores, samples_path=args.sample_sheet)
     page = f"""<!doctype html>
 <html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>PlasBench report: {esc(run_label)}</title>
@@ -2533,7 +2642,7 @@ def main():
 <section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. Where at least five shared samples exist, the statistics section adds paired confidence intervals and permutation evidence with Holm adjustment.</p><ul>{insight_html}</ul></div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
 <section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Perfect reference recovery requires F1 and plasmid recall of 1 with no ambiguous, unmapped, or off-truth predicted bases. Strict reconstruction additionally requires perfect available bin diagnostics; neither label proves nucleotide identity or circular closure. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p>{leaderboard_panels}</section>
-<section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p><div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
+<section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p>{recommendation_why}<div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th><th>Decision score</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
 <section id='validation'><h2>Leave-one-study-out validation</h2><p class='lead'>For each source study, the method is selected using all other studies and then evaluated only on the held-out study. A withheld result means the cohort does not yet have enough independent study evidence; it is not a failed method.</p><div class='panel'><table class='sortable'><thead><tr><th>Held-out study</th><th>Held-out samples</th><th>Training-selected method</th><th>Training samples</th><th>Held-out mean F1</th><th>Status</th><th>Interpretation</th></tr></thead><tbody>{validation_rows}</tbody></table></div></section>
 <section id='extended'><h2>Extended analyses and next steps</h2><p class='lead'>These optional analyses add decision context. They do not replace the primary benchmark ranking, and an unavailable item means it was not requested or lacked suitable evidence.</p><div class='insight neutral'>{optional_analysis}</div></section>
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
@@ -2569,7 +2678,7 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
 </body></html>"""
     page = page.replace("<a href='#scores'>", "<a href='#enterprise'>Interactive dashboard</a><a href='#scores'>")
     page = page.replace("<section id='scores'>", enterprise_html + "<section id='scores'>")
-    design_html = headline_design_section(out.parent)
+    design_html = headline_design_section(results_dir)
     page = page.replace("<section id='recommendations'>",
                         robustness_html + design_html + "<section id='recommendations'>", 1)
     page = page.replace("<a href='#recommendations'>Recommendations</a>",
@@ -2579,7 +2688,7 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # Question-bank sections (baselines/calibration, interpretation limits,
     # metadata completeness): python/report_question_bank.py.
     import report_question_bank
-    page = report_question_bank.inject(page, out.parent, leaderboard, args.data_dir)
+    page = report_question_bank.inject(page, results_dir, leaderboard, args.data_dir)
     # Scoring specification and panel sections; each is fed by an explicit argument.
     import report_scoring_spec
     spec_sources = {"leaderboard": args.leaderboard, "manifest": args.manifest, "scores": args.scores,
@@ -2596,7 +2705,7 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
         report_scoring_spec.markdown(spec_sources), encoding="utf-8")
     # Evaluation additions learned from PlasEval, plsMD and GAEMR (python/report_learnings.py): read from the stage-6 tables.
     import report_learnings
-    page = report_learnings.inject(page, str(out.parent), args.scores)
+    page = report_learnings.inject(page, str(results_dir), args.scores)
     # Report overhaul: scorecard, circular plasmid maps and the "Data in this report" inventory
     # (python/report_scorecard.py, report_maps.py, report_surfaces.py; shared helpers in report_common.py).
     # The workflow figure is in the README (python/report_workflow.py writes docs/images/workflow.svg).
@@ -2605,13 +2714,28 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     import report_scorecard
     import report_surfaces
     page = report_common.add_style(page)
-    page = report_scorecard.inject(page, str(out.parent), args.scores)
-    page = report_maps.inject(page, str(out.parent), args.data_dir, args.scores)
+    page = report_scorecard.inject(page, str(results_dir), args.scores,
+                                   samples_path=args.sample_sheet, report_path=str(out))
+    import report_isolates   # the isolate filter and the plasmid-by-tool matrix (python/report_isolates.py)
+    page = report_isolates.inject(page, str(results_dir), args.data_dir, args.scores, report_cards=report_cards,
+                                  grade_rows_html=grade_rows_html, label=display_tool_name)
+    page = report_maps.inject(page, str(results_dir), args.data_dir, args.scores)
+    import report_figures   # the figure gallery: ladder, 3D landscape, heatmap, distributions, forest, precision-recall
+    page = report_figures.inject(page, str(results_dir), args.data_dir, args.scores)
+    import report_post   # condense, fold and lay out the finished page (python/report_post.py lists the steps)
+    page = report_post.run(page)
     # Outputs the report did not show before (per-plasmid detail, assembly quality, clonal groups, regret, truth depth, column
     # groups, Run files) and the grouped navigation (python/report_wiring.py). Before the inventory so it lists them as shown.
-    page = report_wiring.inject(page, str(out.parent), args.data_dir, args.scores)
-    page = report_surfaces.inject(page, str(out.parent), args.data_dir)
+    page = report_wiring.inject(page, str(results_dir), args.data_dir, args.scores)
+    page = report_surfaces.inject(page, str(results_dir), args.data_dir)
     page = report_wiring.finish(page)
+    import report_merge    # fold related analyses into tabbed containers, keeping every old id as a panel id (python/report_merge.py)
+    page = report_merge.transform(page)
+    import report_layout   # the page shell: top bar, left rail, one view at a time, print/PDF form (python/report_layout.py)
+    page = report_layout.transform(page)
+    # Last step: move the explanatory notes into info popovers (python/report_info.py), then add their positioning script.
+    import report_info
+    page = report_info.transform(page, info_script())
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
