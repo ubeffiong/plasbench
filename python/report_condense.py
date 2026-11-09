@@ -220,7 +220,8 @@ def _scan(page):
                 for e in stack:
                     if e[0] == "table":
                         e[4].has_inner_table = True
-            blocked = any("rpt-info-pop" in e[1] for e in stack)
+            # tables in a popover, or in a <template> (the isolate filter's pre-rendered per-isolate content), are never windowed or tabbed
+            blocked = any("rpt-info-pop" in e[1] or e[0] == "template" for e in stack)
             rec = _Table(m.start(), m.end(), name, attrs, sec, in_table, blocked)
             tables.append(rec)
             if sec is not None:

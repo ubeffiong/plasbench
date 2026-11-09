@@ -34,7 +34,7 @@ COLLAPSE = {
 
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 RAW_TEXT = {"script", "style", "textarea", "title"}
-SKIP_ANCESTORS = {"details"}
+SKIP_ANCESTORS = {"details", "template"}
 SKIP_CLASSES = {"insight", "caution", "warn", "warning", "finding", "rpt-info-pop", "rpt-collapsible"}
 _TOKEN = re.compile(r"<!--.*?-->|<(/?)([A-Za-z][A-Za-z0-9:-]*)((?:[^>\"']|\"[^\"]*\"|'[^']*')*)>", re.S)
 _CLASS = re.compile(r"""\bclass\s*=\s*(?:'([^']*)'|"([^"]*)")""")

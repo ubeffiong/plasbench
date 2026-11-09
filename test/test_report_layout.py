@@ -113,8 +113,8 @@ def main():
     check("the rail links every section once, in document order", links == secs_in_order, links)
     check("the rail carries the label of the old nav link", ">files label<" in rail)
     check("the old flat nav is gone", "<nav class='nav'" not in out)
-    check("the title band carries the title, the run line and the KPI chip",
-          "<h1>The Report Title</h1>" in out and "<strong>Run:</strong> demo" in out and "<small>Samples observed</small><strong>6</strong>" in out
+    check("the title band carries the title and the KPI chip, and no run line (the run details are in Run metadata)",
+          "<h1>The Report Title</h1>" in out and "<strong>Run:</strong> demo" not in out and "<p class='rpt-runline'>" not in out and "<small>Samples observed</small><strong>6</strong>" in out
           and out.count("class='metrics'") == 1)
     check("the old dark <header> is replaced", "<header>" not in out)
     check("the top bar names the run", "<span class='rpt-top-run' title='demo · cohort c1'>" in out)

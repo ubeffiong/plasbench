@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """No analytic is lost when the report is restructured: every feature of every old section is checked.
 
-test/data/report_feature_manifest.tsv lists one machine-checkable row per feature of the report's
+test/fixtures/report_feature_manifest.tsv lists one machine-checkable row per feature of the report's
 old sections (a table's columns, a filter, a download link, a caveat sentence, ...). This test builds
 the demo report ONCE into a temporary copy of results_demo (so the report sits beside its data) and
 evaluates every row. A row is resolved through test/report_regions.region(), which finds a
@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT / "python"))
 import report_aliases  # noqa: E402
 import report_regions as rr  # noqa: E402
 
-MANIFEST = HERE / "data" / "report_feature_manifest.tsv"
+MANIFEST = HERE / "fixtures" / "report_feature_manifest.tsv"
 
 # Rows that are expected to fail until the work that makes them true is done. Keep this a plain,
 # sorted list: the lead empties it at the end of the container merge, and a row that is listed

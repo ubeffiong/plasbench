@@ -1,0 +1,255 @@
+feature_id	old_section	kind	check	description	new_home
+summary.01	summary	table_headers	Tool | Grade | Base F1 | Plasmid recall | Chromosomal contamination | Runs completed	table #1 keeps its columns (first 6 of 6)	summary
+summary.02	summary	heading	Report card	sub-heading survives (panel title)	summary
+summary.03	summary	heading	Start here	sub-heading survives (panel title)	summary
+leaderboard.01	leaderboard	table_headers	Rank | Tool | Scored | Completed | Failed | Skipped | Mean precision | Mean base recall | Mean plasmid recall | Perfect reference recovery | Strict reconstruction | Mean bin F1 (count-based) | Mean NMI | Mean VI	table #1 keeps its columns (first 14 of 20)	leaderboard
+leaderboard.02	leaderboard	table_headers	rank | analysis_track | task | tool | n_ranking_samples | ranking_basis | n_independent_clusters | significant_vs_runner_up | ranking_metric | ranking_score | ranking_ci_low | ranking_ci_high | ranking_species_basis | n_headline_species	table #2 keeps its columns (first 14 of 95)	leaderboard
+leaderboard.03	leaderboard	attr	[data-cg-toggle='Base-level accuracy']	column-group switch	leaderboard
+leaderboard.04	leaderboard	attr	[data-cg-toggle='Bins']	column-group switch	leaderboard
+leaderboard.05	leaderboard	attr	[data-cg-toggle='Calibration']	column-group switch	leaderboard
+leaderboard.06	leaderboard	attr	[data-cg-toggle='Contig layer']	column-group switch	leaderboard
+leaderboard.07	leaderboard	attr	[data-cg-toggle='Database leakage']	column-group switch	leaderboard
+leaderboard.08	leaderboard	attr	[data-cg-toggle='Plasmid recovery']	column-group switch	leaderboard
+leaderboard.09	leaderboard	attr	[data-cg-toggle='Rank and basis']	column-group switch	leaderboard
+leaderboard.10	leaderboard	attr	[data-cg-toggle='Run counts']	column-group switch	leaderboard
+leaderboard.11	leaderboard	attr	[data-cg-toggle='Zero-plasmid isolates']	column-group switch	leaderboard
+leaderboard.12	leaderboard	element_id	leaderboard-groups-table	named table	leaderboard
+robustness.01	robustness	table_headers	Tool | Mean base F1 (shared samples) | Ranked on samples | Independent clusters | Mean F1, all scored | Failed runs scored 0 | Mean precision | Strict precision | Base recall | Recall ceiling | Ceiling-adjusted recall | Redundant predicted bp | Database overlap (samples) | Mean F1 after database	table #1 keeps its columns (first 14 of 14)	robustness
+headline-design.01	headline-design	table_headers	Track | Task | Ranking metric | Reference standard | Species basis	table #1 keeps its columns (first 5 of 5)	headline-design
+headline-design.02	headline-design	table_headers	Sample | Tier | Assembly strategy | Polishing reads | Identity criteria valid | Labels evidence-checked | AMBIGUOUS plasmids | Reason	table #2 keeps its columns (first 8 of 8)	headline-design
+headline-design.03	headline-design	table_headers	Track / task | Tool | Species | Samples | Independent clusters | Mean ranking metric | In headline	table #3 keeps its columns (first 7 of 7)	headline-design
+headline-design.04	headline-design	heading	Reference-tier sensitivity	sub-heading survives (panel title)	headline-design
+headline-design.05	headline-design	heading	Species balance	sub-heading survives (panel title)	headline-design
+headline-design.06	headline-design	heading	Truth provenance	sub-heading survives (panel title)	headline-design
+metric-framework.01	metric-framework	table_headers	Track / task | Tool | Base F1 (macro) | Base F1 (micro) | Contig F1 (count) | Contig F1 (length) | MCC (count) | MCC (length) | Binning F1 (length) | Binning F1 (assembly-aware) | ARI | CPRR	table #1 keeps its columns (first 12 of 12)	leaderboard
+baselines-calibration.01	baselines-calibration	text	No trivial baseline was scored	baseline table appears only when a baseline or calibrated tool exists; otherwise this Not-run sentence stands alone (its columns live in the leaderboard preset)	leaderboard
+interpretation-limits.01	interpretation-limits	heading	These results do NOT show	sub-heading survives (panel title)	interpretation-limits
+interpretation-limits.02	interpretation-limits	heading	These results support	sub-heading survives (panel title)	interpretation-limits
+interpretation-limits.03	interpretation-limits	heading	Words used in this report	sub-heading survives (panel title)	interpretation-limits
+metadata-completeness.01	metadata-completeness	table_headers	Sample | Missing | Fields | What it changes	table #1 keeps its columns (first 4 of 4)	cohort-qc
+prereg.01	prereg	table_headers	Item | Value	table #1 keeps its columns (first 2 of 2)	data-inventory (Appendix: Governance)
+scoring-additions.01	scoring-additions	table_headers	Track / task | Tool | F1 (macro) | F1 (micro) | MCC | F2 (recall-weighted) | F0.5 (precision-weighted) | Abstention rate	table #1 keeps its columns (first 8 of 8)	leaderboard
+plasmid-outcomes.01	plasmid-outcomes	table_headers	Track / task | Tool | Perfect | Fragmented | Merged | Fragmented and merged | Partial | Missed | ARI	table #1 keeps its columns (first 9 of 9)	bin-diagnostics
+label-schemes.01	label-schemes	table_headers	Scheme | Role | Samples | Replicons | Plasmids | Plasmid bp | Excluded (AMBIGUOUS) | Plasmid calls differing from primary | Scored file	table #1 keeps its columns (first 9 of 9)	cohort-qc
+label-schemes.02	label-schemes	heading	Dimer corrections	sub-heading survives (panel title)	cohort-qc
+outcome-states.01	outcome-states	table_headers	Track | Tool | Runs | Completed | Reused | Failed (tool) | Failed (resource) | Infrastructure failure | Not applicable | Retried	table #1 keeps its columns (first 10 of 10)	health
+outcome-states.02	outcome-states	table_headers	Tool | Status | Runs | Reason (most common)	table #2 keeps its columns (first 4 of 4)	health
+outcome-states.03	outcome-states	heading	Tools compared: why runs were skipped or failed	sub-heading survives (panel title)	health
+taxon-transfer.01	taxon-transfer	table_headers	Level | Held-out group | Isolates | Training isolates | Mean regret | Single-best regret | Near-optimal | Gap closed | Status | Note	table #1 keeps its columns (first 10 of 10)	recommender-eval
+taxon-transfer.02	statistics	table_headers	Track | Task | Tool A | Tool B | Pairs | Mean difference (A minus B) | Permutation p | Holm-adjusted p | Wilcoxon p (Holm) | Equivalent within delta	table #2 keeps its columns (first 9 of 9) (the duplicate copy in taxon-transfer was removed; the Paired tests table holds every one of these columns)	recommender-eval
+validity.01	validity	table_headers	Claim | Status | Basis	table #1 keeps its columns (first 3 of 3)	interpretation-limits
+learn-agreement.01	learn-agreement	table_headers	Track | Tool | Isolates | Reference-base F1 (primary) | Best-match F1 (bp) | Best-match F1 (count) | Dissimilarity (0 = identical) | Split cost | Join cost | Shared or misjoined contigs excluded | Not applicable because	table #1 keeps its columns (first 11 of 11)	bin-diagnostics
+learn-agreement.02	learn-agreement	table_headers	Tool A | Tool B (or truth) | Samples | Mean dissimilarity	table #2 keeps its columns (first 4 of 4)	bin-diagnostics
+learn-agreement.03	learn-agreement	heading	Do tools agree with each other?	sub-heading survives (panel title)	bin-diagnostics
+learn-adequacy.01	learn-adequacy	table_headers	Sample | Status | Plasmid adequacy | Adequate | Contigs | N50 | Chimeric contigs | Chimeric fraction (bp) | Unplaced fraction (bp) | Reason	table #1 keeps its columns (first 10 of 10)	cohort-qc
+learn-truthqc.01	learn-truthqc	table_headers	Sample | Plasmid | Length | Internal repeat fraction | Shared with chromosome | Shared with other plasmids | Repeat-rich	table #1 keeps its columns (first 7 of 7)	cohort-qc
+learn-truthqc.02	learn-truthqc	heading	Read-depth windows	sub-heading survives (panel title)	cohort-qc
+recommendations.01	recommendations	table_headers	Scope | Group | Primary method | State | Scored | Coverage | Mean F1 | Mean plasmid recall | Median runtime s | Median peak RSS KiB | Decision note	table #1 keeps its columns (first 11 of 11)	recommendations
+validation.01	validation	table_headers	Held-out study | Held-out samples | Training-selected method | Training samples | Held-out mean F1 | Status | Interpretation	table #1 keeps its columns (first 7 of 7)	recommender-eval
+selected.01	selected	heading	abauma_a: mob_like	sub-heading survives (panel title)	recommendations
+selected.02	selected	heading	abauma_b: mob_like	sub-heading survives (panel title)	recommendations
+selected.03	selected	heading	ecoli_a: mob_like	sub-heading survives (panel title)	recommendations
+selected.04	selected	heading	ecoli_b: mob_like	sub-heading survives (panel title)	recommendations
+selected.05	selected	heading	kpneu_a: mob_like	sub-heading survives (panel title)	recommendations
+selected.06	selected	heading	kpneu_b: mob_like	sub-heading survives (panel title)	recommendations
+scores.01	scores	table_headers	Sample | Tool | Tool version | Origin | Read depth × | True plasmid bp | TP bp | FP bp | FN bp | Unambiguous predicted bp | Ambiguous predicted bp | Unmapped predicted bp | Precision | Recall	table #1 keeps its columns (first 14 of 17)	scores
+scores.02	scores	table_headers	sample | tool | analysis_track | true_plasmid_bp | TP_bp | FP_bp | FN_bp | predicted_record_count | precision | recall | f1 | true_plasmid_count | recovered_plasmid_count | plasmid_recall	table #2 keeps its columns (first 14 of 127)	scores
+scores.03	scores	element_id	sample-filter	filter control	scores
+scores.04	scores	element_id	tool-filter	filter control	scores
+scores.05	scores	element_id	version-filter	filter control	scores
+scores.06	scores	element_id	organism-filter	filter control	scores
+scores.07	scores	element_id	origin-filter	filter control	scores
+scores.08	scores	element_id	tech-filter	filter control	scores
+scores.09	scores	element_id	tier-filter	filter control	scores
+scores.10	scores	element_id	size-filter	filter control	scores
+scores.11	scores	element_id	depth-min	filter control	scores
+scores.12	scores	element_id	depth-max	filter control	scores
+scores.13	scores	element_id	band-filter	filter control	scores
+scores.14	scores	attr	[data-cg-toggle='Agreement']	column-group switch	scores
+scores.15	scores	attr	[data-cg-toggle='Bins']	column-group switch	scores
+scores.16	scores	attr	[data-cg-toggle='Confusion and abstention']	column-group switch	scores
+scores.17	scores	attr	[data-cg-toggle='Contig layer']	column-group switch	scores
+scores.18	scores	attr	[data-cg-toggle='Core']	column-group switch	scores
+scores.19	scores	attr	[data-cg-toggle='Diagnostics']	column-group switch	scores
+scores.20	scores	attr	[data-cg-toggle='Graded recovery']	column-group switch	scores
+scores.21	scores	attr	[data-cg-toggle='Identity']	column-group switch	scores
+scores.22	scores	attr	[data-cg-toggle='Recovery']	column-group switch	scores
+scores.23	scores	element_id	score-table	named table	scores
+scores.24	scores	element_id	score-groups-table	named table	scores
+statistics.01	statistics	table_headers	Track | Task | Metric | Tool A | Tool B | Pairs | Mean difference (A minus B) | 95% bootstrap CI | Permutation p | Holm-adjusted p | Wilcoxon p (Holm) | Equivalent within delta | A wins / ties / B wins	table #1 keeps its columns (first 13 of 13)	robustness
+statistics.02	statistics	heading	Track: short_read	sub-heading survives (panel title)	robustness
+bin-diagnostics.01	bin-diagnostics	table_headers	Sample | Tool | Bin precision | Bin recall | Bin F1 | Matched bins | Unmatched bins | Missed plasmids | Split events | Merge events | Contaminated bins | Repeat ambiguity bp | Contamination fraction | Record-level detail	table #1 keeps its columns (first 14 of 14)	bin-diagnostics
+zero-plasmid.01	zero-plasmid	table_headers	Tool | Plasmid-free isolates scored | Mean isolate specificity | Total chromosome FP bp	table #1 keeps its columns (first 4 of 4)	leaderboard
+graded-tiers.01	graded-tiers	table_headers	Tool | Recall ≥50% complete | Recall ≥90% complete	table #1 keeps its columns (first 3 of 3)	leaderboard
+isolate-difficulty.01	isolate-difficulty	table_headers	Sample | GFA dead-end count | Plasmid/chromosome depth ratio | Plasmid/chromosome Mash distance	table #1 keeps its columns (first 4 of 4)	cohort-qc
+cohort-qc.01	cohort-qc	table_headers	Sample | Field | Value | Cohort median | Cohort MAD | Modified z-score | Note	table #1 keeps its columns (first 7 of 7)	cohort-qc
+cohort-qc.02	cohort-qc	heading	Clonal groups	sub-heading survives (panel title)	cohort-qc
+replicon-recovery.01	replicon-recovery	table_headers	Track | Tool | Label type | Label | Plasmids | Samples | Mean completeness | Median (IQR) | Recovered fraction | CPRR | Note	table #1 keeps its columns (first 11 of 11)	replicon-recovery
+quast-diagnostics.01	quast-diagnostics	table_headers	Tool | Reference | Comparisons | Mean genome fraction (%) | Total misassemblies | Mean duplication ratio	table #1 keeps its columns (first 6 of 6)	data-inventory (Appendix: Optional diagnostics)
+rank-robustness.01	rank-robustness	table_headers	Track | Variant | Kendall tau vs baseline | Top tool | Top tool unchanged	table #1 keeps its columns (first 5 of 5)	robustness
+truth-label-audit.01	truth-label-audit	table_headers	Sample | Sequence | Truth label | Length | Replicon | MOB | Finding	table #1 keeps its columns (first 7 of 7)	cohort-qc
+stratified.01	stratified	table_headers	Scope | Group | Tool | Samples scored | Coverage | Mean F1 | Recommendation | Reason	table #1 keeps its columns (first 8 of 8)	recommendations
+accuracy-dimension.01	accuracy-dimension	table_headers	Track | Tool | Samples | Identity | Mismatch | Insertion | Deletion | Samples not assessable | Blocks without CIGAR | Plasmids | Missing regions per plasmid | Missing bp | Longest gap (bp)	table #1 keeps its columns (first 13 of 13)	data-inventory (Appendix: Scorecard component tables)
+feature-preservation.01	feature-preservation	table_headers	Track | Tool | Feature kind | Expected | Full length | Truncated | Missed | Full-length rate | Mean covered fraction	table #1 keeps its columns (first 9 of 9)	data-inventory (Appendix: Scorecard component tables)
+feature-preservation.02	feature-preservation	table_headers	Track | Tool | Features used | Adjacent pairs | Conserved | NGOC	table #2 keeps its columns (first 6 of 6)	data-inventory (Appendix: Scorecard component tables)
+bin-quality.01	bin-quality	table_headers	Track | Tool | Bins | High | Medium | Low | Spurious | High-quality yield | Medium-or-better yield | Homogeneity | Completeness | V-measure	table #1 keeps its columns (first 12 of 12)	bin-diagnostics
+performance.01	performance	table_headers	Tool | Runs | Success rate | Resource failures | Median runtime (s) | P90 runtime (s) | Median peak memory (GB) | Threads | Thread-s per recovered plasmid | CPU utilisation | Runtime exponent | Memory exponent	table #1 keeps its columns (first 12 of 12)	health
+power.01	power	table_headers	Track | Pair | Paired samples | Clusters | Mean difference | Minimum detectable difference | Clusters needed for a 0.05 difference | Status	table #1 keeps its columns (first 8 of 8)	robustness
+scenarios.01	scenarios	table_headers	Track | Scenario | Tool | Isolates | Mean F1 | Mean per-plasmid recall | Note	table #1 keeps its columns (first 7 of 7)	scorecard-scenarios
+composite.01	composite	table_headers	Track | Tool | Accuracy | Completeness | Structure | Biology | Performance | Composite | Rank | Status | Gates failed | Mean rank under reweighting | Best-worst rank | First under reweighting	table #1 keeps its columns (first 14 of 15)	scorecard
+health.01	health	table_headers	Sample | Tool | Status | Runtime s | Peak RSS KiB | Reason / log location	table #1 keeps its columns (first 6 of 6)	health
+health.02	health	element_id	status-filter	filter control	health
+health.03	health	element_id	status-table	named table	health
+tools.01	tools	table_headers	Sample | Precision | Recall | F1 | Chromosome FP bp | Unmapped bp	table #1 keeps its columns (first 6 of 6)	scores
+samples.01	samples	table_headers	Tool | Precision | Recall | F1 | Chromosome FP bp | Unmapped bp | PR-AUC	table #1 keeps its columns (first 7 of 7)	scores
+keys.01	keys	heading	AMR recovery	sub-heading survives (panel title)	keys
+keys.02	keys	heading	Base F1	sub-heading survives (panel title)	keys
+keys.03	keys	heading	Base precision	sub-heading survives (panel title)	keys
+keys.04	keys	heading	Base recall	sub-heading survives (panel title)	keys
+keys.05	keys	heading	Bin F1	sub-heading survives (panel title)	keys
+keys.06	keys	heading	Chromosomal contamination	sub-heading survives (panel title)	keys
+summary.04	summary	element_id	summary	KPI tiles and report card exist (post-refactor: id resolves)	summary
+summary.05	summary	text	Methods compared	KPI tile: methods compared	summary
+summary.06	summary	text	Truth plasmids	KPI tile: truth plasmids	summary
+summary.07	summary	text	Leading method	KPI tile: leading method	summary
+summary.08	summary	text	Runs not completed	KPI tile: runs not completed	summary
+summary.09	summary	text	A component that was not measured is dropped	grade caveat (never counted as zero) kept, now for scorecard overall	summary
+summary.10	summary	anchor	#health	Start-here link to execution health resolves	summary
+summary.11	summary	anchor	#statistics	Start-here link to paired evidence resolves (alias)	summary
+summary.12	summary	anchor	#pb-explorer-view	Start-here link to the evidence explorer resolves	summary
+summary.13	summary	not_text	excluded from every mean rather than counted as zero	stale claim removed	summary
+insights.01	insights	element_id	insights	findings box exists	insights
+insights.02	insights	not_text	mean F1 (0.988	ranking score is not called mean F1	insights
+chart.01	chart	svg_count>=1	chart	precision/recall/F1 bars still drawn (inside leaderboard panel)	leaderboard
+chart.02	chart	text	Precision	legend	leaderboard
+leaderboard.13	leaderboard	text	not applicable	"""not applicable is not a zero"" caveat"	leaderboard
+leaderboard.14	leaderboard	text	Plasmid reconstruction	reconstruction table heading	leaderboard
+leaderboard.15	leaderboard	text	Plasmid classification	classification table heading	leaderboard
+leaderboard.16	leaderboard	preset	Headline	default column preset = the 20 headline columns	leaderboard
+leaderboard.17	leaderboard	preset	Metric framework	preset carrying metric-framework columns (Base F1 macro/micro, Contig F1 count/length, MCC count/length, Binning F1 length/assembly-aware, ARI, CPRR)	leaderboard
+leaderboard.18	leaderboard	preset	MCC and F-beta	preset carrying scoring-additions columns incl. Abstention rate	leaderboard
+leaderboard.19	leaderboard	preset	Graded recovery	preset carrying Recall >=50%, >=90%, Complete + circular recall	leaderboard
+leaderboard.20	leaderboard	preset	Negative control	preset carrying Plasmid-free isolates scored, Mean isolate specificity, Total chromosome FP bp	leaderboard
+leaderboard.21	leaderboard	preset	Baselines and calibration	preset carrying Versus best baseline, Mean Brier score, Mean ECE, Samples calibrated	leaderboard
+leaderboard.22	leaderboard	sortable	table.sortable	every leaderboard table is sortable	leaderboard
+robustness.02	robustness	svg_count>=1	robustness	at least one SVG chart survives	robustness
+robustness.03	robustness	text	Failed runs scored 0	failed-run column survives	robustness
+robustness.04	robustness	text	Mean base F1 (shared samples)	NEW: column renamed from Mean F1 (ranking)	robustness
+headline-design.07	headline-design	heading	Species balance	panel survives	headline-design
+headline-design.08	headline-design	heading	Reference-tier sensitivity	panel survives	headline-design
+headline-design.09	headline-design	heading	Truth provenance	panel survives	headline-design
+metric-framework.02	metric-framework	text	Contig labels	contig-labelling rules text kept (preset note)	leaderboard
+database-membership.01	database-membership	text	truth plasmid	contained-pair counter or Not-run reason	robustness
+baselines-calibration.02	baselines-calibration	text	Brier	calibration explanation	leaderboard
+interpretation-limits.04	interpretation-limits	heading	These results support	list survives	interpretation-limits
+interpretation-limits.05	interpretation-limits	heading	These results do NOT show	list survives	interpretation-limits
+interpretation-limits.06	interpretation-limits	heading	Words used in this report	word list survives	interpretation-limits
+validity.02	validity	table_headers	Claim | Status | Basis	validity table merged into interpretation-limits	interpretation-limits
+scoring-additions.02	scoring-additions	text	Abstention rate	abstention column/definition	leaderboard
+plasmid-outcomes.02	plasmid-outcomes	anchor	#plasmid-outcomes	ladder link target resolves (alias)	bin-diagnostics
+plasmid-outcomes.03	plasmid-outcomes	text	Fragmented and merged	outcome class	bin-diagnostics
+label-schemes.03	label-schemes	heading	Dimer corrections	panel survives	cohort-qc
+label-schemes.04	label-schemes	text	AMBIGUOUS	excluded count survives	cohort-qc
+outcome-states.04	outcome-states	text	infrastructure failure	failure class definition	health
+taxon-transfer.03	taxon-transfer	text	Leave-one-genus-out	genus/phylum text kept in recommender-eval tab	recommender-eval
+taxon-transfer.04	taxon-transfer	unique	Tool A | Tool B | Pairs | Wilcoxon p (Holm)	paired table exists exactly once (in paired tests), not twice	recommender-eval
+learn-agreement.04	learn-agreement	heading	Do tools agree with each other?	panel survives	bin-diagnostics
+learn-truthqc.03	learn-truthqc	heading	Read-depth windows	panel survives	cohort-qc
+learn-plsmd.01	learn-plsmd	text	plsMD	tool note survives	robustness
+recommendations.02	recommendations	element_id	recommendations	injection anchor id kept	recommendations
+recommendations.03	recommendations	tab	Selected reconstructions	tab exists	recommendations
+stratified.02	stratified	tab	Evidence by stratum	stratified merged into recommendations	recommendations
+validation.02	validation	tab	Held-out studies	LOSO validation merged into recommender-eval	recommender-eval
+selected.07	selected	file_glob	selected_candidates/*/*.candidate.plasmid.fasta	FASTA download per isolate (6 in demo)	recommendations
+selected.08	selected	file_glob	selected_candidates/*/*.selection_report.json	JSON download per isolate (6 in demo)	recommendations
+selected.09	selected	text	Why this selection needs review	review trigger details	recommendations
+enterprise.01	enterprise	element_id	pb-explorer-view	summary link target	enterprise
+enterprise.02	enterprise	element_id	cohort-evidence-explorer	explorer container	enterprise
+enterprise.03	enterprise	element_id	sampleSearch	cohort grid sample search (inside srcdoc iframe)	enterprise
+enterprise.04	enterprise	element_id	metricSelect	cohort grid metric selector	enterprise
+enterprise.05	enterprise	element_id	vq-sample	explorer sample selector	enterprise
+enterprise.06	enterprise	element_id	vq-plasmid	explorer plasmid selector	enterprise
+enterprise.07	enterprise	element_id	vq-tool	explorer tool selector	enterprise
+enterprise.08	enterprise	element_id	vq-download	explorer JSON download	enterprise
+enterprise.09	enterprise	string	Export BED	BED export button (script text)	enterprise
+enterprise.10	enterprise	string	Bin-to-truth flow	Sankey ribbon view	enterprise
+enterprise.11	enterprise	string	Dot plot	dot plot view	enterprise
+enterprise.12	enterprise	string	Method comparison	baseline vs comparator view	enterprise
+enterprise.13	enterprise	string	Method agreement	agreement band	enterprise
+enterprise.14	enterprise	string	Protein annotations and coordinate recovery	protein recovery panel	enterprise
+enterprise.15	enterprise	string	Structural alignment diagnostics	structural diagnostics panel	enterprise
+enterprise.16	enterprise	string	Print / save as PDF	print control	enterprise
+scores.25	scores	element_id	export-scores	Download filtered CSV button	scores
+scores.26	scores	text	All score columns by group	127-column switch	scores
+scores.27	scores	view	by tool	"group-by-tool view with summary line ""scored sample(s) . mean F1 . F1 range"" (from tools)"	scores
+scores.28	scores	view	by sample	group-by-sample view (from samples)	scores
+tools.02	tools	text	Chromosome FP bp	column survives (scores group-by-tool view)	scores
+tools.03	tools	text	Unmapped bp	column survives	scores
+samples.02	samples	text	PR-AUC	column survives (group-by-sample view)	scores
+statistics.03	statistics	tab	Paired tests	tab exists	robustness
+statistics.04	statistics	text	not estimated (n < 5)	small-n output rule kept	robustness
+statistics.05	statistics	anchor	#statistics	alias resolves	robustness
+bin-diagnostics.02	bin-diagnostics	file_glob	*/*.bin_matches.tsv	per sample-tool matches TSV (12 in demo)	bin-diagnostics
+bin-quality.02	bin-quality	tab	Quality tiers	bin-quality merged into bin-diagnostics	bin-diagnostics
+learn-agreement.05	learn-agreement	tab	Agreement	learn-agreement merged into bin-diagnostics	bin-diagnostics
+zero-plasmid.02	zero-plasmid	text	No plasmid-free isolate was scored	Not-run reason or table	leaderboard
+graded-tiers.02	graded-tiers	text	Complete + circular recall	graded column	leaderboard
+cohort-qc.03	cohort-qc	text	Clonal groups	clonal groups sub-panel	cohort-qc
+cohort-qc.04	cohort-qc	text	Advisory only	advisory caveat	cohort-qc
+replicon-recovery.02	replicon-recovery	file_link	benchmark.recovery_by_replicon.tsv	download	replicon-recovery
+replicon-recovery.03	replicon-recovery	text	Median (IQR)	median and IQR column	replicon-recovery
+replicon-recovery.04	replicon-recovery	text	untyped	untyped-label explanation	replicon-recovery
+quast-diagnostics.02	quast-diagnostics	text	QUAST	Not-run reason or table (Appendix)	data-inventory (Appendix: Optional diagnostics)
+rank-robustness.02	rank-robustness	tab	Filter and metric sensitivity	tab exists	robustness
+rank-robustness.03	rank-robustness	file_link	benchmark.rank_robustness.tsv	download	robustness
+rank-robustness.04	rank-robustness	text	Kendall tau vs baseline	column	robustness
+truth-label-audit.02	truth-label-audit	file_link	benchmark.truth_label_audit.tsv	download	cohort-qc
+stratified.03	stratified	file_link	benchmark.stratified.tsv	download	recommendations
+stratified.04	stratified	text	coverage-gated multi-objective recommendation	reason text per stratum	recommendations
+orthogonal-evidence.01	orthogonal-evidence	text	No orthogonal evidence was supplied	status text	cohort-qc
+accuracy-dimension.02	accuracy-dimension	file_link	benchmark.accuracy.tsv	download	data-inventory (Appendix: Scorecard component tables)
+accuracy-dimension.03	accuracy-dimension	file_link	benchmark.missing_regions.tsv	download	data-inventory (Appendix: Scorecard component tables)
+feature-preservation.03	feature-preservation	file_link	benchmark.feature_preservation.tsv	download	data-inventory (Appendix: Scorecard component tables)
+feature-preservation.04	feature-preservation	file_link	benchmark.ngoc.tsv	download	data-inventory (Appendix: Scorecard component tables)
+bin-quality.03	bin-quality	file_link	benchmark.bin_quality.tsv	download	bin-diagnostics
+performance.02	performance	file_link	benchmark.performance.tsv	download	health
+performance.03	performance	text	Median peak memory (GB)	column	health
+power.02	power	file_link	benchmark.power.tsv	download	robustness
+power.03	power	text	Minimum detectable difference	column	robustness
+power.04	power	text	Metric	NEW: the power table names the metric it uses	robustness
+scenarios.02	scenarios	file_link	benchmark.scenarios.tsv	download	scorecard-scenarios
+scenarios.03	scenarios	file_link	benchmark.scenario_performance.tsv	download	scorecard-scenarios
+scenarios.04	scenarios	text	Mean per-plasmid recall	column in merged scenario view	scorecard-scenarios
+scenarios.05	scenarios	text	underpowered	small-n flag	scorecard-scenarios
+scenarios.06	scenarios	consistency	isolate counts per scenario identical in every scenario view	one scenario definition	scorecard-scenarios
+composite.02	composite	file_link	benchmark.composite.tsv	download	scorecard
+composite.03	composite	file_link	benchmark.composite_sensitivity.tsv	download	scorecard
+composite.04	composite	text	Mean rank under reweighting	sensitivity column	scorecard
+composite.05	composite	text	Gates failed	gate column	scorecard
+reproducibility.01	reproducibility	text	Run the benchmark twice	empty-state guidance (test_demo_end_to_end)	robustness
+health.04	health	element_id	status-filter	status filter	health
+health.05	health	element_id	status-table	per-run table	health
+health.06	health	text	Reason / log location	column	health
+health.07	health	anchor	#health	alias resolves	health
+tools.04	tools	text	scored sample(s)	per-tool summary line	scores
+tools.05	tools	text	F1 range	range in summary line	scores
+samples.03	samples	text	scored tool(s)	per-sample summary line	scores
+samples.04	samples	file_glob	selected_candidates/*/*.selection_report.json	selected-candidate report link per sample	scores
+keys.07	keys	text	Base F1	glossary entry	keys
+keys.08	keys	text	CPRR	NEW: glossary entry added	keys
+keys.09	keys	text	Scored weight share	NEW: scorecard terms in glossary	keys
+files.01	files	element_id	run-files	run files block	files
+files.02	files	text	downloadable file	file counts per root	files
+method.01	method	text	Scoring method	heading	method
+method.02	method	page_file_link	benchmark.leaderboard.tsv	footer download link (outside the section, anywhere on the page)	method
+method.03	method	page_file_link	scores.tsv	footer download link	method
+method.04	method	page_file_link	tool_status.tsv	footer download link	method
+prereg.02	prereg	text	prereg.tsv SHA-256	hash row	data-inventory (Appendix: Governance)
+extended.01	extended	text	Depth/read-quality ladders	status line / ladder SVGs in Appendix	data-inventory (Appendix: Optional analyses)
+metadata.01	metadata	text	Report generated	provenance tile	metadata
+metadata.02	metadata	text	Reference scope	provenance tile	metadata
+metadata-completeness.02	metadata-completeness	text	What it changes	column	cohort-qc
+excluded-replicons.01	excluded-replicons	text	AMBIGUOUS	definition	cohort-qc
+isolate-difficulty.02	isolate-difficulty	text	GFA dead-end count	column	cohort-qc
+learn-adequacy.02	learn-adequacy	text	Plasmid adequacy	column	cohort-qc
+learn-copynumber.01	learn-copynumber	text	copy number	Not-run reason or table	bin-diagnostics

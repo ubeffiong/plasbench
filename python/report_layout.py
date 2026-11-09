@@ -386,6 +386,7 @@ def build_topbar(run_name, first_view_title):
             f"<span class='rpt-top-run' title='{_esc(run_name)}'>{_esc(run_name)}</span>"
             f"<span class='rpt-top-view' id='rpt-view-name' aria-live='polite'>{_esc(first_view_title)}</span>"
             "<span class='rpt-top-gap'></span>"
+            "<div id='rpt-isolate-slot' class='rpt-iso-slot' data-needs-js></div>"
             "<div class='rpt-search' role='search' data-needs-js>"
             "<label class='rpt-sr' for='rpt-q'>Search the report by section title</label>"
             "<input id='rpt-q' type='search' placeholder='Jump to section  ( / )' autocomplete='off' role='combobox' "
@@ -403,8 +404,9 @@ def build_topbar(run_name, first_view_title):
 def build_band(title, eyebrow, run_html, kpis_html):
     kpis = f"<div class='rpt-kpis'>{kpis_html}</div>" if kpis_html else ""
     eyebrow_html = f"<p class='rpt-eyebrow'>{eyebrow}</p>" if eyebrow else "<p class='rpt-eyebrow'>PlasBench report</p>"
-    run = f"<p class='rpt-runline'>{run_html}</p>" if run_html else ""
-    return (f"<div class='rpt-titleband'><div class='rpt-title-text'>{eyebrow_html}<h1>{title or 'PlasBench report'}</h1>{run}</div>{kpis}</div>")
+    # The run line (run folder, cohort, generation time, "offline HTML...") is not repeated under the title: the run folder is in the top bar and the
+    # full run details are in the Run metadata section. `run_html` is kept in the signature for callers.
+    return (f"<div class='rpt-titleband'><div class='rpt-title-text'>{eyebrow_html}<h1>{title or 'PlasBench report'}</h1></div>{kpis}</div>")
 
 
 def build_cover(plan, labels):

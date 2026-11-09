@@ -521,10 +521,10 @@ def _tool_table(specs, per_tool, order, results):
     return rc.panel(headers, rows, "No tool was scored.", extra_class="rpt-scorecard")
 
 
-def scorecard_section(page, specs, per_tool):
+def scorecard_body(specs, per_tool):
+    """The scorecard tables, notes and profile strips for `per_tool` (all isolates, or one isolate's values)."""
     if not per_tool:
-        return rc.section("scorecard", "Benchmark scorecard", _intro(page, specs),
-                          rc.not_run("scores.tsv has no scored tool, so no scorecard can be computed."), group="Scoring")
+        return str(rc.not_run("no scored tool for this selection, so no scorecard can be computed."))
     body = ""
     for track in sorted({k[0] for k in per_tool}):
         sub = {k: v for k, v in per_tool.items() if k[0] == track}
@@ -546,13 +546,24 @@ def scorecard_section(page, specs, per_tool):
                     "left out, never counted as zero); the scored weight share says how much of the 100 weights it rests on. "
                     "Structural accuracy is alignment-derived and unvalidated; annotation concordance is coordinate-based, not "
                     "orthology; runtime is hardware-dependent.", "")
+    return body
+
+
+def scorecard_section(page, specs, per_tool):
+    if not per_tool:
+        return rc.section("scorecard", "Benchmark scorecard", _intro(page, specs),
+                          rc.not_run("scores.tsv has no scored tool, so no scorecard can be computed."), group="Scoring")
+    # the body sits in a slot the isolate filter (python/report_isolates.py) can swap; without it, or on "All isolates", it is what is shown
+    body = ("<p class='muted'>Showing <span class='pb-scope' data-iso-scope>All isolates</span>. The isolate filter in the top bar re-scores "
+            "every tool on one isolate.</p>"
+            f"<div data-iso-slot='scorecard'>{scorecard_body(specs, per_tool)}</div>")
     return rc.section("scorecard", "Benchmark scorecard", _intro(page, specs), body, group="Scoring")
 
 
-def summary_block(specs, per_tool):
-    """The scorecard overall beside the Summary's report-card grade (never replacing it), with which view is which."""
+def summary_table(specs, per_tool):
+    """The Summary's scorecard-overall table for `per_tool` (all isolates, or one isolate's values)."""
     if not per_tool:
-        return ""
+        return str(rc.not_run("no scored tool for this selection."))
     rows = []
     for track in sorted({k[0] for k in per_tool}):
         sub = {k: v for k, v in per_tool.items() if k[0] == track}
@@ -562,15 +573,22 @@ def summary_block(specs, per_tool):
             band = rc.band_chip(res["band"]) if res["band"] else rc.missing("no metric could be scored")
             rows.append([k[0], k[1], "-" if res["score"] is None else f"{res['score']:.1f}", band,
                          f"{res['scored_share']:.2f}"])
-    table = rc.panel(["Track", "Tool", "Scorecard overall", "Scorecard band", "Scored weight share"], rows)
-    return ("<h3 id='summary-scorecard'>Scorecard overall</h3>"
+    return str(rc.panel(["Track", "Tool", "Scorecard overall", "Scorecard band", "Scored weight share"], rows))
+
+
+def summary_block(specs, per_tool):
+    """The scorecard overall beside the Summary's report-card grade (never replacing it), with which view is which."""
+    if not per_tool:
+        return ""
+    table = summary_table(specs, per_tool)
+    return ("<h3 id='summary-scorecard'>Scorecard overall <span class='pb-scope' data-iso-scope>All isolates</span></h3>"
             "<p class='lead'>These are three different views and they will not match number for number. The grade above is an "
             "A-D reading of four components (Base F1, plasmid recall, chromosomal contamination, completed runs); the scorecard "
             "overall here is a 0-100 score over the metrics that could be scored, each scaled by its own thresholds, with the "
             "bands excellent, good, moderate and poor and the share of the 100 weight points it rests on; the "
             f"{report_aliases.link('composite', 'five-dimension composite')} uses a third transform with accuracy and completeness "
             "gates. The leaderboard rank is the only ranking. See "
-            f"{report_aliases.link('scorecard', 'the scorecard')}.</p>" + str(table))
+            f"{report_aliases.link('scorecard', 'the scorecard')}.</p><div data-iso-slot='summary-scorecard'>" + table + "</div>")
 
 
 def definitions_section(specs, error=None):

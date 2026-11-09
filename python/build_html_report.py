@@ -571,6 +571,21 @@ def recommendation_note(recommendations, headline):
             f"({esc(leader)}) is ranked by {esc(headline_label(headline))} alone.{tie}</p>")
 
 
+def grade_rows_html(cards):
+    """The report-card table rows (tool, grade, Base F1, plasmid recall, contamination, runs completed) for `cards` from report_cards()."""
+    return "".join(
+        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
+        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
+            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
+            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
+            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
+                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
+            contam=("not measured" if c["parts"]["contamination"] is None
+                    else f"{c['parts']['contamination']:.1%}"),
+            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
+        for c in cards)
+
+
 def summary_section(leaderboard, cards, findings, scores, status_counts, metadata):
     """The headline numbers, the grades, and what to look at first."""
     if not leaderboard:
@@ -593,27 +608,7 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         f"<div class='sum-stat' title='{esc(hint)}'><small>{esc(label)}</small>"
         f"<strong>{value}</strong></div>" for label, value, hint in stats)
 
-    grade_html = "".join(
-        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
-        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
-            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
-            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
-            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
-                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
-            contam=("not measured" if c["parts"]["contamination"] is None
-                    else f"{c['parts']['contamination']:.1%}"),
-            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
-        for c in cards) if False else "".join(
-        "<tr><td>{tool}</td><td><span class='grade grade-{low}'>{grade}</span></td>"
-        "<td>{f1}</td><td>{recall}</td><td>{contam}</td><td>{done}</td></tr>".format(
-            tool=esc(c["tool"]), low=c["grade"].lower(), grade=c["grade"],
-            f1=("-" if c["parts"]["mean_f1"] is None else f"{c['parts']['mean_f1']:.3f}"),
-            recall=("-" if c["parts"]["mean_plasmid_recall"] is None
-                    else f"{c['parts']['mean_plasmid_recall']:.0%}"),
-            contam=("not measured" if c["parts"]["contamination"] is None
-                    else f"{c['parts']['contamination']:.1%}"),
-            done=("-" if c["parts"]["completion"] is None else f"{c['parts']['completion']:.0%}"))
-        for c in cards)
+    grade_html = grade_rows_html(cards)
 
     find_html = "".join(
         f"<li class='finding {f['tone']}'><span class='flabel'>{esc(f['label'])}</span>"
@@ -626,7 +621,7 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         "Every figure here is repeated in full further down; this is the entry point, not a "
         "second source.</p>"
         f"<div class='sum-stats'>{stat_html}</div>"
-        "<h3>Report card</h3>"
+        "<h3>Report card <span class='pb-scope' data-iso-scope>All isolates</span></h3>"
         "<p class='lead'>A reading aid, not an acceptance threshold. The grade is a weighted "
         "composite of Base F1 (40%), plasmid recall (25%), freedom from chromosomal "
         "contamination (20%) and completed runs (15%); A &ge;0.90, B &ge;0.80, C &ge;0.65, "
@@ -634,7 +629,7 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         "never counted as zero. The components are shown so the grade can be taken apart.</p>"
         "<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Grade</th>"
         "<th>Base F1</th><th>Plasmid recall</th><th>Chromosomal contamination</th>"
-        f"<th>Runs completed</th></tr></thead><tbody>{grade_html}</tbody></table></div>"
+        f"<th>Runs completed</th></tr></thead><tbody data-iso-slot='summary-card'>{grade_html}</tbody></table></div>"
         "<h3>Start here</h3>"
         f"<ul class='findings'>{find_html}</ul>"
         "</section>")
@@ -2721,6 +2716,9 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     page = report_common.add_style(page)
     page = report_scorecard.inject(page, str(results_dir), args.scores,
                                    samples_path=args.sample_sheet, report_path=str(out))
+    import report_isolates   # the isolate filter and the plasmid-by-tool matrix (python/report_isolates.py)
+    page = report_isolates.inject(page, str(results_dir), args.data_dir, args.scores, report_cards=report_cards,
+                                  grade_rows_html=grade_rows_html, label=display_tool_name)
     page = report_maps.inject(page, str(results_dir), args.data_dir, args.scores)
     import report_figures   # the figure gallery: ladder, 3D landscape, heatmap, distributions, forest, precision-recall
     page = report_figures.inject(page, str(results_dir), args.data_dir, args.scores)
