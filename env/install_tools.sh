@@ -69,7 +69,46 @@ else
     TARGET_LABEL="$ENV_NAME (not yet created)"
 fi
 
+# MOB-suite pins pandas<=1.5.3 and numpy<1.23.5, which cannot co-exist with the
+# modern pandas of the main environment. Solved into it, mob_recon installs but
+# crashes at start ("cannot import name 'EmptyDataError' from
+# 'pandas.io.common'", or later "unexpected keyword argument 'line_terminator'"),
+# and every run then scores 0. So mob_suite is always installed into its own
+# environment, <env>-mobsuite, with the same pins as the Dockerfile, and exposed
+# in the main environment's bin/ through thin wrappers. scripts/lib.sh's
+# mobsuite_db_dir follows a wrapper to the real installation's database.
+MOBSUITE_SPEC=("mob_suite=3.1.9" "python=3.10" "pandas<=1.5.3" "numpy<1.23.5" "blast>=2.9.0,<2.16.0" "mash>=2.0")
+MOBSUITE_COMMANDS=(mob_recon mob_typer mob_cluster mob_init)
+install_mobsuite() {
+    local main_prefix="$1" mob_prefix cmd
+    mob_prefix="$(dirname "$main_prefix")/${ENV_NAME}-mobsuite"
+    if [[ -x "$mob_prefix/bin/mob_recon" ]] && "$mob_prefix/bin/mob_recon" --version >/dev/null 2>&1; then
+        echo "[plasbench] MOB-suite environment already works: $mob_prefix"
+    else
+        echo "[plasbench] creating the MOB-suite environment (pinned, separate from the main one): $mob_prefix"
+        run_with_heartbeat "Conda is solving/linking MOB-suite's own environment" \
+            "$SOLVER_BIN" create -y -p "$mob_prefix" "${CHANNELS[@]}" "${MOBSUITE_SPEC[@]}"
+    fi
+    "$mob_prefix/bin/mob_recon" --version >/dev/null 2>&1 \
+        || { echo "ERROR: mob_recon in $mob_prefix does not start" >&2; return 1; }
+    mkdir -p "$main_prefix/bin"
+    for cmd in "${MOBSUITE_COMMANDS[@]}"; do
+        rm -f "$main_prefix/bin/$cmd"
+        { echo '#!/bin/sh'
+          echo "# PlasBench wrapper: MOB-suite runs from its own pinned environment (env/install_tools.sh)."
+          echo "PATH=\"$mob_prefix/bin:\$PATH\""
+          echo 'export PATH'
+          echo "exec \"$mob_prefix/bin/$cmd\" \"\$@\""; } > "$main_prefix/bin/$cmd"
+        chmod 0755 "$main_prefix/bin/$cmd"
+    done
+    echo "[plasbench] MOB-suite wrappers installed in $main_prefix/bin (${MOBSUITE_COMMANDS[*]})"
+    # Reuse a database kept in the machine store (env/preserve_databases.sh) rather than downloading it.
+    PATH="$main_prefix/bin:$PATH" bash -c 'source "$0/../config/config.sh"; source "$0/../scripts/lib.sh"; mobsuite_db_preserve' "$HERE" || true
+    echo "[plasbench] its database is fetched by: bash env/download_mobsuite_db.sh"
+}
+
 case "$PROFILE" in
+ mobsuite) PKGS=(mob_suite);;
  locked) LOCK="$HERE/environment.lock.yml"; grep -q '^@EXPLICIT$' "$LOCK" || { echo "ERROR: $LOCK is not a Conda @EXPLICIT lock. Regenerate with: bash env/lock_environment.sh" >&2; exit 2; }; mapfile -t LOCKED_PKGS < <(awk '!/^(@|#|$)/ {print}' "$LOCK"); "${CREATE[@]}" "${LOCKED_PKGS[@]}"; exit;;
  core) PKGS=(ncbi-datasets-cli sra-tools fastp minimap2 seqtk unzip);;
  assembly) PKGS=(spades unicycler);;
@@ -297,7 +336,7 @@ EOF
     # `metagenomics` is deliberately absent: its two baseline dependencies are
     # already covered by `assembly` and `genomad` below. Keeping it out avoids
     # a redundant second solver transaction during install-tools all.
-    for installed_profile in core assembly reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast utilities reference-annotation annotation annotation-prokka; do
+    for installed_profile in core assembly mobsuite reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast utilities reference-annotation annotation annotation-prokka; do
         echo "[plasbench] ===== install-tools $installed_profile ====="
         "$0" --env "$ENV_NAME" "$installed_profile" || failures=1
     done
@@ -311,5 +350,26 @@ EOF
     ;;
  *) PKGS=("$PROFILE");;
 esac
-echo "[plasbench] installing into $TARGET_LABEL: ${PKGS[*]}"
-run_with_heartbeat "Conda is solving/linking dependency tools: ${PKGS[*]}" "${SOLVER[@]}" "${PKGS[@]}"
+# mob_suite never goes into the main environment (see install_mobsuite above).
+NEEDS_MOBSUITE=0 OTHER_PKGS=()
+for pkg in "${PKGS[@]}"; do
+    if [[ "$pkg" == "mob_suite" ]]; then NEEDS_MOBSUITE=1; else OTHER_PKGS+=("$pkg"); fi
+done
+if [[ ${#OTHER_PKGS[@]} -gt 0 ]]; then
+    echo "[plasbench] installing into $TARGET_LABEL: ${OTHER_PKGS[*]}"
+    run_with_heartbeat "Conda is solving/linking dependency tools: ${OTHER_PKGS[*]}" "${SOLVER[@]}" "${OTHER_PKGS[@]}"
+fi
+if [[ "$NEEDS_MOBSUITE" -eq 1 ]]; then
+    TARGET_PREFIX="${TARGET_PREFIX:-$(resolve_prefix || true)}"
+    if [[ -n "$TARGET_PREFIX" ]]; then
+        install_mobsuite "$TARGET_PREFIX"
+    else
+        # No main environment to put wrappers in: still create MOB-suite's own
+        # environment by name, and say how to finish once the main one exists.
+        echo "[plasbench] main environment '$ENV_NAME' not found; creating ${ENV_NAME}-mobsuite on its own"
+        run_with_heartbeat "Conda is solving/linking MOB-suite's own environment" \
+            "$SOLVER_BIN" create -y -n "${ENV_NAME}-mobsuite" "${CHANNELS[@]}" "${MOBSUITE_SPEC[@]}"
+        echo "[plasbench] after creating '$ENV_NAME' (bash env/setup_conda.sh), run: bash env/install_tools.sh mobsuite" >&2
+        exit 1
+    fi
+fi

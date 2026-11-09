@@ -18,7 +18,21 @@ if [[ -f "$LOCAL_SETTINGS" ]]; then
     source "$LOCAL_SETTINGS"
 fi
 
-export DATA_DIR="${DATA_DIR:-${PLASBENCH_DATA_DIR:-$PROJECT_ROOT/data}}" # refs + reads + DBs
+export DATA_DIR="${DATA_DIR:-${PLASBENCH_DATA_DIR:-$PROJECT_ROOT/data}}" # refs + reads
+# Tool databases are kept once per machine, not per project or per DATA_DIR, so
+# a new checkout, a new cohort folder or a rebuilt conda environment reuses them
+# instead of downloading gigabytes again. A database already at the old
+# per-project location ($DATA_DIR/db/...) is still used until the store has its
+# own copy (bash env/preserve_databases.sh moves it there).
+export PLASBENCH_DB_DIR="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}"
+plasbench_db_path() {
+    local rel="$1"
+    if [[ -e "$DATA_DIR/db/$rel" && ! -e "$PLASBENCH_DB_DIR/$rel" ]]; then
+        printf '%s' "$DATA_DIR/db/$rel"
+    else
+        printf '%s' "$PLASBENCH_DB_DIR/$rel"
+    fi
+}
 export RESULTS_DIR="${RESULTS_DIR:-$PROJECT_ROOT/results}" # all outputs
 export LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/logs}"
 export TMP_DIR="${TMP_DIR:-$PROJECT_ROOT/tmp}"
@@ -327,7 +341,7 @@ export PLASMIDHUNTER_THREADS="${PLASMIDHUNTER_THREADS:-$THREADS}"
 # pointed at via PLASMER_DB; see INSTALL.md.
 export RUN_PLASMER="${RUN_PLASMER:-0}"
 export PLASMER_THREADS="${PLASMER_THREADS:-$THREADS}"
-export PLASMER_DB="${PLASMER_DB:-$DATA_DIR/db/plasmer}"
+export PLASMER_DB="${PLASMER_DB:-$(plasbench_db_path plasmer)}"
 export PLASMER_MIN_LENGTH="${PLASMER_MIN_LENGTH:-500}"     # Plasmer's own -m default
 export PLASMER_LENGTH="${PLASMER_LENGTH:-500000}"          # Plasmer's own -l (chromosome length threshold) default
 # A real, documented kmer-db RAM floor -- deliberately NOT derived from the
@@ -349,8 +363,8 @@ export PLASCOPE_THREADS="${PLASCOPE_THREADS:-$THREADS}"
 # databases use different basenames, so no shared PLASCOPE_DB_DIR var is
 # needed; run_plascope() derives --db_dir/--db_name from whichever prefix
 # applies via dirname/basename.
-export PLASCOPE_ECOLI_DB="${PLASCOPE_ECOLI_DB:-$DATA_DIR/db/plascope/ecoli/chromosome_plasmid_db}"           # Zenodo 10.5281/zenodo.1311641
-export PLASCOPE_KLEBSIELLA_DB="${PLASCOPE_KLEBSIELLA_DB:-$DATA_DIR/db/plascope/klebsiella/Klebsiella_PlaScope}"  # Zenodo 10.5281/zenodo.1311647
+export PLASCOPE_ECOLI_DB="${PLASCOPE_ECOLI_DB:-$(plasbench_db_path plascope/ecoli/chromosome_plasmid_db)}"           # Zenodo 10.5281/zenodo.1311641
+export PLASCOPE_KLEBSIELLA_DB="${PLASCOPE_KLEBSIELLA_DB:-$(plasbench_db_path plascope/klebsiella/Klebsiella_PlaScope)}"  # Zenodo 10.5281/zenodo.1311647
 export RUN_FLYE_MOB_RECON="${RUN_FLYE_MOB_RECON:-0}"
 export FLYE_MOB_RECON_THREADS="${FLYE_MOB_RECON_THREADS:-$THREADS}"
 # CIRCULARITY GUARD (see scripts/lib.sh: long_read_truth_eligible). Off by
@@ -367,7 +381,7 @@ export FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH="${FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUT
 # never ranked against short-read-only tools -- see docs/METHODS.md.
 export RUN_PLASSEMBLER="${RUN_PLASSEMBLER:-0}"
 export PLASSEMBLER_THREADS="${PLASSEMBLER_THREADS:-$THREADS}"
-export PLASSEMBLER_DB="${PLASSEMBLER_DB:-$DATA_DIR/db/plassembler}"
+export PLASSEMBLER_DB="${PLASSEMBLER_DB:-$(plasbench_db_path plassembler)}"
 # Passed to plassembler -c: contigs at least this long are treated as
 # chromosome. Must be smaller than the smallest chromosome in the cohort.
 export PLASSEMBLER_CHROMOSOME_LENGTH="${PLASSEMBLER_CHROMOSOME_LENGTH:-1000000}"
@@ -471,9 +485,9 @@ export REUSE_UNFINGERPRINTED="${REUSE_UNFINGERPRINTED:-0}"
 
 # --- Tool databases (set after INSTALL step) ---------------------------------
 # Platon needs its DB downloaded once; point to it here.
-export PLATON_DB="${PLATON_DB:-$DATA_DIR/db/platon/db}"
-export GENOMAD_DB="${GENOMAD_DB:-$DATA_DIR/db/genomad}"
-export PLASME_DB="${PLASME_DB:-$DATA_DIR/db/plasme}"
+export PLATON_DB="${PLATON_DB:-$(plasbench_db_path platon/db)}"
+export GENOMAD_DB="${GENOMAD_DB:-$(plasbench_db_path genomad)}"
+export PLASME_DB="${PLASME_DB:-$(plasbench_db_path plasme)}"
 
 # --- Read handling -----------------------------------------------------------
 export MIN_READ_LEN="${MIN_READ_LEN:-50}"   # fastp: discard shorter reads
@@ -612,11 +626,11 @@ export QUAST_DIAGNOSTICS_MIN_CONTIG="${QUAST_DIAGNOSTICS_MIN_CONTIG:-0}"
 # convention as PLATON_DB/GENOMAD_DB/PLASME_DB above -- they live under
 # DATA_DIR/db, gitignored, built once by build_plasmid_reference_set.py.
 export RUN_PLASMID_NOVELTY_CLASSIFICATION="${RUN_PLASMID_NOVELTY_CLASSIFICATION:-0}"
-export PLASMID_REFERENCE_SKETCH="${PLASMID_REFERENCE_SKETCH:-$DATA_DIR/db/plasmid_reference/reference.msh}"
-export PLASMID_REFERENCE_METADATA="${PLASMID_REFERENCE_METADATA:-$DATA_DIR/db/plasmid_reference/reference_metadata.tsv}"
+export PLASMID_REFERENCE_SKETCH="${PLASMID_REFERENCE_SKETCH:-$(plasbench_db_path plasmid_reference/reference.msh)}"
+export PLASMID_REFERENCE_METADATA="${PLASMID_REFERENCE_METADATA:-$(plasbench_db_path plasmid_reference/reference_metadata.tsv)}"
 export PLASMID_NOVELTY_SIMILARITY_THRESHOLD="${PLASMID_NOVELTY_SIMILARITY_THRESHOLD:-0.05}"
 export PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS="${PLASMID_NOVELTY_MIN_CLUSTER_MEMBERS:-2}"
-export PLASMID_REFERENCE_FASTA="${PLASMID_REFERENCE_FASTA:-$DATA_DIR/db/plasmid_reference/reference.fasta}"
+export PLASMID_REFERENCE_FASTA="${PLASMID_REFERENCE_FASTA:-$(plasbench_db_path plasmid_reference/reference.fasta)}"
 
 # Trivial baselines (python/baseline_predictors.py, stage 4): reference points
 # every tool should beat, scored and ranked like tools on the classification

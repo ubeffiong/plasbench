@@ -69,6 +69,12 @@ else
         "$SOLVER" env create -f "$HERE/environment.yml"
 fi
 
+# MOB-suite gets its own pinned environment (its pandas cannot co-exist with the
+# main one); wrappers for mob_recon/mob_typer/mob_init land in the main env's bin/.
+echo "[setup_conda] installing MOB-suite into its own environment ..."
+bash "$HERE/install_tools.sh" --env "$ENV_NAME" mobsuite \
+    || echo "[setup_conda] WARNING: MOB-suite environment not installed; run: bash env/install_tools.sh mobsuite" >&2
+
 echo
 echo "[setup_conda] done. Activate it with:"
 echo "    conda activate $ENV_NAME"

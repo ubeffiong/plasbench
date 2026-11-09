@@ -13,6 +13,24 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- databases kept once per machine
+- **`PLASBENCH_DB_DIR`** (default `~/.plasbench/databases`): every tool database default points
+  there instead of `DATA_DIR/db`, so new checkouts, new `DATA_DIR`s and rebuilt environments reuse
+  what is downloaded. A database still at the old `DATA_DIR/db` path is used until the store has it.
+- **`env/preserve_databases.sh`** moves existing databases into the store and leaves a link at the
+  old path; never deletes; reports duplicates.
+- **MOB-suite's database** moves to the store and its environment folder becomes a link; setup and
+  the MOB-suite installer link a rebuilt environment to the stored copy instead of downloading again.
+
+### Fixed -- MOB-suite pandas incompatibility in local installs
+- MOB-suite needs `pandas<=1.5.3`; in the main environment (pandas 3) `mob_recon` crashed at start
+  and every run scored 0. `env/environment.yml` and its lock no longer include `mob_suite`;
+  `env/install_tools.sh` installs it into its own environment, `<env>-mobsuite` (MOB-suite 3.1.9,
+  the Dockerfile's pins), and writes `mob_recon`/`mob_typer`/`mob_cluster`/`mob_init` wrappers into
+  the main environment. `setup_conda.sh` runs this step; `plasbench install-tools mobsuite` repairs
+  an existing install. The MOB-suite database checks follow the wrapper (`scripts/lib.sh`
+  `mobsuite_db_dir`), as does stage 6's database-containment step.
+
 ### Added -- downloads kept for future runs; broken tools caught early
 - **Preserved downloads** (`PRESERVE_DOWNLOADS=1`): stage 1 writes `<sample>/downloads.sha256` for the
   reads and NCBI records and makes the reads read-only; a later run with the same `DATA_DIR` verifies

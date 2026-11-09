@@ -20,7 +20,7 @@ if command -v cygpath >/dev/null 2>&1; then BASE="file:///$(cygpath -m "$TMP")";
 URL_GOOD="$BASE/good.fasta"
 URL_PAGE="$BASE/page.html"
 
-run() { env DATA_DIR="$TMP/data" "$@" bash "$ROOT/env/download_plsdb.sh" > "$TMP/out.log" 2>&1; }
+run() { env DATA_DIR="$TMP/data" PLASBENCH_DB_DIR="$TMP/data/db" "$@" bash "$ROOT/env/download_plsdb.sh" > "$TMP/out.log" 2>&1; }
 
 if run PLSDB_URL="$URL_PAGE"; then echo "FAIL: an HTML page must be refused" >&2; cat "$TMP/out.log" >&2; exit 1; fi
 [[ ! -e "$TMP/data/db/plsdb/sequences.fasta" ]] || { echo "FAIL: nothing may be installed from a web page" >&2; exit 1; }
@@ -31,7 +31,7 @@ if run PLSDB_URL="$URL_GOOD" PLSDB_SHA256="$(printf 0%.0s $(seq 64))"; then echo
 [[ ! -e "$TMP/data/db/plsdb/sequences.fasta" ]] || { echo "FAIL: nothing may be installed on a checksum mismatch" >&2; exit 1; }
 echo "a checksum mismatch is refused -> PASS"
 
-if env DATA_DIR="$TMP/data" bash "$ROOT/env/download_plsdb.sh" > "$TMP/out.log" 2>&1; then echo "FAIL: no URL must be refused" >&2; exit 1; fi
+if env DATA_DIR="$TMP/data" PLASBENCH_DB_DIR="$TMP/data/db" bash "$ROOT/env/download_plsdb.sh" > "$TMP/out.log" 2>&1; then echo "FAIL: no URL must be refused" >&2; exit 1; fi
 echo "no PLSDB_URL is refused -> PASS"
 
 run PLSDB_URL="$URL_GOOD" PLSDB_SHA256="$GOOD_SHA" || { echo "FAIL: a verified FASTA should install" >&2; cat "$TMP/out.log" >&2; exit 1; }

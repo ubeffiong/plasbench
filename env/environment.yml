@@ -13,7 +13,9 @@ dependencies:
   - spades>=3.15           # provides spades.py AND plasmidspades.py
   - unicycler              # optional alternative assembler (cleaner graphs)
   # --- plasmid reconstruction tools under test ---
-  - mob_suite              # mob_recon
+  # mob_suite is NOT in this environment: it needs pandas<=1.5.3, which breaks the
+  # rest. env/setup_conda.sh installs it into its own pinned environment and puts
+  # wrappers for mob_recon/mob_typer here (env/install_tools.sh mobsuite).
   - platon                 # contig-level plasmid classification
   # gplas is off by default (RUN_GPLAS2_MOB/RUN_GPLAS2_EXTERNAL); install it
   # separately with: plasbench install-tools gplas (see INSTALL.md)
@@ -22,7 +24,7 @@ dependencies:
   - samtools               # coverage/depth (RUN_DIFFICULTY_FEATURES; also convenience if you extend)
   - barrnap                # rRNA genes: chromosomal evidence for truth labelling
   - mash                   # plasmid-vs-chromosome k-mer distance (RUN_DIFFICULTY_FEATURES);
-                            # previously only a transitive lock dependency via mob_suite
+                            # (mob_suite has its own environment; see above)
   # --- glue ---
   - python>=3.9            # scoring scripts use the stdlib only
   - pip                    # install the PlasBench command-line wrapper

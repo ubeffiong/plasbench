@@ -27,7 +27,7 @@ source "$HERE/../scripts/lib.sh"
 
 [[ -n "${PLSDB_URL:-}" ]] || die "PLSDB_URL is required (no default is trusted). See the header of env/download_plsdb.sh."
 
-DEST_DIR="$DATA_DIR/db/plsdb"
+DEST_DIR="$(plasbench_db_path plsdb)"
 DEST="$DEST_DIR/sequences.fasta"
 PROV="$DEST_DIR/sequences.provenance.json"
 mkdir -p "$DEST_DIR"

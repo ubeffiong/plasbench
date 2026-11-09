@@ -44,8 +44,9 @@ TABLE = {
     "amrfinder": ("ncbi-amrfinderplus", {"profile", "check"}),
     "isescan.py": ("isescan", {"profile", "check"}),
     "isescan": ("isescan", {"profile"}),
-    "mob_typer": ("mob_suite", {"env", "profile", "check"}),
-    "mob_recon": ("mob_suite", {"env", "profile"}),
+    # mob_suite has its own pinned environment (env/install_tools.sh mobsuite), never environment.yml.
+    "mob_typer": ("mob_suite", {"profile", "check"}),
+    "mob_recon": ("mob_suite", {"profile"}),
     "spades.py": ("spades", {"env", "profile", "check"}),
     "unicycler": ("unicycler", {"env", "profile", "check"}),
     "fastp": ("fastp", {"env", "profile", "check"}),

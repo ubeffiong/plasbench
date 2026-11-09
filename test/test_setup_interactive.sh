@@ -12,6 +12,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
+# The installers write to the database store; keep it in this test's scratch data/db.
+export PLASBENCH_DB_DIR="$TMP/data/db"
 trap 'rm -rf "$TMP"' EXIT
 
 # This suite's whole premise is simulating which tools are present or absent
@@ -63,7 +65,9 @@ EOF
 chmod +x "$TMP/bin_partial/conda"
 
 run_setup() {
-    PATH="$1:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+    # HOME is the scratch dir, so install_tools.sh cannot find (and write wrappers
+    # into) a real conda environment on the machine running the test.
+    HOME="$TMP" PATH="$1:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
         bash "$ROOT/scripts/00_setup.sh" "${@:2}" > "$TMP/run.log" 2>&1
 }
 
@@ -80,13 +84,16 @@ if run_setup "$TMP/bin_partial" --yes; then
     cat "$TMP/run.log" >&2; exit 1
 fi
 grep -q "install-tools profile: reconstruction" "$TMP/run.log" || { echo "FAIL: reconstruction profile not offered" >&2; cat "$TMP/run.log" >&2; exit 1; }
-grep -q "mob_suite" "$TMP/conda_calls.log" && grep -q "platon" "$TMP/conda_calls.log" || {
-    echo "FAIL: install_tools.sh did not actually ask conda to install mob_suite/platon" >&2; cat "$TMP/conda_calls.log" >&2; exit 1; }
+# platon goes into the main environment; mob_suite into its own pinned one (create).
+grep -q "install .*platon" "$TMP/conda_calls.log" && grep -q "create .*mob_suite=3.1.9" "$TMP/conda_calls.log" || {
+    echo "FAIL: install_tools.sh did not install platon and create the pinned mob_suite env" >&2; cat "$TMP/conda_calls.log" >&2; exit 1; }
+if grep -q "install .*mob_suite" "$TMP/conda_calls.log"; then
+    echo "FAIL: mob_suite was installed into the main environment" >&2; cat "$TMP/conda_calls.log" >&2; exit 1; fi
 echo "missing reconstruction tools + --yes triggers install-tools -> conda end to end -> PASS"
 
 # --- same gap, declining consent: must not touch conda at all. ---
 : > "$TMP/conda_calls.log"
-if PATH="$TMP/bin_partial:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
+if HOME="$TMP" PATH="$TMP/bin_partial:$CLEAN_BIN" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" \
     bash "$ROOT/scripts/00_setup.sh" < /dev/null > "$TMP/run.log" 2>&1; then
     echo "FAIL: declining should exit non-zero" >&2; cat "$TMP/run.log" >&2; exit 1
 fi

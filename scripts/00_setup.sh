@@ -279,6 +279,9 @@ if [[ "${RUN_MOB_RECON:-0}" -eq 1 || "${RUN_GPLAS2_MOB:-0}" -eq 1 || "${RUN_TRYC
     # no resume. So check for the database here rather than letting mob_init
     # "check" by downloading it again. The path is inside the installed
     # mob_suite package -- not fixed across machines, but derivable.
+    # Keep it in the machine store ($PLASBENCH_DB_DIR/mob_suite), and link a
+    # fresh environment to a stored copy instead of downloading it again.
+    mobsuite_db_preserve
     MOBSUITE_DB_DIR="$(mobsuite_db_dir)"
     MOBSUITE_DB_OK=1
     for f in status.txt ncbi_plasmid_full_seqs.fas ncbi_plasmid_full_seqs.fas.msh repetitive.dna.fas; do
