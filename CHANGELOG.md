@@ -13,6 +13,18 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- interactive report views
+- **Interactive plasmid map viewer** (`assets/report/plasmid_viewer_*.html`, `python/report_maps.py`): one viewer with a side panel replaces the
+  stack of static maps. Hover tooltips, click drilldown into a Detail tab, wheel zoom and drag rotate with labels re-laid out, region inputs,
+  search, layer, class and tool filters, Tools / Features / Events tables as tabs, SVG, PNG and TSV export, shareable URL-hash state, keyboard
+  and touch support. The static SVG maps stay as the no-JavaScript and print fallback.
+- **3D views** (`python/report_3d.py`, `assets/report/viz3d_*.html`): rotatable SVG scenes (no libraries, offline) for the contig layer beside
+  the reference layer (bars per tool and layer with the independent-scorer cross-check), the per-isolate recommender against the single best
+  tool and the oracle (regret gaps and a verdict banner), and AMR genes on the right plasmid (a tower of rings, one per tool). A static server-
+  rendered view is the no-JavaScript and print fallback; a test checks the JS and Python projections agree.
+- Large tables are collapsed until opened: scorecard definitions, headline design and reference standard, classification and reconstruction
+  metrics, interpretation limits, the per-plasmid table and the regret table (their rows are also in the viewer and 3D panels; nothing is removed).
+
 ### Added -- report overhaul: scorecard, maps, workflow, inventory
 - **Workflow figure moved to the README**: it describes how the pipeline is built, not what one run produced, so the report no longer has a
   Workflow section. `python/report_workflow.py` now draws a static `docs/images/workflow.svg` (embedded in the README's "Benchmark workflow"
