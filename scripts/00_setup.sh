@@ -94,9 +94,25 @@ elif [[ "$ASSEMBLER" == "unicycler" ]]; then
     check_tool unicycler assembly
 fi
 
+# A tool that is on PATH but cannot start (a broken Python dependency, for
+# example MOB-suite importing a name newer pandas removed) is worse than a
+# missing one: every run fails and, under failure-as-zero, scores 0. So each
+# enabled Python-based tool is started once with --version.
+smoke_test() {
+    local binary="$1" out
+    out="$("$binary" --version 2>&1)" && return 0
+    if grep -qE "ImportError|ModuleNotFoundError|cannot import name|No module named" <<<"$out"; then
+        warn "  [BROKEN] $binary is installed but cannot start: $(grep -m1 -E 'Error' <<<"$out")"
+        BROKEN_TOOLS+=("$binary")
+        return 1
+    fi
+    return 0   # some tools exit non-zero for --version; only an import failure is "broken"
+}
+BROKEN_TOOLS=()
 log "Checking optional plasmid reconstruction tools (only those switched on in config)..."
 if [[ "${RUN_MOB_RECON:-0}" -eq 1 ]]; then
-    have mob_recon && log "  [ok]   mob_recon" || { warn "  [MISS] mob_recon (RUN_MOB_RECON=1)"; NEEDED_PROFILES["reconstruction"]=1; }
+    if have mob_recon; then smoke_test mob_recon && log "  [ok]   mob_recon"
+    else warn "  [MISS] mob_recon (RUN_MOB_RECON=1)"; NEEDED_PROFILES["reconstruction"]=1; fi
 fi
 if [[ "${RUN_PLASSEMBLER:-0}" -eq 1 ]]; then
     check_tool plassembler plassembler
@@ -116,7 +132,8 @@ if [[ "${RUN_PLASSEMBLER:-0}" -eq 1 || "${RUN_HYBRACTER_LONG:-0}" -eq 1 || "${RU
 fi
 
 if [[ "${RUN_PLATON:-0}" -eq 1 ]]; then
-    have platon && log "  [ok]   platon" || { warn "  [MISS] platon (RUN_PLATON=1)"; NEEDED_PROFILES["reconstruction"]=1; }
+    if have platon; then smoke_test platon && log "  [ok]   platon"
+    else warn "  [MISS] platon (RUN_PLATON=1)"; NEEDED_PROFILES["reconstruction"]=1; fi
 fi
 if [[ "${RUN_GPLAS2_MOB:-0}" -eq 1 ]]; then
     have gplas && log "  [ok]   gplas (gplas2_mob)" || { warn "  [MISS] gplas (RUN_GPLAS2_MOB=1)"; NEEDED_PROFILES["gplas"]=1; }
@@ -274,6 +291,11 @@ if [[ "${RUN_MOB_RECON:-0}" -eq 1 || "${RUN_GPLAS2_MOB:-0}" -eq 1 || "${RUN_TRYC
         NEED_MOBSUITE_DB=1; CORE_OK=0
     fi
 fi
+for broken in "${BROKEN_TOOLS[@]:-}"; do
+    [[ -z "$broken" ]] && continue
+    UNFIXABLE+=("$broken is installed but cannot start (a dependency conflict in this environment); install it in its own environment and put that first on PATH, see INSTALL.md")
+    CORE_OK=0
+done
 if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 && "$PROTEIN_ANNOTATION_ENGINE" == "bakta" ]]; then
     if [[ -n "${PROTEIN_ANNOTATION_DATABASE:-}" && -s "$PROTEIN_ANNOTATION_DATABASE/version.json" ]]; then
         log "  [ok]   Bakta DB at $PROTEIN_ANNOTATION_DATABASE"
