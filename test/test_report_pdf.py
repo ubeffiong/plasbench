@@ -52,6 +52,9 @@ def main():
         print("SKIPPED: results_demo/benchmark.report.html not found; run the demo first")
         sys.exit(0 if ok else 1)
 
+    if sys.platform.startswith("linux") and os.environ.get("CI") and "PLASBENCH_BROWSER_FLAGS" not in os.environ:
+        # a CI runner usually cannot start the browser sandbox (setuid helper not configured); the sandbox stays on everywhere else
+        os.environ["PLASBENCH_BROWSER_FLAGS"] = "--no-sandbox"
     print("the demo report exported with " + os.path.basename(browser))
     with open(demo, encoding="utf-8") as handle:
         page = handle.read()

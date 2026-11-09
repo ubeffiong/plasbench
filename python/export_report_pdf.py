@@ -60,11 +60,20 @@ def find_browser():
     return None
 
 
+def extra_flags():
+    """Extra browser flags from $PLASBENCH_BROWSER_FLAGS (space separated), for environments that need them.
+
+    The browser's sandbox stays ON by default. A container or CI runner where the sandbox cannot start can set
+    PLASBENCH_BROWSER_FLAGS=--no-sandbox for that run only.
+    """
+    return os.environ.get("PLASBENCH_BROWSER_FLAGS", "").split()
+
+
 def print_command(browser, url, out_pdf, profile, budget_ms):
     return [browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
             f"--user-data-dir={profile}", "--allow-file-access-from-files", "--window-size=1280,1024",
             "--no-pdf-header-footer", f"--print-to-pdf={out_pdf}",
-            f"--virtual-time-budget={budget_ms}", "--run-all-compositor-stages-before-draw", url]
+            f"--virtual-time-budget={budget_ms}", "--run-all-compositor-stages-before-draw", *extra_flags(), url]
 
 
 def export(report, out=None, budget_ms=20000, timeout=600):
@@ -90,7 +99,9 @@ def export(report, out=None, budget_ms=20000, timeout=600):
             raise SystemExit(f"ERROR: {browser} did not finish within {timeout} s")
     if not out.is_file() or out.stat().st_size < 1000:
         tail = (result.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-5:]
-        raise SystemExit(f"ERROR: {browser} wrote no PDF (exit {result.returncode}). " + " | ".join(tail))
+        hint = (" If the browser's sandbox cannot start here (a container or CI runner), set PLASBENCH_BROWSER_FLAGS=--no-sandbox for this run."
+                if any("sandbox" in line.lower() for line in tail) else "")
+        raise SystemExit(f"ERROR: {browser} wrote no PDF (exit {result.returncode}). " + " | ".join(tail) + hint)
     return out
 
 
