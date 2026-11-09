@@ -5,6 +5,7 @@ each section appears with its values when its input exists, and with an explicit
 build_html_report.py accepts every new argument and calls the module."""
 import json
 import re
+import shutil
 import tempfile
 from pathlib import Path
 import sys
@@ -107,6 +108,22 @@ def main():
             assert "Not run" not in body or sid == "contig-layer", f"{sid} unexpectedly not run"
         assert page.count("<a href='#") == len(rss.SECTIONS) + 1
         print(f"  PASS: all {len(checks)} sections render their values, with nav links")
+
+        # The three views are 3D scenes with the raw table kept in a collapsed details block.
+        contig = section(page, "contig-layer")
+        assert "data-v3='bars'" in contig and "Show the data table" in contig and "0.8100" in contig, "contig layer is not a 3D view"
+        assert page.count("PlasBench 3D engine") == 1, "the 3D engine must be emitted exactly once"
+        assert "data-v3='recs'" not in section(page, "recommender-eval"), "no regret table: the 3D scene must not draw empty"
+        shutil.copy(tmp / "eval.tsv", tmp / "benchmark.recommender_eval.tsv")
+        write(tmp / "benchmark.recommender_regret.tsv", ["profile", "sample", "held_out_study", "organism", "recommended_tool", "recommended_score",
+                                                         "predicted_score", "best_tool", "best_score", "regret", "near_optimal",
+                                                         "single_best_tool", "single_best_score", "single_best_regret", "floor_flag", "basis"],
+              [["f1", "S1", "st", "E. coli", "toolA", "0.9", "0.9", "toolB", "1.0", "0.1", "no", "toolA", "0.9", "0.1", "no", "model"]])
+        sources["recommender_eval"] = tmp / "benchmark.recommender_eval.tsv"
+        recs_body = section(rss.inject(PAGE, sources), "recommender-eval")
+        assert "data-v3='recs'" in recs_body and "Verdict: Recommending per isolate beats" in recs_body and "cohort_outlier:n50" in recs_body
+        sources["recommender_eval"] = tmp / "eval.tsv"
+        print("  PASS: contig layer and recommender are 3D views with a collapsed raw table, verdict in words, engine emitted once")
 
         empty = rss.inject(PAGE, {})
         for sid in checks:

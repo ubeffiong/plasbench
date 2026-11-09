@@ -1,0 +1,364 @@
+<script>
+/* PlasBench 3D views: scene builders (pure functions, testable in node) and the thin glue that mounts them.
+   Hosts look like <div class="v3" data-v3="bars|recs|rings" data-src="id-of-json-script">. */
+(function (root) {
+'use strict';
+var P = root.PB3D, esc = P.esc, fmt = P.fmt;
+var OI = {blue: '#0072B2', orange: '#E69F00', green: '#009E73', purple: '#CC79A7', vermillion: '#D55E00', sky: '#56B4E9', ink: '#17231d', grey: '#8c8c8c'};
+var PLACE = {
+  correct_plasmid: {label: 'Correct plasmid', color: OI.green, shape: 'circle'},
+  wrong_plasmid: {label: 'Wrong plasmid', color: OI.vermillion, shape: 'cross'},
+  shared_contig: {label: 'Shared contig', color: OI.orange, shape: 'diamond'},
+  unassigned_contig: {label: 'Unassigned contig', color: OI.sky, shape: 'square'},
+  not_recovered: {label: 'Not recovered', color: '#555555', shape: 'ring'}
+};
+var PLACE_ORDER = ['correct_plasmid', 'wrong_plasmid', 'shared_contig', 'unassigned_contig', 'not_recovered'];
+
+function floorAndWalls(prims, xmin, xmax, zmin, zmax, H, ticks) {
+  prims.push({k: 'poly', role: 'floor', layer: 0, cls: 'v3-floor', pts: [[xmin, 0, zmax], [xmax, 0, zmax], [xmax, 0, zmin], [xmin, 0, zmin]]});
+  for (var t = 0; t <= ticks; t++) {
+    var y = H * t / ticks;
+    prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[xmin, y, zmin], [xmax, y, zmin]]});
+    prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[xmin, y, zmin], [xmin, y, zmax]]});
+    prims.push({k: 'text', role: 'ytick', layer: 2, cls: 'v3-t-m', p: [xmin, y, zmax], t: (t / ticks).toFixed(2).replace(/0$/, ''), anchor: 'end', dx: -7, dy: 4});
+  }
+  prims.push({k: 'line', role: 'axis', layer: 0, cls: 'v3-axis', pts: [[xmin, 0, zmax], [xmin, H, zmax]]});
+  prims.push({k: 'line', role: 'axis', layer: 0, cls: 'v3-axis', pts: [[xmin, 0, zmax], [xmax, 0, zmax]]});
+  prims.push({k: 'line', role: 'axis', layer: 0, cls: 'v3-axis', pts: [[xmax, 0, zmin], [xmax, 0, zmax]]});
+}
+function addBox(prims, o) {
+  P.boxFaces(o.x - o.w / 2, o.x + o.w / 2, 0, o.h, o.z - o.d / 2, o.z + o.d / 2).forEach(function (f) {
+    prims.push({k: 'poly', role: o.role || 'bar', cls: 'v3-bar', pts: f[1], fill: o.fill, shade: f[2], cull: true, id: o.id, grp: o.grp, focus: f[0] === 'top', label: o.label, op: o.op});
+  });
+}
+
+/* ================================================================ view 1: contig layer bars */
+function barsDefaults(data) { return {group: '', layer: ''}; }
+function buildBars(data, o) {
+  o = o || {}; var hid = o.hidden || {};
+  var tools = data.tools.filter(function (t) { return !o.group || t.group === o.group; });
+  var layers = data.layers.filter(function (l) { return !hid['L:' + l.key] && (!o.layer || o.layer === l.key); });
+  var nx = tools.length, nz = layers.length;
+  var scene = {prims: [], legend: [], tips: {}, title: 'Contig layer beside the reference layer: 3D bar chart',
+    desc: 'Bars: x is the tool, depth is the scoring layer, height is the score from 0 to 1. Markers show the independent k-mer scorer.'};
+  if (!nx || !nz) return scene;
+  var gx = 1.7, gz = 1.9, bw = 1.05, H = 4, prims = scene.prims;
+  var xmin = -1.1, xmax = (nx - 1) * gx + 1.1, zmin = -1.1, zmax = (nz - 1) * gz + 1.1;
+  floorAndWalls(prims, xmin, xmax, zmin, zmax, H, 4);
+  for (var i = 0; i < nx; i++) prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[i * gx, 0, zmin], [i * gx, 0, zmax]]});
+  for (var j = 0; j < nz; j++) prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[xmin, 0, j * gz], [xmax, 0, j * gz]]});
+  tools.forEach(function (t, i) {
+    prims.push({k: 'text', role: 'xlabel', layer: 2, cls: 'v3-t-b', p: [i * gx, 0, zmax + 0.15], t: t.label, anchor: nx > 5 ? 'end' : 'middle', dy: 16, rot: nx > 5 ? -28 : 0});
+  });
+  layers.forEach(function (l, j) {
+    prims.push({k: 'text', role: 'zlabel', layer: 2, cls: 'v3-t-b', p: [xmax + 0.1, 0, j * gz], t: l.label, anchor: 'start', dx: 8, dy: 4});
+  });
+  prims.push({k: 'text', role: 'axtitle', layer: 2, cls: 'v3-t-m v3-ital', p: [xmin, H, zmax], t: 'Score (0 to 1)', anchor: 'end', dx: -4, dy: -12});
+  var labelled = nx * nz <= 40, anyXc = false;
+  tools.forEach(function (t, i) {
+    layers.forEach(function (l, j) {
+      var x = i * gx, z = j * gz, v = t.v[l.key], id = 'b|' + t.id + '|' + l.key, grp = 't|' + t.id;
+      if (v == null) {
+        prims.push({k: 'poly', role: 'na', cls: 'v3-na', pts: [[x - bw / 2, 0.03, z + bw / 2], [x + bw / 2, 0.03, z + bw / 2], [x + bw / 2, 0.03, z - bw / 2], [x - bw / 2, 0.03, z - bw / 2]],
+          fill: '#999999', op: 0.12, id: id, grp: grp, focus: true, label: t.label + ', ' + l.label + ': not scored'});
+        scene.tips[id] = {t: t.label + ' / ' + l.label, rows: [['Value', 'not scored at this layer']], note: l.def};
+        return;
+      }
+      var h = Math.max(v * H, 0.02);
+      addBox(prims, {x: x, z: z, w: bw, d: bw, h: h, fill: l.color, id: id, grp: grp, label: t.label + ', ' + l.label + ': ' + fmt(v)});
+      if (labelled) prims.push({k: 'text', role: 'value', layer: 2, cls: 'v3-t-b', size: 10, p: [x, h, z], t: fmt(v, 2), dy: -7});
+      var tip = {t: t.label + ' / ' + l.label, rows: [['Value', fmt(v, 4)]], note: l.def};
+      var xc = t.xc, iv = xc ? (l.key === 'contig_f1' ? xc.f1 : l.key === 'contig_mcc' ? xc.mcc : null) : null;
+      if (xc && iv != null && !hid.xc) {
+        anyXc = true;
+        var dis = xc.dis > 0, d = l.key === 'contig_f1' ? xc.d_f1 : xc.d_mcc;
+        prims.push({k: 'line', role: 'xcwhisker', cls: 'v3-xcw', pts: [[x, h, z], [x, iv * H, z]], stroke: dis ? OI.vermillion : '#222222', w: 2, op: 0.9});
+        prims.push({k: 'mark', role: 'xc', p: [x, iv * H, z], bias: 0.05, shape: dis ? 'triangle' : 'diamond', r: 6, fill: dis ? OI.vermillion : '#ffffff', stroke: '#111111', id: 'x|' + t.id + '|' + l.key, grp: grp});
+        scene.tips['x|' + t.id + '|' + l.key] = {t: 'Independent k-mer scorer: ' + t.label + ' / ' + l.label,
+          rows: [['k-mer scorer', fmt(iv, 4)], ['Delta vs minimap2', fmt(d, 4)], ['Status', dis ? 'DISAGREE (' + xc.dis + ' of ' + xc.n + ' samples beyond ' + data.thr + ')' : 'agree within ' + data.thr], ['Samples cross-checked', xc.n]], note: 'Diamond = agrees, triangle = flagged.'};
+        tip.rows.push(['k-mer scorer (independent)', fmt(iv, 4)], ['Delta vs minimap2', fmt(d, 4)], ['Cross-check', dis ? 'flagged: disagree' : 'agrees']);
+      }
+      scene.tips[id] = tip;
+    });
+  });
+  data.layers.forEach(function (l) { scene.legend.push({group: 'Layer (click to hide)', key: 'L:' + l.key, label: l.label, color: l.color, shape: 'square', title: l.def}); });
+  scene.legend.push({group: 'Independent scorer', key: 'xc', label: 'Agrees (diamond)', color: '#ffffff', shape: 'diamond'}, {group: 'Independent scorer', key: 'xc', label: 'Flagged: disagrees (triangle)', color: OI.vermillion, shape: 'triangle'});
+  return scene;
+}
+function barsControls(data, vals) {
+  var groups = [['', 'All tracks / tasks']].concat(data.groups.map(function (g) { return [g, g]; })), out = [];
+  if (data.groups.length > 1) out.push({key: 'group', label: 'Track / task', options: groups});
+  out.push({key: 'layer', label: 'Layer', options: [['', 'All four layers']].concat(data.layers.map(function (l) { return [l.key, l.label]; }))});
+  return out;
+}
+function barsSide(data) {
+  return '<div class="v3-card"><h3>Excluded from contig scoring</h3><p class="v3-big">' + data.shared.toLocaleString('en-US') + ' bp <span>shared (AMBIGUOUS)</span></p><p class="v3-big">' +
+    data.unassigned.toLocaleString('en-US') + ' bp <span>unassigned (UNPLACED)</span></p><p class="v3-muted">Summed over every scored run. These contigs are left out of the contig layer rather than counted wrong.</p></div>' +
+    '<div class="v3-card"><h3>Independent second scorer</h3><p>' + esc(data.xcStatus) + ': ' + esc(data.xcBasis) + '.</p></div>';
+}
+function barsToolRows(data, id) {
+  var t = data.tools.filter(function (x) { return x.id === id; })[0];
+  return {tool: t, rows: t ? data.xcRows.filter(function (r) { return r[1] === t.tool; }) : []};
+}
+function barsPanel(data, vals, grp) {
+  var id = grp.split('|')[1], tr = barsToolRows(data, id), t = tr.tool; if (!t) return null;
+  var vrows = data.layers.map(function (l) { return [l.label, t.v[l.key] == null ? 'not scored' : fmt(t.v[l.key], 4)]; });
+  var html = P.tableHTML(['Layer', 'Mean value'], vrows) + '<p class="v3-muted">Excluded for this tool: shared ' + t.ex.shared.toLocaleString('en-US') + ' bp, unassigned ' + t.ex.unassigned.toLocaleString('en-US') + ' bp.</p>';
+  var tabs = [{name: 'Per-sample cross-check', html: tr.rows.length ? P.tableHTML(data.xcHeader, tr.rows) : '<p class="v3-muted">No independent-scorer rows for this tool in this run.</p>',
+    csv: tr.rows.length ? {name: 'contig_crosscheck_' + t.tool + '.csv', header: data.xcHeader, rows: tr.rows} : null}, allRowsTab(data)];
+  return {title: t.label, html: html, tabs: tabs};
+}
+function allRowsTab(data) {
+  return {name: 'All cross-check rows', html: data.xcRows.length ? P.tableHTML(data.xcHeader, data.xcRows) : '<p class="v3-muted">No independent scorer ran (RUN_CONTIG_CROSSCHECK=0 or no contig labels).</p>',
+    csv: data.xcRows.length ? {name: 'contig_crosscheck_all.csv', header: data.xcHeader, rows: data.xcRows} : null};
+}
+function barsPanelDefault(data) { return {title: 'Click a tool to drill down', html: '<p class="v3-muted">Click any bar of a tool (or focus it and press Enter) to see its per-sample cross-check rows.</p>', tabs: [allRowsTab(data)]}; }
+
+/* ================================================================ view 2: recommender strategies */
+var RI = {S: 0, ORG: 1, STUDY: 2, RT: 3, RS: 4, PS: 5, BT: 6, BS: 7, RG: 8, NEAR: 9, ST: 10, SS: 11, SR: 12, FL: 13, BASIS: 14};
+var STRATS = [{key: 'rec', label: 'Per-isolate recommender', color: OI.blue, col: RI.RS}, {key: 'single', label: 'Single best tool', color: OI.orange, col: RI.SS}, {key: 'oracle', label: 'Oracle best tool', color: OI.green, col: RI.BS}];
+function recsDefaults(data) { return {profile: data.profiles.length ? data.profiles[0].p : ''}; }
+function buildRecs(data, o) {
+  o = o || {}; var hid = o.hidden || {}, rows = (data.iso && data.iso[o.profile]) || [];
+  var strs = STRATS.filter(function (s) { return !hid['S:' + s.key]; }), nx = rows.length, nz = strs.length;
+  var scene = {prims: [], legend: [], tips: {}, title: 'Recommender strategies per isolate: 3D bar chart',
+    desc: 'Bars: x is the isolate, depth is the strategy (recommender, single best tool, oracle), height is the score. Dashed segments are regret gaps.'};
+  if (!nx || !nz) return scene;
+  var gx = 1.2, gz = 2.5, bw = 0.7, H = 4, prims = scene.prims;
+  var xmin = -1, xmax = (nx - 1) * gx + 1, zmin = -1.1, zmax = (nz - 1) * gz + 1.1;
+  floorAndWalls(prims, xmin, xmax, zmin, zmax, H, 4);
+  strs.forEach(function (s, j) {
+    var zz = (nz - 1 - j) * gz;
+    prims.push({k: 'line', role: 'grid', layer: 0, cls: 'v3-grid', pts: [[xmin, 0, zz], [xmax, 0, zz]]});
+    prims.push({k: 'text', role: 'zlabel', layer: 2, cls: 'v3-t-b', p: [xmax + 0.1, 0, zz], t: s.label, anchor: 'start', dx: 8, dy: 4});
+  });
+  var many = nx > 5;
+  rows.forEach(function (r, i) {
+    var x = i * gx, grp = 'i|' + i;
+    prims.push({k: 'text', role: 'xlabel', layer: 2, cls: 'v3-t-b', p: [x, 0, zmax + 0.15], t: r[RI.S], anchor: many ? 'end' : 'middle', dy: 16, rot: many ? -35 : 0});
+    var tops = [];
+    strs.forEach(function (s, j) {
+      var v = r[s.col], z = (nz - 1 - j) * gz, id = 's|' + i + '|' + s.key;
+      if (v == null) return;
+      addBox(prims, {x: x, z: z, w: bw, d: bw, h: Math.max(v * H, 0.02), fill: s.color, id: id, grp: grp, label: r[RI.S] + ', ' + s.label + ': ' + fmt(v)});
+      tops.push([x, v * H, z]);
+      var tip = {t: r[RI.S] + ' / ' + s.label, rows: []};
+      if (s.key === 'rec') tip.rows.push(['Tool picked', r[RI.RT] || '-'], ['Predicted score', fmt(r[RI.PS], 4)], ['Achieved score', fmt(v, 4)], ['Regret', fmt(r[RI.RG], 4)], ['Near-optimal', r[RI.NEAR] === 'yes' ? 'yes' : 'no'], ['Floor flagged', r[RI.FL] === 'yes' ? 'yes' : 'no']);
+      else if (s.key === 'single') tip.rows.push(['Tool', r[RI.ST] || '-'], ['Achieved score', fmt(v, 4)], ['Regret', fmt(r[RI.SR], 4)]);
+      else tip.rows.push(['Best tool on this isolate', r[RI.BT] || '-'], ['Score', fmt(v, 4)]);
+      tip.note = 'Click for the isolate detail.'; scene.tips[id] = tip;
+      if (s.key === 'rec') {
+        var near = r[RI.NEAR] === 'yes';
+        prims.push({k: 'mark', role: 'near', p: [x, v * H, z], bias: 0.05, shape: near ? 'circle' : 'triangle', r: 5.5, fill: near ? '#ffffff' : OI.vermillion, stroke: '#111111', id: id, grp: grp});
+        if (r[RI.FL] === 'yes') prims.push({k: 'mark', role: 'floorflag', p: [x, v * H, z], bias: 0.04, shape: 'ring', r: 10, fill: '#111111', id: id, grp: grp});
+      }
+      var bs = r[RI.BS], gap = s.key === 'rec' || s.key === 'single' ? (bs != null ? bs - v : 0) : 0;
+      if (gap > 1e-9) prims.push({k: 'line', role: 'regret', cls: 'v3-regret', cap: true, pts: [[x, v * H, z], [x, bs * H, z]], stroke: OI.vermillion, w: 3, dash: '5 3', id: id, grp: grp});
+    });
+    for (var q = 0; q + 1 < tops.length; q++) {
+      var a = tops[q], b = tops[q + 1];
+      prims.push({k: 'poly', role: 'ribbon', cls: 'v3-ribbon', pts: [[a[0] - 0.12, a[1], a[2]], [a[0] + 0.12, a[1], a[2]], [b[0] + 0.12, b[1], b[2]], [b[0] - 0.12, b[1], b[2]]], fill: '#5b6f86', op: 0.65, grp: grp});
+    }
+  });
+  STRATS.forEach(function (s) { scene.legend.push({group: 'Strategy (click to hide)', key: 'S:' + s.key, label: s.label, color: s.color, shape: 'square'}); });
+  scene.legend.push({group: 'Markers', static: true, label: 'Recommendation near-optimal', color: '#17231d', shape: 'ring'}, {group: 'Markers', static: true, label: 'Not near-optimal', color: OI.vermillion, shape: 'triangle'},
+    {group: 'Markers', static: true, label: 'Regret gap to the oracle (dashed)', color: OI.vermillion, shape: 'line'}, {group: 'Markers', static: true, label: 'Ribbon joins the three strategies', color: '#5b6f86', shape: 'square'});
+  return scene;
+}
+function profRow(data, p) { return data.profiles.filter(function (x) { return x.p === p; })[0] || null; }
+function verdictWords(v, pr) {
+  var gap = v.oracle_gap == null || v.oracle_gap === '' ? 'n/a' : v.oracle_gap, closed = v.gap_closed == null || v.gap_closed === '' ? 'not defined' : (Math.round(v.gap_closed * 1000) / 10) + '%';
+  var floor = v.oracle_gap_floor != null ? v.oracle_gap_floor : 0.02;
+  switch (v.verdict) {
+    case 'benchmark_only': return ['neutral', '■', 'Use the leaderboard: recommending per isolate cannot add value here.', 'The best single tool is already within ' + gap + ' F1 of the per-isolate oracle, below the ' + floor + ' floor, so choosing a tool per isolate has nothing left to gain.'];
+    case 'recommender_adds_value': return ['good', '●', 'Recommending per isolate beats the single best tool.', 'It closes ' + closed + ' of the gap to the oracle (oracle gap ' + gap + ' F1).'];
+    case 'recommender_no_better': return ['caution', '▲', 'Recommending per isolate does not beat the single best tool.', 'Gap closed ' + closed + ' of an oracle gap of ' + gap + ' F1: use the single best tool.'];
+    default: return ['neutral', '○', 'Verdict not assessed.', v.note || 'The evaluation did not reach a verdict.'];
+  }
+}
+function recsBanner(data, vals) {
+  var v = data.verdict || {}, w = verdictWords(v, null), pr = profRow(data, vals.profile);
+  var line = pr ? 'Profile ' + pr.p + ': mean regret ' + fmt(pr.mean_regret, 4) + ', single-best regret ' + fmt(pr.sb_regret, 4) + ', near-optimal ' + fmt(pr.near, 3) + ', gap closed ' + (pr.gap_closed == null ? 'not defined' : fmt(pr.gap_closed, 3)) + ', oracle gap ' + fmt(pr.oracle_gap, 4) + ' (' + esc(pr.verdict) + ').' : '';
+  return '<div class="v3-verdict v3-verdict-' + w[0] + '" role="status"><span class="v3-vglyph" aria-hidden="true">' + w[1] + '</span><div><strong>Verdict: ' + esc(w[2]) + '</strong> ' + esc(w[3]) +
+    (v.note ? ' <span class="v3-muted">(' + esc(v.note) + ')</span>' : '') + (line ? '<br><span class="v3-muted">' + line + '</span>' : '') + '</div></div>';
+}
+function recsControls(data) { return [{key: 'profile', label: 'Decision profile', options: data.profiles.map(function (p) { return [p.p, p.p]; })}]; }
+function recsSide(data, vals) {
+  var pr = profRow(data, vals.profile); if (!pr) return '';
+  function box(l, v) { return '<div class="v3-stat"><small>' + l + '</small><strong>' + v + '</strong></div>'; }
+  return '<div class="v3-card"><h3>Profile ' + esc(pr.p) + '</h3><div class="v3-stats">' + box('Isolates', pr.n) + box('Folds', pr.folds) + box('Mean regret', fmt(pr.mean_regret, 4)) + box('Single-best regret', fmt(pr.sb_regret, 4)) +
+    box('Near-optimal', fmt(pr.near, 3)) + box('Oracle gap', fmt(pr.oracle_gap, 4)) + box('Gap closed', pr.gap_closed == null ? 'n/a' : fmt(pr.gap_closed, 3)) + box('Floor flagged', pr.floor) + '</div></div>';
+}
+function recsTabs(data, vals, rowsHtml, csv) {
+  var tabs = [{name: 'Isolates', html: rowsHtml, csv: csv}];
+  tabs.push({name: 'Warnings scored', html: data.warnings.rows.length ? P.tableHTML(data.warnings.header, data.warnings.rows) : '<p class="v3-muted">Not run: no warnings table (needs the recommender evaluation and at least one warning source).</p>',
+    csv: data.warnings.rows.length ? {name: 'recommender_warnings.csv', header: data.warnings.header, rows: data.warnings.rows} : null});
+  tabs.push({name: 'Leave-taxon-out', html: data.taxon.rows.length ? P.tableHTML(data.taxon.header, data.taxon.rows) : '<p class="v3-muted">Not run: leave-taxon-out needs RUN_RECOMMENDER_EVAL=1 and a genus or phylum per isolate.</p>',
+    csv: data.taxon.rows.length ? {name: 'leave_taxon_out.csv', header: data.taxon.header, rows: data.taxon.rows} : null});
+  tabs.push({name: 'Profiles', html: P.tableHTML(data.evalHeader, data.evalRows), csv: {name: 'recommender_eval.csv', header: data.evalHeader, rows: data.evalRows}});
+  return tabs;
+}
+var ISO_HEADER = ['sample', 'held_out_study', 'organism', 'recommended_tool', 'recommended_score', 'predicted_score', 'best_tool', 'best_score', 'regret', 'near_optimal', 'single_best_tool', 'single_best_score', 'single_best_regret', 'floor_flag', 'basis'];
+function isoCsvRow(r) { return [r[RI.S], r[RI.STUDY], r[RI.ORG], r[RI.RT], r[RI.RS], r[RI.PS], r[RI.BT], r[RI.BS], r[RI.RG], r[RI.NEAR], r[RI.ST], r[RI.SS], r[RI.SR], r[RI.FL], r[RI.BASIS]]; }
+function recsPanel(data, vals, grp) {
+  var rows = (data.iso && data.iso[vals.profile]) || [], r = rows[+grp.split('|')[1]]; if (!r) return null;
+  var tbl = P.tableHTML(['Strategy', 'Tool', 'Predicted', 'Achieved', 'Regret', 'Near-optimal', 'Floor flagged'], [
+    ['Per-isolate recommender', r[RI.RT], fmt(r[RI.PS], 4), fmt(r[RI.RS], 4), fmt(r[RI.RG], 4), r[RI.NEAR], r[RI.FL]],
+    ['Single best tool', r[RI.ST], '-', fmt(r[RI.SS], 4), fmt(r[RI.SR], 4), '-', '-'],
+    ['Oracle best tool', r[RI.BT], '-', fmt(r[RI.BS], 4), '0', '-', '-']]);
+  var info = '<p class="v3-muted">' + esc([r[RI.ORG], r[RI.STUDY] ? 'held-out study ' + r[RI.STUDY] : '', r[RI.BASIS] ? 'basis ' + r[RI.BASIS] : ''].filter(Boolean).join(' - ')) + '</p>';
+  return {title: 'Isolate ' + r[RI.S] + ' (profile ' + vals.profile + ')', html: info,
+    tabs: recsTabs(data, vals, tbl + '<p class="v3-muted">Regret = oracle score minus the strategy\'s score. The CSV holds every isolate of this profile.</p>', {name: 'recommender_regret_' + vals.profile + '.csv', header: ISO_HEADER, rows: rows.map(isoCsvRow)})};
+}
+function recsPanelDefault(data, vals) {
+  var rows = (data.iso && data.iso[vals.profile]) || [];
+  return {title: 'Evaluation detail', html: '<p class="v3-muted">Click an isolate to see the tool picked, predicted score, regret and flags.</p>',
+    tabs: recsTabs(data, vals, rows.length ? P.tableHTML(ISO_HEADER, rows.map(isoCsvRow)) : '<p class="v3-muted">No per-isolate regret table was written.</p>', rows.length ? {name: 'recommender_regret_' + vals.profile + '.csv', header: ISO_HEADER, rows: rows.map(isoCsvRow)} : null)};
+}
+
+/* ================================================================ view 3: stack of rings */
+var GI = {PID: 0, GENE: 1, CLS: 2, START: 3, END: 4, COPY: 5};
+var RO = {GI: 0, PLACE: 1, COVER: 2, BIN: 3, MATCH: 4, RT: 5};
+var AMR_HEADER = ['sample', 'tool', 'copy_id', 'gene_name', 'gene_class', 'sequence_id', 'start', 'end', 'covering_record', 'assigned_bin', 'matched_plasmid', 'placement', 'replicon_type_correct'];
+function ringsPlasmids(data, sample) {
+  var S = data.samples[sample]; if (!S) return [];
+  var counts = {}; S.g.forEach(function (g) { counts[g[GI.PID]] = (counts[g[GI.PID]] || 0) + 1; });
+  return Object.keys(S.pl).filter(function (p) { return counts[p]; }).sort(function (a, b) { return counts[b] - counts[a] || a.localeCompare(b); }).map(function (p) { return [p, S.pl[p][0], counts[p]]; });
+}
+function ringsDefaults(data) {
+  var best = null;
+  data.order.forEach(function (x) { var pl = ringsPlasmids(data, x); if (pl.length && (!best || pl[0][2] > best[2])) best = [x, pl[0][0], pl[0][2]]; });
+  return best ? {sample: best[0], plasmid: best[1]} : {sample: data.order[0] || '', plasmid: ''};
+}
+function ringsNormalize(data, vals, key) {
+  if (key === 'sample') { var pl = ringsPlasmids(data, vals.sample); vals.plasmid = pl.length ? pl[0][0] : ''; }
+}
+function ringsControls(data, vals) {
+  var pl = ringsPlasmids(data, vals.sample);
+  return [{key: 'sample', label: 'Sample', options: data.order.map(function (s) { return [s, s]; })},
+          {key: 'plasmid', label: 'Truth plasmid', options: pl.map(function (p) { return [p[0], p[0] + ' (' + p[1].toLocaleString('en-US') + ' bp, ' + p[2] + ' AMR)']; })}];
+}
+function ringsVisibleGenes(data, vals, hid) {
+  var S = data.samples[vals.sample], out = [];
+  if (!S) return out;
+  S.g.forEach(function (g, gi) { if (g[GI.PID] === vals.plasmid && !hid['C:' + g[GI.CLS]]) out.push(gi); });
+  return out;
+}
+function ringsToolRows(S, tool) { var m = {}; (S.tools[tool] || []).forEach(function (r) { m[r[RO.GI]] = r; }); return m; }
+function buildRings(data, o) {
+  o = o || {}; var hid = o.hidden || {}, S = data.samples[o.sample];
+  var scene = {prims: [], legend: [], tips: {}, title: 'AMR genes on the right plasmid: stack of rings', desc: 'One ring per tool, stacked below the reference ring; markers are AMR gene copies placed by angle along the plasmid.'};
+  if (!S || !S.pl[o.plasmid]) return scene;
+  var L = S.pl[o.plasmid][0], tools = Object.keys(S.tools).sort(), n = tools.length + 1, R = 3, gap = 1.5, prims = scene.prims, genes = ringsVisibleGenes(data, o, hid);
+  var yTop = (n - 1) * gap, STEP = 72, step = P.niceStep(L, 8);
+  function ringPts(y) { var q = []; for (var s = 0; s <= STEP; s++) { var xz = P.ringXZ(R, s / STEP * 360); q.push([xz[0], y, xz[1]]); } return q; }
+  var rates = {};
+  for (var ri = 0; ri < n; ri++) {
+    var truth = ri === 0, tool = truth ? null : tools[ri - 1], y = (n - 1 - ri) * gap, rowMap = truth ? null : ringsToolRows(S, tool), ok = 0, tot = 0;
+    var circ = ringPts(y);
+    prims.push({k: 'poly', role: 'disc', layer: 1, cls: 'v3-disc', pts: circ.slice(0, STEP), fill: '#8c8c8c', op: truth ? 0.1 : 0.045});
+    prims.push({k: 'line', role: 'ring', layer: 1, cls: truth ? 'v3-ring v3-ring-ref' : 'v3-ring', pts: circ, w: truth ? 2.4 : 1.6});
+    for (var p = 0; p < L && p / L < 1; p += step) {
+      var a = P.bpToDeg(p, L), i0 = P.ringXZ(R, a), i1 = P.ringXZ(R + 0.16, a);
+      prims.push({k: 'line', role: 'tick', layer: 1, cls: 'v3-tick', pts: [[i0[0], y, i0[1]], [i1[0], y, i1[1]]]});
+      if (truth) { var lb = P.ringXZ(R + 0.5, a); prims.push({k: 'text', role: 'ticklabel', layer: 2, cls: 'v3-t-m', size: 9.5, p: [lb[0], y, lb[1]], t: P.bpLabel(p), dy: 3}); }
+    }
+    var lab = P.ringXZ(R, 270), lcol = [-(R + 1.7), y, 0];
+    prims.push({k: 'line', role: 'leader', layer: 1, cls: 'v3-conn', pts: [[lab[0], y, lab[1]], lcol]});
+    var plabel = truth ? 'Reference (truth)' : tool;
+    prims.push({k: 'text', role: 'rlabel', layer: 2, cls: 'v3-t-b', p: lcol, t: plabel, anchor: 'end', dx: -4, dy: 4});
+    genes.forEach(function (gi) {
+      var g = S.g[gi], sp = P.geneSpan(g[GI.START], g[GI.END], L), deg = P.bpToDeg(sp.mid, L), xz = P.ringXZ(R, deg);
+      if (truth) {
+        var gid = 'g|T|' + gi;
+        prims.push({k: 'mark', role: 'truthgene', p: [xz[0], y, xz[1]], bias: 0.05, shape: 'diamond', r: 5.5, fill: '#17231d', stroke: '#ffffff', id: gid, grp: gid, focus: true, label: 'Reference ' + g[GI.GENE]});
+        scene.tips[gid] = {t: g[GI.GENE] + ' (reference)', rows: [['Class', g[GI.CLS]], ['Plasmid', g[GI.PID]], ['Coordinates', g[GI.START] + '-' + g[GI.END] + ' of ' + L.toLocaleString('en-US') + ' bp'], ['Angle', Math.round(deg) + ' deg clockwise from the origin']], note: 'Click to compare this gene across tools.'};
+        if (genes.length <= 14) { var lp = P.ringXZ(R + 0.55, deg); prims.push({k: 'text', role: 'glabel', layer: 2, cls: 'v3-t-b', size: 10.5, p: [lp[0], y + 0.12, lp[1]], t: g[GI.GENE], anchor: xz[0] >= 0 ? 'start' : 'end', dx: xz[0] >= 0 ? 4 : -4, dy: -4}); }
+        var yb = 0, bot = [xz[0], yb, xz[1]];
+        if (n > 1) prims.push({k: 'line', role: 'connector', layer: 1, cls: 'v3-conn', pts: [[xz[0], y, xz[1]], bot]});
+        return;
+      }
+      var r = rowMap[gi]; if (!r) return;
+      var pl = PLACE[r[RO.PLACE]] || PLACE.not_recovered; tot++; if (r[RO.PLACE] === 'correct_plasmid') ok++;
+      if (hid['P:' + r[RO.PLACE]]) return;
+      var id = 'g|' + (ri - 1) + '|' + gi, arc = [], ns = Math.max(2, Math.ceil(sp.span / L * STEP) + 1);
+      for (var s = 0; s < ns; s++) { var q = P.ringXZ(R, P.bpToDeg(g[GI.START] + sp.span * s / (ns - 1), L)); arc.push([q[0], y, q[1]]); }
+      prims.push({k: 'line', role: 'arc', layer: 1, cls: 'v3-arc', pts: arc, stroke: pl.color, w: 5, cap: true, id: id, grp: id});
+      prims.push({k: 'mark', role: 'genemark', p: [xz[0], y, xz[1]], bias: 0.05, shape: pl.shape, r: 6, fill: pl.color, stroke: '#ffffff', id: id, grp: id, focus: true, label: tool + ' ' + g[GI.GENE] + ': ' + pl.label});
+      scene.tips[id] = {t: g[GI.GENE] + ' on ' + tool, rows: [['Placement', pl.label], ['Gene class', g[GI.CLS]], ['Coordinates', g[GI.START] + '-' + g[GI.END]], ['Covering record', r[RO.COVER] || '-'], ['Assigned bin', r[RO.BIN] || '-'], ['Matched plasmid', r[RO.MATCH] || '-'], ['Replicon-type correct', r[RO.RT] || '-']], note: 'Click for the detail panel.'};
+    });
+    if (!truth) rates[tool] = [ok, tot];
+    if (!truth) prims.push({k: 'text', role: 'rate', layer: 2, cls: 'v3-t-m', size: 10, p: lcol, t: ok + '/' + tot + ' correct', anchor: 'end', dx: -4, dy: 16});
+  }
+  scene.rates = rates; scene.L = L;
+  PLACE_ORDER.forEach(function (k) { scene.legend.push({group: 'Placement (click to hide)', key: 'P:' + k, label: PLACE[k].label, color: PLACE[k].color, shape: PLACE[k].shape}); });
+  scene.legend.push({group: 'Reference', static: true, label: 'Reference gene (top ring)', color: '#17231d', shape: 'diamond'});
+  data.classes.forEach(function (c) { scene.legend.push({group: 'Gene class (click to hide)', key: 'C:' + c, label: c, color: '#8c8c8c', shape: 'square'}); });
+  return scene;
+}
+function ringsSide(data, vals, scene, hid) {
+  var S = data.samples[vals.sample]; if (!S || !S.pl[vals.plasmid]) return '';
+  var rates = scene.rates || {}, tools = Object.keys(rates).sort();
+  return '<div class="v3-card"><h3>' + esc(vals.plasmid) + ' <span class="v3-muted">' + S.pl[vals.plasmid][0].toLocaleString('en-US') + ' bp' + (S.pl[vals.plasmid][1] ? ', circular' : '') + '</span></h3>' +
+    '<p class="v3-muted">Correct-plasmid rate per tool for the ' + ringsVisibleGenes(data, vals, hid).length + ' gene copy(ies) shown (gene-class filter applies).</p>' +
+    tools.map(function (t) { var r = rates[t], pc = r[1] ? Math.round(r[0] / r[1] * 100) : 0; return '<div class="v3-rate"><span>' + esc(t) + '</span><i><b style="width:' + pc + '%"></b></i><em>' + r[0] + '/' + r[1] + (r[1] ? ' (' + pc + '%)' : ' (n/a)') + '</em></div>'; }).join('') + '</div>';
+}
+function ringsRowsFor(data, sample, pid, gi) {
+  var S = data.samples[sample], out = [];
+  Object.keys(S.tools).sort().forEach(function (t) {
+    S.tools[t].forEach(function (r) { var g = S.g[r[RO.GI]]; if ((pid == null || g[GI.PID] === pid) && (gi == null || r[RO.GI] === gi)) out.push([sample, t, g[GI.COPY], g[GI.GENE], g[GI.CLS], g[GI.PID], g[GI.START], g[GI.END], r[RO.COVER], r[RO.BIN], r[RO.MATCH], r[RO.PLACE], r[RO.RT]]); });
+  });
+  return out;
+}
+function ringsAllRows(data) { var out = []; data.order.forEach(function (s) { out = out.concat(ringsRowsFor(data, s, null, null)); }); return out; }
+function ringsPanel(data, vals, grp) {
+  var parts = grp.split('|'), gi = +parts[2], S = data.samples[vals.sample], g = S && S.g[gi]; if (!g) return null;
+  var tool = parts[1] === 'T' ? null : Object.keys(S.tools).sort()[+parts[1]], across = ringsRowsFor(data, vals.sample, g[GI.PID], gi);
+  var acrossT = P.tableHTML(['Tool', 'Placement', 'Covering record', 'Assigned bin', 'Matched plasmid', 'Replicon-type correct'], across.map(function (r) { return [r[1], (PLACE[r[11]] || {}).label || r[11], r[8], r[9], r[10], r[12]]; }));
+  var head = [['Gene', g[GI.GENE]], ['Gene class', g[GI.CLS]], ['Truth plasmid', g[GI.PID]], ['Coordinates', g[GI.START] + '-' + g[GI.END]]];
+  var tabs = [];
+  if (tool) {
+    var r = across.filter(function (x) { return x[1] === tool; })[0] || [];
+    head.push(['Tool', tool], ['Placement', (PLACE[r[11]] || {}).label || r[11]], ['Covering record', r[8]], ['Assigned bin', r[9]], ['Matched plasmid', r[10]], ['Replicon-type correct', r[12]]);
+  }
+  tabs.push({name: 'Same gene across tools', html: acrossT, csv: {name: 'amr_' + g[GI.GENE] + '_across_tools.csv', header: AMR_HEADER, rows: across}});
+  var plRows = ringsRowsFor(data, vals.sample, vals.plasmid, null);
+  tabs.push({name: 'This plasmid', html: P.tableHTML(AMR_HEADER, plRows), csv: {name: 'amr_placement_' + vals.sample + '_' + vals.plasmid + '.csv', header: AMR_HEADER, rows: plRows}});
+  tabs.push(allTab(data));
+  return {title: g[GI.GENE] + (tool ? ' on ' + tool : ' (reference)'), html: P.tableHTML(['Field', 'Value'], head), tabs: tabs};
+}
+function allTab(data) { var all = ringsAllRows(data); return {name: 'All samples', html: '<p class="v3-muted">' + all.length.toLocaleString('en-US') + ' placement row(s) across all samples; download them as CSV.</p>', csv: {name: 'amr_placement_all.csv', header: AMR_HEADER, rows: all}}; }
+function ringsPanelDefault(data, vals) {
+  var plRows = vals.plasmid ? ringsRowsFor(data, vals.sample, vals.plasmid, null) : [];
+  return {title: 'AMR placement detail', html: '<p class="v3-muted">Click a marker to see the gene, its class, coordinates, covering record, assigned bin, matched plasmid and replicon-type result.</p>',
+    tabs: [{name: 'This plasmid', html: P.tableHTML(AMR_HEADER, plRows), csv: {name: 'amr_placement_' + vals.sample + '_' + vals.plasmid + '.csv', header: AMR_HEADER, rows: plRows}}, allTab(data)]};
+}
+
+/* ================================================================ mounting */
+var SPECS = {
+  bars: {name: 'plasbench-contig-layer-3d', defaults: barsDefaults, build: buildBars, controls: barsControls, side: barsSide, panel: barsPanel, panelDefault: barsPanelDefault, camera: {yaw: -28, pitch: 24}},
+  recs: {name: 'plasbench-recommender-3d', defaults: recsDefaults, build: buildRecs, controls: recsControls, banner: recsBanner, side: recsSide, panel: recsPanel, panelDefault: recsPanelDefault, camera: {yaw: -24, pitch: 36}},
+  rings: {name: 'plasbench-amr-rings-3d', defaults: ringsDefaults, build: buildRings, controls: ringsControls, normalize: ringsNormalize, side: ringsSide, panel: ringsPanel, panelDefault: ringsPanelDefault, camera: {yaw: -18, pitch: 26}}
+};
+function init() {
+  Array.prototype.forEach.call(document.querySelectorAll('.v3[data-v3]'), function (host) {
+    if (host.getAttribute('data-v3-live')) return;
+    try {
+      var tag = document.getElementById(host.getAttribute('data-src')), spec = Object.assign({}, SPECS[host.getAttribute('data-v3')]);
+      spec.data = JSON.parse(tag.textContent);
+      var inner = SPECS[host.getAttribute('data-v3')].build;
+      spec.build = function (d, v, h) { return inner(d, Object.assign({}, v, {hidden: h}), h); };
+      P.mount(host, spec);
+    } catch (e) { /* the static SVG stays in place */ if (window.console) console.warn('PlasBench 3D view not started:', e); }
+  });
+}
+var api = {buildBars: buildBars, buildRecs: buildRecs, buildRings: buildRings, barsDefaults: barsDefaults, recsDefaults: recsDefaults, ringsDefaults: ringsDefaults,
+  ringsPlasmids: ringsPlasmids, ringsRowsFor: ringsRowsFor, ringsAllRows: ringsAllRows, verdictWords: verdictWords, recsBanner: recsBanner, barsPanel: barsPanel, recsPanel: recsPanel, ringsPanel: ringsPanel,
+  ringsSide: ringsSide, barsToolRows: barsToolRows, isoCsvRow: isoCsvRow, ISO_HEADER: ISO_HEADER, AMR_HEADER: AMR_HEADER, PLACE: PLACE, SPECS: SPECS, init: init};
+root.PB3DViews = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+}
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

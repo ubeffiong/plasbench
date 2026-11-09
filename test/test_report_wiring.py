@@ -180,10 +180,10 @@ def main():
     allgrouped = {i for g in rw._G.values() for i in g.split()}
     check("group table has no id in two groups",
           sum(len(g.split()) for g in rw._G.values()) == len(allgrouped))
-    page2 = rw.finish(stub("summary", "leaderboard", "recommendations", "scorecard", "workflow", "plasmid-maps"))
+    page2 = rw.finish(stub("summary", "leaderboard", "recommendations", "scorecard", "plasmid-maps"))
     order = re.findall(r"<section id='([a-z-]+)'", page2)
-    check("scorecard, maps and workflow move up behind the leaderboard",
-          order == ["summary", "leaderboard", "scorecard", "plasmid-maps", "workflow", "recommendations"], order)
+    check("scorecard and maps move up behind the leaderboard",
+          order == ["summary", "leaderboard", "scorecard", "plasmid-maps", "recommendations"], order)
 
     print("overlap wording")
     check("no reference database: every screen row says so",
@@ -241,6 +241,13 @@ def main():
             hrefs = [h for h in re.findall(r"href='([^#'][^']*\.md)'", sec("files"))]
             check("Run files links exist and include the leaderboard and the spec",
                   hrefs and all(os.path.isfile(p(h)) for h in hrefs) and "benchmark.leaderboard.md" in hrefs and "benchmark.scoring_spec.md" in hrefs, hrefs)
+            for sid, marker in (("headline-design", "<table"), ("metric-framework", "<table"), ("scorecard-definitions", "<table"),
+                                ("interpretation-limits", "These results do NOT show"),
+                                ("per-plasmid-detail", "<table")):
+                block = sec(sid)
+                check(f"{sid}: its detail is collapsed in a closed <details> until clicked",
+                      "<details class='rpt-collapsible'>" in block and "<details class='rpt-collapsible' open" not in block
+                      and block.index("<details") < block.index(marker) < block.index("</details>"))
             nav = html[html.index("<nav class='nav'"):html.index("</nav>")]
             ids = re.findall(r"<section id='([a-z-]+)'", html)
             check("nav links every section exactly once", sorted(re.findall(r"href='#([a-z-]+)'", nav)) == sorted(ids))

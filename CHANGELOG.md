@@ -13,14 +13,29 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- interactive report views
+- **Interactive plasmid map viewer** (`assets/report/plasmid_viewer_*.html`, `python/report_maps.py`): one viewer with a side panel replaces the
+  stack of static maps. Hover tooltips, click drilldown into a Detail tab, wheel zoom and drag rotate with labels re-laid out, region inputs,
+  search, layer, class and tool filters, Tools / Features / Events tables as tabs, SVG, PNG and TSV export, shareable URL-hash state, keyboard
+  and touch support. The static SVG maps stay as the no-JavaScript and print fallback.
+- **3D views** (`python/report_3d.py`, `assets/report/viz3d_*.html`): rotatable SVG scenes (no libraries, offline) for the contig layer beside
+  the reference layer (bars per tool and layer with the independent-scorer cross-check), the per-isolate recommender against the single best
+  tool and the oracle (regret gaps and a verdict banner), and AMR genes on the right plasmid (a tower of rings, one per tool). A static server-
+  rendered view is the no-JavaScript and print fallback; a test checks the JS and Python projections agree.
+- Large tables are collapsed until opened: scorecard definitions, headline design and reference standard, classification and reconstruction
+  metrics, interpretation limits, the per-plasmid table and the regret table (their rows are also in the viewer and 3D panels; nothing is removed).
+
 ### Added -- report overhaul: scorecard, maps, workflow, inventory
+- **Workflow figure moved to the README**: it describes how the pipeline is built, not what one run produced, so the report no longer has a
+  Workflow section. `python/report_workflow.py` now draws a static `docs/images/workflow.svg` (embedded in the README's "Benchmark workflow"
+  section); a test fails if the committed file drifts from the generator.
 - **Weighted scorecard** (`python/report_scorecard.py`, `config/scorecard.tsv`): 17 metrics A1-E3, piecewise-linear score (100/85/60/0), metric bands, overall
   bands (90/75/55), weights renormalised over scored metrics with the scored weight share, and non-exclusive scenarios (simple, complex, annotated,
   challenging) with an underpowered flag below `SCORECARD_MIN_SAMPLES` (5). Only the identity bands are `fixed`; the rest are `proposed` and registered in
   `config/prereg.tsv`. A4 and C2 are `undefined` (no truth variant set): no thresholds, excluded from the overall.
 - **Circular plasmid maps** (`python/report_maps.py`): per truth plasmid, with truth genes, tool coverage rings, GC content and GC skew
   (`MAP_MAX_TOOLS` 8, `MAP_MAX_BP` 600000).
-- **Workflow figure**, **data inventory** ("Data in this report", `python/report_surfaces.py`), per-plasmid detail, assembly-quality section, depth strip,
+- **Data inventory** ("Data in this report", `python/report_surfaces.py`), per-plasmid detail, assembly-quality section, depth strip,
   grouped collapsible navigation, a column-group switch for the scores table, and links to `leaderboard.md` and `scoring_spec.md`.
 - Corrected the paired-comparison table and the overlap wording.
 - Docs: SCIENTIFIC_GUIDE 7.10, 13.3, 15, 17.4; METHODS; README. New variable `SCORECARD_MIN_SAMPLES`.

@@ -170,7 +170,8 @@ def per_plasmid_rows(results_dir, data_dir=None):
 def per_plasmid_section(results_dir, data_dir=None):
     title = "Per-plasmid detail: which truth plasmids each tool recovered"
     lead = ("One row for each truth plasmid and tool: how much of it was covered, the outcome class, whether it is repeat-rich "
-            "and which bin held it. Filter by sample, tool, outcome or repeat content; without JavaScript every row is shown.")
+            "and which bin held it. The same rows are in the Tools tab of the plasmid map viewer. Filter by sample, tool, outcome or repeat "
+            "content; without JavaScript every row is shown.")
     rows = per_plasmid_rows(results_dir, data_dir)
     if not rows:
         return rc.section("per-plasmid-detail", title, lead,
@@ -198,7 +199,10 @@ def per_plasmid_section(results_dir, data_dir=None):
                          f"data-repeat='{rc.esc(r['repeat'] or 'unknown')}'>" + "".join(f"<td>{rc.cell(c)}</td>" for c in cells) + "</tr>")
     table = (f"<div class='panel'><table id='pp-table' class='sortable'><thead><tr>{''.join(f'<th>{rc.esc(h)}</th>' for h in headers)}"
              f"</tr></thead><tbody>{''.join(body_rows)}</tbody></table></div>")
-    return rc.section("per-plasmid-detail", title, lead, controls + table + asset("per_plasmid_filter_script.html"))
+    # the same rows are in the Tools tab of the interactive plasmid map viewer, so the table is collapsed until asked for
+    folded = ("<details class='rpt-collapsible'><summary>Show the per-plasmid table (all samples and tools)</summary>"
+              + controls + table + "</details>")
+    return rc.section("per-plasmid-detail", title, lead, folded + asset("per_plasmid_filter_script.html"))
 
 
 # ------------------------------------------------------------------------------------------------ assembly quality
@@ -271,8 +275,9 @@ def regret_html(results_dir):
               r.get("floor_flag") or rc.missing("not judged"), dash(r.get("basis"))] for r in rows]
     return ("<h3>Regret per isolate</h3><p class='muted'>Regret is the score of the best tool minus the score of the recommended tool "
             f"on that isolate. Mean regret over the <strong>{len(rows)}</strong> rows is <strong>{rc.fmt(mean_regret, 4)}</strong>.</p>"
+            + "<details class='rpt-collapsible'><summary>Show the regret table (the 3D view above draws the same rows)</summary>"
             + str(rc.panel(["Profile", "Sample", "Recommended", "Best tool", "Regret", "Near-optimal", "Single best tool",
-                            "Single-best regret", "Floor flag", "Basis"], table)))
+                            "Single-best regret", "Floor flag", "Basis"], table)) + "</details>")
 
 
 # ------------------------------------------------------------------------------------------------ truth depth strip
@@ -444,7 +449,7 @@ NAV_GROUP_ORDER = ["Results", "Scorecard and maps", "Evidence and quality", "Rec
 _G = {
     "Results": "summary metadata insights chart leaderboard robustness scores statistics stratified scenarios enterprise selected "
                "tools samples",
-    "Scorecard and maps": "scorecard scorecard-definitions scorecard-scenarios plasmid-maps workflow per-plasmid-detail "
+    "Scorecard and maps": "scorecard scorecard-definitions scorecard-scenarios plasmid-maps per-plasmid-detail "
                           "plasmid-outcomes bin-diagnostics bin-quality graded-tiers replicon-recovery zero-plasmid contig-layer "
                           "amr-placement learn-agreement learn-copynumber accuracy-dimension feature-preservation",
     "Evidence and quality": "database-membership baselines-calibration excluded-replicons label-schemes validity learn-adequacy "
@@ -524,7 +529,7 @@ def inject(page, results_dir, data_dir=None, scores_path=None):
 
 
 def finish(page):
-    """After every section exists: move the scorecard, maps and workflow up, then group the navigation."""
-    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps", "workflow"],
+    """After every section exists: move the scorecard and maps up, then group the navigation."""
+    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps"],
                       ["robustness", "leaderboard"])
     return group_navigation(page)

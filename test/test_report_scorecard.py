@@ -238,6 +238,10 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         write(os.path.join(tmp, "scores.tsv"), ["sample", "tool", "analysis_track", "recall"], [])
         page = sc.inject(PAGE, tmp, os.path.join(tmp, "scores.tsv"))
+        defs = page.split("id='scorecard-definitions'")[1].split("</section>")[0]
+        check("the definitions table is collapsed until clicked (a closed <details> holding the table)",
+              "<details class='rpt-collapsible'>" in defs and "<details class='rpt-collapsible' open" not in defs
+              and defs.index("<details") < defs.index("<table") < defs.index("</details>"))
         check("an empty score table: the scorecard and scenario sections say Not run (definitions stay, they come from config)", page.count("Not run") == 2
               and all(f"id='{sid}'" in page for sid, _ in sc.SECTIONS))
         page = sc.inject(PAGE, tmp, os.path.join(tmp, "absent.tsv"))

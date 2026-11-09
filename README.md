@@ -120,7 +120,7 @@ The report is one self-contained file. Besides the leaderboard it contains:
   fewer than 5 samples as underpowered. Only the identity bands are fixed; the others are proposed. SNP concordance and structural variant F1 are
   not available because no truth variant set exists. See section 7.10 of the [scientific guide](docs/SCIENTIFIC_GUIDE.md).
 - **Circular plasmid maps**, one per truth plasmid: truth genes, one ring per tool, GC content and GC skew.
-- **A workflow figure** showing what actually ran in this results directory, and a **data inventory** listing every output and where the report shows it.
+- **A data inventory** ("Data in this report") listing every output and where the report shows it.
 - Grouped, collapsible navigation, per-plasmid detail, an assembly-quality section and links to `leaderboard.md` and `scoring_spec.md`.
 
 ## Scientific guide for domain experts
@@ -409,6 +409,12 @@ CPRR there keeps the same per-isolate bootstrap, species macro-average and paire
 The benchmark runs as numbered stages (`scripts/run_all.sh`; run selected stages with
 `bash scripts/run_all.sh 3 4 5`, or everything with `plasbench run`). A sample that fails a stage is
 recorded and skipped, not fatal to the run.
+
+<p align="center"><img src="docs/images/workflow.svg" alt="PlasBench workflow: a, inputs and truth construction; b, short-read assembly and the tools; c, scoring layers, statistics and the recommendation" width="100%"></p>
+
+*Figure. The pipeline at a glance: a, inputs and truth construction; b, short-read assembly and the tools, grouped by class; c, scoring layers, statistics and the recommendation. Regenerate it with `python python/report_workflow.py --out docs/images/workflow.svg`.*
+
+The same flow as numbered stages:
 
 ```mermaid
 flowchart TD

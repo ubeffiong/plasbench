@@ -485,6 +485,8 @@ def definitions_section(specs, error=None):
             + [s["status"], s.get("rationale", "")] for s in specs]
     body = rc.panel(["ID", "Metric", "Weight", "Direction", "Unit", "Excellent", "Good", "Moderate", "Floor (0)", "Status", "Rationale"],
                     rows, extra_class="rpt-scorecard")
+    # collapsed until the reader asks for it; the section and its navigation link stay
+    body = rc.Raw("<details class='rpt-collapsible'><summary>Show the weights, thresholds and status of all 17 metrics</summary>" + str(body) + "</details>")
     return rc.section("scorecard-definitions", "Scorecard definitions", lead, body, group="Scoring")
 
 
