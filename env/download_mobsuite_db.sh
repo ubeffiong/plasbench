@@ -18,6 +18,7 @@
 #   bash env/download_mobsuite_db.sh --force   # re-download even if present
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/../config/config.sh"
 source "$HERE/../scripts/lib.sh"
 
 ASSUME_YES=0
@@ -34,16 +35,9 @@ done
 have mob_init || die "mob_init not found; install MOB-suite first: plasbench install-tools reconstruction"
 
 # Where does the installed mob_suite keep its databases?
-mobsuite_db_dir() {
-    python3 - <<'PYEOF' 2>/dev/null || true
-import os
-try:
-    import mob_suite
-except Exception:
-    raise SystemExit(0)
-print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)), "databases"))
-PYEOF
-}
+# scripts/lib.sh's mobsuite_db_dir (sourced above) follows the mob_recon wrapper
+# to MOB-suite's own environment, so the database checked here is the one the
+# running tool reads, not an unused copy importable from this interpreter.
 
 DB_DIR="$(mobsuite_db_dir)"
 
@@ -67,6 +61,11 @@ database_present() {
     return 0
 }
 
+# A database kept in the machine store is linked in instead of downloaded again.
+if [[ "$FORCE" -ne 1 ]]; then
+    mobsuite_db_preserve
+    DB_DIR="$(mobsuite_db_dir)"
+fi
 if [[ -n "$DB_DIR" ]] && database_present "$DB_DIR"; then
     log "  [ok]   MOB-suite DB already present at $DB_DIR"
     if [[ "$FORCE" -ne 1 ]]; then
@@ -106,4 +105,5 @@ log "Running mob_init (a live status line appears every minute after 3 quiet min
 run_with_heartbeat "MOB-suite database download/index build" mob_init || die "mob_init failed; check network access and see its output above.
 If your connection keeps dropping, a prebuilt database directory can be copied
 into $DB_DIR instead -- every file in it is plain data with no absolute paths."
-log "MOB-suite database ready."
+mobsuite_db_preserve
+log "MOB-suite database ready (kept in ${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/mob_suite)."

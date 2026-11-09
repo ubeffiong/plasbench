@@ -311,6 +311,44 @@ long_read_truth_eligible() {
 # co-exist with the main lock, while an unused copy may still sit in the main
 # environment. The database that matters is the one the running tool reads, so
 # resolve mob_recon first and only fall back to the import.
+# mobsuite_db_complete DIR -- 0 when DIR holds a finished MOB-suite database.
+mobsuite_db_complete() {
+    local dir="$1" f
+    [[ -n "$dir" && -d "$dir" ]] || return 1
+    for f in status.txt ncbi_plasmid_full_seqs.fas ncbi_plasmid_full_seqs.fas.msh repetitive.dna.fas; do
+        [[ -s "$dir/$f" ]] || return 1
+    done
+}
+
+# mobsuite_db_preserve -- keep MOB-suite's database in the machine-wide store
+# ($PLASBENCH_DB_DIR/mob_suite/databases) and make the environment's folder a link
+# to it, so rebuilding or replacing the conda environment never loses it.
+#   * env has a database, store has none: move it to the store (same disk: a rename),
+#     then link the env folder to the store;
+#   * env has none, store has one: set the env's empty folder aside and link;
+#   * both, or already linked: nothing.
+# Nothing is deleted: a folder set aside keeps its contents under *.pre-store.
+mobsuite_db_preserve() {
+    # PLASBENCH_DB_PRESERVE=0 (the test suite) never moves or links a real database.
+    [[ "${PLASBENCH_DB_PRESERVE:-1}" == "0" ]] && return 0
+    local env_db store="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/mob_suite/databases"
+    env_db="$(mobsuite_db_dir)"
+    [[ -n "$env_db" ]] || return 0
+    if [[ -L "$env_db" ]]; then
+        return 0
+    fi
+    mkdir -p "$(dirname "$store")"
+    if mobsuite_db_complete "$env_db" && ! mobsuite_db_complete "$store"; then
+        if [[ -e "$store" ]]; then mv "$store" "$store.incomplete.$(date +%s)"; fi
+        mv "$env_db" "$store" && ln -s "$store" "$env_db" \
+            && log "  MOB-suite database moved to the machine store: $store (linked from the environment)"
+    elif mobsuite_db_complete "$store"; then
+        mv "$env_db" "$env_db.pre-store.$(date +%s)" && ln -s "$store" "$env_db" \
+            && log "  MOB-suite environment linked to the stored database: $store"
+    fi
+    return 0
+}
+
 mobsuite_db_dir() {
     local exe target env_root candidate found
     exe="$(command -v mob_recon 2>/dev/null || true)"

@@ -6,7 +6,7 @@
 #   bash env/download_bakta_db.sh              # "light" DB, asks first
 #   bash env/download_bakta_db.sh --yes        # no prompt
 #   bash env/download_bakta_db.sh --full       # the large DB instead of light
-#   bash env/download_bakta_db.sh --output DIR # default: $DATA_DIR/db/bakta
+#   bash env/download_bakta_db.sh --output DIR # default: $PLASBENCH_DB_DIR/bakta
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
@@ -14,7 +14,7 @@ source "$HERE/../scripts/lib.sh"
 
 ASSUME_YES=0
 DB_TYPE="light"
-OUTPUT_DIR="$DATA_DIR/db/bakta"
+OUTPUT_DIR="$(plasbench_db_path bakta)"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -y|--yes) ASSUME_YES=1; shift ;;

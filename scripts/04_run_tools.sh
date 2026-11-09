@@ -83,7 +83,9 @@ classify_failure() {
         124|137) echo "resource"; return ;;
         125|126|127) echo "infrastructure"; return ;;
     esac
-    if [[ -s "$log_file" ]] && grep -qiE "no space left on device|disk quota exceeded|cannot connect to the docker daemon" "$log_file"; then
+    # A tool that cannot even start (missing or incompatible Python dependency)
+    # is an installation fault, not the tool's result: never scored, rerun after fixing.
+    if [[ -s "$log_file" ]] && grep -qiE "no space left on device|disk quota exceeded|cannot connect to the docker daemon|ImportError|ModuleNotFoundError|cannot import name|No module named" "$log_file"; then
         echo "infrastructure"; return
     fi
     echo "tool"

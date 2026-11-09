@@ -89,7 +89,9 @@ fi
 # ("tool1,tool2=/path.fasta;tool3=/other.fasta"). Advisory: never re-ranks.
 if [[ "${RUN_DATABASE_CONTAINMENT:-1}" == "1" ]] && command -v minimap2 >/dev/null 2>&1; then
     CONTAINMENT_DBS=()
-    MOB_DB_FASTA="$(python3 -c 'import os, mob_suite; print(os.path.join(os.path.dirname(mob_suite.__file__), "databases", "ncbi_plasmid_full_seqs.fas"))' 2>/dev/null || true)"
+    # The database of the MOB-suite that actually runs (follows the wrapper; scripts/lib.sh).
+    MOB_DB_DIR="$(mobsuite_db_dir)"
+    MOB_DB_FASTA="${MOB_DB_DIR:+$MOB_DB_DIR/ncbi_plasmid_full_seqs.fas}"
     [[ -s "$MOB_DB_FASTA" ]] && CONTAINMENT_DBS+=(--database "mob_recon,flye_mob_recon,trycycler_mob_recon,gplas2_mob=$MOB_DB_FASTA")
     IFS=';' read -r -a EXTRA_DBS <<< "${TOOL_DATABASE_FASTAS:-}"
     for spec in "${EXTRA_DBS[@]}"; do

@@ -65,6 +65,30 @@ confirm_download() {
     esac
 }
 
+# Downloaded inputs are kept for every later run (PRESERVE_DOWNLOADS=1, default):
+# each sample's reads and NCBI records get a SHA-256 manifest (downloads.sha256)
+# and the read files are made read-only. A later run with the same DATA_DIR
+# verifies them against the manifest instead of downloading again; a file that
+# no longer matches is reported and fetched afresh.
+DOWNLOAD_FILES=(reference.fna sequence_report.jsonl assembly_data_report.jsonl)
+preserve_downloads() {
+    local sdir="$1" sra="$2"
+    [[ "${PRESERVE_DOWNLOADS:-1}" == "1" ]] || return 0
+    local files=() f
+    for f in "${DOWNLOAD_FILES[@]}" "${sra}_1.fastq.gz" "${sra}_2.fastq.gz" "${sra}.ena_provenance.json"; do
+        [[ -s "$sdir/$f" ]] && files+=("$f")
+    done
+    [[ ${#files[@]} -gt 0 ]] || return 0
+    (cd "$sdir" && sha256sum "${files[@]}" > downloads.sha256)
+    chmod a-w "$sdir/${sra}_1.fastq.gz" "$sdir/${sra}_2.fastq.gz" 2>/dev/null || true
+}
+# 0 when every file in the manifest still matches (or there is no manifest yet).
+verify_downloads() {
+    local sdir="$1"
+    [[ -s "$sdir/downloads.sha256" ]] || return 0
+    (cd "$sdir" && sha256sum --quiet -c downloads.sha256 > /dev/null 2>&1)
+}
+
 # Paired FASTQ for one run from ENA (python/fetch_ena_reads.py: HTTPS, MD5-verified).
 fetch_from_ena() {
     local sample="$1" run="$2" sdir="$3"
@@ -219,8 +243,8 @@ download_sample() {
             fi
             log "  simulated reads -> $R1 , $R2 , $LONG_READS"
         fi
-    elif [[ -s "$R1" && -s "$R2" ]]; then
-        log "  reads already present, skipping download"
+    elif [[ -s "$R1" && -s "$R2" ]] && verify_downloads "$SDIR"; then
+        log "  reads already present (checked against downloads.sha256 when present), skipping download"
     elif [[ "${READ_SOURCE:-auto}" == "ena" ]] && fetch_from_ena "$SAMPLE" "$SRA" "$SDIR"; then
         log "  reads (ENA) -> $R1 , $R2"
     else
@@ -314,6 +338,7 @@ download_sample() {
         fi
     fi
 
+    preserve_downloads "$SDIR" "$SRA"
     record_download "$SAMPLE" "ok" ""
 }
 

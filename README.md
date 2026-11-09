@@ -1353,7 +1353,7 @@ a percentage and can sit still for minutes — that is normal, not a hang.
 If it is already installed, the script tells you so and does nothing:
 
 ```
-[ok]   MOB-suite DB already present at /home/you/miniforge3/envs/plasbench/lib/python3.11/site-packages/mob_suite/databases
+[ok]   MOB-suite DB already present at /home/you/miniforge3/envs/plasbench-mobsuite/lib/python3.10/site-packages/mob_suite/databases
 ```
 
 **If this download keeps failing**, see step 7c. Do not keep retrying it: MOB-suite's
@@ -1371,18 +1371,20 @@ another machine works. If a colleague has a working PlasBench install, ask them 
 two directories and copy them in.
 
 Find where the MOB-suite database belongs on **your** machine — this command prints the
-exact path, you do not need to work it out:
+exact path, you do not need to work it out. Run it from the PlasBench folder: MOB-suite
+lives in its own environment (`plasbench-mobsuite`), and this follows the `mob_recon`
+wrapper to it:
 
 ```bash
 conda activate plasbench
-python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))'
+bash -c 'source scripts/lib.sh; mobsuite_db_dir'
 ```
 
 Copy their `databases` directory into the path it printed, then copy their Platon `db`
 directory into `$PLASBENCH_DATA_DIR/db/platon/db`. Confirm both:
 
 ```bash
-MOB_DB="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))')"
+MOB_DB="$(bash -c 'source scripts/lib.sh; mobsuite_db_dir')"
 ls "$MOB_DB" | wc -l                                    # expect 31
 ls "$PLASBENCH_DATA_DIR/db/platon/db" | wc -l           # expect 31
 ```
@@ -1670,7 +1672,7 @@ print the exact source and destination paths without guessing where Conda was
 installed:
 
 ```bash
-MOB_DB="$(python3 -c 'import os,mob_suite; print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)),"databases"))')"
+MOB_DB="$(bash -c 'source scripts/lib.sh; mobsuite_db_dir')"
 echo "$MOB_DB"
 rsync -a --info=progress2 /path/from/source-PC/mob_suite/databases/ "$MOB_DB/"
 plasbench check
@@ -3457,7 +3459,8 @@ A benchmark result depends on the machine it ran on, so please include:
 
 ```bash
 plasbench --version
-conda list --export | grep -E "spades|mob_suite|platon|minimap2"
+conda list --export | grep -E "spades|platon|minimap2"
+mob_recon --version          # MOB-suite runs from its own environment, plasbench-mobsuite
 uname -a && free -g | head -2
 ```
 

@@ -743,6 +743,8 @@ All settings are environment variables read by `config/config.sh` (override them
 | `RUN_ASSEMBLY_QC_GATE`, `ASSEMBLY_QC_MAX_SIZE_MB`, `ASSEMBLY_QC_MAX_GC_SPREAD` | 1, 8.5, 0.12 | Advisory assembly QC gate. |
 | `RUN_CONTIG_CROSSCHECK`, `CONTIG_CROSSCHECK_SCALED` | 1, 10 | Independent alignment-free second scorer for the contig layer. |
 | `READ_SOURCE` | auto | Short reads from the SRA Toolkit, falling back to ENA (HTTPS, MD5-verified) if `prefetch` fails; `sra` or `ena` to force one. |
+| `PLASBENCH_DB_DIR` | `~/.plasbench/databases` | One store per machine for every tool database (Platon, geNomad, PLASMe, Plassembler, Plasmer, PlaScope, Bakta, PLSDB, the plasmid reference set, and MOB-suite's database, which its environment links to). New checkouts, new `DATA_DIR`s and rebuilt environments reuse it. `bash env/preserve_databases.sh` moves databases from old `DATA_DIR/db` folders into it. |
+| `PRESERVE_DOWNLOADS` | 1 | Keep downloads for future runs: a SHA-256 manifest per sample (`downloads.sha256`), read files made read-only, and a later run with the same `DATA_DIR` verifies them instead of downloading again. |
 
 **Operational mode and optional diagnostics**
 
