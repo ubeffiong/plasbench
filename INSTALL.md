@@ -42,15 +42,31 @@ conda activate plasbench
 ```
 
 This installs: `ncbi-datasets-cli`, `sra-tools`, `entrez-direct`, `fastp`, `spades`
-(provides `spades.py` **and** `plasmidspades.py`), `unicycler`, `mob_suite`, `platon`,
+(provides `spades.py` **and** `plasmidspades.py`), `unicycler`, `platon`,
 `minimap2`, `samtools`, `barrnap`, `mash`, `pigz`.
+
+**MOB-suite gets its own environment.** It pins `pandas<=1.5.3` and `numpy<1.23.5`, which
+cannot co-exist with the main environment: installed there, `mob_recon` crashes at start
+(`cannot import name 'EmptyDataError' from 'pandas.io.common'`, or
+`unexpected keyword argument 'line_terminator'`) and every run scores 0. `setup_conda.sh`
+therefore also creates `plasbench-mobsuite` (MOB-suite 3.1.9, the same pins as the
+Dockerfile) and puts `mob_recon`, `mob_typer`, `mob_cluster` and `mob_init` wrappers in the
+main environment, so `conda activate plasbench` is still all you need. To add or repair it
+on an existing install:
+
+```bash
+plasbench install-tools mobsuite      # or: bash env/install_tools.sh mobsuite
+bash env/download_mobsuite_db.sh      # its database, into the new environment
+```
+
+`plasbench check` reports a MOB-suite that is installed but cannot start as `[BROKEN]`.
 
 If you built the environment another way (or `bash scripts/00_setup.sh` reports one of these
 missing), two install profiles supply the rest:
 
 ```bash
 plasbench install-tools utilities             # mash, samtools, barrnap
-plasbench install-tools reference-annotation  # abricate, ncbi-amrfinderplus, isescan, mob_suite
+plasbench install-tools reference-annotation  # abricate, ncbi-amrfinderplus, isescan; mob_suite in its own env
 amrfinder -u                                  # once, after reference-annotation
 ```
 

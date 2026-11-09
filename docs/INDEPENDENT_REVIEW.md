@@ -451,7 +451,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:205` | `base_level_metrics_valid` |
 | E41 | Tool database dates (first row) | `config/tool_database_releases.tsv:2` | `mob_recon` |
 | E42 | Exclusion of possible overlaps is off by default | `config/config.sh:534` | `EXCLUDE_DATABASE_OVERLAP` |
-| E43 | barrnap is in the environment file | `env/environment.yml:23` | `barrnap` |
+| E43 | barrnap is in the environment file | `env/environment.yml:25` | `barrnap` |
 | E44 | minimap2 is a hard requirement of scoring | `scripts/05_score.sh:21` | `need minimap2` |
 | E52 | Unresolvable truth sequences are labelled REVIEW | `python/make_truth.py:50` | `REVIEW = "REVIEW"` |
 | E53 | A legacy option restores the chromosome guess | `python/make_truth.py:18` | `--allow-default` |

@@ -34,16 +34,9 @@ done
 have mob_init || die "mob_init not found; install MOB-suite first: plasbench install-tools reconstruction"
 
 # Where does the installed mob_suite keep its databases?
-mobsuite_db_dir() {
-    python3 - <<'PYEOF' 2>/dev/null || true
-import os
-try:
-    import mob_suite
-except Exception:
-    raise SystemExit(0)
-print(os.path.join(os.path.dirname(os.path.abspath(mob_suite.__file__)), "databases"))
-PYEOF
-}
+# scripts/lib.sh's mobsuite_db_dir (sourced above) follows the mob_recon wrapper
+# to MOB-suite's own environment, so the database checked here is the one the
+# running tool reads, not an unused copy importable from this interpreter.
 
 DB_DIR="$(mobsuite_db_dir)"
 

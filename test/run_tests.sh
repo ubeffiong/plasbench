@@ -69,4 +69,5 @@ for test in test_label_schemes.py test_dimer_collapse.py test_mcc_abstention.py 
 done
 bash "$HERE/test_outcome_states.sh"
 bash "$HERE/test_preserve_downloads.sh"
+bash "$HERE/test_mobsuite_env.sh"
 echo "ALL PLASBENCH TESTS PASSED"

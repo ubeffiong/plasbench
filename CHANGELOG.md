@@ -13,6 +13,15 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- MOB-suite pandas incompatibility in local installs
+- MOB-suite needs `pandas<=1.5.3`; in the main environment (pandas 3) `mob_recon` crashed at start
+  and every run scored 0. `env/environment.yml` and its lock no longer include `mob_suite`;
+  `env/install_tools.sh` installs it into its own environment, `<env>-mobsuite` (MOB-suite 3.1.9,
+  the Dockerfile's pins), and writes `mob_recon`/`mob_typer`/`mob_cluster`/`mob_init` wrappers into
+  the main environment. `setup_conda.sh` runs this step; `plasbench install-tools mobsuite` repairs
+  an existing install. The MOB-suite database checks follow the wrapper (`scripts/lib.sh`
+  `mobsuite_db_dir`), as does stage 6's database-containment step.
+
 ### Added -- downloads kept for future runs; broken tools caught early
 - **Preserved downloads** (`PRESERVE_DOWNLOADS=1`): stage 1 writes `<sample>/downloads.sha256` for the
   reads and NCBI records and makes the reads read-only; a later run with the same `DATA_DIR` verifies
