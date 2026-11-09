@@ -196,6 +196,7 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
     have = [r for r in rows if r.get("mean_contig_f1_bp")]
     status, basis = crosscheck_summary(crosscheck)
     tables = ""
+    drawn = False          # the 3D view carries its own "Independent second scorer" card; the paragraph below is only for when it is not drawn
     if not have:
         body = not_run("contig layer", "no tool was scored at contig level (RUN_CONTIG_CLASSIFICATION=0, no "
                        "contigs.fasta, or every tool outputs reassembled sequences)")
@@ -205,6 +206,7 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
         payload = report_3d.bars_payload(leaderboard, scores, crosscheck)
         scene = report_3d.build_bars(payload)
         body = report_3d.host("bars", "v3-data-contig", payload, scene, -28, 24) if scene["prims"] else ""
+        drawn = bool(scene["prims"])
         body += (f"<p class='muted'>Excluded contig length summed over scored runs: shared (AMBIGUOUS) {shared:,} bp, "
                  f"unassigned (UNPLACED) {unassigned:,} bp.</p>")
         tables = table(["Track / task", "Tool", "Base F1 (reference layer)", "Contig F1 (length)", "Contig MCC (length)",
@@ -212,7 +214,8 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
                        [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], r.get("mean_f1"),
                          r.get("mean_contig_f1_bp"), r.get("mean_contig_mcc_bp"), r.get("mean_contig_bin_f1_bp"))
                         for r in have])
-    body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
+    if not drawn:
+        body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
     if crosscheck:
         tables += table(report_3d.XC_HEADER, [[r.get(f, "") for f in report_3d.XC_FIELDS] for r in crosscheck])
     else:
