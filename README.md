@@ -2,7 +2,14 @@
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
 
-**Docs:** [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
+**Docs:** **[Run it: step-by-step lab guide](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** · [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
+
+> **Want to run it?** The dry-lab route is written out command by command in
+> **[Section 3: from a new machine to your first leaderboard](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)**
+> (Steps 1-11: terminal, conda, download, install, databases, NCBI key, first run, reading
+> the results). [Section 0](#0-which-route-do-i-take) helps you pick a route (laboratory,
+> metagenomic, container, source). Cohort-building and every other command are in
+> [Section 4](#4-cohort-studies--every-manipulation-end-to-end).
 
 PlasBench is a reproducible, Ubuntu-first framework that **benchmarks how well
 plasmid-reconstruction tools recover plasmids**, using complete (long-read)
@@ -790,13 +797,13 @@ the section-by-section answers to the reviewer question bank, and the list of wh
 
 | You are… | Go to | You need |
 |---|---|---|
-| a laboratory that wants to run the benchmark | **[Section 3 — step by step](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** | a Linux machine, or Windows with WSL2 |
+| a laboratory that wants to run the benchmark | **[Section 3 — step by step](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** | a Linux machine, or Windows with WSL2 |
 | a laboratory benchmarking a mixed community | [Metagenomic workflow](#metagenomic-community-workflow) below, then [`docs/METAGENOMICS.md`](docs/METAGENOMICS.md) | declared community manifest, graph/bin outputs, and truth when scoring is required |
 | a laboratory recording PCR, conjugation, long-read, or Hi-C evidence | [Orthogonal validation](#orthogonal-validation-evidence) below | reviewable evidence TSV with accession, DOI, protocol, or laboratory-record reference |
 | someone who would rather install nothing | [Container](#container) below | Docker only |
 | modifying PlasBench, or citing exact source | [Source checkout](#source-checkout) below | git and conda |
 
-**If you are not sure, use [Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard).**
+**If you are not sure, use [Section 3](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard).**
 It writes out every command, from a machine with nothing installed to a finished
 leaderboard, and assumes no prior experience with conda or bioinformatics tooling.
 
@@ -888,7 +895,7 @@ plasbench test && plasbench demo
 - **[`FAQ.md`](FAQ.md)** — the hard questions a reviewer or new user will ask (scope, truth,
   scoring, statistics, leakage, reproducibility), each answered with the file or test that
   supports it and an explicit list of what is still open.
-- **[Section 3](#3-step-by-step-from-a-new-machine-to-your-first-leaderboard)** — every
+- **[Section 3](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** — every
   command, from a bare machine to a leaderboard, with what to do when a step fails.
 - **[Section 4](#4-cohort-studies--every-manipulation-end-to-end)** — running and
   building cohort studies, and every option available.
