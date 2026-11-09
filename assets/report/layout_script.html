@@ -19,13 +19,24 @@ function nudge(v){
  safe(function(){window.dispatchEvent(new Event('resize'))});
  setTimeout(function(){safe(function(){window.dispatchEvent(new Event('resize'))})},150)}
 
-/* ---------- on this page (right strip) + current-section tracking ---------- */
+/* ---------- on this page (bottom of the left rail) + current-section tracking ---------- */
+var tocNav=null;
+function fillToc(v){
+ if(!tocNav||!v)return;
+ var list=tocNav.querySelector('.rpt-rail-toc-list');if(!list)return;
+ var us=units(v);
+ tocNav.setAttribute('aria-label','On this page: '+((v.querySelector('.rpt-view-title')||{}).textContent||''));
+ list.textContent='';
+ us.forEach(function(u){
+  var id=unitId(u);var link=rail&&rail.querySelector('.rpt-rail-sub a[href="#'+id+'"]');
+  var a=document.createElement('a');a.href='#'+id;a.textContent=link?link.textContent:id;list.appendChild(a)});
+ tocNav.hidden=us.length<2}
 function units(v){return [].slice.call(v.querySelectorAll('.rpt-body>section[id],.rpt-body>.rpt-card[data-card]'))}
 function unitId(u){return u.getAttribute('data-card')||u.id}
 function markCurrent(id){
- [].forEach.call(document.querySelectorAll('.rpt-toc a[aria-current],.rpt-rail-sub a[aria-current]'),function(a){a.removeAttribute('aria-current')});
+ [].forEach.call(document.querySelectorAll('.rpt-rail-toc a[aria-current],.rpt-rail-sub a[aria-current]'),function(a){a.removeAttribute('aria-current')});
  if(!id)return;
- [].forEach.call(document.querySelectorAll('.rpt-toc a[href="#'+id+'"],.rpt-rail-sub a[href="#'+id+'"]'),function(a){a.setAttribute('aria-current','true')})}
+ [].forEach.call(document.querySelectorAll('.rpt-rail-toc a[href="#'+id+'"],.rpt-rail-sub a[href="#'+id+'"]'),function(a){a.setAttribute('aria-current','true')})}
 function track(v){
  if(observer){observer.disconnect();observer=null}
  var us=units(v);if(!us.length||!('IntersectionObserver' in window))return;
@@ -48,8 +59,9 @@ function show(v){
    var on=li.getAttribute('data-view')===id;li.classList.toggle('rpt-active',on);
    var a=li.querySelector('.rpt-rail-link');if(a){if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')}});
   if(nameEl)nameEl.textContent=(v.querySelector('.rpt-view-title')||{}).textContent||id;
-  var cap=exp&&exp.querySelector('span');if(exp){exp.setAttribute('aria-pressed','false');if(cap)cap.textContent='Expand all'}
+  syncExp(v);
   current=v;
+  fillToc(v);
   nudge(v);track(v)}
  return changed}
 function scrollToEl(el){
@@ -65,15 +77,12 @@ function route(initial){
  show(byId[DEFAULT])}
 window.addEventListener('hashchange',function(){route(false)});
 
-/* ---------- build the on-this-page strip from the units of the view (the rail already lists them without JS) ---------- */
-views.forEach(function(v){
- var us=units(v);if(us.length<2)return;
- var toc=document.createElement('nav');toc.className='rpt-toc';toc.setAttribute('aria-label','On this page: '+((v.querySelector('.rpt-view-title')||{}).textContent||''));
- var p=document.createElement('p');p.textContent='On this page';toc.appendChild(p);
- us.forEach(function(u){
-  var id=unitId(u);var link=rail&&rail.querySelector('.rpt-rail-sub a[href="#'+id+'"]');
-  var a=document.createElement('a');a.href='#'+id;a.textContent=link?link.textContent:id;toc.appendChild(a)});
- var body=v.querySelector('.rpt-body');v.insertBefore(toc,body)});
+/* ---------- build the on-this-page block at the bottom of the rail (the rail already lists the sections without JS) ---------- */
+if(rail){
+ tocNav=document.createElement('nav');tocNav.className='rpt-rail-toc';
+ var tp=document.createElement('p');tp.textContent='On this page';tocNav.appendChild(tp);
+ var tl=document.createElement('div');tl.className='rpt-rail-toc-list';tocNav.appendChild(tl);
+ rail.appendChild(tocNav);fillToc(current)}
 
 /* ---------- rail: collapse to icons, remembered; arrow keys move between items ---------- */
 var tog=document.querySelector('.rpt-rail-toggle');
@@ -136,13 +145,18 @@ if(q&&list){
   if(e.key==='/'&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName||'')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();q.focus();q.select()}
   else if(e.key==='Escape'&&!list.hidden)closeResults()})}
 
-/* ---------- expand / collapse every details of the shown view ---------- */
+/* ---------- collapse / expand every details of the shown view (folds start open; the button says what it will do) ---------- */
+function syncExp(v){
+ var b=document.getElementById('rpt-expand');if(!b||!v)return;
+ var anyClosed=[].some.call(v.querySelectorAll('details'),function(d){return !d.open});
+ b.setAttribute('aria-pressed',String(!anyClosed));
+ var s=b.querySelector('span');if(s)s.textContent=anyClosed?'Expand all':'Collapse all'}
 var exp=document.getElementById('rpt-expand');
 if(exp)exp.addEventListener('click',function(){
- var on=exp.getAttribute('aria-pressed')!=='true';
- [].forEach.call(current.querySelectorAll('details'),function(d){d.open=on});
- exp.setAttribute('aria-pressed',String(on));var s=exp.querySelector('span');if(s)s.textContent=on?'Collapse all':'Expand all';
- nudge(current)});
+ var anyClosed=[].some.call(current.querySelectorAll('details'),function(d){return !d.open});
+ [].forEach.call(current.querySelectorAll('details'),function(d){d.open=anyClosed});
+ syncExp(current);nudge(current)});
+document.addEventListener('toggle',function(){if(current)syncExp(current)},true);
 // A details that opens (a card, a folded table) may hold a widget that was laid out at zero width.
 document.addEventListener('toggle',function(e){if(e.target&&e.target.open){var v=viewOf(e.target);if(v){safe(function(){e.target.dispatchEvent(new CustomEvent('pb-view-shown',{bubbles:true}))});
  setTimeout(function(){safe(function(){window.dispatchEvent(new Event('resize'))})},30)}}},true);

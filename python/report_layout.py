@@ -394,7 +394,7 @@ def build_topbar(run_name, first_view_title):
             "<div class='rpt-actions' data-needs-js>"
             "<button type='button' id='pb-cvd' aria-pressed='false' title='Swap the green/red status palette for blue/orange, which stays "
             "separable with deuteranopia or protanopia. Every value is also printed as text.'>Colour-blind <span class='rpt-btn-long'>palette</span></button>"
-            "<button type='button' id='rpt-expand' aria-pressed='false' title='Open or close every fold in the view that is shown'><span>Expand all</span></button>"
+            "<button type='button' id='rpt-expand' aria-pressed='true' title='Collapse or expand every fold in the view that is shown'><span>Collapse all</span></button>"
             "<button type='button' id='pb-print' title='Print or save as PDF: every view prints in order, every fold open, each view on a new page'>"
             "Print <span class='rpt-btn-long'>/ Save PDF</span></button>"
             "</div></div>")
@@ -408,8 +408,11 @@ def build_band(title, eyebrow, run_html, kpis_html):
 
 
 def build_cover(plan, labels):
-    items = "".join(
-        f"<li><b>{_esc(view[1])}</b><ul>{''.join(f'<li><a href=\'#{_esc(s)}\'>{labels[s]}</a></li>' for s in ids)}</ul></li>" for view, ids in plan)
+    def entries(ids):
+        # built outside the f-string: a backslash inside an f-string expression is a syntax error before Python 3.12
+        return "".join("<li><a href='#" + _esc(s) + "'>" + labels[s] + "</a></li>" for s in ids)
+
+    items = "".join(f"<li><b>{_esc(view[1])}</b><ul>{entries(ids)}</ul></li>" for view, ids in plan)
     return f"<div class='rpt-cover' aria-hidden='true'><h2>Contents</h2><ol>{items}</ol></div>"
 
 
@@ -430,6 +433,39 @@ def build_view(view, ids, blocks, labels, sections, cards, active=False):
             body.append(block)
     return (f"<div class='rpt-view{' rpt-active' if active else ''}' id='view-{vid}' data-view='{vid}' "
             f"aria-label='{_esc(view[1])}'>{head}<div class='rpt-body'>{''.join(body)}</div></div>")
+
+
+# ------------------------------------------------------------------------------------------------ folds start open
+def open_details(html_text):
+    """Every <details> in the markup gets the `open` attribute, so folds start expanded and the reader chooses what to collapse.
+
+    A fold that already has `open` is left alone; script and style bodies are skipped whole, so a template string in a script is not touched.
+    """
+    edits, i = [], 0
+    while True:
+        m = TOKEN.search(html_text, i)
+        if not m:
+            break
+        i = m.end()
+        if m.group(2) is None:
+            continue
+        name = m.group(2).lower()
+        if name in RAW_TEXT and not m.group(1):
+            i = _skip_raw(html_text, name, i)
+            continue
+        if name == "details" and not m.group(1) and not re.search(r"\sopen(?=\s|=|/|$)", " " + m.group(3)):
+            edits.append(m.start() + len("<details"))
+    for pos in reversed(edits):
+        html_text = html_text[:pos] + " open" + html_text[pos:]
+    return html_text
+
+
+_SHOW_SUMMARY = re.compile(r"(<details\b[^>]*\bclass='rpt-collapsible'[^>]*>\s*<summary[^>]*>)Show (\S)")
+
+
+def retitle_folds(html_text):
+    """Fold summaries written as 'Show the X table' read as 'The X table' once the fold starts open."""
+    return _SHOW_SUMMARY.sub(lambda m: m.group(1) + m.group(2).upper(), html_text)
 
 
 # ------------------------------------------------------------------------------------------------ the transform
@@ -487,6 +523,7 @@ def transform(page):
     else:
         close_main = False
     views_html = "".join(build_view(view, ids, blocks, labels, sections, view[5], k == 0) for k, (view, ids) in enumerate(plan))
+    views_html = retitle_folds(open_details(views_html))      # folds start expanded; the reader collapses what they do not need
     rest = tail[cut:]
     style = asset("layout_style.html") + asset("layout_print.html") + named_page_css(views)
     script = asset("layout_script.html")

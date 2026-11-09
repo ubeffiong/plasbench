@@ -247,8 +247,8 @@ def main():
                                 ("interpretation-limits", "These results do NOT show"),
                                 ("per-plasmid-detail", "<table")):
                 block = sec(sid)
-                check(f"{sid}: its detail is collapsed in a closed <details> until clicked",
-                      "<details class='rpt-collapsible'>" in block and "<details class='rpt-collapsible' open" not in block
+                check(f"{sid}: its detail sits in a collapsible <details> that starts open (the reader can fold it)",
+                      re.search(r"<details open class='rpt-collapsible'>", block) is not None
                       and block.index("<details") < block.index(marker) < block.index("</details>"))
             nav = html[html.index("<nav class='rpt-rail'"):html.index("</nav>")]
             ids = re.findall(r"<section id='([a-z-]+)'", html)

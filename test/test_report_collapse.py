@@ -85,7 +85,7 @@ def main():
             block = html[b[0]:b[1]]
             if fig and rcl.section_bounds(html, fig):
                 check(f"{sid}: its tables are folded in a closed details (demo report)", "<table" not in block or
-                      re.search(r"<details class='rpt-collapsible'><summary>Show .*?</summary><div class='panel'>", block) is not None)
+                      re.search(r"<details(?: open)? class='rpt-collapsible'><summary>[^<]+</summary><div class='panel'>", block) is not None)   # open by default after the layout step
     else:
         print("  SKIP: no results_demo report to check the real plan against")
 

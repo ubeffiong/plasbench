@@ -120,7 +120,7 @@ def main():
     check("the top bar names the run", "<span class='rpt-top-run' title='demo · cohort c1'>" in out)
     check("search, palette, expand and print controls exist", all(x in out for x in ("id='rpt-q'", "id='pb-cvd'", "id='rpt-expand'", "id='pb-print'")))
     check("the first view is the active one and no view is hidden without JavaScript",
-          out.count("rpt-view rpt-active") == 1 and not re.search(r"class='rpt-view[^']*'[^>]*hidden", out) and "html.pb-js:not(.pb-printmode) .rpt-view{display:none}" in out)
+          out.count("rpt-view rpt-active") == 1 and not re.search(r"class='rpt-view[^']*'[^>]*\bhidden\b", out) and "html.pb-js:not(.pb-printmode) .rpt-view{display:none}" in out)
     check("the page keeps its own scripts and footer", "<script>var x=1;</script>" in out and "<footer>foot</footer>" in out)
     check("the layout script, print stylesheet and per-view named pages are added once",
           out.count("id=\"rpt-layout-script\"") == 1 and out.count("id=\"rpt-layout-print\"") == 1 and "@page pv-overview" in out)
@@ -134,7 +134,17 @@ def main():
     print("cards and chips in the page")
     quality = out[out.index("id='view-quality'"):]
     quality = quality[:quality.index("id='view-recommendation'")] if "id='view-recommendation'" in quality else quality
-    check("the Data quality view is an accordion of closed cards", "<details class='rpt-card' data-card='health'>" in quality)
+    check("the Data quality view is an accordion of cards that start OPEN (the reader collapses what they do not need)", "<details open class='rpt-card' data-card='health'>" in quality)
+    markup = re.sub(r"<script\b.*?</script>|<style\b.*?</style>", "", out, flags=re.S)
+    check("no fold in the laid-out page starts closed", "<details" in markup and re.search(r"<details(?![^>]*\bopen\b)", markup) is None,
+          re.findall(r"<details(?![^>]*\bopen\b)[^>]*>", markup)[:3])
+    check("a fold summary written as 'Show the X' reads 'The X' once the fold starts open",
+          rl.retitle_folds("<details open class='rpt-collapsible'><summary>Show the table (x)</summary>") == "<details open class='rpt-collapsible'><summary>The table (x)</summary>"
+          and "Show all 17 rows" in rl.retitle_folds("<button>Show all 17 rows</button>"))
+    check("the right-hand 'On this page' strip is gone and the rail carries it at the bottom (built by the page script)",
+          "class='rpt-toc'" not in markup and "rpt-rail-toc" in out and "grid-template-columns:minmax(0,1fr) 196px" not in out)
+    check("opening folds is idempotent and leaves markup inside scripts alone", rl.open_details(rl.open_details("<details class='a'></details><script>var t=\"<details>\";</script>"))
+          == "<details open class='a'></details><script>var t=\"<details>\";</script>")
     check("the card carries the section title and its chip", "<summary><span class='rpt-card-title'>health label</span>" in quality
           and "<span class='rpt-chip rpt-chip-neutral'>2 rows</span>" in quality, quality[:600])
     check("a card wraps its section whole", "<div class='rpt-card-body'><section id='health'>" in quality)
