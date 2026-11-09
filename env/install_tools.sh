@@ -102,6 +102,8 @@ install_mobsuite() {
         chmod 0755 "$main_prefix/bin/$cmd"
     done
     echo "[plasbench] MOB-suite wrappers installed in $main_prefix/bin (${MOBSUITE_COMMANDS[*]})"
+    # Reuse a database kept in the machine store (env/preserve_databases.sh) rather than downloading it.
+    PATH="$main_prefix/bin:$PATH" bash -c 'source "$0/../config/config.sh"; source "$0/../scripts/lib.sh"; mobsuite_db_preserve' "$HERE" || true
     echo "[plasbench] its database is fetched by: bash env/download_mobsuite_db.sh"
 }
 

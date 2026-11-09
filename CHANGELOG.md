@@ -13,6 +13,15 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- databases kept once per machine
+- **`PLASBENCH_DB_DIR`** (default `~/.plasbench/databases`): every tool database default points
+  there instead of `DATA_DIR/db`, so new checkouts, new `DATA_DIR`s and rebuilt environments reuse
+  what is downloaded. A database still at the old `DATA_DIR/db` path is used until the store has it.
+- **`env/preserve_databases.sh`** moves existing databases into the store and leaves a link at the
+  old path; never deletes; reports duplicates.
+- **MOB-suite's database** moves to the store and its environment folder becomes a link; setup and
+  the MOB-suite installer link a rebuilt environment to the stored copy instead of downloading again.
+
 ### Fixed -- MOB-suite pandas incompatibility in local installs
 - MOB-suite needs `pandas<=1.5.3`; in the main environment (pandas 3) `mob_recon` crashed at start
   and every run scored 0. `env/environment.yml` and its lock no longer include `mob_suite`;

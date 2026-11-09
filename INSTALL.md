@@ -61,6 +61,23 @@ bash env/download_mobsuite_db.sh      # its database, into the new environment
 
 `plasbench check` reports a MOB-suite that is installed but cannot start as `[BROKEN]`.
 
+**Databases are kept once per machine.** Every tool database lives in
+`PLASBENCH_DB_DIR` (default `~/.plasbench/databases`), not inside a project folder or a
+conda environment, so a new checkout, a new `DATA_DIR` or a rebuilt environment reuses
+what is already downloaded. MOB-suite keeps its database inside its environment; the
+environment's `databases` folder is a link into the store, and a rebuilt environment is
+linked again (`plasbench check` does this) instead of downloading 450 MB. Databases from an
+older install under `data/db/` are adopted with:
+
+```bash
+bash env/preserve_databases.sh                       # this project's data/db
+bash env/preserve_databases.sh --from /old/project/data/db   # any other folder
+bash env/preserve_databases.sh --list                # what the store holds
+```
+
+Each database is moved into the store and a link is left at its old path, so older
+projects keep working. Nothing is deleted.
+
 If you built the environment another way (or `bash scripts/00_setup.sh` reports one of these
 missing), two install profiles supply the rest:
 

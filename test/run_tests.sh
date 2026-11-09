@@ -70,4 +70,5 @@ done
 bash "$HERE/test_outcome_states.sh"
 bash "$HERE/test_preserve_downloads.sh"
 bash "$HERE/test_mobsuite_env.sh"
+bash "$HERE/test_preserve_databases.sh"
 echo "ALL PLASBENCH TESTS PASSED"
