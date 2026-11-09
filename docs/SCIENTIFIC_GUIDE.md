@@ -615,7 +615,7 @@ A single self-contained file. Its main sections are: Summary (report card and "s
 - **grouped, collapsible navigation**, and links to `leaderboard.md` and `scoring_spec.md`;
 - a corrected paired-comparison table and corrected overlap wording.
 
-The report offers sortable tables, filters, CSV and BED export, a colour-blind-safe palette and a print view. Unmeasured values are shown as "not measured", never zero, and read coverage is never displayed because it is not measured.
+The report offers sortable tables, filters, CSV and BED export, a colour-blind-safe palette and a print view. Unmeasured values are shown as "not measured", never zero, and read coverage is never displayed because it is not measured. Explanatory notes (section leads, how-to-read lines and the plasmid viewer and 3D view hints) sit behind a small circled "i" beside the heading and open on hover, keyboard focus or tap, while status lines, warnings, "Not run" notices and values stay on the page and the print view shows every note inline.
 
 ### 13.4 How to read a leaderboard
 

@@ -361,7 +361,8 @@ def main():
 
     # One explorer, not two. The adopted design and the analysis panels that
     # share its selection live in a single container under a single heading.
-    assert page.count("<h3>Reconstruction evidence explorer</h3>") == 1,         "the evidence explorer heading must appear exactly once"
+    # (the heading now carries an info icon before its closing tag, so match the opening tag and text)
+    assert page.count("<h3>Reconstruction evidence explorer<") == 1,        "the evidence explorer heading must appear exactly once"
     start = page.index("id='pb-explorer-view'")
     end = page.index("<section id='scores'>")
     container = page[start:end]

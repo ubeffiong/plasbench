@@ -204,9 +204,11 @@ function mount(host, spec) {
     '<button type="button" data-act="persp" aria-pressed="true" title="Switch between perspective and orthographic projection">Perspective</button>' +
     '<button type="button" data-act="auto" aria-pressed="false">Auto-rotate</button>' +
     '<button type="button" data-act="in" aria-label="Zoom in">+</button><button type="button" data-act="out" aria-label="Zoom out">&minus;</button>' +
-    '<button type="button" data-act="svg">Export SVG</button><button type="button" data-act="png">Export PNG</button></div></div>' +
+    '<button type="button" data-act="svg">Export SVG</button><button type="button" data-act="png">Export PNG</button>' +
+    '<span class="rpt-info"><button type="button" class="rpt-info-btn" aria-label="How to use this 3D view" aria-describedby="' + uid + 'h" aria-expanded="false">i</button>' +
+    '<span role="tooltip" id="' + uid + 'h" class="rpt-info-pop">Drag to rotate, wheel or +/&minus; to zoom, arrow keys to rotate, R to reset. Hover or focus a mark for exact values; click or press Enter to open details.</span></span></div></div>' +
     '<div class="v3-main"><div class="v3-stagewrap"><div class="v3-stage" tabindex="0" aria-describedby="' + uid + 'h"><div class="v3-svgbox"></div><div class="v3-tip" role="status" hidden></div></div>' +
-    '<p class="v3-hint" id="' + uid + 'h">Drag to rotate, wheel or +/&minus; to zoom, arrow keys to rotate, R to reset. Hover or focus a mark for exact values; click or press Enter to open details.</p>' +
+    
     '<div class="v3-legend" role="group" aria-label="Legend (click an entry to show or hide it)"></div></div>' +
     '<aside class="v3-side"><div class="v3-summary"></div><div class="v3-detail" aria-live="polite"></div></aside></div></div>';
   var $ = function (c) { return host.querySelector(c); };

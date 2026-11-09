@@ -17,6 +17,11 @@ from urllib.parse import quote
 from plasbench_common import display_tool_name  # noqa: E402
 
 
+def info_script():
+    """Positions the info popovers (hover, focus, click to pin, Esc); see python/report_info.py."""
+    return report_asset("info_script.html")
+
+
 def report_asset(name):
     """Static CSS/JS/HTML fragment shipped in assets/report/ (kept out of the code so this
     module holds logic, not 1,000+ lines of embedded web assets)."""
@@ -2612,6 +2617,9 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     page = report_wiring.inject(page, str(out.parent), args.data_dir, args.scores)
     page = report_surfaces.inject(page, str(out.parent), args.data_dir)
     page = report_wiring.finish(page)
+    # Last step: move the explanatory notes into info popovers (python/report_info.py), then add their positioning script.
+    import report_info
+    page = report_info.transform(page, info_script())
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")

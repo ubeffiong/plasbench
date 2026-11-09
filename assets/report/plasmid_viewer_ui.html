@@ -56,7 +56,13 @@ svg.setAttribute('viewBox', '0 0 ' + C.W + ' ' + C.H); svg.setAttribute('class',
 svg.setAttribute('tabindex', '0'); svg.setAttribute('role', 'group'); svg.setAttribute('aria-roledescription', 'interactive circular plasmid map');
 svg.setAttribute('aria-describedby', 'pv-help');
 var mini = el('div', {'class': 'pv-mini', title: 'Overview: click to move the view', role: 'button', tabindex: '0', 'aria-label': 'Overview of the whole plasmid; activate to centre the view'});
-var hint = el('div', {'class': 'pv-hint', id: 'pv-help'}, 'Scroll to zoom, drag to rotate, click a feature for details, arrow keys to step, + and - to zoom, Esc to clear.');
+/* the how-to-use line is an info icon on the toolbar (same classes as the other info popovers of the report; the page script positions it) */
+function infoIcon(id, label, text) {
+  return el('span', {'class': 'rpt-info'}, [
+    el('button', {type: 'button', 'class': 'rpt-info-btn', 'aria-label': label, 'aria-describedby': id, 'aria-expanded': 'false'}, 'i'),
+    el('span', {role: 'tooltip', id: id, 'class': 'rpt-info-pop'}, text)]);
+}
+var hint = infoIcon('pv-help', 'How to use this map', 'Scroll to zoom, drag to rotate, click a feature for details, arrow keys to step, + and - to zoom, Esc to clear.');
 var legend = el('div', {'class': 'pv-legend', role: 'group', 'aria-label': 'Legend and class filter'});
 var inStart = el('input', {type: 'number', min: '0', step: '1', id: 'pv-start', 'aria-label': 'Region start (bp)'}), inEnd = el('input', {type: 'number', min: '0', step: '1', id: 'pv-end', 'aria-label': 'Region end (bp)'});
 var rgStart = el('input', {type: 'range', min: '0', max: '1', step: '1', id: 'pv-rstart', 'aria-label': 'Region start slider'}), rgEnd = el('input', {type: 'range', min: '0', max: '1', step: '1', id: 'pv-rend', 'aria-label': 'Region end slider'});
@@ -70,8 +76,8 @@ var main = el('div', {'class': 'pv-main'}, [
       btn('Reset view', function () { flyTo({start: 0, span: 0}); }), btn('↺ 30°', function () { rotateBy(-30); }, {'aria-label': 'Rotate 30 degrees anticlockwise'}),
       btn('↻ 30°', function () { rotateBy(30); }, {'aria-label': 'Rotate 30 degrees clockwise'}), btn('Zoom to selection', function () { zoomSelection(); }),
       btn('Origin here', function () { originToSelection(); }, {title: 'Put the start of the selected feature (or the middle of the view) at the top'}),
-      el('span', {'class': 'pv-sp'}), panelBtn]),
-    el('div', {'class': 'pv-mapwrap'}, [svg, mini, hint]),
+      el('span', {'class': 'pv-sp'}), hint, panelBtn]),
+    el('div', {'class': 'pv-mapwrap'}, [svg, mini]),
     el('div', {'class': 'pv-view'}, [
       el('label', {'for': 'pv-start'}, 'Region start (bp)'), rgStart, inStart,
       el('label', {'for': 'pv-end'}, 'Region end (bp)'), rgEnd, inEnd,
