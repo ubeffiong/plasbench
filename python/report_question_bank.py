@@ -256,6 +256,7 @@ def metric_framework_section(leaderboard, data_dir):
         "Reconstruction</strong> (which contigs form one plasmid?): length-weighted binning F1 from a one-to-one "
         "Hungarian match, the same with recall measured against the plasmid length the assembly actually covers, "
         "base-pair-weighted Adjusted Rand Index, and CPRR (share of truth plasmids reconstructed correctly).</p>"
+        "<details class='rpt-collapsible'><summary>Show the contig-labelling rules and the metrics table for every tool</summary>"
         "<p class='muted'>Contig labels: contigs shorter than CONTIG_MIN_LENGTH (default 1 kb) are excluded; a contig "
         "is PLASMID or CHROMOSOME when at least 80% of it aligns to that kind of truth at 95% identity; one that "
         "aligns that well to both is AMBIGUOUS and excluded, not multi-assigned; one that aligns to neither is "
@@ -267,7 +268,7 @@ def metric_framework_section(leaderboard, data_dir):
         "<th>Base F1 (macro)</th><th>Base F1 (micro)</th><th>Contig F1 (count)</th><th>Contig F1 (length)</th>"
         "<th>MCC (count)</th><th>MCC (length)</th><th>Binning F1 (length)</th><th>Binning F1 (assembly-aware)</th>"
         "<th>ARI</th><th>CPRR</th></tr></thead><tbody>"
-        + (body or "<tr><td colspan='12'>No scored tools.</td></tr>") + "</tbody></table></div></section>")
+        + (body or "<tr><td colspan='12'>No scored tools.</td></tr>") + "</tbody></table></div></details></section>")
 
 
 def database_membership_section(leaderboard, out_dir):

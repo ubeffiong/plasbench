@@ -241,6 +241,11 @@ def main():
             hrefs = [h for h in re.findall(r"href='([^#'][^']*\.md)'", sec("files"))]
             check("Run files links exist and include the leaderboard and the spec",
                   hrefs and all(os.path.isfile(p(h)) for h in hrefs) and "benchmark.leaderboard.md" in hrefs and "benchmark.scoring_spec.md" in hrefs, hrefs)
+            for sid in ("headline-design", "metric-framework", "scorecard-definitions"):
+                block = sec(sid)
+                check(f"{sid}: its tables are collapsed in a closed <details> until clicked",
+                      "<details class='rpt-collapsible'>" in block and "<details class='rpt-collapsible' open" not in block
+                      and block.index("<details") < block.index("<table") < block.index("</details>"))
             nav = html[html.index("<nav class='nav'"):html.index("</nav>")]
             ids = re.findall(r"<section id='([a-z-]+)'", html)
             check("nav links every section exactly once", sorted(re.findall(r"href='#([a-z-]+)'", nav)) == sorted(ids))

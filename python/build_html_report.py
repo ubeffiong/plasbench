@@ -1135,6 +1135,7 @@ def headline_design_section(out_dir):
         "headline. Replicons whose plasmid/chromosome label conflicts with marker, rRNA or long-read evidence are "
         "AMBIGUOUS and excluded from scoring. The ranking score averages per-species means over species with "
         "enough independent (non-clonal) isolates; smaller species are described only.</p>"
+        "<details class='rpt-collapsible'><summary>Show the reference standard, truth provenance, tier sensitivity and species balance</summary>"
         "<div class='panel'><table><thead><tr><th>Track</th><th>Task</th><th>Ranking metric</th>"
         f"<th>Reference standard</th><th>Species basis</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
         f"<h3>Truth provenance</h3><p class='muted'>Tier counts: "
@@ -1147,7 +1148,7 @@ def headline_design_section(out_dir):
         "<h3>Reference-tier sensitivity</h3><div class='chart-card'>" + chart + "</div>"
         "<h3>Species balance</h3><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th>"
         "<th>Tool</th><th>Species</th><th>Samples</th><th>Independent clusters</th><th>Mean ranking metric</th>"
-        f"<th>In headline</th></tr></thead><tbody>{species_rows}</tbody></table></div></section>"
+        f"<th>In headline</th></tr></thead><tbody>{species_rows}</tbody></table></div></details></section>"
     )
 
 
