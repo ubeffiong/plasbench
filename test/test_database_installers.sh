@@ -7,6 +7,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
+# The installers write to the database store; keep it in this test's scratch data/db.
+export PLASBENCH_DB_DIR="$TMP/data/db"
 trap 'rm -rf "$TMP"' EXIT
 
 # --- MOB-suite ---
