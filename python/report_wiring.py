@@ -445,13 +445,14 @@ def overlap_cell(possible, after, unknown, statuses):
 
 
 # ------------------------------------------------------------------------------------------------ navigation
-NAV_GROUP_ORDER = ["Results", "Scorecard and maps", "Evidence and quality", "Recommendation", "Methods and limits", "Appendix"]
+NAV_GROUP_ORDER = ["Results", "Scorecard and maps", "Figures", "Evidence and quality", "Recommendation", "Methods and limits", "Appendix"]
 _G = {
     "Results": "summary metadata insights chart leaderboard robustness scores statistics stratified scenarios enterprise selected "
                "tools samples",
     "Scorecard and maps": "scorecard scorecard-definitions scorecard-scenarios plasmid-maps per-plasmid-detail "
                           "plasmid-outcomes bin-diagnostics bin-quality graded-tiers replicon-recovery zero-plasmid contig-layer "
                           "amr-placement learn-agreement learn-copynumber accuracy-dimension feature-preservation",
+    "Figures": "fig-ladder fig-landscape fig-heatmap fig-distributions fig-forest fig-pr",
     "Evidence and quality": "database-membership baselines-calibration excluded-replicons label-schemes validity learn-adequacy "
                             "learn-truthqc learn-plsmd assembly-quality cohort-qc isolate-difficulty quast-diagnostics "
                             "rank-robustness truth-label-audit orthogonal-evidence metadata-completeness health outcome-states "
@@ -530,6 +531,6 @@ def inject(page, results_dir, data_dir=None, scores_path=None):
 
 def finish(page):
     """After every section exists: move the scorecard and maps up, then group the navigation."""
-    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps"],
+    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps", "fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr"],
                       ["robustness", "leaderboard"])
     return group_navigation(page)

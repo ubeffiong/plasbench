@@ -251,7 +251,9 @@ def main():
             nav = html[html.index("<nav class='nav'"):html.index("</nav>")]
             ids = re.findall(r"<section id='([a-z-]+)'", html)
             check("nav links every section exactly once", sorted(re.findall(r"href='#([a-z-]+)'", nav)) == sorted(ids))
-            check("the six named groups lead the nav", re.findall(r"data-navgroup='([^']+)'", nav)[:6] == rw.NAV_GROUP_ORDER, re.findall(r"data-navgroup='([^']+)'", nav))
+            groups = re.findall(r"data-navgroup='([^']+)'", nav)
+            check("the named groups lead the nav in order (Figures only when a figure module produced a section)",
+                  groups[:len(groups)] == [g for g in rw.NAV_GROUP_ORDER if g in groups] and len(groups) >= 6, groups)
             check("scorecard sits right after the robustness section", ids.index("scorecard") == ids.index("robustness") + 1, ids[:10])
             check("inventory no longer lists the wired outputs as not shown", "Not shown yet" not in sec("data-inventory"))
 
