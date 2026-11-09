@@ -13,6 +13,16 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- downloads kept for future runs; broken tools caught early
+- **Preserved downloads** (`PRESERVE_DOWNLOADS=1`): stage 1 writes `<sample>/downloads.sha256` for the
+  reads and NCBI records and makes the reads read-only; a later run with the same `DATA_DIR` verifies
+  them and downloads nothing, and re-fetches only a file that fails its checksum.
+- **Tool smoke test at setup**: an enabled tool that is installed but cannot start (for example
+  MOB-suite importing a name newer pandas removed) is reported as `[BROKEN]`, not `[ok]`.
+- **Import failures are infrastructure failures**: a run whose log shows `ImportError`,
+  `ModuleNotFoundError` or similar is never scored as the tool's F1 = 0; it is rerun after the fix.
+- Download tests force `READ_SOURCE=sra`, so they never reach ENA over the network.
+
 ### Added -- interactive report views
 - **Interactive plasmid map viewer** (`assets/report/plasmid_viewer_*.html`, `python/report_maps.py`): one viewer with a side panel replaces the
   stack of static maps. Hover tooltips, click drilldown into a Detail tab, wheel zoom and drag rotate with labels re-laid out, region inputs,

@@ -31,7 +31,13 @@ cat > "$TMP/bin/plasmidspades.py" <<'EOF'
 #!/usr/bin/env bash
 sleep 5
 EOF
-chmod +x "$TMP/bin/mob_recon" "$TMP/bin/platon" "$TMP/bin/plasmidspades.py"
+# genomad cannot start: an import error is an installation fault (infrastructure).
+cat > "$TMP/bin/genomad" <<'EOF'
+#!/usr/bin/env bash
+echo "ImportError: cannot import name 'EmptyDataError' from 'pandas.io.common'" >&2
+exit 1
+EOF
+chmod +x "$TMP/bin/mob_recon" "$TMP/bin/platon" "$TMP/bin/plasmidspades.py" "$TMP/bin/genomad"
 
 printf '>contig1\nACGTACGTACGT\n' > "$TMP/data/s1/contigs.fasta"
 printf '@r1\nACGT\n+\nIIII\n' | gzip > "$TMP/data/s1/SRR1_1.trim.fastq.gz"
@@ -40,7 +46,7 @@ printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\n' > "$TMP/config/a
 
 export DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" SAMPLE_SHEET="$TMP/config/accessions.tsv"
 export REQUIRE_CURATED_METADATA=0 TOOL_RETRIES=1 TOOL_TIMEOUT_SECONDS=2 PLATON_DB="$TMP"
-export RUN_BASELINE_COVERAGE=0 RUN_BASELINE_REFERENCE=0
+export RUN_BASELINE_COVERAGE=0 RUN_BASELINE_REFERENCE=0 RUN_GENOMAD=1 GENOMAD_DB="$TMP"
 PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/04_run_tools.sh" > "$TMP/stage.log" 2>&1 || {
     echo "FAIL: stage 4 must finish" >&2; tail -20 "$TMP/stage.log" >&2; exit 1; }
 
@@ -69,6 +75,12 @@ fi
     echo "FAIL: plasmidspades timeout row" >&2; cat "$OUTCOMES" >&2; exit 1; }
 [[ "$(col "$OUTCOMES" plasmidspades 6)" == "1" ]] || { echo "FAIL: a timeout must not be retried" >&2; exit 1; }
 echo "TOOL_TIMEOUT_SECONDS -> exit 124, resource failure, not retried -> PASS"
+
+if [[ -n "$(col "$STATUS" genomad 3)" ]]; then
+    [[ "$(col "$STATUS" genomad 3)" == "infrastructure_failure" ]] || {
+        echo "FAIL: an ImportError must be an infrastructure failure, got $(col "$STATUS" genomad 3)" >&2; cat "$STATUS" >&2; exit 1; }
+    echo "a tool that cannot import its dependencies -> infrastructure_failure (never scored) -> PASS"
+fi
 
 python3 -c "
 import sys; sys.path.insert(0, '$ROOT/python')

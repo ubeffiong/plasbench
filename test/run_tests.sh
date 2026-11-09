@@ -68,4 +68,5 @@ for test in test_label_schemes.py test_dimer_collapse.py test_mcc_abstention.py 
     python3 "$HERE/$test"
 done
 bash "$HERE/test_outcome_states.sh"
+bash "$HERE/test_preserve_downloads.sh"
 echo "ALL PLASBENCH TESTS PASSED"
