@@ -170,7 +170,8 @@ def per_plasmid_rows(results_dir, data_dir=None):
 def per_plasmid_section(results_dir, data_dir=None):
     title = "Per-plasmid detail: which truth plasmids each tool recovered"
     lead = ("One row for each truth plasmid and tool: how much of it was covered, the outcome class, whether it is repeat-rich "
-            "and which bin held it. Filter by sample, tool, outcome or repeat content; without JavaScript every row is shown.")
+            "and which bin held it. The same rows are in the Tools tab of the plasmid map viewer. Filter by sample, tool, outcome or repeat "
+            "content; without JavaScript every row is shown.")
     rows = per_plasmid_rows(results_dir, data_dir)
     if not rows:
         return rc.section("per-plasmid-detail", title, lead,
@@ -198,7 +199,10 @@ def per_plasmid_section(results_dir, data_dir=None):
                          f"data-repeat='{rc.esc(r['repeat'] or 'unknown')}'>" + "".join(f"<td>{rc.cell(c)}</td>" for c in cells) + "</tr>")
     table = (f"<div class='panel'><table id='pp-table' class='sortable'><thead><tr>{''.join(f'<th>{rc.esc(h)}</th>' for h in headers)}"
              f"</tr></thead><tbody>{''.join(body_rows)}</tbody></table></div>")
-    return rc.section("per-plasmid-detail", title, lead, controls + table + asset("per_plasmid_filter_script.html"))
+    # the same rows are in the Tools tab of the interactive plasmid map viewer, so the table is collapsed until asked for
+    folded = ("<details class='rpt-collapsible'><summary>Show the per-plasmid table (all samples and tools)</summary>"
+              + controls + table + "</details>")
+    return rc.section("per-plasmid-detail", title, lead, folded + asset("per_plasmid_filter_script.html"))
 
 
 # ------------------------------------------------------------------------------------------------ assembly quality

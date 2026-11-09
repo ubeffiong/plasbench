@@ -1,0 +1,774 @@
+<script>
+/* PlasBench plasmid viewer, DOM glue. All geometry and text come from PlasmidViewerCore (plasmid_viewer_core.html). */
+(function () {
+'use strict';
+var PV = window.PlasmidViewerCore, root = document.getElementById('pv-root'), section = document.getElementById('plasmid-maps');
+if (!PV || !root || !section) { return; }
+var SVGNS = 'http://www.w3.org/2000/svg', LS_KEY = 'pb-pv-layout';
+var cfgEl = document.getElementById('pv-config');
+try { PV.configure(JSON.parse(cfgEl.textContent).core); } catch (e) { return; }
+var models = [];
+Array.prototype.forEach.call(document.querySelectorAll('script.pv-data'), function (s) {
+  try { models.push(PV.normalize(JSON.parse(s.textContent))); } catch (e) { /* a broken payload leaves that plasmid to the static map */ }
+});
+if (!models.length) { return; }
+var C = PV.cfg, M = null, S = null, scene = null, hits = [], cur = null, kbd = false;
+var quick = false, settleTimer = 0, pendingZoom = 1, pendingAng = 0, raf = 0, hashTimer = 0, anim = 0, drag = null, pinch = null, pts = {}, tipTimer = 0, featQuery = '', featVisible = false, lastFeatIds = null;
+var sortState = {}, prefs = {panel: true, tab: 'layers', legend: true, labelSize: 1};
+try { var saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (saved && typeof saved === 'object') { Object.keys(saved).forEach(function (k) { prefs[k] = saved[k]; }); } } catch (e) { /* storage blocked */ }
+function savePrefs() {
+  prefs.panel = !root.querySelector('.pv-main').classList.contains('pv-nopanel');
+  prefs.tab = S.tab; prefs.legend = S.legend; prefs.labelSize = S.labelSize;
+  try { localStorage.setItem(LS_KEY, JSON.stringify(prefs)); } catch (e) { /* storage blocked */ }
+}
+function reduced() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+
+/* ---------- small DOM helper: text is always set as text, never as markup ---------- */
+function el(tag, attrs, kids) {
+  var e = document.createElement(tag), k;
+  if (attrs) {
+    for (k in attrs) {
+      if (!Object.prototype.hasOwnProperty.call(attrs, k)) { continue; }
+      var v = attrs[k];
+      if (k === 'class') { e.className = v; } else if (k.slice(0, 2) === 'on') { e.addEventListener(k.slice(2), v); }
+      else if (v === true) { e.setAttribute(k, ''); } else if (v !== false && v !== null && v !== undefined) { e.setAttribute(k, v); }
+    }
+  }
+  add(e, kids);
+  return e;
+}
+function add(e, kids) {
+  if (kids === null || kids === undefined) { return; }
+  if (Array.isArray(kids)) { kids.forEach(function (c) { add(e, c); }); } else if (typeof kids === 'object') { e.appendChild(kids); } else { e.appendChild(document.createTextNode(String(kids))); }
+}
+function btn(text, fn, attrs) { var a = attrs || {}; a.type = 'button'; a['class'] = a['class'] || 'pv-btn'; a.onclick = fn; return el('button', a, text); }
+function linkBtn(text, fn) { return el('button', {type: 'button', 'class': 'pv-link', onclick: fn}, text); }
+function pal() { return C.palettes[S && S.cvd ? 'cvd' : 'default']; }
+function swatch(cls) { var s = el('span', {'class': 'pv-sw'}); s.style.background = pal()[cls] || '#888'; return s; }
+
+/* ---------- skeleton ---------- */
+var live = el('div', {'class': 'pv-live', 'aria-live': 'polite', 'aria-atomic': 'true'});
+var tip = el('div', {'class': 'pv-tip', role: 'tooltip', id: 'pv-tip', hidden: true});
+var selSample = el('select', {id: 'pv-sample', 'aria-label': 'Sample'}), selPlasmid = el('select', {id: 'pv-plasmid', 'aria-label': 'Plasmid'});
+var sumEl = el('div', {'class': 'pv-sum'}), strip = el('div', {'class': 'pv-strip', role: 'group', 'aria-label': 'Plasmid gallery'});
+var svg = document.createElementNS(SVGNS, 'svg');
+svg.setAttribute('viewBox', '0 0 ' + C.W + ' ' + C.H); svg.setAttribute('class', 'pv-svg'); svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+svg.setAttribute('tabindex', '0'); svg.setAttribute('role', 'group'); svg.setAttribute('aria-roledescription', 'interactive circular plasmid map');
+svg.setAttribute('aria-describedby', 'pv-help');
+var mini = el('div', {'class': 'pv-mini', title: 'Overview: click to move the view', role: 'button', tabindex: '0', 'aria-label': 'Overview of the whole plasmid; activate to centre the view'});
+var hint = el('div', {'class': 'pv-hint', id: 'pv-help'}, 'Scroll to zoom, drag to rotate, click a feature for details, arrow keys to step, + and - to zoom, Esc to clear.');
+var legend = el('div', {'class': 'pv-legend', role: 'group', 'aria-label': 'Legend and class filter'});
+var inStart = el('input', {type: 'number', min: '0', step: '1', id: 'pv-start', 'aria-label': 'Region start (bp)'}), inEnd = el('input', {type: 'number', min: '0', step: '1', id: 'pv-end', 'aria-label': 'Region end (bp)'});
+var rgStart = el('input', {type: 'range', min: '0', max: '1', step: '1', id: 'pv-rstart', 'aria-label': 'Region start slider'}), rgEnd = el('input', {type: 'range', min: '0', max: '1', step: '1', id: 'pv-rend', 'aria-label': 'Region end slider'});
+var regionNote = el('span', {'class': 'pv-muted'});
+var tabsEl = el('div', {'class': 'pv-tabs', role: 'tablist', 'aria-label': 'Viewer panels'}), tabBody = el('div', {'class': 'pv-tabbody', role: 'tabpanel', id: 'pv-tabpanel', tabindex: '-1'});
+var panelBtn = btn('Controls', function () { togglePanel(); }, {'aria-expanded': 'true', 'aria-controls': 'pv-tabpanel'});
+var main = el('div', {'class': 'pv-main'}, [
+  el('div', {'class': 'pv-stage'}, [
+    el('div', {'class': 'pv-toolbar'}, [
+      btn('+ Zoom in', function () { zoomButton(1.6); }, {'aria-label': 'Zoom in'}), btn('- Zoom out', function () { zoomButton(1 / 1.6); }, {'aria-label': 'Zoom out'}),
+      btn('Reset view', function () { flyTo({start: 0, span: 0}); }), btn('↺ 30°', function () { rotateBy(-30); }, {'aria-label': 'Rotate 30 degrees anticlockwise'}),
+      btn('↻ 30°', function () { rotateBy(30); }, {'aria-label': 'Rotate 30 degrees clockwise'}), btn('Zoom to selection', function () { zoomSelection(); }),
+      btn('Origin here', function () { originToSelection(); }, {title: 'Put the start of the selected feature (or the middle of the view) at the top'}),
+      el('span', {'class': 'pv-sp'}), panelBtn]),
+    el('div', {'class': 'pv-mapwrap'}, [svg, mini, hint]),
+    el('div', {'class': 'pv-view'}, [
+      el('label', {'for': 'pv-start'}, 'Region start (bp)'), rgStart, inStart,
+      el('label', {'for': 'pv-end'}, 'Region end (bp)'), rgEnd, inEnd,
+      el('span', {'class': 'pv-muted'}, 'Position at top'), regionNote, btn('Rotate origin', function () { setOrigin(); }, {title: 'Make the start-region position the 0 position (top)'})]),
+    legend]),
+  el('aside', {'class': 'pv-panel', 'aria-label': 'Map controls'}, el('div', {'class': 'pv-panel-in'}, [tabsEl, tabBody]))]);
+root.appendChild(el('div', {'class': 'pv-head'}, [
+  el('label', null, ['Sample ', selSample]), el('label', null, ['Plasmid ', selPlasmid]),
+  btn('◀', function () { stepPlasmid(-1); }, {'aria-label': 'Previous plasmid'}), btn('▶', function () { stepPlasmid(1); }, {'aria-label': 'Next plasmid'}), sumEl]));
+root.appendChild(strip); root.appendChild(main); root.appendChild(live); root.appendChild(tip);
+root.hidden = false; section.classList.add('pv-on');
+/* sample details with every plasmid drawn in the viewer have nothing left to show in the static fallback */
+Array.prototype.forEach.call(section.querySelectorAll('.pv-fallback > details'), function (d) {
+  var all = d.querySelectorAll('.pv-static'), done = d.querySelectorAll('.pv-static[data-pv]');
+  if (all.length && all.length === done.length) { d.hidden = true; }
+});
+
+/* ---------- helpers on the current model ---------- */
+function viewNow() { return PV.makeView(M.length, S.view.start, S.view.span || M.length); }
+function setView(v) { S.view = {start: PV.mod(v.start, M.length), span: v.span >= M.length ? 0 : v.span}; }
+function announce(text) { live.textContent = ''; setTimeout(function () { live.textContent = text; }, 30); }
+function svgPoint(e) {
+  var m = svg.getScreenCTM();
+  if (!m) { return {x: C.CX, y: C.CY}; }
+  var p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  var q = p.matrixTransform(m.inverse());
+  return {x: q.x, y: q.y};
+}
+function pointAngle(e) {
+  var p = svgPoint(e);
+  return PV.mod(Math.atan2(p.x - C.CX, -(p.y - C.CY)) * 180 / Math.PI, 360);
+}
+function pointBp(e) { return PV.angleToBp(viewNow(), pointAngle(e), true); }
+function geneMid(g) { return g.start <= g.end ? (g.start + g.end) / 2 : PV.mod((g.start + g.end + M.length) / 2, M.length); }
+function selectionInfo() {
+  if (!S.sel) { return null; }
+  var k = S.sel.k, i = S.sel.i;
+  if (k === 'g') { return M.genes[i] ? PV.geneInfo(M, M.genes[i]) : null; }
+  if (k === 't') { return M.tools[i] ? PV.toolInfo(M, M.tools[i]) : null; }
+  if (k === 'e') { return M.events[i] ? PV.eventInfo(M, M.events[i]) : null; }
+  return null;
+}
+function describe(info) {
+  if (!info) { return ''; }
+  return info.title + '. ' + info.rows.slice(0, 5).map(function (r) { return r[0] + ' ' + r[1]; }).join('; ');
+}
+function infoFor(k, i, e) {
+  if (k === 'g') { return M.genes[i] ? PV.geneInfo(M, M.genes[i]) : null; }
+  if (k === 't') { return M.tools[i] ? PV.toolInfo(M, M.tools[i], e ? pointBp(e) : null) : null; }
+  if (k === 'e') { return M.events[i] ? PV.eventInfo(M, M.events[i]) : null; }
+  if (k === 'gc' || k === 'skew') { var bp = e ? pointBp(e) : null; return bp === null ? null : PV.gcAt(M, bp, k); }
+  return null;
+}
+
+/* ---------- tooltip ---------- */
+function showTip(info, x, y, cls) {
+  if (!info) { hideTip(); return; }
+  tip.textContent = '';
+  var t = el('strong', null, [cls ? swatch(cls) : null, info.title]), dl = el('dl');
+  info.rows.forEach(function (r) { dl.appendChild(el('dt', null, r[0])); dl.appendChild(el('dd', null, r[1])); });
+  tip.appendChild(t); tip.appendChild(dl); tip.hidden = false;
+  var w = tip.offsetWidth, h = tip.offsetHeight, nx = x + 14, ny = y + 16;
+  if (nx + w > window.innerWidth - 8) { nx = x - w - 14; }
+  if (ny + h > window.innerHeight - 8) { ny = y - h - 12; }
+  tip.style.left = Math.max(4, nx) + 'px'; tip.style.top = Math.max(4, ny) + 'px';
+}
+function hideTip() { tip.hidden = true; if (tipTimer) { clearTimeout(tipTimer); tipTimer = 0; } }
+function hover(e) {
+  var n = e.target && e.target.closest ? e.target.closest('[data-k]') : null;
+  if (!n) { hideTip(); return; }
+  var k = n.getAttribute('data-k'), i = parseInt(n.getAttribute('data-i'), 10);
+  if (k === 'tick') { hideTip(); return; }
+  var cls = k === 'g' && M.genes[i] ? M.genes[i].cls : null;
+  showTip(infoFor(k, i, e), e.clientX, e.clientY, cls);
+}
+
+/* ---------- drawing ---------- */
+/* while the view is changing continuously (wheel, pinch, fly) labels are skipped; they are laid out again once it settles */
+function drawSoon() {
+  quick = true;
+  if (!raf) { raf = window.requestAnimationFrame(function () { raf = 0; draw(); }); }
+  if (settleTimer) { clearTimeout(settleTimer); }
+  settleTimer = setTimeout(function () { settleTimer = 0; quick = false; draw(); }, 170);
+}
+function draw() {
+  if (!M) { return; }
+  if (pendingZoom !== 1) {
+    var nv = PV.zoomAt(viewNow(), pendingAng, pendingZoom); pendingZoom = 1; setView(nv);
+  }
+  hits = S.q ? PV.searchGenes(M, S.q).slice(0, 60) : [];
+  scene = PV.buildScene(M, S, {maxScale: 1.5, hits: hits, cur: kbd ? cur : null, skipLabels: quick});
+  svg.innerHTML = PV.sceneInner(scene);
+  var view = scene.view;
+  svg.setAttribute('aria-label', 'Circular map of ' + M.plasmid + ', ' + M.length.toLocaleString('en-US') + ' bp, sample ' + M.sample + (view.full ? '' : ', zoomed to ' + Math.round(view.start) + ' to ' + Math.round(PV.mod(view.start + view.span, M.length)) + ' bp') +
+    '. ' + scene.counts.genes + ' annotations and ' + scene.counts.tools + ' tool rings shown.');
+  mini.innerHTML = PV.thumbSvg(M, 92, S, view);
+  syncRegion(view); syncLegend(); scheduleHash();
+  if (kbd && cur) { var o = svg.querySelector('.pv-cur'); if (o) { var r = o.getBoundingClientRect(); var info = infoFor(cur.k, cur.i, null); showTip(info, r.left + r.width / 2, r.top + r.height / 2, cur.k === 'g' && M.genes[cur.i] ? M.genes[cur.i].cls : null); } }
+}
+function syncRegion(view) {
+  var L = M.length, end = view.full ? view.start : PV.mod(view.start + view.span, L);
+  [rgStart, rgEnd].forEach(function (r) { r.max = String(L); });
+  inStart.max = inEnd.max = String(L);
+  if (document.activeElement !== inStart) { inStart.value = String(Math.round(view.start)); }
+  if (document.activeElement !== inEnd) { inEnd.value = String(Math.round(end)); }
+  rgStart.value = String(Math.round(view.start)); rgEnd.value = String(Math.round(end));
+  regionNote.textContent = view.full ? 'full circle (origin at ' + Math.round(view.start).toLocaleString('en-US') + ' bp)' : Math.round(view.span).toLocaleString('en-US') + ' bp in view, ' + (L / view.span).toFixed(1) + 'x';
+}
+
+/* ---------- view changes ---------- */
+function flyTo(target, done) {
+  if (anim) { window.cancelAnimationFrame(anim); anim = 0; }
+  var L = M.length, a = {start: S.view.start, span: S.view.span || L}, b = {start: target.start, span: target.span || L};
+  if (reduced()) { setView(b); draw(); if (done) { done(); } return; }
+  var t0 = performance.now(), dur = 380;
+  function step(now) {
+    var t = Math.min(1, (now - t0) / dur), q = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2, v = PV.lerpView(L, a, b, q);
+    setView(v); quick = t < 1; draw();
+    if (t < 1) { anim = window.requestAnimationFrame(step); } else { anim = 0; setView(b); draw(); if (done) { done(); } }
+  }
+  anim = window.requestAnimationFrame(step);
+}
+function focusBp() {
+  if (S.sel && S.sel.k === 'g' && M.genes[S.sel.i]) { return geneMid(M.genes[S.sel.i]); }
+  if (S.sel && S.sel.k === 'e' && M.events[S.sel.i]) { return M.events[S.sel.i].pos; }
+  var v = viewNow(); return PV.mod(v.start + v.span / 2, M.length);
+}
+function zoomButton(f) {
+  var v = viewNow(), bp = focusBp(), ang = PV.bpToAngle(v, bp);
+  if (ang === null) { ang = v.off + v.sweep / 2; }
+  setView(PV.zoomAt(v, ang, f)); draw();
+}
+function rotateBy(deg) { setView(PV.rotateView(viewNow(), deg)); draw(); }
+function regionForSel() {
+  if (!S.sel) { return null; }
+  var L = M.length, min = Math.min(L, 1500);
+  if (S.sel.k === 'g' && M.genes[S.sel.i]) { var g = M.genes[S.sel.i]; return PV.regionFor(L, g.start, g.end, 0.35, min); }
+  if (S.sel.k === 'e' && M.events[S.sel.i]) { var p = M.events[S.sel.i].pos; return PV.regionFor(L, PV.mod(p - 300, L), PV.mod(p + 300, L), 0.5, min); }
+  return null;
+}
+function zoomSelection() {
+  var r = regionForSel();
+  if (r) { flyTo({start: r.start, span: r.span >= M.length ? 0 : r.span}); } else { announce('Select a gene, feature or event to zoom to it.'); }
+}
+function originToSelection() {
+  var v = viewNow(), bp = S.sel && S.sel.k === 'g' && M.genes[S.sel.i] ? M.genes[S.sel.i].start : PV.mod(v.start + v.span / 2, M.length);
+  var nv = v.full ? {start: bp, span: 0} : PV.originAt(v, bp);
+  flyTo({start: nv.start, span: v.full ? 0 : v.span});
+}
+function setOrigin() {
+  var bp = parseInt(inStart.value, 10);
+  if (isNaN(bp)) { return; }
+  var v = viewNow();
+  setView(v.full ? {start: bp, span: M.length} : {start: bp, span: v.span}); draw();
+}
+function applyRegion(s, e) {
+  var r = PV.clampRegion(M.length, s, e);
+  setView({start: r.start, span: r.span}); draw();
+}
+function flyToGene(gi, select) {
+  var g = M.genes[gi];
+  if (!g) { return; }
+  S.hideCls[g.cls] = false; S.layers[PV.geneRing(g)] = true;
+  var r = PV.regionFor(M.length, g.start, g.end, 0.35, Math.min(M.length, 1500));
+  if (select) { doSelect('g', gi, {stay: true}); }
+  flyTo({start: r.start, span: r.span >= M.length ? 0 : r.span});
+}
+
+/* ---------- selection ---------- */
+function doSelect(k, i, opt) {
+  opt = opt || {};
+  S.sel = {k: k, i: i}; S.hl = k === 't' ? i : null;
+  if (!opt.stay) { S.tab = 'detail'; openPanel(); }
+  renderTabs(); renderPanel(); draw(); savePrefs();
+  announce('Selected ' + describe(selectionInfo()));
+}
+function clearSel() {
+  if (!S.sel && S.hl === null) { return; }
+  S.sel = null; S.hl = null; hideTip();
+  renderPanel(); draw(); announce('Selection cleared');
+}
+function openPanel() { main.classList.remove('pv-nopanel'); panelBtn.setAttribute('aria-expanded', 'true'); }
+function togglePanel() {
+  var closed = main.classList.toggle('pv-nopanel');
+  panelBtn.setAttribute('aria-expanded', String(!closed)); savePrefs();
+}
+
+/* ---------- pointer, wheel and keyboard on the map ---------- */
+function dist2() { var ids = Object.keys(pts), a = pts[ids[0]], b = pts[ids[1]]; return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)); }
+svg.addEventListener('pointerdown', function (e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) { return; }
+  pts[e.pointerId] = {x: e.clientX, y: e.clientY};
+  try { svg.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+  hideTip();
+  var n = Object.keys(pts).length;
+  if (n === 1) { drag = {id: e.pointerId, x0: e.clientX, y0: e.clientY, a0: pointAngle(e), moved: false, da: 0, touch: e.pointerType !== 'mouse'}; }
+  else if (n === 2) {
+    drag = null;
+    var ids = Object.keys(pts), mid = {clientX: (pts[ids[0]].x + pts[ids[1]].x) / 2, clientY: (pts[ids[0]].y + pts[ids[1]].y) / 2};
+    pinch = {d0: dist2(), view0: viewNow(), ang: pointAngle(mid)};
+  }
+});
+svg.addEventListener('pointermove', function (e) {
+  if (pts[e.pointerId]) { pts[e.pointerId] = {x: e.clientX, y: e.clientY}; }
+  if (pinch && Object.keys(pts).length >= 2) {
+    var f = dist2() / Math.max(1, pinch.d0);
+    setView(PV.zoomAt(pinch.view0, pinch.ang, f)); drawSoon(); return;
+  }
+  if (drag && drag.id === e.pointerId) {
+    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (!drag.moved && Math.sqrt(dx * dx + dy * dy) > 5) { drag.moved = true; svg.classList.add('pv-drag'); hideTip(); }
+    if (drag.moved) {
+      var da = pointAngle(e) - drag.a0; da = ((da + 540) % 360) - 180; drag.da = da;
+      var g = svg.querySelector('#pv-rot'), o = svg.querySelector('.pv-overlay'), tr = 'rotate(' + da.toFixed(2) + ' ' + C.CX + ' ' + C.CY + ')';
+      if (g) { g.setAttribute('transform', tr); var lb = g.querySelector('.gene-labels'); if (lb) { lb.setAttribute('opacity', '0'); } }
+      if (o) { o.setAttribute('transform', tr); }
+    }
+    return;
+  }
+  if (e.pointerType !== 'touch') { hover(e); }
+});
+function endPointer(e) {
+  var d = drag, wasPinch = !!pinch;
+  delete pts[e.pointerId];
+  try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
+  if (Object.keys(pts).length < 2) { pinch = null; }
+  svg.classList.remove('pv-drag');
+  if (wasPinch) { if (!Object.keys(pts).length) { drag = null; } draw(); return; }
+  if (!d || d.id !== e.pointerId) { return; }
+  drag = null;
+  if (e.type === 'pointercancel') { draw(); return; }
+  if (d.moved) { setView(PV.rotateView(viewNow(), d.da)); draw(); return; }
+  var t = document.elementFromPoint(e.clientX, e.clientY), n = t && t.closest ? t.closest('[data-k]') : null, k = n ? n.getAttribute('data-k') : null;
+  if (k === 'g' || k === 't' || k === 'e') {
+    var i = parseInt(n.getAttribute('data-i'), 10);
+    doSelect(k, i);
+    if (d.touch) { showTip(infoFor(k, i, e), e.clientX, e.clientY, k === 'g' ? M.genes[i].cls : null); tipTimer = setTimeout(hideTip, 3000); }
+  } else { clearSel(); }
+}
+svg.addEventListener('pointerup', endPointer);
+svg.addEventListener('pointercancel', endPointer);
+svg.addEventListener('pointerleave', function (e) { if (e.pointerType !== 'touch' && !drag) { hideTip(); } });
+svg.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  var f = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0016));
+  pendingZoom = Math.max(0.2, Math.min(5, pendingZoom * f)); pendingAng = pointAngle(e); drawSoon();
+}, {passive: false});
+svg.addEventListener('focus', function () { kbd = true; draw(); });
+svg.addEventListener('blur', function () { kbd = false; hideTip(); draw(); });
+function moveCursor(delta) {
+  if (!scene) { return; }
+  var order = PV.cursorOrder(M, S, scene.ids), nxt = PV.neighbour(order, cur, delta);
+  if (!nxt) { return; }
+  cur = {k: nxt.k, i: nxt.i}; kbd = true;
+  var bp = null;
+  if (cur.k === 'g') { bp = geneMid(M.genes[cur.i]); } else if (cur.k === 'e') { bp = M.events[cur.i].pos; }
+  var v = viewNow();
+  if (bp !== null && !v.full && PV.bpToAngle(v, bp) === null) { setView({start: PV.mod(bp - v.span / 2, M.length), span: v.span}); }
+  draw();
+  announce(describe(infoFor(cur.k, cur.i, null)));
+}
+svg.addEventListener('keydown', function (e) {
+  var k = e.key, handled = true;
+  if (k === 'ArrowRight' || k === 'ArrowDown') { moveCursor(1); }
+  else if (k === 'ArrowLeft' || k === 'ArrowUp') { moveCursor(-1); }
+  else if (k === 'Home' || k === 'End') { cur = null; moveCursor(k === 'Home' ? 1 : -1); }
+  else if (k === 'Enter' || k === ' ') { if (cur) { doSelect(cur.k, cur.i); } }
+  else if (k === '+' || k === '=') { zoomButton(1.6); }
+  else if (k === '-' || k === '_') { zoomButton(1 / 1.6); }
+  else if (k === '0') { flyTo({start: 0, span: 0}); }
+  else if (k === 'r' || k === 'R') { rotateBy(e.shiftKey ? -30 : 30); }
+  else { handled = false; }
+  if (handled) { e.preventDefault(); }
+});
+root.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { hideTip(); if (S.sel || S.hl !== null) { clearSel(); e.preventDefault(); } }
+});
+mini.addEventListener('click', function (e) {
+  var r = mini.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  var ang = PV.mod(Math.atan2(dx, -dy) * 180 / Math.PI, 360), bp = ang / 360 * M.length, v = viewNow();
+  var nv = PV.originAt(v, bp); flyTo({start: nv.start, span: v.full ? 0 : v.span});
+});
+mini.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flyTo({start: 0, span: 0}); } });
+inStart.addEventListener('change', function () { var s = parseInt(inStart.value, 10), e2 = parseInt(inEnd.value, 10); if (!isNaN(s) && !isNaN(e2)) { applyRegion(s, e2); } });
+inEnd.addEventListener('change', function () { var s = parseInt(inStart.value, 10), e2 = parseInt(inEnd.value, 10); if (!isNaN(s) && !isNaN(e2)) { applyRegion(s, e2); } });
+rgStart.addEventListener('input', function () { inStart.value = rgStart.value; applyRegion(parseInt(rgStart.value, 10), parseInt(rgEnd.value, 10)); });
+rgEnd.addEventListener('input', function () { inEnd.value = rgEnd.value; applyRegion(parseInt(rgStart.value, 10), parseInt(rgEnd.value, 10)); });
+
+/* ---------- legend (doubles as the class filter) ---------- */
+var legendBuilt = '';
+function syncLegend() {
+  legend.hidden = !S.legend;
+  var present = {}, counts = {};
+  M.genes.forEach(function (g) { present[g.cls] = true; counts[g.cls] = (counts[g.cls] || 0) + 1; });
+  var sig = M.id + '|' + (S.cvd ? 1 : 0);
+  if (sig !== legendBuilt) {
+    legendBuilt = sig; legend.textContent = '';
+    C.classes.forEach(function (cls) {
+      if (!present[cls]) { return; }
+      var b = el('button', {type: 'button', 'class': 'pv-chip', 'data-class': cls, onclick: function () { S.hideCls[cls] = !S.hideCls[cls]; renderPanelIf('filters'); draw(); }}, [swatch(cls), (C.labels[cls] || cls) + ' (' + counts[cls] + ')']);
+      legend.appendChild(b);
+    });
+    legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = pal().cover; return i; })(), 'Tool ring: covered']));
+    legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = '#eef1f4'; i.style.borderStyle = 'dashed'; return i; })(), 'not covered']));
+    legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = '#111'; i.style.width = '3px'; return i; })(), 'structural event']));
+    if (M.gc) { legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = pal().skewPos; return i; })(), 'GC skew +']));
+                legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = pal().skewNeg; return i; })(), 'GC skew -'])); }
+  }
+  Array.prototype.forEach.call(legend.querySelectorAll('.pv-chip'), function (b) { b.setAttribute('aria-pressed', String(!S.hideCls[b.getAttribute('data-class')])); });
+}
+
+/* ---------- tables ---------- */
+function dataTable(id, cols, rows, opt) {
+  opt = opt || {};
+  var st = sortState[id] || (sortState[id] = {col: opt.sortCol === undefined ? -1 : opt.sortCol, dir: opt.dir || 1}), data = rows.slice();
+  if (st.col >= 0 && cols[st.col]) {
+    var c = cols[st.col];
+    data.sort(function (a, b) {
+      var x = c.v(a), y = c.v(b), nx = x === null || x === undefined || x === '', ny = y === null || y === undefined || y === '';
+      if (nx && ny) { return 0; } if (nx) { return 1; } if (ny) { return -1; }
+      return ((typeof x === 'number' && typeof y === 'number') ? x - y : String(x).localeCompare(String(y))) * st.dir;
+    });
+  }
+  var head = el('tr');
+  cols.forEach(function (c, ci) {
+    var th = el('th', {scope: 'col', 'aria-sort': st.col === ci ? (st.dir > 0 ? 'ascending' : 'descending') : 'none'},
+      btn(c.h, function () { if (st.col === ci) { st.dir = -st.dir; } else { st.col = ci; st.dir = c.num ? -1 : 1; } opt.again(); }, {'class': 'pv-thbtn', title: 'Sort by ' + c.h}));
+    head.appendChild(th);
+  });
+  var body = el('tbody');
+  data.forEach(function (r) {
+    var sel = opt.isSel ? opt.isSel(r) : false;
+    var tr = el('tr', {'class': 'pv-r', tabindex: '0', 'aria-selected': String(!!sel), onclick: function () { opt.onRow(r); }, onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.onRow(r); } }});
+    cols.forEach(function (c) { tr.appendChild(el('td', null, c.t ? c.t(r) : (function (v) { return v === null || v === undefined ? '' : v; })(c.v(r)))); });
+    body.appendChild(tr);
+  });
+  if (!data.length) { body.appendChild(el('tr', null, el('td', {colspan: String(cols.length), 'class': 'pv-muted'}, opt.empty || 'Nothing to show.'))); }
+  return el('div', {'class': 'pv-tw'}, el('table', null, [el('thead', null, head), body]));
+}
+function plainTable(headers, rows) {
+  return el('div', {'class': 'pv-tw'}, el('table', null, [el('thead', null, el('tr', null, headers.map(function (h) { return el('th', {scope: 'col'}, h); }))),
+    el('tbody', null, rows.map(function (r) { return el('tr', null, r.map(function (c) { return el('td', null, c); })); }))]));
+}
+function pctText(v) { return v === null || v === undefined ? '' : PV.pct(v); }
+
+/* ---------- panel ---------- */
+var TAB_LABELS = {layers: 'Layers', filters: 'Filters', tools: 'Tools', features: 'Features', events: 'Events', detail: 'Detail', appearance: 'Appearance', 'export': 'Export'};
+function renderTabs() {
+  tabsEl.textContent = '';
+  PV.TABS.forEach(function (t) {
+    var n = t === 'tools' ? M.tools.length : (t === 'features' ? M.genes.length : (t === 'events' ? M.events.length : null));
+    var b = el('button', {type: 'button', role: 'tab', 'class': 'pv-tab', id: 'pv-tab-' + t, 'aria-selected': String(S.tab === t), tabindex: S.tab === t ? '0' : '-1', 'aria-controls': 'pv-tabpanel',
+      onclick: function () { S.tab = t; renderTabs(); renderPanel(); scheduleHash(); savePrefs(); },
+      onkeydown: function (e) {
+        var i = PV.TABS.indexOf(t), j = e.key === 'ArrowRight' ? i + 1 : (e.key === 'ArrowLeft' ? i - 1 : -1);
+        if (j >= 0) { e.preventDefault(); S.tab = PV.TABS[(j + PV.TABS.length) % PV.TABS.length]; renderTabs(); renderPanel(); var nb = document.getElementById('pv-tab-' + S.tab); if (nb) { nb.focus(); } }
+      }}, TAB_LABELS[t] + (n !== null ? ' (' + n + ')' : ''));
+    tabsEl.appendChild(b);
+  });
+  tabBody.setAttribute('aria-labelledby', 'pv-tab-' + S.tab);
+}
+function renderPanel() {
+  var top = tabBody.scrollTop;
+  tabBody.textContent = '';
+  var fn = {layers: tabLayers, filters: tabFilters, tools: tabTools, features: tabFeatures, events: tabEvents, detail: tabDetail, appearance: tabAppearance, 'export': tabExport}[S.tab] || tabLayers;
+  fn(tabBody);
+  tabBody.scrollTop = top;
+}
+function renderPanelIf(tab) { if (S.tab === tab) { renderPanel(); } }
+function check(label, get, set, disabled, why) {
+  var cb = el('input', {type: 'checkbox'}); cb.checked = !!get(); cb.disabled = !!disabled;
+  cb.addEventListener('change', function () { set(cb.checked); });
+  return el('div', {'class': 'pv-row'}, el('label', null, [cb, label + (disabled && why ? ' (' + why + ')' : '')]));
+}
+function slider(label, min, max, step, get, set, fmt) {
+  var out = el('output', null, fmt(get())), r = el('input', {type: 'range', min: String(min), max: String(max), step: String(step), 'aria-label': label});
+  r.value = String(get());
+  r.addEventListener('input', function () { out.textContent = fmt(parseFloat(r.value)); set(parseFloat(r.value)); });
+  return el('div', {'class': 'pv-row'}, [el('span', null, label), r, out]);
+}
+function tabLayers(b) {
+  var hasFeat = M.genes.some(function (g) { return g.strand !== '+' && g.strand !== '-'; });
+  b.appendChild(el('h4', null, 'Rings and marks'));
+  [['fwd', 'Genes, + strand'], ['rev', 'Genes, - strand'], ['feat', 'Feature blocks (strand not given)'], ['repeat', 'Repeat regions'], ['gc', 'GC content'], ['skew', 'GC skew'],
+   ['events', 'Structural event ticks'], ['scale', 'Scale (ticks and labels)'], ['labels', 'Gene labels']].forEach(function (p) {
+    var off = (p[0] === 'feat' && !hasFeat) ? 'none here' : ((p[0] === 'gc' || p[0] === 'skew') && !M.gc ? 'no reference sequence' : (p[0] === 'repeat' && !M.repeatRegions.length ? 'no coordinates' : ''));
+    b.appendChild(check(p[1], function () { return S.layers[p[0]]; }, function (v) { S.layers[p[0]] = v; draw(); }, !!off, off));
+  });
+  b.appendChild(el('h4', null, 'Tool rings (' + PV.visibleTools(M, S).length + ' of ' + M.tools.length + ' shown)'));
+  var nIn = el('input', {type: 'number', min: '1', max: String(Math.max(1, M.tools.length)), value: String(Math.min(C.MAX_TOOLS, Math.max(1, M.tools.length))), 'aria-label': 'Number of best tools'});
+  b.appendChild(el('div', {'class': 'pv-row'}, [btn('All', function () { S.toolsOn = M.tools.map(function (t) { return t.name; }); renderPanel(); draw(); }),
+    btn('None', function () { S.toolsOn = []; renderPanel(); draw(); }), btn('Best', function () { S.toolsOn = PV.bestTools(M, Math.max(1, parseInt(nIn.value, 10) || 1)); renderPanel(); draw(); }), nIn,
+    btn('Default', function () { S.toolsOn = null; renderPanel(); draw(); })]));
+  var sortSel = el('select', {'aria-label': 'Sort tool rings'}, [['default', 'Ring order: report rank, then completeness'], ['completeness', 'Ring order: completeness'], ['rank', 'Ring order: rank'], ['name', 'Ring order: name']]
+    .map(function (o) { return el('option', {value: o[0], selected: S.toolSort === o[0]}, o[1]); }));
+  sortSel.addEventListener('change', function () { S.toolSort = sortSel.value; renderPanel(); draw(); });
+  b.appendChild(el('div', {'class': 'pv-row'}, sortSel));
+  var on = {}; PV.visibleTools(M, S).forEach(function (t) { on[t.name] = true; });
+  var list = el('div', {'class': 'pv-tools-list', role: 'group', 'aria-label': 'Tool rings'});
+  PV.sortTools(M, S.toolSort).forEach(function (t) {
+    var cb = el('input', {type: 'checkbox'}); cb.checked = !!on[t.name];
+    cb.addEventListener('change', function () {
+      var cur2 = PV.visibleTools(M, S).map(function (x) { return x.name; }).filter(function (n) { return n !== t.name; });
+      if (cb.checked) { cur2.push(t.name); }
+      S.toolsOn = cur2; draw(); var h = tabBody.querySelector('h4:nth-of-type(2)'); if (h) { h.textContent = 'Tool rings (' + cur2.length + ' of ' + M.tools.length + ' shown)'; }
+    });
+    list.appendChild(el('div', {'class': 'pv-row'}, [el('label', null, [cb, t.label]), el('span', {'class': 'pv-cm'}, pctText(t.completeness) + (t.outcome ? ' ' + t.outcome : ''))]));
+  });
+  b.appendChild(list);
+  b.appendChild(el('h4', null, 'Layout'));
+  var ord = el('select', {'aria-label': 'Ring order'}, [['gtc', 'Genes, tools, GC (outside in)'], ['tgc', 'Tools, genes, GC'], ['gct', 'GC, genes, tools']].map(function (o) { return el('option', {value: o[0], selected: S.order === o[0]}, o[1]); }));
+  ord.addEventListener('change', function () { S.order = ord.value; draw(); });
+  b.appendChild(el('div', {'class': 'pv-row'}, [el('span', null, 'Ring order'), ord]));
+  b.appendChild(slider('Gene ring thickness', 0.5, 2, 0.1, function () { return S.thGene; }, function (v) { S.thGene = v; draw(); }, function (v) { return v.toFixed(1) + 'x'; }));
+  b.appendChild(slider('Tool ring thickness', 0.5, 2.5, 0.1, function () { return S.thTool; }, function (v) { S.thTool = v; draw(); }, function (v) { return v.toFixed(1) + 'x'; }));
+  if (M.toolsNotDrawn.length) { b.appendChild(el('p', {'class': 'pv-note'}, 'The static map draws at most ' + C.MAX_TOOLS + ' tools. The viewer starts with those and can show the rest: ' + M.toolsNotDrawn.join(', ') + '.')); }
+}
+function tabFilters(b) {
+  b.appendChild(el('h4', null, 'Classes'));
+  var chips = el('div', {'class': 'pv-legend'}), present = {};
+  M.genes.forEach(function (g) { present[g.cls] = (present[g.cls] || 0) + 1; });
+  C.classes.forEach(function (cls) {
+    if (!present[cls]) { return; }
+    chips.appendChild(el('button', {type: 'button', 'class': 'pv-chip', 'aria-pressed': String(!S.hideCls[cls]),
+      onclick: function () { S.hideCls[cls] = !S.hideCls[cls]; renderPanel(); draw(); }}, [swatch(cls), (C.labels[cls] || cls) + ' (' + present[cls] + ')']));
+  });
+  b.appendChild(chips);
+  b.appendChild(el('div', {'class': 'pv-row'}, [btn('Show all', function () { S.hideCls = {}; renderPanel(); draw(); }), btn('Hide all', function () { C.classes.forEach(function (c) { S.hideCls[c] = true; }); renderPanel(); draw(); })]));
+  var maxLen = 100; M.genes.forEach(function (g) { maxLen = Math.max(maxLen, PV.geneLength(g, M.length)); });
+  maxLen = Math.min(Math.ceil(maxLen / 100) * 100, 20000);
+  b.appendChild(el('h4', null, 'Size'));
+  b.appendChild(slider('Hide features shorter than', 0, maxLen, 10, function () { return S.minBp; }, function (v) { S.minBp = v; draw(); }, function (v) { return v + ' bp'; }));
+  b.appendChild(el('h4', null, 'Labels'));
+  [['key', 'Key genes (AMR, replication, IS, transfer)'], ['amr', 'AMR genes only'], ['all', 'All named features'], ['none', 'No labels']].forEach(function (o) {
+    var rb = el('input', {type: 'radio', name: 'pv-labmode'}); rb.checked = S.labelMode === o[0];
+    rb.addEventListener('change', function () { S.labelMode = o[0]; draw(); });
+    b.appendChild(el('div', {'class': 'pv-row'}, el('label', null, [rb, o[1]])));
+  });
+  b.appendChild(el('h4', null, 'Find a gene'));
+  var q = el('input', {type: 'search', placeholder: 'name or product, e.g. bla, tetracycline', 'aria-label': 'Search genes and features', value: S.q}), results = el('ul', {'class': 'pv-list', 'aria-label': 'Search results'});
+  function fill() {
+    results.textContent = '';
+    var ids = PV.searchGenes(M, q.value);
+    if (q.value.trim() && !ids.length) { results.appendChild(el('li', {'class': 'pv-muted'}, 'No gene or feature matches.')); }
+    ids.slice(0, 12).forEach(function (gi) {
+      var g = M.genes[gi];
+      results.appendChild(el('li', null, [swatch(g.cls), linkBtn((g.name || g.product || 'feature') + '  ' + g.start + '-' + g.end, function () { flyToGene(gi, true); renderPanel(); }), g.product ? el('span', {'class': 'pv-muted'}, ' ' + g.product) : null]));
+    });
+    if (ids.length > 12) { results.appendChild(el('li', {'class': 'pv-muted'}, (ids.length - 12) + ' more; narrow the search. All matches are outlined on the map.')); }
+  }
+  q.addEventListener('input', function () { S.q = q.value; fill(); draw(); });
+  q.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var ids = PV.searchGenes(M, q.value); if (ids.length) { e.preventDefault(); flyToGene(ids[0], true); } } });
+  b.appendChild(q); b.appendChild(results); fill();
+  b.appendChild(el('p', {'class': 'pv-note'}, 'Matches are outlined in magenta on the map. Enter flies to the best match.'));
+}
+function toolRowsData() {
+  return M.tools.map(function (t) { var od = t.outcomeDetail || {}; return {t: t, rank: t.rank, comp: t.completeness, outcome: t.outcome, cov: t.coveredBp, amr: t.amrTotal === null ? null : t.amrRecovered.length, amrTot: t.amrTotal, ev: t.events.length, contam: od.contamination === undefined ? null : od.contamination}; });
+}
+function tabTools(b) {
+  b.appendChild(el('h4', null, 'Tools on this plasmid'));
+  b.appendChild(el('p', {'class': 'pv-note'}, 'Click a row to outline its ring on the map. Sort by any column.'));
+  var host = el('div');
+  function again() {
+    host.textContent = '';
+    host.appendChild(dataTable('tools', [
+      {h: 'Rank', v: function (r) { return r.rank; }, num: true}, {h: 'Tool', v: function (r) { return r.t.label; }, t: function (r) { return [r.t.label, el('div', {'class': 'pv-muted'}, r.t.track)]; }},
+      {h: 'Completeness', v: function (r) { return r.comp; }, t: function (r) { return pctText(r.comp); }, num: true}, {h: 'Outcome', v: function (r) { return r.outcome; }},
+      {h: 'Covered bp', v: function (r) { return r.cov; }, t: function (r) { return r.cov.toLocaleString('en-US'); }, num: true},
+      {h: 'AMR', v: function (r) { return r.amr; }, t: function (r) { return r.amr === null ? '' : r.amr + '/' + r.amrTot; }, num: true}, {h: 'Events', v: function (r) { return r.ev; }, num: true},
+      {h: 'Contam.', v: function (r) { return r.contam; }, t: function (r) { return r.contam === null ? '' : (r.contam * 100).toFixed(1) + '%'; }, num: true}],
+      toolRowsData(), {again: again, sortCol: 0, isSel: function (r) { return S.hl === r.t.i; }, empty: 'No tool produced a result for this plasmid.',
+        onRow: function (r) { S.hl = S.hl === r.t.i ? null : r.t.i; S.sel = S.hl === null ? null : {k: 't', i: r.t.i}; if (S.hl !== null && S.toolsOn) { var nm = PV.visibleTools(M, S).map(function (x) { return x.name; }); if (nm.indexOf(r.t.name) < 0) { nm.push(r.t.name); S.toolsOn = nm; } } again(); draw(); announce(S.sel ? 'Highlighted ' + r.t.label : 'Highlight cleared'); }}));
+  }
+  b.appendChild(host); again();
+  var rows = [];
+  M.tools.forEach(function (t) { t.amr.forEach(function (a) { rows.push([t.label, a.gene, a.placement, a.repOk, a.record]); }); });
+  b.appendChild(el('h4', null, 'AMR placement on this plasmid'));
+  if (rows.length) { b.appendChild(plainTable(['Tool', 'Gene', 'Placement', 'Replicon type correct', 'Record'], rows)); } else { b.appendChild(el('p', {'class': 'pv-note'}, 'No AMR placement rows for this plasmid.')); }
+  var od = M.tools.filter(function (t) { return t.outcomeDetail; });
+  if (od.length) {
+    b.appendChild(el('h4', null, 'Per-plasmid outcome'));
+    b.appendChild(plainTable(['Tool', 'Best bin', 'Recall', 'Precision', 'Bins sharing', 'Merged with'], od.map(function (t) {
+      var d = t.outcomeDetail; return [t.label, d.bin, pctText(d.recall), pctText(d.precision), d.bins === null ? '' : String(d.bins), d.mergedWith];
+    })));
+  }
+}
+function featRows() {
+  var q = featQuery.trim().toLowerCase(), shown = {};
+  if (featVisible) { scene.ids.forEach(function (i) { shown[i] = true; }); }
+  return M.genes.filter(function (g) {
+    if (featVisible && !shown[g.i]) { return false; }
+    return !q || g.name.toLowerCase().indexOf(q) >= 0 || g.product.toLowerCase().indexOf(q) >= 0 || g.cls.indexOf(q) >= 0 || (C.labels[g.cls] || '').toLowerCase().indexOf(q) >= 0 || g.ftype.toLowerCase().indexOf(q) >= 0;
+  });
+}
+function tabFeatures(b) {
+  b.appendChild(el('h4', null, 'Truth features and genes'));
+  var q = el('input', {type: 'search', placeholder: 'filter by name, product or class', 'aria-label': 'Filter features', value: featQuery}), host = el('div');
+  var vis = el('input', {type: 'checkbox'}); vis.checked = featVisible;
+  function again() {
+    host.textContent = '';
+    var list = featRows(); lastFeatIds = list.map(function (g) { return g.i; });
+    host.appendChild(dataTable('features', [
+      {h: 'Name', v: function (g) { return g.name || g.product; }, t: function (g) { return [swatch(g.cls), g.name || g.product || 'feature']; }},
+      {h: 'Class', v: function (g) { return C.labels[g.cls] || g.cls; }}, {h: 'Start', v: function (g) { return g.start; }, num: true}, {h: 'End', v: function (g) { return g.end; }, num: true},
+      {h: 'Len', v: function (g) { return PV.geneLength(g, M.length); }, num: true}, {h: 'Str', v: function (g) { return g.strand || '.'; }}],
+      list, {again: again, sortCol: 2, dir: 1, isSel: function (g) { return !!S.sel && S.sel.k === 'g' && S.sel.i === g.i; }, empty: 'No feature matches the filter.', onRow: function (g) { flyToGene(g.i, true); again(); }}));
+    b.querySelector('.pv-count').textContent = list.length + ' of ' + M.genes.length + ' shown. Product text, coordinates and strand are in the tooltip and the Detail tab.';
+  }
+  q.addEventListener('input', function () { featQuery = q.value; again(); });
+  vis.addEventListener('change', function () { featVisible = vis.checked; again(); });
+  b.appendChild(q); b.appendChild(el('div', {'class': 'pv-row'}, el('label', null, [vis, 'Only features currently drawn (after layers, class and size filters)'])));
+  b.appendChild(el('p', {'class': 'pv-note pv-count'})); b.appendChild(host); again();
+}
+function tabEvents(b) {
+  b.appendChild(el('h4', null, 'Structural events on this plasmid'));
+  var host = el('div');
+  function again() {
+    host.textContent = '';
+    host.appendChild(dataTable('events', [{h: 'Tool', v: function (e) { return e.toolLabel; }}, {h: 'Type', v: function (e) { return e.type; }}, {h: 'Position', v: function (e) { return e.pos; }, t: function (e) { return e.pos.toLocaleString('en-US'); }, num: true},
+      {h: 'Record', v: function (e) { return e.record; }}], M.events, {again: again, sortCol: 2, dir: 1, empty: 'No structural events were called on this plasmid.',
+      isSel: function (e) { return !!S.sel && S.sel.k === 'e' && S.sel.i === e.i; },
+      onRow: function (e) { var on = PV.visibleTools(M, S).map(function (x) { return x.name; }); if (on.indexOf(e.toolName) < 0) { on.push(e.toolName); S.toolsOn = on; } S.layers.events = true; doSelect('e', e.i, {stay: true}); var r = regionForSel(); if (r) { flyTo({start: r.start, span: r.span >= M.length ? 0 : r.span}); } again(); }}));
+  }
+  b.appendChild(host); again();
+  b.appendChild(el('p', {'class': 'pv-note'}, 'Events are alignment-derived structural discordance, not validated misassemblies. A row flies to the event; the Detail tab lists the features around it.'));
+}
+function detailLinks(items, fmt) {
+  if (!items.length) { return el('p', {'class': 'pv-note'}, 'None.'); }
+  return el('ul', {'class': 'pv-list'}, items.map(fmt));
+}
+function geneLink(g, extra) { return el('li', null, [swatch(g.cls), linkBtn(g.name || g.product || 'feature', function () { doSelect('g', g.i); }), el('span', {'class': 'pv-muted'}, ' ' + (C.labels[g.cls] || g.cls) + ', ' + g.start + '-' + g.end + (extra || ''))]); }
+function tabDetail(b) {
+  if (!S.sel) { b.appendChild(el('p', {'class': 'pv-empty'}, 'Click or press Enter on a gene, feature block, tool ring or structural event to see everything known about it here. Esc clears the selection.')); return; }
+  var rel = PV.related(M, S.sel);
+  if (!rel.info) { b.appendChild(el('p', {'class': 'pv-empty'}, 'That item is not in this plasmid.')); return; }
+  var g = S.sel.k === 'g' ? M.genes[S.sel.i] : null;
+  b.appendChild(el('h3', {'class': 'pv-detail-h'}, [g ? swatch(g.cls) : null, rel.info.title]));
+  var dl = el('dl', {'class': 'pv-dl'});
+  rel.info.rows.forEach(function (r) { dl.appendChild(el('dt', null, r[0])); dl.appendChild(el('dd', null, r[1])); });
+  b.appendChild(dl);
+  b.appendChild(el('div', {'class': 'pv-row'}, [btn('Zoom to it', zoomSelection), btn('Clear (Esc)', clearSel)]));
+  if (S.sel.k === 'g') {
+    if (g.cls === 'amr') {
+      b.appendChild(el('h4', null, 'AMR placement by tool'));
+      b.appendChild(rel.amr.length ? plainTable(['Tool', 'Placement', 'Replicon type correct', 'Record'], rel.amr.map(function (a) { return [a.tool, a.placement, a.repOk, a.record]; })) : el('p', {'class': 'pv-note'}, 'No AMR placement row matches this gene (the placement tables list genes by name and coordinates).'));
+    }
+    b.appendChild(el('h4', null, 'Tools covering it'));
+    b.appendChild(plainTable(['Tool', 'Coverage', 'Covered bp'], rel.covering.map(function (c) { return [c.tool, c.state + ' (' + Math.round(c.fraction * 100) + '%)', c.bp.toLocaleString('en-US')]; })));
+    b.appendChild(el('h4', null, 'Nearby features'));
+    b.appendChild(detailLinks(rel.nearby, function (n) { return geneLink(n.gene, ', ' + (n.dist === 0 ? 'overlaps' : n.dist.toLocaleString('en-US') + ' bp away')); }));
+    b.appendChild(el('h4', null, 'Structural events overlapping it'));
+    b.appendChild(detailLinks(rel.events, function (ev) { return el('li', null, [linkBtn(ev.type + ' (' + ev.toolLabel + ')', function () { doSelect('e', ev.i); }), el('span', {'class': 'pv-muted'}, ' at ' + ev.pos.toLocaleString('en-US') + ' bp')]); }));
+  } else if (S.sel.k === 't') {
+    var t = M.tools[S.sel.i], od = t.outcomeDetail;
+    if (od) {
+      b.appendChild(el('h4', null, 'Per-plasmid outcome'));
+      var d2 = el('dl', {'class': 'pv-dl'});
+      [['Best bin', od.bin || 'n/a'], ['Bin recall', pctText(od.recall) || 'n/a'], ['Bin precision', pctText(od.precision) || 'n/a'], ['Bins sharing this plasmid', od.bins === null ? 'n/a' : String(od.bins)],
+       ['Merged with', od.mergedWith || 'none'], ['Contamination fraction', od.contamination === null ? 'n/a' : (od.contamination * 100).toFixed(1) + '%']].forEach(function (r) { d2.appendChild(el('dt', null, r[0])); d2.appendChild(el('dd', null, r[1])); });
+      b.appendChild(d2);
+    }
+    b.appendChild(el('h4', null, 'AMR genes on this plasmid'));
+    b.appendChild(rel.amr.length ? plainTable(['Gene', 'Placement', 'Replicon type correct', 'Record'], rel.amr.map(function (a) { return [a.gene, a.placement, a.repOk, a.record]; })) : el('p', {'class': 'pv-note'}, 'No AMR placement rows for this tool and plasmid.'));
+    b.appendChild(el('h4', null, 'Structural events'));
+    b.appendChild(detailLinks(rel.events, function (ev) { return el('li', null, [linkBtn(ev.type, function () { doSelect('e', ev.i); }), el('span', {'class': 'pv-muted'}, ' at ' + ev.pos.toLocaleString('en-US') + ' bp')]); }));
+    var counts = {'fully covered': 0, 'partly covered': 0, 'not covered': 0}; rel.genes.forEach(function (x) { counts[x.state]++; });
+    b.appendChild(el('h4', null, 'Truth annotation by coverage'));
+    b.appendChild(el('p', null, counts['fully covered'] + ' fully covered, ' + counts['partly covered'] + ' partly covered, ' + counts['not covered'] + ' not covered.'));
+    var missed = rel.genes.filter(function (x) { return x.state !== 'fully covered'; }).sort(function (p, q) { return (q.gene.cls === 'amr') - (p.gene.cls === 'amr') || p.gene.start - q.gene.start; }).slice(0, 14);
+    b.appendChild(detailLinks(missed, function (x) { return geneLink(x.gene, ', ' + x.state); }));
+  } else if (S.sel.k === 'e') {
+    b.appendChild(el('h4', null, 'Features at or within 500 bp'));
+    b.appendChild(detailLinks(rel.genes, function (x) { return geneLink(x.gene, ', ' + x.state); }));
+  }
+}
+function tabAppearance(b) {
+  b.appendChild(el('h4', null, 'Palette'));
+  b.appendChild(check('Colour-blind safe palette (follows the report toggle)', function () { return S.cvd; }, function (v) { S.cvd = v; legendBuilt = ''; renderPanelIf('appearance'); draw(); }));
+  var sw = el('div', {'class': 'pv-row'});
+  C.classes.forEach(function (c) { sw.appendChild(el('span', {'class': 'pv-key'}, [swatch(c), C.labels[c]])); });
+  b.appendChild(sw);
+  b.appendChild(el('p', {'class': 'pv-note'}, 'Colour is never the only channel: strand is the arrow direction, classes are named in the legend and in every tooltip, and covered or not covered is solid versus pale with a dashed outline.'));
+  b.appendChild(el('h4', null, 'Labels and legend'));
+  b.appendChild(slider('Label size', 0.7, 1.7, 0.1, function () { return S.labelSize; }, function (v) { S.labelSize = v; draw(); savePrefs(); }, function (v) { return v.toFixed(1) + 'x'; }));
+  b.appendChild(check('Show legend and class filter', function () { return S.legend; }, function (v) { S.legend = v; draw(); savePrefs(); }));
+  b.appendChild(el('p', {'class': 'pv-note'}, 'The map keeps a white background so exported figures and prints are unchanged. The report has no dark theme.'));
+}
+function fileBase() { return ('plasbench-' + M.sample + '-' + M.plasmid).replace(/[^A-Za-z0-9._-]+/g, '_'); }
+function download(name, data, mime) {
+  var blob = data instanceof Blob ? data : new Blob([data], {type: mime}), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+}
+function exportSvg() { download(fileBase() + '.svg', PV.standaloneSvg(M, S, {maxScale: 1.5}), 'image/svg+xml'); announce('SVG downloaded'); }
+function exportPng() {
+  var text = PV.standaloneSvg(M, S, {maxScale: 1.5}), img = new Image();
+  img.onload = function () {
+    try {
+      var cv = document.createElement('canvas'); cv.width = C.W * 2; cv.height = C.H * 2;
+      var ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      cv.toBlob(function (blob) { if (blob) { download(fileBase() + '.png', blob, 'image/png'); announce('PNG downloaded'); } else { announce('PNG export failed'); } }, 'image/png');
+    } catch (e) { announce('PNG export failed'); }
+  };
+  img.onerror = function () { announce('PNG export failed'); };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+}
+function tabExport(b) {
+  b.appendChild(el('h4', null, 'Figure'));
+  b.appendChild(el('div', {'class': 'pv-row'}, [btn('Download SVG', exportSvg), btn('Download PNG', exportPng), btn('Print this map', function () { window.print(); })]));
+  b.appendChild(el('p', {'class': 'pv-note'}, 'The figure is exactly what is on screen: current zoom, rotation, layers, filters, palette and selection.'));
+  b.appendChild(el('h4', null, 'Tables (TSV)'));
+  b.appendChild(el('div', {'class': 'pv-row'}, [
+    btn('Features TSV', function () { var ids = lastFeatIds && S.tab === 'export' && featQuery ? lastFeatIds : null; download(fileBase() + '.features.tsv', PV.tsv(PV.FEATURE_COLS, PV.featureRows(M, ids)), 'text/tab-separated-values'); announce('Features TSV downloaded'); }),
+    btn('Tools TSV', function () { download(fileBase() + '.tools.tsv', PV.tsv(PV.TOOL_COLS, PV.toolRows(M)), 'text/tab-separated-values'); announce('Tools TSV downloaded'); }),
+    btn('Events TSV', function () { download(fileBase() + '.events.tsv', PV.tsv(PV.EVENT_COLS, PV.eventRows(M)), 'text/tab-separated-values'); announce('Events TSV downloaded'); })]));
+  b.appendChild(el('p', {'class': 'pv-note'}, featQuery ? 'The features table honours the text typed in the Features filter (' + (lastFeatIds ? lastFeatIds.length : M.genes.length) + ' rows).' : 'The features table has every truth feature of this plasmid; type in the Features filter first to export a subset.'));
+  b.appendChild(el('h4', null, 'Share'));
+  b.appendChild(el('div', {'class': 'pv-row'}, [btn('Copy link to this view', function () {
+    writeHash(); var url = location.href;
+    try { navigator.clipboard.writeText(url).then(function () { announce('Link copied'); }, function () { announce('Copy failed; the address bar holds the link'); }); } catch (e) { announce('Copy failed; the address bar holds the link'); }
+  })]));
+  b.appendChild(el('p', {'class': 'pv-note'}, 'The address bar keeps the sample, plasmid, selection, zoom, layers and filters, so the link reopens this exact view.'));
+}
+
+/* ---------- URL hash and loading ---------- */
+function writeHash() { try { var h = PV.encodeHash(S, M); if (location.hash !== h) { history.replaceState(null, '', h); } } catch (e) { /* file: pages may refuse */ } }
+function scheduleHash() { if (hashTimer) { clearTimeout(hashTimer); } hashTimer = setTimeout(writeHash, 250); }
+function findModel(sample, plasmid) {
+  var hit = null;
+  models.forEach(function (m) { if (!hit && m.sample === sample && m.plasmid === plasmid) { hit = m; } });
+  if (!hit) { models.forEach(function (m) { if (!hit && m.sample === sample) { hit = m; } }); }
+  return hit;
+}
+function sanitize(st, m) {
+  var names = {}; m.tools.forEach(function (t) { names[t.name] = true; });
+  if (st.toolsOn) { st.toolsOn = st.toolsOn.filter(function (n) { return names[n]; }); }
+  if (st.sel) { var pool = {g: m.genes, t: m.tools, e: m.events}[st.sel.k]; if (!pool || !pool[st.sel.i]) { st.sel = null; } }
+  if (st.hl !== null && st.hl !== undefined && !m.tools[st.hl]) { st.hl = null; }
+  return st;
+}
+function loadModel(model, st, quiet) {
+  M = model; S = sanitize(st || PV.defaultState(), model); S.sample = model.sample; S.plasmid = model.plasmid;
+  cur = null; hits = []; kbd = false; legendBuilt = ''; featQuery = ''; lastFeatIds = null; pendingZoom = 1; sortState = {}; hideTip();
+  selSample.value = model.sample;
+  selPlasmid.textContent = '';
+  models.filter(function (m) { return m.sample === model.sample; }).forEach(function (m) { selPlasmid.appendChild(el('option', {value: m.plasmid, selected: m.plasmid === model.plasmid}, m.plasmid + ' (' + m.length.toLocaleString('en-US') + ' bp)')); });
+  var nOk = model.tools.filter(function (t) { return (t.completeness || 0) >= C.COVERAGE_GOOD; }).length;
+  sumEl.textContent = model.length.toLocaleString('en-US') + ' bp, circular ' + (model.circular === null ? 'unknown' : (model.circular ? 'yes' : 'no')) + ', ' + model.genes.length + ' annotations, ' +
+    model.tools.length + ' tools (' + nOk + ' at or above ' + Math.round(C.COVERAGE_GOOD * 100) + '% complete), ' + model.events.length + ' structural events';
+  Array.prototype.forEach.call(strip.querySelectorAll('.pv-thumb'), function (b) { b.setAttribute('aria-current', String(b.getAttribute('data-id') === model.id)); });
+  renderTabs(); draw(); renderPanel(); panelBtn.setAttribute('aria-expanded', String(!main.classList.contains('pv-nopanel')));
+  if (!quiet) { announce('Showing ' + model.plasmid + ' from ' + model.sample); }
+}
+function freshState() {
+  var st = PV.defaultState();
+  if (S) { st.cvd = S.cvd; st.labelSize = S.labelSize; st.legend = S.legend; st.tab = S.tab === 'detail' ? 'layers' : S.tab; } else { st.labelSize = prefs.labelSize || 1; st.legend = prefs.legend !== false; st.tab = PV.TABS.indexOf(prefs.tab) >= 0 && prefs.tab !== 'detail' ? prefs.tab : 'layers'; }
+  return st;
+}
+function stepPlasmid(d) {
+  var i = models.indexOf(M), nxt = models[(i + d + models.length) % models.length]; loadModel(nxt, freshState());
+}
+function applyHash(first) {
+  var parsed = PV.decodeHash(location.hash);
+  if (!parsed) { return false; }
+  var model = findModel(parsed.sample || (M && M.sample) || models[0].sample, parsed.plasmid || (M && M.plasmid) || '') || models[0];
+  var st = PV.stateFromHash(parsed, model), base = freshState();
+  ['cvd', 'labelSize', 'legend', 'tab'].forEach(function (k) { if (!(k in parsed)) { st[k] = base[k]; } });
+  loadModel(model, st, first);
+  return !!parsed.sample;
+}
+var samples = [];
+models.forEach(function (m) { if (samples.indexOf(m.sample) < 0) { samples.push(m.sample); } });
+samples.forEach(function (s) { selSample.appendChild(el('option', {value: s}, s)); });
+selSample.addEventListener('change', function () { var m = findModel(selSample.value, ''); if (m) { loadModel(m, freshState()); } });
+selPlasmid.addEventListener('change', function () { var m = findModel(selSample.value, selPlasmid.value); if (m) { loadModel(m, freshState()); } });
+models.forEach(function (m) {
+  strip.appendChild(el('button', {type: 'button', 'class': 'pv-thumb', 'data-id': m.id, 'aria-label': 'Show ' + m.plasmid + ' from ' + m.sample, title: m.sample + ' / ' + m.plasmid + ', ' + m.length.toLocaleString('en-US') + ' bp',
+    onclick: function () { loadModel(m, freshState()); }}, [el('span', {'class': 'pv-thumbimg'}), el('span', null, m.plasmid), el('span', {'class': 'pv-ts'}, m.sample)]));
+});
+function paintThumbs() {
+  Array.prototype.forEach.call(strip.querySelectorAll('.pv-thumb'), function (b) {
+    var m = null; models.forEach(function (x) { if (x.id === b.getAttribute('data-id')) { m = x; } });
+    if (m) { b.querySelector('.pv-thumbimg').innerHTML = PV.thumbSvg(m, 72, S); }
+  });
+}
+/* the page own colour-blind toggle sets data-cvd on the root element; the map follows it */
+function pageCvd() { return document.documentElement.getAttribute('data-cvd') === '1' || document.documentElement.dataset.cvd === '1'; }
+try {
+  new MutationObserver(function () { var v = pageCvd(); if (S && S.cvd !== v) { S.cvd = v; legendBuilt = ''; paintThumbs(); renderPanelIf('appearance'); draw(); } }).observe(document.documentElement, {attributes: true, attributeFilter: ['data-cvd']});
+} catch (e) { /* no observer */ }
+window.addEventListener('hashchange', function () { var h = location.hash; if (h.indexOf('#plasmid-maps?') === 0) { applyHash(false); root.scrollIntoView({block: 'start'}); } });
+window.addEventListener('resize', function () { hideTip(); });
+if (prefs.panel === false) { main.classList.add('pv-nopanel'); }
+S = PV.defaultState(); S.cvd = pageCvd(); S.labelSize = prefs.labelSize || 1; S.legend = prefs.legend !== false;
+var hadHash = applyHash(true);
+if (!hadHash) { var st0 = freshState(); st0.cvd = pageCvd() || st0.cvd; loadModel(models[0], st0, true); }
+paintThumbs();
+if (hadHash) { window.setTimeout(function () { root.scrollIntoView({block: 'start'}); }, 0); }
+})();
+</script>
