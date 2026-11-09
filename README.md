@@ -2,7 +2,7 @@
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
 
-**Docs:** [FAQ](FAQ.md) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
+**Docs:** [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
 
 PlasBench is a reproducible, Ubuntu-first framework that **benchmarks how well
 plasmid-reconstruction tools recover plasmids**, using complete (long-read)
@@ -205,7 +205,8 @@ cannot match. This table states only what was verified in their repositories and
 - **No benchmark result on real data ships with PlasBench.** The bundled leaderboards come from a synthetic demo. plsMD and PlasEval
   report results on real data in their publications; PlasBench provides the instrument, and the run is still to be done.
 - **PlasEval handles repeated contigs** by pairing copies across bins (branch and bound) and has a peer-reviewed description. PlasBench's
-  re-implementation excludes shared contigs and counts them, and has not been cross-checked against the original program.
+  re-implementation excludes shared contigs and counts them. It matches the original program on best-match precision, recall and F1 and on the
+  dissimilarity where no contig repeats (`test/test_plaseval_crosscheck.py`, run against a PlasEval checkout), but not on real data.
 - **plsMD reconstructs** ordered, overlap-trimmed plasmids from references and reports copy number and mob-typing for each; PlasBench only
   evaluates such output, and its plsMD wrapper has been tested with a stand-in binary, not the real tool.
 - **GAEMR is broader as assembly QC** (contamination screening by BLAST taxonomy, gap analysis, insert sizes). PlasBench takes a few of its
@@ -214,6 +215,224 @@ cannot match. This table states only what was verified in their repositories and
   relate the plasmids in your own sample; it benchmarks the tools that do reconstruct them.
 
 See sections 7.9 and 17 of the [Scientific Guide](docs/SCIENTIFIC_GUIDE.md) for the definitions and the limits.
+
+## Evaluation framework: outcomes, metrics and endpoints
+
+A plasmid tool can fail in three separate ways: it can miss plasmid sequence (detection), it can put
+the right contigs in the wrong groups (binning), or it can produce a plasmid whose sequence or structure
+does not match the reference (sequence reconstruction). PlasBench scores each of these on its own, then
+combines them into one per-plasmid verdict, the **correct plasmid reconstruction rate (CPRR)**.
+
+| Evaluation outcome | What it measures | Recommended metrics | PlasBench columns |
+|---|---|---|---|
+| **Plasmid detection** | Whether plasmid-derived sequence and contigs are identified as plasmid | Precision, recall, F1 (base-level and contig-level); MCC | `mean_precision`, `mean_recall`, `mean_f1`, `micro_f1`, `mean_contig_f1_bp`, `mean_contig_mcc_bp` |
+| **Plasmid binning** | Whether contigs from the same plasmid are grouped together, and only with each other | Length-weighted precision, recall, F1; ARI; per-plasmid outcomes; PlasEval (external cross-check) | `ranking_score` (`lw_bin_f1`), `mean_lw_bin_f1_assembly_aware`, `mean_bin_ari`, `total_outcome_*` |
+| **Sequence reconstruction** | Whether the reconstructed plasmid sequence matches the reference | Sequence identity, aligned coverage, structural concordance (NGOC, split and merge events) | `benchmark.accuracy.tsv`, `benchmark.missing_regions.tsv`, `benchmark.ngoc.tsv` |
+| **Overall (per plasmid)** | Whether each reference plasmid was reconstructed correctly on every criterion above | **CPRR** | `cprr`, `cprr_ci_low`, `cprr_ci_high`, `<tool>.cprr.tsv` |
+
+Notation used below: *P* is the set of truth (reference) plasmids, *B* the set of bins a tool
+outputs, *L(p)* the length of truth plasmid *p*, and *m(p)* the bin matched to *p* by the optimal
+one-to-one matching (below). All base counts come from `minimap2` primary alignments with overlapping
+intervals merged, so no reference base is counted twice.
+
+### 1. Plasmid detection
+
+**Question:** of all the sequence the tool calls plasmid, how much really is, and how much of the real
+plasmid sequence did it find?
+
+**Base-level (every tool).** Each reference base is labelled `PLASMID` or `CHROMOSOME`, and the tool's
+predicted-plasmid FASTA is projected onto the reference.
+
+| Count | Definition |
+|---|---|
+| TP | plasmid reference bases covered by a prediction |
+| FP | chromosome reference bases covered by a prediction |
+| FN | plasmid reference bases not covered by any prediction |
+| TN | chromosome reference bases not covered (used only for MCC and specificity) |
+
+$$
+\text{Precision}=\frac{TP}{TP+FP}\qquad
+\text{Recall}=\frac{TP}{TP+FN}\qquad
+F_1=\frac{2\cdot\text{Precision}\cdot\text{Recall}}{\text{Precision}+\text{Recall}}
+$$
+
+$$
+\text{MCC}=\frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}}\qquad
+\text{Specificity}=\frac{\text{chromosome bp}-FP}{\text{chromosome bp}}
+$$
+
+F2 and F0.5 (`mean_f2`, `mean_f0_5`) are also reported. Values are macro-averaged (per isolate, then
+averaged, species-balanced where possible) and micro-averaged (bases pooled over all isolates); the two
+can rank tools differently, so both appear.
+
+**Contig-level (tools that classify assembly contigs).** Each assembly contig is labelled against the
+truth: plasmid or chromosome if it matches with **≥ 95% identity over ≥ 80% of its length**. Contigs
+shorter than **1 kb**, contigs matching both a plasmid and the chromosome (`AMBIGUOUS`) and unplaced
+contigs are excluded, and each excluded group is counted and reported. Precision, recall, F1 and MCC
+are then computed twice: by contig count, and weighted by contig length (`*_count`, `*_bp`).
+Implementation: `python/contig_classification.py`, cross-checked by an independent alignment-free
+scorer (`python/contig_crosscheck.py`).
+
+### 2. Plasmid binning
+
+**Question:** did the tool put each plasmid's contigs into one bin, and keep other molecules out of it?
+
+**Optimal matching.** A bin can overlap several plasmids and a plasmid can be spread across several
+bins, so precision and recall are only meaningful after each bin is paired with at most one plasmid.
+PlasBench uses a **Hungarian maximum-weight bipartite match** that maximises total aligned plasmid
+bases (`python/score_bins.py`), not a greedy overlap rule. Let *a(b, p)* be the bases of plasmid *p*
+covered by bin *b*, and *A(b)* all reference bases (chromosome, other plasmids) that bin *b* aligns to.
+
+**Length-weighted binning metrics (the reconstruction ranking endpoint).**
+
+$$
+\text{LW precision}=\frac{\sum_{p\in P} a\big(m(p),p\big)}{\sum_{b\in B} A(b)}\qquad
+\text{LW recall}=\frac{\sum_{p\in P} a\big(m(p),p\big)}{\sum_{p\in P} L(p)}\qquad
+\text{LW }F_1=\frac{2\cdot\text{LW precision}\cdot\text{LW recall}}{\text{LW precision}+\text{LW recall}}
+$$
+
+Because the weights are base pairs, a small correctly binned plasmid cannot outweigh a large
+mis-binned one. Chromosome bases, bases of other plasmids and unmatched bins all count against
+precision. An **assembly-aware** recall (`lw_bin_recall_assembly_aware`) replaces the denominator
+with the plasmid bases the assembly actually contains, so a tool is not blamed for assembly gaps.
+
+**Per-plasmid outcome states** (`<tool>.plasmid_outcomes.tsv`; thresholds pre-registered in
+`config/prereg.tsv`). The *best bin* is the bin holding most of the plasmid's bases.
+
+| Outcome | Rule |
+|---|---|
+| `missed` | best-bin recall < 0.50, or no bin at all |
+| `fragmented` | another bin also holds ≥ 20% of the plasmid |
+| `merged` | the best bin also holds ≥ 20% of another truth plasmid |
+| `fragmented_and_merged` | both of the above |
+| `perfect` | best-bin recall and precision ≥ 0.95, neither fragmented nor merged |
+| `partial` | anything else |
+
+**Descriptive agreement statistics** (never ranked): base-pair-weighted Adjusted Rand Index
+(`mean_bin_ari`), NMI, variation of information, homogeneity, completeness and V-measure, with the
+unclaimed chromosome left out. **Bin quality tiers**: *high* is ≥ 90% complete and ≤ 5% contaminated;
+*medium* is ≥ 50% complete and ≤ 10% contaminated (`benchmark.bin_quality.tsv`).
+
+**PlasEval.** PlasEval results can be imported as an external cross-check with
+`plasbench import-external-benchmark`. A first-class PlasEval adapter and repeat-aware matching are
+still open (see [What is still open](#what-is-still-open)).
+
+### 3. Sequence reconstruction
+
+**Question:** once a plasmid is found and binned, is its sequence correct, complete and in the right order?
+
+| Metric | Definition | Output |
+|---|---|---|
+| **Sequence identity** | matching bases / alignment block length over the bin's alignments to the plasmid; mismatch, insertion and deletion rates decoded from the CIGAR (the four shares of alignment columns sum to 100%) | `benchmark.accuracy.tsv` |
+| **Aligned coverage (completeness)** | *a(m(p), p) / L(p)*: the share of the reference plasmid covered by its matched bin | `<tool>.cprr.tsv` (`coverage`) |
+| **Missing regions** | count, total length and longest gap of uncovered reference sequence per plasmid | `benchmark.missing_regions.tsv` |
+| **Structural concordance (NGOC)** | share of adjacent feature pairs on the reference that are still adjacent, in the same orientation and on the same record in the reconstruction; strand- and circularity-aware | `benchmark.ngoc.tsv` |
+| **Split and merge events** | whether a plasmid is spread across bins, or shares its bin with another plasmid | outcome table above |
+| **Structural variants** | alignment-derived inversion, relocation and duplication calls (unvalidated) | `call_structural_variants.py` |
+| **Feature preservation** | per feature kind (replicon, mobility, AMR, IS, gene): full length, truncated or missed; a truncated gene does not count as recovered | `benchmark.feature_preservation.tsv` |
+
+$$
+\text{Identity}(p)=\frac{\text{matching bases}}{\text{alignment block length}}\qquad
+\text{Coverage}(p)=\frac{a\big(m(p),p\big)}{L(p)}\qquad
+\text{NGOC}=\frac{\text{conserved adjacent feature pairs}}{\text{adjacent feature pairs in the reference}}
+$$
+
+Identity is left **blank** where the reference was polished with the benchmark's own reads, because the
+truth would then carry those reads' errors (`python/mask_accuracy.py`).
+
+### Correct plasmid reconstruction rate (CPRR)
+
+$$
+\text{CPRR}=\frac{\text{Number of correctly reconstructed plasmids}}{\text{Total expected reference plasmids}}\times 100
+$$
+
+The denominator is every truth plasmid in the scored samples, including plasmids the tool missed
+entirely, so a tool cannot raise its CPRR by declining to predict. Plasmids are pooled across samples
+(a micro average), and the 95% confidence interval is a 1,000-resample **cluster bootstrap** that
+resamples independent isolate clusters, not individual plasmids (`cprr_fields` in
+`python/headline_design.py`).
+
+A plasmid counts as correctly reconstructed only when it meets **every** pre-specified criterion
+(`correct_reconstruction` in `python/score_bins.py`):
+
+| Criterion | Rule (default) | Column in `<tool>.cprr.tsv` | Option |
+|---|---|---|---|
+| **Correct plasmid identification** | the plasmid is matched to a bin by the optimal one-to-one matching | `identified` | – |
+| **Correct contig assignment, without substantial contamination** | ≥ 95% of the matched bin's aligned bases belong to this plasmid, so chromosome and other plasmids together are ≤ 5% | `share_ok` (`bin_share`) | `--cprr-min-share` |
+| **Not fragmented** | no other bin holds ≥ 10% of the plasmid | `not_split` | `--split-threshold` |
+| **Adequate reference coverage** | the matched bin covers ≥ 95% of the reference plasmid | `coverage_ok` (`coverage`) | `--cprr-min-coverage` |
+| **High sequence identity** | the matched alignments reach ≥ 99% identity; applied only where base-level comparison is valid (not for truth polished with the benchmark's own reads) | `identity_ok` (`identity`) | `--cprr-min-identity` |
+| **Correct structural organisation, including circularity where established** | *Proposed; not yet part of the CPRR verdict.* Structure is currently reported beside CPRR as NGOC, split and merge events and SV calls, and circular references as `complete_circular_plasmid_recall`, which shows the reference circle was fully covered but does not claim the tool closed it. | – | – |
+
+Each plasmid row records `correct` (all criteria) and `correct_without_identity` (all except identity).
+The aggregate uses `correct` where identity is valid for the sample and `correct_without_identity`
+where it is not, so CPRR is never penalised for errors that are in the truth rather than the tool.
+
+CPRR is defined only for tools that output bins; classification-only tools show "not bin-scored".
+Circularity is still **not** a CPRR criterion.
+
+### Pre-registered endpoints, by track
+
+The primary endpoint depends on the input track (`config/prereg.tsv`, `primary_endpoint` and
+`primary_endpoint_long_read`; `ranking_metric()` in `python/headline_design.py`):
+
+| Track and task | Primary endpoint (ranks tools) | Key secondary |
+|---|---|---|
+| Short-read reconstruction | Length-weighted binning F1 (`lw_bin_f1`) | CPRR |
+| Long-read and hybrid reconstruction | **Isolate-level CPRR** (`sample_cprr`): correct plasmids / truth plasmids per isolate, averaged over isolates | Length-weighted binning F1 |
+| Classification (any track) | Base-level F1 | – |
+
+**Why it differs by track.** Complete, single-bin recovery from short-read assemblies is rare, so a
+pass/fail endpoint would sit near zero for most tools and lose statistical power. The paired tests,
+regret and power analysis are also defined per isolate. Long-read and hybrid tools are built to close
+whole plasmids, so CPRR separates them and answers the question their users ask. Using isolate-level
+CPRR there keeps the same per-isolate bootstrap, species macro-average and paired tests.
+
+**CPRR robustness outputs** (descriptive; they never change a rank):
+
+| Output | What it shows | Where |
+|---|---|---|
+| Threshold sweep | Pooled and isolate-weighted CPRR with the coverage and bin-share criteria both set to each value from 0.80 to 0.99 (step 0.01); identification, not-split and identity unchanged | `benchmark.cprr_threshold_sweep.tsv` |
+| Sweep AUC | Normalised area under the pooled CPRR curve over 0.80-0.99, so no single cut-off decides how a tool reads | leaderboard `cprr_auc` |
+| Isolate-weighted CPRR | Mean of per-isolate rates, so an isolate with many plasmids cannot dominate | leaderboard `cprr_isolate_mean`, `cprr_isolates` |
+| Stratified CPRR | CPRR per plasmid size band, replicon, MOB type and AMR carriage, and per reference tier | `benchmark.recovery_by_replicon.tsv` (`cprr`, `n_cprr_assessed`); `benchmark.reference_tiers.tsv` (`cprr`) |
+
+## Benchmark workflow
+
+The benchmark runs as numbered stages (`scripts/run_all.sh`; run selected stages with
+`bash scripts/run_all.sh 3 4 5`, or everything with `plasbench run`). A sample that fails a stage is
+recorded and skipped, not fatal to the run.
+
+```mermaid
+flowchart TD
+    A[Cohort TSV<br/>accessions] --> S0[0 Setup<br/>check tools and databases]
+    S0 --> S1[1 Download<br/>complete reference + matched Illumina reads]
+    S1 --> S2[2 Truth<br/>label each reference sequence plasmid / chromosome]
+    S1 --> S3[3 Assemble<br/>fastp trimming + SPAdes / Unicycler]
+    S3 --> S4[4 Run tools<br/>each enabled tool + its adapter]
+    S1 -. long reads, opt-in .-> S7[7 Long-read / hybrid reconstruction<br/>Flye+MOB-recon, Plassembler, Hybracter]
+    S4 --> F[Standard predicted-plasmid FASTA<br/>and bin table per tool]
+    S7 --> F
+    S2 --> S5
+    F --> S5[5 Score<br/>minimap2 to reference; detection, binning,<br/>sequence and CPRR metrics]
+    S5 --> S6[6 Aggregate<br/>per-track leaderboards, CIs, paired tests,<br/>diagnostics, HTML report]
+    S6 --> S8[8 Operational reconstruction<br/>run the selected method on a new sample]
+```
+
+| Stage | Script | What it does | Main outputs |
+|---|---|---|---|
+| 0 Setup | `00_setup.sh` | Creates directories, checks required tools and databases, and offers to install missing ones (conda manager, tool profiles, Platon, MOB-suite and Bakta databases). | ready environment |
+| 1 Download | `01_download.sh` | Per sample, downloads the complete long-read/hybrid reference assembly with its NCBI sequence report (ground truth) and the matched Illumina reads from SRA. | `results/download_status.tsv` |
+| 2 Truth | `02_truth.sh` | Builds the truth table from the sequence report: every reference sequence labelled plasmid or chromosome. Headline uses NCBI labels (Scheme 3); other schemes are sensitivity analyses. | `truth.tsv` (`sequence_id`, `molecule_type`, `length`) |
+| 3 Assemble | `03_assemble.sh` | Quality-trims reads (fastp) and assembles them (SPAdes/Unicycler) into the shared contig set the classification tools use. | contigs; `results/assembly_status.tsv` |
+| 4 Run tools | `04_run_tools.sh` | Runs each enabled tool (mob_recon, Platon, plasmidSPAdes, gplas and others in `adapters/REGISTRY.md`); its adapter writes a standard output. | `results/<sample>/pred_<tool>.plasmid.fasta`, bin tables |
+| 7 Long-read / hybrid (optional) | `07_long_read_reconstruct.sh` | Native long-read and hybrid tools, each off by default; runs before scoring so its predictions join the same pass. Needs a cohort declaring read independence from the truth (§4.9). | long-read and hybrid predictions |
+| 5 Score | `05_score.sh` | Maps each prediction to the reference with minimap2 (primary alignments only) and computes the detection, binning, sequence-reconstruction and CPRR metrics above. | per-sample score rows, `<tool>.cprr.tsv`, `<tool>.plasmid_outcomes.tsv` |
+| 6 Aggregate | `06_aggregate.sh` | Builds one leaderboard per input track (short-read, long-read, hybrid), with bootstrap CIs, paired permutation and Wilcoxon tests (Holm-corrected), diagnostics and the HTML report. Ranks each track on its pre-registered endpoint (above). | leaderboard TSV + Markdown, `benchmark.cprr_threshold_sweep.tsv` and other `benchmark.*.tsv`, HTML report |
+| 8 Operational (separate) | `08_operational_reconstruct.sh` | For one new sample with no reference truth, runs only the method the benchmark selected; it is not scored. | reconstructed plasmids for that sample |
+
+Results are never pooled across input tracks, and a tool that crashes on a sample scores F1 = 0 there,
+so it cannot improve its rank by failing on hard isolates.
 
 ## How scoring works (at a glance)
 
@@ -374,7 +593,7 @@ Both are blank unless the matching curated truth file is supplied.
 
 **Aggregation and ranking** (`python/aggregate_results.py`)
 
-- Tools are ranked by **mean F1**, separately within each track (short-read, long-read, hybrid).
+- Tools are ranked separately within each track (short-read, long-read, hybrid), on that track's pre-registered endpoint: length-weighted binning F1 for short-read reconstruction, isolate-level CPRR for long-read and hybrid reconstruction, base-level F1 for classification (see [Pre-registered endpoints, by track](#pre-registered-endpoints-by-track)).
 - Ranking uses only plasmid-bearing samples that every tool in the track has a result
   for (`ranking_basis = shared_samples`). A tool that crashed on a sample counts as
   F1 = 0 there, so it cannot rise by failing on hard isolates.
@@ -446,7 +665,7 @@ addressed in the implementation. Repeat-aware *matching* is not implemented; rep
 ### The five dimensions
 
 Each dimension is measured, reported on its own, and shown in the HTML report. None of them changes the headline ranking
-(the length-weighted binning F1 for binning-capable tools, base-level F1 for classifiers, with CPRR as the secondary endpoint).
+(the length-weighted binning F1 for short-read binning-capable tools, isolate-level CPRR for long-read and hybrid reconstruction, base-level F1 for classifiers, with CPRR or binning F1 as the key secondary endpoint).
 
 | Dimension | Question | Status | What PlasBench reports | Script |
 |---|---|---|---|---|

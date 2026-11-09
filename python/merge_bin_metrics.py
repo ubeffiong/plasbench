@@ -32,6 +32,9 @@ FIELDS = [
     # Per-plasmid outcome counts (score_bins.py --outcomes-out).
     "outcome_perfect", "outcome_fragmented", "outcome_merged", "outcome_fragmented_and_merged",
     "outcome_partial", "outcome_missed",
+    # CPRR threshold sweep (score_bins.py): comma-separated correct counts, one per
+    # plasbench_common.CPRR_SWEEP_THRESHOLDS value.
+    "cprr_sweep_correct", "cprr_sweep_correct_without_identity",
 ]
 
 

@@ -10,7 +10,9 @@ standard", "Species balance") explains the rules; in short:
   length-weighted binning F1 (lw_bin_f1, the primary endpoint). Tools that
   only classify contigs are ranked on a separate CLASSIFICATION track by
   base-level F1 -- they are never scored zero on a binning task they do not
-  attempt.
+  attempt. On the long-read and hybrid input tracks, reconstruction tools are
+  ranked instead by isolate-level CPRR (sample_cprr), because those tools aim
+  to close whole plasmids (ranking_metric(); config/prereg.tsv).
 * Reference standard. Only reference tiers <= HEADLINE_MAX_REFERENCE_TIER
   (default 2) enter the headline; tier 3 (short-read-first or unknown
   provenance) is a sensitivity analysis. If no sample qualifies, the
@@ -35,12 +37,24 @@ from collections import defaultdict
 from fractions import Fraction
 from pathlib import Path
 
-from plasbench_common import UnionFind  # noqa: E402
+from plasbench_common import UnionFind, CPRR_SWEEP_THRESHOLDS, cprr_sweep_auc  # noqa: E402
 
 TASK_RECONSTRUCTION = "reconstruction"
 TASK_CLASSIFICATION = "classification"
 TASK_METRIC = {TASK_RECONSTRUCTION: "lw_bin_f1", TASK_CLASSIFICATION: "f1"}
-METRIC_LABEL = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level classification F1"}
+# Track-specific primary endpoint (config/prereg.tsv, primary_endpoint_long_read):
+# long-read and hybrid reconstruction tools are built to close whole plasmids, so
+# they are ranked on isolate-level CPRR. Short-read reconstruction stays on
+# lw_bin_f1, where complete recovery is rare enough that CPRR would floor out.
+TRACK_TASK_METRIC = {("long_read", TASK_RECONSTRUCTION): "sample_cprr",
+                     ("hybrid", TASK_RECONSTRUCTION): "sample_cprr"}
+METRIC_LABEL = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level classification F1",
+                "sample_cprr": "isolate-level CPRR"}
+
+
+def ranking_metric(track, task):
+    """The pre-registered ranking metric for one (analysis track, task)."""
+    return TRACK_TASK_METRIC.get((track, task), TASK_METRIC.get(task, "f1"))
 
 
 def read_rows(path):
@@ -357,26 +371,98 @@ def ranking_fields(tool, by_tool, shared, design, metric):
             "n_headline_species": len(set(strata)) if strata else 0, "n_ranking_clusters": len(set(groups))}
 
 
+def cprr_counts(row, design):
+    """(correct, total) for one score row under the identity rule; None when not bin-scored.
+
+    Where identity is not valid for the sample (truth polished with the benchmark's
+    own reads) the identity criterion is dropped, as for the pooled CPRR.
+    """
+    if row.get("cprr_plasmids") in (None, 0):
+        return None
+    valid = design.identity_valid(row["sample"]) if design else True
+    correct = row.get("cprr_correct") if valid else row.get("cprr_correct_without_identity")
+    return None if correct is None else (correct, row["cprr_plasmids"])
+
+
+def cprr_sweep_counts(row, design):
+    """Per-threshold correct counts for one row under the identity rule, or None."""
+    if row.get("cprr_plasmids") in (None, 0):
+        return None
+    valid = design.identity_valid(row["sample"]) if design else True
+    return row.get("cprr_sweep_correct") if valid else row.get("cprr_sweep_correct_without_identity")
+
+
+def attach_sample_cprr(rows, design):
+    """Set row['sample_cprr'] = correct / truth plasmids for that isolate (None if undefined).
+
+    This is the isolate-weighted CPRR unit: every isolate counts once, however many
+    plasmids it carries. It is also the ranking metric on the long-read and hybrid
+    reconstruction tracks, so it reuses the per-isolate bootstrap and paired tests.
+    """
+    for row in rows:
+        counts = cprr_counts(row, design)
+        row["sample_cprr"] = counts[0] / counts[1] if counts else None
+    return rows
+
+
 def cprr_fields(tool, rows, design):
-    """Pooled correct-plasmid-reconstruction rate with a cluster bootstrap CI."""
-    pairs, samples = [], []
+    """Pooled and isolate-weighted CPRR, cluster bootstrap CI, and threshold-sweep AUC."""
+    pairs, samples, sweeps = [], [], []
     for r in rows:
-        if r["tool"] != tool or r.get("cprr_plasmids") in (None, 0):
+        if r["tool"] != tool:
             continue
-        valid = design.identity_valid(r["sample"]) if design else True
-        correct = r.get("cprr_correct") if valid else r.get("cprr_correct_without_identity")
-        if correct is None:
+        counts = cprr_counts(r, design)
+        if counts is None:
             continue
-        pairs.append((correct, r["cprr_plasmids"]))
+        pairs.append(counts)
         samples.append(r["sample"])
+        sweeps.append((cprr_sweep_counts(r, design), counts[1]))
     total = sum(t for _, t in pairs)
     if not total:
-        return {"cprr": None, "cprr_ci_low": None, "cprr_ci_high": None, "cprr_plasmids": 0, "cprr_correct": 0}
+        return {"cprr": None, "cprr_ci_low": None, "cprr_ci_high": None, "cprr_plasmids": 0, "cprr_correct": 0,
+                "cprr_isolate_mean": None, "cprr_isolates": 0, "cprr_auc": None}
     groups = [design.cluster(s) if design else f"sample:{s}" for s in samples]
     low, high = ratio_bootstrap(pairs, groups)
     correct = sum(c for c, _ in pairs)
     return {"cprr": correct / total, "cprr_ci_low": low, "cprr_ci_high": high,
-            "cprr_plasmids": total, "cprr_correct": correct}
+            "cprr_plasmids": total, "cprr_correct": correct,
+            "cprr_isolate_mean": statistics.mean(c / t for c, t in pairs), "cprr_isolates": len(pairs),
+            "cprr_auc": cprr_sweep_auc(pooled_sweep(sweeps)["pooled"])}
+
+
+def pooled_sweep(sweeps):
+    """[(per-threshold counts or None, truth plasmids)] -> pooled and isolate-mean rates per threshold.
+
+    Rows without sweep counts (older score tables) are left out of both curves; a
+    curve with no rows at all is a list of None, so its AUC is None, never 0.
+    """
+    usable = [(counts, total) for counts, total in sweeps if counts is not None and total]
+    n = len(CPRR_SWEEP_THRESHOLDS)
+    if not usable:
+        return {"pooled": [None] * n, "isolate_mean": [None] * n, "n_isolates": 0, "n_plasmids": 0}
+    plasmids = sum(t for _, t in usable)
+    return {"pooled": [sum(c[i] for c, _ in usable) / plasmids for i in range(n)],
+            "isolate_mean": [statistics.mean(c[i] / t for c, t in usable) for i in range(n)],
+            "n_isolates": len(usable), "n_plasmids": plasmids}
+
+
+def cprr_sweep_table(track, task, rows, design):
+    """Per tool x sweep threshold: pooled and isolate-weighted CPRR (benchmark.cprr_threshold_sweep.tsv)."""
+    by_tool = defaultdict(list)
+    for r in rows:
+        counts = cprr_counts(r, design)
+        if counts is not None:
+            by_tool[r["tool"]].append((cprr_sweep_counts(r, design), counts[1]))
+    out = []
+    for tool, sweeps in sorted(by_tool.items()):
+        curve = pooled_sweep(sweeps)
+        if not curve["n_isolates"]:
+            continue
+        for i, threshold in enumerate(CPRR_SWEEP_THRESHOLDS):
+            out.append({"analysis_track": track, "task": task, "tool": tool, "threshold": f"{threshold:.2f}",
+                        "cprr": curve["pooled"][i], "cprr_isolate_mean": curve["isolate_mean"][i],
+                        "n_isolates": curve["n_isolates"], "n_plasmids": curve["n_plasmids"]})
+    return out
 
 
 def species_table(track, task, rows, metric, design, failed_samples, known_tools=None, eligible_samples=None):
@@ -406,10 +492,21 @@ def species_table(track, task, rows, metric, design, failed_samples, known_tools
 
 
 def tier_table(track, task, rows, metric, design):
-    """Per tool x reference tier: n and mean ranking metric (sensitivity)."""
-    by = defaultdict(list)
+    """Per tool x reference tier: n, mean ranking metric and pooled CPRR (sensitivity)."""
+    by, cprr = defaultdict(list), defaultdict(list)
     for r in rows:
+        key = (r["tool"], design.tier(r["sample"]) or "unrecorded")
         if r.get(metric) is not None:
-            by[(r["tool"], design.tier(r["sample"]) or "unrecorded")].append(r[metric])
+            by[key].append(r[metric])
+        counts = cprr_counts(r, design)
+        if counts is not None:
+            cprr[key].append(counts)
+
+    def pooled(pairs):
+        total = sum(t for _, t in pairs)
+        return sum(c for c, _ in pairs) / total if total else None
     return [{"analysis_track": track, "task": task, "tool": tool, "reference_tier": tier, "n_samples": len(v),
-             "mean_metric": statistics.mean(v), "metric": metric} for (tool, tier), v in sorted(by.items())]
+             "mean_metric": statistics.mean(v), "metric": metric,
+             "cprr": pooled(cprr.get((tool, tier), [])),
+             "cprr_plasmids": sum(t for _, t in cprr.get((tool, tier), []))}
+            for (tool, tier), v in sorted(by.items())]

@@ -243,7 +243,7 @@ run_baseline() {
             record_status "$SAMPLE" "$TOOL" "skipped" "" "abricate not installed"
             return 0
         fi
-        local HITS="$RDIR/${TOOL}.replicon_hits.tsv" HITS_TMP db first=1
+        local HITS="$RDIR/${TOOL}.replicon_hits.tsv" db first=1
         : > "$HITS"
         for db in $REPLICON_ABRICATE_DBS; do
             if abricate --db "$db" --threads "$THREADS" "$CONTIGS" > "$HITS.tmp" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
@@ -309,6 +309,35 @@ run_plsmd() {
             else
                 rm -f "$PRED" "$DONE"; warn "plsmd failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
+        fi
+    fi
+}
+
+# PlasBin-flow (flow-based MILP binning of an assembly graph). It needs a Gurobi licence, a gzipped GFA with dp or KC tags,
+# a contig plasmid-score file and a GC-probability file, so PlasBench does not run it: like gplas2_external it adapts the
+# tool's own output. PLASBIN_FLOW_OUTPUTS_DIR/<sample>.tsv is the output of `plasbin_flow.py -outfile`, produced from the SAME
+# assembly. A missing directory or file is a skip with the reason recorded; ids that do not belong to this assembly are
+# also a skip (an incompatible input is not the tool's failure and is never relabelled).
+run_plasbin_flow() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    tool_enabled RUN_PLASBIN_FLOW plasbin_flow || return 0
+    local TOOL="plasbin_flow" PRED="$RDIR/pred_plasbin_flow.plasmid.fasta" DONE="$RDIR/.plasbin_flow.complete"
+    local OUTFILE="${PLASBIN_FLOW_OUTPUTS_DIR:-}/${SAMPLE}.tsv"
+    if [[ -z "${PLASBIN_FLOW_OUTPUTS_DIR:-}" ]]; then
+        record_status "$SAMPLE" "$TOOL" "skipped" "" "PLASBIN_FLOW_OUTPUTS_DIR not set"
+    elif [[ ! -f "$OUTFILE" ]]; then
+        record_status "$SAMPLE" "$TOOL" "skipped" "" "PlasBin-flow output not found: $OUTFILE"
+    elif is_complete "$DONE" "$PRED"; then
+        log "  plasbin_flow: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+    else
+        rm -f "$PRED" "$DONE" "$RDIR/pred_plasbin_flow.bins.tsv"
+        log "  plasbin_flow ($SAMPLE) ..."
+        local START; START=$(profile_start)
+        if bash "$ADAPT/adapt_plasbin_flow.sh" "$OUTFILE" "$CONTIGS" "$PRED" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1; then
+            touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "PlasBin-flow output: $OUTFILE" "$(profile_elapsed "$START")"
+        else
+            rm -f "$PRED" "$DONE"; warn "plasbin_flow output does not match the assembly of $SAMPLE; skipped"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "PlasBin-flow output unusable for this assembly: see $LOG_DIR/${SAMPLE}.${TOOL}.log"
         fi
     fi
 }
@@ -640,6 +669,7 @@ process_sample() {
     local mob_recon_pid=$!
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_platon "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plsmd "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasbin_flow "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmidspades "$SAMPLE" "$RDIR" "$CONTIGS" "$T1" "$T2" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_gplas2_external "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_genomad "$SAMPLE" "$RDIR" "$CONTIGS" &
@@ -685,7 +715,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

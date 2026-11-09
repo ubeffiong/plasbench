@@ -9,7 +9,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 TMP="$(mktemp -d)"
-trap "if [ -n \"${KEEP:-}\" ]; then echo kept:$TMP; else rm -rf $TMP; fi" EXIT
+trap 'if [ -n "${KEEP:-}" ]; then echo "kept:$TMP"; else rm -rf "$TMP"; fi' EXIT
 
 mkdir -p "$TMP/bin" "$TMP/data/s1" "$TMP/config" "$TMP/db"
 touch "$TMP/db/plsdb.nhr"

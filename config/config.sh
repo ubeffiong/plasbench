@@ -677,4 +677,14 @@ export REPEAT_KMER="${REPEAT_KMER:-29}"
 export RUN_TRUTH_DEPTH_ANOMALIES="${RUN_TRUTH_DEPTH_ANOMALIES:-0}"
 export DEPTH_WINDOW_BP="${DEPTH_WINDOW_BP:-1000}"
 export DEPTH_ANOMALY_Z="${DEPTH_ANOMALY_Z:-3}"
+# PlasBin-flow (adapters/adapt_plasbin_flow.sh): adapts the tool's own output; PlasBench does not run it (it needs a Gurobi
+# licence, a gzipped GFA with dp/KC tags, a contig plasmid-score file and a GC-probability file). Off by default.
+# PLASBIN_FLOW_OUTPUTS_DIR/<sample>.tsv is the file written by `plasbin_flow.py -outfile`, made from the same assembly.
+export RUN_PLASBIN_FLOW="${RUN_PLASBIN_FLOW:-0}"
+export PLASBIN_FLOW_OUTPUTS_DIR="${PLASBIN_FLOW_OUTPUTS_DIR:-}"
+# Optional extra label evidence for the truth (all off unless set; a missing one is "not evaluated", never absent):
+#   ANNOTATION_REPLICON_DB may list several Abricate databases, comma or space separated (default plasmidfinder).
+#   ISFINDER_FASTA is a curated ISFinder IS sequence FASTA you downloaded from ISFinder under its terms (not shipped);
+#   it adds BLAST-based IS annotation beside ISEScan and feeds the repeat_rich scenario tag.
+export ISFINDER_FASTA="${ISFINDER_FASTA:-}"
 export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"

@@ -117,10 +117,14 @@ python3 "$HERE/../python/aggregate_results.py" \
     "${DESIGN_ARGS[@]}" \
     --out-prefix "$RESULTS_DIR/benchmark"
 
-# Descriptive recovery-by-replicon/MOB breakdown (python/stratify_recovery.py).
-# Never ranks tools and never alters the leaderboard; a failure only warns.
+# Descriptive recovery-by-replicon/MOB breakdown (python/stratify_recovery.py),
+# with CPRR per stratum (size, replicon, MOB, AMR carriage). Never ranks tools and
+# never alters the leaderboard; a failure only warns.
+STRATIFY_ARGS=()
+[[ -s "$RESULTS_DIR/benchmark.truth_provenance.tsv" ]] && \
+    STRATIFY_ARGS=(--truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv")
 if ! python3 "$HERE/../python/stratify_recovery.py" \
-        --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+        --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" "${STRATIFY_ARGS[@]}" \
         --out "$RESULTS_DIR/benchmark.recovery_by_replicon.tsv"; then
     warn "recovery-by-replicon breakdown failed; leaderboard is unaffected"
 fi

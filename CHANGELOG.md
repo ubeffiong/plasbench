@@ -25,7 +25,30 @@ history is lost, only the numbering is cleaner. See
 - Corrected the paired-comparison table and the overlap wording.
 - Docs: SCIENTIFIC_GUIDE 7.10, 13.3, 15, 17.4; METHODS; README. New variable `SCORECARD_MIN_SAMPLES`.
 
-<<<<<<< HEAD
+### Changed -- track-specific endpoints and CPRR robustness
+- **Long-read and hybrid reconstruction are now ranked on isolate-level CPRR** (`sample_cprr`); short-read reconstruction stays on
+  length-weighted binning F1 with CPRR as the key secondary endpoint (`headline_design.ranking_metric()`; `config/prereg.tsv`
+  `primary_endpoint`, `primary_endpoint_long_read`).
+- **CPRR threshold sweep**: `score_bins.py` writes correct counts with coverage and bin share at 0.80-0.99; new
+  `benchmark.cprr_threshold_sweep.tsv` and leaderboard `cprr_auc` (normalised area under the pooled curve).
+- **Isolate-weighted CPRR** (`cprr_isolate_mean`, `cprr_isolates`) beside the pooled rate.
+- **Stratified CPRR**: `cprr` and `n_cprr_assessed` per size band, replicon, MOB and AMR carriage in
+  `benchmark.recovery_by_replicon.tsv` (identity rule via `--truth-provenance`), and pooled CPRR per reference tier.
+- README evaluation framework and workflow sections; METHODS, PREREGISTRATION and the HTML report updated to match;
+  `test/test_cprr_robustness.py` added.
+
+### Added -- completing the plsMD, PlasEval and GAEMR follow-ups
+- **PlasBin-flow output adapter** (`RUN_PLASBIN_FLOW`, `PLASBIN_FLOW_OUTPUTS_DIR`, `adapters/adapt_plasbin_flow.sh`): adapts the tool's own output
+  (it needs a Gurobi licence, so PlasBench does not run it); a contig listed in several bins stays in the first and the rest are recorded.
+- **Cross-check against the original PlasEval** (`test/test_plaseval_crosscheck.py`, optional, `PLASEVAL_SRC`): best-match precision, recall and F1
+  agree on every case, and the normalised dissimilarity agrees on every case without repeated contigs.
+- **Optional label evidence**: several Abricate replicon databases (`ANNOTATION_REPLICON_DB`) and BLAST-based ISFinder annotation (`ISFINDER_FASTA`).
+- `env/download_plsdb.sh` now has an offline test and refuses a download that is not FASTA: the PLSDB address in plsMD's Dockerfile redirects to an HTML page.
+
+### Fixed
+- The `repeat_rich` scenario tag never fired on real annotation: it counted feature types `is` and `isescan`, while `annotate_reference.py` writes
+  `insertion_sequence`.
+
 ### Added -- lessons from plsMD, PlasEval and GAEMR
 - **plsMD wrapper** (`RUN_PLSMD`, `adapters/adapt_plsmd.sh`): an optional benchmarked reassembly tool, skipped with a recorded reason when
   its command, PLSDB index or Unicycler assembly is missing; PLSDB listed as its database for the leakage screens.
@@ -38,7 +61,6 @@ history is lost, only the numbering is cleaner. See
 - Local read pairing for `init-local --reads-dir` (`_1`, `_R1`, `_R1_001`), `env/download_plsdb.sh`, report sections for all of the above, and a README
   section on what PlasBench offers over the three projects, with where each is better.
 
-=======
 ### Added -- cross-check, ENA fallback, demo coverage
 - **Independent second scorer for the contig layer** (`contig_crosscheck.py`): alignment-free k-mer
   labels and separately written metrics; per-run agreement table, report and validity statement.
@@ -46,7 +68,6 @@ history is lost, only the numbering is cleaner. See
   example an old SRA Toolkit failing TLS), the same run is fetched from ENA and MD5-verified.
 - The demo now has a synthetic assembly, so the contig layer, the cross-check, assembly statistics and
   the QC-gate warnings render with real values.
->>>>>>> origin/main
 
 ### Added -- scoring specification and panel examination
 - **Pre-registration** (`config/prereg.tsv`, `freeze_prereg.py`): freeze/verify a SHA-256 lock; the
