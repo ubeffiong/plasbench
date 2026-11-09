@@ -421,23 +421,23 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E10 | Pipeline default MAPQ is 20 | `config/config.sh:502` | `MIN_ALIGNMENT_MAPQ` |
 | E11 | Pipeline default query coverage is 0.20 | `config/config.sh:503` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
 | E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:800` | `0.99995` |
-| E13 | Bin purity gate default 0.9 | `python/score_bins.py:387` | `--min-bin-purity` |
-| E14 | Split threshold default 0.1 | `python/score_bins.py:388` | `--split-threshold` |
+| E13 | Bin purity gate default 0.9 | `python/score_bins.py:404` | `--min-bin-purity` |
+| E14 | Split threshold default 0.1 | `python/score_bins.py:405` | `--split-threshold` |
 | E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:342` | `def length_weighted_binning` |
 | E16 | Ungated one-to-one Hungarian match | `python/score_bins.py:297` | `def maximum_weight` |
 | E17 | CPRR is computed after the match | `python/score_bins.py:354` | `def correct_reconstruction` |
 | E18 | CPRR minimum coverage 0.95 | `config/config.sh:50` | `CPRR_MIN_COVERAGE` |
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:52` | `CPRR_MIN_IDENTITY` |
-| E20 | Interval requires at least five clusters | `python/aggregate_results.py:660` | `len(values) < 5 or len(units) < 5` |
-| E21 | Permutation test requires at least five clusters | `python/aggregate_results.py:676` | `len(differences) < 5 or len(units) < 5` |
-| E22 | Holm adjustment across pairs | `python/aggregate_results.py:697` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:834` | `def attach_significance` |
-| E24 | Percentile cluster bootstrap | `python/aggregate_results.py:651` | `def bootstrap_ci` |
+| E20 | Interval requires at least five clusters | `python/aggregate_results.py:679` | `len(values) < 5 or len(units) < 5` |
+| E21 | Permutation test requires at least five clusters | `python/aggregate_results.py:695` | `len(differences) < 5 or len(units) < 5` |
+| E22 | Holm adjustment across pairs | `python/aggregate_results.py:716` | `def holm_adjust` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:853` | `def attach_significance` |
+| E24 | Percentile cluster bootstrap | `python/aggregate_results.py:670` | `def bootstrap_ci` |
 | E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:78` | `def sample_clusters` |
-| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:84` | `UnionFind()` |
-| E27 | Headline falls back to all samples when no sample reaches the tiers | `python/headline_design.py:125` | `FALLBACK: no sample in reference tiers` |
-| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:64` | `min_species_clusters=20` |
-| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:304` | `def shared_values` |
+| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:98` | `UnionFind()` |
+| E27 | Headline falls back to all samples when no sample reaches the tiers | `python/headline_design.py:139` | `FALLBACK: no sample in reference tiers` |
+| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:78` | `min_species_clusters=20` |
+| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:318` | `def shared_values` |
 | E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:196` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:153` | `--min-long-read-depth` |
