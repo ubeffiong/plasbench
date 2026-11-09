@@ -180,10 +180,10 @@ def main():
     allgrouped = {i for g in rw._G.values() for i in g.split()}
     check("group table has no id in two groups",
           sum(len(g.split()) for g in rw._G.values()) == len(allgrouped))
-    page2 = rw.finish(stub("summary", "leaderboard", "recommendations", "scorecard", "workflow", "plasmid-maps"))
+    page2 = rw.finish(stub("summary", "leaderboard", "recommendations", "scorecard", "plasmid-maps"))
     order = re.findall(r"<section id='([a-z-]+)'", page2)
-    check("scorecard, maps and workflow move up behind the leaderboard",
-          order == ["summary", "leaderboard", "scorecard", "plasmid-maps", "workflow", "recommendations"], order)
+    check("scorecard and maps move up behind the leaderboard",
+          order == ["summary", "leaderboard", "scorecard", "plasmid-maps", "recommendations"], order)
 
     print("overlap wording")
     check("no reference database: every screen row says so",

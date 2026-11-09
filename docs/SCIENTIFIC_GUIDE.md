@@ -609,7 +609,6 @@ A single self-contained file. Its main sections are: Summary (report card and "s
 
 - a **weighted scorecard** (with its definitions and a per-scenario view; section 7.10) and a column-group switch for the scores table;
 - **circular plasmid maps**, one per truth plasmid per sample: rings from the outside are a kb scale, truth genes on the forward and reverse strand, features of unknown strand (replicon, mobility, insertion sequences, AMR), one ring per tool (filled where truth bases are covered, pale and dashed where not, black ticks for structural events), GC content and GC skew. At most `MAP_MAX_TOOLS` (8) tools are drawn and plasmids longer than `MAP_MAX_BP` (600,000 bp) are not drawn;
-- a **workflow figure** whose boxes carry what ran in this results directory (sample count, tool runs by status, and for each scoring layer whether it exists, with a row count, or "Not run");
 - a **per-plasmid detail section**, an **assembly-quality section** and a **depth strip**;
 - a **data inventory** appendix ("Data in this report") listing every output file the pipeline wrote and where the report shows it, so nothing is silently missing;
 - **grouped, collapsible navigation**, and links to `leaderboard.md` and `scoring_spec.md`;

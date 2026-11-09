@@ -1,118 +1,89 @@
 #!/usr/bin/env python3
 """
-The Workflow section: a data-driven pipeline figure that documents what ran.
+The workflow figure lives in the README, not in the HTML report.
 
-Hand-built directory (no pipeline needed):
-  tool_status.tsv has completed 3, reused 1, failed 2, skipped 1, infrastructure_failure 1  -> the figure says exactly those
-  samples.tsv has 4 samples                                                                 -> "4 samples"
-  scores.tsv has 6 rows with contig and bin columns                                          -> reference/contig/bin layers filled
-  benchmark.copy_number.tsv (2 rows) exists, benchmark.amr_placement.tsv does not           -> copy number filled, AMR 'Not run' dashed
-No results directory at all: the figure still renders and every layer says Not run.
+  - render_svg() is well-formed XML, scales through its viewBox, has a title and a description, and every box of the figure
+    (2 input boxes + 6 truth steps, 1 assembly box + 5 tool groups, 6 scoring layers, 3 statistics boxes, 1 output box
+    = 24 boxes) carries its name, so the figure reads without colour;
+  - every stage family in the legend is used by at least one box, and no coordinate is NaN or infinite;
+  - docs/images/workflow.svg is exactly what the generator draws (a stale committed file fails here), and --check says so;
+  - the README embeds that image with alt text;
+  - the HTML report builder no longer has a Workflow section: no `report_workflow` import in build_html_report.py, and the
+    report modules do not mention a `workflow` section id.
 """
-
-import csv
 import os
 import re
+import subprocess
 import sys
-import tempfile
 import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "python"))
+ROOT = os.path.join(HERE, "..")
+sys.path.insert(0, os.path.join(ROOT, "python"))
 
 import report_workflow as wf  # noqa: E402
 
-TAB = chr(9)
-PAGE = ("<main><nav><a href='#recommendations'>Recommendations</a></nav><section id='leaderboard'>x</section>"
-        "<section id='recommendations'>x</section></main>")
-
-
-def write(path, header, rows):
-    with open(path, "w", newline="", encoding="utf-8") as handle:
-        w = csv.writer(handle, delimiter=TAB, lineterminator=chr(10))
-        w.writerow(header)
-        w.writerows(rows)
-
-
-def texts(svg):
-    root = ET.fromstring(svg)
-    return ["".join(t.itertext()) for t in root.iter("{http://www.w3.org/2000/svg}text")], root
-
-
-def build(tmp):
-    write(os.path.join(tmp, "samples.tsv"), ["sample_id", "organism"], [[f"s{i}", "E. coli"] for i in range(4)])
-    status = ([["s0", f"tool{i}", "completed"] for i in range(3)] + [["s1", "tool_r", "reused"]]
-              + [["s1", "tool_f", "failed"], ["s2", "tool_f", "failed"], ["s2", "baseline_x", "skipped"],
-                 ["s3", "plsmd", "infrastructure_failure"]])
-    write(os.path.join(tmp, "tool_status.tsv"), ["sample", "tool", "status"], status)
-    write(os.path.join(tmp, "scores.tsv"), ["sample", "tool", "f1", "contig_classification_status", "bin_f1", "bestmatch_status"],
-          [[f"s{i}", "tool0", "0.5", "ok", "0.4", "ok"] for i in range(6)])
-    write(os.path.join(tmp, "benchmark.copy_number.tsv"), ["sample", "tool"], [["s0", "t"], ["s1", "t"]])
+FIGURE = os.path.join(ROOT, "docs", "images", "workflow.svg")
 
 
 def main():
     ok = True
 
-    def check(label, condition):
+    def check(label, condition, detail=""):
         nonlocal ok
         ok &= bool(condition)
-        print(f"  {'PASS' if condition else 'FAIL'}: {label}")
+        print(f"  {'PASS' if condition else 'FAIL'}: {label}" + (f"  {detail}" if detail and not condition else ""))
 
-    print("a hand-built results directory")
-    with tempfile.TemporaryDirectory() as tmp:
-        build(tmp)
-        model = wf.build_model(tmp, os.path.join(tmp, "scores.tsv"))
-        c = model["tool_counts"]
-        check("status counts equal tool_status.tsv", (c["completed"], c["reused"], c["failed"], c["skipped"], c["infrastructure_failure"]) == (3, 1, 2, 1, 1))
-        check("sample count is 4", model["n_samples"] == 4)
-        svg = wf.render_svg(model)
-        words, root = texts(svg)
-        check("figure is well-formed XML with a viewBox and no fixed size", root.get("viewBox") and root.get("width") is None)
-        joined = " ".join(words)
-        check("figure prints the status counts",
-              "completed 3, reused 1, failed 2, skipped 1, infrastructure failure 1" in " ".join(words))
-        check("figure prints 4 samples", "4 samples" in joined)
-        for stage in ("Isolate short reads", "Complete reference genome", "Truth construction", "Evidence labels", "Reference tiers",
-                      "Labelling schemes", "Dimer check", "Repeat content", "Depth anomalies", "Short-read assembly", "Binning",
-                      "Reassembly", "Classifiers", "Trivial baselines", "Optional adapters", "Reference-base", "Contig-level",
-                      "Bin-level", "AMR placement", "Copy number", "Assembly adequacy", "Cluster bootstrap", "Rank robustness",
-                      "Database leakage", "Recommendation and report"):
-            check(f"box for {stage}", stage in joined)
-        check("copy number has a filled box with 2 rows", "2 rows" in joined)
-        check("AMR placement is absent, so Not run appears", "Not run" in joined)
-        # the AMR layer box: its dashed rect precedes the title text; count dashed boxes vs 'Not run' texts
-        dashed = svg.count("wf-notrun")
-        check("dashed boxes carry the words Not run (or none recorded / no truth table)", dashed >= 1 and sum(("Not run" in w or w.startswith("none") or w.startswith("no ")) for w in words) >= dashed)
-        check("plsMD run lands in the optional adapters box", model["by_class"].get("adapter", {}).get("runs") == 1)
-        check("filled and dashed boxes both present", "wf-ran" in svg and "wf-notrun" in svg and "stroke-dasharray" in svg)
-        check("no text smaller than 10 px", all(float(m) >= 10 for m in re.findall(r"font-size='([0-9.]+)'", svg)))
+    svg = wf.render_svg()
+    print("the figure")
+    try:
+        root = ET.fromstring(svg)
+        parsed = True
+    except ET.ParseError:
+        root, parsed = None, False
+    check("well-formed XML", parsed)
+    if not parsed:
+        sys.exit(1)
+    ns = "{http://www.w3.org/2000/svg}"
+    check("scales through a viewBox, with no fixed width", root.get("viewBox") == "0 0 1000 700" and root.get("width") is None)
+    check("has a title and a description for screen readers", root.find(ns + "title") is not None and root.find(ns + "desc") is not None)
+    boxes = [e for e in root.iter(ns + "rect") if e.get("class") == "wf-box"]
+    check("24 boxes", len(boxes) == 24, len(boxes))
+    text = " ".join("".join(t.itertext()) for t in root.iter(ns + "text"))
+    names = ([n for n, _ in wf.TRUTH_STEPS] + [n for n, _ in wf.TOOL_GROUPS] + [n for n, _ in wf.SCORING_LAYERS]
+             + ["Isolate short reads", "Complete reference genome", "Short-read assembly", "Rank robustness", "Recommendation and report"])
+    missing = [n for n in names if n.split()[0] not in text]
+    check("every box name appears as text", not missing, missing)
+    used = {e.get("stroke") for e in boxes}
+    check("every stage family is used by a box", all(f[1] in used for f in wf.FAMILIES.values()))
+    check("no NaN or infinity in any coordinate", not re.search(r"[=, ](-?nan|-?inf)[' ,]", svg))
+    check("deterministic", wf.render_svg() == svg)
 
-        section = str(wf.render_workflow(model, known_section_ids={"leaderboard", "samples"}))
-        check("section id is workflow", "<section id='workflow'" in section)
-        links = set(re.findall(r"href='#([^']+)'", section))
-        check("links only go to known ids", links and links <= {"leaderboard", "samples"})
-        check("tools row links to the leaderboard", "href='#leaderboard'" in section)
-        check("a stage without a known section carries no link", "href='#amr-placement'" not in section)
+    print("the committed file and the README")
+    exists = os.path.isfile(FIGURE)
+    check("docs/images/workflow.svg exists", exists)
+    if exists:
+        with open(FIGURE, encoding="utf-8", newline="") as handle:
+            check("it is exactly what the generator draws", handle.read() == svg + "\n")
+        done = subprocess.run([sys.executable, os.path.join(ROOT, "python", "report_workflow.py"), "--check", FIGURE],
+                              capture_output=True, text=True)
+        check("--check passes on the committed file", done.returncode == 0, done.stderr)
+    stale = os.path.join(os.environ.get("TMPDIR", os.environ.get("TEMP", ".")), "plasbench_stale_workflow.svg")
+    with open(stale, "w", encoding="utf-8") as handle:
+        handle.write("<svg/>")
+    done = subprocess.run([sys.executable, os.path.join(ROOT, "python", "report_workflow.py"), "--check", stale], capture_output=True, text=True)
+    os.remove(stale)
+    check("--check fails on a stale file and says how to regenerate it", done.returncode == 1 and "--out" in done.stderr)
+    with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as handle:
+        readme = handle.read()
+    check("the README embeds the figure with alt text", "docs/images/workflow.svg" in readme and 'alt="PlasBench workflow' in readme)
 
-        page = wf.inject(PAGE, tmp, os.path.join(tmp, "scores.tsv"))
-        check("injected before Recommendations", page.index("id='workflow'") < page.index("id='recommendations'"))
-        check("nav link added", "href='#workflow'>Workflow</a>" in page)
-        check("page links to the sections already in it only", set(re.findall(r"href='#([^']+)'", page)) <=
-              {"leaderboard", "recommendations", "workflow"})
-        check("injecting twice adds one section", wf.inject(page, tmp, os.path.join(tmp, "scores.tsv")).count("id='workflow'") == 1)
-
-    print("no results directory")
-    for missing in (None, os.path.join(tempfile.gettempdir(), "plasbench-no-such-dir-xyz")):
-        model = wf.build_model(missing, None)
-        svg = wf.render_svg(model)
-        words, _ = texts(svg)
-        check("renders well-formed", words)
-        check("every scoring layer is Not run", all(not v["present"] for v in model["layers"].values()))
-        check("no 'ran' boxes among layers or statistics", all(not v["present"] for v in model["stats"].values()))
-        check("Not run is shown", "Not run" in words)
-        section = str(wf.render_workflow(model))
-        check("no links at all by default", "href=" not in section)
-        check("page injection still works", "id='workflow'" in wf.inject(PAGE, missing, None))
+    print("the report no longer has a Workflow section")
+    with open(os.path.join(ROOT, "python", "build_html_report.py"), encoding="utf-8") as handle:
+        builder = handle.read()
+    check("build_html_report.py does not use report_workflow", "report_workflow" not in builder.replace("python/report_workflow.py", ""))
+    wiring = open(os.path.join(ROOT, "python", "report_wiring.py"), encoding="utf-8").read()
+    check("the navigation groups do not list a workflow section", '"workflow"' not in wiring and " workflow " not in wiring)
 
     print()
     if not ok:

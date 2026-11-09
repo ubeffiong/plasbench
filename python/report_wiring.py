@@ -444,7 +444,7 @@ NAV_GROUP_ORDER = ["Results", "Scorecard and maps", "Evidence and quality", "Rec
 _G = {
     "Results": "summary metadata insights chart leaderboard robustness scores statistics stratified scenarios enterprise selected "
                "tools samples",
-    "Scorecard and maps": "scorecard scorecard-definitions scorecard-scenarios plasmid-maps workflow per-plasmid-detail "
+    "Scorecard and maps": "scorecard scorecard-definitions scorecard-scenarios plasmid-maps per-plasmid-detail "
                           "plasmid-outcomes bin-diagnostics bin-quality graded-tiers replicon-recovery zero-plasmid contig-layer "
                           "amr-placement learn-agreement learn-copynumber accuracy-dimension feature-preservation",
     "Evidence and quality": "database-membership baselines-calibration excluded-replicons label-schemes validity learn-adequacy "
@@ -524,7 +524,7 @@ def inject(page, results_dir, data_dir=None, scores_path=None):
 
 
 def finish(page):
-    """After every section exists: move the scorecard, maps and workflow up, then group the navigation."""
-    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps", "workflow"],
+    """After every section exists: move the scorecard and maps up, then group the navigation."""
+    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps"],
                       ["robustness", "leaderboard"])
     return group_navigation(page)
