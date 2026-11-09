@@ -135,8 +135,92 @@ profile_exec_in_dir() {
     return "$rc"
 }
 
+# -------- result reuse --------
+# A finished tool run leaves .<tool>.complete holding a FINGERPRINT of everything
+# that decides its output: the PlasBench version and adapter, the tool's installed
+# executable (path, size, mtime; never run to ask), its database registry row, its <TOOL>_* settings (thread
+# counts excluded: they do not change results) and the input files. A later run
+# reuses the result only when the fingerprint is unchanged, so upgrading a tool or
+# its database, changing a parameter or re-assembling re-runs that tool instead of
+# silently reusing stale predictions. Bash dynamic scoping: TOOL, CONTIGS and the
+# optional T1, T2, OUTFILE, CLASSIFIER are the caller's (run_<tool>) locals.
+declare -A TOOL_EXECUTABLE=(
+    [mob_recon]=mob_recon [gplas2_mob]=gplas [gplas2_external]=gplas [platon]=platon
+    [plasmidspades]=plasmidspades.py [genomad]=genomad [plasme]=PLASMe.py [rfplasmid]=rfplasmid
+    [plasmidhunter]=plasmidhunter [plasmer]=Plasmer [plascope]=plaScope.sh
+    [plasgraph2]=plASgraph2_classify.py
+)
+# Identity of a tool's executable without running it: resolved path, size and
+# modification time. Upgrading or reinstalling a tool rewrites its entry point (conda
+# and pip regenerate the console-script shim), so this changes with the installed
+# version. Running `<tool> --version` instead would execute every tool before deciding
+# whether to run it, and a tool that does not parse that flag could start a real run.
+# The exact version strings are recorded separately in the run manifest.
+executable_identity() {
+    local exe="$1" path
+    [[ -n "$exe" ]] || { printf 'none'; return; }
+    path="$(command -v "$exe" 2>/dev/null)" || { printf 'unavailable'; return; }
+    path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+    printf '%s %s' "$path" "$(stat -c '%s:%Y' "$path" 2>/dev/null || printf 'unknown')"
+}
+
+file_digest() {
+    [[ -n "${1:-}" && -f "$1" ]] || { printf 'none'; return; }
+    sha256sum "$1" | cut -d' ' -f1
+}
+
+tool_fingerprint() {
+    local upper exe adapter params
+    upper="$(printf '%s' "$TOOL" | tr '[:lower:]' '[:upper:]')"
+    exe="${TOOL_EXECUTABLE[$TOOL]:-}"
+    [[ "$TOOL" == "plsmd" ]] && exe="${PLSMD_CMD:-}"
+    case "$TOOL" in
+        baseline_*) adapter="$PROJECT_ROOT/python/baseline_predictors.py" ;;
+        gplas2_*) adapter="$PROJECT_ROOT/adapters/adapt_gplas.sh" ;;
+        *) adapter="$PROJECT_ROOT/adapters/adapt_${TOOL}.sh" ;;
+    esac
+    # `|| true`: a tool with no <TOOL>_* settings makes grep exit 1, which under
+    # `set -euo pipefail` must not abort the stage.
+    params="$( { env | grep "^${upper}_" | grep -v "^${upper}_THREADS=" | LC_ALL=C sort | tr '\n' ';'; } || true)"
+    printf 'plasbench_fingerprint=1\n'
+    printf 'tool=%s\n' "$TOOL"
+    printf 'plasbench=%s\n' "$(sed -n 's/^__version__ *= *["'"'"']\([^"'"'"']*\).*/\1/p' "$PROJECT_ROOT/plasbench/__init__.py" 2>/dev/null)"
+    printf 'adapter=%s\n' "$(file_digest "$adapter")"
+    printf 'executable=%s %s\n' "${exe:-none}" "$(executable_identity "$exe")"
+    printf 'database=%s\n' "$(awk -F'\t' -v t="$TOOL" '$1 == t {print $2 "|" $3 "|" $4}' \
+        "$PROJECT_ROOT/config/tool_database_releases.tsv" 2>/dev/null)"
+    printf 'params=%s\n' "$params"
+    printf 'contigs=%s\n' "$(file_digest "${CONTIGS:-}")"
+    printf 'outfile=%s\n' "$(file_digest "${OUTFILE:-}")"
+    printf 'classifier=%s\n' "$(file_digest "${CLASSIFIER:-}")"
+    local reads="" r
+    for r in "${T1:-}" "${T2:-}"; do
+        [[ -n "$r" && -f "$r" ]] && reads+="$(stat -c '%s:%Y' "$r");"
+    done
+    printf 'reads=%s\n' "$reads"
+}
+
 is_complete() {
-    [[ -e "$1" && -f "$2" && "${FORCE_RERUN_TOOLS:-0}" -ne 1 ]]
+    [[ -e "$1" && -f "$2" && "${FORCE_RERUN_TOOLS:-0}" -ne 1 ]] || return 1
+    if [[ ! -s "$1" ]]; then
+        # Marker from a release before fingerprints: its inputs cannot be checked.
+        if [[ "${REUSE_UNFINGERPRINTED:-0}" -eq 1 ]]; then
+            warn "  $TOOL: reusing a result with no fingerprint (REUSE_UNFINGERPRINTED=1); its inputs were not checked"
+            return 0
+        fi
+        log "  $TOOL: earlier result has no fingerprint; re-running (REUSE_UNFINGERPRINTED=1 reuses it unchecked)"
+        return 1
+    fi
+    if [[ "$(cat "$1")" == "$(tool_fingerprint)" ]]; then
+        return 0
+    fi
+    log "  $TOOL: version, database, parameters or inputs changed since the last run; re-running"
+    return 1
+}
+
+# Record a finished run (replaces a bare `touch` of the marker).
+mark_complete() {
+    tool_fingerprint > "$1"
 }
 
 # When ONLY_TOOL is unset (the default), behaves exactly like the plain
@@ -176,7 +260,7 @@ run_mob_recon() {
             local START; START=$(profile_start)
             if profile_exec mob_recon --infile "$CONTIGS" --outdir "$OUT" --num_threads "$MOB_RECON_THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_mob_recon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "mob_recon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -206,7 +290,7 @@ run_gplas2_mob() {
                 --out "$CLASSIFIER" --provenance "$PROVENANCE" --min-contig-length "$GPLAS2_MIN_CONTIG_LENGTH" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 profile_exec_in_dir "$OUT" gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" >> "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_gplas.sh" "$OUT/results" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "MOB hard-label classifier provenance: $PROVENANCE" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "MOB hard-label classifier provenance: $PROVENANCE" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -268,7 +352,7 @@ run_baseline() {
     local status=0
     python3 "$HERE/../python/baseline_predictors.py" "${ARGS[@]}" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 || status=$?
     if [[ "$status" -eq 0 ]]; then
-        touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "trivial baseline" "$(profile_elapsed "$START")"
+        mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "trivial baseline" "$(profile_elapsed "$START")"
     elif [[ "$status" -eq 3 ]]; then
         rm -f "$PRED"; record_status "$SAMPLE" "$TOOL" "skipped" "" "baseline not applicable: see $LOG_DIR/${SAMPLE}.${TOOL}.log"
     else
@@ -305,7 +389,7 @@ run_plsmd() {
             if profile_exec "$PLSMD_CMD" --preprocessing --input fasta --dir "$OUT/input" --output "$OUT/preprocessing" --threads "$PLSMD_THREADS" --db "$PLSMD_DB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 profile_exec "$PLSMD_CMD" --processing --dir "$OUT/preprocessing" --output "$OUT/processing" >> "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plsmd.sh" "$OUT/processing" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLSMD_DB" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLSMD_DB" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plsmd failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -334,7 +418,7 @@ run_plasbin_flow() {
         log "  plasbin_flow ($SAMPLE) ..."
         local START; START=$(profile_start)
         if bash "$ADAPT/adapt_plasbin_flow.sh" "$OUTFILE" "$CONTIGS" "$PRED" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1; then
-            touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "PlasBin-flow output: $OUTFILE" "$(profile_elapsed "$START")"
+            mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "PlasBin-flow output: $OUTFILE" "$(profile_elapsed "$START")"
         else
             rm -f "$PRED" "$DONE"; warn "plasbin_flow output does not match the assembly of $SAMPLE; skipped"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "PlasBin-flow output unusable for this assembly: see $LOG_DIR/${SAMPLE}.${TOOL}.log"
@@ -354,7 +438,7 @@ run_platon() {
             local START; START=$(profile_start)
             if profile_exec platon --db "$PLATON_DB" --threads "$PLATON_THREADS" --output "$OUT" --prefix "$SAMPLE" "$CONTIGS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_platon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "platon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -377,7 +461,7 @@ run_plasmidspades() {
             local START; START=$(profile_start)
             if profile_exec plasmidspades.py -1 "$T1" -2 "$T2" -o "$OUT" --threads "$PLASMIDSPADES_THREADS" --memory "$PLASMIDSPADES_MEMORY_GB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plasmidspades.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasmidSPAdes failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -406,7 +490,7 @@ run_gplas2_external() {
             if python3 "$HERE/../python/validate_gplas_classifier.py" --graph "$GRAPH" --classifier "$CLASSIFIER" --min-contig-length "$GPLAS2_MIN_CONTIG_LENGTH" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 profile_exec_in_dir "$OUT" gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" >> "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_gplas.sh" "$OUT/results" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "external classifier TSV: $CLASSIFIER" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "external classifier TSV: $CLASSIFIER" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -429,7 +513,7 @@ run_genomad() {
             local START; START=$(profile_start)
             if profile_exec genomad end-to-end --threads "$GENOMAD_THREADS" "$CONTIGS" "$OUT" "$GENOMAD_DB/genomad_db" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_genomad.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "genomad failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -453,7 +537,7 @@ run_plasme() {
             if profile_exec PLASMe.py "$CONTIGS" "$OUT/plasme_output.fasta" -d "$PLASME_DB" \
                     -p "$PLASME_PROBABILITY" -t "$PLASME_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plasme.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasme failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -486,7 +570,7 @@ run_rfplasmid() {
             if profile_exec rfplasmid --species "$RFPLASMID_SPECIES" --input "$STAGE" --out "$OUT" \
                     --threads "$RFPLASMID_THREADS" "${jelly_flag[@]}" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_rfplasmid.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "rfplasmid failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -511,7 +595,7 @@ run_plasmidhunter() {
             local START; START=$(profile_start)
             if profile_exec plasmidhunter -i "$CONTIGS" -o "$OUT" -c "$PLASMIDHUNTER_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plasmidhunter.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasmidhunter failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -544,7 +628,7 @@ run_plasmer() {
             if profile_exec Plasmer -g "$CONTIGS" -p "$SAMPLE" -d "$PLASMER_DB" -t "$PLASMER_THREADS" \
                     -m "$PLASMER_MIN_LENGTH" -l "$PLASMER_LENGTH" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plasmer.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLASMER_DB" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLASMER_DB" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasmer failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -584,7 +668,7 @@ run_plascope() {
                     --db_dir "$(dirname "$db")" --db_name "$(basename "$db")" -t "$PLASCOPE_THREADS" \
                     > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plascope.sh" "$OUT/${SAMPLE}_PlaScope" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $db" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $db" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi
@@ -619,7 +703,7 @@ run_plasgraph2() {
             [[ "$PLASGRAPH2_CPU_ONLY" == "1" ]] && export CUDA_VISIBLE_DEVICES=""
             if profile_exec plASgraph2_classify.py gfa "$GRAPH_GZ" "$PLASGRAPH2_MODEL_DIR" "$CSV" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 bash "$ADAPT/adapt_plasgraph2.sh" "$CSV" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
-                touch "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
             fi

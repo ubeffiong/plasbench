@@ -42,8 +42,16 @@ from plasbench_common import merge_intervals as merge  # noqa: E402
 SEPARATOR = "__plasbench_window__"
 
 
+from plasbench_common import iter_fasta, open_maybe_gz  # noqa: E402
+
+
 def open_text(path):
-    return gzip.open(path, "rt") if path.endswith(".gz") else open(path)
+    return open_maybe_gz(path, "rt")
+
+
+def read_fasta(path):
+    for name, _, seq in iter_fasta(path):
+        yield name, seq
 
 
 def read_truth(path):
@@ -62,23 +70,6 @@ def read_truth(path):
         sys.exit(f"ERROR: sequence id '{clashes[0]}' contains the reserved window "
                  f"separator '{SEPARATOR}'; rename it before computing scorable truth.")
     return truth
-
-
-def read_fasta(path):
-    name, chunks = None, []
-    with open_text(path) as handle:
-        for raw in handle:
-            line = raw.strip()
-            if not line:
-                continue
-            if line.startswith(">"):
-                if name is not None:
-                    yield name, "".join(chunks)
-                name, chunks = line[1:].split()[0], []
-            else:
-                chunks.append(line)
-    if name is not None:
-        yield name, "".join(chunks)
 
 
 def window_starts(length, window, step):

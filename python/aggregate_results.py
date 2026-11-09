@@ -32,8 +32,11 @@ from collections import defaultdict
 from pathlib import Path
 
 import headline_design as hd
-
-fast_mean = hd.exact_mean  # bit-identical to statistics.mean, faster (see headline_design.exact_mean)
+# Resampling primitives (resampling.py); re-exported because validate_recommendations.py
+# and the tests import bootstrap_ci / paired_permutation_pvalue from this module.
+from resampling import (  # noqa: E402,F401
+    bootstrap_ci, paired_permutation_pvalue, resampling_units, exact_mean as fast_mean,
+)
 
 # Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
 # parent_sample_id column, so a copied ladder sheet still cannot be ranked.
@@ -611,22 +614,6 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
     return summary
 
 
-def resampling_units(values, groups=None):
-    """Group values into independent resampling units (clusters).
-
-    Without groups every value is its own unit, which reproduces plain
-    per-sample resampling exactly (same RNG draws, same results).
-    """
-    if groups is None:
-        return [[value] for value in values]
-    if len(groups) != len(values):
-        raise ValueError("groups must align one-to-one with values")
-    units = {}
-    for value, group in zip(values, groups):
-        units.setdefault(group, []).append(value)
-    return list(units.values())
-
-
 def overlap_summary(tool, rows, overlap):
     if not overlap:
         return {"n_possible_db_overlap": None, "n_after_database": None, "mean_f1_after_database": None,
@@ -665,52 +652,6 @@ LEAKAGE_UNASSESSED_NOTE = (
     "score contigs against a plasmid database or a model trained on one may have seen the truth "
     "genomes, so their F1 can be inflated relative to new isolates. Treat their ranking as "
     "provisional until the dates are filled in and the screen is re-run.")
-
-
-def bootstrap_ci(values, iterations=1000, groups=None):
-    """Deterministic percentile CI for the mean F1; descriptive, not a p-value.
-
-    With groups, whole clusters are resampled (cluster bootstrap), so
-    correlated isolates from one study widen the interval instead of
-    narrowing it. At least 5 independent units are required.
-    """
-    units = resampling_units(values, groups)
-    # Intervals from very small cohorts imply a precision the data do not have.
-    if len(values) < 5 or len(units) < 5:
-        return None, None
-    rng = random.Random(20260831)
-    means = sorted(fast_mean([value for unit in rng.choices(units, k=len(units)) for value in unit])
-                   for _ in range(iterations))
-    return means[int(0.025 * iterations)], means[int(0.975 * iterations) - 1]
-
-
-def paired_permutation_pvalue(differences, iterations=10000, groups=None):
-    """Two-sided sign-flip permutation p-value for paired mean differences.
-
-    With groups, every difference in a cluster is flipped together, which is
-    the valid null when isolates within a study are correlated. At least 5
-    independent units are required.
-    """
-    units = resampling_units(differences, groups)
-    if len(differences) < 5 or len(units) < 5:
-        return None
-    observed = abs(fast_mean(differences))
-    rng = random.Random(20260901)
-    getrandbits = rng.getrandbits
-    negated = [[-item for item in unit] for unit in units]
-    pairs = list(zip(units, negated))
-    extreme = 0
-    for _ in range(iterations):
-        signed = []
-        for unit, flipped in pairs:
-            # Same bit stream as rng.randrange(2) (2 bits, reject >= 2), minus the call overhead.
-            bits = getrandbits(2)
-            while bits >= 2:
-                bits = getrandbits(2)
-            signed.extend(unit if bits else flipped)
-        value = abs(fast_mean(signed))
-        extreme += value >= observed
-    return (extreme + 1) / (iterations + 1)
 
 
 def holm_adjust(pvalues):
@@ -936,7 +877,7 @@ def write_tsv(summary, path):
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
-            fh.write("\t".join(str(x) for x in [
+            values = [
                 s.get("rank", i), s.get("analysis_track", ""), s.get("task", ""), s["tool"], s["n_samples"], s["n_completed"], s["n_failed"], s["n_skipped"],
                 f"{s['mean_precision']:.4f}" if s["mean_precision"] is not None else "",
                 f"{s['mean_recall']:.4f}" if s["mean_recall"] is not None else "",
@@ -1002,7 +943,13 @@ def write_tsv(summary, path):
                 # Isolate-weighted CPRR (each isolate counts once) and the normalised
                 # area under the CPRR threshold-sweep curve (0.80-0.99).
                 fmt4(s.get("cprr_isolate_mean")), s.get("cprr_isolates", ""), fmt4(s.get("cprr_auc")),
-            ]) + "\n")
+            ]
+            # The values are positional: a column added to `cols` without its value (or
+            # the reverse) would shift every later column silently. Refuse instead.
+            if len(values) != len(cols):
+                raise AssertionError(f"leaderboard writer: {len(cols)} columns but {len(values)} values; "
+                                     "add each new column to both `cols` and `values`")
+            fh.write("\t".join(str(x) for x in values) + "\n")
 
 
 def format_rate(rate, assessed):

@@ -52,21 +52,12 @@ COV = re.compile(r"(?:_cov_|\bdepth=)([0-9.]+)", re.IGNORECASE)
 NOT_APPLICABLE = 3
 
 
+from plasbench_common import iter_fasta  # noqa: E402
+
+
 def read_fasta(path):
-    records, name, header, chunks = [], None, "", []
-    with open(path, encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.rstrip("\n")
-            if line.startswith(">"):
-                if name is not None:
-                    records.append((name, header, "".join(chunks)))
-                header = line[1:]
-                name, chunks = header.split()[0], []
-            elif line.strip():
-                chunks.append(line.strip())
-    if name is not None:
-        records.append((name, header, "".join(chunks)))
-    return records
+    """[(name, header, sequence)] (shared FASTA reader)."""
+    return list(iter_fasta(path))
 
 
 def write_outputs(prefix, records, chosen):

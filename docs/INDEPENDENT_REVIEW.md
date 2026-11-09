@@ -409,40 +409,40 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 
 | ID | Claim | Evidence | Symbol |
 |---|---|---|---|
-| E1 | TP is reference plasmid bases covered by the prediction | `python/score_plasmids.py:324` | `tp = 0` |
-| E2 | FN is plasmid bases minus TP | `python/score_plasmids.py:334` | `fn = total_plasmid - tp` |
-| E3 | Unmapped predicted bases are counted separately and are not FP | `python/score_plasmids.py:255` | `unmapped_pred_bp += max` |
-| E4 | Scorer CLI default minimum alignment length is 1 | `python/score_plasmids.py:654` | `--min-alignment-length` |
-| E5 | Scorer CLI default minimum identity is 0 | `python/score_plasmids.py:656` | `--min-alignment-identity` |
-| E6 | Scorer CLI default minimum MAPQ is 0 | `python/score_plasmids.py:658` | `--min-alignment-mapq` |
-| E7 | Scorer CLI default query coverage is 0 | `python/score_plasmids.py:660` | `--min-alignment-query-coverage` |
-| E8 | Pipeline default minimum alignment length is 200 | `config/config.sh:500` | `MIN_ALIGNMENT_LENGTH` |
-| E9 | Pipeline default identity is 0.90 | `config/config.sh:501` | `MIN_ALIGNMENT_IDENTITY` |
-| E10 | Pipeline default MAPQ is 20 | `config/config.sh:502` | `MIN_ALIGNMENT_MAPQ` |
-| E11 | Pipeline default query coverage is 0.20 | `config/config.sh:503` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
-| E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:800` | `0.99995` |
-| E13 | Bin purity gate default 0.9 | `python/score_bins.py:404` | `--min-bin-purity` |
-| E14 | Split threshold default 0.1 | `python/score_bins.py:405` | `--split-threshold` |
-| E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:342` | `def length_weighted_binning` |
-| E16 | Ungated one-to-one Hungarian match | `python/score_bins.py:297` | `def maximum_weight` |
-| E17 | CPRR is computed after the match | `python/score_bins.py:354` | `def correct_reconstruction` |
+| E1 | TP is reference plasmid bases covered by the prediction | `python/score_plasmids.py:288` | `tp = 0` |
+| E2 | FN is plasmid bases minus TP | `python/score_plasmids.py:298` | `fn = total_plasmid - tp` |
+| E3 | Unmapped predicted bases are counted separately and are not FP | `python/score_plasmids.py:219` | `unmapped_pred_bp += max` |
+| E4 | Scorer CLI default minimum alignment length is 1 | `python/score_plasmids.py:628` | `--min-alignment-length` |
+| E5 | Scorer CLI default minimum identity is 0 | `python/score_plasmids.py:630` | `--min-alignment-identity` |
+| E6 | Scorer CLI default minimum MAPQ is 0 | `python/score_plasmids.py:632` | `--min-alignment-mapq` |
+| E7 | Scorer CLI default query coverage is 0 | `python/score_plasmids.py:634` | `--min-alignment-query-coverage` |
+| E8 | Pipeline default minimum alignment length is 200 | `config/config.sh:523` | `MIN_ALIGNMENT_LENGTH` |
+| E9 | Pipeline default identity is 0.90 | `config/config.sh:524` | `MIN_ALIGNMENT_IDENTITY` |
+| E10 | Pipeline default MAPQ is 20 | `config/config.sh:525` | `MIN_ALIGNMENT_MAPQ` |
+| E11 | Pipeline default query coverage is 0.20 | `config/config.sh:526` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
+| E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:781` | `0.99995` |
+| E13 | Bin purity gate default 0.9 | `python/score_bins.py:366` | `--min-bin-purity` |
+| E14 | Split threshold default 0.1 | `python/score_bins.py:367` | `--split-threshold` |
+| E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:304` | `def length_weighted_binning` |
+| E16 | Ungated one-to-one Hungarian match | `python/score_bins.py:53` | `def maximum_weight` |
+| E17 | CPRR is computed after the match | `python/score_bins.py:316` | `def correct_reconstruction` |
 | E18 | CPRR minimum coverage 0.95 | `config/config.sh:50` | `CPRR_MIN_COVERAGE` |
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:52` | `CPRR_MIN_IDENTITY` |
-| E20 | Interval requires at least five clusters | `python/aggregate_results.py:679` | `len(values) < 5 or len(units) < 5` |
-| E21 | Permutation test requires at least five clusters | `python/aggregate_results.py:695` | `len(differences) < 5 or len(units) < 5` |
-| E22 | Holm adjustment across pairs | `python/aggregate_results.py:716` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:853` | `def attach_significance` |
-| E24 | Percentile cluster bootstrap | `python/aggregate_results.py:670` | `def bootstrap_ci` |
-| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:78` | `def sample_clusters` |
-| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:98` | `UnionFind()` |
-| E27 | Headline falls back to all samples when no sample reaches the tiers | `python/headline_design.py:139` | `FALLBACK: no sample in reference tiers` |
-| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:78` | `min_species_clusters=20` |
-| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:318` | `def shared_values` |
-| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:196` | `def build_variants` |
+| E20 | Interval requires at least five clusters | `python/resampling.py:118` | `len(values) < 5 or len(units) < 5` |
+| E21 | Permutation test requires at least five clusters | `python/resampling.py:199` | `len(differences) < 5 or len(units) < 5` |
+| E22 | Holm adjustment across pairs | `python/aggregate_results.py:657` | `def holm_adjust` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:794` | `def attach_significance` |
+| E24 | Percentile cluster bootstrap | `python/resampling.py:109` | `def bootstrap_ci` |
+| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:81` | `def sample_clusters` |
+| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:101` | `UnionFind()` |
+| E27 | Headline falls back to all samples when no sample reaches the tiers | `python/headline_design.py:142` | `FALLBACK: no sample in reference tiers` |
+| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:81` | `min_species_clusters=20` |
+| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:211` | `def shared_values` |
+| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:192` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:153` | `--min-long-read-depth` |
 | E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:200` | `reference_tier, tier_reason = tier(` |
-| E34 | Circularity guard for long-read tools | `scripts/lib.sh:244` | `truth_independent_of_long_reads` |
+| E34 | Circularity guard for long-read tools | `scripts/lib.sh:272` | `truth_independent_of_long_reads` |
 | E35 | Date-based overlap screen | `python/flag_database_overlap.py:92` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:189` | `lambda was selected on the same LOSO folds` |
@@ -450,7 +450,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E39 | CI installs minimap2 so the aligner test runs for real | `.github/workflows/ci.yml:28` | `apt-get install -y -qq minimap2` |
 | E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:205` | `base_level_metrics_valid` |
 | E41 | Tool database dates (first row) | `config/tool_database_releases.tsv:2` | `mob_recon` |
-| E42 | Exclusion of possible overlaps is off by default | `config/config.sh:508` | `EXCLUDE_DATABASE_OVERLAP` |
+| E42 | Exclusion of possible overlaps is off by default | `config/config.sh:531` | `EXCLUDE_DATABASE_OVERLAP` |
 | E43 | barrnap is in the environment file | `env/environment.yml:23` | `barrnap` |
 | E44 | minimap2 is a hard requirement of scoring | `scripts/05_score.sh:21` | `need minimap2` |
 | E52 | Unresolvable truth sequences are labelled REVIEW | `python/make_truth.py:50` | `REVIEW = "REVIEW"` |

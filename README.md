@@ -93,6 +93,16 @@ bounded and checked at the shell level (`MAX_PARALLEL_SAMPLES`,
 `MAX_PARALLEL_TOOLS`, with an oversubscription warning). `PLASBENCH_STATS_WORKERS=1`
 forces the serial path.
 
+A second audit ([docs/PERFORMANCE_AUDIT.md](docs/PERFORMANCE_AUDIT.md)) then replaced a cubic bin
+matcher with a rectangular one (`score_bins.py` on 2,000 one-contig bins: 41.6 minutes → 0.4 s), removed
+exact-fraction overhead from the leaderboard statistics (2–4× faster aggregation), indexed and deduplicated
+with hash maps where scans were quadratic, streamed reference reads, parallelised ENA downloads (both mates
+plus byte ranges, MD5-verified) and stage 6's advisory analyses, reused one minimap2 index per sample, and
+fingerprinted tool-result reuse so an upgrade or a changed setting re-runs the tool. The bundled demo runs in
+180 s instead of 646 s (WSL Ubuntu), and 527 of its 528 output files are byte-identical; the report differs only
+in timestamps. With `THREADS` unset, the cores are now shared across the parallel job slots instead of every job
+requesting all of them.
+
 **Maintainability.** The shared scientific definitions (interval coverage and
 overlap, single-linkage clustering, Mash sketch size, tool display names) live once
 in `python/plasbench_common.py` and are pinned by `test/test_plasbench_common.py`,
@@ -603,6 +613,12 @@ Both are blank unless the matching curated truth file is supplied.
 | `--min-alignment-query-coverage` | 0.0 | Drop alignments covering less than this fraction of the predicted record. |
 | `--plasmid-recovery-threshold` | 0.90 | Completeness needed to count a plasmid as recovered. |
 | `--amr-gene-recovery-threshold` | 0.90 | Coverage needed to count an AMR gene as recovered. |
+
+These are the script's own defaults, which keep every alignment. The pipeline, the Galaxy wrapper and the
+installed `plasbench-score` command apply the **pre-registered** filters instead: length 200, identity 0.90,
+MAPQ 20 and query coverage 0.20 (`config/prereg.tsv`; `MIN_ALIGNMENT_*` in `config/config.sh`).
+`plasbench-score` fills in any of the four that a call leaves out, and a direct `score_plasmids.py` run with
+none of them prints a note saying so.
 
 **Aggregation and ranking** (`python/aggregate_results.py`)
 

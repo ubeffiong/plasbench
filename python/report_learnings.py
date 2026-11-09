@@ -21,6 +21,9 @@ SECTIONS = [("learn-agreement", "Bin agreement"), ("learn-adequacy", "Assembly a
             ("learn-plsmd", "Database-dependent tools")]
 
 
+from plasbench_common import number  # noqa: E402,F401
+
+
 def esc(value):
     return html.escape(str(value), quote=True)
 
@@ -31,13 +34,6 @@ def read_tsv(path):
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader((line for line in handle if line.strip() and not line.startswith("#")),
                                    delimiter=chr(9)))
-
-
-def number(text):
-    try:
-        return float(text) if text not in (None, "") else None
-    except ValueError:
-        return None
 
 
 def mean(values):

@@ -33,7 +33,11 @@ def default_registry(project_root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--registry", required=True)
-    parser.add_argument("--tool", required=True)
+    parser.add_argument("--tool", help="the tool to query (not needed with --dump)")
+    parser.add_argument("--dump", action="store_true",
+                        help="validate the whole registry and print one line per tool: "
+                             "tool, binning_capable, analysis_track, requires_independent_long_read_truth "
+                             "(tab-separated; read once by scripts/lib.sh load_capabilities)")
     parser.add_argument("--binning-capable", action="store_true")
     parser.add_argument("--analysis-track", action="store_true",
                         help="print the tool's declared analysis_track instead of binning_capable")
@@ -41,9 +45,17 @@ def main():
                         help="exit 0 only if the tool's requires_independent_long_read_truth is yes")
     args = parser.parse_args()
     try:
-        row = read_capabilities(args.registry).get(args.tool)
+        capabilities = read_capabilities(args.registry)
     except ValueError as exc:
         raise SystemExit(f"ERROR: {exc}") from exc
+    if args.dump:
+        for tool, row in capabilities.items():
+            print("\t".join((tool, row["binning_capable"], row["analysis_track"],
+                             row["requires_independent_long_read_truth"])))
+        return
+    if not args.tool:
+        parser.error("--tool is required unless --dump is given")
+    row = capabilities.get(args.tool)
     if row is None:
         raise SystemExit(f"ERROR: tool not declared in capability registry: {args.tool}")
     if args.analysis_track:

@@ -65,13 +65,12 @@ from pathlib import Path
 from plasbench_common import MASH_SKETCH_SIZE  # noqa: E402
 
 
+from plasbench_common import read_truth_table  # noqa: E402
+
+
 def read_truth(path):
-    """sequence_id -> molecule_type ("CHROMOSOME"/"PLASMID"), from truth.tsv."""
-    labels = {}
-    with open(path, newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            labels[row["sequence_id"]] = row["molecule_type"]
-    return labels
+    """sequence_id -> molecule_type ("CHROMOSOME"/"PLASMID"), validated as the scorer validates truth.tsv."""
+    return {seq_id: mol for seq_id, (mol, _) in read_truth_table(path)[0].items()}
 
 
 def split_reference_by_label(fasta_path, labels, out_dir):

@@ -56,26 +56,50 @@ COMPARE_FIELDS = ["sample", "tool", "n_contigs", "n_low_information", "n_label_a
 COMPLEMENT = str.maketrans("ACGTacgt", "TGCAtgca")
 
 
+from plasbench_common import iter_fasta  # noqa: E402
+
+
 def fasta(path):
-    opener = gzip.open if str(path).endswith(".gz") else open
-    name, parts = None, []
-    with opener(path, "rt") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            if line[0] == ">":
-                if name is not None:
-                    yield name, "".join(parts).upper()
-                name, parts = line[1:].split()[0], []
-            else:
-                parts.append(line)
-    if name is not None:
-        yield name, "".join(parts).upper()
+    """Yield (id, upper-cased sequence)."""
+    for name, _, seq in iter_fasta(path):
+        yield name, seq.upper()
 
 
 def sampled_kmers(sequence, k, scaled):
-    """Canonical k-mers whose hash is 0 modulo `scaled` (deterministic: blake2b)."""
+    """Canonical k-mers whose hash is 0 modulo `scaled` (deterministic: blake2b).
+
+    A window containing "N" is skipped. Rather than search every window for "N", the
+    sequence is cut at its N positions and the window slides only inside each N-free
+    segment (two pointers over the sorted N positions). The sequence and its reverse
+    complement are encoded to bytes once instead of once per window; bytes compare like
+    the ASCII text they encode, so the canonical choice and the hash are unchanged.
+    """
+    if not sequence.isascii():               # byte offsets would not match character offsets
+        return _sampled_kmers_text(sequence, k, scaled)
+    out = set()
+    n = len(sequence)
+    forward_bytes = sequence.encode("ascii")
+    reverse_bytes = sequence.translate(COMPLEMENT)[::-1].encode("ascii")
+    blake2b, from_bytes, add = hashlib.blake2b, int.from_bytes, out.add
+    stops, at = [], sequence.find("N")           # N positions by C-level search, then the end
+    while at != -1:
+        stops.append(at)
+        at = sequence.find("N", at + 1)
+    stops.append(n)
+    start = 0
+    for stop in stops:
+        for i in range(start, stop - k + 1):
+            forward = forward_bytes[i:i + k]
+            rc = reverse_bytes[n - i - k:n - i]
+            value = from_bytes(blake2b(forward if forward <= rc else rc, digest_size=8).digest(), "little")
+            if value % scaled == 0:
+                add(value)
+        start = stop + 1
+    return out
+
+
+def _sampled_kmers_text(sequence, k, scaled):
+    """The original per-window reader, kept for non-ASCII input."""
     out = set()
     reverse = sequence.translate(COMPLEMENT)[::-1]
     n = len(sequence)

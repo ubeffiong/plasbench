@@ -20,6 +20,9 @@ TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycle
          "plASgraph2_classify.py", "rfplasmid", "plasmidhunter", "Plasmer", "plaScope.sh")
 
 
+from plasbench_common import sha256  # noqa: E402,F401
+
+
 def tool_version():
     """Report the version of the checkout that actually produced this run.
 
@@ -39,14 +42,6 @@ def tool_version():
         return __version__
     except ImportError:
         return "unknown"
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def checksum_record(path, warnings, category):

@@ -18,6 +18,9 @@ from pathlib import Path
 REQUIRED = {"community_id", "sample_id", "reference_fasta", "abundance_percent", "coverage_x", "plasmid_copy_number", "community_complexity", "phage_burden", "contamination_level"}
 
 
+from plasbench_common import sha256  # noqa: E402,F401
+
+
 def rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
@@ -25,14 +28,6 @@ def rows(path: Path) -> list[dict[str, str]]:
             missing = REQUIRED - set(reader.fieldnames or [])
             raise ValueError(f"{path}: missing required columns: {', '.join(sorted(missing))}")
         return [{key: (value or "").strip() for key, value in row.items()} for row in reader]
-
-
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -29,33 +29,35 @@ import csv
 import math
 import os
 from collections import defaultdict
-from plasbench_common import merge_intervals, interval_overlap_bp as overlap, CPRR_SWEEP_THRESHOLDS  # noqa: E402
-
-
-def merge(intervals):
-    total, end = 0, -1
-    for start, stop in sorted((start, stop) for start, stop in intervals if stop > start):
-        total += max(0, stop - max(end, start))
-        end = max(end, stop)
-    return total
+from plasbench_common import (  # noqa: E402
+    merge_intervals, interval_overlap_bp as overlap, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership,
+    read_truth_split,
+)
+from matching import max_weight_matching  # noqa: E402
 
 
 def read_truth(path):
-    with open(path, encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle, delimiter="\t"))
-    plasmids = {row["sequence_id"]: int(row["length"]) for row in rows if row["molecule_type"].upper() == "PLASMID"}
-    chromosomes = {row["sequence_id"]: int(row["length"]) for row in rows if row["molecule_type"].upper() == "CHROMOSOME"}
-    return plasmids, chromosomes
+    """(plasmid id -> length, chromosome id -> length), with the scorer's validation."""
+    return read_truth_split(path)
 
 
 def read_bins(path):
-    membership = {}
-    with open(path, encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            if not row.get("bin_id") or not row.get("sequence_id") or row["sequence_id"] in membership:
-                raise ValueError("bins TSV requires unique sequence_id and nonempty bin_id")
-            membership[row["sequence_id"]] = row["bin_id"]
-    return membership
+    return read_bin_membership(path)
+
+
+def merge(intervals):
+    """Covered length of the union of [start, stop) intervals; empty or reversed ones count 0."""
+    return union_length(intervals)
+
+
+def maximum_weight(edges, bins_list, plasmids_list):
+    """Maximum-weight one-to-one bin <-> plasmid assignment: [(bin, plasmid, aligned bp)].
+
+    The shared rectangular Hungarian (matching.py). It replaced a square O(max(B, P)^3)
+    solver here; the optimum is the same, at a fraction of the cost when a tool emits
+    many bins (docs/PERFORMANCE_AUDIT.md).
+    """
+    return max_weight_matching(edges, bins_list, plasmids_list)
 
 
 def bin_ambiguity(path, membership, plasmids, chromosomes, min_length=1, min_identity=0.0,
@@ -292,46 +294,6 @@ def plasmid_outcomes(overlaps, plasmids, total_mapped, chromosome_bp, perfect=0.
                      "contamination_fraction": f"{safe_div(chromosome_bp.get(best, 0), total_mapped.get(best, 0)):.4f}",
                      "outcome": outcome})
     return rows
-
-
-def maximum_weight(edges, bins_list, plasmids_list):
-    """Return a maximum-weight one-to-one assignment using Hungarian O(n^3)."""
-    n = max(len(bins_list), len(plasmids_list))
-    if not n:
-        return []
-    high = max(edges.values(), default=0)
-    cost = [[high] * n for _ in range(n)]
-    for i, bin_id in enumerate(bins_list):
-        for j, plasmid in enumerate(plasmids_list):
-            cost[i][j] = high - edges.get((bin_id, plasmid), 0)
-    u, v, p, way = [0] * (n + 1), [0] * (n + 1), [0] * (n + 1), [0] * (n + 1)
-    for i in range(1, n + 1):
-        p[0], j0, minv, used = i, 0, [float("inf")] * (n + 1), [False] * (n + 1)
-        while True:
-            used[j0] = True
-            i0, delta, j1 = p[j0], float("inf"), 0
-            for j in range(1, n + 1):
-                if not used[j]:
-                    current = cost[i0 - 1][j - 1] - u[i0] - v[j]
-                    if current < minv[j]: minv[j], way[j] = current, j0
-                    if minv[j] < delta: delta, j1 = minv[j], j
-            for j in range(n + 1):
-                if used[j]: u[p[j]] += delta; v[j] -= delta
-                else: minv[j] -= delta
-            j0 = j1
-            if not p[j0]: break
-        while True:
-            j1 = way[j0]
-            p[j0] = p[j1]
-            j0 = j1
-            if not j0: break
-    matched = []
-    for j in range(1, n + 1):
-        i = p[j]
-        if i and i <= len(bins_list) and j <= len(plasmids_list):
-            key = (bins_list[i - 1], plasmids_list[j - 1])
-            if edges.get(key, 0) > 0: matched.append((key[0], key[1], edges[key]))
-    return matched
 
 
 CPRR_FIELDS = ["true_plasmid", "length", "matched_bin", "coverage", "bin_share", "identity",
