@@ -958,7 +958,7 @@ def dumbbell_chart(rows, left_key, right_key, left_label, right_label, aria, emp
     return legend + "".join(parts) + "</svg>"
 
 
-def robustness_section(track_leaderboards, ordered_tracks):
+def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None):
     """How much each headline number can be trusted, per analysis track."""
     blocks = []
     for track in ordered_tracks:
@@ -982,8 +982,14 @@ def robustness_section(track_leaderboards, ordered_tracks):
                     # date not filled in). That is not the same as "checked and clean".
                     overlap = (f"<strong>not assessed</strong> ({int(unknown)} pair(s) unknown: "
                                f"database release date not filled in)")
-                elif possible == 0 and after_db == 0:
-                    overlap = "n/a (tool uses no reference database)"
+                elif possible == 0 and after_db == 0 and unknown == 0:
+                    # 0/0/0 is two different things: a tool with no reference database, or a screen with no rows for
+                    # the tool. benchmark.database_overlap.tsv tells them apart; without it the cell says it cannot.
+                    import report_wiring
+                    overlap = esc(report_wiring.overlap_cell(0, 0, 0, (overlap_statuses or {}).get(row["tool"], [])))
+                elif possible == 0 and unknown == 0:
+                    import report_wiring
+                    overlap = esc(report_wiring.overlap_cell(0, after_db, 0, []))
                 else:
                     overlap = f"{esc(row['n_possible_db_overlap'])} possible / {_value_or(row, 'n_after_database', '0')} after"
                     if unknown > 0:
@@ -2048,7 +2054,9 @@ def main():
         leaderboard_panels = leaderboard_table(
             track_leaderboards.get(ordered_tracks[0], leaderboard) if ordered_tracks else leaderboard)
 
-    robustness_html = robustness_section(track_leaderboards, ordered_tracks or list(track_leaderboards))
+    import report_wiring
+    robustness_html = robustness_section(track_leaderboards, ordered_tracks or list(track_leaderboards),
+                                         report_wiring.overlap_statuses(str(out.parent)))
 
     score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
     score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
@@ -2333,8 +2341,15 @@ def main():
         for row in recommendation_validation
     ) or "<tr><td colspan='7'>No leave-one-study-out validation file was available.</td></tr>"
 
-    comparison_rows = "".join(
-        "<tr><td>{a}</td><td>{b}</td><td>{n}</td><td>{difference}</td><td>{ci}</td><td>{p}</td><td>{holm}</td><td>{wins}/{ties}/{losses}</td></tr>".format(
+    def comparison_row(row):
+        delta = row.get("smallest_difference")
+        equivalent = row.get("equivalent") or ""
+        equivalence = ({"yes": "yes", "no": "no"}.get(equivalent, "not assessed")
+                       + (f" (delta {delta})" if delta and equivalent in ("yes", "no") else ""))
+        return ("<tr><td>{track}</td><td>{task}</td><td>{metric}</td><td>{a}</td><td>{b}</td><td>{n}</td><td>{difference}</td>"
+                "<td>{ci}</td><td>{p}</td><td>{holm}</td><td>{wholm}</td><td>{equiv}</td><td>{wins}/{ties}/{losses}</td></tr>").format(
+            track=esc(row.get("analysis_track") or "not recorded"), task=esc(row.get("task") or "not recorded"),
+            metric=esc(row.get("metric") or "f1"),
             a=esc(row["tool_a"]), b=esc(row["tool_b"]),
             n=esc(row["paired_samples"]) + (
                 f" ({esc(row['paired_clusters'])} clusters)"
@@ -2344,9 +2359,22 @@ def main():
                     f"{row['difference_ci_low']} to {row['difference_ci_high']}") or "not estimated (n < 5)"),
             p=esc(row.get("permutation_p_value") or "not estimated (n < 5)"),
             holm=esc(row.get("permutation_p_value_holm") or "not estimated (n < 5)"),
-            wins=esc(row["wins_a"]), ties=esc(row["ties"]), losses=esc(row["wins_b"]),
-        ) for row in comparisons
-    ) or "<tr><td colspan='8'>No paired score rows are available.</td></tr>"
+            wholm=esc(row.get("wilcoxon_p_value_holm") or "not estimated"),
+            equiv=esc(equivalence),
+            wins=esc(row["wins_a"]), ties=esc(row["ties"]), losses=esc(row["wins_b"]))
+
+    comparison_head = ("<thead><tr><th>Track</th><th>Task</th><th>Metric</th><th>Tool A</th><th>Tool B</th><th>Pairs</th>"
+                       "<th>Mean difference (A minus B)</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th>"
+                       "<th>Wilcoxon p (Holm)</th><th>Equivalent within delta</th><th>A wins / ties / B wins</th></tr></thead>")
+    comparison_tracks = []
+    for row in comparisons:
+        if (row.get("analysis_track") or "not recorded") not in comparison_tracks:
+            comparison_tracks.append(row.get("analysis_track") or "not recorded")
+    comparison_tables = "".join(
+        f"<h3 class='rpt-trackrow'>Track: {esc(t)}</h3><div class='panel'><table class='sortable'>{comparison_head}<tbody>"
+        + "".join(comparison_row(r) for r in comparisons if (r.get("analysis_track") or "not recorded") == t)
+        + "</tbody></table></div>" for t in comparison_tracks
+    ) or f"<div class='panel'><table class='sortable'>{comparison_head}<tbody><tr><td colspan='13'>No paired score rows are available.</td></tr></tbody></table></div>"
     score_failure_html = "".join(
         "<li><strong>{sample} / {tool}</strong> at {stage}: {reason}</li>".format(
             sample=esc(row["sample"]), tool=esc(row["tool"]), stage=esc(row["stage"]), reason=esc(row["reason"])
@@ -2500,7 +2528,7 @@ def main():
 <section id='extended'><h2>Extended analyses and next steps</h2><p class='lead'>These optional analyses add decision context. They do not replace the primary benchmark ranking, and an unavailable item means it was not requested or lacked suitable evidence.</p><div class='insight neutral'>{optional_analysis}</div></section>
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
 <section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. Circular-truth recovery is not evidence that a predicted sequence is closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{tool_options}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Circular truth recovery</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
-<section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least five independent units. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool A</th><th>Tool B</th><th>Pairs</th><th>Mean F1 difference</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th><th>A wins / ties / B wins</th></tr></thead><tbody>{comparison_rows}</tbody></table></div><p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
+<section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least five independent units. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p>{comparison_tables}<p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
 <section id='zero-plasmid'><h2>Zero-plasmid isolates (negative control)</h2><p class='lead'>Precision, recall, and F1 are correctly undefined on an isolate with no true plasmid at all -- there is nothing to recover, and a tool predicting nothing has made a correct abstention, not scored a zero. These isolates are still valuable: they are the only ones that directly measure false-positive behavior. Isolate specificity is 1 minus the fraction of that isolate's chromosome a tool wrongly called plasmid; chromosome FP bp is the same false call in raw bases, summed across every plasmid-free isolate a tool was scored on. A specificity below 1.0 means real chromosomal sequence was misclassified as plasmid on a sample where NO plasmid exists to justify it.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Plasmid-free isolates scored</th><th>Mean isolate specificity</th><th>Total chromosome FP bp</th></tr></thead><tbody>{zero_plasmid_html}</tbody></table></div></section>
 <section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered AND circular, the strictest per-plasmid claim this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>
@@ -2553,6 +2581,9 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
                     "warning_eval": args.warning_eval, "leave_taxon_out": args.leave_taxon_out,
                     "amr_placement": args.amr_placement, "contig_crosscheck": args.contig_crosscheck}
     page = report_scoring_spec.inject(page, spec_sources)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    (out.parent / (out.name.split(".report")[0] + ".scoring_spec.md")).write_text(
+        report_scoring_spec.markdown(spec_sources), encoding="utf-8")
     # Evaluation additions learned from PlasEval, plsMD and GAEMR (python/report_learnings.py): read from the stage-6 tables.
     import report_learnings
     page = report_learnings.inject(page, str(out.parent), args.scores)
@@ -2567,10 +2598,11 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     page = report_scorecard.inject(page, str(out.parent), args.scores)
     page = report_maps.inject(page, str(out.parent), args.data_dir, args.scores)
     page = report_workflow.inject(page, str(out.parent), args.scores, args.tool_status, args.data_dir)
+    # Outputs the report did not show before (per-plasmid detail, assembly quality, clonal groups, regret, truth depth, column
+    # groups, Run files) and the grouped navigation (python/report_wiring.py). Before the inventory so it lists them as shown.
+    page = report_wiring.inject(page, str(out.parent), args.data_dir, args.scores)
     page = report_surfaces.inject(page, str(out.parent), args.data_dir)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    (out.parent / (out.name.split(".report")[0] + ".scoring_spec.md")).write_text(
-        report_scoring_spec.markdown(spec_sources), encoding="utf-8")
+    page = report_wiring.finish(page)
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")

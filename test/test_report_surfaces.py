@@ -60,15 +60,18 @@ def main():
           e["level"] in ("per_sample", "per_tool", "aggregate", "column") for e in rs.SURFACES))
     check("every entry has a reason and a producer", all(e["reason"] and e["producer"] for e in rs.SURFACES))
     ns = [e for e in rs.SURFACES if e["status"] == "not_surfaced"]
-    check("not_surfaced entries have a reason and a planned_section", ns and all(e["reason"] and e["planned_section"] for e in ns),
+    check("not_surfaced entries have a reason and a planned_section", all(e["reason"] and e["planned_section"] for e in ns),
           str([e["pattern"] for e in ns if not e["planned_section"]]))
     check("only not_surfaced entries carry a planned_section", all(e["planned_section"] is None for e in rs.SURFACES
                                                                     if e["status"] != "not_surfaced"))
     wanted = {"{sample}/{tool}.per_plasmid.tsv", "{sample}/{tool}.plasmid_outcomes.tsv", "{sample}/assembly_qc.tsv",
               "{sample}/assembly_stats.tsv", "benchmark.clonal_groups.tsv", "benchmark.recommender_regret.tsv",
               "{sample}/truth_depth_windows.tsv", "benchmark.leaderboard.md", "benchmark.scoring_spec.md"}
-    check("the audited not-shown outputs are registered as not_surfaced", wanted <= {e["pattern"] for e in ns},
-          str(wanted - {e["pattern"] for e in ns}))
+    by_pattern = {e["pattern"]: e for e in rs.SURFACES}
+    check("the audited outputs are registered and now shown in a section (or still declared not_surfaced)",
+          all(w in by_pattern and (by_pattern[w]["status"] == "shown" and by_pattern[w]["section"]
+                                   or by_pattern[w]["status"] == "not_surfaced") for w in wanted),
+          str(sorted(w for w in wanted if w not in by_pattern)))
     check("column groups cover the ten named groups", set(rs.SCORE_COLUMN_GROUPS) == {
         "Identity", "Core", "Recovery", "Graded recovery", "Confusion and abstention", "Bins", "Contig layer", "Agreement",
         "Calibration", "Diagnostics"})

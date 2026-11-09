@@ -1,0 +1,15 @@
+<script>
+(()=>{
+if(window.__rptColumnGroups)return;window.__rptColumnGroups=true;
+function setup(){
+document.querySelectorAll('.rpt-colgroups').forEach(box=>{
+ const chips=box.querySelector('.rpt-chips');if(!chips)return;chips.hidden=false;
+ const on=new Set((box.dataset['default']||'').split('|').filter(Boolean));
+ const boxes=[...chips.querySelectorAll('input[data-cg-toggle]')];
+ function apply(){const live=new Set(boxes.filter(b=>b.checked).map(b=>b.dataset.cgToggle));
+  box.querySelectorAll('[data-cg]').forEach(c=>{c.hidden=!live.has(c.dataset.cg)})}
+ boxes.forEach(b=>{b.checked=on.has(b.dataset.cgToggle);b.addEventListener('change',apply)});
+ apply()})}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup);else setup();
+})();
+</script>
