@@ -32,6 +32,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+import report_3d
+
 SECTIONS = (("prereg", "Pre-registration"), ("scoring-additions", "MCC &amp; F-beta"),
             ("plasmid-outcomes", "Plasmid outcomes"), ("label-schemes", "Label schemes"),
             ("contig-layer", "Contig layer"), ("outcome-states", "Run outcomes"),
@@ -70,6 +72,11 @@ def table(headers, rows):
 
 def not_run(what, why):
     return f"<p class='muted'><strong>Not run:</strong> {esc(what)}. {esc(why)}</p>"
+
+
+def collapsible(inner, summary="Show the data table"):
+    """The raw table behind a 3D view: collapsed, but in the page for print, screen readers and no-JS."""
+    return f"<details class='rpt-collapsible'><summary>{esc(summary)}</summary>{inner}</details>"
 
 
 def section(section_id, title, lead, body):
@@ -186,29 +193,31 @@ def crosscheck_summary(rows):
 def contig_layer_section(leaderboard, scores, crosscheck=()):
     rows = [r for r in leaderboard if r.get("tool")]
     have = [r for r in rows if r.get("mean_contig_f1_bp")]
+    status, basis = crosscheck_summary(crosscheck)
+    tables = ""
     if not have:
         body = not_run("contig layer", "no tool was scored at contig level (RUN_CONTIG_CLASSIFICATION=0, no "
                        "contigs.fasta, or every tool outputs reassembled sequences)")
     else:
         shared = sum(int(r.get("contigs_ambiguous_bp") or 0) for r in scores)
         unassigned = sum(int(r.get("contigs_unplaced_bp") or 0) for r in scores)
-        body = table(["Track / task", "Tool", "Base F1 (reference layer)", "Contig F1 (length)", "Contig MCC (length)",
-                      "Contig binning F1 (length)"],
-                     [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], r.get("mean_f1"),
-                       r.get("mean_contig_f1_bp"), r.get("mean_contig_mcc_bp"), r.get("mean_contig_bin_f1_bp"))
-                      for r in have])
+        payload = report_3d.bars_payload(leaderboard, scores, crosscheck)
+        scene = report_3d.build_bars(payload)
+        body = report_3d.host("bars", "v3-data-contig", payload, scene, -28, 24) if scene["prims"] else ""
         body += (f"<p class='muted'>Excluded contig length summed over scored runs: shared (AMBIGUOUS) {shared:,} bp, "
                  f"unassigned (UNPLACED) {unassigned:,} bp.</p>")
-    status, basis = crosscheck_summary(crosscheck)
+        tables = table(["Track / task", "Tool", "Base F1 (reference layer)", "Contig F1 (length)", "Contig MCC (length)",
+                        "Contig binning F1 (length)"],
+                       [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], r.get("mean_f1"),
+                         r.get("mean_contig_f1_bp"), r.get("mean_contig_mcc_bp"), r.get("mean_contig_bin_f1_bp"))
+                        for r in have])
     body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
     if crosscheck:
-        body += table(["Sample", "Tool", "Contigs", "Low-information (excluded)", "Label agreement", "Kappa", "F1 (minimap2)", "F1 (k-mer)",
-                       "|delta F1|", "MCC (minimap2)", "MCC (k-mer)", "|delta MCC|", "Status", "Contigs labelled differently"],
-                      [(r["sample"], r["tool"], r["n_contigs"], r.get("n_low_information"), r["label_agreement"], r["label_kappa"], r["primary_f1_bp"],
-                        r["independent_f1_bp"], r["delta_f1_bp"], r["primary_mcc_bp"], r["independent_mcc_bp"],
-                        r["delta_mcc_bp"], r["status"], r["differing_contigs"]) for r in crosscheck])
+        tables += table(report_3d.XC_HEADER, [[r.get(f, "") for f in report_3d.XC_FIELDS] for r in crosscheck])
     else:
         body += not_run("independent contig scorer", "no benchmark.contig_crosscheck.tsv (RUN_CONTIG_CROSSCHECK=0 or no contig labels)")
+    if tables:
+        body += collapsible(tables)
     return section("contig-layer", "Contig layer beside the reference layer",
                    "A parallel layer, never the headline: assembly contigs are labelled against the reference and each "
                    "tool's calls scored per contig, weighted by length. Its recall denominator is the summed length of "
@@ -244,19 +253,24 @@ def outcome_states_section(states, status_rows=()):
                    "Failed runs are retried TOOL_RETRIES times; every tool gets the same TOOL_TIMEOUT_SECONDS.", body)
 
 
-def recommender_section(evaluation, verdict, warnings):
+def recommender_section(evaluation, verdict, warnings, regret=(), taxon=()):
+    tables = ""
     if not evaluation:
         body = not_run("recommender evaluation", "RUN_RECOMMENDER_EVAL=0, or evaluate_recommender.py failed")
     else:
-        body = table(["Profile", "Isolates", "Folds", "Mean regret", "95th pct regret", "Near-optimal", "Top-1",
-                      "Kendall tau", "Single-best regret", "Oracle gap", "Gap closed", "Floor flagged", "Verdict"],
-                     [(r["profile"], r["n_isolates"], r["n_folds"], r["mean_regret"], r["p95_regret"],
-                       r["near_optimal_rate"], r["top1_rate"], r["mean_kendall_tau"], r["single_best_mean_regret"],
-                       r["oracle_gap"], r["gap_closed"], r["floor_flagged"], r["verdict"]) for r in evaluation])
-        if verdict:
-            body += f"<p><strong>Verdict:</strong> {esc(verdict.get('verdict'))} -- {esc(verdict.get('note'))}</p>"
+        payload = report_3d.recs_payload(evaluation, regret, verdict, warnings, taxon)
+        scene = report_3d.build_recs(payload)
+        banner = report_3d.verdict_banner(verdict) if verdict else ""
+        if scene["prims"]:
+            body = report_3d.host("recs", "v3-data-recs", payload, scene, -24, 36, banner)
+        else:
+            body = banner + ("<p class='muted'>The per-isolate regret table (benchmark.recommender_regret.tsv) is not available, "
+                             "so the strategies cannot be drawn in 3D; the profile summary is below.</p>")
+            if verdict:
+                body += f"<p><strong>Verdict:</strong> {esc(verdict.get('verdict'))} -- {esc(verdict.get('note'))}</p>"
+        tables = table(report_3d.EVAL_HEADER, [[r.get(f, "") for f in report_3d.EVAL_FIELDS] for r in evaluation])
     if warnings:
-        body += "<h3>Warnings scored against failed recommendations</h3>" + table(
+        tables += "<h3>Warnings scored against failed recommendations</h3>" + table(
             ["Warning", "Evaluated", "Fired", "Failed", "Firing rate", "PPV", "Sensitivity", "Could not be applied",
              "Status"],
             [(r["warning"], r["n_evaluated"], r["n_fired"], r["n_failed"], r["firing_rate"], r["ppv"], r["sensitivity"],
@@ -264,6 +278,8 @@ def recommender_section(evaluation, verdict, warnings):
     else:
         body += not_run("warning scoring", "no warnings table (needs the recommender evaluation and at least one warning "
                         "source: cohort QC flags or the assembly QC gate)")
+    if tables:
+        body += collapsible(tables)
     return section("recommender-eval", "Does recommending per isolate beat the single best tool?",
                    "Leave-one-study-out. Regret = best tool's F1 on the isolate minus the recommended tool's. "
                    "Near-optimal = regret within NEAR_OPTIMAL_MARGIN (0.05). Gap closed = 1 - recommender regret / "
@@ -298,20 +314,29 @@ def transfer_section(taxon_rows, comparisons):
                    "".join(parts))
 
 
-def amr_section(rows):
+AMR_LEAD = ("Each curated AMR gene copy is matched by position. Level 2: the bin holding it is matched "
+            "one-to-one to the gene's own plasmid. Level 1: that plasmid shares a replicon type with the gene's "
+            "plasmid. Copies on shared or unassigned contigs are their own category. Gene classes come from "
+            "config/amr_gene_classes.tsv.")
+
+
+def amr_section(rows, data_dir=None):
     if not rows:
-        body = not_run("AMR placement", "no curated truth_amr.tsv passed validation, or RUN_AMR_PLACEMENT=0")
-    else:
-        body = table(["Tool", "Gene class", "Gene copies", "Recovered", "Correct plasmid", "Wrong plasmid",
-                      "Shared contig", "Unassigned contig", "Correct-plasmid rate", "Replicon-type correct"],
-                     [(r["tool"], r["gene_class"], r["n_gene_copies"], r["n_recovered"], r["n_correct_plasmid"],
-                       r["n_wrong_plasmid"], r["n_shared_contig"], r["n_unassigned_contig"], r["correct_plasmid_rate"],
-                       r["replicon_type_correct_rate"]) for r in rows])
-    return section("amr-placement", "AMR genes on the right plasmid",
-                   "Each curated AMR gene copy is matched by position. Level 2: the bin holding it is matched "
-                   "one-to-one to the gene's own plasmid. Level 1: that plasmid shares a replicon type with the gene's "
-                   "plasmid. Copies on shared or unassigned contigs are their own category. Gene classes come from "
-                   "config/amr_gene_classes.tsv.", body)
+        return section("amr-placement", "AMR genes on the right plasmid", AMR_LEAD,
+                       not_run("AMR placement", "no curated truth_amr.tsv passed validation, or RUN_AMR_PLACEMENT=0"))
+    tables = table(["Tool", "Gene class", "Gene copies", "Recovered", "Correct plasmid", "Wrong plasmid",
+                    "Shared contig", "Unassigned contig", "Correct-plasmid rate", "Replicon-type correct"],
+                   [(r["tool"], r["gene_class"], r["n_gene_copies"], r["n_recovered"], r["n_correct_plasmid"],
+                     r["n_wrong_plasmid"], r["n_shared_contig"], r["n_unassigned_contig"], r["correct_plasmid_rate"],
+                     r["replicon_type_correct_rate"]) for r in rows])
+    payload = report_3d.rings_payload(data_dir)
+    scene = report_3d.build_rings(payload) if payload else {"prims": []}
+    if not scene["prims"]:
+        note = ("<p class='muted'>The per-sample placement files (&lt;sample&gt;/&lt;tool&gt;.amr_placement.tsv) were not found, "
+                "so the ring view is unavailable; the summary table is below.</p>")
+        return section("amr-placement", "AMR genes on the right plasmid", AMR_LEAD, note + tables)
+    return section("amr-placement", "AMR genes on the right plasmid", AMR_LEAD,
+                   report_3d.host("rings", "v3-data-amr", payload, scene, -18, 26) + collapsible(tables))
 
 
 def validity_section(leaderboard, provenance, evaluation, crosscheck=()):
@@ -363,12 +388,25 @@ def markdown(sources):
     return "\n".join(lines) + "\n"
 
 
+def regret_path(sources):
+    """benchmark.recommender_regret.tsv sits beside benchmark.recommender_eval.tsv (an explicit source wins)."""
+    if sources.get("recommender_regret"):
+        return sources["recommender_regret"]
+    eval_path = sources.get("recommender_eval")
+    if eval_path:
+        path = Path(eval_path)
+        if "recommender_eval" in path.name:
+            return path.with_name(path.name.replace("recommender_eval", "recommender_regret"))
+    return None
+
+
 def inject(page, sources):
     """Insert every section before Recommendations, with nav links."""
     leaderboard = read_tsv(sources.get("leaderboard"))
     provenance = read_tsv(sources.get("truth_provenance"))
     evaluation = read_tsv(sources.get("recommender_eval"))
     crosscheck = read_tsv(sources.get("contig_crosscheck"))
+    taxon = read_tsv(sources.get("leave_taxon_out"))
     html_sections = (
         prereg_section(read_json(sources.get("manifest")))
         + scoring_additions_section(leaderboard)
@@ -378,10 +416,12 @@ def inject(page, sources):
         + contig_layer_section(leaderboard, read_tsv(sources.get("scores")), crosscheck)
         + outcome_states_section(read_tsv(sources.get("outcome_states")), read_tsv(sources.get("tool_status")))
         + recommender_section(evaluation, read_json(sources.get("recommender_verdict")),
-                              read_tsv(sources.get("warning_eval")))
-        + transfer_section(read_tsv(sources.get("leave_taxon_out")), read_tsv(sources.get("comparisons")))
-        + amr_section(read_tsv(sources.get("amr_placement")))
+                              read_tsv(sources.get("warning_eval")), read_tsv(regret_path(sources)), taxon)
+        + transfer_section(taxon, read_tsv(sources.get("comparisons")))
+        + amr_section(read_tsv(sources.get("amr_placement")), sources.get("data_dir"))
         + validity_section(leaderboard, provenance, evaluation, crosscheck))
+    if "class='v3'" in html_sections:
+        html_sections = report_3d.assets() + html_sections   # the 3D engine, once, before the first view
     anchor = "<section id='recommendations'>"
     if anchor in page:
         page = page.replace(anchor, html_sections + anchor, 1)

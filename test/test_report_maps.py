@@ -58,6 +58,13 @@ def svgs(html_text):
     return re.findall(r"<svg.*?</svg>", html_text, re.S)
 
 
+def fallback(page):
+    """The static no-JavaScript maps of the section (the viewer's scripts also contain svg text, which is not a map)."""
+    start = page.index("<div class='pv-fallback'>")
+    end = page.find("<script>", start)
+    return page[start:end if end > 0 else len(page)]
+
+
 def parses(markup):
     try:
         ET.fromstring(markup)
@@ -219,25 +226,28 @@ def main():
         write(scores, ["sample", "tool", "analysis_track"], [["sA", "mob", "short_read"], ["sB", "mob", "short_read"], ["sA", "baseline_x", "short_read"]])
         write(os.path.join(res, "benchmark.leaderboard.tsv"), ["rank", "analysis_track", "tool"], [["1", "short_read", "mob"]])
         out = rm.inject(PAGE, res, data, scores)
-        check("both samples produce a map and a gallery row", len(svgs(out)) == 2 and out.count("href='#map-") == 2)
-        check("every svg in the section is well-formed", all(parses(s) for s in svgs(out)))
+        static = fallback(out)
+        check("both samples produce a static fallback map, a payload and a gallery row linking to the viewer",
+              len(svgs(static)) == 2 and out.count("class='pv-data'") == 2 and out.count("href='#plasmid-maps?msample=") == 2)
+        check("every static svg in the section is well-formed", all(parses(s) for s in svgs(static)))
+        check("the gallery table is collapsed in a details element", "<details class='pv-index'>" in out and "id='pv-root' hidden" in out)
         check("the first sample is open, the second is not", out.count("<details open>") == 1 and out.count("<details>") == 1)
         check("badge from the tool tables", "50% | fragmented | AMR 1/2" in out)
         check("the AMR gene without a protein is drawn as a feature block", "sul1" in out)
         check("the duplicate AMR gene is drawn once as an arrow and not again as a block",
-              sum(1 for s in svgs(out)[:1] for g in elements(s, "path", "gene") if g.get("data-name") == "blaCTX-M-15") == 1)
-        check("structural event ticks from both coordinates (4,000 and 2,000)", len(elements(svgs(out)[0], "line", "event")) == 2)
+              sum(1 for s in svgs(static)[:1] for g in elements(s, "path", "gene") if g.get("data-name") == "blaCTX-M-15") == 1)
+        check("structural event ticks from both coordinates (4,000 and 2,000)", len(elements(svgs(static)[0], "line", "event")) == 2)
         check("the checkbox ids are unique across the page", len(re.findall(r"\bid='([^']+)'", out)) == len(set(re.findall(r"\bid='([^']+)'", out))))
         check("the section sits before Recommendations", out.index("id='plasmid-maps'") < out.index("id='recommendations'"))
         again = rm.inject(PAGE, res, "", scores)
         check("data_dir may be falsy (truth is then read from the results dir): still a section, with maps drawn without annotation",
-              "id='plasmid-maps'" in again and len(svgs(again)) == 2 and "No truth annotation" in again)
+              "id='plasmid-maps'" in again and len(svgs(fallback(again))) == 2 and "No truth annotation" in again)
 
     print("the demo cohort")
     demo = os.path.join(HERE, "..", "results_demo")
     if os.path.isfile(os.path.join(demo, "ecoli_a", "visualization", "alignment_blocks.json")):
         out = rm.inject(PAGE, demo, None, os.path.join(demo, "scores.tsv"))
-        maps = svgs(out)
+        maps = svgs(fallback(out))
         check("at least one map is produced from results_demo", len(maps) >= 1)
         check("every demo map is well-formed", all(parses(s) for s in maps))
         check("demo ids are unique", len(re.findall(r"\bid='([^']+)'", out)) == len(set(re.findall(r"\bid='([^']+)'", out))))

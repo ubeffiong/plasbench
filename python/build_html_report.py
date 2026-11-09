@@ -1135,6 +1135,7 @@ def headline_design_section(out_dir):
         "headline. Replicons whose plasmid/chromosome label conflicts with marker, rRNA or long-read evidence are "
         "AMBIGUOUS and excluded from scoring. The ranking score averages per-species means over species with "
         "enough independent (non-clonal) isolates; smaller species are described only.</p>"
+        "<details class='rpt-collapsible'><summary>Show the reference standard, truth provenance, tier sensitivity and species balance</summary>"
         "<div class='panel'><table><thead><tr><th>Track</th><th>Task</th><th>Ranking metric</th>"
         f"<th>Reference standard</th><th>Species basis</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
         f"<h3>Truth provenance</h3><p class='muted'>Tier counts: "
@@ -1147,7 +1148,7 @@ def headline_design_section(out_dir):
         "<h3>Reference-tier sensitivity</h3><div class='chart-card'>" + chart + "</div>"
         "<h3>Species balance</h3><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th>"
         "<th>Tool</th><th>Species</th><th>Samples</th><th>Independent clusters</th><th>Mean ranking metric</th>"
-        f"<th>In headline</th></tr></thead><tbody>{species_rows}</tbody></table></div></section>"
+        f"<th>In headline</th></tr></thead><tbody>{species_rows}</tbody></table></div></details></section>"
     )
 
 
@@ -2596,17 +2597,16 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # Evaluation additions learned from PlasEval, plsMD and GAEMR (python/report_learnings.py): read from the stage-6 tables.
     import report_learnings
     page = report_learnings.inject(page, str(out.parent), args.scores)
-    # Report overhaul: scorecard, circular plasmid maps, workflow figure and the "Data in this report" inventory
-    # (python/report_scorecard.py, report_maps.py, report_workflow.py, report_surfaces.py; shared helpers in report_common.py).
+    # Report overhaul: scorecard, circular plasmid maps and the "Data in this report" inventory
+    # (python/report_scorecard.py, report_maps.py, report_surfaces.py; shared helpers in report_common.py).
+    # The workflow figure is in the README (python/report_workflow.py writes docs/images/workflow.svg).
     import report_common
     import report_maps
     import report_scorecard
     import report_surfaces
-    import report_workflow
     page = report_common.add_style(page)
     page = report_scorecard.inject(page, str(out.parent), args.scores)
     page = report_maps.inject(page, str(out.parent), args.data_dir, args.scores)
-    page = report_workflow.inject(page, str(out.parent), args.scores, args.tool_status, args.data_dir)
     # Outputs the report did not show before (per-plasmid detail, assembly quality, clonal groups, regret, truth depth, column
     # groups, Run files) and the grouped navigation (python/report_wiring.py). Before the inventory so it lists them as shown.
     page = report_wiring.inject(page, str(out.parent), args.data_dir, args.scores)

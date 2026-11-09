@@ -1,0 +1,932 @@
+<script>
+/* PlasBench plasmid viewer, pure core: geometry, scene building, filters, zoom maths, URL hash, TSV.
+   No DOM access here. The same file is loaded by node in test/test_plasmid_viewer.py (module.exports) and by the browser (window.PlasmidViewerCore). */
+(function (root) {
+'use strict';
+var PV = {};
+var C = PV.cfg = {
+  W: 1100, H: 900, R_OUT: 330, R_MIN: 105, GAP: 3, TOOL_LABEL_FONT: 8, LABEL_FONT: 10, COVERAGE_GOOD: 0.9,
+  COVER_FILL: '#3b6ea8', EVENT_STROKE: '#111111', MAX_TOOLS: 8,
+  classes: ['replication', 'amr', 'mobile', 'transfer', 'metal', 'integrase', 'maintenance', 'other'],
+  labels: {replication: 'Replication', amr: 'Antimicrobial resistance', mobile: 'Mobile element / IS', transfer: 'Conjugation / transfer',
+           metal: 'Metal / biocide resistance', integrase: 'Integrase', maintenance: 'Maintenance', other: 'Other genes'},
+  palettes: {
+    'default': {replication: '#882255', amr: '#D55E00', mobile: '#56B4E9', transfer: '#0072B2', metal: '#E69F00', integrase: '#CC79A7',
+                maintenance: '#009E73', other: '#8c8c8c', cover: '#3b6ea8', skewPos: '#009E73', skewNeg: '#8e4ba0'},
+    cvd: {replication: '#332288', amr: '#D55E00', mobile: '#88CCEE', transfer: '#0072B2', metal: '#DDCC77', integrase: '#CC79A7',
+          maintenance: '#117733', other: '#999999', cover: '#0072B2', skewPos: '#0072B2', skewNeg: '#D55E00'}
+  },
+  priority: {amr: 100, replication: 90, relaxase: 80, mobile: 70, transfer: 50, integrase: 40}
+};
+PV.configure = function (cfg) {
+  var k;
+  for (k in (cfg || {})) { if (Object.prototype.hasOwnProperty.call(cfg, k)) { C[k] = cfg[k]; } }
+  C.CX = C.W / 2; C.CY = C.H / 2;
+  return C;
+};
+PV.configure({});
+
+/* ---------- numbers and basic geometry (ports of python/report_svg.py) ---------- */
+function mod(a, n) { return ((a % n) + n) % n; }
+PV.mod = mod;
+function num(x, d) {
+  if (d === undefined) { d = 2; }
+  if (!isFinite(x)) { throw new Error('non-finite coordinate: ' + x); }
+  var t = x.toFixed(d), p10 = Math.pow(10, d), sc = x * p10, n = Math.floor(sc);
+  /* python rounds an exact tie (such as 395.125) to even, toFixed rounds it up: match python so the two renderers print the same text */
+  if (Math.abs(x) < 1e12 && sc === n + 0.5 && sc / p10 === x) { t = ((n % 2 === 0 ? n : n + 1) / p10).toFixed(d); }
+  if (t.indexOf('.') >= 0) { t = t.replace(/0+$/, '').replace(/\.$/, ''); }
+  return (t === '' || t === '-0') ? '0' : t;
+}
+PV.num = num;
+function esc(v) {
+  var s = String(v === null || v === undefined ? '' : v), out = '', i, c, code;
+  for (i = 0; i < s.length; i++) {
+    c = s.charAt(i); code = s.charCodeAt(i);
+    out += c === '&' ? '&amp;' : (c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (code === 34 ? '&quot;' : (code === 39 ? '&#39;' : c))));
+  }
+  return out;
+}
+PV.esc = esc;
+PV.bpToDeg = function (pos, len) { return len <= 0 ? 0 : mod(pos, len) / len * 360; };
+function polar(cx, cy, r, deg) {
+  var rad = deg * Math.PI / 180;
+  return [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
+}
+PV.polar = polar;
+function pt(p) { return num(p[0]) + ' ' + num(p[1]); }
+
+PV.splitWrapped = function (start, end, length) {
+  if (length <= 0) { return []; }
+  if (start === end) { return []; }
+  if (end - start >= length && end > start) { return [[0, length]]; }
+  if (start >= length) { start = start % length; }
+  if (end > length) { end = end % length; }
+  if (start < end) { return [[Math.max(0, start), Math.min(length, end)]]; }
+  var parts = [];
+  if (start < length) { parts.push([start, length]); }
+  if (end > 0) { parts.push([0, end]); }
+  return parts;
+};
+
+PV.ringPath = function (cx, cy, rIn, rOut) {
+  return 'M' + num(cx - rOut) + ' ' + num(cy) + 'A' + num(rOut) + ' ' + num(rOut) + ' 0 1 1 ' + num(cx + rOut) + ' ' + num(cy) +
+    'A' + num(rOut) + ' ' + num(rOut) + ' 0 1 1 ' + num(cx - rOut) + ' ' + num(cy) + 'Z' +
+    'M' + num(cx - rIn) + ' ' + num(cy) + 'A' + num(rIn) + ' ' + num(rIn) + ' 0 1 0 ' + num(cx + rIn) + ' ' + num(cy) +
+    'A' + num(rIn) + ' ' + num(rIn) + ' 0 1 0 ' + num(cx - rIn) + ' ' + num(cy) + 'Z';
+};
+PV.sectorPath = function (cx, cy, rIn, rOut, a0, a1) {
+  var sweep = a1 - a0;
+  if (sweep <= 0) { return ''; }
+  if (sweep >= 359.999) { return PV.ringPath(cx, cy, rIn, rOut); }
+  var large = sweep > 180 ? 1 : 0;
+  return 'M' + pt(polar(cx, cy, rOut, a0)) + 'A' + num(rOut) + ' ' + num(rOut) + ' 0 ' + large + ' 1 ' + pt(polar(cx, cy, rOut, a1)) +
+    'L' + pt(polar(cx, cy, rIn, a1)) + 'A' + num(rIn) + ' ' + num(rIn) + ' 0 ' + large + ' 0 ' + pt(polar(cx, cy, rIn, a0)) + 'Z';
+};
+PV.arrowPath = function (cx, cy, rIn, rOut, a0, a1, forward, headDeg, headFrac) {
+  var sweep = a1 - a0;
+  if (sweep <= 0) { return ''; }
+  if (headFrac === undefined || headFrac === null) { headFrac = 0.32; }
+  var head = (headDeg !== undefined && headDeg !== null) ? headDeg : Math.min(4.0, sweep * headFrac);
+  head = Math.min(head, sweep);
+  var mid = (rIn + rOut) / 2, half = (rOut - rIn) / 2, flare = half * 1.25;
+  var shaftOut = mid + half * 0.62, shaftIn = mid - half * 0.62, base, large, d;
+  if (forward) {
+    base = a1 - head;
+    d = ['M' + pt(polar(cx, cy, shaftOut, a0))];
+    if (base > a0) {
+      large = (base - a0) > 180 ? 1 : 0;
+      d.push('A' + num(shaftOut) + ' ' + num(shaftOut) + ' 0 ' + large + ' 1 ' + pt(polar(cx, cy, shaftOut, base)));
+    }
+    d.push('L' + pt(polar(cx, cy, mid + flare, base)));
+    d.push('L' + pt(polar(cx, cy, mid, a1)));
+    d.push('L' + pt(polar(cx, cy, mid - flare, base)));
+    d.push('L' + pt(polar(cx, cy, shaftIn, base)));
+    if (base > a0) {
+      large = (base - a0) > 180 ? 1 : 0;
+      d.push('A' + num(shaftIn) + ' ' + num(shaftIn) + ' 0 ' + large + ' 0 ' + pt(polar(cx, cy, shaftIn, a0)));
+    }
+    d.push('Z');
+    return d.join('');
+  }
+  base = a0 + head;
+  d = ['M' + pt(polar(cx, cy, mid, a0))];
+  d.push('L' + pt(polar(cx, cy, mid + flare, base)));
+  d.push('L' + pt(polar(cx, cy, shaftOut, base)));
+  if (a1 > base) {
+    large = (a1 - base) > 180 ? 1 : 0;
+    d.push('A' + num(shaftOut) + ' ' + num(shaftOut) + ' 0 ' + large + ' 1 ' + pt(polar(cx, cy, shaftOut, a1)));
+  }
+  d.push('L' + pt(polar(cx, cy, shaftIn, a1)));
+  if (a1 > base) {
+    large = (a1 - base) > 180 ? 1 : 0;
+    d.push('A' + num(shaftIn) + ' ' + num(shaftIn) + ' 0 ' + large + ' 0 ' + pt(polar(cx, cy, shaftIn, base)));
+  }
+  d.push('L' + pt(polar(cx, cy, mid - flare, base)));
+  d.push('Z');
+  return d.join('');
+};
+PV.shaftPath = function (cx, cy, rIn, rOut, a0, a1) {
+  var mid = (rIn + rOut) / 2, half = (rOut - rIn) / 2;
+  return PV.sectorPath(cx, cy, mid - half * 0.62, mid + half * 0.62, a0, a1);
+};
+PV.niceTicks = function (length, target) {
+  if (target === undefined) { target = 10; }
+  if (length <= 0 || target <= 0) { return {step: 0, ticks: []}; }
+  var raw = length / target;
+  var magnitude = raw > 0 ? Math.pow(10, Math.floor(Math.log10(raw))) : 1;
+  var cands = [], i, f, m, ms = [magnitude, magnitude * 10], fs = [1, 2, 5];
+  for (m = 0; m < 2; m++) { for (f = 0; f < 3; f++) { cands.push(fs[f] * ms[m]); } }
+  var best = cands[0];
+  for (i = 1; i < cands.length; i++) { if (Math.abs(length / cands[i] - target) < Math.abs(length / best - target)) { best = cands[i]; } }
+  var step = Math.max(1, Math.floor(best)), ticks = [];
+  for (i = 0; i < length; i += step) { ticks.push(i); }
+  return {step: step, ticks: ticks};
+};
+function g6(x) { return String(Number(x.toPrecision(6))); }
+PV.kbLabel = function (p) {
+  if (p === 0) { return '0'; }
+  if (p >= 1000000) { return g6(p / 1000000) + ' Mb'; }
+  if (p >= 1000) { return g6(p / 1000) + ' kb'; }
+  return p + ' bp';
+};
+/* a label with just enough decimals for the tick step (zoomed views) */
+PV.stepLabel = function (p, step) {
+  if (step >= 1000 || p < 1000) { return PV.kbLabel(p); }
+  var dec = Math.min(4, Math.ceil(-Math.log10(step / 1000)));
+  if (p >= 1000000) { return (p / 1000000).toFixed(Math.min(5, dec + 3)).replace(/0+$/, '').replace(/\.$/, '') + ' Mb'; }
+  return (p / 1000).toFixed(dec).replace(/0+$/, '').replace(/\.$/, '') + ' kb';
+};
+PV.textBox = function (text, fontSize, x, y, anchor) {
+  var width = text.length * fontSize * 0.56, height = fontSize * 1.15, x0, x1;
+  if (anchor === 'end') { x0 = x - width; x1 = x; } else if (anchor === 'middle') { x0 = x - width / 2; x1 = x + width / 2; } else { x0 = x; x1 = x + width; }
+  return [x0, y - height * 0.8, x1, y + height * 0.2];
+};
+function overlap(a, b, pad) {
+  if (pad === undefined) { pad = 2.0; }
+  return !(a[2] + pad <= b[0] || b[2] + pad <= a[0] || a[3] + pad <= b[1] || b[3] + pad <= a[1]);
+}
+PV.overlap = overlap;
+
+/* Port of report_svg.place_labels: no two label boxes overlap, every label tries radial levels and small angular shifts. */
+PV.placeLabels = function (items, cx, cy, rBase, fontSize, width, height, levels, levelStep, maxShiftDeg, avoid) {
+  if (levels === undefined) { levels = 4; }
+  if (levelStep === undefined || levelStep === null) { levelStep = fontSize * 1.5; }
+  if (maxShiftDeg === undefined) { maxShiftDeg = 14.0; }
+  var order = items.map(function (it, i) { return [i, it]; });
+  order.sort(function (a, b) {
+    var pa = -(a[1].priority || 0), pb = -(b[1].priority || 0);
+    if (pa !== pb) { return pa - pb; }
+    var aa = mod(a[1].angle, 360), ab = mod(b[1].angle, 360);
+    if (aa !== ab) { return aa - ab; }
+    return a[0] - b[0];
+  });
+  var placed = [], dropped = [], boxes = (avoid || []).slice();
+  order.forEach(function (pair) {
+    var item = pair[1], done = false, shifts = [0], step = Math.max(1.0, fontSize / Math.max(rBase, 1.0) * 57.3 * 0.6), k = 1, level, s, radius;
+    while (k * step <= maxShiftDeg) { shifts.push(k * step, -k * step); k++; }
+    for (level = 0; level < levels && !done; level++) {
+      radius = rBase + fontSize * 0.6 + level * levelStep;
+      for (s = 0; s < shifts.length; s++) {
+        var angle = mod(item.angle + shifts[s], 360), p = polar(cx, cy, radius, angle), x = p[0], y = p[1];
+        var anchor = x >= cx ? 'start' : 'end';
+        var bx = x + (anchor === 'start' ? 3 : -3), by = y + fontSize * 0.35;
+        var box = PV.textBox(item.text, fontSize, bx, by, anchor);
+        if (box[0] < 0 || box[2] > width || box[1] < 0 || box[3] > height) { continue; }
+        var clash = false, o;
+        for (o = 0; o < boxes.length; o++) { if (overlap(box, boxes[o])) { clash = true; break; } }
+        if (clash) { continue; }
+        boxes.push(box);
+        var f = polar(cx, cy, rBase, item.angle), out = {};
+        Object.keys(item).forEach(function (key) { out[key] = item[key]; });
+        out.x = bx; out.y = by; out.anchor = anchor; out.box = box; out.leader = [f, [x, y]]; out.level = level;
+        placed.push(out);
+        done = true;
+        break;
+      }
+    }
+    if (!done) { dropped.push(item); }
+  });
+  return {placed: placed, dropped: dropped};
+};
+
+/* ---------- classification helpers (class itself is decided in python and shipped in the payload) ---------- */
+function isRelaxase(g) {
+  var t = ((g.name || '') + ' ' + (g.product || '') + ' ' + (g.ftype || '')).toLowerCase();
+  return t.indexOf('relaxase') >= 0 || t.indexOf('mob') >= 0;
+}
+
+/* ---------- view maths: the visible region [start, start+span) is laid over the circle ---------- */
+PV.makeView = function (len, start, span, minSpan) {
+  if (minSpan === undefined) { minSpan = Math.min(len, 50); }
+  if (!span || span >= len) { span = len; }
+  span = Math.max(minSpan, Math.min(len, span));
+  var full = span >= len;
+  var sweep = full ? 360 : 340;
+  return {len: len, start: len > 0 ? mod(start || 0, len) : 0, span: span, full: full, sweep: sweep, off: (360 - sweep) / 2};
+};
+PV.relBp = function (view, bp) { return mod(bp - view.start, view.len); };
+PV.bpToAngle = function (view, bp) {
+  var rel = mod(bp - view.start, view.len);
+  if (rel > view.span) {
+    if (view.full) { rel = rel % view.len; } else { return null; }
+  }
+  return view.off + rel / view.span * view.sweep;
+};
+PV.angleToBp = function (view, ang, clamp) {
+  var a = view.full ? mod(ang, 360) : ang - view.off;
+  if (view.full) { return mod(view.start + a / 360 * view.len, view.len); }
+  if (a < 0 || a > view.sweep) {
+    if (!clamp) { return null; }
+    a = Math.max(0, Math.min(view.sweep, a));
+  }
+  return mod(view.start + a / view.sweep * view.span, view.len);
+};
+PV.angleToRel = function (view, ang) {
+  var a = view.full ? mod(ang, 360) : Math.max(0, Math.min(view.sweep, ang - view.off));
+  return a / view.sweep * view.span;
+};
+PV.clampRegion = function (len, start, end, minSpan) {
+  if (minSpan === undefined) { minSpan = Math.min(len, 50); }
+  var span = mod(end - start, len);
+  if (span === 0) { span = len; }
+  span = Math.max(minSpan, Math.min(len, span));
+  var s = mod(start, len), e = mod(s + span, len);
+  if (e === 0) { e = len; }
+  return {start: s, end: e, span: span};
+};
+PV.zoomAt = function (view, ang, factor, minSpan) {
+  var rel = PV.angleToRel(view, ang), frac = rel / view.span;
+  var span = Math.max(minSpan === undefined ? Math.min(view.len, 50) : minSpan, Math.min(view.len, view.span / factor));
+  return {start: mod(view.start + rel - frac * span, view.len), span: span};
+};
+PV.rotateView = function (view, deltaDeg) {
+  return {start: mod(view.start - deltaDeg / view.sweep * view.span, view.len), span: view.span};
+};
+PV.originAt = function (view, bp) {
+  return view.full ? {start: mod(bp, view.len), span: view.span} : {start: mod(bp - view.span / 2, view.len), span: view.span};
+};
+PV.regionFor = function (len, s, e, pad, minSpan) {
+  if (pad === undefined) { pad = 0.2; }
+  var span = (e >= s) ? e - s : e + len - s;
+  if (span <= 0) { span = 1; }
+  var padBp = Math.max(span * pad, 25), total = span + 2 * padBp;
+  if (minSpan === undefined) { minSpan = Math.min(len, 400); }
+  total = Math.max(minSpan, total);
+  if (total >= len) { return {start: 0, span: len}; }
+  return {start: mod(s - (total - span) / 2, len), span: total};
+};
+PV.lerpView = function (len, a, b, t) {
+  var d = mod(b.start - a.start + len / 2, len) - len / 2;
+  var sa = Math.log(Math.max(1, a.span)), sb = Math.log(Math.max(1, b.span));
+  var span = Math.exp(sa + (sb - sa) * t);
+  if (t >= 1) { span = b.span; }
+  return {start: mod(a.start + d * t, len), span: Math.min(len, span)};
+};
+/* fragments of the bp interval [s, e) (already unwrapped, s <= e) that fall inside the view, as relative offsets from view.start */
+PV.clipPiece = function (view, s, e) {
+  var L = view.len, n = e - s, r0 = mod(s - view.start, L), out = [], c, cands = [r0, r0 - L], i;
+  for (i = 0; i < cands.length; i++) {
+    c = cands[i];
+    var lo = Math.max(c, 0), hi = Math.min(c + n, view.span);
+    if (hi > lo || (n === 0 && c >= 0 && c <= view.span)) { out.push({rel0: lo, rel1: hi, cutL: lo > c, cutR: hi < c + n}); }
+  }
+  return out;
+};
+PV.relAngle = function (view, rel) { return view.off + rel / view.span * view.sweep; };
+
+/* ---------- model ---------- */
+function mergeIntervals(iv) {
+  var a = iv.map(function (x) { return [Number(x[0]), Number(x[1])]; }).filter(function (x) { return x[1] > x[0]; }).sort(function (p, q) { return p[0] - q[0]; });
+  var out = [];
+  a.forEach(function (x) {
+    if (out.length && x[0] <= out[out.length - 1][1]) { out[out.length - 1][1] = Math.max(out[out.length - 1][1], x[1]); } else { out.push([x[0], x[1]]); }
+  });
+  return out;
+}
+PV.mergeIntervals = mergeIntervals;
+function sumLen(iv) { var t = 0; iv.forEach(function (x) { t += x[1] - x[0]; }); return t; }
+PV.coveredIn = function (intervals, s, e, len) {
+  var pieces = PV.splitWrapped(s, e, len), total = 0;
+  pieces.forEach(function (p) {
+    intervals.forEach(function (iv) { var lo = Math.max(p[0], iv[0]), hi = Math.min(p[1], iv[1]); if (hi > lo) { total += hi - lo; } });
+  });
+  return total;
+};
+PV.geneLength = function (g, len) { return g.start <= g.end ? g.end - g.start : g.end + len - g.start; };
+
+/* compact payload -> model. See report_maps.viewer_payload for the key legend. */
+PV.normalize = function (raw) {
+  var m = {id: raw.id, sample: raw.sample, plasmid: raw.plasmid, length: raw.length, circular: raw.circ === undefined ? null : raw.circ,
+           repeatRich: raw.rr === undefined ? null : raw.rr, repeatRegions: raw.rg || [], notes: raw.notes || [], genes: [], tools: [], events: [], gc: null,
+           toolsNotDrawn: raw.nd || []};
+  (raw.genes || []).forEach(function (g, i) {
+    m.genes.push({i: i, start: g.s, end: g.e, strand: g.t || '', name: g.n || '', product: g.p || '', cls: g.c || 'other', kind: g.k || 'gene', ftype: g.f || ''});
+  });
+  (raw.tools || []).forEach(function (t, i) {
+    var iv = mergeIntervals(t.iv || []);
+    var tool = {i: i, name: t.n, label: t.dn || t.n, track: t.tr || '', rank: t.rk === undefined ? null : t.rk, completeness: t.cm === undefined ? null : t.cm,
+                outcome: t.oc || '', intervals: iv, coveredBp: sumLen(iv), amrTotal: t.at === undefined ? null : t.at, amrRecovered: t.ar || [],
+                amr: (t.am || []).map(function (a) { return {gene: a.g, cls: a.c || '', start: a.s, end: a.e, placement: a.pl || '', repOk: a.rc || '', record: a.r || '', bin: a.b || ''}; }),
+                outcomeDetail: t.od ? {bin: t.od.b || '', recall: t.od.r === undefined ? null : t.od.r, precision: t.od.p === undefined ? null : t.od.p, bins: t.od.n === undefined ? null : t.od.n,
+                                       mergedWith: t.od.m || '', contamination: t.od.c === undefined ? null : t.od.c} : null,
+                def: !!t.d, events: []};
+    (t.ev || []).forEach(function (ev) {
+      var e = {i: m.events.length, tool: i, toolName: t.n, toolLabel: t.dn || t.n, pos: ev.p, type: ev.t || 'event', record: ev.r || '', detail: ev.d || ''};
+      m.events.push(e); tool.events.push(e);
+    });
+    m.tools.push(tool);
+  });
+  if (raw.gc) { m.gc = {window: raw.gc.w, mean: raw.gc.m, gc: raw.gc.g, skew: raw.gc.k}; }
+  return m;
+};
+
+/* ---------- state ---------- */
+PV.defaultState = function () {
+  return {sample: '', plasmid: '', view: {start: 0, span: 0}, sel: null, tab: 'layers',
+    layers: {fwd: true, rev: true, feat: true, repeat: true, gc: true, skew: true, events: true, scale: true, labels: true},
+    toolsOn: null, toolSort: 'default', order: 'gtc', thGene: 1, thTool: 1, hideCls: {}, minBp: 0, labelMode: 'key', q: '',
+    cvd: false, labelSize: 1, legend: true, hl: null};
+};
+PV.LAYER_KEYS = ['fwd', 'rev', 'feat', 'repeat', 'gc', 'skew', 'events', 'scale', 'labels'];
+PV.TABS = ['layers', 'filters', 'tools', 'features', 'events', 'detail', 'appearance', 'export'];
+PV.sortTools = function (model, mode) {
+  var a = model.tools.slice();
+  if (mode === 'completeness') { a.sort(function (p, q) { return ((q.completeness === null ? -1 : q.completeness) - (p.completeness === null ? -1 : p.completeness)) || p.i - q.i; }); }
+  else if (mode === 'rank') { a.sort(function (p, q) { return ((p.rank === null ? 1e9 : p.rank) - (q.rank === null ? 1e9 : q.rank)) || p.i - q.i; }); }
+  else if (mode === 'name') { a.sort(function (p, q) { return p.name < q.name ? -1 : (p.name > q.name ? 1 : p.i - q.i); }); }
+  return a;
+};
+PV.visibleTools = function (model, state) {
+  var on = state.toolsOn, set = null;
+  if (on) { set = {}; on.forEach(function (n) { set[n] = true; }); }
+  return PV.sortTools(model, state.toolSort).filter(function (t) { return set ? !!set[t.name] : t.def; });
+};
+PV.bestTools = function (model, n) {
+  return model.tools.slice().sort(function (p, q) { return ((p.rank === null ? 1e9 : p.rank) - (q.rank === null ? 1e9 : q.rank)) || ((q.completeness || 0) - (p.completeness || 0)) || p.i - q.i; })
+    .slice(0, n).map(function (t) { return t.name; });
+};
+PV.geneRing = function (g) { return g.strand === '+' ? 'fwd' : (g.strand === '-' ? 'rev' : 'feat'); };
+PV.filterGenes = function (model, state) {
+  var out = [];
+  model.genes.forEach(function (g) {
+    if (state.hideCls[g.cls]) { return; }
+    if (!state.layers[PV.geneRing(g)]) { return; }
+    if (state.minBp > 0 && PV.geneLength(g, model.length) < state.minBp) { return; }
+    out.push(g.i);
+  });
+  return out;
+};
+PV.searchGenes = function (model, q) {
+  q = (q || '').trim().toLowerCase();
+  if (!q) { return []; }
+  var hits = [];
+  model.genes.forEach(function (g) {
+    var n = g.name.toLowerCase(), p = g.product.toLowerCase(), score = 0;
+    if (n === q) { score = 4; } else if (n.indexOf(q) === 0) { score = 3; } else if (n.indexOf(q) >= 0) { score = 2; }
+    else if (p.indexOf(q) >= 0 || g.cls.indexOf(q) >= 0 || g.ftype.toLowerCase().indexOf(q) >= 0) { score = 1; }
+    if (score) { hits.push([score, g.start, g.i]); }
+  });
+  hits.sort(function (a, b) { return (b[0] - a[0]) || (a[1] - b[1]) || (a[2] - b[2]); });
+  return hits.map(function (h) { return h[2]; });
+};
+
+/* ---------- layout of rings ---------- */
+PV.ringSpec = function (model, state) {
+  var haveFeat = model.genes.some(function (g) { return g.strand !== '+' && g.strand !== '-'; });
+  var tools = PV.visibleTools(model, state), tg = state.thGene || 1, tt = state.thTool || 1;
+  var genes = [], toolSpec = [], gcSpec = [], i;
+  if (state.layers.fwd) { genes.push(['fwd', 18 * tg]); }
+  if (state.layers.rev) { genes.push(['rev', 18 * tg]); }
+  if (haveFeat && state.layers.feat) { genes.push(['feat', 12 * tg]); }
+  for (i = 0; i < tools.length; i++) { toolSpec.push(['t' + tools[i].i, 13 * tt]); }
+  if (model.gc) {
+    if (state.layers.gc) { gcSpec.push(['gc', 22]); }
+    if (state.layers.skew) { gcSpec.push(['skew', 22]); }
+  }
+  var o = state.order || 'gtc';
+  if (o === 'tgc') { return toolSpec.concat(genes, gcSpec); }
+  if (o === 'gct') { return gcSpec.concat(genes, toolSpec); }
+  return genes.concat(toolSpec, gcSpec);
+};
+PV.ringBounds = function (spec, maxScale) {
+  var needed = 0, i;
+  for (i = 0; i < spec.length; i++) { needed += spec[i][1]; }
+  needed += C.GAP * Math.max(0, spec.length - 1);
+  var scale = needed > 0 ? Math.min(maxScale === undefined ? 1.0 : maxScale, (C.R_OUT - C.R_MIN) / needed) : 1;
+  var out = {}, r = C.R_OUT;
+  spec.forEach(function (s) { var h = s[1] * scale; out[s[0]] = [r - h, r]; r -= h + C.GAP * scale; });
+  return {rings: out, scale: scale};
+};
+
+/* ---------- scene ---------- */
+function txt(x, y, content, size, anchor, weight, fill, extra) {
+  return "<text x='" + num(x) + "' y='" + num(y) + "' font-size='" + num(size) + "' text-anchor='" + anchor + "' font-weight='" + weight + "' fill='" +
+    fill + "' font-family='Arial,Helvetica,sans-serif' " + (extra || '') + '>' + esc(content) + '</text>';
+}
+function pathEl(d, fill, stroke, width, extra) {
+  if (!d) { return ''; }
+  return "<path d='" + d + "' fill='" + fill + "' stroke='" + stroke + "' stroke-width='" + num(width) + "' fill-rule='evenodd' " + (extra || '') + '/>';
+}
+function ringName(text, rMid, size) {
+  var x = C.CX - 4, y = C.CY - rMid + size * 0.35;
+  return txt(x, y, text, size, 'end', 'normal', '#fff', "stroke='#fff' stroke-width='2.6' stroke-linejoin='round'") + txt(x, y, text, size, 'end', 'normal', '#222');
+}
+PV.geneShapes = function (view, g, rIn, rOut, ring) {
+  var pieces = PV.splitWrapped(g.start, g.end, view.len), out = [], forward = g.strand === '+';
+  pieces.forEach(function (pc, k) {
+    var isStart = k === 0, isEnd = k === pieces.length - 1;
+    PV.clipPiece(view, pc[0], pc[1]).forEach(function (f) {
+      var a0 = PV.relAngle(view, f.rel0), a1 = PV.relAngle(view, f.rel1), d;
+      if (a1 - a0 < 0.5) { a1 = a0 + 0.5; }
+      if (ring === 'feat') { d = PV.sectorPath(C.CX, C.CY, rIn, rOut, a0, a1); }
+      else {
+        var head = forward ? (isEnd && !f.cutR) : (isStart && !f.cutL);
+        d = head ? PV.arrowPath(C.CX, C.CY, rIn, rOut, a0, a1, forward) : PV.shaftPath(C.CX, C.CY, rIn, rOut, a0, a1);
+      }
+      out.push({d: d, a0: a0, a1: a1});
+    });
+  });
+  return out;
+};
+function midAngle(view, g) {
+  var best = null, bestLen = -1;
+  PV.splitWrapped(g.start, g.end, view.len).forEach(function (pc) {
+    PV.clipPiece(view, pc[0], pc[1]).forEach(function (f) { if (f.rel1 - f.rel0 > bestLen) { bestLen = f.rel1 - f.rel0; best = f; } });
+  });
+  return best ? PV.relAngle(view, (best.rel0 + best.rel1) / 2) : null;
+}
+function overlapFraction(a0, a1, b0, b1) {
+  var lo = Math.max(a0, b0), hi = Math.min(a1, b1), shorter = Math.max(1, Math.min(a1 - a0, b1 - b0));
+  return Math.max(0, hi - lo) / shorter;
+}
+PV.labelCandidates = function (model, state, ids) {
+  var mode = state.labelMode, out = [], taken = [];
+  if (mode === 'none' || !state.layers.labels) { return out; }
+  var order = ids.map(function (i) { return model.genes[i]; });
+  order.sort(function (a, b) { return ((a.kind === 'feature' ? 0 : 1) - (b.kind === 'feature' ? 0 : 1)) || (a.start - b.start); });
+  order.forEach(function (g) {
+    var relax = isRelaxase(g) && g.cls === 'transfer';
+    var always = g.cls === 'amr' || g.cls === 'replication' || g.cls === 'mobile' || relax;
+    if (mode === 'amr') { if (g.cls !== 'amr') { return; } }
+    else if (mode === 'key') { if (!(always || g.cls === 'transfer' || g.cls === 'integrase')) { return; } }
+    if (!g.name) { return; }
+    var dup = taken.some(function (t) { return t.cls === g.cls && overlapFraction(g.start, g.end, t.start, t.end) >= 0.5; });
+    if (dup) { return; }
+    taken.push(g);
+    out.push({g: g, relax: relax});
+  });
+  if (out.length > 350) {
+    /* placement is greedy and drops what does not fit; do not spend time on a thousand labels that cannot all be seen */
+    out.sort(function (a, b) { return ((C.priority[b.g.cls] || 10) - (C.priority[a.g.cls] || 10)) || (PV.geneLength(b.g, model.length) - PV.geneLength(a.g, model.length)); });
+    out = out.slice(0, 350);
+  }
+  return out;
+};
+PV.buildScene = function (model, state, opts) {
+  opts = opts || {};
+  var L = model.length, view = PV.makeView(L, state.view.start, state.view.span || L);
+  var pal = C.palettes[state.cvd ? 'cvd' : 'default'];
+  var spec = PV.ringSpec(model, state), rb = PV.ringBounds(spec, opts.maxScale === undefined ? 1.0 : opts.maxScale), rings = rb.rings;
+  var ids = PV.filterGenes(model, state), scene = {view: view, rings: rings, scale: rb.scale, ringOrder: spec.map(function (s) { return s[0]; }), palette: pal};
+  var cx = C.CX, cy = C.CY, i, j;
+  /* scale */
+  var scaleParts = [], tickBoxes = [], ticks = [];
+  var tickTarget = view.full ? 10 : 12, step, tickPos = [];
+  if (view.full) {
+    var nt = PV.niceTicks(L, tickTarget); step = nt.step; tickPos = nt.ticks;
+  } else {
+    var nt2 = PV.niceTicks(view.span, tickTarget); step = nt2.step;
+    var first = Math.ceil(view.start / step) * step, p;
+    for (p = first; p <= view.start + view.span + 1e-9; p += step) { tickPos.push(mod(p, L)); }
+    var seen = {}; tickPos = tickPos.filter(function (q) { if (seen[q]) { return false; } seen[q] = true; return true; });
+  }
+  var rTickIn = C.R_OUT + 10, rTickOut = C.R_OUT + 16;
+  if (state.layers.scale) {
+    if (view.full) { scaleParts.push("<circle cx='" + num(cx) + "' cy='" + num(cy) + "' r='" + num(C.R_OUT + 10) + "' fill='none' stroke='#999' stroke-width='0.8'/>"); }
+    else {
+      var pa = polar(cx, cy, C.R_OUT + 10, view.off), pb = polar(cx, cy, C.R_OUT + 10, view.off + view.sweep);
+      scaleParts.push("<path d='M" + pt(pa) + 'A' + num(C.R_OUT + 10) + ' ' + num(C.R_OUT + 10) + ' 0 ' + (view.sweep > 180 ? 1 : 0) + ' 1 ' + pt(pb) + "' fill='none' stroke='#999' stroke-width='0.8'/>");
+    }
+    tickPos.forEach(function (pos) {
+      var ang = PV.bpToAngle(view, pos);
+      if (ang === null) { return; }
+      var p1 = polar(cx, cy, rTickIn, ang), p2 = polar(cx, cy, rTickOut, ang), pl = polar(cx, cy, rTickOut + 5, ang);
+      var lx = pl[0], ly = pl[1];
+      var anchor = (ang < 12 || ang > 348 || (ang > 168 && ang < 192)) ? 'middle' : (lx >= cx ? 'start' : 'end');
+      ly += !(ang < 12 || ang > 348) ? 3 : -2;
+      ly += (ang > 168 && ang < 192) ? 7 : 0;
+      var label = view.full ? PV.kbLabel(pos) : PV.stepLabel(pos, step);
+      var box = PV.textBox(label, 9, lx, ly, anchor);
+      var keepLabel = !tickBoxes.some(function (b) { return overlap(box, b, 1); });
+      scaleParts.push("<line x1='" + num(p1[0]) + "' y1='" + num(p1[1]) + "' x2='" + num(p2[0]) + "' y2='" + num(p2[1]) + "' stroke='#555' stroke-width='1' data-k='tick' data-bp='" + pos + "'/>");
+      if (keepLabel) { scaleParts.push(txt(lx, ly, label, 9, anchor, 'normal', '#444')); tickBoxes.push(box); }
+      ticks.push({bp: pos, angle: ang, label: label, x: lx, y: ly, anchor: anchor, box: box, shown: keepLabel});
+    });
+  }
+  scene.ticks = ticks; scene.step = step;
+  var counts = {fwd: 0, rev: 0, feat: 0, tools: 0, events: 0, genes: 0, shapes: 0};
+  var parts = [];
+  parts.push("<g class='scale'>" + scaleParts.join('') + '</g>');
+  /* genes */
+  var present = {};
+  ['fwd', 'rev', 'feat'].forEach(function (ring) {
+    if (!rings[ring]) { return; }
+    var rIn = rings[ring][0], rOut = rings[ring][1], label = {fwd: '+ strand', rev: '- strand', feat: 'features'}[ring], body = [];
+    ids.forEach(function (gi) {
+      var g = model.genes[gi];
+      if (PV.geneRing(g) !== ring) { return; }
+      var shapes = PV.geneShapes(view, g, rIn, rOut, ring);
+      if (!shapes.length) { return; }
+      present[g.cls] = true; counts[ring]++; counts.genes++;
+      shapes.forEach(function (s) { counts.shapes++; body.push(pathEl(s.d, pal[g.cls], '#222', 0.5, "class='gene' data-k='g' data-i='" + gi + "' data-class='" + g.cls + "'")); });
+    });
+    parts.push("<g class='ring-genes ring-" + ring + "'><circle cx='" + num(cx) + "' cy='" + num(cy) + "' r='" + num((rIn + rOut) / 2) + "' fill='none' stroke='#e2e2e2' stroke-width='" + num(rOut - rIn) + "'/>" +
+      body.join('') + ringName(label, (rIn + rOut) / 2, 8) + '</g>');
+  });
+  scene.present = present;
+  /* repeat regions */
+  if (state.layers.repeat && model.repeatRegions && model.repeatRegions.length) {
+    var tops = spec.map(function (s) { return rings[s[0]][1]; }), rTop = tops.length ? Math.max.apply(null, tops) : C.R_OUT;
+    var rd = [];
+    model.repeatRegions.forEach(function (rg) {
+      PV.splitWrapped(rg[0], rg[1], L).forEach(function (pc) {
+        PV.clipPiece(view, pc[0], pc[1]).forEach(function (f) { rd.push(PV.sectorPath(cx, cy, rTop + 2, C.R_OUT + 8, PV.relAngle(view, f.rel0), PV.relAngle(view, f.rel1))); });
+      });
+    });
+    parts.push(pathEl(rd.join(''), '#bbbbbb', 'none', 0, "opacity='0.45' class='repeat-regions'"));
+  }
+  /* tool rings */
+  var tools = PV.visibleTools(model, state);
+  tools.forEach(function (t) {
+    var rn = 't' + t.i, b = rings[rn], rIn = b[0], rOut = b[1], cov = [];
+    t.intervals.forEach(function (iv) {
+      var s = Math.max(0, iv[0]), e = Math.min(L, iv[1]);
+      if (e <= s) { return; }
+      PV.clipPiece(view, s, e).forEach(function (f) {
+        cov.push(pathEl(PV.sectorPath(cx, cy, rIn, rOut, PV.relAngle(view, f.rel0), PV.relAngle(view, f.rel1)), pal.cover, '#12355b', 0.6, "class='cov' data-k='t' data-i='" + t.i + "'"));
+      });
+    });
+    var evs = [];
+    if (state.layers.events) {
+      t.events.forEach(function (ev) {
+        var ang = PV.bpToAngle(view, ev.pos);
+        if (ang === null) { return; }
+        var p1 = polar(cx, cy, rIn - 1.5, ang), p2 = polar(cx, cy, rOut + 1.5, ang);
+        counts.events++;
+        evs.push("<line x1='" + num(p1[0]) + "' y1='" + num(p1[1]) + "' x2='" + num(p2[0]) + "' y2='" + num(p2[1]) + "' stroke='" + C.EVENT_STROKE + "' stroke-width='2.2' class='event' data-k='e' data-i='" + ev.i + "'/>");
+      });
+    }
+    counts.tools++;
+    parts.push("<g class='ring-t' data-tool='" + esc(t.name) + "'>" +
+      pathEl(PV.ringPath(cx, cy, rIn, rOut), '#eef1f4', '#7d8a97', 0.7, "class='uncov' stroke-dasharray='3 2' data-k='t' data-i='" + t.i + "'") +
+      cov.join('') + evs.join('') + ringName(t.label.slice(0, 18), (rIn + rOut) / 2, C.TOOL_LABEL_FONT) + '</g>');
+  });
+  /* GC */
+  if (model.gc && (state.layers.gc || state.layers.skew)) {
+    var gc = model.gc, glen = L, w = gc.window;
+    var windows = function (values, pos, neg, base, half, top, centreValue) {
+      var pd = [], nd = [];
+      values.forEach(function (raw, k) {
+        var v = raw - centreValue, h = half * Math.min(1.0, Math.abs(v) / top);
+        if (h < 0.05) { return; }
+        var s = k * w, e = Math.min(glen, (k + 1) * w);
+        PV.clipPiece(view, s, e).forEach(function (f) {
+          var a0 = PV.relAngle(view, f.rel0), a1 = PV.relAngle(view, f.rel1);
+          if (v > 0) { pd.push(PV.sectorPath(cx, cy, base, base + h, a0, a1)); } else { nd.push(PV.sectorPath(cx, cy, base - h, base, a0, a1)); }
+        });
+      });
+      return [pd, nd];
+    };
+    if (rings.gc) {
+      var gb = rings.gc, gbase = (gb[0] + gb[1]) / 2, ghalf = (gb[1] - gb[0]) / 2;
+      var dev = gc.gc.map(function (v) { return v - gc.mean; }), gtop = Math.max(0.01, Math.max.apply(null, dev.map(Math.abs).concat([0])));
+      var gw = windows(gc.gc, null, null, gbase, ghalf, gtop, gc.mean);
+      parts.push("<g class='ring-gc'><circle cx='" + num(cx) + "' cy='" + num(cy) + "' r='" + num(gbase) + "' fill='none' stroke='#bbb' stroke-width='0.5'/>" +
+        pathEl(gw[0].concat(gw[1]).join(''), '#000000', 'none', 0, "class='gc-bars' data-k='gc'") +
+        "<path d='" + PV.ringPath(cx, cy, gb[0], gb[1]) + "' fill='transparent' stroke='none' data-k='gc' pointer-events='all'/>" + ringName('GC', gbase, 8) + '</g>');
+    }
+    if (rings.skew) {
+      var sb = rings.skew, sbase = (sb[0] + sb[1]) / 2, shalf = (sb[1] - sb[0]) / 2;
+      var stop = Math.max(0.01, Math.max.apply(null, gc.skew.map(Math.abs).concat([0])));
+      var sw = windows(gc.skew, null, null, sbase, shalf, stop, 0);
+      parts.push("<g class='ring-skew'><circle cx='" + num(cx) + "' cy='" + num(cy) + "' r='" + num(sbase) + "' fill='none' stroke='#bbb' stroke-width='0.5'/>" +
+        pathEl(sw[0].join(''), pal.skewPos, 'none', 0, "class='skew-pos' data-k='skew'") + pathEl(sw[1].join(''), pal.skewNeg, 'none', 0, "class='skew-neg' data-k='skew'") +
+        "<path d='" + PV.ringPath(cx, cy, sb[0], sb[1]) + "' fill='transparent' stroke='none' data-k='skew' pointer-events='all'/>" + ringName('skew', sbase, 8) + '</g>');
+    }
+  }
+  /* labels */
+  var items = [];
+  (opts.skipLabels ? [] : PV.labelCandidates(model, state, ids)).forEach(function (c) {
+    var g = c.g, ang = midAngle(view, g);
+    if (ang === null) { return; }
+    var rn = PV.geneRing(g);
+    if (!rings[rn]) { return; }
+    var prio = c.relax ? C.priority.relaxase : (C.priority[g.cls] || 10);
+    if (state.labelMode === 'all' && !C.priority[g.cls]) { prio = 10; }
+    items.push({angle: ang, text: g.name, priority: prio, cls: g.cls, rOut: rings[rn][1], gi: g.i});
+  });
+  var fs = C.LABEL_FONT * (state.labelSize || 1);
+  var lab = opts.skipLabels ? {placed: [], dropped: []} : PV.placeLabels(items, cx, cy, C.R_OUT + 34, fs, C.W, C.H, 5, fs * 1.45, 14.0, tickBoxes);
+  scene.labels = lab;
+  var lp = ["<g class='gene-labels'>"];
+  lab.placed.forEach(function (p) {
+    var s = polar(cx, cy, p.rOut + 1, p.angle), f = p.leader[0], l = p.leader[1];
+    lp.push("<polyline points='" + num(s[0]) + ',' + num(s[1]) + ' ' + num(f[0]) + ',' + num(f[1]) + ' ' + num(l[0]) + ',' + num(l[1]) + "' fill='none' stroke='#777' stroke-width='0.6'/>");
+    lp.push(txt(p.x, p.y, p.text, fs, p.anchor, p.cls === 'amr' ? 'bold' : 'normal', p.cls !== 'other' ? pal[p.cls] : '#333', "class='gene-label' data-k='g' data-i='" + p.gi + "' style='cursor:pointer'"));
+  });
+  lp.push('</g>');
+  scene.labelsSvg = lp.join('');
+  scene.partsSvg = parts.join('');
+  scene.counts = counts;
+  scene.ids = ids;
+  /* overlays: selection, highlighted tool, keyboard cursor, search hits */
+  var ov = [];
+  function outline(k, i, stroke, width, dash, cls) {
+    var ex = "class='" + cls + "' pointer-events='none'" + (dash ? " stroke-dasharray='" + dash + "'" : '');
+    if (k === 'g') {
+      var g = model.genes[i];
+      if (!g) { return; }
+      var ring = PV.geneRing(g), b = rings[ring];
+      if (!b) { return; }
+      PV.geneShapes(view, g, b[0], b[1], ring).forEach(function (s) { ov.push(pathEl(s.d, 'none', stroke, width, ex)); });
+    } else if (k === 't') {
+      var b2 = rings['t' + i];
+      if (b2) { ov.push(pathEl(PV.ringPath(cx, cy, b2[0], b2[1]), 'none', stroke, width, ex)); }
+    } else if (k === 'e') {
+      var ev = model.events[i];
+      if (!ev) { return; }
+      var ang = PV.bpToAngle(view, ev.pos), br = rings['t' + ev.tool];
+      if (ang === null || !br) { return; }
+      var p1 = polar(cx, cy, br[0] - 4, ang), p2 = polar(cx, cy, br[1] + 4, ang);
+      ov.push("<line x1='" + num(p1[0]) + "' y1='" + num(p1[1]) + "' x2='" + num(p2[0]) + "' y2='" + num(p2[1]) + "' stroke='" + stroke + "' stroke-width='" + num(width + 2) + "' " + ex + '/>');
+    }
+  }
+  if (opts.hits) { opts.hits.forEach(function (gi) { outline('g', gi, '#c2185b', 2, '', 'pv-hit'); }); }
+  if (state.hl !== null && state.hl !== undefined) { outline('t', state.hl, '#d98100', 3, '', 'pv-hl'); }
+  if (state.sel) { outline(state.sel.k, state.sel.i, '#000000', 3, '', 'pv-sel'); outline(state.sel.k, state.sel.i, '#ffffff', 1, '', 'pv-sel-in'); }
+  if (opts.cur) { outline(opts.cur.k, opts.cur.i, '#1a1a1a', 2, '4 2', 'pv-cur'); }
+  scene.overlaySvg = ov.join('');
+  /* centre */
+  var nOk = model.tools.filter(function (t) { return (t.completeness || 0) >= C.COVERAGE_GOOD; }).length, nAll = model.tools.length;
+  var yn = function (v) { return v === true ? 'yes' : (v === false ? 'no' : 'unknown'); };
+  var pid = String(model.plasmid), pidSize = pid.length <= 14 ? 20 : Math.max(10, Math.floor(260 / (pid.length * 0.6)));
+  var cen = ["<g class='centre'>", txt(cx, cy - 28, pid, pidSize, 'middle', 'bold', '#111'), txt(cx, cy - 6, L.toLocaleString('en-US') + ' bp', 14, 'middle', 'normal', '#222'),
+    txt(cx, cy + 14, 'circular: ' + yn(model.circular), 12, 'middle', 'normal', '#222'), txt(cx, cy + 30, 'repeat-rich: ' + yn(model.repeatRich), 12, 'middle', 'normal', '#222'),
+    txt(cx, cy + 46, nOk + ' of ' + nAll + ' tools >= ' + Math.round(C.COVERAGE_GOOD * 100) + '%', 12, 'middle', 'normal', '#222')];
+  if (!view.full) {
+    var endBp = mod(view.start + view.span, L);
+    cen.push(txt(cx, cy + 66, 'view ' + Math.round(view.start).toLocaleString('en-US') + '-' + Math.round(endBp).toLocaleString('en-US') + ' bp', 12, 'middle', 'bold', '#0c6b4f'));
+    cen.push(txt(cx, cy + 82, '(' + Math.round(view.span).toLocaleString('en-US') + ' bp, ' + (L / view.span).toFixed(1) + 'x)', 11, 'middle', 'normal', '#0c6b4f'));
+  }
+  cen.push('</g>');
+  scene.centreSvg = cen.join('');
+  return scene;
+};
+PV.sceneInner = function (scene) {
+  return "<rect x='0' y='0' width='" + C.W + "' height='" + C.H + "' fill='#ffffff'/><g id='pv-rot' class='pv-rot'>" + scene.partsSvg + scene.labelsSvg + '</g>' +
+    "<g class='pv-overlay'>" + scene.overlaySvg + '</g>' + scene.centreSvg;
+};
+PV.svgOpen = function (title, desc) {
+  return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 " + C.W + ' ' + C.H + "' role='img' preserveAspectRatio='xMidYMid meet'><title>" + esc(title) + '</title><desc>' + esc(desc) + '</desc>';
+};
+PV.standaloneSvg = function (model, state, opts) {
+  var scene = PV.buildScene(model, state, opts);
+  return PV.svgOpen('Circular map of ' + model.plasmid + ' (' + model.length + ' bp) in ' + model.sample, model.genes.length + ' truth annotations') + PV.sceneInner(scene) + '</svg>';
+};
+
+/* ---------- thumbnails and minimap: one path per class, so a strip of them stays cheap ---------- */
+PV.thumbSvg = function (model, size, state, view) {
+  var pal = C.palettes[state && state.cvd ? 'cvd' : 'default'], L = model.length, c = 50, byCls = {}, cov = [];
+  model.genes.forEach(function (g) {
+    PV.splitWrapped(g.start, g.end, L).forEach(function (pc) {
+      var a0 = pc[0] / L * 360, a1 = Math.max(a0 + 1.2, pc[1] / L * 360);
+      (byCls[g.cls] = byCls[g.cls] || []).push(PV.sectorPath(c, c, g.strand === '-' ? 33 : 38, g.strand === '-' ? 38 : 44, a0, Math.min(a1, 360)));
+    });
+  });
+  var best = PV.bestTools(model, 1)[0], bt = null;
+  model.tools.forEach(function (t) { if (t.name === best) { bt = t; } });
+  var s = ["<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' width='" + size + "' height='" + size + "' aria-hidden='true' focusable='false'>"];
+  s.push("<circle cx='50' cy='50' r='41' fill='none' stroke='#e4e8e4' stroke-width='12'/>");
+  Object.keys(byCls).forEach(function (k) { s.push("<path d='" + byCls[k].join('') + "' fill='" + pal[k] + "'/>"); });
+  s.push("<circle cx='50' cy='50' r='27' fill='none' stroke='#eef1f4' stroke-width='7'/>");
+  if (bt) {
+    bt.intervals.forEach(function (iv) { cov.push(PV.sectorPath(c, c, 23.5, 30.5, iv[0] / L * 360, Math.min(360, iv[1] / L * 360))); });
+    s.push("<path d='" + cov.join('') + "' fill='" + pal.cover + "'/>");
+  }
+  if (view && !view.full) {
+    var a0 = view.start / L * 360, a1 = a0 + view.span / L * 360;
+    s.push("<path d='" + PV.sectorPath(c, c, 14, 48, a0, Math.min(a1, 360)) + (a1 > 360 ? PV.sectorPath(c, c, 14, 48, 0, a1 - 360) : '') + "' fill='#0c6b4f' fill-opacity='0.25' stroke='#0c6b4f' stroke-width='1.2'/>");
+  }
+  s.push("<line x1='50' y1='3' x2='50' y2='12' stroke='#111' stroke-width='2'/></svg>");
+  return s.join('');
+};
+
+/* ---------- tooltips, details and related rows (text only; the DOM glue shows them) ---------- */
+function bpFmt(n) { return Math.round(n).toLocaleString('en-US'); }
+PV.fmtBp = bpFmt;
+function pct(v) { return v === null || v === undefined ? 'n/a' : (v * 100).toFixed(1) + '%'; }
+PV.pct = pct;
+var STRAND = {'+': 'forward strand (+)', '-': 'reverse strand (-)'};
+PV.geneInfo = function (model, g) {
+  var len = PV.geneLength(g, model.length);
+  return {title: g.name || g.product || 'feature', rows: [
+    ['Product', g.product || 'not given'], ['Class', C.labels[g.cls] || g.cls], ['Type', g.kind === 'gene' ? 'gene' + (g.ftype ? ' (' + g.ftype + ')' : '') : 'feature block' + (g.ftype ? ' (' + g.ftype + ')' : '')],
+    ['Coordinates', bpFmt(g.start) + '-' + bpFmt(g.end) + (g.start > g.end ? ' (crosses the origin)' : '') + ' bp'], ['Length', bpFmt(len) + ' bp'], ['Strand', STRAND[g.strand] || 'strand not given']]};
+};
+PV.toolInfo = function (model, t, bp) {
+  var rows = [['Rank', t.rank === null ? 'n/a' : String(t.rank)], ['Track', t.track || 'n/a'], ['Completeness', pct(t.completeness)], ['Outcome', t.outcome || 'n/a'],
+    ['Covered', bpFmt(t.coveredBp) + ' of ' + bpFmt(model.length) + ' bp']];
+  if (t.amrTotal !== null) { rows.push(['AMR recovered', t.amrRecovered.length + ' of ' + t.amrTotal]); }
+  if (bp !== undefined && bp !== null) {
+    var cov = t.intervals.some(function (iv) { return bp >= iv[0] && bp < iv[1]; });
+    rows.push(['At ' + bpFmt(bp) + ' bp', cov ? 'covered' : 'not covered']);
+  }
+  rows.push(['Structural events', String(t.events.length)]);
+  return {title: t.label, rows: rows};
+};
+PV.eventInfo = function (model, ev) {
+  return {title: ev.type + ' (' + ev.toolLabel + ')', rows: [['Tool', ev.toolLabel], ['Event type', ev.type], ['Position', bpFmt(ev.pos) + ' bp'], ['Record', ev.record || 'n/a'], ['Detail', ev.detail || 'n/a']]};
+};
+PV.gcAt = function (model, bp, which) {
+  var gc = model.gc;
+  if (!gc) { return null; }
+  var k = Math.min(gc.gc.length - 1, Math.max(0, Math.floor(bp / gc.window)));
+  var s = k * gc.window, e = Math.min(model.length, (k + 1) * gc.window);
+  if (which === 'skew') { return {title: 'GC skew window', rows: [['Window', bpFmt(s) + '-' + bpFmt(e) + ' bp'], ['Skew (G-C)/(G+C)', gc.skew[k].toFixed(3)], ['Reading', gc.skew[k] > 0 ? 'G-rich (positive)' : (gc.skew[k] < 0 ? 'C-rich (negative)' : 'balanced')]]}; }
+  return {title: 'GC window', rows: [['Window', bpFmt(s) + '-' + bpFmt(e) + ' bp'], ['GC', (gc.gc[k] * 100).toFixed(1) + '%'], ['Replicon mean', (gc.mean * 100).toFixed(1) + '%'],
+    ['Deviation', ((gc.gc[k] - gc.mean) * 100).toFixed(1) + ' points']]};
+};
+PV.related = function (model, sel) {
+  var L = model.length, out = {kind: sel.k, info: null, amr: [], covering: [], nearby: [], events: [], genes: []};
+  if (sel.k === 'g') {
+    var g = model.genes[sel.i];
+    if (!g) { return out; }
+    out.info = PV.geneInfo(model, g);
+    var glen = PV.geneLength(g, L);
+    model.tools.forEach(function (t) {
+      var cb = PV.coveredIn(t.intervals, g.start, g.end, L), f = glen > 0 ? cb / glen : 0;
+      out.covering.push({tool: t.label, fraction: f, bp: cb, state: f >= 0.999 ? 'fully covered' : (f > 0 ? 'partly covered' : 'not covered')});
+      t.amr.forEach(function (a) {
+        var same = a.gene && g.name && a.gene.toLowerCase() === g.name.toLowerCase();
+        var ov = a.start !== null && a.start !== undefined && overlapFraction(a.start, a.end, g.start, g.end) >= 0.5;
+        if (g.cls === 'amr' && (same || ov)) { out.amr.push({tool: t.label, gene: a.gene, placement: a.placement, repOk: a.repOk, record: a.record}); }
+      });
+    });
+    var dist = function (o) {
+      var d = Math.min(Math.abs(o.start - g.end), Math.abs(g.start - o.end), Math.abs(o.start - g.start));
+      return PV.splitWrapped(g.start, g.end, L).some(function (p) { return PV.splitWrapped(o.start, o.end, L).some(function (q) { return Math.max(p[0], q[0]) < Math.min(p[1], q[1]); }); }) ? 0 : Math.min(d, L - d);
+    };
+    out.nearby = model.genes.filter(function (o) { return o.i !== g.i; }).map(function (o) { return {gene: o, dist: dist(o)}; })
+      .sort(function (a, b) { return (a.dist - b.dist) || (a.gene.start - b.gene.start); }).slice(0, 6);
+    model.events.forEach(function (ev) {
+      var inside = PV.splitWrapped(g.start, g.end, L).some(function (p) { return ev.pos >= p[0] && ev.pos <= p[1]; });
+      if (inside) { out.events.push(ev); }
+    });
+  } else if (sel.k === 't') {
+    var t = model.tools[sel.i];
+    if (!t) { return out; }
+    out.info = PV.toolInfo(model, t);
+    out.amr = t.amr.map(function (a) { return {tool: t.label, gene: a.gene, placement: a.placement, repOk: a.repOk, record: a.record}; });
+    out.events = t.events.slice();
+    model.genes.forEach(function (g) {
+      var glen = PV.geneLength(g, L), cb = PV.coveredIn(t.intervals, g.start, g.end, L), f = glen > 0 ? cb / glen : 0;
+      out.genes.push({gene: g, fraction: f, state: f >= 0.999 ? 'fully covered' : (f > 0 ? 'partly covered' : 'not covered')});
+    });
+  } else if (sel.k === 'e') {
+    var ev0 = model.events[sel.i];
+    if (!ev0) { return out; }
+    out.info = PV.eventInfo(model, ev0);
+    model.genes.forEach(function (g) {
+      var near = PV.splitWrapped(g.start, g.end, L).some(function (p) { return ev0.pos >= p[0] - 500 && ev0.pos <= p[1] + 500; });
+      if (near) { out.genes.push({gene: g, fraction: null, state: PV.splitWrapped(g.start, g.end, L).some(function (p) { return ev0.pos >= p[0] && ev0.pos <= p[1]; }) ? 'inside' : 'within 500 bp'}); }
+    });
+  }
+  return out;
+};
+PV.neighbour = function (order, cur, delta) {
+  /* order: array of {k,i}; cur: {k,i} or null; returns the next item, wrapping */
+  if (!order.length) { return null; }
+  var idx = -1, n;
+  for (n = 0; n < order.length; n++) { if (cur && order[n].k === cur.k && order[n].i === cur.i) { idx = n; break; } }
+  if (idx < 0) { return order[delta >= 0 ? 0 : order.length - 1]; }
+  return order[mod(idx + delta, order.length)];
+};
+PV.cursorOrder = function (model, state, ids) {
+  var items = ids.map(function (i) { return {k: 'g', i: i, pos: model.genes[i].start, w: 1}; });
+  if (state.layers.events) {
+    var on = {}; PV.visibleTools(model, state).forEach(function (t) { on[t.i] = true; });
+    model.events.forEach(function (e) { if (on[e.tool]) { items.push({k: 'e', i: e.i, pos: e.pos, w: 2}); } });
+  }
+  PV.visibleTools(model, state).forEach(function (t) { items.push({k: 't', i: t.i, pos: -1, w: 0}); });
+  items.sort(function (a, b) { return (a.w === 0 ? -1 : 0) - (b.w === 0 ? -1 : 0) || (a.pos - b.pos) || (a.w - b.w) || (a.i - b.i); });
+  return items;
+};
+
+/* ---------- tables and TSV ---------- */
+PV.FEATURE_COLS = ['sample', 'plasmid', 'name', 'product', 'class', 'type', 'feature_type', 'start', 'end', 'length_bp', 'strand'];
+PV.TOOL_COLS = ['sample', 'plasmid', 'tool', 'track', 'rank', 'completeness', 'outcome', 'covered_bp', 'amr_recovered', 'amr_total', 'structural_events',
+                'best_bin_recall', 'best_bin_precision', 'contamination_fraction'];
+PV.EVENT_COLS = ['sample', 'plasmid', 'tool', 'event_type', 'position_bp', 'record', 'detail'];
+PV.featureRows = function (model, ids) {
+  var list = ids ? ids.map(function (i) { return model.genes[i]; }) : model.genes;
+  return list.map(function (g) {
+    return [model.sample, model.plasmid, g.name, g.product, g.cls, g.kind, g.ftype, g.start, g.end, PV.geneLength(g, model.length), g.strand];
+  });
+};
+function nz(v) { return v === null || v === undefined ? '' : v; }
+PV.toolRows = function (model) {
+  return model.tools.map(function (t) {
+    var od = t.outcomeDetail || {};
+    return [model.sample, model.plasmid, t.name, t.track, t.rank, t.completeness === null ? '' : t.completeness.toFixed(4), t.outcome, t.coveredBp,
+      t.amrRecovered.length, t.amrTotal, t.events.length, nz(od.recall), nz(od.precision), nz(od.contamination)];
+  });
+};
+PV.eventRows = function (model) {
+  return model.events.map(function (e) { return [model.sample, model.plasmid, e.toolName, e.type, e.pos, e.record, e.detail]; });
+};
+PV.tsv = function (cols, rows) {
+  var clean = function (v) { return v === null || v === undefined ? '' : String(v).replace(/[\t\r\n]+/g, ' '); };
+  return [cols.join('\t')].concat(rows.map(function (r) { return r.map(clean).join('\t'); })).join('\n') + '\n';
+};
+
+/* ---------- URL hash ---------- */
+var HASH_ID = 'plasmid-maps';
+PV.encodeHash = function (st, model) {
+  var d = PV.defaultState(), q = [], list = function (a) { return a.map(encodeURIComponent).join(','); };
+  q.push('msample=' + encodeURIComponent(st.sample)); q.push('mplasmid=' + encodeURIComponent(st.plasmid));
+  if (st.sel) { q.push('sel=' + st.sel.k + st.sel.i); }
+  if (st.view.span && st.view.span > 0) {
+    var L = model ? model.length : 0, e = L ? mod(st.view.start + st.view.span, L) : st.view.start + st.view.span;
+    q.push('view=' + Math.round(st.view.start) + '-' + Math.round(e) + (L && e === 0 ? 'w' : ''));
+  } else if (st.view.start) { q.push('rot=' + Math.round(st.view.start)); }
+  var off = PV.LAYER_KEYS.filter(function (k) { return st.layers[k] !== d.layers[k]; });
+  if (off.length) { q.push('off=' + off.join(',')); }
+  if (st.toolsOn) { q.push('tools=' + list(st.toolsOn)); }
+  var hide = Object.keys(st.hideCls).filter(function (k) { return st.hideCls[k]; });
+  if (hide.length) { q.push('hide=' + hide.join(',')); }
+  if (st.minBp) { q.push('minbp=' + st.minBp); }
+  if (st.labelMode !== d.labelMode) { q.push('lab=' + st.labelMode); }
+  if (st.q) { q.push('q=' + encodeURIComponent(st.q)); }
+  if (st.toolSort !== d.toolSort) { q.push('sort=' + st.toolSort); }
+  if (st.order !== d.order) { q.push('ord=' + st.order); }
+  if (st.thGene !== d.thGene) { q.push('tg=' + st.thGene); }
+  if (st.thTool !== d.thTool) { q.push('tt=' + st.thTool); }
+  if (st.cvd) { q.push('cvd=1'); }
+  if (st.labelSize !== d.labelSize) { q.push('ls=' + st.labelSize); }
+  if (!st.legend) { q.push('legend=0'); }
+  if (st.hl !== null && st.hl !== undefined) { q.push('hl=' + st.hl); }
+  if (st.tab !== d.tab) { q.push('tab=' + st.tab); }
+  return '#' + HASH_ID + '?' + q.join('&');
+};
+PV.decodeHash = function (hash) {
+  var h = String(hash || '').replace(/^#/, ''), qi = h.indexOf('?');
+  if (h.slice(0, HASH_ID.length) !== HASH_ID) { return null; }
+  var st = {}, d = PV.defaultState();
+  if (qi < 0) { return st; }
+  var dec = function (s) { try { return decodeURIComponent(s); } catch (e) { return s; } };
+  var list = function (s) { return s === '' ? [] : s.split(',').map(dec); };
+  h.slice(qi + 1).split('&').forEach(function (pair) {
+    var eq = pair.indexOf('='), k = eq < 0 ? pair : pair.slice(0, eq), v = eq < 0 ? '' : pair.slice(eq + 1), m;
+    if (k === 'msample') { st.sample = dec(v); }
+    else if (k === 'mplasmid') { st.plasmid = dec(v); }
+    else if (k === 'sel') { m = /^([gte])(\d+)$/.exec(v); if (m) { st.sel = {k: m[1], i: parseInt(m[2], 10)}; } }
+    else if (k === 'view') {
+      m = /^(\d+)-(\d+)(w?)$/.exec(v);
+      if (m) { st.viewRaw = {start: parseInt(m[1], 10), end: parseInt(m[2], 10), wrapZero: m[3] === 'w'}; }
+    }
+    else if (k === 'rot') { st.rot = parseInt(v, 10) || 0; }
+    else if (k === 'off') { st.layers = {}; PV.LAYER_KEYS.forEach(function (n) { st.layers[n] = d.layers[n]; }); list(v).forEach(function (n) { if (n in st.layers) { st.layers[n] = !d.layers[n]; } }); }
+    else if (k === 'tools') { st.toolsOn = list(v); }
+    else if (k === 'hide') { st.hideCls = {}; list(v).forEach(function (n) { st.hideCls[n] = true; }); }
+    else if (k === 'minbp') { st.minBp = parseInt(v, 10) || 0; }
+    else if (k === 'lab') { if (v === 'amr' || v === 'all' || v === 'none' || v === 'key') { st.labelMode = v; } }
+    else if (k === 'q') { st.q = dec(v); }
+    else if (k === 'sort') { if (['default', 'completeness', 'rank', 'name'].indexOf(v) >= 0) { st.toolSort = v; } }
+    else if (k === 'ord') { if (['gtc', 'tgc', 'gct'].indexOf(v) >= 0) { st.order = v; } }
+    else if (k === 'tg') { st.thGene = parseFloat(v) || 1; }
+    else if (k === 'tt') { st.thTool = parseFloat(v) || 1; }
+    else if (k === 'cvd') { st.cvd = v === '1'; }
+    else if (k === 'ls') { st.labelSize = parseFloat(v) || 1; }
+    else if (k === 'legend') { st.legend = v !== '0'; }
+    else if (k === 'hl') { st.hl = parseInt(v, 10); if (isNaN(st.hl)) { delete st.hl; } }
+    else if (k === 'tab') { if (PV.TABS.indexOf(v) >= 0) { st.tab = v; } }
+  });
+  return st;
+};
+/* decoded hash -> a full state for a given model (view needs the length) */
+PV.stateFromHash = function (parsed, model) {
+  var st = PV.defaultState(), k;
+  for (k in parsed) { if (k !== 'viewRaw' && k !== 'rot' && Object.prototype.hasOwnProperty.call(parsed, k)) { st[k] = parsed[k]; } }
+  if (parsed.viewRaw && model) {
+    var r = PV.clampRegion(model.length, parsed.viewRaw.start, parsed.viewRaw.wrapZero ? model.length : parsed.viewRaw.end);
+    st.view = {start: r.start, span: r.span >= model.length ? 0 : r.span};
+  } else if (parsed.rot !== undefined && model) { st.view = {start: mod(parsed.rot, model.length), span: 0}; }
+  return st;
+};
+
+PV.VERSION = 1;
+if (typeof module !== 'undefined' && module.exports) { module.exports = PV; }
+root.PlasmidViewerCore = PV;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+</script>
