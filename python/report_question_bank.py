@@ -164,13 +164,14 @@ def interpretation_section():
         "<section id='interpretation-limits'><h2>Interpretation limits</h2>"
         "<p class='lead'>What these results support, and what they must not be used to claim. A benchmark of "
         "reconstruction tools answers a methods question; it does not answer surveillance or lineage questions.</p>"
+        "<details class='rpt-collapsible'><summary>Show what these results support, what they do not show, and the words used</summary>"
         "<div class='insight neutral'><h3>These results support</h3><ul>"
         + "".join(f"<li>{esc(item)}</li>" for item in supports) + "</ul>"
         "<h3>These results do NOT show</h3><ul>"
         + "".join(f"<li><strong>{esc(claim)}</strong> {esc(why)}</li>" for claim, why in does_not) + "</ul>"
         "<h3>Words used in this report</h3><ul>"
         + "".join(f"<li><strong>{esc(term)}</strong>: {esc(meaning)}</li>" for term, meaning in vocabulary)
-        + "</ul></div></section>")
+        + "</ul></div></details></section>")
 
 
 def metadata_section(out_dir):
