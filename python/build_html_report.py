@@ -37,6 +37,35 @@ def report_asset(name):
 SCRIPT_END_SENTINEL = "PB_SCRIPT_END_7f21ac93"
 
 
+def lazy_frame_js(doc_id):
+    """JavaScript (an expression statement list, no surrounding function) defining `lazyFrame(f)` for the iframe `f` whose document is the text of
+    <script id=doc_id type='text/template'>.
+
+    The two explorers carry 7 to 8 MB documents. Writing them into srcdoc at page load made the browser run both dashboards even though they sit in a
+    view that is hidden when the page opens. The document stays in the page (the report is one offline file), but it is written into the frame only when the
+    frame first becomes visible (an IntersectionObserver, with a margin so it starts just before), when the reader presses Load now, when the page is
+    printed or exported to PDF (?print=1 and beforeprint load it eagerly, as before), or at once where IntersectionObserver does not exist.
+    `f.pbLoad()` loads it on demand (a link that jumps to the explorer can call it).
+    """
+    return ("const lazyFrame=f=>{if(!f)return;const note=f.parentElement&&f.parentElement.querySelector('.pb-lazy-note');"
+            "const load=()=>{if(f.dataset.pbLoaded)return;f.dataset.pbLoaded='1';"
+            f"const raw=document.getElementById('{doc_id}').textContent;"
+            f"f.srcdoc=raw.split('{SCRIPT_END_SENTINEL}').join('</scr'+'ipt');if(note)note.hidden=true}};"
+            "f.pbLoad=load;const btn=note&&note.querySelector('button');if(btn)btn.addEventListener('click',load);"
+            "if(/[?&]print(=|&|$)/.test(location.search)||!('IntersectionObserver' in window)){load();return}"
+            "window.addEventListener('beforeprint',load);"
+            "const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){io.disconnect();load()}},{rootMargin:'400px 0px'});"
+            "io.observe(f)};")
+
+
+def lazy_frame_note(what):
+    """The placeholder shown in the panel until the frame loads."""
+    return (f"<div class='pb-lazy-note' style='padding:18px 16px;font:14px Arial,sans-serif;color:#314238;background:#f6f8f6;border-bottom:1px solid #d5ddd6'>"
+            f"The {what} loads when this section is opened, to keep the report quick to open. <button type='button' style='margin-left:8px;font:600 12px Arial,sans-serif;"
+            "padding:4px 12px;border:1px solid #1f6f56;border-radius:14px;background:#fff;color:#14231c;cursor:pointer'>Load now</button> "
+            "<noscript>(This section needs JavaScript.)</noscript></div>")
+
+
 def read_tsv(path):
     with open(path, newline="") as fh:
         return list(csv.DictReader(fh, delimiter="\t"))
@@ -1685,13 +1714,13 @@ def evidence_explorer_section(project_root, scores, results_dir, vendor_html, pa
             "measured from this run. Read depth is not computed by projection scoring, so per-segment "
             "coverage reads “not measured” rather than zero, and the nucleotide view resolves only "
             "where a CIGAR-bounded local alignment exists.</p>"
-            "<div class='panel' style='padding:0'><iframe id='pb-explorer' "
+            "<div class='panel' style='padding:0'>" + lazy_frame_note("reconstruction evidence explorer")
+            + "<iframe id='pb-explorer' "
             "title='PlasBench reconstruction evidence explorer' "
             "style='width:100%;height:1180px;border:0;display:block'></iframe></div>"
             f"<script id='pb-explorer-doc' type='text/template'>{encoded}</script>"
             "<script>(()=>{const f=document.getElementById('pb-explorer');"
-            "const raw=document.getElementById('pb-explorer-doc').textContent;"
-            f"f.srcdoc=raw.split('{SCRIPT_END_SENTINEL}').join('</scr'+'ipt');"
+            + lazy_frame_js("pb-explorer-doc") + "lazyFrame(f);"
             "const push=()=>{const s=document.getElementById('vq-sample'),"
             "p=document.getElementById('vq-plasmid');if(!f.contentWindow)return;"
             "f.contentWindow.postMessage({pbExplorer:'select',"
@@ -1791,12 +1820,12 @@ def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
             "<p class='lead'>The adopted enterprise dashboard, driven entirely by this run's measured "
             "results. Values that were never measured render as “not measured” rather than as zero. "
             "It runs in an isolated frame so its own stylesheet cannot restyle this report.</p>"
-            "<div class='panel' style='padding:0'><iframe id='pb-enterprise' title='PlasBench interactive cohort dashboard' "
+            "<div class='panel' style='padding:0'>" + lazy_frame_note("interactive cohort dashboard")
+            + "<iframe id='pb-enterprise' title='PlasBench interactive cohort dashboard' "
             "style='width:100%;min-height:900px;height:1240px;border:0;display:block'></iframe></div>"
             f"<script id='pb-enterprise-doc' type='text/template'>{encoded}</script>"
             "<script>(()=>{const f=document.getElementById('pb-enterprise');"
-            "const raw=document.getElementById('pb-enterprise-doc').textContent;"
-            f"f.srcdoc=raw.split('{SCRIPT_END_SENTINEL}').join('</scr'+'ipt');"
+            + lazy_frame_js("pb-enterprise-doc") + "lazyFrame(f);"
             "window.addEventListener('message',event=>{if(event.source!==f.contentWindow)return;"
             "const value=event.data;if(!value||value.type!=='plasbench-enterprise-height')return;"
             "const height=Number(value.height);if(!Number.isFinite(height)||height<1)return;"
