@@ -484,9 +484,14 @@ def main():
     nav_html = page[nav_start:page.index("</nav>", nav_start)]
     nav_ids = re.findall(r"href='#([a-z-]+)'", nav_html)
     section_ids = re.findall(r"<section id='([a-z-]+)'", page)
-    assert nav_ids == section_ids, (
-        "the navigation must list every section in document order; "
+    # The nav is grouped: every section appears in exactly one group, and within a group in document order.
+    assert sorted(nav_ids) == sorted(section_ids) and len(set(nav_ids)) == len(nav_ids), (
+        "the navigation must link every section exactly once; "
         f"nav={nav_ids} sections={section_ids}")
+    for group_html in nav_html.split("<details")[1:]:
+        in_group = re.findall(r"href='#([a-z-]+)'", group_html)
+        assert in_group == [i for i in section_ids if i in in_group], (
+            f"within a navigation group the sections must follow document order: {in_group}")
     assert "aria-current" in page, "the bar never says which section you are in"
     # The tracker is emitted inside a section, so it must wait for the rest.
     assert "DOMContentLoaded" in page,         "section tracking must be built after the document is parsed, not mid-page"

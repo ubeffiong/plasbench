@@ -1,0 +1,20 @@
+# Weighted benchmark scorecard: an additional view, never the ranking. Weights sum to 100. Thresholds are in the unit column.
+# Higher-better: value >= threshold; lower-better: value <= threshold. status: proposed (changeable default) or fixed (stated definition).
+id	name	group	weight	source	column	direction	unit	excellent	good	moderate	floor	status	rationale
+A1	Nucleotide identity	A	10	accuracy	identity	higher	percent	99.9	99.0	95.0	90	fixed	Excellent >= 99.9%, Good 99-99.89%, Moderate 95-98.99%, Poor below (the stated example definition); aligned-column weighted mean over samples.
+A2	Mismatch rate	A	5	accuracy	mismatch_rate	lower	per 100 aligned columns	0.1	0.5	2.0	10	proposed	Mirrors identity: 0.1 mismatches per 100 columns is the 99.9% identity line, 2.0 is roughly the 98% line.
+A3	Insertion/deletion accuracy	A	5	accuracy	1-(insertion_rate+deletion_rate)	higher	percent	99.9	99.5	98	90	proposed	Indels break reading frames, so the bands are set tighter than for substitutions only at the top.
+A4	SNP concordance	A	10	truth_variants	snp_concordance	higher	fraction					undefined	No bands are defined: this metric needs a truth variant set that the benchmark does not yet carry, and the bands should be set by the panel once real values exist. Shown as not available and excluded from the overall.
+B1	Reference coverage	B	10	scores	recall	higher	fraction	0.99	0.95	0.8	0.5	proposed	Share of truth plasmid bases recovered; 0.99 leaves room for assembly gaps in repeats.
+B2	Reconstruction completeness	B	5	scores	plasmid_recall_ge90	higher	fraction	0.95	0.85	0.6	0.2	proposed	Share of truth plasmids recovered to at least 90% of their length.
+B3	Plasmid recovery rate	B	5	scores	plasmid_recall	higher	fraction	0.95	0.85	0.6	0.2	proposed	Share of truth plasmids recovered at all, each plasmid weighted equally.
+C1	Structural accuracy (alignment-derived, unvalidated)	C	8	ngoc	ngoc	higher	fraction	0.95	0.85	0.7	0.4	proposed	Conserved gene order from alignments (NGOC), else collinear fraction; it is not read- or graph-validated.
+C2	Structural variant F1	C	7	truth_variants	sv_f1	higher	fraction					undefined	No bands are defined: this metric needs a truth variant set that the benchmark does not yet carry, and the bands should be set by the panel once real values exist. Shown as not available and excluded from the overall.
+C3	Circularization accuracy	C	5	scores	complete_circular_plasmid_recall	higher	fraction	0.9	0.7	0.4	0	proposed	Share of circular truth plasmids recovered as one complete circular record; hard for short reads, hence lenient bands.
+C4	Repeat resolution	C	5	per_plasmid	completeness	higher	fraction	0.95	0.85	0.6	0.2	proposed	Mean completeness of repeat-rich truth plasmids, where collapsed or split repeats show up.
+D1	Gene recovery	D	5	scores	amr_gene_recall	higher	fraction	0.99	0.95	0.85	0.5	proposed	Resistance genes are the clinically actionable cargo, so the top bands are strict.
+D2	Annotation concordance (coordinate-based, not orthology)	D	5	alignment_blocks	protein_features	higher	fraction	0.95	0.85	0.7	0.4	proposed	Share of truth proteins whose predicted CDS projects onto them at projection fraction >= 0.9; coordinates only.
+D3	Functional element completeness	D	5	feature_preservation	mean_covered_fraction	higher	fraction	0.95	0.85	0.7	0.4	proposed	Mean covered fraction of replicon, mobility and AMR elements on the truth plasmids.
+E1	Runtime	E	4	performance	median_runtime_seconds	lower	seconds	60	300	1800	14400	proposed	Hardware-dependent: compare only runs made on the same machine and thread count.
+E2	Memory consumption	E	3	performance	median_peak_memory_gb	lower	GB	2	8	32	256	proposed	2 GB fits a laptop, 8 GB a workstation, 32 GB a small server.
+E3	Reconstruction success rate	E	3	performance	success_rate	higher	fraction	0.99	0.95	0.8	0.5	proposed	Share of isolates on which the tool ran to completion.

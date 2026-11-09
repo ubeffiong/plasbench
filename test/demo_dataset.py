@@ -17,7 +17,9 @@ edited sequence with a CIGAR, so the drilldown has real nucleotides to show.
 
 import argparse
 import csv
+import functools
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -72,27 +74,60 @@ PROTEINS = {
            (22_000, 23_600, "-", "traI", "conjugative relaxase", "conjugation"),
            (38_000, 38_900, "+", "parA", "plasmid partitioning protein", "partition"),
            (52_000, 53_100, "-", "tnpA", "IS3 family transposase", "transposase"),
-           (66_000, 66_700, "+", "orf_pA_1", "hypothetical protein", "unknown")],
+           (66_000, 66_700, "+", "orf_pA_1", "hypothetical protein", "unknown"),
+           (26_000, 27_100, "+", "intI1", "class 1 integrase", "integrase"),
+           (30_000, 31_400, "+", "mobA", "relaxase MobA", "mob"),
+           (59_400, 60_600, "-", "traB", "conjugal transfer protein", "conjugation"),
+           (33_000, 33_900, "-", "traA", "conjugal transfer pilin subunit", "conjugation"),
+           (45_100, 45_910, "-", "sul1", "dihydropteroate synthase", "amr"),
+           (70_000, 71_400, "-", "pcoA", "copper resistance multicopper oxidase", "metal_resistance"),
+           (74_000, 74_500, "+", "silE", "silver-binding periplasmic protein", "metal_resistance"),
+           (80_000, 81_300, "+", "merA", "mercuric reductase", "metal_resistance"),
+           # Wraps the origin of the 90,000 bp circular plasmid: start > end, so it
+           # runs 89,400 -> 90,000 -> 0 -> 700 (1,300 bp). The projection builder
+           # drops such rows from the explorer payload; the circular maps keep them.
+           (89_400, 700, "+", "repA2", "replication initiation protein", "replicon")],
     "pB": [(500, 1_400, "+", "mobA", "relaxase MobA", "mob"),
            (3_000, 3_800, "-", "orf_pB_1", "hypothetical protein", "unknown")],
     "pC": [(1_200, 2_300, "+", "repZ", "replication protein", "replicon"),
            (8_200, 9_013, "+", "blaKPC-2", "class A carbapenemase", "amr"),
-           (30_000, 31_500, "-", "traJ", "conjugal transfer protein", "conjugation")],
+           (30_000, 31_500, "-", "traJ", "conjugal transfer protein", "conjugation"),
+           (20_000, 21_050, "+", "mobA", "relaxase MobA", "mob"),
+           (40_000, 41_300, "-", "aac(6')-Ib", "aminoglycoside N-acetyltransferase", "amr"),
+           (45_000, 46_000, "+", "cusA", "copper/silver efflux RND transporter", "metal_resistance"),
+           (50_000, 50_900, "+", "arsB", "arsenite efflux pump", "metal_resistance"),
+           (55_000, 55_900, "-", "intI1", "class 1 integrase", "integrase")],
     "pE": [(2_000, 3_150, "+", "repA", "replication initiation protein", "replicon"),
            (61_000, 61_813, "+", "blaNDM-1", "metallo-beta-lactamase", "amr"),
            (85_000, 86_400, "-", "virB4", "type IV secretion ATPase", "conjugation"),
            (120_000, 121_150, "+", "tnpA", "IS26 transposase", "transposase"),
-           (140_000, 140_950, "+", "parB", "partition protein B", "partition")],
+           (140_000, 140_950, "+", "parB", "partition protein B", "partition"),
+           (30_000, 31_500, "+", "traA", "conjugal transfer pilin subunit", "conjugation"),
+           (95_000, 95_800, "+", "tetA", "tetracycline efflux pump", "amr"),
+           (100_500, 101_500, "-", "mobA", "relaxase MobA", "mob"),
+           (110_000, 110_900, "-", "merP", "mercuric transport protein", "metal_resistance"),
+           (125_000, 126_000, "+", "intI1", "class 1 integrase", "integrase"),
+           # Genes sitting on the block edges of the demo methods (see project_proteins).
+           (36_800, 38_000, "-", "orf_pE_2", "hypothetical protein", "unknown"),
+           (49_500, 50_800, "+", "stbB", "plasmid stability protein", "partition"),
+           (74_000, 76_000, "+", "orf_pE_1", "hypothetical protein", "unknown"),
+           (82_000, 83_200, "-", "trbB", "conjugal transfer protein", "conjugation")],
     "pI": [(1_000, 2_050, "+", "repC", "replication initiation protein", "replicon"),
            (3_100, 3_726, "+", "tetA", "tetracycline efflux pump", "amr"),
            (9_000, 10_050, "-", "mobC", "mobilization protein C", "mob"),
            (14_000, 15_100, "+", "higA", "antitoxin HigA", "toxin_antitoxin"),
            (20_000, 21_100, "-", "tnpA", "IS903 transposase", "transposase"),
-           (23_000, 23_800, "+", "orf_pI_1", "hypothetical protein", "unknown")],
+           (23_000, 23_800, "+", "orf_pI_1", "hypothetical protein", "unknown"),
+           (5_000, 5_900, "-", "aac(3)-IIa", "aminoglycoside N-acetyltransferase", "amr")],
     "pJ": [(200, 1_100, "+", "repB", "replication protein B", "replicon"),
            (2_400, 3_300, "-", "orf_pJ_1", "hypothetical protein", "unknown"),
            (4_500, 5_400, "+", "pemK", "toxin PemK", "toxin_antitoxin")],
 }
+
+# One repeat-rich plasmid: four copies of one 3 kb element. The truth QC stage
+# computes repeat content from reference.fna, so the repeat is in the sequence, not
+# only declared here; four copies is 12 kb of 150 kb (8%), over the 5% threshold.
+REPEAT_REGIONS = {"pE": [(20_000, 23_000), (55_000, 58_000), (95_000, 98_000), (120_000, 123_000)]}
 
 TOOLS = ["mob_like", "platon_like", "spades_like", "gplas_like", "weak_like"]
 # Only declared binners get bin membership, matching tool_capabilities.tsv.
@@ -106,6 +141,69 @@ FAILS = {("abauma_b", "weak_like")}
 def dna(length, seed=0):
     bases = "ACGT"
     return "".join(bases[(index * 7 + seed * 13 + index // 11) % 4] for index in range(length))
+
+
+@functools.lru_cache(maxsize=None)
+def reference_sequence(sample, plasmid, length):
+    """Deterministic pseudo-random plasmid sequence with a drifting GC content.
+
+    Random rather than the cyclic dna(): a cyclic sequence is all repeats (every
+    plasmid would be repeat-rich) and has flat GC. GC steps between 3 kb blocks so
+    the GC and skew rings show structure. Plasmids in REPEAT_REGIONS carry the
+    same random element at each listed region. Not a biological sequence.
+    """
+    rng = random.Random(f"{sample}/{plasmid}")
+    out = []
+    for block in range((length + 2_999) // 3_000):
+        gc = 0.36 + 0.24 * ((block * 37 + len(plasmid)) % 7) / 6
+        for _ in range(min(3_000, length - block * 3_000)):
+            r = rng.random()
+            out.append(("G" if r < gc / 2 else "C") if r < gc else ("A" if r < gc + (1 - gc) / 2 else "T"))
+    regions = REPEAT_REGIONS.get(plasmid, [])
+    if regions and length >= max(e for _, e in regions):
+        element = [rng.choice("ACGT") for _ in range(max(e - s for s, e in regions))]
+        for start, end in regions:
+            out[start:end] = element[:end - start]
+    return "".join(out)
+
+
+def zoom_segment(sample, plasmids):
+    """Reference window the short per-method record is edited from."""
+    target, tlen, _ = plasmids[-1]
+    return reference_sequence(sample, target, tlen)[:min(1_200, tlen)]
+
+
+def project_proteins(sample, tool, rows, plasmids):
+    """Predicted CDS in the method's own record coordinates, as an annotation caller would emit.
+
+    Each truth CDS is carried through every alignment block that overlaps it, so a gene
+    cut by a block edge is only partly covered there and its projection_fraction falls
+    below 1. PROTEINS places genes across the block edges the methods produce (the halves
+    of spades_like, the thirds of gplas_like, the gap of platon_like, the quarter of
+    weak_like), so the methods differ and straddle the 0.9 annotation-concordance cut.
+    """
+    genes = []
+    for pname, _, _ in plasmids:
+        genes += [(pname, g) for g in PROTEINS.get(pname, []) if g[0] < g[1]]
+    out = []
+    for pname, (start, end, strand, gene, product, category) in genes:
+        length = end - start
+        for row in rows:
+            record, qlen, qs, qe, bstrand, target, _, ts, te = row[:9]
+            if target != pname or min(end, te) <= max(start, ts):
+                continue
+            if bstrand == "+":
+                q0 = qs + (start - ts)
+                flip = strand
+            else:
+                q0 = qs + (te - end)
+                flip = "-" if strand == "+" else "+"
+            if q0 < 0:
+                continue
+            q1 = q0 + length
+            out.append([record, q0, q1, flip, f"{tool}_{record}_{q0}", gene, product, category,
+                        f"{tool}_annotator", "0.0-synthetic", "synthetic"])
+    return out
 
 
 def edited(segment, seed):
@@ -225,7 +323,7 @@ def predictions(sample, tool, chrom_len, plasmids):
     target, tlen, _ = plasmids[-1]
     window = min(1_200, tlen)
     seed = TOOLS.index(tool)
-    query, cigar = edited(dna(window, seed=0), seed)
+    query, cigar = edited(zoom_segment(sample, plasmids), seed)
     rows.append(block(f"{tool.split('_')[0]}_zoom", len(query), 0, len(query), "+",
                       target, tlen, 0, window, identity=0.98, cigar=cigar))
     return rows
@@ -343,7 +441,7 @@ def main():
         with (sdir / "reference.fna").open("w", encoding="utf-8") as handle:
             for pname, plen, _ in plasmids:
                 handle.write(f">{pname}\n")
-                sequence = dna(plen, seed=0)
+                sequence = reference_sequence(sample, pname, plen)
                 for start in range(0, plen, 60):
                     handle.write(sequence[start:start + 60] + "\n")
 
@@ -378,6 +476,11 @@ def main():
                       ["sequence_id", "start", "end", "strand", "feature_id", "gene", "product",
                        "category", "source", "version", "confidence"], proteins)
 
+        regions = [[name, start, end, f"repeat_{i}"] for name, _, _ in plasmids
+                   for i, (start, end) in enumerate(REPEAT_REGIONS.get(name, []), start=1)]
+        if regions:
+            write_tsv(sdir / "truth_repeat_regions.tsv", ["sequence_id", "start", "end", "label"], regions)
+
         for index, tool in enumerate(TOOLS):
             failed = (sample, tool) in FAILS
             if failed:
@@ -389,6 +492,10 @@ def main():
                 for row in rows:
                     tags = [f"NM:i:{int(row[10]) - int(row[9])}", f"cg:Z:{int(row[10])}M"]
                     handle.write("\t".join(str(x) for x in list(row) + tags) + "\n")
+            write_tsv(sdir / f"{tool}.proteins.tsv",
+                      ["sequence_id", "start", "end", "strand", "feature_id", "gene", "product",
+                       "category", "source", "version", "confidence"],
+                      project_proteins(sample, tool, rows, plasmids))
             # Prediction FASTA: one record per aligned query, padded to length.
             lengths = {}
             for row in rows:
@@ -402,8 +509,7 @@ def main():
                     # The short record carries real edited sequence so its CIGAR
                     # reconstructs against the reference; the rest is padding.
                     if record == zoom_record:
-                        sequence = edited(dna(min(1_200, zoom_tlen), seed=0),
-                                          TOOLS.index(tool))[0]
+                        sequence = edited(zoom_segment(sample, plasmids), TOOLS.index(tool))[0]
                     else:
                         sequence = "A" * qlen
                     handle.write(f">{record}\n")

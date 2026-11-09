@@ -687,3 +687,4 @@ export PLASBIN_FLOW_OUTPUTS_DIR="${PLASBIN_FLOW_OUTPUTS_DIR:-}"
 #   ISFINDER_FASTA is a curated ISFinder IS sequence FASTA you downloaded from ISFinder under its terms (not shipped);
 #   it adds BLAST-based IS annotation beside ISEScan and feeds the repeat_rich scenario tag.
 export ISFINDER_FASTA="${ISFINDER_FASTA:-}"
+export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"
