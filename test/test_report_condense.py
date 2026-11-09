@@ -266,7 +266,7 @@ out.limit = C.LIMIT;
         check("the real transform is idempotent", rc.transform(out_real) == out_real)
         check("skipped sections' tables are not windowed", all(
             "data-rpt-table" not in out_real[m.start():out_real.find("</section>", m.start())]
-            for m in re.finditer(r"<section id='(?:fig-[a-z]+|scorecard|plasmid-maps|contig-layer|recommender-eval|amr-placement|enterprise|summary)'", out_real)))
+            for m in re.finditer(r"<section id='(?:fig-[a-z]+|plasmid-maps|contig-layer|amr-placement|enterprise|summary)'", out_real)))
         print(f"  info: demo stats {stats}")
 
     print()

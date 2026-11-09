@@ -38,15 +38,8 @@ MANIFEST = HERE / "data" / "report_feature_manifest.tsv"
 #   * tab / view / preset / unique rows assert the merged structure (containers with tabs, the
 #     leaderboard column presets, the scores group-by views, one copy of the paired table);
 #   * the remaining rows assert a fix that needs the merged structure to be meaningful.
-PENDING = sorted([
-    # preset: the leaderboard's named column presets (phase B)
-    "leaderboard.16", "leaderboard.17", "leaderboard.18", "leaderboard.19", "leaderboard.20", "leaderboard.21",
-    # tab / view: analyses that become tabs or views of a container (phase B)
-    "bin-quality.02", "learn-agreement.05", "rank-robustness.02", "recommendations.03", "scores.27", "scores.28",
-    "statistics.03", "stratified.02", "validation.02",
-    # unique: the paired-comparison table appears twice (statistics and taxon-transfer) until phase B drops one copy
-    "taxon-transfer.04",
-])
+PENDING = sorted([])   # every manifest row passes: the structure rows were satisfied by the phase B merges
+
 
 
 def build_report(workdir):

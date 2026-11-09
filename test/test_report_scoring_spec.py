@@ -98,7 +98,7 @@ def main():
                   "contig-layer": ["0.8100", "0.6600", "1,500 bp", "1,200 bp"],
                   "outcome-states": ["Infrastructure failure", ">10<", ">2<", "assembly graph unavailable"],
                   "recommender-eval": ["0.8333", "0.6667", "recommender_adds_value", "cohort_outlier:n50", "0.3333"],
-                  "taxon-transfer": ["Klebsiella", "0.380000", ">yes<"],
+                  "taxon-transfer": ["Klebsiella", "Paired tests"],   # the paired table itself is shown once, in Ranking confidence
                   "amr-placement": ["carbapenemase", "0.6667"],
                   "validity": ["partially validated", "3 fold(s)"]}
         for sid, needles in checks.items():
@@ -107,7 +107,7 @@ def main():
                 assert needle in body, f"{sid}: '{needle}' not in section"
             assert "Not run" not in body or sid == "contig-layer", f"{sid} unexpectedly not run"
         # one nav link per section, the page's own nav link, and the label-schemes prose link to the ranking-robustness table
-        assert page.count("<a href='#") == len(rss.SECTIONS) + 2
+        assert page.count("<a href='#") == len(rss.SECTIONS) + 3   # + the page's nav link, the label-schemes prose link and the taxon-transfer pointer to the paired tests
         print(f"  PASS: all {len(checks)} sections render their values, with nav links")
 
         # The three views are 3D scenes with the raw table kept in a collapsed details block.

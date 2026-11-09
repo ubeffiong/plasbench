@@ -299,16 +299,10 @@ def transfer_section(taxon_rows, comparisons):
                              r["status"], r["note"]) for r in taxon_rows]))
     else:
         parts.append(not_run("leave-taxon-out", "RUN_RECOMMENDER_EVAL=0 or no genus/phylum recorded"))
-    with_w = [r for r in comparisons if "wilcoxon_p_value" in r]
-    if with_w:
-        parts.append("<h3>Paired comparisons: permutation (primary), Wilcoxon and equivalence</h3>" + table(
-            ["Track", "Task", "Tool A", "Tool B", "Pairs", "Mean difference", "Permutation p (Holm)",
-             "Wilcoxon p (Holm)", f"Equivalent (|d| < {with_w[0].get('smallest_difference') or '0.05'})"],
-            [(r.get("analysis_track"), r.get("task"), r["tool_a"], r["tool_b"], r["paired_samples"],
-              r["mean_f1_difference"], r.get("permutation_p_value_holm"), r.get("wilcoxon_p_value_holm"),
-              r.get("equivalent")) for r in with_w]))
-    else:
-        parts.append(not_run("Wilcoxon and equivalence columns", "the paired-comparison table predates them"))
+    # The paired comparisons (permutation, Wilcoxon, equivalence) are shown once, in the Paired tests tab of Ranking confidence: a second
+    # copy here could drift from it. This section keeps the transfer evidence and points to the one table.
+    parts.append("<p class='muted'>Paired comparisons between tools (permutation, Wilcoxon and equivalence) are in "
+                 "<a href='#statistics'>Ranking confidence, Paired tests</a>.</p>")
     return section("taxon-transfer", "Transfer to unseen taxa, and paired tests",
                    "Leave-one-genus-out and leave-one-phylum-out regret; isolates without a taxon are counted, not "
                    "dropped. split=holdout isolates stay locked until evaluated once with --confirm-holdout.",

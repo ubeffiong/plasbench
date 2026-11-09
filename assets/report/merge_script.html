@@ -1,0 +1,108 @@
+<script id='rpt-merge-script'>
+(function () {
+  'use strict';
+  // report_merge: a container section holds its analyses as tab panels (.rpt-panel, each keeping the id of the section it was); this script turns the
+  // hidden strip into tabs, moves between them with the arrow keys, and opens the tab that holds the target of a link or address.
+
+  // ---- pure functions (also run under node by test/test_report_merge.py) ----
+  // The tab index a key moves to (automatic activation, wrapping), or -1 when the key is not a tab key.
+  function nextTab(current, count, key) {
+    if (!count) return -1;
+    if (key === 'ArrowRight' || key === 'Right') return (current + 1) % count;
+    if (key === 'ArrowLeft' || key === 'Left') return (current - 1 + count) % count;
+    if (key === 'Home') return 0;
+    if (key === 'End') return count - 1;
+    return -1;
+  }
+  // The index of the panel that holds a link target: `panelIds` are the container's panel ids in tab order, `ancestorIds` the ids of the target and
+  // of everything above it (nearest first). -1 when the target is in none of the panels.
+  function indexForTarget(panelIds, ancestorIds) {
+    for (var a = 0; a < ancestorIds.length; a++) {
+      var i = panelIds.indexOf(ancestorIds[a]);
+      if (i >= 0 && ancestorIds[a]) return i;
+    }
+    return -1;
+  }
+  // '#some%20id' -> 'some id' (empty when there is no address or it does not decode).
+  function decodeHash(raw) {
+    var h = String(raw || '').replace(/^#/, '');
+    try { return decodeURIComponent(h); } catch (e) { return h; }
+  }
+  var core = {nextTab: nextTab, indexForTarget: indexForTarget, decodeHash: decodeHash};
+  if (typeof window !== 'undefined') window.__rptMerge = core;
+  if (typeof document === 'undefined') return;
+
+  function safe(fn) { try { return fn(); } catch (e) { return null; } }
+  var boxes = [];
+
+  function select(box, i, focus, quiet) {
+    var tabs = box._tabs, panels = box._panels;
+    if (i < 0 || i >= tabs.length) return false;
+    var changed = !tabs[i].getAttribute('aria-selected') || tabs[i].getAttribute('aria-selected') !== 'true';
+    tabs.forEach(function (t, j) {
+      t.setAttribute('aria-selected', j === i ? 'true' : 'false');
+      t.tabIndex = j === i ? 0 : -1;
+      panels[j].hidden = j !== i;
+    });
+    if (focus) tabs[i].focus();
+    if (changed && !quiet) {                 // a widget in the panel that was hidden was laid out at zero size: tell it to re-fit
+      safe(function () { panels[i].dispatchEvent(new CustomEvent('pb-view-shown', {bubbles: true, detail: {tab: panels[i].id}})); });
+      safe(function () { window.dispatchEvent(new Event('resize')); });
+    }
+    return changed;
+  }
+
+  function bind(box) {
+    var list = box.querySelector(':scope > .rpt-mtabs');
+    if (!list || box._tabs) return;
+    var tabs = Array.prototype.slice.call(list.querySelectorAll('[role=tab]'));
+    var panels = Array.prototype.slice.call(box.querySelectorAll(':scope > .rpt-panel'));
+    if (!tabs.length || tabs.length !== panels.length) return;
+    box._tabs = tabs; box._panels = panels;
+    tabs.forEach(function (t, i) { t.addEventListener('click', function () { select(box, i, false); }); });
+    list.addEventListener('keydown', function (e) {
+      var current = tabs.indexOf(document.activeElement);
+      if (current < 0) return;
+      var to = nextTab(current, tabs.length, e.key);
+      if (to < 0) return;
+      e.preventDefault();
+      select(box, to, true);
+    });
+    list.hidden = false;
+    box.classList.add('rpt-on');
+    select(box, 0, false, true);
+    boxes.push(box);
+  }
+
+  // Open the tab that holds element `id` (a panel id or anything inside a panel); true when a tab was switched.
+  function reveal(id) {
+    if (!id) return false;
+    var el = document.getElementById(id), changed = false;
+    if (!el) return false;
+    for (var node = el; node && node !== document.body; node = node.parentElement) {
+      var box = node.parentElement && node.parentElement._panels ? node.parentElement : null;
+      if (!box || !node.classList.contains('rpt-panel')) continue;
+      var i = indexForTarget(box._panels.map(function (p) { return p.id; }), [node.id]);
+      if (i >= 0 && select(box, i, false)) changed = true;
+    }
+    return changed;
+  }
+
+  function setup() {
+    Array.prototype.forEach.call(document.querySelectorAll('.rpt-merge'), bind);
+    reveal(decodeHash(location.hash));
+  }
+  window.__rptMerge.reveal = reveal;
+  window.__rptMerge.select = function (id, i) { var el = document.getElementById(id); if (el && el._tabs) return select(el, i, false); return false; };
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a) return;
+    var id = decodeHash(a.getAttribute('href'));
+    setTimeout(function () {
+      if (reveal(id)) { var el = document.getElementById(id); if (el) safe(function () { el.scrollIntoView({block: 'start'}); }); }
+    }, 0);
+  });
+  window.addEventListener('hashchange', function () { reveal(decodeHash(location.hash)); });
+  setup();
+})();
+</script>

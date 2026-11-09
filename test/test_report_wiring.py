@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "python"))
 import report_common as rc  # noqa: E402
 import report_surfaces as rs  # noqa: E402
 import report_wiring as rw  # noqa: E402
+from report_regions import region  # noqa: E402
 
 TAB = chr(9)
 ok = True
@@ -211,7 +212,7 @@ def main():
             done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", cwd=ROOT)
             check("the report builds", done.returncode == 0, done.stderr[-800:])
             html = open(p("benchmark.report.html"), encoding="utf-8").read()
-            sec = lambda sid: html[html.index(f"<section id='{sid}'"):html.index("</section>", html.index(f"<section id='{sid}'"))]  # noqa: E731
+            sec = lambda sid: region(html, sid)   # a section, or a panel of a merged container (old ids resolve through report_aliases)  # noqa: E731
             pp = sec("per-plasmid-detail")
             n_rows = sum(len(rows) for rows in [list(csv.DictReader(open(f, encoding="utf-8"), delimiter=TAB))
                                                 for f in __import__("glob").glob(os.path.join(work, "*", "*.per_plasmid.tsv"))])

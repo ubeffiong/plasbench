@@ -123,7 +123,15 @@ for the incremental precision-recall sweep.
 
 ## What the HTML report adds
 
-The report is one self-contained file. Besides the leaderboard it contains:
+The report is one self-contained file that opens on an **Overview** and shows **one view at a time**, chosen from a fixed left rail (Overview, Scorecard,
+Figures, Plasmid maps, Diagnostics, Data quality, Recommendation, Methods, Appendix) beside a slim top bar with a jump-to-section search. The analyses are
+ordered as a story (headline, scorecard, figures, maps, diagnostics, data quality, recommendation, methods, appendix), and related analyses are merged into one
+tabbed section (for example *Ranking confidence* holds the paired tests, rank sensitivity, power, database leakage and reproducibility; *Cohort and truth quality*
+holds eight data-quality checks; *Method ranking* holds the metric chart, graded recovery, negative control and baselines). Old section links still work: each merged
+section keeps its id as a tab. Long tables show their first 12 rows with a filter and *Show all*. Nothing is removed: a feature manifest test checks that every
+table, chart, control, download and definition of the earlier report is still present. **Full PDF**: the *Print / Save PDF* button, or
+`plasbench report-pdf --report results/benchmark.report.html [--out report.pdf]`, writes every view in order (cover and contents, then each view on a new
+page with every fold open and every note printed in full). Besides the leaderboard it contains:
 
 - **A weighted scorecard** of 17 metrics (A1-E3) with grade bands, shown beside the leaderboard and never replacing it. Scores are piecewise linear
   (100/85/60/0), the overall is renormalised over the metrics that could be scored, and scenario views (simple, complex, annotated, challenging) flag

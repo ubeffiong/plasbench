@@ -2731,6 +2731,8 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     page = report_wiring.inject(page, str(results_dir), args.data_dir, args.scores)
     page = report_surfaces.inject(page, str(results_dir), args.data_dir)
     page = report_wiring.finish(page)
+    import report_merge    # fold related analyses into tabbed containers, keeping every old id as a panel id (python/report_merge.py)
+    page = report_merge.transform(page)
     import report_layout   # the page shell: top bar, left rail, one view at a time, print/PDF form (python/report_layout.py)
     page = report_layout.transform(page)
     # Last step: move the explanatory notes into info popovers (python/report_info.py), then add their positioning script.

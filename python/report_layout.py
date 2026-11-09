@@ -67,7 +67,7 @@ VIEWS = [
      "metric-framework headline-design interpretation-limits prereg scoring-additions keys method scoring-spec"),
     ("appendix", "Appendix", "Appendix", "folder",
      "The interactive explorer, every file the run produced, and what was reproduced.", True,
-     "enterprise extended reproducibility data-inventory files"),
+     "enterprise appendix-reference extended reproducibility data-inventory files"),
 ]
 MORE = ("more", "More", "More", "dots", "Sections that no view lists, kept here so nothing disappears.", True, "")
 OPEN_CARDS = {"figures": ("fig-ladder",), "maps": ("plasmid-maps",), "recommendation": ("recommendations",), "appendix": ("enterprise",),
