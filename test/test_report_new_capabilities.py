@@ -135,8 +135,7 @@ with tempfile.TemporaryDirectory() as tmp:
     ])
     check("a 'not_assessed' verdict renders as a labeled not-assessed badge, never a guessed yes/no",
           "sig-badge not-assessed" in html)
-    check("the interpretation prose says the margin is not yet statistically assessed",
-          "not yet statistically assessed" in " ".join(html.split()))
+    # (the 'Automated interpretation' prose section was removed as a duplicate of Start here; the not-assessed badge above is the statement)
 
 # --- 2. Mean NMI / Mean VI leaderboard columns -------------------------------
 with tempfile.TemporaryDirectory() as tmp:
@@ -157,7 +156,7 @@ with tempfile.TemporaryDirectory() as tmp:
         leader_row(rank="1", tool="tool_a", n_zero_plasmid_isolates="3",
                    mean_zero_plasmid_specificity="0.9800", total_zero_plasmid_chromosome_fp_bp="450"),
     ])
-    check("the nav bar links the new Zero-plasmid isolates section", "href='#zero-plasmid'" in html)
+    check("the Zero-plasmid isolates section is on the page (now a tab; its id still lands)", "id='zero-plasmid'" in html)
     check("the section reports the plasmid-free isolate count, specificity, and FP bp for the tool",
           "id='zero-plasmid'" in html and "0.9800" in html and ">3<" in html and "450" in html)
 
@@ -220,7 +219,7 @@ with tempfile.TemporaryDirectory() as tmp:
 # --- 7. Isolate difficulty section (python/compute_difficulty_features.py) ---
 with tempfile.TemporaryDirectory() as tmp:
     html = build(tmp, [leader_row(rank="1", tool="tool_a")])  # no --data-dir given at all
-    check("the nav bar links the new Isolate difficulty section", "href='#isolate-difficulty'" in html)
+    check("the Isolate difficulty section is on the page (a tab of Cohort quality; its id still lands)", "id='isolate-difficulty'" in html)
     check("with no --data-dir given, the section says so plainly rather than an empty table",
           "id='isolate-difficulty'" in html and "RUN_DIFFICULTY_FEATURES" in html)
 

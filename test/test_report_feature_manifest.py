@@ -38,6 +38,16 @@ MANIFEST = HERE / "fixtures" / "report_feature_manifest.tsv"
 #   * tab / view / preset / unique rows assert the merged structure (containers with tabs, the
 #     leaderboard column presets, the scores group-by views, one copy of the paired table);
 #   * the remaining rows assert a fix that needs the merged structure to be meaningful.
+# Features removed or reshaped BY DECISION (the section review of 2026-11-10), each with its reason and where the information went. A row listed here
+# may fail; a row that fails and is NOT listed fails the test, so nothing is lost silently. A listed row that passes is reported so the list can shrink.
+REMOVED_BY_DECISION = {
+    "insights.01": "'Automated interpretation' repeated 'Start here' (Summary); the Summary keeps the findings",
+    "insights.02": "same section: the not-'mean F1' wording check applies to the Summary's Leading-method line instead (test_report_tracks)",
+    "outcome-states.02": "the second run-outcome table is merged into table 1, which now has a 'Why runs did not complete (most common reason)' column",
+    "outcome-states.03": "heading of the removed second table (see outcome-states.02)",
+    "extended.01": "'Extended analyses and next steps' only listed what was not run: it is now one line in Run metadata ('Not run in this run'); shown as a section only when results exist",
+    "excluded-replicons.01": "a section that holds only a Not-run notice is not shown; its reason is listed in Run metadata (id kept as an anchor). It reappears, with this text, when replicons are excluded",
+}
 PENDING = sorted([])   # every manifest row passes: the structure rows were satisfied by the phase B merges
 
 
@@ -79,6 +89,7 @@ def build_into(results, out):
             "--leave-taxon-out", prefix + ".leave_taxon_out.tsv",
             "--amr-placement", prefix + ".amr_placement.tsv",
             "--contig-crosscheck", prefix + ".contig_crosscheck.tsv",
+            "--embed-dashboard",           # the manifest covers the dashboard's features too (it is optional in the default build)
             "--out", str(out)]
     done = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
                           env={**os.environ, "PYTHONIOENCODING": "utf-8"})
@@ -217,7 +228,8 @@ def main():
         page, _ = build_report(work)
     failures = evaluate(page, rows)
     failed = {f[0] for f in failures}
-    unexpected = [f for f in failures if f[0] not in PENDING]
+    unexpected = [f for f in failures if f[0] not in PENDING and f[0] not in REMOVED_BY_DECISION]
+    assert set(REMOVED_BY_DECISION) <= set(ids), "REMOVED_BY_DECISION names a row that is not in the manifest"
     stale = [p for p in PENDING if p not in failed]
     print("manifest rows: %d; passing: %d; failing: %d; pending (expected failing): %d"
           % (len(rows), len(rows) - len(failures), len(failures), len(PENDING)))
@@ -228,7 +240,11 @@ def main():
     for fid, kind, check, why in unexpected:
         print("FAIL %s [%s] %s -- %s" % (fid, kind, check, why))
     assert not unexpected, "%d manifest feature(s) missing from the report" % len(unexpected)
-    print("OK: every manifest feature outside PENDING is present")
+    still = [i for i in REMOVED_BY_DECISION if i not in failed]
+    print("removed by decision: %d (%s)" % (len(REMOVED_BY_DECISION), ", ".join(sorted(REMOVED_BY_DECISION))))
+    if still:
+        print("removed-by-decision rows that pass anyway: " + ", ".join(still))
+    print("OK: every manifest feature outside PENDING and REMOVED_BY_DECISION is present")
 
 
 if __name__ == "__main__":

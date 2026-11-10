@@ -126,11 +126,11 @@ leaderboard.13	leaderboard	text	not applicable	"""not applicable is not a zero""
 leaderboard.14	leaderboard	text	Plasmid reconstruction	reconstruction table heading	leaderboard
 leaderboard.15	leaderboard	text	Plasmid classification	classification table heading	leaderboard
 leaderboard.16	leaderboard	preset	Headline	default column preset = the 20 headline columns	leaderboard
-leaderboard.17	leaderboard	preset	Metric framework	preset carrying metric-framework columns (Base F1 macro/micro, Contig F1 count/length, MCC count/length, Binning F1 length/assembly-aware, ARI, CPRR)	leaderboard
-leaderboard.18	leaderboard	preset	MCC and F-beta	preset carrying scoring-additions columns incl. Abstention rate	leaderboard
-leaderboard.19	leaderboard	preset	Graded recovery	preset carrying Recall >=50%, >=90%, Complete + circular recall	leaderboard
-leaderboard.20	leaderboard	preset	Negative control	preset carrying Plasmid-free isolates scored, Mean isolate specificity, Total chromosome FP bp	leaderboard
-leaderboard.21	leaderboard	preset	Baselines and calibration	preset carrying Versus best baseline, Mean Brier score, Mean ECE, Samples calibrated	leaderboard
+leaderboard.17	metric-framework	element_id	metric-framework	section for the metric-framework columns (Methods and limits)	leaderboard
+leaderboard.18	more-metrics	tab	MCC and F-beta	tab of Additional ranking metrics	leaderboard
+leaderboard.19	more-metrics	tab	Graded recovery	tab of Additional ranking metrics	leaderboard
+leaderboard.20	more-metrics	tab	Negative control	tab of Additional ranking metrics	leaderboard
+leaderboard.21	more-metrics	tab	Baselines and calibration	tab of Additional ranking metrics	leaderboard
 leaderboard.22	leaderboard	sortable	table.sortable	every leaderboard table is sortable	leaderboard
 robustness.02	robustness	svg_count>=1	robustness	at least one SVG chart survives	robustness
 robustness.03	robustness	text	Failed runs scored 0	failed-run column survives	robustness
@@ -155,7 +155,7 @@ taxon-transfer.03	taxon-transfer	text	Leave-one-genus-out	genus/phylum text kept
 taxon-transfer.04	taxon-transfer	unique	Tool A | Tool B | Pairs | Wilcoxon p (Holm)	paired table exists exactly once (in paired tests), not twice	recommender-eval
 learn-agreement.04	learn-agreement	heading	Do tools agree with each other?	panel survives	bin-diagnostics
 learn-truthqc.03	learn-truthqc	heading	Read-depth windows	panel survives	cohort-qc
-learn-plsmd.01	learn-plsmd	text	plsMD	tool note survives	robustness
+learn-plsmd.01	ranking-sensitivity	text	plsMD	tool note survives	robustness
 recommendations.02	recommendations	element_id	recommendations	injection anchor id kept	recommendations
 recommendations.03	recommendations	tab	Selected reconstructions	tab exists	recommendations
 stratified.02	stratified	tab	Evidence by stratum	stratified merged into recommendations	recommendations

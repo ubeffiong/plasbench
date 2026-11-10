@@ -230,6 +230,7 @@ python3 "$PY/build_html_report.py" \
     --leave-taxon-out "$DEMO/benchmark.leave_taxon_out.tsv" \
     --amr-placement "$DEMO/benchmark.amr_placement.tsv" \
     --contig-crosscheck "$DEMO/benchmark.contig_crosscheck.tsv" \
+    --embed-dashboard \
     --out "$DEMO/benchmark.report.html"
 
 echo

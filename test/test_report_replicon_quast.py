@@ -65,7 +65,7 @@ def main():
         html = build(paths, os.path.join(d, "empty.html"))
         assert "id='replicon-recovery'" in html and "No recovery-by-replicon table" in html
         assert "id='quast-diagnostics'" in html and "RUN_QUAST_DIAGNOSTICS=0" in html
-        assert "href='#replicon-recovery'" in html and "href='#quast-diagnostics'" in html
+        assert "id='replicon-recovery'" in html and "id='quast-diagnostics'" in html
 
         replicon = os.path.join(d, "r.tsv")
         with open(replicon, "w") as fh:

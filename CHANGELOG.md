@@ -13,6 +13,27 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- section review: duplicates, mixed tasks and not-run sections
+- **Recommendations are made for one task.** `select_operational_method.py` now recommends among the reconstruction tools only (`binning_capable=yes` in
+  `config/tool_capabilities.tsv`); classifiers are ranked separately and are no longer compared with reconstruction tools in one "recommended overall" line.
+  `benchmark.recommendations.tsv` has a last column `task`; `--task all` keeps the old behaviour and warns. The report says "One task" above the recommendation.
+- **One place for each result**: the Automated interpretation section (it repeated *Start here*) is gone; per-plasmid results live in Plasmid maps ("All per-plasmid
+  results" is its tab); run outcomes are one table with a reason column; Assembly adequacy is a tab of Assembly quality; both database-leakage screens are one tab;
+  the two truth-quality groups are one *Reference standard* group beside the Headline design (with the pre-registration); the contig layer no longer prints the
+  independent second scorer twice.
+- **Fewer views of the same data**: the scorecard and its by-scenario views and the five-dimension composite are one *Scorecard (exploratory)* view with tabs; the
+  Overview keeps the result, its confidence and the findings, the rest moved to Detailed results and Methods; the per-isolate recommender evaluation is one
+  *Recommender validation* card under Recommendation, closed by default.
+- **Artifact explorer replaces the "Data in this report" table**: each of its files has a description (what it is, which step wrote it, where it is shown); empty
+  Logs and Data folds are hidden.
+- **Glossary**: the 40 key headings are one searchable table.
+- **Not-run sections are listed once**: a section or tab that holds only a "Not run" notice is not shown; *Run metadata* lists it with its reason ("Not run in this
+  run"), and the old section id still lands there. *Extended analyses and next steps* is one line in Run metadata unless results exist.
+- **The interactive cohort dashboard is optional** (`--embed-dashboard` or `REPORT_EMBED_DASHBOARD=1`, default off): it repeats the heatmap and metric tables and
+  adds about 1 MB (the 6.5 MB of evidence-explorer data is separate and stays, lazy-loaded). The evidence explorer is unaffected.
+- Panels of the explorers no longer show two headings; "Selected reconstructions" says why a selection needs review. The feature manifest keeps an explicit
+  `REMOVED_BY_DECISION` list (six rows, each with its reason and where the information went) so nothing is lost silently.
+
 ### Changed -- order and wording for readers who are deciding
 - **View order**: Overview, Recommendation, Figures, Plasmid maps, Detailed results (was "Statistical diagnostics"), Data quality, Methods and limits, Scorecard
   (exploratory), Appendix. Menu labels equal view titles; section labels in the menu are two to four words. Figures run CPRR differences, CPRR distributions, heatmap,

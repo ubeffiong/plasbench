@@ -66,7 +66,7 @@ def main():
         out = os.path.join(results, "report.html")
         subprocess.run([sys.executable, REPORT, "--project-root", ROOT, "--scores", scores,
                         "--tool-status", os.path.join(results, "absent.tsv"),
-                        "--leaderboard", leaderboard, "--out", out], check=True)
+                        "--leaderboard", leaderboard, "--embed-dashboard", "--out", out], check=True)
         page = open(out, encoding="utf-8").read()
 
     # The retained canvas matrix exposes an accessible description, receives
@@ -427,7 +427,7 @@ def main():
                  "Chromosomal contamination", "Purity"):
         assert term in page, f"glossary term missing: {term}"
     assert page.count("Why it matters") >= 18,         "every term must say why it matters, not only what it measures"
-    assert "class='term-card'" in page or 'class="term-card"' in page,         "the keys section must render from the glossary"
+    assert "class='sortable glossary'" in page or "sortable glossary" in page,         "the keys section must render from the glossary"
 
     # Summary first: headline numbers, a graded report card, and where to look.
     assert page.index("<section id='summary'>") < page.index("<section id='metadata'>"),         "the summary must come first"

@@ -59,8 +59,8 @@ def main():
     out = rm.transform(base)
 
     print("structure")
-    check("the absorbed sections are no longer top-level sections", top_ids(out) == ["summary", "robustness", "leaderboard", "recommendations"], top_ids(out))
-    check("no section is nested", all(out.count("<section") == out.count("</section>") for _ in [0]) and out.count("<section") == 4)
+    check("the absorbed sections are no longer top-level sections", top_ids(out) == ["summary", "robustness", "ranking-sensitivity", "leaderboard", "recommendations"], top_ids(out))   # power is a tab of the virtual ranking-sensitivity container
+    check("no section is nested", all(out.count("<section") == out.count("</section>") for _ in [0]) and out.count("<section") == 5)
     check("the container's own content is the first panel", "id='robustness-main'" in out and region(out, "robustness-main").count("own") == 1)
     check("each absorbed section is a panel with the old id", "<div class='rpt-panel' id='statistics'" in out and "<div class='rpt-panel' id='power'" in out)
     check("a link to the old id still lands on an element", all(f"id='{i}'" in out for i in ("statistics", "power", "chart", "st-svg")))
@@ -77,13 +77,13 @@ def main():
     check("LEGACY_IDS resolves the absorbed ids to (container, tab)", report_aliases.LEGACY_IDS["statistics"] == ("robustness", "Paired tests")
           and report_aliases.LEGACY_IDS["composite"][0] == "scorecard")
     check("an unknown id resolves to nothing", report_aliases.LEGACY_IDS.get("no-such-section") is None)
-    check("every absorbed id in MERGES is in LEGACY_IDS", all(o in report_aliases.LEGACY_IDS for s in rm.MERGES for o, _l in s["tabs"]))
+    check("every absorbed id in MERGES is in LEGACY_IDS", all(o in report_aliases.LEGACY_IDS for s in rm.MERGES for o_, _l in s["tabs"] for o in (o_ if isinstance(o_, (tuple, list)) else [o_])))
     check("region() finds an absorbed section by its old id", "Paired tests." in region(out, "statistics"))
-    check("panels_of lists the container's panels in order", [p[0] for p in rm.panels_of(region(out, "robustness") if region(out, "robustness").startswith("<section") else "")] in ([], ["robustness-main", "statistics", "power"]))
+    check("panels_of lists the container's panels in order", [p[0] for p in rm.panels_of(region(out, "robustness") if region(out, "robustness").startswith("<section") else "")] in ([], ["robustness-main", "statistics"]))
 
     print("what is left alone")
     check("idempotent", rm.transform(out) == out)
-    no_container = page_of(sec("statistics", STAT), sec("power", POW))
+    no_container = page_of(sec("statistics", STAT), sec("chart", CHART))
     check("a missing container leaves the absorbed sections standing alone", rm.transform(no_container) == no_container)
     only_container = page_of(sec("robustness", "<h2>R</h2><p>own</p>"))
     check("a container with nothing to absorb is unchanged", rm.transform(only_container) == only_container)
@@ -94,9 +94,9 @@ def main():
     check("a page without sections is unchanged", rm.transform("<p>x</p>") == "<p>x</p>")
 
     print("the appendix container")
-    app = rm.transform(page_of(sec("summary", "<h2>S</h2>"), sec("prereg", "<h2>Prereg</h2><p>p</p>"), sec("extended", "<h2>Ext</h2><p>e</p>")))
+    app = rm.transform(page_of(sec("summary", "<h2>S</h2>"), sec("accuracy-dimension", "<h2>Accuracy</h2><p>p</p>"), sec("quast-diagnostics", "<h2>Quast</h2><p>e</p>")))
     check("'appendix-reference' takes the place of the first absorbed section", top_ids(app) == ["summary", "appendix-reference"], top_ids(app))
-    check("its tabs are the reference sections with their old ids", "id='prereg'" in app and "id='extended'" in app and "data-tab='Pre-registration'" in app)
+    check("its tabs are the reference sections with their old ids", "id='accuracy-dimension'" in app and "id='quast-diagnostics'" in app and "data-tab='QUAST diagnostics'" in app)
 
     print("the real demo report")
     report = os.path.join(HERE, "..", "results_demo", "benchmark.report.html")

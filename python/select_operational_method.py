@@ -22,6 +22,7 @@ import shutil
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from tool_capabilities import read_capabilities
 from recommendation_model import (DEFAULT_DECISION_PROFILE, DECISION_PROFILES, attach_assembly_stats,
                                   decision_score, load_assembly_stats, load_model)
 from plasbench_common import merge_intervals as _merge_intervals, interval_overlap_bp as interval_overlap  # noqa: E402
@@ -240,8 +241,23 @@ def applicability_tier(summary, min_samples, min_coverage):
     return "low"
 
 
+def reconstruction_tools(registry_path, tools):
+    """The tools among `tools` that the capability registry marks binning-capable (they group contigs into plasmid bins: the RECONSTRUCTION task).
+
+    Everything else (classifiers, re-assemblers whose contigs are not bins) is ranked on the CLASSIFICATION task. The two tasks are never compared with each
+    other anywhere else in the benchmark, so a recommendation must not compare them either: an overall winner chosen across tasks can be a tool that does not
+    reconstruct plasmids at all. Returns None when the registry cannot be read or no scored tool is binning-capable (the caller then keeps every tool and says so).
+    """
+    try:
+        registry = read_capabilities(Path(registry_path))
+    except (OSError, ValueError, KeyError):
+        return None
+    allowed = {tool for tool in tools if str((registry.get(tool) or {}).get("binning_capable", "")).strip().lower() == "yes"}
+    return allowed or None
+
+
 def write_recommendations(rows, statuses, total_samples, out_path, min_samples, min_coverage, validation_ready=True,
-                          model=None, decision_profile=DEFAULT_DECISION_PROFILE, min_expected_score=0.0):
+                          model=None, decision_profile=DEFAULT_DECISION_PROFILE, min_expected_score=0.0, task=""):
     """Write benchmark.recommendations.tsv: one primary tool per scope, or none.
 
     min_expected_score (decision D11, RECOMMENDATION_MIN_EXPECTED_SCORE): when the
@@ -259,7 +275,7 @@ def write_recommendations(rows, statuses, total_samples, out_path, min_samples, 
         scopes.extend((field, value, group) for value, group in sorted(groups.items()))
     columns = ["scope", "group", "tool", "eligible", "applicability", "recommendation", "reason", "n_scored", "coverage",
                "mean_f1", "mean_precision", "mean_recall", "mean_plasmid_recall", "mean_bin_f1", "mean_amr_gene_recall", "decision_profile_effective", "failure_rate",
-               "median_runtime_seconds", "median_peak_rss_kb", "decision_score"]
+               "median_runtime_seconds", "median_peak_rss_kb", "decision_score", "task"]
     recommendations, written = {}, []
     for scope, group, group_rows in scopes:
         summaries = tool_quality(group_rows, statuses, total_samples if scope == "overall" else len({row["sample"] for row in group_rows}),
@@ -280,7 +296,7 @@ def write_recommendations(rows, statuses, total_samples, out_path, min_samples, 
                       else "insufficient coverage or not the highest eligible decision score")
             if item.get("model_used"):
                 reason += " (model-fitted)"
-            item.update({"scope": scope, "group": group, "eligible": str(eligible(item, min_samples, min_coverage)).lower(),
+            item.update({"task": task, "scope": scope, "group": group, "eligible": str(eligible(item, min_samples, min_coverage)).lower(),
                          "applicability": applicability_tier(item, min_samples, min_coverage) if validation_ready else "unsupported",
                          "recommendation": "primary" if winner and item["tool"] == winner["tool"] else "none",
                          "reason": reason})
@@ -445,6 +461,11 @@ def main():
                         default=float(os.environ.get("RECOMMENDATION_MIN_EXPECTED_SCORE", 0.40)),
                         help="Decision D11: below this expected F1 no tool is recommended (default 0.40).")
     parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
+    parser.add_argument("--capabilities", default=str(Path(__file__).resolve().parent.parent / "config" / "tool_capabilities.tsv"),
+                        help="config/tool_capabilities.tsv; binning_capable=yes marks the tools of the reconstruction task.")
+    parser.add_argument("--task", choices=("reconstruction", "all"), default="reconstruction",
+                        help="Which task's tools are recommended (default: reconstruction, like the headline result). 'all' restores the old behaviour of "
+                             "choosing one winner across tasks, which compares tools that are never ranked against each other.")
     parser.add_argument("--decision-profile", choices=tuple(DECISION_PROFILES), default=DEFAULT_DECISION_PROFILE,
                         help="Named decision_score weight set (recommendation_model.py). The default reproduces "
                              "today's original single formula exactly; a different profile only changes ranking, "
@@ -465,6 +486,15 @@ def main():
     attach_assembly_stats(rows, load_assembly_stats(args.data_dir))
     attach_read_quality_bands(rows, args.data_dir)
     statuses = status_profiles(args.tool_status)
+    task_label = "all"
+    if args.task == "reconstruction":
+        allowed = reconstruction_tools(args.capabilities, {row["tool"] for row in rows})
+        if allowed:
+            rows = [row for row in rows if row["tool"] in allowed]
+            task_label = "reconstruction"
+        else:
+            print("WARNING: no scored tool is marked binning-capable in the capability registry, so recommendations cover every tool "
+                  "(the task is recorded as 'all').", file=__import__("sys").stderr)
     validation_rows = read_tsv(args.recommendation_validation) if args.recommendation_validation and Path(args.recommendation_validation).is_file() else []
     # validate_recommendations.py also writes a per-stratum LOSO diagnostic
     # row alongside each fold's "overall" row -- a stratum lacking enough
@@ -483,12 +513,12 @@ def main():
     recommendations_path = out_prefix.with_name(out_prefix.name + ".recommendations.tsv")
     recommendations, recommendation_rows = write_recommendations(
         rows, statuses, len(metadata), recommendations_path, args.min_samples, args.min_coverage, validation_ready,
-        model=model, decision_profile=args.decision_profile, min_expected_score=args.min_expected_score)
+        model=model, decision_profile=args.decision_profile, min_expected_score=args.min_expected_score, task=task_label)
     stratified_path = out_prefix.with_name(out_prefix.name + ".stratified.tsv")
     with open(stratified_path, "w", newline="", encoding="utf-8") as handle:
         columns = ["scope", "group", "tool", "eligible", "applicability", "recommendation", "reason", "n_scored", "coverage",
                    "mean_f1", "mean_precision", "mean_recall", "mean_plasmid_recall", "mean_bin_f1", "failure_rate",
-                   "median_runtime_seconds", "median_peak_rss_kb", "decision_score"]
+                   "median_runtime_seconds", "median_peak_rss_kb", "decision_score", "task"]
         writer = csv.DictWriter(handle, fieldnames=columns, delimiter="\t")
         writer.writeheader()
         for row in recommendation_rows:

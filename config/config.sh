@@ -728,3 +728,5 @@ export PLASBIN_FLOW_OUTPUTS_DIR="${PLASBIN_FLOW_OUTPUTS_DIR:-}"
 #   it adds BLAST-based IS annotation beside ISEScan and feeds the repeat_rich scenario tag.
 export ISFINDER_FASTA="${ISFINDER_FASTA:-}"
 export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"
+# 1 embeds the interactive cohort dashboard in the HTML report (about 1 MB; it repeats the heatmap and metric tables). Default 0.
+export REPORT_EMBED_DASHBOARD="${REPORT_EMBED_DASHBOARD:-0}"

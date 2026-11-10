@@ -50,6 +50,8 @@
 #pb-analyses td{padding:7px 9px;border-bottom:1px solid #eef2ef;color:var(--pb-ink)}
 #pb-analyses tbody tr:hover td{background:#f5faf6}
 #pb-analyses h3,#pb-analyses h4:not(.pb-card>header h4){font:600 14px Arial,sans-serif;margin:0 0 8px}
+/* a panel has ONE heading, the card title; the panel's own first heading carries the selection (which method, which plasmid) and reads as a subtitle */
+#pb-analyses .pb-body > * > h3:first-child,#pb-analyses .pb-body > * > h4:first-child{font:500 12.5px Arial,sans-serif;color:var(--pb-dim);margin:0 0 8px}
 #pb-analyses p{margin:0 0 10px;color:var(--pb-dim);font-size:13.5px}
 #pb-analyses svg{max-width:100%;height:auto}
 @media (max-width:760px){.pb-grid{grid-template-columns:1fr}}
@@ -92,6 +94,10 @@ function makeCard(id,title,hint){const el=$(id);if(!el)return null;
   +'<button type="button" class="pb-expand" aria-expanded="false">Expand</button>'
   +'</header><div class="pb-body"></div>';
  card.querySelector('.pb-body').append(el);
+ // an inner heading that only repeats the card title is hidden (the panels render their content after this runs, so watch for it)
+ const dedupe=()=>{const own=el.querySelector(':scope > h3, :scope > h4');
+  if(own&&own.textContent.trim().toLowerCase()===title.trim().toLowerCase())own.hidden=true};
+ dedupe();new MutationObserver(dedupe).observe(el,{childList:true});
  const button=card.querySelector('.pb-expand');
  button.addEventListener('click',()=>{const on=card.classList.toggle('expanded');
   scrim.classList.toggle('on',on);button.textContent=on?'Close':'Expand';

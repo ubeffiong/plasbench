@@ -87,7 +87,7 @@ def main():
     for name in ("replicon-recovery", "rank-robustness", "truth-label-audit", "stratified",
                  "orthogonal-evidence", "quast-diagnostics", "accuracy-dimension", "feature-preservation",
                  "bin-quality", "performance", "power", "scenarios", "composite", "reproducibility"):
-        assert f"href='#{name}'" in html, name
+        assert f"id='{name}'" in html, name   # sections are tabs of containers now: the id still lands
     # Additions learned from PlasEval, plsMD and GAEMR: output files and populated sections. The demo carries an assembly
     # with contig labels, so bin agreement (for the tool whose bins are assembly contigs), assembly adequacy and repeat
     # content hold values; copy number needs truth depth the demo lacks and must say so; plsMD is not run in the demo.
@@ -104,8 +104,8 @@ def main():
     assert "Best-match F1" in section(html, "learn-agreement") and "Not run: scores.tsv" not in section(html, "learn-agreement")
     assert "Plasmid adequacy" in section(html, "learn-adequacy") and "Not run" not in section(html, "learn-adequacy")
     assert "repeat-rich" in section(html, "learn-truthqc")
-    assert "Not run" in section(html, "learn-copynumber"), "no truth depth in the demo: the section must say so"
-    assert "plsMD was not run" in section(html, "learn-plsmd")
+    assert "data-notrun='learn-copynumber'" in html and "copy_number.tsv was not produced" in html, "no truth depth in the demo: Run metadata must say so (the empty section is no longer shown)"
+    assert "plsMD was not run" in section(html, "database-membership") + section(html, "ranking-sensitivity")   # one Database leakage tab holds both screens
     print("demo run -> per-plasmid files -> stratification, robustness, audit, strata -> HTML: PASS")
     print("ALL DEMO END-TO-END TESTS PASSED")
     return 0

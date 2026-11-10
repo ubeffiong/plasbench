@@ -26,6 +26,8 @@ The report grew one top-level section per analysis (73 in the demo). This step, 
   * Appendix: five reference sections become tabs of the new container 'appendix-reference' (nothing of its own).
 
   MERGES                   the table: container id, title, rail label, first tab label, [(absorbed id, tab label)]
+                           GROUP TABS: the absorbed id may be a tuple of ids, e.g. (("database-membership", "learn-plsmd"), "Database leakage"): the sections
+                           stack in ONE tab, the first id is the panel id and the others keep their ids as anchors inside it (old links still land)
   LEGACY_IDS               {absorbed id: (container id, tab label)}, shared with report_aliases
   panels_of(section)       [(panel id, tab label, inner html)] of a merged container (used by report_layout's status chips and the tests)
   transform(page)          the merged page
@@ -44,49 +46,67 @@ MARK = "rpt-merge"
 # container id, container title (None keeps the container's own heading), rail label (None keeps the navigation label), blurb for a new
 # title, label of the container's own first tab, [(absorbed section id, tab label)] in tab order.
 MERGES = [
+    # ---- Overview: the result and its confidence (the other metrics and checks are in Detailed results and Methods)
     {"id": "leaderboard", "title": None, "rail": "Method ranking", "first": "Headline",
-     "tabs": [("chart", "Precision, recall and F1"), ("metric-framework", "Metric framework"), ("scoring-additions", "MCC and F-beta"),
-              ("graded-tiers", "Graded recovery"), ("zero-plasmid", "Negative control"), ("baselines-calibration", "Baselines and calibration")]},
+     "tabs": [("chart", "Precision, recall and F1")]},
     {"id": "robustness", "title": "Ranking confidence", "rail": "Ranking confidence", "first": "Basis and metric checks",
-     "blurb": "How far the ranking can be trusted: the basis and the metric checks, the paired tests behind every gap, the sensitivity of the "
-              "ranking to filters and metrics, statistical power, leakage from tool databases, and reproducibility across runs.",
-     "tabs": [("statistics", "Paired tests"), ("rank-robustness", "Filter and metric sensitivity"), ("power", "Statistical power"),
-              ("database-membership", "Truth in tool databases"), ("learn-plsmd", "plsMD leakage"), ("reproducibility", "Reproducibility")]},
-    {"id": "scorecard", "title": None, "rail": "Scorecard", "first": "Scorecard",
-     "tabs": [("composite", "Weights and sensitivity")]},
-    {"id": "scorecard-scenarios", "title": None, "rail": "Scorecard by scenario", "first": "Overlapping tags",
-     "tabs": [("scenarios", "Exclusive scenarios")]},
+     "blurb": "How far the ranking can be trusted: the basis and the metric checks, and the paired tests behind every gap. Sensitivity, power, leakage and "
+              "reproducibility are in Detailed results.",
+     "tabs": [("statistics", "Paired tests")]},
+    # ---- Detailed results
+    {"id": "more-metrics", "title": "Additional ranking metrics", "rail": "More ranking metrics", "first": None,
+     "blurb": "Ranking metrics beyond the headline: MCC and F-beta with abstention, graded recovery, the negative control, and the baselines with calibration.",
+     "tabs": [("scoring-additions", "MCC and F-beta"), ("graded-tiers", "Graded recovery"), ("zero-plasmid", "Negative control"),
+              ("baselines-calibration", "Baselines and calibration")]},
+    {"id": "ranking-sensitivity", "title": "Sensitivity, power and reproducibility", "rail": "Sensitivity and power", "first": None,
+     "blurb": "How the ranking changes under other choices and how much data it rests on: filter and metric sensitivity, statistical power, leakage from tool "
+              "databases (one tab for both screens) and reproducibility across runs.",
+     "tabs": [("rank-robustness", "Filter and metric sensitivity"), ("power", "Statistical power"),
+              (("database-membership", "learn-plsmd"), "Database leakage"), ("reproducibility", "Reproducibility")]},
     {"id": "scores", "title": None, "rail": "All scores", "first": "All scores",
      "tabs": [("tools", "By tool"), ("samples", "By sample")]},
     {"id": "bin-diagnostics", "title": None, "rail": "Bin diagnostics", "first": "Matching",
      "tabs": [("bin-quality", "Quality tiers"), ("plasmid-outcomes", "Per-plasmid outcomes"), ("learn-agreement", "Agreement"),
               ("learn-copynumber", "Copy number")]},
-    {"id": "cohort-qc", "title": "Cohort and truth quality", "rail": "Cohort and truth quality", "first": "Cohort QC flags",
-     "blurb": "Checks on the cohort and on the truth it is scored against: outlier isolates, metadata, difficulty, assembly adequacy, truth "
-              "labels, repeats and depth, excluded replicons, labelling schemes and laboratory evidence.",
-     "tabs": [("metadata-completeness", "Metadata completeness"), ("isolate-difficulty", "Isolate difficulty"),
-              ("learn-adequacy", "Assembly adequacy"), ("truth-label-audit", "Truth labels"), ("learn-truthqc", "Truth repeats and depth"),
-              ("excluded-replicons", "Excluded replicons"), ("label-schemes", "Label schemes"), ("orthogonal-evidence", "Orthogonal evidence")]},
+    # ---- Plasmid maps: one place for per-plasmid results
+    {"id": "plasmid-maps", "title": None, "rail": "Plasmid maps", "first": "Maps",
+     "tabs": [("per-plasmid-detail", "All per-plasmid results")]},
+    # ---- Data and reference quality
+    {"id": "assembly-quality", "title": None, "rail": "Assembly quality", "first": "Size and quality gate",
+     "tabs": [("learn-adequacy", "Assembly adequacy")]},
+    {"id": "cohort-qc", "title": "Cohort quality", "rail": "Cohort quality", "first": "Cohort QC flags",
+     "blurb": "Checks on the cohort: outlier isolates, metadata and difficulty. Checks on the truth are under Headline design and reference standard.",
+     "tabs": [("metadata-completeness", "Metadata completeness"), ("isolate-difficulty", "Isolate difficulty")]},
+    {"id": "headline-design", "title": None, "rail": "Reference standard", "first": "Design, tiers and provenance",
+     "tabs": [("prereg", "Pre-registration"), ("truth-label-audit", "Truth labels"), ("label-schemes", "Label schemes"),
+              ("excluded-replicons", "Excluded replicons"), ("orthogonal-evidence", "Orthogonal evidence"),
+              ("learn-truthqc", "Truth repeats and depth")]},
     {"id": "health", "title": "Run outcomes and cost", "rail": "Run outcomes and cost", "first": "Every run",
      "blurb": "How every run ended, which runs failed and why, and what they cost in time, memory and threads.",
      "tabs": [("outcome-states", "Outcome counts"), ("performance", "Cost")]},
+    # ---- Methods and limits
     {"id": "interpretation-limits", "title": None, "rail": "Interpretation limits", "first": "Limits",
-     "tabs": [("validity", "What is validated")]},
+     "tabs": [("validity", "What is validated"), ("method", "Scoring method")]},
+    # ---- Recommendation
     {"id": "recommendations", "title": None, "rail": "Recommendations", "first": "Recommendations",
      "tabs": [("stratified", "Evidence by stratum"), ("selected", "Selected reconstructions")]},
-    {"id": "recommender-eval", "title": None, "rail": "Recommender", "first": "Per-isolate selection",
+    {"id": "recommender-eval", "title": None, "rail": "Recommender validation", "first": "Per-isolate selection",
      "tabs": [("taxon-transfer", "Unseen taxa"), ("validation", "Held-out studies")]},
-    {"id": "appendix-reference", "title": "Appendix: reference tables and optional analyses", "rail": "Reference tables", "first": None,
-     "blurb": "Scorecard component tables, pre-registration, QUAST diagnostics and the optional analyses. Each tab is a full section with its "
-              "own downloads.",
+    # ---- Exploratory: one scorecard, its scenario views and the five-dimension composite as tabs
+    {"id": "scorecard", "title": None, "rail": "Scorecard", "first": "Scorecard",
+     "tabs": [("scorecard-scenarios", "By scenario (overlapping tags)"), ("scenarios", "By scenario (exclusive)"), ("composite", "Weights and sensitivity")]},
+    # ---- Appendix
+    {"id": "appendix-reference", "title": "Appendix: reference tables", "rail": "Reference tables", "first": None,
+     "blurb": "Scorecard component tables and QUAST diagnostics. Each tab is a full section with its own downloads.",
      "tabs": [("accuracy-dimension", "Accuracy and missing regions"), ("feature-preservation", "Feature preservation and gene order"),
-              ("prereg", "Pre-registration"), ("quast-diagnostics", "QUAST diagnostics"), ("extended", "Optional analyses")]},
+              ("quast-diagnostics", "QUAST diagnostics")]},
 ]
 
 LEGACY_IDS = report_aliases.LEGACY_IDS
 for _spec in MERGES:
     for _old, _label in _spec["tabs"]:
-        LEGACY_IDS[_old] = (_spec["id"], _label)
+        for _each in (_old if isinstance(_old, (tuple, list)) else [_old]):      # a tab may hold several sections (see GROUP TABS in the module doc)
+            LEGACY_IDS[_each] = (_spec["id"], _label)
 
 # Links the two big interactive views share (the same isolates drawn two ways).
 CROSS_LINKS = {
@@ -307,20 +327,28 @@ def transform(page):
                 continue
         absorbed = []
         for old, label in spec["tabs"]:
-            if old not in where or old in used or old == cid:
+            # a GROUP TAB lists several section ids: their contents stack in one tab (the first id is the panel id, the others keep their ids as anchors)
+            members = [o for o in (list(old) if isinstance(old, (tuple, list)) else [old]) if o in where and o not in used and o != cid]
+            parts, aks = [], []
+            for o in members:
+                ak = where[o]
+                a_start, a_end = found[ak][1], found[ak][2]
+                _open, ainner = _parts(page[a_start:a_end])
+                if _has_nested_section(ainner):
+                    continue
+                anchor = f"<span id='{_esc(o)}'></span>" if parts else ""
+                parts.append((o, anchor + ainner + page[a_end:ends[ak]]))
+                aks.append(ak)
+            if not parts:
                 continue
-            ak = where[old]
-            s, e = found[ak][1], found[ak][2]
-            _open, ainner = _parts(page[s:e])
-            if _has_nested_section(ainner):
-                continue
-            absorbed.append((old, label, ainner + page[e:ends[ak]], ak))
+            absorbed.append((parts[0][0], label, "".join(h for _o, h in parts), aks, [o for o, _h in parts]))
         if not absorbed:
             continue
         merged = True
-        used.update(o for o, _l, _h, _a in absorbed)
-        panels = [(o, lab, h) for o, lab, h, _a in absorbed]
-        gone = [ak for _o, _l, _h, ak in absorbed]
+        for entry in absorbed:
+            used.update(entry[4])
+        panels = [(o, lab, h) for o, lab, h, _a, _m in absorbed]
+        gone = [ak for _o, _l, _h, aks, _m in absorbed for ak in aks]
         if virtual:                              # the new container takes the place of the first absorbed section
             host = min(gone)
             gone.remove(host)

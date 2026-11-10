@@ -63,7 +63,7 @@ def main():
         rail = rail[:rail.index("</nav>")]
         labels = re.findall(r"class='rpt-rail-label'>([^<]*)<", rail)
         check("the views come in the reviewed order",
-              labels == ["Overview", "Recommendation", "Figures", "Plasmid maps", "Detailed results", "Data quality", "Methods and limits", "Scorecard (exploratory)", "Appendix"], labels)
+              labels == ["Overview", "Recommendation", "Figures", "Plasmid maps", "Detailed results", "Data and reference quality", "Methods and limits", "Scorecard (exploratory)", "Appendix"], labels)
         titles = re.findall(r"class='rpt-view-title' role='heading' aria-level='2'>([^<]+)<", text)
         check("each view's title equals its menu label", titles == labels, titles)
         summary = text[text.index("<section id='summary'"):]

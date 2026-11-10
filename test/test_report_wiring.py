@@ -257,8 +257,8 @@ def main():
             views_in_rail = re.findall(r"href='#view-([a-z]+)'", nav)
             check("the views lead the rail in story order", views_in_rail[:3] == ["overview", "recommendation", "figures"] and len(views_in_rail) >= 6, views_in_rail)
             check("the Recommendation view follows the Overview, and the exploratory Scorecard comes after Methods and limits",
-                  ids.index("recommendations") == ids.index("metadata") + 1 and ids.index("scorecard") > ids.index("method"), ids[:10])
-            check("inventory no longer lists the wired outputs as not shown", "Not shown yet" not in sec("data-inventory"))
+                  ids.index("recommendations") == ids.index("metadata") + 1 and ids.index("scorecard") > ids.index("interpretation-limits"), ids[:10])
+            check("the file list is the artifact explorer (the separate inventory table was removed: 549 files were listed twice)", "id='data-inventory'" not in html and "file-desc" in html)
 
     print()
     if not ok:

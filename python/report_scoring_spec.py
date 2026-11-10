@@ -196,6 +196,7 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
     have = [r for r in rows if r.get("mean_contig_f1_bp")]
     status, basis = crosscheck_summary(crosscheck)
     tables = ""
+    drawn = False          # the 3D view carries its own "Independent second scorer" card; the paragraph below is only for when it is not drawn
     if not have:
         body = not_run("contig layer", "no tool was scored at contig level (RUN_CONTIG_CLASSIFICATION=0, no "
                        "contigs.fasta, or every tool outputs reassembled sequences)")
@@ -205,6 +206,7 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
         payload = report_3d.bars_payload(leaderboard, scores, crosscheck)
         scene = report_3d.build_bars(payload)
         body = report_3d.host("bars", "v3-data-contig", payload, scene, -28, 24) if scene["prims"] else ""
+        drawn = bool(scene["prims"])
         body += (f"<p class='muted'>Excluded contig length summed over scored runs: shared (AMBIGUOUS) {shared:,} bp, "
                  f"unassigned (UNPLACED) {unassigned:,} bp.</p>")
         tables = table(["Track / task", "Tool", "Base F1 (reference layer)", "Contig F1 (length)", "Contig MCC (length)",
@@ -212,7 +214,8 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
                        [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], r.get("mean_f1"),
                          r.get("mean_contig_f1_bp"), r.get("mean_contig_mcc_bp"), r.get("mean_contig_bin_f1_bp"))
                         for r in have])
-    body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
+    if not drawn:
+        body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
     if crosscheck:
         tables += table(report_3d.XC_HEADER, [[r.get(f, "") for f in report_3d.XC_FIELDS] for r in crosscheck])
     else:
@@ -229,22 +232,25 @@ def outcome_states_section(states, status_rows=()):
     if not states:
         body = not_run("run outcome states", "no tool_status.tsv was given to aggregation")
     else:
-        body = table(["Track", "Tool", "Runs", "Completed", "Reused", "Failed (tool)", "Failed (resource)",
-                      "Infrastructure failure", "Not applicable", "Retried"],
-                     [(r.get("analysis_track"), r["tool"], r["n_runs"], r["completed"], r["reused"], r["failed_tool"],
-                       r["failed_resource"], r["infrastructure_failure"], r["not_applicable"], r["retried"])
-                      for r in states])
-        # Tools compared (panel D15): why each tool did not run or did not finish.
+        # Panel D15 (why each tool did not run or did not finish) is a column of THIS table, not a second table: the most common reason for each non-success
+        # status of the tool ("skipped: input the tool cannot use; failed: ..."), or a dash when every run of the tool completed.
         reasons = {}
         for row in status_rows:
             if row.get("status") not in ("completed", "reused") and row.get("tool"):
                 reason = (row.get("reason") or "no reason recorded").split("; exit_code")[0]
-                reasons.setdefault((row["tool"], row.get("status")), Counter())[reason] += 1
-        if reasons:
-            body += "<h3>Tools compared: why runs were skipped or failed</h3>" + table(
-                ["Tool", "Status", "Runs", "Reason (most common)"],
-                [(tool, status, sum(c.values()), c.most_common(1)[0][0]) for (tool, status), c in sorted(reasons.items())])
-        else:
+                reasons.setdefault(row["tool"], {}).setdefault(row.get("status") or "unknown", Counter())[reason] += 1
+
+        def why(tool):
+            by_status = reasons.get(tool)
+            if not by_status:
+                return "-"
+            return "; ".join(f"{status} ({sum(c.values())}): {c.most_common(1)[0][0]}" for status, c in sorted(by_status.items()))
+        body = table(["Track", "Tool", "Runs", "Completed", "Reused", "Failed (tool)", "Failed (resource)",
+                      "Infrastructure failure", "Not applicable", "Retried", "Why runs did not complete (most common reason)"],
+                     [(r.get("analysis_track"), r["tool"], r["n_runs"], r["completed"], r["reused"], r["failed_tool"],
+                       r["failed_resource"], r["infrastructure_failure"], r["not_applicable"], r["retried"], why(r["tool"]))
+                      for r in states])
+        if not reasons:
             body += "<p class='muted'>Every run of every tool completed.</p>"
     return section("outcome-states", "How every run ended",
                    "Decision D6: a tool crash or missing output scores F1 = 0 and counts in the ranking. A resource "
