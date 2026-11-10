@@ -424,13 +424,15 @@ def glossary_tooltip(term):
 
 
 def glossary_section():
-    """Render the keys section from the single glossary."""
+    """The keys section from the single glossary: ONE searchable table (term, what it measures, why it matters), not one heading per term.
+
+    A table of more than 15 rows gets the report's row filter and a Show all button from report_condense, so a reader finds a term by typing part of it.
+    """
     rows = "".join(
-        f"<div class='term-card'><h3>{esc(term)}</h3>"
-        f"<p class='what'>{esc(entry['what'])}</p>"
-        f"<p class='why'><strong>Why it matters.</strong> {esc(entry['why'])}</p></div>"
+        f"<tr><th scope='row'>{esc(term)}</th><td>{esc(entry['what'])}</td><td>{esc(entry['why'])}</td></tr>"
         for term, entry in GLOSSARY.items())
-    return rows
+    return ("<div class='panel'><table class='sortable glossary'><thead><tr><th>Term</th><th>What it measures</th><th>Why it matters</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table></div>")
 
 
 # Grade bands. Stated here rather than buried in the renderer, because a grade
@@ -752,8 +754,13 @@ def read_tool_versions(path):
 
 
 def optional_analysis_html(manifest_path, results_dir, report_path):
-    """Summarise optional decision-support artifacts without treating absence as failure."""
+    """Optional decision-support artifacts: (html of what exists, [names of what was not run]).
+
+    Absence is not a failure and is not a result either, so what was not run is returned as a short list for the Run metadata section instead of a
+    section of its own.
+    """
     model = {}
+    not_run = []
     try:
         model = json.loads(Path(manifest_path).read_text(encoding="utf-8")).get("models", {}).get("recommendation", {})
     except (OSError, json.JSONDecodeError, TypeError):
@@ -766,7 +773,8 @@ def optional_analysis_html(manifest_path, results_dir, report_path):
         model_html = (f"<p><strong>Recommendation model:</strong> {'ready for guarded decision support' if model.get('model_ready') else 'withheld'}; "
                       f"validation: {esc(strategy)}. {esc(claim)}{card_link}</p>")
     else:
-        model_html = "<p><strong>Recommendation model:</strong> not enabled for this run; fixed transparent recommendation rules were used.</p>"
+        model_html = ""
+        not_run.append("recommendation model (not enabled; fixed transparent recommendation rules were used)")
     ladders = []
     for svg in sorted(results_dir.glob("*.recovery.svg")):
         summary = svg.with_name(svg.name.replace(".recovery.svg", ".summary.tsv"))
@@ -774,8 +782,10 @@ def optional_analysis_html(manifest_path, results_dir, report_path):
         links = f"<a href='{relative_link(svg, report_path)}' download>Download SVG</a>"
         if summary.is_file(): links += f" · <a href='{relative_link(summary, report_path)}' download>Download summary TSV</a>"
         ladders.append(f"<li><strong>{esc(label)}:</strong> {links}. These are controlled sensitivity experiments, not independent benchmark samples.</li>")
-    ladder_html = "<ul>" + "".join(ladders) + "</ul>" if ladders else "<p><strong>Depth/read-quality ladders:</strong> not run for this report. Their absence is not a failed benchmark.</p>"
-    return model_html + ladder_html
+    ladder_html = "<ul>" + "".join(ladders) + "</ul>" if ladders else ""
+    if not ladders:
+        not_run.append("depth and read-quality ladders")
+    return model_html + ladder_html, not_run
 
 
 def number(value):
@@ -1407,6 +1417,9 @@ def selection_card(sample, results_dir, report_path):
     confirmation = report.get("long_read_confirmation_reasons") or []
     status = "Benchmark-validated candidate" if truth_set else "Candidate only: operational method recommendation"
     confidence_label = "Ready for routine research review" if confidence == "high" else "Long-read confirmation required"
+    if confidence != "high" and confirmation:
+        # say WHY on the card itself, not only inside the fold below it
+        confidence_label += ": " + "; ".join(str(reason) for reason in confirmation[:3]) + (" and more" if len(confirmation) > 3 else "")
     metrics = report.get("candidate_metrics") or {}
     score_text = "No complete-reference score is available for this sample."
     if metrics:
@@ -1757,13 +1770,18 @@ def evidence_section(evidence_html):
 
 
 def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
-                            results_dir, vendor_html, evidence_html=""):
+                            results_dir, vendor_html, evidence_html="", embed=True):
     """Embed the vendored enterprise dashboard, driven by measured results.
 
     The dashboard is rendered inside an isolated iframe. Its stylesheet styles
     bare `*` and `body`, so inlining it into this page would restyle the whole
     report; the iframe keeps the adopted look byte-for-byte without leaking.
+
+    The dashboard is a second, separately styled dashboard that repeats the heatmap and the metric tables, and it adds about 1 MB, so it is
+    embedded only when asked for (`--embed-dashboard`, REPORT_EMBED_DASHBOARD=1). Without it the evidence explorer is still returned.
     """
+    if not embed:
+        return evidence_section(evidence_html)
     template = Path(project_root) / "assets" / "enterprise" / "template.html"
     if not template.is_file():
         return ""
@@ -2018,6 +2036,8 @@ def main():
     ap.add_argument("--truth-label-audit", help="Optional advisory truth-label audit TSV (audit_truth_labels.py).")
     ap.add_argument("--stratified", help="Optional evidence-gated stratified performance TSV (select_operational_method.py).")
     ap.add_argument("--orthogonal-summary", help="Optional orthogonal-validation summary JSON (validate_orthogonal_evidence.py).")
+    ap.add_argument("--embed-dashboard", action="store_true", default=os.environ.get("REPORT_EMBED_DASHBOARD", "0") == "1",
+                    help="Also embed the interactive cohort dashboard (about 1 MB; it repeats the heatmap and metric tables). Default off; REPORT_EMBED_DASHBOARD=1 sets it.")
     ap.add_argument("--dimensions-prefix", help="Prefix of the stage-6 dimension tables (<prefix>.accuracy.tsv, .feature_preservation.tsv, .bin_quality.tsv, .performance.tsv, .power.tsv, .scenarios.tsv, .composite.tsv, ...); rendered by report_dimensions.py.")
     # Scoring specification and panel sections (python/report_scoring_spec.py).
     ap.add_argument("--label-schemes", help="benchmark.label_schemes.tsv (label_schemes.py collect)")
@@ -2623,7 +2643,8 @@ def main():
         tree, count, bytes_total = file_tree(root, out, report_inputs if label == "Results" else ())
         artifact_count += count
         artifact_bytes += bytes_total
-        explorers.append(f"<details class='explorer' open><summary><strong>{label}</strong><span>{count} downloadable file(s)</span></summary>{tree}</details>")
+        if count:        # an empty folder ("Logs: 0 files", "Data: 0 files") is not shown
+            explorers.append(f"<details class='explorer' open><summary><strong>{label}</strong><span>{count} downloadable file(s)</span></summary>{tree}</details>")
 
     best_value = esc(best["tool"]) if best else "No scored tool"
     best_f1 = esc((best.get("ranking_score") or best.get("mean_f1") or "-") if best else "-")
@@ -2637,7 +2658,15 @@ def main():
                   if best and multi_track else "")
     insight_notes, insight_tone = interpretation(headline_leaderboard, status_counts)
     cards = report_cards(headline_leaderboard, scores)
-    optional_analysis = optional_analysis_html(args.manifest, results_dir, out)
+    optional_analysis, optional_not_run = optional_analysis_html(args.manifest, results_dir, out)
+    if not args.embed_dashboard:
+        optional_not_run.append("interactive cohort dashboard (not embedded: it repeats the heatmap and metric tables and adds about 1 MB; "
+                                "rebuild with --embed-dashboard or REPORT_EMBED_DASHBOARD=1)")
+    # "Extended analyses" only listed what was not run: housekeeping, not a result. It is a section only when something exists; otherwise one line in Run metadata.
+    extended_section = ("<section id='extended'><h2>Extended analyses</h2><p class='lead'>Optional analyses that add decision context. They do not replace the "
+                        "primary benchmark ranking.</p><div class='insight neutral'>" + optional_analysis + "</div></section>") if optional_analysis else ""
+    optional_not_run_html = (f"<div><small>Optional analyses not run</small>{esc('; '.join(optional_not_run))}. Their absence is not a failed benchmark.</div>"
+                             if optional_not_run else "")
     findings = guided_findings(headline_leaderboard, cards, scores, status_counts)
     summary_html = summary_section(headline_leaderboard, cards, findings, scores, status_counts, metadata, scope=best_scope)
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
@@ -2663,7 +2692,7 @@ def main():
     explorer_html = evidence_explorer_section(args.project_root, scores, results_dir,
                                               vendor_html, visual_html)
     enterprise_html = enterprise_view_section(args.project_root, scores, status, leaderboard,
-                                              metadata, results_dir, vendor_html, explorer_html)
+                                              metadata, results_dir, vendor_html, explorer_html, embed=args.embed_dashboard)
     # Further benchmark dimensions (accuracy, feature preservation, bin quality, performance, power,
     # scenarios, composite, reproducibility): one module renders them all; missing tables show empty states.
     import report_dimensions
@@ -2681,16 +2710,15 @@ def main():
 </style></head><body>
 <script>window.pbEsc=s=>String(s==null?'':s).replace(/[&<>\\u0022\\u0027]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','\\u0022':'&quot;','\\u0027':'&#39;'}}[c]));</script>
 <header><p class="eyebrow">Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.</p><h1>PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools</h1><p><strong>Run:</strong> {esc(run_label)} · generated {esc(generated)} · offline HTML with direct artifact downloads</p></header>
-<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#insights'>Interpretation</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#isolate-difficulty'>Isolate difficulty</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#replicon-recovery'>Recovery by replicon</a><a href='#quast-diagnostics'>QUAST diagnostics</a><a href='#rank-robustness'>Ranking robustness</a><a href='#truth-label-audit'>Truth-label audit</a><a href='#stratified'>Performance by stratum</a><a href='#orthogonal-evidence'>Orthogonal evidence</a>{dimension_nav_html}<a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
+<main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#isolate-difficulty'>Isolate difficulty</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#replicon-recovery'>Recovery by replicon</a><a href='#quast-diagnostics'>QUAST diagnostics</a><a href='#rank-robustness'>Ranking robustness</a><a href='#truth-label-audit'>Truth-label audit</a><a href='#stratified'>Performance by stratum</a><a href='#orthogonal-evidence'>Orthogonal evidence</a>{dimension_nav_html}<a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
 <div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: {best_metric}</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 {summary_html}
-<section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div></div></section>
-<section id='insights'><h2>Automated interpretation</h2><div class='insight {insight_tone}'><p class='lead'>Generated from the score and execution-status tables. Where at least five shared samples exist, the statistics section adds paired confidence intervals and permutation evidence with Holm adjustment.</p><ul>{insight_html}</ul></div></section>
+<section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div>{optional_not_run_html}</div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
 <section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Perfect reference recovery requires F1 and plasmid recall of 1 with no ambiguous, unmapped, or off-truth predicted bases. Strict reconstruction additionally requires perfect available bin diagnostics; neither label proves nucleotide identity or circular closure. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p>{leaderboard_panels}</section>
 <section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p>{recommendation_task_note}{recommendation_why}<div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th><th>Decision score</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
 <section id='validation'><h2>Leave-one-study-out validation</h2><p class='lead'>For each source study, the method is selected using all other studies and then evaluated only on the held-out study. A withheld result means the cohort does not yet have enough independent study evidence; it is not a failed method.</p><div class='panel'><table class='sortable'><thead><tr><th>Held-out study</th><th>Held-out samples</th><th>Training-selected method</th><th>Training samples</th><th>Held-out mean F1</th><th>Status</th><th>Interpretation</th></tr></thead><tbody>{validation_rows}</tbody></table></div></section>
-<section id='extended'><h2>Extended analyses and next steps</h2><p class='lead'>These optional analyses add decision context. They do not replace the primary benchmark ranking, and an unavailable item means it was not requested or lacked suitable evidence.</p><div class='insight neutral'>{optional_analysis}</div></section>
+{extended_section}
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
 <section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. Circular-truth recovery is not evidence that a predicted sequence is closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{tool_options}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Circular truth recovery</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 <section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least five independent units. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p>{comparison_tables}<p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
@@ -2709,7 +2737,7 @@ def main():
 <section id='health'><h2>Execution health</h2><p class='lead'>A failed tool run on an isolate with true plasmid counts as F1 = 0 for that tool's ranking; a skipped or unavailable tool is left out, and samples not shared by every ranked tool are left out of everyone's ranking. Runtime is elapsed wall-clock seconds; peak RSS is shown when the host profiler provides it.</p><div class='controls'><label>Status <select id='status-filter'><option value=''>All states</option><option value='completed'>Completed</option><option value='reused'>Reused</option><option value='failed'>Failed</option><option value='skipped'>Skipped</option></select></label><span id='status-count' class='count'></span></div><div class='panel'><table id='status-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Status</th><th>Runtime s</th><th>Peak RSS KiB</th><th>Reason / log location</th></tr></thead><tbody>{status_rows}</tbody></table></div></section>
 <section id='tools'><h2>Tool drill-down</h2><p class='lead'>Open a tool to inspect its score distribution across samples. Rows are initially ordered by F1.</p>{''.join(tool_sections) or "<p class='muted'>No tools were found.</p>"}</section>
 <section id='samples'><h2>Sample drill-down</h2><p class='lead'>Open a sample to compare every completed tool side-by-side.</p>{''.join(sample_sections) or "<p class='muted'>No samples were found.</p>"}</section>
-<section id='keys'><h2>Keys, legend, and metric definitions</h2><p class='lead'>Every term the report uses, what it measures, and why it matters. The same text appears as a tooltip wherever the term is used, so this page is a reference rather than the only place an explanation exists.</p><div class='legend'><span><i style='background:#087250'></i>High F1: &ge;0.90</span><span><i style='background:#c68221'></i>Medium F1: 0.70&ndash;0.89</span><span><i style='background:#bd4b42'></i>Low F1: &lt;0.70</span><span class='muted'>Bands are visual aids, not acceptance thresholds.</span></div><div class='term-grid'>{glossary_cards}</div></section>
+<section id='keys'><h2>Keys, legend, and metric definitions</h2><p class='lead'>Every term the report uses, what it measures, and why it matters. The same text appears as a tooltip wherever the term is used, so this page is a reference rather than the only place an explanation exists.</p><div class='legend'><span><i style='background:#087250'></i>High F1: &ge;0.90</span><span><i style='background:#c68221'></i>Medium F1: 0.70&ndash;0.89</span><span><i style='background:#bd4b42'></i>Low F1: &lt;0.70</span><span class='muted'>Bands are visual aids, not acceptance thresholds.</span></div>{glossary_cards}</section>
 <section id='files'><h2>Artifact explorer</h2><p class='lead'>All files created or consumed by this project are listed below. Select a filename to open or download it; directory branches can be expanded independently.</p>{''.join(explorers)}</section>
 <section id='method'><h2>Scoring method and interpretation</h2><div class='method'><p><strong>Truth:</strong> sequences in each complete reference assembly are labelled plasmid or chromosome from the NCBI sequence report.</p><p><strong>Prediction:</strong> each tool’s standardized predicted-plasmid FASTA is aligned to the reference using minimap2.</p><p><strong>Metrics:</strong> covered plasmid reference bases are TP; covered chromosome reference bases are FP; uncovered plasmid bases are FN. Precision measures contamination control; recall measures plasmid completeness; F1 balances both.</p><p><strong>Run integrity:</strong> a failed tool run on an isolate with true plasmid counts as F1 = 0 for that tool, so a tool cannot rise in the ranking by failing on hard isolates. A tool that runs but predicts nothing there also scores F1 = 0. Skipped tools and scoring-stage failures are not scored; every tool is ranked only on the samples all ranked tools share. All of these appear in execution health and in the leaderboard counts.</p></div></section>
 <footer>Inputs: <a href='scores.tsv'>scores.tsv</a>, <a href='tool_status.tsv'>tool_status.tsv</a>, <a href='benchmark.leaderboard.tsv'>benchmark.leaderboard.tsv</a>. Report location: {esc(out.name)}.</footer></main>
@@ -2777,6 +2805,8 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     page = report_wiring.finish(page)
     import report_merge    # fold related analyses into tabbed containers, keeping every old id as a panel id (python/report_merge.py)
     page = report_merge.transform(page)
+    import report_prune    # sections and tabs that only say "Not run" are listed once in Run metadata instead (python/report_prune.py)
+    page = report_prune.transform(page)
     import report_layout   # the page shell: top bar, left rail, one view at a time, print/PDF form (python/report_layout.py)
     page = report_layout.transform(page)
     # Last step: move the explanatory notes into info popovers (python/report_info.py), then add their positioning script.

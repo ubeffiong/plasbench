@@ -41,33 +41,35 @@ MARKER = "class='rpt-shell'"
 VIEWS = [
     ('overview', 'Overview', 'Overview', 'grid',
      'The headline result: who leads, by how much, and how stable the ranking is.', False,
-     'summary insights leaderboard chart robustness metadata'),
+     'summary leaderboard robustness metadata'),
     ('recommendation', 'Recommendation', 'Recommendation', 'star',
-     'Which method to use where, how well that advice held up on held-out data, and how it transfers.', True,
-     'recommendations recommender-eval taxon-transfer validation validity'),
+     'Which reconstruction method to use where, and the validation behind that advice. The validation is method research, not the benchmark result.', True,
+     'recommendations recommender-eval'),
     ('figures', 'Figures', 'Figures', 'chart',
      'The comparison drawn: CPRR differences and distributions, the tool heatmap, precision-recall, the reconstruction ladder, the 3D landscape and the interactive cohort dashboard.', True,
      'fig-forest fig-distributions fig-heatmap fig-pr fig-ladder fig-landscape enterprise'),
     ('maps', 'Plasmid maps', 'Plasmid maps', 'ring',
-     'Reconstructions drawn back onto the truth plasmids: the maps, the evidence explorer, per-plasmid results, antimicrobial-resistance gene placement and the contig layer.', True,
-     'plasmid-maps evidence-explorer per-plasmid-detail plasmid-outcomes amr-placement contig-layer selected'),
+     'Reconstructions drawn back onto the truth plasmids: the maps with every per-plasmid result, the evidence explorer, antimicrobial-resistance gene placement and the contig layer.', True,
+     'plasmid-maps evidence-explorer amr-placement contig-layer'),
     ('diagnostics', 'Detailed results', 'Detailed results', 'pulse',
-     'The full score tables and the diagnostics behind the headline: scores by tool and sample, recovery by stratum and replicon, bins, accuracy, features and runtime. Open a card for the detail.', True,
-     'statistics rank-robustness stratified scenarios replicon-recovery graded-tiers accuracy-dimension feature-preservation bin-diagnostics bin-quality learn-agreement learn-copynumber learn-plsmd performance baselines-calibration scores'),
-    ('quality', 'Data quality', 'Data quality', 'shield',
-     'Checks on the inputs and the runs: assemblies, cohort outliers, labels, metadata and run health. Each card carries a status; open it for the detail.', True,
-     'assembly-quality learn-adequacy learn-truthqc cohort-qc isolate-difficulty truth-label-audit label-schemes metadata-completeness database-membership excluded-replicons quast-diagnostics zero-plasmid orthogonal-evidence outcome-states health samples tools'),
+     'The full score tables and the diagnostics behind the headline: additional ranking metrics, sensitivity and power, scores by tool and sample, recovery by stratum and replicon, bins, accuracy, features and runtime.', True,
+     'more-metrics ranking-sensitivity statistics rank-robustness stratified scenarios replicon-recovery graded-tiers accuracy-dimension feature-preservation bin-diagnostics bin-quality learn-agreement learn-copynumber learn-plsmd performance baselines-calibration scores'),
+    ('quality', 'Data and reference quality', 'Data and reference quality', 'shield',
+     'The reference standard the scores rest on (design, tiers, labels, repeats) and checks on the assemblies, the cohort and the runs. Each card carries a status; open it for the detail.', True,
+     'headline-design assembly-quality cohort-qc quast-diagnostics database-membership health isolate-difficulty orthogonal-evidence excluded-replicons label-schemes truth-label-audit learn-truthqc metadata-completeness samples tools'),
     ('methods', 'Methods and limits', 'Methods and limits', 'book',
      'What is measured, how it is scored, and what the numbers do not mean.', True,
-     'metric-framework headline-design interpretation-limits prereg scoring-additions keys method scoring-spec'),
+     'metric-framework interpretation-limits keys scoring-spec'),
     ('scorecard', 'Scorecard (exploratory)', 'Scorecard (exploratory)', 'list',
-     'An exploratory view of every tool against every metric, by scenario, with the definitions and the statistical power behind them. It is not the ranking: the leaderboard is.', False,
-     'scorecard scorecard-scenarios scorecard-definitions composite power'),
+     'An exploratory view of every tool against every metric, by scenario, with the definitions behind them. It is not the ranking: the leaderboard is.', False,
+     'scorecard scorecard-definitions'),
     ('appendix', 'Appendix', 'Appendix', 'folder',
-     'Reference tables, every file the run produced, and what was reproduced.', True,
-     'appendix-reference extended reproducibility data-inventory files'),
+     'Reference tables and every file the run produced.', True,
+     'appendix-reference extended data-inventory files'),
 ]
 MORE = ("more", "More", "More", "dots", "Sections that no view lists, kept here so nothing disappears.", True, "")
+# Cards that start CLOSED although every other fold starts open: method research, not the benchmark result (the per-isolate recommender validation).
+CLOSED_CARDS = {"recommender-eval"}
 OPEN_CARDS = {"figures": ("fig-ladder",), "maps": ("plasmid-maps",), "recommendation": ("recommendations",), "appendix": ("enterprise",),
               "diagnostics": ("statistics",), "methods": ("metric-framework",)}
 
@@ -89,7 +91,7 @@ ICONS = {
 SHORT_LABELS = {
     "fig-landscape": "3D landscape", "fig-ladder": "Reconstruction ladder", "fig-forest": "CPRR differences", "fig-distributions": "CPRR distributions",
     "fig-heatmap": "Tool heatmap", "fig-pr": "Precision-recall", "per-plasmid-detail": "Per-plasmid detail", "assembly-quality": "Assembly quality",
-    "appendix-reference": "Reference tables", "enterprise": "Interactive dashboard", "evidence-explorer": "Evidence explorer",
+    "appendix-reference": "Reference tables", "enterprise": "Interactive dashboard", "evidence-explorer": "Evidence explorer", "ranking-sensitivity": "Sensitivity and power",
 }
 
 
@@ -443,7 +445,7 @@ def build_view(view, ids, blocks, labels, sections, cards, active=False):
         block = blocks[sid]
         if cards:
             chips = "".join(f"<span class='rpt-chip rpt-chip-{tone}'>{_esc(text)}</span>" for text, tone in status_chips(sections[sid]))
-            opened = " open" if sid in OPEN_CARDS.get(vid, ()) else ""
+            opened = " open" if sid in OPEN_CARDS.get(vid, ()) else (" data-closed" if sid in CLOSED_CARDS else "")
             body.append(f"<details class='rpt-card' data-card='{_esc(sid)}'{opened}><summary><span class='rpt-card-title'>{labels[sid]}</span>"
                         f"<span class='rpt-chips2'>{chips}</span></summary><div class='rpt-card-body'>{block}</div></details>")
         else:
@@ -470,7 +472,7 @@ def open_details(html_text):
         if name in RAW_TEXT and not m.group(1):
             i = _skip_raw(html_text, name, i)
             continue
-        if name == "details" and not m.group(1) and not re.search(r"\sopen(?=\s|=|/|$)", " " + m.group(3)):
+        if name == "details" and not m.group(1) and not re.search(r"\sopen(?=\s|=|/|$)", " " + m.group(3)) and "data-closed" not in m.group(3):
             edits.append(m.start() + len("<details"))
     for pos in reversed(edits):
         html_text = html_text[:pos] + " open" + html_text[pos:]

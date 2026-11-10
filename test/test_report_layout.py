@@ -45,7 +45,7 @@ def sections_of(page):
 
 def main():
     print("plan")
-    ids = ["files", "method", "summary", "fig-pr", "mystery", "scores", "health", "scorecard", "recommendations", "plasmid-maps", "zzz-other"]
+    ids = ["files", "interpretation-limits", "summary", "fig-pr", "mystery", "scores", "health", "scorecard", "recommendations", "plasmid-maps", "zzz-other"]
     plan = rl.layout_plan(ids)
     flat = [i for _v, m in plan for i in m]
     check("every id is in exactly one view, once", sorted(flat) == sorted(ids) and len(flat) == len(set(flat)), flat)
@@ -59,9 +59,9 @@ def main():
     check("the view table lists no id twice", len(all_ids) == len(set(all_ids)), [i for i in all_ids if all_ids.count(i) > 1])
     check("a view with no section is left out", "figures" in by and "recommendation" in by and
           "methods" in by and rl.layout_plan(["summary"])[0][0][0] == "overview" and len(rl.layout_plan(["summary"])) == 1)
-    order_in = rl.layout_plan(["leaderboard", "summary", "robustness", "insights", "chart", "metadata"])[0][1]
+    order_in = rl.layout_plan(["leaderboard", "summary", "robustness", "chart", "metadata"])[0][1]
     check("the order inside a view is the defined order, not the document order",
-          order_in == ["summary", "insights", "leaderboard", "chart", "robustness", "metadata"], order_in)
+          order_in == ["summary", "leaderboard", "robustness", "metadata"], order_in)
     check("story order: headline -> recommendation -> figures -> maps -> detailed results -> quality -> methods and limits -> scorecard (exploratory) -> appendix",
           [v[0] for v in rl.VIEWS] == ["overview", "recommendation", "figures", "maps", "diagnostics", "quality", "methods", "scorecard", "appendix"])
     check("a rail label is the view's title (one name for one thing)", all(v[1] == v[2] for v in rl.VIEWS))
@@ -194,9 +194,9 @@ def main():
         rail = laid[laid.index("<nav class='rpt-rail'"):laid.index("</nav>", laid.index("<nav class='rpt-rail'"))]
         check("the demo rail has nine views and every section once",
               len(re.findall(r"data-view='", rail)) == 9 and len([i for i in re.findall(r"href='#([a-z-]+)'", rail) if not i.startswith("view-")]) == len(raw_before))
-        check("the demo's views: Overview, Recommendation, Figures, Plasmid maps, Detailed results, Data quality, Methods and limits, Scorecard (exploratory), Appendix",
+        check("the demo's views: Overview, Recommendation, Figures, Plasmid maps, Detailed results, Data and reference quality, Methods and limits, Scorecard (exploratory), Appendix",
               re.findall(r"class='rpt-view-title' role='heading' aria-level='2'>([^<]+)<", laid) ==
-              ["Overview", "Recommendation", "Figures", "Plasmid maps", "Detailed results", "Data quality", "Methods and limits", "Scorecard (exploratory)", "Appendix"])
+              ["Overview", "Recommendation", "Figures", "Plasmid maps", "Detailed results", "Data and reference quality", "Methods and limits", "Scorecard (exploratory)", "Appendix"])
 
     print()
     if not ok:

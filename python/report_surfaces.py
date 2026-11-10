@@ -511,10 +511,36 @@ def inventory_section(results_dir, data_dir=None, known_section_ids=()):
     return rc.section(SECTION_ID, "Appendix: Data in this report", lead, body + extra)
 
 
+_FILE_ITEM = re.compile(r"(<li class='file'><a href='([^']*)' download>[^<]*</a><span>[^<]*</span>)(</li>)")
+FILE_STYLE = ("<style id='rpt-filedesc-style'>.file-tree .file .file-desc{display:block;margin:1px 0 4px 0;color:#4a5a50;font:12px Arial,sans-serif}"
+              ".file-tree .file .file-desc a{font-weight:600}</style>")
+
+
+def describe_files(page, known_section_ids=None):
+    """Put a description under every file of the Artifact explorer: what the file is, which step wrote it and which section shows it.
+
+    This replaces the separate "Data in this report" table (176 rows listing the same files again): the explorer is the one file list, and the registry
+    that table was built from now describes each file where it is listed. A file the registry does not know keeps its name and size only.
+    """
+    import report_aliases
+    ids = (set(re.findall(r"<section id='([^']+)'", page)) | set(report_aliases.LEGACY_IDS)) if known_section_ids is None else set(known_section_ids)
+
+    def one(m):
+        from urllib.parse import unquote
+        entry = classify_file(unquote(m.group(2)))
+        if not entry:
+            return m.group(0)
+        section = entry.get("section")
+        where = (f" · shown in <a href='#{rc.esc(section)}'>{rc.esc(section.replace('-', ' '))}</a>" if section and section in ids
+                 else " · listed here only" if entry.get("status") in ("not_surfaced", "partly") else "")
+        return (m.group(1) + f"<span class='file-desc'>{rc.esc(entry['label'])} (written by {rc.esc(entry['producer'])}){where}</span>" + m.group(3))
+    out = _FILE_ITEM.sub(one, page)
+    if out != page and "id='rpt-filedesc-style'" not in out and "</head>" in out:
+        h = out.index("</head>")
+        out = out[:h] + FILE_STYLE + out[h:]
+    return out
+
+
 def inject(page, results_dir, data_dir=None, known_section_ids=None):
-    """Put the appendix before Recommendations. `known_section_ids` defaults to the section ids already on the page."""
-    ids = set(re.findall(r"<section id='([^']+)'", page)) if known_section_ids is None else known_section_ids
-    if SECTION_ID in ids:
-        return page
-    html = str(inventory_section(results_dir, data_dir, ids))
-    return rc.inject_sections(rc.add_style(page), html, NAV)
+    """Describe the files of the Artifact explorer. The separate "Data in this report" appendix section is no longer added (inventory_section still builds it)."""
+    return describe_files(page, known_section_ids)

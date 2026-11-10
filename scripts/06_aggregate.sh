@@ -333,7 +333,12 @@ python3 "$HERE/../python/write_manifest.py" \
     --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" \
     --out "$RESULTS_DIR/run_manifest.json"
 
+# The interactive cohort dashboard repeats the heatmap and metric tables and adds about 1 MB: embedded only when REPORT_EMBED_DASHBOARD=1.
+REPORT_FLAGS=()
+if [ "${REPORT_EMBED_DASHBOARD:-0}" = "1" ]; then REPORT_FLAGS+=(--embed-dashboard); fi
+
 python3 "$HERE/../python/build_html_report.py" \
+    ${REPORT_FLAGS[@]+"${REPORT_FLAGS[@]}"} \
     --project-root "$PROJECT_ROOT" \
     --data-dir "$DATA_DIR" \
     --scores "$SCORES" \

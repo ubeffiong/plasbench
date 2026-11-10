@@ -232,22 +232,25 @@ def outcome_states_section(states, status_rows=()):
     if not states:
         body = not_run("run outcome states", "no tool_status.tsv was given to aggregation")
     else:
-        body = table(["Track", "Tool", "Runs", "Completed", "Reused", "Failed (tool)", "Failed (resource)",
-                      "Infrastructure failure", "Not applicable", "Retried"],
-                     [(r.get("analysis_track"), r["tool"], r["n_runs"], r["completed"], r["reused"], r["failed_tool"],
-                       r["failed_resource"], r["infrastructure_failure"], r["not_applicable"], r["retried"])
-                      for r in states])
-        # Tools compared (panel D15): why each tool did not run or did not finish.
+        # Panel D15 (why each tool did not run or did not finish) is a column of THIS table, not a second table: the most common reason for each non-success
+        # status of the tool ("skipped: input the tool cannot use; failed: ..."), or a dash when every run of the tool completed.
         reasons = {}
         for row in status_rows:
             if row.get("status") not in ("completed", "reused") and row.get("tool"):
                 reason = (row.get("reason") or "no reason recorded").split("; exit_code")[0]
-                reasons.setdefault((row["tool"], row.get("status")), Counter())[reason] += 1
-        if reasons:
-            body += "<h3>Tools compared: why runs were skipped or failed</h3>" + table(
-                ["Tool", "Status", "Runs", "Reason (most common)"],
-                [(tool, status, sum(c.values()), c.most_common(1)[0][0]) for (tool, status), c in sorted(reasons.items())])
-        else:
+                reasons.setdefault(row["tool"], {}).setdefault(row.get("status") or "unknown", Counter())[reason] += 1
+
+        def why(tool):
+            by_status = reasons.get(tool)
+            if not by_status:
+                return "-"
+            return "; ".join(f"{status} ({sum(c.values())}): {c.most_common(1)[0][0]}" for status, c in sorted(by_status.items()))
+        body = table(["Track", "Tool", "Runs", "Completed", "Reused", "Failed (tool)", "Failed (resource)",
+                      "Infrastructure failure", "Not applicable", "Retried", "Why runs did not complete (most common reason)"],
+                     [(r.get("analysis_track"), r["tool"], r["n_runs"], r["completed"], r["reused"], r["failed_tool"],
+                       r["failed_resource"], r["infrastructure_failure"], r["not_applicable"], r["retried"], why(r["tool"]))
+                      for r in states])
+        if not reasons:
             body += "<p class='muted'>Every run of every tool completed.</p>"
     return section("outcome-states", "How every run ended",
                    "Decision D6: a tool crash or missing output scores F1 = 0 and counts in the ranking. A resource "
