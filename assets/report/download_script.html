@@ -1,0 +1,42 @@
+<script id="pb-dl-script">
+/* Download buttons (python/report_isolates.py): each [data-pb-dl] link is checked once, when it appears, and greyed out when the file cannot be reached from where the page is
+   open (the report was moved out of its results folder). Over http(s) the check is a HEAD request; from a local file:// page the browser forbids reading files, so the file is
+   requested as a script (it loads when the file exists and fails when it does not; its content is never run as code that does anything, and the resulting parse error is silenced). */
+(function () {
+  'use strict';
+  var cache = Object.create(null), probing = null;
+  var REASON = 'Not available here: the selected reconstruction file was not found. Open this report from inside the project’s results folder to download it.';
+  function viaScript(url, done) {
+    var s = document.createElement('script'), finished = false, abs = new URL(url, document.baseURI).href;
+    function mute(e) { if (e && (e.filename === abs || (e.target === s))) { e.preventDefault(); } }
+    window.addEventListener('error', mute, true);
+    function fin(ok) { if (finished) return; finished = true; window.removeEventListener('error', mute, true); if (s.parentNode) s.parentNode.removeChild(s); done(ok); }
+    s.onload = function () { fin(true); };
+    s.onerror = function () { fin(false); };
+    s.async = true; s.src = url; document.head.appendChild(s);
+  }
+  function exists(url) {
+    if (cache[url]) return cache[url];
+    cache[url] = new Promise(function (resolve) {
+      if (location.protocol === 'file:' || !window.fetch) { viaScript(url, resolve); return; }
+      fetch(url, {method: 'HEAD', cache: 'no-store'}).then(function (r) { resolve(r.ok); }, function () { viaScript(url, resolve); });
+    });
+    return cache[url];
+  }
+  function off(a) {
+    a.classList.add('pb-dl-off'); a.setAttribute('aria-disabled', 'true'); a.setAttribute('title', REASON);
+    a.removeAttribute('href'); a.removeAttribute('download'); a.setAttribute('role', 'link');
+  }
+  function refresh() {
+    var links = document.querySelectorAll('a.pb-dl[data-pb-dl]:not([data-pb-dl-checked])');
+    Array.prototype.forEach.call(links, function (a) {
+      a.setAttribute('data-pb-dl-checked', '1');
+      exists(a.getAttribute('data-pb-dl')).then(function (ok) { if (!ok) off(a); });
+    });
+  }
+  function later() { if (probing) return; probing = setTimeout(function () { probing = null; refresh(); }, 60); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', refresh); else refresh();
+  /* the isolate filter swaps whole tables into the page: check the buttons of what appears */
+  new MutationObserver(later).observe(document.documentElement, {childList: true, subtree: true});
+})();
+</script>

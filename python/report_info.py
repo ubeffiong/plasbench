@@ -16,7 +16,7 @@ unchanged (links, em, strong and code stay):
         <span role='tooltip' id='rpt-info-xxxx' class='rpt-info-pop'>note</span></span>
 
 What is never moved (it must stay readable on the page): anything inside an .insight / .finding / .selection-card box,
-the Summary section lead, "Not run" and empty-state notices, notes that carry a status sentence or a data value
+the Summary section's own lead (the notes under its sub-headings do move), "Not run" and empty-state notices, notes that carry a status sentence or a data value
 (see STATUS), and notes that are not directly after a heading or summary (there is nothing for the icon to sit beside).
 The note stays in the HTML, so searching the page source still finds it, and the print stylesheet shows it inline.
 
@@ -77,7 +77,7 @@ def info_html(ident, label, note_html):
             f"<span role='tooltip' id='{ident}' class='rpt-info-pop'>{note_html}</span></span>")
 
 
-def classify(kind, inner, ancestors, section_id, anchored):
+def classify(kind, inner, ancestors, section_id, anchored, heading=""):
     """Return None when the note should move, else the reason it stays."""
     if not _text(inner):
         return "empty"
@@ -85,8 +85,8 @@ def classify(kind, inner, ancestors, section_id, anchored):
         return "already moved"
     if any(c in KEEP_ANCESTOR_CLASSES for classes in ancestors for c in classes):
         return "in status box"
-    if section_id in KEEP_SECTIONS and kind == "lead":
-        return "start-here section"
+    if section_id in KEEP_SECTIONS and kind == "lead" and heading not in ("h3", "h4"):
+        return "start-here section"      # the Summary's own lead; the notes under its sub-headings (matrix, report card) are tooltips like everywhere else
     if not anchored:
         return "no heading to sit beside"
     if kind == "figcaption":
@@ -162,7 +162,7 @@ def transform_with_records(page):
             if name != "figcaption" and prev[0] == "anchor" and prev[3] is not None:
                 if prev[1] in HEADINGS or (prev[1] == "summary" and kind == "muted"):
                     anchor = prev
-            reason = classify(kind, inner, ancestors, sid, anchor is not None or kind == "figcaption")
+            reason = classify(kind, inner, ancestors, sid, anchor is not None or kind == "figcaption", anchor[1] if anchor else "")
             record = {"kind": kind, "action": "kept" if reason else "moved", "reason": reason, "note": inner,
                       "section": sid, "id": None, "heading": ""}
             records.append(record)

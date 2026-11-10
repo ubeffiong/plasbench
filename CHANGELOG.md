@@ -13,6 +13,15 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- a download button per isolate in the plasmid matrix
+- In *Which tool recovered which plasmid* (one table per analysis track) every isolate has a small **FASTA** button that downloads that isolate's best reconstructed
+  plasmid(s): the selected candidate, `selected_candidates/<isolate>/<isolate>.candidate.plasmid.fasta`. The button works when the report is open from its results
+  folder. When the report has been copied away, so the file cannot be reached, the button is **greyed out** and says why; an isolate with no selected reconstruction is
+  grey from the start. Over http(s) the check is a HEAD request; from a local file the browser forbids reading files, so the file is requested as a script (it loads when
+  the file exists and fails when it does not; the browser may log one harmless parse error per file in its developer console).
+- The notes under the Summary's sub-headings (the plasmid matrix, the report card) are now hover tooltips like every other section note; only the Summary's own lead
+  stays visible.
+
 ### Added -- a sample report in the repository
 - `docs/sample_report/benchmark.report.html` is the report built from the offline demo (synthetic data, about 11 MB), with a README that says what it is, how to regenerate it and what differs from a real run. The project README links to it, with an online preview link. `test/test_sample_report.py` keeps the link, the file and its contents honest.
 

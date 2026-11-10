@@ -1,0 +1,11 @@
+<style id="pb-dl-style">
+/* Download button of the plasmid matrix (python/report_isolates.py, assets/report/download_script.html). Grey when the file cannot be reached. */
+.pb-dl{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 8px;border:1px solid #1f6b4a;border-radius:11px;background:#eaf5ee;color:#14513a;font:600 10.5px/1.6 Arial,Helvetica,sans-serif;text-decoration:none;vertical-align:middle;white-space:nowrap;cursor:pointer}
+a.pb-dl:hover{background:#1f6b4a;color:#fff}
+a.pb-dl:focus-visible{outline:2px solid #0b57d0;outline-offset:2px}
+.pb-dl.pb-dl-off{border-color:#c4cbc7;background:#eceeed;color:#8a948e;cursor:not-allowed;pointer-events:auto}
+.pb-dl.pb-dl-off:hover{background:#eceeed;color:#8a948e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pb-dl{background:#1f3a2c;color:#bfe3cc;border-color:#3f8a64}
+:root:not([data-theme="light"]) .pb-dl.pb-dl-off{background:#2a312d;color:#7d8981;border-color:#46524b}}
+@media print{.pb-dl{display:none!important}}
+</style>

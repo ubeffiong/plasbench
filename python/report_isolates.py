@@ -16,7 +16,8 @@ The default (and the no-JavaScript view, and the print view) is "All isolates": 
 rendered here in Python (the same functions that render the cohort view, applied to one isolate's rows) and kept in <template> elements inside the
 Summary section; assets/report/isolates_script.html copies a template into its slot when the filter changes. Nothing is computed in the browser.
 
-  matrix_html(rows, label)              the plasmid matrix for per-plasmid rows (dicts from report_wiring.per_plasmid_rows)
+  matrix_html(rows, label, downloads)   the plasmid matrix for per-plasmid rows (dicts from report_wiring.per_plasmid_rows); `downloads` maps an isolate to
+                                        the relative path of its selected reconstruction FASTA (or None): see DOWNLOAD BUTTON below
   isolate_report_cards(...)             the report-card rows for one isolate (the same report_cards() the cohort card uses)
   build(...)                            {isolate: {slot: html}}, the isolate list and the "All isolates" matrix
   inject(page, results_dir, data_dir, scores_path, ...)
@@ -54,6 +55,20 @@ def _num(value):
         return None
 
 
+def download_button(isolate, href):
+    """A small button in the Isolate cell: download the isolate's best reconstructed plasmid(s), the selected candidate FASTA.
+
+    With a path (the file exists in the results folder the report was built from) the button is a link; assets/report/download_script.html checks, when the page opens,
+    that the file can be reached from where the page is open, and greys the button out when it cannot (the report was copied away from its results folder).
+    With no path (no selected reconstruction was produced for the isolate) it is grey from the start."""
+    name = _esc(isolate)
+    icon = "<svg viewBox='0 0 12 12' width='11' height='11' aria-hidden='true'><path d='M6 1v6.5M3 5l3 3 3-3M1.5 10.5h9' fill='none' stroke='currentColor' stroke-width='1.6'/></svg>"
+    if not href:
+        return (f"<span class='pb-dl pb-dl-off' aria-disabled='true' role='link' title='No selected reconstruction was produced for {name}.'>{icon}<span>FASTA</span></span>")
+    return (f"<a class='pb-dl' href='{_esc(href)}' download data-pb-dl='{_esc(href)}' title='Download the best reconstructed plasmid(s) of {name} (the selected candidate, FASTA)' "
+            f"aria-label='Download the best reconstructed plasmid of {name}'>{icon}<span>FASTA</span></a>")
+
+
 def _cls(completeness):
     if completeness is None:
         return "pb-none", "–", "no result"
@@ -73,7 +88,7 @@ def humanise(markup, labels):
     return re.sub(r">([^<>]+)<", lambda m: ">" + pattern.sub(lambda t: labels[t.group(1)], m.group(1)) + "<", markup)
 
 
-def matrix_html(rows, label=lambda tool: tool):
+def matrix_html(rows, label=lambda tool: tool, downloads=None):
     """The plasmid matrix (one table per analysis track) for per-plasmid `rows`; a visible Not run note when there are none."""
     rows = [r for r in rows if r.get("tool") and r.get("plasmid")]
     if not rows:
@@ -121,7 +136,8 @@ def matrix_html(rows, label=lambda tool: tool):
                     best = ", ".join(label(t) for t in winners) + (" (tie)" if len(winners) > 1 else "")
             else:
                 best = "none recovered it" if any(v is not None for v in values.values()) else "no result"
-            body.append(f"<tr><td>{_esc(key[0])}</td><td><strong>{_esc(key[1])}</strong></td><td class='rpt-num'>{_esc(length.get(key, ''))}</td>"
+            button = download_button(key[0], downloads.get(key[0])) if downloads is not None else ""
+            body.append(f"<tr><td>{_esc(key[0])}{button}</td><td><strong>{_esc(key[1])}</strong></td><td class='rpt-num'>{_esc(length.get(key, ''))}</td>"
                         + "".join(cells) + f"<td>{_esc(best)}</td></tr>")
         total = len(plasmids)
         head = ("<tr><th>Isolate</th><th>Plasmid</th><th>Length (bp)</th>" + "".join(f"<th>{_esc(label(t))}</th>" for t in tools) + "<th>Best tool</th></tr>")
@@ -151,6 +167,12 @@ def isolate_report_cards(report_cards, scores, status, isolate):
     return sorted(cards, key=lambda c: (c["composite"] is None, -(c["composite"] or 0)))
 
 
+def selected_fasta(results_dir, isolate):
+    """The path, relative to the report (which sits in the results folder), of the isolate's selected reconstruction FASTA, or None when none was written."""
+    relative = f"selected_candidates/{isolate}/{isolate}.candidate.plasmid.fasta"
+    return relative if os.path.isfile(os.path.join(results_dir, *relative.split("/"))) else None
+
+
 def build(results_dir, data_dir, scores_path, specs, report_cards, grade_rows_html, label, inputs=None):
     """({isolate: {slot: html}}, [isolate ids], the 'All isolates' matrix) from the files of one run."""
     inp = inputs or sc.Inputs(results_dir, scores_path)
@@ -160,6 +182,7 @@ def build(results_dir, data_dir, scores_path, specs, report_cards, grade_rows_ht
     per_plasmid = rw.per_plasmid_rows(results_dir, data_dir)
     tools = sorted({r["tool"] for r in scores if r.get("tool")} | {r["tool"] for r in per_plasmid})
     labels = {t: label(t) for t in tools}
+    downloads = {iso: selected_fasta(results_dir, iso) for iso in isolates}
     slots = {}
     for iso in isolates:
         per_tool = sc.metric_values(results_dir, scores_path, samples=[iso], inputs=inp)
@@ -168,9 +191,9 @@ def build(results_dir, data_dir, scores_path, specs, report_cards, grade_rows_ht
             "summary-card": humanise(grade_rows_html(cards) or "<tr><td colspan='6'>No scored tool for this isolate.</td></tr>", labels),
             "summary-scorecard": humanise(sc.summary_table(specs, per_tool), labels),
             "scorecard": humanise(sc.scorecard_body(specs, per_tool), labels),
-            "plasmid-matrix": matrix_html([r for r in per_plasmid if r["sample"] == iso], label),
+            "plasmid-matrix": matrix_html([r for r in per_plasmid if r["sample"] == iso], label, downloads),
         }
-    return slots, isolates, matrix_html(per_plasmid, label), per_plasmid
+    return slots, isolates, matrix_html(per_plasmid, label, downloads), per_plasmid
 
 
 def _asset(name):
@@ -209,7 +232,7 @@ def inject(page, results_dir, data_dir, scores_path, config_path=None, report_ca
     page = page[:end] + store + page[end:]
     page = rc.add_style(page)
     if "id='pb-iso-style'" not in page:
-        style, script = _asset("isolates_style.html"), _asset("isolates_script.html")
+        style, script = _asset("isolates_style.html") + _asset("download_style.html"), _asset("isolates_script.html") + _asset("download_script.html")
         if "</head>" in page:
             h = page.index("</head>")
             page = page[:h] + style + page[h:]
