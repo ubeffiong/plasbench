@@ -14,6 +14,9 @@ history is lost, only the numbering is cleaner. See
 ## [Unreleased]
 
 <<<<<<< HEAD
+### Added -- a sample report in the repository
+- `docs/sample_report/benchmark.report.html` is the report built from the offline demo (synthetic data, about 11 MB), with a README that says what it is, how to regenerate it and what differs from a real run. The project README links to it, with an online preview link. `test/test_sample_report.py` keeps the link, the file and its contents honest.
+
 ### Added -- a "?" help button on every section and tab
 - Every section and every tab of the report has a green **?** button beside its title. A click opens one help dialog that explains the analysis for a reader who is
   not a specialist, in the same six parts everywhere: *In plain words*, *Data used*, *How it was made*, *How to read it*, *Why it matters* and *Keep in mind*. Esc, the
