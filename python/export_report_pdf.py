@@ -21,7 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 PATH_NAMES = ["msedge", "microsoft-edge", "microsoft-edge-stable", "google-chrome", "google-chrome-stable", "chrome", "chromium", "chromium-browser"]
 
@@ -69,6 +69,27 @@ def extra_flags():
     return os.environ.get("PLASBENCH_BROWSER_FLAGS", "").split()
 
 
+def windows_browser_from_wsl(browser):
+    """True when a Windows browser (.exe) is driven from WSL: it cannot open Linux paths."""
+    return (sys.platform.startswith("linux") and str(browser).lower().endswith(".exe")
+            and shutil.which("wslpath") is not None)
+
+
+def browser_path(path, browser):
+    """The path as the browser must see it: a Windows path (wslpath -w) for a Windows browser under WSL."""
+    if not windows_browser_from_wsl(browser):
+        return str(path)
+    return subprocess.run(["wslpath", "-w", str(path)], check=True, stdout=subprocess.PIPE,
+                          text=True).stdout.strip()
+
+
+def browser_url(report, browser):
+    """file:// URL of the report that this browser can open, with ?print=1."""
+    if windows_browser_from_wsl(browser):
+        return PureWindowsPath(browser_path(report, browser)).as_uri() + "?print=1"
+    return report.as_uri() + "?print=1"
+
+
 def print_command(browser, url, out_pdf, profile, budget_ms):
     return [browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
             f"--user-data-dir={profile}", "--allow-file-access-from-files", "--window-size=1280,1024",
@@ -90,9 +111,9 @@ def export(report, out=None, budget_ms=20000, timeout=600):
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.exists():
         out.unlink()
-    url = report.as_uri() + "?print=1"
+    url = browser_url(report, browser)
     with tempfile.TemporaryDirectory(prefix="plasbench-pdf-") as profile:
-        cmd = print_command(browser, url, str(out), profile, budget_ms)
+        cmd = print_command(browser, url, browser_path(out, browser), browser_path(profile, browser), budget_ms)
         try:
             result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=False)
         except subprocess.TimeoutExpired:
