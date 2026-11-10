@@ -31,6 +31,14 @@ cat > "$TMP/bin/plasmidspades.py" <<'EOF'
 #!/usr/bin/env bash
 sleep 5
 EOF
+# plasmidhunter runs out of memory without a SIGKILL (SPAdes/mimalloc style, exit 250):
+# a resource failure, not the tool's result.
+cat > "$TMP/bin/plasmidhunter" <<'EOF'
+#!/usr/bin/env bash
+echo "mimalloc: error: unable to allocate OS memory (746586112 bytes, error code: 12 [Cannot allocate memory])" >&2
+exit 250
+EOF
+chmod +x "$TMP/bin/plasmidhunter"
 # genomad cannot start: an import error is an installation fault (infrastructure).
 cat > "$TMP/bin/genomad" <<'EOF'
 #!/usr/bin/env bash
@@ -46,7 +54,7 @@ printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\n' > "$TMP/config/a
 
 export DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" SAMPLE_SHEET="$TMP/config/accessions.tsv"
 export REQUIRE_CURATED_METADATA=0 TOOL_RETRIES=1 TOOL_TIMEOUT_SECONDS=2 PLATON_DB="$TMP"
-export RUN_BASELINE_COVERAGE=0 RUN_BASELINE_REFERENCE=0 RUN_GENOMAD=1 GENOMAD_DB="$TMP"
+export RUN_BASELINE_COVERAGE=0 RUN_BASELINE_REFERENCE=0 RUN_GENOMAD=1 GENOMAD_DB="$TMP" RUN_PLASMIDHUNTER=1
 PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/04_run_tools.sh" > "$TMP/stage.log" 2>&1 || {
     echo "FAIL: stage 4 must finish" >&2; tail -20 "$TMP/stage.log" >&2; exit 1; }
 
@@ -75,6 +83,15 @@ fi
     echo "FAIL: plasmidspades timeout row" >&2; cat "$OUTCOMES" >&2; exit 1; }
 [[ "$(col "$OUTCOMES" plasmidspades 6)" == "1" ]] || { echo "FAIL: a timeout must not be retried" >&2; exit 1; }
 echo "TOOL_TIMEOUT_SECONDS -> exit 124, resource failure, not retried -> PASS"
+
+if [[ -n "$(col "$OUTCOMES" plasmidhunter 5)" ]]; then
+    [[ "$(col "$OUTCOMES" plasmidhunter 5)" == "resource" && "$(col "$OUTCOMES" plasmidhunter 4)" == "250" ]] || {
+        echo "FAIL: 'Cannot allocate memory' must be a resource failure, got $(col "$OUTCOMES" plasmidhunter 5)" >&2
+        cat "$OUTCOMES" >&2; exit 1; }
+    echo "out of memory without SIGKILL (exit 250, 'Cannot allocate memory') -> resource failure -> PASS"
+else
+    echo "FAIL: plasmidhunter did not run" >&2; cat "$STATUS" >&2; exit 1
+fi
 
 if [[ -n "$(col "$STATUS" genomad 3)" ]]; then
     [[ "$(col "$STATUS" genomad 3)" == "infrastructure_failure" ]] || {

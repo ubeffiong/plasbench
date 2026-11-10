@@ -13,6 +13,14 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- out-of-memory failures counted as the tool's fault
+- A run whose log shows "Cannot allocate memory", `std::bad_alloc`, `MemoryError` or "out of memory"
+  is a **resource** failure, like exit 124/137: by default it still scores 0, but it is reported as
+  `failed_resource`, and `--resource-failures exclude` drops it. Found on cohort 1, where plasmidSPAdes
+  ran out of memory on one isolate (exit 250) and was counted as an ordinary tool failure.
+- **PDF export from WSL**: a Windows Edge/Chrome found under `/mnt/c` is given Windows paths (`wslpath -w`)
+  for the report, the PDF and its profile; it could not open Linux paths and wrote no PDF.
+
 ### Changed -- section review: duplicates, mixed tasks and not-run sections
 - **Recommendations are made for one task.** `select_operational_method.py` now recommends among the reconstruction tools only (`binning_capable=yes` in
   `config/tool_capabilities.tsv`); classifiers are ranked separately and are no longer compared with reconstruction tools in one "recommended overall" line.

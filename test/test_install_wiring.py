@@ -30,7 +30,7 @@ def read(*parts):
 
 
 # Tools the operating system provides; not installed by PlasBench.
-SYSTEM = {"python3", "bash", "git", "gzip", "tar", "curl", "sha256sum", "wslview", "timeout"}
+SYSTEM = {"python3", "bash", "git", "gzip", "tar", "curl", "sha256sum", "wslview", "wslpath", "timeout"}
 
 # binary -> (conda package, routes that must exist). env = environment.yml, lock = the conda lock,
 # profile = an env/install_tools.sh profile installs it, check = scripts/00_setup.sh checks it.
