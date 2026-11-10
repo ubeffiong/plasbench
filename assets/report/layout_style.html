@@ -27,6 +27,7 @@ body{padding-top:var(--top-h)}
 .rpt-results a small{color:var(--muted);white-space:nowrap}
 .rpt-results a:hover,.rpt-results a[aria-selected='true']{background:var(--lime)}
 .rpt-results .rpt-none{padding:7px var(--s3);color:var(--muted)}
+.rpt-more{display:none}
 .rpt-actions{display:flex;gap:var(--s2);align-items:center}
 .rpt-actions button{height:32px;padding:0 var(--s3);border:1px solid #ffffff77;border-radius:6px;background:transparent;color:#fff;font:600 12px Arial,sans-serif;cursor:pointer;white-space:nowrap}
 .rpt-actions button:hover{background:#ffffff26}
@@ -70,7 +71,7 @@ html.pb-js .rpt-shell{margin-left:var(--rail-w);transition:margin-left .15s}
 .rpt-shell footer{margin-top:var(--s5);padding-top:var(--s3);border-top:1px solid var(--line);color:var(--muted);font:12px Arial,sans-serif}
 .rpt-titleband{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s3) var(--s5);padding:var(--s4) var(--s5);background:#fff;border-bottom:1px solid var(--line)}
 .rpt-title-text{flex:1 1 420px;min-width:0}
-.rpt-eyebrow{margin:0 0 2px;color:var(--muted);font:700 11px/1.3 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase}
+.rpt-eyebrow{margin:0 0 2px;color:var(--muted);font:600 12px/1.35 Arial,sans-serif;letter-spacing:0;text-transform:none}
 .rpt-titleband h1{margin:0;font:700 clamp(17px,1.9vw,22px)/1.25 Arial,sans-serif;letter-spacing:-.01em;color:var(--ink)}
 .rpt-runline{margin:4px 0 0;color:var(--ink-2);font:13px/1.4 Arial,sans-serif}
 .rpt-kpis .metrics{display:flex;flex-wrap:wrap;gap:var(--s2);margin:0}
@@ -133,8 +134,17 @@ html.pb-rail-min .rpt-rail-toc{display:none}
 @media (max-width:820px){
  .rpt-top-run,.rpt-top-view{display:none}
  .rpt-topbar{gap:var(--s2);padding:0 var(--s3)}
- .rpt-actions button{padding:0 var(--s2)}
- .rpt-actions .rpt-btn-long{display:none}
+ .rpt-brand{font-size:14px}
+ /* the three actions (palette, collapse all, print or save as PDF) sit behind one menu button; the search keeps the room */
+ html.pb-js .rpt-more{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:36px;height:32px;padding:0;border:1px solid #ffffff77;border-radius:6px;background:transparent;color:#fff;font:700 20px/1 Arial,sans-serif;cursor:pointer}
+ html.pb-js .rpt-more[aria-expanded='true']{background:#fff;color:#183a2d}
+ html.pb-js .rpt-more:focus-visible{outline:2px solid #fff;outline-offset:2px}
+ html.pb-js .rpt-actions{display:none;position:absolute;top:calc(var(--top-h) - 6px);right:var(--s3);flex-direction:column;align-items:stretch;gap:var(--s2);padding:var(--s3);background:#183a2d;border:1px solid #ffffff44;border-radius:var(--r);box-shadow:0 10px 28px rgba(0,0,0,.28);min-width:210px}
+ html.pb-js .rpt-topbar.pb-menu-open .rpt-actions{display:flex}
+ html.pb-js .rpt-actions button{height:38px;justify-content:flex-start;text-align:left}
+ .rpt-iso-slot{display:none}       /* the isolate filter moves into the actions menu on narrow screens (assets/report/isolates_script.html) */
+ html.pb-js .rpt-actions .pb-iso{width:100%;justify-content:space-between;gap:var(--s3)}
+ html.pb-js .rpt-actions .pb-iso select{flex:1 1 auto;max-width:none;min-height:38px;border-radius:6px}
  html.pb-js body{padding-top:calc(var(--top-h) + 44px)}
  html.pb-js .rpt-rail{top:var(--top-h);bottom:auto;left:0;right:0;width:auto;height:44px;flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--line)}
  html.pb-js .rpt-rail-toggle{display:none}
@@ -149,7 +159,7 @@ html.pb-rail-min .rpt-rail-toc{display:none}
  .rpt-shell main{padding:var(--s3)}
  .rpt-titleband{padding:var(--s3)}
  .rpt-body>section{padding:var(--s3)}
- .rpt-search{flex:1 1 120px}
+ .rpt-search{flex:1 1 110px;min-width:0}
  html{scroll-padding-top:calc(var(--top-h) + 56px)}
  .rpt-view{scroll-margin-top:calc(var(--top-h) + 52px)}
  .rpt-body>section,.rpt-card,.rpt-card-body>section{scroll-margin-top:calc(var(--top-h) + 56px)}

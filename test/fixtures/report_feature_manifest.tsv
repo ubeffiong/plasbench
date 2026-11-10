@@ -46,12 +46,12 @@ learn-truthqc.01	learn-truthqc	table_headers	Sample | Plasmid | Length | Interna
 learn-truthqc.02	learn-truthqc	heading	Read-depth windows	sub-heading survives (panel title)	cohort-qc
 recommendations.01	recommendations	table_headers	Scope | Group | Primary method | State | Scored | Coverage | Mean F1 | Mean plasmid recall | Median runtime s | Median peak RSS KiB | Decision note	table #1 keeps its columns (first 11 of 11)	recommendations
 validation.01	validation	table_headers	Held-out study | Held-out samples | Training-selected method | Training samples | Held-out mean F1 | Status | Interpretation	table #1 keeps its columns (first 7 of 7)	recommender-eval
-selected.01	selected	heading	abauma_a: mob_like	sub-heading survives (panel title)	recommendations
-selected.02	selected	heading	abauma_b: mob_like	sub-heading survives (panel title)	recommendations
-selected.03	selected	heading	ecoli_a: mob_like	sub-heading survives (panel title)	recommendations
-selected.04	selected	heading	ecoli_b: mob_like	sub-heading survives (panel title)	recommendations
-selected.05	selected	heading	kpneu_a: mob_like	sub-heading survives (panel title)	recommendations
-selected.06	selected	heading	kpneu_b: mob_like	sub-heading survives (panel title)	recommendations
+selected.01	selected	heading	abauma_a: MOB-like	sub-heading survives (panel title)	recommendations
+selected.02	selected	heading	abauma_b: MOB-like	sub-heading survives (panel title)	recommendations
+selected.03	selected	heading	ecoli_a: MOB-like	sub-heading survives (panel title)	recommendations
+selected.04	selected	heading	ecoli_b: MOB-like	sub-heading survives (panel title)	recommendations
+selected.05	selected	heading	kpneu_a: MOB-like	sub-heading survives (panel title)	recommendations
+selected.06	selected	heading	kpneu_b: MOB-like	sub-heading survives (panel title)	recommendations
 scores.01	scores	table_headers	Sample | Tool | Tool version | Origin | Read depth × | True plasmid bp | TP bp | FP bp | FN bp | Unambiguous predicted bp | Ambiguous predicted bp | Unmapped predicted bp | Precision | Recall	table #1 keeps its columns (first 14 of 17)	scores
 scores.02	scores	table_headers	sample | tool | analysis_track | true_plasmid_bp | TP_bp | FP_bp | FN_bp | predicted_record_count | precision | recall | f1 | true_plasmid_count | recovered_plasmid_count | plasmid_recall	table #2 keeps its columns (first 14 of 127)	scores
 scores.03	scores	element_id	sample-filter	filter control	scores

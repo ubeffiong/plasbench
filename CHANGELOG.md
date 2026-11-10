@@ -13,6 +13,17 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- order and wording for readers who are deciding
+- **View order**: Overview, Recommendation, Figures, Plasmid maps, Detailed results (was "Statistical diagnostics"), Data quality, Methods and limits, Scorecard
+  (exploratory), Appendix. Menu labels equal view titles; section labels in the menu are two to four words. Figures run CPRR differences, CPRR distributions, heatmap,
+  precision-recall, ladder, 3D landscape, then the interactive cohort dashboard; the dashboard (Figures) and the reconstruction evidence explorer (Plasmid maps, new
+  section `evidence-explorer`) are no longer in the Appendix.
+- **Banner**: the title only. The duplicate numbers (samples, tools, leader, execution issues) are gone; the Summary has them once, then *Start here*, the plasmid matrix,
+  the report card and the scorecard overall. The eyebrow is no longer all capitals.
+- **Phone top bar**: the isolate filter, palette, collapse all and print / save PDF sit behind one menu button; the search keeps the room.
+- **Display names at build time** (`python/report_names.py`): tool ids in the page text become display names when the report is built (link text only when it is exactly
+  one id; file names, attributes, options and code are left alone), so print, PDF and no-JavaScript readers see them too.
+
 ### Changed -- the two explorers load when first shown
 - The interactive cohort dashboard and the reconstruction evidence explorer (7 to 8 MB each) were written into their iframes at page load even though they sit in the
   Appendix, which opens hidden. They are now written only when the frame first becomes visible (with a 400 px margin), when the reader presses *Load now*, or at once

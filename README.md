@@ -123,9 +123,11 @@ for the incremental precision-recall sweep.
 
 ## What the HTML report adds
 
-The report is one self-contained file that opens on an **Overview** and shows **one view at a time**, chosen from a fixed left rail (Overview, Scorecard,
-Figures, Plasmid maps, Diagnostics, Data quality, Recommendation, Methods, Appendix) beside a slim top bar with a jump-to-section search. The analyses are
-ordered as a story (headline, scorecard, figures, maps, diagnostics, data quality, recommendation, methods, appendix), and related analyses are merged into one
+The report is one self-contained file that opens on an **Overview** and shows **one view at a time**, chosen from a fixed left rail (Overview,
+Recommendation, Figures, Plasmid maps, Detailed results, Data quality, Methods and limits, Scorecard (exploratory), Appendix) beside a slim top bar with a
+jump-to-section search (on a phone the palette, collapse and print actions sit behind one menu button). The analyses are ordered for someone reading to decide
+(headline result, the practical recommendation, the figures that answer the main question, the maps, the detailed tables, data quality, the limits, then the
+exploratory scorecard and the appendix), and related analyses are merged into one
 tabbed section (for example *Ranking confidence* holds the paired tests, rank sensitivity, power, database leakage and reproducibility; *Cohort and truth quality*
 holds eight data-quality checks; *Method ranking* holds the metric chart, graded recovery, negative control and baselines). Old section links still work: each merged
 section keeps its id as a tab. Long tables show their first 12 rows with a filter and *Show all*. Nothing is removed: a feature manifest test checks that every

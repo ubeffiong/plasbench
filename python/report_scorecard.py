@@ -684,6 +684,9 @@ def inject(page, results_dir, scores_path, config_path=None, samples_path=None, 
             scen = scenarios_section(specs, inp, _quality_bands(samples_path), link)
         sections = [scorecard_section(page, specs, per_tool), definitions_section(specs), scen]
     page = rc.add_style(page)
-    if not error and inp.scores and "<h3>Start here</h3>" in page:
+    marker = "<!--pb-after-report-card-->"
+    if not error and inp.scores and marker in page:
+        page = page.replace(marker, summary_block(specs, per_tool) + marker, 1)      # the scorecard overall sits right after the report card
+    elif not error and inp.scores and "<h3>Start here</h3>" in page:
         page = page.replace("<h3>Start here</h3>", summary_block(specs, per_tool) + "<h3>Start here</h3>", 1)
     return rc.inject_sections(page, "".join(sections), SECTIONS)

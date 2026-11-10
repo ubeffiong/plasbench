@@ -50,7 +50,7 @@ def main():
     flat = [i for _v, m in plan for i in m]
     check("every id is in exactly one view, once", sorted(flat) == sorted(ids) and len(flat) == len(set(flat)), flat)
     check("views come in the story order, More last",
-          [v[0] for v, _m in plan] == ["overview", "scorecard", "figures", "maps", "diagnostics", "quality", "recommendation", "methods", "appendix", "more"],
+          [v[0] for v, _m in plan] == ["overview", "recommendation", "figures", "maps", "diagnostics", "quality", "methods", "scorecard", "appendix", "more"],
           [v[0] for v, _m in plan])
     by = {v[0]: m for v, m in plan}
     check("unknown ids land in More, in document order", by["more"] == ["mystery", "zzz-other"], by["more"])
@@ -62,8 +62,12 @@ def main():
     order_in = rl.layout_plan(["leaderboard", "summary", "robustness", "insights", "chart", "metadata"])[0][1]
     check("the order inside a view is the defined order, not the document order",
           order_in == ["summary", "insights", "leaderboard", "chart", "robustness", "metadata"], order_in)
-    check("story order of the first sections: headline -> scorecard -> figures -> maps -> diagnostics -> quality -> recommendation -> methods -> appendix",
-          [v[0] for v in rl.VIEWS] == ["overview", "scorecard", "figures", "maps", "diagnostics", "quality", "recommendation", "methods", "appendix"])
+    check("story order: headline -> recommendation -> figures -> maps -> detailed results -> quality -> methods and limits -> scorecard (exploratory) -> appendix",
+          [v[0] for v in rl.VIEWS] == ["overview", "recommendation", "figures", "maps", "diagnostics", "quality", "methods", "scorecard", "appendix"])
+    check("a rail label is the view's title (one name for one thing)", all(v[1] == v[2] for v in rl.VIEWS))
+    check("section labels in the menu are short (a known override, else the text before a colon)",
+          rl.short_label("per-plasmid-detail", "x") == "Per-plasmid detail" and rl.short_label("zz", "Assembly quality: size, contiguity and the gate") == "Assembly quality"
+          and rl.short_label("zz", "Plain title") == "Plain title")
 
     print("status chips")
     rows2 = "<div class='panel'><table><thead><tr><th>a</th></tr></thead><tbody><tr><td>1</td></tr><tr><td>2</td></tr></tbody></table></div>"
@@ -113,9 +117,9 @@ def main():
     check("the rail links every section once, in document order", links == secs_in_order, links)
     check("the rail carries the label of the old nav link", ">files label<" in rail)
     check("the old flat nav is gone", "<nav class='nav'" not in out)
-    check("the title band carries the title and the KPI chip, and no run line (the run details are in Run metadata)",
-          "<h1>The Report Title</h1>" in out and "<strong>Run:</strong> demo" not in out and "<p class='rpt-runline'>" not in out and "<small>Samples observed</small><strong>6</strong>" in out
-          and out.count("class='metrics'") == 1)
+    check("the title band carries the title only: no run line and no KPI chips (those numbers are in the Summary, once)",
+          "<h1>The Report Title</h1>" in out and "<strong>Run:</strong> demo" not in out and "<p class='rpt-runline'>" not in out and "<small>Samples observed</small>" not in out
+          and out.count("class='metrics'") == 0 and "class='rpt-kpis'" not in out)
     check("the old dark <header> is replaced", "<header>" not in out)
     check("the top bar names the run", "<span class='rpt-top-run' title='demo · cohort c1'>" in out)
     check("search, palette, expand and print controls exist", all(x in out for x in ("id='rpt-q'", "id='pb-cvd'", "id='rpt-expand'", "id='pb-print'")))
@@ -148,7 +152,7 @@ def main():
     check("the card carries the section title and its chip", "<summary><span class='rpt-card-title'>health label</span>" in quality
           and "<span class='rpt-chip rpt-chip-neutral'>2 rows</span>" in quality, quality[:600])
     check("a card wraps its section whole", "<div class='rpt-card-body'><section id='health'>" in quality)
-    ov = out[out.index("id='view-overview'"):out.index("id='view-scorecard'")]
+    ov = out[out.index("id='view-overview'"):out.index("id='view-recommendation'")]
     check("the Overview view stacks its sections (no cards)", "rpt-card" not in ov and "<section id='summary'>" in ov)
     check("cards that start open are the ones named in OPEN_CARDS", "data-card='method' open" not in out and "data-card='fig-pr'" in out)
 
@@ -190,9 +194,9 @@ def main():
         rail = laid[laid.index("<nav class='rpt-rail'"):laid.index("</nav>", laid.index("<nav class='rpt-rail'"))]
         check("the demo rail has nine views and every section once",
               len(re.findall(r"data-view='", rail)) == 9 and len([i for i in re.findall(r"href='#([a-z-]+)'", rail) if not i.startswith("view-")]) == len(raw_before))
-        check("the demo's views: Overview, Scorecard, Figures, Plasmid maps, Diagnostics, Data quality, Recommendation, Methods and limits, Appendix",
+        check("the demo's views: Overview, Recommendation, Figures, Plasmid maps, Detailed results, Data quality, Methods and limits, Scorecard (exploratory), Appendix",
               re.findall(r"class='rpt-view-title' role='heading' aria-level='2'>([^<]+)<", laid) ==
-              ["Overview", "Scorecard", "Figures", "Plasmid maps", "Statistical diagnostics", "Data quality", "Recommendation", "Methods and limits", "Appendix"])
+              ["Overview", "Recommendation", "Figures", "Plasmid maps", "Detailed results", "Data quality", "Methods and limits", "Scorecard (exploratory)", "Appendix"])
 
     print()
     if not ok:
