@@ -115,6 +115,26 @@ def main():
         check("the top bar has the slot the control mounts into", "id='rpt-isolate-slot'" in text)
         check("the run line is not repeated under the title", "<p class='rpt-runline'>" not in text)
 
+    print("the download button")
+    import tempfile
+    with_dl = ri.matrix_html(ROWS, str, {"s1": "selected_candidates/s1/s1.candidate.plasmid.fasta", "s2": None})
+    check("an isolate with a selected FASTA gets a download link to it, in its Isolate cell",
+          re.search(r"<td>s1<a class='pb-dl' href='selected_candidates/s1/s1.candidate.plasmid.fasta' download data-pb-dl='selected_candidates/s1/s1.candidate.plasmid.fasta'", with_dl) is not None)
+    check("an isolate without one gets a grey button with the reason and no link",
+          re.search(r"<td>s2<span class='pb-dl pb-dl-off' aria-disabled='true'[^>]*title='No selected reconstruction was produced for s2.'", with_dl) is not None
+          and "href='selected_candidates/s2" not in with_dl)
+    check("without a downloads map the matrix is unchanged (no button)", "pb-dl" not in html)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "selected_candidates", "s1"))
+        open(os.path.join(tmp, "selected_candidates", "s1", "s1.candidate.plasmid.fasta"), "w").write(">p\nACGT\n")
+        check("selected_fasta finds the file relative to the report and returns None for an isolate without one",
+              ri.selected_fasta(tmp, "s1") == "selected_candidates/s1/s1.candidate.plasmid.fasta" and ri.selected_fasta(tmp, "s9") is None)
+    script = ri._asset("download_script.html")
+    check("the script greys a button out when its file cannot be reached (HEAD over http, a script request from a local file)",
+          "pb-dl-off" in script and "method: 'HEAD'" in script and "location.protocol === 'file:'" in script and "removeAttribute('href')" in script)
+    check("the script checks buttons that appear later (the isolate filter swaps tables in)", "MutationObserver" in script)
+    check("the button is hidden in print", "@media print{.pb-dl{display:none!important}}" in ri._asset("download_style.html"))
+
     print()
     if not ok:
         print("REPORT ISOLATES TESTS FAILED")
