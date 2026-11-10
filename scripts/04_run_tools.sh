@@ -83,6 +83,12 @@ classify_failure() {
         124|137) echo "resource"; return ;;
         125|126|127) echo "infrastructure"; return ;;
     esac
+    # Ran out of memory without the kernel's SIGKILL (exit 137): SPAdes/mimalloc
+    # "Cannot allocate memory", C++ std::bad_alloc, Python MemoryError. Like a
+    # timeout, that says the machine was too small, not that the tool is wrong.
+    if [[ -s "$log_file" ]] && grep -qiE "cannot allocate memory|unable to allocate (os )?memory|std::bad_alloc|MemoryError|out of memory" "$log_file"; then
+        echo "resource"; return
+    fi
     # A tool that cannot even start (missing or incompatible Python dependency)
     # is an installation fault, not the tool's result: never scored, rerun after fixing.
     if [[ -s "$log_file" ]] && grep -qiE "no space left on device|disk quota exceeded|cannot connect to the docker daemon|ImportError|ModuleNotFoundError|cannot import name|No module named" "$log_file"; then
