@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- 3D charts drawn flat
+- Pruning a Not-run tab also removed the shared 3D engine script that was emitted after it, so the 3D landscape fell back to its flat static picture. Pruning now keeps
+  script and style blocks, and a test checks the demo page carries the engine.
+
 ### Changed -- section review: duplicates, mixed tasks and not-run sections
 - **Recommendations are made for one task.** `select_operational_method.py` now recommends among the reconstruction tools only (`binning_capable=yes` in
   `config/tool_capabilities.tsv`); classifiers are ranked separately and are no longer compared with reconstruction tools in one "recommended overall" line.

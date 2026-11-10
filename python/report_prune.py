@@ -108,6 +108,11 @@ def pruned_items(page):
     return items
 
 
+def _keep(removed):
+    """The script and style blocks inside what is removed: a tab can carry, after its content, the page-wide blocks emitted there (the shared 3D engine)."""
+    return "".join(re.findall(r"<script\b.*?</script>|<style\b.*?</style>", removed, flags=re.S | re.I))
+
+
 def _notrun_block(items):
     lis = "".join(f"<li id='{html.escape(pid or sid, quote=True)}' data-notrun='{html.escape(pid or sid, quote=True)}'><strong>{html.escape(title)}:</strong> {html.escape(reason)}</li>"
                   for sid, pid, title, reason in items)
@@ -127,11 +132,13 @@ def prune(page):
     for sid, pid, title, reason in items:
         s, e = next((s, e) for i, s, e in found if i == sid)
         if pid is None:
-            edits.append((s, e, ""))
+            # remove the section element only: the text after it (the shared 3D engine script, style blocks) belongs to the page, not to the section
+            end = s + page[s:e].rindex("</section>") + len("</section>")
+            edits.append((s, end, _keep(page[s:end])))
             continue
         section = page[s:e]
         panel = next(p for p in _panels(section) if p[2] == pid)
-        edits.append((s + panel[0], s + panel[1], ""))
+        edits.append((s + panel[0], s + panel[1], _keep(section[panel[0]:panel[1]])))
         button = _tab_button(section, pid)
         if button:
             edits.append((s + button[0], s + button[1], ""))

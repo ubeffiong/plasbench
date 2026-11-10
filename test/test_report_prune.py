@@ -54,9 +54,21 @@ def main():
     check("Run metadata lists both once, with the reason and an anchor that keeps the old id landing",
           out.count("data-notrun=") == 2 and "<li id='empty' data-notrun='empty'>" in out and "needs depth headers" in out and "<li id='sub'" in out)
     check("the list is inside the Run metadata section", out.index("rpt-notrun") > out.index("id='metadata'") and out.index("rpt-notrun") < out.index("id='real'"))
+    # regression: text after a pruned section (the shared 3D engine script is emitted there) belongs to the page and must survive
+    engine = "<script>root.PB3D = api;</script>"
+    kept = rp.prune(PAGE.replace("<section id='empty'", engine + "<section id='empty'", 1).replace("</section><section id='real'", "</section>" + engine + "<section id='real'", 1))
+    check("the script after a pruned section is kept (the 3D charts stay 3D)", kept.count("root.PB3D = api") == 2 and "<section id='empty'" not in kept)
+    inside = PAGE.replace("<p>Not run: no sub input.</p></div></section>", "<p>Not run: no sub input.</p><script>root.PB3D = api;</script></div></section>")
+    check("a script inside a pruned tab's panel is kept too", rp.prune(inside).count("root.PB3D = api") == 1 and "aria-controls='sub'" not in rp.prune(inside))
     check("idempotent", rp.prune(out) == out)
     no_meta = PAGE.replace("<section id='metadata'><h2>Run metadata</h2><div class='grid'><div>x</div></div></section>", "")
     check("a page without Run metadata is left as it is", rp.prune(no_meta) == no_meta)
+
+    demo = ROOT / "results_demo" / "benchmark.report.html"
+    if demo.is_file():
+        text = demo.read_text(encoding="utf-8")
+        check("the demo page carries the shared 3D engine once (a 3D chart without it falls back to a flat picture)",
+              text.count("root.PB3D = api") == 1 or "id='ls-root'" not in text, text.count("root.PB3D = api"))
 
     print()
     if not ok:
