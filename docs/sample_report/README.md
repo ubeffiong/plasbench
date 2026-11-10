@@ -14,12 +14,18 @@ Two things differ from a real run:
   report sits beside its results folder, as it does after a run.
 - Large optional parts are included so every feature can be seen (the interactive cohort dashboard and the evidence explorer).
 
-## Regenerate it
+## It is replaced automatically
+
+Every demo run writes a fresh report and then replaces this sample with it: `bash test/run_demo.sh`, `plasbench demo` and the demo tests all end by running
+`python/refresh_sample_report.py`. So the sample is always the newest demo report; commit it with the change that altered the report.
+
+The refresh is skipped, with a printed reason, when this folder is absent (an installed copy or a container), when `PLASBENCH_SAMPLE_REPORT=0`, or when the demo
+report is incomplete or contains a path of the machine that built it (the sample is public). It never fails the demo.
 
 ```bash
-bash test/run_demo.sh                                   # writes results_demo/benchmark.report.html (about 2 minutes)
-cp results_demo/benchmark.report.html docs/sample_report/benchmark.report.html
+bash test/run_demo.sh                       # about 2 minutes; replaces docs/sample_report/benchmark.report.html
+PLASBENCH_SAMPLE_REPORT=0 bash test/run_demo.sh   # run the demo without touching the sample
 ```
 
-`test/test_sample_report.py` checks that the sample exists, carries the help dialog and no local paths, and that the README links to it. Regenerate it when the report
-changes in a way you want the sample to show; the file is about 11 MB, so regenerate it deliberately, not on every commit.
+`test/test_sample_report.py` checks the sample's contents; `test/test_refresh_sample_report.py` checks the refresh. The file is about 11 MB, so a commit that
+changes it adds that much to the repository history: batch report changes before committing the refreshed sample.
