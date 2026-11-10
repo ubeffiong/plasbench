@@ -2812,6 +2812,8 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # Last step: move the explanatory notes into info popovers (python/report_info.py), then add their positioning script.
     import report_info
     page = report_info.transform(page, info_script())
+    import report_help    # a "?" help button on every section and tab: what it shows, the data, how it was made, how to read it, why it matters (python/report_help.py)
+    page = report_help.transform(page)
     import report_names   # tool ids -> display names in the page text, so print, PDF and no-JavaScript readers see them too
     page = report_names.humanise(page, {tool: display_tool_name(tool) for tool in tools})
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")

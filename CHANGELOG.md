@@ -13,6 +13,19 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+<<<<<<< HEAD
+### Added -- a "?" help button on every section and tab
+- Every section and every tab of the report has a green **?** button beside its title. A click opens one help dialog that explains the analysis for a reader who is
+  not a specialist, in the same six parts everywhere: *In plain words*, *Data used*, *How it was made*, *How to read it*, *Why it matters* and *Keep in mind*. Esc, the
+  Close button or a click outside closes it; focus returns to the button; the button is hidden in print. The texts are in `python/report_help_text.py` (84 entries on
+  the demo), injected by `python/report_help.py` as one JSON block, so the page grows by about 45 KB, not once per button.
+- `test/test_report_help.py` fails when a section or tab has no entry or an entry leaves one of the six parts empty, so a new analysis cannot ship without its help.
+  It sits beside the small "i" popovers, which still carry each section's own lead note on hover.
+
+### Fixed -- 3D charts drawn flat
+- Pruning a Not-run tab also removed the shared 3D engine script that was emitted after it, so the 3D landscape fell back to its flat static picture. Pruning now keeps
+  script and style blocks, and a test checks the demo page carries the engine.
+=======
 ### Fixed -- out-of-memory failures counted as the tool's fault
 - A run whose log shows "Cannot allocate memory", `std::bad_alloc`, `MemoryError` or "out of memory"
   is a **resource** failure, like exit 124/137: by default it still scores 0, but it is reported as
@@ -20,6 +33,7 @@ history is lost, only the numbering is cleaner. See
   ran out of memory on one isolate (exit 250) and was counted as an ordinary tool failure.
 - **PDF export from WSL**: a Windows Edge/Chrome found under `/mnt/c` is given Windows paths (`wslpath -w`)
   for the report, the PDF and its profile; it could not open Linux paths and wrote no PDF.
+>>>>>>> origin/main
 
 ### Changed -- section review: duplicates, mixed tasks and not-run sections
 - **Recommendations are made for one task.** `select_operational_method.py` now recommends among the reconstruction tools only (`binning_capable=yes` in
