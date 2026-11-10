@@ -13,7 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
-<<<<<<< HEAD
+### Added -- a sample report in the repository
+- `docs/sample_report/benchmark.report.html` is the report built from the offline demo (synthetic data, about 11 MB), with a README that says what it is, how to regenerate it and what differs from a real run. The project README links to it, with an online preview link. `test/test_sample_report.py` keeps the link, the file and its contents honest.
+
 ### Added -- a "?" help button on every section and tab
 - Every section and every tab of the report has a green **?** button beside its title. A click opens one help dialog that explains the analysis for a reader who is
   not a specialist, in the same six parts everywhere: *In plain words*, *Data used*, *How it was made*, *How to read it*, *Why it matters* and *Keep in mind*. Esc, the
@@ -25,7 +27,7 @@ history is lost, only the numbering is cleaner. See
 ### Fixed -- 3D charts drawn flat
 - Pruning a Not-run tab also removed the shared 3D engine script that was emitted after it, so the 3D landscape fell back to its flat static picture. Pruning now keeps
   script and style blocks, and a test checks the demo page carries the engine.
-=======
+
 ### Fixed -- out-of-memory failures counted as the tool's fault
 - A run whose log shows "Cannot allocate memory", `std::bad_alloc`, `MemoryError` or "out of memory"
   is a **resource** failure, like exit 124/137: by default it still scores 0, but it is reported as
@@ -33,7 +35,6 @@ history is lost, only the numbering is cleaner. See
   ran out of memory on one isolate (exit 250) and was counted as an ordinary tool failure.
 - **PDF export from WSL**: a Windows Edge/Chrome found under `/mnt/c` is given Windows paths (`wslpath -w`)
   for the report, the PDF and its profile; it could not open Linux paths and wrote no PDF.
->>>>>>> origin/main
 
 ### Changed -- section review: duplicates, mixed tasks and not-run sections
 - **Recommendations are made for one task.** `select_operational_method.py` now recommends among the reconstruction tools only (`binning_capable=yes` in

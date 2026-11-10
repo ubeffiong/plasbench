@@ -123,6 +123,8 @@ for the incremental precision-recall sweep.
 
 ## What the HTML report adds
 
+**See it first:** [open the sample report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html) (or open [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html) in a browser after cloning). It is built from the synthetic offline demo, so its numbers are not real results; see [docs/sample_report/](docs/sample_report/README.md).
+
 The report is one self-contained file that opens on an **Overview** and shows **one view at a time**, chosen from a fixed left rail (Overview,
 Recommendation, Figures, Plasmid maps, Detailed results, Data quality, Methods and limits, Scorecard (exploratory), Appendix) beside a slim top bar with a
 jump-to-section search (on a phone the palette, collapse and print actions sit behind one menu button). The analyses are ordered for someone reading to decide
@@ -147,7 +149,8 @@ page with every fold open and every note printed in full). Besides the leaderboa
   of CPRR differences by species, plasmid size and reference tier; and an interactive **precision-recall** plot with iso-F1 lines and false positives per recovered plasmid.
   The plasmid viewer also draws each tool's alignment blocks against the truth plasmid in a linear **Reference versus reconstruction** pane linked to the circular map.
   Tables that a figure now draws are folded until opened; nothing is removed.
-- **A data inventory** ("Data in this report") listing every output and where the report shows it.
+- **A "?" help button on every section and tab** that explains the analysis in plain language: what it shows, the data used, how it was made, how to read it, why it matters and what to keep in mind.
+- **An Artifact explorer** listing every file the run produced, each with a description of what it is, which step wrote it and where the report shows it.
 - Grouped, collapsible navigation, per-plasmid detail, an assembly-quality section and links to `leaderboard.md` and `scoring_spec.md`.
 
 ## Scientific guide for domain experts
