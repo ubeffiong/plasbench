@@ -1,0 +1,65 @@
+<script id="rpt-help-script">
+/* PlasBench help dialog: one shared dialog filled from the JSON in #rpt-help-data when a "?" button is used. Esc, the Close button or a click outside closes it; focus returns to the button. */
+(function () {
+  'use strict';
+  var data = null, dlg = null, last = null;
+  function load() {
+    if (data) return data;
+    try { data = JSON.parse(document.getElementById('rpt-help-data').textContent); } catch (e) { data = {fields: [], items: {}}; }
+    return data;
+  }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function build() {
+    if (dlg) return dlg;
+    dlg = el('div'); dlg.id = 'rpt-help-dlg'; dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-labelledby', 'rpt-help-title');
+    var box = el('div', 'rpt-help-box'), head = el('div', 'rpt-help-head'), titles = el('div'), close = el('button', 'rpt-help-close', 'Close');
+    close.type = 'button';
+    var small = el('small', null, 'Help'), h = el('h2'); h.id = 'rpt-help-title';
+    titles.appendChild(small); titles.appendChild(h); titles.style.flex = '1';
+    head.appendChild(titles); head.appendChild(close);
+    var body = el('div', 'rpt-help-body'); body.id = 'rpt-help-body';
+    box.appendChild(head); box.appendChild(body); dlg.appendChild(box); document.body.appendChild(dlg);
+    close.addEventListener('click', hide);
+    dlg.addEventListener('mousedown', function (e) { if (e.target === dlg) hide(); });
+    return dlg;
+  }
+  function fill(key) {
+    var d = load(), item = d.items[key]; if (!item) return false;
+    build();
+    document.getElementById('rpt-help-title').textContent = item.title;
+    var body = document.getElementById('rpt-help-body'); body.textContent = '';
+    body.appendChild(el('p', 'rpt-help-lead', item.plain));
+    var dl = el('dl');
+    d.fields.forEach(function (f) {
+      if (f[0] === 'plain' || f[0] === 'careful' || !item[f[0]]) return;
+      dl.appendChild(el('dt', null, f[1])); dl.appendChild(el('dd', null, item[f[0]]));
+    });
+    body.appendChild(dl);
+    if (item.careful) {
+      var c = el('div', 'rpt-help-careful'); c.appendChild(el('b', null, 'Keep in mind')); c.appendChild(document.createTextNode(item.careful)); body.appendChild(c);
+    }
+    var foot = el('p', 'rpt-help-foot'), a = el('a', null, 'Look up a term in the glossary'); a.href = '#keys';
+    a.addEventListener('click', hide); foot.appendChild(a); body.appendChild(foot);
+    return true;
+  }
+  function show(btn) {
+    if (!fill(btn.getAttribute('data-help'))) return;
+    last = btn; dlg.classList.add('rpt-open'); dlg.querySelector('.rpt-help-close').focus();
+    dlg.querySelector('.rpt-help-box').scrollTop = 0;
+  }
+  function hide() { if (!dlg || !dlg.classList.contains('rpt-open')) return; dlg.classList.remove('rpt-open'); if (last && last.focus) last.focus(); }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.rpt-help-btn');
+    if (b) { e.preventDefault(); e.stopPropagation(); show(b); }
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') hide();
+    else if (e.key === 'Tab' && dlg && dlg.classList.contains('rpt-open')) {
+      var f = dlg.querySelectorAll('button, a[href]'); if (!f.length) return;
+      var first = f[0], lastEl = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastEl.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); first.focus(); }
+    }
+  });
+})();
+</script>

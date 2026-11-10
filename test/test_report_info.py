@@ -87,7 +87,7 @@ def infos(page):
 def strip_infos(page):
     for block in infos(page):
         page = page.replace(block, "", 1)
-    return page
+    return re.sub(r"<span class='rpt-help'><button[^>]*>\?</button></span>", "", page)   # the '?' help buttons (report_help) are not heading text
 
 
 def popovers(page):
