@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the sample report is replaced by every demo run
+- `test/run_demo.sh` (so `plasbench demo` and the demo tests too) ends by running `python/refresh_sample_report.py`, which replaces `docs/sample_report/benchmark.report.html` with the demo report just built. It is skipped, with a printed reason, when `docs/sample_report/` is absent, `PLASBENCH_SAMPLE_REPORT=0`, or the report is incomplete or holds a local path, and it never fails the demo. `test/test_refresh_sample_report.py` covers it.
+
+
 ### Added -- a download button per isolate in the plasmid matrix
 - In *Which tool recovered which plasmid* (one table per analysis track) every isolate has a small **FASTA** button that downloads that isolate's best reconstructed
   plasmid(s): the selected candidate, `selected_candidates/<isolate>/<isolate>.candidate.plasmid.fasta`. The button works when the report is open from its results

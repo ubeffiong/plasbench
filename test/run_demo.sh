@@ -233,6 +233,10 @@ python3 "$PY/build_html_report.py" \
     --embed-dashboard \
     --out "$DEMO/benchmark.report.html"
 
+# Every generated demo report replaces the sample report in the repository (docs/sample_report/); it is skipped, with a printed reason, when that folder is absent,
+# PLASBENCH_SAMPLE_REPORT=0, or the report is incomplete or holds a local path. It never fails the demo.
+python3 "$PY/refresh_sample_report.py" --project-root "$ROOT" || true
+
 echo
 echo "===== leaderboard markdown ====="
 cat "$DEMO/benchmark.leaderboard.md"
