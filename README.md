@@ -2761,7 +2761,7 @@ plasbench run --cohort my-cohort --plasgraph2 on \
 plasbench install-tools rfplasmid       # bioconda; also needs a one-time CheckM data setup, see INSTALL.md
 plasbench run --cohort my-cohort --rfplasmid on
 
-plasbench install-tools plasmidhunter   # installs diamond+prodigal via conda, then `pip install plasmidhunter`
+plasbench install-tools plasmidhunter   # own python 3.10 env (plasbench-plasmidhunter), wrapper in the main env
 plasbench run --cohort my-cohort --plasmidhunter on
 
 plasbench install-tools plasmer         # conda, from Plasmer's own custom channel; documents a ~32GB RAM minimum

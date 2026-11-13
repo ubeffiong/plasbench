@@ -79,6 +79,74 @@ fi
 # mobsuite_db_dir follows a wrapper to the real installation's database.
 MOBSUITE_SPEC=("mob_suite=3.1.9" "python=3.10" "pandas<=1.5.3" "numpy<1.23.5" "blast>=2.9.0,<2.16.0" "mash>=2.0")
 MOBSUITE_COMMANDS=(mob_recon mob_typer mob_cluster mob_init)
+
+# write_wrappers MAIN_PREFIX TOOL_PREFIX LABEL CMD...: thin scripts in the main
+# environment's bin/ that run CMD from TOOL_PREFIX, with that environment's bin/
+# first on PATH so the tool finds its own helpers (blast, centrifuge, diamond...).
+write_wrappers() {
+    local main_prefix="$1" tool_prefix="$2" label="$3" cmd; shift 3
+    mkdir -p "$main_prefix/bin"
+    for cmd in "$@"; do
+        rm -f "$main_prefix/bin/$cmd"
+        { echo '#!/bin/sh'
+          echo "# PlasBench wrapper: $label runs from its own pinned environment (env/install_tools.sh)."
+          echo "PATH=\"$tool_prefix/bin:\$PATH\""
+          echo 'export PATH'
+          echo "exec \"$tool_prefix/bin/$cmd\" \"\$@\""; } > "$main_prefix/bin/$cmd"
+        chmod 0755 "$main_prefix/bin/$cmd"
+    done
+    echo "[plasbench] $label wrappers installed in $main_prefix/bin ($*)"
+}
+
+# Tools whose Python cannot share the main environment's (python 3.12) get their
+# own environment, <env>-<suffix>, exposed through wrappers like MOB-suite:
+#   plascope       needs centrifuge 1.0.3, built only for python <= 3.6
+#   plasmer        published for python 3.10 only (channel iskoldt)
+#   plasmidhunter  its PyPI releases require python ==3.10.*
+# Each was a hard solver/pip failure inside the main environment.
+# install_isolated SUFFIX LABEL "COMMANDS" "PIP_PKG" "PROBE" CHANNEL_ARGS... -- SPEC...
+# PROBE (optional) is a command line run inside the environment to prove the tool
+# starts, not merely that its file exists. The environment is reused when every
+# command is present and the probe passes; otherwise it is (re)created.
+install_isolated() {
+    local suffix="$1" label="$2" cmds="$3" pip_pkg="$4" probe="$5" main_prefix iso_prefix cmd ok=1
+    shift 5
+    local channels=() spec=()
+    while [[ $# -gt 0 && "$1" != "--" ]]; do channels+=("$1"); shift; done
+    [[ $# -gt 0 ]] && shift
+    spec=("$@")
+    main_prefix="${TARGET_PREFIX:-}"
+    if [[ -z "$main_prefix" ]]; then
+        echo "ERROR: main environment '$ENV_NAME' not found; create it first (bash env/setup_conda.sh), then re-run: bash env/install_tools.sh $PROFILE" >&2
+        return 1
+    fi
+    iso_prefix="$(dirname "$main_prefix")/${ENV_NAME}-$suffix"
+    for cmd in $cmds; do [[ -x "$iso_prefix/bin/$cmd" ]] || ok=0; done
+    if [[ "$ok" -eq 1 && -n "$probe" ]]; then
+        PATH="$iso_prefix/bin:$PATH" bash -c "$probe" >/dev/null 2>&1 || ok=0
+    fi
+    if [[ "$ok" -eq 1 ]]; then
+        echo "[plasbench] $label environment already present: $iso_prefix"
+    else
+        echo "[plasbench] creating the $label environment (separate from the main one): $iso_prefix"
+        run_with_heartbeat "Conda is solving/linking $label's own environment" \
+            "$SOLVER_BIN" create -y -p "$iso_prefix" "${channels[@]}" "${spec[@]}"
+        if [[ -n "$pip_pkg" ]]; then
+            run_with_heartbeat "pip is installing $pip_pkg into $iso_prefix" "$iso_prefix/bin/pip" install "$pip_pkg"
+        fi
+    fi
+    for cmd in $cmds; do
+        [[ -x "$iso_prefix/bin/$cmd" ]] || { echo "ERROR: $cmd is missing from $iso_prefix after install" >&2; return 1; }
+    done
+    if [[ -n "$probe" ]] && ! PATH="$iso_prefix/bin:$PATH" bash -c "$probe" >/dev/null 2>&1; then
+        echo "ERROR: $label does not start in $iso_prefix ($probe):" >&2
+        PATH="$iso_prefix/bin:$PATH" bash -c "$probe" 2>&1 | tail -5 >&2
+        return 1
+    fi
+    # shellcheck disable=SC2086
+    write_wrappers "$main_prefix" "$iso_prefix" "$label" $cmds
+}
+
 install_mobsuite() {
     local main_prefix="$1" mob_prefix cmd
     mob_prefix="$(dirname "$main_prefix")/${ENV_NAME}-mobsuite"
@@ -91,17 +159,7 @@ install_mobsuite() {
     fi
     "$mob_prefix/bin/mob_recon" --version >/dev/null 2>&1 \
         || { echo "ERROR: mob_recon in $mob_prefix does not start" >&2; return 1; }
-    mkdir -p "$main_prefix/bin"
-    for cmd in "${MOBSUITE_COMMANDS[@]}"; do
-        rm -f "$main_prefix/bin/$cmd"
-        { echo '#!/bin/sh'
-          echo "# PlasBench wrapper: MOB-suite runs from its own pinned environment (env/install_tools.sh)."
-          echo "PATH=\"$mob_prefix/bin:\$PATH\""
-          echo 'export PATH'
-          echo "exec \"$mob_prefix/bin/$cmd\" \"\$@\""; } > "$main_prefix/bin/$cmd"
-        chmod 0755 "$main_prefix/bin/$cmd"
-    done
-    echo "[plasbench] MOB-suite wrappers installed in $main_prefix/bin (${MOBSUITE_COMMANDS[*]})"
+    write_wrappers "$main_prefix" "$mob_prefix" MOB-suite "${MOBSUITE_COMMANDS[@]}"
     # Reuse a database kept in the machine store (env/preserve_databases.sh) rather than downloading it.
     PATH="$main_prefix/bin:$PATH" bash -c 'source "$0/../config/config.sh"; source "$0/../scripts/lib.sh"; mobsuite_db_preserve' "$HERE" || true
     echo "[plasbench] its database is fetched by: bash env/download_mobsuite_db.sh"
@@ -182,44 +240,33 @@ EOF
  plascope)
     # plascope is a real bioconda package -- the species-specific Centrifuge
     # database is a separate download (env/download_plascope_db.sh), not
-    # something this profile installs.
-    PKGS=(plascope)
+    # something this profile installs. Its pinned centrifuge 1.0.3 exists only
+    # for python <= 3.6, so it gets its own environment (see install_isolated).
+    install_isolated plascope PlaScope "plaScope.sh centrifuge" "" "centrifuge --version" \
+        -c conda-forge -c bioconda -- "plascope=1.3.1" "python=3.6"
+    exit $?
     ;;
  plasmidhunter)
-    # PlasmidHunter's classifier itself is a PyPI package (`pip install
-    # plasmidhunter`), not a bioconda package -- only its diamond/prodigal
-    # dependencies are conda packages, both already available via existing
-    # profiles. Install those through the normal conda solver first, then
-    # pip-install the tool itself into the SAME resolved environment prefix
-    # (never a bare `pip install` on whatever's first on PATH), and exit here
-    # rather than falling through to the single bottom-of-file conda install,
-    # which only ever runs one solver command.
-    PKGS=(diamond prodigal)
-    echo "[plasbench] installing into $TARGET_LABEL: ${PKGS[*]}"
-    run_with_heartbeat "Conda is solving/linking dependency tools: ${PKGS[*]}" "${SOLVER[@]}" "${PKGS[@]}"
-    if [[ -n "${TARGET_PREFIX:-}" && -x "$TARGET_PREFIX/bin/pip" ]]; then
-        PIP_BIN="$TARGET_PREFIX/bin/pip"
-    else
-        PIP_BIN="pip"
-        echo "WARNING: could not resolve an existing $ENV_NAME prefix's own pip; falling back to 'pip' on PATH -- re-run this profile after the conda env above is created if that installs plasmidhunter into the wrong environment." >&2
-    fi
-    echo "[plasbench] installing plasmidhunter via pip ($PIP_BIN)"
-    run_with_heartbeat "pip is installing plasmidhunter" "$PIP_BIN" install plasmidhunter
-    exit 0
+    # PlasmidHunter's classifier is a PyPI package; its diamond/prodigal
+    # dependencies are conda packages. Every PyPI release requires python
+    # ==3.10.*, so pip cannot install it into the python 3.12 main environment
+    # ("No matching distribution found"). It gets its own python 3.10
+    # environment: conda solves the dependencies, then that environment's own
+    # pip installs the pinned release. PlasmidHunter 1.4 imports pkg_resources,
+    # which setuptools 81 removed, so setuptools is held below 81 and the
+    # install is proven by actually starting the program.
+    install_isolated plasmidhunter PlasmidHunter "plasmidhunter" "plasmidhunter==1.4" "plasmidhunter --help" \
+        -c conda-forge -c bioconda -- "python=3.10" diamond prodigal pip "setuptools<81"
+    exit $?
     ;;
  plasmer)
     # Plasmer is a real conda package, but published under its own custom
     # channel (not plain bioconda) -- its own README's exact install
     # command is `conda install -c iskoldt -c bioconda -c conda-forge
-    # -c defaults plasmer`. This profile's own CHANNELS array (conda-forge,
-    # bioconda) is not enough on its own, so -c iskoldt is prepended here
-    # rather than reused from the shared SOLVER array.
-    if TARGET_PREFIX="$(resolve_prefix)"; then
-        SOLVER=("$SOLVER_BIN" install -y -p "$TARGET_PREFIX" -c iskoldt "${CHANNELS[@]}" -c defaults)
-    else
-        SOLVER=("$SOLVER_BIN" install -y -n "$ENV_NAME" -c iskoldt "${CHANNELS[@]}" -c defaults)
-    fi
-    PKGS=(plasmer)
+    # -c defaults plasmer`. Its only build is for python 3.10, which conflicts
+    # with the main environment's python 3.12, so it gets its own environment.
+    # The commercial 'defaults' channel is not needed to solve it (iskoldt,
+    # bioconda and conda-forge suffice), so it is left out.
     cat >&2 <<'EOF'
 NOTE: Plasmer's own README states "A minimum of 32GB system memory is
       required for kmer-db to load the databases" -- this is a real,
@@ -229,6 +276,9 @@ NOTE: Plasmer's own README states "A minimum of 32GB system memory is
       the package) -- point PLASMER_DB at it after downloading. See
       INSTALL.md for the full walkthrough.
 EOF
+    install_isolated plasmer Plasmer "Plasmer" "" "" \
+        -c iskoldt -c bioconda -c conda-forge -- plasmer "python=3.10"
+    exit $?
     ;;
  # QUAST is a real bioconda package, for the optional RUN_QUAST_DIAGNOSTICS
  # supplementary diagnostics stage (see docs/METHODS.md). `deadends`
