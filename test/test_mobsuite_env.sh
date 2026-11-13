@@ -24,7 +24,10 @@ case "\$1" in
   create)
     prefix=""; while [[ \$# -gt 0 ]]; do [[ "\$1" == "-p" ]] && prefix="\$2"; shift; done
     mkdir -p "\$prefix/bin" "\$prefix/lib/python3.10/site-packages/mob_suite/databases"
+    : > "\$prefix/lib/python3.10/site-packages/mob_suite/__init__.py"
     echo ok > "\$prefix/lib/python3.10/site-packages/mob_suite/databases/status.txt"
+    # conda-forge's python3.1 -> python3.10 alias, which sorts first
+    ln -s python3.10 "\$prefix/lib/python3.1"
     for c in mob_recon mob_typer mob_cluster mob_init; do
       printf '#!/bin/sh\necho "%s 3.1.9 from \$0"\n' "\$c" > "\$prefix/bin/\$c"; chmod +x "\$prefix/bin/\$c"
     done ;;

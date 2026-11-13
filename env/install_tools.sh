@@ -236,7 +236,9 @@ EOF
     # after install, regardless of how it was installed -- this is a CheckM
     # prerequisite, not a PlasBench-managed database, so there is no
     # env/download_rfplasmid_db.sh here.
-    PKGS=(rfplasmid)
+    # CheckM imports pkg_resources, which setuptools 81 removed: without the
+    # pin every `checkm` (and so every RFPlasmid run) dies at import.
+    PKGS=(rfplasmid "setuptools<81")
     cat >&2 <<'EOF'
 NOTE: rfplasmid also requires CheckM's own reference data to be set up once
       (a one-time step independent of this install, per CheckM's own docs):
