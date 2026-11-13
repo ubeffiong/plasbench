@@ -36,6 +36,9 @@ def main():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     check("the project README links to the sample report", "](docs/sample_report/benchmark.report.html)" in readme)
     check("and says its numbers are not real results", "not real results" in readme)
+    top = "\n".join(readme.splitlines()[:12])
+    check("the sample report link is at the top of the README (before the first screen ends), not only in the report section",
+          "htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html" in top and "Open the sample HTML report" in top)
 
     print()
     if not ok:

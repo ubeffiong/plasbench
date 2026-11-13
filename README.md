@@ -2,6 +2,8 @@
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
 
+> **[Open the sample HTML report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html)** (opens in your browser, nothing to install; Ctrl-click, Cmd-click or middle-click to open it in a new tab). It is the report PlasBench writes, built from the offline demo; the data are synthetic, so its numbers are not real results. To open it from a clone instead: [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html).
+
 **Docs:** **[Run it: step-by-step lab guide](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** · [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
 
 > **Want to run it?** The dry-lab route is written out command by command in
