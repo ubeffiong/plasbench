@@ -8,7 +8,7 @@ flye_mob_recon	long-read	conda	yes	plasbench	automated	flye --version	Uses the M
 plassembler	plassembler	conda	yes	plasbench	automated	plassembler --help	Uses the Plassembler managed database.
 hybracter_long	hybracter	conda	yes	plasbench	automated	hybracter --help	Uses the Plassembler managed database.
 hybracter_hybrid	hybracter	conda	yes	plasbench	automated	hybracter --help	Uses the Plassembler managed database.
-trycycler_mob_recon	trycycler	conda	yes	plasbench	automated	trycycler --help	Uses the MOB-suite managed database.
+trycycler_mob_recon	trycycler	conda_isolated	yes	plasbench-trycycler	automated	trycycler --help	Own environment (Trycycler, Flye, Medaka; Medaka's PyTorch stack would not solve in the main environment); wrappers for trycycler, medaka, medaka_consensus. Uses the MOB-suite managed database.
 genomad	genomad	conda	yes	plasbench	automated	genomad --version	geNomad database is installed by the managed database step.
 plasme	plasme	isolated_source	planned	plasme	automated	PLASMe.py --help	Pinned source runtime required; PLASMe database is managed separately.
 rfplasmid	rfplasmid	conda	yes	plasbench	manual	RFPlasmid --help	CheckM reference data must be configured from its licensed upstream distribution.
