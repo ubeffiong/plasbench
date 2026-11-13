@@ -179,6 +179,10 @@ Next:
 $( [[ "$WITH_TOOLS" -eq 1 ]] || echo "Then install the tools when you need them:
     plasbench install-tools all
 " )
+Databases: install Platon's and MOB-suite's (README step 7a-7b). AMRFinderPlus,
+RFPlasmid (CheckM data) and Plasmer need their own one-time setup (README step 7d).
+Then run 'plasbench check' to see anything still missing.
+
 Run a benchmark on a shipped cohort:
     plasbench run --samples cohorts/public-v2.tsv
 

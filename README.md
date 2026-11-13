@@ -1303,9 +1303,11 @@ populated database directory.
 bash env/download_platon_db.sh
 ```
 
-If it says `already present ... nothing to do`, continue to step 7b. If it
-says the database is missing, use the manual download below. The manual route
-is retained because Platon periodically changes its published database URL.
+If it says `already present ... nothing to do`, continue to step 7b. Otherwise it
+downloads Platon's database (1.69 GB from Zenodo), checks its size and unpacks it.
+The download resumes: run the same command again after an interruption and it
+continues where it stopped. The manual route below does the same by hand, for
+when the script cannot be used.
 
 ```bash
 source config/local.env
@@ -1361,8 +1363,10 @@ If it is already installed, the script tells you so and does nothing:
 [ok]   MOB-suite DB already present at /home/you/miniforge3/envs/plasbench-mobsuite/lib/python3.10/site-packages/mob_suite/databases
 ```
 
-**If this download keeps failing**, see step 7c. Do not keep retrying it: MOB-suite's
-downloader cannot resume, so every attempt restarts from zero.
+The download resumes: if the connection drops, or you stop it, run the same command
+again and it continues from where it stopped. While the internet is down it waits and
+carries on when the connection returns, instead of failing. **If it still cannot
+finish**, see step 7c.
 
 #### 7c — Troubleshooting only: if a database download will not complete
 
@@ -1393,6 +1397,89 @@ MOB_DB="$(bash -c 'source scripts/lib.sh; mobsuite_db_dir')"
 ls "$MOB_DB" | wc -l                                    # expect 31
 ls "$PLASBENCH_DATA_DIR/db/platon/db" | wc -l           # expect 31
 ```
+
+#### 7d — Databases for the optional tools (AMRFinderPlus, RFPlasmid, Plasmer)
+
+`install.sh --tools` installs these three programs, but each needs its own reference data,
+which the installer does not fetch. You need them only for what you use: AMRFinderPlus
+for resistance-gene context in the report, RFPlasmid and Plasmer only when you switch
+those tools on (`--rfplasmid on`, `--plasmer on`). Skip any you do not need;
+`plasbench check` (Step 9) lists whatever is still missing.
+
+Run everything below in the `plasbench` environment, from the PlasBench folder:
+
+```bash
+conda activate plasbench
+cd "$PB"   # the PlasBench folder from step 3
+```
+
+**AMRFinderPlus** (about 1 minute):
+
+```bash
+amrfinder -u
+```
+
+**RFPlasmid** uses CheckM, which needs its reference data (about 1.4 GB) once. Conda
+often downloads the file during the install already, so check first:
+
+```bash
+checkm taxon_list | head -3
+```
+
+If that prints a table of taxa, you are done. If it says the data root is not set, run:
+
+```bash
+DB_DIR="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/checkm_data"
+mkdir -p "$DB_DIR" && cd "$DB_DIR"
+f="$(ls "$CONDA_PREFIX"/staging/checkm_data_2015_01_16.tar.gz 2>/dev/null || true)"
+if [[ -z "$f" ]]; then
+  curl -fL -C - --retry 10 -O https://zenodo.org/records/7401545/files/checkm_data_2015_01_16.tar.gz
+  f=checkm_data_2015_01_16.tar.gz
+fi
+tar -xzf "$f"
+checkm data setRoot "$DB_DIR"
+cd "$PB"
+checkm taxon_list | head -3   # should now print a table
+```
+
+This reuses the file conda already downloaded and only downloads it when it is missing.
+
+**Plasmer** needs **at least 32 GB of RAM** (Plasmer's own documented minimum) and a
+database you download yourself. Check the memory first:
+
+```bash
+free -g
+```
+
+If the `total` in the `Mem:` row is under 32, leave Plasmer off and skip the rest of this
+section. (On WSL, the Linux side only gets part of the computer's RAM; the limit can be
+raised in `%UserProfile%\.wslconfig`.)
+
+1. From [Plasmer's Zenodo record](https://doi.org/10.5281/zenodo.7030674) (or the
+   [Google Drive mirror](https://drive.google.com/drive/folders/1C1XLqTuPVfwyB7N3b5QAU09Rn-Qq7RdD))
+   download both `plasmerMainDB.tar.xz` and `customizedKraken2DB.tar.xz`. On Zenodo you
+   can right-click each Download button, copy the link, and fetch it in the terminal with
+   `curl -fL -C - -O <link>`.
+2. Put both files in the folder PlasBench reads Plasmer's database from, check them, and
+   unpack both there:
+
+```bash
+PLASMER_DIR="$(bash -c 'source config/config.sh; echo "$PLASMER_DB"')"
+echo "$PLASMER_DIR"          # by default ~/.plasbench/databases/plasmer
+mkdir -p "$PLASMER_DIR"
+# move the two downloaded .tar.xz files into "$PLASMER_DIR", then:
+cd "$PLASMER_DIR"
+sha1sum plasmerMainDB.tar.xz customizedKraken2DB.tar.xz
+#   expect 0b08f5c30d60b137f54de6024ab7557031850db6  plasmerMainDB.tar.xz
+#          b14efdd9232fd5f6d066716bd8e3e6ca80c9c0de  customizedKraken2DB.tar.xz
+tar -xJf plasmerMainDB.tar.xz
+tar -xJf customizedKraken2DB.tar.xz
+cd "$PB"
+```
+
+Plasmer expects both archives unpacked into the same folder, and PlasBench passes that
+folder to it. Because this is PlasBench's default location, you do not need to set
+`PLASMER_DB`; set it only if you keep the database somewhere else.
 
 ---
 

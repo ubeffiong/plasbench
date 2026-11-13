@@ -349,6 +349,88 @@ mobsuite_db_preserve() {
     return 0
 }
 
+# --- resumable downloads (same approach as GenoSuv's BaseSpace transfers) ------
+# net_online HOST: can a TCP connection to HOST:443 be opened? Cheap, no download.
+net_online() {
+    local host="$1"
+    [[ "${PLASBENCH_ASSUME_ONLINE:-0}" == "1" ]] && return 0   # tests
+    timeout "${PLASBENCH_ONLINE_TIMEOUT:-6}" bash -c ">/dev/tcp/$host/443" 2>/dev/null
+}
+
+# wait_online HOST: when the connection is down, pause (log once, poll every
+# PLASBENCH_ONLINE_POLL seconds) instead of spending retries; continue as soon
+# as it is back. Gives up after PLASBENCH_OFFLINE_MAX_MINUTES (default 120).
+wait_online() {
+    local host="$1" waited=0 poll="${PLASBENCH_ONLINE_POLL:-30}"
+    local max=$(( ${PLASBENCH_OFFLINE_MAX_MINUTES:-120} * 60 ))
+    net_online "$host" && return 0
+    log "  internet is down ($host unreachable): download paused, will continue when it is back"
+    while ! net_online "$host"; do
+        (( waited >= max )) && return 1
+        sleep "$poll"; waited=$(( waited + poll ))
+    done
+    log "  internet is back: download resumed"
+}
+
+# resumable_download URL DEST [EXPECTED_BYTES]
+# Downloads to DEST.part and keeps every byte already received: a dropped
+# connection, a closed laptop or a later re-run continues where it stopped
+# (curl -C -), never from zero. Retries with back-off, pauses while offline,
+# checks the size (EXPECTED_BYTES, else the server's Content-Length) and only
+# then renames DEST.part to DEST. A finished DEST is not downloaded again.
+resumable_download() {
+    local url="$1" dest="$2" want="${3:-}" part="$2.part" host attempt max got
+    host="$(printf '%s' "$url" | sed -E 's#^[a-z]+://([^/:]+).*#\1#')"
+    max="${PLASBENCH_DOWNLOAD_ATTEMPTS:-30}"
+    mkdir -p "$(dirname "$dest")"
+    if [[ -z "$want" ]]; then
+        want="$(curl -sSIL --max-time 30 "$url" 2>/dev/null | tr -d '\r' \
+                | awk 'tolower($1)=="content-length:"{n=$2} END{print n}')" || want=""
+    fi
+    if [[ -s "$dest" ]] && { [[ -z "$want" ]] || [[ "$(stat -c %s "$dest")" == "$want" ]]; }; then
+        log "  already downloaded: $dest"; return 0
+    fi
+    for (( attempt = 1; attempt <= max; attempt++ )); do
+        wait_online "$host" || { warn "still offline after ${PLASBENCH_OFFLINE_MAX_MINUTES:-120} min; the partial file is kept: $part"; return 1; }
+        got="$( [[ -f "$part" ]] && stat -c %s "$part" || echo 0)"
+        if [[ -n "$want" && "$got" -gt "$want" ]]; then
+            warn "  partial file is larger than the source ($got > $want bytes); starting it again"
+            rm -f "$part"; got=0
+        fi
+        (( got > 0 )) && log "  resuming at $(( got / 1048576 )) MB of ${want:+$(( want / 1048576 )) MB}${want:-unknown size} (attempt $attempt/$max)"
+        if curl -fL -C - --connect-timeout 30 --speed-limit 1024 --speed-time 120 \
+               -o "$part" "$url"; then
+            got="$(stat -c %s "$part")"
+            if [[ -z "$want" || "$got" == "$want" ]]; then
+                mv -f "$part" "$dest"
+                log "  download complete: $dest ($(( got / 1048576 )) MB)"
+                return 0
+            fi
+            warn "  download ended at $got of $want bytes; continuing"
+        else
+            local rc=$?
+            # 33 = the server refused the range (a stale partial file): start over once.
+            [[ "$rc" -eq 33 ]] && { warn "  server could not resume this file; starting it again"; rm -f "$part"; }
+            local wait=$(( attempt * 15 )); (( wait > 300 )) && wait=300
+            warn "  download interrupted (curl exit $rc); keeping $(( $( [[ -f "$part" ]] && stat -c %s "$part" || echo 0) / 1048576 )) MB, retrying in ${wait}s"
+            sleep "${PLASBENCH_RETRY_SLEEP:-$wait}"
+        fi
+    done
+    warn "download did not finish after $max attempts; the partial file is kept, re-run to continue: $part"
+    return 1
+}
+
+# mobsuite_env_root: the conda environment that holds MOB-suite (follows the
+# mob_recon wrapper), or nothing.
+mobsuite_env_root() {
+    local exe target
+    exe="$(command -v mob_recon 2>/dev/null || true)"
+    [[ -n "$exe" ]] || return 0
+    target="$(grep -o "/[^\"]*/bin/mob_recon" "$exe" 2>/dev/null | head -1 || true)"
+    [[ -n "$target" ]] && exe="$target"
+    (cd "$(dirname "$exe")/.." 2>/dev/null && pwd) || true
+}
+
 mobsuite_db_dir() {
     local exe target env_root candidate found
     exe="$(command -v mob_recon 2>/dev/null || true)"
@@ -357,10 +439,17 @@ mobsuite_db_dir() {
         target="$(grep -o "/[^\"]*/bin/mob_recon" "$exe" 2>/dev/null | head -1 || true)"
         [[ -n "$target" ]] && exe="$target"
         if env_root="$(cd "$(dirname "$exe")/.." 2>/dev/null && pwd)"; then
+            # conda-forge adds lib/python3.1 -> python3.10 as an alias; it sorts
+            # first and made messages show ".../python3.1/..." paths. Skip
+            # aliases and directories without a real mob_suite package.
             for candidate in "$env_root"/lib/python*/site-packages/mob_suite/databases; do
+                [[ -L "${candidate%/site-packages/*}" ]] && continue
+                [[ -f "$(dirname "$candidate")/__init__.py" ]] || continue
                 [[ -s "$candidate/status.txt" ]] && { printf %s "$candidate"; return 0; }
             done
             for candidate in "$env_root"/lib/python*/site-packages/mob_suite/databases; do
+                [[ -L "${candidate%/site-packages/*}" ]] && continue
+                [[ -f "$(dirname "$candidate")/__init__.py" ]] || continue
                 [[ -d "$candidate" ]] && { printf %s "$candidate"; return 0; }
             done
         fi
