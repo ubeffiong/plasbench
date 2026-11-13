@@ -244,7 +244,17 @@ EOF
  long-read) PKGS=(flye mob_suite filtlong);;
  plassembler) PKGS=(plassembler);;
  hybracter) PKGS=(hybracter);;
- trycycler) PKGS=(trycycler flye medaka);;
+ trycycler)
+    # Medaka brings a PyTorch stack. Solved into the large main environment,
+    # conda searched for 45+ minutes without finishing; in a fresh environment
+    # the same three packages solve in seconds. So Trycycler and Medaka get
+    # their own environment. Flye is included there for Trycycler's own use,
+    # but is not wrapped: the long-read profile installs flye into the main
+    # environment and that copy is left alone.
+    install_isolated trycycler Trycycler "trycycler medaka medaka_consensus" "" "trycycler --version" \
+        -c conda-forge -c bioconda -- trycycler flye medaka
+    exit $?
+    ;;
  genomad) PKGS=(genomad);;
  rfplasmid)
     # rfplasmid is a real bioconda package (unlike plasme/plasgraph2 below),
@@ -254,7 +264,9 @@ EOF
     # after install, regardless of how it was installed -- this is a CheckM
     # prerequisite, not a PlasBench-managed database, so there is no
     # env/download_rfplasmid_db.sh here.
-    PKGS=(rfplasmid)
+    # CheckM imports pkg_resources, which setuptools 81 removed: without the
+    # pin every `checkm` (and so every RFPlasmid run) dies at import.
+    PKGS=(rfplasmid "setuptools<81")
     cat >&2 <<'EOF'
 NOTE: rfplasmid also requires CheckM's own reference data to be set up once
       (a one-time step independent of this install, per CheckM's own docs):

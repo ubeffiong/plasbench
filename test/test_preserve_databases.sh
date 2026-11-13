@@ -28,6 +28,7 @@ echo "defaults point at the machine store; an old-location database is still use
 # MOB-suite: a wrapper pointing at a separate environment that holds the database.
 MOBENV="$TMP/mobenv"; DBD="$MOBENV/lib/python3.10/site-packages/mob_suite/databases"
 mkdir -p "$TMP/bin" "$MOBENV/bin" "$DBD"
+: > "$(dirname "$DBD")/__init__.py"
 for f in status.txt ncbi_plasmid_full_seqs.fas ncbi_plasmid_full_seqs.fas.msh repetitive.dna.fas; do echo x > "$DBD/$f"; done
 printf '#!/bin/sh\necho mob_recon 3.1.9\n' > "$MOBENV/bin/mob_recon"; chmod +x "$MOBENV/bin/mob_recon"
 printf '#!/bin/sh\nexec "%s/bin/mob_recon" "$@"\n' "$MOBENV" > "$TMP/bin/mob_recon"; chmod +x "$TMP/bin/mob_recon"

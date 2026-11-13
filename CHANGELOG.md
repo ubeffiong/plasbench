@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
+A feature release: benchmark your own tools without changing PlasBench's code, and do everything from a window in your browser with `plasbench ui`. No scoring, ranking or report change for the built-in tools. See the [release notes](docs/releases/v0.3.0.md). Compare: [v0.2.3...v0.3.0](https://github.com/ubeffiong/plasbench/compare/v0.2.3...v0.3.0).
+
 ### Added
 - **The PlasBench window: `plasbench ui`.** Everything the command line does, from a page in your browser: a setup
   checklist with one-click fixes, NCBI credentials, the tool catalogue with installs and default switches, a form
@@ -30,6 +34,27 @@ history is lost, only the numbering is cleaner. See
   (`USER_TOOLS` in the config). User tools share the built-in tools' timeouts, retries, outcome states, result reuse,
   leakage check, long-read circularity rule, scoring, ranking and report, and their manifest, checksum and version
   are recorded in `run_manifest.json`. Guide: docs/ADDING_TOOLS.md; examples: tools.d/examples/.
+
+## [0.2.3] - 2026-11-13
+
+A patch release: database downloads resume, `plasbench check` fetches Platon's database itself, RFPlasmid's CheckM starts again, and `plasbench test` passes on a release install. No scoring, ranking or report change. See the [release notes](docs/releases/v0.2.3.md). Compare: [v0.2.2...v0.2.3](https://github.com/ubeffiong/plasbench/compare/v0.2.2...v0.2.3).
+
+### Fixed
+- **MOB-suite and Platon database downloads resume.** A new `resumable_download` helper (`scripts/lib.sh`) keeps every byte already received, continues with `curl -C -` after a dropped connection or a re-run, pauses while the internet is down instead of spending retries, checks the size, and only then renames the `.part` file. `mob_init` cannot resume (it truncates its archive on every attempt), so PlasBench downloads MOB-suite's archive itself and hands `mob_init` the finished file as a `file://` mirror; `mob_init` then only unpacks and builds.
+- **`plasbench check` downloads Platon's database** from its documented Zenodo file (1,690,687,855 bytes, size-verified) instead of asking for a URL.
+- **RFPlasmid / CheckM start again.** CheckM imports `pkg_resources`, removed in setuptools 81; the `rfplasmid` profile now pins `setuptools<81`.
+- **`plasbench test` passes on a release install.** The review-ledger test no longer fails on `.github/` files, which release archives do not ship (still checked in a git checkout and CI).
+- MOB-suite database paths no longer show conda-forge's `lib/python3.1` alias in messages.
+
+### Added
+- README **Step 7d**: one-time setup for AMRFinderPlus (`amrfinder -u`), RFPlasmid's CheckM data and Plasmer's database (links, checksums, default folder, RAM check). The installer's closing message points to it.
+
+## [0.2.2] - 2026-11-13
+
+A patch release: the `trycycler` install no longer stalls. No scoring, ranking or report change. See the [release notes](docs/releases/v0.2.2.md). Compare: [v0.2.1...v0.2.2](https://github.com/ubeffiong/plasbench/compare/v0.2.1...v0.2.2).
+
+### Fixed
+- **Trycycler and Medaka install into their own environment, `plasbench-trycycler`.** Solving Medaka's PyTorch stack into the large main environment ran for 45+ minutes without finishing during `install-tools all` / `install_latest.sh --tools`; in a fresh environment the same packages install in about 4 minutes. Wrappers for `trycycler`, `medaka` and `medaka_consensus` go into the main environment; the main environment's own `flye` is left untouched.
 
 ## [0.2.1] - 2026-11-13
 

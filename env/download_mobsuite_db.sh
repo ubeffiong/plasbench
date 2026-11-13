@@ -5,9 +5,11 @@
 # mob_init is NOT idempotent. It calls download_to_file() unconditionally on
 # every invocation: there is no skip-if-present and no resume, so a re-run
 # re-fetches the whole ~450MB archive from Zenodo and starts again from zero if
-# the connection drops. On a slow or unreliable link that can mean it never
-# completes. This script therefore does the presence check that mob_init does
-# not, and only calls it when the database is genuinely absent.
+# the connection drops. This script therefore (1) does the presence check that
+# mob_init does not, and (2) downloads the archive itself with
+# scripts/lib.sh resumable_download -- kept across attempts, paused while the
+# internet is down -- and hands mob_init the finished file as a file:// mirror,
+# so mob_init only unpacks and builds.
 #
 # The database lives inside the installed mob_suite package. That path is not
 # fixed across machines, but it is derivable -- ask Python where the package is.
@@ -74,7 +76,7 @@ if [[ -n "$DB_DIR" ]] && database_present "$DB_DIR"; then
         exit 0
     fi
     warn "--force given: re-downloading over the existing database."
-    warn "This discards the working copy and fetches ~450MB again with no resume."
+    warn "This discards the working copy and fetches ~450MB again (the download resumes if interrupted)."
     if [[ "$ASSUME_YES" -ne 1 ]]; then
         REPLY=""
         read -r -p "Overwrite the existing MOB-suite database? [y/N] " REPLY || true
@@ -87,9 +89,10 @@ else
     if [[ -n "$DB_DIR" && -d "$DB_DIR" ]]; then
         warn "MOB-suite DB at $DB_DIR is incomplete (an interrupted download leaves a partial tree)."
     fi
-    log "MOB-suite's reference database (~450MB) will be fetched by 'mob_init' into"
+    log "MOB-suite's reference database (~450MB) will be downloaded and built into"
     log "mob_suite's own package directory${DB_DIR:+: $DB_DIR}."
-    log "Note: mob_init cannot resume. If the connection drops it restarts from zero."
+    log "The download resumes: if the connection drops or you stop it, running this again"
+    log "continues from where it stopped. While the internet is down it waits rather than failing."
     echo
     if [[ "$ASSUME_YES" -ne 1 ]]; then
         REPLY=""
@@ -101,9 +104,36 @@ else
     fi
 fi
 
-log "Running mob_init (a live status line appears every minute after 3 quiet minutes) ..."
-run_with_heartbeat "MOB-suite database download/index build" mob_init || die "mob_init failed; check network access and see its output above.
+# mob_init cannot resume: it opens data.tar.gz for writing on every attempt. So
+# PlasBench downloads the archive itself, resumably, into the machine store
+# (kept across attempts and re-runs), and then hands mob_init the finished file
+# as a file:// mirror. mob_init then only unpacks and builds, as it normally does.
+MOB_ROOT="$(mobsuite_env_root)"
+MOB_PY="${MOB_ROOT:+$MOB_ROOT/bin/python}"
+STAGE="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/mob_suite/download"
+ARCHIVE="$STAGE/data.tar.gz"
+if [[ -n "$MOB_PY" && -x "$MOB_PY" ]]; then
+    MIRROR="$("$MOB_PY" -c 'import json, os, mob_suite.mob_init as m; print(m.config["db_mirrors"][0])' 2>/dev/null || true)"
+    MIRROR="${MIRROR:-https://zenodo.org/records/10304948/files/data.tar.gz?download=1}"
+    log "Downloading the MOB-suite archive (resumable) to $ARCHIVE"
+    resumable_download "$MIRROR" "$ARCHIVE" \
+        || die "the MOB-suite download did not finish; run 'bash env/download_mobsuite_db.sh --yes' again to continue it"
+    log "Building the MOB-suite database from the downloaded archive (a status line appears every minute after 3 quiet minutes) ..."
+    run_with_heartbeat "MOB-suite database index build" env PATH="$MOB_ROOT/bin:$PATH" PLASBENCH_MOB_ARCHIVE="$ARCHIVE" \
+        "$MOB_PY" -c '
+import os, sys
+import mob_suite.mob_init as m
+m.config["db_mirrors"] = ["file://" + os.environ["PLASBENCH_MOB_ARCHIVE"]]
+sys.argv = ["mob_init"]
+sys.exit(m.main())
+' || die "building the MOB-suite database failed; see its output above. The downloaded archive is kept at $ARCHIVE, so a re-run does not download it again."
+    rm -f "$ARCHIVE"
+else
+    # MOB-suite's environment could not be located: fall back to mob_init's own (non-resumable) download.
+    warn "could not locate MOB-suite's Python; using mob_init's own download, which cannot resume"
+    run_with_heartbeat "MOB-suite database download/index build" mob_init || die "mob_init failed; check network access and see its output above.
 If your connection keeps dropping, a prebuilt database directory can be copied
 into $DB_DIR instead -- every file in it is plain data with no absolute paths."
+fi
 mobsuite_db_preserve
 log "MOB-suite database ready (kept in ${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/mob_suite)."

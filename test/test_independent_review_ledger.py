@@ -21,6 +21,11 @@ def main():
     for match in rows:
         ident, path, number, symbol = match.groups()
         full = os.path.join(ROOT, path)
+        if not os.path.isfile(full) and path.startswith(".github/") and not os.path.isdir(os.path.join(ROOT, ".github")):
+            # Release archives (scripts/make_release.sh) leave out .github/; the
+            # row is still checked in a git checkout and in CI.
+            print(f"  {ident}: SKIP {path} is not shipped in release archives")
+            continue
         if not os.path.isfile(full):
             print(f"  {ident}: FAIL missing file {path}")
             ok = False

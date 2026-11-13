@@ -367,7 +367,7 @@ fi
 echo "The following can be installed automatically:"
 [[ "$NEED_CONDA" -eq 1 ]] && echo "  - a conda-family package manager (Miniforge)"
 for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $profile"; done
-[[ "$NEED_PLATON_DB" -eq 1 ]] && echo "  - the Platon database (needs a URL you provide; see prompt below)"
+[[ "$NEED_PLATON_DB" -eq 1 ]] && echo "  - the Platon database (~1.7 GB from Zenodo; resumes if interrupted)"
 [[ "$NEED_MOBSUITE_DB" -eq 1 ]] && echo "  - the MOB-suite database"
 [[ "$NEED_BAKTA_DB" -eq 1 ]] && echo "  - the Bakta database"
 [[ "$NEED_PLASSEMBLER_DB" -eq 1 ]] && echo "  - the Plassembler database (also used by both Hybracter modes)"

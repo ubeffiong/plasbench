@@ -164,7 +164,7 @@ plasbench install-tools long-read      # Flye + MOB-suite
 plasbench install-tools plassembler    # Plassembler
 bash env/download_plassembler_db.sh
 plasbench install-tools hybracter      # Hybracter (both modes; reuses the Plassembler database above)
-plasbench install-tools trycycler      # Trycycler + Flye (+ Medaka, for optional polishing)
+plasbench install-tools trycycler      # own env plasbench-trycycler: Trycycler + Flye (+ Medaka, for optional polishing)
 # then enable any combination of:
 #   RUN_FLYE_MOB_RECON=1, RUN_PLASSEMBLER=1, RUN_HYBRACTER_LONG=1,
 #   RUN_HYBRACTER_HYBRID=1, RUN_TRYCYCLER_MOB_RECON=1
