@@ -722,6 +722,11 @@ export DEPTH_ANOMALY_Z="${DEPTH_ANOMALY_Z:-3}"
 # PLASBIN_FLOW_OUTPUTS_DIR/<sample>.tsv is the file written by `plasbin_flow.py -outfile`, made from the same assembly.
 export RUN_PLASBIN_FLOW="${RUN_PLASBIN_FLOW:-0}"
 export PLASBIN_FLOW_OUTPUTS_DIR="${PLASBIN_FLOW_OUTPUTS_DIR:-}"
+# User-added tools (docs/ADDING_TOOLS.md): each is a folder with a plasbench-tool.ini manifest, found on
+# $PLASBENCH_TOOLS_PATH, ~/.plasbench/tools or tools.d/. USER_TOOLS selects which run: a comma-separated list of
+# names, or "all". `plasbench run --tool NAME` sets it. USER_TOOL_THREADS is the default {threads} for each.
+export USER_TOOLS="${USER_TOOLS:-}"
+export USER_TOOL_THREADS="${USER_TOOL_THREADS:-${THREADS:-4}}"
 # Optional extra label evidence for the truth (all off unless set; a missing one is "not evaluated", never absent):
 #   ANNOTATION_REPLICON_DB may list several Abricate databases, comma or space separated (default plasmidfinder).
 #   ISFINDER_FASTA is a curated ISFinder IS sequence FASTA you downloaded from ISFinder under its terms (not shipped);

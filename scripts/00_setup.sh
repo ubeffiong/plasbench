@@ -311,6 +311,36 @@ if [[ "${RUN_PROTEIN_ANNOTATION:-0}" -eq 1 && "$PROTEIN_ANNOTATION_ENGINE" == "b
     fi
 fi
 
+# User-added tools (USER_TOOLS; python/user_tools.py): the manifest must be valid, and its verify_command must pass in
+# the tool's own environment (or on PATH for [install] method = none). A failing one is fixed the same way as a
+# built-in: `plasbench install-tools <name>` reads its [install] section.
+if [[ -n "${USER_TOOLS:-}" ]]; then
+    log "Checking user tools (USER_TOOLS=$USER_TOOLS)..."
+    if ! user_names="$(python3 "$HERE/../python/user_tools.py" names --enabled "$USER_TOOLS" 2>&1)"; then
+        warn "  [MISS] $user_names"
+        UNFIXABLE+=("USER_TOOLS=$USER_TOOLS: fix the manifest(s); plasbench tools validate lists every problem")
+        CORE_OK=0
+    else
+        while IFS= read -r user_tool; do
+            user_tool="${user_tool%$'\r'}"; [[ -n "$user_tool" ]] || continue
+            user_env="" user_verify=""
+            while IFS=$'\t' read -r key value; do
+                value="${value%$'\r'}"
+                [[ "$key" == "ENV" ]] && user_env="$value"
+                [[ "$key" == "VERIFY" ]] && user_verify="$value"
+            done < <(python3 "$HERE/../python/user_tools.py" install-plan "$user_tool")
+            if [[ -z "$user_verify" ]]; then
+                log "  [ok]   $user_tool (user tool; no verify_command declared)"
+            elif conda run -n "$user_env" bash -c "$user_verify" >/dev/null 2>&1 || bash -c "$user_verify" >/dev/null 2>&1; then
+                log "  [ok]   $user_tool (user tool)"
+            else
+                warn "  [MISS] $user_tool (user tool): '$user_verify' failed"
+                NEEDED_PROFILES["$user_tool"]=1
+            fi
+        done <<< "$user_names"
+    fi
+fi
+
 NOTHING_MISSING=0
 [[ "$CORE_OK" -eq 1 && ${#NEEDED_PROFILES[@]} -eq 0 && "$NEED_PLATON_DB" -eq 0 \
     && "$NEED_MOBSUITE_DB" -eq 0 && "$NEED_BAKTA_DB" -eq 0 && "$NEED_PLASSEMBLER_DB" -eq 0 \

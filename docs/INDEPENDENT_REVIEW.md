@@ -434,16 +434,16 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:794` | `def attach_significance` |
 | E24 | Percentile cluster bootstrap | `python/resampling.py:109` | `def bootstrap_ci` |
 | E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:81` | `def sample_clusters` |
-| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:101` | `UnionFind()` |
-| E27 | Headline falls back to all samples when no sample reaches the tiers | `python/headline_design.py:142` | `FALLBACK: no sample in reference tiers` |
-| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:81` | `min_species_clusters=20` |
-| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:211` | `def shared_values` |
+| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:103` | `UnionFind()` |
+| E27 | Headline falls back to all samples when no sample reaches the tiers | `python/headline_design.py:144` | `FALLBACK: no sample in reference tiers` |
+| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:83` | `min_species_clusters=20` |
+| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:213` | `def shared_values` |
 | E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:192` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:153` | `--min-long-read-depth` |
 | E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:200` | `reference_tier, tier_reason = tier(` |
 | E34 | Circularity guard for long-read tools | `scripts/lib.sh:272` | `truth_independent_of_long_reads` |
-| E35 | Date-based overlap screen | `python/flag_database_overlap.py:92` | `possible_overlap` |
+| E35 | Date-based overlap screen | `python/flag_database_overlap.py:97` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:189` | `lambda was selected on the same LOSO folds` |
 | E38 | The bootstrap test re-implements the algorithm | `test/test_robustness_diagnostics.py:48` | `def reference_bootstrap` |

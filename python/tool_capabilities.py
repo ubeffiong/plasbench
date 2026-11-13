@@ -23,7 +23,11 @@ def read_capabilities(path):
             if row.get("requires_independent_long_read_truth") not in {"yes", "no"}:
                 raise ValueError(f"{tool}: requires_independent_long_read_truth must be yes/no")
             capabilities[tool] = row
-    return capabilities
+    try:   # user-declared tools join the built-in registry (python/user_tools.py); fixtures are untouched
+        import user_tools
+    except ImportError:
+        return capabilities
+    return user_tools.merge_rows(path, capabilities)
 
 
 def default_registry(project_root):

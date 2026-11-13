@@ -13,6 +13,28 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
+A feature release: benchmark your own tools without changing PlasBench's code, and do everything from a window in your browser with `plasbench ui`. No scoring, ranking or report change for the built-in tools. See the [release notes](docs/releases/v0.3.0.md). Compare: [v0.2.3...v0.3.0](https://github.com/ubeffiong/plasbench/compare/v0.2.3...v0.3.0).
+
+### Added
+- **The PlasBench window: `plasbench ui`.** Everything the command line does, from a page in your browser: a setup
+  checklist with one-click fixes, NCBI credentials, the tool catalogue with installs and default switches, a form
+  that writes and installs your own tool's manifest, every setting with its default (saved to `config/local.env`),
+  a five-step New benchmark wizard, your own isolates, cohorts, runs and reports (open, PDF, rebuild), a job console
+  with live logs and cancel, and every `plasbench` command as a form generated from the CLI parser itself. It is
+  served only to this computer, with a per-session key, a Host-header check and same-origin POSTs, and it runs
+  nothing but `plasbench` commands that the real parser has accepted. No network resources; light and dark themes.
+- **Bring your own tool.** Any plasmid reconstruction or classification tool can be benchmarked without changing
+  PlasBench's code: a `plasbench-tool.ini` manifest declares its task and track, how to install it (conda, pip, a
+  script, or nothing), how to run it per sample (a command with `{contigs}`, `{graph}`, `{reads_1}`, `{long_reads}`,
+  `{outdir}`, ... placeholders) or where its existing outputs are, and how to read its output (contig-bin table,
+  contig labels with probabilities, plasmid FASTA, a folder of FASTA files, or its own adapter). New commands:
+  `plasbench tools new|validate|list|show|add|install`, `plasbench install-tools NAME` and `plasbench run --tool NAME`
+  (`USER_TOOLS` in the config). User tools share the built-in tools' timeouts, retries, outcome states, result reuse,
+  leakage check, long-read circularity rule, scoring, ranking and report, and their manifest, checksum and version
+  are recorded in `run_manifest.json`. Guide: docs/ADDING_TOOLS.md; examples: tools.d/examples/.
+
 ## [0.2.3] - 2026-11-13
 
 A patch release: database downloads resume, `plasbench check` fetches Platon's database itself, RFPlasmid's CheckM starts again, and `plasbench test` passes on a release install. No scoring, ranking or report change. See the [release notes](docs/releases/v0.2.3.md). Compare: [v0.2.2...v0.2.3](https://github.com/ubeffiong/plasbench/compare/v0.2.2...v0.2.3).

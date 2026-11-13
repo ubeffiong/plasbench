@@ -23,7 +23,7 @@ chmod +x "$TMP/bin/curl"
 
 run() { PATH="$TMP/bin:$PATH" PLASBENCH_DB_DIR="$TMP/store" DATA_DIR="$TMP/data" PLASBENCH_LOCAL_SETTINGS=/dev/null \
     PLASBENCH_ASSUME_ONLINE=1 PLASBENCH_DOWNLOAD_ATTEMPTS=2 PLASBENCH_RETRY_SLEEP=0 \
-    FAKE_ARCHIVE="$TMP/db.tar.gz" bash "$ROOT/env/download_platon_db.sh" "$@"; }
+    FAKE_ARCHIVE="$TMP/db.tar.gz" bash "$ROOT/env/download_platon_db.sh"; }
 
 # Wrong size for the default URL: refused, nothing unpacked, partial file kept for a resume.
 if run > "$TMP/wrong.log" 2>&1; then echo "FAIL: a wrong-size archive was accepted" >&2; cat "$TMP/wrong.log" >&2; exit 1; fi
