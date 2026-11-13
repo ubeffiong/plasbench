@@ -35,7 +35,8 @@ PLASBENCH_ASSUME_ONLINE=1 dl "https://example.org/data.tar.gz" "$TMP/out/data.ta
 cmp -s "$TMP/source.bin" "$TMP/out/data.tar.gz" || { echo "FAIL: resumed file differs from the source" >&2; exit 1; }
 [[ ! -e "$TMP/out/data.tar.gz.part" ]] || { echo "FAIL: .part left behind" >&2; exit 1; }
 [[ "$(grep -c -- '-C -' "$TMP/curl.log")" -eq 2 ]] || { echo "FAIL: second attempt did not resume" >&2; cat "$TMP/curl.log" >&2; exit 1; }
-grep -q "resuming at 0 MB" "$TMP/run1.log" || true
+grep -qE "resuming at 0 MB of 0 MB \(attempt 2/" "$TMP/run1.log" \
+    || { echo "FAIL: resume message wrong: $(grep resuming "$TMP/run1.log")" >&2; exit 1; }
 grep -q "keeping" "$TMP/run1.log" || { echo "FAIL: interruption not reported" >&2; cat "$TMP/run1.log" >&2; exit 1; }
 echo "a dropped connection resumes from the saved bytes and yields the identical file -> PASS"
 

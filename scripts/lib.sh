@@ -397,7 +397,11 @@ resumable_download() {
             warn "  partial file is larger than the source ($got > $want bytes); starting it again"
             rm -f "$part"; got=0
         fi
-        (( got > 0 )) && log "  resuming at $(( got / 1048576 )) MB of ${want:+$(( want / 1048576 )) MB}${want:-unknown size} (attempt $attempt/$max)"
+        if (( got > 0 )); then
+            local total="unknown size"
+            [[ -n "$want" ]] && total="$(( want / 1048576 )) MB"
+            log "  resuming at $(( got / 1048576 )) MB of $total (attempt $attempt/$max)"
+        fi
         if curl -fL -C - --connect-timeout 30 --speed-limit 1024 --speed-time 120 \
                -o "$part" "$url"; then
             got="$(stat -c %s "$part")"
