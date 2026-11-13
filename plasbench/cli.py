@@ -239,7 +239,9 @@ ANALYSES = {
 }
 
 
-def main(argv=None):
+def build_parser():
+    """The complete command-line interface. `plasbench ui` renders a form for every command from this parser,
+    so the window and the command line can never disagree about what a command accepts."""
     parser = argparse.ArgumentParser(
         prog="plasbench",
         description="PlasBench: benchmark plasmid-reconstruction tools against complete references.",
@@ -249,6 +251,7 @@ def main(argv=None):
                "  plasbench check --yes\n"
                "  plasbench install-tools core\n"
                "  plasbench install-tools all\n"
+               "  plasbench ui                      (the same, in a window)\n"
                "  plasbench demo\n"
                "  plasbench run --cohort public-v1 --threads 8\n"
                "  plasbench run --samples samples.tsv --threads 8\n"
@@ -272,6 +275,10 @@ def main(argv=None):
     parser.add_argument("--project-root", type=project_root, default=Path.cwd(),
                         help="PlasBench source checkout (default: current directory).")
     sub = parser.add_subparsers(dest="command", required=True)
+    ui_parser = sub.add_parser(
+        "ui", help="Open the PlasBench window: set up, add tools, run benchmarks and read results without the command line.")
+    ui_parser.add_argument("--port", type=int, default=8770, help="Local port (default 8770; the next free one is used).")
+    ui_parser.add_argument("--no-browser", action="store_true", help="Print the address instead of opening a browser.")
     demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     demo_parser.add_argument("--open-report", action="store_true",
                              help="Open the completed demo report without prompting.")
@@ -421,6 +428,22 @@ def main(argv=None):
     install_parser.add_argument("profile", nargs="?", default="core", help="list, plan, validate, locked, core, assembly, metagenomics, reconstruction, simulate, quast, long-read, annotation, annotation-prokka, ppr-meta, plsmd, mobilome-map, gplas, gplas2, plassembler, hybracter, trycycler, genomad, plasme, plasgraph2, rfplasmid, plasmidhunter, plasmer, plascope, all, or a conda package name.")
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
+    tools_parser = sub.add_parser(
+        "tools", help="Add your own plasmid tool: create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
+    tools_sub = tools_parser.add_subparsers(dest="tools_command", required=True)
+    tools_sub.add_parser("list", help="Every user tool PlasBench can see, with its task, track, run mode and output format.")
+    tools_validate = tools_sub.add_parser("validate", help="Check every manifest (or one); exit 1 with each problem listed.")
+    tools_validate.add_argument("name", nargs="?")
+    tools_show = tools_sub.add_parser("show", help="Print one tool's manifest as PlasBench reads it.")
+    tools_show.add_argument("name")
+    tools_new = tools_sub.add_parser("new", help="Write a commented manifest template to fill in.")
+    tools_new.add_argument("name", help="Tool name: lower-case letters, digits and _.")
+    tools_new.add_argument("--dir", type=Path, help="Where to create it (default: ~/.plasbench/tools).")
+    tools_add = tools_sub.add_parser("add", help="Validate a tool folder (or manifest) and copy it to ~/.plasbench/tools.")
+    tools_add.add_argument("path", type=Path)
+    tools_install = tools_sub.add_parser("install", help="Install a user tool from its [install] section (same as install-tools NAME).")
+    tools_install.add_argument("name")
+    tools_install.add_argument("--env", default="plasbench", help="Conda environment holding PlasBench itself (default: plasbench).")
     candidate_dataset_parser = sub.add_parser("candidate-dataset", help="Build an auditable, label-safe candidate-quality dataset from a completed run.")
     candidate_dataset_parser.add_argument("--scores", type=Path, required=True)
     candidate_dataset_parser.add_argument("--samples", type=Path, required=True)
@@ -637,6 +660,9 @@ def main(argv=None):
             ("--plascope", "plascope", "Enable or disable optional PlaScope Centrifuge classification (E. coli/Klebsiella only)."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
+        tools.add_argument("--tool", dest="user_tools", action="append", metavar="NAME",
+                           help="Also benchmark a user-added tool (see `plasbench tools list`); repeat for several, "
+                                "or give 'all'. Sets USER_TOOLS.")
         tools.add_argument("--force-rerun-tools", action="store_true",
                            help="Discard completed tool results and execute them again.")
 
@@ -647,6 +673,11 @@ def main(argv=None):
     run_parser.add_argument("-p", "--predictions-dir", type=Path,
                             help="Metagenomics only: directory holding <tool>/<community>.bins.tsv normalized outputs.")
 
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
     args = parser.parse_args(argv)
     # Keep accepted shorthand spellings out of downstream control flow and
     # manifests. The stored mode is always the scientifically explicit name.
@@ -671,6 +702,10 @@ def main(argv=None):
             "Run 'cd \"$PB\"' using the installation directory from the README, "
             "or pass --project-root /path/to/plasbench before the command."
         )
+    if args.command == "ui":
+        from .webui import serve
+        serve(root, port=args.port, open_browser=not args.no_browser)
+        return 0
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
     elif args.command == "open-report":
@@ -824,6 +859,18 @@ def main(argv=None):
             command.append("--yes")
         command.append(args.profile)
         code = run(command, root)
+    elif args.command == "tools":
+        if args.tools_command == "install":
+            code = run([bash_command(), "env/install_tools.sh", "--env", args.env, args.name], root)
+        else:
+            command = [sys.executable, "python/user_tools.py", args.tools_command]
+            if args.tools_command in ("validate", "show", "new") and getattr(args, "name", None):
+                command.append(args.name)
+            if args.tools_command == "new" and args.dir:
+                command.extend(["--dir", str(args.dir)])
+            if args.tools_command == "add":
+                command.append(str(args.path.resolve()))
+            code = run(command, root)
     elif args.command == "candidate-dataset":
         command = [sys.executable, "python/build_candidate_quality_dataset.py", "--scores", str(args.scores),
                    "--sample-sheet", str(args.samples), "--results-dir", str(args.results_dir),
@@ -1032,6 +1079,8 @@ def main(argv=None):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"
+        if getattr(args, "user_tools", None):
+            env["USER_TOOLS"] = ",".join(name.strip() for value in args.user_tools for name in value.split(",") if name.strip())
         if args.force_rerun_tools:
             env["FORCE_RERUN_TOOLS"] = "1"
         stages = ["6"] if args.command == "report" else args.stages

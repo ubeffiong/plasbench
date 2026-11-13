@@ -34,3 +34,6 @@ Issues = "https://github.com/ubeffiong/plasbench/issues"
 
 [tool.setuptools]
 packages = ["plasbench"]
+
+[tool.setuptools.package-data]
+plasbench = ["data/*.html"]

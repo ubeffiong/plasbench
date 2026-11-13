@@ -1816,6 +1816,8 @@ def enterprise_view_section(project_root, scores, status, leaderboard, metadata,
     if registry.is_file():
         with registry.open(encoding="utf-8", newline="") as handle:
             capabilities = {row["tool"]: row for row in csv.DictReader(handle, delimiter="\t")}
+        from plasbench_common import with_user_tools
+        capabilities = with_user_tools(registry, capabilities)   # user-declared tools (python/user_tools.py)
     versions = read_tool_versions(results_dir / "run_manifest.json")
 
     manifest_version = "version not recorded"

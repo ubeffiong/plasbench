@@ -65,7 +65,9 @@ def read_rows(path):
         return []
     with open(path, newline="", encoding="utf-8") as handle:
         lines = (line for line in handle if line.strip() and not line.lstrip().startswith("#"))
-        return list(csv.DictReader(lines, delimiter="\t"))
+        rows = list(csv.DictReader(lines, delimiter="\t"))
+    from plasbench_common import with_user_tools
+    return with_user_tools(path, rows)   # user tools join the built-in capability registry
 
 
 def normalise_species(organism):

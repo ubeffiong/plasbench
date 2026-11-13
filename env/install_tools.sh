@@ -57,6 +57,34 @@ else
     exit 1
 fi
 
+# A user-declared tool (python/user_tools.py; docs/ADDING_TOOLS.md) installs into its own environment from its
+# manifest's [install] section, then runs its verify_command there. Built-in profile names never reach this branch:
+# a manifest may not reuse one.
+# A user tool's plan always starts with an "ENV<TAB>name" line; anything else (an error, no output) means the profile
+# is not a user tool and falls through to the built-in profiles below.
+USER_PLAN="$(python3 "$HERE/../python/user_tools.py" install-plan "$PROFILE" 2>/dev/null || true)"
+if [[ "$USER_PLAN" == ENV$'\t'* ]]; then
+    echo "Installing user tool '$PROFILE' (manifest: $(python3 "$HERE/../python/user_tools.py" list | awk -F'\t' -v t="$PROFILE" '$1 == t {print $8}'))"
+    USER_ENV=""
+    while IFS=$'\t' read -r -a STEP; do
+        [[ ${#STEP[@]} -gt 0 ]] || continue
+        STEP=("${STEP[@]%$'\r'}")
+        # ENV names the tool's own environment ([install] env_name); VERIFY runs there, or on PATH for method = none.
+        if [[ "${STEP[0]}" == "ENV" ]]; then USER_ENV="${STEP[1]}"; continue; fi
+        if [[ "${STEP[0]}" == "VERIFY" ]]; then
+            echo "  verify: ${STEP[1]}"
+            "$SOLVER_BIN" run -n "$USER_ENV" bash -c "${STEP[1]}" >/dev/null 2>&1 || bash -c "${STEP[1]}" >/dev/null 2>&1 \
+                || { echo "ERROR: '${STEP[1]}' failed after installing $PROFILE" >&2; exit 1; }
+            continue
+        fi
+        [[ "${STEP[0]}" == "{CONDA}" ]] && STEP[0]="$SOLVER_BIN"
+        echo "  + ${STEP[*]}"
+        "${STEP[@]}"
+    done <<< "$USER_PLAN"
+    echo "Installed user tool '$PROFILE'. Run it with: plasbench run --tool $PROFILE"
+    exit 0
+fi
+
 CHANNELS=(-c conda-forge -c bioconda)
 if TARGET_PREFIX="$(resolve_prefix)"; then
     SOLVER=("$SOLVER_BIN" install -y -p "$TARGET_PREFIX" "${CHANNELS[@]}")

@@ -55,6 +55,39 @@ def checksum_record(path, warnings, category):
                 "checksum_error": str(error)}
 
 
+def user_tool_records():
+    """Provenance for the user tools this run selected (USER_TOOLS): manifest path and checksum, task, track, run
+    mode and the version its version_command reports. Returns (records, method_versions keyed by tool)."""
+    selection = os.environ.get("USER_TOOLS", "").strip()
+    if not selection:
+        return {}, {}
+    try:
+        import user_tools
+        names = user_tools.enabled_names(selection)
+        tools = user_tools.cached()
+    except (ImportError, ValueError) as exc:
+        return {"error": str(exc)}, {}
+    records, versions = {}, {}
+    for name in names:
+        tool = tools[name]
+        version = "unreported"
+        command = tool.get("tool", "version_command")
+        if command:
+            try:
+                result = subprocess.run(["bash", "-c", command], text=True, capture_output=True, timeout=30)
+                lines = (result.stdout or result.stderr).strip().splitlines()
+                version = lines[0] if lines else "unreported"
+            except (OSError, subprocess.TimeoutExpired):
+                version = "unreported"
+        records[name] = {"manifest": str(tool.path), "manifest_sha256": tool.checksum(), "display_name": tool.display_name,
+                         "task": tool.task, "analysis_track": tool.track, "run_mode": tool.get("run", "mode"),
+                         "output_format": tool.get("output", "format"), "install": tool.get("install", "method", "none"),
+                         "citation": tool.get("tool", "citation"), "version": version}
+        # The report's "Tool version" column and filter show this, so readers see the tool was user-declared.
+        versions[name] = f"{version} (user tool)"
+    return records, versions
+
+
 def command_version(name):
     executable = shutil.which(name)
     if not executable:
@@ -220,7 +253,7 @@ def main():
                 "EXCLUDE_DATABASE_OVERLAP",
                 "RUN_BASELINE_COVERAGE", "RUN_BASELINE_REFERENCE", "RUN_BASELINE_REPLICON", "REPLICON_ABRICATE_DBS", "BASELINE_COVERAGE_RATIO",
                 "BASELINE_MIN_CONTIG_LENGTH", "BASELINE_REFERENCE_MIN_QUERY_COVERAGE",
-                "RUN_PLSMD", "PLSMD_DB", "RUN_PLASBIN_FLOW", "PLASBIN_FLOW_OUTPUTS_DIR", "ISFINDER_FASTA", "ANNOTATION_REPLICON_DB", "RUN_BIN_AGREEMENT", "DISSIMILARITY_ALPHA", "RUN_COPY_NUMBER",
+                "RUN_PLSMD", "PLSMD_DB", "RUN_PLASBIN_FLOW", "PLASBIN_FLOW_OUTPUTS_DIR", "USER_TOOLS", "USER_TOOL_THREADS", "PLASBENCH_TOOLS_PATH", "ISFINDER_FASTA", "ANNOTATION_REPLICON_DB", "RUN_BIN_AGREEMENT", "DISSIMILARITY_ALPHA", "RUN_COPY_NUMBER",
                 "RUN_ASSEMBLY_ADEQUACY", "MIN_ASSEMBLY_ADEQUACY", "RUN_REPEAT_CONTENT", "REPEAT_KMER",
                 "RUN_TRUTH_DEPTH_ANOMALIES", "DEPTH_WINDOW_BP", "DEPTH_ANOMALY_Z",
                 "RUN_CONTIG_CLASSIFICATION", "RUN_CONTIG_CROSSCHECK", "CONTIG_CROSSCHECK_SCALED", "CONTIG_MIN_LENGTH", "CONTIG_MIN_IDENTITY", "CONTIG_MIN_COVERAGE",
@@ -240,6 +273,7 @@ def main():
         if path.is_file():
             outputs[path.name] = checksum_record(path, manifest_warnings, "output")
     selected_candidates = collect_selected_candidates(Path(args.results_dir), manifest_warnings)
+    user_records, user_versions = user_tool_records()
     manifest = {
         "schema_version": "1.0", "tool": "PlasBench", "tool_version": tool_version(),
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -269,6 +303,8 @@ def main():
         "input_checksums": {"sample_sheet": checksum_record(
             sample_sheet, manifest_warnings, "sample sheet"), "truth_tables": truth_tables},
         "samples": samples, "tools": {name: command_version(name) for name in TOOLS},
+        # User-added tools (python/user_tools.py): their manifests, and versions the report reads by tool name.
+        "user_tools": user_records, "method_versions": user_versions,
         "execution_profiles": status_rows(args.results_dir),
         "outputs": outputs, "selected_candidates": selected_candidates,
         "warnings": manifest_warnings,
