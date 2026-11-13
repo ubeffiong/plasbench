@@ -28,6 +28,7 @@ case "\$1" in
     case "\$args" in
       *plascope*) mk plaScope.sh; mk centrifuge ;;
       *plasmer*) mk Plasmer ;;
+      *trycycler*) mk trycycler; mk medaka; mk medaka_consensus; mk flye ;;
     esac
     case "\$args" in *" pip"*)
       printf '#!/bin/sh\necho "pip \$*" >> "$TMP/conda.log"\nd=\$(dirname "\$0")\nprintf "#!/bin/sh\\\\necho plasmidhunter from \\\$0\\\\n" > "\$d/plasmidhunter"; chmod +x "\$d/plasmidhunter"\n' > "\$prefix/bin/pip"
@@ -41,9 +42,12 @@ chmod +x "$TMP/bin/conda"
 run() { PATH="$TMP/bin:/usr/bin:/bin" CONDA_PREFIX="" bash "$ROOT/env/install_tools.sh" --env plasbench "$1" > "$TMP/$1.log" 2>&1 \
     || { echo "FAIL: install_tools.sh $1" >&2; cat "$TMP/$1.log" "$TMP/conda.log" >&2; exit 1; }; }
 
-run plascope; run plasmer; run plasmidhunter
+# The main environment's own flye (long-read profile) must survive the trycycler profile.
+printf '#!/bin/sh\necho main-env flye\n' > "$MAIN/bin/flye"; chmod +x "$MAIN/bin/flye"
 
-if grep -E "conda install .*(plascope|plasmer|plasmidhunter|diamond)" "$TMP/conda.log"; then
+run plascope; run plasmer; run plasmidhunter; run trycycler
+
+if grep -E "conda install .*(plascope|plasmer|plasmidhunter|diamond|trycycler|medaka)" "$TMP/conda.log"; then
     echo "FAIL: a tool was installed into the main environment" >&2; exit 1; fi
 grep -q "conda create -y -p $BASE/envs/plasbench-plascope .*plascope=1.3.1 python=3.6" "$TMP/conda.log" \
     || { echo "FAIL: PlaScope env not created with python 3.6" >&2; cat "$TMP/conda.log" >&2; exit 1; }
@@ -56,7 +60,12 @@ grep -q "^pip install plasmidhunter==1.4" "$TMP/conda.log" \
 grep -q -- "-c defaults" "$TMP/conda.log" && { echo "FAIL: the commercial defaults channel is used" >&2; exit 1; }
 echo "each tool gets its own environment with a compatible python; none touch the main env -> PASS"
 
-for pair in plaScope.sh:plascope centrifuge:plascope Plasmer:plasmer plasmidhunter:plasmidhunter; do
+grep -q "conda create -y -p $BASE/envs/plasbench-trycycler .*trycycler flye medaka" "$TMP/conda.log" \
+    || { echo "FAIL: Trycycler env not created" >&2; cat "$TMP/conda.log" >&2; exit 1; }
+[[ "$("$MAIN/bin/flye")" == "main-env flye" ]] || { echo "FAIL: the trycycler profile replaced the main env's flye" >&2; exit 1; }
+echo "trycycler profile: own environment, main env's flye left alone -> PASS"
+
+for pair in plaScope.sh:plascope centrifuge:plascope Plasmer:plasmer plasmidhunter:plasmidhunter trycycler:trycycler medaka:trycycler medaka_consensus:trycycler; do
     cmd="${pair%%:*}"; env="${pair##*:}"
     [[ -x "$MAIN/bin/$cmd" ]] || { echo "FAIL: no $cmd wrapper in the main env" >&2; exit 1; }
     out="$("$MAIN/bin/$cmd")"
@@ -67,7 +76,7 @@ done
 echo "wrappers in the main env run each tool from its own environment -> PASS"
 
 : > "$TMP/conda.log"
-run plascope; run plasmer; run plasmidhunter
+run plascope; run plasmer; run plasmidhunter; run trycycler
 if grep -q "create\|^pip" "$TMP/conda.log"; then echo "FAIL: a working isolated env was rebuilt" >&2; cat "$TMP/conda.log" >&2; exit 1; fi
 echo "re-running the profiles keeps working environments (no rebuild) -> PASS"
 echo "ALL ISOLATED TOOL ENVIRONMENT TESTS PASSED"
