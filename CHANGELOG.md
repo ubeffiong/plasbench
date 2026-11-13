@@ -13,6 +13,15 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-13
+
+A patch release: `plasbench install-tools all` now completes. No scoring, ranking or report change. See the [release notes](docs/releases/v0.2.1.md). Compare: [v0.2.0...v0.2.1](https://github.com/ubeffiong/plasbench/compare/v0.2.0...v0.2.1).
+
+### Fixed
+- **PlaScope, Plasmer and PlasmidHunter install into their own environments.** None could be solved into the python 3.12 main environment: PlaScope's pinned Centrifuge 1.0.3 is built only for python <= 3.6, Plasmer only for python 3.10, and every PlasmidHunter release requires python 3.10. Each now lives in `plasbench-plascope`, `plasbench-plasmer` or `plasbench-plasmidhunter`, with wrappers in the main environment, as MOB-suite already does. You still only activate `plasbench`.
+- PlasmidHunter is pinned (1.4) with `setuptools<81`, which it needs for `pkg_resources`; the installer now proves each isolated tool starts instead of only checking that its file exists, and rebuilds an environment that does not.
+- Plasmer no longer pulls Anaconda's commercial `defaults` channel.
+
 ## [0.2.0] - 2026-11-10
 
 A minor release: rankings, the recommendation output and some column names differ from v0.1.5, and the HTML report is rebuilt. Read **Upgrading from v0.1.5** in the [release notes](docs/releases/v0.2.0.md) first; everything below is the detail behind them. Compare: [v0.1.5...v0.2.0](https://github.com/ubeffiong/plasbench/compare/v0.1.5...v0.2.0).

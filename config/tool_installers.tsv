@@ -12,9 +12,9 @@ trycycler_mob_recon	trycycler	conda	yes	plasbench	automated	trycycler --help	Use
 genomad	genomad	conda	yes	plasbench	automated	genomad --version	geNomad database is installed by the managed database step.
 plasme	plasme	isolated_source	planned	plasme	automated	PLASMe.py --help	Pinned source runtime required; PLASMe database is managed separately.
 rfplasmid	rfplasmid	conda	yes	plasbench	manual	RFPlasmid --help	CheckM reference data must be configured from its licensed upstream distribution.
-plasmidhunter	plasmidhunter	conda_pip	yes	plasbench	none	plasmidhunter --help	Conda dependencies plus the PyPI package in the same managed environment.
-plasmer	plasmer	conda	yes	plasbench	manual	Plasmer --help	The upstream database has no stable checksummed direct URL; installation cannot safely fabricate one.
-plascope	plascope	conda	yes	plasbench	automated	plaScope.sh --help	Species-specific databases are managed separately.
+plasmidhunter	plasmidhunter	conda_isolated	yes	plasbench-plasmidhunter	none	plasmidhunter --help	Own python 3.10 environment (its PyPI releases require python ==3.10.*): conda diamond/prodigal plus pip plasmidhunter==1.4; wrapper in the main environment.
+plasmer	plasmer	conda_isolated	yes	plasbench-plasmer	manual	Plasmer --help	Own python 3.10 environment (channel iskoldt builds only for 3.10); wrapper in the main environment. The upstream database has no stable checksummed direct URL; installation cannot safely fabricate one.
+plascope	plascope	conda_isolated	yes	plasbench-plascope	automated	plaScope.sh --help	Own python 3.6 environment (centrifuge 1.0.3 is built only for python <= 3.6); wrapper in the main environment. Species-specific databases are managed separately.
 plasgraph2	plasgraph2	isolated_source	planned	plasgraph2	none	plASgraph2_classify.py --help	Pinned source runtime and shipped pretrained model required.
 baseline_coverage	baseline	builtin	yes	plasbench	none	python3 python/baseline_predictors.py coverage --help	Built-in trivial baseline; no install or database.
 baseline_reference	baseline	builtin	yes	plasbench	manual	python3 python/baseline_predictors.py reference --help	Built-in trivial baseline; needs minimap2 and the local plasmid reference set (build_plasmid_reference_set.py).

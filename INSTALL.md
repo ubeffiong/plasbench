@@ -256,9 +256,17 @@ PlasmidHunter (a Diamond+Prodigal gene-content Naive Bayes classifier, one
 species-agnostic model) is a PyPI package, not a bioconda package -- only its
 `diamond`/`prodigal` dependencies are conda packages:
 
+Every PyPI release of PlasmidHunter requires Python 3.10, so it cannot go into
+the Python 3.12 main environment (pip reports "No matching distribution found").
+Like MOB-suite, it gets its own environment, `plasbench-plasmidhunter`, with a
+`plasmidhunter` wrapper in the main one. Plasmer (Python 3.10 only) and PlaScope
+(its pinned Centrifuge 1.0.3 needs Python 3.6) are handled the same way, in
+`plasbench-plasmer` and `plasbench-plascope`. You still only activate `plasbench`.
+
 ```bash
-plasbench install-tools plasmidhunter   # installs diamond+prodigal via conda,
-                                         # then `pip install plasmidhunter`
+plasbench install-tools plasmidhunter   # creates plasbench-plasmidhunter (python 3.10,
+                                         # diamond, prodigal) and pip-installs
+                                         # plasmidhunter==1.4 into it
 # then enable RUN_PLASMIDHUNTER=1 in config/config.sh, or --plasmidhunter on
 ```
 
@@ -269,8 +277,8 @@ step (not a PlasBench-imposed default -- see `PLASMER_MEMORY_GB` in
 `config/config.sh`):
 
 ```bash
-plasbench install-tools plasmer   # conda, from Plasmer's own custom channel
-                                   # (-c iskoldt -c bioconda -c conda-forge)
+plasbench install-tools plasmer   # creates plasbench-plasmer (python 3.10) from
+                                   # -c iskoldt -c bioconda -c conda-forge
 # download Plasmer's database separately (Zenodo/Google Drive -- Plasmer's
 # own package does not bundle it) and point PLASMER_DB at it
 # then enable RUN_PLASMER=1 in config/config.sh, or --plasmer on
