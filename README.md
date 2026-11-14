@@ -116,6 +116,7 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- The primary analysis is reported **unavailable** when no isolate has a Tier 1-2 reference; the ranking is then labelled provisional, never the headline.
 - Recommendations are advisory and withheld when evidence is thin; PlasBench does not
   identify, cluster or classify the plasmids in your own sample (see the table below).
 - No claim is made here about how any named competing benchmark performs; the

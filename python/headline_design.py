@@ -31,7 +31,7 @@ Standard library only.
 
 import csv
 import statistics
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from pathlib import Path
 
 from plasbench_common import UnionFind, CPRR_SWEEP_THRESHOLDS, cprr_sweep_auc  # noqa: E402
@@ -74,6 +74,12 @@ def normalise_species(organism):
     """'Salmonella enterica subsp. enterica serovar X' -> 'Salmonella enterica'."""
     words = (organism or "").replace("[", "").replace("]", "").split()
     return " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "")
+
+
+PRIMARY_AVAILABLE = "available"
+PRIMARY_UNAVAILABLE = "unavailable"
+PRIMARY_FALLBACK = "fallback_allowed"
+Selection = namedtuple("Selection", "rows basis status reason population")
 
 
 class Design:
@@ -134,14 +140,31 @@ class Design:
     def tier(self, sample):
         return (self.provenance.get(sample) or {}).get("reference_tier", "")
 
-    def headline_rows(self, rows):
-        """(rows in the headline reference standard, basis label)."""
+    def headline_selection(self, rows, allow_fallback=False):
+        """The headline population and whether the PRIMARY analysis is available: a Selection(rows, basis, status, reason, population).
+
+        The primary analysis needs references the pre-specified criteria accept (reference tiers 1 to `max_tier`). When none exists the primary analysis is UNAVAILABLE:
+        the same numbers are still computed on all samples, but they are labelled provisional everywhere (`primary_status`, `population`, the report banner) and are never
+        the headline. This replaces a silent fallback to all samples. `allow_fallback` (ALLOW_PRIMARY_FALLBACK=1) keeps the numbers as the headline, with status
+        'fallback_allowed' and the warning kept in every label."""
         if not self.provenance:
-            return rows, "all samples (no provenance table)"
-        kept = [r for r in rows if self.tier(r["sample"]) and int(self.tier(r["sample"])) <= self.max_tier]
-        if kept:
-            return kept, f"reference tiers 1-{self.max_tier}"
-        return rows, f"all samples (FALLBACK: no sample in reference tiers 1-{self.max_tier})"
+            reason = "no truth-provenance table, so no sample can be shown to meet the reference requirement"
+        else:
+            kept = [r for r in rows if self.tier(r["sample"]) and int(self.tier(r["sample"])) <= self.max_tier]
+            if kept:
+                label = f"reference tiers 1-{self.max_tier}"
+                return Selection(kept, label, PRIMARY_AVAILABLE, "", f"primary: {label}")
+            reason = f"no sample has a reference in tiers 1-{self.max_tier}"
+        if allow_fallback:
+            return Selection(rows, f"all samples (FALLBACK ALLOWED: {reason})", PRIMARY_FALLBACK, reason,
+                             f"fallback allowed: all samples ({reason})")
+        return Selection(rows, f"provisional: all samples (primary analysis unavailable: {reason})", PRIMARY_UNAVAILABLE, reason,
+                         f"provisional: all samples ({reason})")
+
+    def headline_rows(self, rows):
+        """(rows in the headline reference standard, basis label); see headline_selection for the primary-analysis state."""
+        selection = self.headline_selection(rows)
+        return selection.rows, selection.basis
 
     def identity_valid(self, sample):
         record = self.provenance.get(sample)
