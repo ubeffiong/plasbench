@@ -70,7 +70,7 @@ echo
 
 if [[ "$ASSUME_YES" -ne 1 ]]; then
     REPLY=""
-    read -r -p "Download and install Miniforge now? [y/N] " REPLY || true
+    printf '%s' "Download and install Miniforge now? [y/N] " >&2; read -r REPLY || true
     case "$REPLY" in
         y|Y|yes|YES|Yes) : ;;
         *) log "Skipped. Install manually (see INSTALL.md) and re-run, or pass --yes to skip this prompt."; exit 1 ;;

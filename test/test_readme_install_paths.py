@@ -11,7 +11,7 @@ def main():
     primary = readme.split("#### Alternative: choose or inspect a specific release version", 1)[0]
     assert "scripts/install_latest.sh" in primary
     assert "releases/download/v0.2.6" not in primary
-    assert 'PB="/path/printed/by-install_latest.sh"' in readme
+    assert 'PB="$HOME/PlasBench"' in readme   # one install folder, updated in place
     # Historical releases may be mentioned in release notes, but operational
     # commands must not direct a user to a frozen versioned install path.
     assert "cd ~/plasbench-0.2.6" not in readme
