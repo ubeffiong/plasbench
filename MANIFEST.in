@@ -13,7 +13,7 @@ recursive-include env *.sh *.yml *.txt
 recursive-include cohorts *.tsv *.json *.md
 recursive-include assets *.html *.css *.woff2 *.md
 recursive-include docs *.md
-recursive-include plasbench/data *.html
+recursive-include plasbench/data *.html *.svg
 recursive-include tools.d *.ini *.md *.py *.sh
 recursive-include test *.py *.sh
 recursive-include recipes *
