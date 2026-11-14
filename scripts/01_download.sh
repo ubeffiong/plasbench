@@ -58,7 +58,7 @@ confirm_download() {
         return 0
     fi
     reply=""
-    read -r -p "Download these files now? [y/N] " reply || true
+    printf '%s' "Download these files now? [y/N] " >&2; read -r reply || true
     case "$reply" in
         y|Y|yes|YES|Yes) return 0 ;;
         *) die "Download declined. Nothing was fetched." ;;
