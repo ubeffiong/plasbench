@@ -100,7 +100,7 @@ def lock_packages():
 def profiles():
     """profile label -> set of conda packages its PKGS=(...) installs; plus the `all` loop members."""
     text = read("env", "install_tools.sh")
-    install_block = text.split('case "$PROFILE" in', 2)[-1]
+    install_block = text.split('case "$PROFILE" in', 2)[-1].replace("\\\n", " ")   # join continued lines
     labels, current = {}, None
     for line in install_block.splitlines():
         label = re.match(r"^ ?([a-z0-9][a-z0-9-]*)\)", line)
@@ -110,6 +110,11 @@ def profiles():
         for packages in re.findall(r"PKGS=\(([^)]*)\)", line):
             if current:
                 labels[current].update(packages.split())
+        # A tool in its own environment: install_isolated NAME LABEL "exes" ... -- pkg pkg (package specs after --)
+        isolated = re.search(r"\binstall_isolated\b.*?\s--\s+(.+)$", line)
+        if isolated and current:
+            labels[current].update(re.sub(r"[=<>].*", "", p.strip("'\"")) for p in isolated.group(1).split()
+                                   if not p.startswith(("-", ";", "|", "&")))
     loop = re.search(r"for installed_profile in ([^;]+);", text)
     return labels, (loop.group(1).split() if loop else [])
 

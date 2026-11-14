@@ -205,7 +205,14 @@ def main():
     check("an unknown run index is not served", call("/view/999/benchmark.report.html")[0] == 404)
 
     print("page")
-    html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
+    page_file = ROOT / "plasbench" / "data" / "ui.html"
+    check("the page ships with the package (a .gitignore rule once kept it out of the repository)", page_file.is_file())
+    if (ROOT / ".git").exists() and shutil.which("git"):
+        import subprocess
+        tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "--error-unmatch", "plasbench/data/ui.html"],
+                                 capture_output=True).returncode == 0
+        check("git tracks plasbench/data/ui.html", tracked)
+    html = page_file.read_text(encoding="utf-8")
     views = ["home", "setup", "tools", "addtool", "settings", "wizard", "isolates", "cohorts", "runs", "jobs", "commands", "help"]
     check("every page the rail links to exists", all(f'id="v_{v}"' in html and f'data-view="{v}"' in html for v in views))
     check("the page loads nothing from the network", "http://" not in html.split("<script>")[0].replace("http://www.w3.org", "")
