@@ -666,7 +666,7 @@ The report offers sortable tables, filters, CSV and BED export, a colour-blind-s
 | **Container** | `Dockerfile` pins its base image by digest and builds from the lock. MOB-suite and gplas2 get separate environments. Databases are not baked in; `scripts/docker_run.sh` records the image digest. |
 | **Release archives** | `make_release.sh` builds a checksummed archive; the release workflow verifies it; a Zenodo upload workflow and citation metadata are provided. |
 | **Determinism** | The scorer uses only the Python standard library; bootstrap and permutation use fixed seeds. |
-| **Pre-registration** | `config/prereg.tsv` lists every scoring decision; `plasbench analysis freeze-prereg --write` locks its SHA-256 in `config/prereg.lock.json`. The manifest records the hash, whether the lock matches, the parameters still `TO_FIX`, and every setting that departs from the plan. `REQUIRE_PREREG=1` makes stage 4 refuse to run until the lock matches and nothing is `TO_FIX`. |
+| **Pre-registration** | `config/prereg.tsv` lists every scoring decision; `plasbench analysis freeze-prereg --write` locks its SHA-256 in `config/prereg.lock.json`. The manifest records the hash, whether the lock matches, the parameters still `proposed` or `TO_FIX` (a plan with any is a draft), and every setting that departs from the plan. `REQUIRE_PREREG=1` makes stage 4 refuse to run until the lock matches and nothing is `proposed` or `TO_FIX`; `freeze-prereg --write --strict` refuses to freeze a draft. |
 
 **Gaps to know about:** database release dates are blank until you fill them in, the manifest's database identity hashes names, sizes and times (not contents), the allow-list of settings omits some newer variables, and the MOB-suite database lives inside the conda environment (copy it with the environment).
 
@@ -744,7 +744,7 @@ All settings are environment variables read by `config/config.sh` (override them
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REQUIRE_PREREG` | 0 | 1: stage 4 refuses to run unless the pre-registration lock matches and nothing is `TO_FIX`. |
+| `REQUIRE_PREREG` | 0 | 1: stage 4 refuses to run unless the pre-registration lock matches and nothing is `proposed` or `TO_FIX`. |
 | `PERFECT_THRESHOLD`, `FRAGMENT_SHARE`, `MISSED_RECALL` | 0.95, 0.20, 0.50 | Per-plasmid outcome thresholds. |
 | `TOOL_RETRIES`, `TOOL_TIMEOUT_SECONDS` | 1, blank | Automatic retries of a failed run; the same wall-time budget for every tool (blank = none). |
 | `REPORT_EMBED_DASHBOARD` | 0 | 1 embeds the interactive cohort dashboard in the HTML report (about 1 MB; it repeats the heatmap and metric tables). |
@@ -850,7 +850,7 @@ This section records what has and has not been shown, so that a reader can judge
 | The shipped cohorts are small and taxonomically narrow: 17 of 32 `public-v2` isolates are *E. coli*, `public-v1` is mostly one study, and the added rows lack depth and plasmid counts. | A headline can rarely reach the 20-cluster species minimum, so the pooled basis often applies, and intervals are often unavailable; and when no isolate has a Tier 1-2 reference the primary analysis is reported unavailable. Do not generalise to other taxa. |
 | The nearest-reference Mash screen has not been validated against any independent plasmid partition and uses a 16-plasmid reference set. | Use it only as a distance report. |
 | No laboratory (PCR, long-read confirmation) evidence is bundled. | Computational concordance is not biological confirmation. |
-| Pre-registered values marked `TO_FIX` (tool timeout, integrated-element depth, circular-path requirement) await the panel. | The plan is not frozen; `REQUIRE_PREREG=1` will refuse to run until they are fixed. |
+| Pre-registered values still `proposed` (tool timeout 7200 s, integrated-element depth, circular-path requirement, the scorecard bands) await confirmation; one is `TO_FIX` (A4/C2 bands: no truth variant set). | The plan is a draft; `REQUIRE_PREREG=1` and `freeze-prereg --strict` refuse it until every row is `fixed`. |
 | The contig layer's independent cross-check agrees on synthetic data; real-data agreement is read per run in `benchmark.contig_crosscheck.tsv`. | Check that table before citing contig-level numbers. |
 | The recommender evaluation has run only on synthetic data. | Its verdict on a real cohort is unknown. |
 | The plsMD wrapper has been tested only with a fake binary, and its PLSDB release date is blank. | Run it on a real cohort with the real tool before reading its score; until the date is entered leakage for plsMD is *not assessed*. |

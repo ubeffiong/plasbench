@@ -118,6 +118,7 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- The pre-registration is a **draft** until its proposed values are confirmed and frozen (`freeze-prereg --write --strict`); the report's Pre-registration tab shows the draft state and lists the proposed values.
 - Each reference carries a structured **evidence record** (technology, circularity, long-read support, replicon evidence, structure, independent validation; declared, inferred or unknown), kept field by field; the reference tier is derived from it.
 
 - The primary analysis is reported **unavailable** when no isolate has a Tier 1-2 reference; the ranking is then labelled provisional, never the headline.
