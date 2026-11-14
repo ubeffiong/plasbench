@@ -130,6 +130,42 @@ def main():
     check("commands are recorded with exit status", hist and all("exit" in json.loads(h) for h in hist), hist[-1:])
     check("the WSL path of a drive folder", terminal.to_wsl_path(Path("C:/Users/x y/pb")) in ("/mnt/c/Users/x y/pb", None))
 
+    print("session log and run script")
+    from plasbench import sessionlog
+    log = sessionlog.SessionLog(tmp / "sl" / "sessions.jsonl")
+    log.event("server_start", version="x", root=str(proj))
+    log.event("job_start", job="j1", label="Check", command="plasbench check --yes", cwd=str(proj))
+    log.event("job_input", job="j1", label="Check", answer="n")
+    log.event("job_end", job="j1", label="Check", state="done", exit=0, seconds=1.0)
+    log.event("job_start", job="j2", label="Run", command="plasbench run --cohort x", env={"THREADS": "4"}, cwd=str(proj))
+    log.event("job_end", job="j2", label="Run", state="failed", exit=1, seconds=2.0)
+    log.event("terminal", shell="posix", cwd=str(proj / "sub"), command="ls -la", exit=0, seconds=0.1)
+    log.event("terminal", shell="posix", cwd=str(proj), command="false", exit=1, seconds=0.1)
+    log.event("terminal", shell="powershell", cwd=str(proj), command="Get-ChildItem", exit=0, seconds=0.1)
+    log.settings({"NCBI_API_KEY": "abc123secret", "THREADS": "8", "OLD": None})
+    log.event("workspace", path=str(ws))
+    evs = log.events()
+    check("events are read back in order, for this session", [e["kind"] for e in evs][:3] == ["server_start", "job_start", "job_input"]
+          and all(e["session"] == log.session for e in evs))
+    check("a secret setting is never written", "abc123secret" not in (tmp / "sl" / "sessions.jsonl").read_text(encoding="utf-8"))
+    check("every event reads as a sentence", all(sessionlog.describe(e) for e in evs) and
+          sessionlog.describe(evs[1]).startswith("started Check"))
+    sc = log.script(proj)
+    lines = sc.splitlines()
+    check("script: bash, defines plasbench for this folder", lines[0] == "#!/usr/bin/env bash" and "plasbench()" in sc)
+    check("script: a successful command runs", "plasbench check --yes" in lines)
+    check("script: a failed command is a comment, with its settings", "# THREADS=4 plasbench run --cohort x" in lines)
+    check("script: answers are notes", "#   answered: n" in lines)
+    check("script: terminal command runs in its folder", any(l.startswith("(cd ") and l.endswith("&& ls -la)") for l in lines))
+    check("script: failed terminal command and PowerShell are comments", "# false" in lines and "# PowerShell: Get-ChildItem" in lines)
+    check("script: workspace is exported", any(l.startswith("export PLASBENCH_WORKSPACE=") for l in lines))
+    if bash:
+        sp = tmp / "s.sh"
+        sp.write_bytes(sc.encode("utf-8"))
+        r = subprocess.run([bash, "-n", str(sp)], capture_output=True, text=True)
+        check("script is valid bash", r.returncode == 0, r.stderr)
+    check("sessions are listed with their event counts", log.sessions()[0]["events"] == len(evs))
+
     print("server")
     import importlib
     webui = importlib.import_module("plasbench.webui")
@@ -171,7 +207,23 @@ def main():
     code, body, _ = call("/api/platform")
     plat = json.loads(body)
     check("/api/platform gives info and a plan", code == 200 and plat["plan"]["mode"] in ("conda", "docker", "wsl"))
+    code, body, _ = call("/api/terminal/run", {"command": "cd ~"})
+    code, body, _ = call("/api/sessions")
+    sj = json.loads(body)
+    check("/api/sessions: this session's events, as sentences", code == 200 and sj["session"] and
+          any(e["kind"] == "terminal" and e["text"] for e in sj["events"]), body[:300])
+    code, body, ctype = call("/api/sessions/script")
+    check("/api/sessions/script downloads a bash script", code == 200 and body.startswith(b"#!/usr/bin/env bash")
+          and "shellscript" in ctype)
+    code, _, _ = call("/api/sessions/script?session=../../etc")
+    check("a malformed session id is refused", code == 400)
+    code, _, _ = call("/api/sessions", tok=False)
+    check("the session log needs the session key", code == 403)
     page = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
+    check("page: Session log tab and Save as script", 'id="tab_sess"' in page and 'id="sscript"' in page)
+    check("page: content is never hidden behind the fixed console (body min-height, bottom padding = console)",
+          "body{margin:0;min-height:100%}" in page and "html,body{margin:0;height:100%}" not in page
+          and "padding-bottom:var(--cons)" in page and "scroll-padding-bottom:calc(var(--cons)" in page)
     check("page: logo, favicon, Terminal tab, Quit, This computer",
           all(s in page for s in ('href="#pb-mark"', 'rel="icon"', 'id="tab_term"', 'id="quitbtn"', 'id="pc_card"')))
     # a job that is still running (recorded, no process): Quit must ask before stopping it

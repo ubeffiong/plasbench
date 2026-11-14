@@ -126,12 +126,13 @@ def _psq(s: str) -> str:
 class Terminal:
     """One terminal per window, with its own current folder inside the PlasBench folder or the workspace."""
 
-    def __init__(self, root: Path, history_file: Path, workspace=None):
+    def __init__(self, root: Path, history_file: Path, workspace=None, on_record=None):
         self.root = Path(root).resolve()
         self.workspace = workspace          # a callable returning the current workspace folder (it can change)
         self.cwd = self.root
         self.shell = default_shell()
         self.history_file = Path(history_file)
+        self.on_record = on_record          # called with each command's record (the window's session log)
         self.history: list = []
         self.lock = threading.Lock()
         try:
@@ -232,7 +233,8 @@ class Terminal:
         with self.lock:
             # `cd` is handled here: a child process cannot change the folder of the next command.
             parts = command.split(maxsplit=1)
-            if parts[0].lower() in ("cd", "chdir", "set-location") and "&&" not in command and ";" not in command:
+            if (parts[0].lower() in ("cd", "chdir", "set-location") and "&&" not in command and ";" not in command
+                    and "\n" not in command):
                 self.set_cwd(parts[1] if len(parts) > 1 else "")
                 self._record(command, 0, 0.0)
                 return {"exit": 0, "output": str(self.cwd), "prompt": self.prompt(), "seconds": 0.0, "shell": self.shell}
@@ -255,6 +257,12 @@ class Terminal:
             return {"exit": code, "output": text, "prompt": self.prompt(), "seconds": seconds, "shell": self.shell}
 
     def _record(self, command: str, code: int, seconds: float):
+        if self.on_record:
+            try:
+                self.on_record({"shell": self.shell, "shell_label": shell_label(self.shell), "cwd": str(self.cwd),
+                                "command": command[:2000], "exit": code, "seconds": seconds})
+            except Exception:  # noqa: BLE001 - the record never stops a command
+                pass
         self.history.append(command)
         del self.history[:-200]
         try:

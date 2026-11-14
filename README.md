@@ -923,12 +923,12 @@ there, what is still missing, and the Docker command when Docker is available.
 | **Home** | See how ready this computer is, the next setup step, and your latest results. Run the offline demo in one click. |
 | **Set up this computer** | A checklist of everything PlasBench needs (Python, Bash, conda, the core tools, databases, NCBI access, disk space), each with an **Install** or **Fix** button. Enter your NCBI email and API key. Install any tool profile, upgrade PlasBench, or run the test suite. |
 | **Tools** | Every built-in tool and every tool you added: task, track, input, whether it is installed, its reference database, and a switch for whether it runs by default. Install a missing tool from its row. |
-| **Add your own tool** | A form that writes the tool's manifest for you ([Section 5.11](#511-add-your-own-tool-and-benchmark-it)), with insertable `{contigs}`, `{graph}`, … placeholders, a live check that lists anything to fix, and **Save & install**. |
+| **Add your own tool** | A form that writes the tool's manifest for you ([Section 5.11](#511-add-your-own-tool-and-benchmark-it)), with insertable `{contigs}`, `{graph}`, … placeholders, a live check that lists anything to fix, and **Save & install**. **How it works** explains every section, placeholder and output format, and walks through a full example (adding MOB-recon as your own tool) that you can load into the form. |
 | **Settings** | Every setting PlasBench reads, its default and its explanation, searchable. Your changes are saved to `config/local.env` on this computer, and clearing one returns to the default. |
 | **Workspace & studies** | Every benchmark is a study with its own folder (results, report, logs and a record of how it was run). Choose and check the workspace that holds them (free space, drive type, cloud-sync warnings), see every study, open its report or folder, start a new one. |
 | **New benchmark** | A five-step wizard: the isolates (demo, a bundled cohort, your own sheet, or the metagenomic track), the tools (built-in on/off and your own), resources, outputs and stages, then a review of the exact command before it starts. |
 | **Your own isolates** | Add an isolate from its FASTQ files and complete reference (`plasbench init-local`), with file pickers. |
-| **Cohorts** | The bundled study sets: validate one, or benchmark it in one click. |
+| **Cohorts** | The bundled study sets. **Details** shows what each holds: description, isolates and species, plasmids in the truth, read depth, BioProjects and the download size. Breakdowns cover organism, truth tier, how the truth was assembled, origin and country. A searchable table lists every sample, with NCBI links, host, isolation source, collection date and how its reference was sequenced (from the cohort's lock). Validate a cohort, or benchmark it in one click. |
 | **Runs & reports** | Every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
 | **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
 | **Version control** | Git without the command line: status, staging, diffs, commit, branches, remote, fetch/pull/push and history, for your PlasBench folder or your workspace. A managed `.gitignore` keeps run outputs, reads and credentials out, and every commit is checked for data, secrets and files too large for GitHub. |
@@ -941,13 +941,25 @@ to resize it, or collapse it to its title bar. It has two tabs:
 * **Job output.** What a command started from the window prints, live. You can keep working, cancel it, or copy its
   log. When a command asks a question (for example "Install the missing items now? [y/N]"), the console highlights it.
   Answer in its reply box or with its Yes/No buttons.
+* **Session log.** What happened in this session, one line per event: the window started, commands started from
+  the pages and how they ended, answers typed into their questions, cancels, terminal commands, settings, workspace
+  and study changes. Earlier sessions can be chosen from its list. **Save as script** downloads the session as a
+  bash script that repeats it: every command that succeeded, in order and in its folder. Failed or cancelled
+  commands, PowerShell commands and typed answers are kept as comments, so read the script before running it. The log
+  is kept in `~/.plasbench/ui/sessions.jsonl`. Secret settings are never written to it, and answers typed with "hide"
+  are masked.
 * **Terminal.** Type your own commands, as in any terminal: `ls studies`, `tail -n 40 logs/run.log`, `plasbench
   check`, `git log`. Commands start in the PlasBench folder, and `cd` moves within it and the studies workspace (not
-  elsewhere on the disk). `plasbench` there always means this PlasBench folder. Up and Down recall earlier commands,
+  elsewhere on the disk). `plasbench` there always means this PlasBench folder. The command box is one line, grows as you type (Shift+Enter adds a line, Enter runs), and can be dragged taller.
+  Up and Down recall earlier commands,
   and each command is recorded in `~/.plasbench/ui/terminal_history.jsonl`. On Linux and macOS it is your login shell,
   with the environment's tools on PATH. On Windows it is Ubuntu (WSL) when installed, with PowerShell as an option.
   Commands receive no keyboard input, so start interactive or long work from the pages, where its questions are
   answered in Job output.
+
+**Help on every page.** Each page has a **Help** button, the **?** in the top bar does the same, and so does
+<kbd>F1</kbd>. It explains what the page is for, how to use it step by step, what is good to know, and the
+equivalent command.
 
 The window never does anything the command line cannot, so a colleague can repeat any step by copying its command.
 `--port` chooses the port.

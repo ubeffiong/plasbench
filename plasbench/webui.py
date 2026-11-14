@@ -33,10 +33,20 @@ from . import __version__
 from . import ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
+from .sessionlog import SessionLog, describe as describe_event
 
 TOKEN = secrets.token_urlsafe(24)
 PAGE_FILE = Path(__file__).resolve().parent / "data" / "ui.html"
 LOGO_FILE = Path(__file__).resolve().parent / "data" / "logo.svg"
+_SESSION: dict = {}
+
+
+def session_log() -> SessionLog:
+    """This start's session log (one per process; follows UI_HOME, which the tests point elsewhere)."""
+    log = _SESSION.get("log")
+    if log is None or log.path.parent != UI_HOME:
+        log = _SESSION["log"] = SessionLog(UI_HOME / "sessions.jsonl")
+    return log
 UI_HOME = Path(os.environ.get("PLASBENCH_UI_HOME", Path.home() / ".plasbench" / "ui"))
 SERVABLE = {".html": "text/html; charset=utf-8", ".pdf": "application/pdf", ".tsv": "text/tab-separated-values; charset=utf-8",
             ".json": "application/json; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
@@ -439,6 +449,8 @@ class Jobs:
             self.logs[job_id] = handle
             self._save()
         threading.Thread(target=self._wait, args=(job_id, proc, handle), daemon=True).start()
+        session_log().event("job_start", job=job_id, label=job["label"], command=shown, env=env or None, cwd=str(cwd),
+                            job_kind=kind)
         return job
 
     def _wait(self, job_id, proc, handle):
@@ -455,6 +467,8 @@ class Jobs:
                        state="cancelled" if job["state"] == "cancelling" else ("done" if code == 0 else "failed"))
             self.procs.pop(job_id, None)
             self._save()
+        session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code,
+                            seconds=round(job["ended"] - job["started"], 1))
 
     def answer(self, job_id: str, text: str, secret: bool = False) -> dict:
         """Type one line into a running command, as if at its terminal, and record it in the log (masked if secret)."""
@@ -471,10 +485,11 @@ class Jobs:
                 proc.stdin.flush()
             except (BrokenPipeError, OSError, ValueError) as exc:
                 raise ValueError(f"the command is no longer reading input ({exc})")
+            shown = "•" * len(text) if secret else text
             if handle:
-                shown = "•" * len(text) if secret else text
                 handle.write(f"\n[you] {shown}\n".encode("utf-8"))
                 handle.flush()
+        session_log().event("job_input", job=job_id, label=self.jobs.get(job_id, {}).get("label", ""), answer=shown)
         return {"ok": True}
 
     def cancel(self, job_id: str) -> dict:
@@ -484,6 +499,7 @@ class Jobs:
             if not proc or not job:
                 raise KeyError(job_id)
             job["state"] = "cancelling"
+        session_log().event("job_cancel", job=job_id, label=job["label"])
         if os.name == "nt":
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
         else:
@@ -575,7 +591,8 @@ def browse(path: str, files: bool) -> dict:
 def make_handler(project: Project, jobs: Jobs):
     page_cache = {"mtime": 0, "body": b""}
     from . import studies
-    terminal = Terminal(project.root, UI_HOME / "terminal_history.jsonl", lambda: studies.workspace(project.root))
+    terminal = Terminal(project.root, UI_HOME / "terminal_history.jsonl", lambda: studies.workspace(project.root),
+                        on_record=lambda rec: session_log().event("terminal", **rec))
 
     def page() -> bytes:
         mtime = PAGE_FILE.stat().st_mtime
@@ -601,6 +618,8 @@ def make_handler(project: Project, jobs: Jobs):
                 self.send_header("Content-Security-Policy",
                                  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
                                  "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+            if (extra or {}).get("disposition"):
+                self.send_header("Content-Disposition", f'attachment; filename="{extra["disposition"]}"')
             if cookie:
                 self.send_header("Set-Cookie", f"plasbench_token={TOKEN}; Path=/; SameSite=Strict; HttpOnly")
             self.end_headers()
@@ -681,6 +700,9 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"settings": project.settings(), "local_env": str(project.local_env_path())})
             if route == "cohorts":
                 return self.jsend(200, {"cohorts": project.cohorts()})
+            if route == "cohorts/info":
+                from . import cohort_info
+                return self.jsend(200, cohort_info.info(project.root, q.get("name", "")))
             if route == "runs":
                 return self.jsend(200, {"runs": project.runs(state.get("runs", []))})
             if route == "browse":
@@ -715,6 +737,21 @@ def make_handler(project: Project, jobs: Jobs):
                 raise FileNotFoundError(f"no such API: {route}")
             if route == "terminal":
                 return self.jsend(200, terminal.state())
+            if route == "sessions":
+                log = session_log()
+                events = log.events(q.get("session", ""), int(q.get("limit", 500)))
+                for e in events:
+                    e["text"] = describe_event(e)
+                return self.jsend(200, {"session": log.session, "shown": q.get("session") or log.session,
+                                        "sessions": log.sessions()[:30], "events": events, "file": str(log.path)})
+            if route == "sessions/script":
+                log = session_log()
+                sid = q.get("session", "") or log.session
+                if not re.fullmatch(r"[0-9]{8}-[0-9]{6}", sid):
+                    raise ValueError("not a session id")
+                body = log.script(project.root, sid).encode("utf-8")
+                return self.send(200, body, "text/x-shellscript; charset=utf-8",
+                                 extra={"disposition": f"plasbench-session-{sid}.sh"})
             if route == "platform":
                 from . import platform_info
                 info = platform_info.detect()
@@ -807,7 +844,9 @@ def make_handler(project: Project, jobs: Jobs):
                 changes = data.get("changes") or {}
                 if not isinstance(changes, dict):
                     raise ValueError("changes must be an object")
-                return self.jsend(200, {"local": project.save_local_env(changes)})
+                local = project.save_local_env(changes)
+                session_log().settings(changes)
+                return self.jsend(200, {"local": local})
             if route == "git":
                 return self.jsend(200, self.git_op(data))
             if route == "terminal/run":
@@ -827,6 +866,7 @@ def make_handler(project: Project, jobs: Jobs):
                         jobs.cancel(job["id"])
                     except (KeyError, ValueError):
                         pass
+                session_log().event("quit", forced=bool(running) or None)
                 threading.Timer(0.3, self.server.shutdown).start()
                 return self.jsend(200, {"ok": True})
             if route == "workspace/set":
@@ -847,12 +887,14 @@ def make_handler(project: Project, jobs: Jobs):
                 state = load_state()
                 state["workspaces"] = [str(path)] + [w for w in state.get("workspaces", []) if w != str(path)][:7]
                 save_state(state)
+                session_log().event("workspace", path=str(path))
                 out = workspace.describe(project.root)
                 out["warnings"] = report["warnings"]
                 return self.jsend(200, out)
             if route == "studies/create":
                 from . import studies
                 folder = studies.create(project.root, data.get("name", ""), data.get("note", ""))
+                session_log().event("study_created", path=str(folder))
                 return self.jsend(200, {"path": str(folder)})
             if route == "runs/add":
                 folder = Path(data.get("path", "")).expanduser()
@@ -1061,6 +1103,8 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
         os.chmod(record, 0o600)   # it holds this session's key
     except OSError:
         pass
+    session_log().event("server_start", version=__version__, root=str(Path(root).resolve()),
+                        port=server.server_address[1])
     print(f"PlasBench {__version__} window: {url}", flush=True)
     print("Keep this running while you use the window; close it with Quit in the window, or Ctrl+C here.", flush=True)
     if open_browser:
@@ -1072,6 +1116,7 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
         print("\nClosed the PlasBench window.")
     finally:
         server.server_close()
+        session_log().event("server_stop")
         try:
             if json.loads(record.read_text(encoding="utf-8")).get("pid") == os.getpid():
                 record.unlink()

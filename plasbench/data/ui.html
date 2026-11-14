@@ -36,7 +36,10 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{margin:0;height:100%}
+/* The console is a fixed footer: the page keeps a bottom margin as tall as it (body min-height, not height, so that
+   margin follows the content however long the page is), and scrolling to a field or anchor stops above it. */
+html{height:100%;scroll-padding-top:calc(var(--hdr) + 8px);scroll-padding-bottom:calc(var(--cons) + 12px)}
+body{margin:0;min-height:100%}
 body{font:13.5px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--fg);padding-bottom:var(--cons)}
 a{color:var(--primary);text-decoration:none}a:hover{text-decoration:underline}
 code,kbd,.mono{font-family:var(--mono);font-size:12.5px}
@@ -96,7 +99,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--primary)}
 .results button:hover,.results button.hi{background:var(--select)}.results small{color:var(--mut);display:block;font-size:12px}.results .ico{margin-top:2px;color:var(--mut)}
 
 /* ---------- shell and navigation ---------- */
-.shell{display:grid;grid-template-columns:var(--railw) minmax(0,1fr);min-height:calc(100vh - var(--hdr))}
+.shell{display:grid;grid-template-columns:var(--railw) minmax(0,1fr);min-height:calc(100vh - var(--hdr) - var(--cons))}
 .rail{position:sticky;top:var(--hdr);height:calc(100vh - var(--hdr) - var(--cons));overflow-y:auto;background:var(--rail);border-right:1px solid var(--line);padding:6px 0 16px}
 .rail h6{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);margin:14px 16px 4px}
 .nav{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;border-left:3px solid transparent;
@@ -138,6 +141,15 @@ main{min-width:0;padding:18px 24px 36px;max-width:1440px;width:100%}
 .kpi{padding:10px 14px;display:flex;align-items:center;gap:12px}
 .kpi .kico{color:var(--mut);flex:none}.kpi .kico .ico{width:18px;height:18px}
 .kpi b{display:block;font-size:20px;line-height:1.25;font-weight:600;font-variant-numeric:tabular-nums}.kpi span{color:var(--mut);font-size:12px}
+/* cohort details */
+.cohbars{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.cohbars h6{margin:0 0 4px;font-size:11.5px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.hb{display:grid;grid-template-columns:minmax(0,1fr) 90px 32px;gap:6px;align-items:center;font-size:12.5px;margin:2px 0}
+.hb span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hb i{display:block;height:8px;background:var(--primary);border-radius:1px;min-width:2px}
+.hb .n{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+#cohdetail .desc{font-size:13px}#cohdetail .desc p{margin:4px 0}
+#coh_rows td,#coh_rows th{white-space:nowrap}#coh_rows td.wrap{white-space:normal;min-width:160px}
+tr.sel>td{background:var(--select)}
 .meter{height:6px;background:var(--surface-3);border-radius:1px;overflow:hidden}.meter i{display:block;height:100%;background:var(--primary);width:0;transition:width .4s}
 .meter.ok i{background:var(--ok)}
 .tasks{list-style:none;margin:0;padding:0}
@@ -255,6 +267,13 @@ table.data tbody tr:hover td{background:var(--surface-2)}
 /* ---------- dialogs and notifications ---------- */
 dialog{border:1px solid var(--line);border-radius:var(--radius);padding:0;width:min(700px,94vw);background:var(--surface);color:var(--fg);box-shadow:var(--shadow-lg)}
 dialog::backdrop{background:rgba(16,24,40,.45)}
+dialog.wide{width:min(980px,96vw)}dialog.wide .bd{max-height:74vh}
+.help{font-size:13px;line-height:1.55}.help h4{font-size:14px;margin:18px 0 6px;padding-top:6px;border-top:1px solid var(--line-2)}.help h4:first-of-type{border-top:0;margin-top:6px}
+.help .htoc{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;padding:6px 10px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--radius)}
+.help .htab{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0}.help .htab th,.help .htab td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}.help .htab th{background:var(--surface-2);font-weight:600}
+.help .hsteps dt{font-weight:600;margin-top:8px}.help .hsteps dd{margin:2px 0 0 0;padding-left:12px;border-left:2px solid var(--line)}
+.help .lead{font-size:13.5px;margin-top:0}.help .flow{padding-left:20px}.help .flow li{margin:3px 0}
+.help .hman{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;font:12px/1.5 var(--mono);overflow:auto;white-space:pre}
 dialog .hd{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}dialog .hd h3{flex:1;font-size:14px}
 dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-2)}
 .fs-list{border:1px solid var(--line);border-radius:var(--radius);max-height:44vh;overflow:auto}
@@ -274,6 +293,8 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #chead select{width:auto;max-width:44vw;min-height:24px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);padding:1px 6px;font-size:12px}
 #chead button{background:transparent;border:1px solid var(--term-line);color:var(--term-fg);border-radius:2px;padding:2px 8px;font:inherit;font-size:12px;cursor:pointer;display:inline-flex;gap:5px;align-items:center}
 #chead button:hover{background:#ffffff12}
+#chead button,#chead select{white-space:nowrap;flex:none}
+@media (max-width:640px){#chead{overflow-x:auto;scrollbar-width:thin}#chead .grow{flex:0 0 4px}}
 #cstate{font-size:11.5px;padding:0 6px;line-height:18px;border-radius:2px;border:1px solid var(--term-line);color:#aab3bd}
 #cstate:empty{display:none}
 #cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled{color:#e3c27a;border-color:#6b5520}
@@ -294,13 +315,19 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #chead .ctabs button{white-space:nowrap;border:0;border-bottom:2px solid transparent;border-radius:0;padding:0 10px;color:#aab3bd;background:transparent}
 #chead .ctabs button:hover{color:var(--term-fg);background:#ffffff0d}
 #chead .ctabs button.on{color:var(--term-fg);border-bottom-color:var(--primary-2,#5b9be0);font-weight:600}
-#console.term .jobonly,#console.term #cin{display:none!important}#console:not(.term) .termonly{display:none!important}
+#console.term .jobonly,#console.sess .jobonly,#console.term #cin,#console.sess #cin{display:none!important}
+#console:not(.term) .termonly{display:none!important}#console:not(.sess) .sessonly{display:none!important}
+#slog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word}
+#slog .s-t{color:#8a939d}#slog .s-job{color:#8cc3ff}#slog .s-ok{color:#8fd1a5}#slog .s-bad{color:#f1938a}#slog .s-you{color:#e3c27a}#slog .s-term{color:#d7dce2}#slog .s-sys{color:#aab3bd}
 #tlog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
 #tlog .t-cmd{color:#8cc3ff}#tlog .t-err{color:#f1938a}#tlog .t-mut{color:#8a939d}
-#tin{display:flex;align-items:center;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
+#tin{display:flex;align-items:flex-end;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
 #tin select{width:auto;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font-size:12px;padding:1px 6px}
 #tin .pr{font:12px var(--mono);color:#8cc3ff;white-space:nowrap;max-width:32vw;overflow:hidden;text-overflow:ellipsis}
-#tin input{flex:1;min-width:0;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font:12px var(--mono)}
+/* the command box: one line by default (as before); it grows with what you type, up to 8 lines, and can be dragged taller */
+#tin textarea{flex:1;min-width:0;height:26px;min-height:26px;max-height:45vh;resize:vertical;overflow-y:auto;padding:4px 7px;line-height:16px;
+ background:var(--term-bg);color:var(--term-fg);border:1px solid var(--term-line);border-radius:2px;font:12px/16px var(--mono);white-space:pre-wrap}
+#tin .pr,#tin select,#tin button{margin-bottom:1px}
 #tin button{background:var(--primary);border:1px solid var(--primary);color:#fff;border-radius:2px;padding:2px 12px;font:inherit;font-size:12px;cursor:pointer}
 #tin button:disabled{opacity:.5;cursor:default}
 .top .tbtn.quit:hover{color:var(--bad);border-color:var(--bad)}
@@ -367,6 +394,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.8-8.9A6 6 0 0 1 17.8 8 4.5 4.5 0 0 1 17 18z"/></symbol>
   <!-- The PlasBench mark (plasbench/data/logo.svg): a plasmid map holding three rising benchmark bars. -->
   <symbol id="pb-mark" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" style="stroke:var(--lg-ring)" stroke-width="4.5"/><path d="M41.30 12.06A22 22 0 0 1 51.94 41.30" fill="none" style="stroke:var(--lg-arc)" stroke-width="9"/><path d="M21.00 51.05A22 22 0 0 1 10.75 37.69" fill="none" style="stroke:var(--lg-arc)" stroke-width="9"/><rect x="30.6" y="5" width="2.8" height="10" style="fill:var(--lg-arc)"/><rect x="22" y="34" width="5" height="9" rx="1" style="fill:var(--lg-b1)"/><rect x="29.5" y="28" width="5" height="15" rx="1" style="fill:var(--lg-b2)"/><rect x="37" y="22" width="5" height="21" rx="1" style="fill:var(--lg-b3)"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.8"/><path d="M12 17h.01"/></symbol>
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></symbol>
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></symbol>
   <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></symbol>
@@ -388,6 +416,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <div class="results" id="qres" role="listbox"></div>
  </div>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
+ <button class="tbtn" id="helpbtn" title="Help for this page (F1)" aria-label="Help for this page"><svg class="ico sm"><use href="#i-help"/></svg></button>
  <button class="tbtn" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg></button>
  <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
  <button class="tbtn quit" id="quitbtn" title="Quit PlasBench: stop it and close this window"><svg class="ico sm"><use href="#i-power"/></svg><span>Quit</span></button>
@@ -499,9 +528,10 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <section class="view" id="v_addtool" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Add your own tool</h1>
     <p>Describe a plasmid reconstruction or classification tool once. PlasBench installs it into its own environment, runs it on every sample (or reads outputs you already have), converts its output, and scores, ranks and reports it beside the built-in tools. No code changes.</p></div>
-    <div class="row"><select id="ut_load" aria-label="Edit an existing user tool" style="width:auto"><option value="">New tool…</option></select></div></div>
+    <div class="row"><button class="btn sec" id="ut_help" title="How Add your own tool works, step by step, with a worked example"><svg class="ico sm"><use href="#i-help"/></svg>How it works</button>
+     <select id="ut_load" aria-label="Edit an existing user tool" style="width:auto"><option value="">New tool…</option></select></div></div>
    <div class="split">
-    <div class="card" id="utform"><div class="hd"><h3>Manifest</h3><span class="sub" id="ut_where"></span></div><div id="utsections"></div></div>
+    <div class="card" id="utform"><div class="hd"><h3>Manifest</h3><button class="btn ghost icon sm" data-uthelp title="How this form works, with an example" aria-label="Help: how this form works"><svg class="ico sm"><use href="#i-help"/></svg></button><span class="sub" id="ut_where"></span></div><div id="utsections"></div></div>
     <div class="stack" style="position:sticky;top:calc(var(--hdr) + 18px)">
      <div class="card"><div class="hd"><h3>Check</h3><span class="sub">updates as you type</span></div><div class="bd" id="utcheck"><div class="mut">Fill in the form.</div></div></div>
      <div class="card"><div class="hd"><h3>plasbench-tool.ini</h3><button class="btn ghost sm" id="ut_copy"><svg class="ico sm"><use href="#i-copy"/></svg>Copy</button><button class="btn ghost sm" id="ut_dl"><svg class="ico sm"><use href="#i-down"/></svg>Download</button></div>
@@ -587,6 +617,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
    <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Cohorts</h1>
     <p>Study sets that ship with PlasBench, each a sample sheet of NCBI-linked isolates. Validate one, or benchmark it directly. Building your own cohort (discover, curate, validate, lock) is under <a href="#commands/cohorts">All commands › Cohorts and truth</a>.</p></div></div>
    <div class="card"><div class="tablewrap"><table class="data"><thead><tr><th>Cohort</th><th>Isolates</th><th>Lock</th><th>Track</th><th></th></tr></thead><tbody id="cohtb"></tbody></table></div></div>
+   <div class="card" id="cohdetail" style="margin-top:14px" hidden></div>
   </section>
 
   <!-- RUNS ---------------------------------------------------------------------------------------- -->
@@ -600,7 +631,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <!-- JOBS ---------------------------------------------------------------------------------------- -->
   <section class="view" id="v_jobs" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Results</div><h1>Jobs</h1>
-    <p>Every command started from this window, with its exact command line, how it ended, and its full log. Jobs keep running if you switch pages; closing the window's terminal stops them.</p></div></div>
+    <p>Every command started from this window, with its exact command line, how it ended, and its full log. Jobs keep running if you switch pages; Quit asks before stopping one that is still running.</p></div></div>
    <div class="card"><div class="tablewrap"><table class="data"><thead><tr><th>State</th><th>Job</th><th>Started</th><th>Duration</th><th></th></tr></thead><tbody id="jobtb"></tbody></table></div></div>
   </section>
 
@@ -624,18 +655,22 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
  <div id="cgrip" title="Drag to resize"></div>
  <div id="chead"><span class="ctabs" role="tablist" aria-label="Console views">
    <button id="tab_out" class="on" role="tab" aria-selected="true" title="What the commands started from this window print, and your answers to their questions">Job output</button>
+   <button id="tab_sess" role="tab" aria-selected="false" title="What happened in this session, one line per event: commands started and how they ended, answers, terminal commands, settings. Save it as a run script.">Session log</button>
    <button id="tab_term" role="tab" aria-selected="false" title="Type your own commands in the PlasBench folder">Terminal</button></span>
+  <select id="ssel" class="sessonly" aria-label="Session shown" title="This session, or an earlier one"></select>
   <select id="cjob" class="jobonly" aria-label="Job shown"><option value="">No jobs yet</option></select><span id="cstate" class="jobonly"></span>
   <span id="tcwd" class="termonly mut small" style="color:#8a939d"></span>
   <span class="grow"></span>
   <button id="ccancel" class="jobonly" hidden><svg class="ico sm"><use href="#i-stop"/></svg>Cancel</button>
   <button id="tclear" class="termonly" title="Clear the terminal screen (the history is kept)">Clear</button>
+  <button id="sscript" class="sessonly" title="Download this session as a bash script that repeats its commands, in order"><svg class="ico sm"><use href="#i-down"/></svg>Save as script</button>
   <button id="ccopy"><svg class="ico sm"><use href="#i-copy"/></svg>Copy</button>
   <button id="cfollow" class="jobonly" aria-pressed="true">Follow</button>
   <button id="ctoggle"><svg class="ico sm"><use href="#i-chev"/></svg><span>Expand</span></button>
  </div>
  <pre id="clog" class="jobonly" aria-live="polite"></pre>
  <pre id="tlog" class="termonly" aria-live="polite"></pre>
+ <pre id="slog" class="sessonly"></pre>
  <form id="cin" hidden autocomplete="off" aria-label="Answer the running command">
   <span class="pr">›</span><span class="ask" id="cinask">Waiting for your answer:</span>
   <input type="text" id="cintx" placeholder="Type an answer for the running command and press Enter" aria-label="Answer">
@@ -645,8 +680,9 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
  </form>
  <form id="tin" class="termonly" autocomplete="off" aria-label="Terminal">
   <select id="tsh" title="Which shell the command runs in" aria-label="Shell"></select><span class="pr" id="tpr"></span>
-  <input type="text" id="tcmd" spellcheck="false" autocomplete="off" aria-label="Command"
-   placeholder="A command, e.g.  plasbench check    ls studies    tail -n 40 logs/*.log">
+  <textarea id="tcmd" rows="1" spellcheck="false" autocomplete="off" aria-label="Command (Enter runs, Shift+Enter adds a line)"
+   title="Enter runs the command. Shift+Enter starts a new line. Up/Down recall earlier commands. Drag the corner to make the box taller."
+   placeholder="A command, e.g.  plasbench check    ls studies    tail -n 40 logs/*.log   (Shift+Enter: new line)"></textarea>
   <button type="submit" id="trun" title="Run (Enter). Up/Down: earlier commands">Run</button>
  </form>
 </div>
@@ -656,6 +692,124 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <div class="fs-list" id="fs_list"></div></div>
  <div class="ft"><span class="mut small grow" id="fs_sel"></span><button class="btn sec" data-close>Cancel</button><button class="btn" id="fs_ok">Choose</button></div></dialog>
 
+<dialog id="uthelp" class="wide" aria-labelledby="uh_t"><div class="hd"><svg class="ico"><use href="#i-help"/></svg><h3 id="uh_t">How "Add your own tool" works</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
+ <div class="bd help">
+  <nav class="htoc" aria-label="On this page"><a href="#uh_what">What it does</a><a href="#uh_before">Before you start</a><a href="#uh_steps">The five sections</a><a href="#uh_ph">Placeholders</a><a href="#uh_fmt">Output formats</a><a href="#uh_ex">Worked example: MOB-recon</a><a href="#uh_import">Results you already have</a><a href="#uh_fix">If the check complains</a></nav>
+
+  <h4 id="uh_what">What it does</h4>
+  <p>You describe your tool once: what it is, how to install it, the command that runs it, and where its answer is. PlasBench then treats it like a built-in tool:</p>
+  <ol class="flow"><li><b>Install</b>: it gets its own environment (<code>plasbench-&lt;name&gt;</code>), so it never breaks the other tools.</li>
+   <li><b>Run</b>: on every sample, with that sample's own assembly, reads and a fresh output folder.</li>
+   <li><b>Convert</b>: its output is turned into PlasBench's standard prediction (which contigs are plasmid, grouped into which plasmids).</li>
+   <li><b>Score and report</b>: it is scored against the same truth, ranked and plotted beside the built-in tools, marked "user-supplied".</li></ol>
+  <p>The description is a small text file, <code>plasbench-tool.ini</code>. This form writes it for you, and the box on the right shows it as you type. You never edit PlasBench's own code.</p>
+
+  <h4 id="uh_before">Before you start: four things to know about your tool</h4>
+  <table class="htab"><tr><th>Question</th><th>Where it goes</th><th>Example</th></tr>
+   <tr><td>How is it installed? A conda/bioconda package, a pip package, or your own install script?</td><td>How to install it</td><td><code>mob_suite=3.1.9</code> from bioconda</td></tr>
+   <tr><td>What is the exact command that runs it on one assembly?</td><td>How to run it</td><td><code>mob_recon --infile contigs.fasta --outdir out</code></td></tr>
+   <tr><td>Which file holds its answer, and what does it look like?</td><td>How to read its output</td><td>one FASTA per plasmid: <code>out/plasmid_*.fasta</code></td></tr>
+   <tr><td>Does it name contigs exactly as the assembly does?</td><td>Contig id options</td><td><code>NODE_1</code>, not <code>NODE_1_length_5000_cov_12</code></td></tr></table>
+  <p class="mut small">Run it once by hand on one assembly first (the Terminal tab of the console works). Seeing its output folder makes the last two answers obvious.</p>
+
+  <h4 id="uh_steps">The five sections of the form, top to bottom</h4>
+  <dl class="hsteps">
+   <dt>1 · What it is</dt><dd><b>Name</b>: lower-case letters, digits and <code>_</code>; it cannot be a built-in tool's name. It becomes the tool's id everywhere (<code>my_mob_recon</code>). <b>Task</b>: <i>reconstruction</i> if it groups contigs into separate plasmids, which gives bin-level metrics; <i>classification</i> if it only says plasmid or chromosome per contig. <b>Analysis track</b>: <i>short_read</i> for tools working from Illumina assemblies. Tools are ranked only against tools on the same track. <b>Version command</b>: its first line of output is recorded as the version in the report.</dd>
+   <dt>2 · How to install it</dt><dd><b>conda</b>: list the packages with versions; channels default to conda-forge and bioconda. <b>pip</b>: a Python package. <b>script</b>: your own <code>install.sh</code> placed next to the manifest. <b>none</b>: already on your PATH, or you only import results. <b>Verify command</b> is run after installing and by <code>plasbench check</code>; anything that exits 0 when the tool works, such as <code>--help</code>.</dd>
+   <dt>3 · Reference database</dt><dd>Say <b>yes</b> if the tool compares contigs to a plasmid database (PLSDB, MOB-suite's, ...). PlasBench then checks whether the test genomes are inside that database, which would inflate the score. <b>Database path</b> is what <code>{db}</code> means in the command.</dd>
+   <dt>4 · How to run it</dt><dd>Write the command for one sample using <a href="#uh_ph">placeholders</a> instead of file names. Click a placeholder chip to insert it. Tick the inputs it <b>requires</b>: a sample missing one, for example without long reads, is skipped with that reason rather than failing. Every value is safely quoted for you, so spaces in paths are fine. A long command may continue on indented lines.</dd>
+   <dt>5 · How to read its output</dt><dd>Pick the <a href="#uh_fmt">format</a> that matches what the tool writes, then give the <b>output path</b> relative to <code>{outdir}</code>. For tables, say which column holds the contig and which holds the bin or label (by header name, or by number starting at 1).</dd></dl>
+  <p>The <b>Check</b> box updates as you type and lists anything still to fix. When it says <b>Valid manifest</b>, press <b>Save &amp; install</b>. The tool is saved in <code>~/.plasbench/tools/&lt;name&gt;/</code> and installed, and the progress shows in the console.</p>
+  <p><b>Then benchmark it</b>: on <b>New benchmark</b>, step <i>Tools</i>, tick it under <i>Your tools</i>. It also appears on the <b>Tools</b> page, where a switch sets whether it runs by default. From a terminal, the same is <code>plasbench run --cohort public-v1 --tool my_mob_recon</code>.</p>
+
+  <h4 id="uh_ph">Placeholders: what PlasBench puts in the command for each sample</h4>
+  <table class="htab"><tr><th>Write</th><th>It becomes</th></tr>
+   <tr><td><code>{contigs}</code></td><td>the sample's assembled contigs (FASTA), the same assembly every tool is scored on</td></tr>
+   <tr><td><code>{graph}</code></td><td>the sample's assembly graph (GFA), for graph-based binners</td></tr>
+   <tr><td><code>{reads_1}</code> <code>{reads_2}</code></td><td>the trimmed Illumina reads, mate 1 and mate 2 (FASTQ.gz)</td></tr>
+   <tr><td><code>{long_reads}</code></td><td>the sample's long reads (FASTQ.gz), for long-read and hybrid tools</td></tr>
+   <tr><td><code>{outdir}</code></td><td>an empty folder for this tool and this sample: write everything here</td></tr>
+   <tr><td><code>{threads}</code> · <code>{sample}</code></td><td>the thread count for the tool · the sample's id</td></tr>
+   <tr><td><code>{db}</code> · <code>{tool_dir}</code></td><td>the database path from section 3 · the folder holding the manifest (for scripts you ship with it)</td></tr></table>
+
+  <h4 id="uh_fmt">Output formats: pick the one that looks like your tool's answer</h4>
+  <table class="htab"><tr><th>Format</th><th>The tool writes</th><th>You fill in</th></tr>
+   <tr><td><b>fasta_dir</b></td><td>a folder with one FASTA file per predicted plasmid</td><td>the folder (<i>Output path</i>) and which files (<i>FASTA file patterns</i>)</td></tr>
+   <tr><td><b>plasmid_fasta</b></td><td>one FASTA with all plasmid contigs (no grouping)</td><td>the file</td></tr>
+   <tr><td><b>contig_bins</b></td><td>a table: contig, and the plasmid (bin) it belongs to</td><td>the file, delimiter, header, contig column, bin column</td></tr>
+   <tr><td><b>contig_labels</b></td><td>a table: contig, plasmid/chromosome label and/or a probability</td><td>label column and the values meaning plasmid, or a probability column and threshold. A probability also gives a precision-recall curve.</td></tr>
+   <tr><td><b>adapter</b></td><td>anything else</td><td>a small script of yours that converts it (see the guide <i>ADDING_TOOLS.md</i>)</td></tr></table>
+  <p class="mut small">Contig ids must match the assembly. If the tool rewrites them, use <b>Contig id: first_token</b>, which keeps the first word, or <b>Strip from contig ids</b>, a pattern removed from each id such as <code>_length_.*$</code>.</p>
+
+  <h4 id="uh_ex">Worked example: adding MOB-recon as if it were your own tool</h4>
+  <p>MOB-recon (from MOB-suite) is already built in. Adding it again under another name is a safe way to learn the form, because you can compare your copy with the built-in result: they should score the same. Run by hand, it looks like this:</p>
+  <div class="cmdline"><span class="p">$</span><code>mob_recon --infile contigs.fasta --outdir out --num_threads 8 --force</code></div>
+  <p>and it writes <code>out/chromosome.fasta</code>, <code>out/contig_report.txt</code> and <b>one <code>out/plasmid_&lt;cluster&gt;.fasta</code> per plasmid it reconstructed</b>. One FASTA per plasmid is exactly the <b>fasta_dir</b> format. So, section by section:</p>
+  <table class="htab"><tr><th>Section</th><th>Field</th><th>Value</th><th>Why</th></tr>
+   <tr><td rowspan="4">1 What it is</td><td>Name</td><td><code>my_mob_recon</code></td><td><code>mob_recon</code> is taken by the built-in</td></tr>
+   <tr><td>Task</td><td>reconstruction</td><td>it groups contigs into plasmids</td></tr>
+   <tr><td>Analysis track</td><td>short_read</td><td>it works on Illumina assemblies</td></tr>
+   <tr><td>Version command</td><td><code>mob_recon --version</code></td><td>recorded in the report</td></tr>
+   <tr><td rowspan="3">2 Install</td><td>Method</td><td>conda</td><td>it is a bioconda package</td></tr>
+   <tr><td>Conda packages</td><td><code>mob_suite=3.1.9 python=3.10 pandas&lt;=1.5.3 numpy&lt;1.23.5</code></td><td>the versions PlasBench pins for its built-in copy, known to work together</td></tr>
+   <tr><td>Verify command</td><td><code>mob_recon --help</code></td><td>exits 0 when installed</td></tr>
+   <tr><td>3 Database</td><td>Searches a plasmid database</td><td>yes</td><td>MOB-suite matches contigs to its plasmid database, so the leakage check applies</td></tr>
+   <tr><td rowspan="2">4 Run</td><td>Command</td><td><code>mob_recon --infile {contigs} --outdir {outdir}/mob --num_threads {threads} --force</code></td><td>the hand-run command with the file names replaced by placeholders</td></tr>
+   <tr><td>Required inputs</td><td>contigs</td><td>it needs only the assembly</td></tr>
+   <tr><td rowspan="3">5 Output</td><td>Output format</td><td>fasta_dir</td><td>one FASTA per plasmid</td></tr>
+   <tr><td>Output path</td><td><code>mob</code></td><td>the <code>{outdir}/mob</code> folder from the command</td></tr>
+   <tr><td>FASTA file patterns</td><td><code>plasmid_*.fasta</code></td><td>only the plasmid files, not <code>chromosome.fasta</code></td></tr></table>
+  <p>The finished manifest, which is exactly what the box on the right will show:</p>
+  <pre class="hman">[tool]
+name = my_mob_recon
+display_name = MOB-recon (my copy)
+task = reconstruction
+analysis_track = short_read
+description = MOB-suite's plasmid reconstruction, added as a user tool
+citation = Robertson &amp; Nash (2018) Microbial Genomics. doi:10.1099/mgen.0.000206
+version_command = mob_recon --version
+
+[install]
+method = conda
+packages = mob_suite=3.1.9 python=3.10 pandas&lt;=1.5.3 numpy&lt;1.23.5
+channels = conda-forge, bioconda
+verify_command = mob_recon --help
+
+[database]
+uses_reference_database = yes
+database = MOB-suite plasmid database
+
+[run]
+mode = command
+command = mob_recon --infile {contigs} --outdir {outdir}/mob --num_threads {threads} --force
+requires = contigs
+
+[output]
+format = fasta_dir
+path = mob
+fasta_glob = plasmid_*.fasta
+</pre>
+  <ol class="flow"><li>Press <b>Load this example</b> below. The form fills in, and the Check box should say <b>Valid manifest</b>.</li>
+   <li>Press <b>Save &amp; install</b>. The conda environment <code>plasbench-my_mob_recon</code> is created; follow it in the console.</li>
+   <li>MOB-suite needs its database once: in the Terminal tab, run <code>conda run -n plasbench-my_mob_recon mob_init</code>. Skip this if the built-in MOB-recon is already set up.</li>
+   <li><b>New benchmark</b> → <i>Tools</i> → tick <b>my_mob_recon</b> under <i>Your tools</i> → run. In the report it appears as "MOB-recon (my copy)", marked user-supplied, next to the built-in MOB-recon.</li></ol>
+
+  <h4 id="uh_import">You already ran the tool: import its results instead</h4>
+  <p>Set <b>How it runs</b> to <b>import</b>, set <b>Install method</b> to <b>none</b>, and give the <b>Outputs folder</b> and a <b>File name pattern</b> containing <code>{sample}</code>, such as <code>{sample}.tsv</code>, with one file per sample. Then fill in the output format as above. PlasBench runs nothing and scores what you give it. The files must come from the same assemblies PlasBench scores, so the contig ids match.</p>
+
+  <h4 id="uh_fix">If the Check box complains</h4>
+  <table class="htab"><tr><th>It says</th><th>Do this</th></tr>
+   <tr><td>'…' is a built-in PlasBench tool; choose another name</td><td>choose another name (for example add <code>my_</code>)</td></tr>
+   <tr><td>[run] command uses graph but requires does not list it</td><td>tick that input under <i>Required inputs</i></td></tr>
+   <tr><td>[run] command uses unknown placeholder(s)</td><td>use only the placeholders in the table above; check the spelling and the braces</td></tr>
+   <tr><td>[output] format = contig_labels needs label_column or score_column (or a missing column for contig_bins)</td><td>fill in the label or probability column, or the contig / bin column</td></tr>
+   <tr><td>[section] unknown key '…'</td><td>a typo in the text box (the message lists the allowed keys); the form itself only writes known keys</td></tr></table>
+  <p class="mut small">After a run, a sample whose output could not be read is listed as <i>skipped</i> with the reason. A tool error is listed as <i>failed</i>, and its log is in the study's <code>logs/</code> folder. Command-line equivalents: <code>plasbench tools new NAME</code>, <code>plasbench tools validate</code>, <code>plasbench install-tools NAME</code>. The full guide is <b>Guides → ADDING_TOOLS.md</b>.</p>
+ </div>
+ <div class="ft"><span class="mut small grow">The example fills the form; nothing is saved until you press Save.</span><button class="btn sec" data-close>Close</button><button class="btn" id="uh_load"><svg class="ico sm"><use href="#i-edit"/></svg>Load this example</button></div></dialog>
+
+<dialog id="pghelp" class="wide" aria-labelledby="ph_t"><div class="hd"><svg class="ico"><use href="#i-help"/></svg><h3 id="ph_t">Help</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
+ <div class="bd help" id="ph_b"></div><div class="ft"><button class="btn" data-close>Close</button></div></dialog>
 <dialog id="confirm"><div class="hd"><h3 id="cf_t">Run this command?</h3></div><div class="bd"><p id="cf_p" class="mut" style="margin-top:0"></p><div class="cmdline"><span class="p">$</span><code id="cf_cmd"></code></div></div>
  <div class="ft"><button class="btn sec" data-close>Cancel</button><button class="btn" id="cf_ok"><svg class="ico sm"><use href="#i-play"/></svg>Run</button></div></dialog>
 
@@ -792,7 +946,7 @@ async function pollConsole(force) {
     if (j.log) { const clean = j.log.replace(/\x1b\[[0-9;]*m/g, ""); $("#clog").insertAdjacentHTML("beforeend", colorize(clean));
       S.consOffset = j.offset; S.tail = ((S.tail || "") + clean).slice(-400); }
     const running = j.state === "running";
-    $("#cin").hidden = !running || S.ctab === "term";
+    $("#cin").hidden = !running || S.ctab !== "out";
     // A question the command is waiting on: the output ends with a [y/N]-style or "?"/":" prompt and no newline after it.
     const lastLine = (S.tail || "").split("\n").pop();
     const waiting = running && /(\[[yY]\/[nN]\]|\[[yY]es\/[nN]o\]|\?|:)\s*$/.test(lastLine) && lastLine.trim().length > 3;
@@ -822,7 +976,7 @@ $("#cin").onsubmit = e => { e.preventDefault(); sendAnswer($("#cintx").value); }
 $("#cin").addEventListener("click", e => { const b = e.target.closest("[data-ans]"); if (b) sendAnswer(b.dataset.ans); });
 $("#cinsec").onchange = e => { $("#cintx").type = e.target.checked ? "password" : "text"; };
 $("#ccancel").onclick = async () => { try { await api(`jobs/${S.consJob}/cancel`, {}); toast("Cancelling…"); } catch (e) { toast(e.message, "bad"); } };
-$("#ccopy").onclick = () => { navigator.clipboard.writeText((S.ctab === "term" ? $("#tlog") : $("#clog")).innerText); toast("Copied"); };
+$("#ccopy").onclick = () => { navigator.clipboard.writeText(({term: $("#tlog"), sess: $("#slog")}[S.ctab] || $("#clog")).innerText); toast("Copied"); };
 $("#cfollow").onclick = e => { S.follow = !S.follow; e.currentTarget.setAttribute("aria-pressed", S.follow); e.currentTarget.style.opacity = S.follow ? 1 : .55; };
 // The console is a fixed footer, open from the start at a quarter of the window (never under 160 px); it remembers
 // its height and whether you closed it.
@@ -842,15 +996,53 @@ $("#cgrip").onmousedown = e => { e.preventDefault(); const y0 = e.clientY, h0 = 
   addEventListener("mousemove", mv); addEventListener("mouseup", up); };
 setConsole(localStorage.getItem("pb_consopen") !== "0");
 
-/* ---- console tabs: Job output | Terminal ---- */
+/* ---- console tabs: Job output | Session log | Terminal ----
+   Job output   what a command started from the window is printing right now
+   Session log  what happened in this session, one line per event; saved as a run script
+   Terminal     your own commands in the PlasBench folder (they appear in the session log too) */
 S.ctab = "out";
 function setCTab(t) {
-  S.ctab = t; $("#console").classList.toggle("term", t === "term");
-  for (const [id, name] of [["#tab_out", "out"], ["#tab_term", "term"]]) { $(id).classList.toggle("on", name === t); $(id).setAttribute("aria-selected", name === t); }
-  if (t === "term") { setConsole(true); termState(); setTimeout(() => $("#tcmd").focus(), 30); } else pollConsole(true);
+  S.ctab = t; $("#console").classList.toggle("term", t === "term"); $("#console").classList.toggle("sess", t === "sess");
+  for (const [id, name] of [["#tab_out", "out"], ["#tab_sess", "sess"], ["#tab_term", "term"]]) { $(id).classList.toggle("on", name === t); $(id).setAttribute("aria-selected", name === t); }
+  setConsole(true);
+  if (t === "term") { termState(); setTimeout(() => $("#tcmd").focus(), 30); }
+  else if (t === "sess") pollSession(true);
+  else pollConsole(true);
 }
 $("#tab_out").onclick = () => setCTab("out");
+$("#tab_sess").onclick = () => setCTab("sess");
 $("#tab_term").onclick = () => setCTab("term");
+
+/* ---- session log ---- */
+const SL = {shown: "", count: -1};
+const sessClass = e => ({job_start: "s-job", job_input: "s-you", job_cancel: "s-bad", terminal: "s-term"})[e.kind]
+  || (e.kind === "job_end" ? (e.state === "done" ? "s-ok" : "s-bad") : "s-sys");
+const sessName = s => s.id.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)\d\d$/, "$1-$2-$3 $4:$5");
+async function pollSession(force) {
+  try {
+    const j = await api("sessions?limit=1000" + (SL.shown ? "&session=" + encodeURIComponent(SL.shown) : ""));
+    $("#ssel").innerHTML = j.sessions.map(s => `<option value="${esc(s.id)}">${s.id === j.session ? "This session" : "Session " + esc(sessName(s))}${s.events ? ` · ${s.events} events` : ""}</option>`).join("");
+    $("#ssel").value = j.shown;
+    if (!force && j.events.length === SL.count) return;
+    SL.count = j.events.length;
+    const b = $("#slog"), atEnd = b.scrollTop + b.clientHeight >= b.scrollHeight - 30;
+    b.innerHTML = j.events.length ? j.events.map(e => `<span class="s-t">${esc(e.t.slice(11))}</span>  <span class="${sessClass(e)}">${esc(e.text)}</span>`).join("\n")
+      : `<span class="s-sys">Nothing has happened in this session yet. Commands you start from the pages and type in the Terminal appear here, with how they ended. Save as script turns them into a bash script that repeats them.</span>`;
+    if (atEnd || force) b.scrollTop = b.scrollHeight;
+  } catch {}
+}
+$("#ssel").onchange = e => { SL.shown = e.target.value; SL.count = -1; pollSession(true); };
+setInterval(() => { if (S.ctab === "sess" && !document.hidden) pollSession(); }, 2000);
+$("#sscript").onclick = async () => {
+  try {
+    const r = await fetch("/api/sessions/script" + (SL.shown ? "?session=" + encodeURIComponent(SL.shown) : ""), {headers: {"X-PlasBench-Token": TOKEN}});
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+    const name = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || "plasbench-session.sh";
+    const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    toast(`Saved ${name} to your downloads. Read it before you run it.`, "ok");
+  } catch (e) { toast(e.message, "bad"); }
+};
 
 /* ---- terminal: your own commands, in the PlasBench folder (or the workspace) ---- */
 const T = {hist: [], at: 0, loaded: false};
@@ -875,7 +1067,7 @@ async function termRun() {
   const inp = $("#tcmd"), cmd = inp.value.trim(); if (!cmd) return;
   if (cmd === "clear" || cmd === "cls") { $("#tlog").innerHTML = ""; inp.value = ""; return; }
   tPrint(`<span class="t-cmd">${esc($("#tpr").textContent)} ${esc(cmd)}</span>\n`);
-  T.hist.push(cmd); T.at = T.hist.length; inp.value = ""; inp.disabled = true; $("#trun").disabled = true;
+  T.hist.push(cmd); T.at = T.hist.length; inp.value = ""; tFit(); inp.disabled = true; $("#trun").disabled = true;
   try {
     const r = await api("terminal/run", {command: cmd});
     const out = (r.output || "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\s+$/, "");
@@ -887,9 +1079,16 @@ async function termRun() {
   inp.disabled = false; $("#trun").disabled = false; inp.focus();
 }
 $("#tin").onsubmit = e => { e.preventDefault(); termRun(); };
+// The box grows with its content up to 8 lines (a height you dragged is kept while it is taller than that).
+function tFit() { const el = $("#tcmd"); if (!el.value) { delete el.dataset.dragged; el.style.height = "26px"; return; } if (el.dataset.dragged) return; el.style.height = "26px";
+  el.style.height = Math.min(Math.max(26, el.scrollHeight + 2), 16 * 8 + 10) + "px"; }
+$("#tcmd").addEventListener("input", tFit);
+$("#tcmd").addEventListener("mouseup", e => { if (e.target.offsetHeight > 16 * 8 + 12) e.target.dataset.dragged = "1"; });
 $("#tcmd").addEventListener("keydown", e => {
-  if (e.key === "ArrowUp" && T.hist.length) { e.preventDefault(); T.at = Math.max(0, T.at - 1); e.target.value = T.hist[T.at] || ""; }
-  else if (e.key === "ArrowDown" && T.hist.length) { e.preventDefault(); T.at = Math.min(T.hist.length, T.at + 1); e.target.value = T.hist[T.at] || ""; }
+  const el = e.target, oneLine = !el.value.includes("\n");
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); termRun(); }
+  else if (e.key === "ArrowUp" && T.hist.length && (oneLine || el.selectionStart === 0)) { e.preventDefault(); T.at = Math.max(0, T.at - 1); el.value = T.hist[T.at] || ""; tFit(); }
+  else if (e.key === "ArrowDown" && T.hist.length && (oneLine || el.selectionEnd === el.value.length)) { e.preventDefault(); T.at = Math.min(T.hist.length, T.at + 1); el.value = T.hist[T.at] || ""; tFit(); }
 });
 $("#tsh").onchange = async e => {
   try { const st = await api("terminal/shell", {shell: e.target.value}); tShow(st); tPrint(`<span class="t-mut">[now ${esc(st.shell_label)}] ${esc(st.about)}</span>\n`); $("#tcmd").focus(); }
@@ -1205,6 +1404,303 @@ $("#utsections").addEventListener("click", e => {
     ta.focus(); UT.run.command = ta.value; utChanged(false); }
 });
 $("#ut_text").addEventListener("input", () => { if (!utSync) utChanged(true); });
+
+/* ===================================================================================================
+   PAGE HELP: every page has a Help button (and F1) explaining what it is for and how to use it
+   =================================================================================================== */
+const PAGE_HELP = {
+"home": {
+"title": "Overview",
+"what": "The starting point. It shows how ready this computer is, what to do next, and your latest results.",
+"steps": [
+"Read <b>Installation status</b>. If something is missing it names the next step, with a button that does it.",
+"New to PlasBench? Press <b>Run the offline demo</b>. Six synthetic isolates are scored and reported in about a minute, with no downloads. Its report shows what a real benchmark produces.",
+"Ready for real data? Press <b>New benchmark</b>, or pick a task under <b>Common tasks</b>.",
+"Your latest results are listed at the bottom. Open a report from there, or from <a href=\"#runs\">Runs &amp; reports</a>."
+],
+"tips": [
+"The four numbers at the top are live: setup checks passing, tools installed, results folders found, jobs running.",
+"Everything the window starts appears in the console at the bottom. Use <b>Job output</b> for what it prints, <b>Session log</b> for what happened, and <b>Terminal</b> to type your own commands."
+],
+"cli": [
+"plasbench check",
+"plasbench demo"
+]
+},
+"setup": {
+"title": "Set up this computer",
+"what": "Gets this computer ready. It checks everything PlasBench needs and fixes what is missing with one click.",
+"steps": [
+"Read <b>This computer</b> on the right. It says what this machine is and how PlasBench should run here. On Windows that means inside WSL2; elsewhere, the <code>plasbench</code> conda environment. It also lists anything still to do.",
+"In the <b>Checklist</b>, each red item has an <b>Install</b> or <b>Fix</b> button. Or press <b>Check &amp; fix all</b> once. The commands run in the console; answer their questions there if they ask.",
+"Enter your NCBI <b>email</b> and, if you have one, an <b>API key</b>, then press Save. They are needed to download cohorts, and the key makes downloads faster.",
+"Under <b>Install a tool profile</b>, install <b>core</b> first, then the profiles you need (<b>reconstruction</b>, <b>assembly</b>, ...). <b>Show install plan</b> lists what each one installs.",
+"Press <b>Re-check</b> until the checklist says all required items are present."
+],
+"tips": [
+"Optional items, shown in grey, are only needed for some analyses. A benchmark runs without them.",
+"<b>Add desktop icon</b> puts a PlasBench icon on your desktop and in the applications menu. Clicking it starts PlasBench.",
+"Conda is the normal way to get the tools. Docker is an alternative: the card shows the command when Docker is available.",
+"<b>Upgrade PlasBench</b> updates this folder in place. Your studies, settings, downloads and tools are kept."
+],
+"cli": [
+"plasbench check --yes",
+"plasbench install-tools core",
+"plasbench desktop-icon"
+]
+},
+"tools": {
+"title": "Tools",
+"what": "Every tool PlasBench can benchmark, built-in and your own, with what it does and whether it is ready.",
+"steps": [
+"Use the chips at the top to filter: All, Reconstruction, Classification, Short-read, Long-read, Hybrid, Installed, Not installed, Your tools.",
+"Read a row: the <b>task</b> (reconstruction groups contigs into plasmids; classification labels contigs), the <b>track</b> (short-read, long-read, hybrid), the input it needs, whether it is installed, and the reference database it searches.",
+"A missing tool has an <b>Install</b> button in its row.",
+"The switch sets whether the tool runs <b>by default</b>, saved for this computer. The New benchmark page can still change it for a single run."
+],
+"tips": [
+"Tools are ranked only against tools on the same track.",
+"A tool that searches a plasmid database is checked for truth leakage: whether the test genomes are already in its database.",
+"To benchmark a tool that is not listed, use <a href=\"#addtool\">Add your own tool</a>."
+],
+"cli": [
+"plasbench install-tools list",
+"plasbench install-tools NAME",
+"plasbench tools list"
+]
+},
+"settings": {
+"title": "Settings",
+"what": "Every setting PlasBench reads, with its default and an explanation. Your changes apply to this computer only.",
+"steps": [
+"Search for a setting by name or by what it does (for example <i>threads</i>, <i>memory</i>, <i>timeout</i>).",
+"Type a new value, then press <b>Save</b>. It is written to <code>config/local.env</code>, which upgrades keep.",
+"Clear a value and save to return to the default."
+],
+"tips": [
+"A value given for one run (New benchmark, or a command option) overrides these settings for that run only.",
+"The NCBI email and API key are kept here too. They are never sent anywhere except NCBI."
+],
+"cli": [
+"edit config/local.env",
+"plasbench run --threads 8"
+]
+},
+"workspace": {
+"title": "Workspace & studies",
+"what": "Where your benchmarks are kept. Every benchmark is a <b>study</b>: one folder with its results, report, logs and a record of how it was run.",
+"steps": [
+"The <b>workspace</b> is the folder holding all studies. By default it is <code>PlasBench/studies</code>. To use another, type or browse to a folder and press <b>Check</b>. It reports free space, drive type, and cloud-sync or long-path problems.",
+"Press <b>Use this folder</b> to switch. Existing studies are not moved; switch back any time.",
+"The <b>Studies</b> list shows every study: open its report or its folder.",
+"<b>New study</b> makes an empty study folder. New benchmark also names one for you, after the cohort or sample sheet."
+],
+"tips": [
+"Choose a local disk with plenty of space: a cohort benchmark can use tens of GB. Avoid OneDrive or Dropbox folders, which slow runs and can corrupt files that are still being written.",
+"In WSL, keep the workspace under /home rather than /mnt/c: it is much faster.",
+"Downloads, tool environments and databases are shared by all studies; they are not copied into each one."
+],
+"cli": [
+"plasbench run --study cohort1 ...",
+"PLASBENCH_WORKSPACE=/data/plasbench plasbench run ..."
+]
+},
+"wizard": {
+"title": "New benchmark",
+"what": "Starts a benchmark step by step and shows the exact command before it runs.",
+"steps": [
+"<b>Isolates</b>: choose the offline demo, a bundled cohort (see <a href=\"#cohorts\">Cohorts</a> for what is in each), your own sample sheet, or the metagenomic track.",
+"<b>Tools</b>: tick the built-in tools to run, and your own tools under <i>Your tools</i>.",
+"<b>Resources</b>: threads, memory and the assembler. The defaults suit a typical workstation.",
+"<b>Options</b>: the study folder name, outputs, which stages to run, and report options.",
+"<b>Review</b>: read the command. Press <b>Start</b>, then follow it in the console. The results appear on <a href=\"#runs\">Runs &amp; reports</a>."
+],
+"tips": [
+"A cohort run downloads reads and references first. The review step shows the estimated download size.",
+"You can close a page while it runs. The job keeps going until it finishes or you cancel it, and Quit asks first.",
+"Rerunning the same study reuses finished steps, so an interrupted run continues where it stopped."
+],
+"cli": [
+"plasbench run --cohort public-v1",
+"plasbench run --samples my_samples.tsv --tool my_tool"
+]
+},
+"isolates": {
+"title": "Your own isolates",
+"what": "Adds an isolate you sequenced, so it can be benchmarked like the public ones.",
+"steps": [
+"Give it a sample id (letters, digits, _ and -).",
+"Choose its paired Illumina reads (<code>_1</code> and <code>_2</code> FASTQ, gzipped is fine).",
+"Choose its complete reference assembly: chromosome and plasmids as separate records, ideally long-read first. This is the truth the tools are judged against.",
+"Optionally add the NCBI sequence report, to label which records are plasmids.",
+"Press <b>Add</b>. PlasBench copies or links the files, drafts <code>truth.tsv</code>, and adds a row to your sample sheet.",
+"<b>Check the drafted truth.tsv</b>: every PLASMID or CHROMOSOME label is what the tools will be scored against. Then benchmark the sheet from <a href=\"#wizard\">New benchmark</a>."
+],
+"tips": [
+"A reference assembled from the same short reads you benchmark is circular truth. Prefer long-read or hybrid references made independently.",
+"Mix your isolates with a public cohort by adding both sheets in New benchmark."
+],
+"cli": [
+"plasbench init-local --sample S1 --reads-1 R1.fq.gz --reads-2 R2.fq.gz --reference ref.fasta"
+]
+},
+"cohorts": {
+"title": "Cohorts",
+"what": "The ready-made study sets that ship with PlasBench, and what is in each.",
+"steps": [
+"Press <b>Details</b> on a cohort to see what is in it. You get its description, the number of isolates and species, plasmids in the truth, read depth, BioProjects, and the download size. Breakdowns show organism, truth tier, how the truth was assembled, origin and country, and a table lists every sample.",
+"Filter the sample table by organism, country, accession or study. Accessions link to their NCBI pages. <b>all columns</b> shows every field, including host, isolation source, collection date and how the reference was sequenced.",
+"<b>Validate</b> checks the sheet: columns, accessions, duplicates, and the lock, if there is one.",
+"<b>Benchmark</b> opens New benchmark with this cohort chosen."
+],
+"tips": [
+"<b>Tier A</b>: the isolate's truth comes from a reviewed publication. <b>Tier B</b>: every NCBI evidence check passes, but no publication was reviewed.",
+"<b>Locked</b> means the sheet was verified against NCBI and its checksum recorded; <i>matches the sheet</i> means it has not changed since.",
+"Start with <b>public-v1</b> (10 isolates, about 4 GB to download), then move to larger cohorts.",
+"Metagenomic sheets describe communities, not isolates; they run on the metagenomic track."
+],
+"cli": [
+"plasbench validate-cohort --samples cohorts/public-v1.tsv",
+"plasbench run --cohort public-v1"
+]
+},
+"runs": {
+"title": "Runs & reports",
+"what": "Every finished or partial benchmark, with its report.",
+"steps": [
+"Each card is one results folder (a study), newest first, with the leading tool of each task.",
+"<b>Open report</b> opens the interactive HTML report in the window.",
+"<b>Export PDF</b> makes a printable copy, and <b>Rebuild</b> remakes the report after you change settings or add a tool's results.",
+"<b>Add a results folder</b> lists results kept somewhere else, for example copied from a colleague or a server. <b>Refresh</b> looks for new ones."
+],
+"tips": [
+"The report's headline is the recommendation; the methods, statistics and per-sample details follow below it.",
+"Rebuilding a report never reruns the tools; it rescores what is on disk."
+],
+"cli": [
+"plasbench report --study cohort1",
+"plasbench report-pdf --results-dir PATH"
+]
+},
+"jobs": {
+"title": "Jobs",
+"what": "Every command started from this window, with how it ended and its full log.",
+"steps": [
+"Each row shows the command, when it started, how long it took and how it ended: done, failed, cancelled or interrupted.",
+"<b>Log</b> shows the job's full output in the console's Job output tab.",
+"<b>Cancel</b> stops a running job; <b>Run again</b> repeats a finished one with the same options.",
+"The trash button removes a finished job from the list, together with its log."
+],
+"tips": [
+"Jobs keep running while you use other pages. <b>Quit</b> asks before stopping a running job.",
+"A job that was running when PlasBench stopped is marked <i>interrupted</i>. Rerun it; finished steps are reused.",
+"The console's <b>Session log</b> tab lists the same events in order, and <b>Save as script</b> turns them into a bash script."
+],
+"cli": []
+},
+"git": {
+"title": "Version control",
+"what": "Git without the command line, for your PlasBench folder or your workspace. Keep a history of your settings, sample sheets and own tools, and share them.",
+"steps": [
+"Choose the repository at the top: the PlasBench folder, or the workspace. If it is not a repository yet, press <b>Initialise repository</b>. It adds the safety .gitignore block first.",
+"The first time, enter your name and email under identity and press Save. Commits need them.",
+"The changes list shows modified files. Click one to see its diff. Press <b>Stage all</b>, or select files and press <b>Stage selected</b>.",
+"Write a short message (what changed, and why) and press <b>Commit</b>. The commit is checked first for reads, run outputs, secrets (such as the NCBI API key) and files too large for GitHub.",
+"Remote: paste your GitHub or GitLab address (without a password in it) and press Save. <b>Sign in to GitHub</b> if asked. Then <b>Push</b>; <b>Fetch</b> and <b>Pull</b> get others' changes. Network steps run in the console.",
+"The history shows past commits, which you can click to view. Under branches, switch to a branch, or type a name and press <b>Create and switch</b>."
+],
+"tips": [
+"A managed .gitignore block keeps studies, results, downloads, reads and credentials out of the repository.",
+"Nothing is ever force-pushed. Sign-in uses your normal Git credentials (credential manager or SSH key)."
+],
+"cli": [
+"git status",
+"git commit",
+"git push"
+]
+},
+"commands": {
+"title": "All commands",
+"what": "Every <code>plasbench</code> command and option as a form. It is generated from the command line itself, so nothing is missing.",
+"steps": [
+"Pick a command on the left; search with <kbd>/</kbd>.",
+"Fill in only what you need. Every option shows its help text, and anything left empty keeps its default.",
+"Read the command line shown below the form. The red note explains anything the command would reject.",
+"Press <b>Run</b>. It runs in the console, exactly as if you had typed it."
+],
+"tips": [
+"Copy the command line into a script or a colleague's terminal; it does the same thing there.",
+"The Terminal tab of the console accepts the same commands, typed by hand."
+],
+"cli": [
+"plasbench --help",
+"plasbench COMMAND --help"
+]
+},
+"help": {
+"title": "Guides",
+"what": "The README and every guide shipped with this installation, readable here.",
+"steps": [
+"Pick a guide on the left. <b>README</b> covers everything end to end; the others go deeper into one subject.",
+"Use the search box at the top of the window to find a page, a setting or a command."
+],
+"tips": [
+"Useful guides: <b>USER_GUIDE</b> (step by step), <b>ADDING_TOOLS</b> (your own tool), <b>COHORTS</b> (the study sets), <b>METHODS</b> (how scoring works), <b>SCIENTIFIC_GUIDE</b> (interpreting results)."
+],
+"cli": []
+},
+"addtool": {
+"title": "Add your own tool",
+"what": "Benchmark a tool PlasBench does not ship: describe it once, and it is installed, run, scored and reported like a built-in tool.",
+"steps": [
+"Press <b>How it works</b> for the full guide: the five sections of the form, the placeholders, the output formats, and a worked example (MOB-recon) you can load into the form."
+],
+"tips": [],
+"cli": [
+"plasbench tools new NAME",
+"plasbench tools validate",
+"plasbench install-tools NAME"
+],
+"more": "uthelp"
+}
+};
+function curView() { const v = (location.hash.slice(1) || "home").split("/")[0]; return VIEWS.includes(v) ? v : "home"; }
+function openPageHelp(view) {
+  view = view || curView(); const h = PAGE_HELP[view]; if (!h) return;
+  $("#ph_t").textContent = "Help: " + h.title;
+  $("#ph_b").innerHTML = `<p class="lead">${h.what}</p>
+    <h4>How to use this page</h4><ol class="flow">${h.steps.map(s => `<li>${s}</li>`).join("")}</ol>
+    ${h.more === "uthelp" ? `<p><button class="btn" onclick="$('#pghelp').close();openUtHelp()">${icon("help")}Open the full guide with an example</button></p>` : ""}
+    ${h.tips.length ? `<h4>Good to know</h4><ul class="flow">${h.tips.map(s => `<li>${s}</li>`).join("")}</ul>` : ""}
+    ${h.cli.length ? `<h4>From the command line (or the console's Terminal tab)</h4>${h.cli.map(c => `<div class="cmdline small" style="margin:4px 0"><span class="p">$</span><code>${esc(c)}</code></div>`).join("")}` : ""}
+    <p class="mut small" style="margin-top:14px">Press <kbd>F1</kbd> on any page for its help. The full documentation is under <a href="#help" data-close>Guides</a>.</p>`;
+  $("#pghelp").showModal(); $("#ph_b").scrollTop = 0;
+}
+// a Help button on every page header
+for (const v of VIEWS) {
+  const head = $(`#v_${v} .vhead`); if (!head || head.querySelector("[data-pghelp]")) continue;
+  let row = [...head.children].find(c => c.classList.contains("row"));
+  if (!row) { row = document.createElement("div"); row.className = "row"; head.appendChild(row); }
+  row.insertAdjacentHTML("afterbegin", `<button class="btn ghost sm" data-pghelp="${v}" title="What this page is for and how to use it (F1)">${icon("help")}Help</button>`);
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-pghelp]"); if (b) openPageHelp(b.dataset.pghelp); });
+$("#helpbtn").onclick = () => openPageHelp();
+addEventListener("keydown", e => { if (e.key === "F1") { e.preventDefault(); openPageHelp(); } });
+
+/* help: how the form works, with MOB-recon as a worked example */
+const UT_EXAMPLE = "[tool]\nname = my_mob_recon\ndisplay_name = MOB-recon (my copy)\ntask = reconstruction\nanalysis_track = short_read\ndescription = MOB-suite's plasmid reconstruction, added as a user tool\ncitation = Robertson & Nash (2018) Microbial Genomics. doi:10.1099/mgen.0.000206\nversion_command = mob_recon --version\n\n[install]\nmethod = conda\npackages = mob_suite=3.1.9 python=3.10 pandas<=1.5.3 numpy<1.23.5\nchannels = conda-forge, bioconda\nverify_command = mob_recon --help\n\n[database]\nuses_reference_database = yes\ndatabase = MOB-suite plasmid database\n\n[run]\nmode = command\ncommand = mob_recon --infile {contigs} --outdir {outdir}/mob --num_threads {threads} --force\nrequires = contigs\n\n[output]\nformat = fasta_dir\npath = mob\nfasta_glob = plasmid_*.fasta\n";
+function openUtHelp() { $("#uthelp").showModal(); $("#uthelp .bd").scrollTop = 0; }
+$("#ut_help").onclick = openUtHelp;
+document.addEventListener("click", e => { if (e.target.closest("[data-uthelp]")) openUtHelp(); });
+$("#uthelp .bd").onclick = e => { const a = e.target.closest('a[href^="#uh_"]'); if (!a) return; e.preventDefault();
+  $("#uthelp " + a.getAttribute("href")).scrollIntoView({behavior: "smooth", block: "start"}); };
+$("#uh_load").onclick = () => {
+  const cur = (UT.tool && UT.tool.name) || "";
+  if (cur && cur !== "my_mob_recon" && !confirm(`Replace "${cur}" in the form with the MOB-recon example? (Nothing is saved until you press Save.)`)) return;
+  $("#uthelp").close(); $("#ut_load").value = ""; $("#ut_where").textContent = "";
+  $("#ut_text").value = UT_EXAMPLE; utChanged(true); scrollTo({top: 0, behavior: "smooth"});
+  toast("Example loaded: check the form, then Save & install", "ok");
+};
 $("#ut_copy").onclick = () => { navigator.clipboard.writeText($("#ut_text").value); toast("Manifest copied"); };
 $("#ut_dl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([$("#ut_text").value], {type:"text/plain"}));
   a.download = "plasbench-tool.ini"; a.click(); };
@@ -1519,10 +2015,84 @@ async function loadIsolates() {
 async function loadCohorts() {
   const cs = await getCohorts();
   $("#s_cohorts").textContent = `${cs.filter(c => !c.metagenomic).length} isolate · ${cs.filter(c => c.metagenomic).length} metagenomic`;
-  $("#cohtb").innerHTML = cs.map(c => `<tr><td><b>${esc(c.name)}</b><div class="mut small">${esc(c.path)}</div></td><td>${c.rows}</td>
+  $("#cohtb").innerHTML = cs.map(c => `<tr data-coh="${esc(c.name)}"${S.coh === c.name ? ' class="sel"' : ""}><td><a href="javascript:void 0" onclick="cohortInfo('${esc(c.name)}')"><b>${esc(c.name)}</b></a><div class="mut small">${esc(c.path)}</div></td><td>${c.rows}</td>
     <td>${c.locked ? `<span class="tag ok">${icon("check")}locked</span>` : `<span class="tag">unlocked</span>`}</td><td>${c.metagenomic ? "metagenomic" : "isolate"}</td>
-    <td style="text-align:right;white-space:nowrap">${c.metagenomic ? "" : `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", c.path])}' data-label="Validate ${esc(c.name)}">Validate</button>
+    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="cohortInfo('${esc(c.name)}')">${icon("info")}Details</button> ${c.metagenomic ? "" : `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", c.path])}' data-label="Validate ${esc(c.name)}">Validate</button>
       <button class="btn sec sm" onclick="benchCohort('${esc(c.name)}')">${icon("play")}Benchmark</button>`}</td></tr>`).join("");
+}
+/* cohort details: what is in it, from the sheet, its lock and cohorts/README.md (nothing is downloaded) */
+const NCBI = [[/^GC[AF]_\d+\.\d+$/, "https://www.ncbi.nlm.nih.gov/datasets/genome/"], [/^[SED]RR\d+$/, "https://www.ncbi.nlm.nih.gov/sra/"],
+              [/^PRJ[A-Z]+\d+$/, "https://www.ncbi.nlm.nih.gov/bioproject/"], [/^SAM[A-Z]+\d+$/, "https://www.ncbi.nlm.nih.gov/biosample/"]];
+const ncbiLink = v => { const m = NCBI.find(([re]) => re.test(v || "")); return m ? `<a href="${m[1]}${encodeURIComponent(v)}" target="_blank" rel="noopener noreferrer">${esc(v)}</a>` : esc(v); };
+const COH_MAIN = ["sample_id", "organism", "truth_quality_tier", "truth_technology", "sample_origin", "country", "read_depth_x", "assembly_plasmid_count",
+                  "read_gbases", "reference_sequencing", "assembly_accession", "sra_run", "bioproject", "source_study",
+                  "community_id", "information_regime", "truth_status", "source_environment", "source_country", "dataset_class", "input_read_technology"];
+const COH_LABEL = {sample_id: "Sample", organism: "Organism", truth_quality_tier: "Tier", truth_technology: "Truth from", sample_origin: "Origin",
+  country: "Country", read_depth_x: "Depth (x)", assembly_plasmid_count: "Plasmids", read_gbases: "Reads (Gbp)", reference_sequencing: "Reference sequenced with",
+  assembly_accession: "Reference assembly", sra_run: "Illumina run", bioproject: "BioProject", source_study: "Study", biosample: "BioSample",
+  community_id: "Community", information_regime: "Regime", truth_status: "Truth", source_environment: "Environment", source_country: "Country",
+  dataset_class: "Dataset", input_read_technology: "Reads", host: "Host", isolation_source: "Isolation source", collection_date: "Collected",
+  assembly_method: "Reference assembly method", truth_assembly_strategy: "Truth assembly strategy", truth_polish_reads: "Polishing reads"};
+const COH_WORDS = {truth_quality_tier: {A: "A · reviewed publication", B: "B · NCBI evidence only"}};
+function hbars(title, list) {
+  if (!list || !list.length) return "";
+  const max = Math.max(...list.map(x => x.n));
+  return `<div><h6>${esc(title)}</h6>${list.map(x => `<div class="hb"><span title="${esc(x.value)}">${esc(x.value)}</span><i style="width:${Math.round(90 * x.n / max)}px"></i><span class="n">${x.n}</span></div>`).join("")}</div>`;
+}
+async function cohortInfo(name) {
+  S.coh = name; $$("#cohtb tr").forEach(tr => tr.classList.toggle("sel", tr.dataset.coh === name));
+  const box = $("#cohdetail"); box.hidden = false; box.innerHTML = `<div class="bd mut">Reading ${esc(name)}…</div>`;
+  let d; try { d = await api("cohorts/info?name=" + encodeURIComponent(name)); } catch (e) { box.innerHTML = `<div class="bd"><div class="note bad">${esc(e.message)}</div></div>`; return; }
+  S.cohInfo = d; const s = d.summary, L = d.lock;
+  const lockTag = !L.present ? `<span class="tag">no lock</span>` : L.matches_sheet ? `<span class="tag ok">${icon("check")}locked · matches the sheet</span>`
+    : `<span class="tag warn">${icon("alert")}lock is out of date</span>`;
+  const kindWord = {isolate: "isolate cohort", metagenomic: "metagenomic", example: "schema example"}[d.kind];
+  let stats = "";
+  if (d.kind === "isolate") {
+    const dep = s.depth ? `${s.depth.median.toLocaleString()}×` : "–";
+    stats = `<div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <div><label>Isolates</label><b>${s.isolates}</b><span>${s.species} species</span></div>
+      <div><label>Plasmids in the truth</label><b>${s.plasmids_total ?? "–"}</b><span>${s.plasmids_recorded ? `recorded for ${s.plasmids_recorded} of ${s.isolates}` : "counted when the truth is built"}</span></div>
+      <div><label>Median read depth</label><b>${dep}</b><span>${s.depth ? `${s.depth.min}–${s.depth.max}×, recorded for ${s.depth.n}` : "measured in stage 2"}</span></div>
+      <div><label>Independent sources</label><b>${s.bioprojects}</b><span>BioProjects · ${s.studies} reviewed studies</span></div>
+      <div><label>Illumina reads</label><b>${s.read_gbases_total != null ? s.read_gbases_total + " Gbp" : "–"}</b><span>${s.download_estimate_gb != null ? `about ${s.download_estimate_gb} GB to download` : "no lock: size unknown"}</span></div></div>`;
+  } else stats = `<div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div><label>Samples</label><b>${s.samples}</b><span>${s.communities} communities</span></div></div>`;
+  const bars = d.kind === "isolate"
+    ? [hbars("Organism", s.organism), hbars("Truth quality tier", (s.truth_quality_tier || []).map(x => ({...x, value: COH_WORDS.truth_quality_tier[x.value] || x.value}))),
+       hbars("Truth assembled from", s.truth_technology), hbars("Truth assembly strategy", s.truth_assembly_strategy), hbars("Sample origin", s.sample_origin),
+       hbars("Country", s.country), hbars("Plasmids per isolate", s.plasmids_per_isolate)].join("")
+    : ["information_regime", "truth_status", "source_environment", "source_country", "dataset_class", "input_read_technology", "comparability_group"]
+        .map(k => hbars(COH_LABEL[k] || k.replace(/_/g, " "), s[k])).join("");
+  const desc = (d.readme ? md(d.readme.replace(/^##[^\n]*\n/, "")) : "") + (d.comments.length ? `<p class="mut small">${d.comments.map(esc).join(" ")}</p>` : "");
+  box.innerHTML = `<div class="hd"><svg class="ico"><use href="#i-users"/></svg><h3>${esc(d.name)}</h3><span class="tag">${kindWord}</span> ${lockTag}<span class="grow"></span>
+     ${d.kind === "isolate" ? `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", d.path])}' data-label="Validate ${esc(d.name)}">Validate</button>
+     <button class="btn sm" onclick="benchCohort('${esc(d.name)}')">${icon("play")}Benchmark</button>` : ""}
+     <button class="btn ghost icon sm" onclick="$('#cohdetail').hidden=true;S.coh='';$$('#cohtb tr').forEach(t=>t.classList.remove('sel'))" aria-label="Close details">${icon("x")}</button></div>
+   <div class="bd stack" style="gap:14px">
+    ${desc ? `<div class="desc md">${desc}</div>` : ""}
+    ${stats}
+    <div class="cohbars">${bars}</div>
+    ${L.present ? `<p class="mut small" style="margin:0">From the sheet and its verification lock (<code>${esc(L.path)}</code>): country, host, isolation source, collection date, how the reference was sequenced and assembled, and the Illumina run's size come from NCBI as recorded when the cohort was locked. The download estimate uses the same factors as <code>plasbench run</code>'s pre-download check.</p>` : ""}
+    <div>
+     <div class="row" style="margin-bottom:6px"><input type="search" id="coh_q" placeholder="Filter samples: organism, country, accession, study…" aria-label="Filter samples" style="max-width:360px">
+      <label class="small row" style="gap:4px"><input type="checkbox" id="coh_all"> all columns</label><span class="grow"></span><span class="mut small" id="coh_n"></span>
+      <button class="btn ghost sm" id="coh_copy">${icon("copy")}Copy as TSV</button></div>
+     <div class="tablewrap" style="max-height:440px;border:1px solid var(--line)"><table class="data" id="coh_rows"></table></div>
+     ${d.truncated ? `<p class="mut small">Showing the first ${d.rows.length} rows.</p>` : ""}
+    </div></div>`;
+  const draw = () => {
+    const all = $("#coh_all").checked, q = $("#coh_q").value.trim().toLowerCase();
+    const cols = all ? d.columns : COH_MAIN.filter(c => d.columns.includes(c));
+    const rows = d.rows.filter(r => !q || Object.values(r).some(v => String(v ?? "").toLowerCase().includes(q)));
+    $("#coh_n").textContent = `${rows.length} of ${d.rows.length} ${d.kind === "isolate" ? "isolates" : "samples"}`;
+    $("#coh_rows").innerHTML = `<thead><tr>${cols.map(c => `<th title="${esc(c)}">${esc(COH_LABEL[c] || c)}</th>`).join("")}</tr></thead><tbody>` +
+      rows.map(r => `<tr>${cols.map(c => { const v = r[c] ?? ""; const long = String(v).length > 40;
+        return `<td${long ? ' class="wrap"' : ""}>${c === "organism" ? `<i>${esc(v)}</i>` : ncbiLink(String(v))}</td>`; }).join("")}</tr>`).join("") + "</tbody>";
+  };
+  $("#coh_q").oninput = draw; $("#coh_all").onchange = draw; draw();
+  $("#coh_copy").onclick = () => { const cols = $("#coh_all").checked ? d.columns : COH_MAIN.filter(c => d.columns.includes(c));
+    navigator.clipboard.writeText([cols.join("\t"), ...d.rows.map(r => cols.map(c => r[c] ?? "").join("\t"))].join("\n")); toast("Copied as TSV"); };
+  box.scrollIntoView({behavior: "smooth", block: "start"});
 }
 /* WORKSPACE ------------------------------------------------------------------------------------------ */
 const fmtGB = b => b == null ? "unknown" : `${(b / 2 ** 30).toLocaleString(undefined, {maximumFractionDigits: 0})} GB`;
