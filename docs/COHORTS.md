@@ -286,6 +286,10 @@ them blank to let PlasBench derive them; set them to override a derived value.
 |---|---|---|
 | `truth_assembly_strategy` | `long_read_only`, `long_read_first_hybrid`, `short_read_first_hybrid`, `unknown` | How the truth's structure was resolved. Short-read-first and unknown truth is reference tier 3 (provisional, outside the headline). Derived from NCBI's assembly method when blank. |
 | `truth_polish_reads` | `none`, `independent`, `same_as_benchmark`, `unknown` | Whether the truth was polished with the same Illumina run the tools are benchmarked on. `same_as_benchmark` keeps the truth for labelling but drops identity criteria. |
+| `truth_circularity_evidence` | `independent`, `reported`, `uncertain`, `unknown` | How well the truth's circular plasmids are supported (evidence record). Blank = not recorded. |
+| `truth_read_support` | `supported`, `partial`, `none`, `unknown` | Whether long reads support each truth plasmid. Blank: inferred from the long-read depth in `truth_labels.tsv` when present. `none` caps a reference at Tier 2. |
+| `truth_structural_integrity` | `resolved`, `unresolved_repeats`, `unknown` | Whether repeats are resolved in the truth. `unresolved_repeats` caps a reference at Tier 2. |
+| `truth_independent_validation` | `none`, `long_read_reassembly`, `pcr`, `hic`, `other`, `unknown` | Independent evidence beyond the assembly. Recorded, never demotes. |
 | `clonal_group` | free text, e.g. an ST or cgMLST cluster | Isolates sharing a value count as one independent unit in confidence intervals and in each species' minimum. Derived from whole-genome Mash distance when blank. |
 
 `validate_cohort.py` rejects values outside these vocabularies and prints advisory
