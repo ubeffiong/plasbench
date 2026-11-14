@@ -2,6 +2,8 @@ data/
 # ...but not the package's own data folder: it holds the plasbench ui page (plasbench/data/ui.html).
 !plasbench/data/
 results/
+# study folders (plasbench run --study; the window's Workspace page): user data, never committed
+studies/
 results_demo/
 results_demo_metagenomics/
 logs/

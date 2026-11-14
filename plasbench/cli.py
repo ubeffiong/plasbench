@@ -597,7 +597,13 @@ def build_parser():
                             help="Write the exact resolved commands to this file instead of running them, "
                                  "so you can review or edit them before running it yourself with bash.")
         inputs.add_argument("-d", "--data-dir", type=Path, help="Directory for downloaded references, reads, and assemblies.")
-        inputs.add_argument("-o", "--results-dir", type=Path, help="Directory for predictions, scores, and reports.")
+        inputs.add_argument("-o", "--results-dir", type=Path,
+                            help="Directory for predictions, scores, and reports (instead of a study folder).")
+        inputs.add_argument("--study", metavar="NAME",
+                            help="Keep this run in its own study folder, <workspace>/NAME/ (results, logs, tmp and a "
+                                 "study.json record). A run names its study after the cohort or sample sheet when this "
+                                 "is not given; `report --study NAME` rebuilds that study's report. The workspace is "
+                                 "PLASBENCH_WORKSPACE, default <PlasBench folder>/studies.")
         inputs.add_argument("--open-report", action="store_true",
                             help="Open benchmark.report.html after a successful report-producing run; never prompts.")
         inputs.add_argument("--no-report-prompt", action="store_true",
@@ -1004,7 +1010,19 @@ def main(argv=None):
                 args.samples = cohort_path
         if not args.samples:
             parser.error("plasbench run --mode meta requires --samples or --cohort bmock12")
-        meta_results = args.results_dir or (root / "results_meta")
+        if args.study and args.results_dir:
+            parser.error("give --study or --results-dir, not both")
+        if args.results_dir:
+            meta_results = args.results_dir
+        else:
+            from . import studies
+            try:
+                study_name = args.study or studies.default_name(args.cohort, args.samples, meta=True)
+                folder = studies.prepare(root, study_name, args.samples, args.cohort, argv or sys.argv[1:])
+            except ValueError as exc:
+                parser.error(str(exc))
+            meta_results = folder / "results"
+            print(f"[plasbench] Study folder: {folder}")
         command = [sys.executable, "python/metagenomics.py", "score", "--manifest", str(args.samples),
                    "--predictions-dir", str(args.predictions_dir), "--out-dir", str(meta_results)]
         if args.write_script:
@@ -1024,6 +1042,24 @@ def main(argv=None):
                     f"available: {', '.join(available) if available else 'none'}"
                 )
             args.samples = cohort_path
+        if args.study and args.results_dir:
+            parser.error("give --study or --results-dir, not both")
+        # Every run keeps what it produces in its own study folder (plasbench/studies.py); downloads stay shared.
+        # `report` uses a study only when named, so `report --results-dir DIR` and the old layout keep working.
+        study_tmp = None
+        if not args.results_dir and (args.study or args.command == "run"):
+            from . import studies
+            try:
+                study_name = args.study or studies.default_name(args.cohort, args.samples)
+                folder = studies.prepare(root, study_name, args.samples if args.command == "run" else None,
+                                         args.cohort, argv or sys.argv[1:])
+            except ValueError as exc:
+                parser.error(str(exc))
+            args.results_dir = folder / "results"
+            if not args.log_dir:
+                args.log_dir = folder / "logs"
+            study_tmp = (folder / "tmp").resolve().as_posix()
+            print(f"[plasbench] Study folder: {folder}")
         env = {}
         path_options = {
             "samples": "SAMPLE_SHEET", "data_dir": "DATA_DIR", "results_dir": "RESULTS_DIR",
@@ -1040,6 +1076,8 @@ def main(argv=None):
                 # breaks the moment scripts/*.sh use it as a path. A no-op on
                 # POSIX hosts, where paths already use forward slashes.
                 env[variable] = value.resolve().as_posix()
+        if study_tmp:
+            env["TMP_DIR"] = study_tmp
         if args.local_inputs:
             env["LOCAL_INPUTS_ONLY"] = "1"
         if args.long_reads_file:

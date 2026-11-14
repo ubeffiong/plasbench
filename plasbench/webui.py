@@ -299,6 +299,8 @@ class Project:
         candidates = {self.root / "results", self.root / "results_demo"}
         candidates.update(p for p in self.root.glob("results*") if p.is_dir())
         candidates.update(Path(e) for e in extra)
+        from . import studies
+        candidates.update(Path(st["results"]) for st in studies.list_studies(self.root))
         rows = []
         for folder in sorted(candidates):
             if not folder.is_dir():
@@ -326,7 +328,10 @@ class Project:
                 samples = len({r.get("sample") for r in rows_})
                 failed = sum(1 for r in rows_ if r.get("status") in ("failed", "infrastructure_failure"))
             stamp = max((p.stat().st_mtime for p in (report, leaderboard) if p.exists()), default=0)
-            rows.append({"path": str(folder), "name": folder.name, "report": report.is_file(),
+            # a study's results live in <study>/results: show the study's name
+            is_study = folder.name == "results" and (folder.parent / "study.json").is_file()
+            rows.append({"path": str(folder), "name": folder.parent.name if is_study else folder.name, "study": is_study,
+                         "study_dir": str(folder.parent) if is_study else None, "report": report.is_file(),
                          "pdf": (folder / "benchmark.report.pdf").is_file(),
                          "summary_pdf": (folder / "benchmark.report.summary.pdf").is_file(),
                          "modified": stamp, "tools": len(tools - {None}), "samples": samples, "failed": failed,
