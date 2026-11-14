@@ -654,8 +654,10 @@ benchmark reads, cohort tier A, evidence-checked labels. Tier 2 = long-read-firs
 failing a Tier-1 condition. Tier 3 = short-read-first, unknown provenance or cohort
 tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2);
 `benchmark.reference_tiers.tsv` and the report's tier-sensitivity chart show results by
-tier. When no sample reaches tier 2, the headline falls back to all samples and says
-so in `benchmark.headline_design.tsv`.
+tier. When no sample reaches tier 2, the **primary analysis is unavailable**: the same numbers are
+computed on all samples but are labelled provisional (`primary_status` and `population` in the leaderboard,
+`primary_status` in `benchmark.headline_design.tsv`, a banner in the report) and are not the headline.
+`ALLOW_PRIMARY_FALLBACK=1` keeps them as the headline with the warning.
 
 **Evidence-based labels** (`python/label_truth_evidence.py`, stage 2). Source labels
 are confirmed with evidence, never assigned by size:
