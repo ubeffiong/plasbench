@@ -308,6 +308,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
  <defs>
   <symbol id="i-plasmid" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 7.4 4.3" stroke-width="3.4"/><path d="M5.2 17.2a8.5 8.5 0 0 0 4.6 3.1" stroke-width="3.4"/><path d="M12 1.8v3.4M22.2 12h-3.4"/></symbol>
+  <symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3.6-11 7"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></symbol>
   <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 12.6a6 6 0 0 1-7.8 1.6l-7 7a2.1 2.1 0 0 1-3-3l7-7A6 6 0 0 1 11.4 3l1.3 1.3a4 4 0 0 0 2 2z"/></symbol>
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></symbol>
@@ -376,6 +377,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <button class="nav" data-view="addtool"><svg class="ico"><use href="#i-plus"/></svg><span class="t"><b>Add your own tool</b><small id="s_addtool">Manifest builder</small></span></button>
   <button class="nav" data-view="settings"><svg class="ico"><use href="#i-sliders"/></svg><span class="t"><b>Settings</b><small id="s_settings">Paths, threads, defaults</small></span></button>
   <h6>Benchmark</h6>
+  <button class="nav" data-view="workspace"><svg class="ico"><use href="#i-folder"/></svg><span class="t"><b>Workspace &amp; studies</b><small id="s_workspace">Where runs are kept</small></span><span class="badge warn" id="b_workspace" hidden>!</span></button>
   <button class="nav" data-view="wizard"><svg class="ico"><use href="#i-rocket"/></svg><span class="t"><b>New benchmark</b><small>Guided, step by step</small></span></button>
   <button class="nav" data-view="isolates"><svg class="ico"><use href="#i-flask"/></svg><span class="t"><b>Your own isolates</b><small>Add FASTQ + reference</small></span></button>
   <button class="nav" data-view="cohorts"><svg class="ico"><use href="#i-users"/></svg><span class="t"><b>Cohorts</b><small id="s_cohorts">Bundled study sets</small></span></button>
@@ -383,6 +385,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <button class="nav" data-view="runs"><svg class="ico"><use href="#i-chart"/></svg><span class="t"><b>Runs &amp; reports</b><small id="s_runs">Finding results…</small></span></button>
   <button class="nav" data-view="jobs"><svg class="ico"><use href="#i-list"/></svg><span class="t"><b>Jobs</b><small id="s_jobs">Nothing running</small></span><span class="badge run" id="b_jobs" hidden></span></button>
   <h6>Advanced</h6>
+  <button class="nav" data-view="git"><svg class="ico"><use href="#i-git"/></svg><span class="t"><b>Version control</b><small id="s_git">Git for your work</small></span><span class="badge" id="b_git" hidden></span></button>
   <button class="nav" data-view="commands"><svg class="ico"><use href="#i-cmd"/></svg><span class="t"><b>All commands</b><small id="s_commands">Every CLI command as a form</small></span></button>
   <h6>Help</h6>
   <button class="nav" data-view="help"><svg class="ico"><use href="#i-book"/></svg><span class="t"><b>Guides</b><small>README and docs</small></span></button>
@@ -494,6 +497,50 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
    <div class="wsteps" id="wsteps"></div>
    <div id="wbody"></div>
    <div class="row" style="margin-top:16px;justify-content:space-between"><button class="btn sec" id="wprev">Back</button><div class="row"><span class="mut small" id="wvalid"></span><button class="btn" id="wnext">Next</button></div></div>
+  </section>
+
+  <!-- WORKSPACE ----------------------------------------------------------------------------------- -->
+  <section class="view" id="v_workspace" hidden>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Workspace &amp; studies</h1>
+    <p>Every benchmark is a <b>study</b> with its own folder: its results, report, logs and a record of how it was run. The
+    <b>workspace</b> is the folder that holds all studies. Downloads, tool environments and databases are shared between
+    studies, so a new study never downloads the same reads again.</p></div>
+    <div class="row"><button class="btn sec" id="ws_ref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button></div></div>
+   <div class="split">
+    <div class="stack">
+     <div class="card"><div class="hd"><h3>Current workspace</h3><span class="sub" id="ws_src"></span></div><div class="bd" id="ws_cur"><span class="mut">Loading…</span></div>
+      <div class="ft"><button class="btn sec" id="ws_reveal"><svg class="ico sm"><use href="#i-folder"/></svg>Open folder</button></div></div>
+     <div class="card"><div class="hd"><h3>Studies</h3><span class="sub" id="ws_n"></span></div>
+      <div class="tablewrap"><table class="data"><thead><tr><th>Study</th><th>Isolates</th><th>Runs</th><th>Last change</th><th></th></tr></thead><tbody id="ws_tb"></tbody></table></div></div>
+    </div>
+    <div class="stack">
+     <div class="card"><div class="hd"><h3>Change the workspace</h3></div><div class="bd">
+      <p class="mut small" style="margin-top:0">Choose a folder with plenty of free space: a public cohort needs hundreds of GB.
+       A local disk is fastest; an external drive works if it stays connected. Existing studies stay where they are.</p>
+      <div class="row"><input type="text" id="ws_path" placeholder="D:\PlasBenchStudies" aria-label="Workspace folder"><button class="btn sec sm" data-browse="ws_path" data-dir="1">Browse</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn sec" id="ws_check">Check this folder</button><button class="btn" id="ws_use" disabled>Use this folder</button></div>
+      <div id="ws_report" style="margin-top:10px"></div>
+      <div id="ws_recent"></div>
+     </div></div>
+     <div class="card"><div class="hd"><h3>New study</h3></div><div class="bd">
+      <p class="mut small" style="margin-top:0">Optional: a run creates its study automatically, named after the cohort or sample sheet.
+       Create one here to name it yourself, then choose it on New benchmark.</p>
+      <div class="field"><label for="st_name">Name</label><div class="ctl"><input type="text" id="st_name" placeholder="cohort1"></div><div class="help">Letters, digits, '.', '_' or '-'.</div></div>
+      <div class="field"><label for="st_note">Note</label><div class="ctl"><input type="text" id="st_note" placeholder="What this study is for (optional)"></div></div>
+     </div><div class="ft"><button class="btn" id="st_create"><svg class="ico sm"><use href="#i-plus"/></svg>Create study</button></div></div>
+    </div>
+   </div>
+  </section>
+
+  <!-- VERSION CONTROL ----------------------------------------------------------------------------- -->
+  <section class="view" id="v_git" hidden>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Advanced</div><h1>Version control</h1>
+    <p>Git without the command line, for your own copy of PlasBench, your tools and settings, or your study notes. Run
+    outputs, downloads, reads and credentials are kept out by a managed <code>.gitignore</code> block, and every commit is
+    checked for data, secrets and files too large for GitHub before it is made. Nothing is ever force-pushed.</p></div>
+    <div class="row"><select id="g_repo" aria-label="Repository" style="width:auto;max-width:380px"></select><button class="btn sec" id="g_ref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button></div></div>
+   <div class="stats" id="g_stats" style="margin-bottom:12px"></div>
+   <div id="g_body"><div class="card"><div class="bd mut">Loading…</div></div></div>
   </section>
 
   <!-- ISOLATES ------------------------------------------------------------------------------------ -->
@@ -622,7 +669,7 @@ const cmdText = argv => "plasbench " + argv.map(quote).join(" ");
 /* ===================================================================================================
    Navigation
    =================================================================================================== */
-const VIEWS = ["home","setup","tools","addtool","settings","wizard","isolates","cohorts","runs","jobs","commands","help"];
+const VIEWS = ["home","setup","tools","addtool","settings","workspace","git","wizard","isolates","cohorts","runs","jobs","commands","help"];
 function go(view, sub) { location.hash = sub ? `${view}/${sub}` : view; }
 function route() {
   const [view, ...rest] = (location.hash.slice(1) || "home").split("/");
@@ -634,7 +681,7 @@ function route() {
   window.scrollTo(0, 0);
   const sub = rest.join("/");
   ({home:loadHome, setup:loadSetup, tools:loadTools, addtool:loadAddTool, settings:loadSettings, wizard:loadWizard,
-    isolates:loadIsolates, cohorts:loadCohorts, runs:loadRuns, jobs:renderJobs, commands:() => loadCommands(sub), help:() => loadHelp(sub)})[v]();
+    workspace:loadWorkspace, git:loadGit, isolates:loadIsolates, cohorts:loadCohorts, runs:loadRuns, jobs:renderJobs, commands:() => loadCommands(sub), help:() => loadHelp(sub)})[v]();
 }
 document.addEventListener("click", e => {
   const g = e.target.closest("[data-go]"); if (g) { e.preventDefault(); go(g.dataset.go); }
@@ -1192,7 +1239,7 @@ function showHelpDialog(c, sc) {
    =================================================================================================== */
 const WSTEPS = [["Isolates","What to benchmark"],["Tools","Which tools run"],["Resources","Threads, memory"],["Options","Outputs and stages"],["Review","Check and start"]];
 async function loadWizard() {
-  await getSchema(); await getCohorts(); await getTools(); await getUser();
+  await getSchema(); await getCohorts(); await getTools(); await getUser(); await getWorkspace();
   renderWizard();
 }
 function wizRun() { return command("run"); }
@@ -1215,7 +1262,10 @@ function renderWizard() {
         W.source === "sheet" ? `<div class="field"><label>Sample sheet <span class="req">*</span></label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="config/my_isolates.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div><div class="help">Columns sample_id, assembly_accession, sra_run (see Your own isolates).</div></div>
           <div class="field"><label>Local inputs only</label><div class="ctl"><label class="switch"><input type="checkbox" id="wlocal" ${V.local_inputs ? "checked" : ""}><span></span></label></div><div class="help">Your reads and references are already on disk; never download.</div></div>` :
         `<div class="field"><label>Community sheet</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="meta_samples.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div></div>
-         <div class="field"><label>Predictions folder</label><div class="ctl"><input type="text" id="wpred" value="${esc(V.predictions_dir || "")}" placeholder="predictions_meta"><button class="btn sec sm" data-browse="wpred" data-dir="1">Browse</button></div><div class="help">&lt;tool&gt;/&lt;community&gt;.bins.tsv normalized outputs.</div></div>`}</div></div>`;
+         <div class="field"><label>Predictions folder</label><div class="ctl"><input type="text" id="wpred" value="${esc(V.predictions_dir || "")}" placeholder="predictions_meta"><button class="btn sec sm" data-browse="wpred" data-dir="1">Browse</button></div><div class="help">&lt;tool&gt;/&lt;community&gt;.bins.tsv normalized outputs.</div></div>`}</div></div>
+      ${W.source !== "demo" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>Study folder</h3><span class="sub">everything this benchmark produces goes here</span></div><div class="bd">
+        <div class="field"><label for="wstudy">Study name</label><div class="ctl"><input type="text" id="wstudy" value="${esc(V.study || "")}" placeholder="${esc(wizDefaultStudy())}"></div>
+        <div class="help" id="wstudyhelp">${esc(studyWhere())}</div></div></div></div>` : ""}`;
   } else if (W.step === 1) {
     if (W.source === "demo" || W.source === "meta") html = `<div class="note info">${icon("info", "ico")}<div>${W.source === "demo" ? "The demo uses its own five synthetic methods." : "The metagenomics track scores the tools present in the predictions folder."} Press Next.</div></div>`;
     else {
@@ -1255,6 +1305,15 @@ function renderWizard() {
   $("#wprev").disabled = W.step === 0; $("#wnext").hidden = W.step === WSTEPS.length - 1;
   bindWizard();
 }
+function wizDefaultStudy() {
+  const W = S.wiz, V = W.values;
+  const base = W.source === "cohort" ? (V.cohort || "cohort") : V.samples ? V.samples.split(/[\\/]/).pop().replace(/\.[^.]*$/, "") : "accessions";
+  return (W.source === "meta" ? "meta-" : "") + base.replace(/[^A-Za-z0-9._-]+/g, "-");
+}
+function studyWhere() {
+  const name = S.wiz.values.study || wizDefaultStudy(), base = S.ws?.path || "the workspace";
+  return `${base}${S.info?.sep || "/"}${name}  (results, report, logs and study.json)` + (S.wiz.values.study ? "" : " — named after the isolates; type a name to choose your own");
+}
 function wizArgv() {
   const W = S.wiz, V = W.values;
   if (W.source === "demo") return ["demo", "--no-report-prompt", ...(V.open_report ? ["--open-report"] : [])];
@@ -1270,14 +1329,15 @@ function wizSummary() {
   const W = S.wiz, V = W.values;
   const src = {demo:"Offline demo", cohort:`Cohort ${V.cohort || "(choose)"}`, sheet:`Sheet ${V.samples || "(choose)"}`, meta:"Metagenomics track"}[W.source];
   const on = Object.entries(V).filter(([k, v]) => v === "on").map(([k]) => k), off = Object.entries(V).filter(([k, v]) => v === "off").map(([k]) => k);
-  return [["Isolates", src], ["Tools changed for this run", [...on.map(t => "+" + t), ...off.map(t => "−" + t), ...(V.user_tools || []).map(u => "+" + u + " (yours)")].join(", ") || "defaults"],
+  return [["Isolates", src], ["Study folder", W.source === "demo" ? "results_demo (the demo's own folder)" : (S.ws?.path || "") + (S.info?.sep || "/") + (V.study || wizDefaultStudy())], ["Tools changed for this run", [...on.map(t => "+" + t), ...off.map(t => "−" + t), ...(V.user_tools || []).map(u => "+" + u + " (yours)")].join(", ") || "defaults"],
           ["Threads per tool", V.threads || "default"], ["Results folder", V.results_dir || "default (results/)"], ["Stages", (V.stages || []).join(" ") || "all"], ["Assembler", V.assembler || "default"]];
 }
 function bindWizard() {
   const W = S.wiz, V = W.values;
   $$("[name=wsrc]").forEach(r => r.onchange = () => { W.source = r.value; if (r.value === "cohort" && !V.cohort) V.cohort = S.cohorts.find(c => !c.metagenomic)?.name; renderWizard(); });
-  if ($("#wcoh")) { if (!V.cohort) V.cohort = $("#wcoh").value; $("#wcoh").onchange = e => V.cohort = e.target.value; }
-  if ($("#wsheet")) $("#wsheet").oninput = e => V.samples = e.target.value;
+  if ($("#wcoh")) { if (!V.cohort) V.cohort = $("#wcoh").value; $("#wcoh").onchange = e => { V.cohort = e.target.value; if ($("#wstudy")) { $("#wstudy").placeholder = wizDefaultStudy(); $("#wstudyhelp").textContent = studyWhere(); } }; }
+  if ($("#wsheet")) $("#wsheet").oninput = e => { V.samples = e.target.value; if ($("#wstudy")) { $("#wstudy").placeholder = wizDefaultStudy(); $("#wstudyhelp").textContent = studyWhere(); } };
+  if ($("#wstudy")) $("#wstudy").oninput = e => { V.study = e.target.value.trim(); $("#wstudyhelp").textContent = studyWhere(); };
   if ($("#wpred")) $("#wpred").oninput = e => V.predictions_dir = e.target.value;
   if ($("#wlocal")) $("#wlocal").onchange = e => V.local_inputs = e.target.checked;
   $$("[data-wtool]").forEach(b => b.onclick = () => { V[b.dataset.wtool] = b.dataset.val; b.parentElement.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); });
@@ -1324,6 +1384,186 @@ async function loadCohorts() {
     <td style="text-align:right;white-space:nowrap">${c.metagenomic ? "" : `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", c.path])}' data-label="Validate ${esc(c.name)}">Validate</button>
       <button class="btn sec sm" onclick="benchCohort('${esc(c.name)}')">${icon("play")}Benchmark</button>`}</td></tr>`).join("");
 }
+/* WORKSPACE ------------------------------------------------------------------------------------------ */
+const fmtGB = b => b == null ? "unknown" : `${(b / 2 ** 30).toLocaleString(undefined, {maximumFractionDigits: 0})} GB`;
+async function getWorkspace(force) { if (!S.ws || force) S.ws = await api("workspace"); return S.ws; }
+function renderWorkspaceNav() {
+  const w = S.ws; if (!w) return;
+  $("#where").textContent = w.path; $("#where").title = `Workspace (all studies): ${w.path}`;
+  $("#s_workspace").textContent = w.available ? `${w.studies.length} stud${w.studies.length === 1 ? "y" : "ies"}` : "Folder not available";
+  $("#b_workspace").hidden = w.available;
+}
+async function loadWorkspace(force) {
+  try {
+    const w = await getWorkspace(force); renderWorkspaceNav();
+    $("#ws_src").textContent = w.source;
+    $("#ws_cur").innerHTML = `<div class="mono" style="font-size:13.5px;overflow-wrap:anywhere">${esc(w.path)}</div>
+      <div class="row wrap small mut" style="margin-top:6px;gap:16px">${w.available ? `<span class="ok-t">${icon("check")} available</span>` : `<span class="bad-t">${icon("x")} not available: connect the drive, or choose another folder</span>`}
+       <span>${esc(w.kind_label)}</span><span>${fmtGB(w.free)} free</span></div>
+      ${w.env_override ? `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>PLASBENCH_WORKSPACE is set in the environment, which wins over the choice saved here.</div></div>` : ""}`;
+    $("#ws_n").textContent = `${w.studies.length} in this workspace`;
+    $("#ws_tb").innerHTML = w.studies.map(st => {
+      const run = (S.runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, ""));
+      const idx = run ? S.runs.indexOf(run) : -1;
+      return `<tr><td><b class="mono">${esc(st.name)}</b>${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}</td>
+        <td class="small">${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "–"))}</td><td>${st.runs}</td><td class="small">${fmtTime(st.modified)}</td>
+        <td style="text-align:right;white-space:nowrap">${st.report && idx >= 0 ? `<a class="btn sec sm" href="/view/${idx}/benchmark.report.html" target="_blank" rel="noopener">Report</a>` : ""}
+          <button class="btn ghost sm" onclick="benchStudy('${esc(st.name)}')">Run in this study</button>
+          <button class="btn ghost icon sm" title="Open the study folder" onclick="reveal('${esc(st.path.replace(/\\/g, "\\\\"))}')">${icon("folder")}</button></td></tr>`; }).join("")
+      || `<tr><td colspan="5" class="mut">No studies yet. Start one from <a href="#wizard">New benchmark</a>, or create one on the right.</td></tr>`;
+    $("#ws_recent").innerHTML = w.recent.length ? `<div class="small mut" style="margin-top:12px">Recent workspaces</div>` + w.recent.map(r =>
+      `<button class="task" style="padding:6px 0" data-wsr="${esc(r)}"><svg class="ico"><use href="#i-folder"/></svg><span class="tx"><b class="mono" style="font-size:12.5px">${esc(r)}</b></span></button>`).join("") : "";
+  } catch (e) { toast(e.message, "bad"); }
+}
+let wsChecked = null;
+$("#ws_check").onclick = async () => {
+  const path = $("#ws_path").value.trim(); if (!path) return toast("Enter or browse to a folder", "bad");
+  try {
+    const r = await api(`workspace/check?path=${encodeURIComponent(path)}`); wsChecked = r.ok ? r.path : null; $("#ws_use").disabled = !r.ok;
+    $("#ws_report").innerHTML = (r.errors.length ? `<div class="note bad">${icon("x", "ico")}<div>${r.errors.map(esc).join("<br>")}</div></div>` :
+      `<div class="note ok">${icon("check", "ico")}<div><b>${esc(r.path)}</b><br>${esc(r.kind_label)} · ${fmtGB(r.free)} free${r.will_create ? " · will be created" : ""}${r.studies ? ` · already holds ${r.studies} stud${r.studies === 1 ? "y" : "ies"}` : ""}</div></div>`)
+      + (r.warnings.length ? `<div class="note warn" style="margin-top:6px">${icon("alert", "ico")}<div><ul style="margin:0">${r.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div></div>` : "");
+  } catch (e) { toast(e.message, "bad"); }
+};
+$("#ws_path").oninput = () => { $("#ws_use").disabled = true; wsChecked = null; };
+$("#ws_use").onclick = async () => {
+  if (!wsChecked) return;
+  try {
+    let r = await api("workspace/set", {path: wsChecked});
+    if (r.needs_create) { if (!confirm(`Create ${r.path}?`)) return; r = await api("workspace/set", {path: wsChecked, create: true}); }
+    toast(`Workspace: ${r.path}`, "ok"); $("#ws_report").innerHTML = ""; $("#ws_path").value = ""; $("#ws_use").disabled = true;
+    S.runs = null; await getRuns(true); await loadWorkspace(true);
+  } catch (e) { toast(e.message, "bad"); }
+};
+$("#ws_recent").onclick = e => { const b = e.target.closest("[data-wsr]"); if (b) { $("#ws_path").value = b.dataset.wsr; $("#ws_check").click(); } };
+$("#ws_ref").onclick = async () => { await getRuns(true); loadWorkspace(true); };
+$("#ws_reveal").onclick = () => S.ws && reveal(S.ws.path);
+$("#st_create").onclick = async () => {
+  try { const r = await api("studies/create", {name: $("#st_name").value.trim(), note: $("#st_note").value.trim()});
+    toast(`Created ${r.path}`, "ok"); $("#st_name").value = $("#st_note").value = ""; loadWorkspace(true); }
+  catch (e) { toast(e.message, "bad"); }
+};
+window.benchStudy = name => { S.wiz = {step: 0, source: S.wiz.source === "demo" ? "cohort" : S.wiz.source, values: {...S.wiz.values, study: name}}; go("wizard"); };
+
+/* VERSION CONTROL ------------------------------------------------------------------------------------ */
+const G = {repo: "", sel: new Set(), diffPath: null};
+const gq = () => G.repo ? `repo=${encodeURIComponent(G.repo)}` : "";
+async function gitOp(body, okMsg) {
+  try { const r = await api("git", {repo: G.repo, ...body});
+    if (r.job) { toast(`Started ${r.job.label}; follow it in the console`, "ok"); await refreshJobs(); showConsole(r.job.id, true); }
+    else if (okMsg) toast(typeof okMsg === "function" ? okMsg(r) : okMsg, "ok");
+    await loadGit(); return r; }
+  catch (e) { toast(e.message, "bad"); }
+}
+const STATUS_WORD = {M: "modified", A: "added", D: "deleted", R: "renamed", C: "copied", U: "conflict", "?": "new", T: "type changed"};
+async function loadGit() {
+  try {
+    const st = await api(`git/status?${gq()}`); G.repo = st.repo || G.repo;
+    const sel = $("#g_repo");
+    const opts = [...st.choices.map(c => [c.path, `${c.label}: ${c.path}`])];
+    if (st.repo && !opts.some(o => o[0] === st.repo)) opts.push([st.repo, st.repo]);
+    sel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}" ${v === st.repo ? "selected" : ""}>${esc(l)}</option>`).join("");
+    const changed = (st.files || []).length;
+    $("#s_git").textContent = !st.installed ? "Git not installed" : !st.is_repo ? "Not a repository" : `${st.branch || "?"}${changed ? ` · ${changed} change${changed > 1 ? "s" : ""}` : " · clean"}`;
+    $("#b_git").hidden = !changed; $("#b_git").textContent = changed;
+    if (!st.installed) {
+      $("#g_stats").innerHTML = ""; $("#g_body").innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>Git is not installed. Install it from <a href="https://git-scm.com/" target="_blank" rel="noopener">git-scm.com</a>, then reopen this page.</div></div>`; return;
+    }
+    if (!st.is_repo) {
+      $("#g_stats").innerHTML = "";
+      $("#g_body").innerHTML = `<div class="split"><div class="card"><div class="hd"><h3>Start a repository here</h3></div><div class="bd">
+        <p style="margin-top:0">${esc(st.repo)} is not a git repository yet. Initialising adds the PlasBench safety <code>.gitignore</code> block first.</p>
+        <div class="field"><label>Branch</label><div class="ctl"><input type="text" id="gi_branch" value="main"></div></div>
+        <div class="field"><label>First commit</label><div class="ctl"><label class="switch"><input type="checkbox" id="gi_first"><span></span></label></div><div class="help">Commit what is here now (after the safety checks).</div></div></div>
+        <div class="ft"><button class="btn" id="gi_go">Initialise repository</button></div></div>
+        <div class="card"><div class="hd"><h3>Or clone an existing repository</h3></div><div class="bd">
+        <div class="field"><label>Address</label><div class="ctl"><input type="text" id="gc_url" placeholder="https://github.com/your-org/your-repo.git"></div></div>
+        <div class="field"><label>Into folder</label><div class="ctl"><input type="text" id="gc_dest" placeholder="${esc(st.repo)}${S.info?.sep || "/"}my-repo"><button class="btn sec sm" data-browse="gc_dest" data-dir="1">Browse</button></div><div class="help">A new, empty folder inside the PlasBench folder or the workspace.</div></div></div>
+        <div class="ft"><button class="btn sec" id="gc_go">Clone</button></div></div></div>`;
+      $("#gi_go").onclick = () => gitOp({op: "init", branch: $("#gi_branch").value.trim(), first_commit: $("#gi_first").checked}, "Repository initialised");
+      $("#gc_go").onclick = () => gitOp({op: "clone", url: $("#gc_url").value.trim(), dest: $("#gc_dest").value.trim()});
+      return;
+    }
+    const remote = (st.remotes || [])[0];
+    $("#g_stats").innerHTML = `<div><label>Branch</label><b class="mono" style="font-size:17px">${esc(st.branch || "?")}</b><span>${st.upstream ? `tracks ${esc(st.upstream)}` : "not published yet"}</span></div>
+      <div><label>Not yet pushed / pulled</label><b>${st.ahead || 0} / ${st.behind || 0}</b><span>commits ahead / behind</span></div>
+      <div><label>Changes</label><b>${changed}</b><span>${(st.files || []).filter(f => f.staged).length} staged for the next commit</span></div>
+      <div><label>Last commit</label><b class="mono" style="font-size:15px">${esc(st.last?.hash || "–")}</b><span>${esc(st.last ? `${st.last.subject.slice(0, 48)} · ${st.last.when}` : "no commits yet")}</span></div>`;
+    const files = st.files || [];
+    const who = st.user?.name && st.user?.email;
+    $("#g_body").innerHTML = `<div class="split"><div class="stack">
+      <div class="card"><div class="hd"><h3>Changes</h3><span class="sub">${files.length ? "tick files, then stage or unstage them" : "nothing to commit"}</span>
+        <button class="btn ghost sm" id="g_all">Stage all</button><button class="btn ghost sm" id="g_stage">Stage selected</button><button class="btn ghost sm" id="g_unstage">Unstage selected</button></div>
+       <div class="tablewrap" style="max-height:340px"><table class="data"><tbody>${files.map(f => `<tr data-gf="${esc(f.path)}" style="cursor:pointer">
+         <td style="width:28px"><input type="checkbox" data-gsel="${esc(f.path)}" ${G.sel.has(f.path) ? "checked" : ""} aria-label="Select ${esc(f.path)}"></td>
+         <td class="mono small" style="word-break:break-all">${esc(f.path)}</td>
+         <td style="white-space:nowrap">${f.staged ? `<span class="tag ok">staged ${esc(STATUS_WORD[f.x] || f.x)}</span>` : ""}${f.unstaged ? ` <span class="tag warn">${esc(STATUS_WORD[f.y] || f.y)}</span>` : ""}${f.untracked ? `<span class="tag">new file</span>` : ""}${f.conflict ? `<span class="tag bad">conflict</span>` : ""}</td></tr>`).join("") || `<tr><td class="mut">The working tree is clean.</td></tr>`}</tbody></table></div>
+       <div id="g_diff"></div></div>
+      <div class="card"><div class="hd"><h3>Commit</h3><span class="sub">only staged changes are committed</span></div><div class="bd">
+       ${who ? "" : `<div class="note warn" style="margin-bottom:8px">${icon("alert", "ico")}<div>Git does not know who you are yet: save your name and e-mail under Identity first.</div></div>`}
+       <textarea id="g_msg" rows="3" placeholder="What changed, and why" style="font-family:inherit;font-size:13px"></textarea>
+       <div id="g_scan" style="margin-top:8px"></div></div>
+       <div class="ft"><button class="btn" id="g_commit" ${who ? "" : "disabled"}>Commit</button></div></div>
+      <div class="card"><div class="hd"><h3>History</h3></div><div class="tablewrap" style="max-height:300px"><table class="data"><tbody id="g_log"><tr><td class="mut">Loading…</td></tr></tbody></table></div><div id="g_show"></div></div>
+     </div><div class="stack">
+      <div class="card"><div class="hd"><h3>Sync with the remote</h3></div><div class="bd">
+       ${remote ? `<div class="mono small" style="overflow-wrap:anywhere">${esc(remote.name)} → ${esc(remote.url)}</div>` : `<p class="mut small" style="margin:0">No remote yet: add the repository address below.</p>`}</div>
+       <div class="ft"><button class="btn sec" id="g_fetch" ${remote ? "" : "disabled"}>Fetch</button><button class="btn sec" id="g_pull" ${remote ? "" : "disabled"}>Pull</button><button class="btn" id="g_push" ${remote ? "" : "disabled"}>Push${st.ahead ? ` ${st.ahead}` : ""}</button></div></div>
+      <div class="card"><div class="hd"><h3>Branches</h3></div><div id="g_br" class="tasks"></div>
+       <div class="bd"><div class="row"><input type="text" id="g_newbr" placeholder="new-branch-name"><button class="btn sec" id="g_mkbr">Create and switch</button></div></div></div>
+      <div class="card"><div class="hd"><h3>Remote</h3></div><div class="bd">
+       <div class="row"><input type="text" id="g_url" value="${esc(remote ? remote.url : "")}" placeholder="https://github.com/your-org/your-repo.git"><button class="btn sec" id="g_seturl">Save</button></div>
+       <p class="mut small" style="margin:6px 0 0">Never put a password or token in the address; sign in with Git's credential manager or the GitHub CLI.</p>
+       ${st.gh ? `<div class="row" style="margin-top:8px">${st.gh_logged_in ? `<span class="small ok-t">${icon("check")} signed in to GitHub</span>` : `<button class="btn sec sm" id="g_ghlogin">Sign in to GitHub</button>`}</div>` : ""}</div></div>
+      <div class="card"><div class="hd"><h3>Identity</h3><span class="sub">who your commits are from</span></div><div class="bd">
+       <div class="field"><label>Name</label><div class="ctl"><input type="text" id="g_name" value="${esc(st.user?.name || "")}"></div></div>
+       <div class="field"><label>E-mail</label><div class="ctl"><input type="text" id="g_mail" value="${esc(st.user?.email || "")}"></div></div>
+       <div class="field"><label>For</label><div class="ctl"><select id="g_scope"><option value="local">this repository</option><option value="global">every repository on this computer</option></select></div></div></div>
+       <div class="ft"><button class="btn sec" id="g_saveid">Save</button></div></div>
+     </div></div>`;
+    bindGit(st);
+    api(`git/log?${gq()}&n=40`).then(r => { $("#g_log").innerHTML = r.log.map(c => `<tr data-grev="${esc(c.hash)}" style="cursor:pointer"><td class="mono small" style="width:70px">${esc(c.short)}</td><td>${esc(c.subject)}</td><td class="mut small" style="white-space:nowrap">${esc(c.author)} · ${esc(c.when)}</td></tr>`).join("") || `<tr><td class="mut">No commits yet.</td></tr>`; });
+    api(`git/branches?${gq()}`).then(r => { $("#g_br").innerHTML = r.branches.map(b => `<button class="task" ${b.current ? "disabled" : ""} data-gbr="${esc(b.name)}"><svg class="ico"><use href="#i-git"/></svg><span class="tx"><b class="mono">${esc(b.name)}</b><span>${b.current ? "current branch" : "switch to this branch"}${b.upstream ? ` · tracks ${esc(b.upstream)}` : ""}</span></span></button>`).join(""); });
+    if ((st.files || []).some(f => f.staged)) api(`git/scan?${gq()}`).then(r => showScan(r.findings));
+  } catch (e) { $("#g_body").innerHTML = `<div class="note bad">${icon("x", "ico")}<div>${esc(e.message)}</div></div>`; }
+}
+function showScan(findings) {
+  const blocks = findings.filter(f => f.level === "block"), warns = findings.filter(f => f.level !== "block");
+  $("#g_scan").innerHTML = (blocks.length ? `<div class="note bad">${icon("x", "ico")}<div><b>The commit is blocked:</b><ul>${blocks.map(f => `<li><span class="mono">${esc(f.path)}</span>: ${esc(f.why)}</li>`).join("")}</ul>
+      Unstage these files or add them to <code>.gitignore</code>.${blocks.some(f => f.kind !== "size") ? ` To commit them anyway, type <b class="mono">I UNDERSTAND THIS MAY EXPOSE DATA OR SECRETS</b>:<input type="text" id="g_override" style="margin-top:6px">` : ""}</div></div>` : "")
+    + (warns.length ? `<div class="note warn" style="margin-top:6px">${icon("alert", "ico")}<div><ul style="margin:0">${warns.map(f => `<li><span class="mono">${esc(f.path)}</span>: ${esc(f.why)}</li>`).join("")}</ul></div></div>` : "")
+    + (!findings.length ? `<div class="small ok-t">${icon("check")} The staged files passed the data, secret and size checks.</div>` : "");
+}
+function bindGit(st) {
+  $("#g_body").onchange = e => { const c = e.target.dataset.gsel; if (c != null) e.target.checked ? G.sel.add(c) : G.sel.delete(c); };
+  $("#g_body").onclick = async e => {
+    if (e.target.closest("input,button,a,textarea,select")) {
+      const br = e.target.closest("[data-gbr]"); if (br && !br.disabled) gitOp({op: "checkout", name: br.dataset.gbr}, `Switched to ${br.dataset.gbr}`);
+      return;
+    }
+    const row = e.target.closest("[data-gf]");
+    if (row) { const f = (st.files || []).find(x => x.path === row.dataset.gf);
+      const r = await api(`git/diff?${gq()}&path=${encodeURIComponent(row.dataset.gf)}&staged=${f && f.staged && !f.unstaged ? 1 : 0}`);
+      $("#g_diff").innerHTML = `<div class="bd" style="border-top:1px solid var(--line-2)"><div class="small mut mono">${esc(row.dataset.gf)}</div><pre class="cmdline" style="display:block;max-height:320px;white-space:pre;margin-top:6px">${r.diff ? r.diff.split("\n").map(l => `<span style="color:${l.startsWith("+") && !l.startsWith("+++") ? "var(--ok)" : l.startsWith("-") && !l.startsWith("---") ? "var(--bad)" : l.startsWith("@@") ? "var(--primary)" : "inherit"}">${esc(l)}</span>`).join("\n") : "(no textual difference)"}</pre></div>`; }
+    const rev = e.target.closest("[data-grev]");
+    if (rev) { const r = await api(`git/show?${gq()}&rev=${rev.dataset.grev}`); $("#g_show").innerHTML = `<div class="bd" style="border-top:1px solid var(--line-2)"><pre class="cmdline" style="display:block;max-height:360px;white-space:pre">${esc(r.text)}</pre></div>`; }
+  };
+  $("#g_all").onclick = () => gitOp({op: "stage"}, "Staged everything");
+  $("#g_stage").onclick = () => G.sel.size ? gitOp({op: "stage", paths: [...G.sel]}, "Staged") : toast("Tick files first", "bad");
+  $("#g_unstage").onclick = () => G.sel.size ? gitOp({op: "unstage", paths: [...G.sel]}, "Unstaged") : toast("Tick files first", "bad");
+  $("#g_commit").onclick = async () => { const r = await gitOp({op: "commit", message: $("#g_msg").value, override: $("#g_override")?.value || ""}, r => `Committed ${r.committed}`); if (r) G.sel.clear(); };
+  $("#g_fetch").onclick = () => gitOp({op: "fetch"});
+  $("#g_pull").onclick = () => gitOp({op: "pull"});
+  $("#g_push").onclick = () => { const remote = (st.remotes || [])[0];
+    if (confirm(`Push ${st.ahead || "your"} commit(s) on '${st.branch}' to ${remote ? remote.url : "the remote"}?`)) gitOp({op: "push", confirm: true}); };
+  $("#g_mkbr").onclick = () => gitOp({op: "branch_create", name: $("#g_newbr").value.trim(), switch: true}, "Branch created");
+  $("#g_seturl").onclick = () => gitOp({op: "remote_set", name: "origin", url: $("#g_url").value.trim()}, "Remote saved");
+  $("#g_saveid").onclick = () => gitOp({op: "identity", name: $("#g_name").value.trim(), email: $("#g_mail").value.trim(), scope: $("#g_scope").value}, "Identity saved");
+  if ($("#g_ghlogin")) $("#g_ghlogin").onclick = () => gitOp({op: "gh_login"});
+}
+$("#g_repo").onchange = async e => { G.repo = e.target.value; G.sel.clear(); await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); loadGit(); };
+$("#g_ref").onclick = () => loadGit();
+
 window.benchCohort = name => { S.wiz = {step: 1, source: "cohort", values: {cohort: name}}; go("wizard"); };
 
 /* ===================================================================================================
@@ -1364,7 +1604,7 @@ function renderJobs() {
     <td><b>${esc(j.label)}</b><div class="mono small mut" style="word-break:break-all">${esc(j.command)}</div></td><td class="small">${fmtTime(j.started)}</td>
     <td class="small">${fmtDur((j.ended || Date.now() / 1000) - j.started)}</td>
     <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="showConsole('${j.id}', true)">Log</button>
-     ${j.state === "running" ? `<button class="btn danger sm" onclick="cancelJob('${j.id}')">Cancel</button>` : `<button class="btn ghost sm" data-run='${esc(JSON.stringify(j.argv))}' data-label="${esc(j.label)}">Run again</button><button class="btn ghost icon sm" title="Remove" onclick="delJob('${j.id}')">${icon("trash")}</button>`}</td></tr>`).join("")
+     ${j.state === "running" ? `<button class="btn danger sm" onclick="cancelJob('${j.id}')">Cancel</button>` : `${j.kind === "git" || !j.argv.length ? "" : `<button class="btn ghost sm" data-run='${esc(JSON.stringify(j.argv))}' data-label="${esc(j.label)}">Run again</button>`}<button class="btn ghost icon sm" title="Remove" onclick="delJob('${j.id}')">${icon("trash")}</button>`}</td></tr>`).join("")
     || `<tr><td colspan="5" class="mut">No jobs yet. Everything you start from this window appears here.</td></tr>`;
 }
 window.showConsole = showConsole;
@@ -1462,11 +1702,12 @@ document.addEventListener("click", e => { if (!e.target.closest(".search")) $("#
   try {
     S.info = await api("info");
     $("#h_root").innerHTML = `${icon("folder")} ${esc(S.info.root)}`;
-    $("#where").textContent = S.info.root; $("#where").title = `Workspace: ${S.info.root}`;
+    $("#where").textContent = S.info.root; $("#where").title = `PlasBench folder: ${S.info.root}`;
     $("#h_sys").textContent = `${S.info.platform} · Python ${S.info.python} · ${S.info.cpus} threads${S.info.memory_gb ? " · " + S.info.memory_gb + " GB" : ""}`;
     S.settings = null; await getSettings(); S.settings._local = Object.fromEntries(S.settings.settings.filter(s => s.override != null).map(s => [s.key, s.override]));
   } catch (e) { document.body.innerHTML = `<div style="padding:40px;font-family:system-ui"><h2>PlasBench could not start the window</h2><p>${esc(e.message)}</p><p>Start it again with <code>plasbench ui</code> and open the link it prints.</p></div>`; return; }
   route(); refreshJobs();
+  getWorkspace().then(renderWorkspaceNav).catch(() => {});
   getEnv().then(renderEnv).catch(() => {});
   getRuns().then(r => $("#s_runs").textContent = r.length ? `${r.length} found` : "None yet").catch(() => {});
   getTools().then(t => { const real = t.filter(x => x.source !== "demo"); $("#s_tools").textContent = `${real.filter(x => x.installed).length} of ${real.length} installed`; }).catch(() => {});

@@ -32,6 +32,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
 from . import ui_schema
+from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 
 TOKEN = secrets.token_urlsafe(24)
 PAGE_FILE = Path(__file__).resolve().parent / "data" / "ui.html"
@@ -392,10 +393,22 @@ class Jobs:
         ok, message = ui_schema.validate_argv(argv)
         if not ok:
             raise ValueError(message)
-        job_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
-        log = self.dir / f"{job_id}.log"
         command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(argv)
         shown = "plasbench " + " ".join(shlex.quote(a) for a in argv)
+        return self._launch(command, shown, label, env, list(argv), "plasbench", self.project.root)
+
+    def start_git(self, command: list, label: str, cwd) -> dict:
+        """A git network operation built by plasbench.gitops.argv (never from the request): runs like any job."""
+        from . import gitops
+        if any(j.get("kind") == "git" and j["state"] in ("running", "cancelling") for j in self.jobs.values()):
+            raise ValueError("another git operation is still running: wait for it to finish")
+        shown = gitops.redact(" ".join(shlex.quote(str(a)) for a in ["git"] + list(command[1:])))
+        env = {"GIT_TERMINAL_PROMPT": "0"}
+        return self._launch(list(command), shown, label, env, [], "git", cwd)
+
+    def _launch(self, command, shown, label, env, argv, kind, cwd) -> dict:
+        job_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
+        log = self.dir / f"{job_id}.log"
         child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
         for key, value in (env or {}).items():
             if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
@@ -410,9 +423,9 @@ class Jobs:
         kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
         # stdin is a pipe the window can type into (answer()): a command that asks a question waits for the answer
         # typed in the console instead of being handed an empty one.
-        proc = subprocess.Popen(command, cwd=str(self.project.root), stdin=subprocess.PIPE, stdout=handle,
+        proc = subprocess.Popen(command, cwd=str(cwd), stdin=subprocess.PIPE, stdout=handle,
                                 stderr=subprocess.STDOUT, env=child_env, **kwargs)
-        job = {"id": job_id, "label": label or shown, "argv": list(argv), "command": shown, "env": env or {},
+        job = {"id": job_id, "label": label or shown, "argv": list(argv), "command": shown, "env": env or {}, "kind": kind,
                "state": "running", "started": time.time(), "ended": None, "exit": None, "pid": proc.pid}
         with self.lock:
             self.jobs[job_id] = job
@@ -634,7 +647,7 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.api_get(path[len("/api/"):], q)
             except (FileNotFoundError, KeyError) as exc:
                 return self.jsend(404, {"error": str(exc).strip("'")})
-            except (PermissionError, ValueError) as exc:
+            except (PermissionError, ValueError, GitError) as exc:
                 return self.jsend(400, {"error": str(exc)})
             except Exception as exc:  # the window shows it rather than hanging
                 return self.jsend(500, {"error": f"{type(exc).__name__}: {exc}"})
@@ -667,6 +680,35 @@ def make_handler(project: Project, jobs: Jobs):
                 if name not in allowed:
                     raise FileNotFoundError(name)
                 return self.jsend(200, {"name": name, "text": (project.root / name).read_text(encoding="utf-8", errors="replace")})
+            if route.startswith("git/"):
+                from . import gitops
+                repo = self.git_repo(q.get("repo"))
+                what = route[len("git/"):]
+                if what == "status":
+                    info = gitops.info(repo) if repo else {"installed": bool(gitops.find_git()), "is_repo": False}
+                    info.update(self.git_choices(), gh_logged_in=gitops.gh_logged_in() if gitops.find_gh() else False,
+                                gh=bool(gitops.find_gh()), repo=str(repo) if repo else "")
+                    return self.jsend(200, info)
+                if what == "log":
+                    return self.jsend(200, {"log": gitops.log(repo, int(q.get("n", 40)))})
+                if what == "branches":
+                    return self.jsend(200, {"branches": gitops.branches(repo)})
+                if what == "diff":
+                    return self.jsend(200, {"diff": gitops.diff(repo, q.get("path", ""), q.get("staged") == "1")})
+                if what == "show":
+                    return self.jsend(200, {"text": gitops.show(repo, q.get("rev", ""))})
+                if what == "scan":
+                    return self.jsend(200, {"findings": gitops.scan_staged(repo)})
+                raise FileNotFoundError(f"no such API: {route}")
+            if route == "workspace":
+                from . import studies, workspace
+                info = workspace.describe(project.root)
+                info["studies"] = studies.list_studies(project.root) if info["available"] else []
+                info["recent"] = [r for r in state.get("workspaces", []) if r != info["path"]][:8]
+                return self.jsend(200, info)
+            if route == "workspace/check":
+                from . import workspace
+                return self.jsend(200, workspace.check(q.get("path", "")))
             if route == "jobs":
                 return self.jsend(200, {"jobs": jobs.list()})
             if route.startswith("jobs/"):
@@ -718,7 +760,7 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.api_post(route, data)
             except (FileNotFoundError, KeyError) as exc:
                 return self.jsend(404, {"error": str(exc).strip("'")})
-            except (PermissionError, ValueError) as exc:
+            except (PermissionError, ValueError, GitError) as exc:
                 return self.jsend(400, {"error": str(exc)})
             except Exception as exc:
                 return self.jsend(500, {"error": f"{type(exc).__name__}: {exc}"})
@@ -747,6 +789,33 @@ def make_handler(project: Project, jobs: Jobs):
                 if not isinstance(changes, dict):
                     raise ValueError("changes must be an object")
                 return self.jsend(200, {"local": project.save_local_env(changes)})
+            if route == "git":
+                return self.jsend(200, self.git_op(data))
+            if route == "workspace/set":
+                from . import workspace
+                if any(j["state"] in ("running", "cancelling") for j in jobs.list()):
+                    raise ValueError("a job is running: wait for it, or cancel it, before changing the workspace")
+                report = workspace.check(data.get("path", ""))
+                if not report["ok"]:
+                    raise ValueError(report["errors"][0] if report["errors"] else "that folder cannot be used")
+                path = Path(report["path"])
+                if not path.exists():
+                    if not data.get("create"):
+                        return self.jsend(200, {"needs_create": True, "path": str(path)})
+                    path.mkdir(parents=True)
+                default = (project.root / "studies").resolve()
+                # The default needs no setting; anything else is saved for this computer.
+                project.save_local_env({"PLASBENCH_WORKSPACE": None if path.resolve() == default else str(path)})
+                state = load_state()
+                state["workspaces"] = [str(path)] + [w for w in state.get("workspaces", []) if w != str(path)][:7]
+                save_state(state)
+                out = workspace.describe(project.root)
+                out["warnings"] = report["warnings"]
+                return self.jsend(200, out)
+            if route == "studies/create":
+                from . import studies
+                folder = studies.create(project.root, data.get("name", ""), data.get("note", ""))
+                return self.jsend(200, {"path": str(folder)})
             if route == "runs/add":
                 folder = Path(data.get("path", "")).expanduser()
                 if not folder.is_dir():
@@ -776,6 +845,82 @@ def make_handler(project: Project, jobs: Jobs):
                     subprocess.Popen(["xdg-open", str(target if target.is_dir() else target.parent)])
                 return self.jsend(200, {"ok": True})
             raise FileNotFoundError(f"no such API: {route}")
+
+        # ---------------------------------------------------------------- git (plasbench/gitops.py)
+        def git_roots(self):
+            from . import studies
+            return [project.root, studies.workspace(project.root)]
+
+        def git_choices(self) -> dict:
+            from . import studies
+            return {"choices": [{"label": "PlasBench folder", "path": str(project.root)},
+                                {"label": "Workspace (studies)", "path": str(studies.workspace(project.root))}]}
+
+        def git_repo(self, requested=None):
+            """The repository the Git page works on: the request's, else the saved one, else the PlasBench folder.
+            Always inside the PlasBench folder or the workspace (gitops.valid_repo)."""
+            from . import gitops
+            chosen = requested or load_state().get("git_repo") or str(project.root)
+            try:
+                return gitops.valid_repo(chosen, self.git_roots())
+            except ValueError:
+                if requested:
+                    raise
+                return gitops.valid_repo(str(project.root), self.git_roots())
+
+        def git_op(self, body: dict) -> dict:
+            """Every git action. Quick ones run now; fetch/pull/push/clone/GitHub run as jobs in the console."""
+            from . import gitops
+            op = body.get("op", "")
+            repo = self.git_repo(body.get("repo")) if op != "clone" else None
+            if op == "repo_set":
+                state = load_state()
+                state["git_repo"] = str(repo)
+                save_state(state)
+                return {"repo": str(repo)}
+            if op == "init":
+                return gitops.init(repo, body.get("branch") or "main", bool(body.get("first_commit")),
+                                   body.get("message") or "Initial commit")
+            if op == "identity":
+                gitops.set_identity(repo, body.get("name"), body.get("email"), body.get("scope") or "local")
+                return {"ok": True}
+            if op == "stage":
+                gitops.stage(repo, body.get("paths") or None)
+                return {"ok": True}
+            if op == "unstage":
+                gitops.unstage(repo, body.get("paths") or None)
+                return {"ok": True}
+            if op == "commit":
+                return gitops.commit(repo, body.get("message", ""), body.get("override", ""))
+            if op == "branch_create":
+                gitops.create_branch(repo, body.get("name", ""), bool(body.get("switch", True)))
+                return {"ok": True}
+            if op == "checkout":
+                gitops.checkout(repo, body.get("name", ""))
+                return {"ok": True}
+            if op == "remote_set":
+                gitops.set_remote(repo, body.get("name") or "origin", body.get("url", ""))
+                return {"ok": True}
+            if op == "remote_remove":
+                gitops.remove_remote(repo, body.get("name", ""))
+                return {"ok": True}
+            if op in ("fetch", "pull", "push", "clone", "gh_login", "gh_setup_git", "gh_create"):
+                if op == "push" and not body.get("confirm"):
+                    info = gitops.info(repo)
+                    raise ValueError(f"confirm the push: {info.get('ahead', 0)} commit(s) on '{info.get('branch')}' will be "
+                                     f"sent to " + (info["remotes"][0]["url"] if info.get("remotes") else "the remote"))
+                dest = None
+                if op == "clone":
+                    dest = gitops.valid_repo(str(Path(body.get("dest", "")).parent), self.git_roots()) / Path(body.get("dest", "")).name
+                command = gitops.argv(op, repo, url=body.get("url"), dest=str(dest) if dest else None,
+                                      name=body.get("name"), visibility=body.get("visibility"))
+                job = jobs.start_git(command, f"git {op}", dest.parent if dest else repo)
+                if op == "clone":
+                    state = load_state()
+                    state["git_repo"] = str(dest)
+                    save_state(state)
+                return {"job": job}
+            raise ValueError("unknown git action")
 
         def validate_manifest(self, text):
             import tempfile

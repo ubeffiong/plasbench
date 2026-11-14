@@ -13,6 +13,33 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added
+- **Study folders.** Every benchmark keeps everything it produces in its own folder, `<workspace>/<study>/`
+  (results, report, logs, tmp and a `study.json` recording the sample sheet with its checksum, the cohort and every
+  command). `plasbench run` names the study after the cohort or sample sheet, or `--study NAME`;
+  `plasbench report --study NAME` rebuilds one. The workspace is `PlasBench/studies` by default, or
+  `PLASBENCH_WORKSPACE`. Downloads, tool environments and databases stay shared between studies.
+- **The window: Workspace & studies.** Choose and check the workspace (writable, free space, drive type, cloud-sync
+  and long-path warnings; a missing chosen folder is reported, never silently replaced), recent workspaces, every
+  study with its report and folder, and New study. The New benchmark wizard shows and names the study folder.
+- **The window: Version control.** Git without the command line, after GenoSuv's design: status, staging, diffs,
+  commit, branches, remote, fetch/pull/push (as console jobs) and history, for the PlasBench folder or the
+  workspace. A managed `.gitignore` block keeps studies, results, downloads, reads and credentials out; every commit
+  is scanned (reads and run folders, `config/local.env` with the NCBI API key, tokens, files over 100 MB); remote
+  addresses may not carry credentials; nothing is force-pushed; AI co-author trailers are removed.
+- **The window's console answers questions.** A command that asks (for example "Install the missing items now?")
+  shows the question in the console, which highlights it; answer in the reply box or with Yes/No.
+
+### Changed
+- **One `PlasBench` folder, updated in place.** `install_latest.sh` installs into `~/PlasBench` (or
+  `$PLASBENCH_INSTALL_DIR/PlasBench`), and `update.sh` / `plasbench upgrade` update that folder instead of creating
+  `plasbench-<version>` folders. Only files the previous release installed are replaced (`scripts/release_sync.sh`
+  keeps a checksummed list; an edited release file is backed up to `.plasbench-backup/`); studies, settings, own
+  tools, downloads, tool environments and databases are kept. An older versioned install is carried in: its runs
+  move to `PlasBench/studies/`, its settings and own tools are copied, its downloads move to the shared folder once,
+  and the old folder is deleted after confirmation (`--yes`, or kept with `--keep-old`).
+- Script prompts print their question explicitly, so it is visible when the command runs from the window.
+
 ## [0.3.0] - 2026-11-13
 
 A feature release: benchmark your own tools without changing PlasBench's code, and do everything from a window in your browser with `plasbench ui`. No scoring, ranking or report change for the built-in tools. See the [release notes](docs/releases/v0.3.0.md). Compare: [v0.2.3...v0.3.0](https://github.com/ubeffiong/plasbench/compare/v0.2.3...v0.3.0).

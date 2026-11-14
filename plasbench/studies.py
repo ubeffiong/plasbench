@@ -90,6 +90,19 @@ def prepare(root, name: str, samples=None, cohort=None, argv=None) -> Path:
     return folder
 
 
+def create(root, name: str, note: str = "") -> Path:
+    """An empty study (from the window's New study button): its folders and a study.json, no run yet."""
+    folder = workspace(root) / valid_name(name)
+    if (folder / "study.json").exists():
+        raise ValueError(f"a study named {folder.name} already exists")
+    for sub in SUBDIRS:
+        (folder / sub).mkdir(parents=True, exist_ok=True)
+    now = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    record = {"name": folder.name, "created": now, "updated": now, "note": note, "runs": []}
+    (folder / "study.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return folder
+
+
 def list_studies(root) -> list:
     """Every study in the workspace, newest first, with what the window shows about it."""
     base = workspace(root)
@@ -109,6 +122,8 @@ def list_studies(root) -> list:
         out.append({"name": folder.name, "path": str(folder), "results": str(results), "modified": stamp,
                     "cohort": record.get("cohort"), "sample_sheet": record.get("sample_sheet"),
                     "runs": len(record.get("runs", [])), "report": (results / "benchmark.report.html").is_file(),
-                    "created": record.get("created")})
+                    "created": record.get("created"), "note": record.get("note", ""),
+                    "migrated_from": record.get("migrated_from"),
+                    "last_command": (record.get("runs") or [{}])[-1].get("command")})
     out.sort(key=lambda s: -s["modified"])
     return out

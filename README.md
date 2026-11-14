@@ -895,16 +895,19 @@ session has its own key, so other programs and web pages cannot use it.
 | **Tools** | Every built-in tool and every tool you added: task, track, input, whether it is installed, its reference database, and a switch for whether it runs by default. Install a missing tool from its row. |
 | **Add your own tool** | A form that writes the tool's manifest for you ([Section 5.11](#511-add-your-own-tool-and-benchmark-it)), with insertable `{contigs}`, `{graph}`, … placeholders, a live check that lists anything to fix, and **Save & install**. |
 | **Settings** | Every setting PlasBench reads, its default and its explanation, searchable. Your changes are saved to `config/local.env` on this computer, and clearing one returns to the default. |
+| **Workspace & studies** | Every benchmark is a study with its own folder (results, report, logs and a record of how it was run). Choose and check the workspace that holds them (free space, drive type, cloud-sync warnings), see every study, open its report or folder, start a new one. |
 | **New benchmark** | A five-step wizard: the isolates (demo, a bundled cohort, your own sheet, or the metagenomic track), the tools (built-in on/off and your own), resources, outputs and stages, then a review of the exact command before it starts. |
 | **Your own isolates** | Add an isolate from its FASTQ files and complete reference (`plasbench init-local`), with file pickers. |
 | **Cohorts** | The bundled study sets: validate one, or benchmark it in one click. |
 | **Runs & reports** | Every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
 | **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
+| **Version control** | Git without the command line: status, staging, diffs, commit, branches, remote, fetch/pull/push and history, for your PlasBench folder or your workspace. A managed `.gitignore` keeps run outputs, reads and credentials out, and every commit is checked for data, secrets and files too large for GitHub. |
 | **All commands** | Every `plasbench` command and option as a form, generated from the command line itself, so nothing is missing. Each shows the command it will run before you run it. |
 | **Guides** | This README and every guide, readable in the window. |
 
 Whatever you start runs as an ordinary `plasbench` command, shown in the console at the bottom of the window as it
-runs; you can keep working, cancel it, or copy its log. The window never does anything the command line cannot,
+runs; you can keep working, cancel it, or copy its log. When a command asks a question (for example "Install the
+missing items now? [y/N]"), the console highlights it and you answer in its reply box, or with its Yes/No buttons. The window never does anything the command line cannot,
 so a colleague can repeat any step by copying its command. `plasbench ui --no-browser` prints the address
 instead of opening a browser, and `--port` chooses the port.
 
@@ -1175,9 +1178,10 @@ This must now print a version number before you continue.
 #### First option: install the latest stable release automatically
 
 This is the recommended path for most laboratory users. It always resolves the
-latest published GitHub release, verifies its SHA-256 checksum, extracts it in
-your home directory, and starts the normal installer. Add `--tools` to install
-the benchmark tools and their databases at the same time.
+latest published GitHub release, verifies its SHA-256 checksum, installs it in
+**one folder, `~/PlasBench`**, and starts the normal installer. Add `--tools` to
+install the benchmark tools and their databases at the same time. Running the same
+command later updates that folder in place (see [Upgrade an existing installation](#upgrade-an-existing-installation)).
 
 ```bash
 cd ~
@@ -1185,18 +1189,18 @@ curl -fL -O https://raw.githubusercontent.com/ubeffiong/plasbench/main/scripts/i
 bash install_latest.sh --tools
 ```
 
-The script prints the installed version and directory when it completes. Save
-that directory for the later commands in this guide. In the same terminal,
-define `PB` once (replace the placeholder with the path the script printed):
+The script prints the installed version and folder when it completes. PlasBench
+always lives in `~/PlasBench`, so define `PB` once for the later commands in this guide:
 
 ```bash
-PB="/path/printed/by-install_latest.sh"
+PB="$HOME/PlasBench"
 cd "$PB"
 ```
 
 In a new terminal, define `PB` again before any command below that uses it.
 To install into another location, set `PLASBENCH_INSTALL_DIR=/path/to/location`
-before running the installer.
+before running the installer; PlasBench then lives in `/path/to/location/PlasBench`
+(use that as `PB`).
 
 #### Alternative: choose or inspect a specific release version
 
@@ -1837,17 +1841,31 @@ plasbench upgrade
 ```
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
-It finds the latest release, downloads and verifies it, unpacks it into a new sibling
-directory (for example `~/plasbench-0.1.3` → `~/plasbench-<new-version>`, your current one is never touched
-or deleted), then reuses one physical data directory for reads and databases. On the
-first upgrade from an older release, it **moves** the old `data/` directory once to
-`~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
-with a compatibility link; it never copies or re-downloads the database. It also carries
-over `config/local.tsv` and `.ncbi.env`, then installs the new PlasBench code into the
-existing `plasbench` environment **without refreshing Conda packages or tools**. Finish with:
+It finds the latest release, downloads and verifies it, and **updates your `PlasBench`
+folder in place**. Only the files the previous release installed are replaced (a release
+file you edited is backed up to `.plasbench-backup/` first); everything that is yours stays
+exactly where it is:
+
+| Kept as it is | Where |
+|---|---|
+| Your studies (every run, its results, report and logs) | `PlasBench/studies/`, or your chosen workspace |
+| Your settings for this computer | `config/local.env`, `.ncbi.env`, `config/local.tsv` |
+| Your own tools | `~/.plasbench/tools/` and `tools.d/<your tool>/` |
+| Downloaded reads and references | the shared data folder (`~/.local/share/plasbench/data` by default) |
+| Tool environments and databases | your conda environments and `~/.plasbench/databases` |
+
+The new code is installed into the existing `plasbench` environment **without refreshing
+Conda packages or tools** (`./update.sh --refresh-tools` refreshes them when release notes ask).
+
+**Coming from an older install in a versioned folder** (`~/plasbench-0.2.3` and earlier)?
+Run `./update.sh` there, or run `install_latest.sh` again. Either one installs the new
+release into `~/PlasBench`, moves the old folder's runs into `PlasBench/studies/`, copies
+its settings and own tools, moves its downloads to the shared data folder once (never
+copied, never downloaded again), and then asks before deleting the old folder (`--yes`
+deletes it without asking; `--keep-old` keeps it). Finish with:
 
 ```bash
-cd /path/printed/by-update.sh
+cd ~/PlasBench
 conda activate plasbench
 plasbench --version         # should print the new version
 ```
@@ -3545,6 +3563,30 @@ Keep them in separate sheets and run them separately. A cohort sheet carries
 curation metadata and a verification lock; a local sheet does not, and
 `REQUIRE_CURATED_METADATA=0` would switch that checking off for the public rows
 too. Two runs into two `--results-dir` directories keeps both honest.
+
+---
+
+### 5.10a Where each run is kept: study folders
+
+Every benchmark is a **study** with its own folder, so one cohort's results never mix with another's:
+
+```
+$PB/studies/<study>/
+    study.json   the sample sheet (with its checksum), the cohort, and every command run in this study
+    results/     predictions, scores, leaderboard and benchmark.report.html
+    logs/        tool and mapping logs
+    tmp/         scratch space
+```
+
+`plasbench run --cohort cohort1` keeps everything in `studies/cohort1/`; `--samples my_isolates.tsv` in
+`studies/my_isolates/`. Name it yourself with `--study NAME`, and rebuild one study's report with
+`plasbench report --study NAME`. `--results-dir DIR` still writes exactly where you say instead. Downloads, tool
+environments and databases are shared between studies, so a second study of the same isolates downloads nothing
+again.
+
+The folder that holds the studies is the **workspace**: `$PB/studies` by default. Put it on a larger or external
+disk from the window's **Workspace & studies** page, or set `PLASBENCH_WORKSPACE=/path/to/folder` in
+`config/local.env`.
 
 ---
 
