@@ -2,6 +2,8 @@ data/
 # ...but not the package's own data folder: it holds the plasbench ui page (plasbench/data/ui.html).
 !plasbench/data/
 results/
+# study folders (plasbench run --study; the window's Workspace page): user data, never committed
+studies/
 results_demo/
 results_demo_metagenomics/
 logs/
@@ -18,6 +20,11 @@ config/local.env
 build/
 *.egg-info/
 !config/accessions.tsv
+# Third-party reference figures kept locally for design (docs/images/reference/README.md says what each is for); never committed or shipped.
+docs/images/reference/*.jpg
+docs/images/reference/*.jpeg
+docs/images/reference/*.png
+!docs/images/reference/README.md
 
 # Release archives are build output, produced by `make dist` and attached to
 # GitHub Releases; they are not committed.

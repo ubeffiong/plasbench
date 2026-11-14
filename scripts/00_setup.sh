@@ -382,7 +382,7 @@ if [[ "$ASSUME_YES" -eq 1 ]]; then
     PROCEED=1
 else
     REPLY=""
-    read -r -p "Install the missing item(s) above now? [y/N] " REPLY || true
+    printf '%s' "Install the missing item(s) above now? [y/N] " >&2; read -r REPLY || true
     case "$REPLY" in y|Y|yes|YES|Yes) PROCEED=1 ;; esac
 fi
 

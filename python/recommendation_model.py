@@ -38,13 +38,26 @@ from pathlib import Path
 # mean, so a sample without stats simply falls back to average behaviour on
 # those axes instead of being unusable.
 ASSEMBLY_STAT_FIELDS = ("gc_percent", "n50", "contig_count", "assembly_size_bp")
-SCORE_CONTINUOUS_FIELDS = ("read_depth_x", "true_plasmid_bp", "true_plasmid_count")
+# TRUTH-FREE FEATURES ONLY. The model predicts how a tool will do on an isolate that has no reference, so every feature must be knowable for such an isolate:
+# the read depth measured from the reads, the statistics of its own short-read assembly, and its organism metadata. A feature taken from the truth (the true plasmid
+# size or count, the truth's AMR annotation) is known only in a retrospective benchmark; training on it leaks the answer and the model could not use it on a new
+# isolate (it was imputed with the training mean there). TRUTH_DERIVED_FIELDS lists what is forbidden; fit_feature_spec() refuses it.
+SCORE_CONTINUOUS_FIELDS = ("read_depth_x",)
 CONTINUOUS_FIELDS = SCORE_CONTINUOUS_FIELDS + ASSEMBLY_STAT_FIELDS
-# Models fitted before assembly stats were added stored three continuous
-# fields and no explicit field list. Their coefficient vectors are laid out in
-# this order, so an old JSON must be decoded against it -- see encode_row().
-LEGACY_CONTINUOUS_FIELDS = SCORE_CONTINUOUS_FIELDS
-CATEGORICAL_FIELDS = ("tool", "organism", "gram_group", "amr_status")
+CATEGORICAL_FIELDS = ("tool", "organism", "gram_group")
+TRUTH_DERIVED_FIELDS = frozenset({"true_plasmid_bp", "true_plasmid_count", "true_amr_gene_count", "amr_status"})
+# Models fitted before assembly stats were added stored three continuous fields (two of them truth-derived) and no explicit field list; models before this change stored
+# four categorical fields (one truth-derived). Their coefficient vectors are laid out in these orders, so an old JSON must be decoded against them -- see encode_row() --
+# but a model that used a truth-derived feature is no longer served (see truth_derived_in_spec and load_model).
+LEGACY_CONTINUOUS_FIELDS = ("read_depth_x", "true_plasmid_bp", "true_plasmid_count")
+LEGACY_CATEGORICAL_FIELDS = ("tool", "organism", "gram_group", "amr_status")
+
+
+def assert_truth_free(fields):
+    """Raise ValueError when `fields` contains a truth-derived feature (see TRUTH_DERIVED_FIELDS)."""
+    bad = sorted(set(fields) & TRUTH_DERIVED_FIELDS)
+    if bad:
+        raise ValueError("truth-derived feature(s) cannot be model inputs: " + ", ".join(bad))
 TARGETS = ("f1", "plasmid_recall")
 
 
@@ -232,7 +245,8 @@ def fit_feature_spec(rows):
     # module constant can grow (it did, when assembly stats were added); a
     # serialized model must keep decoding against the layout its coefficients
     # were actually fitted in.
-    return {"continuous": list(CONTINUOUS_FIELDS), "means": means, "stds": stds, "vocab": vocab}
+    assert_truth_free(list(CONTINUOUS_FIELDS) + list(CATEGORICAL_FIELDS))
+    return {"continuous": list(CONTINUOUS_FIELDS), "categorical": list(CATEGORICAL_FIELDS), "means": means, "stds": stds, "vocab": vocab}
 
 
 def spec_continuous_fields(spec):
@@ -247,6 +261,18 @@ def spec_continuous_fields(spec):
     return spec.get("continuous") or list(LEGACY_CONTINUOUS_FIELDS)
 
 
+def spec_categorical_fields(spec):
+    """The categorical fields this spec was fitted with (a spec from before the explicit list used the four legacy fields)."""
+    return spec.get("categorical") or list(LEGACY_CATEGORICAL_FIELDS)
+
+
+def truth_derived_in_spec(spec):
+    """The truth-derived features a fitted spec used, sorted (empty for a truth-free model)."""
+    if not spec:
+        return []
+    return sorted((set(spec_continuous_fields(spec)) | set(spec_categorical_fields(spec))) & TRUTH_DERIVED_FIELDS)
+
+
 def encode_row(row, spec):
     """Turn one row (a scores.tsv row, or a live isolate's known fields) into
     a feature vector using a fit-time spec. A missing continuous value is
@@ -258,7 +284,7 @@ def encode_row(row, spec):
         value = _as_float(row.get(field))
         value = spec["means"][field] if value is None else value
         vector.append((value - spec["means"][field]) / spec["stds"][field])
-    for field in CATEGORICAL_FIELDS:
+    for field in spec_categorical_fields(spec):
         value = str(row.get(field) or "not_recorded")
         vector.extend(1.0 if value == category else 0.0 for category in spec["vocab"][field])
     return vector
@@ -318,4 +344,9 @@ def load_model(path):
         return None, False, "recommendation model file unavailable or unreadable"
     ready = bool(payload.get("model_ready"))
     reason = payload.get("reason", "")
+    leaked = truth_derived_in_spec(payload.get("spec")) if ready else []
+    if leaked:
+        # a model fitted on truth-derived features learned from information a new isolate does not have: never served, refit with this release
+        return None, False, ("this model was fitted with truth-derived feature(s) (" + ", ".join(leaked) + ") and is not served; refit it with this release "
+                             "(python/fit_recommendation_model.py), which uses truth-free features only")
     return (RecommendationModel.from_dict(payload) if ready else None), ready, reason

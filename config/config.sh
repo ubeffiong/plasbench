@@ -735,3 +735,5 @@ export ISFINDER_FASTA="${ISFINDER_FASTA:-}"
 export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"
 # 1 embeds the interactive cohort dashboard in the HTML report (about 1 MB; it repeats the heatmap and metric tables). Default 0.
 export REPORT_EMBED_DASHBOARD="${REPORT_EMBED_DASHBOARD:-0}"
+# 1 keeps the all-sample numbers as the headline when no sample has a reference in the headline tiers (status fallback_allowed, warning kept). Default 0: the primary analysis is then unavailable and the ranking is provisional.
+export ALLOW_PRIMARY_FALLBACK="${ALLOW_PRIMARY_FALLBACK:-0}"
