@@ -13,6 +13,76 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added
+- **Study folders.** Every benchmark keeps everything it produces in its own folder, `<workspace>/<study>/`
+  (results, report, logs, tmp and a `study.json` recording the sample sheet with its checksum, the cohort and every
+  command). `plasbench run` names the study after the cohort or sample sheet, or `--study NAME`;
+  `plasbench report --study NAME` rebuilds one. The workspace is `PlasBench/studies` by default, or
+  `PLASBENCH_WORKSPACE`. Downloads, tool environments and databases stay shared between studies.
+- **The window: Workspace & studies.** Choose and check the workspace (writable, free space, drive type, cloud-sync
+  and long-path warnings; a missing chosen folder is reported, never silently replaced), recent workspaces, every
+  study with its report and folder, and New study. The New benchmark wizard shows and names the study folder.
+- **The window: Version control.** Git without the command line, after GenoSuv's design: status, staging, diffs,
+  commit, branches, remote, fetch/pull/push (as console jobs) and history, for the PlasBench folder or the
+  workspace. A managed `.gitignore` block keeps studies, results, downloads, reads and credentials out; every commit
+  is scanned (reads and run folders, `config/local.env` with the NCBI API key, tokens, files over 100 MB); remote
+  addresses may not carry credentials; nothing is force-pushed; AI co-author trailers are removed.
+- **PlasBench starts like a desktop program.** The installer adds a PlasBench icon to the desktop and the
+  applications/Start menu (`plasbench desktop-icon`; `--remove`, `--no-desktop`; `install.sh --no-icon` skips it).
+  On Linux it is a `.desktop` entry, on macOS `~/Applications/PlasBench.app`, and on Windows, with PlasBench
+  installed inside WSL2, a Windows shortcut that starts PlasBench in Ubuntu. Clicking it runs
+  `scripts/plasbench_launcher.sh`, which activates the `plasbench` conda/mamba/micromamba environment and starts the
+  window. A second click brings the running window back (one server per PlasBench folder, recorded in
+  `~/.plasbench/ui/server.json`). The window opens as an app window (Edge/Chrome `--app`; `plasbench ui --tab` for a
+  browser tab). **Quit** in the window stops PlasBench, and asks first if a job is still running.
+- **The PlasBench logo and icon.** A plasmid map holding three rising benchmark bars (`plasbench/data/logo.svg`,
+  `docs/images/plasbench-logo.svg`, `docs/images/plasbench-icon.svg`). It appears in the window's app bar, as its
+  favicon, as the desktop icon (PNG/ICO/ICNS drawn from the same geometry, nothing downloaded) and at the top of the
+  README.
+- **A terminal in the window's console.** The console stays fixed at the bottom of the window and now has two tabs:
+  **Job output** and **Terminal**, after GenoSuv's design. The Terminal runs your own commands in the PlasBench folder,
+  confined to it and the studies workspace. It offers the login shell (Linux, macOS), Ubuntu (WSL) or PowerShell
+  (Windows), keeps a command history, and records each command. `plasbench` there runs this PlasBench folder.
+- **Set up this computer → This computer.** Operating system, WSL, architecture, CPUs and RAM, conda and the
+  `plasbench` environment, Docker. It also gives the recommended way to run PlasBench there (the conda environment,
+  or WSL2 on Windows), the steps still to do, the warnings (Apple Silicon, low RAM, `/mnt/c` speed) and Docker as the
+  alternative, with its command. The checklist also checks for the `plasbench` environment.
+- **Session log and run script.** The console has a third tab, **Session log**. It shows, one line per event, what
+  happened in the session: commands started from the pages and how they ended, answers, cancels, terminal commands,
+  settings, workspace and study changes. Earlier sessions can be chosen too. **Save as script** downloads the session
+  as a bash script that repeats it, with failed commands, PowerShell commands and answers as comments. The log is
+  `~/.plasbench/ui/sessions.jsonl`; secret settings are never written, and hidden answers are masked.
+- **Help on every page.** A Help button on each page header, the **?** in the top bar, and F1 each explain the page:
+  what it is for, the steps, what is good to know, and the command-line equivalent. **Add your own tool** has a full
+  guide (**How it works**) covering the form's five sections, placeholders and output formats. Its worked example
+  adds MOB-recon as a user tool, and **Load this example** fills the form with it.
+- **Cohort details.** On the Cohorts page, **Details** describes each shipped cohort, from its sheet, its lock and
+  `cohorts/README.md`: isolates and species, plasmids in the truth, read depth, BioProjects, Illumina read volume and
+  the download estimate. Breakdowns cover organism, truth tier, truth technology and strategy, origin, country and
+  plasmids per isolate. A searchable sample table has NCBI links and, from the lock, host, isolation source,
+  collection date and how the reference was sequenced and assembled. It also says whether the lock still matches the
+  sheet. Metagenomic sheets show their communities, regimes and truth status (`plasbench/cohort_info.py`).
+- **The window's console answers questions.** A command that asks (for example "Install the missing items now?")
+  shows the question in the console, which highlights it; answer in the reply box or with Yes/No.
+
+### Changed
+- **One `PlasBench` folder, updated in place.** `install_latest.sh` installs into `~/PlasBench` (or
+  `$PLASBENCH_INSTALL_DIR/PlasBench`), and `update.sh` / `plasbench upgrade` update that folder instead of creating
+  `plasbench-<version>` folders. Only files the previous release installed are replaced (`scripts/release_sync.sh`
+  keeps a checksummed list; an edited release file is backed up to `.plasbench-backup/`); studies, settings, own
+  tools, downloads, tool environments and databases are kept. An older versioned install is carried in: its runs
+  move to `PlasBench/studies/`, its settings and own tools are copied, its downloads move to the shared folder once,
+  and the old folder is deleted after confirmation (`--yes`, or kept with `--keep-old`).
+- Script prompts print their question explicitly, so it is visible when the command runs from the window.
+- `scripts/docker_run.sh` mounts the studies workspace (`PLASBENCH_WORKSPACE`, default `./studies`) at
+  `/work/studies`, so a run in the container lands in the same study folder as a native run. An explicit
+  `RESULTS_DIR` in the environment is honoured like `--results-dir`.
+- The console is open by default (a quarter of the window) and remembers its height and whether you closed it.
+- The fixed console never hides the end of a page: the page keeps a bottom margin as tall as the console, and
+  scrolling to a field stops above it. The body was `height:100%`, so that margin used to end at the first screen.
+- The Terminal's command box is an expandable text area: one line by default, it grows as you type (Shift+Enter for
+  a new line) and can be dragged taller.
+
 ## [0.3.0] - 2026-11-13
 
 A feature release: benchmark your own tools without changing PlasBench's code, and do everything from a window in your browser with `plasbench ui`. No scoring, ranking or report change for the built-in tools. See the [release notes](docs/releases/v0.3.0.md). Compare: [v0.2.3...v0.3.0](https://github.com/ubeffiong/plasbench/compare/v0.2.3...v0.3.0).

@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/plasbench-logo.svg" alt="PlasBench" width="400"></p>
+
 # PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
@@ -878,35 +880,89 @@ than only these six lines.
 
 ### The PlasBench window (no command line)
 
-Everything in this README can also be done from a window in your web browser:
+Everything in this README can also be done from the PlasBench window, and the command line stays fully supported:
+every page runs an ordinary `plasbench` command, and the window has its own terminal.
+
+**Starting it.** The installer puts a **PlasBench icon** on your desktop and in the applications (Start) menu.
+Double-click it: PlasBench starts and its window opens. Double-click it again while PlasBench is running and you get the
+same window back; a second copy is not started. **Quit** (top right) stops PlasBench. Its studies, settings and jobs
+are kept. From a terminal the same thing is:
 
 ```bash
-plasbench ui
+plasbench ui                 # start PlasBench and open its window
+plasbench ui --tab           # open it in a normal browser tab instead of an app window
+plasbench ui --no-browser    # only print the address (a server, or another browser)
+plasbench desktop-icon       # (re)make the icon; --remove takes it away, --no-desktop keeps it to the menu
 ```
 
-It opens a page on this computer (the terminal prints its address; keep the terminal open while you use it, and
-press Ctrl+C there to close it). Nothing is sent anywhere: the page is served only to this computer, and each
-session has its own key, so other programs and web pages cannot use it.
+The window is a page served only to this computer (127.0.0.1). Each start gets its own session key, so other programs
+and web pages cannot use it, and nothing is sent anywhere. It opens as an app-style window, with no tabs or address
+bar, in Edge or Chrome when either is installed. Otherwise it opens in your default browser.
+
+**What the icon does on each kind of computer**
+
+| Computer | The icon | Where the tools run |
+|---|---|---|
+| Linux (Ubuntu, Debian, Fedora, ...) | applications menu + desktop (`~/.local/share/applications/plasbench.desktop`) | natively, from the `plasbench` conda environment |
+| macOS (Intel or Apple Silicon) | `~/Applications/PlasBench.app` + a link on the desktop | natively, from the `plasbench` conda environment (Apple Silicon: Rosetta for tools without an arm64 build) |
+| Windows | install PlasBench **inside WSL2 (Ubuntu)**; the installer then puts the icon on the **Windows** desktop and Start menu. It starts PlasBench inside Ubuntu, and the window opens in your Windows browser. | inside WSL2: the benchmark tools are Linux programs and do not run on Windows itself |
+
+The icon runs `scripts/plasbench_launcher.sh`. That script finds conda, mamba or micromamba and activates the
+`plasbench` environment. Then it starts the window and writes its messages to `~/.plasbench/ui/launcher.log`. Every
+check, install and run started from the window finds the environment's tools, however the window was started.
+
+**Conda or Docker?** Conda is the normal way: `plasbench install-tools` (or **Set up this computer**) creates the
+`plasbench` environment in your home folder, without administrator rights. Docker is an alternative, not a
+requirement. The release image `ghcr.io/ubeffiong/plasbench` carries every tool. `scripts/docker_run.sh plasbench run
+...` runs a command in it, with your downloads, settings and studies folder mounted, so results land in the same
+study folders. **Set up this computer → This computer** shows what this computer is, the way PlasBench should run
+there, what is still missing, and the Docker command when Docker is available.
 
 | Page | What you do there |
 |---|---|
 | **Home** | See how ready this computer is, the next setup step, and your latest results. Run the offline demo in one click. |
 | **Set up this computer** | A checklist of everything PlasBench needs (Python, Bash, conda, the core tools, databases, NCBI access, disk space), each with an **Install** or **Fix** button. Enter your NCBI email and API key. Install any tool profile, upgrade PlasBench, or run the test suite. |
 | **Tools** | Every built-in tool and every tool you added: task, track, input, whether it is installed, its reference database, and a switch for whether it runs by default. Install a missing tool from its row. |
-| **Add your own tool** | A form that writes the tool's manifest for you ([Section 5.11](#511-add-your-own-tool-and-benchmark-it)), with insertable `{contigs}`, `{graph}`, … placeholders, a live check that lists anything to fix, and **Save & install**. |
+| **Add your own tool** | A form that writes the tool's manifest for you ([Section 5.11](#511-add-your-own-tool-and-benchmark-it)), with insertable `{contigs}`, `{graph}`, … placeholders, a live check that lists anything to fix, and **Save & install**. **How it works** explains every section, placeholder and output format, and walks through a full example (adding MOB-recon as your own tool) that you can load into the form. |
 | **Settings** | Every setting PlasBench reads, its default and its explanation, searchable. Your changes are saved to `config/local.env` on this computer, and clearing one returns to the default. |
+| **Workspace & studies** | Every benchmark is a study with its own folder (results, report, logs and a record of how it was run). Choose and check the workspace that holds them (free space, drive type, cloud-sync warnings), see every study, open its report or folder, start a new one. |
 | **New benchmark** | A five-step wizard: the isolates (demo, a bundled cohort, your own sheet, or the metagenomic track), the tools (built-in on/off and your own), resources, outputs and stages, then a review of the exact command before it starts. |
 | **Your own isolates** | Add an isolate from its FASTQ files and complete reference (`plasbench init-local`), with file pickers. |
-| **Cohorts** | The bundled study sets: validate one, or benchmark it in one click. |
+| **Cohorts** | The bundled study sets. **Details** shows what each holds: description, isolates and species, plasmids in the truth, read depth, BioProjects and the download size. Breakdowns cover organism, truth tier, how the truth was assembled, origin and country. A searchable table lists every sample, with NCBI links, host, isolation source, collection date and how its reference was sequenced (from the cohort's lock). Validate a cohort, or benchmark it in one click. |
 | **Runs & reports** | Every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
 | **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
+| **Version control** | Git without the command line: status, staging, diffs, commit, branches, remote, fetch/pull/push and history, for your PlasBench folder or your workspace. A managed `.gitignore` keeps run outputs, reads and credentials out, and every commit is checked for data, secrets and files too large for GitHub. |
 | **All commands** | Every `plasbench` command and option as a form, generated from the command line itself, so nothing is missing. Each shows the command it will run before you run it. |
 | **Guides** | This README and every guide, readable in the window. |
 
-Whatever you start runs as an ordinary `plasbench` command, shown in the console at the bottom of the window as it
-runs; you can keep working, cancel it, or copy its log. The window never does anything the command line cannot,
-so a colleague can repeat any step by copying its command. `plasbench ui --no-browser` prints the address
-instead of opening a browser, and `--port` chooses the port.
+**The console** is fixed at the bottom of the window. It opens at a quarter of the window's height; drag its top edge
+to resize it, or collapse it to its title bar. It has two tabs:
+
+* **Job output.** What a command started from the window prints, live. You can keep working, cancel it, or copy its
+  log. When a command asks a question (for example "Install the missing items now? [y/N]"), the console highlights it.
+  Answer in its reply box or with its Yes/No buttons.
+* **Session log.** What happened in this session, one line per event: the window started, commands started from
+  the pages and how they ended, answers typed into their questions, cancels, terminal commands, settings, workspace
+  and study changes. Earlier sessions can be chosen from its list. **Save as script** downloads the session as a
+  bash script that repeats it: every command that succeeded, in order and in its folder. Failed or cancelled
+  commands, PowerShell commands and typed answers are kept as comments, so read the script before running it. The log
+  is kept in `~/.plasbench/ui/sessions.jsonl`. Secret settings are never written to it, and answers typed with "hide"
+  are masked.
+* **Terminal.** Type your own commands, as in any terminal: `ls studies`, `tail -n 40 logs/run.log`, `plasbench
+  check`, `git log`. Commands start in the PlasBench folder, and `cd` moves within it and the studies workspace (not
+  elsewhere on the disk). `plasbench` there always means this PlasBench folder. The command box is one line, grows as you type (Shift+Enter adds a line, Enter runs), and can be dragged taller.
+  Up and Down recall earlier commands,
+  and each command is recorded in `~/.plasbench/ui/terminal_history.jsonl`. On Linux and macOS it is your login shell,
+  with the environment's tools on PATH. On Windows it is Ubuntu (WSL) when installed, with PowerShell as an option.
+  Commands receive no keyboard input, so start interactive or long work from the pages, where its questions are
+  answered in Job output.
+
+**Help on every page.** Each page has a **Help** button, the **?** in the top bar does the same, and so does
+<kbd>F1</kbd>. It explains what the page is for, how to use it step by step, what is good to know, and the
+equivalent command.
+
+The window never does anything the command line cannot, so a colleague can repeat any step by copying its command.
+`--port` chooses the port.
 
 On a remote server, start it there and forward the port to your own computer, then open the printed address
 locally: `ssh -L 8770:127.0.0.1:8770 you@server`, then `plasbench ui --no-browser` on the server.
@@ -1175,9 +1231,10 @@ This must now print a version number before you continue.
 #### First option: install the latest stable release automatically
 
 This is the recommended path for most laboratory users. It always resolves the
-latest published GitHub release, verifies its SHA-256 checksum, extracts it in
-your home directory, and starts the normal installer. Add `--tools` to install
-the benchmark tools and their databases at the same time.
+latest published GitHub release, verifies its SHA-256 checksum, installs it in
+**one folder, `~/PlasBench`**, and starts the normal installer. Add `--tools` to
+install the benchmark tools and their databases at the same time. Running the same
+command later updates that folder in place (see [Upgrade an existing installation](#upgrade-an-existing-installation)).
 
 ```bash
 cd ~
@@ -1185,18 +1242,18 @@ curl -fL -O https://raw.githubusercontent.com/ubeffiong/plasbench/main/scripts/i
 bash install_latest.sh --tools
 ```
 
-The script prints the installed version and directory when it completes. Save
-that directory for the later commands in this guide. In the same terminal,
-define `PB` once (replace the placeholder with the path the script printed):
+The script prints the installed version and folder when it completes. PlasBench
+always lives in `~/PlasBench`, so define `PB` once for the later commands in this guide:
 
 ```bash
-PB="/path/printed/by-install_latest.sh"
+PB="$HOME/PlasBench"
 cd "$PB"
 ```
 
 In a new terminal, define `PB` again before any command below that uses it.
 To install into another location, set `PLASBENCH_INSTALL_DIR=/path/to/location`
-before running the installer.
+before running the installer; PlasBench then lives in `/path/to/location/PlasBench`
+(use that as `PB`).
 
 #### Alternative: choose or inspect a specific release version
 
@@ -1837,17 +1894,31 @@ plasbench upgrade
 ```
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
-It finds the latest release, downloads and verifies it, unpacks it into a new sibling
-directory (for example `~/plasbench-0.1.3` → `~/plasbench-<new-version>`, your current one is never touched
-or deleted), then reuses one physical data directory for reads and databases. On the
-first upgrade from an older release, it **moves** the old `data/` directory once to
-`~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
-with a compatibility link; it never copies or re-downloads the database. It also carries
-over `config/local.tsv` and `.ncbi.env`, then installs the new PlasBench code into the
-existing `plasbench` environment **without refreshing Conda packages or tools**. Finish with:
+It finds the latest release, downloads and verifies it, and **updates your `PlasBench`
+folder in place**. Only the files the previous release installed are replaced (a release
+file you edited is backed up to `.plasbench-backup/` first); everything that is yours stays
+exactly where it is:
+
+| Kept as it is | Where |
+|---|---|
+| Your studies (every run, its results, report and logs) | `PlasBench/studies/`, or your chosen workspace |
+| Your settings for this computer | `config/local.env`, `.ncbi.env`, `config/local.tsv` |
+| Your own tools | `~/.plasbench/tools/` and `tools.d/<your tool>/` |
+| Downloaded reads and references | the shared data folder (`~/.local/share/plasbench/data` by default) |
+| Tool environments and databases | your conda environments and `~/.plasbench/databases` |
+
+The new code is installed into the existing `plasbench` environment **without refreshing
+Conda packages or tools** (`./update.sh --refresh-tools` refreshes them when release notes ask).
+
+**Coming from an older install in a versioned folder** (`~/plasbench-0.2.3` and earlier)?
+Run `./update.sh` there, or run `install_latest.sh` again. Either one installs the new
+release into `~/PlasBench`, moves the old folder's runs into `PlasBench/studies/`, copies
+its settings and own tools, moves its downloads to the shared data folder once (never
+copied, never downloaded again), and then asks before deleting the old folder (`--yes`
+deletes it without asking; `--keep-old` keeps it). Finish with:
 
 ```bash
-cd /path/printed/by-update.sh
+cd ~/PlasBench
 conda activate plasbench
 plasbench --version         # should print the new version
 ```
@@ -3545,6 +3616,30 @@ Keep them in separate sheets and run them separately. A cohort sheet carries
 curation metadata and a verification lock; a local sheet does not, and
 `REQUIRE_CURATED_METADATA=0` would switch that checking off for the public rows
 too. Two runs into two `--results-dir` directories keeps both honest.
+
+---
+
+### 5.10a Where each run is kept: study folders
+
+Every benchmark is a **study** with its own folder, so one cohort's results never mix with another's:
+
+```
+$PB/studies/<study>/
+    study.json   the sample sheet (with its checksum), the cohort, and every command run in this study
+    results/     predictions, scores, leaderboard and benchmark.report.html
+    logs/        tool and mapping logs
+    tmp/         scratch space
+```
+
+`plasbench run --cohort cohort1` keeps everything in `studies/cohort1/`; `--samples my_isolates.tsv` in
+`studies/my_isolates/`. Name it yourself with `--study NAME`, and rebuild one study's report with
+`plasbench report --study NAME`. `--results-dir DIR` still writes exactly where you say instead. Downloads, tool
+environments and databases are shared between studies, so a second study of the same isolates downloads nothing
+again.
+
+The folder that holds the studies is the **workspace**: `$PB/studies` by default. Put it on a larger or external
+disk from the window's **Workspace & studies** page, or set `PLASBENCH_WORKSPACE=/path/to/folder` in
+`config/local.env`.
 
 ---
 

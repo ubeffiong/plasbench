@@ -65,6 +65,17 @@ TABLE = {
 }
 # Used by code but deliberately not installed through PlasBench. Each says why.
 MANUAL = {
+    # the PlasBench window, its desktop icon and its terminal: each is looked up first and optional
+    "conda": "the window's platform check and the desktop launcher look for it; plasbench install-conda installs it",
+    "micromamba": "an alternative to conda, looked up by the platform check and the desktop launcher",
+    "docker": "optional: the platform check reports it; scripts/docker_run.sh is the documented Docker mode",
+    "gh": "optional: Version control publishes to GitHub with it when present",
+    "gio": "GNOME only: marks the desktop icon trusted when present",
+    "update-desktop-database": "freedesktop only: refreshes the applications menu when present",
+    "notify-send": "optional: the desktop launcher shows an error notification when present",
+    "powershell": "Windows: makes the Start-menu and desktop shortcuts; also a terminal shell",
+    "powershell.exe": "Windows from WSL: makes the Windows desktop shortcut",
+    "wsl": "Windows: the platform check and the terminal's Ubuntu (WSL) shell",
     "deadends": "no bioconda package; INSTALL.md documents the manual build",
     "blastn": "only the one-off compare_scoring_methods.py cross-check uses it, and it states its own requirement",
     "timeout": "GNU coreutils; scripts/04_run_tools.sh uses it only when TOOL_TIMEOUT_SECONDS is set and checks for it first",

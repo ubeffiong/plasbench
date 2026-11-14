@@ -51,7 +51,7 @@ if database_present "$PLASSEMBLER_DB"; then
     warn "--force given: re-downloading over the existing database."
     if [[ "$ASSUME_YES" -ne 1 ]]; then
         REPLY=""
-        read -r -p "Overwrite the existing Plassembler database? [y/N] " REPLY || true
+        printf '%s' "Overwrite the existing Plassembler database? [y/N] " >&2; read -r REPLY || true
         case "$REPLY" in y|Y|yes|YES|Yes) : ;; *) log "Kept the existing database."; exit 0 ;; esac
     fi
 else
@@ -62,7 +62,7 @@ else
     echo
     if [[ "$ASSUME_YES" -ne 1 ]]; then
         REPLY=""
-        read -r -p "Download the Plassembler/Hybracter database now? [y/N] " REPLY || true
+        printf '%s' "Download the Plassembler/Hybracter database now? [y/N] " >&2; read -r REPLY || true
         case "$REPLY" in
             y|Y|yes|YES|Yes) : ;;
             *) log "Skipped. Re-run with --yes to skip this prompt."; exit 1 ;;

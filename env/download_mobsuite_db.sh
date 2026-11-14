@@ -79,7 +79,7 @@ if [[ -n "$DB_DIR" ]] && database_present "$DB_DIR"; then
     warn "This discards the working copy and fetches ~450MB again (the download resumes if interrupted)."
     if [[ "$ASSUME_YES" -ne 1 ]]; then
         REPLY=""
-        read -r -p "Overwrite the existing MOB-suite database? [y/N] " REPLY || true
+        printf '%s' "Overwrite the existing MOB-suite database? [y/N] " >&2; read -r REPLY || true
         case "$REPLY" in
             y|Y|yes|YES|Yes) : ;;
             *) log "Kept the existing database."; exit 0 ;;
@@ -96,7 +96,7 @@ else
     echo
     if [[ "$ASSUME_YES" -ne 1 ]]; then
         REPLY=""
-        read -r -p "Download the MOB-suite database now? [y/N] " REPLY || true
+        printf '%s' "Download the MOB-suite database now? [y/N] " >&2; read -r REPLY || true
         case "$REPLY" in
             y|Y|yes|YES|Yes) : ;;
             *) log "Skipped. Re-run with --yes to skip this prompt, or run 'mob_init' directly later."; exit 1 ;;
