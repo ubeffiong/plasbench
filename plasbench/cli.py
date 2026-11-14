@@ -278,7 +278,17 @@ def build_parser():
     ui_parser = sub.add_parser(
         "ui", help="Open the PlasBench window: set up, add tools, run benchmarks and read results without the command line.")
     ui_parser.add_argument("--port", type=int, default=8770, help="Local port (default 8770; the next free one is used).")
-    ui_parser.add_argument("--no-browser", action="store_true", help="Print the address instead of opening a browser.")
+    ui_parser.add_argument("--no-browser", action="store_true", help="Print the address instead of opening a window.")
+    ui_parser.add_argument("--tab", action="store_true",
+                           help="Open the page in a normal browser tab instead of an app-style window.")
+    ui_parser.add_argument("--new-instance", action="store_true",
+                           help="Start another server even if a PlasBench window is already running for this folder.")
+    icon_parser = sub.add_parser(
+        "desktop-icon",
+        help="Put a PlasBench icon on the desktop and in the applications/Start menu; clicking it starts PlasBench.")
+    icon_parser.add_argument("--remove", action="store_true", help="Remove the PlasBench icons instead.")
+    icon_parser.add_argument("--no-desktop", action="store_true",
+                             help="Only the applications/Start menu entry, not an icon on the desktop.")
     demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     demo_parser.add_argument("--open-report", action="store_true",
                              help="Open the completed demo report without prompting.")
@@ -710,8 +720,12 @@ def main(argv=None):
         )
     if args.command == "ui":
         from .webui import serve
-        serve(root, port=args.port, open_browser=not args.no_browser)
+        serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance)
         return 0
+    if args.command == "desktop-icon":
+        from . import desktop
+        return desktop.main(["--project-root", str(root)] + (["--remove"] if args.remove else [])
+                            + (["--no-desktop"] if args.no_desktop else []))
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
     elif args.command == "open-report":
@@ -1047,7 +1061,9 @@ def main(argv=None):
         # Every run keeps what it produces in its own study folder (plasbench/studies.py); downloads stay shared.
         # `report` uses a study only when named, so `report --results-dir DIR` and the old layout keep working.
         study_tmp = None
-        if not args.results_dir and (args.study or args.command == "run"):
+        # An explicit RESULTS_DIR in the environment (a script, a container) is honoured like --results-dir.
+        explicit_results = bool(os.environ.get("RESULTS_DIR")) and not args.study
+        if not args.results_dir and not explicit_results and (args.study or args.command == "run"):
             from . import studies
             try:
                 study_name = args.study or studies.default_name(args.cohort, args.samples)

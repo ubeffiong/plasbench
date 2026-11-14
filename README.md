@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/plasbench-logo.svg" alt="PlasBench" width="400"></p>
+
 # PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
@@ -878,15 +880,43 @@ than only these six lines.
 
 ### The PlasBench window (no command line)
 
-Everything in this README can also be done from a window in your web browser:
+Everything in this README can also be done from the PlasBench window, and the command line stays fully supported:
+every page runs an ordinary `plasbench` command, and the window has its own terminal.
+
+**Starting it.** The installer puts a **PlasBench icon** on your desktop and in the applications (Start) menu.
+Double-click it: PlasBench starts and its window opens. Double-click it again while PlasBench is running and you get the
+same window back; a second copy is not started. **Quit** (top right) stops PlasBench. Its studies, settings and jobs
+are kept. From a terminal the same thing is:
 
 ```bash
-plasbench ui
+plasbench ui                 # start PlasBench and open its window
+plasbench ui --tab           # open it in a normal browser tab instead of an app window
+plasbench ui --no-browser    # only print the address (a server, or another browser)
+plasbench desktop-icon       # (re)make the icon; --remove takes it away, --no-desktop keeps it to the menu
 ```
 
-It opens a page on this computer (the terminal prints its address; keep the terminal open while you use it, and
-press Ctrl+C there to close it). Nothing is sent anywhere: the page is served only to this computer, and each
-session has its own key, so other programs and web pages cannot use it.
+The window is a page served only to this computer (127.0.0.1). Each start gets its own session key, so other programs
+and web pages cannot use it, and nothing is sent anywhere. It opens as an app-style window, with no tabs or address
+bar, in Edge or Chrome when either is installed. Otherwise it opens in your default browser.
+
+**What the icon does on each kind of computer**
+
+| Computer | The icon | Where the tools run |
+|---|---|---|
+| Linux (Ubuntu, Debian, Fedora, ...) | applications menu + desktop (`~/.local/share/applications/plasbench.desktop`) | natively, from the `plasbench` conda environment |
+| macOS (Intel or Apple Silicon) | `~/Applications/PlasBench.app` + a link on the desktop | natively, from the `plasbench` conda environment (Apple Silicon: Rosetta for tools without an arm64 build) |
+| Windows | install PlasBench **inside WSL2 (Ubuntu)**; the installer then puts the icon on the **Windows** desktop and Start menu. It starts PlasBench inside Ubuntu, and the window opens in your Windows browser. | inside WSL2: the benchmark tools are Linux programs and do not run on Windows itself |
+
+The icon runs `scripts/plasbench_launcher.sh`. That script finds conda, mamba or micromamba and activates the
+`plasbench` environment. Then it starts the window and writes its messages to `~/.plasbench/ui/launcher.log`. Every
+check, install and run started from the window finds the environment's tools, however the window was started.
+
+**Conda or Docker?** Conda is the normal way: `plasbench install-tools` (or **Set up this computer**) creates the
+`plasbench` environment in your home folder, without administrator rights. Docker is an alternative, not a
+requirement. The release image `ghcr.io/ubeffiong/plasbench` carries every tool. `scripts/docker_run.sh plasbench run
+...` runs a command in it, with your downloads, settings and studies folder mounted, so results land in the same
+study folders. **Set up this computer → This computer** shows what this computer is, the way PlasBench should run
+there, what is still missing, and the Docker command when Docker is available.
 
 | Page | What you do there |
 |---|---|
@@ -905,11 +935,22 @@ session has its own key, so other programs and web pages cannot use it.
 | **All commands** | Every `plasbench` command and option as a form, generated from the command line itself, so nothing is missing. Each shows the command it will run before you run it. |
 | **Guides** | This README and every guide, readable in the window. |
 
-Whatever you start runs as an ordinary `plasbench` command, shown in the console at the bottom of the window as it
-runs; you can keep working, cancel it, or copy its log. When a command asks a question (for example "Install the
-missing items now? [y/N]"), the console highlights it and you answer in its reply box, or with its Yes/No buttons. The window never does anything the command line cannot,
-so a colleague can repeat any step by copying its command. `plasbench ui --no-browser` prints the address
-instead of opening a browser, and `--port` chooses the port.
+**The console** is fixed at the bottom of the window. It opens at a quarter of the window's height; drag its top edge
+to resize it, or collapse it to its title bar. It has two tabs:
+
+* **Job output.** What a command started from the window prints, live. You can keep working, cancel it, or copy its
+  log. When a command asks a question (for example "Install the missing items now? [y/N]"), the console highlights it.
+  Answer in its reply box or with its Yes/No buttons.
+* **Terminal.** Type your own commands, as in any terminal: `ls studies`, `tail -n 40 logs/run.log`, `plasbench
+  check`, `git log`. Commands start in the PlasBench folder, and `cd` moves within it and the studies workspace (not
+  elsewhere on the disk). `plasbench` there always means this PlasBench folder. Up and Down recall earlier commands,
+  and each command is recorded in `~/.plasbench/ui/terminal_history.jsonl`. On Linux and macOS it is your login shell,
+  with the environment's tools on PATH. On Windows it is Ubuntu (WSL) when installed, with PowerShell as an option.
+  Commands receive no keyboard input, so start interactive or long work from the pages, where its questions are
+  answered in Job output.
+
+The window never does anything the command line cannot, so a colleague can repeat any step by copying its command.
+`--port` chooses the port.
 
 On a remote server, start it there and forward the port to your own computer, then open the printed address
 locally: `ssh -L 8770:127.0.0.1:8770 you@server`, then `plasbench ui --no-browser` on the server.

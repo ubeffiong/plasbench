@@ -27,6 +27,26 @@ history is lost, only the numbering is cleaner. See
   workspace. A managed `.gitignore` block keeps studies, results, downloads, reads and credentials out; every commit
   is scanned (reads and run folders, `config/local.env` with the NCBI API key, tokens, files over 100 MB); remote
   addresses may not carry credentials; nothing is force-pushed; AI co-author trailers are removed.
+- **PlasBench starts like a desktop program.** The installer adds a PlasBench icon to the desktop and the
+  applications/Start menu (`plasbench desktop-icon`; `--remove`, `--no-desktop`; `install.sh --no-icon` skips it).
+  On Linux it is a `.desktop` entry, on macOS `~/Applications/PlasBench.app`, and on Windows, with PlasBench
+  installed inside WSL2, a Windows shortcut that starts PlasBench in Ubuntu. Clicking it runs
+  `scripts/plasbench_launcher.sh`, which activates the `plasbench` conda/mamba/micromamba environment and starts the
+  window. A second click brings the running window back (one server per PlasBench folder, recorded in
+  `~/.plasbench/ui/server.json`). The window opens as an app window (Edge/Chrome `--app`; `plasbench ui --tab` for a
+  browser tab). **Quit** in the window stops PlasBench, and asks first if a job is still running.
+- **The PlasBench logo and icon.** A plasmid map holding three rising benchmark bars (`plasbench/data/logo.svg`,
+  `docs/images/plasbench-logo.svg`, `docs/images/plasbench-icon.svg`). It appears in the window's app bar, as its
+  favicon, as the desktop icon (PNG/ICO/ICNS drawn from the same geometry, nothing downloaded) and at the top of the
+  README.
+- **A terminal in the window's console.** The console stays fixed at the bottom of the window and now has two tabs:
+  **Job output** and **Terminal**, after GenoSuv's design. The Terminal runs your own commands in the PlasBench folder,
+  confined to it and the studies workspace. It offers the login shell (Linux, macOS), Ubuntu (WSL) or PowerShell
+  (Windows), keeps a command history, and records each command. `plasbench` there runs this PlasBench folder.
+- **Set up this computer → This computer.** Operating system, WSL, architecture, CPUs and RAM, conda and the
+  `plasbench` environment, Docker. It also gives the recommended way to run PlasBench there (the conda environment,
+  or WSL2 on Windows), the steps still to do, the warnings (Apple Silicon, low RAM, `/mnt/c` speed) and Docker as the
+  alternative, with its command. The checklist also checks for the `plasbench` environment.
 - **The window's console answers questions.** A command that asks (for example "Install the missing items now?")
   shows the question in the console, which highlights it; answer in the reply box or with Yes/No.
 
@@ -39,6 +59,10 @@ history is lost, only the numbering is cleaner. See
   move to `PlasBench/studies/`, its settings and own tools are copied, its downloads move to the shared folder once,
   and the old folder is deleted after confirmation (`--yes`, or kept with `--keep-old`).
 - Script prompts print their question explicitly, so it is visible when the command runs from the window.
+- `scripts/docker_run.sh` mounts the studies workspace (`PLASBENCH_WORKSPACE`, default `./studies`) at
+  `/work/studies`, so a run in the container lands in the same study folder as a native run. An explicit
+  `RESULTS_DIR` in the environment is honoured like `--results-dir`.
+- The console is open by default (a quarter of the window) and remembers its height and whether you closed it.
 
 ## [0.3.0] - 2026-11-13
 

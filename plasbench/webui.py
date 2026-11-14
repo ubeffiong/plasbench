@@ -25,7 +25,6 @@ import subprocess
 import sys
 import threading
 import time
-import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
@@ -33,9 +32,11 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 from . import __version__
 from . import ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
+from .terminal import Terminal, TerminalError
 
 TOKEN = secrets.token_urlsafe(24)
 PAGE_FILE = Path(__file__).resolve().parent / "data" / "ui.html"
+LOGO_FILE = Path(__file__).resolve().parent / "data" / "logo.svg"
 UI_HOME = Path(os.environ.get("PLASBENCH_UI_HOME", Path.home() / ".plasbench" / "ui"))
 SERVABLE = {".html": "text/html; charset=utf-8", ".pdf": "application/pdf", ".tsv": "text/tab-separated-values; charset=utf-8",
             ".json": "application/json; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
@@ -236,8 +237,13 @@ class Project:
                 "" if os.name != "nt" else "Install Git for Windows (Git Bash) or WSL.")
         except Exception as exc:
             add("bash", "Bash (runs the pipeline stages)", False, str(exc), "Install Git for Windows (Git Bash) or WSL.")
-        solver = next((s for s in ("mamba", "conda", "micromamba") if shutil.which(s)), None)
-        add("conda", "Conda, mamba or micromamba (installs the tools)", solver, solver or "not found", "" if solver else "install-conda")
+        from . import platform_info
+        solver, solver_exe = platform_info.conda_solver()
+        add("conda", "Conda, mamba or micromamba (installs the tools)", solver, solver_exe or "not found",
+            "" if solver else "install-conda")
+        prefix = platform_info.env_prefix()
+        add("plasbench_env", "The plasbench conda environment (holds the tools)", prefix, str(prefix) if prefix else "not created yet",
+            "" if prefix else "install-tools core")
         add("git", "Git (upgrades, contributions)", shutil.which("git"), shutil.which("git") or "not found",
             "Install Git from https://git-scm.com/", optional=True)
         core = [("datasets", "NCBI datasets"), ("prefetch", "SRA toolkit: prefetch"), ("fasterq-dump", "SRA toolkit: fasterq-dump"),
@@ -568,6 +574,8 @@ def browse(path: str, files: bool) -> dict:
 
 def make_handler(project: Project, jobs: Jobs):
     page_cache = {"mtime": 0, "body": b""}
+    from . import studies
+    terminal = Terminal(project.root, UI_HOME / "terminal_history.jsonl", lambda: studies.workspace(project.root))
 
     def page() -> bytes:
         mtime = PAGE_FILE.stat().st_mtime
@@ -633,6 +641,11 @@ def make_handler(project: Project, jobs: Jobs):
             path, q = unquote(u.path), {k: v[0] for k, v in parse_qs(u.query).items()}
             if path == "/healthz":
                 return self.send(200, b"ok", "text/plain; charset=utf-8")
+            if path in ("/logo.svg", "/favicon.ico", "/icon.png"):   # the PlasBench mark: public, holds nothing private
+                if path == "/logo.svg":
+                    return self.send(200, LOGO_FILE.read_bytes(), "image/svg+xml")
+                from . import desktop
+                return self.send(200, desktop.png_bytes(64) if path == "/favicon.ico" else desktop.png_bytes(192), "image/png")
             if not self.token_ok():
                 return self.send(403, ("<!doctype html><title>PlasBench</title><body style='font-family:system-ui;padding:40px'>"
                                        "<h2>Open PlasBench from the link <code>plasbench ui</code> printed</h2><p>This address "
@@ -700,6 +713,12 @@ def make_handler(project: Project, jobs: Jobs):
                 if what == "scan":
                     return self.jsend(200, {"findings": gitops.scan_staged(repo)})
                 raise FileNotFoundError(f"no such API: {route}")
+            if route == "terminal":
+                return self.jsend(200, terminal.state())
+            if route == "platform":
+                from . import platform_info
+                info = platform_info.detect()
+                return self.jsend(200, {"info": info, "plan": platform_info.recommend(info)})
             if route == "workspace":
                 from . import studies, workspace
                 info = workspace.describe(project.root)
@@ -791,6 +810,25 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"local": project.save_local_env(changes)})
             if route == "git":
                 return self.jsend(200, self.git_op(data))
+            if route == "terminal/run":
+                command = data.get("command", "")
+                if not isinstance(command, str):
+                    raise ValueError("command must be a string")
+                return self.jsend(200, terminal.run(command))
+            if route == "terminal/shell":
+                terminal.use_shell(str(data.get("shell", "")))
+                return self.jsend(200, terminal.state())
+            if route == "shutdown":
+                running = [j for j in jobs.list() if j["state"] in ("running", "cancelling")]
+                if running and not data.get("force"):
+                    return self.jsend(200, {"ok": False, "running": [j["label"] for j in running]})
+                for job in running:
+                    try:
+                        jobs.cancel(job["id"])
+                    except (KeyError, ValueError):
+                        pass
+                threading.Timer(0.3, self.server.shutdown).start()
+                return self.jsend(200, {"ok": True})
             if route == "workspace/set":
                 from . import workspace
                 if any(j["state"] in ("running", "cancelling") for j in jobs.list()):
@@ -965,9 +1003,43 @@ def make_handler(project: Project, jobs: Jobs):
     return Handler
 
 
-def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: bool = True):
+def _instance_file() -> Path:
+    return UI_HOME / "server.json"
+
+
+def running_instance(root: Path):
+    """The URL of a PlasBench window already serving this PlasBench folder, or None."""
+    try:
+        info = json.loads(_instance_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if Path(info.get("root", "")).resolve() != Path(root).resolve():
+        return None
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"http://127.0.0.1:{int(info['port'])}/healthz", timeout=2) as r:
+            if r.status == 200:
+                return info["url"]
+    except (OSError, ValueError, KeyError):
+        return None
+    return None
+
+
+def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: bool = True, tab: bool = False,
+          new_instance: bool = False):
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise SystemExit("ERROR: the PlasBench window only listens on this computer (127.0.0.1).")
+    from . import appwindow, platform_info
+    # One window per PlasBench folder: a second start (a second click on the desktop icon) brings it back.
+    existing = None if new_instance else running_instance(root)
+    if existing:
+        print(f"PlasBench is already running: {existing}", flush=True)
+        if open_browser:
+            print("Opened: " + appwindow.open_app_window(existing, UI_HOME / "app-window", tab), flush=True)
+        return
+    # Every check and command started from the window finds the plasbench environment's tools, however the window was
+    # started (a desktop icon does not run `conda activate`).
+    os.environ["PATH"] = platform_info.tools_path()
     project = Project(root)
     jobs = Jobs(project)
     handler = make_handler(project, jobs)
@@ -981,13 +1053,27 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     if server is None:
         raise SystemExit(f"ERROR: no free port between {port} and {port + 19}")
     url = f"http://127.0.0.1:{server.server_address[1]}/?t={quote(TOKEN)}"
+    UI_HOME.mkdir(parents=True, exist_ok=True)
+    record = _instance_file()
+    record.write_text(json.dumps({"url": url, "port": server.server_address[1], "pid": os.getpid(),
+                                  "root": str(Path(root).resolve())}), encoding="utf-8")
+    try:
+        os.chmod(record, 0o600)   # it holds this session's key
+    except OSError:
+        pass
     print(f"PlasBench {__version__} window: {url}", flush=True)
-    print("Keep this terminal open while you use the window; press Ctrl+C here to close it.", flush=True)
+    print("Keep this running while you use the window; close it with Quit in the window, or Ctrl+C here.", flush=True)
     if open_browser:
-        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+        threading.Timer(0.6, lambda: print("Opened: " + appwindow.open_app_window(url, UI_HOME / "app-window", tab),
+                                           flush=True)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nClosed the PlasBench window.")
     finally:
         server.server_close()
+        try:
+            if json.loads(record.read_text(encoding="utf-8")).get("pid") == os.getpid():
+                record.unlink()
+        except (OSError, ValueError):
+            pass

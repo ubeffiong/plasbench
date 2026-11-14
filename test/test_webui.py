@@ -242,7 +242,8 @@ def main():
     views = ["home", "setup", "tools", "addtool", "settings", "wizard", "isolates", "cohorts", "runs", "jobs", "commands", "help"]
     check("every page the rail links to exists", all(f'id="v_{v}"' in html and f'data-view="{v}"' in html for v in views))
     check("the page loads nothing from the network", "http://" not in html.split("<script>")[0].replace("http://www.w3.org", "")
-          and "<link " not in html and "src=\"http" not in html)
+          and all(l.startswith('<link rel="icon"') and 'href="/' in l for l in html.split("<link ")[1:] for l in ["<link " + l])
+          and "src=\"http" not in html)
     check("API calls send the session token header", "X-PlasBench-Token" in html)
     check("[hidden] always hides (no component style overrides it)", "[hidden]{display:none!important}" in html)
 

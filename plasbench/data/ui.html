@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="plasbench-version" content="__VERSION__">
 <title>PlasBench</title>
+<link rel="icon" type="image/png" href="/favicon.ico">
 <style>
 /* ======================================================================================================
    PlasBench window (plasbench ui). One file, no network.
@@ -20,6 +21,7 @@
  --radius:3px;--radius-sm:3px;--shadow:none;--shadow-lg:0 10px 40px rgba(16,24,40,.22);
  --hdr:48px;--railw:248px;--cons:0px;--mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,"DejaVu Sans Mono",monospace;
  --term-bg:#1f2329;--term-fg:#d7dce2;--term-line:#323840;--term-head:#272c33;
+ --lg-ring:#1d5fa7;--lg-arc:#123f72;--lg-b1:#9dbbe0;--lg-b2:#4f86c2;--lg-b3:#1d5fa7;
  color-scheme:light;
 }
 :root[data-theme=dark]{
@@ -29,6 +31,7 @@
  --ok:#4fb26d;--ok-soft:#1b2e22;--warn:#d6a53c;--warn-soft:#33290f;--bad:#e8776d;--bad-soft:#3a1d1b;--info:#6aa8ea;--info-soft:#1f3044;
  --bar-bg:#1f2226;--bar-line:#3a4048;--rail:#1b1e21;--select:#263649;
  --term-bg:#121417;--term-line:#2a2f36;--term-head:#1a1d21;--shadow-lg:0 10px 40px rgba(0,0,0,.55);
+ --lg-ring:#4c8fd6;--lg-arc:#a9cbf0;--lg-b1:#3b5d84;--lg-b2:#4c8fd6;--lg-b3:#a9cbf0;
  color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -72,8 +75,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--primary)}
  padding:0 14px 0 12px;border-bottom:1px solid var(--bar-line)}
 .brand{display:flex;align-items:center;gap:10px;min-width:0;color:inherit;text-decoration:none;height:100%;padding-right:14px;border-right:1px solid var(--line-2)}
 .brand:hover{text-decoration:none}
-.brand .logo{width:26px;height:26px;display:grid;place-items:center;color:var(--primary)}
-.brand .logo .ico{width:26px;height:26px;stroke-width:2}
+.brand .logo{width:30px;height:30px;display:grid;place-items:center}
+.brand .logo svg{width:30px;height:30px;display:block}
 .brand b{font-size:15px;font-weight:600;letter-spacing:.005em}.brand .prod{display:flex;flex-direction:column;line-height:1.15}
 .brand small{color:var(--mut);font-size:11.5px;font-weight:400}
 .top .where{color:var(--mut);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:34vw}
@@ -286,6 +289,24 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #cin .ask{display:none;font-size:12px;color:#e3c27a;white-space:nowrap}
 #cin.waiting{background:#3a2f12;border-top-color:#8a6d1e}#cin.waiting .ask{display:inline}
 #cin.waiting input[type=text],#cin.waiting input[type=password]{border-color:#c9a23f}
+/* console tabs: Job output (what a command started from the window prints) and Terminal (type your own) */
+#chead .ctabs{display:inline-flex;align-self:stretch;gap:2px;margin:-3px 4px -3px 0}
+#chead .ctabs button{white-space:nowrap;border:0;border-bottom:2px solid transparent;border-radius:0;padding:0 10px;color:#aab3bd;background:transparent}
+#chead .ctabs button:hover{color:var(--term-fg);background:#ffffff0d}
+#chead .ctabs button.on{color:var(--term-fg);border-bottom-color:var(--primary-2,#5b9be0);font-weight:600}
+#console.term .jobonly,#console.term #cin{display:none!important}#console:not(.term) .termonly{display:none!important}
+#tlog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
+#tlog .t-cmd{color:#8cc3ff}#tlog .t-err{color:#f1938a}#tlog .t-mut{color:#8a939d}
+#tin{display:flex;align-items:center;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
+#tin select{width:auto;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font-size:12px;padding:1px 6px}
+#tin .pr{font:12px var(--mono);color:#8cc3ff;white-space:nowrap;max-width:32vw;overflow:hidden;text-overflow:ellipsis}
+#tin input{flex:1;min-width:0;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font:12px var(--mono)}
+#tin button{background:var(--primary);border:1px solid var(--primary);color:#fff;border-radius:2px;padding:2px 12px;font:inherit;font-size:12px;cursor:pointer}
+#tin button:disabled{opacity:.5;cursor:default}
+.top .tbtn.quit:hover{color:var(--bad);border-color:var(--bad)}
+.facts{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;font-size:12.5px;margin:0}
+.facts dt{color:var(--mut)}.facts dd{margin:0;overflow-wrap:anywhere}
+.modetag{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:2px;background:var(--primary-soft);color:var(--primary-ink);border:1px solid var(--line)}
 
 /* ---------- responsive ---------- */
 .grid>*,.split>*,.cmdgrid>*,.stats>*{min-width:0}
@@ -344,6 +365,10 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/></symbol>
   <symbol id="i-rocket" viewBox="0 0 24 24"><path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.8-.9.8-2.3-.1-3.1-.9-.8-2.2-.8-2.9.1z"/><path d="M12 15l-3-3a19 19 0 0 1 9.5-8.5L21 3l-.5 2.5A19 19 0 0 1 12 15z"/><path d="M9 12H5l2.5-3.5H11M12 15v4l3.5-2.5V13"/></symbol>
   <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.8-8.9A6 6 0 0 1 17.8 8 4.5 4.5 0 0 1 17 18z"/></symbol>
+  <!-- The PlasBench mark (plasbench/data/logo.svg): a plasmid map holding three rising benchmark bars. -->
+  <symbol id="pb-mark" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" style="stroke:var(--lg-ring)" stroke-width="4.5"/><path d="M41.30 12.06A22 22 0 0 1 51.94 41.30" fill="none" style="stroke:var(--lg-arc)" stroke-width="9"/><path d="M21.00 51.05A22 22 0 0 1 10.75 37.69" fill="none" style="stroke:var(--lg-arc)" stroke-width="9"/><rect x="30.6" y="5" width="2.8" height="10" style="fill:var(--lg-arc)"/><rect x="22" y="34" width="5" height="9" rx="1" style="fill:var(--lg-b1)"/><rect x="29.5" y="28" width="5" height="15" rx="1" style="fill:var(--lg-b2)"/><rect x="37" y="22" width="5" height="21" rx="1" style="fill:var(--lg-b3)"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></symbol>
   <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></symbol>
  </defs>
 </svg>
@@ -351,7 +376,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 <header class="top">
  <button class="tbtn" id="navtoggle" style="display:none" aria-label="Show navigation"><svg class="ico"><use href="#i-menu"/></svg></button>
  <a class="brand" href="#home" aria-label="PlasBench overview">
-  <span class="logo"><svg class="ico"><use href="#i-plasmid"/></svg></span>
+  <span class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#pb-mark"/></svg></span>
   <span class="prod"><b>PlasBench</b><small>Plasmid reconstruction benchmark · v__VERSION__</small></span>
  </a>
  <span class="where" id="where"></span>
@@ -364,7 +389,8 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
  </div>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
  <button class="tbtn" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg></button>
- <button class="tbtn" id="consbtn" title="Show or hide the job console"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
+ <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
+ <button class="tbtn quit" id="quitbtn" title="Quit PlasBench: stop it and close this window"><svg class="ico sm"><use href="#i-power"/></svg><span>Quit</span></button>
 </header>
 
 <div class="shell">
@@ -430,6 +456,10 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
    <div class="split">
     <div class="card"><div class="hd"><h3>Checklist</h3><span class="sub" id="envsum"></span></div><div id="envlist"><div class="bd mut">Checking…</div></div></div>
     <div class="stack">
+     <div class="card" id="pc_card"><div class="hd"><svg class="ico"><use href="#i-monitor"/></svg><h3>This computer</h3><span class="sub" id="pc_mode"></span></div>
+      <div class="bd" id="pc_body"><span class="mut">Looking at this computer…</span></div>
+      <div class="ft"><button class="btn sec sm" data-run='["desktop-icon","--remove"]' data-label="Remove the PlasBench desktop icon">Remove icon</button>
+       <button class="btn sm" data-run='["desktop-icon"]' data-label="Add the PlasBench icon to the desktop and the applications menu"><svg class="ico sm"><use href="#i-plus"/></svg>Add desktop icon</button></div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-key"/></svg><h3>NCBI access</h3></div><div class="bd">
       <p class="mut small" style="margin-top:0">Cohort downloads use NCBI. An email is courtesy; an API key raises the request allowance from 3 to 10 per second. Both are saved in <code id="ncbi_where">config/local.env</code> on this computer only.</p>
       <label class="small" for="ncbi_email"><b>Contact email</b></label><input type="text" id="ncbi_email" placeholder="you@institute.org" autocomplete="email">
@@ -592,21 +622,32 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 
 <div id="console" class="min" aria-label="Job console">
  <div id="cgrip" title="Drag to resize"></div>
- <div id="chead"><svg class="ico sm"><use href="#i-term"/></svg><b>Console</b>
-  <select id="cjob" aria-label="Job shown"><option value="">No jobs yet</option></select><span id="cstate"></span>
+ <div id="chead"><span class="ctabs" role="tablist" aria-label="Console views">
+   <button id="tab_out" class="on" role="tab" aria-selected="true" title="What the commands started from this window print, and your answers to their questions">Job output</button>
+   <button id="tab_term" role="tab" aria-selected="false" title="Type your own commands in the PlasBench folder">Terminal</button></span>
+  <select id="cjob" class="jobonly" aria-label="Job shown"><option value="">No jobs yet</option></select><span id="cstate" class="jobonly"></span>
+  <span id="tcwd" class="termonly mut small" style="color:#8a939d"></span>
   <span class="grow"></span>
-  <button id="ccancel" hidden><svg class="ico sm"><use href="#i-stop"/></svg>Cancel</button>
+  <button id="ccancel" class="jobonly" hidden><svg class="ico sm"><use href="#i-stop"/></svg>Cancel</button>
+  <button id="tclear" class="termonly" title="Clear the terminal screen (the history is kept)">Clear</button>
   <button id="ccopy"><svg class="ico sm"><use href="#i-copy"/></svg>Copy</button>
-  <button id="cfollow" aria-pressed="true">Follow</button>
+  <button id="cfollow" class="jobonly" aria-pressed="true">Follow</button>
   <button id="ctoggle"><svg class="ico sm"><use href="#i-chev"/></svg><span>Expand</span></button>
  </div>
- <pre id="clog" aria-live="polite"></pre>
+ <pre id="clog" class="jobonly" aria-live="polite"></pre>
+ <pre id="tlog" class="termonly" aria-live="polite"></pre>
  <form id="cin" hidden autocomplete="off" aria-label="Answer the running command">
   <span class="pr">›</span><span class="ask" id="cinask">Waiting for your answer:</span>
   <input type="text" id="cintx" placeholder="Type an answer for the running command and press Enter" aria-label="Answer">
   <label title="Mask what you type, here and in the log"><input type="checkbox" id="cinsec"> hide</label>
   <button type="button" data-ans="y" title="Send y">Yes</button><button type="button" data-ans="n" title="Send n">No</button>
   <button type="submit" class="send">Send</button>
+ </form>
+ <form id="tin" class="termonly" autocomplete="off" aria-label="Terminal">
+  <select id="tsh" title="Which shell the command runs in" aria-label="Shell"></select><span class="pr" id="tpr"></span>
+  <input type="text" id="tcmd" spellcheck="false" autocomplete="off" aria-label="Command"
+   placeholder="A command, e.g.  plasbench check    ls studies    tail -n 40 logs/*.log">
+  <button type="submit" id="trun" title="Run (Enter). Up/Down: earlier commands">Run</button>
  </form>
 </div>
 
@@ -648,7 +689,7 @@ async function api(path, body) {
   return data;
 }
 function sessionEnded(msg) {
-  if (document.getElementById("ended")) return;
+  if (S.quit || document.getElementById("ended")) return;
   const d = document.createElement("div"); d.id = "ended";
   d.style.cssText = "position:fixed;inset:0;z-index:200;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:20px";
   d.innerHTML = `<div class="card" style="max-width:520px"><div class="hd">${icon("alert", "ico")}<h3>Reconnect to PlasBench</h3></div>
@@ -751,11 +792,11 @@ async function pollConsole(force) {
     if (j.log) { const clean = j.log.replace(/\x1b\[[0-9;]*m/g, ""); $("#clog").insertAdjacentHTML("beforeend", colorize(clean));
       S.consOffset = j.offset; S.tail = ((S.tail || "") + clean).slice(-400); }
     const running = j.state === "running";
-    $("#cin").hidden = !running;
+    $("#cin").hidden = !running || S.ctab === "term";
     // A question the command is waiting on: the output ends with a [y/N]-style or "?"/":" prompt and no newline after it.
     const lastLine = (S.tail || "").split("\n").pop();
     const waiting = running && /(\[[yY]\/[nN]\]|\[[yY]es\/[nN]o\]|\?|:)\s*$/.test(lastLine) && lastLine.trim().length > 3;
-    if (waiting && !$("#cin").classList.contains("waiting")) { setConsole(true); toast("A command is waiting for your answer in the console", ""); $("#cintx").focus(); }
+    if (waiting && !$("#cin").classList.contains("waiting")) { setConsole(true); setCTab("out"); toast("A command is waiting for your answer in the console", ""); $("#cintx").focus(); }
     $("#cin").classList.toggle("waiting", waiting);
     const st = $("#cstate"); st.className = j.state; st.textContent = stateWord(j.state) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
     $("#ccancel").hidden = j.state !== "running";
@@ -781,22 +822,97 @@ $("#cin").onsubmit = e => { e.preventDefault(); sendAnswer($("#cintx").value); }
 $("#cin").addEventListener("click", e => { const b = e.target.closest("[data-ans]"); if (b) sendAnswer(b.dataset.ans); });
 $("#cinsec").onchange = e => { $("#cintx").type = e.target.checked ? "password" : "text"; };
 $("#ccancel").onclick = async () => { try { await api(`jobs/${S.consJob}/cancel`, {}); toast("Cancelling…"); } catch (e) { toast(e.message, "bad"); } };
-$("#ccopy").onclick = () => { navigator.clipboard.writeText($("#clog").innerText); toast("Log copied"); };
+$("#ccopy").onclick = () => { navigator.clipboard.writeText((S.ctab === "term" ? $("#tlog") : $("#clog")).innerText); toast("Copied"); };
 $("#cfollow").onclick = e => { S.follow = !S.follow; e.currentTarget.setAttribute("aria-pressed", S.follow); e.currentTarget.style.opacity = S.follow ? 1 : .55; };
-let consH = +(localStorage.getItem("pb_consh") || 300);
-function setConsole(open) {
+// The console is a fixed footer, open from the start at a quarter of the window (never under 160 px); it remembers
+// its height and whether you closed it.
+let consH = +(localStorage.getItem("pb_consh") || Math.max(160, Math.round(innerHeight * .25)));
+function setConsole(open, remember) {
   const c = $("#console"); c.classList.toggle("min", !open);
+  if (remember) localStorage.setItem("pb_consopen", open ? "1" : "0");
   document.documentElement.style.setProperty("--cons", (open ? consH : 40) + "px");
   $("#ctoggle span").textContent = open ? "Collapse" : "Expand";
   $("#ctoggle .ico").style.transform = open ? "" : "rotate(180deg)";
 }
-$("#ctoggle").onclick = () => setConsole($("#console").classList.contains("min"));
-$("#consbtn").onclick = () => setConsole($("#console").classList.contains("min"));
+$("#ctoggle").onclick = () => setConsole($("#console").classList.contains("min"), true);
+$("#consbtn").onclick = () => setConsole($("#console").classList.contains("min"), true);
 $("#cgrip").onmousedown = e => { e.preventDefault(); const y0 = e.clientY, h0 = consH;
   const mv = ev => { consH = Math.max(120, Math.min(innerHeight - 160, h0 + (y0 - ev.clientY))); setConsole(true); };
   const up = () => { localStorage.setItem("pb_consh", consH); removeEventListener("mousemove", mv); removeEventListener("mouseup", up); };
   addEventListener("mousemove", mv); addEventListener("mouseup", up); };
-setConsole(false);
+setConsole(localStorage.getItem("pb_consopen") !== "0");
+
+/* ---- console tabs: Job output | Terminal ---- */
+S.ctab = "out";
+function setCTab(t) {
+  S.ctab = t; $("#console").classList.toggle("term", t === "term");
+  for (const [id, name] of [["#tab_out", "out"], ["#tab_term", "term"]]) { $(id).classList.toggle("on", name === t); $(id).setAttribute("aria-selected", name === t); }
+  if (t === "term") { setConsole(true); termState(); setTimeout(() => $("#tcmd").focus(), 30); } else pollConsole(true);
+}
+$("#tab_out").onclick = () => setCTab("out");
+$("#tab_term").onclick = () => setCTab("term");
+
+/* ---- terminal: your own commands, in the PlasBench folder (or the workspace) ---- */
+const T = {hist: [], at: 0, loaded: false};
+function tPrint(html) { const b = $("#tlog"); b.insertAdjacentHTML("beforeend", html); b.scrollTop = b.scrollHeight; }
+function tShow(st) {
+  $("#tpr").textContent = st.prompt || ""; $("#tpr").title = st.cwd || ""; $("#tcwd").textContent = st.shown_cwd || "";
+  $("#tcmd").disabled = !st.enabled; $("#trun").disabled = !st.enabled;
+}
+async function termState() {
+  try {
+    const st = await api("terminal");
+    $("#tsh").innerHTML = st.shells.map(x => `<option value="${esc(x.id)}" title="${esc(x.what)}">${esc(x.label)}</option>`).join("");
+    if (st.shell) $("#tsh").value = st.shell;
+    tShow(st);
+    if (!T.loaded) {
+      T.loaded = true; T.hist = st.history || []; T.at = T.hist.length;
+      tPrint(`<span class="t-mut">${esc(st.enabled ? `${st.about} Folder: ${st.cwd}. cd stays inside the PlasBench folder and the workspace. Long or interactive work: start it from the pages, where its questions are answered in Job output.` : "Terminal unavailable: " + st.note)}</span>\n`);
+    }
+  } catch (e) { tPrint(`<span class="t-err">${esc(e.message)}</span>\n`); }
+}
+async function termRun() {
+  const inp = $("#tcmd"), cmd = inp.value.trim(); if (!cmd) return;
+  if (cmd === "clear" || cmd === "cls") { $("#tlog").innerHTML = ""; inp.value = ""; return; }
+  tPrint(`<span class="t-cmd">${esc($("#tpr").textContent)} ${esc(cmd)}</span>\n`);
+  T.hist.push(cmd); T.at = T.hist.length; inp.value = ""; inp.disabled = true; $("#trun").disabled = true;
+  try {
+    const r = await api("terminal/run", {command: cmd});
+    const out = (r.output || "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\s+$/, "");
+    if (out) tPrint(esc(out) + "\n");
+    if (r.exit !== 0) tPrint(`<span class="t-err">[exit ${r.exit}]</span>\n`);
+    $("#tpr").textContent = r.prompt || $("#tpr").textContent;
+    if (/^(cd|chdir|set-location)\b/i.test(cmd)) termState();
+  } catch (e) { tPrint(`<span class="t-err">${esc(e.message)}</span>\n`); }
+  inp.disabled = false; $("#trun").disabled = false; inp.focus();
+}
+$("#tin").onsubmit = e => { e.preventDefault(); termRun(); };
+$("#tcmd").addEventListener("keydown", e => {
+  if (e.key === "ArrowUp" && T.hist.length) { e.preventDefault(); T.at = Math.max(0, T.at - 1); e.target.value = T.hist[T.at] || ""; }
+  else if (e.key === "ArrowDown" && T.hist.length) { e.preventDefault(); T.at = Math.min(T.hist.length, T.at + 1); e.target.value = T.hist[T.at] || ""; }
+});
+$("#tsh").onchange = async e => {
+  try { const st = await api("terminal/shell", {shell: e.target.value}); tShow(st); tPrint(`<span class="t-mut">[now ${esc(st.shell_label)}] ${esc(st.about)}</span>\n`); $("#tcmd").focus(); }
+  catch (err) { toast(err.message, "bad"); }
+};
+$("#tclear").onclick = () => { $("#tlog").innerHTML = ""; };
+
+/* ---- Quit: stop PlasBench (the server) and close the window ---- */
+$("#quitbtn").onclick = async () => {
+  if (!confirm("Quit PlasBench?\n\nThis stops PlasBench and closes the window. Your studies, results and settings are kept. Start it again from the desktop icon or with: plasbench ui")) return;
+  try {
+    let r = await api("shutdown", {});
+    if (!r.ok) {
+      if (!confirm(`Still running:\n  ${r.running.join("\n  ")}\n\nStop ${r.running.length > 1 ? "them" : "it"} and quit?`)) return;
+      r = await api("shutdown", {force: true});
+    }
+  } catch (e) { toast(e.message, "bad"); return; }
+  S.quit = true;
+  document.body.innerHTML = `<div style="display:grid;place-items:center;height:100vh;font-family:system-ui;color:#3c4650;text-align:center">
+    <div><svg viewBox="0 0 64 64" width="56" height="56"><use href="#pb-mark"/></svg><h2 style="font-weight:600;margin:12px 0 6px">PlasBench has stopped</h2>
+    <p>You can close this window. Start PlasBench again from its desktop icon or with <code>plasbench ui</code>.</p></div></div>` + document.querySelector("svg[aria-hidden]").outerHTML;
+  setTimeout(() => window.close(), 600);
+};
 
 /* ===================================================================================================
    Shared loaders
@@ -844,8 +960,32 @@ async function loadHome() {
 /* ===================================================================================================
    SETUP
    =================================================================================================== */
+async function loadPlatform(force) {
+  if (S.platform && !force) return renderPlatform(S.platform);
+  try { S.platform = await api("platform"); renderPlatform(S.platform); }
+  catch (e) { $("#pc_body").innerHTML = `<span class="mut">${esc(e.message)}</span>`; }
+}
+function renderPlatform({info, plan}) {
+  const modeWord = {conda: "Tools run from the plasbench conda environment", docker: "Tools run in the Docker image", wsl: "Install and run inside WSL2"}[plan.mode] || plan.mode;
+  $("#pc_mode").innerHTML = `<span class="modetag">${esc(modeWord)}</span>`;
+  const d = info.docker || {}, r = info.resources || {};
+  const facts = [["System", `${info.os_label} · ${info.arch}`], ["Resources", `${r.cpus} CPUs` + (r.ram_gb ? ` · ${r.ram_gb} GB RAM` : "")],
+    ["Python", info.python], ["Conda", info.conda_solver ? `${info.conda_solver} (${info.conda_exe})` : "not found"],
+    ["plasbench env", info.env_prefix || "not created yet"],
+    ["Docker", !d.installed ? "not installed" : !d.running ? "installed, not running" : `running ${d.version || ""}` + (d.image ? " · PlasBench image present" : "")]];
+  const list = (arr, cls, ic) => arr.map(t => `<div class="note ${cls}" style="margin-top:8px">${icon(ic, "ico")}<div>${esc(t)}</div></div>`).join("");
+  $("#pc_body").innerHTML = `<p style="margin-top:0"><b>${esc(plan.summary)}</b></p>
+    <dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    ${plan.reasons.length ? `<p class="small mut">${plan.reasons.map(esc).join(" ")}</p>` : ""}
+    ${plan.steps.length ? `<div class="small"><b>To do</b><ol style="margin:4px 0 0;padding-left:20px">${plan.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol></div>` : `<div class="note ok" style="margin-top:8px">${icon("check", "ico")}<div>Nothing to install for the way PlasBench runs here.</div></div>`}
+    ${list(plan.warnings, "warn", "alert")}
+    ${plan.alternatives.length ? `<p class="small" style="margin-bottom:4px"><b>Also possible</b>: ${plan.alternatives.map(esc).join(" ")}</p>
+      <div class="cmdline small"><span class="p">$</span><code>${esc(plan.docker_command)}</code></div>` : ""}
+    <p class="small mut" style="margin-bottom:0">The desktop icon starts PlasBench (or brings this window back). Quit, top right, stops it. Every page also works from the command line, and from the Terminal tab of the console below.</p>`;
+}
 async function loadSetup(force) {
   $("#ncbi_where").textContent = S.info?.local_env || "config/local.env";
+  loadPlatform(force);
   try {
     const env = await getEnv(force);
     renderEnv(env);
