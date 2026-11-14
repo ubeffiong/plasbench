@@ -13,6 +13,14 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- a run cut off during assembly resumes cleanly
+- **Stage 3 is crash-safe.** fastp now writes `*.trim.partial.fastq.gz` and renames the pair only when it succeeds;
+  a `.fastp.complete` marker records a finished trim. Trimmed reads left by a run that was cut off (a full disk, WSL
+  or the machine stopping) used to be taken for finished reads and assembled truncated; they are now trimmed again,
+  with a log line saying so. An interrupted SPAdes/Unicycler folder is cleared before reassembling, and the contigs
+  and graph are copied under `.partial` names first, so a half-copied `contigs.fasta` is never reused. Finished work
+  is still reused, including samples trimmed and assembled by an earlier PlasBench.
+
 ### Added -- a structured evidence record for every reference (review H3)
 - `python/truth_provenance.py` records six evidence fields per reference, additively: assembly technology, circularity evidence, read support, replicon/MOB evidence, structural integrity and independent validation, each `declared` (new optional sample-sheet columns `truth_circularity_evidence`, `truth_read_support`, `truth_structural_integrity`, `truth_independent_validation`), `inferred` (NCBI metadata, `truth_labels.tsv`) or `unknown`; plus `evidence_recorded` and `evidence_sources`. The original columns keep their order. Unknown never demotes a reference; an explicit adverse value (read support none, unresolved repeats) caps Tier 1 at Tier 2 and says why. `validate_cohort.py` checks the new vocabularies; the headline design table gains an *Evidence recorded* column; the demo declares some evidence and now builds the provenance table before aggregating (so the headline and the report read the same references). `test/test_truth_evidence_record.py` covers it. The cohort `truth_quality_tier` column is kept for now: it still feeds the tier and replacing it needs the cohorts re-curated (maintainer-owned).
 
