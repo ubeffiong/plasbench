@@ -57,7 +57,8 @@ HELP = {
         "Compare the ranking score first, then precision (is what it called plasmid really plasmid?) and recall (did it find the plasmid?). The 95% interval shows the "
         "uncertainty.",
         "Shows who is best and how the leader wins: by finding more, or by being more careful.",
-        "With few isolates the interval is wide and ranks can swap. Columns marked 'not computed' were not available for this run."),
+        "With few isolates the interval is wide and ranks can swap. Columns marked 'not computed' were not available for this run. If a banner says the primary "
+        "analysis is unavailable, no reference met the requirement and this table is provisional, not the headline."),
     "chart": H(
         "The ranking as bars: precision, recall and F1 for each tool.",
         "The same scores as the ranking table.",

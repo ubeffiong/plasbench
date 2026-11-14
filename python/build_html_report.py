@@ -136,6 +136,11 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Primary analysis": {
+        "what": "The headline ranking computed only on references that meet the pre-specified requirement (reference tiers 1-2).",
+        "why": "A ranking is only as good as its reference standard. When no reference qualifies the primary analysis is reported unavailable and the all-sample "
+               "ranking is shown as provisional, so a weak result is never mistaken for the headline.",
+    },
     "Base F1": {
         "what": "Harmonic mean of base-level precision and recall, 0 to 1.",
         "why": "It is a single number for two different failures -- claiming "
@@ -503,6 +508,29 @@ def report_cards(leaderboard, scores):
     return cards
 
 
+def primary_state(leaderboard):
+    """(status, population) of the primary analysis from the leaderboard rows. An older leaderboard without the column is treated as available (it makes no claim)."""
+    row = leaderboard[0] if leaderboard else {}
+    return (row.get("primary_status") or "available"), (row.get("population") or "")
+
+
+def primary_banner(leaderboard):
+    """The banner above the ranking when the primary analysis is unavailable (or only allowed by fallback); empty when it is available."""
+    status, population = primary_state(leaderboard)
+    if status == "available":
+        return ""
+    reason = population.split("(", 1)[1].rstrip(")") if "(" in population else population
+    if status == "fallback_allowed":
+        head = "Primary analysis unavailable; fallback allowed."
+        tail = ("ALLOW_PRIMARY_FALLBACK=1 keeps the all-sample numbers as the headline. They are not the pre-specified primary analysis: read them as provisional.")
+    else:
+        head = "Primary analysis unavailable."
+        tail = ("The table below is the PROVISIONAL ranking on all samples; it is not the headline result and must not be quoted as one. To obtain the primary analysis, add "
+                "references that meet the pre-specified requirement (reference tiers 1-2: long-read-first, independently polished, evidence-checked labels); see Headline design "
+                "and reference standard for what each isolate lacks.")
+    return (f"<div class='insight caution primary-unavailable' id='primary-banner'><p><strong>{esc(head)}</strong> Reason: {esc(reason)}. {esc(tail)}</p></div>")
+
+
 def guided_findings(leaderboard, cards, scores, status_counts):
     """Findings a reader should look at, each pointing at where to look.
 
@@ -532,8 +560,17 @@ def guided_findings(leaderboard, cards, scores, status_counts):
                      "treat the rank as provisional, not a settled result.",
         }.get(sig_raw, " Too few samples are shared with the runner-up for a paired "
                        "significance test yet, so this lead is not statistically assessed.")
+        status, population = primary_state(leaderboard)
+        if status != "available":
+            findings.append({
+                "tone": "caution", "label": "Primary analysis unavailable",
+                "text": (f"No reference meets the pre-specified requirement ({esc(population.split('(', 1)[1].rstrip(')') if '(' in population else population)}), so the ranking is "
+                         "provisional and is not the headline result."),
+                "target": "#headline-design", "action": "See the reference standard",
+            })
         findings.append({
-            "tone": "good" if sig_raw == "true" else "caution", "label": f"Highest {headline_label(best)}",
+            "tone": "good" if sig_raw == "true" and status == "available" else "caution",
+            "label": ("Provisional: " if status != "available" else "") + f"Highest {headline_label(best)}",
             "text": f"{esc(best['tool'])} leads on {esc(headline_label(best))} at {best_f1:.3f}{margin}."
                     f"{spread + '.' if spread else ''}{sig_clause}",
             "target": "#statistics", "action": "See the paired evidence",
@@ -631,8 +668,10 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         ("Isolates", str(samples), "Samples with a truth set and at least one scored method."),
         ("Truth plasmids", str(int(plasmids)), "Reference plasmids the methods were measured against."),
         # `scope` names the analysis track when several were scored (" · Short-read track"): the leader belongs to one track, never to a pooled ranking
-        ("Leading method", esc(best["tool"]),
-         f"Highest {headline_label(best)} ({headline_value(best) or 0:.3f}){scope} · method ranking only."),
+        (("Leading method" if primary_state(leaderboard)[0] == "available" else "Leading method (provisional)"), esc(best["tool"]),
+         (f"Highest {headline_label(best)} ({headline_value(best) or 0:.3f}){scope} · method ranking only."
+          if primary_state(leaderboard)[0] == "available" else
+          f"Provisional: highest {headline_label(best)} ({headline_value(best) or 0:.3f}){scope}. Primary analysis unavailable (no qualifying reference); not the headline result.")),
         ("Runs not completed", str(status_counts.get("failed", 0) + status_counts.get("skipped", 0)),
          "Failed runs on plasmid-bearing isolates count as zero for that tool; skipped runs are left out."),
     ]
@@ -1216,7 +1255,8 @@ def headline_design_section(out_dir):
     design_rows = "".join(
         f"<tr><td>{esc(r.get('analysis_track'))}</td><td>{esc(TASK_LABELS.get(r.get('task'), r.get('task')))}</td>"
         f"<td>{esc(METRIC_LABELS.get(r.get('ranking_metric'), r.get('ranking_metric')))}</td>"
-        f"<td>{esc(r.get('reference_basis'))}</td><td>{esc(r.get('species_basis') or 'pooled')}</td></tr>"
+        f"<td>{esc(r.get('reference_basis'))}</td><td>{esc(r.get('species_basis') or 'pooled')}</td>"
+        f"<td>{esc(r.get('primary_status') or 'available')}</td></tr>"
         for r in design) or "<tr><td colspan='5'>Not recorded.</td></tr>"
     tier_counts = Counter(r.get("reference_tier") for r in provenance)
     provenance_rows = "".join(
@@ -1256,7 +1296,7 @@ def headline_design_section(out_dir):
         "enough independent (non-clonal) isolates; smaller species are described only.</p>"
         "<details class='rpt-collapsible'><summary>Show the reference standard, truth provenance, tier sensitivity and species balance</summary>"
         "<div class='panel'><table><thead><tr><th>Track</th><th>Task</th><th>Ranking metric</th>"
-        f"<th>Reference standard</th><th>Species basis</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
+        f"<th>Reference standard</th><th>Species basis</th><th>Primary analysis</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
         f"<h3>Truth provenance</h3><p class='muted'>Tier counts: "
         + (", ".join(f"tier {esc(t)}: {n}" for t, n in sorted(tier_counts.items()) if t) or "none")
         + ". Derived values are heuristics from NCBI assembly metadata; set truth_assembly_strategy and "
@@ -2222,6 +2262,7 @@ def main():
         leaderboard_panels = leaderboard_table(
             track_leaderboards.get(ordered_tracks[0], leaderboard) if ordered_tracks else leaderboard)
 
+    leaderboard_panels = primary_banner(headline_leaderboard) + leaderboard_panels
     import report_wiring
     robustness_html = robustness_section(track_leaderboards, ordered_tracks or list(track_leaderboards),
                                          report_wiring.overlap_statuses(str(results_dir)))

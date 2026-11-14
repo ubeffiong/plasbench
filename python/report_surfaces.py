@@ -84,7 +84,7 @@ LEADERBOARD_COLUMN_GROUPS = {
     "Rank and basis": [
         "rank", "analysis_track", "task", "tool", "is_baseline", "beats_best_baseline", "ranking_metric", "ranking_score",
         "ranking_ci_low", "ranking_ci_high", "ranking_basis", "ranking_species_basis", "n_headline_species", "n_ranking_clusters",
-        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples"],
+        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population"],
     "Run counts": [
         "n_samples", "n_completed", "n_failed", "n_skipped", "n_failed_resource", "n_failed_tool", "n_infrastructure_failure",
         "n_not_applicable", "n_f1_scored", "n_failures_scored_zero"],

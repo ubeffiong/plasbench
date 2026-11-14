@@ -873,7 +873,8 @@ def write_tsv(summary, path):
             "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
             "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed",
             "n_failed_tool", "n_infrastructure_failure", "n_not_applicable", "mean_contig_bin_f1_bp",
-            "cprr_isolate_mean", "cprr_isolates", "cprr_auc"]
+            "cprr_isolate_mean", "cprr_isolates", "cprr_auc",
+            "primary_status", "population"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -943,6 +944,7 @@ def write_tsv(summary, path):
                 # Isolate-weighted CPRR (each isolate counts once) and the normalised
                 # area under the CPRR threshold-sweep curve (0.80-0.99).
                 fmt4(s.get("cprr_isolate_mean")), s.get("cprr_isolates", ""), fmt4(s.get("cprr_auc")),
+                s.get("primary_status", ""), s.get("population", ""),
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
@@ -997,6 +999,9 @@ def write_md_table(fh, summary, track=None, task=None):
         title.append(f"{task} (ranked by {hd.METRIC_LABEL.get(metric, metric)})")
     if title:
         fh.write("## " + " · ".join(title) + "\n\n")
+    if summary and summary[0].get("primary_status") not in (None, "", hd.PRIMARY_AVAILABLE):
+        fh.write(f"> **{'PROVISIONAL: primary analysis unavailable' if summary[0]['primary_status'] == hd.PRIMARY_UNAVAILABLE else 'FALLBACK ALLOWED: primary analysis unavailable'}.** "
+                 f"Population: {summary[0].get('population', '')}. This is not the primary result.\n\n")
     fh.write("| Rank | Tool | Scored | Completed | Failed | Skipped | **Ranking score** | 95% CI | Basis | "
              "CPRR | Mean base F1 | Mean precision | Mean base recall | Significant vs runner-up |\n")
     fh.write("|" + "|".join(["---:", ":---", "---:", "---:", "---:", "---:", "---:", "---:", ":---",
@@ -1202,6 +1207,9 @@ def main():
     ap.add_argument("--truth-provenance", help="truth_provenance.py output (reference tiers).")
     ap.add_argument("--clonal-groups", help="clonal_groups.py output.")
     ap.add_argument("--database-containment", help="database_containment.py output (truth plasmids in tool databases).")
+    ap.add_argument("--allow-primary-fallback", action="store_true", default=os.environ.get("ALLOW_PRIMARY_FALLBACK", "0") == "1",
+                    help="When no sample has a reference in the headline tiers, keep the all-sample numbers as the headline (status 'fallback_allowed', warning kept). "
+                         "Default off: the primary analysis is then reported as unavailable and the numbers are provisional. ALLOW_PRIMARY_FALLBACK=1 sets it.")
     ap.add_argument("--headline-max-tier", type=int, default=2,
                     help="highest reference tier included in the headline (default 2).")
     ap.add_argument("--min-species-clusters", type=int, default=20,
@@ -1251,9 +1259,14 @@ def main():
     design = hd.Design(args.sample_sheet, args.capabilities, args.truth_provenance, args.clonal_groups,
                        args.headline_max_tier, args.min_species_clusters)
     all_rows = rows
-    rows, reference_basis = design.headline_rows(rows)
+    selection = design.headline_selection(rows, allow_fallback=args.allow_primary_fallback)
+    rows, reference_basis = selection.rows, selection.basis
     print(f"[aggregate] headline reference standard: {reference_basis} "
           f"({len({r['sample'] for r in rows})} of {len({r['sample'] for r in all_rows})} sample(s)).")
+    if selection.status != hd.PRIMARY_AVAILABLE:
+        print(f"{chr(10)}[aggregate] WARNING: PRIMARY ANALYSIS UNAVAILABLE ({selection.reason}). Every ranking below is PROVISIONAL (all samples) and is "
+              f"not the primary result; add references in tiers 1-{args.headline_max_tier} (independent, long-read-first, evidence-checked) to obtain it."
+              + (" ALLOW_PRIMARY_FALLBACK=1 keeps the numbers as the headline." if selection.status == hd.PRIMARY_FALLBACK else "") + chr(10))
     # A sample whose only plasmids were evidence-labelled AMBIGUOUS is not a
     # plasmid-free negative control.
     for row in rows:
@@ -1288,6 +1301,8 @@ def main():
     # The combined files hold every (track, task) leaderboard, each ranked on
     # its own (rank restarts per group). They never rank across groups.
     summary = [row for *_, track_summary, _ in per_track for row in track_summary]
+    for row in summary:                     # the primary-analysis state travels with every leaderboard row (never a silent fallback)
+        row["primary_status"], row["population"] = selection.status, selection.population
     # Outcome states per tool (completed / failed: tool, resource / infrastructure /
     # not applicable / retried), beside accuracy in the leaderboard and the report.
     states = outcome_states(args.tool_status, tool_tracks)
@@ -1329,7 +1344,7 @@ def main():
         all_group = [r for r in all_rows if r["analysis_track"] == track and design.task(r["tool"], all_rows) == task]
         tier_rows.extend(hd.tier_table(track, task, all_group, metric, design))
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,
-                            "reference_basis": reference_basis,
+                            "reference_basis": reference_basis, "primary_status": selection.status,
                             "species_basis": track_summary[0].get("ranking_species_basis", "") if track_summary else "",
                             "min_species_clusters": design.min_species_clusters})
     write_rows(species_rows, args.out_prefix + ".species.tsv",
@@ -1346,7 +1361,7 @@ def main():
                 "n_isolates", "n_plasmids"])
     write_rows(design_rows, args.out_prefix + ".headline_design.tsv",
                ["analysis_track", "task", "ranking_metric", "reference_basis", "species_basis",
-                "min_species_clusters"])
+                "min_species_clusters", "primary_status"])
     if args.sample_sheet:
         completeness = metadata_completeness(args.sample_sheet, {r["sample"] for r in all_rows})
         write_rows(completeness, args.out_prefix + ".metadata_completeness.tsv",

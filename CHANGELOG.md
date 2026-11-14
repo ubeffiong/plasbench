@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the primary analysis is unavailable, visibly, when no reference qualifies (review E27 / H4)
+- `headline_design.Design.headline_selection` replaces the silent fallback to all samples. With no reference in tiers 1-2 (or no provenance table) the **primary analysis is unavailable**: the same numbers are computed on all samples but labelled provisional. New append-only leaderboard columns `primary_status` (`available` / `unavailable` / `fallback_allowed`) and `population`; `primary_status` in `benchmark.headline_design.tsv`; a PROVISIONAL banner in the markdown leaderboards; a stdout warning; and in the HTML a banner above the ranking, a "Leading method (provisional)" tile, a "Primary analysis unavailable" finding, and a Primary analysis column in the headline design table. `--allow-primary-fallback` / `ALLOW_PRIMARY_FALLBACK=1` (default off) keeps the numbers as the headline with the warning. An older leaderboard without the columns is read as available. `test/test_primary_eligibility.py` covers the design, the aggregation and the report; the review ledger rows (E26-E29) are re-pointed and E27 is marked fixed. **Public-v3 and the demo are in the unavailable state** (no Tier 1-2 reference / no provenance table).
+
 ## [0.3.0] - 2026-11-13
 
 A feature release: benchmark your own tools without changing PlasBench's code, and do everything from a window in your browser with `plasbench ui`. No scoring, ranking or report change for the built-in tools. See the [release notes](docs/releases/v0.3.0.md). Compare: [v0.2.3...v0.3.0](https://github.com/ubeffiong/plasbench/compare/v0.2.3...v0.3.0).
