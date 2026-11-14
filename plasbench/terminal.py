@@ -46,22 +46,69 @@ def _which_wsl():
 
 
 _wsl_cache: dict = {}
+WSL_TTL = 30.0
+
+
+def wsl_distros() -> list:
+    """The Linux distributions installed in WSL ([{name, default, state}]), default first; Docker Desktop's internal
+    ones are left out. `wsl -l -v` answers in a fraction of a second, even when a distribution is stopped."""
+    if not IS_WIN:
+        return []
+    now = time.time()
+    if _wsl_cache.get("at", 0) + WSL_TTL > now:
+        return _wsl_cache["list"]
+    out = []
+    exe = _which_wsl()
+    if exe:
+        try:
+            p = subprocess.run([exe, "-l", "-v"], capture_output=True, timeout=20,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            raw = p.stdout
+            text = raw.decode("utf-16-le", errors="replace") if raw[1:2] == b"\0" else raw.decode("utf-8", errors="replace")
+            for line in text.replace("\0", "").splitlines()[1:]:
+                parts = line.replace("*", " * ", 1).split() if line.strip() else []
+                if not parts:
+                    continue
+                default = parts[0] == "*"
+                parts = parts[1:] if default else parts
+                name = parts[0]
+                if name.lower().startswith("docker-desktop"):
+                    continue
+                out.append({"name": name, "default": default, "state": parts[1] if len(parts) > 1 else ""})
+        except (OSError, subprocess.TimeoutExpired, IndexError):
+            out = []
+    out.sort(key=lambda d: not d["default"])
+    _wsl_cache.update(at=now, list=out)
+    return out
 
 
 def wsl_available() -> bool:
+    return bool(wsl_distros())
+
+
+def git_for_windows_bash():
+    """Git Bash's bash.exe from Git for Windows (never C:\\Windows\\System32\\bash.exe, the WSL launcher)."""
     if not IS_WIN:
-        return False
-    if "ok" not in _wsl_cache:
-        exe = _which_wsl()
-        ok = False
-        if exe:
-            try:
-                ok = subprocess.run([exe, "-e", "true"], capture_output=True, timeout=60,
-                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).returncode == 0
-            except (OSError, subprocess.TimeoutExpired):
-                ok = False
-        _wsl_cache["ok"] = ok
-    return _wsl_cache["ok"]
+        return None
+    for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"), os.environ.get("LOCALAPPDATA")):
+        if base:
+            for rel in (("Git", "bin", "bash.exe"), ("Programs", "Git", "bin", "bash.exe")):
+                cand = Path(base, *rel)
+                if cand.is_file():
+                    return str(cand)
+    found = shutil.which("bash")
+    if found and "system32" not in found.lower() and "windowsapps" not in found.lower():
+        return found
+    return None
+
+
+def git_path_dirs() -> list:
+    """Folders that hold git on Windows (Git for Windows' cmd and bin), to put on the terminal's PATH."""
+    bash = git_for_windows_bash()
+    if not bash:
+        return []
+    top = Path(bash).parent.parent
+    return [str(d) for d in (top / "cmd", top / "bin", top / "usr" / "bin") if d.is_dir()]
 
 
 def powershell_argv():
@@ -73,6 +120,9 @@ def powershell_argv():
 
 
 def posix_argv():
+    if IS_WIN:
+        bash = git_for_windows_bash()
+        return [bash, "-lc"] if bash else None
     cands = [os.environ.get("SHELL", "")] + (["zsh"] if sys.platform == "darwin" else []) + ["bash", "sh"]
     for c in cands:
         if not c:
@@ -84,27 +134,50 @@ def posix_argv():
 
 
 def available_shells() -> dict:
+    """{id: what it reaches}, in the order they are offered. On Windows: each WSL distribution (where the benchmark
+    tools run), Git Bash, PowerShell. Elsewhere: the login shell, and PowerShell if pwsh is installed."""
     out = {}
-    if wsl_available():
-        out["wsl"] = "Ubuntu (WSL): where the benchmark tools run on Windows"
+    for d in wsl_distros():
+        out["wsl:" + d["name"]] = (f"{d['name']} (Linux in WSL{', the default distribution' if d['default'] else ''}): "
+                                   "where the benchmark tools, conda and git run on Windows")
     if posix_argv():
-        out["posix"] = ("a POSIX shell on Windows (Git Bash): no access to the WSL tools" if IS_WIN
-                        else "the login shell: the plasbench environment's tools are on its PATH")
+        out["posix"] = ("Git Bash (Git for Windows): bash and git on Windows; no access to the WSL tools" if IS_WIN
+                        else "your login shell: the plasbench environment's tools and git are on its PATH")
     if powershell_argv():
-        out["powershell"] = "PowerShell: drive letters, Explorer, Windows programs" if IS_WIN else "PowerShell (pwsh)"
+        out["powershell"] = "PowerShell: Windows programs, drive letters, and git when Git for Windows is installed" if IS_WIN \
+            else "PowerShell (pwsh)"
     return out
 
 
 def default_shell() -> str:
     shells = available_shells()
-    for name in (("wsl", "powershell", "posix") if IS_WIN else ("posix", "powershell")):
+    if IS_WIN:
+        for name in shells:                   # the default WSL distribution comes first
+            if name.startswith("wsl:"):
+                return name
+        for name in ("posix", "powershell"):
+            if name in shells:
+                return name
+        return ""
+    for name in ("posix", "powershell"):
         if name in shells:
             return name
     return ""
 
 
 def shell_label(name: str) -> str:
-    return {"wsl": "Ubuntu (WSL)", "posix": "Shell", "powershell": "PowerShell"}.get(name, name or "none")
+    if name.startswith("wsl:"):
+        return f"{name[4:]} (WSL)"
+    return {"wsl": "Ubuntu (WSL)", "posix": "Git Bash" if IS_WIN else Path((posix_argv() or ["bash"])[0]).stem.capitalize(),
+            "powershell": "PowerShell"}.get(name, name or "none")
+
+
+def to_msys_path(p) -> str:
+    """C:\\x\\y -> /c/x/y, the form Git Bash expects."""
+    w = PureWindowsPath(str(p))
+    if not w.drive or not w.drive.endswith(":"):
+        return str(p).replace("\\", "/")
+    return "/" + w.drive[0].lower() + "/" + "/".join(w.parts[1:])
 
 
 def to_wsl_path(p: Path):
@@ -190,11 +263,15 @@ class Terminal:
     def prompt(self) -> str:
         if self.shell == "powershell":
             return f"PS {self.shown_cwd()}>"
+        if self.shell.startswith("wsl:"):
+            return f"{self.shell[4:]}:{self.shown_cwd()}$"
         return f"{self.shown_cwd()}$"
 
     # ------------------------------------------------------------------------------------------- running
     def use_shell(self, name: str):
         shells = available_shells()
+        if name == "wsl":                     # the default distribution
+            name = next((k for k in shells if k.startswith("wsl:")), name)
         if name not in shells:
             raise TerminalError(f"'{name}' is not available here; this computer offers: " + (", ".join(shells) or "none"))
         self.shell = name
@@ -207,7 +284,8 @@ class Terminal:
                 raise TerminalError("PowerShell was not found")
             prelude = f"function plasbench {{ & {_psq(py)} -m plasbench --project-root {_psq(root)} @args }}; "
             return ps + [prelude + command]
-        if self.shell == "wsl":
+        if self.shell.startswith("wsl"):
+            distro = self.shell[4:] if self.shell.startswith("wsl:") else ""
             where = to_wsl_path(self.cwd)
             if not where:
                 raise TerminalError(f"WSL cannot reach {self.cwd}; switch the terminal to PowerShell.")
@@ -215,10 +293,13 @@ class Terminal:
             # `plasbench` inside Ubuntu runs this same PlasBench folder with Ubuntu's Python, unless Ubuntu has its own.
             prelude = (f"command -v plasbench >/dev/null 2>&1 || plasbench() {{ python3 -m plasbench --project-root {_q(wroot)} \"$@\"; }}; "
                        if wroot else "")
-            return [_which_wsl() or "wsl", "-e", "bash", "-lc", f"{prelude}cd {_q(where)} && {command}"]
+            return ([_which_wsl() or "wsl"] + (["-d", distro] if distro else [])
+                    + ["-e", "bash", "-lc", f"{prelude}cd {_q(where)} && {command}"])
         sh = posix_argv()
         if not sh:
             raise TerminalError("no shell was found on this computer")
+        if IS_WIN:                            # Git Bash wants /c/... paths
+            py, root = to_msys_path(py), to_msys_path(root)
         prelude = f"plasbench() {{ {_q(py)} -m plasbench --project-root {_q(root)} \"$@\"; }}; "
         return sh + [prelude + command]
 
@@ -240,9 +321,13 @@ class Terminal:
                 return {"exit": 0, "output": str(self.cwd), "prompt": self.prompt(), "seconds": 0.0, "shell": self.shell}
             started = time.time()
             try:
-                p = subprocess.run(self._argv(command), cwd=None if self.shell == "wsl" else str(self.cwd),
+                env = dict(os.environ, PLASBENCH_TERMINAL="1")
+                extra = [d for d in git_path_dirs() if d not in env.get("PATH", "").split(os.pathsep)]
+                if extra:                     # git (and Git Bash's tools) on PATH for PowerShell and Git Bash
+                    env["PATH"] = os.pathsep.join([env.get("PATH", "")] + extra)
+                p = subprocess.run(self._argv(command), cwd=None if self.shell.startswith("wsl") else str(self.cwd),
                                    stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace",
-                                   timeout=timeout, env=dict(os.environ, PLASBENCH_TERMINAL="1"),
+                                   timeout=timeout, env=env,
                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                 code, text = p.returncode, (p.stdout or "") + (p.stderr or "")
             except subprocess.TimeoutExpired:
@@ -251,6 +336,10 @@ class Terminal:
                 code, text = 127, str(exc)
             seconds = round(time.time() - started, 2)
             text = text.replace("\x00", "").replace("\r\n", "\n")
+            if self.shell.startswith("wsl") and (code in (-1, 4294967295) or "connection attempt failed" in text.lower()
+                                                 or "wsl/service" in text.lower()):
+                text += ("\n[WSL did not respond. In PowerShell run  wsl --shutdown  then try again (Docker Desktop "
+                         "restarts its own WSL parts). Git Bash and PowerShell still work from the shell list.]")
             if len(text) > MAX_OUTPUT:
                 text = text[:MAX_OUTPUT] + f"\n... output cut at {MAX_OUTPUT} characters"
             self._record(command, code, seconds)
@@ -275,11 +364,20 @@ class Terminal:
             pass
 
     def about(self) -> str:
-        return {"wsl": "Ubuntu (WSL): where the benchmark tools live on Windows. `plasbench` runs this PlasBench folder.",
-                "powershell": "PowerShell. `plasbench` runs this PlasBench folder.",
-                "posix": ("Git Bash: a Windows shell without the WSL tools. `plasbench` runs this PlasBench folder." if IS_WIN
-                          else "Your login shell, with the plasbench environment's tools on PATH. `plasbench` runs this PlasBench folder.")
-                }.get(self.shell, "")
+        git = "" if self.shell.startswith("wsl") or self._git_here() else \
+            " Git was not found: Set up this computer > Git > Install (optional)."
+        if self.shell.startswith("wsl"):
+            return (f"{shell_label(self.shell)}: Linux, where the benchmark tools live on Windows; git, bash and conda run "
+                    "here. `plasbench` runs this PlasBench folder.")
+        return {"powershell": "PowerShell. `plasbench` runs this PlasBench folder; `git` works when Git for Windows is installed.",
+                "posix": ("Git Bash: bash and git on Windows, without the WSL tools. `plasbench` runs this PlasBench folder."
+                          if IS_WIN else
+                          "Your login shell, with the plasbench environment's tools and git on PATH. `plasbench` runs this "
+                          "PlasBench folder.")}.get(self.shell, "") + git
+
+    def _git_here(self) -> bool:
+        path = os.pathsep.join([os.environ.get("PATH", "")] + git_path_dirs())
+        return bool(shutil.which("git", path=path))
 
     def state(self) -> dict:
         shells = available_shells()

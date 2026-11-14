@@ -244,9 +244,9 @@ class Project:
         try:
             bash = bash_command()
             add("bash", "Bash (runs the pipeline stages)", bool(bash and shutil.which(bash) or Path(str(bash)).exists()), str(bash),
-                "" if os.name != "nt" else "Install Git for Windows (Git Bash) or WSL.")
+                "" if os.name != "nt" else "install-git")
         except Exception as exc:
-            add("bash", "Bash (runs the pipeline stages)", False, str(exc), "Install Git for Windows (Git Bash) or WSL.")
+            add("bash", "Bash (runs the pipeline stages)", False, str(exc), "install-git" if os.name == "nt" else "")
         from . import platform_info
         solver, solver_exe = platform_info.conda_solver()
         add("conda", "Conda, mamba or micromamba (installs the tools)", solver, solver_exe or "not found",
@@ -254,8 +254,10 @@ class Project:
         prefix = platform_info.env_prefix()
         add("plasbench_env", "The plasbench conda environment (holds the tools)", prefix, str(prefix) if prefix else "not created yet",
             "" if prefix else "install-tools core")
-        add("git", "Git (upgrades, contributions)", shutil.which("git"), shutil.which("git") or "not found",
-            "Install Git from https://git-scm.com/", optional=True)
+        from .terminal import git_path_dirs
+        git = shutil.which("git") or shutil.which("git", path=os.pathsep.join(git_path_dirs()))
+        add("git", "Git for Windows with Git Bash (version control of your runs, terminal)" if os.name == "nt"
+            else "Git (version control of your runs, upgrades)", git, git or "not found", "install-git", optional=True)
         core = [("datasets", "NCBI datasets"), ("prefetch", "SRA toolkit: prefetch"), ("fasterq-dump", "SRA toolkit: fasterq-dump"),
                 ("fastp", "fastp (read trimming)"), ("minimap2", "minimap2 (scoring alignments)")]
         for exe, label in core:
@@ -721,17 +723,25 @@ def make_handler(project: Project, jobs: Jobs):
                 what = route[len("git/"):]
                 if what == "status":
                     info = gitops.info(repo) if repo else {"installed": bool(gitops.find_git()), "is_repo": False}
-                    info.update(self.git_choices(), gh_logged_in=gitops.gh_logged_in() if gitops.find_gh() else False,
+                    choices = self.git_choices()
+                    info["is_workspace"] = bool(repo) and Path(os.path.realpath(repo)) == Path(os.path.realpath(choices["workspace"]))
+                    info.update(choices, gh_logged_in=gitops.gh_logged_in() if gitops.find_gh() else False,
                                 gh=bool(gitops.find_gh()), repo=str(repo) if repo else "")
                     return self.jsend(200, info)
                 if what == "log":
                     return self.jsend(200, {"log": gitops.log(repo, int(q.get("n", 40)))})
                 if what == "branches":
                     return self.jsend(200, {"branches": gitops.branches(repo)})
+                if what == "files":
+                    return self.jsend(200, gitops.files(repo))
                 if what == "diff":
                     return self.jsend(200, {"diff": gitops.diff(repo, q.get("path", ""), q.get("staged") == "1")})
                 if what == "show":
                     return self.jsend(200, {"text": gitops.show(repo, q.get("rev", ""))})
+                if what == "file":
+                    return self.jsend(200, gitops.file_state(repo, q.get("path", "")))
+                if what == "commit":
+                    return self.jsend(200, gitops.commit_detail(repo, q.get("rev", "")))
                 if what == "scan":
                     return self.jsend(200, {"findings": gitops.scan_staged(repo)})
                 raise FileNotFoundError(f"no such API: {route}")
@@ -932,21 +942,40 @@ def make_handler(project: Project, jobs: Jobs):
             return [project.root, studies.workspace(project.root)]
 
         def git_choices(self) -> dict:
+            """Version control tracks your runs, one repository per STUDY: each study folder in the workspace is offered,
+            newest first, marked tracked or not. The PlasBench program folder is listed only when it already is a git
+            checkout of its own (a developer's copy)."""
             from . import studies
-            return {"choices": [{"label": "PlasBench folder", "path": str(project.root)},
-                                {"label": "Workspace (studies)", "path": str(studies.workspace(project.root))}]}
+            choices = [{"label": f"Study: {st['name']}" + ("" if (Path(st["path"]) / ".git").exists() else "  (not tracked yet)"),
+                        "path": st["path"], "kind": "study", "tracked": (Path(st["path"]) / ".git").exists()}
+                       for st in studies.list_studies(project.root)]
+            if (project.root / ".git").exists():
+                choices.append({"label": "PlasBench program (developer checkout)", "path": str(project.root), "kind": "program"})
+            return {"choices": choices, "workspace": str(studies.workspace(project.root))}
 
         def git_repo(self, requested=None):
-            """The repository the Git page works on: the request's, else the saved one, else the PlasBench folder.
+            """The repository the Git page works on: the request's, else the saved one, else the most recent study (each
+            study is its own repository), else the workspace (which then shows "no studies yet").
             Always inside the PlasBench folder or the workspace (gitops.valid_repo)."""
             from . import gitops
-            chosen = requested or load_state().get("git_repo") or str(project.root)
+            from . import studies
+            ws = studies.workspace(project.root)
+            ws.mkdir(parents=True, exist_ok=True)
+            saved = load_state().get("git_repo")
+            if saved and not Path(saved).is_dir():
+                saved = None
+            recent = next(iter(studies.list_studies(project.root)), None)
+            chosen = requested or saved or (recent["path"] if recent else str(ws))
+            # a saved choice of the program folder that is not a checkout, or of the workspace itself, moves to a study
+            if not requested and (Path(chosen).resolve() == project.root.resolve() and not (project.root / ".git").exists()
+                                  or Path(chosen).resolve() == ws.resolve()) and recent:
+                chosen = recent["path"]
             try:
                 return gitops.valid_repo(chosen, self.git_roots())
             except ValueError:
                 if requested:
                     raise
-                return gitops.valid_repo(str(project.root), self.git_roots())
+                return gitops.valid_repo(str(ws), self.git_roots())
 
         def git_op(self, body: dict) -> dict:
             """Every git action. Quick ones run now; fetch/pull/push/clone/GitHub run as jobs in the console."""
@@ -959,8 +988,15 @@ def make_handler(project: Project, jobs: Jobs):
                 save_state(state)
                 return {"repo": str(repo)}
             if op == "init":
+                from . import studies
+                ws = Path(os.path.realpath(studies.workspace(project.root)))
+                here = Path(os.path.realpath(repo))
+                if here.parent != ws:
+                    raise ValueError("Version control is for your runs, one repository per study: start it in a study "
+                                     f"folder (a folder inside {ws}), not in the workspace itself or the PlasBench program "
+                                     "folder, which updates replace.")
                 return gitops.init(repo, body.get("branch") or "main", bool(body.get("first_commit")),
-                                   body.get("message") or "Initial commit")
+                                   body.get("message") or "Track PlasBench runs", kind="runs")
             if op == "identity":
                 gitops.set_identity(repo, body.get("name"), body.get("email"), body.get("scope") or "local")
                 return {"ok": True}

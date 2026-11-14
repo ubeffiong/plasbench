@@ -123,7 +123,7 @@ def list_studies(root) -> list:
                     "cohort": record.get("cohort"), "sample_sheet": record.get("sample_sheet"),
                     "runs": len(record.get("runs", [])), "report": (results / "benchmark.report.html").is_file(),
                     "created": record.get("created"), "note": record.get("note", ""),
-                    "migrated_from": record.get("migrated_from"),
+                    "migrated_from": record.get("migrated_from"), "tracked": (folder / ".git").exists(),
                     "last_command": (record.get("runs") or [{}])[-1].get("command")})
     out.sort(key=lambda s: -s["modified"])
     return out

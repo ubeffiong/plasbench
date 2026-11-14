@@ -140,9 +140,9 @@ class SessionLog:
                     lines.append(f"#   (the terminal moved to {e.get('cwd', '')})")
                     continue
                 cwd = e.get("cwd", root)
-                if shell == "wsl":
+                if shell.startswith("wsl"):
                     cwd = _wsl(cwd) or cwd
-                full = cmd if Path(str(cwd)) == Path(root) and shell != "wsl" else f"(cd {shlex.quote(str(cwd))} && {cmd})"
+                full = cmd if Path(str(cwd)) == Path(root) and not shell.startswith("wsl") else f"(cd {shlex.quote(str(cwd))} && {cmd})"
                 if code:
                     lines.append(_comment(full))
                 else:

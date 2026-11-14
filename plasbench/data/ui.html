@@ -349,7 +349,87 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
  #chead select{max-width:46vw}#ccopy,#cfollow,#ctoggle span,#chead>b{display:none}#chead{overflow:hidden}
  .wsteps{overflow-x:auto}.wsteps button{min-width:110px}.leaders{width:auto}
 }
-@media print{.top,.rail,#console{display:none}}
+
+/* ---------- source control drawer (right-hand side, every page) ---------- */
+#gdrawer{position:fixed;top:var(--hdr);right:0;bottom:var(--cons);width:var(--gdw);z-index:66;background:var(--surface);border-left:1px solid var(--line);
+ display:flex;flex-direction:column;transform:translateX(100%);transition:transform .16s ease;box-shadow:none}
+body.gd-open #gdrawer{transform:none}
+:root{--gdw:248px}   /* the same width as the navigation rail on the left */
+@media (min-width:1280px){body.gd-open .shell{margin-right:var(--gdw)}body.gd-open #toasts{right:calc(var(--gdw) + 16px)}}
+@media (max-width:1279px){body.gd-open #gdrawer{box-shadow:var(--shadow-lg)}}
+@media (max-width:640px){:root{--gdw:min(320px,92vw)}}
+#gd_head{display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:var(--surface-2);flex:none;min-height:36px}
+#gd_tabs{display:flex;flex:1;min-width:0}
+#gd_tabs button{flex:1;min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--mut);font:inherit;font-size:12.5px;cursor:pointer;padding:0 4px;white-space:nowrap}
+#gd_tabs button:hover{color:var(--fg);background:var(--surface-3)}
+#gd_tabs button.on{color:var(--fg);border-bottom-color:var(--primary);font-weight:600;background:var(--surface)}
+#gd_tabs .badge{margin-left:2px}
+#gd_head .gd-ib{align-self:center;margin:0 4px}
+.gdpane{flex:1;display:flex;flex-direction:column;min-height:0}
+.gdpane[hidden]{display:none!important}
+.gd-tools{display:flex;gap:4px;align-items:center;padding:4px 8px;border-bottom:1px solid var(--line-2);font-size:11.5px;color:var(--mut);flex:none}
+.gd-tools .grow{flex:1}
+.plist{list-style:none;margin:0;padding:4px 0;overflow-y:auto;flex:1}
+.plist li{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-bottom:1px solid var(--line-2);cursor:pointer;font-size:12.5px}
+.plist li:hover{background:var(--surface-2)}
+.plist .t{flex:1;min-width:0}.plist .t b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plist .t span{display:block;color:var(--mut);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sdot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--faint)}
+.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled{background:var(--warn)}
+/* git history colour code: you are here / pushed / not yet pushed / merge */
+.hdot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;background:var(--faint)}
+.hdot.head{background:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}.hdot.pushed{background:var(--ok)}.hdot.local{background:var(--warn)}
+.hdot.merge{border-radius:1px;transform:rotate(45deg);width:8px;height:8px;background:#7b4fb3}
+.hlegend{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--mut);margin:4px 0 2px}.hlegend span{display:inline-flex;gap:4px;align-items:center}
+.rtag{font:10.5px var(--mono);padding:0 4px;border:1px solid var(--line);border-radius:2px;color:var(--primary-ink);background:var(--primary-soft);white-space:nowrap}
+.rtag.tag{color:var(--warn);background:var(--warn-soft)}.rtag.remote{color:var(--ok);background:var(--ok-soft)}
+/* main-area tabs: the page, plus documents opened from it (diffs, commits) */
+.mtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:-6px 0 14px;overflow-x:auto;scrollbar-width:thin}
+.mtab{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid transparent;border-bottom:0;border-radius:3px 3px 0 0;background:transparent;color:var(--mut);font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap;max-width:280px;flex:none}
+.mtab>span{overflow:hidden;text-overflow:ellipsis}.mtab:hover{color:var(--fg);background:var(--surface-2)}
+.mtab.on{background:var(--surface);border-color:var(--line);color:var(--fg);margin-bottom:-1px;font-weight:600}
+.mtab .x{border:0;background:transparent;color:var(--mut);cursor:pointer;padding:0 2px;font-size:15px;line-height:1;border-radius:2px}.mtab .x:hover{color:var(--bad);background:var(--surface-3)}
+/* diff viewer */
+.diffv{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.diffv table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
+.diffv td{padding:0 8px;white-space:pre;vertical-align:top}
+.diffv td.n{width:1%;text-align:right;color:var(--faint);user-select:none;border-right:1px solid var(--line-2);padding:0 6px}
+.diffv tr.ad{background:var(--ok-soft)}.diffv tr.dl{background:var(--bad-soft)}.diffv tr.hk{background:var(--info-soft);color:var(--primary-ink)}.diffv tr.meta td{color:var(--mut)}
+.docbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}.docbar h2{margin:0;font-size:16px;font-weight:600;flex:1;min-width:0;overflow-wrap:anywhere}
+.cfiles{list-style:none;margin:0;padding:0;font-size:12.5px}.cfiles li{display:flex;gap:8px;padding:3px 0;cursor:pointer}.cfiles li:hover{color:var(--primary)}
+.cfiles .st{font:600 11px var(--mono);width:14px}.cfiles .st.M{color:var(--warn)}.cfiles .st.A{color:var(--ok)}.cfiles .st.D{color:var(--bad)}.cfiles .st.R{color:var(--primary)}
+.cpatch details{border:1px solid var(--line);border-radius:var(--radius);margin-top:10px;background:var(--surface)}
+.cpatch summary{cursor:pointer;padding:6px 10px;font:12.5px var(--mono);background:var(--surface-2)}
+.cpatch .diffv{border:0;border-top:1px solid var(--line);border-radius:0}
+#gd_meta{padding:6px 10px;border-bottom:1px solid var(--line-2);font-size:12px;flex:none;display:flex;flex-direction:column;gap:4px}
+#gd_meta select{width:100%;min-height:26px;font-size:12px;padding:1px 6px}
+#gd_meta .br{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#gd_body{flex:1;overflow-y:auto}
+#gd_body details{border-bottom:1px solid var(--line-2)}
+#gd_body summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 10px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-2);user-select:none}
+#gd_body summary::-webkit-details-marker{display:none}
+#gd_body summary .chev{transition:transform .12s;width:12px;height:12px}#gd_body details:not([open]) summary .chev{transform:rotate(-90deg)}
+#gd_body summary .cnt{margin-left:auto;font-weight:600;font-size:11px;color:var(--mut);text-transform:none}
+#gd_body summary:hover{background:var(--surface-2)}
+#gd_body .sec{padding:2px 10px 10px}
+.gfl{list-style:none;margin:0;padding:0}
+.gfl li{display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:2px;font-size:12.5px;cursor:pointer}
+.gfl li:hover{background:var(--surface-2)}.gfl li.on{background:var(--select)}
+.gfl .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+.gfl .st{font:600 11px var(--mono);width:16px;text-align:center;flex:none}
+.gfl .st.M{color:var(--warn)}.gfl .st.A,.gfl .st.U2{color:var(--ok)}.gfl .st.D{color:var(--bad)}.gfl .st.Q{color:var(--ok)}.gfl .st.C{color:var(--bad)}
+.gfl .act{display:none;gap:2px}.gfl li:hover .act,.gfl li.on .act{display:flex}
+.gfl .act button,.gd-ib{background:transparent;border:1px solid transparent;border-radius:2px;color:var(--fg-2);padding:0 4px;min-height:20px;cursor:pointer;font:inherit;font-size:12px;display:inline-flex;align-items:center}
+.gfl .act button:hover,.gd-ib:hover{border-color:var(--line);background:var(--surface)}
+.gd-sub{font-size:11px;color:var(--mut);margin:6px 0 2px;font-weight:600}
+#gd_diff pre{margin:6px 0 0;max-height:280px;overflow:auto;font:11.5px/1.45 var(--mono);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:6px 8px;white-space:pre}
+#gd_msg{width:100%;font:inherit;font-size:12.5px;min-height:52px;resize:vertical}
+.gd-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.gd-row .btn{flex:1;justify-content:center}
+#gd_files_q{width:100%;min-height:26px;font-size:12px;margin-bottom:4px}
+.gd-hist li{cursor:pointer}.gd-hist .h{font:11px var(--mono);color:var(--mut);flex:none}
+.top .tbtn .badge{margin-left:2px}
+@media print{.top,.rail,#console,#gdrawer{display:none}}
 </style>
 </head>
 <body>
@@ -394,6 +474,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.8-8.9A6 6 0 0 1 17.8 8 4.5 4.5 0 0 1 17 18z"/></symbol>
   <!-- The PlasBench mark (plasbench/data/logo.svg): a plasmid map holding three rising benchmark bars. -->
   <symbol id="pb-mark" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" style="stroke:var(--lg-ring)" stroke-width="4.5"/><path d="M41.30 12.06A22 22 0 0 1 51.94 41.30" fill="none" style="stroke:var(--lg-arc)" stroke-width="9"/><path d="M21.00 51.05A22 22 0 0 1 10.75 37.69" fill="none" style="stroke:var(--lg-arc)" stroke-width="9"/><rect x="30.6" y="5" width="2.8" height="10" style="fill:var(--lg-arc)"/><rect x="22" y="34" width="5" height="9" rx="1" style="fill:var(--lg-b1)"/><rect x="29.5" y="28" width="5" height="15" rx="1" style="fill:var(--lg-b2)"/><rect x="37" y="22" width="5" height="21" rx="1" style="fill:var(--lg-b3)"/></symbol>
+  <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
   <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.8"/><path d="M12 17h.01"/></symbol>
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></symbol>
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></symbol>
@@ -416,6 +497,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <div class="results" id="qres" role="listbox"></div>
  </div>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
+ <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Git, Jobs and Studies (Ctrl+Shift+G)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
  <button class="tbtn" id="helpbtn" title="Help for this page (F1)" aria-label="Help for this page"><svg class="ico sm"><use href="#i-help"/></svg></button>
  <button class="tbtn" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg></button>
  <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
@@ -447,6 +529,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
  </nav>
 
  <main id="main">
+  <div class="mtabs" id="mtabs" role="tablist" aria-label="Open pages and documents"></div>
   <!-- HOME ---------------------------------------------------------------------------------------- -->
   <section class="view" id="v_home">
    <div class="vhead"><div class="ttl"><div class="crumbs">PlasBench</div><h1>Overview</h1><p id="herop">Checking this computer…</p></div>
@@ -595,9 +678,11 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <!-- VERSION CONTROL ----------------------------------------------------------------------------- -->
   <section class="view" id="v_git" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Advanced</div><h1>Version control</h1>
-    <p>Git without the command line, for your own copy of PlasBench, your tools and settings, or your study notes. Run
-    outputs, downloads, reads and credentials are kept out by a managed <code>.gitignore</code> block, and every commit is
-    checked for data, secrets and files too large for GitHub before it is made. Nothing is ever force-pushed.</p></div>
+    <p>Git without the command line, for your <b>runs</b>: <b>each study is its own repository</b>, with the study's
+    record, sample sheets, settings, result tables, reports, figures and logs, its own history and its own remote. The PlasBench program itself is not tracked
+    here, because updates replace it. A managed <code>.gitignore</code> keeps raw sequence data (reads, assemblies,
+    FASTA, alignments), tmp folders and credentials out. Every commit is checked for data, secrets and files too large
+    for GitHub before it is made, and nothing is ever force-pushed.</p></div>
     <div class="row"><select id="g_repo" aria-label="Repository" style="width:auto;max-width:380px"></select><button class="btn sec" id="g_ref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button></div></div>
    <div class="stats" id="g_stats" style="margin-bottom:12px"></div>
    <div id="g_body"><div class="card"><div class="bd mut">Loading…</div></div></div>
@@ -644,6 +729,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   </section>
 
   <!-- HELP ---------------------------------------------------------------------------------------- -->
+  <section id="v_doc" hidden aria-live="polite"></section>
   <section class="view" id="v_help" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Help</div><h1>Guides</h1><p>The README and every guide shipped with this installation.</p></div></div>
    <div class="cmdgrid"><div class="card cmdlist" id="doclist"></div><div class="card"><div class="bd md" id="docbody"><p class="mut">Choose a guide.</p></div></div></div>
@@ -651,6 +737,28 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
  </main>
 </div>
 
+<aside id="gdrawer" aria-label="Side panel" aria-hidden="true">
+ <div id="gd_head"><div id="gd_tabs" role="tablist" aria-label="Side panel">
+   <button data-pt="git" role="tab" title="Source control: changes, commit, branches, remote, files, history"><svg class="ico sm"><use href="#i-git"/></svg>Git<span class="badge" id="gdtabbadge" hidden></span></button>
+   <button data-pt="jobs" role="tab" title="Commands started from this window, newest first"><svg class="ico sm"><use href="#i-list"/></svg>Jobs<span class="badge" id="pjbadge" hidden></span></button>
+   <button data-pt="studies" role="tab" title="The studies in your workspace: open a report or a folder"><svg class="ico sm"><use href="#i-flask"/></svg>Studies</button></div>
+  <button class="gd-ib" id="gd_close" title="Close the panel (Ctrl+Shift+G)" aria-label="Close the panel"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+ <div class="gdpane" id="gdp_git">
+  <div class="gd-tools"><span>Source control</span><span class="grow"></span>
+   <button class="gd-ib" id="gd_ref" title="Refresh" aria-label="Refresh"><svg class="ico sm"><use href="#i-refresh"/></svg></button>
+   <a class="gd-ib" href="#git" title="Open the Version control page" aria-label="Open the Version control page"><svg class="ico sm"><use href="#i-ext"/></svg></a></div>
+  <div id="gd_meta"></div>
+  <div id="gd_body"><div class="sec mut small" style="padding:10px">Loading…</div></div></div>
+ <div class="gdpane" id="gdp_jobs" hidden>
+  <div class="gd-tools"><span>Jobs</span><span class="grow"></span><a class="gd-ib" href="#jobs" title="Open the Jobs page" aria-label="Open the Jobs page"><svg class="ico sm"><use href="#i-ext"/></svg></a></div>
+  <ul class="plist" id="pj_list"></ul></div>
+ <div class="gdpane" id="gdp_studies" hidden>
+  <div class="gd-tools"><span id="ps_where">Studies</span><span class="grow"></span>
+   <button class="gd-ib" id="ps_ref" title="Refresh" aria-label="Refresh"><svg class="ico sm"><use href="#i-refresh"/></svg></button>
+   <a class="gd-ib" href="#workspace" title="Open Workspace &amp; studies" aria-label="Open Workspace and studies"><svg class="ico sm"><use href="#i-ext"/></svg></a></div>
+  <ul class="plist" id="ps_list"></ul>
+  <div class="gd-tools" style="border-top:1px solid var(--line-2);border-bottom:0"><a class="btn sm" href="#wizard" style="flex:1;justify-content:center"><svg class="ico sm"><use href="#i-plus"/></svg>New benchmark</a></div></div>
+</aside>
 <div id="console" class="min" aria-label="Job console">
  <div id="cgrip" title="Drag to resize"></div>
  <div id="chead"><span class="ctabs" role="tablist" aria-label="Console views">
@@ -874,6 +982,7 @@ function route() {
   $$(".nav").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   $("#rail").classList.remove("open");
   window.scrollTo(0, 0);
+  if (window.mtOnRoute) mtOnRoute(v);
   const sub = rest.join("/");
   ({home:loadHome, setup:loadSetup, tools:loadTools, addtool:loadAddTool, settings:loadSettings, wizard:loadWizard,
     workspace:loadWorkspace, git:loadGit, isolates:loadIsolates, cohorts:loadCohorts, runs:loadRuns, jobs:renderJobs, commands:() => loadCommands(sub), help:() => loadHelp(sub)})[v]();
@@ -925,6 +1034,9 @@ async function refreshJobs() {
   sel.innerHTML = S.jobs.length ? S.jobs.slice(0, 40).map(j => `<option value="${j.id}">${esc(stateWord(j.state))} · ${esc(j.label).slice(0, 80)}</option>`).join("") : `<option value="">No jobs yet</option>`;
   if (cur) sel.value = cur;
   if (!$("#v_jobs").hidden) renderJobs();
+  if (typeof renderPanelJobs === "function" && GD.open && PT.active === "jobs") renderPanelJobs();
+  const nrun = S.jobs.filter(j => j.state === "running" || j.state === "cancelling").length;
+  if ($("#pjbadge")) { $("#pjbadge").hidden = !nrun; $("#pjbadge").textContent = nrun; }
 }
 const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted"})[s] || s;
 function showConsole(id, expand) {
@@ -961,6 +1073,7 @@ async function pollConsole(force) {
 }
 function afterJob(j) {
   const n = j.argv[0];
+  if (j.kind === "git") refreshGit();   // fetch, pull, push: the drawer and the page show the new state
   if (["check","install-tools","install-conda","tools"].includes(n)) { S.env = null; S.tools = null; S.user = null; if (!$("#v_setup").hidden) loadSetup(true); }
   if (["run","demo","report","report-pdf"].includes(n)) { S.runs = null; if (!$("#v_runs").hidden) loadRuns(); if (!$("#v_home").hidden) loadHome(); }
 }
@@ -1211,6 +1324,7 @@ function renderEnv(env) {
     let fix = "";
     if (!c.ok && c.fix) {
       if (c.fix === "install-conda") fix = `<button class="btn sec sm" data-run='["install-conda","--yes"]' data-label="Install conda">Install</button>`;
+      else if (c.fix === "install-git") fix = `<button class="btn sec sm" data-run='["install-git"]' data-label="Install Git${S.info?.os === "nt" || /Windows/.test(c.label) ? " for Windows (Git Bash)" : ""}">Install</button>`;
       else if (c.fix.startsWith("install-tools ")) fix = `<button class="btn sec sm" data-run='${JSON.stringify(["install-tools", c.fix.split(" ")[1], "--yes"])}' data-label="Install ${esc(c.fix.split(" ")[1])} tools">Install</button>`;
       else if (c.fix === "check") fix = `<button class="btn sec sm" data-run='["check","--yes"]' data-label="Download tool databases">Download</button>`;
       else if (c.fix.startsWith("settings:")) fix = `<button class="btn sec sm" onclick="document.getElementById('${c.fix.endsWith("KEY") ? "ncbi_key" : "ncbi_email"}').focus()">Enter</button>`;
@@ -1441,7 +1555,8 @@ const PAGE_HELP = {
 "Optional items, shown in grey, are only needed for some analyses. A benchmark runs without them.",
 "<b>Add desktop icon</b> puts a PlasBench icon on your desktop and in the applications menu. Clicking it starts PlasBench.",
 "Conda is the normal way to get the tools. Docker is an alternative: the card shows the command when Docker is available.",
-"<b>Upgrade PlasBench</b> updates this folder in place. Your studies, settings, downloads and tools are kept."
+"<b>Upgrade PlasBench</b> updates this folder in place. Your studies, settings, downloads and tools are kept.",
+"<b>Git</b> (optional) keeps a history of your runs. On Windows, Git for Windows also provides Git Bash, which runs PlasBench's scripts and is a Terminal shell."
 ],
 "cli": [
 "plasbench check --yes",
@@ -1600,23 +1715,23 @@ const PAGE_HELP = {
 },
 "git": {
 "title": "Version control",
-"what": "Git without the command line, for your PlasBench folder or your workspace. Keep a history of your settings, sample sheets and own tools, and share them.",
+"what": "Git without the command line, for your <b>runs</b>. <b>Each study is its own repository</b>: its record (study.json), sample sheets, settings, result tables, reports, figures and logs, with its own history and its own remote. The PlasBench program itself is not tracked, because updates replace it.",
 "steps": [
-"Choose the repository at the top: the PlasBench folder, or the workspace. If it is not a repository yet, press <b>Initialise repository</b>. It adds the safety .gitignore block first.",
-"The first time, enter your name and email under identity and press Save. Commits need them.",
-"The changes list shows modified files. Click one to see its diff. Press <b>Stage all</b>, or select files and press <b>Stage selected</b>.",
-"Write a short message (what changed, and why) and press <b>Commit</b>. The commit is checked first for reads, run outputs, secrets (such as the NCBI API key) and files too large for GitHub.",
-"Remote: paste your GitHub or GitLab address (without a password in it) and press Save. <b>Sign in to GitHub</b> if asked. Then <b>Push</b>; <b>Fetch</b> and <b>Pull</b> get others' changes. Network steps run in the console.",
-"The history shows past commits, which you can click to view. Under branches, switch to a branch, or type a name and press <b>Create and switch</b>."
+"Choose the study at the top (the list shows which are tracked). If it is not tracked yet, press <b>Initialise repository</b>; it writes the managed runs .gitignore first, keeping raw sequence data (reads, assemblies, FASTA, alignments), tmp folders and credentials out. The Git button on a study (Workspace &amp; studies, or the side panel's Studies tab) does the same.",
+"The first time, enter your name and email under Identity and press Save. Commits need them.",
+"The changes list shows new and modified run files. Click one to see its diff. Press <b>Stage all</b>, or select files and press <b>Stage selected</b>.",
+"Write a short message (which runs, and why) and press <b>Commit</b>. The commit is checked first for raw data, secrets (such as the NCBI API key), patient identifiers and files too large for GitHub.",
+"Remote: paste your GitHub or GitLab address (without a password in it) and press Save. <b>Sign in to GitHub</b> if asked. Then <b>Push</b>; <b>Fetch</b> and <b>Pull</b> get others' changes. These run in the console.",
+"The <b>Git</b> button in the top bar (or Ctrl+Shift+G) opens the same controls as a drawer on the right, on any page. It shows changes with their diffs, commit, branches, remote, tracked files and history."
 ],
 "tips": [
-"A managed .gitignore block keeps studies, results, downloads, reads and credentials out of the repository.",
+"Git is optional. Set up this computer &gt; Git &gt; Install puts it in: Git for Windows with Git Bash on Windows, or the conda-forge git elsewhere.",
+"The PlasBench program folder appears in the list only when it already is a developer's git checkout.",
 "Nothing is ever force-pushed. Sign-in uses your normal Git credentials (credential manager or SSH key)."
 ],
 "cli": [
-"git status",
-"git commit",
-"git push"
+"plasbench install-git",
+"git -C \"$PLASBENCH_WORKSPACE/cohort1\" status"
 ]
 },
 "commands": {
@@ -2119,6 +2234,7 @@ async function loadWorkspace(force) {
         <td class="small">${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "–"))}</td><td>${st.runs}</td><td class="small">${fmtTime(st.modified)}</td>
         <td style="text-align:right;white-space:nowrap">${st.report && idx >= 0 ? `<a class="btn sec sm" href="/view/${idx}/benchmark.report.html" target="_blank" rel="noopener">Report</a>` : ""}
           <button class="btn ghost sm" onclick="benchStudy('${esc(st.name)}')">Run in this study</button>
+          <button class="btn ghost icon sm" title="${st.tracked ? "Tracked with Git: open its version control" : "Track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}" onclick="gitStudy('${esc(st.path.replace(/\\/g, "\\\\"))}')">${icon("git")}</button>
           <button class="btn ghost icon sm" title="Open the study folder" onclick="reveal('${esc(st.path.replace(/\\/g, "\\\\"))}')">${icon("folder")}</button></td></tr>`; }).join("")
       || `<tr><td colspan="5" class="mut">No studies yet. Start one from <a href="#wizard">New benchmark</a>, or create one on the right.</td></tr>`;
     $("#ws_recent").innerHTML = w.recent.length ? `<div class="small mut" style="margin-top:12px">Recent workspaces</div>` + w.recent.map(r =>
@@ -2162,7 +2278,7 @@ async function gitOp(body, okMsg) {
   try { const r = await api("git", {repo: G.repo, ...body});
     if (r.job) { toast(`Started ${r.job.label}; follow it in the console`, "ok"); await refreshJobs(); showConsole(r.job.id, true); }
     else if (okMsg) toast(typeof okMsg === "function" ? okMsg(r) : okMsg, "ok");
-    await loadGit(); return r; }
+    refreshGit(); return r; }
   catch (e) { toast(e.message, "bad"); }
 }
 const STATUS_WORD = {M: "modified", A: "added", D: "deleted", R: "renamed", C: "copied", U: "conflict", "?": "new", T: "type changed"};
@@ -2179,10 +2295,17 @@ async function loadGit() {
     if (!st.installed) {
       $("#g_stats").innerHTML = ""; $("#g_body").innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>Git is not installed. Install it from <a href="https://git-scm.com/" target="_blank" rel="noopener">git-scm.com</a>, then reopen this page.</div></div>`; return;
     }
+    if (!st.is_repo && st.is_workspace) {
+      $("#g_stats").innerHTML = "";
+      $("#g_body").innerHTML = `<div class="note info">${icon("info", "ico")}<div><b>Each study is its own repository.</b> ${st.choices.some(c => c.kind === "study")
+        ? "Choose a study above to track it." : `There are no studies yet. Start one from <a href="#wizard">New benchmark</a> or <a href="#workspace">Workspace &amp; studies</a>, then come back to track it.`}</div></div>`;
+      return;
+    }
     if (!st.is_repo) {
       $("#g_stats").innerHTML = "";
-      $("#g_body").innerHTML = `<div class="split"><div class="card"><div class="hd"><h3>Start a repository here</h3></div><div class="bd">
-        <p style="margin-top:0">${esc(st.repo)} is not a git repository yet. Initialising adds the PlasBench safety <code>.gitignore</code> block first.</p>
+      $("#g_body").innerHTML = `<div class="split"><div class="card"><div class="hd"><h3>Track this study</h3></div><div class="bd">
+        <p style="margin-top:0">The study <b class="mono">${esc(st.repo.split(/[\\/]/).pop())}</b> is not a git repository yet. Each study is its own repository, with its own history and remote. Initialising adds the PlasBench <b>runs</b> <code>.gitignore</code> first:
+        each study's <code>study.json</code>, tables, reports, figures and logs are tracked; reads, assemblies, FASTA, alignments, tmp folders and credentials are not.</p>
         <div class="field"><label>Branch</label><div class="ctl"><input type="text" id="gi_branch" value="main"></div></div>
         <div class="field"><label>First commit</label><div class="ctl"><label class="switch"><input type="checkbox" id="gi_first"><span></span></label></div><div class="help">Commit what is here now (after the safety checks).</div></div></div>
         <div class="ft"><button class="btn" id="gi_go">Initialise repository</button></div></div>
@@ -2214,7 +2337,7 @@ async function loadGit() {
        <textarea id="g_msg" rows="3" placeholder="What changed, and why" style="font-family:inherit;font-size:13px"></textarea>
        <div id="g_scan" style="margin-top:8px"></div></div>
        <div class="ft"><button class="btn" id="g_commit" ${who ? "" : "disabled"}>Commit</button></div></div>
-      <div class="card"><div class="hd"><h3>History</h3></div><div class="tablewrap" style="max-height:300px"><table class="data"><tbody id="g_log"><tr><td class="mut">Loading…</td></tr></tbody></table></div><div id="g_show"></div></div>
+      <div class="card"><div class="hd"><h3>History</h3><span class="sub" id="g_legend"></span></div><div class="tablewrap" style="max-height:360px"><table class="data"><tbody id="g_log"><tr><td class="mut">Loading…</td></tr></tbody></table></div></div>
      </div><div class="stack">
       <div class="card"><div class="hd"><h3>Sync with the remote</h3></div><div class="bd">
        ${remote ? `<div class="mono small" style="overflow-wrap:anywhere">${esc(remote.name)} → ${esc(remote.url)}</div>` : `<p class="mut small" style="margin:0">No remote yet: add the repository address below.</p>`}</div>
@@ -2232,7 +2355,10 @@ async function loadGit() {
        <div class="ft"><button class="btn sec" id="g_saveid">Save</button></div></div>
      </div></div>`;
     bindGit(st);
-    api(`git/log?${gq()}&n=40`).then(r => { $("#g_log").innerHTML = r.log.map(c => `<tr data-grev="${esc(c.hash)}" style="cursor:pointer"><td class="mono small" style="width:70px">${esc(c.short)}</td><td>${esc(c.subject)}</td><td class="mut small" style="white-space:nowrap">${esc(c.author)} · ${esc(c.when)}</td></tr>`).join("") || `<tr><td class="mut">No commits yet.</td></tr>`; });
+    api(`git/log?${gq()}&n=60`).then(r => { $("#g_log").innerHTML = r.log.map(c => `<tr data-grev="${esc(c.hash)}" style="cursor:pointer" title="${esc(commitTip(c))}">
+      <td style="width:18px"><span class="hdot ${commitKind(c)}"></span></td><td class="mono small" style="width:70px">${esc(c.short)}</td>
+      <td>${esc(c.subject)} ${c.refs.map(refTag).join(" ")}</td><td class="mut small" style="white-space:nowrap">${esc(c.author)} · ${esc(c.when)}</td></tr>`).join("") || `<tr><td class="mut">No commits yet.</td></tr>`;
+      $("#g_legend").innerHTML = HLEGEND; });
     api(`git/branches?${gq()}`).then(r => { $("#g_br").innerHTML = r.branches.map(b => `<button class="task" ${b.current ? "disabled" : ""} data-gbr="${esc(b.name)}"><svg class="ico"><use href="#i-git"/></svg><span class="tx"><b class="mono">${esc(b.name)}</b><span>${b.current ? "current branch" : "switch to this branch"}${b.upstream ? ` · tracks ${esc(b.upstream)}` : ""}</span></span></button>`).join(""); });
     if ((st.files || []).some(f => f.staged)) api(`git/scan?${gq()}`).then(r => showScan(r.findings));
   } catch (e) { $("#g_body").innerHTML = `<div class="note bad">${icon("x", "ico")}<div>${esc(e.message)}</div></div>`; }
@@ -2253,10 +2379,11 @@ function bindGit(st) {
     }
     const row = e.target.closest("[data-gf]");
     if (row) { const f = (st.files || []).find(x => x.path === row.dataset.gf);
+      return openDoc({kind: "diff", path: row.dataset.gf, staged: !!(f && f.staged && !f.unstaged)});
       const r = await api(`git/diff?${gq()}&path=${encodeURIComponent(row.dataset.gf)}&staged=${f && f.staged && !f.unstaged ? 1 : 0}`);
       $("#g_diff").innerHTML = `<div class="bd" style="border-top:1px solid var(--line-2)"><div class="small mut mono">${esc(row.dataset.gf)}</div><pre class="cmdline" style="display:block;max-height:320px;white-space:pre;margin-top:6px">${r.diff ? r.diff.split("\n").map(l => `<span style="color:${l.startsWith("+") && !l.startsWith("+++") ? "var(--ok)" : l.startsWith("-") && !l.startsWith("---") ? "var(--bad)" : l.startsWith("@@") ? "var(--primary)" : "inherit"}">${esc(l)}</span>`).join("\n") : "(no textual difference)"}</pre></div>`; }
     const rev = e.target.closest("[data-grev]");
-    if (rev) { const r = await api(`git/show?${gq()}&rev=${rev.dataset.grev}`); $("#g_show").innerHTML = `<div class="bd" style="border-top:1px solid var(--line-2)"><pre class="cmdline" style="display:block;max-height:360px;white-space:pre">${esc(r.text)}</pre></div>`; }
+    if (rev) return openDoc({kind: "commit", rev: rev.dataset.grev});
   };
   $("#g_all").onclick = () => gitOp({op: "stage"}, "Staged everything");
   $("#g_stage").onclick = () => G.sel.size ? gitOp({op: "stage", paths: [...G.sel]}, "Staged") : toast("Tick files first", "bad");
@@ -2271,9 +2398,301 @@ function bindGit(st) {
   $("#g_saveid").onclick = () => gitOp({op: "identity", name: $("#g_name").value.trim(), email: $("#g_mail").value.trim(), scope: $("#g_scope").value}, "Identity saved");
   if ($("#g_ghlogin")) $("#g_ghlogin").onclick = () => gitOp({op: "gh_login"});
 }
-$("#g_repo").onchange = async e => { G.repo = e.target.value; G.sel.clear(); await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); loadGit(); };
+$("#g_repo").onchange = async e => { G.repo = e.target.value; G.sel.clear(); GD.files = null; await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); refreshGit(); };
+/* ---- source control drawer: changes, files, branches, git actions and remote actions, from any page ---- */
+const GD = {open: false, files: null, filesFor: "", diff: null, timer: null, st: null};
+const gdSec = (id, title, count, body, open) => `<details id="${id}" ${open ? "open" : ""}><summary><svg class="ico chev"><use href="#i-chev"/></svg>${title}${count != null ? `<span class="cnt">${count}</span>` : ""}</summary><div class="sec">${body}</div></details>`;
+const gdLetter = f => f.conflict ? ["C", "!"] : f.untracked ? ["Q", "U"] : null;
+function gdState(id) { try { const v = localStorage.getItem("pb_gd_" + id); return v == null ? null : v === "1"; } catch { return null; } }
+const PT = {active: "git"};
+try { PT.active = localStorage.getItem("pb_pt") || "git"; } catch {}
+function setPanelTab(t) {
+  PT.active = ["git", "jobs", "studies"].includes(t) ? t : "git";
+  try { localStorage.setItem("pb_pt", PT.active); } catch {}
+  $$("#gd_tabs [data-pt]").forEach(b => { const on = b.dataset.pt === PT.active; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  for (const t of ["git", "jobs", "studies"]) $("#gdp_" + t).hidden = t !== PT.active;
+  if (GD.open) panelLoad();
+}
+function panelLoad(quiet) { if (PT.active === "git") loadDrawer(quiet); else if (PT.active === "jobs") renderPanelJobs(); else loadPanelStudies(); }
+$("#gd_tabs").onclick = e => { const b = e.target.closest("[data-pt]"); if (b) setPanelTab(b.dataset.pt); };
+function setDrawer(open, remember = true) {
+  GD.open = open; document.body.classList.toggle("gd-open", open);
+  $("#gdrawer").setAttribute("aria-hidden", open ? "false" : "true");
+  $("#gdbtn").setAttribute("aria-pressed", open ? "true" : "false");
+  if (remember) try { localStorage.setItem("pb_gd_open", open ? "1" : "0"); } catch {}
+  clearInterval(GD.timer);
+  if (open) { setPanelTab(PT.active); GD.timer = setInterval(() => { if (!document.hidden && GD.open && PT.active !== "jobs") panelLoad(true); }, 15000); }
+}
+async function loadDrawer(quiet) {
+  let st;
+  try { st = await api(`git/status?${gq()}`); } catch (e) { $("#gd_body").innerHTML = `<div class="sec small" style="padding:10px;color:var(--bad)">${esc(e.message)}</div>`; return; }
+  G.repo = st.repo || G.repo; GD.st = st;
+  const files = st.files || [], changed = files.length;
+  for (const id of ["#gdbadge", "#gdtabbadge"]) { $(id).hidden = !changed; $(id).textContent = changed; }
+  const opts = [...(st.choices || []).map(c => [c.path, c.label])]; if (st.repo && !opts.some(o => o[0] === st.repo)) opts.push([st.repo, st.repo]);
+  $("#gd_meta").innerHTML = `<select id="gd_repo" aria-label="Repository" title="${esc(st.repo || "")}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === st.repo ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` +
+    (!st.installed ? "" : !st.is_repo ? `<span class="mut">Not a git repository yet.</span>` :
+     `<div class="br"><span class="tag"><svg class="ico sm"><use href="#i-git"/></svg><b class="mono">${esc(st.branch || "?")}</b></span>
+      <span class="mut" title="commits not yet pushed / not yet pulled">↑${st.ahead || 0} ↓${st.behind || 0}</span>
+      <span class="mut">${st.upstream ? "tracks " + esc(st.upstream) : "not published"}</span></div>`);
+  $("#gd_repo").onchange = async e => { G.repo = e.target.value; GD.files = null; GD.diff = null; await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); refreshGit(); };
+  if (!st.installed) { $("#gd_body").innerHTML = `<div class="sec small" style="padding:10px">Git is not installed. Install it from <a href="https://git-scm.com/" target="_blank" rel="noopener">git-scm.com</a>.</div>`; return; }
+  if (!st.is_repo) { $("#gd_body").innerHTML = `<div class="sec small" style="padding:10px">${st.is_workspace
+      ? (st.choices.some(c => c.kind === "study") ? "Each study is its own repository: choose a study above." : `No studies yet. Start one from <a href="#wizard">New benchmark</a>.`)
+      : `This study is not tracked yet. <button class="btn sm" id="gd_init" style="margin-top:6px">Track this study with Git</button>`}</div>`;
+    if ($("#gd_init")) $("#gd_init").onclick = () => gitOp({op: "init", branch: "main", first_commit: false}, "Study is now tracked");
+    return; }
+  // keep sections' open/closed state and scroll position across refreshes
+  const keepOpen = id => { const el = $("#" + id); return el ? el.open : (gdState(id) ?? ["gd_changes", "gd_commit"].includes(id)); };
+  const scroll = $("#gd_body").scrollTop;
+  const staged = files.filter(f => f.staged), work = files.filter(f => f.unstaged || f.untracked || f.conflict);
+  const li = (f, kind) => { const L = kind === "staged" ? f.x : (gdLetter(f) || [f.y, f.y])[0]; const shown = kind === "staged" ? f.x : (gdLetter(f) || [f.y, f.y])[1];
+    const on = GD.diff && GD.diff.path === f.path && GD.diff.staged === (kind === "staged");
+    return `<li class="${on ? "on" : ""}" data-gdf="${esc(f.path)}" data-gdk="${kind}" title="${esc(f.path)} · ${esc(STATUS_WORD[f[kind === "staged" ? "x" : "y"]] || (f.untracked ? "new file" : ""))}">
+      <span class="st ${esc(L)}">${esc(shown)}</span><span class="nm">${esc(f.path)}</span><span class="act">${kind === "staged"
+        ? `<button data-gdu="${esc(f.path)}" title="Unstage">−</button>` : `<button data-gds="${esc(f.path)}" title="Stage">+</button>`}</span></li>`; };
+  const changes = (staged.length ? `<div class="gd-sub">Staged for the next commit (${staged.length})</div><ul class="gfl">${staged.map(f => li(f, "staged")).join("")}</ul>` : "")
+    + (work.length ? `<div class="gd-sub">Changes (${work.length})</div><ul class="gfl">${work.map(f => li(f, "work")).join("")}</ul>` : "")
+    + (!changed ? `<div class="mut small">No changes: the working tree is clean.</div>` : `<div class="gd-row"><button class="btn sec sm" id="gd_stall">Stage all</button><button class="btn sec sm" id="gd_unall" ${staged.length ? "" : "disabled"}>Unstage all</button></div>`)
+  ;
+  const who = st.user?.name && st.user?.email;
+  const commit = (who ? "" : `<div class="note warn small" style="margin-bottom:6px">${icon("alert", "ico")}<div>Set your name and e-mail on the <a href="#git">Version control</a> page first.</div></div>`)
+    + `<textarea id="gd_msg" placeholder="Commit message: what changed, and why" aria-label="Commit message">${esc(GD.msg || "")}</textarea><div id="gd_scan"></div>
+       <div class="gd-row"><button class="btn sm" id="gd_commit" ${who && staged.length ? "" : "disabled"} title="${staged.length ? "Commit the staged changes" : "Stage changes first"}">${icon("check")}Commit ${staged.length ? staged.length + " file" + (staged.length > 1 ? "s" : "") : ""}</button></div>
+       <div class="mut small" style="margin-top:4px">Only staged files are committed. Each commit is checked first for reads, run outputs, secrets and files too large for GitHub.</div>`;
+  const remote = (st.remotes || [])[0];
+  const remoteBody = (remote ? `<div class="mono small" style="overflow-wrap:anywhere">${esc(remote.name)} → ${esc(remote.url)}</div>` : `<div class="mut small">No remote yet.</div>`)
+    + `<div class="gd-row"><button class="btn sec sm" id="gd_fetch" ${remote ? "" : "disabled"}>Fetch</button><button class="btn sec sm" id="gd_pull" ${remote ? "" : "disabled"}>Pull${st.behind ? " " + st.behind : ""}</button><button class="btn sm" id="gd_push" ${remote ? "" : "disabled"}>Push${st.ahead ? " " + st.ahead : ""}</button></div>
+       <div class="gd-row"><input type="text" id="gd_url" value="${esc(remote ? remote.url : "")}" placeholder="https://github.com/your-org/your-repo.git" aria-label="Remote address" style="flex:1;min-width:0;font-size:12px;min-height:26px"><button class="btn sec sm" id="gd_seturl" style="flex:none">Save</button></div>
+       ${st.gh ? (st.gh_logged_in ? `<div class="small ok-t" style="margin-top:6px">${icon("check")} signed in to GitHub</div>` : `<div class="gd-row"><button class="btn sec sm" id="gd_gh">Sign in to GitHub</button></div>`) : ""}
+       <div class="mut small" style="margin-top:4px">Fetch, pull and push run in the console. Never put a password or token in the address.</div>`;
+  $("#gd_body").innerHTML =
+    gdSec("gd_changes", "Changes", changed, changes, keepOpen("gd_changes")) +
+    gdSec("gd_commit", "Commit", null, commit, keepOpen("gd_commit")) +
+    gdSec("gd_branches", "Branches", null, `<ul class="gfl" id="gd_brl"><li class="mut">Loading…</li></ul>
+      <div class="gd-row"><input type="text" id="gd_newbr" placeholder="new-branch-name" aria-label="New branch name" style="flex:1;min-width:0;font-size:12px;min-height:26px"><button class="btn sec sm" id="gd_mkbr" style="flex:none">Create</button></div>`, keepOpen("gd_branches")) +
+    gdSec("gd_remote", "Remote", st.ahead || st.behind ? `↑${st.ahead || 0} ↓${st.behind || 0}` : null, remoteBody, keepOpen("gd_remote")) +
+    gdSec("gd_files", "Files", null, `<input type="search" id="gd_files_q" placeholder="Filter tracked files" aria-label="Filter tracked files"><ul class="gfl" id="gd_fl"><li class="mut">Open to list the tracked files.</li></ul>`, keepOpen("gd_files")) +
+    gdSec("gd_history", "History", null, `${HLEGEND}<ul class="gfl gd-hist" id="gd_hl"><li class="mut">Loading…</li></ul>`, keepOpen("gd_history"));
+  $("#gd_body").scrollTop = scroll;
+  $$("#gd_body details").forEach(d => d.addEventListener("toggle", () => { try { localStorage.setItem("pb_gd_" + d.id, d.open ? "1" : "0"); } catch {} if (d.id === "gd_files" && d.open) gdFiles(); if (d.id === "gd_history" && d.open) gdHistory(); if (d.id === "gd_branches" && d.open) gdBranches(); }));
+  // actions
+  const q = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+  q("#gd_stall", () => gitOp({op: "stage"}, "Staged everything"));
+  q("#gd_unall", () => gitOp({op: "unstage", paths: staged.map(f => f.path)}, "Unstaged everything"));
+  $("#gd_msg").oninput = e => { GD.msg = e.target.value; };
+  q("#gd_commit", async () => { const r = await gitOp({op: "commit", message: $("#gd_msg").value, override: $("#gd_override")?.value || ""}, r => `Committed ${r.committed}`); if (r) { GD.msg = ""; GD.diff = null; refreshGit(); } });
+  q("#gd_fetch", () => gitOp({op: "fetch"}));
+  q("#gd_pull", () => gitOp({op: "pull"}));
+  q("#gd_push", () => { if (confirm(`Push ${st.ahead || "your"} commit(s) on '${st.branch}' to ${remote ? remote.url : "the remote"}?`)) gitOp({op: "push", confirm: true}); });
+  q("#gd_seturl", () => gitOp({op: "remote_set", name: "origin", url: $("#gd_url").value.trim()}, "Remote saved"));
+  q("#gd_gh", () => gitOp({op: "gh_login"}));
+  q("#gd_mkbr", () => gitOp({op: "branch_create", name: $("#gd_newbr").value.trim(), switch: true}, "Branch created"));
+  $("#gd_files_q").oninput = () => gdFiles(true);
+  if ($("#gd_branches").open) gdBranches();
+  if ($("#gd_files").open) gdFiles();
+  if ($("#gd_history").open) gdHistory();
+  if (staged.length) api(`git/scan?${gq()}`).then(r => { const b = r.findings.filter(f => f.level === "block");
+    $("#gd_scan").innerHTML = b.length ? `<div class="note bad small" style="margin-top:6px">${icon("x", "ico")}<div><b>The commit is blocked</b>: ${b.map(f => `<span class="mono">${esc(f.path)}</span> (${esc(f.why)})`).join(", ")}. Unstage them, or override on the <a href="#git">Version control</a> page.</div></div>`
+      : r.findings.length ? `<div class="note warn small" style="margin-top:6px">${icon("alert", "ico")}<div>${r.findings.map(f => `<span class="mono">${esc(f.path)}</span>: ${esc(f.why)}`).join("<br>")}</div></div>` : ""; }).catch(() => {});
+}
+async function gdShowDiff(path, staged, quiet) {
+  GD.diff = {path, staged};
+  $$("#gd_body [data-gdf]").forEach(li => li.classList.toggle("on", li.dataset.gdf === path && (li.dataset.gdk === "staged") === staged));
+  try { const r = await api(`git/diff?${gq()}&path=${encodeURIComponent(path)}&staged=${staged ? 1 : 0}`);
+    $("#gd_diff").innerHTML = `<div class="gd-sub" style="display:flex;align-items:center">${esc(path)}${staged ? " (staged)" : ""}<button class="gd-ib" style="margin-left:auto" onclick="GD.diff=null;$('#gd_diff').innerHTML='';$$('#gd_body [data-gdf]').forEach(l=>l.classList.remove('on'))" aria-label="Close the diff">${icon("x")}</button></div>
+      <pre>${r.diff ? r.diff.split("\n").map(l => `<span style="color:${l.startsWith("+") && !l.startsWith("+++") ? "var(--ok)" : l.startsWith("-") && !l.startsWith("---") ? "var(--bad)" : l.startsWith("@@") ? "var(--primary)" : "inherit"}">${esc(l)}</span>`).join("\n") : "(no textual difference)"}</pre>`;
+  } catch (e) { if (!quiet) toast(e.message, "bad"); }
+}
+async function gdBranches() {
+  try { const r = await api(`git/branches?${gq()}`);
+    $("#gd_brl").innerHTML = r.branches.map(b => `<li ${b.current ? "" : `data-gdb="${esc(b.name)}"`} title="${b.current ? "current branch" : "switch to " + esc(b.name)}"><span class="st">${b.current ? "●" : ""}</span><span class="nm mono" style="direction:ltr">${esc(b.name)}</span>${b.upstream ? `<span class="mut small">${esc(b.upstream)}</span>` : ""}${b.current ? "" : `<span class="act"><button data-gdb="${esc(b.name)}">Switch</button></span>`}</li>`).join("") || `<li class="mut">No branches yet.</li>`;
+  } catch {}
+}
+async function gdFiles(filterOnly) {
+  try {
+    if (!GD.files || GD.filesFor !== G.repo) { if (filterOnly && !GD.files) return; const r = await api(`git/files?${gq()}`); GD.files = r; GD.filesFor = G.repo; }
+    const q = ($("#gd_files_q")?.value || "").toLowerCase(), changed = new Map((GD.st?.files || []).map(f => [f.path, f]));
+    const list = GD.files.files.filter(n => !q || n.toLowerCase().includes(q)), shown = list.slice(0, 400);
+    $("#gd_fl").innerHTML = shown.map(n => { const f = changed.get(n); const L = f ? (f.staged ? f.x : f.y) : "";
+      return `<li ${f ? `data-gdf="${esc(n)}" data-gdk="${f.staged && !f.unstaged ? "staged" : "work"}"` : ""} title="${esc(n)}${f ? " · changed" : ""}"><span class="st ${esc(L)}">${esc(L)}</span><span class="nm">${esc(n)}</span></li>`; }).join("")
+      + (list.length > shown.length ? `<li class="mut small">${list.length - shown.length} more: filter to narrow</li>` : "")
+      + (!list.length ? `<li class="mut small">${GD.files.total ? "No match." : "No tracked files yet."}</li>` : "");
+  } catch (e) { $("#gd_fl").innerHTML = `<li class="mut">${esc(e.message)}</li>`; }
+}
+async function gdHistory() {
+  try { const r = await api(`git/log?${gq()}&n=25`);
+    $("#gd_hl").innerHTML = r.log.map(c => `<li data-gdrev="${esc(c.hash)}" title="${esc(commitTip(c))}"><span class="hdot ${commitKind(c)}"></span><span class="h">${esc(c.short)}</span><span class="nm" style="direction:ltr">${esc(c.subject)}</span></li>`).join("") || `<li class="mut">No commits yet.</li>`;
+  } catch {}
+}
+$("#gd_body").addEventListener("click", async e => {
+  const s = e.target.closest("[data-gds]"); if (s) { e.stopPropagation(); return gitOp({op: "stage", paths: [s.dataset.gds]}, "Staged"); }
+  const u = e.target.closest("[data-gdu]"); if (u) { e.stopPropagation(); return gitOp({op: "unstage", paths: [u.dataset.gdu]}, "Unstaged"); }
+  const b = e.target.closest("[data-gdb]"); if (b) return gitOp({op: "checkout", name: b.dataset.gdb}, `Switched to ${b.dataset.gdb}`);
+  const f = e.target.closest("[data-gdf]"); if (f) return openDoc({kind: "diff", path: f.dataset.gdf, staged: f.dataset.gdk === "staged"});
+  const r = e.target.closest("[data-gdrev]"); if (r) return openDoc({kind: "commit", rev: r.dataset.gdrev});
+});
+$("#gdbtn").onclick = () => setDrawer(!GD.open);
+$("#gd_close").onclick = () => setDrawer(false);
+$("#gd_ref").onclick = () => { GD.files = null; loadDrawer(); };
+addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "G" || e.key === "g")) { e.preventDefault();
+  if (GD.open && PT.active !== "git") setPanelTab("git"); else { PT.active = "git"; setDrawer(!GD.open); } } });
+function refreshGit() { if (!$("#v_git").hidden) loadGit(); if (GD.open && PT.active === "git") loadDrawer();
+  const t = MT.tabs.find(x => x.id === MT.active); if (t && t.kind === "diff") renderDoc(t); }
+/* ---- colour code and hover text for git history ---- */
+const HLEGEND = `<span class="hlegend"><span><i class="hdot head"></i>you are here</span><span><i class="hdot pushed"></i>pushed</span><span><i class="hdot local"></i>not yet pushed</span><span><i class="hdot merge"></i>merge</span></span>`;
+const commitKind = c => c.merge ? "merge" : c.head ? "head" : !c.has_remote || !c.pushed ? "local" : "pushed";
+function commitTip(c) {
+  const d = c.date ? new Date(c.date) : null;
+  return [`${c.short} · ${c.subject}`, `${c.author}${c.email ? " <" + c.email + ">" : ""}`,
+          `${d ? d.toLocaleString() : ""} (${c.when})`, c.refs && c.refs.length ? "On: " + c.refs.join(", ") : "",
+          c.merge ? `Merge of ${c.parents.length} branches` : "",
+          c.head ? "This is the commit you are on." : "", !c.has_remote ? "No remote yet." : c.pushed ? "Pushed to the remote." : "Not yet pushed.",
+          "Click to open it in a tab."].filter(Boolean).join("\n");
+}
+const refTag = r => { const t = r.replace(/^HEAD -> /, ""); const cls = t.startsWith("tag: ") ? "tag" : t.includes("/") ? "remote" : "";
+  return `<span class="rtag ${cls}">${esc(t.replace(/^tag: /, ""))}</span>`; };
+
+/* ---- main-area tabs: the page, plus diffs and commits opened from Git ---- */
+const MT = {tabs: [], active: "page"};
+try { MT.tabs = JSON.parse(sessionStorage.getItem("pb_tabs") || "[]"); } catch {}
+const mtSave = () => { try { sessionStorage.setItem("pb_tabs", JSON.stringify(MT.tabs)); } catch {} };
+const mtKey = t => [t.kind, t.repo, t.path || "", t.rev || "", t.staged ? 1 : 0].join("|");
+const baseName = p => String(p || "").split("/").pop();
+function tabTitle(t, full) {
+  if (t.kind === "diff") return full ? `${t.path} (${t.staged ? "staged" : "working"} changes)\n${t.repo}` : `${baseName(t.path)}${t.staged ? " · staged" : ""}`;
+  return full ? `${t.short || t.rev.slice(0, 7)} ${t.subject || ""}\n${t.repo}` : `${t.short || t.rev.slice(0, 7)} ${t.subject ? "· " + t.subject : ""}`;
+}
+function openDoc(t) {
+  t.repo = t.repo || G.repo; t.id = mtKey(t);
+  const old = MT.tabs.find(x => x.id === t.id);
+  if (!old) { MT.tabs.push(t); if (MT.tabs.length > 14) MT.tabs.shift(); mtSave(); }
+  mtActivate(t.id);
+}
+function mtActivate(id) {
+  if (id !== "page" && !MT.tabs.some(t => t.id === id)) id = "page";
+  MT.active = id; const doc = id !== "page", v = curView();
+  VIEWS.forEach(x => $("#v_" + x).hidden = doc || x !== v);
+  $("#v_doc").hidden = !doc; renderTabs();
+  if (doc) renderDoc(MT.tabs.find(t => t.id === id));
+  window.scrollTo(0, 0);
+}
+function mtClose(id) {
+  const i = MT.tabs.findIndex(t => t.id === id); if (i < 0) return;
+  MT.tabs.splice(i, 1); mtSave();
+  if (MT.active === id) mtActivate(MT.tabs[i]?.id || MT.tabs[i - 1]?.id || "page"); else renderTabs();
+}
+window.mtOnRoute = () => { MT.active = "page"; $("#v_doc").hidden = true; renderTabs(); };
+function renderTabs() {
+  const v = curView(), title = $(`#v_${v} h1`)?.textContent || v, ic = $(`.nav[data-view="${v}"] use`)?.getAttribute("href") || "#i-home";
+  $("#mtabs").innerHTML = `<button class="mtab ${MT.active === "page" ? "on" : ""}" data-mt="page" role="tab" aria-selected="${MT.active === "page"}" title="${esc(title)}"><svg class="ico sm"><use href="${ic}"/></svg><span>${esc(title)}</span></button>`
+    + MT.tabs.map(t => `<span class="mtab ${MT.active === t.id ? "on" : ""}" data-mt="${esc(t.id)}" role="tab" aria-selected="${MT.active === t.id}" tabindex="0" title="${esc(tabTitle(t, true))}">
+        <svg class="ico sm"><use href="#${t.kind === "commit" ? "i-git" : "i-file"}"/></svg><span>${esc(tabTitle(t))}</span>
+        <button class="x" data-mtx="${esc(t.id)}" aria-label="Close ${esc(tabTitle(t))}" title="Close (middle-click)">×</button></span>`).join("");
+}
+$("#mtabs").addEventListener("click", e => { const x = e.target.closest("[data-mtx]"); if (x) { e.stopPropagation(); return mtClose(x.dataset.mtx); }
+  const t = e.target.closest("[data-mt]"); if (t) mtActivate(t.dataset.mt); });
+$("#mtabs").addEventListener("auxclick", e => { const t = e.target.closest("[data-mt]"); if (e.button === 1 && t && t.dataset.mt !== "page") { e.preventDefault(); mtClose(t.dataset.mt); } });
+$("#mtabs").addEventListener("keydown", e => { const t = e.target.closest("[data-mt]"); if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); mtActivate(t.dataset.mt); } });
+// clicking the current page in the navigation brings its tab back to the front
+document.addEventListener("click", e => { const n = e.target.closest(".nav"); if (n && n.dataset.view === curView() && MT.active !== "page") mtActivate("page"); });
+
+function renderDiff(text) {
+  if (!text || !text.trim()) return `<div class="mut small" style="padding:10px">(no textual difference)</div>`;
+  let o = 1, n = 1; const rows = [];
+  for (const l of text.split("\n")) {
+    const m = l.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (m) { o = +m[1]; n = +m[2]; rows.push(`<tr class="hk"><td class="n"></td><td class="n"></td><td>${esc(l)}</td></tr>`); continue; }
+    if (/^(diff --git|index |--- |\+\+\+ |new file|deleted file|similarity|rename |old mode|new mode|Binary|\\ No newline)/.test(l)) { rows.push(`<tr class="meta"><td class="n"></td><td class="n"></td><td>${esc(l)}</td></tr>`); continue; }
+    if (l.startsWith("+")) rows.push(`<tr class="ad"><td class="n"></td><td class="n">${n++}</td><td>${esc(l)}</td></tr>`);
+    else if (l.startsWith("-")) rows.push(`<tr class="dl"><td class="n">${o++}</td><td class="n"></td><td>${esc(l)}</td></tr>`);
+    else rows.push(`<tr><td class="n">${o++}</td><td class="n">${n++}</td><td>${esc(l)}</td></tr>`);
+  }
+  if (rows.length && rows[rows.length - 1].includes("<td></td></tr>")) rows.pop();
+  return `<div class="diffv"><table>${rows.join("")}</table></div>`;
+}
+async function renderDoc(t) {
+  const box = $("#v_doc"), rq = `repo=${encodeURIComponent(t.repo)}`;
+  box.innerHTML = `<div class="mut">Loading…</div>`;
+  try {
+    if (t.kind === "diff") {
+      const [d, fs] = await Promise.all([api(`git/diff?${rq}&path=${encodeURIComponent(t.path)}&staged=${t.staged ? 1 : 0}`), api(`git/file?${rq}&path=${encodeURIComponent(t.path)}`)]);
+      const f = fs.changed ? fs : null;
+      const where = f ? (t.staged ? "staged for the next commit" : f.untracked ? "new file, not tracked yet" : "changed, not staged") : "no longer changed (committed or reverted)";
+      box.innerHTML = `<div class="docbar"><h2 class="mono">${esc(t.path)}</h2><span class="tag ${t.staged ? "ok" : "warn"}">${esc(where)}</span>
+        ${f && !t.staged ? `<button class="btn sec sm" id="dv_stage">${icon("plus")}Stage</button>` : ""}${f && t.staged ? `<button class="btn sec sm" id="dv_unstage">Unstage</button>` : ""}
+        <button class="btn ghost sm" id="dv_ref">${icon("refresh")}Refresh</button><button class="btn ghost sm" onclick="mtClose('${esc(t.id).replace(/'/g, "\\'")}')">${icon("x")}Close</button></div>
+        <div class="mut small" style="margin:-4px 0 8px">${esc(t.repo)}</div>${renderDiff(d.diff)}`;
+      if ($("#dv_stage")) $("#dv_stage").onclick = async () => { await gitOp({op: "stage", paths: [t.path], repo: t.repo}, "Staged"); mtClose(t.id); openDoc({kind: "diff", path: t.path, staged: true, repo: t.repo}); };
+      if ($("#dv_unstage")) $("#dv_unstage").onclick = async () => { await gitOp({op: "unstage", paths: [t.path], repo: t.repo}, "Unstaged"); mtClose(t.id); openDoc({kind: "diff", path: t.path, staged: false, repo: t.repo}); };
+      $("#dv_ref").onclick = () => renderDoc(t);
+      return;
+    }
+    const c = await api(`git/commit?${rq}&rev=${encodeURIComponent(t.rev)}`);
+    if (!t.subject) { t.subject = c.subject; t.short = c.short; mtSave(); renderTabs(); }
+    const kind = c.parents.length > 1 ? "merge" : (!c.pushed ? "local" : "pushed");
+    const word = {merge: "merge commit", local: "not yet pushed", pushed: "pushed"}[kind];
+    const chunks = c.patch.split(/\n(?=diff --git )/).filter(x => x.trim());
+    box.innerHTML = `<div class="docbar"><h2>${esc(c.subject)}</h2><span class="tag"><span class="hdot ${kind}"></span>&nbsp;${word}</span>
+        <button class="btn ghost sm" onclick="navigator.clipboard.writeText('${esc(c.hash)}');toast('Commit id copied')">${icon("copy")}${esc(c.short)}</button>
+        <button class="btn ghost sm" onclick="mtClose('${esc(t.id).replace(/'/g, "\\'")}')">${icon("x")}Close</button></div>
+      <div class="card"><div class="bd"><dl class="facts">
+        <dt>Author</dt><dd>${esc(c.author)} &lt;${esc(c.email)}&gt;</dd><dt>Date</dt><dd>${esc(new Date(c.date).toLocaleString())} (${esc(c.when)})</dd>
+        <dt>Commit</dt><dd class="mono">${esc(c.hash)}</dd>
+        <dt>Parent${c.parents.length > 1 ? "s" : ""}</dt><dd>${c.parents.map(p => `<a href="javascript:void 0" class="mono" data-oprev="${esc(p)}">${esc(p.slice(0, 7))}</a>`).join(" ") || "none (first commit)"}</dd>
+        ${c.refs.length ? `<dt>On</dt><dd>${c.refs.map(refTag).join(" ")}</dd>` : ""}</dl>
+        ${c.body ? `<pre class="cmdline small" style="display:block;white-space:pre-wrap;margin-top:10px">${esc(c.body)}</pre>` : ""}</div></div>
+      <div class="card" style="margin-top:12px"><div class="hd"><h3>${c.files.length} file${c.files.length === 1 ? "" : "s"} changed</h3></div><div class="bd">
+        <ul class="cfiles">${c.files.map((f, i) => `<li data-cfi="${i}" title="${esc(f.from ? f.from + " → " + f.path : f.path)}"><span class="st ${esc(f.status)}">${esc(f.status)}</span><span class="mono">${esc(f.path)}</span></li>`).join("")}</ul></div></div>
+      <div class="cpatch">${chunks.map((ch, i) => { const m = ch.match(/^diff --git a\/(.*?) b\/(.*)$/m);
+        return `<details open id="cfi_${i}"><summary>${esc(m ? m[2] : "patch")}</summary>${renderDiff(ch)}</details>`; }).join("")}</div>`;
+    box.querySelectorAll("[data-oprev]").forEach(a => a.onclick = () => openDoc({kind: "commit", rev: a.dataset.oprev, repo: t.repo}));
+    box.querySelectorAll("[data-cfi]").forEach(li => li.onclick = () => { const d = $("#cfi_" + li.dataset.cfi); if (d) { d.open = true; d.scrollIntoView({behavior: "smooth", block: "start"}); } });
+  } catch (e) { box.innerHTML = `<div class="note bad">${icon("x", "ico")}<div>${esc(e.message)}</div></div>`; }
+}
+
+/* ---- side panel: Jobs ---- */
+function renderPanelJobs() {
+  const jobs = (S.jobs || []).slice(0, 40);
+  $("#pj_list").innerHTML = jobs.map(j => `<li data-pjob="${esc(j.id)}" title="${esc(j.command)}"><span class="sdot ${esc(j.state)}"></span>
+    <span class="t"><b>${esc(j.label)}</b><span>${esc(stateWord(j.state))} · ${esc(fmtTime(j.started))}${j.ended || j.state === "running" ? " · " + esc(fmtDur((j.ended || Date.now() / 1000) - j.started)) : ""}</span></span>
+    ${j.state === "running" ? `<button class="gd-ib" data-pjcancel="${esc(j.id)}" title="Cancel">${icon("stop")}</button>` : ""}</li>`).join("")
+    || `<li class="mut" style="cursor:default">Nothing started from this window yet.</li>`;
+}
+$("#pj_list").onclick = async e => {
+  const c = e.target.closest("[data-pjcancel]"); if (c) { e.stopPropagation(); try { await api(`jobs/${c.dataset.pjcancel}/cancel`, {}); toast("Cancelling…"); } catch (err) { toast(err.message, "bad"); } return; }
+  const li = e.target.closest("[data-pjob]"); if (li) { setCTab("out"); showConsole(li.dataset.pjob, true); }
+};
+
+/* ---- side panel: Studies ---- */
+async function loadPanelStudies() {
+  try {
+    const [w, runs] = await Promise.all([getWorkspace(true), getRuns(true).catch(() => [])]);
+    $("#ps_where").textContent = `Studies · ${w.studies.length}`; $("#ps_where").title = w.path;
+    $("#ps_list").innerHTML = w.studies.map(st => {
+      const run = (runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, ""));
+      const idx = run ? runs.indexOf(run) : -1;
+      return `<li title="${esc(st.path)}${st.last_command ? "\n" + esc(st.last_command) : ""}"><span class="sdot ${st.report ? "done" : ""}"></span>
+        <span class="t"><b class="mono">${esc(st.name)}</b><span>${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "no runs yet"))} · ${esc(fmtTime(st.modified))}</span></span>
+        ${st.report && idx >= 0 ? `<a class="gd-ib" href="/view/${idx}/benchmark.report.html" target="_blank" rel="noopener" title="Open the report">${icon("chart")}</a>` : ""}
+        <button class="gd-ib" data-psgit="${esc(st.path)}" title="${st.tracked ? "Tracked with Git: show its changes and history" : "Not tracked yet: track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}">${icon("git")}</button>
+        <button class="gd-ib" data-psdir="${esc(st.path)}" title="Open the study folder">${icon("folder")}</button></li>`; }).join("")
+      || `<li class="mut" style="cursor:default">No studies yet. Start one with New benchmark.</li>`;
+  } catch (e) { $("#ps_list").innerHTML = `<li class="mut">${esc(e.message)}</li>`; }
+}
+$("#ps_list").onclick = async e => { const b = e.target.closest("[data-psdir]"); if (b) { e.stopPropagation(); reveal(b.dataset.psdir); return; }
+  const g = e.target.closest("[data-psgit]"); if (g) { e.stopPropagation(); G.repo = g.dataset.psgit; GD.files = null;
+    await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); setPanelTab("git"); if (!$("#v_git").hidden) loadGit(); return; }
+  const li = e.target.closest("li[title]"); if (li && !e.target.closest("a")) go("workspace"); };
+$("#ps_ref").onclick = () => loadPanelStudies();
+renderTabs();
+
+try { if (localStorage.getItem("pb_gd_open") === "1") setDrawer(true, false); } catch {}
+$$("#gd_tabs [data-pt]").forEach(b => b.classList.toggle("on", b.dataset.pt === PT.active));
+
 $("#g_ref").onclick = () => loadGit();
 
+window.gitStudy = async path => { G.repo = path; GD.files = null; await api("git", {op: "repo_set", repo: path}).catch(e => toast(e.message, "bad")); go("git"); };
 window.benchCohort = name => { S.wiz = {step: 1, source: "cohort", values: {cohort: name}}; go("wizard"); };
 
 /* ===================================================================================================

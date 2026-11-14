@@ -47,6 +47,24 @@ history is lost, only the numbering is cleaner. See
   `plasbench` environment, Docker. It also gives the recommended way to run PlasBench there (the conda environment,
   or WSL2 on Windows), the steps still to do, the warnings (Apple Silicon, low RAM, `/mnt/c` speed) and Docker as the
   alternative, with its command. The checklist also checks for the `plasbench` environment.
+- **Side panel and main-area tabs.** **Panel** (top bar, Ctrl+Shift+G) opens a right-hand panel as wide as the
+  navigation rail, with three tabs. **Git** has changes with stage/unstage, commit, branches, remote, tracked files and
+  history. **Jobs** shows running and recent jobs with cancel. **Studies** lists the workspace's studies with reports
+  and folders. The main area has tabs: the page you are on, plus a tab for each diff or commit opened from Git (line
+  numbers, files changed, parents, Stage/Unstage). Tabs close with × or a middle-click.
+- **Git history is colour-coded**: the commit you are on, pushed, not yet pushed, and merge commits, with branch and
+  tag labels. Hovering a commit shows its author, date, labels and whether it is pushed; clicking it opens it in a tab.
+- **Version control tracks your runs, not the program: one repository per study.** Each study folder is its own
+  repository, with its own history and remote. Its managed `runs` `.gitignore` keeps the study's record, tables,
+  reports, figures and logs, and leaves raw sequence data (reads, assemblies, FASTA, alignments), tmp folders and
+  credentials out. Studies show whether they are tracked, with a Git button on Workspace & studies and in the side
+  panel. A new repository can no longer be started in the
+  PlasBench program folder, and a workspace inside a program checkout is no longer mistaken for that checkout.
+- **`plasbench install-git`** (optional; Set up → Git → Install). On Windows it installs Git for Windows with Git Bash
+  through winget, and you answer any prompt in the console. Elsewhere it installs conda-forge git into the plasbench
+  environment, or prints the system command.
+- **The Terminal lists each WSL distribution by name**, plus Git Bash (never the WSL launcher) and PowerShell, and runs
+  `git` in every shell. When WSL does not respond, it says so and suggests `wsl --shutdown`.
 - **Session log and run script.** The console has a third tab, **Session log**. It shows, one line per event, what
   happened in the session: commands started from the pages and how they ended, answers, cancels, terminal commands,
   settings, workspace and study changes. Earlier sessions can be chosen too. **Save as script** downloads the session
@@ -80,6 +98,7 @@ history is lost, only the numbering is cleaner. See
 - The console is open by default (a quarter of the window) and remembers its height and whether you closed it.
 - The fixed console never hides the end of a page: the page keeps a bottom margin as tall as the console, and
   scrolling to a field stops above it. The body was `height:100%`, so that margin used to end at the first screen.
+- `test_install_latest.sh` follows the installer into the one `PlasBench` folder.
 - The Terminal's command box is an expandable text area: one line by default, it grows as you type (Shift+Enter for
   a new line) and can be dragged taller.
 

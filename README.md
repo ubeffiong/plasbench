@@ -931,7 +931,7 @@ there, what is still missing, and the Docker command when Docker is available.
 | **Cohorts** | The bundled study sets. **Details** shows what each holds: description, isolates and species, plasmids in the truth, read depth, BioProjects and the download size. Breakdowns cover organism, truth tier, how the truth was assembled, origin and country. A searchable table lists every sample, with NCBI links, host, isolation source, collection date and how its reference was sequenced (from the cohort's lock). Validate a cohort, or benchmark it in one click. |
 | **Runs & reports** | Every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
 | **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
-| **Version control** | Git without the command line: status, staging, diffs, commit, branches, remote, fetch/pull/push and history, for your PlasBench folder or your workspace. A managed `.gitignore` keeps run outputs, reads and credentials out, and every commit is checked for data, secrets and files too large for GitHub. |
+| **Version control** | Git without the command line, for your **runs**: **each study is its own repository**, holding the study's record, sample sheets, settings, result tables, reports, figures and logs, with its own history and its own remote. The PlasBench program is not tracked, because updates replace it. A managed `.gitignore` keeps reads, assemblies, FASTA, alignments, tmp folders and credentials out. You get status, staging, commit, branches, remote, fetch/pull/push, and a colour-coded history: you are here, pushed, not yet pushed, and merges, with details on hover. Diffs and commits open as tabs, and every commit is checked for raw data, secrets, patient identifiers and files too large for GitHub. Git is optional: `plasbench install-git` installs Git for Windows with Git Bash on Windows, or the conda-forge git elsewhere. |
 | **All commands** | Every `plasbench` command and option as a form, generated from the command line itself, so nothing is missing. Each shows the command it will run before you run it. |
 | **Guides** | This README and every guide, readable in the window. |
 
@@ -956,6 +956,20 @@ to resize it, or collapse it to its title bar. It has two tabs:
   with the environment's tools on PATH. On Windows it is Ubuntu (WSL) when installed, with PowerShell as an option.
   Commands receive no keyboard input, so start interactive or long work from the pages, where its questions are
   answered in Job output.
+
+**Side panel and tabs.** **Panel** in the top bar (or Ctrl+Shift+G) opens a panel on the right, as wide as the
+navigation on the left, with three tabs:
+
+* **Git** shows changes, commit, branches, remote, tracked files and a colour-coded history.
+* **Jobs** lists what is running and what ran, with cancel, and shows a job's output in the console.
+* **Studies** lists your studies, with their reports and folders.
+
+The main area has tabs too. The page you are on is the first tab. A diff or a commit opened from Git gets its own
+tab, with line numbers, its files and Stage/Unstage. Close a tab with its × or a middle-click.
+
+The Terminal tab offers each Linux distribution installed in WSL (Ubuntu, Debian, ...), Git Bash and PowerShell on
+Windows, and your login shell elsewhere. `git` and `plasbench` work in each. If WSL does not respond, the terminal
+says so and suggests `wsl --shutdown`.
 
 **Help on every page.** Each page has a **Help** button, the **?** in the top bar does the same, and so does
 <kbd>F1</kbd>. It explains what the page is for, how to use it step by step, what is good to know, and the

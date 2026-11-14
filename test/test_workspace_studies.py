@@ -139,8 +139,16 @@ def main():
         repo = new_ws / "notes"
         repo.mkdir()
         code, r = call("/api/git", {"op": "init", "repo": str(repo)})
-        check("a repository is initialised inside the workspace, with the safety block", code == 200
-              and "PlasBench safety block" in (repo / ".gitignore").read_text(encoding="utf-8"), r)
+        check("a repository is initialised inside the workspace, with the runs block (tracks runs, not raw data)",
+              code == 200 and "PlasBench runs block" in (repo / ".gitignore").read_text(encoding="utf-8"), r)
+        code, r = call("/api/git", {"op": "init", "repo": str(ROOT / "plasbench")})
+        check("no repository is started in the PlasBench program folder", code == 400 and "runs" in r.get("error", ""), r)
+        code, r = call("/api/git", {"op": "init", "repo": str(new_ws)})
+        check("no repository is started at the workspace level (one per study)", code == 400 and "per study" in r.get("error", ""), r)
+        code, st = call(f"/api/git/status?repo={urllib.request.quote(str(repo))}")
+        mine = [c for c in st.get("choices", []) if c.get("path") == str(repo)]
+        check("each study is offered as its own repository, marked tracked", code == 200 and mine and mine[0]["kind"] == "study"
+              and mine[0]["tracked"], st.get("choices"))
         outside = tmp / "elsewhere"
         outside.mkdir()
         check("a folder outside the PlasBench folder and the workspace is refused",

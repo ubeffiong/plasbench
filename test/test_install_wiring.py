@@ -76,6 +76,8 @@ MANUAL = {
     "powershell": "Windows: makes the Start-menu and desktop shortcuts; also a terminal shell",
     "powershell.exe": "Windows from WSL: makes the Windows desktop shortcut",
     "wsl": "Windows: the platform check and the terminal's Ubuntu (WSL) shell",
+    "winget": "Windows: plasbench install-git installs Git for Windows (Git Bash) with it, when present",
+    "xcode-select": "macOS: plasbench install-git opens Apple's command line tools installer (includes git)",
     "deadends": "no bioconda package; INSTALL.md documents the manual build",
     "blastn": "only the one-off compare_scoring_methods.py cross-check uses it, and it states its own requirement",
     "timeout": "GNU coreutils; scripts/04_run_tools.sh uses it only when TOOL_TIMEOUT_SECONDS is set and checks for it first",

@@ -283,6 +283,11 @@ def build_parser():
                            help="Open the page in a normal browser tab instead of an app-style window.")
     ui_parser.add_argument("--new-instance", action="store_true",
                            help="Start another server even if a PlasBench window is already running for this folder.")
+    git_parser = sub.add_parser(
+        "install-git",
+        help="Install Git (optional): Git for Windows with Git Bash on Windows, conda-forge git elsewhere.")
+    git_parser.add_argument("--force", action="store_true", help="Install even if git is already found.")
+    git_parser.add_argument("--dry-run", action="store_true", help="Only say what would be done.")
     icon_parser = sub.add_parser(
         "desktop-icon",
         help="Put a PlasBench icon on the desktop and in the applications/Start menu; clicking it starts PlasBench.")
@@ -722,6 +727,9 @@ def main(argv=None):
         from .webui import serve
         serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance)
         return 0
+    if args.command == "install-git":
+        from . import install_git
+        return install_git.main((["--force"] if args.force else []) + (["--dry-run"] if args.dry_run else []))
     if args.command == "desktop-icon":
         from . import desktop
         return desktop.main(["--project-root", str(root)] + (["--remove"] if args.remove else [])

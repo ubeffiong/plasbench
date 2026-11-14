@@ -3,7 +3,10 @@
 Ported from GenoSuv's gitops.py (same design, same author), with PlasBench's data rules:
   * git is always called with an argument LIST (never through a shell), `GIT_TERMINAL_PROMPT=0` (no hidden prompt that
     hangs) and config hardening so a repository's own .git/config cannot make reading it run a program;
-  * a managed .gitignore block keeps studies, results, downloads, reads, alignments, logs and credentials out;
+  * what is tracked is your RUNS, not the program, one repository per STUDY: each study folder is its own repository,
+    whose managed "runs" .gitignore keeps the study's record, tables, reports, figures and logs and leaves raw
+    sequence data, tmp and credentials out. The PlasBench program folder is offered only when it already is a developer checkout (its
+    own block keeps studies, results, downloads and credentials out of the program's history);
   * every commit is scanned first: reads/alignments/run folders, secrets (config/local.env holds the NCBI API key) and
     files over GitHub's 100 MB limit block it (data and secrets can be overridden only by typing a sentence; size not);
   * remote addresses may not contain credentials; there is no force-push and no history rewriting;
@@ -58,6 +61,58 @@ id_ed25519*
 # --- end PlasBench safety block ---
 """
 
+RUNS_IGNORE = """# --- PlasBench runs block (managed) ---
+# This repository tracks your benchmark RUNS: each study's record (study.json), sample sheets, settings snapshots,
+# result tables (.tsv/.csv/.json), reports (.html/.pdf), figures and logs. Raw and intermediate sequence data stay out:
+# they are large, and a rerun re-creates them. Credentials never go in.
+tmp/
+**/tmp/
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.fasta
+*.fasta.gz
+*.fa
+*.fa.gz
+*.fna
+*.fna.gz
+*.ffn
+*.faa
+*.gbk
+*.gff
+*.gff3
+*.gfa
+*.gfa.gz
+*.fastg
+*.paf
+*.paf.gz
+*.bam
+*.bai
+*.sam
+*.cram
+*.sra
+*.sqlite
+*.db
+*.h5
+*.npz
+.env
+*.pem
+*.key
+*.pfx
+id_rsa*
+id_ed25519*
+__pycache__/
+*.pyc
+# --- end PlasBench runs block ---
+"""
+RUNS_MARKER = "PlasBench runs block"
+# In a runs repository the study folders' results/ and logs/ ARE what is tracked; raw data and tmp are not.
+RUN_DATA_PATTERNS = [
+    (re.compile(r"\.(fastq|fq|bam|cram|sam|sra|bcf)(\.gz)?$", re.I), "raw sequencing reads or alignments"),
+    (re.compile(r"\.(fasta|fa|fna|ffn|faa|gfa|fastg|paf)(\.gz)?$", re.I), "sequence data (re-created by a rerun)"),
+    (re.compile(r"(^|/)tmp/"), "temporary files of a run"),
+]
 DATA_PATTERNS = [
     (re.compile(r"\.(fastq|fq|bam|cram|sam|sra|bcf)(\.gz)?$", re.I), "raw sequencing reads or alignments"),
     (re.compile(r"\.(paf|gfa)(\.gz)?$", re.I), "alignment or assembly-graph output"),
@@ -213,8 +268,14 @@ def info(repo: str | Path) -> dict:
     out["user"] = {"name": cfg_name, "email": cfg_mail}
     if top.returncode != 0:
         return out
+    toplevel = top.stdout.strip()
+    if os.path.normcase(os.path.realpath(toplevel)) != os.path.normcase(os.path.realpath(str(repo))):
+        # e.g. the studies workspace inside a PlasBench program checkout: not a repository of its own (yet)
+        out["inside_repo"] = toplevel
+        return out
     out["is_repo"] = True
-    out["root"] = top.stdout.strip()
+    out["root"] = toplevel
+    out["kind"] = repo_kind(repo)
     # 'normal' reports an untracked DIRECTORY once; 'all' walked every file inside it, so a
     # polled status recursed through runs/ (hundreds of thousands of files) every few seconds.
     st = run(repo, "status", "--porcelain=v2", "--branch", "--untracked-files=normal", "-z", check=False)
@@ -267,12 +328,63 @@ def info(repo: str | Path) -> dict:
 
 
 def log(repo, n: int = 30) -> list[dict]:
-    p = run(repo, "log", f"-{int(n)}", "--format=%H%x09%h%x09%s%x09%an%x09%ar", check=False)
+    """Recent commits, newest first, with what the history view colours and shows on hover:
+    head (the commit you are on), pushed (on a remote) or local only, merge commits, and branch/tag labels."""
+    fmt = "%H%x09%h%x09%s%x09%an%x09%ae%x09%ar%x09%aI%x09%P%x09%D"
+    p = run(repo, "log", f"-{max(1, min(int(n), 500))}", f"--format={fmt}", check=False)
+    local = set(run(repo, "rev-list", "HEAD", "--not", "--remotes", check=False).stdout.split())
+    has_remote = bool(run(repo, "remote", check=False).stdout.strip())
+    head = run(repo, "rev-parse", "HEAD", check=False).stdout.strip()
     rows = []
     for line in p.stdout.splitlines():
-        h, s, subj, a, w = (line.split("\t") + ["", "", "", ""])[:5]
-        rows.append({"hash": h, "short": s, "subject": subj, "author": a, "when": w})
+        h, s, subj, a, mail, w, iso, parents, refs = (line.split("\t") + [""] * 9)[:9]
+        par = parents.split()
+        rows.append({"hash": h, "short": s, "subject": subj, "author": a, "email": mail, "when": w, "date": iso,
+                     "parents": par, "merge": len(par) > 1, "head": h == head,
+                     "refs": [r.strip() for r in refs.split(",") if r.strip()],
+                     "pushed": has_remote and h not in local, "has_remote": has_remote})
     return rows
+
+
+def file_state(repo, path: str) -> dict:
+    """One file's state, cheaply (for a diff tab): {changed, staged, unstaged, untracked}."""
+    rel = _inside(repo, path)
+    out = run(repo, "status", "--porcelain=v1", "--untracked-files=all", "--", rel, check=False).stdout
+    line = next((l for l in out.splitlines() if l.strip()), "")
+    if not line:
+        return {"changed": False, "staged": False, "unstaged": False, "untracked": False}
+    x, y = line[0], line[1]
+    return {"changed": True, "untracked": x == "?", "staged": x not in (" ", "?"), "unstaged": y not in (" ",) and x != "?" or x == "?"}
+
+
+def commit_detail(repo, rev: str, limit: int = 400_000) -> dict:
+    """One commit for its tab: who, when, message, parents, labels, the files it changed and its patch."""
+    r = (rev or "").strip()
+    if not re.match(r"^[0-9a-fA-F]{4,40}$", r):
+        raise ValueError("not a commit id")
+    meta = run(repo, "show", "-s", "--format=%H%x00%h%x00%an%x00%ae%x00%aI%x00%ar%x00%P%x00%D%x00%s%x00%b", r, check=False)
+    if meta.returncode != 0:
+        raise ValueError("no such commit")
+    f = (meta.stdout.split("\0") + [""] * 10)[:10]
+    names = run(repo, "show", "--no-color", "--format=", "--name-status", "-M", r, check=False).stdout
+    files = []
+    for line in names.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            files.append({"status": parts[0][:1], "path": parts[-1], "from": parts[1] if len(parts) > 2 else ""})
+    patch_text = run(repo, "show", "--no-color", "--no-ext-diff", "--format=", "--patch", "-M", r, check=False).stdout
+    local = set(run(repo, "rev-list", "HEAD", "--not", "--remotes", check=False).stdout.split())
+    return {"hash": f[0], "short": f[1], "author": f[2], "email": f[3], "date": f[4], "when": f[5],
+            "parents": f[6].split(), "refs": [x.strip() for x in f[7].split(",") if x.strip()], "subject": f[8],
+            "body": f[9].strip(), "files": files, "pushed": f[0] not in local,
+            "patch": redact(patch_text[:limit] + ("\n... (truncated)" if len(patch_text) > limit else ""))}
+
+
+def files(repo, limit: int = 5000) -> dict:
+    """The files git tracks in this repository (read-only `git ls-files`), at most `limit` of them."""
+    p = run(repo, "ls-files", "-z", check=False)
+    names = [n for n in p.stdout.split("\0") if n]
+    return {"files": names[:limit], "total": len(names), "truncated": len(names) > limit}
 
 
 def branches(repo) -> list[dict]:
@@ -305,23 +417,32 @@ def _inside(repo, path: str) -> str:
 
 
 # ---------------------------------------------------------------- operations
-def ensure_gitignore(repo) -> bool:
-    """Add the managed safety block if missing. Returns True if the file changed."""
+def repo_kind(repo) -> str:
+    """'runs' for a repository of benchmark runs (the managed runs block), else 'program'."""
+    try:
+        return "runs" if RUNS_MARKER in (Path(repo) / ".gitignore").read_text(encoding="utf-8") else "program"
+    except OSError:
+        return "program"
+
+
+def ensure_gitignore(repo, kind: str = "program") -> bool:
+    """Add the managed block for this kind of repository if missing. Returns True if the file changed."""
     gi = Path(repo) / ".gitignore"
     cur = gi.read_text(encoding="utf-8") if gi.exists() else ""
-    if "PlasBench safety block" in cur:
+    marker, block = (RUNS_MARKER, RUNS_IGNORE) if kind == "runs" else ("PlasBench safety block", SAFE_IGNORE)
+    if marker in cur:
         return False
-    gi.write_text((cur.rstrip("\n") + "\n\n" if cur.strip() else "") + SAFE_IGNORE, encoding="utf-8")
+    gi.write_text((cur.rstrip("\n") + "\n\n" if cur.strip() else "") + block, encoding="utf-8")
     return True
 
 
-def init(repo, branch: str = "main", first_commit: bool = False, message: str = "Initial commit") -> dict:
+def init(repo, branch: str = "main", first_commit: bool = False, message: str = "Initial commit", kind: str = "runs") -> dict:
     repo = valid_repo(str(repo))
     branch = valid_branch(branch)
     if run(repo, "rev-parse", "--is-inside-work-tree", check=False).returncode == 0 and (repo / ".git").exists():
         raise GitError("this folder is already a git repository")
     run(repo, "init", "-b", branch)
-    changed = ensure_gitignore(repo)
+    changed = ensure_gitignore(repo, kind)
     res = {"initialised": True, "gitignore_updated": changed}
     if first_commit:
         run(repo, "add", "-A")
@@ -361,12 +482,13 @@ def scan_staged(repo) -> list[dict]:
     """Findings for what is currently staged: [{path, level: block|warn, kind: data|secret|size, why}]."""
     p = run(repo, "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR", check=False)
     findings = []
+    data_patterns = RUN_DATA_PATTERNS if repo_kind(repo) == "runs" else DATA_PATTERNS
     for rel in [x for x in p.stdout.split("\0") if x]:
         norm = rel.replace("\\", "/")
         f = Path(repo) / rel
         exempt = norm.startswith(("test/", "tests/"))   # small synthetic fixtures
         if not exempt:
-            for pat, why in DATA_PATTERNS:
+            for pat, why in data_patterns:
                 if pat.search(norm):
                     findings.append({"path": rel, "level": "block", "kind": "data", "why": why}); break
         for pat, why in SECRET_PATTERNS:

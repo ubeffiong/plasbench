@@ -125,9 +125,78 @@ def main():
     check("/api/cohorts/info returns the summary and rows", code == 200 and body["n"] == len(body["rows"]) and body["summary"]["isolates"])
     code, _ = get("/api/cohorts/info?name=..%2FREADME")
     check("/api/cohorts/info refuses a path", code == 400)
+    code, body = get("/api/git/files?repo=" + urllib.request.quote(str(ROOT)))
+    check("/api/git/files lists a checkout's tracked files", code == 200 and ("plasbench/webui.py" in body.get("files", [])
+          or not (ROOT / ".git").exists()), body if code != 200 else body["total"])
+    code, body = get("/api/git/status")
+    check("version control defaults to a study (or the workspace when there is none), never the program", code == 200
+          and all(c["kind"] in ("study", "program") for c in body["choices"])
+          and Path(body["repo"]).resolve() != ROOT.resolve(), body.get("repo"))
     code, _ = get("/api/cohorts/info?name=nope")
     check("/api/cohorts/info: unknown cohort is a 404", code == 404)
     server.shutdown()
+
+    print("source control drawer")
+    check("panel on every page: Panel button, Ctrl+Shift+G, six Git sections", 'id="gdrawer"' in page and 'id="gdbtn"' in page
+          and 'e.key === "G"' in script and all(f'gdSec("gd_{k}"' in script for k in
+                                               ("changes", "commit", "branches", "remote", "files", "history")))
+    check("drawer collapses and remembers it", "pb_gd_open" in script and "gd-open" in page)
+    check("the page makes room for the drawer on wide screens", "body.gd-open .shell{margin-right:var(--gdw)}" in page)
+    from plasbench import gitops
+    if gitops.find_git():
+        repo = tmp / "repo"
+        repo.mkdir()
+        gitops.run(repo, "init", "-q")
+        (repo / "a.txt").write_text("a", encoding="utf-8")
+        (repo / "b.txt").write_text("b", encoding="utf-8")
+        gitops.run(repo, "add", "a.txt")
+        r = gitops.files(repo)
+        check("tracked files are listed (git ls-files), untracked ones are not", r["files"] == ["a.txt"] and r["total"] == 1, r)
+        check("the file list is capped", gitops.files(repo, limit=0)["truncated"] is True)
+    else:
+        print("  skip  git not installed")
+
+    print("side panel, main tabs, git history")
+    check("side panel: Git, Jobs and Studies tabs", all(f'data-pt="{t}"' in page for t in ("git", "jobs", "studies")))
+    check("side panel is as wide as the navigation rail", ":root{--gdw:248px}" in page and "--railw:248px" in page)
+    check("main-area tabs: the page plus documents, closable", 'id="mtabs"' in page and 'id="v_doc"' in page
+          and "function openDoc" in script and "function mtClose" in script and "auxclick" in script)
+    check("diffs and commits open as tabs", 'openDoc({kind: "diff"' in script and 'openDoc({kind: "commit"' in script)
+    check("history has a colour code and hover text", "const HLEGEND" in script and "function commitTip" in script
+          and ".hdot.local" in page and ".hdot.pushed" in page)
+    if gitops.find_git():
+        g = tmp / "hist"
+        g.mkdir()
+        gitops.run(g, "init", "-q", "-b", "main")
+        gitops.run(g, "config", "user.name", "T")
+        gitops.run(g, "config", "user.email", "t@example.org")
+        (g / "a.tsv").write_bytes(b"x\n")
+        gitops.run(g, "add", "a.tsv")
+        gitops.run(g, "commit", "-q", "-m", "first run")
+        (g / "a.tsv").write_bytes(b"x\ny\n")
+        log = gitops.log(g, 5)
+        check("log: head, not pushed (no remote), refs, parents, ISO date", log and log[0]["head"] and not log[0]["pushed"]
+              and log[0]["has_remote"] is False and any("main" in r for r in log[0]["refs"]) and log[0]["date"][:4].isdigit(), log[:1])
+        d = gitops.commit_detail(g, log[0]["hash"])
+        check("commit detail: files and patch", d["files"] == [{"status": "A", "path": "a.tsv", "from": ""}] and "+x" in d["patch"], d["files"])
+        fs = gitops.file_state(g, "a.tsv")
+        check("file state: changed, not staged", fs["changed"] and fs["unstaged"] and not fs["staged"], fs)
+        try:
+            gitops.commit_detail(g, "not-a-hash")
+            check("commit detail refuses a bad id", False)
+        except ValueError:
+            check("commit detail refuses a bad id", True)
+
+    print("optional git install and terminal shells")
+    from plasbench import install_git, terminal as term
+    plan = install_git.plan()
+    check("install-git always has a plan", plan["action"] in ("none", "run", "manual") and plan["say"])
+    if plan["action"] == "run":
+        check("install-git runs a known installer", any(x in plan["argv"][0].lower() for x in ("winget", "conda", "mamba", "micromamba", "xcode-select")))
+    shells = term.available_shells()
+    check("the terminal offers at least one shell", bool(shells))
+    check("WSL distributions are offered by name", all(k.startswith("wsl:") or k in ("posix", "powershell") for k in shells), shells)
+    check("Git Bash is never the WSL launcher", not (term.git_for_windows_bash() or "").lower().endswith(("system32\\bash.exe", "system32/bash.exe")))
 
     print("console")
     check("the terminal command box is an expandable textarea", re.search(r'<textarea id="tcmd" rows="1"', page) is not None
