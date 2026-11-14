@@ -88,7 +88,9 @@ HELP = {
         "the sample sheet records them. Holm adjustment corrects for making many comparisons.",
         "A small adjusted p-value and an interval that excludes zero point to a real difference. 'Equivalent within delta' means the tools are practically the same.",
         "Stops you from over-reading small gaps.",
-        "With fewer than five independent units a test is 'not estimated'. A p-value says a difference is unlikely to be chance, not that it matters in practice."),
+        "With fewer than six independent units (studies, not isolates) a test is 'not estimated': five units can never reach p below 0.05. The 'Permutation test' column says "
+        "whether the p-value is exact or an estimate and the smallest p it could ever report; 'underpowered' means the data cannot show significance whatever the effect. "
+        "A p-value says a difference is unlikely to be chance, not that it matters in practice."),
     "metadata": H(
         "What was run: the folder, the cohort, when the report was made, which inputs were used, and which analyses were not run.",
         "The run's own records (manifest, execution status and the files it wrote).",

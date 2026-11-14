@@ -474,7 +474,7 @@ Exit codes 124 (timeout) and 137 (SIGKILL, the usual out-of-memory kill) are cla
 | Procedure | Detail |
 |---|---|
 | Interval | Percentile interval from a 1,000-resample bootstrap (fixed seed), resampling whole clusters within each species, then macro-averaging. Reported only with at least 5 values and 5 independent clusters. |
-| Pairwise comparison | Two-sided sign-flip permutation test on paired per-sample differences (10,000 permutations, fixed seed), flipping whole clusters together; at least 5 paired clusters. |
+| Pairwise comparison | Two-sided sign-flip permutation test on paired per-sample differences (10,000 permutations, fixed seed), flipping whole clusters together; at least 6 independent clusters (with 5 the smallest attainable two-sided p is 0.0625, which can never reach 0.05). Up to 12 clusters every sign pattern is enumerated (an exact p-value, no random numbers); above 12 the 10,000-permutation estimate is used. `permutation_method`, `min_attainable_p` and `p_status` (ok / underpowered / not_estimated) are written beside every p-value. |
 | Multiplicity | Holm correction across all pairs within one (track, task). |
 | Wilcoxon signed-rank | Reported beside the permutation test, never replacing it: exact for up to 25 non-zero differences (conditional on ties), normal approximation with continuity correction above; zero differences dropped; Holm-adjusted (`wilcoxon_p_value_holm`). |
 | Equivalence | `equivalent = yes` when the mean difference and its interval lie inside ±`SMALLEST_DIFFERENCE` (0.05). |
@@ -606,6 +606,8 @@ Blank always means "not defined or not assessed", never zero.
 ### 13.3 The HTML report
 
 **Download the best reconstruction of an isolate.** In the plasmid matrix of the Summary each isolate has a small FASTA button. It downloads the isolate's selected reconstruction when the report is open inside its results folder, and is greyed out (with the reason) when the report has been moved away from its results or no reconstruction was selected for that isolate.
+
+**How many independent units a test needs.** An interval needs at least 5 independent units (`MIN_CLUSTERS_CI`); a sign-flip permutation test needs at least 6 (`MIN_CLUSTERS_TEST`), because with n units there are only 2**n sign patterns and the smallest two-sided p-value is 2/2**n: 0.0625 for 5 units (never significant at 0.05), 0.03125 for 6. Up to 12 units (`EXACT_MAX_UNITS`) the p-value is exact; above, Monte Carlo. A comparison whose smallest attainable p is above 0.05 is flagged `underpowered` rather than reported as a null result. The thresholds are pre-registered (`min_clusters_ci`, `min_clusters_test`, `exact_permutation_max_units`).
 
 **Reference evidence record.** Each truth assembly carries six separate evidence fields (assembly technology, circularity evidence, long-read support, replicon/MOB evidence, structural integrity, independent validation), each `declared`, `inferred` or `unknown`, in `benchmark.truth_provenance.tsv` and the *Evidence recorded* column of the headline design table. They are kept individually, not collapsed into one score; the tier is derived from them. An unknown value never demotes a reference; an explicit adverse one caps it at Tier 2. Set the optional sample-sheet columns (`truth_circularity_evidence`, `truth_read_support`, `truth_structural_integrity`, `truth_independent_validation`, see docs/COHORTS.md) to record what you know.
 

@@ -428,11 +428,11 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E17 | CPRR is computed after the match | `python/score_bins.py:316` | `def correct_reconstruction` |
 | E18 | CPRR minimum coverage 0.95 | `config/config.sh:64` | `CPRR_MIN_COVERAGE` |
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
-| E20 | Interval requires at least five clusters | `python/resampling.py:118` | `len(values) < 5 or len(units) < 5` |
-| E21 | Permutation test requires at least five clusters | `python/resampling.py:199` | `len(differences) < 5 or len(units) < 5` |
+| E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:169` | `len(values) < 5 or len(units) < MIN_CLUSTERS_CI` |
+| E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:253` | `len(differences) < 5 or len(units) < MIN_CLUSTERS_TEST` |
 | E22 | Holm adjustment across pairs | `python/aggregate_results.py:657` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:794` | `def attach_significance` |
-| E24 | Percentile cluster bootstrap | `python/resampling.py:109` | `def bootstrap_ci` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:800` | `def attach_significance` |
+| E24 | Percentile cluster bootstrap | `python/resampling.py:160` | `def bootstrap_ci` |
 | E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:81` | `def sample_clusters` |
 | E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:109` | `UnionFind()` |
 | E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:80` | `PRIMARY_UNAVAILABLE = "unavailable"` |
