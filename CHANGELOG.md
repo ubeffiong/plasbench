@@ -85,6 +85,7 @@ history is lost, only the numbering is cleaner. See
   sheet. Metagenomic sheets show their communities, regimes and truth status (`plasbench/cohort_info.py`).
 - **The window's console answers questions.** A command that asks (for example "Install the missing items now?")
   shows the question in the console, which highlights it; answer in the reply box or with Yes/No.
+- **Reference figures folder (planning for v0.4.0).** `docs/images/reference/README.md` (tracked) maps four third-party reference figures to the report features they inspire (map identity rings and resistance-region brackets, numeric heatmap, true/false-positive 3D scatter, radar fingerprint). The images are gitignored and not shipped. `test/test_reference_images.py` keeps the README and the ignore rules in place.
 
 ### Changed
 - **One `PlasBench` folder, updated in place.** `install_latest.sh` installs into `~/PlasBench` (or
