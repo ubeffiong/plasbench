@@ -964,10 +964,14 @@ mean-based terms (F1 and plasmid recall only -- every other term is
 unchanged) with a small, hand-rolled (pure Python, no new dependency) ridge
 regression predicting them directly from an isolate's own continuous
 features instead of a coarse stratum bucket. Those features are the
-isolate's read depth, plasmid size and plasmid count from `scores.tsv`, plus
-its GC content, N50, contig count and assembly size from the stage-2
-`data/<sample>/assembly_stats.tsv` -- the same per-isolate statistics the
-advisory cohort-QC flagger uses. A sample missing any of them (an operational
+isolate's read depth, plus its GC content, N50, contig count and assembly
+size from the stage-2 `data/<sample>/assembly_stats.tsv` -- the same
+per-isolate statistics the advisory cohort-QC flagger uses -- and its organism
+and Gram group. Every one is knowable for an isolate that has no reference.
+The truth's plasmid size and count and its AMR annotation are **not** used: they
+exist only in a retrospective benchmark, and a model trained on them would learn
+the answer. A model file fitted with an earlier release (which used them) is not
+served; refit it with `python/fit_recommendation_model.py`. A sample missing any of them (an operational
 isolate has no reference assembly, so no stats) has that feature imputed with
 the training mean rather than being unusable:
 

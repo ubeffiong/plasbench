@@ -33,6 +33,8 @@ def main():
             return subprocess.run(["git", "check-ignore", "-q", path], cwd=ROOT).returncode == 0
         check("git ignores an image in the folder", ignored("docs/images/reference/1.jpg"))
         check("git does not ignore the README", not ignored("docs/images/reference/README.md"))
+        tracked = subprocess.run(["git", "ls-files", "docs/images/reference"], cwd=ROOT, capture_output=True, text=True).stdout.split()
+        check("no third-party image in the folder is tracked by git (only the README is)", all(name.endswith("README.md") for name in tracked), tracked)
 
     print()
     if not ok:
