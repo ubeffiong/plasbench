@@ -64,9 +64,22 @@ id_ed25519*
 RUNS_IGNORE = """# --- PlasBench runs block (managed) ---
 # This repository tracks your benchmark RUNS: each study's record (study.json), sample sheets, settings snapshots,
 # result tables (.tsv/.csv/.json), reports (.html/.pdf), figures and logs. Raw and intermediate sequence data stay out:
-# they are large, and a rerun re-creates them. Credentials never go in.
+# they are large, and a rerun re-creates them. Per-sample sub-folders (predictions, alignments, truth, reads) can carry
+# sample identity or clinical detail, so only the study-level tables and reports in results/ are tracked.
+# Credentials never go in.
 tmp/
 **/tmp/
+results/*/
+data/
+reads/
+assembly/
+predictions*/
+metadata/
+clinical/
+patient*/
+**/*patient*
+**/*clinical*
+**/*linelist*
 *.fastq
 *.fastq.gz
 *.fq
@@ -79,6 +92,13 @@ tmp/
 *.fna.gz
 *.ffn
 *.faa
+*.fai
+*.2bit
+*.vcf
+*.vcf.gz
+*.bcf
+*.gbff
+*.genbank
 *.gbk
 *.gff
 *.gff3
@@ -111,6 +131,10 @@ RUNS_MARKER = "PlasBench runs block"
 RUN_DATA_PATTERNS = [
     (re.compile(r"\.(fastq|fq|bam|cram|sam|sra|bcf)(\.gz)?$", re.I), "raw sequencing reads or alignments"),
     (re.compile(r"\.(fasta|fa|fna|ffn|faa|gfa|fastg|paf)(\.gz)?$", re.I), "sequence data (re-created by a rerun)"),
+    (re.compile(r"\.(vcf|bcf|fai|2bit|gbff|gbk|gff3?)(\.gz)?$", re.I), "variant, annotation or sequence-index files"),
+    (re.compile(r"(^|/)results/[^/]+/"), "per-sample output folder (sequence and sample-level files)"),
+    (re.compile(r"(^|/)(data|reads|assembly|metadata|clinical|predictions[^/]*)/"), "sample data folder"),
+    (re.compile(r"(patient|clinical|linelist)", re.I), "file named for patient or clinical data"),
     (re.compile(r"(^|/)tmp/"), "temporary files of a run"),
 ]
 DATA_PATTERNS = [
@@ -138,7 +162,8 @@ SECRET_CONTENT = [
 # Isolate metadata can carry patient information (clinical isolates): direct identifier columns block a commit.
 IDENTIFIER_CONTENT = [
     (re.compile(r"(?im)^.*\b(patient[_ ]?name|full[_ ]?name|surname|first[_ ]?name|date[_ ]?of[_ ]?birth|"
-                r"national[_ ]?id|hospital[_ ]?number|home[_ ]?address|telephone|phone[_ ]?number)\b.*$"),
+                r"national[_ ]?id|hospital[_ ]?number|home[_ ]?address|telephone|phone[_ ]?number|"
+                r"patient[_ ]?id|medical[_ ]?record|mrn|nhs[_ ]?number|ward|bed[_ ]?number)\b.*$"),
      "a column of direct patient identifiers"),
 ]
 
@@ -431,6 +456,13 @@ def ensure_gitignore(repo, kind: str = "program") -> bool:
     cur = gi.read_text(encoding="utf-8") if gi.exists() else ""
     marker, block = (RUNS_MARKER, RUNS_IGNORE) if kind == "runs" else ("PlasBench safety block", SAFE_IGNORE)
     if marker in cur:
+        if kind == "runs" and block not in cur:
+            start = cur.find("# --- PlasBench runs block")
+            end_marker = "# --- end PlasBench runs block ---\n"
+            end = cur.find(end_marker, start)
+            if start >= 0 and end > start:
+                gi.write_text(cur[:start] + block + cur[end + len(end_marker):], encoding="utf-8")
+                return True
         return False
     gi.write_text((cur.rstrip("\n") + "\n\n" if cur.strip() else "") + block, encoding="utf-8")
     return True
