@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- the recommendation model used truth-derived features
+- `python/recommendation_model.py` fitted its ridge model on the truth's plasmid size and plasmid count and on the truth's AMR annotation, which are unknown for an isolate with no reference (they were imputed with the training mean there), so the model could learn the answer in a retrospective run. The inputs are now truth-free only: read depth, the isolate's own assembly statistics, tool, organism and Gram group. `TRUTH_DERIVED_FIELDS` lists what is barred, `assert_truth_free` enforces it when fitting, and `load_model` refuses a ready model whose spec used one (with the reason and the refit instruction); older specs still decode. `test/test_recommender_truth_free.py` covers it.
+
 ## [0.3.0] - 2026-11-13
 
 A feature release: benchmark your own tools without changing PlasBench's code, and do everything from a window in your browser with `plasbench ui`. No scoring, ranking or report change for the built-in tools. See the [release notes](docs/releases/v0.3.0.md). Compare: [v0.2.3...v0.3.0](https://github.com/ubeffiong/plasbench/compare/v0.2.3...v0.3.0).
