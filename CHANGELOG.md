@@ -47,11 +47,14 @@ history is lost, only the numbering is cleaner. See
   `plasbench` environment, Docker. It also gives the recommended way to run PlasBench there (the conda environment,
   or WSL2 on Windows), the steps still to do, the warnings (Apple Silicon, low RAM, `/mnt/c` speed) and Docker as the
   alternative, with its command. The checklist also checks for the `plasbench` environment.
-- **Side panel and main-area tabs.** **Panel** (top bar, Ctrl+Shift+G) opens a right-hand panel as wide as the
-  navigation rail, with three tabs. **Git** has changes with stage/unstage, commit, branches, remote, tracked files and
-  history. **Jobs** shows running and recent jobs with cancel. **Studies** lists the workspace's studies with reports
-  and folders. The main area has tabs: the page you are on, plus a tab for each diff or commit opened from Git (line
-  numbers, files changed, parents, Stage/Unstage). Tabs close with × or a middle-click.
+- **Side panel and main-area tabs.** **Panel** (top bar) opens a right-hand panel as wide as the navigation rail,
+  with three tabs. **Studies** (the default) is a folder tree of the workspace's studies: reports open in a report tab,
+  and tables, logs and text files open as read-only tabs. **Jobs** shows running and recent jobs with cancel. **Git**
+  (Ctrl+Shift+G) has changes with stage/unstage, commit, branches, remote, tracked files and history.
+  The main area works like a browser. It opens with an Overview tab, and every page you open is its own tab. Reports
+  (with **Open in browser**; Ctrl+click opens the browser directly), files, diffs (line numbers, Stage/Unstage) and
+  commits (files changed, parents, patch) open in tabs next to the current one. Tabs close with × or a middle-click,
+  and the last one closed brings back Overview.
 - **Git history is colour-coded**: the commit you are on, pushed, not yet pushed, and merge commits, with branch and
   tag labels. Hovering a commit shows its author, date, labels and whether it is pushed; clicking it opens it in a tab.
 - **Version control tracks your runs, not the program: one repository per study.** Each study folder is its own

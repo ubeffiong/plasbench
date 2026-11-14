@@ -553,6 +553,30 @@ def save_state(state: dict):
     _state_path().write_text(json.dumps(state, indent=1), encoding="utf-8")
 
 
+TEXT_PREVIEW = {".tsv": "table", ".csv": "table", ".txt": "text", ".log": "text", ".md": "text", ".json": "text",
+                ".yaml": "text", ".yml": "text", ".ini": "text", ".sh": "text", ".py": "text", ".gff": "text", ".gff3": "text"}
+MAX_PREVIEW = 2 * 2**20
+
+
+def read_study_file(root, raw: str) -> dict:
+    """A text or table file inside the studies workspace, for a read-only tab in the window (at most 2 MB shown)."""
+    from . import studies
+    ws = Path(os.path.realpath(studies.workspace(root)))
+    p = Path(os.path.realpath(Path(raw or "").expanduser()))
+    if ws not in p.parents:
+        raise PermissionError("only files inside the studies workspace are shown here")
+    if not p.is_file():
+        raise FileNotFoundError(f"{p} is not a file")
+    kind = TEXT_PREVIEW.get(p.suffix.lower())
+    if not kind:
+        raise ValueError(f"{p.suffix or 'this'} files are not shown in the window; open the folder instead")
+    size = p.stat().st_size
+    with open(p, "rb") as handle:
+        data = handle.read(MAX_PREVIEW)
+    return {"path": str(p), "name": p.name, "size": size, "kind": kind, "truncated": size > MAX_PREVIEW,
+            "text": data.decode("utf-8", "replace")}
+
+
 def browse(path: str, files: bool) -> dict:
     if not path:
         if os.name == "nt":
@@ -707,6 +731,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, cohort_info.info(project.root, q.get("name", "")))
             if route == "runs":
                 return self.jsend(200, {"runs": project.runs(state.get("runs", []))})
+            if route == "files/read":
+                return self.jsend(200, read_study_file(project.root, q.get("path", "")))
             if route == "browse":
                 return self.jsend(200, browse(q.get("path", ""), q.get("files") == "1"))
             if route == "docs":

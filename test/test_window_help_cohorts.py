@@ -157,11 +157,35 @@ def main():
         print("  skip  git not installed")
 
     print("side panel, main tabs, git history")
-    check("side panel: Git, Jobs and Studies tabs", all(f'data-pt="{t}"' in page for t in ("git", "jobs", "studies")))
+    check("side panel tabs in order: Studies (default), Jobs, Git",
+          page.index('data-pt="studies"') < page.index('data-pt="jobs"') < page.index('data-pt="git"')
+          and 'const PT = {active: "studies"}' in script)
+    check("Studies is a folder tree; files open as tabs", 'class="tree"' in page and "function treeFill" in script
+          and 'openDoc({kind: "file"' in script)
+    from plasbench import webui as w, studies as stu
+    os.environ["PLASBENCH_WORKSPACE"] = str(tmp / "wsx")
+    sd = stu.create(ROOT, "treecheck", "")
+    (sd / "results").mkdir(exist_ok=True)
+    (sd / "results" / "x.tsv").write_text("a\tb\n1\t2\n", encoding="utf-8")
+    (sd / "results" / "x.bin").write_bytes(b"\0\1")
+    r = w.read_study_file(ROOT, str(sd / "results" / "x.tsv"))
+    check("a study's table is read for its tab", r["kind"] == "table" and r["text"].startswith("a\tb"), r)
+    for bad, exc in ((str(ROOT / "README.md"), PermissionError), (str(sd / "results" / "x.bin"), ValueError)):
+        try:
+            w.read_study_file(ROOT, bad)
+            check(f"refused: {Path(bad).name}", False)
+        except exc:
+            check(f"refused: {Path(bad).name}", True)
+    os.environ.pop("PLASBENCH_WORKSPACE", None)
     check("side panel is as wide as the navigation rail", ":root{--gdw:248px}" in page and "--railw:248px" in page)
     check("main-area tabs: the page plus documents, closable", 'id="mtabs"' in page and 'id="v_doc"' in page
           and "function openDoc" in script and "function mtClose" in script and "auxclick" in script)
     check("diffs and commits open as tabs", 'openDoc({kind: "diff"' in script and 'openDoc({kind: "commit"' in script)
+    check("every page opens as its own tab; the window starts with Overview", "function pageTab" in script
+          and 'window.mtOnRoute = v => { MT.active = pageTab(v)' in script and '{kind: "page", view: "home", id: "page|home"}' in script)
+    check("reports open as a tab, with Open in browser", 'openDoc({kind: "report"' in script and 'class="repframe"' in script
+          and "Open in browser" in script and 'a[href^="/view/"]' in script)
+    check("a closed last tab never leaves an empty window", "never an empty window" in script)
     check("history has a colour code and hover text", "const HLEGEND" in script and "function commitTip" in script
           and ".hdot.local" in page and ".hdot.pushed" in page)
     if gitops.find_git():

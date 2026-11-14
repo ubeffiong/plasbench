@@ -957,15 +957,20 @@ to resize it, or collapse it to its title bar. It has two tabs:
   Commands receive no keyboard input, so start interactive or long work from the pages, where its questions are
   answered in Job output.
 
-**Side panel and tabs.** **Panel** in the top bar (or Ctrl+Shift+G) opens a panel on the right, as wide as the
-navigation on the left, with three tabs:
+**Side panel and tabs.** **Panel** in the top bar opens a panel on the right, as wide as the navigation on the
+left, with three tabs:
 
-* **Git** shows changes, commit, branches, remote, tracked files and a colour-coded history.
+* **Studies** (the default) is a folder tree of your studies. Expand a study to see its results, logs and record. A
+  report opens in a report tab, and a table, log or text file opens as a read-only tab. Each study also has buttons
+  for its report, its Git and its folder.
 * **Jobs** lists what is running and what ran, with cancel, and shows a job's output in the console.
-* **Studies** lists your studies, with their reports and folders.
+* **Git** (Ctrl+Shift+G) shows the chosen study's changes, commit, branches, remote, tracked files and a
+  colour-coded history.
 
-The main area has tabs too. The page you are on is the first tab. A diff or a commit opened from Git gets its own
-tab, with line numbers, its files and Stage/Unstage. Close a tab with its × or a middle-click.
+The main area works like a browser. It opens with an **Overview** tab, and every page you open from the navigation
+becomes its own tab. Reports, files, diffs and commits open in tabs next to the one you are on. A report tab has
+**Open in browser**, and Ctrl+click on any report link opens it in your browser directly. Close a tab with its × or
+a middle-click.
 
 The Terminal tab offers each Linux distribution installed in WSL (Ubuntu, Debian, ...), Git Bash and PowerShell on
 Windows, and your login shell elsewhere. `git` and `plasbench` work in each. If WSL does not respond, the terminal

@@ -374,6 +374,14 @@ body.gd-open #gdrawer{transform:none}
 .plist li:hover{background:var(--surface-2)}
 .plist .t{flex:1;min-width:0}.plist .t b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .plist .t span{display:block;color:var(--mut);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ps_list{flex:1;overflow-y:auto;padding:4px 0}.tree{list-style:none;margin:0;padding:0}.tree ul{list-style:none;margin:0;padding-left:14px}
+.tree .tn{display:flex;align-items:center;gap:5px;padding:3px 8px 3px 6px;font-size:12.5px;cursor:pointer;border-radius:2px;min-width:0}
+.tree .tn:hover{background:var(--surface-2)}.tree .tn .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree .tn .cv{width:12px;height:12px;flex:none;transition:transform .12s;color:var(--mut)}.tree li:not(.open)>.tn .cv{transform:rotate(-90deg)}
+.tree .tn .cv.leaf{visibility:hidden}.tree .tn .fi{width:14px;height:14px;flex:none;color:var(--mut)}.tree .tn .fi.dir{color:var(--primary)}
+.tree .tn .sz{font-size:11px;color:var(--faint);flex:none}.tree .tn .act{display:none;gap:2px}.tree .tn:hover .act{display:flex}
+.tree li.study>.tn{font-weight:600;padding-top:5px;padding-bottom:5px;border-top:1px solid var(--line-2)}
+.tree li:not(.open)>ul{display:none}
 .sdot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--faint)}
 .sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled{background:var(--warn)}
 /* git history colour code: you are here / pushed / not yet pushed / merge */
@@ -395,6 +403,7 @@ body.gd-open #gdrawer{transform:none}
 .diffv td{padding:0 8px;white-space:pre;vertical-align:top}
 .diffv td.n{width:1%;text-align:right;color:var(--faint);user-select:none;border-right:1px solid var(--line-2);padding:0 6px}
 .diffv tr.ad{background:var(--ok-soft)}.diffv tr.dl{background:var(--bad-soft)}.diffv tr.hk{background:var(--info-soft);color:var(--primary-ink)}.diffv tr.meta td{color:var(--mut)}
+.repframe{display:block;width:100%;height:calc(100vh - var(--hdr) - var(--cons) - 118px);min-height:420px;border:1px solid var(--line);border-radius:var(--radius);background:#fff}
 .docbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}.docbar h2{margin:0;font-size:16px;font-weight:600;flex:1;min-width:0;overflow-wrap:anywhere}
 .cfiles{list-style:none;margin:0;padding:0;font-size:12.5px}.cfiles li{display:flex;gap:8px;padding:3px 0;cursor:pointer}.cfiles li:hover{color:var(--primary)}
 .cfiles .st{font:600 11px var(--mono);width:14px}.cfiles .st.M{color:var(--warn)}.cfiles .st.A{color:var(--ok)}.cfiles .st.D{color:var(--bad)}.cfiles .st.R{color:var(--primary)}
@@ -497,7 +506,7 @@ body.gd-open #gdrawer{transform:none}
   <div class="results" id="qres" role="listbox"></div>
  </div>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
- <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Git, Jobs and Studies (Ctrl+Shift+G)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
+ <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
  <button class="tbtn" id="helpbtn" title="Help for this page (F1)" aria-label="Help for this page"><svg class="ico sm"><use href="#i-help"/></svg></button>
  <button class="tbtn" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg></button>
  <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
@@ -739,9 +748,9 @@ body.gd-open #gdrawer{transform:none}
 
 <aside id="gdrawer" aria-label="Side panel" aria-hidden="true">
  <div id="gd_head"><div id="gd_tabs" role="tablist" aria-label="Side panel">
-   <button data-pt="git" role="tab" title="Source control: changes, commit, branches, remote, files, history"><svg class="ico sm"><use href="#i-git"/></svg>Git<span class="badge" id="gdtabbadge" hidden></span></button>
+   <button data-pt="studies" role="tab" title="Your studies as a folder tree: reports, tables, logs"><svg class="ico sm"><use href="#i-folder"/></svg>Studies</button>
    <button data-pt="jobs" role="tab" title="Commands started from this window, newest first"><svg class="ico sm"><use href="#i-list"/></svg>Jobs<span class="badge" id="pjbadge" hidden></span></button>
-   <button data-pt="studies" role="tab" title="The studies in your workspace: open a report or a folder"><svg class="ico sm"><use href="#i-flask"/></svg>Studies</button></div>
+   <button data-pt="git" role="tab" title="Source control of the chosen study: changes, commit, branches, remote, files, history"><svg class="ico sm"><use href="#i-git"/></svg>Git<span class="badge" id="gdtabbadge" hidden></span></button></div>
   <button class="gd-ib" id="gd_close" title="Close the panel (Ctrl+Shift+G)" aria-label="Close the panel"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
  <div class="gdpane" id="gdp_git">
   <div class="gd-tools"><span>Source control</span><span class="grow"></span>
@@ -756,7 +765,7 @@ body.gd-open #gdrawer{transform:none}
   <div class="gd-tools"><span id="ps_where">Studies</span><span class="grow"></span>
    <button class="gd-ib" id="ps_ref" title="Refresh" aria-label="Refresh"><svg class="ico sm"><use href="#i-refresh"/></svg></button>
    <a class="gd-ib" href="#workspace" title="Open Workspace &amp; studies" aria-label="Open Workspace and studies"><svg class="ico sm"><use href="#i-ext"/></svg></a></div>
-  <ul class="plist" id="ps_list"></ul>
+  <ul class="tree" id="ps_list" role="tree" aria-label="Studies"></ul>
   <div class="gd-tools" style="border-top:1px solid var(--line-2);border-bottom:0"><a class="btn sm" href="#wizard" style="flex:1;justify-content:center"><svg class="ico sm"><use href="#i-plus"/></svg>New benchmark</a></div></div>
 </aside>
 <div id="console" class="min" aria-label="Job console">
@@ -2232,7 +2241,7 @@ async function loadWorkspace(force) {
       const idx = run ? S.runs.indexOf(run) : -1;
       return `<tr><td><b class="mono">${esc(st.name)}</b>${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}</td>
         <td class="small">${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "–"))}</td><td>${st.runs}</td><td class="small">${fmtTime(st.modified)}</td>
-        <td style="text-align:right;white-space:nowrap">${st.report && idx >= 0 ? `<a class="btn sec sm" href="/view/${idx}/benchmark.report.html" target="_blank" rel="noopener">Report</a>` : ""}
+        <td style="text-align:right;white-space:nowrap">${st.report && idx >= 0 ? `<a class="btn sec sm" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">Report</a>` : ""}
           <button class="btn ghost sm" onclick="benchStudy('${esc(st.name)}')">Run in this study</button>
           <button class="btn ghost icon sm" title="${st.tracked ? "Tracked with Git: open its version control" : "Track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}" onclick="gitStudy('${esc(st.path.replace(/\\/g, "\\\\"))}')">${icon("git")}</button>
           <button class="btn ghost icon sm" title="Open the study folder" onclick="reveal('${esc(st.path.replace(/\\/g, "\\\\"))}')">${icon("folder")}</button></td></tr>`; }).join("")
@@ -2404,13 +2413,13 @@ const GD = {open: false, files: null, filesFor: "", diff: null, timer: null, st:
 const gdSec = (id, title, count, body, open) => `<details id="${id}" ${open ? "open" : ""}><summary><svg class="ico chev"><use href="#i-chev"/></svg>${title}${count != null ? `<span class="cnt">${count}</span>` : ""}</summary><div class="sec">${body}</div></details>`;
 const gdLetter = f => f.conflict ? ["C", "!"] : f.untracked ? ["Q", "U"] : null;
 function gdState(id) { try { const v = localStorage.getItem("pb_gd_" + id); return v == null ? null : v === "1"; } catch { return null; } }
-const PT = {active: "git"};
-try { PT.active = localStorage.getItem("pb_pt") || "git"; } catch {}
+const PT = {active: "studies"};
+try { PT.active = localStorage.getItem("pb_pt") || "studies"; } catch {}
 function setPanelTab(t) {
-  PT.active = ["git", "jobs", "studies"].includes(t) ? t : "git";
+  PT.active = ["studies", "jobs", "git"].includes(t) ? t : "studies";
   try { localStorage.setItem("pb_pt", PT.active); } catch {}
   $$("#gd_tabs [data-pt]").forEach(b => { const on = b.dataset.pt === PT.active; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
-  for (const t of ["git", "jobs", "studies"]) $("#gdp_" + t).hidden = t !== PT.active;
+  for (const t of ["studies", "jobs", "git"]) $("#gdp_" + t).hidden = t !== PT.active;
   if (GD.open) panelLoad();
 }
 function panelLoad(quiet) { if (PT.active === "git") loadDrawer(quiet); else if (PT.active === "jobs") renderPanelJobs(); else loadPanelStudies(); }
@@ -2554,48 +2563,88 @@ const refTag = r => { const t = r.replace(/^HEAD -> /, ""); const cls = t.starts
   return `<span class="rtag ${cls}">${esc(t.replace(/^tag: /, ""))}</span>`; };
 
 /* ---- main-area tabs: the page, plus diffs and commits opened from Git ---- */
-const MT = {tabs: [], active: "page"};
-try { MT.tabs = JSON.parse(sessionStorage.getItem("pb_tabs") || "[]"); } catch {}
+// Every page you open is a tab (like a browser), and so is each report, diff and commit opened from it.
+const MT = {tabs: [], active: ""};
+try { MT.tabs = JSON.parse(sessionStorage.getItem("pb_tabs") || "[]").filter(t => t && t.id && (t.kind !== "page" || VIEWS.includes(t.view))); } catch {}
 const mtSave = () => { try { sessionStorage.setItem("pb_tabs", JSON.stringify(MT.tabs)); } catch {} };
-const mtKey = t => [t.kind, t.repo, t.path || "", t.rev || "", t.staged ? 1 : 0].join("|");
+const mtKey = t => t.kind === "page" ? "page|" + t.view : t.kind === "file" ? "file|" + t.path : t.kind === "report" ? ["report", t.path, t.file].join("|") : [t.kind, t.repo, t.path || "", t.rev || "", t.staged ? 1 : 0].join("|");
 const baseName = p => String(p || "").split("/").pop();
+const pageTitle = v => $(`#v_${v} h1`)?.textContent || v;
 function tabTitle(t, full) {
+  if (t.kind === "page") return full ? `${pageTitle(t.view)}\n(page; middle-click or × closes it)` : pageTitle(t.view);
+  if (t.kind === "file") return full ? t.path : t.name;
+  if (t.kind === "report") return full ? `${t.file.endsWith(".pdf") ? "PDF report" : "Report"}: ${t.name}\n${t.path}` : `${t.name}${t.file.endsWith(".pdf") ? " · PDF" : ""}`;
   if (t.kind === "diff") return full ? `${t.path} (${t.staged ? "staged" : "working"} changes)\n${t.repo}` : `${baseName(t.path)}${t.staged ? " · staged" : ""}`;
   return full ? `${t.short || t.rev.slice(0, 7)} ${t.subject || ""}\n${t.repo}` : `${t.short || t.rev.slice(0, 7)} ${t.subject ? "· " + t.subject : ""}`;
 }
 function openDoc(t) {
-  t.repo = t.repo || G.repo; t.id = mtKey(t);
+  if (t.kind !== "report" && t.kind !== "file") t.repo = t.repo || G.repo;
+  t.id = mtKey(t);
   const old = MT.tabs.find(x => x.id === t.id);
-  if (!old) { MT.tabs.push(t); if (MT.tabs.length > 14) MT.tabs.shift(); mtSave(); }
+  if (!old) {                                           // opens next to the tab you are on, like a browser
+    const at = MT.tabs.findIndex(x => x.id === MT.active);
+    MT.tabs.splice(at < 0 ? MT.tabs.length : at + 1, 0, t);
+    while (MT.tabs.length > 20) { const j = MT.tabs.findIndex(x => x.id !== t.id && x.id !== MT.active); if (j < 0) break; MT.tabs.splice(j, 1); }
+    mtSave();
+  }
   mtActivate(t.id);
 }
+function pageTab(v) {
+  const id = "page|" + v;
+  if (!MT.tabs.some(t => t.id === id)) {
+    const at = MT.tabs.findIndex(t => t.id === MT.active);                 // a new page opens next to the current tab
+    MT.tabs.splice(at < 0 ? MT.tabs.length : at + 1, 0, {kind: "page", view: v, id});
+    while (MT.tabs.length > 20) { const j = MT.tabs.findIndex(t => t.id !== id && t.id !== MT.active); if (j < 0) break; MT.tabs.splice(j, 1); }
+    mtSave();
+  }
+  return id;
+}
 function mtActivate(id) {
-  if (id !== "page" && !MT.tabs.some(t => t.id === id)) id = "page";
-  MT.active = id; const doc = id !== "page", v = curView();
+  let t = MT.tabs.find(x => x.id === id);
+  if (!t) { id = pageTab(curView()); t = MT.tabs.find(x => x.id === id); }
+  if (t.kind === "page" && t.view !== curView()) { MT.active = id; go(t.view); return; }   // route() shows the page
+  MT.active = id; const doc = t.kind !== "page", v = curView();
   VIEWS.forEach(x => $("#v_" + x).hidden = doc || x !== v);
   $("#v_doc").hidden = !doc; renderTabs();
-  if (doc) renderDoc(MT.tabs.find(t => t.id === id));
+  if (doc) renderDoc(t);
   window.scrollTo(0, 0);
 }
 function mtClose(id) {
   const i = MT.tabs.findIndex(t => t.id === id); if (i < 0) return;
   MT.tabs.splice(i, 1); mtSave();
-  if (MT.active === id) mtActivate(MT.tabs[i]?.id || MT.tabs[i - 1]?.id || "page"); else renderTabs();
+  if (!MT.tabs.length) { MT.active = ""; if (curView() === "home") mtOnRoute("home"); else go("home"); return; }   // never an empty window
+  if (MT.active === id) mtActivate((MT.tabs[i] || MT.tabs[i - 1]).id); else renderTabs();
 }
-window.mtOnRoute = () => { MT.active = "page"; $("#v_doc").hidden = true; renderTabs(); };
+
+/* ---- reports open as tabs in the main area (Open in browser is one click away) ---- */
+function openReport(idx, file) {
+  const r = (S.runs || [])[idx]; if (!r) return toast("Refresh Runs & reports, then try again", "bad");
+  openDoc({kind: "report", path: r.path, file: file || "benchmark.report.html", name: r.name || r.path.split(/[\\/]/).pop()});
+}
+window.openReport = openReport;
+// every /view/<run>/benchmark.report.(html|pdf) link opens as a tab; Ctrl/Shift/middle-click still opens the browser
+document.addEventListener("click", e => {
+  const a = e.target.closest('a[href^="/view/"]'); if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+  if (a.closest("#v_doc .docbar")) return;               // the tab's own "Open in browser"
+  const m = a.getAttribute("href").match(/^\/view\/(\d+)\/(benchmark\.report\.(?:html|pdf))$/); if (!m) return;
+  e.preventDefault(); openReport(+m[1], m[2]);
+});
+window.mtOnRoute = v => { MT.active = pageTab(v); $("#v_doc").hidden = true; renderTabs(); };
 function renderTabs() {
-  const v = curView(), title = $(`#v_${v} h1`)?.textContent || v, ic = $(`.nav[data-view="${v}"] use`)?.getAttribute("href") || "#i-home";
-  $("#mtabs").innerHTML = `<button class="mtab ${MT.active === "page" ? "on" : ""}" data-mt="page" role="tab" aria-selected="${MT.active === "page"}" title="${esc(title)}"><svg class="ico sm"><use href="${ic}"/></svg><span>${esc(title)}</span></button>`
-    + MT.tabs.map(t => `<span class="mtab ${MT.active === t.id ? "on" : ""}" data-mt="${esc(t.id)}" role="tab" aria-selected="${MT.active === t.id}" tabindex="0" title="${esc(tabTitle(t, true))}">
-        <svg class="ico sm"><use href="#${t.kind === "commit" ? "i-git" : "i-file"}"/></svg><span>${esc(tabTitle(t))}</span>
-        <button class="x" data-mtx="${esc(t.id)}" aria-label="Close ${esc(tabTitle(t))}" title="Close (middle-click)">×</button></span>`).join("");
+  $("#mtabs").innerHTML = MT.tabs.map(t => {
+    const ic = t.kind === "page" ? ($(`.nav[data-view="${t.view}"] use`)?.getAttribute("href") || "#i-home")
+      : "#" + (t.kind === "commit" ? "i-git" : t.kind === "report" ? "i-chart" : t.kind === "file" && /\.(tsv|csv)$/i.test(t.name) ? "i-list" : "i-file");
+    return `<span class="mtab ${MT.active === t.id ? "on" : ""}" data-mt="${esc(t.id)}" role="tab" aria-selected="${MT.active === t.id}" tabindex="0" title="${esc(tabTitle(t, true))}">
+        <svg class="ico sm"><use href="${ic}"/></svg><span>${esc(tabTitle(t))}</span>
+        <button class="x" data-mtx="${esc(t.id)}" aria-label="Close ${esc(tabTitle(t))}" title="Close (middle-click)">×</button></span>`; }).join("");
+  const on = $("#mtabs .mtab.on"); if (on) on.scrollIntoView({block: "nearest", inline: "nearest"});
 }
 $("#mtabs").addEventListener("click", e => { const x = e.target.closest("[data-mtx]"); if (x) { e.stopPropagation(); return mtClose(x.dataset.mtx); }
   const t = e.target.closest("[data-mt]"); if (t) mtActivate(t.dataset.mt); });
-$("#mtabs").addEventListener("auxclick", e => { const t = e.target.closest("[data-mt]"); if (e.button === 1 && t && t.dataset.mt !== "page") { e.preventDefault(); mtClose(t.dataset.mt); } });
+$("#mtabs").addEventListener("auxclick", e => { const t = e.target.closest("[data-mt]"); if (e.button === 1 && t) { e.preventDefault(); mtClose(t.dataset.mt); } });
 $("#mtabs").addEventListener("keydown", e => { const t = e.target.closest("[data-mt]"); if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); mtActivate(t.dataset.mt); } });
 // clicking the current page in the navigation brings its tab back to the front
-document.addEventListener("click", e => { const n = e.target.closest(".nav"); if (n && n.dataset.view === curView() && MT.active !== "page") mtActivate("page"); });
+document.addEventListener("click", e => { const n = e.target.closest(".nav"); if (n && n.dataset.view === curView()) mtActivate(pageTab(n.dataset.view)); });
 
 function renderDiff(text) {
   if (!text || !text.trim()) return `<div class="mut small" style="padding:10px">(no textual difference)</div>`;
@@ -2612,9 +2661,46 @@ function renderDiff(text) {
   return `<div class="diffv"><table>${rows.join("")}</table></div>`;
 }
 async function renderDoc(t) {
-  const box = $("#v_doc"), rq = `repo=${encodeURIComponent(t.repo)}`;
+  const box = $("#v_doc"), rq = `repo=${encodeURIComponent(t.repo || "")}`;
   box.innerHTML = `<div class="mut">Loading…</div>`;
   try {
+    if (t.kind === "file") {
+      const f = await api(`files/read?path=${encodeURIComponent(t.path)}`);
+      let body;
+      if (f.kind === "table") {
+        const sep = /\.csv$/i.test(f.name) ? "," : "\t";
+        const rows = f.text.split("\n").filter(l => l.length && !l.startsWith("#")).map(l => l.split(sep));
+        const head = rows.shift() || [], shown = rows.slice(0, 2000);
+        body = `<div class="tablewrap" style="max-height:calc(100vh - var(--hdr) - var(--cons) - 150px);border:1px solid var(--line)"><table class="data">
+          <thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${shown.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+          <p class="mut small">${rows.length} row${rows.length === 1 ? "" : "s"}${rows.length > shown.length ? `; the first ${shown.length} are shown` : ""}.</p>`;
+      } else body = `<pre class="cmdline" style="display:block;white-space:pre-wrap;max-height:calc(100vh - var(--hdr) - var(--cons) - 150px);overflow:auto">${esc(f.text)}</pre>`;
+      box.innerHTML = `<div class="docbar"><h2 class="mono">${esc(f.name)}</h2><span class="tag">${esc(fmtSize(f.size))}${f.truncated ? " · first 2 MB shown" : ""}</span>
+          <button class="btn ghost sm" id="fv_ref">${icon("refresh")}Reload</button>
+          <button class="btn sec sm" id="fv_dir">${icon("folder")}Open folder</button>
+          <button class="btn ghost sm" id="fv_close">${icon("x")}Close</button></div>
+        <div class="mut small mono" style="margin:-4px 0 8px;overflow-wrap:anywhere">${esc(f.path)}</div>${body}`;
+      $("#fv_ref").onclick = () => renderDoc(t); $("#fv_close").onclick = () => mtClose(t.id);
+      $("#fv_dir").onclick = () => reveal(f.path.replace(/[\\/][^\\/]+$/, ""));
+      return;
+    }
+    if (t.kind === "report") {
+      // the run's index can change between sessions: find it again from the run's folder
+      const runs = await getRuns(true), idx = runs.findIndex(r => r.path === t.path);
+      if (idx < 0) throw new Error(`${t.path} is no longer listed on Runs & reports. Add the folder there, then open the report again.`);
+      const url = `/view/${idx}/${t.file}`, pdf = runs[idx].pdf;
+      box.innerHTML = `<div class="docbar"><h2>${esc(t.name)}</h2><span class="tag">${t.file.endsWith(".pdf") ? "PDF report" : "benchmark report"}</span>
+          ${!t.file.endsWith(".pdf") && pdf ? `<button class="btn ghost sm" id="rp_pdf">${icon("file")}PDF</button>` : ""}
+          <button class="btn ghost sm" id="rp_reload">${icon("refresh")}Reload</button>
+          <a class="btn sec sm" href="${url}" target="_blank" rel="noopener" title="Open this report in your web browser">${icon("ext")}Open in browser</a>
+          <button class="btn ghost sm" id="rp_close">${icon("x")}Close</button></div>
+        <div class="mut small mono" style="margin:-4px 0 8px;overflow-wrap:anywhere">${esc(t.path)}</div>
+        <iframe class="repframe" id="rp_frame" src="${url}" title="${esc(t.name)} report" referrerpolicy="no-referrer"></iframe>`;
+      $("#rp_reload").onclick = () => { $("#rp_frame").src = url; };
+      $("#rp_close").onclick = () => mtClose(t.id);
+      if ($("#rp_pdf")) $("#rp_pdf").onclick = () => openReport(idx, "benchmark.report.pdf");
+      return;
+    }
     if (t.kind === "diff") {
       const [d, fs] = await Promise.all([api(`git/diff?${rq}&path=${encodeURIComponent(t.path)}&staged=${t.staged ? 1 : 0}`), api(`git/file?${rq}&path=${encodeURIComponent(t.path)}`)]);
       const f = fs.changed ? fs : null;
@@ -2664,28 +2750,73 @@ $("#pj_list").onclick = async e => {
   const li = e.target.closest("[data-pjob]"); if (li) { setCTab("out"); showConsole(li.dataset.pjob, true); }
 };
 
-/* ---- side panel: Studies ---- */
+/* ---- side panel: Studies, as a folder tree ---- */
+const fmtSize = n => n == null ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : n < 1073741824 ? (n / 1048576).toFixed(1) + " MB" : (n / 1073741824).toFixed(1) + " GB";
+const TREE_OPEN = new Set();
+try { JSON.parse(sessionStorage.getItem("pb_tree") || "[]").forEach(p => TREE_OPEN.add(p)); } catch {}
+const treeSave = () => { try { sessionStorage.setItem("pb_tree", JSON.stringify([...TREE_OPEN])); } catch {} };
+function fileIcon(name, dir) {
+  if (dir) return "folder";
+  return /\.(html|pdf)$/i.test(name) ? "chart" : /\.(tsv|csv)$/i.test(name) ? "list" : "file";
+}
+function treeNode(e) {
+  const dir = e.dir, open = dir && TREE_OPEN.has(e.path);
+  return `<li class="${open ? "open" : ""}" role="treeitem" aria-expanded="${dir ? open : ""}" data-tpath="${esc(e.path)}" data-tdir="${dir ? 1 : 0}">
+    <div class="tn" title="${esc(e.path)}${dir ? "" : " · " + fmtSize(e.size)}"><svg class="ico cv ${dir ? "" : "leaf"}"><use href="#i-chev"/></svg>
+      <svg class="ico fi ${dir ? "dir" : ""}"><use href="#i-${fileIcon(e.name, dir)}"/></svg><span class="nm">${esc(e.name)}</span>
+      ${dir ? "" : `<span class="sz">${fmtSize(e.size)}</span>`}</div>${dir ? `<ul>${open ? `<li class="mut small" style="padding:2px 8px">Loading…</li>` : ""}</ul>` : ""}</li>`;
+}
+async function treeFill(li) {
+  const ul = li.querySelector(":scope > ul");
+  try {
+    const r = await api(`browse?files=1&path=${encodeURIComponent(li.dataset.tpath)}`);
+    ul.innerHTML = r.entries.map(treeNode).join("") || `<li class="mut small" style="padding:2px 8px">(empty)</li>`;
+    ul.querySelectorAll(":scope > li.open[data-tdir='1']").forEach(treeFill);
+  } catch (e) { ul.innerHTML = `<li class="mut small" style="padding:2px 8px">${esc(e.message)}</li>`; }
+}
 async function loadPanelStudies() {
   try {
     const [w, runs] = await Promise.all([getWorkspace(true), getRuns(true).catch(() => [])]);
     $("#ps_where").textContent = `Studies · ${w.studies.length}`; $("#ps_where").title = w.path;
     $("#ps_list").innerHTML = w.studies.map(st => {
       const run = (runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, ""));
-      const idx = run ? runs.indexOf(run) : -1;
-      return `<li title="${esc(st.path)}${st.last_command ? "\n" + esc(st.last_command) : ""}"><span class="sdot ${st.report ? "done" : ""}"></span>
-        <span class="t"><b class="mono">${esc(st.name)}</b><span>${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "no runs yet"))} · ${esc(fmtTime(st.modified))}</span></span>
-        ${st.report && idx >= 0 ? `<a class="gd-ib" href="/view/${idx}/benchmark.report.html" target="_blank" rel="noopener" title="Open the report">${icon("chart")}</a>` : ""}
-        <button class="gd-ib" data-psgit="${esc(st.path)}" title="${st.tracked ? "Tracked with Git: show its changes and history" : "Not tracked yet: track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}">${icon("git")}</button>
-        <button class="gd-ib" data-psdir="${esc(st.path)}" title="Open the study folder">${icon("folder")}</button></li>`; }).join("")
-      || `<li class="mut" style="cursor:default">No studies yet. Start one with New benchmark.</li>`;
-  } catch (e) { $("#ps_list").innerHTML = `<li class="mut">${esc(e.message)}</li>`; }
+      const idx = run ? runs.indexOf(run) : -1, open = TREE_OPEN.has(st.path);
+      return `<li class="study ${open ? "open" : ""}" role="treeitem" aria-expanded="${open}" data-tpath="${esc(st.path)}" data-tdir="1">
+        <div class="tn" title="${esc(st.path)}${st.last_command ? "\n" + esc(st.last_command) : ""}"><svg class="ico cv"><use href="#i-chev"/></svg>
+          <span class="sdot ${st.report ? "done" : ""}" style="margin-top:0"></span><span class="nm mono">${esc(st.name)}</span>
+          <span class="act">${st.report && idx >= 0 ? `<a class="gd-ib" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab">${icon("chart")}</a>` : ""}
+          <button class="gd-ib" data-psgit="${esc(st.path)}" title="${st.tracked ? "Tracked with Git: show its changes and history" : "Not tracked yet: track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}">${icon("git")}</button>
+          <button class="gd-ib" data-psdir="${esc(st.path)}" title="Open the study folder">${icon("ext")}</button></span></div>
+        <ul>${open ? `<li class="mut small" style="padding:2px 8px">Loading…</li>` : ""}</ul></li>`; }).join("")
+      || `<li class="mut" style="padding:10px;cursor:default">No studies yet. Start one with New benchmark.</li>`;
+    $$("#ps_list > li.open").forEach(treeFill);
+  } catch (e) { $("#ps_list").innerHTML = `<li class="mut" style="padding:10px">${esc(e.message)}</li>`; }
 }
-$("#ps_list").onclick = async e => { const b = e.target.closest("[data-psdir]"); if (b) { e.stopPropagation(); reveal(b.dataset.psdir); return; }
+$("#ps_list").onclick = async e => {
+  const d = e.target.closest("[data-psdir]"); if (d) { e.stopPropagation(); return reveal(d.dataset.psdir); }
   const g = e.target.closest("[data-psgit]"); if (g) { e.stopPropagation(); G.repo = g.dataset.psgit; GD.files = null;
     await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); setPanelTab("git"); if (!$("#v_git").hidden) loadGit(); return; }
-  const li = e.target.closest("li[title]"); if (li && !e.target.closest("a")) go("workspace"); };
+  if (e.target.closest("a")) return;                        // report links open as tabs (global handler)
+  const li = e.target.closest("li[data-tpath]"); if (!li || !e.target.closest(".tn")) return;
+  if (li.dataset.tdir === "1") {
+    const open = !li.classList.contains("open"); li.classList.toggle("open", open); li.setAttribute("aria-expanded", open);
+    open ? TREE_OPEN.add(li.dataset.tpath) : TREE_OPEN.delete(li.dataset.tpath); treeSave();
+    if (open) { li.querySelector(":scope > ul").innerHTML = `<li class="mut small" style="padding:2px 8px">Loading…</li>`; treeFill(li); }
+    return;
+  }
+  const p = li.dataset.tpath, name = p.split(/[\\/]/).pop();
+  if (/\.(html|pdf)$/i.test(name)) {                        // a report: open it as a report tab when its run is listed
+    const runs = await getRuns(true).catch(() => []); const dir = p.replace(/[\\/][^\\/]+$/, "");
+    const idx = runs.findIndex(r => r.path.replace(/[\\/]+$/, "") === dir);
+    if (idx >= 0 && /^benchmark\.report\.(html|pdf)$/.test(name)) return openReport(idx, name);
+    return toast("Open this file from its folder (the folder button), or from Runs & reports", "");
+  }
+  openDoc({kind: "file", path: p, name});
+};
 $("#ps_ref").onclick = () => loadPanelStudies();
-renderTabs();
+// the window always opens with tabs: Overview first, then the page you arrived on
+if (!MT.tabs.some(t => t.kind === "page")) { MT.tabs.unshift({kind: "page", view: "home", id: "page|home"}); mtSave(); }
+mtOnRoute(curView());
 
 try { if (localStorage.getItem("pb_gd_open") === "1") setDrawer(true, false); } catch {}
 $$("#gd_tabs [data-pt]").forEach(b => b.classList.toggle("on", b.dataset.pt === PT.active));
@@ -2703,7 +2834,7 @@ function runRow(r, i) {
   return `<div class="run"><div><h4>${esc(r.name)} ${r.failed ? `<span class="tag bad">${r.failed} failed run${r.failed > 1 ? "s" : ""}</span>` : ""}</h4>
     <div class="meta"><span>${icon("folder")} ${esc(r.path)}</span><span>${fmtTime(r.modified)}</span><span>${r.samples} isolates</span><span>${r.tools} tools</span></div>
     <div class="leaders">${r.leaders.map(l => `<div class="leader"><span class="mut">${esc([l.task, l.track.replace("_", " ")].filter(Boolean).join(" · ") || "leader")}</span><b>${esc(l.display || l.tool)}</b><span class="mut">${l.lw ? "lw-F1 " + (+l.lw).toFixed(3) : "F1 " + (+l.f1 || 0).toFixed(3)}</span></div>`).join("")}</div></div>
-    <div class="row wrap" style="justify-content:flex-end;align-content:flex-start">${r.report ? `<a class="btn sec" href="/view/${idx}/benchmark.report.html" target="_blank" rel="noopener">${icon("ext")}Open report</a>` : ""}
+    <div class="row wrap" style="justify-content:flex-end;align-content:flex-start">${r.report ? `<a class="btn sec" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">${icon("chart")}Open report</a>` : ""}
       ${r.pdf ? `<a class="btn sec" href="/view/${idx}/benchmark.report.pdf" target="_blank">PDF</a>` : `<button class="btn sec" data-run='${JSON.stringify(["report-pdf", "--results-dir", r.path])}' data-label="Export ${esc(r.name)} to PDF">${icon("down")}Export PDF</button>`}
       <button class="btn ghost" data-run='${JSON.stringify(["report", "--results-dir", r.path, "--no-report-prompt"])}' data-label="Rebuild the report of ${esc(r.name)}">${icon("refresh")}Rebuild</button>
       <button class="btn ghost icon" title="Show the folder" onclick="reveal('${esc(r.path.replace(/\\/g, "\\\\"))}')">${icon("folder")}</button></div></div>`;
@@ -2712,7 +2843,7 @@ function runBrief(r) {
   const idx = S.runs.indexOf(r), lead = r.leaders.map(l => `${esc(l.display || l.tool)} <span class="mut">(${esc(l.task || "leader")})</span>`).join(", ");
   return `<div class="task" style="cursor:default"><svg class="ico"><use href="#i-chart"/></svg><span class="tx"><b class="mono">${esc(r.name)}</b>
     <span>${fmtTime(r.modified)} · ${r.samples} isolates · ${r.tools} tools${r.failed ? ` · <span class="bad-t">${r.failed} failed</span>` : ""}</span>
-    ${lead ? `<span style="display:block">Leading: ${lead}</span>` : ""}</span>${r.report ? `<a class="btn ghost sm" href="/view/${idx}/benchmark.report.html" target="_blank" rel="noopener">Open report</a>` : ""}</div>`;
+    ${lead ? `<span style="display:block">Leading: ${lead}</span>` : ""}</span>${r.report ? `<a class="btn ghost sm" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">Open report</a>` : ""}</div>`;
 }
 window.reveal = async p => { try { await api("reveal", {path: p}); } catch (e) { toast(e.message, "bad"); } };
 async function loadRuns(force) {
