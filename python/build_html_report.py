@@ -136,6 +136,11 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Interval coverage": {
+        "what": "How often a 95% confidence interval contains the true value, measured on simulated data where the truth is known.",
+        "why": "An interval is only worth reading if it covers about 95% of the time. With few independent studies the percentile bootstrap covers less, "
+               "which means its intervals are too narrow and should be read as optimistic.",
+    },
     "Evidence record": {
         "what": "Six separate pieces of evidence kept for each reference plasmid set: assembly technology, circularity evidence, long-read support, replicon/MOB evidence, "
                 "structural integrity and independent validation, each declared, inferred or unknown.",

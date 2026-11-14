@@ -737,3 +737,6 @@ export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"
 export REPORT_EMBED_DASHBOARD="${REPORT_EMBED_DASHBOARD:-0}"
 # 1 keeps the all-sample numbers as the headline when no sample has a reference in the headline tiers (status fallback_allowed, warning kept). Default 0: the primary analysis is then unavailable and the ranking is provisional.
 export ALLOW_PRIMARY_FALLBACK="${ALLOW_PRIMARY_FALLBACK:-0}"
+# 1 runs the statistics simulation (python/simulate_validation.py) in stage 6 and shows it in the report (Sensitivity, power and reproducibility). STATS_VALIDATION_MODE is smoke (seconds, indicative) or full (minutes, the evidence).
+export RUN_STATS_VALIDATION="${RUN_STATS_VALIDATION:-0}"
+export STATS_VALIDATION_MODE="${STATS_VALIDATION_MODE:-smoke}"

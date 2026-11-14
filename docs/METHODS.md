@@ -747,7 +747,8 @@ clonal collection) are not independent. When the sample sheet has a `bioproject`
 permutation test flips every difference in a cluster together. At least five independent
 clusters are required for an interval and six for a permutation test (with five the smallest
 attainable two-sided p is 0.0625); with fewer, none is reported. Up to twelve clusters the p-value is
-exact (every sign pattern is enumerated); above that, 10,000 random sign flips. The leaderboard's
+exact (every sign pattern is enumerated); above that, 10,000 random sign flips.
+The calibration of these procedures is checked by simulation (`python/simulate_validation.py`): interval coverage, type-I error and power under correlated, unequal and incomplete data. The leaderboard's
 `n_independent_clusters` and the comparisons' `paired_clusters` show how many there were.
 Without a cluster column every sample is its own cluster and the results are identical to
 plain per-sample resampling.

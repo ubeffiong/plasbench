@@ -328,6 +328,7 @@ def _file_entries():
         S("benchmark.composite.tsv", ag, "Five-dimension composite", "composite_score.py", "composite", "shown", "Table."),
         S("benchmark.composite_sensitivity.tsv", ag, "Composite weight sensitivity", "composite_score.py", "composite", "shown", "Table."),
         S("benchmark.reproducibility_tools.tsv", ag, "Reproducibility across runs", "compare_runs.py", "reproducibility", "shown", "Table."),
+        S("benchmark.stats_validation.tsv", ag, "Statistical validation by simulation", "simulate_validation.py", "stats-validation", "shown", "Table."),
         S("benchmark.accuracy.masked.tsv", ag, "Accuracy with low-confidence truth masked", "mask_accuracy.py", "accuracy-dimension", "partly", "Quoted beside the accuracy table."),
         S("benchmark.scoring_spec.md", ag, "Scoring specification (text)", "report_scoring_spec.py", "files", "shown",
           "Linked from the Run files panel."),
