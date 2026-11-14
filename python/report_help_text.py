@@ -405,7 +405,8 @@ HELP = {
         "Tiers: 1 = long-read-first truth independent of the benchmark reads with checked labels; 2 = long-read-first truth that fails a tier-1 condition.",
         "Check the tier and species basis for your track.",
         "Shows how trustworthy and balanced the headline is.",
-        "Tiers describe the reference, not the tool."),
+        "Tiers describe the reference, not the tool. The 'Evidence recorded' column shows what is known beyond the tier (technology, circularity, long-read support, replicon "
+        "evidence, structure, independent validation); an unknown value is a gap, not a mark against the reference."),
     "prereg": H(
         "The scoring decisions that were fixed before the results were seen.",
         "The pre-registration file and this run's settings.",

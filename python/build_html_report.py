@@ -136,6 +136,12 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Evidence record": {
+        "what": "Six separate pieces of evidence kept for each reference plasmid set: assembly technology, circularity evidence, long-read support, replicon/MOB evidence, "
+                "structural integrity and independent validation, each declared, inferred or unknown.",
+        "why": "A reference is only as good as what supports it. The fields are kept individually (not collapsed into one score) so you can see exactly what is and is not known; "
+               "the reference tier is derived from them. An unknown value never counts against a reference.",
+    },
     "Base F1": {
         "what": "Harmonic mean of base-level precision and recall, 0 to 1.",
         "why": "It is a single number for two different failures -- claiming "
@@ -1205,6 +1211,16 @@ def primary_task_rows(rows):
     return rows
 
 
+def provenance_evidence(row):
+    """One line for the evidence record of a reference: the count, then each recorded field. Unknown fields are named too (a gap is information)."""
+    if not row.get("evidence_recorded"):
+        return "not recorded"
+    known = [f"{name.replace('_', ' ')} {row.get(name)}" for name in
+             ("assembly_technology", "circularity_evidence", "read_support", "replicon_evidence", "structural_integrity", "independent_validation")
+             if row.get(name) and row.get(name) != "unknown"]
+    return f"{row['evidence_recorded']}" + (": " + ", ".join(known) if known else "")
+
+
 def headline_design_section(out_dir):
     """Reference standard, provenance tiers and species balance behind the headline."""
     design = read_tsv(out_dir / "benchmark.headline_design.tsv") if (out_dir / "benchmark.headline_design.tsv").is_file() else []
@@ -1223,8 +1239,9 @@ def headline_design_section(out_dir):
         f"<tr><td>{esc(r.get('sample'))}</td><td>{esc(r.get('reference_tier'))}</td>"
         f"<td>{esc(r.get('truth_assembly_strategy'))}</td><td>{esc(r.get('truth_polish_reads'))}</td>"
         f"<td>{esc(r.get('base_level_metrics_valid'))}</td><td>{esc(r.get('labels_evidence_checked'))}</td>"
-        f"<td>{esc(r.get('ambiguous_plasmids') or '0')}</td><td>{esc(r.get('tier_reason'))}</td></tr>"
-        for r in provenance) or "<tr><td colspan='8'>No provenance table.</td></tr>"
+        f"<td>{esc(r.get('ambiguous_plasmids') or '0')}</td><td>{esc(r.get('tier_reason'))}</td>"
+        f"<td title='{esc(r.get('evidence_sources') or 'not recorded')}'>{esc(provenance_evidence(r))}</td></tr>"
+        for r in provenance) or "<tr><td colspan='9'>No provenance table.</td></tr>"
     species_rows = "".join(
         f"<tr><td>{esc(r.get('analysis_track'))} / {esc(r.get('task'))}</td><td>{esc(r.get('tool'))}</td>"
         f"<td><em>{esc(r.get('species'))}</em></td><td>{esc(r.get('n_samples'))}</td><td>{esc(r.get('n_clusters'))}</td>"
@@ -1263,7 +1280,7 @@ def headline_design_section(out_dir):
         "truth_polish_reads in the sample sheet to override.</p>"
         "<div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tier</th><th>Assembly strategy</th>"
         "<th>Polishing reads</th><th>Identity criteria valid</th><th>Labels evidence-checked</th>"
-        f"<th>AMBIGUOUS plasmids</th><th>Reason</th></tr></thead><tbody>{provenance_rows}</tbody></table></div>"
+        f"<th>AMBIGUOUS plasmids</th><th>Reason</th><th>Evidence recorded</th></tr></thead><tbody>{provenance_rows}</tbody></table></div>"
         "<h3>Reference-tier sensitivity</h3><div class='chart-card'>" + chart + "</div>"
         "<h3>Species balance</h3><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th>"
         "<th>Tool</th><th>Species</th><th>Samples</th><th>Independent clusters</th><th>Mean ranking metric</th>"

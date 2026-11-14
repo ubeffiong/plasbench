@@ -405,6 +405,11 @@ PROVENANCE_VALUES = {
     # optional and blank-allowed: same_extraction gates truth grade A; split
     # marks the locked holdout (python/leave_taxon_out.py --confirm-holdout).
     "same_extraction": ("yes", "no", "unknown"),
+    # Reference evidence record (python/truth_provenance.py, docs/COHORTS.md): optional, blank-allowed; unknown never demotes a reference.
+    "truth_circularity_evidence": ("independent", "reported", "uncertain", "unknown"),
+    "truth_read_support": ("supported", "partial", "none", "unknown"),
+    "truth_structural_integrity": ("resolved", "unresolved_repeats", "unknown"),
+    "truth_independent_validation": ("none", "long_read_reassembly", "pcr", "hic", "other", "unknown"),
     "split": ("pilot", "development", "holdout"),
 }
 # Optional free-text columns, accepted and carried through: grade_source,

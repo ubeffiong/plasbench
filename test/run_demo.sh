@@ -131,8 +131,11 @@ else
     cat "$SCORES"
 fi
 
+# How each truth was built and what evidence supports it (reference tiers), before aggregation so the headline and the report read the same table.
+python3 "$PY/truth_provenance.py" --sample-sheet "$SAMPLES" --data-dir "$DEMO" \
+    --out "$DEMO/benchmark.truth_provenance.tsv" >/dev/null
 python3 "$PY/aggregate_results.py" --scores "$SCORES" --tool-status "$STATUS" \
-    --sample-sheet "$SAMPLES" --out-prefix "$DEMO/benchmark"
+    --sample-sheet "$SAMPLES" --truth-provenance "$DEMO/benchmark.truth_provenance.tsv" --out-prefix "$DEMO/benchmark"
 # Advisory layers, same scripts and arguments as stage 6: never ranked, never alter scores.
 python3 "$PY/stratify_recovery.py" --results-dir "$DEMO" --data-dir "$DEMO" \
     --out "$DEMO/benchmark.recovery_by_replicon.tsv"
@@ -184,8 +187,6 @@ python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" -
 # Scoring specification layers, same scripts as stage 6.
 python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark.label_schemes.tsv" \
     --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"
-python3 "$PY/truth_provenance.py" --sample-sheet "$SAMPLES" --data-dir "$DEMO" \
-    --out "$DEMO/benchmark.truth_provenance.tsv" >/dev/null
 python3 "$PY/score_amr_placement.py" collect --results-dir "$DEMO" --out "$DEMO/benchmark.amr_placement.tsv"
 python3 "$PY/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
     --out-prefix "$DEMO/benchmark" --min-train-samples 1

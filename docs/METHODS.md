@@ -641,6 +641,8 @@ own truth source (self-built truth is Unicycler, i.e. short-read-first), else NC
 recorded assembly method and sequencing technologies. Derived values are heuristics
 and are labelled as such; set the sheet columns to override them.
 
+**Evidence record** (additive, stage 6). Beside the tier, each reference carries six evidence fields: assembly technology, circularity evidence, long-read support, replicon/MOB evidence, structural integrity and independent validation, each marked `declared` (sample-sheet column), `inferred` (NCBI metadata or `truth_labels.tsv`) or `unknown`. The tier is derived from them and never replaces them: an unknown value never demotes a reference, an explicit adverse value (`read_support` none, `structural_integrity` unresolved_repeats) caps a Tier-1 reference at Tier 2 and says so in `tier_reason`. `evidence_recorded` counts the known fields.
+
 * **Short-read-first hybrids are not headline truth.** Their structure comes from the
   same Illumina assembly graph the tools use, so truth and tools share repeat-resolution
   errors.
