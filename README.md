@@ -236,6 +236,7 @@ cannot match. This table states only what was verified in their repositories and
 5. **Leakage made visible.** A tool that searches a database is judged separately on plasmids inside and outside it.
 6. **A recommendation with its evidence.** The operational mode recommends a tool for a sample only when the evidence gates are met, and
    states whether that recommendation has been tested on held-out studies.
+   The optional learned model behind it uses truth-free features only (read depth, the isolate's own assembly statistics, organism metadata); a model fitted on the truth's plasmid size, plasmid count or AMR annotation is refused.
 
 **Where the others are better, or PlasBench is weaker**
 
