@@ -186,7 +186,33 @@ def main():
             break
         time.sleep(0.25)
     check("a running job can be cancelled", st["state"] == "cancelled", st["state"])
-    check("jobs are listed newest first", [j["id"] for j in json.loads(call("/api/jobs")[1])["jobs"]][:2] == [slow["id"], job["id"]])
+    print("answering a command's question from the console")
+    call("/api/settings", {"changes": {"RESULTS_DIR": None}})   # the settings test pointed it at /data/my results
+    ask = json.loads(call("/api/jobs", {"argv": ["check"], "label": "check without --yes"})[1])
+    seen = ""
+    for _ in range(480):   # 00_setup.sh lists what is missing, then asks before installing anything
+        seen = json.loads(call(f"/api/jobs/{ask['id']}")[1])
+        if "[y/N]" in seen["log"] or seen["state"] != "running":
+            break
+        time.sleep(0.25)
+    if "[y/N]" in seen["log"]:
+        check("the question is shown in the log (bash's read -p alone would hide it without a terminal)",
+              seen["log"].rstrip().endswith("[y/N]"), seen["log"][-200:])
+        code, body, _ = call(f"/api/jobs/{ask['id']}/input", {"text": "n"})
+        check("an answer is accepted while the command runs", code == 200, body)
+        for _ in range(240):
+            done = json.loads(call(f"/api/jobs/{ask['id']}")[1])
+            if done["state"] != "running":
+                break
+            time.sleep(0.25)
+        check("the command reads the answer and acts on it (n: nothing installed)",
+              done["state"] == "failed" and "[you] n" in done["log"] and "Skipped" in done["log"], done["log"][-400:])
+        check("an answer to a finished command is refused", call(f"/api/jobs/{ask['id']}/input", {"text": "y"})[0] == 400)
+    else:
+        print(f"  skip  `plasbench check` asked no question here (state {seen['state']}): ...{seen['log'][-300:]!r}")
+    check("an answer must be a single line", call(f"/api/jobs/{ask['id']}/input", {"text": "y\nrm -rf /"})[0] == 400)
+    order = [j["id"] for j in json.loads(call("/api/jobs")[1])["jobs"]]
+    check("jobs are listed newest first", order.index(slow["id"]) < order.index(job["id"]), order)
     check("the job history survives a restart of the window", job["id"] in webui.Jobs(project).jobs)
 
     print("result folders")

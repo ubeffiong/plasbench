@@ -275,7 +275,17 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #cstate:empty{display:none}
 #cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
-#clog .c-err{color:#f1938a}#clog .c-warn{color:#e3c27a}#clog .c-ok{color:#8fd1a5}#clog .c-cmd{color:#8cc3ff}
+#clog .c-err{color:#f1938a}#clog .c-warn{color:#e3c27a}#clog .c-ok{color:#8fd1a5}#clog .c-cmd{color:#8cc3ff}#clog .c-you{color:#d7dce2;font-weight:600}
+/* reply row: what the command reads from its "terminal" */
+#cin{display:flex;align-items:center;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
+#cin .pr{font:12px var(--mono);color:#8cc3ff}
+#cin input[type=text],#cin input[type=password]{flex:1;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font:12px var(--mono)}
+#cin button{background:transparent;border:1px solid var(--term-line);color:var(--term-fg);border-radius:2px;padding:2px 10px;font:inherit;font-size:12px;cursor:pointer}
+#cin button:hover{background:#ffffff12}#cin button.send{background:var(--primary);border-color:var(--primary);color:#fff}
+#cin label{display:flex;gap:4px;align-items:center;font-size:12px;color:#aab3bd;white-space:nowrap}
+#cin .ask{display:none;font-size:12px;color:#e3c27a;white-space:nowrap}
+#cin.waiting{background:#3a2f12;border-top-color:#8a6d1e}#cin.waiting .ask{display:inline}
+#cin.waiting input[type=text],#cin.waiting input[type=password]{border-color:#c9a23f}
 
 /* ---------- responsive ---------- */
 .grid>*,.split>*,.cmdgrid>*,.stats>*{min-width:0}
@@ -544,6 +554,13 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
   <button id="ctoggle"><svg class="ico sm"><use href="#i-chev"/></svg><span>Expand</span></button>
  </div>
  <pre id="clog" aria-live="polite"></pre>
+ <form id="cin" hidden autocomplete="off" aria-label="Answer the running command">
+  <span class="pr">›</span><span class="ask" id="cinask">Waiting for your answer:</span>
+  <input type="text" id="cintx" placeholder="Type an answer for the running command and press Enter" aria-label="Answer">
+  <label title="Mask what you type, here and in the log"><input type="checkbox" id="cinsec"> hide</label>
+  <button type="button" data-ans="y" title="Send y">Yes</button><button type="button" data-ans="n" title="Send n">No</button>
+  <button type="submit" class="send">Send</button>
+ </form>
 </div>
 
 <dialog id="fsdlg"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="fs_title">Choose</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
@@ -669,7 +686,7 @@ async function refreshJobs() {
 }
 const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted"})[s] || s;
 function showConsole(id, expand) {
-  if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; $("#clog").innerHTML = ""; }
+  if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
   $("#cjob").value = S.consJob || "";
   if (expand) setConsole(true);
   pollConsole(true);
@@ -677,14 +694,22 @@ function showConsole(id, expand) {
 function colorize(text) {
   return esc(text).split("\n").map(l => /ERROR|FAIL|Traceback|error:/i.test(l) ? `<span class="c-err">${l}</span>` :
      /WARN/i.test(l) ? `<span class="c-warn">${l}</span>` : /PASS|complete|Wrote|\bok\b|\[ok\]/i.test(l) ? `<span class="c-ok">${l}</span>` :
-     l.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : l).join("\n");
+     l.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : l.startsWith("[you] ") ? `<span class="c-you">${l}</span>` : l).join("\n");
 }
 let polling = false;
 async function pollConsole(force) {
   if (!S.consJob || polling) return; polling = true;
   try {
     const j = await api(`jobs/${S.consJob}?offset=${S.consOffset}`);
-    if (j.log) { $("#clog").insertAdjacentHTML("beforeend", colorize(j.log.replace(/\x1b\[[0-9;]*m/g, ""))); S.consOffset = j.offset; }
+    if (j.log) { const clean = j.log.replace(/\x1b\[[0-9;]*m/g, ""); $("#clog").insertAdjacentHTML("beforeend", colorize(clean));
+      S.consOffset = j.offset; S.tail = ((S.tail || "") + clean).slice(-400); }
+    const running = j.state === "running";
+    $("#cin").hidden = !running;
+    // A question the command is waiting on: the output ends with a [y/N]-style or "?"/":" prompt and no newline after it.
+    const lastLine = (S.tail || "").split("\n").pop();
+    const waiting = running && /(\[[yY]\/[nN]\]|\[[yY]es\/[nN]o\]|\?|:)\s*$/.test(lastLine) && lastLine.trim().length > 3;
+    if (waiting && !$("#cin").classList.contains("waiting")) { setConsole(true); toast("A command is waiting for your answer in the console", ""); $("#cintx").focus(); }
+    $("#cin").classList.toggle("waiting", waiting);
     const st = $("#cstate"); st.className = j.state; st.textContent = stateWord(j.state) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
     $("#ccancel").hidden = j.state !== "running";
     if (S.follow) $("#clog").scrollTop = $("#clog").scrollHeight;
@@ -700,6 +725,14 @@ function afterJob(j) {
 setInterval(() => { pollConsole(); }, 1000);
 setInterval(refreshJobs, 4000);
 $("#cjob").onchange = e => showConsole(e.target.value);
+async function sendAnswer(text) {
+  if (!S.consJob) return;
+  try { await api(`jobs/${S.consJob}/input`, {text, secret: $("#cinsec").checked}); $("#cintx").value = ""; $("#cin").classList.remove("waiting"); S.tail += "\n"; pollConsole(true); }
+  catch (e) { toast(e.message, "bad"); }
+}
+$("#cin").onsubmit = e => { e.preventDefault(); sendAnswer($("#cintx").value); };
+$("#cin").addEventListener("click", e => { const b = e.target.closest("[data-ans]"); if (b) sendAnswer(b.dataset.ans); });
+$("#cinsec").onchange = e => { $("#cintx").type = e.target.checked ? "password" : "text"; };
 $("#ccancel").onclick = async () => { try { await api(`jobs/${S.consJob}/cancel`, {}); toast("Cancelling…"); } catch (e) { toast(e.message, "bad"); } };
 $("#ccopy").onclick = () => { navigator.clipboard.writeText($("#clog").innerText); toast("Log copied"); };
 $("#cfollow").onclick = e => { S.follow = !S.follow; e.currentTarget.setAttribute("aria-pressed", S.follow); e.currentTarget.style.opacity = S.follow ? 1 : .55; };

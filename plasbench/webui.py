@@ -368,6 +368,7 @@ class Jobs:
         self.lock = threading.Lock()
         self.jobs: dict[str, dict] = {}
         self.procs: dict[str, subprocess.Popen] = {}
+        self.logs: dict = {}
         index = self.dir / "jobs.json"
         if index.is_file():
             try:
@@ -395,32 +396,62 @@ class Jobs:
             if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
                 raise ValueError(f"not a setting name: {key}")
             child_env[key] = str(value)
-        handle = open(log, "wb")
+        # Append mode: the command and this server (echoing the answers typed in the window) both write to it.
+        handle = open(log, "ab")
         handle.write(f"$ {shown}\n".encode())
         if env:
             handle.write(("  with " + " ".join(f"{k}={shlex.quote(str(v))}" for k, v in env.items()) + "\n").encode())
         handle.flush()
         kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
-        proc = subprocess.Popen(command, cwd=str(self.project.root), stdin=subprocess.DEVNULL, stdout=handle,
+        # stdin is a pipe the window can type into (answer()): a command that asks a question waits for the answer
+        # typed in the console instead of being handed an empty one.
+        proc = subprocess.Popen(command, cwd=str(self.project.root), stdin=subprocess.PIPE, stdout=handle,
                                 stderr=subprocess.STDOUT, env=child_env, **kwargs)
         job = {"id": job_id, "label": label or shown, "argv": list(argv), "command": shown, "env": env or {},
                "state": "running", "started": time.time(), "ended": None, "exit": None, "pid": proc.pid}
         with self.lock:
             self.jobs[job_id] = job
             self.procs[job_id] = proc
+            self.logs[job_id] = handle
             self._save()
         threading.Thread(target=self._wait, args=(job_id, proc, handle), daemon=True).start()
         return job
 
     def _wait(self, job_id, proc, handle):
         code = proc.wait()
-        handle.close()
         with self.lock:
+            self.logs.pop(job_id, None)
+            handle.close()
+            try:
+                proc.stdin.close()
+            except (OSError, AttributeError, ValueError):
+                pass
             job = self.jobs[job_id]
             job.update(ended=time.time(), exit=code,
                        state="cancelled" if job["state"] == "cancelling" else ("done" if code == 0 else "failed"))
             self.procs.pop(job_id, None)
             self._save()
+
+    def answer(self, job_id: str, text: str, secret: bool = False) -> dict:
+        """Type one line into a running command, as if at its terminal, and record it in the log (masked if secret)."""
+        if "\n" in text or "\r" in text:
+            raise ValueError("one line at a time")
+        if len(text) > 4096:
+            raise ValueError("answer too long")
+        with self.lock:
+            proc, handle = self.procs.get(job_id), self.logs.get(job_id)
+            if not proc or proc.poll() is not None:
+                raise ValueError("this job is not running")
+            try:
+                proc.stdin.write((text + "\n").encode("utf-8"))
+                proc.stdin.flush()
+            except (BrokenPipeError, OSError, ValueError) as exc:
+                raise ValueError(f"the command is no longer reading input ({exc})")
+            if handle:
+                shown = "•" * len(text) if secret else text
+                handle.write(f"\n[you] {shown}\n".encode("utf-8"))
+                handle.flush()
+        return {"ok": True}
 
     def cancel(self, job_id: str) -> dict:
         with self.lock:
@@ -693,6 +724,11 @@ def make_handler(project: Project, jobs: Jobs):
                 if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
                     raise ValueError("argv must be a non-empty list of strings")
                 return self.jsend(200, jobs.start(argv, data.get("label", ""), data.get("env") or None))
+            if route.startswith("jobs/") and route.endswith("/input"):
+                text = data.get("text", "")
+                if not isinstance(text, str):
+                    raise ValueError("text must be a string")
+                return self.jsend(200, jobs.answer(route[len("jobs/"):-len("/input")], text, bool(data.get("secret"))))
             if route.startswith("jobs/") and route.endswith("/cancel"):
                 return self.jsend(200, jobs.cancel(route[len("jobs/"):-len("/cancel")]))
             if route.startswith("jobs/") and route.endswith("/delete"):
