@@ -1055,6 +1055,7 @@ plasbench/
 ├── docs/
 │   ├── FINDING_DATA.md       <- how to find matched complete-assembly + Illumina pairs
 │   └── METHODS.md            <- the scoring model, for your write-up / methods section
+│   └── images/reference/     <- local, uncommitted third-party figures used as report design references (its README maps each to a planned feature)
 ├── config/
 │   ├── config.sh             <- EDIT THIS: paths, threads, which tools to run
 │   └── accessions.tsv        <- EDIT THIS: your sample sheet (isolate → accessions)
