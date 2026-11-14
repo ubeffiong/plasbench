@@ -32,3 +32,45 @@ dist/
 
 # Local assistant/session state; not part of the project.
 .claude/
+
+# Sample-level data stays out of git. Reads, assemblies, predictions and alignments can carry
+# sample identity or patient-linked metadata, so the defaults below keep them untracked even if a
+# laboratory runs outside the default data/ and results/ folders (or puts a git repository around
+# its own study folder). Fixtures that ship with PlasBench are re-included further down.
+meta_project/
+predictions_meta/
+assembly/
+metadata/
+*.fasta
+*.fa
+*.fna
+*.fasta.gz
+*.fa.gz
+*.fna.gz
+*.fq
+*.fq.gz
+*.bam
+*.cram
+*.sam
+*.paf
+*.vcf
+*.vcf.gz
+# Study metadata sheets a laboratory fills in (sample names, origin, dates).
+meta_samples.tsv
+accessions.local.tsv
+
+# Shipped, synthetic or public fixtures (tracked on purpose).
+!results_audit/
+!results_audit/**
+!galaxy/test-data/
+!galaxy/test-data/**
+!test/
+!test/**
+!demo/
+!demo/**
+!cohorts/
+!cohorts/**
+!docs/
+!docs/**
+!assets/
+!assets/**
