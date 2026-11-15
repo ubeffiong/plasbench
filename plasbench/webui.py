@@ -284,6 +284,41 @@ class Project:
             "A full cohort needs hundreds of GB; free space or set DATA_DIR on a larger drive.", group="System", optional=True)
         return checks
 
+    # Run-form fields that name a tool database, with the config variable that overrides
+    # it and its path under the machine-wide store (config/config.sh, plasbench_db_path).
+    DB_FIELDS = (("platon_db", "PLATON_DB", "platon/db"), ("genomad_db", "GENOMAD_DB", "genomad"),
+                 ("plasme_db", "PLASME_DB", "plasme"), ("plasgraph2_model_dir", "PLASGRAPH2_MODEL_DIR", None))
+
+    def databases(self) -> dict:
+        """Where a run will find each tool database when its form field is left empty.
+
+        Mirrors config/config.sh: an explicit setting wins; otherwise the machine-wide store
+        (PLASBENCH_DB_DIR, default ~/.plasbench/databases), except that a copy already under
+        DATA_DIR/db is used while the store has none. The window shows this so a database
+        that is already installed is visibly reused instead of looking like a blank to fill in.
+        """
+        local = self.local_env()
+        store = Path(os.environ.get("PLASBENCH_DB_DIR") or local.get("PLASBENCH_DB_DIR") or Path.home() / ".plasbench" / "databases")
+        data = self.path_setting("DATA_DIR", "data")
+        out = {}
+        for dest, var, rel in self.DB_FIELDS:
+            explicit = os.environ.get(var) or local.get(var)
+            if explicit:
+                path, source = Path(os.path.expanduser(explicit)), "setting"
+            elif rel is None:
+                out[dest] = {"path": "", "found": False, "source": "none"}
+                continue
+            elif (data / "db" / rel).exists() and not (store / rel).exists():
+                path, source = data / "db" / rel, "project"
+            else:
+                path, source = store / rel, "store"
+            try:
+                found = path.is_dir() and any(path.iterdir())
+            except OSError:
+                found = False
+            out[dest] = {"path": str(path), "found": found, "source": source}
+        return out
+
     def info(self) -> dict:
         cpus = os.cpu_count() or 1
         mem = None
@@ -306,7 +341,8 @@ class Project:
         return {"version": __version__, "root": str(self.root), "platform": f"{platform.system()} {platform.release()}",
                 "python": sys.version.split()[0], "cpus": cpus, "memory_gb": round(mem, 1) if mem else None,
                 "data_dir": str(self.path_setting("DATA_DIR", "data")), "results_dir": str(self.root / "results"),
-                "local_env": str(self.local_env_path()), "home": str(Path.home()), "sep": os.sep}
+                "local_env": str(self.local_env_path()), "home": str(Path.home()), "sep": os.sep,
+                "databases": self.databases()}
 
     # -- runs and reports ---------------------------------------------------------------------------------------
     def runs(self, extra: list[str]) -> list[dict]:

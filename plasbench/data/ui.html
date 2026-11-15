@@ -1922,11 +1922,26 @@ function fieldHTML(a, values, prefix) {
     else ctl = `<select id="${id}" data-dest="${a.dest}"><option value="">${a.default != null ? `default (${esc(a.default)})` : "— not set —"}</option>${a.choices.map(c => `<option ${String(v) === String(c) ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
   }
   else if (a.kind === "int" || a.kind === "float") ctl = `<input type="number" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null ? "default " + esc(a.default) : ""}" ${a.kind === "float" ? 'step="any"' : ""}>`;
-  else if (a.kind === "path") ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null && a.default !== "" ? esc(a.default) : ""}"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="${/dir|folder/.test(a.dest) ? 1 : 0}">Browse</button>`;
+  else if (a.kind === "path") {
+    // A tool database already installed is reused: show where, so an empty field reads as
+    // "use the existing one", not as something to fill in for every benchmark.
+    const db = S.info?.databases?.[a.dest];
+    const ph = db?.found ? `uses the installed copy: ${db.path}` : (a.default != null && a.default !== "" ? a.default : "");
+    ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${esc(ph)}"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="${/dir|folder/.test(a.dest) ? 1 : 0}">Browse</button>`;
+  }
   else if (a.kind === "list") ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(Array.isArray(v) ? v.join(" ") : v ?? "")}" placeholder="space separated${a.choices ? ": " + esc(a.choices.join(" ")) : ""}">`;
   else ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null && a.default !== "" ? "default " + esc(a.default) : ""}">`;
   return `<div class="field ${changed ? "changed" : ""}"><label for="${id}">${esc(argLabel(a))}${a.required ? `<span class="req">*</span>` : ""} <code>${esc(a.positional ? "<" + a.dest + ">" : flag)}</code></label>
-    <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help ? `<div class="help">${esc(a.help)}</div>` : ""}</div>`;
+    <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help ? `<div class="help">${esc(a.help)}</div>` : ""}${dbStatusHTML(a.dest)}</div>`;
+}
+// Under a database field: whether a run will reuse an installed copy, and from where.
+function dbStatusHTML(dest) {
+  const db = S.info?.databases?.[dest];
+  if (!db || db.source === "none") return "";
+  const where = {store: "the shared database store", project: "this install's data folder", setting: "your settings"}[db.source] || "";
+  return db.found
+    ? `<div class="help ok-t">${icon("check")} Installed at <code>${esc(db.path)}</code> (${esc(where)}). Leave this empty and every benchmark reuses it; nothing is downloaded again.</div>`
+    : `<div class="help warn-t">${icon("info")} Not installed yet at <code>${esc(db.path)}</code>. Install it once from <a href="#setup">Set up this computer</a> (Download tool databases), or Browse to a copy you already have. Only needed if this tool is switched on.</div>`;
 }
 function bindForm(root, values, onChange) {
   root.addEventListener("input", e => { const d = e.target.dataset.dest; if (!d || e.target.type === "checkbox") return; values[d] = e.target.value; markChanged(e.target, e.target.value !== ""); onChange(); });
@@ -2020,6 +2035,8 @@ function showHelpDialog(c, sc) {
 const WSTEPS = [["Isolates","What to benchmark"],["Tools","Which tools run"],["Resources","Threads, memory"],["Options","Outputs and stages"],["Review","Check and start"]];
 async function loadWizard() {
   await getSchema(); await getCohorts(); await getTools(); await getUser(); await getWorkspace();
+  // Refresh where each database is, so one installed since the window opened shows as found.
+  try { S.info = await api("info"); } catch (e) { /* keep the start-up copy */ }
   renderWizard();
 }
 function wizRun() { return command("run"); }
@@ -2073,6 +2090,7 @@ function renderWizard() {
         [["0","Check"],["1","Download"],["2","Truth"],["3","Assemble"],["4","Run tools"],["5","Score"],["6","Aggregate & report"],["7","Long-read tools"]].map(([s, l]) =>
         `<button type="button" class="chip ${(V.stages || []).includes(s) ? "on" : ""}" data-stage="${s}">${s} · ${l}</button>`).join("")}</div>
         <p class="mut small" style="margin:10px 0 0">Choose stages to resume or re-run part of a benchmark, e.g. 5 and 6 to re-score and rebuild the report.</p></div></div>
+       <div class="note info" style="margin-top:16px">${icon("info", "ico")}<div><b>Nothing here needs filling in to reuse what you have.</b> Installed tools, tool databases and downloaded reads are shared by every benchmark on this computer: reads and assemblies in <code>${esc(S.info?.data_dir || "the data folder")}</code>, databases where each field below shows. Leave a field empty to reuse them; fill one in only to use a different copy.</div></div>
        <div class="card" style="margin-top:16px" id="wform">${groupedFields(io, V, "w", true)}${groupedFields(run.args.filter(a => a.group === "" && !["stages","mode","predictions_dir"].includes(a.dest)), V, "w", true)}</div>`;
   } else {
     const argv = wizArgv();
