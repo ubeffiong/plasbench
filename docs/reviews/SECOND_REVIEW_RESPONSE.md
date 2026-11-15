@@ -13,13 +13,26 @@ release, with the reason).
 |---|---|---|---|
 | **Task classification** (section 3): a tool without bins was ranked as a contig classifier, so plasmidSPAdes shared a leaderboard with Platon | `config/tool_capabilities.tsv` declares `evaluation_task` (`binning_reconstruction`, `sequence_reassembly`, `classification`) and `output_unit` for every tool, from its output contract. `headline_design.py` ranks from it, with a third **reassembly** track (base-level sequence-recovery F1); older registries and user manifests fall back to `binning_capable` and `method_class`; an unknown value is an error. User tool manifests accept `task = reassembly`. Plassembler, Hybracter and plsMD stay on reconstruction because each output record is one plasmid (`output_unit = plasmid_records`). | `test_evaluation_task.py` | done |
 | **Reference independence** (section 4): reference quality and independence were one variable | `truth_provenance.py` records `reference_independence` and `reference_group` beside the tier. By default (`HEADLINE_REFERENCE_INDEPENDENCE=independent`, pre-registered as *proposed*) only independent tier 1-2 references enter the primary analysis; same-read-polished and unrecorded ones go to the new **reference-independence sensitivity table** (`benchmark.reference_independence.tsv`: mean, rank and their change from the independent group, with sample and cluster counts), shown in the report. The headline design table states the composition. | `test_reference_independence.py` | done |
-| **Statistical uncertainty** (issues 1 and 5A): the percentile cluster bootstrap under-covers with few studies | `resampling.py` adds a cluster-robust t interval (CR1, t on G−1 df; stratified form) and a studentized cluster bootstrap. `simulate_validation.py` measures all three on the same data, adds stratified scenarios and a Holm family-wise error scenario. The leaderboard and comparison intervals use the method the simulation supports (`PLASBENCH_CI_METHOD`, recorded in every output). See *Calibration result* below. | `test_simulate_validation.py`, `test_resampling_equivalence.py` | done |
+| **Statistical uncertainty** (issues 1 and 5A): the percentile cluster bootstrap under-covers with few studies | `resampling.py` adds a cluster-robust t interval (CR1, t on G−1 df; stratified form) and a studentized cluster bootstrap. `simulate_validation.py` measures all three on the same data, adds stratified scenarios and a Holm family-wise error scenario. The leaderboard and comparison intervals use the method the simulation supports (`PLASBENCH_CI_METHOD`, recorded in every output). See *Calibration result* below. | `test_simulate_validation.py`, `test_resampling_equivalence.py` | partly: near-nominal with balanced studies; with very unbalanced study sizes every method still under-covers (91-93%), and the report says so |
 | **AMR placement for non-binning tools** (section 7): one-to-one matching penalised a classifier whose two contigs both come from one plasmid | A tool without bins is scored by **contig attribution**: each gene-bearing record goes to the truth sequence it aligns to most, several records may share one plasmid. It is reported as plasmid-sequence attribution, not reconstruction: AMR-PRR and pairs kept together stay unavailable. The mode is recorded per gene copy and in the summary and report. | `test_amr_placement.py` (the review's fixture: one plasmid, two genes, two contigs; and the same contigs forced through one-to-one matching, to show the old penalty) | done |
 | Regression fixtures for task mapping and AMR placement | As above | as above | done |
 
 ### Calibration result
 
-CALIBRATION_TABLE
+| Design (1,000 replicates each) | Percentile bootstrap | Cluster t (default) | Studentized bootstrap |
+|---|---|---|---|
+| Balanced, 6 studies | 0.855-0.863 | 0.948-0.955 | 0.941-0.947 |
+| Balanced, 8 studies | 0.876-0.890 | 0.945-0.954 | 0.943-0.951 |
+| Balanced, 12 studies | 0.896-0.931 | 0.944-0.967 | 0.939-0.961 |
+| Balanced, 20 and 30 studies | 0.915-0.935 | 0.943-0.958 | 0.939-0.955 |
+| Strong study effect, 12 studies | 0.901-0.910 | 0.943-0.953 | 0.948-0.949 |
+| One isolate per study, 12 studies | 0.898-0.913 | 0.944-0.955 | 0.932-0.947 |
+| Two species strata, 4 and 8 studies each | 0.828-0.929 | 0.951-0.965 | (cluster t) |
+| **Unbalanced sizes with 10-20% missing** | 0.881-0.925 | **0.910-0.947** | 0.910-0.945 |
+
+Ranges are over true effects 0, 0.05 and 0.10. With unbalanced study sizes no method reaches 95%; those rows are reported as below nominal and
+the limitation is stated in the Scientific Guide (section 8.4). The sign-flip test's type-I error is within tolerance everywhere; the Holm
+family-wise error is 4.7% over 6 comparisons and 4.9% over 28. Full table: `docs/validation/stats_validation_full.tsv`.
 
 ## P1: before claiming generalisable tool selection
 

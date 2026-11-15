@@ -754,6 +754,9 @@ export HEADLINE_MAX_REFERENCE_TIER="${HEADLINE_MAX_REFERENCE_TIER:-2}"
 # benchmark's own Illumina reads is a dependent reference and goes to the reference-independence sensitivity table, not the primary analysis. any: the tier alone decides.
 # Pre-registration row headline_reference_independence.
 export HEADLINE_REFERENCE_INDEPENDENCE="${HEADLINE_REFERENCE_INDEPENDENCE:-independent}"
+# Interval method of the leaderboard and the paired comparisons (python/resampling.py): cluster_t (default; chosen by simulate_validation.py), bootstrap_t or percentile.
+# Pre-registration row interval_method.
+export PLASBENCH_CI_METHOD="${PLASBENCH_CI_METHOD:-cluster_t}"
 # Independent clusters (BioProjects or clonal groups) the references in those tiers must come from for the primary analysis to be available. Below it the ranking is shown as provisional:
 # a headline from fewer clusters has no interval and no test. Default 5 is the interval minimum (MIN_CLUSTERS_CI). Pre-registration row headline_min_clusters (proposed).
 export HEADLINE_MIN_CLUSTERS="${HEADLINE_MIN_CLUSTERS:-5}"
