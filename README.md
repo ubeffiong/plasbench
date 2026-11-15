@@ -4,6 +4,8 @@
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
 
+> **[Open the sample HTML report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html)** (opens in your browser, nothing to install; Ctrl-click, Cmd-click or middle-click to open it in a new tab). It is the report PlasBench writes, built from the offline demo; the data are synthetic, so its numbers are not real results. To open it from a clone instead: [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html).
+
 **Docs:** **[Run it: step-by-step lab guide](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** · [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
 
 > **Want to run it?** The dry-lab route is written out command by command in
@@ -118,6 +120,8 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- The statistics are checked by simulation (`plasbench analysis simulate-validation`, `RUN_STATS_VALIDATION=1`): interval coverage, type-I error and power under study-to-study differences, correlated isolates, unequal study sizes and missing data, shown in the report under Sensitivity, power and reproducibility. A first smoke run shows the percentile cluster bootstrap under-covers with few studies, so its intervals are optimistic.
+- The pre-registration is a **draft** until its proposed values are confirmed and frozen (`freeze-prereg --write --strict`); the report's Pre-registration tab shows the draft state and lists the proposed values.
 - Each reference carries a structured **evidence record** (technology, circularity, long-read support, replicon evidence, structure, independent validation; declared, inferred or unknown), kept field by field; the reference tier is derived from it.
 
 - The primary analysis is reported **unavailable** when no isolate has a Tier 1-2 reference; the ranking is then labelled provisional, never the headline.
@@ -654,8 +658,8 @@ none of them prints a note saying so.
   F1 = 0 there, so it cannot rise by failing on hard isolates.
 - Uncertainty: a deterministic 1,000-resample bootstrap CI on mean F1, paired per-sample
   differences with win/tie/loss counts, and `significant_vs_runner_up` (sign-flip
-  permutation test, 10,000 permutations, Holm-corrected; needs at least 5 paired
-  samples, otherwise `not_assessed`).
+  permutation test, Holm-corrected: exact (every sign pattern) for 6 to 12 independent units, 10,000 permutations above that; needs at least 6 independent
+  units, otherwise `not_assessed`).
 
 **Optional diagnostics (never ranked).** Stage 6 also writes
 `benchmark.recovery_by_replicon.tsv`, which breaks per-plasmid recovery down by replicon
@@ -935,7 +939,7 @@ there, what is still missing, and the Docker command when Docker is available.
 | **Cohorts** | The bundled study sets. **Details** shows what each holds: description, isolates and species, plasmids in the truth, read depth, BioProjects and the download size. Breakdowns cover organism, truth tier, how the truth was assembled, origin and country. A searchable table lists every sample, with NCBI links, host, isolation source, collection date and how its reference was sequenced (from the cohort's lock). Validate a cohort, or benchmark it in one click. |
 | **Runs & reports** | Every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
 | **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
-| **Version control** | Git without the command line, for your **runs**: **each study is its own repository**, holding the study's record, sample sheets, settings, result tables, reports, figures and logs, with its own history and its own remote. The PlasBench program is not tracked, because updates replace it. A managed `.gitignore` keeps reads, assemblies, FASTA, alignments, tmp folders and credentials out. You get status, staging, commit, branches, remote, fetch/pull/push, and a colour-coded history: you are here, pushed, not yet pushed, and merges, with details on hover. Diffs and commits open as tabs, and every commit is checked for raw data, secrets, patient identifiers and files too large for GitHub. Git is optional: `plasbench install-git` installs Git for Windows with Git Bash on Windows, or the conda-forge git elsewhere. |
+| **Version control** | Git without the command line, for your **runs**: **each study is its own repository**, holding the study's record, sample sheets, settings, result tables, reports, figures and logs, with its own history and its own remote. The PlasBench program is not tracked, because updates replace it. A managed `.gitignore` keeps heavy data out: reads (FASTQ, SRA, FAST5/POD5), alignments (BAM, SAM, CRAM and their indexes), variants (VCF/BCF), assemblies and sequences (FASTA, GFA, GFF), aligner indexes and tool databases, archives, tmp folders and credentials. You can add your own rules under **Ignored files**, and **Test a path** shows which rule decides. You get status, staging, commit, branches, remote, fetch/pull/push, and a colour-coded history: you are here, pushed, not yet pushed, and merges, with details on hover. Diffs and commits open as tabs, and every commit is checked for raw data, secrets, patient identifiers and files too large for GitHub. Git is optional: `plasbench install-git` installs Git for Windows with Git Bash on Windows, or the conda-forge git elsewhere. |
 | **All commands** | Every `plasbench` command and option as a form, generated from the command line itself, so nothing is missing. Each shows the command it will run before you run it. |
 | **Guides** | This README and every guide, readable in the window. |
 

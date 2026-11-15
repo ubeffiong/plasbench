@@ -136,6 +136,11 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Interval coverage": {
+        "what": "How often a 95% confidence interval contains the true value, measured on simulated data where the truth is known.",
+        "why": "An interval is only worth reading if it covers about 95% of the time. With few independent studies the percentile bootstrap covers less, "
+               "which means its intervals are too narrow and should be read as optimistic.",
+    },
     "Evidence record": {
         "what": "Six separate pieces of evidence kept for each reference plasmid set: assembly technology, circularity evidence, long-read support, replicon/MOB evidence, "
                 "structural integrity and independent validation, each declared, inferred or unknown.",
@@ -1258,6 +1263,20 @@ def provenance_evidence(row):
              ("assembly_technology", "circularity_evidence", "read_support", "replicon_evidence", "structural_integrity", "independent_validation")
              if row.get(name) and row.get(name) != "unknown"]
     return f"{row['evidence_recorded']}" + (": " + ", ".join(known) if known else "")
+
+
+def permutation_note(row):
+    """How the permutation p-value was made and whether the comparison can reach significance at all, from the paired_comparisons columns."""
+    method = row.get("permutation_method")
+    if not method:
+        return "not recorded (older run)"
+    floor = row.get("min_attainable_p")
+    text = {"exact": "exact", "monte_carlo": "Monte Carlo", "not_estimated": "not estimated"}.get(method, method)
+    if floor and method != "not_estimated":
+        text += f", smallest attainable p {floor}"
+    if row.get("p_status") == "underpowered":
+        text += " (underpowered: cannot reach 0.05)"
+    return text
 
 
 def headline_design_section(out_dir):
@@ -2591,7 +2610,7 @@ def main():
         equivalence = ({"yes": "yes", "no": "no"}.get(equivalent, "not assessed")
                        + (f" (delta {delta})" if delta and equivalent in ("yes", "no") else ""))
         return ("<tr><td>{track}</td><td>{task}</td><td>{metric}</td><td>{a}</td><td>{b}</td><td>{n}</td><td>{difference}</td>"
-                "<td>{ci}</td><td>{p}</td><td>{holm}</td><td>{wholm}</td><td>{equiv}</td><td>{wins}/{ties}/{losses}</td></tr>").format(
+                "<td>{ci}</td><td>{p}</td><td>{holm}</td><td>{wholm}</td><td>{equiv}</td><td>{wins}/{ties}/{losses}</td><td>{method}</td></tr>").format(
             track=esc(row.get("analysis_track") or "not recorded"), task=esc(row.get("task") or "not recorded"),
             metric=esc(row.get("metric") or "f1"),
             a=esc(row["tool_a"]), b=esc(row["tool_b"]),
@@ -2601,15 +2620,16 @@ def main():
             difference=esc(row["mean_f1_difference"]),
             ci=esc((row.get("difference_ci_low") and row.get("difference_ci_high") and
                     f"{row['difference_ci_low']} to {row['difference_ci_high']}") or "not estimated (n < 5)"),
-            p=esc(row.get("permutation_p_value") or "not estimated (n < 5)"),
-            holm=esc(row.get("permutation_p_value_holm") or "not estimated (n < 5)"),
+            p=esc(row.get("permutation_p_value") or "not estimated (fewer than 6 independent units)"),
+            holm=esc(row.get("permutation_p_value_holm") or "not estimated (fewer than 6 independent units)"),
             wholm=esc(row.get("wilcoxon_p_value_holm") or "not estimated"),
             equiv=esc(equivalence),
-            wins=esc(row["wins_a"]), ties=esc(row["ties"]), losses=esc(row["wins_b"]))
+            wins=esc(row["wins_a"]), ties=esc(row["ties"]), losses=esc(row["wins_b"]),
+            method=esc(permutation_note(row)))
 
     comparison_head = ("<thead><tr><th>Track</th><th>Task</th><th>Metric</th><th>Tool A</th><th>Tool B</th><th>Pairs</th>"
                        "<th>Mean difference (A minus B)</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th>"
-                       "<th>Wilcoxon p (Holm)</th><th>Equivalent within delta</th><th>A wins / ties / B wins</th></tr></thead>")
+                       "<th>Wilcoxon p (Holm)</th><th>Equivalent within delta</th><th>A wins / ties / B wins</th><th>Permutation test</th></tr></thead>")
     comparison_tracks = []
     for row in comparisons:
         if (row.get("analysis_track") or "not recorded") not in comparison_tracks:

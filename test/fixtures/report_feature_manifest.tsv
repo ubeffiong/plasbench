@@ -253,3 +253,5 @@ excluded-replicons.01	excluded-replicons	text	AMBIGUOUS	definition	cohort-qc
 isolate-difficulty.02	isolate-difficulty	text	GFA dead-end count	column	cohort-qc
 learn-adequacy.02	learn-adequacy	text	Plasmid adequacy	column	cohort-qc
 learn-copynumber.01	learn-copynumber	text	copy number	Not-run reason or table	bin-diagnostics
+stats-validation.01	stats-validation	heading	Statistical validation (simulation)	section title (tab of Sensitivity, power and reproducibility)	ranking-sensitivity
+stats-validation.02	stats-validation	table_headers	Scenario | Studies | Isolates per study | Between-study sd | Isolate sd | Missing | True effect | Replicates | Interval coverage | Interval verdict | Test rejects at 0.05 | Test | Test verdict	the simulation table keeps its columns	ranking-sensitivity

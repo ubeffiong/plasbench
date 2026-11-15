@@ -223,7 +223,7 @@ export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memo
 # sample at a time, one tool at a time. Raise them only after checking your
 # machine's core/RAM budget below can actually support it -- e.g. 2 parallel
 # samples x 2 parallel tools x THREADS=4 wants 16 CPU threads at once.
-export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 1, 3, 4, 5
+export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 1, 2, 3, 4, 5
 export MAX_PARALLEL_TOOLS="${MAX_PARALLEL_TOOLS:-1}"       # independent tools within one sample, stage 4
 # Stage 6's advisory analyses (stratified recovery, truth audits, copy number, repeat
 # content, bin agreement, the dimension tables, rank sensitivity) are independent
@@ -737,3 +737,6 @@ export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"
 export REPORT_EMBED_DASHBOARD="${REPORT_EMBED_DASHBOARD:-0}"
 # 1 keeps the all-sample numbers as the headline when no sample has a reference in the headline tiers (status fallback_allowed, warning kept). Default 0: the primary analysis is then unavailable and the ranking is provisional.
 export ALLOW_PRIMARY_FALLBACK="${ALLOW_PRIMARY_FALLBACK:-0}"
+# 1 runs the statistics simulation (python/simulate_validation.py) in stage 6 and shows it in the report (Sensitivity, power and reproducibility). STATS_VALIDATION_MODE is smoke (seconds, indicative) or full (minutes, the evidence).
+export RUN_STATS_VALIDATION="${RUN_STATS_VALIDATION:-0}"
+export STATS_VALIDATION_MODE="${STATS_VALIDATION_MODE:-smoke}"

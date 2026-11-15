@@ -745,7 +745,10 @@ failures.
 clonal collection) are not independent. When the sample sheet has a `bioproject` column
 (else `source_study`), the bootstrap CI resamples whole clusters and the sign-flip
 permutation test flips every difference in a cluster together. At least five independent
-clusters are required; with fewer, no interval or p-value is reported. The leaderboard's
+clusters are required for an interval and six for a permutation test (with five the smallest
+attainable two-sided p is 0.0625); with fewer, none is reported. Up to twelve clusters the p-value is
+exact (every sign pattern is enumerated); above that, 10,000 random sign flips.
+The calibration of these procedures is checked by simulation (`python/simulate_validation.py`): interval coverage, type-I error and power under correlated, unequal and incomplete data. The leaderboard's
 `n_independent_clusters` and the comparisons' `paired_clusters` show how many there were.
 Without a cluster column every sample is its own cluster and the results are identical to
 plain per-sample resampling.
@@ -764,7 +767,7 @@ the paired per-sample F1 differences (10,000 permutations, a deterministic seed)
 with Holm's method controlling the family-wise error rate across every pairwise
 tool comparison computed within the same analysis track (each track is a separate
 family; comparisons are never made across tracks). `True` only when the Holm-adjusted
-p-value is below 0.05 **and** there are at least 5 paired samples (the permutation
+p-value is below 0.05 **and** there are at least 6 independent units (the permutation
 test's own minimum — fewer than that returns no p-value at all, never a fabricated
 one); otherwise `not_assessed`. This is deliberately **not** based on whether the
 two tools' bootstrap confidence intervals overlap — CI overlap is a weaker,

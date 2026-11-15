@@ -10,7 +10,7 @@ PlasBench fixes its scoring decisions before results are seen. They live in
 | `config_variable` | The `config/config.sh` variable that implements it, when there is one |
 | `spec_section` | Section of the scoring specification it comes from |
 | `revise_after_pilot` | Whether the pilot may change it (before the freeze only) |
-| `status` | `fixed`, or `TO_FIX` while the panel has not decided |
+| `status` | `fixed` (decided); `proposed` (a value is proposed, rationale in the note, awaiting the maintainer's confirmation); `TO_FIX` (no value yet). `proposed` and `TO_FIX` are *unfixed*: a plan with any is a **draft** |
 
 ## Freezing and checking
 
@@ -18,14 +18,15 @@ PlasBench fixes its scoring decisions before results are seen. They live in
 plasbench analysis freeze-prereg --write      # lock the SHA-256 in config/prereg.lock.json
 plasbench analysis freeze-prereg --verify     # fail if prereg.tsv changed after the freeze
 plasbench analysis freeze-prereg --verify --require-fixed --check-env
+plasbench analysis freeze-prereg --write --strict   # the real freeze: refuses while any row is proposed or TO_FIX
 ```
 
 - Every run manifest (`run_manifest.json`, key `preregistration`) records the
-  hash, whether the lock matches, the parameters still `TO_FIX`, and every
+  hash, whether the lock matches, the parameters still `proposed` or `TO_FIX` (the draft state), and every
   configuration variable whose value departs from the plan.
 - The HTML report's **Pre-registration** section shows the same.
 - With `REQUIRE_PREREG=1`, stage 4 refuses to run any tool until the lock
-  matches, no parameter is `TO_FIX`, and no setting departs from the plan.
+  matches, no parameter is `proposed` or `TO_FIX`, and no setting departs from the plan.
 
 ## Decisions recorded so far
 
@@ -44,16 +45,18 @@ plasbench analysis freeze-prereg --verify --require-fixed --check-env
 | Equivalence margin | 0.05 | Scoring specification |
 | Recommender value | `benchmark_only` when the oracle gap < 0.02 | Scoring specification |
 
-## Still `TO_FIX`
+## Still open: proposed values awaiting confirmation
 
-| Parameter | Proposed value | Why open |
-|---|---|---|
-| `tool_timeout_seconds` | unset (no limit) | Set after the pilot, from the slowest tool's runtime on the largest isolate |
-| `integrated_element_min_depth` | 3× | Integrated-element / unverified-candidate stratum; needs real data |
-| `unverified_candidate_requires_circular_path` | yes | Same stratum; provisional |
+The plan is a **draft** until every row below is confirmed (set `status` to `fixed`) and frozen with `--strict`. A draft can be locked (`--write`) so a run records
+which draft it used, but `REQUIRE_PREREG=1` and `--strict` refuse it.
 
-The values are the specification's proposed defaults and await the panel's
-confirmation. Until they are fixed, `REQUIRE_PREREG=1` will refuse to run.
+| Parameter | Proposed value | Rationale | Status |
+|---|---|---|---|
+| `tool_timeout_seconds` | 7200 (2 h) | Far above the minutes a short-read tool needs on a typical isolate; short enough to catch a hung run. Confirm from the slowest tool on the largest isolate, then set `TOOL_TIMEOUT_SECONDS` to the same value | proposed |
+| `integrated_element_min_depth` | 3x | Integrated-element / unverified-candidate stratum; needs real data | proposed |
+| `unverified_candidate_requires_circular_path` | yes | Same stratum | proposed |
+| `scorecard_weights`, `scorecard_overall_bands`, `scorecard_bands_*`, `scorecard_min_samples`, `map_max_bp` | see `config/prereg.tsv` | Proposed defaults for the exploratory scorecard and map; the identity bands (A1) are fixed | proposed |
+| `scorecard_bands_A4_C2` | none | No truth variant set exists, so there is nothing to propose | TO_FIX |
 
 ## Not adopted from the specification
 

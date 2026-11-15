@@ -208,6 +208,11 @@ job_dimension_analyses() {
     python3 "$HERE/../python/scenario_tags.py" --scores "$SCORES" --data-dir "$DATA_DIR" \
         --sample-sheet "$SAMPLE_SHEET" --out "$DIM.scenarios.tsv" \
         --performance-out "$DIM.scenario_performance.tsv" || warn "scenario tags failed; leaderboard is unaffected" &
+    # Calibration of the intervals and tests by simulation (python/simulate_validation.py): off by default (it does not depend on the run's data); smoke takes seconds.
+    if [[ "${RUN_STATS_VALIDATION:-0}" == "1" ]]; then
+        python3 "$HERE/../python/simulate_validation.py" --mode "${STATS_VALIDATION_MODE:-smoke}" --out "$DIM.stats_validation.tsv" \
+            || warn "statistical validation failed; leaderboard is unaffected" &
+    fi
     wait
     local COMPOSITE_ARGS=()
     for pair in "accuracy:accuracy" "feature-preservation:feature_preservation" "ngoc:ngoc" \
