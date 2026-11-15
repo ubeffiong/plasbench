@@ -1362,6 +1362,16 @@ def permutation_note(row):
     return text
 
 
+# aggregate_results.effect_status: the estimate and its interval come first; significance is beside them (second review, 5B).
+EFFECT_STATUS_TEXT = {
+    "equivalent": "equivalent: the whole interval is within the smallest difference of interest",
+    "practically_different": "a practical difference: the whole interval is beyond the smallest difference of interest",
+    "different_size_unclear": "a difference, but it may be smaller than the smallest difference of interest",
+    "inconclusive": "inconclusive: neither a difference nor equivalence is shown (not evidence of equal performance)",
+    "not_assessable": "not assessable: too few independent units for an interval",
+}
+
+
 def headline_design_section(out_dir):
     """Reference standard, provenance tiers and species balance behind the headline."""
     design = read_tsv(out_dir / "benchmark.headline_design.tsv") if (out_dir / "benchmark.headline_design.tsv").is_file() else []
@@ -2758,8 +2768,10 @@ def main():
         equivalent = row.get("equivalent") or ""
         equivalence = ({"yes": "yes", "no": "no"}.get(equivalent, "not assessed")
                        + (f" (delta {delta})" if delta and equivalent in ("yes", "no") else ""))
+        supports = EFFECT_STATUS_TEXT.get(row.get("effect_status") or "", "not recorded")
         return ("<tr><td>{track}</td><td>{task}</td><td>{metric}</td><td>{a}</td><td>{b}</td><td>{n}</td><td>{difference}</td>"
-                "<td>{ci}</td><td>{p}</td><td>{holm}</td><td>{wholm}</td><td>{equiv}</td><td>{wins}/{ties}/{losses}</td><td>{method}</td></tr>").format(
+                "<td>{ci}</td><td>{supports}</td><td>{p}</td><td>{holm}</td><td>{wholm}</td><td>{equiv}</td><td>{wins}/{ties}/{losses}</td><td>{method}</td></tr>").format(
+            supports=esc(supports),
             track=esc(row.get("analysis_track") or "not recorded"), task=esc(row.get("task") or "not recorded"),
             metric=esc(row.get("metric") or "f1"),
             a=esc(row["tool_a"]), b=esc(row["tool_b"]),
@@ -2777,7 +2789,7 @@ def main():
             method=esc(permutation_note(row)))
 
     comparison_head = ("<thead><tr><th>Track</th><th>Task</th><th>Metric</th><th>Tool A</th><th>Tool B</th><th>Pairs</th>"
-                       "<th>Mean difference (A minus B)</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th>"
+                       "<th>Mean difference (A minus B)</th><th>95% interval</th><th>What the difference supports</th><th>Permutation p</th><th>Holm-adjusted p</th>"
                        "<th>Wilcoxon p (Holm)</th><th>Equivalent within delta</th><th>A wins / ties / B wins</th><th>Permutation test</th></tr></thead>")
     comparison_tracks = []
     for row in comparisons:

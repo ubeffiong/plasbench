@@ -84,8 +84,9 @@ def main():
         header = open(path, encoding="utf-8").readline().rstrip("\n").split("\t")
         record = next(csv.DictReader(open(path, newline="", encoding="utf-8"), delimiter="\t"))
         check("the written table has the new columns last, older columns in place",
-              header[:4] == ["tool_a", "tool_b", "paired_samples", "mean_f1_difference"] and header[-7:-4] == ["wilcoxon_p_value_holm", "equivalent", "smallest_difference"]
-              and header[-4:] == ["permutation_method", "min_attainable_p", "p_status", "holm_min_attainable_p"], header)
+              header[:4] == ["tool_a", "tool_b", "paired_samples", "mean_f1_difference"] and header[header.index("wilcoxon_p_value_holm"):header.index("wilcoxon_p_value_holm") + 3] == ["wilcoxon_p_value_holm", "equivalent", "smallest_difference"]
+              and header[-3:] == ["effect_status", "testable", "ci_method"]
+              and header[-7:-3] == ["permutation_method", "min_attainable_p", "p_status", "holm_min_attainable_p"], header)
         check("and the values", record["permutation_method"] == "exact" and float(record["min_attainable_p"]) == 0.03125 and record["p_status"] == "ok", record)
 
     print("the report and the plan")

@@ -77,13 +77,40 @@ def main():
     import math
     check("a coverage of 0.90 over 100 replicates is below the line (0.95 - 2 x 0.0218 = 0.906); the old rule let it pass", 0.90 < 0.95 - 2 * math.sqrt(0.95 * 0.05 / 100) and 0.90 + 2 * math.sqrt(0.9 * 0.1 / 100) >= 0.95)
 
+    print("the interval methods")
+    import resampling as rs
+    check("Student t quantiles", abs(rs.t_quantile(0.975, 5) - 2.570582) < 1e-5 and abs(rs.t_quantile(0.975, 1) - 12.706205) < 1e-4
+          and abs(rs.t_quantile(0.025, 30) + 2.042272) < 1e-5)
+    vals, grps = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], list("abcdef")
+    low, high = rs.cluster_t_ci(vals, grps)
+    # one value per cluster: CR1 reduces to the ordinary t interval, mean 3.5 +/- t(5) * sd / sqrt(6)
+    se = (sum((v - 3.5) ** 2 for v in vals) / 5) ** 0.5 / 6 ** 0.5
+    check("with one isolate per cluster the cluster t interval is the ordinary t interval",
+          abs(low - (3.5 - 2.570582 * se)) < 1e-5 and abs(high - (3.5 + 2.570582 * se)) < 1e-5, (low, high))
+    check("fewer than 5 clusters: no interval from any method", all(rs.interval([1.0, 2.0, 3.0, 4.0, 5.0], list("aabbc"), method=m) == (None, None) for m in rs.INTERVAL_METHODS))
+    wide, _ = rs.cluster_t_ci([0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.2, 0.8], list("aaabbbccde"))
+    narrow, _ = rs.cluster_t_ci([0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.2, 0.8], [str(i) for i in range(10)])
+    check("clustering widens the interval (correlated isolates count less)", wide < narrow, (wide, narrow))
+    bt = rs.bootstrap_t_ci(vals * 2, grps * 2)
+    check("the bootstrap-t interval contains the mean and is repeatable", bt[0] < 3.5 < bt[1] and bt == rs.bootstrap_t_ci(vals * 2, grps * 2), bt)
+    strat = rs.cluster_t_ci([0.1, 0.2, 0.15, 0.12, 0.9, 0.8, 0.85, 0.95, 0.11, 0.88], list("abcdefghij"), list("AAAABBBBAB"))
+    check("a stratified interval is centred on the macro mean", abs((strat[0] + strat[1]) / 2 - (0.136 + 0.876) / 2) < 1e-9, strat)
+
     print("the command")
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "benchmark.stats_validation.tsv"
         done = subprocess.run([sys.executable, str(ROOT / "python" / "simulate_validation.py"), "--mode", "smoke", "--replicates", "12", "--out", str(out)], capture_output=True, text=True)
         rows = list(csv.DictReader(open(out, newline="", encoding="utf-8"), delimiter="\t")) if out.is_file() else []
         check("smoke mode writes one row per scenario and effect with the documented columns",
-              done.returncode == 0 and len(rows) == len(sv.SMOKE) * len(sv.SETTINGS["smoke"]["effects"]) and list(rows[0]) == list(sv.FIELDS), done.stderr[-300:])
+              done.returncode == 0 and len(rows) == (len(sv.SMOKE) + len(sv.STRATIFIED_SMOKE)) * len(sv.SETTINGS["smoke"]["effects"]) + len(sv.HOLM_SMOKE)
+              and list(rows[0]) == list(sv.FIELDS), done.stderr[-300:])
+        check("every interval row measures all three interval methods, with coverage and width",
+              all(r[f"{m}_coverage"] and r[f"{m}_width"] for r in rows if r["kind"] != "holm" for m in sv.METHODS), rows[0])
+        check("the stratified and Holm scenarios are in the table", {r["kind"] for r in rows} == {"unstratified", "stratified", "holm"})
+        holm = [r for r in rows if r["kind"] == "holm"]
+        check("the Holm row reports a family-wise error over its comparisons, and no interval",
+              holm and "family-wise error" in holm[0]["test_verdict"] and "comparisons" in holm[0]["test_verdict"] and holm[0]["ci_coverage"] == "", holm)
+        check("ci_method names the leaderboard's interval method", all(r["ci_method"] == sv.resampling.INTERVAL_METHOD for r in rows if r["kind"] != "holm"))
         check("it says whether any scenario shows a calibration shortfall", "calibration shortfall" in done.stderr or "no calibration shortfall" in done.stderr, done.stderr)
         prefix = str(Path(tmp) / "benchmark")
         nav, sections = rd.render(prefix, html.escape, lambda p: os.path.basename(p))

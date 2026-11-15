@@ -36,7 +36,7 @@ import headline_design as hd
 # Resampling primitives (resampling.py); re-exported because validate_recommendations.py
 # and the tests import bootstrap_ci / paired_permutation_pvalue from this module.
 from resampling import (  # noqa: E402,F401
-    bootstrap_ci, paired_permutation_pvalue, resampling_units, exact_mean as fast_mean, permutation_method, permutation_floor, MIN_CLUSTERS_CI,
+    bootstrap_ci, paired_permutation_pvalue, resampling_units, interval as resampling_interval, INTERVAL_METHOD, exact_mean as fast_mean, permutation_method, permutation_floor, MIN_CLUSTERS_CI,
 )
 
 # Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
@@ -538,7 +538,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
             ranking_samples = [r["sample"] for r in rows if r["tool"] == tool and r["f1"] is not None]
             ranking_f1 = list(d["f1"])
         groups = cluster_labels(ranking_samples, clusters)
-        f1_ci_low, f1_ci_high = bootstrap_ci(ranking_f1, groups=groups)
+        f1_ci_low, f1_ci_high = resampling_interval(ranking_f1, groups)
         summary.append({
             "tool": tool,
             "n_samples": d["n"],
@@ -850,13 +850,37 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
     for row in comparisons:
         # Equivalence flag: the mean difference AND its interval lie inside
         # +/- SMALLEST_DIFFERENCE, the pre-registered smallest difference of interest.
+        # It needs the interval: without one (fewer than MIN_CLUSTERS_CI units) a small mean difference is
+        # not evidence that two tools perform alike, so it is 'not_assessed', never 'yes' (second review, 5B).
         low, high = row.get("difference_ci_low"), row.get("difference_ci_high")
-        inside = abs(row["mean_f1_difference"]) < smallest
-        if low is not None and high is not None:
-            inside = inside and -smallest < low and high < smallest
-        row["equivalent"] = "yes" if inside else "no"
         row["smallest_difference"] = smallest
+        row["effect_status"] = effect_status(row["mean_f1_difference"], low, high, smallest)
+        if low is None or high is None:
+            row["equivalent"] = "not_assessed"
+        else:
+            row["equivalent"] = "yes" if abs(row["mean_f1_difference"]) < smallest and -smallest < low and high < smallest else "no"
+        row["testable"] = "yes" if row.get("permutation_p_value") is not None else "no"
     return comparisons
+
+
+def effect_status(mean, low, high, smallest):
+    """What a paired difference supports, from its interval against the smallest difference of interest.
+
+    not_assessable          no interval (too few independent units)
+    equivalent              the whole interval lies inside +/- smallest
+    practically_different   the whole interval lies beyond +smallest or beyond -smallest
+    different_size_unclear  the interval excludes 0 but reaches inside +/- smallest
+    inconclusive            the interval includes 0 and reaches beyond +/- smallest: neither a difference nor equivalence is shown
+    A non-significant comparison is never reported as equal performance (second review, 5B)."""
+    if low is None or high is None:
+        return "not_assessable"
+    if -smallest < low and high < smallest:
+        return "equivalent"
+    if low >= smallest or high <= -smallest:
+        return "practically_different"
+    if low > 0 or high < 0:
+        return "different_size_unclear"
+    return "inconclusive"
 
 
 def attach_significance(summary, comparisons, alpha=0.05):
@@ -889,7 +913,8 @@ def write_comparisons(rows, path, comparisons=None):
         comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
         handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\tpaired_clusters\ttask\tmetric"
-                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\tpermutation_method\tmin_attainable_p\tp_status\tholm_min_attainable_p\n")
+                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\tpermutation_method\tmin_attainable_p\tp_status\tholm_min_attainable_p"
+                     "\teffect_status\ttestable\tci_method\n")
         for row in comparisons:
             low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
             high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
@@ -905,7 +930,8 @@ def write_comparisons(rows, path, comparisons=None):
                 f"{row.get('task', '')}\t{row.get('metric', 'f1')}\t"
                 f"{fmt6(row.get('wilcoxon_p_value'))}\t{fmt6(row.get('wilcoxon_p_value_holm'))}\t"
                 f"{row.get('equivalent', '')}\t{row.get('smallest_difference', '')}\t"
-                f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\t{fmt6(row.get('holm_min_attainable_p'))}\n"
+                f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\t{fmt6(row.get('holm_min_attainable_p'))}\t"
+                f"{row.get('effect_status', '')}\t{row.get('testable', '')}\t{INTERVAL_METHOD}\n"
             )
 
 
@@ -946,7 +972,8 @@ def write_tsv(summary, path):
             "primary_status", "population",
             "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp",
             "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap",
-            "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates"]
+            "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates",
+            "ci_method"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -1021,6 +1048,8 @@ def write_tsv(summary, path):
                 *(fmt4(s.get(k)) for k in ("unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap")),
                 fmt4(s.get("sv_prr")), s.get("sv_prr_correct") if s.get("sv_prr_correct") is not None else "", s.get("sv_prr_plasmids") if s.get("sv_prr_plasmids") is not None else "",
                 s.get("sv_prr_isolates") if s.get("sv_prr_isolates") is not None else "", fmt4(s.get("cprr_on_sv_isolates")),
+                # how the ranking and F1 intervals were made (resampling.INTERVAL_METHOD); pooled CPRR keeps its percentile ratio bootstrap
+                INTERVAL_METHOD,
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
@@ -1450,7 +1479,7 @@ def main():
             independence_rows.extend(hd.independence_table(track, task, all_group, metric, design))
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,
                             "reference_basis": reference_basis, "primary_status": selection.status,
-                            "reference_independence_rule": design.reference_independence,
+                            "reference_independence_rule": design.reference_independence, "interval_method": INTERVAL_METHOD,
                             "reference_composition": reference_composition,
                             "species_basis": track_summary[0].get("ranking_species_basis", "") if track_summary else "",
                             "min_species_clusters": design.min_species_clusters})
@@ -1468,7 +1497,7 @@ def main():
                 "n_isolates", "n_plasmids"])
     write_rows(design_rows, args.out_prefix + ".headline_design.tsv",
                ["analysis_track", "task", "ranking_metric", "reference_basis", "species_basis",
-                "min_species_clusters", "primary_status", "reference_independence_rule", "reference_composition"])
+                "min_species_clusters", "primary_status", "reference_independence_rule", "reference_composition", "interval_method"])
     # Reference-independence sensitivity: how much each tool's apparent performance depends on how its
     # references were built (independent vs polished with the benchmark's own reads). Descriptive.
     if independence_rows:
