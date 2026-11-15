@@ -1298,21 +1298,19 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
 
 METRIC_LABELS = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level F1",
                  "sample_cprr": "isolate-level CPRR"}
-TASK_LABELS = {"reconstruction": "Plasmid binning and reconstruction", "reassembly": "Plasmid sequence reassembly",
-               "classification": "Plasmid classification"}
+TASK_LABELS = {"binning_reconstruction": "Plasmid binning (reconstruction)", "sequence_reassembly": "Plasmid sequence reassembly",
+               "classification": "Plasmid classification",
+               "reconstruction": "Plasmid reconstruction (older results: binning and reassembly were one task)"}
 TASK_BLURBS = {
-    "reconstruction": ("Binning-capable tools. On the short-read track they are ranked by length-weighted "
-                       "binning F1 (primary endpoint): bases placed in the correct one-to-one matched bin, with "
-                       "CPRR, the share of truth plasmids reconstructed correctly, as the key secondary endpoint. "
-                       "On the long-read and hybrid tracks, whose tools aim to close whole plasmids, the "
-                       "primary endpoint is isolate-level CPRR and binning F1 is secondary. The CPRR cell also "
-                       "gives the per-isolate rate and the area under the CPRR curve over thresholds 0.80-0.99. "
-                       "Binning F1 measures grouping into plasmids; it is not complete plasmid reconstruction, which is CPRR."),
-    "reassembly": ("Tools that reassemble plasmid-enriched sequence without saying which pieces form one plasmid "
-                   "(for example plasmidSPAdes). They are ranked by base-level sequence-recovery F1, on their own: "
-                   "they are neither contig classifiers nor binners, so they are not ranked against either."),
-    "classification": ("Classifier-only tools, ranked by base-level plasmid/chromosome F1. They are not scored "
-                       "on binning, a task they do not attempt."),
+    "binning_reconstruction": ("Tools that group the contigs of an existing assembly into individual plasmids. Ranked by length-weighted binning F1 (primary "
+                               "endpoint): bases placed in the correct one-to-one matched bin, with CPRR, the share of truth plasmids reconstructed correctly, "
+                               "as the key secondary endpoint. The CPRR cell also gives the per-isolate rate and the area under the CPRR curve over thresholds 0.80-0.99."),
+    "sequence_reassembly": ("Tools that produce plasmid sequences of their own (new records, not the input contigs). Ranked by isolate-level CPRR (primary "
+                            "endpoint): the share of truth plasmids reconstructed completely and accurately, with binning F1 as the secondary endpoint. From short reads "
+                            "complete recovery is rare, so expect a floor effect there."),
+    "classification": ("Tools that label sequence as plasmid-derived or not, ranked by base-level plasmid/chromosome F1. They are not scored "
+                       "on binning or reassembly, tasks they do not attempt."),
+    "reconstruction": ("Results written before binning and reassembly were separated: every bin-scoring tool was ranked together."),
 }
 
 
@@ -1328,9 +1326,9 @@ def headline_label(row):
 
 
 def primary_task_rows(rows):
-    """Rows of the primary task present (reconstruction first), else all rows."""
+    """Rows of the primary task present (binning first, then reassembly, then classification), else all rows."""
     tasks = [row.get("task") or "" for row in rows]
-    for task in ("reconstruction", "reassembly", "classification"):
+    for task in ("binning_reconstruction", "sequence_reassembly", "reconstruction", "classification"):
         if task in tasks:
             return [row for row in rows if (row.get("task") or "") == task]
     return rows
@@ -1392,7 +1390,7 @@ def headline_design_section(out_dir):
         return "" if number_value is None else f"{number_value:+.{digits}f}" if digits else f"{int(number_value):+d}"
     independence_rows = "".join(
         f"<tr><td>{esc(r.get('analysis_track'))} / {esc(TASK_LABELS.get(r.get('task'), r.get('task')))}</td><td>{esc(r.get('tool'))}</td>"
-        f"<td title='{esc(r.get('description'))}'>{esc((r.get('reference_group') or '').replace('_', ' '))}</td>"
+        f"<td>{esc((r.get('evaluation_independence') or '').replace('_', ' '))}</td>"
         f"<td>{esc(r.get('n_samples'))}</td><td>{esc(r.get('n_clusters'))}</td><td>{esc(r.get('mean_metric'))}</td>"
         f"<td>{esc(r.get('rank_in_group'))}</td><td>{esc(signed(r.get('difference_vs_independent')))}</td>"
         f"<td>{esc(signed(r.get('rank_change_vs_independent'), 0))}</td></tr>"
@@ -1400,11 +1398,13 @@ def headline_design_section(out_dir):
     tier_counts = Counter(r.get("reference_tier") for r in provenance)
     provenance_rows = "".join(
         f"<tr><td>{esc(r.get('sample'))}</td><td>{esc(r.get('reference_tier'))}</td>"
+        f"<td>{esc((r.get('reference_quality') or '').replace('_', ' ') or 'not recorded')}</td>"
+        f"<td title='{esc(r.get('independence_reason') or '')}'>{esc((r.get('evaluation_independence') or '').replace('_', ' ') or 'not recorded')}</td>"
         f"<td>{esc(r.get('truth_assembly_strategy'))}</td><td>{esc(r.get('truth_polish_reads'))}</td>"
         f"<td>{esc(r.get('base_level_metrics_valid'))}</td><td>{esc(r.get('labels_evidence_checked'))}</td>"
         f"<td>{esc(r.get('ambiguous_plasmids') or '0')}</td><td>{esc(r.get('tier_reason'))}</td>"
         f"<td title='{esc(r.get('evidence_sources') or 'not recorded')}'>{esc(provenance_evidence(r))}</td></tr>"
-        for r in provenance) or "<tr><td colspan='9'>No provenance table.</td></tr>"
+        for r in provenance) or "<tr><td colspan='11'>No provenance table.</td></tr>"
     species_rows = "".join(
         f"<tr><td>{esc(r.get('analysis_track'))} / {esc(r.get('task'))}</td><td>{esc(r.get('tool'))}</td>"
         f"<td><em>{esc(r.get('species'))}</em></td><td>{esc(r.get('n_samples'))}</td><td>{esc(r.get('n_clusters'))}</td>"
@@ -1426,13 +1426,15 @@ def headline_design_section(out_dir):
                            "No tool was scored on both headline-tier and tier-3 truth in this run.")
     return (
         "<section id='headline-design'><h2>Headline design and reference standard</h2>"
-        "<p class='lead'>Which samples and species the headline ranking rests on. Truth assemblies are graded: "
+        "<p class='lead'>Which samples and species the headline ranking rests on. Two separate questions are asked of each reference. "
+        "<strong>Reference quality</strong> (validated, partially validated, provisional) is the tier. <strong>Evaluation independence</strong> asks whether the reference is independent of the evidence the "
+        "benchmarked tools use: <em>independent</em> (long-read-first, polished with no reads or reads independent of the benchmark), <em>partially independent</em> (long-read-first structure, polished "
+        "with the benchmark's own reads), <em>dependent</em> (short-read-first hybrid) or <em>unknown</em>. The primary analysis needs a reference that is within the tier limit AND independent, from at "
+        "least the minimum number of independent clusters; dependent and unknown references never enter it. The tiers: "
         "<strong>Tier 1</strong> long-read-first truth independent of the benchmark reads with evidence-checked "
         "labels; <strong>Tier 2</strong> long-read-first truth that fails a Tier-1 condition (for example, "
         "polished with the benchmark's own Illumina reads, so identity-based criteria are not applied); "
-        "reference <strong>quality</strong> (the tier) and <strong>independence</strong> from the benchmark reads are recorded "
-        "separately, and by default a Tier 2 reference polished with the benchmark's own reads is a dependent reference: it is "
-        "in the reference-independence sensitivity analysis, not the primary analysis (HEADLINE_REFERENCE_INDEPENDENCE); "
+        "a Tier 2 reference polished with the benchmark's own reads is partially independent, so it is in the sensitivity analyses, not the primary analysis (HEADLINE_INDEPENDENCE); "
         "<strong>Tier 3</strong> short-read-first hybrid or unknown provenance, provisional and outside the "
         "headline. Replicons whose plasmid/chromosome label conflicts with marker, rRNA or long-read evidence are "
         "AMBIGUOUS and excluded from scoring. The ranking score averages per-species means over species with "
@@ -1444,17 +1446,16 @@ def headline_design_section(out_dir):
         + (", ".join(f"tier {esc(t)}: {n}" for t, n in sorted(tier_counts.items()) if t) or "none")
         + ". Derived values are heuristics from NCBI assembly metadata; set truth_assembly_strategy and "
         "truth_polish_reads in the sample sheet to override.</p>"
-        "<div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tier</th><th>Assembly strategy</th>"
+        "<div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tier</th><th>Reference quality</th><th>Evaluation independence</th><th>Assembly strategy</th>"
         "<th>Polishing reads</th><th>Identity criteria valid</th><th>Labels evidence-checked</th>"
         f"<th>AMBIGUOUS plasmids</th><th>Reason</th><th>Evidence recorded</th></tr></thead><tbody>{provenance_rows}</tbody></table></div>"
         "<h3>Reference-tier sensitivity</h3><div class='chart-card'>" + chart + "</div>"
-        "<h3>Reference-independence sensitivity</h3><p class='muted'>How much each tool's apparent performance depends on how its "
-        "references were built: the same tools on references independent of the benchmark reads, on references polished with "
-        "the benchmark's own reads, and on references whose independence is not recorded, with the difference in mean and rank "
-        "from the independent group. <strong>Descriptive only: it never changes the leaderboard.</strong> Each mean is over the "
-        "tool's own scored samples in the group, so read it with the sample and cluster counts.</p>"
-        "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th><th>Reference group</th><th>Samples</th>"
-        "<th>Independent clusters</th><th>Mean ranking metric</th><th>Rank in group</th><th>Difference from independent</th>"
+        "<h3>Reference-independence sensitivity</h3><p class='muted'>How much each tool's apparent performance depends on how its references were built: the same tools on references of "
+        "each evaluation-independence class, with the difference in mean and rank from the independent class. The primary analysis uses the independent class only; partially independent "
+        "references are sensitivity 1 and every reference is sensitivity 2. <strong>Descriptive only: it never changes the leaderboard.</strong> Each mean is over the tool's own scored "
+        "samples in the class, so read it with the sample and cluster counts.</p>"
+        "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th><th>Evaluation independence</th><th>Samples</th>"
+        "<th>Independent clusters</th><th>Mean ranking metric</th><th>Rank in class</th><th>Difference from independent</th>"
         f"<th>Rank change from independent</th></tr></thead><tbody>{independence_rows}</tbody></table></div>"
         "<h3>Species balance</h3><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th>"
         "<th>Tool</th><th>Species</th><th>Samples</th><th>Independent clusters</th><th>Mean ranking metric</th>"
@@ -2748,11 +2749,14 @@ def main():
         feature_rows, evidence_verdict)
     # Recommendations are made for ONE task. Choosing a winner across the reconstruction and classification tasks compared tools that the rest of the report
     # never ranks against each other (a re-assembler could be "recommended overall" above a binner). Older results have no task column: no sentence then.
+    recommended_task = next((row.get("task") for row in recommendations if row.get("task") in TASK_LABELS), "")
     recommendation_task_note = (
-        "<p class='lead'><strong>One task.</strong> Recommendations cover the reconstruction task only: tools that group contigs into plasmid bins. "
-        "Classifiers and re-assemblers are ranked on their own task in the leaderboard and are never compared with reconstruction tools here, so the method "
-        "recommended overall is a reconstruction method, like the headline result.</p>"
-        if any(row.get("task") == "reconstruction" for row in recommendations) else "")
+        "<p class='lead'><strong>One task.</strong> Recommendations cover the " + esc(TASK_LABELS[recommended_task].split(" (")[0].lower()) + " task only: "
+        + {"binning_reconstruction": "tools that group the contigs of an existing assembly into plasmid bins", "sequence_reassembly": "tools that produce plasmid sequences of their own",
+           "classification": "tools that label sequence as plasmid-derived or not", "reconstruction": "tools that were ranked together as one reconstruction task"}[recommended_task]
+        + ". The other tasks are ranked on their own in the leaderboard and are never compared with these tools here, so the method recommended overall belongs to this task, "
+        "like the headline result.</p>"
+        if recommended_task else "")
 
     validation_rows = "".join(
         "<tr><td>{study}</td><td>{held}</td><td>{tool}</td><td>{train}</td><td>{f1}</td><td>{status}</td><td>{note}</td></tr>".format(

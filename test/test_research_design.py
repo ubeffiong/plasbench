@@ -147,8 +147,8 @@ def headline(ok):
                ("k1", "Klebsiella pneumoniae"), ("k2", "Klebsiella pneumoniae"), ("k3", "Klebsiella pneumoniae"),
                ("t3", "Escherichia coli"), ("z0", "Escherichia coli")]
     write("hsheet.tsv", "sample_id\torganism\tbioproject\n" + "".join(f"{s}\t{o}\tPRJ{s}\n" for s, o in samples))
-    write("hprov.tsv", "sample\treference_tier\tbase_level_metrics_valid\tambiguous_plasmids\n"
-                       + "".join(f"{s}\t{'3' if s == 't3' else '2'}\t{'yes' if s.startswith('e') else 'no'}\t"
+    write("hprov.tsv", "sample\treference_tier\tevaluation_independence\tbase_level_metrics_valid\tambiguous_plasmids\n"
+                       + "".join(f"{s}\t{'3' if s == 't3' else '2'}\t{'dependent' if s == 't3' else 'independent'}\t{'yes' if s.startswith('e') else 'no'}\t"
                                  f"{'1' if s == 'z0' else '0'}\n" for s, _ in samples))
     write("caps.tsv", "tool\tmethod_class\tbinning_capable\tanalysis_track\n"
                       "binner\tbinning\tyes\tshort_read\nbinner2\tbinning\tyes\tshort_read\n"
@@ -182,7 +182,7 @@ def headline(ok):
          "--headline-reference-independence", "any", "--out-prefix", "h"])
     board = {r["tool"]: r for r in read("h.leaderboard.tsv")}
     ok = check(ok, "tasks assigned from the capability registry",
-               board["binner"]["task"] == "reconstruction" and board["classy"]["task"] == "classification")
+               board["binner"]["task"] == "binning_reconstruction" and board["classy"]["task"] == "classification")
     ok = check(ok, "reconstruction ranked by lw_bin_f1 (not base F1)",
                board["binner"]["rank"] == "1" and board["binner"]["ranking_metric"] == "lw_bin_f1",
                f"(binner {board['binner']['ranking_score']}, binner2 {board['binner2']['ranking_score']})")

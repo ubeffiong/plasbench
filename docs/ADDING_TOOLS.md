@@ -51,7 +51,7 @@ change a benchmark. Comments start with `#` or `;`, also at the end of a line.
 |---|---|
 | `name` | **required.** The tool's id in every table: lower-case letters, digits and `_`. |
 | `display_name` | The name readers see in the report (default: `name`). |
-| `task` | **required.** `reconstruction` (groups contigs into plasmids: bin metrics, CPRR, ranked by length-weighted binning F1), `reassembly` (writes plasmid-enriched sequence without saying which pieces form one plasmid, like plasmidSPAdes: ranked on its own by base-level sequence-recovery F1) or `classification` (labels contigs plasmid/chromosome: ranked by base-level F1). Choose by what the tool's output says, not by how it works inside. |
+| `task` | **required.** `binning_reconstruction` (groups the contigs of an existing assembly into plasmids: bin metrics, ranked by length-weighted binning F1), `sequence_reassembly` (produces plasmid sequences of its own: bin metrics with each record as its own bin, ranked by isolate-level CPRR) or `classification` (labels contigs plasmid/chromosome: ranked by base-level F1). The old value `reconstruction` still means `binning_reconstruction`. |
 | `analysis_track` | **required.** `short_read`, `long_read` or `hybrid`. Tools are only ranked within their track. |
 | `requires_independent_long_read_truth` | `auto` (default: yes for long_read/hybrid), `yes` or `no`. When yes, a sample whose truth was built from the same long reads is skipped unless the sample sheet says `truth_independent_of_long_reads=yes` (or `<NAME>_ALLOW_CIRCULAR_TRUTH=1`). |
 | `method_class`, `description`, `citation`, `url` | Shown in the registry, the run manifest and the report. |
@@ -126,7 +126,7 @@ Contig ids must match the assembly's. `contig_id_from = first_token` keeps the f
 
 For `contig_labels`, a contig is called plasmid when its `label_column` value is in `plasmid_values`; without a label
 column, when its score is at least `threshold` (default 0.5). A `score_column` (values in [0, 1]) also gives the tool
-a precision-recall curve and PR-AUC. A classifier (`task = classification`) gets no bins; a reconstruction tool
+a precision-recall curve and PR-AUC. A classifier (`task = classification`) gets no bins; a binning or reassembly tool
 whose output is per-contig labels gets one bin per plasmid contig.
 
 ## What PlasBench records

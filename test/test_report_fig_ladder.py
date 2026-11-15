@@ -103,7 +103,7 @@ def test_svg(p):
         assert "Binning is not reconstruction" in svg and "Circular is not correct" in svg and "3D appearance is illustrative" in svg
         assert "NaN" not in svg and "inf" not in re.sub(r"[A-Za-z]inf|inf[A-Za-z]", "", svg)
         assert root.tag.endswith("svg")
-    assert "0 of 10" in L.render_svg(L.live_lines(p)) and "not computable" not in L.render_svg(L.live_lines(p))
+    assert "0 of 12" in L.render_svg(L.live_lines(p)) and "not computable" not in L.render_svg(L.live_lines(p))
     committed = os.path.join(ROOT, "docs", "images", "reconstruction_ladder.svg")
     with open(committed, encoding="utf-8", newline="") as h:
         assert h.read() == L.render_svg() + "\n", "docs/images/reconstruction_ladder.svg is out of date: run python python/report_fig_ladder.py --out docs/images/reconstruction_ladder.svg"
@@ -193,7 +193,9 @@ def main():
         return
     p = test_payload(d_demo)
     got = {x["id"]: (x["num"], x["den"]) for x in p["distinctions"]}
-    assert got == {1: (0, 10), 2: (5, 11)}, got                       # the bundled demo, counted by hand from structural_calls.json
+    # the bundled demo, counted by hand from structural_calls.json; distinction 1 counts perfect clean bins, and the demo's reassembler (spades_like) is bin-scored since the
+    # three-task split (its records are its own bins), which adds its two perfect plasmids: 10 -> 12
+    assert got == {1: (0, 12), 2: (5, 11)}, got
     test_svg(p)
     test_node()
     size = test_section(d_demo)

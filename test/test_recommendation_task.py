@@ -49,15 +49,15 @@ def main():
         recs_all, _ = som.write_recommendations(every, statuses, 3, tmp / "all.tsv", 1, 0.1)
         check("across both tasks the classifier wins (the old behaviour, still available as --task all)", recs_all[("overall", "all")] == "clsB", recs_all.get(("overall", "all")))
         only = [r for r in every if r["tool"] in som.reconstruction_tools(registry, {r["tool"] for r in every})]
-        recs, written = som.write_recommendations(only, statuses, 3, tmp / "rec.tsv", 1, 0.1, task="reconstruction")
+        recs, written = som.write_recommendations(only, statuses, 3, tmp / "rec.tsv", 1, 0.1, task="binning_reconstruction")
         check("over the reconstruction task the binning tool is recommended", recs[("overall", "all")] == "binA", recs.get(("overall", "all")))
         check("the classifier is not in the recommendation at all", all(r["tool"] == "binA" for r in written))
-        check("every row carries its task", all(r["task"] == "reconstruction" for r in written))
+        check("every row carries its task", all(r["task"] == "binning_reconstruction" for r in written))
         with open(tmp / "rec.tsv", newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle, delimiter="\t")
             first = next(reader)
             header = reader.fieldnames
-        check("the TSV has a task column, last", header[-1] == "task" and first["task"] == "reconstruction", header[-3:])
+        check("the TSV has a task column, last", header[-1] == "task" and first["task"] == "binning_reconstruction", header[-3:])
 
     print("the report")
     report = ROOT / "results_demo" / "benchmark.report.html"
@@ -68,7 +68,7 @@ def main():
         recs_tsv = ROOT / "results_demo" / "benchmark.recommendations.tsv"
         with open(recs_tsv, newline="", encoding="utf-8") as handle:
             demo = list(csv.DictReader(handle, delimiter="\t"))
-        check("the demo recommendations are reconstruction-only", demo and all(r.get("task") == "reconstruction" for r in demo), {r.get("task") for r in demo})
+        check("the demo recommendations are for the binning-reconstruction task only (the reassembler and the classifiers are other tasks)", demo and all(r.get("task") == "binning_reconstruction" for r in demo), {r.get("task") for r in demo})
         check("the report says so", "<strong>One task.</strong>" in text)
         check("the overall recommended method is a reconstruction tool (not the classification leader)",
               [r["tool"] for r in demo if r["scope"] == "overall" and r["recommendation"] == "primary"] == ["mob_like"])

@@ -631,19 +631,19 @@ endpoint would cost power (`headline_design.ranking_metric()`; `config/prereg.ts
   adds pooled CPRR per reference tier, so a tool cannot look strong only on small,
   simple plasmids.
 
-**Task tracks.** Each tool declares its evaluation task in `config/tool_capabilities.tsv`
-(`evaluation_task`, with `output_unit`), from its documented output contract:
-`binning_reconstruction` (sequence grouped into individual plasmids: bins, or one plasmid
-per record) is ranked on the reconstruction track by `lw_bin_f1` (CPRR on the long-read and
-hybrid tracks); `sequence_reassembly` (plasmid-enriched sequence that does not say which
-pieces form one plasmid, e.g. plasmidSPAdes) is ranked on its own reassembly track by
-base-level sequence-recovery F1; `classification` (labels on the input contigs, e.g.
-Platon, geNomad) by base-level F1. The task is never inferred from `binning_capable`
-alone (a row without the column falls back to it and to `method_class`). No tool is scored
-zero on a task it does not attempt, the tracks are never pooled, and each metric in
-`config/metrics.tsv` lists the tasks it can score. Binning F1 measures grouping, not
-complete reconstruction (that is CPRR); every leaderboard says which question its ranking
-metric answers. Input tracks (short-read, long-read, hybrid) stay separate as before.
+**Evaluation tasks.** Three different questions, each ranked on its own and never against another. The task of a tool is the `evaluation_task` of its row in
+`config/tool_capabilities.tsv` (`binning_capable` no longer decides it; it only says whether the tool's output is a set of per-plasmid units that the bin metrics can score).
+
+| Task | Question | Tools (examples) | Primary endpoint |
+|---|---|---|---|
+| `classification` | Is this sequence plasmid-derived? | Platon, geNomad, PLASMe, RFPlasmid, PlaScope | base-level F1 (also MCC, precision, recall) |
+| `binning_reconstruction` | Are the existing contigs grouped into the right plasmids? | MOB-recon, gplas2, PlasBin-flow, Flye + MOB-recon | length-weighted binning F1 (also bin precision and recall) |
+| `sequence_reassembly` | Is the plasmid sequence itself produced, completely and accurately? | plasmidSPAdes, Plassembler, Hybracter, plsmd | isolate-level CPRR (also completeness, identity, plasmid-level recovery) |
+
+A tool is never scored zero on a task it does not attempt, and the tasks are never pooled. Before this change (v0.4.0 and earlier) the task was decided by `binning_capable` alone: plasmidSPAdes, which
+reassembles, was ranked as a classifier, and Plassembler, Hybracter and plsmd, which also reassemble, shared one reconstruction track with the binners. A reassembler's records are
+its own bins (`adapt_plasmidspades.sh` writes each contig as its own bin), so it is bin-scored and gets a CPRR. From short reads complete recovery is rare, so a reassembler's CPRR
+can floor out there; binning F1 is reported beside it. Input tracks (short-read, long-read, hybrid) stay separate as before.
 
 ### Reference standard
 
@@ -681,6 +681,13 @@ tier. When no sample reaches tier 2, the **primary analysis is unavailable**: th
 computed on all samples but are labelled provisional (`primary_status` and `population` in the leaderboard,
 `primary_status` in `benchmark.headline_design.tsv`, a banner in the report) and are not the headline.
 `ALLOW_PRIMARY_FALLBACK=1` keeps them as the headline with the warning.
+
+**Statistics validation** (`simulate_validation.py`). Scenarios: balanced, unbalanced, dominant and heavy studies; within-study correlation; missing outputs and resource failures (per isolate and whole studies); a dominant species with the stratified functions; Holm over 6 and 15 comparisons. Results are grouped by the number of independent studies; `by_studies()` marks a number 'supported' only for a full run with no shortfall, and `overall_status()` keeps the procedures provisional otherwise. A full-mode simulation (75 scenario rows, 1,000 replicates each, production resampling counts, seed 20261114; results in docs/stats_validation/) found that the paired tests (exact sign-flip up to 12 studies, Monte Carlo above) and the Holm adjustment are calibrated in every structure simulated, and that the percentile cluster-bootstrap intervals are NOT: coverage of the nominal 95% was 82-85% at 5-6 studies, 87-92% at 8-20 studies, 94% at 30 balanced studies, and as low as 74% with one dominant species. Intervals are therefore optimistic (too narrow) at every number of studies tested below 30, and the statistical procedures stay provisional.
+
+**Reference quality and evaluation independence** (`truth_provenance.py`; separate columns `reference_quality` and `evaluation_independence`, with `independence_reason`).
+Quality is the tier (validated / partially validated / provisional). Independence is derived from the assembly strategy and the polishing reads: independent = long-read-only or
+long-read-first with polishing none or independent; partially independent = long-read-first polished with the benchmark's reads (or unrecorded); dependent = short-read-first
+hybrid; unknown = unrecorded strategy. The primary analysis requires both: its **reference quality** is within the tier limit (`HEADLINE_MAX_REFERENCE_TIER`, default 2: validated or partially validated) AND its **evaluation independence** is `independent` (`HEADLINE_INDEPENDENCE`). Independent means long-read-only or long-read-first truth polished with no reads or reads independent of the benchmark; partially independent is long-read-first truth polished with the benchmark's own reads (or unrecorded); dependent is a short-read-first hybrid; unknown is an unrecorded strategy, never assumed independent. The qualifying references must come from at least `HEADLINE_MIN_CLUSTERS` (default 5, the interval minimum) independent clusters (BioProjects or clonal groups), counted over the qualifying references only. Sensitivity analysis 1 adds partially independent references; sensitivity analysis 2 uses every reference; dependent and unknown references never enter the primary analysis. If the primary analysis is unavailable the ranking is shown as provisional, never as the headline. `benchmark.reference_independence.tsv` gives each tool's ranking metric per class; a provenance table written before the column existed is classified from its strategy and polishing columns.
 
 **Evidence-based labels** (`python/label_truth_evidence.py`, stage 2). Source labels
 are confirmed with evidence, never assigned by size:
@@ -1140,7 +1147,8 @@ in GC between the length-weighted 10th and 90th percentiles. Advisory: stage 8 w
 recommending; stage 6 writes it for every assembly so its warning can be scored.
 
 **AMR placement** (`score_amr_placement.py`). Per curated gene copy (matched by position, ≥ 90% covered
-by one predicted record): correct or wrong plasmid via one-to-one bin-to-plasmid matching, shared or
+by one predicted record): correct or wrong plasmid (attribution depends on the tool's evaluation task: a binner's bins are matched one-to-one with the plasmids, a classifier's or
+reassembler's records are each attributed to the plasmid they overlap most, so two contigs of one plasmid are both correct), shared or
 unassigned contig, or not recovered; level 1 asks whether the matched plasmid shares a replicon type.
 Summarised per gene class from `config/amr_gene_classes.tsv` (unmatched genes: `other`).
 

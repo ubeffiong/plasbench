@@ -269,7 +269,7 @@ def convert(tool, output, contigs, out_fasta):
         run_adapter(tool, str(output), contigs, out_fasta)
         prov["adapter"] = tool.get("output", "adapter")
         return prov
-    reconstruction = tool.task == "reconstruction"
+    reconstruction = tool.task in ("binning_reconstruction", "sequence_reassembly")
     if mapping.format == "contig_bins":
         records, bins, scores = from_contig_bins(output, read_assembly(contigs), mapping, prov)
     elif mapping.format == "contig_labels":

@@ -519,7 +519,7 @@ def main():
                     handle.write(f">{record}\n")
                     for start in range(0, len(sequence), 60):
                         handle.write(sequence[start:start + 60] + "\n")
-            if tool in BINNERS:
+            if tool in BINNERS or tool == "spades_like":   # a reassembler's records are its own bins (as adapt_plasmidspades.sh writes them), so it is bin-scored for CPRR
                 # One bin per contig for the strong binner; the splitter puts two
                 # contigs in one bin so a merge edge appears in the flow.
                 membership = []

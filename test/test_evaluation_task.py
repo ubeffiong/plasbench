@@ -37,23 +37,22 @@ def main():
     check("every row has a valid evaluation_task",
           all(r.get("evaluation_task") in hd.EVALUATION_TASKS for r in rows),
           [r["tool"] for r in rows if r.get("evaluation_task") not in hd.EVALUATION_TASKS])
-    check("binning_reconstruction tools declare bins",
-          all(r["binning_capable"] == "yes" for r in rows if r["evaluation_task"] == "binning_reconstruction"))
-    check("sequence_reassembly and classification tools declare none",
-          all(r["binning_capable"] == "no" for r in rows if r["evaluation_task"] != "binning_reconstruction"))
+    check("binning_reconstruction and sequence_reassembly tools are bin-scored (a reassembler's records are its own bins)",
+          all(r["binning_capable"] == "yes" for r in rows if r["evaluation_task"] != "classification"))
+    check("classification tools declare no bins", all(r["binning_capable"] == "no" for r in rows if r["evaluation_task"] == "classification"))
     check("every row says what its output unit is",
           all(r.get("output_unit") in ("plasmid_bins", "plasmid_records", "enriched_contigs", "contig_labels") for r in rows))
     by_tool = {r["tool"]: r for r in rows}
     check("plasmidSPAdes is a reassembler, not a classifier", hd.evaluation_task(by_tool["plasmidspades"]) == hd.TASK_REASSEMBLY)
     check("Platon is a classifier", hd.evaluation_task(by_tool["platon"]) == hd.TASK_CLASSIFICATION)
     check("MOB-recon is binning and reconstruction", hd.evaluation_task(by_tool["mob_recon"]) == hd.TASK_RECONSTRUCTION)
-    check("a one-plasmid-per-record tool (Plassembler) is reconstruction",
-          hd.evaluation_task(by_tool["plassembler"]) == hd.TASK_RECONSTRUCTION and by_tool["plassembler"]["output_unit"] == "plasmid_records")
+    check("a one-plasmid-per-record tool (Plassembler) is sequence reassembly and says its output unit",
+          hd.evaluation_task(by_tool["plassembler"]) == hd.TASK_REASSEMBLY and by_tool["plassembler"]["output_unit"] == "plasmid_records")
 
     print("rows without the column (older registry, user tool)")
     check("binning_capable=yes -> reconstruction", hd.evaluation_task({"binning_capable": "yes"}) == hd.TASK_RECONSTRUCTION)
-    check("reassembly class without bins -> reassembly",
-          hd.evaluation_task({"binning_capable": "no", "method_class": "reassembly"}) == hd.TASK_REASSEMBLY)
+    check("reassembly class that declares bins -> reassembly (bin-scored)",
+          hd.evaluation_task({"binning_capable": "yes", "method_class": "reassembly"}) == hd.TASK_REASSEMBLY)
     check("anything else -> classification", hd.evaluation_task({"binning_capable": "no", "method_class": "ml_classification"}) == hd.TASK_CLASSIFICATION)
     try:
         hd.evaluation_task({"tool": "x", "evaluation_task": "binning"})
@@ -67,7 +66,7 @@ def main():
         with open(caps, "w", encoding="utf-8") as fh:
             fh.write("tool\tmethod_class\tbinning_capable\tanalysis_track\tevaluation_task\n"
                      "binner\tbinning\tyes\tshort_read\tbinning_reconstruction\n"
-                     "reasm\treassembly\tno\tshort_read\tsequence_reassembly\n"
+                     "reasm\treassembly\tyes\tshort_read\tsequence_reassembly\n"
                      "clf\tclassification\tno\tshort_read\tclassification\n")
         design = hd.Design(capabilities=caps)
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -76,24 +75,26 @@ def main():
         for sample in ("s1", "s2"):
             for tool, f1 in (("binner", 0.9), ("reasm", 0.8), ("clf", 0.7)):
                 r = row(sample, tool, f1)
-                r["lw_bin_f1"] = 0.85 if tool == "binner" else None
+                r["lw_bin_f1"] = 0.85 if tool in ("binner", "reasm") else None
+                r["sample_cprr"] = 0.5 if tool == "reasm" else None
                 score_rows.append(r)
         check("design tasks", [design.task(t, score_rows) for t in ("binner", "reasm", "clf")]
               == [hd.TASK_RECONSTRUCTION, hd.TASK_REASSEMBLY, hd.TASK_CLASSIFICATION])
         groups = {(t, k) for t, k, *_ in ag.ranked_tracks(score_rows, status_counts(), design=design)}
-        check("three separate leaderboards", groups == {("short_read", "reconstruction"), ("short_read", "reassembly"),
+        check("three separate leaderboards", groups == {("short_read", "binning_reconstruction"), ("short_read", "sequence_reassembly"),
                                                        ("short_read", "classification")}, groups)
-        check("a reassembler is labelled by sequence recovery",
-              hd.metric_label(hd.TASK_REASSEMBLY, hd.ranking_metric("short_read", hd.TASK_REASSEMBLY)) == "base-level sequence-recovery F1")
+        check("a reassembler is ranked by isolate-level CPRR, a binner by binning F1, a classifier by base F1",
+              [hd.ranking_metric("short_read", t) for t in (hd.TASK_REASSEMBLY, hd.TASK_BINNING, hd.TASK_CLASSIFICATION)] == ["sample_cprr", "lw_bin_f1", "f1"])
 
     print("metrics say which tasks they can score")
     import metric_registry as mr
     metrics = {r["id"]: r for r in mr.load()}
     check("the registry's task vocabulary is the ranking's", set(mr.TASK_TYPES) == set(hd.TASKS))
-    check("binning metrics never apply to a reassembler or a classifier",
-          all(not mr.applies_to(metrics[m], t) for m in ("lw_bin_f1", "bin_f1", "cprr", "amr_prr") for t in ("reassembly", "classification")))
+    check("binning metrics apply to the bin-scored tasks (binning and reassembly) and never to a classifier",
+          all(mr.applies_to(metrics[m], t) for m in ("lw_bin_f1", "bin_f1", "cprr", "amr_prr") for t in ("reconstruction", "reassembly"))
+          and all(not mr.applies_to(metrics[m], "classification") for m in ("lw_bin_f1", "bin_f1", "cprr", "amr_prr")))
     check("base-level F1 applies to every task", all(mr.applies_to(metrics["base_f1"], t) for t in mr.TASK_TYPES))
-    check("AMR placement applies to every task (sequence attribution without bins)", mr.applies_to(metrics["amr_placement"], "reassembly"))
+    check("AMR placement applies to every task (sequence attribution for classifiers and reassemblers)", mr.applies_to(metrics["amr_placement"], "reassembly"))
     with tempfile.TemporaryDirectory() as d:
         bad = os.path.join(d, "metrics.tsv")
         with open(os.path.join(ROOT, "config", "metrics.tsv"), encoding="utf-8") as fh:

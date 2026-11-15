@@ -39,18 +39,24 @@ RUNGS = (("detection", "Detection", "Did the tool identify plasmid-derived seque
          ("biological_validity", "Biological validity", "Were resistance genes and other features kept, in the right plasmid?"))
 EFFICIENCY = ("efficiency", "Computational efficiency", "What the answer cost in time and memory, and how reliably it was produced.")
 RUNG_IDS = tuple(r[0] for r in RUNGS) + (EFFICIENCY[0],)
-TASK_TYPES = ("reconstruction", "reassembly", "classification")
+TASK_TYPES = ("binning_reconstruction", "sequence_reassembly", "classification")   # the registry's evaluation_task vocabulary
+# the shorter names used in config/metrics.tsv and by the second-review branch; both are accepted everywhere
+SHORT_TASKS = {"reconstruction": "binning_reconstruction", "reassembly": "sequence_reassembly"}
+
+
+def normalise_task(task):
+    return SHORT_TASKS.get(task, task)
 TOOL_TYPES = ("reconstruction", "classification", "all")   # the earlier single-value vocabulary, still accepted
 
 
 def tasks_of(value):
     """The tasks a tool_types value covers."""
-    return set(TASK_TYPES) if value == "all" else set(value.split("+"))
+    return set(TASK_TYPES) if value == "all" else {normalise_task(v) for v in value.split("+")}
 
 
 def applies_to(row, task):
     """True when the metric row can score a tool of this evaluation task."""
-    return task in tasks_of(row["tool_types"])
+    return normalise_task(task) in tasks_of(row["tool_types"])
 EVIDENCE = ("published_definition", "project_defined", "unvalidated", "not_available")
 EVIDENCE_LABEL = {"published_definition": "published definition", "project_defined": "defined by PlasBench", "unvalidated": "unvalidated estimate", "not_available": "not available"}
 
@@ -75,7 +81,7 @@ def load(path=None):
             if row[column] not in allowed:
                 raise ValueError(f"{path} row {number} ({name}): {column} must be one of {', '.join(allowed)} (got '{row[column]}')")
         types = row["tool_types"]
-        if types != "all" and (not types or not set(types.split("+")) <= set(TASK_TYPES) or len(types.split("+")) != len(set(types.split("+")))):
+        if types != "all" and (not types or not {normalise_task(v) for v in types.split("+")} <= set(TASK_TYPES) or len(types.split("+")) != len({normalise_task(v) for v in types.split("+")})):
             raise ValueError(f"{path} row {number} ({name}): tool_types must be 'all' or one or more of {', '.join(TASK_TYPES)} joined by '+' (got '{types}')")
         for column in ("source", "column", "shown_in", "limitations", "required_inputs"):
             if not row[column].strip():

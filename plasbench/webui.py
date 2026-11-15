@@ -221,8 +221,7 @@ class Project:
             enabled = local.get(flag) or os.environ.get(flag) or (flag_row["default"] if flag_row else None)
             out.append({
                 "tool": name, "display": display_tool_name(name), "source": row.get("source") or ("demo" if name.endswith("_like") else "builtin"),
-                "task": {"binning_reconstruction": "reconstruction", "sequence_reassembly": "reassembly", "classification": "classification"}.get(
-                    row.get("evaluation_task") or "", "reconstruction" if row.get("binning_capable") == "yes" else "classification"),
+                "task": row.get("evaluation_task") or ("binning_reconstruction" if row.get("binning_capable") == "yes" else "classification"),
                 "track": row.get("analysis_track"), "method_class": row.get("method_class"),
                 "input": row.get("primary_input"), "description": row.get("description", ""),
                 "profile": inst.get("profile", ""), "automated": inst.get("automated", ""),

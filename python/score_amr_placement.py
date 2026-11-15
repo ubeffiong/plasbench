@@ -41,6 +41,14 @@ reference, its predicted FASTA and, when it bins, its bins TSV. Per gene copy:
 Gene class comes from config/amr_gene_classes.tsv (prefix match on gene_name;
 unmatched genes are "other").
 
+How a predicted unit is attributed to a plasmid depends on what the tool outputs (the registry's evaluation_task; --task):
+  binning_reconstruction   ONE-TO-ONE: each bin is matched to at most one plasmid and each plasmid to at most one bin (maximum weight over aligned bases). Two bins that both hold
+                           pieces of one plasmid cannot both be that plasmid: the plasmid is fragmented, and the bin that lost the matching is wrong for its genes.
+  classification,          MANY-TO-ONE: each predicted record is attributed to the plasmid it overlaps most, so two contigs that each carry one resistance gene of the same plasmid
+  sequence_reassembly      are both correctly attributed. That says which plasmid the evidence points at for each gene; it is NOT evidence that the tool linked the genes or reconstructed
+                           the plasmid. Forcing one record per plasmid on these tools (as one-to-one matching does) would call the second correct contig wrong and understate their gene recovery.
+AMR-PRR and the co-localisation of genes are only defined for tools whose output supports plasmid-level reconstruction (binning and reassembly); a classifier gets neither.
+
 Context (plan B4), per gene copy and per plasmid, reported beside the placement and never ranking a tool:
   flank context   share of the +-AMR_FLANK_BP (1000) flanks of the copy that the SAME covering record also covers (clipped at the plasmid ends):
                   was the gene recovered with its surroundings, or as a fragment? Blank when the copy was not recovered.
@@ -69,14 +77,14 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import score_bins  # noqa: E402
 import score_plasmids as sp  # noqa: E402
+import tool_capabilities as tc  # noqa: E402
 
 GENE_FIELDS = ["sample", "tool", "copy_id", "gene_name", "gene_class", "sequence_id", "start", "end",
                "covering_record", "assigned_bin", "matched_plasmid", "placement", "replicon_type_correct", "flank_covered", "plasmid_cprr_correct",
-               "plasmid_cprr_correct_no_identity", "truth_evidence_tier", "attribution_mode"]
+               "plasmid_cprr_correct_no_identity", "truth_evidence_tier", "evaluation_task", "attribution", "attribution_mode"]
 SUMMARY_FIELDS = ["tool", "gene_class", "n_gene_copies", "n_recovered", "n_correct_plasmid", "n_wrong_plasmid",
                   "n_shared_contig", "n_unassigned_contig", "correct_plasmid_rate", "replicon_type_correct_rate",
-                  "n_samples", "n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate", "draft_truth_copies",
-                  "attribution_mode"]
+                  "n_samples", "n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate", "draft_truth_copies", "evaluation_task", "attribution_mode"]
 DEFAULT_CLASSES = Path(__file__).resolve().parents[1] / "config" / "amr_gene_classes.tsv"
 
 
@@ -127,6 +135,23 @@ def replicon_types(features):
     return types
 
 
+ONE_TO_ONE_TASKS = ("binning_reconstruction",)
+
+
+def attribute_units(overlaps, plasmids, task):
+    """{unit: plasmid}: which plasmid each predicted unit (a bin, or a record for a tool that does not bin) is attributed to, by the rule of the tool's task (see the module docstring).
+
+    overlaps: {(unit, plasmid): aligned bases}. One-to-one for binning (a plasmid goes to one bin); many-to-one for the others (a unit goes to the plasmid it overlaps most, ties by name)."""
+    units = sorted({u for u, _ in overlaps})
+    if task in ONE_TO_ONE_TASKS:
+        return {b: p for b, p, _ in score_bins.maximum_weight(dict(overlaps), units, sorted(plasmids))}
+    best = {}
+    for (unit, plasmid), bp in sorted(overlaps.items()):
+        if bp > 0 and (unit not in best or bp > best[unit][1]):
+            best[unit] = (plasmid, bp)
+    return {unit: plasmid for unit, (plasmid, _bp) in best.items()}
+
+
 def cmd_score(args):
     truth, _, _ = sp.read_truth(args.truth)
     amr = read_tsv(args.amr_truth)
@@ -146,20 +171,24 @@ def cmd_score(args):
         sys.stderr.write(f"[score_amr_placement] WARNING: {args.sample}: the AMR truth contains auto-derived DRAFT rows (evidence_tier=auto_derived), not curated truth: review the draft and "
                          "promote it (plasbench promote-amr-truth) instead of copying it to truth_amr.tsv.\n")
 
-    mode = "bin_matching" if membership else "contig_attribution"
+    # Unit (bin, or record) -> plasmid, by the rule of the tool's task: one-to-one for a binner, best plasmid per record for a classifier or a reassembler.
+    task = tc.LEGACY_TASKS.get(getattr(args, "task", "binning_reconstruction"), getattr(args, "task", "binning_reconstruction"))
+    overlaps = defaultdict(int)
+    for target, intervals in covered_by_query.items():
+        if target not in plasmids:
+            continue
+        for query, start, end in intervals:
+            overlaps[(membership.get(query, query), target)] += max(0, end - start)
+    # bin_matching: a binner with bins, matched one-to-one. contig_attribution: a classifier or reassembler (or a binner that wrote no bins): each record is attributed to the truth sequence
+    # (plasmid or chromosome) it aligns to most, many records may share one plasmid, and a record that is mostly chromosome is wrong for a plasmid gene.
+    mode = "bin_matching" if task in ONE_TO_ONE_TASKS and membership else "contig_attribution"
     if mode == "bin_matching":
-        # Bin -> plasmid by maximum-weight one-to-one matching over aligned bases.
-        overlaps = defaultdict(int)
-        for target, intervals in covered_by_query.items():
-            if target not in plasmids:
-                continue
-            for query, start, end in intervals:
-                overlaps[(membership.get(query, query), target)] += max(0, end - start)
-        bins = sorted({b for b, _ in overlaps})
-        matched = {b: p for b, p, _ in score_bins.maximum_weight(dict(overlaps), bins, sorted(plasmids))}
+        matched = attribute_units(overlaps, plasmids, task)
     else:
         matched = dominant_targets(covered_by_query)
-        cprr, cprr_no_identity = {}, {}   # no plasmid-level reconstruction to judge: AMR-PRR is not applicable
+    attribution = "one_to_one_bin" if mode == "bin_matching" else "best_plasmid_per_record"
+    if mode == "contig_attribution" and task != "sequence_reassembly":
+        cprr, cprr_no_identity = {}, {}   # no plasmid-level reconstruction to judge (a classifier, or a binner that wrote no bins): AMR-PRR is not applicable
 
     out = []
     for row in amr:
@@ -175,7 +204,7 @@ def cmd_score(args):
                   "sequence_id": sid, "start": start, "end": end, "covering_record": "", "assigned_bin": "",
                   "matched_plasmid": "", "placement": "not_recovered", "replicon_type_correct": "", "flank_covered": "",
                   "plasmid_cprr_correct": cprr.get(sid, ""), "plasmid_cprr_correct_no_identity": cprr_no_identity.get(sid, ""),
-                  "truth_evidence_tier": (row.get("evidence_tier") or "").strip(), "attribution_mode": mode}
+                  "truth_evidence_tier": (row.get("evidence_tier") or "").strip(), "evaluation_task": task, "attribution": attribution, "attribution_mode": mode}
         if best and best_bp / length >= args.min_gene_coverage:
             # contig_attribution: the record is attributed on its own; there is no bin, so no co-localisation claim
             bin_id = membership.get(best, best) if mode == "bin_matching" else ""
@@ -239,6 +268,15 @@ def context(items, invalid_identity=frozenset()):
             f"{sum(flanks) / len(flanks):.4f}" if flanks else "")
 
 
+def summary_context(items, invalid_identity=frozenset()):
+    """The context columns of one summary row. AMR-PRR and the pair co-localisation are blank for a classifier: its records are not plasmid reconstructions, so
+    'these genes were kept together' and 'the plasmid was reconstructed' are not claims it makes. Its gene attribution and flank context are still reported."""
+    values = dict(zip(("n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate"), context(items, invalid_identity)))
+    if (items[0].get("evaluation_task") or "binning_reconstruction") == "classification":
+        values.update(amr_prr="", n_pairs="", n_colocalised_pairs="", colocalisation_rate="")
+    return values
+
+
 def summarise(rows, invalid_identity=frozenset()):
     groups = defaultdict(list)
     for row in rows:
@@ -258,9 +296,9 @@ def summarise(rows, invalid_identity=frozenset()):
                     "correct_plasmid_rate": fmt(sum(r["placement"] == "correct_plasmid" for r in decided), len(items)),
                     "replicon_type_correct_rate": fmt(sum(r["replicon_type_correct"] == "yes" for r in typed), len(typed)),
                     "n_samples": len({r["sample"] for r in items}),
-                    **dict(zip(("n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate"),
-                               context(items, invalid_identity))),
+                    **summary_context(items, invalid_identity),
                     "draft_truth_copies": sum(1 for r in items if (r.get("truth_evidence_tier") or "") == "auto_derived"),
+                    "evaluation_task": items[0].get("evaluation_task") or "binning_reconstruction",
                     "attribution_mode": "/".join(sorted({r.get("attribution_mode") or "bin_matching" for r in items}))})
     return out
 
@@ -291,6 +329,8 @@ def main():
     s.add_argument("--contig-labels", help="contig_classification.py labels (AMBIGUOUS/UNPLACED categories)")
     s.add_argument("--features", help="truth_features.tsv (replicon types, level 1)")
     s.add_argument("--gene-classes", default=str(DEFAULT_CLASSES))
+    s.add_argument("--task", choices=tc.EVALUATION_TASKS + tuple(tc.LEGACY_TASKS), default="binning_reconstruction",
+                   help="the tool's evaluation task (registry evaluation_task): binning is matched one-to-one, classification and reassembly attribute each record to the plasmid it overlaps most")
     s.add_argument("--cprr", help="the tool's <tool>.cprr.tsv (score_bins.py --cprr-out): which truth plasmids it reconstructed correctly (for AMR-PRR)")
     s.add_argument("--flank-bp", type=int, default=FLANK_BP, help="bases either side of a gene copy whose coverage is the flank context (env AMR_FLANK_BP, default 1000)")
     s.add_argument("--min-gene-coverage", type=float, default=0.90)

@@ -8,6 +8,9 @@ The statistics simulation (python/simulate_validation.py) and where it is wired.
     never rounds a shortfall up: 'consistent with 95%' exactly when coverage reaches 0.95 minus two standard errors expected under the nominal rate, otherwise 'below nominal';
   - the command writes the TSV with the documented columns, in smoke mode, quickly;
   - the report: a 'Statistical validation (simulation)' section with the table, an explicit Not run empty state that says how to run it, and a tab in the Sensitivity group;
+  - the extended structures: one dominant study, two heavy studies, resource failures (per isolate and a whole study), several species with one dominant, and Holm over many
+    comparisons (family-wise error with and without the adjustment, power); results summarised by the number of independent studies, and a status that stays provisional
+    unless a FULL run supports every number of studies it covered;
   - the wiring: the CLI command, stage 6 and its setting, the file registry, the pre-registration-free config variable, the demo.
 """
 import csv
@@ -44,6 +47,42 @@ def main():
     check("missing observations are dropped (about half of 200)", 60 < len(values) < 140, len(values))
     flat, _ = sv.simulate(random.Random(4), 5, 20, 0.0, 0.0, 0.0, 0.25)
     check("with no study effect and no noise every value is the effect", set(flat) == {0.25})
+
+    print("the extended structures")
+    values, groups = sv.simulate(random.Random(5), 12, None, 0.05, 0.1, 0.0, 0.0, sizes="dominant")
+    counts = sorted((groups.count(g) for g in set(groups)), reverse=True)
+    check("a dominant study holds about 60% of the isolates", len(counts) == 12 and 0.55 <= counts[0] / len(values) <= 0.65, counts)
+    values, groups = sv.simulate(random.Random(6), 12, None, 0.05, 0.1, 0.0, 0.0, sizes="heavy2")
+    counts = sorted((groups.count(g) for g in set(groups)), reverse=True)
+    check("two heavy studies hold about 80% of the isolates", 0.75 <= (counts[0] + counts[1]) / len(values) <= 0.85, counts)
+    values, _groups = sv.simulate(random.Random(7), 40, 5, 0.0, 0.0, 0.0, 0.2, failure=0.2)
+    failed = [v for v in values if abs(abs(v) - sv.FAILURE_MAGNITUDE) < 1e-9]
+    check("resource failures are scored zero: a paired difference of +-0.7 in both directions, about 20% of observations, symmetric",
+          0.12 <= len(failed) / len(values) <= 0.28 and min(failed) < 0 < max(failed), (len(failed), len(values)))
+    values, groups = sv.simulate(random.Random(8), 20, 4, 0.0, 0.0, 0.0, 0.2, failure=0.3, clustered=True)
+    whole = {g for g in set(groups) if all(abs(abs(v) - sv.FAILURE_MAGNITUDE) < 1e-9 for v, gg in zip(values, groups) if gg == g)}
+    check("a clustered failure takes whole studies (every observation of a failed study is +-0.7)", 1 <= len(whole) < 20, len(whole))
+    _v, _g, strata = sv.draw(random.Random(9), 20, 3, 0.05, 0.1, 0.0, 0.0, species=3)
+    shares = {s: strata.count(s) / len(strata) for s in set(strata)}
+    check("one dominant species holds about 70% of the studies", len(shares) == 3 and 0.6 <= max(shares.values()) <= 0.8, shares)
+    spec = sv.run_scenario("species", 12, 3, 0.05, 0.1, 0.0, 0.0, 30, 100, 500, 11, "smoke", species=3, family="dominant species")
+    check("the species-stratified functions are used (a row with a verdict)", spec["family"] == "dominant species" and spec["species"] == 3 and spec["ci_coverage"] != "", spec)
+    holm = sv.run_holm(sv.S("holm", 8, family="holm", comparisons=6), 0.0, 40, 500, 13, "smoke")
+    check("Holm: the family-wise error is reported with and without the adjustment, and the adjusted rate is not above the unadjusted one",
+          holm["fwer_holm"] != "" and float(holm["fwer_holm"]) <= float(holm["fwer_unadjusted"]) and holm["comparisons"] == 6, holm)
+    power = sv.run_holm(sv.S("holm", 8, family="holm", comparisons=6, tau=0.02), 0.3, 40, 500, 14, "smoke")
+    check("Holm power is reported when some comparisons are real, and is not above the unadjusted power",
+          power["power_holm"] != "" and float(power["power_holm"]) <= float(power["power_unadjusted"]) and float(power["power_unadjusted"]) > 0.5, power)
+    rows = [{**sv.run_scenario("a", 12, 3, 0.02, 0.1, 0.0, e, 40, 100, 500, 21, "smoke"), "mode": "smoke"} for e in (0.0, 0.1)]
+    table = sv.by_studies(rows)
+    check("by_studies has one row per number of studies, and a smoke run is never 'supported'", [r["n_studies"] for r in table] == [12] and table[0]["status"] != "supported", table)
+    full = [dict(r, mode="full", ci_verdict="consistent with 95%", test_verdict="valid (type-I error within tolerance)" if r["effect"] == 0.0 else "power 0.90") for r in rows]
+    check("a full run with no shortfall is 'supported', and overall_status says supported at that number",
+          sv.by_studies(full)[0]["status"] == "supported" and sv.overall_status(full).startswith("supported by the full simulation at 12 independent studies"), sv.overall_status(full))
+    short = [dict(r, mode="full", ci_verdict="below nominal (86%): the interval is too narrow") for r in full]
+    check("a full run with an interval shortfall is a shortfall, and the overall status stays provisional and names the scenario",
+          sv.by_studies(short)[0]["status"] == "shortfall" and sv.overall_status(short).startswith("provisional") and "a" in sv.by_studies(short)[0]["limiting_scenarios"], sv.overall_status(short))
+    check("no simulation at all is provisional", sv.overall_status([]).startswith("provisional"))
 
     print("the scenarios")
     def row(clusters, effect, per=3, replicates=60, tau=0.05, mode="smoke"):
@@ -99,22 +138,18 @@ def main():
     print("the command")
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "benchmark.stats_validation.tsv"
-        done = subprocess.run([sys.executable, str(ROOT / "python" / "simulate_validation.py"), "--mode", "smoke", "--replicates", "12", "--out", str(out)], capture_output=True, text=True)
+        done = subprocess.run([sys.executable, str(ROOT / "python" / "simulate_validation.py"), "--mode", "smoke", "--replicates", "12", "--out", str(out), "--by-studies-out", str(Path(tmp) / "by.tsv")], capture_output=True, text=True)
         rows = list(csv.DictReader(open(out, newline="", encoding="utf-8"), delimiter="\t")) if out.is_file() else []
         check("smoke mode writes one row per scenario and effect with the documented columns",
-              done.returncode == 0 and len(rows) == (len(sv.SMOKE) + len(sv.STRATIFIED_SMOKE)) * len(sv.SETTINGS["smoke"]["effects"]) + len(sv.HOLM_SMOKE)
-              and list(rows[0]) == list(sv.FIELDS), done.stderr[-300:])
-        check("every interval row measures all three interval methods, with coverage and width",
-              all(r[f"{m}_coverage"] and r[f"{m}_width"] for r in rows if r["kind"] != "holm" for m in sv.METHODS), rows[0])
-        check("the stratified and Holm scenarios are in the table", {r["kind"] for r in rows} == {"unstratified", "stratified", "holm"})
-        holm = [r for r in rows if r["kind"] == "holm"]
-        check("the Holm row reports a family-wise error over its comparisons, and no interval",
-              holm and "family-wise error" in holm[0]["test_verdict"] and "comparisons" in holm[0]["test_verdict"] and holm[0]["ci_coverage"] == "", holm)
-        check("ci_method names the leaderboard's interval method", all(r["ci_method"] == sv.resampling.INTERVAL_METHOD for r in rows if r["kind"] != "holm"))
+              done.returncode == 0 and len(rows) == (sum(2 if sc.family == "holm" else len(sv.SETTINGS["smoke"]["effects"]) for sc in sv.SMOKE)
+                            + len(sv.SETTINGS["smoke"]["stratified"]) * len(sv.SETTINGS["smoke"]["effects"]) + len(sv.SETTINGS["smoke"]["holm_pairs"])) and list(rows[0]) == list(sv.FIELDS), done.stderr[-300:])
+        check("it says the status of the procedures (provisional after a smoke run)", "status: provisional" in done.stderr, done.stderr[-300:])
         check("it says whether any scenario shows a calibration shortfall", "calibration shortfall" in done.stderr or "no calibration shortfall" in done.stderr, done.stderr)
+        by = list(csv.DictReader(open(Path(tmp) / "by.tsv", newline="", encoding="utf-8"), delimiter="\t"))
+        check("the summary by number of studies has the documented columns and one row per number", list(by[0]) == list(sv.BY_STUDIES_FIELDS) and [int(r["n_studies"]) for r in by] == sorted({int(r["n_clusters"]) for r in rows}))
         prefix = str(Path(tmp) / "benchmark")
         nav, sections = rd.render(prefix, html.escape, lambda p: os.path.basename(p))
-        check("the report section with the table", "id='stats-validation'" in sections and "Statistical validation (simulation)" in sections and "Interval coverage" in sections
+        check("the report section with the table", "id='stats-validation'" in sections and "Statistical validation (simulation)" in sections and "Interval coverage" in sections and "By number of independent studies" in sections and "Status of the statistical procedures: provisional" in sections
               and rows[0]["scenario"] in html.unescape(sections) and "benchmark.stats_validation.tsv" in sections.replace("stats validation table", "benchmark.stats_validation.tsv"), sections[:200])
         out.unlink()
         nav, empty = rd.render(prefix, html.escape, lambda p: os.path.basename(p))

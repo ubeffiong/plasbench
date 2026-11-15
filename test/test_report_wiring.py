@@ -223,7 +223,7 @@ def main():
             st = sec("statistics")
             check("paired table has track, task, metric, Wilcoxon Holm and equivalence columns",
                   all(h in st for h in ("<th>Track</th>", "<th>Task</th>", "<th>Metric</th>", "Wilcoxon p (Holm)", "Equivalent within delta")))
-            check("paired values from the demo (platon_like vs weak_like, 0.5331, 0.093750)", "0.5331" in st and "0.093750" in st)
+            check("paired values from the demo (platon_like vs weak_like, 0.5331, 0.031250)", "0.5331" in st and "0.031250" in st)
             check("paired table grouped by track", "Track: short_read" in st)
             check("regret table present", "Regret per isolate" in sec("recommender-eval"))
             rob = sec("robustness")

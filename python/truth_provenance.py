@@ -26,6 +26,18 @@ Reference tiers
   3  provisional: short-read-first hybrid, unknown assembly strategy, or
      cohort tier C. Exploratory only; reported as a sensitivity analysis.
 
+Two separate questions about a reference (the tier above mixes them; both are now recorded as their own columns, and the tier stays for reporting):
+  reference_quality       validated | partially_validated | provisional      how far the reference itself can be trusted (tier 1 / 2 / 3)
+  evaluation_independence independent | partially_independent | dependent | unknown   whether the reference is independent of the evidence the benchmarked tools use
+      independent            long-read-only or long-read-first truth, polished with no reads or reads independent of the benchmark: structure AND bases do not depend on the benchmark's
+                             Illumina data or assembly graph.
+      partially_independent  long-read-first structure, but polished with the benchmark's own reads (or polishing unrecorded): structure is independent, bases are not, so identity-based
+                             criteria are not applied and the claim is weaker.
+      dependent              short-read-first hybrid: truth and tools resolve repeats on the same Illumina graph (circular evaluation).
+      unknown                assembly strategy not recorded or not recognisable; never assumed independent.
+The primary analysis uses independent references only (HEADLINE_INDEPENDENCE); sensitivity analyses add partially independent ones, then every reference. Dependent and unknown references
+never enter the primary analysis. Quality and independence are separate: a tier-2 reference (cohort tier B, labels not checked) can still be independent, and is then eligible.
+
 Evidence record (additive; every field is kept, the tier is derived from them and never replaces them). For each reference, six pieces of evidence are recorded,
 each as `declared` (a sample-sheet column), `inferred` (from NCBI metadata or the truth-label table) or `unknown`; an unknown value NEVER demotes a reference:
   assembly_technology      long_read | hybrid | short_read | unknown            (sheet: truth_technology; else inferred from NCBI sequencingTech)
@@ -63,6 +75,8 @@ STRUCTURAL = ("resolved", "unresolved_repeats", "unknown")
 VALIDATION = ("none", "long_read_reassembly", "pcr", "hic", "other", "unknown")
 EVIDENCE_FIELDS = ("assembly_technology", "circularity_evidence", "read_support", "replicon_evidence", "structural_integrity", "independent_validation")
 ADVERSE = {"read_support": "none", "structural_integrity": "unresolved_repeats"}
+QUALITY = {"1": "validated", "2": "partially_validated", "3": "provisional"}
+INDEPENDENCE = ("independent", "partially_independent", "dependent", "unknown")
 STRATEGIES = ("long_read_only", "long_read_first_hybrid", "short_read_first_hybrid", "unknown")
 POLISH = ("none", "independent", "same_as_benchmark", "unknown")
 
@@ -237,35 +251,23 @@ def tier(strategy, polish, quality, labels_evaluated, adverse=()):
     return "1", "long-read-first, independent of benchmark reads, tier A, evidence-checked labels"
 
 
-# Reference independence is a separate axis from reference quality (second review, section 4): a
-# long-read-first reference polished with the benchmark's own Illumina reads can be structurally
-# sound (tier 2) and still not independent of the data it is used to score.
-INDEPENDENCE = ("independent", "same_read_polished", "unknown")
-
-
-def independence(polish):
-    """independent | same_read_polished | unknown, from truth_polish_reads."""
-    if polish in ("none", "independent"):
-        return "independent"
-    if polish == "same_as_benchmark":
-        return "same_read_polished"
-    return "unknown"
+def independence(strategy, polish):
+    """(evaluation_independence, reason) from the truth assembly strategy and the polishing reads; see the module doc. An unrecognised strategy is 'unknown', never independent."""
+    if strategy in ("long_read_only", "long_read_first_hybrid"):
+        if polish in ("none", "independent"):
+            return "independent", f"{strategy.replace('_', ' ')}; polishing reads {polish}"
+        return "partially_independent", f"{strategy.replace('_', ' ')}; polishing reads {polish}, so the bases are not independent of the benchmark reads"
+    if strategy == "short_read_first_hybrid":
+        return "dependent", "short-read-first hybrid shares the benchmark's Illumina assembly graph"
+    return "unknown", "assembly strategy not recorded or not recognised"
 
 
 def reference_group(reference_tier, independence_value):
-    """The interpretation group of a reference: tier and independence together.
-
-    tier1_independent           primary independent validation
-    tier2_independent           secondary reference-qualified analysis
-    tier2_same_read_polished    dependent-reference sensitivity analysis
-    tier2_unknown_independence  not shown to be independent; sensitivity only
-    tier3                       provisional, exploratory
-    """
+    """The interpretation group of a reference, tier and independence together:
+    tier1_independent (primary), tier2_independent (primary), tier2_partially_independent (sensitivity 1), tier2_unknown, and tier3 (provisional, exploratory)."""
     if reference_tier == "3":
         return "tier3"
-    if independence_value == "independent":
-        return f"tier{reference_tier}_independent"
-    return f"tier{reference_tier}_{'same_read_polished' if independence_value == 'same_read_polished' else 'unknown_independence'}"
+    return f"tier{reference_tier}_{independence_value}"
 
 
 def grade(reference_tier, same_extraction):
@@ -316,6 +318,7 @@ def derive(row, data_dir):
     evidence, evidence_sources, adverse = evidence_record(row, data_dir, tech_text)
     reference_tier, tier_reason = tier(strategy, polish, row.get("truth_quality_tier"), evaluated, adverse)
     quality_grade, grade_reason = grade(reference_tier, row.get("same_extraction"))
+    eval_independence, independence_reason = independence(strategy, polish)
     recorded = sum(1 for name in EVIDENCE_FIELDS if evidence[name] != "unknown")
     return {
         "sample": sample, "truth_assembly_strategy": strategy, "truth_polish_reads": polish,
@@ -327,15 +330,15 @@ def derive(row, data_dir):
         "truth_quality_grade": quality_grade, "grade_reason": grade_reason,
         **evidence, "evidence_recorded": f"{recorded} of {len(EVIDENCE_FIELDS)}",
         "evidence_sources": "; ".join(f"{name}: {evidence_sources[name]}" for name in EVIDENCE_FIELDS),
-        "reference_independence": independence(polish),
-        "reference_group": reference_group(reference_tier, independence(polish)),
+        "reference_quality": QUALITY[reference_tier], "evaluation_independence": eval_independence, "independence_reason": independence_reason,
+        "reference_group": reference_group(reference_tier, eval_independence),
     }
 
 
 FIELDS = ["sample", "truth_assembly_strategy", "truth_polish_reads", "provenance_source",
           "base_level_metrics_valid", "labels_evidence_checked", "reference_tier", "tier_reason",
           "provenance_reason", "ambiguous_plasmids", "marker_free_plasmids", "truth_quality_grade", "grade_reason",
-          *EVIDENCE_FIELDS, "evidence_recorded", "evidence_sources", "reference_independence", "reference_group"]
+          *EVIDENCE_FIELDS, "evidence_recorded", "evidence_sources", "reference_quality", "evaluation_independence", "independence_reason", "reference_group"]
 
 
 def main():
@@ -357,7 +360,7 @@ def main():
     for row in derived:
         counts[row["reference_tier"]] = counts.get(row["reference_tier"], 0) + 1
     summary = ", ".join(f"tier {k}={v}" for k, v in sorted(counts.items())) or "no samples"
-    dependent = sum(1 for row in derived if row["reference_tier"] != "3" and row["reference_independence"] != "independent")
+    dependent = sum(1 for row in derived if row["reference_tier"] != "3" and row["evaluation_independence"] != "independent")
     if dependent:
         summary += f"; {dependent} tier 1-2 reference(s) not independent of the benchmark reads"
     sys.stderr.write(f"[truth_provenance] {summary} -> {args.out}\n")

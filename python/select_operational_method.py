@@ -241,8 +241,22 @@ def applicability_tier(summary, min_samples, min_coverage):
     return "low"
 
 
+def tools_of_task(registry_path, tools, task):
+    """The tools among `tools` whose evaluation_task in the capability registry is `task`; None when the registry cannot be read or no scored tool has that task
+    (the caller then keeps every tool and says so). Tasks are never compared with each other, so a recommendation is made for one task."""
+    try:
+        registry = read_capabilities(Path(registry_path))
+    except (OSError, ValueError, KeyError):
+        return None
+    allowed = {tool for tool in tools if (registry.get(tool) or {}).get("evaluation_task") == task}
+    return allowed or None
+
+
 def reconstruction_tools(registry_path, tools):
-    """The tools among `tools` that the capability registry marks binning-capable (they group contigs into plasmid bins: the RECONSTRUCTION task).
+    """The tools among `tools` that the capability registry gives the BINNING-RECONSTRUCTION task (they group existing contigs into plasmid bins). Kept for callers that
+    predate tools_of_task(); a reassembler is a different task and is not in this set.
+
+    (Older text, still true of the idea:)
 
     Everything else (classifiers, re-assemblers whose contigs are not bins) is ranked on the CLASSIFICATION task. The two tasks are never compared with each
     other anywhere else in the benchmark, so a recommendation must not compare them either: an overall winner chosen across tasks can be a tool that does not
@@ -252,7 +266,7 @@ def reconstruction_tools(registry_path, tools):
         registry = read_capabilities(Path(registry_path))
     except (OSError, ValueError, KeyError):
         return None
-    allowed = {tool for tool in tools if str((registry.get(tool) or {}).get("binning_capable", "")).strip().lower() == "yes"}
+    allowed = {tool for tool in tools if (registry.get(tool) or {}).get("evaluation_task") == "binning_reconstruction"}
     return allowed or None
 
 
@@ -462,10 +476,10 @@ def main():
                         help="Decision D11: below this expected F1 no tool is recommended (default 0.40).")
     parser.add_argument("--analysis-track", choices=("short_read", "long_read", "hybrid"), default="short_read")
     parser.add_argument("--capabilities", default=str(Path(__file__).resolve().parent.parent / "config" / "tool_capabilities.tsv"),
-                        help="config/tool_capabilities.tsv; binning_capable=yes marks the tools of the reconstruction task.")
-    parser.add_argument("--task", choices=("reconstruction", "all"), default="reconstruction",
-                        help="Which task's tools are recommended (default: reconstruction, like the headline result). 'all' restores the old behaviour of "
-                             "choosing one winner across tasks, which compares tools that are never ranked against each other.")
+                        help="config/tool_capabilities.tsv; evaluation_task says which task each tool belongs to.")
+    parser.add_argument("--task", choices=("binning_reconstruction", "sequence_reassembly", "classification", "reconstruction", "all"), default="binning_reconstruction",
+                        help="Which task's tools are recommended (default: binning_reconstruction, like the headline result). 'reconstruction' is the old name of "
+                             "binning_reconstruction. 'all' restores the old behaviour of choosing one winner across tasks, which compares tools that are never ranked against each other.")
     parser.add_argument("--decision-profile", choices=tuple(DECISION_PROFILES), default=DEFAULT_DECISION_PROFILE,
                         help="Named decision_score weight set (recommendation_model.py). The default reproduces "
                              "today's original single formula exactly; a different profile only changes ranking, "
@@ -487,13 +501,14 @@ def main():
     attach_read_quality_bands(rows, args.data_dir)
     statuses = status_profiles(args.tool_status)
     task_label = "all"
-    if args.task == "reconstruction":
-        allowed = reconstruction_tools(args.capabilities, {row["tool"] for row in rows})
+    chosen_task = "binning_reconstruction" if args.task == "reconstruction" else args.task
+    if chosen_task != "all":
+        allowed = tools_of_task(args.capabilities, {row["tool"] for row in rows}, chosen_task)
         if allowed:
             rows = [row for row in rows if row["tool"] in allowed]
-            task_label = "reconstruction"
+            task_label = chosen_task
         else:
-            print("WARNING: no scored tool is marked binning-capable in the capability registry, so recommendations cover every tool "
+            print(f"WARNING: no scored tool has the task {chosen_task} in the capability registry, so recommendations cover every tool "
                   "(the task is recorded as 'all').", file=__import__("sys").stderr)
     validation_rows = read_tsv(args.recommendation_validation) if args.recommendation_validation and Path(args.recommendation_validation).is_file() else []
     # validate_recommendations.py also writes a per-stratum LOSO diagnostic

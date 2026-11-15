@@ -121,10 +121,9 @@ for the incremental precision-recall sweep.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
 - Every tool carries a validation tier (real binary checked, adapter tested, untested) and every database a version, source, release date and checksum (blank = not recorded); a weekly workflow runs the real MOB-suite, Platon and plasmidSPAdes on a known plasmid. Shown in *Truth plasmids in tool databases*.
-- AMR placement now also reports flank context, resistance genes kept together and AMR-PRR; `plasbench promote-amr-truth` turns a reviewed draft into curated AMR truth (name, database version and confirmation required).
+- AMR placement attributes genes by the tool's evaluation task (one-to-one bin matching for binners, best plasmid per record for classifiers and reassemblers; classifiers get no AMR-PRR). It also reports flank context, resistance genes kept together and AMR-PRR; `plasbench promote-amr-truth` turns a reviewed draft into curated AMR truth (name, database version and confirmation required).
 - More figures: isolate complexity against performance, an outcome view of the plasmid matrix, identity shading and resistance-region brackets on the circular maps, true/false-positive encodings in the 3D landscape, and an evidence panel under the recommendation.
-- Settings new in 0.4, all in `config/config.sh` and recorded in the run manifest: `HEADLINE_MIN_CLUSTERS`, `ALLOW_PRIMARY_FALLBACK`, `RUN_STATS_VALIDATION`, `STATS_VALIDATION_MODE`, `CHROMID_MIN_BP`, `LARGE_PLASMID_BP`, `AMR_FLANK_BP`, `RUN_RANK_SENSITIVITY`, `HEADLINE_REFERENCE_INDEPENDENCE`, `PLASBENCH_CI_METHOD` (see the Scientific guide's settings tables).
-- After the second external review: tools are ranked in the task their output declares (binning and reconstruction, sequence reassembly such as plasmidSPAdes, or classification); references polished with the benchmark's own reads leave the primary analysis and get their own sensitivity table; intervals are cluster-robust t intervals chosen by simulation; each paired comparison says whether it shows a practical difference, equivalence or neither; AMR placement no longer penalises tools that do not bin; and per-isolate recommendation is validated with clonal-group and species holdouts, taxonomy-aware neighbours and abstention. Point by point: [docs/reviews/SECOND_REVIEW_RESPONSE.md](docs/reviews/SECOND_REVIEW_RESPONSE.md).
+- Settings new in 0.4, all in `config/config.sh` and recorded in the run manifest: `HEADLINE_INDEPENDENCE`, `HEADLINE_REFERENCE_INDEPENDENCE`, `PLASBENCH_CI_METHOD`, `STATS_VALIDATION_WORKERS`, `HEADLINE_MIN_CLUSTERS`, `ALLOW_PRIMARY_FALLBACK`, `RUN_STATS_VALIDATION`, `STATS_VALIDATION_MODE`, `CHROMID_MIN_BP`, `LARGE_PLASMID_BP`, `AMR_FLANK_BP`, `RUN_RANK_SENSITIVITY` (see the Scientific guide's settings tables).
 - A radar fingerprint per analysis track shows each tool's accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability as one shape (a picture of the table beside it, not a score).
 - The numeric tool x metric heatmap (one block per analysis track) now includes SV-PRR and the predicted-sequence burden columns beside F1, MCC, binning F1 and CPRR.
 - The recommender evaluation compares the single best tool, an organism recommender and a feature-conditioned one (nearest similar isolates, truth-free features), with calibration and abstention; an arm adds value only when it beats the single best tool on average and in most of at least three studies.
@@ -133,11 +132,12 @@ for the incremental precision-recall sweep.
 - The leaderboard reports the burden of predicted sequence that precision does not charge (unmapped, off-truth and multi-mapped shares, and the gap between permissive and strict precision), shown in the report beside strict precision.
 - Every metric is registered in `config/metrics.tsv` (rung of a five-step evaluation ladder from detection to biological validity, whether it ranks tools, how well it is grounded, where its column lives); the report shows the ladder and its gaps, and a test keeps the registry, the glossary and the output in step.
 - The truth audit flags chromid and integrated-plasmid candidates, very large plasmids, fusions, tandem multimers (dimers and higher) and read-depth anomalies, and lists which tools share a database with the evidence that labelled the truth.
-- The statistics are checked by simulation (`plasbench analysis simulate-validation`, `RUN_STATS_VALIDATION=1`): interval coverage, type-I error and power under study-to-study differences, correlated isolates, unequal study sizes and missing data, shown in the report under Sensitivity, power and reproducibility. A first smoke run shows the percentile cluster bootstrap under-covers with few studies, so its intervals are optimistic.
+- A full-mode simulation (75 scenario rows, 1,000 replicates each, production resampling counts, seed 20261114; results in docs/stats_validation/) found that the paired tests (exact sign-flip up to 12 studies, Monte Carlo above) and the Holm adjustment are calibrated in every structure simulated, and that the percentile cluster-bootstrap intervals are NOT: coverage of the nominal 95% was 82-85% at 5-6 studies, 87-92% at 8-20 studies, 94% at 30 balanced studies, and as low as 74% with one dominant species. Intervals are therefore optimistic (too narrow) at every number of studies tested below 30, and the statistical procedures stay provisional. Full details: [docs/STATS_VALIDATION.md](docs/STATS_VALIDATION.md).
+- The statistics are checked by simulation (`plasbench analysis simulate-validation`, `RUN_STATS_VALIDATION=1`, `STATS_VALIDATION_WORKERS`): interval coverage, type-I error and power under study-to-study differences, correlated isolates, unequal study sizes and missing data, shown in the report under Sensitivity, power and reproducibility. A first smoke run shows the percentile cluster bootstrap under-covers with few studies, so its intervals are optimistic.
 - The pre-registration is a **draft** until its proposed values are confirmed and frozen (`freeze-prereg --write --strict`); the report's Pre-registration tab shows the draft state and lists the proposed values.
 - Each reference carries a structured **evidence record** (technology, circularity, long-read support, replicon evidence, structure, independent validation; declared, inferred or unknown), kept field by field; the reference tier is derived from it.
 
-- The primary analysis is reported **unavailable** when no isolate has a Tier 1-2 reference; the ranking is then labelled provisional, never the headline.
+- A reference qualifies for the **primary analysis** only if it passes BOTH of two separate checks: its **reference quality** is within the tier limit (`HEADLINE_MAX_REFERENCE_TIER`, default 2: validated or partially validated) AND its **evaluation independence** is `independent` (`HEADLINE_INDEPENDENCE`). Independent means long-read-only or long-read-first truth polished with no reads or reads independent of the benchmark; partially independent is long-read-first truth polished with the benchmark's own reads (or unrecorded); dependent is a short-read-first hybrid; unknown is an unrecorded strategy, never assumed independent. The qualifying references must come from at least `HEADLINE_MIN_CLUSTERS` (default 5, the interval minimum) independent clusters (BioProjects or clonal groups), counted over the qualifying references only. Sensitivity analysis 1 adds partially independent references; sensitivity analysis 2 uses every reference; dependent and unknown references never enter the primary analysis. If the primary analysis is unavailable the ranking is shown as provisional, never as the headline.
 - Recommendations are advisory and withheld when evidence is thin; PlasBench does not
   identify, cluster or classify the plasmids in your own sample (see the table below).
 - No claim is made here about how any named competing benchmark performs; the
@@ -450,22 +450,21 @@ where it is not, so CPRR is never penalised for errors that are in the truth rat
 CPRR is defined only for tools that output bins; classification-only tools show "not bin-scored".
 Circularity is still **not** a CPRR criterion.
 
-### Pre-registered endpoints, by track
+### Pre-registered endpoints, by task
 
-The primary endpoint depends on the input track (`config/prereg.tsv`, `primary_endpoint` and
-`primary_endpoint_long_read`; `ranking_metric()` in `python/headline_design.py`):
+Three evaluation tasks answer three different questions and are ranked separately, never against one another. The task of a tool is the `evaluation_task` of its row in
+`config/tool_capabilities.tsv`; the endpoints are in `config/prereg.tsv` (`primary_endpoint`, `primary_endpoint_reassembly`; `ranking_metric()` in `python/headline_design.py`):
 
-| Track and task | Primary endpoint (ranks tools) | Key secondary |
-|---|---|---|
-| Short-read reconstruction | Length-weighted binning F1 (`lw_bin_f1`) | CPRR |
-| Long-read and hybrid reconstruction | **Isolate-level CPRR** (`sample_cprr`): correct plasmids / truth plasmids per isolate, averaged over isolates | Length-weighted binning F1 |
-| Classification (any track) | Base-level F1 | – |
+| Task | Question | Primary endpoint (ranks tools) | Key secondary |
+|---|---|---|---|
+| Classification | Is this sequence plasmid-derived? | Base-level F1 | MCC, precision, recall |
+| Binning reconstruction | Are the existing contigs grouped into the right plasmids? | Length-weighted binning F1 (`lw_bin_f1`) | CPRR |
+| Sequence reassembly | Is the plasmid sequence produced, completely and accurately? | **Isolate-level CPRR** (`sample_cprr`): correct plasmids / truth plasmids per isolate, averaged over isolates | Length-weighted binning F1 |
 
-**Why it differs by track.** Complete, single-bin recovery from short-read assemblies is rare, so a
-pass/fail endpoint would sit near zero for most tools and lose statistical power. The paired tests,
-regret and power analysis are also defined per isolate. Long-read and hybrid tools are built to close
-whole plasmids, so CPRR separates them and answers the question their users ask. Using isolate-level
-CPRR there keeps the same per-isolate bootstrap, species macro-average and paired tests.
+**Why three.** A classifier labels sequence, a binner groups contigs that already exist, a reassembler writes new sequence. Judging a reassembler by whether it labelled sequence, or a
+binner by whether it produced a plasmid, asks a question the tool does not attempt. Before this change (v0.4.0 and earlier) the task was decided by whether a tool was binning-capable, so plasmidSPAdes was ranked as a
+classifier and Plassembler, Hybracter and plsmd shared a track with the binners; that is fixed. CPRR is judged per isolate, which keeps the same per-isolate bootstrap, species macro-average and paired tests.
+From short reads complete recovery is rare, so a reassembler's CPRR can sit near zero there; binning F1 is reported beside it. The revised endpoints are marked *proposed* in the pre-registration until you confirm them.
 
 **CPRR robustness outputs** (descriptive; they never change a rank):
 
@@ -706,7 +705,7 @@ none of them prints a note saying so.
 
 **Aggregation and ranking** (`python/aggregate_results.py`)
 
-- Tools are ranked separately within each track (short-read, long-read, hybrid), on that track's pre-registered endpoint: length-weighted binning F1 for short-read reconstruction, isolate-level CPRR for long-read and hybrid reconstruction, base-level F1 for classification (see [Pre-registered endpoints, by track](#pre-registered-endpoints-by-track)).
+- Tools are ranked separately within each track (short-read, long-read, hybrid), and within each of the three evaluation tasks, on that task's pre-registered endpoint: length-weighted binning F1 for binning reconstruction, isolate-level CPRR for sequence reassembly, base-level F1 for classification (see [Pre-registered endpoints, by task](#pre-registered-endpoints-by-task)).
 - Ranking uses only plasmid-bearing samples that every tool in the track has a result
   for (`ranking_basis = shared_samples`). A tool that crashed on a sample counts as
   F1 = 0 there, so it cannot rise by failing on hard isolates.
@@ -778,7 +777,7 @@ addressed in the implementation. Repeat-aware *matching* is not implemented; rep
 ### The five dimensions
 
 Each dimension is measured, reported on its own, and shown in the HTML report. None of them changes the headline ranking
-(the length-weighted binning F1 for short-read binning-capable tools, isolate-level CPRR for long-read and hybrid reconstruction, base-level F1 for classifiers, with CPRR or binning F1 as the key secondary endpoint).
+(the length-weighted binning F1 for binning reconstruction, isolate-level CPRR for sequence reassembly, base-level F1 for classification, with CPRR or binning F1 as the key secondary endpoint).
 
 | Dimension | Question | Status | What PlasBench reports | Script |
 |---|---|---|---|---|
@@ -1837,9 +1836,9 @@ tool's result, not a free pass.
 task. Binning-capable tools are ranked on **reconstruction** by `ranking_score`, the
 length-weighted binning F1 (the primary endpoint: plasmid bases placed in the
 correct bin), with **CPRR** (`cprr`, the share of truth plasmids reconstructed
-correctly) as the secondary endpoint. Classifier-only tools are ranked separately on
-**classification** by base-level F1. The ranking score is averaged per species when
-enough independent isolates exist, uses reference tiers 1-2 only, and covers the
+correctly) as the secondary endpoint. Reassemblers are ranked on **sequence reassembly** by isolate-level CPRR and
+classifiers on **classification** by base-level F1, each on their own. The ranking score is averaged per species when
+enough independent isolates exist, uses independent references within reference tiers 1-2 only (from at least `HEADLINE_MIN_CLUSTERS` independent clusters), and covers the
 samples every tool in the group was scored on (`n_ranking_samples`). A tool that
 predicts nothing, or fails, on an isolate with plasmids scores 0 there. See
 [docs/METHODS.md](docs/METHODS.md#research-design-endpoints-reference-standard-and-species-balance).

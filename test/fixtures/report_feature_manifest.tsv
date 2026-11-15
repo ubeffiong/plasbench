@@ -76,7 +76,7 @@ scores.21	scores	attr	[data-cg-toggle='Identity']	column-group switch	scores
 scores.22	scores	attr	[data-cg-toggle='Recovery']	column-group switch	scores
 scores.23	scores	element_id	score-table	named table	scores
 scores.24	scores	element_id	score-groups-table	named table	scores
-statistics.01	statistics	table_headers	Track | Task | Metric | Tool A | Tool B | Pairs | Mean difference (A minus B) | 95% bootstrap CI | Permutation p | Holm-adjusted p | Wilcoxon p (Holm) | Equivalent within delta | A wins / ties / B wins	table #1 keeps its columns (first 13 of 13)	robustness
+statistics.01	statistics	table_headers	Track | Task | Metric | Tool A | Tool B | Pairs | Mean difference (A minus B) | 95% interval | What the difference supports | Permutation p | Holm-adjusted p | Wilcoxon p (Holm) | Equivalent within delta | A wins / ties / B wins | Permutation test	table #1 keeps its columns (first 15 of 15)	robustness
 statistics.02	statistics	heading	Track: short_read	sub-heading survives (panel title)	robustness
 bin-diagnostics.01	bin-diagnostics	table_headers	Sample | Tool | Bin precision | Bin recall | Bin F1 | Matched bins | Unmatched bins | Missed plasmids | Split events | Merge events | Contaminated bins | Repeat ambiguity bp | Contamination fraction | Record-level detail	table #1 keeps its columns (first 14 of 14)	bin-diagnostics
 zero-plasmid.01	zero-plasmid	table_headers	Tool | Plasmid-free isolates scored | Mean isolate specificity | Total chromosome FP bp	table #1 keeps its columns (first 4 of 4)	leaderboard
@@ -123,8 +123,9 @@ insights.02	insights	not_text	mean F1 (0.988	ranking score is not called mean F1
 chart.01	chart	svg_count>=1	chart	precision/recall/F1 bars still drawn (inside leaderboard panel)	leaderboard
 chart.02	chart	text	Precision	legend	leaderboard
 leaderboard.13	leaderboard	text	not applicable	"""not applicable is not a zero"" caveat"	leaderboard
-leaderboard.14	leaderboard	text	Plasmid reconstruction	reconstruction table heading	leaderboard
-leaderboard.15	leaderboard	text	Plasmid classification	classification table heading	leaderboard
+leaderboard.14	leaderboard	text	Plasmid binning (reconstruction)	binning-reconstruction table heading (the three tasks have their own tables)	leaderboard
+leaderboard.task-reassembly	leaderboard	text	Plasmid sequence reassembly	reassembly table heading	leaderboard
+leaderboard.task-classification	leaderboard	text	Plasmid classification	classification table heading	leaderboard
 leaderboard.16	leaderboard	preset	Headline	default column preset = the 20 headline columns	leaderboard
 leaderboard.17	metric-framework	element_id	metric-framework	section for the metric-framework columns (Methods and limits)	leaderboard
 leaderboard.18	more-metrics	tab	MCC and F-beta	tab of Additional ranking metrics	leaderboard
@@ -254,7 +255,7 @@ isolate-difficulty.02	isolate-difficulty	text	GFA dead-end count	column	cohort-q
 learn-adequacy.02	learn-adequacy	text	Plasmid adequacy	column	cohort-qc
 learn-copynumber.01	learn-copynumber	text	copy number	Not-run reason or table	bin-diagnostics
 stats-validation.01	stats-validation	heading	Statistical validation (simulation)	section title (tab of Sensitivity, power and reproducibility)	ranking-sensitivity
-stats-validation.02	stats-validation	table_headers	Scenario | Studies | Isolates per study | Between-study sd | Isolate sd | Missing | True effect | Replicates | Interval coverage | Interval verdict | Test rejects at 0.05 | Test | Test verdict	the simulation table keeps its columns	ranking-sensitivity
+stats-validation.02	stats-validation	table_headers	Family | Scenario | Studies | Isolates per study | Within-study correlation (icc) | Missing | Failures | True effect | Replicates | Interval coverage | Interval verdict | Test rejects at 0.05 | Holm family-wise error (adjusted / unadjusted) | Test | Test verdict	the simulation table keeps its columns	ranking-sensitivity
 truth-label-audit.03	truth-label-audit	text	Marker databases shared with benchmarked tools	second table of the Truth labels tab	cohort-qc
 truth-label-audit.04	truth-label-audit	text	Flags	column: chromid, integrated-plasmid, multimer, multi-replicon, large-plasmid and depth flags	cohort-qc
 metric-framework.10	metric-framework	text	The reconstruction evaluation ladder	registry-driven ladder table	methods
@@ -264,7 +265,7 @@ fig-radar.01	fig-radar	text	Numbers behind the chart	the radar figure keeps the 
 fig-complexity.01	fig-complexity	text	Rank correlation of F1 with each characteristic	the complexity figure keeps its correlation table	figures
 summary.outcome-view	summary	text	How each plasmid ended (outcome class)	the plasmid matrix has an outcome view under each coverage table	summary
 recommendations.evidence	recommendations	text	Evidence behind the recommendation	the recommendation lists what stands behind it	recommender-eval
-recommendations.arms	recommender-eval	text	Three ways of choosing a tool	single best vs organism vs feature-conditioned, with calibration and abstention	recommender-eval
+recommendations.arms	recommender-eval	text	Ways of choosing a tool	single best vs organism vs feature-conditioned, with calibration and abstention	recommender-eval
 amr-placement.context	amr-placement	text	AMR-PRR	AMR-PRR, pairs kept together and flank context sit beside the placement	amr-placement
 database-membership.provenance	database-membership	text	Tool and database provenance	validation tier and database version, source and checksum of each tool	robustness
 isolate-difficulty.dataset	isolate-difficulty	text	Dataset characteristics	one table of every isolate, each column marked knowable without a reference or not	cohort-qc

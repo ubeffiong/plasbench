@@ -13,7 +13,7 @@ tool's own adapter script). See [docs/ADDING_TOOLS.md](../docs/ADDING_TOOLS.md).
 |---|---|---|---|---|---|
 | MOB-suite | binning | applicable | short-read assembly | `adapt_mob_recon.sh` | supported |
 | Platon | classification | not applicable | short-read assembly | `adapt_platon.sh` | supported |
-| plasmidSPAdes | reassembly | not applicable | paired reads | `adapt_plasmidspades.sh` | supported |
+| plasmidSPAdes | reassembly | applicable (each contig is its own bin) | paired reads | `adapt_plasmidspades.sh` | supported |
 | gplas2_mob | binning | applicable | GFA graph plus MOB-recon hard-label seed TSV | native mode | optional |
 | gplas2_external | binning | applicable | GFA graph plus user classifier TSV | native mode | optional |
 | flye_mob_recon | binning | applicable | long reads | `adapt_mob_recon.sh` | optional |
@@ -30,6 +30,20 @@ tool's own adapter script). See [docs/ADDING_TOOLS.md](../docs/ADDING_TOOLS.md).
 | PlaScope | classification | not applicable | short-read assembly (E. coli/Klebsiella only) | `adapt_plascope.sh` | optional |
 | PlasBin-flow | binning | applicable | assembly graph; PlasBench adapts the tool's own output | `adapt_plasbin_flow.sh` | optional |
 | plsMD | reassembly | applicable | short-read Unicycler assembly plus a PLSDB BLAST index | `adapt_plsmd.sh` | optional |
+
+## Evaluation tasks
+
+`config/tool_capabilities.tsv` gives every tool an `evaluation_task`. It decides where the tool is ranked and by which endpoint; `binning_capable` does not.
+
+| `evaluation_task` | What the tool does | Primary endpoint |
+|---|---|---|
+| `classification` | labels sequence as plasmid-derived or not (Platon, geNomad, PLASMe, RFPlasmid, PlaScope, the baselines) | base-level F1 |
+| `binning_reconstruction` | groups the contigs of an existing assembly into plasmids (MOB-recon, gplas2, PlasBin-flow, Flye + MOB-recon) | length-weighted binning F1 |
+| `sequence_reassembly` | produces plasmid sequences of its own (plasmidSPAdes, Plassembler, Hybracter, plsmd) | isolate-level CPRR |
+
+`binning_capable` is `yes` for the last two (their output is a set of per-plasmid units, scored with the bin metrics: a reassembler's records are its own bins) and `no` for classification;
+the registry reader refuses a row where the two disagree. A registry without the column (an older one, a user registry) falls back to `binning_capable`, telling a reassembler (`method_class = reassembly`)
+from a binner. A user tool states `task = binning_reconstruction`, `sequence_reassembly` or `classification` in its manifest; the old `task = reconstruction` still means binning.
 
 ## Validation tiers and the interface a tool must meet
 

@@ -42,6 +42,7 @@ fi
 # analysis is reported as unavailable and every ranking is provisional (ALLOW_PRIMARY_FALLBACK=1 keeps the numbers as the headline, with the warning).
 DESIGN_ARGS=(--capabilities "$PROJECT_ROOT/config/tool_capabilities.tsv"
              --headline-max-tier "${HEADLINE_MAX_REFERENCE_TIER:-2}"
+             --headline-independence "${HEADLINE_INDEPENDENCE:-independent}"
              --headline-reference-independence "${HEADLINE_REFERENCE_INDEPENDENCE:-independent}"
              --headline-min-clusters "${HEADLINE_MIN_CLUSTERS:-5}"
              --min-species-clusters "${MIN_SPECIES_CLUSTERS:-20}")
@@ -225,6 +226,7 @@ job_dimension_analyses() {
     # Calibration of the intervals and tests by simulation (python/simulate_validation.py): off by default (it does not depend on the run's data); smoke takes seconds.
     if [[ "${RUN_STATS_VALIDATION:-0}" == "1" ]]; then
         python3 "$HERE/../python/simulate_validation.py" --mode "${STATS_VALIDATION_MODE:-smoke}" --out "$DIM.stats_validation.tsv" \
+            --by-studies-out "$DIM.stats_validation_by_studies.tsv" --workers "${STATS_VALIDATION_WORKERS:-1}" \
             || warn "statistical validation failed; leaderboard is unaffected" &
     fi
     wait
