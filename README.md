@@ -167,6 +167,25 @@ page with every fold open and every note printed in full). Besides the leaderboa
   of CPRR differences by species, plasmid size and reference tier; and an interactive **precision-recall** plot with iso-F1 lines and false positives per recovered plasmid.
   The plasmid viewer also draws each tool's alignment blocks against the truth plasmid in a linear **Reference versus reconstruction** pane linked to the circular map.
   Tables that a figure now draws are folded until opened; nothing is removed.
+- **More figures for comparing tools and explaining their errors:**
+  - a **radar fingerprint** of each tool per analysis track (accuracy F1, recovery, CPRR, SV-PRR, verified sequence,
+    runtime and reliability; an axis with no data is left out, not drawn as 0), with its numbers in a table;
+  - the numeric **tool × metric heatmap** now also carries SV-PRR, the unverified-sequence shares and the precision
+    gap (lower-is-better columns have their colour flipped), each with a per-isolate drill-down;
+  - a **complexity** figure: each tool's base F1 on each isolate against the isolate's characteristics (plasmid
+    count, largest repeat fraction, contigs, read depth), each marked as knowable without a reference or not;
+  - under each coverage matrix, an **outcome table**: per plasmid and tool, perfect, partial, fragmented, merged,
+    fragmented and merged, or missed (a tool that writes no bins is *not assessable*, not a miss);
+  - the **plasmid maps** (static and interactive) shade each tool's ring by alignment identity and bracket the
+    resistance regions;
+  - the **3D landscape** can size and colour runs by true-positive or false-positive bases.
+- **Recommendation evidence:** the *Recommendations* view explains each recommendation (expected performance,
+  independent studies, reference quality, how similar your isolates are, uncertainty) and says why when none is given.
+- **Dataset characteristics** (*Isolate difficulty* tab): one row per isolate built from measurements the pipeline
+  already makes, each column marked truth-free (knowable for a new isolate) or truth-derived (benchmark only).
+- **Truth audits** (*Truth labels* tab): flags for integrated plasmids, chromids, secondary chromosomes, large and
+  multi-replicon plasmids, multimers and collapsed repeats, and a table of the tools that share a marker database with
+  the evidence that labelled the truth.
 - **A "?" help button on every section and tab** that explains the analysis in plain language: what it shows, the data used, how it was made, how to read it, why it matters and what to keep in mind.
 - **An Artifact explorer** listing every file the run produced, each with a description of what it is, which step wrote it and where the report shows it.
 - Grouped, collapsible navigation, per-plasmid detail, an assembly-quality section and links to `leaderboard.md` and `scoring_spec.md`.
@@ -617,6 +636,28 @@ the confusion matrix on purpose, so the core precision stays conservative and de
 | `unmapped_pred_bp` | Predicted bases that align nowhere. | Likely mis-assembly or contamination, a failure mode different from calling chromosome plasmid. |
 | `off_truth_pred_bp` | Predicted bases that align only to a reference sequence absent from the truth table (e.g. a contig the NCBI sequence report never classified). | A different failure from "does not align at all". Not scorable either way. |
 | `ambiguously_mapped_pred_bp` (and `unambiguously_mapped_pred_bp`) | Predicted bases with retained alignments to *both* a plasmid and a chromosome sequence, found with a secondary-alignment run. | Flags repeats and shared elements where the molecular assignment is genuinely uncertain. It never changes TP, FP or F1. |
+
+**The burden of unverified sequence, per tool.** The leaderboard pools these diagnostics over the isolates, so a
+tool whose output largely cannot be checked is visible at a glance (columns appended last; blank, never 0, when the
+scores do not carry them):
+
+| Leaderboard column | Meaning |
+|---|---|
+| `total_predicted_bp`, `total_unmapped_pred_bp`, `total_off_truth_pred_bp`, `total_ambiguous_pred_bp` | Predicted bases in total, and those that align nowhere, only off the truth, or to both a plasmid and a chromosome. |
+| `unmapped_fraction`, `off_truth_fraction`, `ambiguous_fraction` | The same as shares of the predicted bases. |
+| `precision_gap` | Permissive minus strict precision: how much precision rests on bases that could not be scored. |
+
+The report shows them in *Ranking confidence* (unmapped, off-truth, alternative placement, precision gap).
+
+#### SV-PRR (CPRR with the structural calls beside it)
+
+- **What it is:** among the plasmids a tool reconstructs correctly by CPRR, the share that no structural-variant
+  call touches (`sv_prr`, `sv_prr_correct`, `sv_prr_plasmids` in the leaderboard; per isolate in
+  `structural_summary.tsv`).
+- **Why it is used:** a plasmid can pass CPRR's coverage and identity bars and still carry a rearrangement.
+- **How to read it:** it is reported beside CPRR and **never ranks tools**. CPRR, its definition and every rank are
+  unchanged. The structural calls are alignment-derived and not yet supported by reads or the assembly graph, so
+  SV-PRR is no more validated than they are.
 
 #### AMR gene recall and circular plasmid recall
 
@@ -1832,15 +1873,20 @@ None of these actions are required for a successful ordinary benchmark run.
 | `set: pipefail: invalid option name` | Archive from before v0.1.1 | Reinstall using the latest-release command in step 3 |
 | `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.1 | Reinstall the latest release, then revalidate the cohort lock |
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
-| `[MISS] Platon DB not found` | Step 7a incomplete | Redo step 7a; the `curl` resumes |
+| `[MISS] Platon DB not found` | Step 7a incomplete | `plasbench check` and answer `y` (it downloads and resumes), or redo step 7a |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
 | Stage 2 stops: `truth table ... still says REVIEW` | A reference sequence could not be labelled plasmid or chromosome | Open `truth.tsv`, replace each `REVIEW` after inspecting that sequence, re-run |
-| Download stops partway, repeatedly | Connection drops on large transfers | Step 7c — copy the databases from another machine |
+| Download stops partway, repeatedly | Connection drops on large transfers | Run the same command again: Platon and MOB-suite downloads resume. If it never finishes, step 7c — copy the databases from another machine |
+| `the run stopped in stage N (...): killed (SIGKILL)` | Usually out of memory, or WSL or the system ended the run | Lower `--memory-gb` or `--parallel-samples`, close other programs, re-run: finished work is reused |
+| `the previous run stopped before it finished` | The last run was cut off (WSL or the computer stopped) | Nothing to fix: re-run, and finished work is reused |
+| A stage stops with a red message naming a script and a command | A command inside that stage failed | Read the message and `logs/run_errors.log`, which keeps every stop with its time, stage, command and exit code |
 
-To see what PlasBench is doing in more detail, every stage writes a log:
+To see what PlasBench is doing in more detail, every stage writes a log, and every stop
+is recorded in `logs/run_errors.log`:
 
 ```bash
 ls "$PB/logs/"
+cat "$PB/logs/run_errors.log"
 ```
 
 ---
@@ -2758,6 +2804,20 @@ valid leaderboard, and `benchmark.recommendations.tsv` will say
 
 `--min-samples` and `--min-coverage` loosen or tighten the evidence gate. Loosening them
 for a small cohort is a choice you should be able to defend in a methods section.
+
+**Three ways to recommend, compared on the same held-out studies.** `benchmark.recommender_arms.tsv` scores:
+
+| Arm | Picks |
+|---|---|
+| Single best | The tool that does best across all training studies: the baseline. |
+| Organism | The best tool for the isolate's species. |
+| Feature-conditioned | The best tool among the five most similar training isolates, using only **truth-free** dataset characteristics (`benchmark.dataset_features.tsv`); a reference-derived column is refused. |
+
+Each arm is reported with its regret, top-1 and near-optimal rates, improvement over the single best, the studies in
+which it beat it, calibration, abstention and the regret when it does answer. A smarter arm counts as adding value
+only if it beats the single best on average **and** in most of at least three studies; otherwise the single best (or no
+recommendation) stands. The existing recommender outputs are unchanged; the table is in the report's
+*Recommendations* evaluation detail.
 
 ---
 
