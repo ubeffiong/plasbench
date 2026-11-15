@@ -84,29 +84,41 @@ assemble_sample() {
     log "=== Assemble $SAMPLE ==="
     local START; START="$(date +%s)"
     # --- fastp trim ---
+    # Crash-safe: fastp writes to *.partial.fastq.gz names, which are renamed only after it succeeds, and a
+    # .fastp.complete marker records the finished pair. A run that is killed mid-trim (a full disk, WSL or the
+    # machine stopping) therefore never leaves a truncated pair that a re-run would mistake for finished reads.
     local T1="$SDIR/${SRA}_1.trim.fastq.gz" T2="$SDIR/${SRA}_2.trim.fastq.gz"
-    if [[ -s "$T1" && -s "$T2" ]]; then
+    local P1="$SDIR/${SRA}_1.trim.partial.fastq.gz" P2="$SDIR/${SRA}_2.trim.partial.fastq.gz"
+    local TRIM_DONE="$SDIR/.fastp.complete"
+    local ASMDIR="$SDIR/assembly"
+    local CONTIGS="$SDIR/contigs.fasta"
+    local GRAPH="$SDIR/assembly_graph.gfa"
+    rm -f "$P1" "$P2"                      # leftovers of an interrupted trim
+    # Trimmed reads count as finished when the marker says so, or (for data trimmed by an earlier PlasBench, which
+    # wrote no marker) when an assembly already exists, i.e. the trim completed long ago. Otherwise they are redone.
+    if [[ -s "$T1" && -s "$T2" ]] && [[ -f "$TRIM_DONE" || -s "$CONTIGS" ]]; then
         log "  trimmed reads present, skipping fastp"
     else
+        [[ -s "$T1" || -s "$T2" ]] && log "  trimmed reads from an unfinished run found: trimming again"
+        rm -f "$T1" "$T2" "$TRIM_DONE"
         log "  fastp trimming ($SAMPLE) ..."
-        if ! fastp -i "$R1" -I "$R2" -o "$T1" -O "$T2" \
+        if ! fastp -i "$R1" -I "$R2" -o "$P1" -O "$P2" \
             --length_required "$MIN_READ_LEN" --thread "$THREADS" \
             --json "$SDIR/fastp.json" --html "$SDIR/fastp.html" $FASTP_EXTRA \
-            > "$LOG_DIR/${SAMPLE}.fastp.log" 2>&1; then
+            > "$LOG_DIR/${SAMPLE}.fastp.log" 2>&1 \
+            || [[ ! -s "$P1" || ! -s "$P2" ]] || ! mv -f "$P1" "$T1" || ! mv -f "$P2" "$T2"; then
             # Remove the partial pair so a re-run retries the trim instead of
             # assembling truncated reads.
-            rm -f "$T1" "$T2"
+            rm -f "$P1" "$P2" "$T1" "$T2"
             warn "fastp failed for $SAMPLE; excluded from assembly and scoring"
             record_assembly_status "$SAMPLE" "failed" "" \
                 "fastp: see $LOG_DIR/${SAMPLE}.fastp.log" "$(( $(date +%s) - START ))"
             return 0
         fi
+        : > "$TRIM_DONE"
     fi
 
     # --- assemble ---
-    local ASMDIR="$SDIR/assembly"
-    local CONTIGS="$SDIR/contigs.fasta"
-    local GRAPH="$SDIR/assembly_graph.gfa"
     if [[ -s "$CONTIGS" ]]; then
         log "  base assembly present, skipping"
         # Trimmed reads may not exist yet on a reused-assembly re-run with
@@ -120,6 +132,9 @@ assemble_sample() {
         return 0
     fi
 
+    # A fresh assembly starts from an empty folder: one interrupted earlier (the machine stopped, the disk filled)
+    # must not be resumed half-written, and the copied contigs are only put in place once complete.
+    rm -rf "$ASMDIR" "$CONTIGS.partial" "$GRAPH.partial"
     if [[ "$ASSEMBLER" == "spades" ]]; then
         need spades.py
         log "  SPAdes assembling ($SAMPLE) ..."
@@ -131,9 +146,11 @@ assemble_sample() {
                 "spades: see $LOG_DIR/${SAMPLE}.spades.log" "$(( $(date +%s) - START ))"
             return 0
         fi
-        cp "$ASMDIR/contigs.fasta" "$CONTIGS"
-        [[ -f "$ASMDIR/assembly_graph_with_scaffolds.gfa" ]] && \
-            cp "$ASMDIR/assembly_graph_with_scaffolds.gfa" "$GRAPH" || true
+        if [[ -f "$ASMDIR/assembly_graph_with_scaffolds.gfa" ]]; then
+            cp "$ASMDIR/assembly_graph_with_scaffolds.gfa" "$GRAPH.partial" && mv -f "$GRAPH.partial" "$GRAPH" || true
+        fi
+        # contigs last: their presence is what marks the sample as assembled on a re-run
+        cp "$ASMDIR/contigs.fasta" "$CONTIGS.partial" && mv -f "$CONTIGS.partial" "$CONTIGS"
     elif [[ "$ASSEMBLER" == "unicycler" ]]; then
         need unicycler
         log "  Unicycler assembling ($SAMPLE) ..."
@@ -144,8 +161,10 @@ assemble_sample() {
                 "unicycler: see $LOG_DIR/${SAMPLE}.unicycler.log" "$(( $(date +%s) - START ))"
             return 0
         fi
-        cp "$ASMDIR/assembly.fasta" "$CONTIGS"
-        [[ -f "$ASMDIR/assembly.gfa" ]] && cp "$ASMDIR/assembly.gfa" "$GRAPH" || true
+        if [[ -f "$ASMDIR/assembly.gfa" ]]; then
+            cp "$ASMDIR/assembly.gfa" "$GRAPH.partial" && mv -f "$GRAPH.partial" "$GRAPH" || true
+        fi
+        cp "$ASMDIR/assembly.fasta" "$CONTIGS.partial" && mv -f "$CONTIGS.partial" "$CONTIGS"
     else
         # A misconfigured assembler is an operator error, not a data failure:
         # it would fail identically for every sample, so it stays fatal.
