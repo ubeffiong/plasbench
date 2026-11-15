@@ -37,6 +37,39 @@ history is lost, only the numbering is cleaner. See
   and graph are copied under `.partial` names first, so a half-copied `contigs.fasta` is never reused. Finished work
   is still reused, including samples trimmed and assembled by an earlier PlasBench.
 
+### Changed -- warnings are yellow and errors red, in the window and in a terminal
+- **The window's console** uses one colour code in all three tabs (Job output, Session log, Terminal): errors are
+  red and bold, with a red bar in Job output, and warnings are yellow. A line PlasBench tags `WARNING:` (for example
+  a tolerated `SPAdes failed for ...`) is yellow; `ERROR:`, tracebacks, `No space left on device`, `command not
+  found` and non-zero exits are red. A success line that mentions a failure (`... -> PASS`) and zero counts such as
+  `failed=0` are not flagged. The Terminal tab now colours command output, and the Session log shows failed jobs and
+  terminal commands red, cancelled or interrupted ones yellow.
+- **Runs in a terminal** print `WARNING:` lines yellow and `ERROR:` lines red (`scripts/lib.sh`), only when the
+  output is a terminal, so log files stay plain. `NO_COLOR` or `PLASBENCH_COLOR=never` turns colour off, and
+  `PLASBENCH_COLOR=always` forces it.
+
+### Changed -- heavy files never go into git, and you can edit .gitignore from the window
+- **One catalogue of heavy formats** (`plasbench/gitops.py`, `HEAVY`) drives both the managed `.gitignore` blocks and
+  the commit check, so the two cannot drift apart. It covers:
+  - reads (FASTQ, also bzip2/xz/zstd-compressed; SRA; nanopore FAST5/POD5/BLOW5);
+  - alignments and their indexes (BAM, SAM, CRAM, BAI, CRAI, CSI, PAF);
+  - variants (VCF, BCF, TBI);
+  - coverage tracks (bigWig, bedGraph);
+  - aligner indexes and tool databases (minimap2, Bowtie2, BWA, Kraken2, Mash, DIAMOND, BLAST, HMMER, SQLite, HDF5,
+    model files);
+  - archives (tar, zip, 7z, bz2, xz, zst);
+  - in study repositories, assemblies and sequences (FASTA, GenBank, GFF, GFA).
+  Previously SAM was missing from the developer rules, and VCF, CRAM/BAM indexes, nanopore signal, indexes, databases
+  and archives were not covered at all.
+- **Repositories set up by an earlier PlasBench get the new rules**: the managed block is brought up to date, and
+  lines outside it are never touched.
+- **Heavy files already committed** (before a rule covered them) are listed on Version control, with **Stop
+  tracking** (`git rm --cached`: the files stay on disk).
+- **Edit `.gitignore` in the window** (Version control > Ignored files). PlasBench's block is shown read-only. Your
+  own rules are editable and come after it, so `!results/key_plasmids.fasta` brings back a file the block leaves
+  out. **Test a path** shows whether a file is ignored and by which rule. A sequence file you keep with your own rule
+  is a warning at commit time. Reads, alignments, variants, indexes and archives stay blocked whatever the rules say.
+
 ### Added -- a structured evidence record for every reference (review H3)
 - `python/truth_provenance.py` records six evidence fields per reference, additively: assembly technology, circularity evidence, read support, replicon/MOB evidence, structural integrity and independent validation, each `declared` (new optional sample-sheet columns `truth_circularity_evidence`, `truth_read_support`, `truth_structural_integrity`, `truth_independent_validation`), `inferred` (NCBI metadata, `truth_labels.tsv`) or `unknown`; plus `evidence_recorded` and `evidence_sources`. The original columns keep their order. Unknown never demotes a reference; an explicit adverse value (read support none, unresolved repeats) caps Tier 1 at Tier 2 and says why. `validate_cohort.py` checks the new vocabularies; the headline design table gains an *Evidence recorded* column; the demo declares some evidence and now builds the provenance table before aggregating (so the headline and the report read the same references). `test/test_truth_evidence_record.py` covers it. The cohort `truth_quality_tier` column is kept for now: it still feeds the tier and replacing it needs the cohorts re-curated (maintainer-owned).
 
