@@ -84,7 +84,8 @@ def plasmid_reference_matches(reference, sketch, max_distance):
     if not sketch or not os.path.isfile(sketch) or not shutil.which("mash"):
         return None
     try:
-        result = subprocess.run(["mash", "dist", "-i", "-d", str(max_distance), sketch, reference],
+        threads = str(max(1, int(os.environ.get("THREADS") or 1)))   # mash dist against a large sketch: use the threads
+        result = subprocess.run(["mash", "dist", "-p", threads, "-i", "-d", str(max_distance), sketch, reference],
                                 text=True, capture_output=True, timeout=3600)
     except (OSError, subprocess.TimeoutExpired):
         return None
