@@ -332,9 +332,12 @@ def transfer_section(taxon_rows, comparisons):
                    "".join(parts))
 
 
-AMR_LEAD = ("Each curated AMR gene copy is matched by position. Level 2: the bin holding it is matched "
-            "one-to-one to the gene's own plasmid. Level 1: that plasmid shares a replicon type with the gene's "
-            "plasmid. Copies on shared or unassigned contigs are their own category. Gene classes come from "
+AMR_LEAD = ("Each curated AMR gene copy is matched by position. Level 2, for a tool that bins: the bin holding it is matched "
+            "one-to-one to the gene's own plasmid. For a tool that does not bin (a classifier or a reassembler) each gene-bearing "
+            "record is attributed to the truth sequence it aligns to most, so several records may rightly come from one plasmid; "
+            "a correct placement then means the gene was recovered on that plasmid's sequence, not that the plasmid was "
+            "reconstructed, and AMR-PRR and pairs kept together are not applicable. Level 1: that plasmid shares a replicon type "
+            "with the gene's plasmid. Copies on shared or unassigned contigs are their own category. Gene classes come from "
             "config/amr_gene_classes.tsv.")
 
 
@@ -345,12 +348,14 @@ def amr_section(rows, data_dir=None):
     na = lambda v: v if v not in ("", None) else "not evaluable"  # noqa: E731
     tables = table(["Tool", "Gene class", "Gene copies", "Recovered", "Correct plasmid", "Wrong plasmid",
                     "Shared contig", "Unassigned contig", "Correct-plasmid rate", "Replicon-type correct",
-                    "AMR plasmids", "All copies on the right plasmid", "AMR-PRR", "Pairs kept together", "Flank context"],
+                    "AMR plasmids", "All copies on the right plasmid", "AMR-PRR", "Pairs kept together", "Flank context", "Attribution"],
                    [(r["tool"], r["gene_class"], r["n_gene_copies"], r["n_recovered"], r["n_correct_plasmid"],
                      r["n_wrong_plasmid"], r["n_shared_contig"], r["n_unassigned_contig"], r["correct_plasmid_rate"],
                      r["replicon_type_correct_rate"], r.get("n_amr_plasmids", ""), na(r.get("amr_complete_rate")), na(r.get("amr_prr")),
                      (f"{r['n_colocalised_pairs']} of {r['n_pairs']} ({na(r.get('colocalisation_rate'))})" if r.get("n_pairs") not in ("", None, "0") else "not evaluable"),
-                     na(r.get("flank_context_rate"))) for r in rows])
+                     na(r.get("flank_context_rate")),
+                     {"bin_matching": "bins matched one-to-one", "contig_attribution": "per record (no bins): sequence attribution, not reconstruction"}.get(
+                         r.get("attribution_mode") or "bin_matching", r.get("attribution_mode") or "")) for r in rows])
     drafts = sum(int(r.get("draft_truth_copies") or 0) for r in rows if r.get("gene_class") == "all")
     if drafts:
         tables += (f"<p class='insight caution'><strong>Uncurated truth.</strong> {drafts} of the gene copies behind this table come from an auto-derived DRAFT (evidence tier auto_derived) that was copied to truth_amr.tsv "
