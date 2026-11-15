@@ -28,94 +28,95 @@ OVERRIDE_SENTENCE = "I UNDERSTAND THIS MAY EXPOSE DATA OR SECRETS"
 MAX_FILE = 100 * 2**20
 WARN_FILE = 20 * 2**20
 
-SAFE_IGNORE = """# --- PlasBench safety block (managed: keeps run outputs, large raw files and credentials out of git) ---
-studies/
-results/
-results_*/
-data/
-logs/
-tmp/
-.plasbench-backup/
-__pycache__/
-*.egg-info/
-*.fastq
-*.fastq.gz
-*.fq
-*.fq.gz
-*.bam
-*.bai
-*.cram
-*.sra
-*.paf
-*.gfa
-*.gfa.gz
-config/local.env
-.ncbi.env
-.env
-*.pem
-*.key
-*.pfx
-id_rsa*
-id_ed25519*
-.pytest_cache/
-# --- end PlasBench safety block ---
-"""
-
-RUNS_IGNORE = """# --- PlasBench runs block (managed) ---
-# This repository tracks your benchmark RUNS: each study's record (study.json), sample sheets, settings snapshots,
-# result tables (.tsv/.csv/.json), reports (.html/.pdf), figures and logs. Raw and intermediate sequence data stay out:
-# they are large, and a rerun re-creates them. Credentials never go in.
-tmp/
-**/tmp/
-*.fastq
-*.fastq.gz
-*.fq
-*.fq.gz
-*.fasta
-*.fasta.gz
-*.fa
-*.fa.gz
-*.fna
-*.fna.gz
-*.ffn
-*.faa
-*.gbk
-*.gff
-*.gff3
-*.gfa
-*.gfa.gz
-*.fastg
-*.paf
-*.paf.gz
-*.bam
-*.bai
-*.sam
-*.cram
-*.sra
-*.sqlite
-*.db
-*.h5
-*.npz
-.env
-*.pem
-*.key
-*.pfx
-id_rsa*
-id_ed25519*
-__pycache__/
-*.pyc
-# --- end PlasBench runs block ---
-"""
-RUNS_MARKER = "PlasBench runs block"
-# In a runs repository the study folders' results/ and logs/ ARE what is tracked; raw data and tmp are not.
-RUN_DATA_PATTERNS = [
-    (re.compile(r"\.(fastq|fq|bam|cram|sam|sra|bcf)(\.gz)?$", re.I), "raw sequencing reads or alignments"),
-    (re.compile(r"\.(fasta|fa|fna|ffn|faa|gfa|fastg|paf)(\.gz)?$", re.I), "sequence data (re-created by a rerun)"),
-    (re.compile(r"(^|/)tmp/"), "temporary files of a run"),
+# ---------------------------------------------------------------- heavy data: never in git
+# One catalogue drives both the managed .gitignore blocks and the commit check, so the two cannot drift apart.
+# group -> (why, glob patterns). Matching is on the file name, case-insensitive.
+HEAVY = {
+    "reads": ("raw sequencing reads", [
+        "*.fastq", "*.fq", "*.fastq.gz", "*.fq.gz", "*.fastq.bz2", "*.fq.bz2", "*.fastq.xz", "*.fq.xz",
+        "*.fastq.zst", "*.fq.zst", "*.sra", "*.sralite", "*.fast5", "*.pod5", "*.blow5", "*.slow5", "*.bax.h5", "*.bas.h5"]),
+    "alignments": ("read alignments and their indexes", [
+        "*.bam", "*.sam", "*.cram", "*.bai", "*.crai", "*.csi", "*.sai", "*.paf", "*.paf.gz", "*.maf.gz"]),
+    "variants": ("variant calls", ["*.vcf", "*.vcf.gz", "*.bcf", "*.tbi", "*.gvcf", "*.gvcf.gz"]),
+    "tracks": ("coverage / genome-browser tracks", ["*.bw", "*.bigwig", "*.bb", "*.bigbed", "*.bedgraph", "*.bedgraph.gz", "*.wig"]),
+    "indexes": ("aligner indexes and tool databases", [
+        "*.mmi", "*.bt2", "*.bt2l", "*.bwt", "*.pac", "*.ann", "*.amb", "*.sa", "*.2bit",
+        "*.k2d", "*.kmer_distrib", "*.msh", "*.dmnd", "*.hmm.h3f", "*.h3m", "*.h3i", "*.h3p",
+        "*.nhr", "*.nin", "*.nsq", "*.nhd", "*.nhi", "*.nog", "*.nsd", "*.nsi", "*.ndb", "*.not", "*.ntf", "*.nto", "*.njs",
+        "*.phr", "*.pin", "*.psq", "*.pog", "*.psd", "*.psi", "*.pdb.gz",
+        "*.sqlite", "*.sqlite3", "*.db", "*.h5", "*.hdf5", "*.npz", "*.npy", "*.pkl", "*.pickle", "*.pt", "*.ckpt", "*.onnx"]),
+    "archives": ("compressed archives (downloads, databases)", [
+        "*.tar", "*.tar.gz", "*.tgz", "*.tar.bz2", "*.tbz2", "*.tar.xz", "*.txz", "*.tar.zst", "*.zip", "*.7z", "*.rar",
+        "*.bz2", "*.xz", "*.zst"]),
+    # assemblies and annotations: re-created by a rerun. Only for RUN repositories: the program has small fixtures.
+    "sequence": ("sequence data (assemblies, contigs, annotations; re-created by a rerun)", [
+        "*.fasta", "*.fa", "*.fna", "*.ffn", "*.faa", "*.fas", "*.fsa", "*.mfa", "*.frn",
+        "*.fasta.gz", "*.fa.gz", "*.fna.gz", "*.faa.gz", "*.ffn.gz",
+        "*.gbk", "*.gbff", "*.gb", "*.embl", "*.gff", "*.gff3", "*.gtf", "*.gff.gz", "*.gff3.gz", "*.gbk.gz", "*.gbff.gz",
+        "*.gfa", "*.gfa.gz", "*.fastg", "*.asqg", "*.agp", "*.fai", "*.genbank"]),
+}
+PROGRAM_HEAVY = ("reads", "alignments", "variants", "tracks", "indexes", "archives")
+# A study repository keeps study-level tables and reports only. Per-sample sub-folders (predictions, alignments,
+# truth, reads) and sample-data folders can carry sample identity or clinical detail, and so can files named for
+# patients, clinical data or line lists: they stay out, whatever their format.
+SAMPLE_DATA_IGNORE = ["results/*/", "data/", "reads/", "assembly/", "predictions*/", "metadata/", "clinical/",
+                      "patient*/", "**/*patient*", "**/*clinical*", "**/*linelist*"]
+SAMPLE_DATA_PATTERNS = [
+    (re.compile(r"(^|/)results/[^/]+/"), "per-sample output folder (sequence and sample-level files)"),
+    (re.compile(r"(^|/)(data|reads|assembly|metadata|clinical|predictions[^/]*)/"), "sample data folder"),
+    (re.compile(r"(patient|clinical|linelist)", re.I), "file named for patient or clinical data"),
 ]
-DATA_PATTERNS = [
-    (re.compile(r"\.(fastq|fq|bam|cram|sam|sra|bcf)(\.gz)?$", re.I), "raw sequencing reads or alignments"),
-    (re.compile(r"\.(paf|gfa)(\.gz)?$", re.I), "alignment or assembly-graph output"),
+RUNS_HEAVY = PROGRAM_HEAVY + ("sequence",)
+
+
+def _any_case(glob: str) -> str:
+    """*.bam -> *.[bB][aA][mM]: git's ignore patterns are case-sensitive on Linux and macOS, so S1.BAM would slip
+    past *.bam there (Windows git ignores case, which hid this)."""
+    return "".join(f"[{c.lower()}{c.upper()}]" if c.isalpha() else c for c in glob)
+
+
+def _globs(groups) -> list:
+    out = []
+    for g in groups:
+        out += [_any_case(p) for p in HEAVY[g][1] if _any_case(p) not in out]
+    return out
+
+
+def _heavy_patterns(groups) -> list:
+    """[(compiled regex on the path, why)] for the commit check, from the same globs as the .gitignore."""
+    out = []
+    for g in groups:
+        out.append((re.compile(r"(^|/)[^/]*(" + "|".join(re.escape(p[1:]) for p in HEAVY[g][1]) + r")$", re.I), HEAVY[g][0]))
+    return out
+
+
+SAFE_IGNORE = ("# --- PlasBench safety block (managed: keeps run outputs, large raw files and credentials out of git) ---\n"
+               "# Updated by PlasBench when its list grows; edit outside the block.\n"
+               "studies/\nresults/\nresults_*/\ndata/\nlogs/\ntmp/\n.plasbench-backup/\n__pycache__/\n*.egg-info/\n.pytest_cache/\n"
+               "*.gfa\n*.gfa.gz\n"
+               + "\n".join(_globs(PROGRAM_HEAVY)) + "\n"
+               "config/local.env\n.ncbi.env\n.env\n*.pem\n*.key\n*.pfx\nid_rsa*\nid_ed25519*\n"
+               "# --- end PlasBench safety block ---\n")
+
+RUNS_IGNORE = ("# --- PlasBench runs block (managed) ---\n"
+               "# This repository tracks a benchmark RUN (one study): its record (study.json), sample sheets, settings,\n"
+               "# result tables (.tsv/.csv/.json), reports (.html/.pdf), figures and logs. Heavy data stays out: reads,\n"
+               "# alignments (BAM/SAM/CRAM), variants, assemblies and sequences, indexes and databases, archives. They are\n"
+               "# large, and a rerun re-creates them. Credentials never go in. PlasBench updates this block when its list\n"
+               "# grows; add your own rules outside it.\n"
+               "# Per-sample folders and files named for patient or clinical data can identify people: they stay out.\n"
+               "tmp/\n**/tmp/\n__pycache__/\n*.pyc\n"
+               + "\n".join(SAMPLE_DATA_IGNORE) + "\n"
+               + "\n".join(_globs(RUNS_HEAVY)) + "\n"
+               ".env\n*.pem\n*.key\n*.pfx\nid_rsa*\nid_ed25519*\n"
+               "# --- end PlasBench runs block ---\n")
+RUNS_MARKER = "PlasBench runs block"
+SAFE_MARKER = "PlasBench safety block"
+# In a runs repository the study's results/ and logs/ ARE what is tracked; heavy data and tmp are not.
+RUN_DATA_PATTERNS = (_heavy_patterns(RUNS_HEAVY) + SAMPLE_DATA_PATTERNS
+                     + [(re.compile(r"(^|/)tmp/"), "temporary files of a run")])
+DATA_PATTERNS = _heavy_patterns(PROGRAM_HEAVY) + [
+    (re.compile(r"\.(gfa)(\.gz)?$", re.I), "assembly-graph output"),
     (re.compile(r"(^|/)(studies|results|results_[^/]+|data|logs|tmp)/"), "run output or download folder"),
     (re.compile(r"(^|/)\.plasbench-backup/"), "PlasBench update backups"),
 ]
@@ -138,7 +139,8 @@ SECRET_CONTENT = [
 # Isolate metadata can carry patient information (clinical isolates): direct identifier columns block a commit.
 IDENTIFIER_CONTENT = [
     (re.compile(r"(?im)^.*\b(patient[_ ]?name|full[_ ]?name|surname|first[_ ]?name|date[_ ]?of[_ ]?birth|"
-                r"national[_ ]?id|hospital[_ ]?number|home[_ ]?address|telephone|phone[_ ]?number)\b.*$"),
+                r"national[_ ]?id|hospital[_ ]?number|home[_ ]?address|telephone|phone[_ ]?number|"
+                r"patient[_ ]?id|medical[_ ]?record|mrn|nhs[_ ]?number|ward|bed[_ ]?number)\b.*$"),
      "a column of direct patient identifiers"),
 ]
 
@@ -276,6 +278,8 @@ def info(repo: str | Path) -> dict:
     out["is_repo"] = True
     out["root"] = toplevel
     out["kind"] = repo_kind(repo)
+    if refresh_gitignore(repo):                   # an older managed block gets the current list of heavy formats
+        out["gitignore_updated"] = True
     # 'normal' reports an untracked DIRECTORY once; 'all' walked every file inside it, so a
     # polled status recursed through runs/ (hundreds of thousands of files) every few seconds.
     st = run(repo, "status", "--porcelain=v2", "--branch", "--untracked-files=normal", "-z", check=False)
@@ -426,14 +430,119 @@ def repo_kind(repo) -> str:
 
 
 def ensure_gitignore(repo, kind: str = "program") -> bool:
-    """Add the managed block for this kind of repository if missing. Returns True if the file changed."""
+    """Add the managed block for this kind of repository, or bring an older copy of it up to date (the list of heavy
+    formats grows over time; repositories made by an earlier PlasBench get the new rules). Lines outside the block are
+    the user's and are never touched. Returns True if the file changed."""
     gi = Path(repo) / ".gitignore"
     cur = gi.read_text(encoding="utf-8") if gi.exists() else ""
-    marker, block = (RUNS_MARKER, RUNS_IGNORE) if kind == "runs" else ("PlasBench safety block", SAFE_IGNORE)
+    marker, block = (RUNS_MARKER, RUNS_IGNORE) if kind == "runs" else (SAFE_MARKER, SAFE_IGNORE)
+    end = f"# --- end {marker} ---"
     if marker in cur:
-        return False
+        start = cur.rfind("\n", 0, cur.index(marker)) + 1
+        stop = cur.find(end, start)
+        if stop < 0:
+            return False                      # a hand-edited block without its end line: leave it alone
+        stop = cur.find("\n", stop)
+        stop = len(cur) if stop < 0 else stop + 1
+        if cur[start:stop] == block:
+            return False
+        gi.write_text(cur[:start] + block + cur[stop:], encoding="utf-8")
+        return True
     gi.write_text((cur.rstrip("\n") + "\n\n" if cur.strip() else "") + block, encoding="utf-8")
     return True
+
+
+def refresh_gitignore(repo) -> bool:
+    """Update the managed block of a repository PlasBench set up (no effect on a .gitignore without one)."""
+    try:
+        cur = (Path(repo) / ".gitignore").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if RUNS_MARKER in cur:
+        return ensure_gitignore(repo, "runs")
+    if SAFE_MARKER in cur:
+        return ensure_gitignore(repo, "program")
+    return False
+
+
+def _split_gitignore(text: str):
+    """(managed block or '', the user's own lines) of a .gitignore."""
+    for marker in (RUNS_MARKER, SAFE_MARKER):
+        if marker in text:
+            start = text.rfind("\n", 0, text.index(marker)) + 1
+            stop = text.find(f"# --- end {marker} ---", start)
+            if stop < 0:
+                break
+            stop = text.find("\n", stop)
+            stop = len(text) if stop < 0 else stop + 1
+            user = (text[:start].rstrip("\n") + "\n\n" + text[stop:].lstrip("\n")).strip("\n")
+            return text[start:stop], user
+    return "", text.strip("\n")
+
+
+def gitignore_parts(repo) -> dict:
+    """What the window's .gitignore editor shows: PlasBench's managed block (read-only: it is rewritten when the list of
+    heavy formats grows) and the user's own rules (editable)."""
+    gi = Path(repo) / ".gitignore"
+    text = gi.read_text(encoding="utf-8") if gi.exists() else ""
+    managed, user = _split_gitignore(text)
+    return {"path": str(gi), "exists": gi.exists(), "kind": repo_kind(repo), "managed": managed, "user": user}
+
+
+def save_gitignore(repo, user_text: str) -> dict:
+    """Write the user's own rules AFTER the managed block, so a later `!pattern` can bring back a file the block
+    leaves out (git applies the last matching rule). A .gitignore without a managed block is the user's entirely."""
+    if not isinstance(user_text, str) or len(user_text) > 64_000 or "\0" in user_text:
+        raise ValueError("the rules must be text, at most 64 KB")
+    gi = Path(repo) / ".gitignore"
+    cur = gi.read_text(encoding="utf-8") if gi.exists() else ""
+    managed, _ = _split_gitignore(cur)
+    user = "\n".join(line.rstrip() for line in user_text.replace("\r\n", "\n").split("\n")).strip("\n")
+    text = (managed + ("\n" if user else "") if managed else "") + (user + "\n" if user else "")
+    gi.write_text(text, encoding="utf-8")
+    return gitignore_parts(repo)
+
+
+def check_ignore(repo, path: str) -> dict:
+    """Is this path ignored, and by which rule? (`git check-ignore -v`; works for files that do not exist yet)"""
+    raw = (path or "").strip().replace("\\", "/").lstrip("/")
+    if not raw or ".." in raw.split("/"):
+        raise ValueError("give a path inside the repository, e.g. results/S1.bam")
+    p = run(repo, "check-ignore", "-v", "--no-index", "--", raw, check=False)
+    line = p.stdout.strip()
+    if p.returncode != 0 or not line:
+        return {"path": raw, "ignored": False}
+    where, _, _ = line.partition("\t")
+    source, _, rest = where.partition(":")
+    lineno, _, pattern = rest.partition(":")
+    return {"path": raw, "ignored": not pattern.startswith("!"), "pattern": pattern, "source": source, "line": lineno}
+
+
+def heavy_tracked(repo, limit: int = 50) -> list:
+    """Heavy files git ALREADY tracks (committed before a rule existed): .gitignore cannot untrack them.
+    [{path, why}] for the window, which offers to stop tracking them (the files stay on disk)."""
+    pats = RUN_DATA_PATTERNS if repo_kind(repo) == "runs" else _heavy_patterns(PROGRAM_HEAVY)
+    names = run(repo, "ls-files", "-z", check=False).stdout.split("\0")
+    out = []
+    for n in names:
+        if not n:
+            continue
+        for pat, why in pats:
+            if pat.search(n.replace("\\", "/")):
+                out.append({"path": n, "why": why})
+                break
+        if len(out) >= limit:
+            break
+    return out
+
+
+def untrack(repo, paths: list) -> dict:
+    """Stop tracking files (git rm --cached): they stay on disk, and the next commit records their removal."""
+    if not paths:
+        raise ValueError("choose the files to stop tracking")
+    rel = [_inside(repo, p) for p in paths]
+    run(repo, "rm", "--cached", "-q", "--", *rel)
+    return {"untracked": rel}
 
 
 def init(repo, branch: str = "main", first_commit: bool = False, message: str = "Initial commit", kind: str = "runs") -> dict:
@@ -462,7 +571,7 @@ def set_identity(repo, name: str, email: str, scope: str = "local"):
 
 def stage(repo, paths: list[str] | None):
     """paths None or ['.'] => everything; otherwise those files (each must be inside the repo)."""
-    ensure_gitignore(repo) if not (Path(repo) / ".gitignore").exists() else None
+    ensure_gitignore(repo, repo_kind(repo)) if not (Path(repo) / ".gitignore").exists() else refresh_gitignore(repo)
     if not paths:
         run(repo, "add", "-A")
     else:
@@ -490,7 +599,14 @@ def scan_staged(repo) -> list[dict]:
         if not exempt:
             for pat, why in data_patterns:
                 if pat.search(norm):
-                    findings.append({"path": rel, "level": "block", "kind": "data", "why": why}); break
+                    level = "block"
+                    # A sequence file the user brought back with their own `!pattern` rule is a deliberate choice: warn,
+                    # do not block. Reads, alignments, variants, indexes and archives stay blocked whatever the rules say.
+                    if why == HEAVY["sequence"][0]:
+                        rule = check_ignore(repo, norm)
+                        if rule.get("pattern", "").startswith("!"):
+                            level, why = "warn", f"{why}; kept by your rule {rule['pattern']}"
+                    findings.append({"path": rel, "level": level, "kind": "data", "why": why}); break
         for pat, why in SECRET_PATTERNS:
             if pat.search(norm):
                 findings.append({"path": rel, "level": "block", "kind": "secret", "why": why}); break

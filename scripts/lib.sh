@@ -34,8 +34,17 @@ run_with_heartbeat() {
     done
     wait "$pid"
 }
-warn() { printf '[%s] WARNING: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
-die()  { printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; exit 1; }
+# Warnings print yellow and errors red, when they go to a terminal (never into a log file or the window, which
+# colours them itself). NO_COLOR (https://no-color.org) or PLASBENCH_COLOR=never turns colour off;
+# PLASBENCH_COLOR=always forces it.
+if [[ "${PLASBENCH_COLOR:-auto}" == "always" ]] \
+   || { [[ -t 2 && -z "${NO_COLOR:-}" && "${PLASBENCH_COLOR:-auto}" != "never" && "${TERM:-}" != "dumb" ]]; }; then
+    _C_WARN=$'\033[33m'; _C_ERR=$'\033[1;31m'; _C_OFF=$'\033[0m'
+else
+    _C_WARN=""; _C_ERR=""; _C_OFF=""
+fi
+warn() { printf '%s[%s] WARNING: %s%s\n' "$_C_WARN" "$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$_C_OFF" >&2; }
+die()  { printf '%s[%s] ERROR: %s%s\n' "$_C_ERR" "$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$_C_OFF" >&2; exit 1; }
 
 # Check a command exists; die if not.
 need() {
@@ -462,3 +471,60 @@ mobsuite_db_dir() {
     [[ -n "$found" && -d "$found" ]] && printf %s "$found"
     return 0
 }
+
+# --- never stop silently ------------------------------------------------------------------------------------------
+# A stage that stops on an unexpected failure (set -e), or is stopped by a signal (Ctrl+C, a closed terminal, the
+# window's Cancel, the system), says so on the console in red: which script, which command, the exit code and what
+# it usually means. The same line goes to logs/run_errors.log. SIGKILL (out of memory) cannot be caught by the process
+# it kills, so run_all.sh, the plasbench command and the window report it from outside. PLASBENCH_NO_TRAPS=1 disables
+# this (for scripts that install their own).
+explain_exit() {
+    local code="$1"
+    case "$code" in
+        0) echo "finished" ;;
+        1) echo "a command reported an error" ;;
+        2) echo "a command was given a wrong option or a missing file" ;;
+        124) echo "a time limit was reached" ;;
+        126) echo "a program could not be run (permissions)" ;;
+        127) echo "a program was not found (not installed, or not on PATH)" ;;
+        129) echo "stopped (SIGHUP): the terminal was closed" ;;
+        130) echo "stopped with Ctrl+C" ;;
+        134) echo "aborted (SIGABRT): the program crashed" ;;
+        137) echo "killed (SIGKILL): usually out of memory, or WSL or the system ended it" ;;
+        139) echo "crashed (segmentation fault)" ;;
+        143) echo "stopped (SIGTERM): cancelled, or the system asked it to stop" ;;
+        *) if [[ "$code" =~ ^[0-9]+$ ]] && (( code > 128 )); then echo "stopped by signal $(( code - 128 ))";
+           else echo "failed with exit code $code"; fi ;;
+    esac
+}
+
+_plasbench_record_error() {
+    local line="$1"
+    printf '%s%s%s\n' "${_C_ERR:-}" "$line" "${_C_OFF:-}" >&2
+    if [[ -n "${LOG_DIR:-}" ]]; then
+        { mkdir -p "$LOG_DIR" && printf '%s\n' "$line" >> "$LOG_DIR/run_errors.log"; } 2>/dev/null || true
+    fi
+}
+
+_plasbench_on_err() {
+    local code=$? cmd="$BASH_COMMAND" src="${BASH_SOURCE[1]:-$0}" lineno="${BASH_LINENO[0]:-?}"
+    [[ $- == *e* ]] || return 0                 # only when set -e is about to stop the script
+    [[ "${_PLASBENCH_ERR_REPORTED:-0}" == "1" ]] && return 0
+    _PLASBENCH_ERR_REPORTED=1
+    _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $(basename "$0") stopped: \`${cmd}\` failed, $(explain_exit "$code") (exit $code, ${src##*/} line $lineno)"
+}
+
+_plasbench_on_signal() {
+    local sig="$1" code="$2"
+    trap - "$sig"
+    _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $(basename "$0") $(explain_exit "$code")"
+    exit "$code"
+}
+
+if [[ "${PLASBENCH_NO_TRAPS:-0}" != "1" ]]; then
+    set -o errtrace                               # the ERR trap also covers functions and subshells
+    trap '_plasbench_on_err' ERR
+    trap '_plasbench_on_signal INT 130' INT
+    trap '_plasbench_on_signal TERM 143' TERM
+    trap '_plasbench_on_signal HUP 129' HUP
+fi

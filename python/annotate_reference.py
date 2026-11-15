@@ -32,7 +32,9 @@ import argparse
 import csv
 import json
 import shutil
+import os
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 import sys
 from pathlib import Path
 
@@ -92,12 +94,12 @@ def parse_tabular(text, mapping, feature_type, source, version, sequence_filter=
     return features
 
 
-def call_abricate(reference, database, timeout, sequences, kind=None):
+def call_abricate(reference, database, timeout, sequences, kind=None, threads=1):
     executable = shutil.which("abricate")
     if not executable:
         return [], {"status": "not_evaluated", "reason": "abricate is not installed"}
     version = tool_version(executable)
-    text, error = run([executable, "--nopath", "--db", database, str(reference)], timeout)
+    text, error = run([executable, "--nopath", "--threads", str(threads), "--db", database, str(reference)], timeout)
     if text is None:
         return [], {"status": "failed", "reason": error, "version": version}
     kind = kind or ("replicon" if database in ("plasmidfinder", "PlasmidFinder") else "amr")
@@ -106,12 +108,12 @@ def call_abricate(reference, database, timeout, sequences, kind=None):
     return features, {"status": "ok", "version": version, "database": database, "features": len(features)}
 
 
-def call_amrfinder(reference, timeout, sequences):
+def call_amrfinder(reference, timeout, sequences, threads=1):
     executable = shutil.which("amrfinder")
     if not executable:
         return [], {"status": "not_evaluated", "reason": "amrfinder is not installed"}
     version = tool_version(executable)
-    text, error = run([executable, "-n", str(reference)], timeout)
+    text, error = run([executable, "--threads", str(threads), "-n", str(reference)], timeout)
     if text is None:
         return [], {"status": "failed", "reason": error, "version": version}
     features = parse_tabular(text, {"sequence": "Contig id", "start": "Start", "end": "Stop",
@@ -123,12 +125,12 @@ def call_amrfinder(reference, timeout, sequences):
     return features, {"status": "ok", "version": version, "features": len(features)}
 
 
-def call_isescan(reference, timeout, sequences, workdir):
+def call_isescan(reference, timeout, sequences, workdir, threads=1):
     executable = shutil.which("isescan.py") or shutil.which("isescan")
     if not executable:
         return [], {"status": "not_evaluated", "reason": "isescan is not installed"}
     version = tool_version(executable)
-    _, error = run([executable, "--seqfile", str(reference), "--output", str(workdir), "--nthread", "1"], timeout)
+    _, error = run([executable, "--seqfile", str(reference), "--output", str(workdir), "--nthread", str(threads)], timeout)
     if error:
         return [], {"status": "failed", "reason": error, "version": version}
     features = []
@@ -185,13 +187,13 @@ def call_isfinder(reference, fasta, timeout, sequences):
     return features, {"status": "ok", "version": version, "database": Path(fasta).name, "features": len(features)}
 
 
-def call_barrnap(reference, timeout, sequences):
+def call_barrnap(reference, timeout, sequences, threads=1):
     """rRNA genes (barrnap GFF3, 1-based inclusive -> 0-based half-open)."""
     executable = shutil.which("barrnap")
     if not executable:
         return [], {"status": "not_evaluated", "reason": "barrnap is not installed"}
     version = tool_version(executable)
-    text, error = run([executable, "--quiet", "--kingdom", "bac", str(reference)], timeout)
+    text, error = run([executable, "--quiet", "--threads", str(threads), "--kingdom", "bac", str(reference)], timeout)
     if text is None:
         return [], {"status": "failed", "reason": error, "version": version}
     features = []
@@ -214,14 +216,15 @@ def call_barrnap(reference, timeout, sequences):
     return features, {"status": "ok", "version": version, "features": len(features)}
 
 
-def call_mob_typer(reference, timeout, sequences):
+def call_mob_typer(reference, timeout, sequences, threads=1):
     """MOB-typer reports per-sequence typing, not coordinates."""
     executable = shutil.which("mob_typer")
     if not executable:
         return [], {"status": "not_evaluated", "reason": "mob_typer is not installed"}
     version = tool_version(executable)
     out = Path(reference).with_suffix(".mobtyper.txt")
-    text, error = run([executable, "--multi", "--infile", str(reference), "--out_file", str(out)], timeout)
+    text, error = run([executable, "--multi", "--num_threads", str(threads), "--infile", str(reference),
+                       "--out_file", str(out)], timeout)
     if text is None and not out.is_file():
         return [], {"status": "failed", "reason": error, "version": version}
     if not out.is_file():
@@ -273,6 +276,8 @@ def main():
     parser.add_argument("--isfinder-fasta", default="",
                         help="optional curated ISFinder FASTA; adds IS annotation by BLAST (blastn -subject, no database build)")
     parser.add_argument("--timeout", type=int, default=1800)
+    parser.add_argument("--threads", type=int, default=int(os.environ.get("THREADS") or os.cpu_count() or 1),
+                        help="CPU threads in total; the callers run at the same time and share them (default: THREADS)")
     parser.add_argument("--workdir", type=Path)
     args = parser.parse_args()
     if not args.reference.is_file():
@@ -282,22 +287,29 @@ def main():
     workdir = args.workdir or args.out.parent / "annotation_work"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    features, provenance = [], {}
-    for name, call in (
-        ("mob_typer", lambda: call_mob_typer(args.reference, args.timeout, sequences)),
-        ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, args.timeout, sequences)),
+    # The callers are independent, so they run at the same time (they used to run one after another, and ISEScan,
+    # the slowest by far, had a single thread). ISEScan gets the whole thread allowance; the quick ones share a few.
+    threads = max(1, args.threads)
+    small = max(1, min(4, threads // 4))
+    calls = (
+        ("mob_typer", lambda: call_mob_typer(args.reference, args.timeout, sequences, small)),
+        ("abricate_amr", lambda: call_abricate(args.reference, args.amr_database, args.timeout, sequences, threads=small)),
         *[("abricate_replicon" if index == 0 else f"abricate_replicon_{name}",
-           lambda name=name: call_abricate(args.reference, name, args.timeout, sequences, kind="replicon"))
+           lambda name=name: call_abricate(args.reference, name, args.timeout, sequences, kind="replicon", threads=small))
           for index, name in enumerate([n for n in args.replicon_database.replace(",", " ").split() if n]
                                        or ["plasmidfinder"])],
-        ("amrfinder", lambda: call_amrfinder(args.reference, args.timeout, sequences)),
-        ("isescan", lambda: call_isescan(args.reference, args.timeout, sequences, workdir)),
+        ("amrfinder", lambda: call_amrfinder(args.reference, args.timeout, sequences, max(1, threads // 2))),
+        ("isescan", lambda: call_isescan(args.reference, args.timeout, sequences, workdir, threads)),
         ("isfinder", lambda: call_isfinder(args.reference, args.isfinder_fasta, args.timeout, sequences)),
-        ("barrnap", lambda: call_barrnap(args.reference, args.timeout, sequences)),
-    ):
-        found, status = call()
-        features.extend(found)
-        provenance[name] = status
+        ("barrnap", lambda: call_barrnap(args.reference, args.timeout, sequences, small)),
+    )
+    features, provenance = [], {}
+    with ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        futures = [(name, pool.submit(call)) for name, call in calls]
+        for name, future in futures:                  # collected in the original order: output stays the same
+            found, status = future.result()
+            features.extend(found)
+            provenance[name] = status
 
     # Deduplicate identical calls from overlapping databases, keeping provenance.
     seen, unique = set(), []
