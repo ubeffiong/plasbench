@@ -430,8 +430,8 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
 | E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:169` | `len(values) < 5 or len(units) < MIN_CLUSTERS_CI` |
 | E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:253` | `len(differences) < 5 or len(units) < MIN_CLUSTERS_TEST` |
-| E22 | Holm adjustment across pairs | `python/aggregate_results.py:657` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:800` | `def attach_significance` |
+| E22 | Holm adjustment across pairs | `python/aggregate_results.py:692` | `def holm_adjust` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:835` | `def attach_significance` |
 | E24 | Percentile cluster bootstrap | `python/resampling.py:160` | `def bootstrap_ci` |
 | E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:81` | `def sample_clusters` |
 | E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:109` | `UnionFind()` |
