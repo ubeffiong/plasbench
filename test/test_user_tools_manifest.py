@@ -72,7 +72,7 @@ def main():
     bad = errors_of(GOOD.replace("{threads}", "{cores}"))
     check("an unknown placeholder is reported with the available ones", "{cores}" in bad and "{contigs}" in bad, bad)
     bad = errors_of(GOOD.replace("task = reconstruction", "task = classification"))
-    check("contig_bins for a classifier is reported", "set [tool] task = reconstruction" in bad, bad)
+    check("contig_bins for a classifier is reported", "set [tool] task = binning_reconstruction" in bad, bad)
     bad = errors_of(GOOD.replace("name = my_binner", "name = My-Binner"))
     check("a name that is not snake_case is reported", "lower-case" in bad, bad)
     bad = errors_of(GOOD.replace("release_date = 2024-03-01", "release_date = March 2024"))
@@ -133,7 +133,7 @@ def main():
         check("the database release date feeds the leakage check", db.get("my_binner", {}).get("database_release_date") == "2024-03-01")
         import headline_design as hd
         design = hd.Design(capabilities=str(caps))
-        check("the headline design places it in the reconstruction task", design.task_of.get("my_binner") == hd.TASK_RECONSTRUCTION)
+        check("the headline design places it in the reconstruction task", design.task_of.get("my_binner") == hd.TASK_BINNING)
 
         print("run spec and install plan")
         tool = found["my_binner"]

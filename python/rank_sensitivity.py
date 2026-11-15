@@ -356,7 +356,7 @@ def cprr_threshold_rows(path):
         if value is None or threshold not in CPRR_THRESHOLDS or not r.get("tool"):
             continue
         task = r.get("task") or ""
-        if task and task not in ("binning_reconstruction", "sequence_reassembly"):   # the tasks that are bin-scored, so have a CPRR
+        if task and task not in ("binning_reconstruction", "sequence_reassembly", "reconstruction"):   # the bin-scored tasks have a CPRR ('reconstruction' is the older single name)
             continue
         per_group[r.get("analysis_track") or "short_read"][threshold][r["tool"]] = (value, r.get("n_isolates", ""))
 

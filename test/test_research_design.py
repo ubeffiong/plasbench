@@ -180,7 +180,7 @@ def headline(ok):
          "--out-prefix", "h"])
     board = {r["tool"]: r for r in read("h.leaderboard.tsv")}
     ok = check(ok, "tasks assigned from the capability registry",
-               board["binner"]["task"] == "reconstruction" and board["classy"]["task"] == "classification")
+               board["binner"]["task"] == "binning_reconstruction" and board["classy"]["task"] == "classification")
     ok = check(ok, "reconstruction ranked by lw_bin_f1 (not base F1)",
                board["binner"]["rank"] == "1" and board["binner"]["ranking_metric"] == "lw_bin_f1",
                f"(binner {board['binner']['ranking_score']}, binner2 {board['binner2']['ranking_score']})")
