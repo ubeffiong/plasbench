@@ -299,7 +299,11 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #cstate:empty{display:none}
 #cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
-#clog .c-err{color:#f1938a}#clog .c-warn{color:#e3c27a}#clog .c-ok{color:#8fd1a5}#clog .c-cmd{color:#8cc3ff}#clog .c-you{color:#d7dce2;font-weight:600}
+/* console colour code, all three tabs: errors red, warnings yellow */
+.c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b;font-weight:600}
+.c-warn,#clog .c-warn,#slog .s-warn{color:#ffd24d}
+#clog .c-err,#clog .c-warn{display:inline-block;width:100%;padding-left:6px;margin-left:-9px;border-left:3px solid}
+#clog .c-err{background:rgba(255,107,107,.08)}#clog .c-warn{background:rgba(255,210,77,.07)}#clog .c-ok{color:#8fd1a5}#clog .c-cmd{color:#8cc3ff}#clog .c-you{color:#d7dce2;font-weight:600}
 /* reply row: what the command reads from its "terminal" */
 #cin{display:flex;align-items:center;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
 #cin .pr{font:12px var(--mono);color:#8cc3ff}
@@ -318,9 +322,9 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #console.term .jobonly,#console.sess .jobonly,#console.term #cin,#console.sess #cin{display:none!important}
 #console:not(.term) .termonly{display:none!important}#console:not(.sess) .sessonly{display:none!important}
 #slog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word}
-#slog .s-t{color:#8a939d}#slog .s-job{color:#8cc3ff}#slog .s-ok{color:#8fd1a5}#slog .s-bad{color:#f1938a}#slog .s-you{color:#e3c27a}#slog .s-term{color:#d7dce2}#slog .s-sys{color:#aab3bd}
+#slog .s-t{color:#8a939d}#slog .s-job{color:#8cc3ff}#slog .s-ok{color:#8fd1a5}#slog .s-you{color:#e3c27a}#slog .s-term{color:#d7dce2}#slog .s-sys{color:#aab3bd}
 #tlog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
-#tlog .t-cmd{color:#8cc3ff}#tlog .t-err{color:#f1938a}#tlog .t-mut{color:#8a939d}
+#tlog .t-cmd{color:#8cc3ff}#tlog .t-mut{color:#8a939d}
 #tin{display:flex;align-items:flex-end;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
 #tin select{width:auto;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font-size:12px;padding:1px 6px}
 #tin .pr{font:12px var(--mono);color:#8cc3ff;white-space:nowrap;max-width:32vw;overflow:hidden;text-overflow:ellipsis}
@@ -1054,10 +1058,24 @@ function showConsole(id, expand) {
   if (expand) setConsole(true);
   pollConsole(true);
 }
+// One rule for the whole console: is a line an error (red), a warning (yellow), or a success?
+// Success wins first, so a test line like "one failed sample is tolerated -> PASS" is not painted red.
+const RX_OK = /->\s*PASS\b|^\s*PASS\b|^\s*ok\s|\bALL [A-Z0-9 -]*PASSED\b|\[ok\]/;
+const RX_ERR = /\bERROR\b|\bFATAL\b|Traceback \(most recent call last\)|\b[A-Z][A-Za-z]*Error:|\bException\b|\berror:|\bFAIL(?:ED|URE)?\b(?!\s*[=:]\s*0\b)|\bfailed\b(?!\s*[=:]\s*0\b)|\[exit [1-9]\d*\]|\bexited [1-9]\d*\b|\bKilled\b|No space left on device|Segmentation fault|command not found/i;
+const RX_WARN = /\bWARN(?:ING)?\b|\bwarning:|\bDeprecat|\bcancell?ed\b|\binterrupted\b|\bskipped\b(?!\s*[=:]\s*0\b)/i;
+// An explicit tag decides first: PlasBench writes "WARNING: SPAdes failed ..." for a recorded, tolerated failure,
+// which is a warning (yellow), and "ERROR: ..." for what stops a run (red).
+const RX_TAG_ERR = /\bERROR:|^\s*\[[^\]]*\]\s*ERROR\b/, RX_TAG_WARN = /\bWARNING:|^\s*\[[^\]]*\]\s*WARNING\b/;
+function lineLevel(l) {
+  return RX_OK.test(l) ? "ok" : RX_TAG_ERR.test(l) ? "err" : RX_TAG_WARN.test(l) ? "warn"
+    : RX_ERR.test(l) ? "err" : RX_WARN.test(l) ? "warn" : "";
+}
 function colorize(text) {
-  return esc(text).split("\n").map(l => /ERROR|FAIL|Traceback|error:/i.test(l) ? `<span class="c-err">${l}</span>` :
-     /WARN/i.test(l) ? `<span class="c-warn">${l}</span>` : /PASS|complete|Wrote|\bok\b|\[ok\]/i.test(l) ? `<span class="c-ok">${l}</span>` :
-     l.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : l.startsWith("[you] ") ? `<span class="c-you">${l}</span>` : l).join("\n");
+  // classify the raw line (escaping would turn "->" into "-&gt;"), then escape it for the page
+  return String(text).split("\n").map(raw => { const v = lineLevel(raw), l = esc(raw);
+    return v === "err" ? `<span class="c-err">${l}</span>` : v === "warn" ? `<span class="c-warn">${l}</span>` :
+      v === "ok" || /complete|Wrote/i.test(raw) ? `<span class="c-ok">${l}</span>` :
+      raw.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : raw.startsWith("[you] ") ? `<span class="c-you">${l}</span>` : l; }).join("\n");
 }
 let polling = false;
 async function pollConsole(force) {
@@ -1137,8 +1155,9 @@ $("#tab_term").onclick = () => setCTab("term");
 
 /* ---- session log ---- */
 const SL = {shown: "", count: -1};
-const sessClass = e => ({job_start: "s-job", job_input: "s-you", job_cancel: "s-bad", terminal: "s-term"})[e.kind]
-  || (e.kind === "job_end" ? (e.state === "done" ? "s-ok" : "s-bad") : "s-sys");
+const sessClass = e => e.kind === "job_end" ? ({done: "s-ok", failed: "s-bad"}[e.state] || "s-warn")
+  : e.kind === "terminal" ? (e.exit ? "s-bad" : "s-term")
+  : ({job_start: "s-job", job_input: "s-you", job_cancel: "s-warn"})[e.kind] || "s-sys";
 const sessName = s => s.id.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)\d\d$/, "$1-$2-$3 $4:$5");
 async function pollSession(force) {
   try {
@@ -1193,7 +1212,7 @@ async function termRun() {
   try {
     const r = await api("terminal/run", {command: cmd});
     const out = (r.output || "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\s+$/, "");
-    if (out) tPrint(esc(out) + "\n");
+    if (out) tPrint(colorize(out) + "\n");
     if (r.exit !== 0) tPrint(`<span class="t-err">[exit ${r.exit}]</span>\n`);
     $("#tpr").textContent = r.prompt || $("#tpr").textContent;
     if (/^(cd|chdir|set-location)\b/i.test(cmd)) termState();
@@ -1734,6 +1753,7 @@ const PAGE_HELP = {
 "The <b>Git</b> button in the top bar (or Ctrl+Shift+G) opens the same controls as a drawer on the right, on any page. It shows changes with their diffs, commit, branches, remote, tracked files and history."
 ],
 "tips": [
+"Heavy files never go in: reads, BAM/SAM/CRAM and their indexes, VCF, nanopore signal, aligner indexes and databases, archives, and (in a study) assemblies and FASTA. <b>Ignored files</b> shows PlasBench's rules, lets you add your own after them (<code>!results/key_plasmids.fasta</code> keeps one file), and <b>Test a path</b> says which rule decides.",
 "Git is optional. Set up this computer &gt; Git &gt; Install puts it in: Git for Windows with Git Bash on Windows, or the conda-forge git elsewhere.",
 "The PlasBench program folder appears in the list only when it already is a developer's git checkout.",
 "Nothing is ever force-pushed. Sign-in uses your normal Git credentials (credential manager or SSH key)."
@@ -2333,7 +2353,7 @@ async function loadGit() {
       <div><label>Last commit</label><b class="mono" style="font-size:15px">${esc(st.last?.hash || "–")}</b><span>${esc(st.last ? `${st.last.subject.slice(0, 48)} · ${st.last.when}` : "no commits yet")}</span></div>`;
     const files = st.files || [];
     const who = st.user?.name && st.user?.email;
-    $("#g_body").innerHTML = `<div class="split"><div class="stack">
+    $("#g_body").innerHTML = `<div id="g_heavy"></div><div class="split"><div class="stack">
       <div class="card"><div class="hd"><h3>Changes</h3><span class="sub">${files.length ? "tick files, then stage or unstage them" : "nothing to commit"}</span>
         <button class="btn ghost sm" id="g_all">Stage all</button><button class="btn ghost sm" id="g_stage">Stage selected</button><button class="btn ghost sm" id="g_unstage">Unstage selected</button></div>
        <div class="tablewrap" style="max-height:340px"><table class="data"><tbody>${files.map(f => `<tr data-gf="${esc(f.path)}" style="cursor:pointer">
@@ -2357,6 +2377,14 @@ async function loadGit() {
        <div class="row"><input type="text" id="g_url" value="${esc(remote ? remote.url : "")}" placeholder="https://github.com/your-org/your-repo.git"><button class="btn sec" id="g_seturl">Save</button></div>
        <p class="mut small" style="margin:6px 0 0">Never put a password or token in the address; sign in with Git's credential manager or the GitHub CLI.</p>
        ${st.gh ? `<div class="row" style="margin-top:8px">${st.gh_logged_in ? `<span class="small ok-t">${icon("check")} signed in to GitHub</span>` : `<button class="btn sec sm" id="g_ghlogin">Sign in to GitHub</button>`}</div>` : ""}</div></div>
+      <div class="card" id="g_ignore"><div class="hd"><h3>Ignored files</h3><span class="sub"><code>.gitignore</code></span></div><div class="bd">
+       <details id="gi_managed"><summary class="small" style="cursor:pointer"><b>PlasBench's rules</b> <span class="mut">(read-only; kept up to date by PlasBench)</span></summary>
+        <pre class="cmdline small" id="gi_block" style="display:block;max-height:220px;white-space:pre;margin-top:6px"></pre></details>
+       <label class="small" for="gi_user" style="display:block;margin-top:10px"><b>Your rules</b> <span class="mut">come after PlasBench's: <code>notes/</code> leaves a folder out, <code>!results/plasmids.fasta</code> brings back a file the rules above leave out.</span></label>
+       <textarea id="gi_user" rows="6" spellcheck="false" style="font:12px/1.5 var(--mono);margin-top:4px" placeholder="# one pattern per line, e.g.&#10;scratch/&#10;*.tmp&#10;!results/key_plasmids.fasta"></textarea>
+       <div class="row" style="margin-top:8px"><input type="text" id="gi_test" placeholder="Test a path, e.g. results/S1.bam" aria-label="Path to test" style="flex:1;min-width:0"><button class="btn ghost sm" id="gi_testgo">Test</button></div>
+       <div id="gi_result" class="small" style="margin-top:6px"></div></div>
+       <div class="ft"><button class="btn ghost sm" id="gi_reset">Undo changes</button><button class="btn sec" id="gi_save">${icon("save")}Save</button></div></div>
       <div class="card"><div class="hd"><h3>Identity</h3><span class="sub">who your commits are from</span></div><div class="bd">
        <div class="field"><label>Name</label><div class="ctl"><input type="text" id="g_name" value="${esc(st.user?.name || "")}"></div></div>
        <div class="field"><label>E-mail</label><div class="ctl"><input type="text" id="g_mail" value="${esc(st.user?.email || "")}"></div></div>
@@ -2370,6 +2398,15 @@ async function loadGit() {
       $("#g_legend").innerHTML = HLEGEND; });
     api(`git/branches?${gq()}`).then(r => { $("#g_br").innerHTML = r.branches.map(b => `<button class="task" ${b.current ? "disabled" : ""} data-gbr="${esc(b.name)}"><svg class="ico"><use href="#i-git"/></svg><span class="tx"><b class="mono">${esc(b.name)}</b><span>${b.current ? "current branch" : "switch to this branch"}${b.upstream ? ` · tracks ${esc(b.upstream)}` : ""}</span></span></button>`).join(""); });
     if ((st.files || []).some(f => f.staged)) api(`git/scan?${gq()}`).then(r => showScan(r.findings));
+    // heavy files committed before a rule existed: .gitignore cannot untrack them, so say so and offer to
+    api(`git/heavy?${gq()}`).then(r => { if (!r.files.length) { $("#g_heavy").innerHTML = ""; return; }
+      $("#g_heavy").innerHTML = `<div class="note warn" style="margin-bottom:12px">${icon("alert", "ico")}<div><b>${r.files.length}${r.files.length >= 50 ? "+" : ""} heavy file${r.files.length === 1 ? " is" : "s are"} already tracked</b>
+        (committed before PlasBench's rules covered them, so <code>.gitignore</code> cannot exclude ${r.files.length === 1 ? "it" : "them"}):
+        <ul style="margin:4px 0">${r.files.slice(0, 8).map(f => `<li><span class="mono">${esc(f.path)}</span>: ${esc(f.why)}</li>`).join("")}${r.files.length > 8 ? `<li>and ${r.files.length - 8} more</li>` : ""}</ul>
+        <button class="btn sec sm" id="g_untrack">Stop tracking ${r.files.length === 1 ? "it" : "them"}</button>
+        <span class="mut small">The files stay on disk; your next commit records that git no longer tracks them. Earlier commits still contain them.</span></div></div>`;
+      $("#g_untrack").onclick = () => { if (confirm(`Stop tracking ${r.files.length} file(s)? They stay on disk.`)) gitOp({op: "untrack", paths: r.files.map(f => f.path)}, "No longer tracked: commit to record it"); };
+    }).catch(() => {});
   } catch (e) { $("#g_body").innerHTML = `<div class="note bad">${icon("x", "ico")}<div>${esc(e.message)}</div></div>`; }
 }
 function showScan(findings) {
@@ -2404,6 +2441,25 @@ function bindGit(st) {
     if (confirm(`Push ${st.ahead || "your"} commit(s) on '${st.branch}' to ${remote ? remote.url : "the remote"}?`)) gitOp({op: "push", confirm: true}); };
   $("#g_mkbr").onclick = () => gitOp({op: "branch_create", name: $("#g_newbr").value.trim(), switch: true}, "Branch created");
   $("#g_seturl").onclick = () => gitOp({op: "remote_set", name: "origin", url: $("#g_url").value.trim()}, "Remote saved");
+  // .gitignore editor: PlasBench's block read-only, the user's own rules editable
+  const giLoad = () => api(`git/gitignore?${gq()}`).then(g => {
+    $("#gi_block").textContent = g.managed || "(this repository has no PlasBench block: every rule below is yours)";
+    $("#gi_managed").hidden = !g.managed; $("#gi_user").value = g.user; $("#gi_user").dataset.orig = g.user;
+  }).catch(e => { $("#gi_result").textContent = e.message; });
+  giLoad();
+  $("#gi_reset").onclick = giLoad;
+  $("#gi_save").onclick = async () => {
+    try { await api("git", {repo: G.repo, op: "gitignore_save", text: $("#gi_user").value}); toast(".gitignore saved", "ok"); refreshGit(); }
+    catch (e) { toast(e.message, "bad"); } };
+  const giTest = async () => {
+    const p = $("#gi_test").value.trim(); if (!p) return;
+    try { const r = await api(`git/checkignore?${gq()}&path=${encodeURIComponent(p)}`);
+      $("#gi_result").innerHTML = r.ignored ? `<span class="warn-t">${icon("x")} <span class="mono">${esc(r.path)}</span> is ignored</span> by <code>${esc(r.pattern)}</code> (line ${esc(r.line)})`
+        : `<span class="ok-t">${icon("check")} <span class="mono">${esc(r.path)}</span> is tracked</span>${r.pattern ? ` (brought back by <code>${esc(r.pattern)}</code>, line ${esc(r.line)})` : ""}.`
+        + ($("#gi_user").value !== $("#gi_user").dataset.orig ? ` <span class="mut">Save first to test your unsaved rules.</span>` : "");
+    } catch (e) { $("#gi_result").textContent = e.message; } };
+  $("#gi_testgo").onclick = giTest;
+  $("#gi_test").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); giTest(); } };
   $("#g_saveid").onclick = () => gitOp({op: "identity", name: $("#g_name").value.trim(), email: $("#g_mail").value.trim(), scope: $("#g_scope").value}, "Identity saved");
   if ($("#g_ghlogin")) $("#g_ghlogin").onclick = () => gitOp({op: "gh_login"});
 }

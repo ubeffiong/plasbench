@@ -84,7 +84,13 @@ def run(command, root, env=None):
     # not inject a Windows path here: Git Bash would interpret its backslashes.
     if env:
         merged_env.update(env)
-    return subprocess.run(command, cwd=root, env=merged_env, check=False).returncode
+    code = subprocess.run(command, cwd=root, env=merged_env, check=False).returncode
+    if code < 0 or code in (137, 139, 134):
+        # Killed from outside (out of memory, WSL or the system stopping it): the command itself could not say so.
+        from .exitcodes import explain
+        sys.stderr.write(f"\nERROR: PlasBench stopped: {explain(code)} (exit {code}). Finished work is kept; run the "
+                         "same command again to continue. The logs folder has the last messages.\n")
+    return code
 
 
 def bash_command():
