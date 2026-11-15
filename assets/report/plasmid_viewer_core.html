@@ -313,7 +313,7 @@ PV.coveredIn = function (intervals, s, e, len) {
   });
   return total;
 };
-/* identity of a covered stretch: the length-weighted mean identity of the tool's alignment blocks over [s, e), null when none carries one (mirror of report_maps.interval_identity) */
+/* identity of a covered stretch: the length-weighted mean identity of the alignment blocks of the tool over [s, e), null when none carries one (mirror of report_maps.interval_identity) */
 PV.intervalIdentity = function (blocks, s, e) {
   var num = 0, den = 0;
   (blocks || []).forEach(function (b) {

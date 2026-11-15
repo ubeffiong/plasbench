@@ -118,9 +118,12 @@ def radar_svg(track, entries, uid):
 
 def block_html(block, columns, k):
     entries = tool_values(block, columns)
+    # Kept free of backslashes inside f-string expressions: Python < 3.12
+    # rejects them, and PlasBench supports 3.9+.
+    too_few = ' <em class="muted">(too few axes for a polygon)</em>'
     legend = "".join(
         f"<li style='display:inline-block;margin:0 14px 4px 0'><span style='display:inline-block;width:12px;height:12px;background:{PALETTE[t % len(PALETTE)]};vertical-align:-1px'></span> "
-        f"{sv.esc(row['label'])}{'' if sum(v is not None for v in values) >= MIN_AXES else ' <em class=\"muted\">(too few axes for a polygon)</em>'}</li>"
+        f"{sv.esc(row['label'])}{'' if sum(v is not None for v in values) >= MIN_AXES else too_few}</li>"
         for t, (row, values) in enumerate(entries))
     head = "".join(f"<th>{sv.esc(label)}</th>" for label, *_ in AXES)
     body = "".join("<tr><td>{}</td>{}</tr>".format(sv.esc(row["label"]), "".join(

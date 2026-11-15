@@ -440,9 +440,9 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:236` | `def shared_values` |
 | E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:203` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
-| E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:153` | `--min-long-read-depth` |
+| E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:154` | `--min-long-read-depth` |
 | E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:286` | `reference_tier, tier_reason = tier(` |
-| E34 | Circularity guard for long-read tools | `scripts/lib.sh:272` | `truth_independent_of_long_reads` |
+| E34 | Circularity guard for long-read tools | `scripts/lib.sh:281` | `truth_independent_of_long_reads` |
 | E35 | Date-based overlap screen | `python/flag_database_overlap.py:97` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:189` | `lambda was selected on the same LOSO folds` |
@@ -455,7 +455,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E44 | minimap2 is a hard requirement of scoring | `scripts/05_score.sh:21` | `need minimap2` |
 | E52 | Unresolvable truth sequences are labelled REVIEW | `python/make_truth.py:50` | `REVIEW = "REVIEW"` |
 | E53 | A legacy option restores the chromosome guess | `python/make_truth.py:18` | `--allow-default` |
-| E54 | Conflicting evidence is labelled AMBIGUOUS and excluded | `python/label_truth_evidence.py:125` | `AMBIGUOUS` |
+| E54 | Conflicting evidence is labelled AMBIGUOUS and excluded | `python/label_truth_evidence.py:126` | `AMBIGUOUS` |
 | E55 | Samples polished with the benchmark's reads | `python/truth_provenance.py:133` | `same_as_benchmark` |
 | E56 | Cohort counts and tiers | `cohorts/public-v3.tsv:6` | `sample_id` |
 

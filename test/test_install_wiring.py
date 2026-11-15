@@ -65,6 +65,7 @@ TABLE = {
 }
 # Used by code but deliberately not installed through PlasBench. Each says why.
 MANUAL = {
+    "pigz": "optional: measure_depth.py decompresses reads with it when installed (faster), else with gzip",
     # the PlasBench window, its desktop icon and its terminal: each is looked up first and optional
     "conda": "the window's platform check and the desktop launcher look for it; plasbench install-conda installs it",
     "micromamba": "an alternative to conda, looked up by the platform check and the desktop launcher",
