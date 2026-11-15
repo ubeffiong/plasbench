@@ -58,6 +58,7 @@ def main():
     study = tmp / "ws" / "cohort1"
     study.mkdir(parents=True)
     gitops.init(study, "main", False, kind="runs")
+    gitops.run(study, "config", "core.ignorecase", "false")   # behave like Linux/macOS git, also on Windows
     gitops.run(study, "config", "user.name", "T")
     gitops.run(study, "config", "user.email", "t@example.org")
     for f in HEAVY_FILES + KEEP_FILES:
@@ -95,7 +96,8 @@ def main():
                                     "# --- end PlasBench runs block ---\n\n# also mine\n*.local\n", encoding="utf-8")
     changed = gitops.refresh_gitignore(old)
     text = (old / ".gitignore").read_text(encoding="utf-8")
-    check("the managed block is updated", changed and "*.vcf.gz" in text and "*.pod5" in text and "*.sam" in text)
+    check("the managed block is updated", changed and all(gitops._any_case(g) in text for g in ("*.vcf.gz", "*.pod5", "*.sam")))
+    check("its rules match any capitalisation (git is case-sensitive on Linux and macOS)", "*.[bB][aA][mM]" in text)
     check("the user's own lines are kept", text.startswith("# mine\nscratch/\n") and text.rstrip().endswith("*.local"))
     check("and the block appears once", text.count("PlasBench runs block (managed)") == 1)
     check("a second refresh changes nothing", gitops.refresh_gitignore(old) is False)

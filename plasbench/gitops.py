@@ -59,10 +59,16 @@ PROGRAM_HEAVY = ("reads", "alignments", "variants", "tracks", "indexes", "archiv
 RUNS_HEAVY = PROGRAM_HEAVY + ("sequence",)
 
 
+def _any_case(glob: str) -> str:
+    """*.bam -> *.[bB][aA][mM]: git's ignore patterns are case-sensitive on Linux and macOS, so S1.BAM would slip
+    past *.bam there (Windows git ignores case, which hid this)."""
+    return "".join(f"[{c.lower()}{c.upper()}]" if c.isalpha() else c for c in glob)
+
+
 def _globs(groups) -> list:
     out = []
     for g in groups:
-        out += [p for p in HEAVY[g][1] if p not in out]
+        out += [_any_case(p) for p in HEAVY[g][1] if _any_case(p) not in out]
     return out
 
 
