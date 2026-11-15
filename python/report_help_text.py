@@ -80,7 +80,8 @@ HELP = {
         "Strict precision, recall ceiling and database overlap are extra safeguards.",
         "'Ranked on' says how many isolates the number rests on; 'independent clusters' says how many separate studies. Small numbers mean weak evidence.",
         "Shows whether the result rests on enough independent data.",
-        "These columns are not the ranking score: mean base F1 here is a different, simpler measure."),
+        "These columns are not the ranking score: mean base F1 here is a different, simpler measure. The last four columns show the predicted sequence that precision does not charge "
+        "(unmapped, off-truth, and with an alternative placement) and how much precision would fall if unmapped bases counted."),
     "statistics": H(
         "Tool-against-tool tests: is the difference between two tools bigger than chance?",
         "Scores of both tools on the isolates they share.",

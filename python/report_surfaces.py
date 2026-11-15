@@ -85,6 +85,9 @@ LEADERBOARD_COLUMN_GROUPS = {
         "rank", "analysis_track", "task", "tool", "is_baseline", "beats_best_baseline", "ranking_metric", "ranking_score",
         "ranking_ci_low", "ranking_ci_high", "ranking_basis", "ranking_species_basis", "n_headline_species", "n_ranking_clusters",
         "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population"],
+    "Predicted-sequence burden": [
+        "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp", "unmapped_fraction", "off_truth_fraction",
+        "ambiguous_fraction", "precision_gap"],
     "Run counts": [
         "n_samples", "n_completed", "n_failed", "n_skipped", "n_failed_resource", "n_failed_tool", "n_infrastructure_failure",
         "n_not_applicable", "n_f1_scored", "n_failures_scored_zero"],
@@ -353,6 +356,7 @@ def _column_entries():
     }
     board = {
         "Rank and basis": ("shown", "leaderboard", "Rank, basis and significance are columns of the leaderboard."),
+        "Predicted-sequence burden": ("shown", "robustness-main", "Unmapped, off-truth and multi-mapped shares and the precision gap, in Ranking confidence."),
         "Run counts": ("partly", "leaderboard", "Completed and failed runs are shown; the failure sub-counts are in the download."),
         "Base-level accuracy": ("shown", "leaderboard", "Mean and interval columns of the leaderboard."),
         "Plasmid recovery": ("shown", "leaderboard", "Recall, circular and perfect recovery and CPRR are in the leaderboard and graded-tiers views."),
