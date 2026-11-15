@@ -31,7 +31,9 @@ from __future__ import annotations
 import argparse
 import csv
 import glob
+import itertools
 import os
+import re
 import sys
 from collections import Counter
 
@@ -71,6 +73,33 @@ def canonical_kmers(seq, k):
             yield fwd if fwd < rev else rev
 
 
+_RC = str.maketrans("ACGT", "TGCA")
+_NON_ACGT = re.compile(r"[^ACGT]+")
+
+
+def canonical_keys(seq, k):
+    """(keys, n): the same canonical k-mers as canonical_kmers(), but iterated in C, about 10x faster.
+
+    Each ACGT-only stretch is sliced into k-mers and the reverse complement of the stretch into the matching
+    reverse-complement k-mers (rc[L-i-k:L-i] pairs with seq[i:i+k]); the smaller of each pair is the canonical
+    k-mer. Lexicographic order on ACGT equals canonical_kmers()' 2-bit order, so the canonical choice is identical.
+    Keys are the 64-bit hash of the canonical k-mer (compact; a collision among a few million k-mers is ~1e-6
+    likely and would shift a fraction by one k-mer). n is the number of k-mer positions (non-ACGT k-mers skipped)."""
+    if k > 32 or k < 1:
+        raise ValueError("k must be 1..32")
+    parts, n = [], 0
+    for seg in _NON_ACGT.split(seq.upper()):
+        count = len(seg) - k + 1
+        if count <= 0:
+            continue
+        n += count
+        rc, length = seg.translate(_RC)[::-1], len(seg)
+        fwd = map(seg.__getitem__, map(slice, range(0, count), range(k, k + count)))
+        rev = map(rc.__getitem__, map(slice, range(length - k, length - k - count, -1), range(length, length - count, -1)))
+        parts.append(map(hash, map(min, fwd, rev)))
+    return itertools.chain.from_iterable(parts), n
+
+
 def read_truth(path):
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
@@ -100,7 +129,7 @@ def compute(reference, truth_rows, sample, k=29, threshold=0.05, max_chromosome_
     for sid, seq in read_fasta(reference):
         if types.get(sid) != "PLASMID":
             continue
-        plasmid_counts[sid] = Counter(canonical_kmers(seq, k))
+        plasmid_counts[sid] = Counter(canonical_keys(seq, k)[0])
         rows[sid]["length"] = str(len(seq)) if not lengths[sid] else lengths[sid]
     union = Counter()
     for counts in plasmid_counts.values():
@@ -114,14 +143,13 @@ def compute(reference, truth_rows, sample, k=29, threshold=0.05, max_chromosome_
         have_chromosome = True
         row = rows[sid]
         small = len(seq) <= max_chromosome_bp
-        counts = Counter() if small else None
-        n = 0
-        for km in canonical_kmers(seq, k):
-            n += 1
-            if counts is not None:
-                counts[km] += 1
-            if km in union:
-                chrom_hits.add(km)
+        keys, n = canonical_keys(seq, k)
+        if small:
+            counts = Counter(keys)                                  # counted in C
+            chrom_hits.update(counts.keys() & union.keys())
+        else:
+            counts = None                                           # streamed: only plasmid-set k-mers kept
+            chrom_hits.update(filter(union.__contains__, keys))
         row["n_kmers"] = n
         if small:
             frac = repeated_fraction(counts)
