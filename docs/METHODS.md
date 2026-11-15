@@ -631,12 +631,19 @@ endpoint would cost power (`headline_design.ranking_metric()`; `config/prereg.ts
   adds pooled CPRR per reference tier, so a tool cannot look strong only on small,
   simple plasmids.
 
-**Task tracks.** Binning-capable tools (`binning_capable=yes` in
-`config/tool_capabilities.tsv`) are ranked on the reconstruction track by
-`lw_bin_f1`. Classifier-only tools (Platon, geNomad, plasmidSPAdes as configured, ...)
-are ranked on a separate classification track by base-level F1. They are never scored
-zero on binning, a task they do not attempt, and the two tracks are never pooled.
-Input tracks (short-read, long-read, hybrid) stay separate as before.
+**Task tracks.** Each tool declares its evaluation task in `config/tool_capabilities.tsv`
+(`evaluation_task`, with `output_unit`), from its documented output contract:
+`binning_reconstruction` (sequence grouped into individual plasmids: bins, or one plasmid
+per record) is ranked on the reconstruction track by `lw_bin_f1` (CPRR on the long-read and
+hybrid tracks); `sequence_reassembly` (plasmid-enriched sequence that does not say which
+pieces form one plasmid, e.g. plasmidSPAdes) is ranked on its own reassembly track by
+base-level sequence-recovery F1; `classification` (labels on the input contigs, e.g.
+Platon, geNomad) by base-level F1. The task is never inferred from `binning_capable`
+alone (a row without the column falls back to it and to `method_class`). No tool is scored
+zero on a task it does not attempt, the tracks are never pooled, and each metric in
+`config/metrics.tsv` lists the tasks it can score. Binning F1 measures grouping, not
+complete reconstruction (that is CPRR); every leaderboard says which question its ranking
+metric answers. Input tracks (short-read, long-read, hybrid) stay separate as before.
 
 ### Reference standard
 
@@ -661,7 +668,14 @@ and are labelled as such; set the sheet columns to override them.
 **Reference tiers.** Tier 1 = long-read-first or long-read-only, independent of the
 benchmark reads, cohort tier A, evidence-checked labels. Tier 2 = long-read-first but
 failing a Tier-1 condition. Tier 3 = short-read-first, unknown provenance or cohort
-tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2);
+tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2), and by default
+(`HEADLINE_REFERENCE_INDEPENDENCE=independent`) only those references independent of the
+benchmark reads: reference quality (the tier) and independence are separate variables
+(`reference_independence`, `reference_group` in the provenance table). A tier-2 reference
+polished with the benchmark's own reads is a dependent reference and enters only the
+reference-independence sensitivity analysis (`benchmark.reference_independence.tsv`: each
+tool's mean and rank on independent, same-read-polished and unrecorded references, and the
+change from the independent group); the headline design table records the composition;
 `benchmark.reference_tiers.tsv` and the report's tier-sensitivity chart show results by
 tier. When no sample reaches tier 2, the **primary analysis is unavailable**: the same numbers are
 computed on all samples but are labelled provisional (`primary_status` and `population` in the leaderboard,
@@ -760,10 +774,18 @@ The calibration of these procedures is checked by simulation (`python/simulate_v
 Without a cluster column every sample is its own cluster and the results are identical to
 plain per-sample resampling.
 
-A deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
-and `benchmark.paired_comparisons.tsv` reports paired per-sample F1
-differences and win/tie/loss counts. These are descriptive uncertainty aids,
-not formal claims of clinical or statistical superiority.
+An interval is emitted for each mean F1 and ranking score by `PLASBENCH_CI_METHOD`
+(default `cluster_t`: a CR1 cluster-robust standard error with a t critical value on
+G−1 degrees of freedom, chosen because it held near-nominal coverage in
+`simulate_validation.py` where the percentile cluster bootstrap under-covered; the
+percentile and studentized bootstrap remain selectable), and
+`benchmark.paired_comparisons.tsv` reports paired per-sample F1 differences, their
+interval, the effect status against `SMALLEST_DIFFERENCE` (equivalent, practically
+different, different but of unclear size, inconclusive, not assessable), whether the pair
+was testable, and win/tie/loss counts. The effect and its interval are the primary reading;
+significance is beside them, and a non-significant comparison is never reported as equal
+performance. These are descriptive uncertainty aids, not formal claims of clinical or
+statistical superiority.
 
 **Significance vs. the runner-up.** The leaderboard's `significant_vs_runner_up`
 column asks one specific, narrow question: on the samples the top-ranked and

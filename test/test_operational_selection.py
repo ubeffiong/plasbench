@@ -40,10 +40,12 @@ def test_recommendation_model_integration():
         sample_rows, score_rows = [], []
         sid = 0
         for study in range(5):
-            for _ in range(6):
+            for i in range(6):
                 sid += 1
                 sample = f"s{sid}"
-                depth = 10 + sid * 3
+                # the same depths as before, spread over the studies so a held-out study is interpolation (the model's
+                # out-of-study calibration gate refuses a model whose every held-out study is an extrapolation)
+                depth = 10 + 3 * (i * 5 + study + 1)
                 f1 = min(0.99, max(0.01, 0.5 + 0.01 * depth + rng.uniform(-0.01, 0.01)))
                 sample_rows.append({"sample_id": sample, "organism": "Example bacterium",
                                     "read_depth_x": str(depth), "source_study": f"study{study}"})
@@ -65,9 +67,12 @@ def test_recommendation_model_integration():
             writer.writerows(score_rows)
 
         model_path = os.path.join(results, "benchmark.recommendation_model.json")
+        verdict_path = os.path.join(results, "benchmark.recommender_verdict.json")   # per-isolate choice shown to add value
+        with open(verdict_path, "w", encoding="utf-8") as handle:
+            json.dump({"any_per_isolate_arm_enabled": True}, handle)
         subprocess.run([sys.executable, FIT_MODEL, "--scores", scores_path, "--sample-sheet", samples_path,
                         "--out", model_path, "--min-studies", "3", "--min-training-samples", "20",
-                        "--min-relative-improvement", "0.05"], check=True, capture_output=True, text=True)
+                        "--min-relative-improvement", "0.05", "--recommender-verdict", verdict_path], check=True, capture_output=True, text=True)
         model_payload = json.load(open(model_path))
         assert model_payload["model_ready"] is True, model_payload["reason"]
 
