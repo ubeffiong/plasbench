@@ -1889,9 +1889,12 @@ function renderSettings() {
     return `<details class="fgroup" ${q || SET.only || groups.length < 4 ? "open" : ""}><summary>${esc(g)} <span class="n">— ${gr.length}</span></summary><div class="fb">` + gr.map(r => {
       const cur = r.key in SET.edits ? SET.edits[r.key] : (r.override ?? ""), changed = r.key in SET.edits;
       const ctl = r.kind === "flag" ? `<select data-key="${r.key}"><option value="" ${cur === "" ? "selected" : ""}>default (${esc(r.default)})</option><option value="1" ${cur === "1" ? "selected" : ""}>1 — on</option><option value="0" ${cur === "0" ? "selected" : ""}>0 — off</option></select>`
-        : `<input type="text" data-key="${r.key}" value="${esc(cur)}" placeholder="default: ${esc(r.default.slice(0, 80))}">`;
+        : `<input type="text" data-key="${r.key}" value="${esc(cur)}" placeholder="default: ${esc((r.resolved || r.default).slice(0, 120))}">`;
+      // A location written as shell code in config.sh is shown as the path it means here, and a
+      // database says whether it is installed, so "leave the default" is a choice you can see.
+      const where = r.resolved ? `<div class="help">${r.found === true ? `<span class="ok-t">${icon("check")} Installed</span> at` : r.found === false ? `<span class="warn-t">${icon("info")} Not installed yet</span> at` : "Default location:"} <code>${esc(r.resolved)}</code>${r.found === false ? ` — install from <a href="#setup">Set up this computer</a> if you use this tool` : ""}</div>` : "";
       return `<div class="field ${changed ? "changed" : ""}"><label>${esc(r.key)}${r.override != null && !changed ? ` <span class="tag rec">set here</span>` : ""}</label><div class="ctl">${ctl}${r.override != null || changed ? `<button class="btn ghost sm" data-clear="${r.key}" title="Back to the default">Default</button>` : ""}</div>
-        <div class="help">${esc(r.comment || "")}${r.env ? ` <span class="tag warn">environment: ${esc(r.env.slice(0, 60))}</span>` : ""}</div></div>`; }).join("") + `</div></details>`; }).join("") || `<div class="bd mut">No setting matches.</div>`;
+        <div class="help">${esc(r.comment || "")}${r.env ? ` <span class="tag warn">environment: ${esc(r.env.slice(0, 60))}</span>` : ""}</div>${r.override == null && !changed ? where : ""}</div>`; }).join("") + `</div></details>`; }).join("") || `<div class="bd mut">No setting matches.</div>`;
   const n = Object.keys(SET.edits).length; $("#set_save").disabled = $("#set_reset").disabled = !n; $("#set_n").textContent = n ? `(${n})` : "";
 }
 $("#setq").oninput = e => { SET.q = e.target.value; renderSettings(); };
@@ -1922,11 +1925,32 @@ function fieldHTML(a, values, prefix) {
     else ctl = `<select id="${id}" data-dest="${a.dest}"><option value="">${a.default != null ? `default (${esc(a.default)})` : "— not set —"}</option>${a.choices.map(c => `<option ${String(v) === String(c) ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
   }
   else if (a.kind === "int" || a.kind === "float") ctl = `<input type="number" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null ? "default " + esc(a.default) : ""}" ${a.kind === "float" ? 'step="any"' : ""}>`;
-  else if (a.kind === "path") ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null && a.default !== "" ? esc(a.default) : ""}"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="${/dir|folder/.test(a.dest) ? 1 : 0}">Browse</button>`;
+  else if (a.kind === "path") {
+    // A tool database already installed is reused: show where, so an empty field reads as
+    // "use the existing one", not as something to fill in for every benchmark.
+    const db = S.info?.databases?.[a.dest];
+    // Other locations PlasBench already knows: say what an empty field means instead of a blank.
+    const known = {
+      data_dir: S.info?.data_dir ? `leave empty: the shared data folder, ${S.info.data_dir} (reads already downloaded are reused)` : "",
+      results_dir: prefix === "w" ? "leave empty: the run's own study folder in the workspace" : "",
+      log_dir: prefix === "w" ? "leave empty: the logs folder inside the run's study folder" : "",
+    }[a.dest];
+    const ph = db?.found ? `uses the installed copy: ${db.path}` : known || (a.default != null && a.default !== "" ? a.default : "");
+    ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${esc(ph)}"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="${/dir|folder/.test(a.dest) ? 1 : 0}">Browse</button>`;
+  }
   else if (a.kind === "list") ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(Array.isArray(v) ? v.join(" ") : v ?? "")}" placeholder="space separated${a.choices ? ": " + esc(a.choices.join(" ")) : ""}">`;
   else ctl = `<input type="text" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null && a.default !== "" ? "default " + esc(a.default) : ""}">`;
   return `<div class="field ${changed ? "changed" : ""}"><label for="${id}">${esc(argLabel(a))}${a.required ? `<span class="req">*</span>` : ""} <code>${esc(a.positional ? "<" + a.dest + ">" : flag)}</code></label>
-    <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help ? `<div class="help">${esc(a.help)}</div>` : ""}</div>`;
+    <div class="ctl">${ctl}<button type="button" class="btn ghost sm reset" data-reset="${a.dest}" title="Back to the default">Reset</button></div>${a.help ? `<div class="help">${esc(a.help)}</div>` : ""}${dbStatusHTML(a.dest)}</div>`;
+}
+// Under a database field: whether a run will reuse an installed copy, and from where.
+function dbStatusHTML(dest) {
+  const db = S.info?.databases?.[dest];
+  if (!db || db.source === "none") return "";
+  const where = {store: "the shared database store", project: "this install's data folder", setting: "your settings"}[db.source] || "";
+  return db.found
+    ? `<div class="help ok-t">${icon("check")} Installed at <code>${esc(db.path)}</code> (${esc(where)}). Leave this empty and every benchmark reuses it; nothing is downloaded again.</div>`
+    : `<div class="help warn-t">${icon("info")} Not installed yet at <code>${esc(db.path)}</code>. Install it once from <a href="#setup">Set up this computer</a> (Download tool databases), or Browse to a copy you already have. Only needed if this tool is switched on.</div>`;
 }
 function bindForm(root, values, onChange) {
   root.addEventListener("input", e => { const d = e.target.dataset.dest; if (!d || e.target.type === "checkbox") return; values[d] = e.target.value; markChanged(e.target, e.target.value !== ""); onChange(); });
@@ -2020,6 +2044,8 @@ function showHelpDialog(c, sc) {
 const WSTEPS = [["Isolates","What to benchmark"],["Tools","Which tools run"],["Resources","Threads, memory"],["Options","Outputs and stages"],["Review","Check and start"]];
 async function loadWizard() {
   await getSchema(); await getCohorts(); await getTools(); await getUser(); await getWorkspace();
+  // Refresh where each database is, so one installed since the window opened shows as found.
+  try { S.info = await api("info"); } catch (e) { /* keep the start-up copy */ }
   renderWizard();
 }
 function wizRun() { return command("run"); }
@@ -2067,13 +2093,23 @@ function renderWizard() {
       `<div class="note info" style="margin-bottom:14px">${icon("info", "ico")}<div>This computer: <b>${S.info.cpus} CPU threads</b>${S.info.memory_gb ? `, <b>${S.info.memory_gb} GB memory</b>` : ""}. Threads apply per tool; parallel samples × parallel tools × threads should not exceed the CPU count.</div></div>
        <div class="card" id="wform">${groupedFields(byGroup("resources and assembly"), V, "w", true)}</div>`;
   } else if (W.step === 3) {
-    const io = byGroup("inputs and outputs").filter(a => !["samples","cohort","local_inputs","open_report","no_report_prompt"].includes(a.dest));
+    // Database paths are overrides, not inputs: a run left blank reuses the installed copy, so
+    // they sit in a closed "optional" fold with a one-line summary instead of in the main form.
+    const DB_DESTS = ["platon_db", "genomad_db", "plasme_db", "plasgraph2_model_dir"];
+    const allIo = byGroup("inputs and outputs").filter(a => !["samples","cohort","local_inputs","open_report","no_report_prompt"].includes(a.dest));
+    const io = allIo.filter(a => !DB_DESTS.includes(a.dest)), dbArgs = allIo.filter(a => DB_DESTS.includes(a.dest));
+    const dbName = {platon_db: "Platon", genomad_db: "geNomad", plasme_db: "PLASMe"};
+    const dbSummary = Object.entries(dbName).map(([d, n]) => { const s = S.info?.databases?.[d];
+      return s ? `${n} ${s.found ? "found" : "not installed"}` : n; }).join(" · ");
+    const dbBlock = dbArgs.length ? `<details class="fgroup" ${dbArgs.some(a => V[a.dest]) ? "open" : ""}><summary>Use a different database copy (optional) <span class="n">— ${esc(dbSummary)}</span></summary><div class="fb">
+        <p class="mut small" style="margin:0 0 10px">Leave these empty: each run uses the database where PlasBench installed it. Fill one in only to use another copy.</p>${dbArgs.map(a => fieldHTML(a, V, "w")).join("")}</div></details>` : "";
     html = W.source === "demo" ? `<div class="card"><div class="bd">${fieldHTML(command("demo").args.find(a => a.dest === "open_report"), V, "w")}</div></div>` :
       `<div class="card"><div class="hd"><h3>Stages</h3><span class="sub">leave all off to run the whole pipeline</span></div><div class="bd"><div class="chips" id="wstages">${
         [["0","Check"],["1","Download"],["2","Truth"],["3","Assemble"],["4","Run tools"],["5","Score"],["6","Aggregate & report"],["7","Long-read tools"]].map(([s, l]) =>
         `<button type="button" class="chip ${(V.stages || []).includes(s) ? "on" : ""}" data-stage="${s}">${s} · ${l}</button>`).join("")}</div>
         <p class="mut small" style="margin:10px 0 0">Choose stages to resume or re-run part of a benchmark, e.g. 5 and 6 to re-score and rebuild the report.</p></div></div>
-       <div class="card" style="margin-top:16px" id="wform">${groupedFields(io, V, "w", true)}${groupedFields(run.args.filter(a => a.group === "" && !["stages","mode","predictions_dir"].includes(a.dest)), V, "w", true)}</div>`;
+       <div class="note info" style="margin-top:16px">${icon("info", "ico")}<div><b>Nothing here needs filling in to reuse what you have.</b> Installed tools, tool databases and downloaded reads are shared by every benchmark on this computer: reads and assemblies in <code>${esc(S.info?.data_dir || "the data folder")}</code>, databases where PlasBench installed them. You do not need to know where that is: a run finds them itself.</div></div>
+       <div class="card" style="margin-top:16px" id="wform">${groupedFields(io, V, "w", true)}${dbBlock}${groupedFields(run.args.filter(a => a.group === "" && !["stages","mode","predictions_dir"].includes(a.dest)), V, "w", true)}</div>`;
   } else {
     const argv = wizArgv();
     html = `<div class="card"><div class="hd"><h3>Review</h3></div><div class="bd">
