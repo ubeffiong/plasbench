@@ -118,6 +118,7 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- The numeric tool x metric heatmap (one block per analysis track) now includes SV-PRR and the predicted-sequence burden columns beside F1, MCC, binning F1 and CPRR.
 - The recommender evaluation compares the single best tool, an organism recommender and a feature-conditioned one (nearest similar isolates, truth-free features), with calibration and abstention; an arm adds value only when it beats the single best tool on average and in most of at least three studies.
 - A dataset-characterisation table describes every isolate (organism, depth, read quality, assembly, repeat content), marking each column as knowable without a reference or benchmark-only; it appears in the *Isolate difficulty* tab.
 - SV-PRR sits beside CPRR in the leaderboard: the share of truth plasmids that are correct and also untouched by an alignment-derived structural call (reported, never ranked, unvalidated).

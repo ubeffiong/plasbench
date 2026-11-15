@@ -151,10 +151,10 @@ def test_leaderboard_and_columns():
     specs = hm.rs.load_config()
     cols = hm._columns(specs)
     ids = [c["id"] for c in cols]
-    assert len(ids) == len(set(ids)) == 17 + 7
-    assert [c["id"] for c in cols if c["fam"] == "L"] == ["F1", "MCC", "BF1", "LWB", "ARI", "CPRR", "CF1"]
+    assert len(ids) == len(set(ids)) == 17 + 12
+    assert [c["id"] for c in cols if c["fam"] == "L"] == ["F1", "MCC", "BF1", "LWB", "ARI", "CPRR", "CF1", "SVP", "UNM", "OFT", "AMB", "PGAP"]
     lower = {c["id"] for c in cols if c["dir"] == "lower"}
-    assert lower == {"A2", "E1", "E2"}
+    assert lower == {"A2", "E1", "E2", "UNM", "OFT", "AMB", "PGAP"}
     assert next(c for c in cols if c["id"] == "A4")["status"] == "undefined" and next(c for c in cols if c["id"] == "A1")["status"] == "fixed"
 
 
@@ -300,12 +300,12 @@ def main():
         demo = ROOT / "results_demo"
         if (demo / "scores.tsv").is_file():
             data = hm.build(str(demo), str(demo), str(demo / "scores.tsv"))
-            assert [b["track"] for b in data["blocks"]] and len(data["cols"]) == 24
+            assert [b["track"] for b in data["blocks"]] and len(data["cols"]) == 29
             text = hm.host_html(data)
             assert "id='hm-data'" in text and "NaN" not in text
             for b in data["blocks"]:
                 for row in b["cells"]:
-                    assert len(row) == 24 and all(c[0] is None or math.isfinite(c[0]) for c in row)
+                    assert len(row) == 29 and all(c[0] is None or math.isfinite(c[0]) for c in row)
             ids = re.findall(r"\bid='([^']+)'", text)
             assert len(ids) == len(set(ids))
             page = "<html><head><style></style></head><body><nav><a href='#recommendations'>Recommendations</a></nav><section id='recommendations'></section></body></html>"
