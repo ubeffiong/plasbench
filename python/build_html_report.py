@@ -136,6 +136,26 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Validation tier": {
+        "what": "How far a tool has been validated in PlasBench: real binary checked (the scheduled workflow ran the real tool on a known input and its output validated), adapter tested (the adapter is tested against recorded or stand-in output, the real binary is not checked), or untested.",
+        "why": "A score is only as trustworthy as the adapter that read the tool's output. The tier says whether that step has been tested at all, and whether the real tool has been seen to behave as the tests assume.",
+    },
+    "Database provenance": {
+        "what": "The version, source, release date and checksum of the reference database a tool uses.",
+        "why": "A tool's result depends on its database, and a database changes over time. Without these facts a result cannot be reproduced or compared, and a blank is shown as not recorded, never filled with a guess.",
+    },
+    "AMR-PRR": {
+        "what": "Of the plasmids that carry a curated resistance gene, the share whose gene copies all sit on the right plasmid and that the tool also reconstructed correctly (the CPRR criteria).",
+        "why": "A resistance gene on the right plasmid inside a badly reconstructed plasmid is not a usable result, and a well reconstructed plasmid with its genes elsewhere is not either. It needs both. It is reported beside the placement, never ranks a tool, and is as unvalidated as the curated truth it rests on.",
+    },
+    "Flank context": {
+        "what": "For a recovered resistance gene copy, the share of the 1 kb on either side of it that the same predicted record also covers.",
+        "why": "A gene recovered with its surroundings sits in a usable piece of plasmid; a gene recovered alone on a short fragment says little about the plasmid around it. Alignment-derived, descriptive, never ranks a tool.",
+    },
+    "Pairs kept together": {
+        "what": "For two recovered resistance gene copies on the same truth plasmid, whether the tool put them in the same bin. Shown as the number of such pairs that stayed together.",
+        "why": "Resistance genes that travel together on one plasmid are the point of plasmid epidemiology; a tool that splits them apart would hide that.",
+    },
     "Recommendation evidence": {
         "what": "The facts behind the recommended tool: its expected performance and the isolates it rests on, the independent studies, the quality of the references, what the recommendation covers and whether choosing by similar isolates beat the single best tool, the uncertainty, and the reason when nothing is recommended.",
         "why": "A recommendation is a claim. This panel lets a reader see how much stands behind it, and says plainly when the evidence is too thin to recommend.",
@@ -156,8 +176,8 @@ GLOSSARY = {
                "unvalidated as the calls it uses: a call can be a tool misassembly, a real rearrangement in the isolate or a reference error.",
     },
     "Predicted-sequence burden": {
-        "what": "The share of a tool's predicted sequence that precision does not charge: bases with no alignment (unmapped), bases aligned only off the labelled truth, and mapped bases that also "
-                "have an alternative placement (multi-mapping). Shown in Ranking confidence beside strict precision.",
+        "what": "The share of a tool's predicted sequence that precision does not charge: bases with no alignment (unmapped), bases aligned only off the labelled truth, and mapped bases that align "
+                "to both a plasmid and a chromosome (a conflicting molecular assignment). Shown in Ranking confidence beside strict precision.",
         "why": "A tool can look precise because the sequence it got wrong never aligned anywhere. These shares show how much of its output is unverified; the precision gap is how much its "
                "precision would drop if unmapped bases were charged.",
     },
@@ -299,7 +319,7 @@ GLOSSARY = {
     "Significant vs runner-up": {
         "what": "Whether the top-ranked tool's F1 advantage over the second-ranked "
                 "tool clears a paired, shared-sample, sign-flip permutation test "
-                "(Holm-adjusted p < 0.05, at least 5 shared samples).",
+                "(Holm-adjusted p < 0.05, at least 6 independent units).",
         "why": "A leaderboard rank alone cannot say whether a gap is real or just "
                "sample-to-sample noise. This is the same test behind the Paired "
                "tool comparisons table below, applied specifically to the winner "
@@ -1028,8 +1048,8 @@ def score_row(row, metadata, tool_versions):
         size=size_band(truth_bp), depth="" if depth_value is None else depth_value,
         depth_text=esc(depth) if depth_value is not None else "-", truth=truth_bp,
         tp=int(number(row["TP_bp"])), fp=int(number(row["FP_bp"])), fn=int(number(row["FN_bp"])),
-        unmapped=int(number(row["unmapped_pred_bp"])), unambiguous=int(number(row.get("unambiguously_mapped_pred_bp"))),
-        ambiguous=int(number(row.get("ambiguously_mapped_pred_bp"))), precision=esc(row["precision"]),
+        unmapped=int(number(row["unmapped_pred_bp"])), unambiguous=int(number(row.get("unambiguously_mapped_pred_bp")) or 0),
+        ambiguous=int(number(row.get("ambiguously_mapped_pred_bp")) or 0), precision=esc(row["precision"]),
         recall=esc(row["recall"]), amr=esc(row.get("amr_gene_recall") or "-"),
         circular=esc(row.get("circular_plasmid_recall") or "-"), f1=esc(row["f1"]), band=band,
     )
@@ -1239,7 +1259,7 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
                  "<th>Failed runs scored 0</th><th>Mean precision</th><th>Strict precision</th><th>Base recall</th>"
                  "<th>Recall ceiling</th><th>Ceiling-adjusted recall</th><th>Redundant predicted bp</th>"
                  "<th>Database overlap (samples)</th><th>Mean F1 after database</th><th>Unmapped predicted bases</th><th>Off-truth predicted bases</th>"
-                 "<th>Predicted bases with an alternative placement</th><th>Precision minus strict precision</th></tr></thead>"
+                 "<th>Mapped bases that align to both a plasmid and a chromosome</th><th>Precision minus strict precision</th></tr></thead>"
                  f"<tbody>{''.join(body)}</tbody></table></div>")
         charts = (
             "<div class='chart-card'><h4>Recall against what was reachable</h4>" + ceiling_chart(rows) + "</div>"
@@ -1331,7 +1351,9 @@ def permutation_note(row):
     if floor and method != "not_estimated":
         text += f", smallest attainable p {floor}"
     if row.get("p_status") == "underpowered":
-        text += " (underpowered: cannot reach 0.05)"
+        holm = row.get("holm_min_attainable_p")
+        text += (f" (underpowered: over all the comparisons of this run the smallest Holm-adjusted p it can reach is {holm}, above 0.05)" if holm
+                 else " (underpowered: cannot reach 0.05)")
     return text
 
 
@@ -2292,7 +2314,8 @@ def main():
                 cprr=esc((f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
                           + (f"; per isolate {number(row['cprr_isolate_mean']):.1%}"
                              if row.get("cprr_isolate_mean") else "")
-                          + (f"; SV-PRR {number(row['sv_prr']):.1%}" if row.get("sv_prr") else "")
+                          + (f"; SV-PRR {number(row['sv_prr']):.1%}" + (f" (CPRR on the same {row['sv_prr_isolates']} isolate(s): {number(row['cprr_on_sv_isolates']):.1%})"
+                                                                         if row.get("sv_prr_isolates") and row.get("cprr_on_sv_isolates") else "") if row.get("sv_prr") else "")
                           + (f"; AUC {number(row['cprr_auc']):.3f}" if row.get("cprr_auc") else ""))
                          if row.get("cprr") else "not bin-scored"),
                 ranked_on=(f"<small class='muted'> on {esc(row['n_ranking_samples'])} shared"
@@ -2900,7 +2923,7 @@ def main():
 {extended_section}
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
 <section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. Circular-truth recovery is not evidence that a predicted sequence is closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{tool_options}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Truth tier <select id='tier-filter'><option value=''>All tiers</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Circular truth recovery</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
-<section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least five independent units. Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p>{comparison_tables}<p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
+<section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least six independent units (five for an interval). Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p>{comparison_tables}<p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
 <section id='zero-plasmid'><h2>Zero-plasmid isolates (negative control)</h2><p class='lead'>Precision, recall, and F1 are correctly undefined on an isolate with no true plasmid at all -- there is nothing to recover, and a tool predicting nothing has made a correct abstention, not scored a zero. These isolates are still valuable: they are the only ones that directly measure false-positive behavior. Isolate specificity is 1 minus the fraction of that isolate's chromosome a tool wrongly called plasmid; chromosome FP bp is the same false call in raw bases, summed across every plasmid-free isolate a tool was scored on. A specificity below 1.0 means real chromosomal sequence was misclassified as plasmid on a sample where NO plasmid exists to justify it.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Plasmid-free isolates scored</th><th>Mean isolate specificity</th><th>Total chromosome FP bp</th></tr></thead><tbody>{zero_plasmid_html}</tbody></table></div></section>
 <section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered AND circular, the strictest per-plasmid claim this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>

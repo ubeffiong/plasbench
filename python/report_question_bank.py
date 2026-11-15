@@ -303,6 +303,31 @@ def metric_framework_section(leaderboard, data_dir):
         + (body or "<tr><td colspan='12'>No scored tools.</td></tr>") + "</tbody></table></div></details></section>")
 
 
+TIER_WORDS = {"real_binary_checked": "real binary checked", "adapter_tested": "adapter tested", "untested": "untested", "not_applicable": "not a third-party tool"}
+
+
+def provenance_table(rows):
+    """Tool and database provenance (database_provenance.py): the validation tier, then the database version, source, release date and checksum of each tool, with what is not recorded said plainly."""
+    if not rows:
+        return ("<h3>Tool and database provenance</h3><p class='muted'>Not run: no provenance table was available "
+                "(stage 6 writes benchmark.database_provenance.tsv with python/database_provenance.py).</p>")
+    shown = [r for r in rows if r.get("used_in_run") != "no"] or rows
+
+    def cell(value, empty="not recorded"):
+        return esc(value) if value else f"<span class='muted'>{empty}</span>"
+    body = "".join(
+        f"<tr><td>{esc(r['tool'])}</td><td>{esc(TIER_WORDS.get(r.get('validation_status'), r.get('validation_status') or 'untested'))}</td>"
+        f"<td>{cell(r.get('database'), 'none')}</td><td>{cell(r.get('database_version'))}</td><td>{cell(r.get('source_url'))}</td><td>{cell(r.get('database_release_date'))}</td>"
+        f"<td>{cell((r.get('checksum_sha256') or '')[:16] + ('...' if r.get('checksum_sha256') else ''))}</td>"
+        f"<td>{esc((r.get('provenance_status') or '').replace('_', ' '))}{(' (missing: ' + esc(r['missing']) + ')') if r.get('missing') and r.get('provenance_status') != 'unrecorded' else ''}</td></tr>"
+        for r in shown)
+    return ("<h3>Tool and database provenance</h3><p class='lead'>Which database version and source stand behind each tool, and how far the tool has been validated: "
+            "<em>real binary checked</em> (the scheduled workflow ran the real tool on a known input), <em>adapter tested</em> (the adapter is tested against recorded or "
+            "stand-in output; the real binary is not checked) or <em>untested</em>. A blank is not recorded, never a guess; a checksum is filled in only from a real download.</p>"
+            "<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Validation</th><th>Database</th><th>Version</th><th>Source</th><th>Release date</th>"
+            f"<th>Checksum (SHA-256)</th><th>Provenance</th></tr></thead><tbody>{body}</tbody></table></div>")
+
+
 def database_membership_section(leaderboard, out_dir):
     """Recovery of truth plasmids inside vs outside each tool's own database."""
     rows = [r for r in leaderboard if r.get("n_plasmids_in_tool_database") not in (None, "")]
@@ -324,6 +349,7 @@ def database_membership_section(leaderboard, out_dir):
                           f"<td><strong>{esc(gap(r))}</strong></td></tr>" for r in rows)
                 + "</tbody></table></div>")
     inside = sum(1 for r in containment if r.get("in_database") == "yes")
+    body += provenance_table(read_tsv(Path(out_dir) / "benchmark.database_provenance.tsv"))
     return ("<section id='database-membership'><h2>Truth plasmids in tool databases</h2>"
             "<p class='lead'>Sequence-level leakage check: a truth plasmid is <em>in</em> a tool's database when one "
             "database record covers at least 95% of it at 99% identity. A tool that recovers in-database plasmids "

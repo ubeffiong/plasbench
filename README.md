@@ -120,7 +120,10 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- Every tool carries a validation tier (real binary checked, adapter tested, untested) and every database a version, source, release date and checksum (blank = not recorded); a weekly workflow runs the real MOB-suite, Platon and plasmidSPAdes on a known plasmid. Shown in *Truth plasmids in tool databases*.
+- AMR placement now also reports flank context, resistance genes kept together and AMR-PRR; `plasbench promote-amr-truth` turns a reviewed draft into curated AMR truth (name, database version and confirmation required).
 - More figures: isolate complexity against performance, an outcome view of the plasmid matrix, identity shading and resistance-region brackets on the circular maps, true/false-positive encodings in the 3D landscape, and an evidence panel under the recommendation.
+- Settings new in 0.4, all in `config/config.sh` and recorded in the run manifest: `HEADLINE_MIN_CLUSTERS`, `ALLOW_PRIMARY_FALLBACK`, `RUN_STATS_VALIDATION`, `STATS_VALIDATION_MODE`, `CHROMID_MIN_BP`, `LARGE_PLASMID_BP`, `AMR_FLANK_BP`, `RUN_RANK_SENSITIVITY` (see the Scientific guide's settings tables).
 - A radar fingerprint per analysis track shows each tool's accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability as one shape (a picture of the table beside it, not a score).
 - The numeric tool x metric heatmap (one block per analysis track) now includes SV-PRR and the predicted-sequence burden columns beside F1, MCC, binning F1 and CPRR.
 - The recommender evaluation compares the single best tool, an organism recommender and a feature-conditioned one (nearest similar isolates, truth-free features), with calibration and abstention; an arm adds value only when it beats the single best tool on average and in most of at least three studies.
@@ -2342,7 +2345,11 @@ ones you'll actually reach for most often; every command has more than shown her
 | `validate-cohort` | Check a cohort sheet's schema, or verify it against NCBI online. | *`--samples`*, `--online`, `--write-lock`, `--verify-lock`, `--ledger` |
 | `validate-orthogonal-evidence` | Validate optional independent laboratory/technology evidence without changing computational scores. | *`--evidence`*, `--out` |
 | `derive-amr-truth` | Draft AMR truth from reference annotation; never writes `truth_amr.tsv`. | *`--features`*, *`--truth`*, *`--out`* |
+| `promote-amr-truth` | Promote a REVIEWED AMR truth draft to `truth_amr.tsv`; refuses without your name, the real database version and the explicit confirmation. | *`--draft`*, *`--truth`*, *`--reviewed-by`*, *`--database-version`*, *`--confirm-reviewed`*, `--out`, `--force` |
 | `audit-truth-labels` | Screen PLASMID/CHROMOSOME truth labels against replicon/MOB evidence (advisory). | `--data-dir`, `--out` |
+| `collect-truth-provenance` | Record each truth assembly's construction (long-read-first or short-read-first) and polishing reads from NCBI evidence. | *`--samples`*, *`--evidence-out`*, `--sheet-out`, `--api-key` |
+| `candidate-dataset` | Build an auditable, label-safe candidate-quality dataset from a completed run. | *`--scores`*, *`--samples`*, *`--results-dir`*, *`--out-prefix`*, `--tool-status` |
+| `discover-design-cohort` | Find long-read-first, one-per-BioProject NCBI isolates until each species reaches a cluster target. | *`--species`* (repeatable), *`--out`*, `--existing`, `--ledger`, `--target-clusters` |
 | `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |

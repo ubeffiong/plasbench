@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from recommendation_model import (ASSEMBLY_STAT_FIELDS, decision_score,  # noqa: E402
+from recommendation_model import (ASSEMBLY_STAT_FIELDS, assembly_stats_of_fasta, decision_score,  # noqa: E402
                                   load_model)
 
 
@@ -39,14 +39,9 @@ def read_plasmid_similarity(path, query_fasta):
 
 
 def read_assembly_stats(path):
-    """Read a one-row assembly_stats.tsv for THIS isolate, if the caller has one.
+    """Read a one-row table of THIS isolate's own assembly statistics (the input_* columns of ASSEMBLY_STAT_FIELDS), if the caller has one.
 
-    An operational isolate normally has no reference assembly, so normally has
-    no stats -- in which case these features are simply absent and the model
-    imputes them with its training mean. Supplying them (e.g. re-selecting for
-    a benchmark isolate that does have a reference) lets the prediction use
-    the isolate's own GC content and assembly fragmentation instead.
-    """
+    Without it the features are absent and the model imputes them with its training mean. Prefer --assembly, which measures them from the isolate's contigs."""
     if not path:
         return {}
     try:
@@ -147,9 +142,10 @@ def main():
                                                         "instead of a discrete scope lookup. Ignored (falls back to the "
                                                         "unchanged scope lookup) when omitted or not model_ready.")
     parser.add_argument("--read-depth-x", type=float, help="This isolate's own read depth, if known, for live model prediction.")
-    parser.add_argument("--assembly-stats", help="Optional one-row assembly_stats.tsv for THIS isolate "
-                                                 "(compute_assembly_stats.py). Supplies GC content and assembly "
-                                                 "fragmentation to the model; absent, those features are imputed.")
+    parser.add_argument("--assembly", help="Optional contigs FASTA of THIS isolate (the assembly the tools are given). Its GC content, N50, contig count and size are "
+                                           "measured and given to the model; absent, those features are imputed with the training mean.")
+    parser.add_argument("--assembly-stats", help="Alternative to --assembly: a one-row table with the input_gc_percent, input_n50, input_contig_count and "
+                                                 "input_assembly_size_bp columns for THIS isolate. (A reference-derived assembly_stats.tsv is not accepted: those numbers describe the truth.)")
     parser.add_argument("--plasmid-similarity", help="Optional plasmid_similarity.tsv for THIS isolate's selected "
                                                      "candidate (classify_operational_plasmid.py). When given, its "
                                                      "per-record novel-vs-known calls are merged into the report "
@@ -166,7 +162,7 @@ def main():
         model = model if model_ready else None
     chosen = choose_recommendation(rows(args.recommendations), args.organism, args.gram_group, model=model,
                                    read_depth_x=args.read_depth_x,
-                                   assembly_stats=read_assembly_stats(args.assembly_stats))
+                                   assembly_stats=(assembly_stats_of_fasta(args.assembly) if args.assembly else read_assembly_stats(args.assembly_stats)))
 
     if args.tool_only:
         if not chosen:

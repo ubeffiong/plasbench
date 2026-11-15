@@ -25,7 +25,7 @@ def build(tmp, studies=4):
             for tool, value in (("X", 0.9 if depth == 20 else 0.4), ("Y", 0.4 if depth == 20 else 0.9)):
                 scores += f"{sample}\t{tool}\t{value}\n"
             row = {c: "" for c in cd.COLUMNS}
-            row.update(sample=sample, read_depth_x=str(depth + i * 0.01), assembly_size_bp=str(5_000_000 + 1000 * i), gc_percent="50")
+            row.update(sample=sample, read_depth_x=str(depth + i * 0.01), input_assembly_size_bp=str(5_000_000 + 1000 * i), input_gc_percent="50")
             feats += "\t".join(row[c] for c in cd.COLUMNS) + "\n"
     for name, text in (("samples.tsv", sheet), ("scores.tsv", scores), ("features.tsv", feats)):
         (tmp / name).write_text(text)
@@ -66,6 +66,27 @@ def main():
         build(tmp, studies=2)
         feature = run(tmp)[("f1", "feature_conditioned")]
         check("with fewer than three studies an arm is not assessed, never declared better", feature["verdict"] == "not_assessed", feature)
+
+    print("the adds-value rule")
+    def items(study, regrets, basis="neighbours"):
+        return [{"study": study, "regret": r, "predicted": 0.9, "score": 0.9, "best": 1.0, "basis": basis} for r in regrets]
+    single = {f"st{i}": 0.30 for i in range(4)}
+    good = sum((items(f"st{i}", [0.10, 0.10]) for i in range(4)), [])
+    check("a clear gain in every study of two isolates adds value", er.arm_summary("f1", "feature_conditioned", good, single, 0.4, 0.05)["verdict"] == "adds_value")
+    tiny = sum((items(f"st{i}", [0.2999, 0.2999]) for i in range(4)), [])
+    check("a negligible gain (0.0001) is not value", er.arm_summary("f1", "feature_conditioned", tiny, single, 0.4, 0.05)["verdict"] == "no_better")
+    lonely = sum((items(f"st{i}", [0.10]) for i in range(4)), [])
+    check("studies of a single isolate do not count: not assessed, however good", er.arm_summary("f1", "feature_conditioned", lonely, single, 0.4, 0.05)["verdict"] == "not_assessed")
+    fell_back = sum((items(f"st{i}", [0.10, 0.10], basis="single_best") for i in range(4)), [])
+    check("a feature arm that fell back to the single best for most isolates is not assessed, not 'no better'",
+          er.arm_summary("f1", "feature_conditioned", fell_back, single, 0.4, 0.05)["verdict"] == "not_assessed" and "fell back" in er.arm_summary("f1", "feature_conditioned", fell_back, single, 0.4, 0.05)["note"])
+    check("the share placed by neighbours is reported", er.arm_summary("f1", "feature_conditioned", good, single, 0.4, 0.05)["share_feature_based"] == "1.000")
+    with tempfile.TemporaryDirectory() as t2:
+        tmp2 = Path(t2)
+        build(tmp2)
+        (tmp2 / "features.tsv").write_text("\t".join(cd.COLUMNS) + "\n")
+        none = run(tmp2)[("f1", "feature_conditioned")]
+        check("with no dataset features at all the feature arm is not assessed (it used to read 'no better')", none["verdict"] == "not_assessed" and none["share_feature_based"] == "0.000", none)
 
     print("the truth-free boundary")
     try:

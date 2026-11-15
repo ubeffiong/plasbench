@@ -26,17 +26,25 @@ def check(name, condition, detail=""):
     print("  " + name + " -> PASS")
 
 
-ROWS = [{"tool": t, "organism": o, "gram_group": "neg", "read_depth_x": d, "gc_percent": 50.0 + d / 10, "n50": 1e5, "contig_count": 100 + d,
-         "assembly_size_bp": 5e6, "true_plasmid_bp": 1000 * d, "true_plasmid_count": d % 4, "amr_status": "AMR annotated" if d % 2 else "AMR not annotated"}
+ROWS = [{"tool": t, "organism": o, "gram_group": "neg", "read_depth_x": d, "input_gc_percent": 50.0 + d / 10, "input_n50": 1e5, "input_contig_count": 100 + d,
+         "input_assembly_size_bp": 5e6, "gc_percent": 1.0, "n50": 1.0, "contig_count": 1.0, "assembly_size_bp": 1.0, "true_plasmid_bp": 1000 * d, "true_plasmid_count": d % 4, "amr_status": "AMR annotated" if d % 2 else "AMR not annotated"}
         for t in ("a", "b") for o in ("E. coli", "K. pneumoniae") for d in (10, 20, 30, 40)]
 
 print("the features")
 check("no continuous feature is truth-derived", not (set(rm.CONTINUOUS_FIELDS) & rm.TRUTH_DERIVED_FIELDS), rm.CONTINUOUS_FIELDS)
 check("no categorical feature is truth-derived", not (set(rm.CATEGORICAL_FIELDS) & rm.TRUTH_DERIVED_FIELDS), rm.CATEGORICAL_FIELDS)
 check("the truth-free inputs are the measured read depth, the assembly's own statistics and the organism metadata",
-      set(rm.CONTINUOUS_FIELDS) == {"read_depth_x", "gc_percent", "n50", "contig_count", "assembly_size_bp"} and set(rm.CATEGORICAL_FIELDS) == {"tool", "organism", "gram_group"})
+      set(rm.CONTINUOUS_FIELDS) == {"read_depth_x", "input_gc_percent", "input_n50", "input_contig_count", "input_assembly_size_bp"} and set(rm.CATEGORICAL_FIELDS) == {"tool", "organism", "gram_group"})
+check("the reference's own statistics are forbidden as inputs (they describe the truth)", set(rm.REFERENCE_STAT_FIELDS) <= rm.TRUTH_DERIVED_FIELDS and not (set(rm.REFERENCE_STAT_FIELDS) & set(rm.CONTINUOUS_FIELDS)))
+check("every input is on the allowlist, and a new column is refused until it is added", set(rm.CONTINUOUS_FIELDS) | set(rm.CATEGORICAL_FIELDS) <= rm.TRUTH_FREE_FEATURES)
 try:
-    rm.assert_truth_free(["gc_percent", "true_plasmid_count"])
+    rm.assert_allowed(["read_depth_x", "some_new_column"])
+    refused_new = False
+except ValueError as error:
+    refused_new = "some_new_column" in str(error)
+check("assert_allowed refuses a column that is not on the allowlist", refused_new)
+try:
+    rm.assert_truth_free(["input_gc_percent", "true_plasmid_count"])
     refused = False
 except ValueError as error:
     refused = "true_plasmid_count" in str(error)

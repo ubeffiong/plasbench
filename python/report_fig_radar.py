@@ -47,6 +47,7 @@ AXES = [
     ("Reliability", "E3", "success_rate", False),
 ]
 PALETTE = ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#CC79A7", "#56B4E9", "#444444", "#9A8700"]
+DASHES = ("", "7 3", "2 3")    # a tool past the 8th palette colour repeats a colour with a dash pattern, so two tools never look alike
 W, H, CX, CY, R = 560, 470, 280, 235, 150
 MIN_AXES = 3
 
@@ -106,9 +107,9 @@ def radar_svg(track, entries, uid):
         have = [(k, v) for k, v in enumerate(values) if v is not None]
         if len(have) < MIN_AXES:
             continue
-        colour = PALETTE[t % len(PALETTE)]
+        colour, dash = PALETTE[t % len(PALETTE)], DASHES[(t // len(PALETTE)) % len(DASHES)]
         pts = " ".join(f"{sv.num(x)},{sv.num(y)}" for x, y in (point(k, v) for k, v in have))
-        parts.append(f"<polygon points='{pts}' fill='{colour}' fill-opacity='0.10' stroke='{colour}' stroke-width='2'><title>{sv.esc(row['label'])}</title></polygon>")
+        parts.append(f"<polygon points='{pts}' fill='{colour}' fill-opacity='0.10' stroke='{colour}' stroke-width='2' stroke-dasharray='{dash}'><title>{sv.esc(row['label'])}</title></polygon>")
         for k, v in have:
             x, y = point(k, v)
             parts.append(f"<circle cx='{sv.num(x)}' cy='{sv.num(y)}' r='3.2' fill='{colour}'><title>{sv.esc(row['label'] + ', ' + AXES[k][0] + ': ' + format(v, '.3f'))}</title></circle>")
@@ -118,12 +119,14 @@ def radar_svg(track, entries, uid):
 
 def block_html(block, columns, k):
     entries = tool_values(block, columns)
-    # Kept free of backslashes inside f-string expressions: Python < 3.12
-    # rejects them, and PlasBench supports 3.9+.
+    # Kept outside the f-strings: a backslash inside an f-string expression is a
+    # SyntaxError before Python 3.12, and PlasBench supports 3.9+.
     too_few = ' <em class="muted">(too few axes for a polygon)</em>'
+    line_notes = ("", " (dashed line)", " (dotted line)")
     legend = "".join(
         f"<li style='display:inline-block;margin:0 14px 4px 0'><span style='display:inline-block;width:12px;height:12px;background:{PALETTE[t % len(PALETTE)]};vertical-align:-1px'></span> "
-        f"{sv.esc(row['label'])}{'' if sum(v is not None for v in values) >= MIN_AXES else too_few}</li>"
+        f"{sv.esc(row['label'])}{line_notes[(t // len(PALETTE)) % len(DASHES)]}"
+        f"{'' if sum(v is not None for v in values) >= MIN_AXES else too_few}</li>"
         for t, (row, values) in enumerate(entries))
     head = "".join(f"<th>{sv.esc(label)}</th>" for label, *_ in AXES)
     body = "".join("<tr><td>{}</td>{}</tr>".format(sv.esc(row["label"]), "".join(

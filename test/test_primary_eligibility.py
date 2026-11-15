@@ -63,6 +63,20 @@ def main():
         check("allow_fallback changes nothing when a reference qualifies", d1.headline_selection(rows, allow_fallback=True).status == hd.PRIMARY_AVAILABLE)
         check("headline_rows still returns (rows, basis) with the same labels", d3.headline_rows(rows) == (rows, d3.headline_selection(rows).basis))
 
+    print("the cluster minimum")
+    with tempfile.TemporaryDirectory() as tmp:
+        sheet = Path(tmp) / "sheet.tsv"
+        sheet.write_text("sample_id\tbioproject\n" + "".join(f"s{i}\tPRJ{i // 2}\n" for i in range(6)), encoding="utf-8")
+        prov = provenance(tmp, {f"s{i}": "1" for i in range(6)})
+        three = hd.Design(sample_sheet=str(sheet), provenance=prov, min_primary_clusters=5)
+        many = [{"sample": f"s{i}", "tool": "t"} for i in range(6)]
+        sel = three.headline_selection(many)
+        check("references from only 3 independent clusters are not enough for a minimum of 5: unavailable, with the reason",
+              sel.status == hd.PRIMARY_UNAVAILABLE and "only 3 independent cluster(s)" in sel.reason and "at least 5" in sel.reason, sel)
+        check("enough clusters: available", hd.Design(sample_sheet=str(sheet), provenance=prov, min_primary_clusters=3).headline_selection(many).status == hd.PRIMARY_AVAILABLE)
+        check("the library default keeps old callers unchanged (one qualifying cluster is enough)", hd.Design(sample_sheet=str(sheet), provenance=prov).headline_selection(many).status == hd.PRIMARY_AVAILABLE)
+        check("allow_fallback keeps the numbers with the warning when the cluster minimum is not met", three.headline_selection(many, allow_fallback=True).status == hd.PRIMARY_FALLBACK)
+
     print("aggregation")
     header = ["sample", "tool", "true_plasmid_bp", "TP_bp", "FP_bp", "FN_bp", "unmapped_pred_bp", "precision", "recall", "f1", "bin_precision", "bin_recall", "bin_f1",
               "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins"]
@@ -85,16 +99,20 @@ def main():
         done, board, prefix = aggregate(tmp, {"s1": "3"})
         names = list(board[0])
         check("leaderboard rows carry primary_status and population, appended last", board[0]["primary_status"] == "unavailable" and board[0]["population"].startswith("provisional")
-              and names[-2:] == ["primary_status", "population"], names[-3:])
+              and names[names.index("primary_status"):names.index("primary_status") + 2] == ["primary_status", "population"]
+              and names.index("population") > names.index("significant_vs_runner_up"), names[-4:])   # appended after the older columns; later releases append after them
         md = open(prefix + ".leaderboard.md", encoding="utf-8").read()
         check("the markdown leaderboard says PROVISIONAL", "PROVISIONAL: primary analysis unavailable" in md and "not the primary result" in md)
         design = list(csv.DictReader(open(prefix + ".headline_design.tsv", newline="", encoding="utf-8"), delimiter="\t"))
         check("the headline design table carries primary_status", design and design[0]["primary_status"] == "unavailable")
         check("a warning is printed", "PRIMARY ANALYSIS UNAVAILABLE" in done.stdout, done.stdout[-300:])
     with tempfile.TemporaryDirectory() as tmp:
-        _done, board, prefix = aggregate(tmp, {"s1": "1"})
+        _done, board, prefix = aggregate(tmp, {"s1": "1"}, extra=["--headline-min-clusters", "1"])
         md = open(prefix + ".leaderboard.md", encoding="utf-8").read()
         check("a tier-1 reference: available, no provisional wording", board[0]["primary_status"] == "available" and "PROVISIONAL" not in md and board[0]["population"].startswith("primary"))
+    with tempfile.TemporaryDirectory() as tmp:
+        _done, board, _prefix = aggregate(tmp, {"s1": "1"})
+        check("the pipeline default needs 5 independent clusters: one tier-1 isolate is not a primary analysis", board[0]["primary_status"] == "unavailable")
     with tempfile.TemporaryDirectory() as tmp:
         _done, board, _prefix = aggregate(tmp, {"s1": "3"}, extra=["--allow-primary-fallback"])
         check("--allow-primary-fallback: status fallback_allowed", board[0]["primary_status"] == "fallback_allowed")

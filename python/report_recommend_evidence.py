@@ -4,7 +4,7 @@ report_recommend_evidence.py -- the evidence panel under the operational recomme
 
 A recommendation is a claim; this lists what stands behind it, from tables the report already holds (nothing is computed here):
 
-  Expected performance   the tool's mean F1 over the isolates it was scored on, how many, and its decision score (recommendations table)
+  Observed performance   the tool's mean F1 over the isolates it was scored on (this cohort, in sample: not a forecast for a new isolate), how many, and its decision score
   Independent studies    the independent clusters behind its ranking (leaderboard n_independent_clusters)
   Reference quality      how many isolates sit on each reference tier, and how many of the six evidence fields were recorded (truth provenance)
   Dataset similarity     what the recommendation covers (isolates, organisms) and whether choosing by similar isolates beat the single best tool
@@ -50,14 +50,14 @@ def card(row, board, provenance, features, verdict):
     tool = row.get("tool")
     lb = next((r for r in board if r.get("tool") == tool), {})
     f1, n, coverage = _num(row.get("mean_f1")), row.get("n_scored"), _num(row.get("coverage"))
-    expected = (f"mean F1 {f1:.3f} over {n} scored isolate(s)" + (f" (coverage {coverage:.0%})" if coverage is not None else "")
+    expected = (f"mean F1 {f1:.3f} over {n} scored isolate(s), in this cohort" + (f" (coverage {coverage:.0%})" if coverage is not None else "")
                 + (f"; decision score {row.get('decision_score')}" if row.get("decision_score") else "")) if f1 is not None else "not recorded"
     clusters = lb.get("n_independent_clusters")
     studies = f"{clusters} independent cluster(s)" if clusters not in (None, "") else "not recorded"
     if lb.get("ranking_ci_low"):
         interval = f"ranking score {lb.get('ranking_score')} (95% CI {lb['ranking_ci_low']} to {lb['ranking_ci_high']})"
     else:
-        interval = "no interval: fewer than five independent units"
+        interval = "no interval recorded (fewer than five independent units, or the primary analysis is unavailable)"
     if lb.get("significant_vs_runner_up"):
         interval += f"; lead over the runner-up: {lb['significant_vs_runner_up']}"
     orgs = organisms(features)
@@ -65,12 +65,12 @@ def card(row, board, provenance, features, verdict):
     transfer = (f"choosing by similar isolates: {arms['feature_conditioned'].replace('_', ' ')}" if arms.get("feature_conditioned") else "choosing by similar isolates: not evaluated")
     similarity = (f"a recommendation for this cohort as a whole ({len(features) or 'unknown number of'} isolates"
                   + (f"; organisms: {', '.join(orgs)}" if orgs else "") + f"), not a prediction for a new isolate; {transfer}")
-    return [("Recommended tool", _esc(tool)), ("Expected performance", _esc(expected)), ("Independent studies", _esc(studies)),
+    return [("Recommended tool", _esc(tool)), ("Observed performance", _esc(expected)), ("Independent studies", _esc(studies)),
             ("Reference quality", _esc(reference_quality(provenance) or "not recorded")), ("Dataset similarity", _esc(similarity)), ("Uncertainty", _esc(interval))]
 
 
-def withheld_reason(recommendations, board):
-    """Why nothing is recommended or why the headline is provisional, or None."""
+def withheld_reason(recommendations, board, verdict=None):
+    """Why nothing is recommended, why the headline is provisional, or what the recommender evaluation says about recommending per isolate; None when there is nothing to say."""
     primaries = [r for r in recommendations if r.get("scope") == "overall" and r.get("recommendation") == "primary"]
     status = next((r.get("primary_status") for r in board if r.get("primary_status")), "")
     reasons = []
@@ -79,12 +79,14 @@ def withheld_reason(recommendations, board):
         reasons.append("no tool met the coverage gate" + (f" ({top.get('reason')})" if top and top.get("reason") else ""))
     if status and status != "available":
         reasons.append(f"the primary analysis is {status.replace('_', ' ')}: no reference of tier 1 or 2 supports the headline, so the ranking is provisional")
+    if (verdict or {}).get("verdict") == "benchmark_only":
+        reasons.append(f"the recommender evaluation finds no gain from choosing per isolate (oracle gap {verdict.get('oracle_gap', 'n/a')}): this is the leader of this cohort, not a prediction for a new isolate")
     return "; ".join(reasons) or None
 
 
 def panel_html(recommendations, board, provenance, features, verdict):
     primaries = [r for r in recommendations if r.get("scope") == "overall" and r.get("recommendation") == "primary"]
-    reason = withheld_reason(recommendations, board)
+    reason = withheld_reason(recommendations, board, verdict)
     parts = ["<h3>Evidence behind the recommendation</h3>"]
     if not recommendations:
         parts.append("<p class='muted'>Not run: no recommendations table was available, so there is no evidence to list.</p>")

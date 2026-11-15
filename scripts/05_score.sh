@@ -386,6 +386,7 @@ score_sample() {
             [[ -s "$BINS" ]] && binning_capable "$tool" && PLACEMENT_ARGS+=(--bins "$BINS")
             [[ -s "$CONTIG_LABELS" ]] && PLACEMENT_ARGS+=(--contig-labels "$CONTIG_LABELS")
             [[ -s "$FEATURES" ]] && PLACEMENT_ARGS+=(--features "$FEATURES")
+            [[ -s "$RDIR/${tool}.cprr.tsv" ]] && PLACEMENT_ARGS+=(--cprr "$RDIR/${tool}.cprr.tsv")
             python3 "$HERE/../python/score_amr_placement.py" score --sample "$SAMPLE" --tool "$tool" \
                 --truth "$SCORE_TRUTH" --amr-truth "$AMR" --paf "$PAF" --pred-fasta "$PRED" \
                 "${PLACEMENT_ARGS[@]+"${PLACEMENT_ARGS[@]}"}" \

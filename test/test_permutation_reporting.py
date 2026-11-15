@@ -64,21 +64,34 @@ def main():
         row = comparisons(n)[0]
         check(f"{n} independent units: method {method}, status {status}", row["permutation_method"] == method and row["p_status"] == status
               and row["min_attainable_p"] == rs.permutation_floor(n), row)
-    check("a comparison whose floor is above 0.05 would be flagged underpowered (the status rule)",
-          ("underpowered" if rs.permutation_floor(5) > 0.05 else "ok") == "underpowered")
+    # underpowered is judged on the Holm-adjusted p over every comparison: 6 units give a floor of 0.03125, so 2 comparisons can still reach 0.0625 (not below 0.05)
+    many = []
+    for t in ("a", "b", "c"):
+        for i in range(6):
+            many.append(make_row(f"s{i}", t, 0.9 - 0.2 * "abc".index(t)))
+    rows3 = ar.compute_comparisons(many)
+    check("with several comparisons a 6-unit test cannot be significant after Holm: underpowered, and the Holm floor says why",
+          len(rows3) == 3 and all(r["p_status"] == "underpowered" and abs(r["holm_min_attainable_p"] - min(1.0, 3 * rs.permutation_floor(6))) < 1e-12 for r in rows3), rows3[0])
+    check("a single 6-unit comparison is still fine (floor 0.03125 x 1)", comparisons(6)[0]["p_status"] == "ok" and abs(comparisons(6)[0]["holm_min_attainable_p"] - 0.03125) < 1e-12)
+    nan = float("nan")
+    check("a NaN in the differences gives no p-value and no interval, never about 1e-4",
+          rs.paired_permutation_pvalue([.1] * 5 + [nan]) is None and rs.stratified_permutation([.1] * 6 + [nan], list(range(7)), ["a"] * 7) is None
+          and rs.bootstrap_ci([.1, .2, .3, .4, .5, nan]) == (None, None))
+    check("an infinite difference keeps its old behaviour (it is not 'not measured')", rs.paired_permutation_pvalue([.1] * 5 + [float("inf")]) is not None)
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "pairs.tsv"
         ar.write_comparisons([], str(path), comparisons=comparisons(6))
         header = open(path, encoding="utf-8").readline().rstrip("\n").split("\t")
         record = next(csv.DictReader(open(path, newline="", encoding="utf-8"), delimiter="\t"))
         check("the written table has the new columns last, older columns in place",
-              header[:4] == ["tool_a", "tool_b", "paired_samples", "mean_f1_difference"] and header[-6:-3] == ["wilcoxon_p_value_holm", "equivalent", "smallest_difference"]
-              and header[-3:] == ["permutation_method", "min_attainable_p", "p_status"], header)
+              header[:4] == ["tool_a", "tool_b", "paired_samples", "mean_f1_difference"] and header[-7:-4] == ["wilcoxon_p_value_holm", "equivalent", "smallest_difference"]
+              and header[-4:] == ["permutation_method", "min_attainable_p", "p_status", "holm_min_attainable_p"], header)
         check("and the values", record["permutation_method"] == "exact" and float(record["min_attainable_p"]) == 0.03125 and record["p_status"] == "ok", record)
 
     print("the report and the plan")
     check("permutation_note: exact with its floor", report.permutation_note({"permutation_method": "exact", "min_attainable_p": "0.031250", "p_status": "ok"}) == "exact, smallest attainable p 0.031250")
-    check("permutation_note: underpowered is said", "underpowered: cannot reach 0.05" in report.permutation_note({"permutation_method": "monte_carlo", "min_attainable_p": "0.0625", "p_status": "underpowered"}))
+    check("permutation_note: underpowered is said", "underpowered: cannot reach 0.05" in report.permutation_note({"permutation_method": "monte_carlo", "min_attainable_p": "0.0625", "p_status": "underpowered"})
+          and "smallest Holm-adjusted p it can reach is 0.093750" in report.permutation_note({"permutation_method": "exact", "min_attainable_p": "0.031250", "p_status": "underpowered", "holm_min_attainable_p": "0.093750"}))
     check("permutation_note: not estimated, and older runs", report.permutation_note({"permutation_method": "not_estimated", "p_status": "not_estimated"}) == "not estimated"
           and report.permutation_note({}) == "not recorded (older run)")
     rows = {r["parameter"]: r for r in freeze_prereg.read_rows(ROOT / "config" / "prereg.tsv")}

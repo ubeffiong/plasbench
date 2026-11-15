@@ -26,6 +26,19 @@ reference, its predicted FASTA and, when it bins, its bins TSV. Per gene copy:
 Gene class comes from config/amr_gene_classes.tsv (prefix match on gene_name;
 unmatched genes are "other").
 
+Context (plan B4), per gene copy and per plasmid, reported beside the placement and never ranking a tool:
+  flank context   share of the +-AMR_FLANK_BP (1000) flanks of the copy that the SAME covering record also covers (clipped at the plasmid ends):
+                  was the gene recovered with its surroundings, or as a fragment? Blank when the copy was not recovered.
+  co-localisation for two recovered copies on one truth plasmid, whether the tool put them in the same bin (same record for a tool that does not bin);
+                  the share of such pairs kept together.
+  AMR-PRR         of the plasmids that carry a curated AMR copy, the share whose copies ALL sit on the right plasmid AND that the tool reconstructed correctly
+                  (CPRR criteria, `--cprr` the tool's per-plasmid table); blank without that table. `amr_complete_rate` is the same without the CPRR condition.
+Each is alignment-derived from curated truth and as unvalidated as that truth: a draft from derive_amr_truth.py is not curated until promote_amr_truth.py.
+A truth row whose `evidence_tier` is `auto_derived` is a draft that someone copied to truth_amr.tsv without promoting it: it is scored (the file is the file the scorer reads) but
+every gene copy carries its `truth_evidence_tier`, a warning is printed, and the summary counts `draft_truth_copies`, so the report can say the result rests on uncurated truth.
+AMR-PRR follows CPRR's identity rule: on an isolate whose truth cannot judge identity (polished with the benchmark's own reads) the tool's CPRR verdict without the identity
+criterion is used (`collect --truth-provenance`).
+
 Subcommands: `score` (one sample and tool) and `collect` (every
 <sample>/<tool>.amr_placement.tsv -> one row per tool and gene class).
 Standard library only.
@@ -43,10 +56,11 @@ import score_bins  # noqa: E402
 import score_plasmids as sp  # noqa: E402
 
 GENE_FIELDS = ["sample", "tool", "copy_id", "gene_name", "gene_class", "sequence_id", "start", "end",
-               "covering_record", "assigned_bin", "matched_plasmid", "placement", "replicon_type_correct"]
+               "covering_record", "assigned_bin", "matched_plasmid", "placement", "replicon_type_correct", "flank_covered", "plasmid_cprr_correct",
+               "plasmid_cprr_correct_no_identity", "truth_evidence_tier"]
 SUMMARY_FIELDS = ["tool", "gene_class", "n_gene_copies", "n_recovered", "n_correct_plasmid", "n_wrong_plasmid",
                   "n_shared_contig", "n_unassigned_contig", "correct_plasmid_rate", "replicon_type_correct_rate",
-                  "n_samples"]
+                  "n_samples", "n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate", "draft_truth_copies"]
 DEFAULT_CLASSES = Path(__file__).resolve().parents[1] / "config" / "amr_gene_classes.tsv"
 
 
@@ -55,6 +69,29 @@ def read_tsv(path):
         return []
     with open(path, newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
+
+
+FLANK_BP = int(os.environ.get("AMR_FLANK_BP", 1000))
+
+
+def covered_bp(intervals, start, end):
+    """Bases of [start, end) covered by the union of `intervals` ((s, e) pairs)."""
+    total, cursor = 0, start
+    for s, e in sorted(intervals):
+        s, e = max(s, cursor), min(e, end)
+        if e > s:
+            total += e - s
+            cursor = e
+    return total
+
+
+def flank_share(record_intervals, start, end, plasmid_length, flank):
+    """Share of the two flanks of [start, end) (each `flank` bases, clipped to 0 and the plasmid length) that the intervals cover; None when there is no flank."""
+    flanks = [(max(0, start - flank), start), (end, min(plasmid_length, end + flank))]
+    total = sum(b - a for a, b in flanks if b > a)
+    if total <= 0:
+        return None
+    return sum(covered_bp(record_intervals, a, b) for a, b in flanks if b > a) / total
 
 
 def gene_class(name, classes):
@@ -86,6 +123,12 @@ def cmd_score(args):
     classes = [(r["gene_prefix"], r["gene_class"]) for r in read_tsv(args.gene_classes) if r.get("gene_prefix")]
     rtypes = replicon_types(read_tsv(args.features))
     plasmids = {sid: length for sid, (mol, length) in truth.items() if mol == "PLASMID"}
+    cprr_rows = read_tsv(args.cprr) if getattr(args, "cprr", None) else []
+    cprr = {r.get("true_plasmid"): r.get("correct") for r in cprr_rows}
+    cprr_no_identity = {r.get("true_plasmid"): r.get("correct_without_identity") for r in cprr_rows}
+    if any((r.get("evidence_tier") or "") == "auto_derived" for r in amr):
+        sys.stderr.write(f"[score_amr_placement] WARNING: {args.sample}: the AMR truth contains auto-derived DRAFT rows (evidence_tier=auto_derived), not curated truth: review the draft and "
+                         "promote it (plasbench promote-amr-truth) instead of copying it to truth_amr.tsv.\n")
 
     # Bin -> plasmid by maximum-weight one-to-one matching over aligned bases.
     overlaps = defaultdict(int)
@@ -109,7 +152,9 @@ def cmd_score(args):
         record = {"sample": args.sample, "tool": args.tool, "copy_id": row.get("copy_id", ""),
                   "gene_name": row.get("gene_name", ""), "gene_class": gene_class(row.get("gene_name"), classes),
                   "sequence_id": sid, "start": start, "end": end, "covering_record": "", "assigned_bin": "",
-                  "matched_plasmid": "", "placement": "not_recovered", "replicon_type_correct": ""}
+                  "matched_plasmid": "", "placement": "not_recovered", "replicon_type_correct": "", "flank_covered": "",
+                  "plasmid_cprr_correct": cprr.get(sid, ""), "plasmid_cprr_correct_no_identity": cprr_no_identity.get(sid, ""),
+                  "truth_evidence_tier": (row.get("evidence_tier") or "").strip()}
         if best and best_bp / length >= args.min_gene_coverage:
             bin_id = membership.get(best, best)
             target = matched.get(bin_id, "")
@@ -123,8 +168,9 @@ def cmd_score(args):
             replicon = "not_evaluated"
             if rtypes and target:
                 replicon = "yes" if (rtypes.get(target, set()) & rtypes.get(sid, set())) else "no"
+            share = flank_share([(qs, qe) for q, qs, qe in covered_by_query.get(sid, []) if q == best], start, end, plasmids.get(sid, end), args.flank_bp)
             record.update(covering_record=best, assigned_bin=bin_id, matched_plasmid=target, placement=placement,
-                          replicon_type_correct=replicon)
+                          replicon_type_correct=replicon, flank_covered="" if share is None else f"{share:.4f}")
         out.append(record)
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=GENE_FIELDS, delimiter="\t", lineterminator="\n")
@@ -134,7 +180,34 @@ def cmd_score(args):
                      f"{sum(r['placement'] == 'correct_plasmid' for r in out)}/{len(out)} gene copies on the right plasmid\n")
 
 
-def summarise(rows):
+def context(items, invalid_identity=frozenset()):
+    """(plasmids with AMR, complete rate, AMR-PRR, pairs, co-localised pairs, co-localisation rate, mean flank context) for one group of gene-copy rows.
+
+    `invalid_identity` is the set of samples whose truth cannot judge identity: for them the CPRR verdict without the identity criterion decides AMR-PRR, as for CPRR itself."""
+    fmt = lambda n, d: f"{n / d:.4f}" if d else ""  # noqa: E731
+    by_plasmid = defaultdict(list)
+    for r in items:
+        by_plasmid[(r["sample"], r["sequence_id"])].append(r)
+    complete = {k: all(r["placement"] == "correct_plasmid" for r in v) for k, v in by_plasmid.items()}
+    def verdict(key):
+        record = by_plasmid[key][0]
+        return record.get("plasmid_cprr_correct_no_identity") if key[0] in invalid_identity else record.get("plasmid_cprr_correct")
+    known = {k: verdict(k) in ("yes", "no") for k in by_plasmid}
+    prr_den = sum(1 for k in by_plasmid if known[k])
+    prr_num = sum(1 for k in by_plasmid if known[k] and complete[k] and verdict(k) == "yes")
+    pairs = together = 0
+    for v in by_plasmid.values():
+        got = [r["assigned_bin"] for r in v if r["placement"] != "not_recovered" and r.get("assigned_bin")]
+        for i in range(len(got)):
+            for j in range(i + 1, len(got)):
+                pairs += 1
+                together += got[i] == got[j]
+    flanks = [float(r["flank_covered"]) for r in items if r.get("flank_covered") not in ("", None)]
+    return (len(by_plasmid), fmt(sum(complete.values()), len(by_plasmid)), fmt(prr_num, prr_den), pairs, together, fmt(together, pairs),
+            f"{sum(flanks) / len(flanks):.4f}" if flanks else "")
+
+
+def summarise(rows, invalid_identity=frozenset()):
     groups = defaultdict(list)
     for row in rows:
         groups[(row["tool"], row["gene_class"])].append(row)
@@ -152,8 +225,16 @@ def summarise(rows):
                     "n_unassigned_contig": sum(r["placement"] == "unassigned_contig" for r in items),
                     "correct_plasmid_rate": fmt(sum(r["placement"] == "correct_plasmid" for r in decided), len(items)),
                     "replicon_type_correct_rate": fmt(sum(r["replicon_type_correct"] == "yes" for r in typed), len(typed)),
-                    "n_samples": len({r["sample"] for r in items})})
+                    "n_samples": len({r["sample"] for r in items}),
+                    **dict(zip(("n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate"),
+                               context(items, invalid_identity))),
+                    "draft_truth_copies": sum(1 for r in items if (r.get("truth_evidence_tier") or "") == "auto_derived")})
     return out
+
+
+def invalid_identity_samples(path):
+    """The samples whose truth cannot judge identity (truth_provenance base_level_metrics_valid is not 'yes'): the rule of headline_design.Design.identity_valid."""
+    return {r["sample"] for r in read_tsv(path) if r.get("sample") and r.get("base_level_metrics_valid") != "yes"} if path else set()
 
 
 def cmd_collect(args):
@@ -163,7 +244,7 @@ def cmd_collect(args):
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=SUMMARY_FIELDS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
-        writer.writerows(summarise(rows))
+        writer.writerows(summarise(rows, invalid_identity_samples(getattr(args, "truth_provenance", None))))
     sys.stderr.write(f"[score_amr_placement] {len(rows)} gene-copy row(s) -> {args.out}\n")
 
 
@@ -177,6 +258,8 @@ def main():
     s.add_argument("--contig-labels", help="contig_classification.py labels (AMBIGUOUS/UNPLACED categories)")
     s.add_argument("--features", help="truth_features.tsv (replicon types, level 1)")
     s.add_argument("--gene-classes", default=str(DEFAULT_CLASSES))
+    s.add_argument("--cprr", help="the tool's <tool>.cprr.tsv (score_bins.py --cprr-out): which truth plasmids it reconstructed correctly (for AMR-PRR)")
+    s.add_argument("--flank-bp", type=int, default=FLANK_BP, help="bases either side of a gene copy whose coverage is the flank context (env AMR_FLANK_BP, default 1000)")
     s.add_argument("--min-gene-coverage", type=float, default=0.90)
     s.add_argument("--min-alignment-length", type=int, default=1)
     s.add_argument("--min-alignment-identity", type=float, default=0.0)
@@ -185,6 +268,7 @@ def main():
     c = sub.add_parser("collect")
     c.add_argument("--results-dir", required=True)
     c.add_argument("--out", required=True)
+    c.add_argument("--truth-provenance", help="benchmark.truth_provenance.tsv: AMR-PRR then follows CPRR's identity rule for isolates whose truth cannot judge identity")
     args = ap.parse_args()
     cmd_score(args) if args.command == "score" else cmd_collect(args)
 

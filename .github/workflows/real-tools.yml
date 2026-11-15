@@ -1,0 +1,97 @@
+name: Real tools
+
+# The ordinary CI runs stand-in tools, so it cannot notice that a REAL tool's output format, contig naming or database handling has changed.
+# This runs the real MOB-suite, Platon and plasmidSPAdes binaries on a known plasmid and checks what comes out
+# (test/real_tools/check_real_tool.py). It is slow (large databases) and depends on third-party downloads, so it runs weekly and on request,
+# never on a pull request. A failure here means a tool or its adapter drifted; it never blocks a merge by itself.
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      accession:
+        description: 'NCBI nuccore accession of the known plasmid used as the input (default: pBR322; check the record before relying on it)'
+        required: false
+        default: 'J01749.1'
+
+permissions:
+  contents: read
+
+jobs:
+  real-tool:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: [mob_recon, platon, plasmidspades]
+    env:
+      ACCESSION: ${{ github.event.inputs.accession || 'J01749.1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: real
+          create-args: >-
+            python=3.11
+            mob_suite
+            platon
+            spades
+            wgsim
+          condarc: |
+            channels:
+              - conda-forge
+              - bioconda
+      - name: Fetch the known plasmid
+        run: |
+          mkdir -p work
+          curl -fsS "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=${ACCESSION}&rettype=fasta&retmode=text" -o work/fixture.fasta
+          head -c 1 work/fixture.fasta | grep -q '>' || { echo "the fetched file is not FASTA"; exit 1; }
+          grep -c '>' work/fixture.fasta
+      - name: MOB-suite database
+        if: matrix.tool == 'mob_recon'
+        shell: micromamba-shell {0}
+        run: mob_init
+      - name: Platon database (cached)
+        if: matrix.tool == 'platon'
+        uses: actions/cache@v4
+        with:
+          path: platon_db
+          key: platon-db-zenodo-4066768
+      - name: Platon database (download when not cached)
+        if: matrix.tool == 'platon'
+        run: |
+          if [ ! -d platon_db/db ]; then
+            mkdir -p platon_db
+            curl -fL -o platon_db/db.tar.gz "https://zenodo.org/record/4066768/files/db.tar.gz"
+            tar -xzf platon_db/db.tar.gz -C platon_db
+            rm platon_db/db.tar.gz
+          fi
+          ls platon_db
+      - name: Simulate reads for plasmidSPAdes
+        if: matrix.tool == 'plasmidspades'
+        shell: micromamba-shell {0}
+        run: wgsim -N 5000 -1 150 -2 150 -e 0.001 -r 0 work/fixture.fasta work/r1.fq work/r2.fq
+      - name: Run the real tool and check its output
+        shell: micromamba-shell {0}
+        run: |
+          export PLATON_DB="$PWD/platon_db/db"
+          ARGS=""
+          if [ "${{ matrix.tool }}" = "plasmidspades" ]; then ARGS="--reads-1 work/r1.fq --reads-2 work/r2.fq"; fi
+          python test/real_tools/check_real_tool.py --tool "${{ matrix.tool }}" --assembly work/fixture.fasta --workdir "work/${{ matrix.tool }}" --summary "work/summary.${{ matrix.tool }}.tsv" $ARGS
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f "work/summary.${{ matrix.tool }}.tsv" ]; then
+            echo "### ${{ matrix.tool }}" >> "$GITHUB_STEP_SUMMARY"
+            column -t -s$'\t' "work/summary.${{ matrix.tool }}.tsv" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-tool-${{ matrix.tool }}
+          path: |
+            work/summary.*.tsv
+            work/${{ matrix.tool }}/*.log
+          if-no-files-found: warn

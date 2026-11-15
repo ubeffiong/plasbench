@@ -86,8 +86,11 @@ class Design:
     """Everything the headline needs to know about samples and tools."""
 
     def __init__(self, sample_sheet=None, capabilities=None, provenance=None, clonal_groups=None,
-                 max_tier=2, min_species_clusters=20):
+                 max_tier=2, min_species_clusters=20, min_primary_clusters=1):
         self.max_tier = int(max_tier)
+        # independent clusters (BioProjects / clonal groups) the qualifying references must come from before the primary analysis counts as available; below it a headline would
+        # carry no interval and no test. The pipeline passes HEADLINE_MIN_CLUSTERS (default 5, the interval minimum); the library default of 1 keeps old callers unchanged.
+        self.min_primary_clusters = int(min_primary_clusters)
         self.min_species_clusters = int(min_species_clusters)
         sheet = read_rows(sample_sheet)
         self.species = {r["sample_id"]: normalise_species(r.get("organism")) for r in sheet if r.get("sample_id")}
@@ -151,10 +154,12 @@ class Design:
             reason = "no truth-provenance table, so no sample can be shown to meet the reference requirement"
         else:
             kept = [r for r in rows if self.tier(r["sample"]) and int(self.tier(r["sample"])) <= self.max_tier]
-            if kept:
+            clusters = len({self.cluster(r["sample"]) for r in kept})
+            if kept and clusters >= self.min_primary_clusters:
                 label = f"reference tiers 1-{self.max_tier}"
                 return Selection(kept, label, PRIMARY_AVAILABLE, "", f"primary: {label}")
-            reason = f"no sample has a reference in tiers 1-{self.max_tier}"
+            reason = (f"no sample has a reference in tiers 1-{self.max_tier}" if not kept else
+                      f"only {clusters} independent cluster(s) have a reference in tiers 1-{self.max_tier}; at least {self.min_primary_clusters} are needed for the headline to carry an interval")
         if allow_fallback:
             return Selection(rows, f"all samples (FALLBACK ALLOWED: {reason})", PRIMARY_FALLBACK, reason,
                              f"fallback allowed: all samples ({reason})")

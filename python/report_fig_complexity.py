@@ -31,9 +31,10 @@ import report_svg as sv  # noqa: E402
 
 SECTION_ID = "fig-complexity"
 TITLE = "Does isolate complexity explain performance?"
-PANELS = ["plasmid_count", "max_internal_repeat_fraction", "contig_count", "read_depth_x"]
+PANELS = ["plasmid_count", "max_internal_repeat_fraction", "input_contig_count", "read_depth_x"]
 MIN_POINTS = 5
 PALETTE = ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#CC79A7", "#56B4E9", "#444444", "#9A8700"]
+SHAPES = ("circle", "square", "triangle")   # past the 8th colour a tool repeats a colour with another marker shape, so two tools never look alike
 PW, PH, ML, MR, MT, MB = 300, 230, 46, 14, 26, 40
 LABEL = {name: (label, basis) for name, basis, _src, label in cd.FEATURES}
 
@@ -80,7 +81,16 @@ def points(scores, features):
     return out
 
 
-def panel_svg(track, feature, by_tool, colours):
+def marker(shape, x, y, colour, title):
+    tip = f"<title>{sv.esc(title)}</title>"
+    if shape == "square":
+        return f"<rect x='{sv.num(x - 3.2)}' y='{sv.num(y - 3.2)}' width='6.4' height='6.4' fill='{colour}' fill-opacity='0.75'>{tip}</rect>"
+    if shape == "triangle":
+        return f"<polygon points='{sv.num(x)},{sv.num(y - 4)} {sv.num(x - 3.8)},{sv.num(y + 3)} {sv.num(x + 3.8)},{sv.num(y + 3)}' fill='{colour}' fill-opacity='0.75'>{tip}</polygon>"
+    return f"<circle cx='{sv.num(x)}' cy='{sv.num(y)}' r='3.4' fill='{colour}' fill-opacity='0.75'>{tip}</circle>"
+
+
+def panel_svg(track, feature, by_tool, colours, shapes=None):
     label, basis = LABEL[feature]
     xs_all = [x[feature] for pts in by_tool.values() for _s, x, _f in pts if feature in x]
     if not xs_all:
@@ -101,8 +111,8 @@ def panel_svg(track, feature, by_tool, colours):
     for tool, pts in by_tool.items():
         for sample, x, f1 in pts:
             if feature in x:
-                parts.append(f"<circle cx='{sv.num(px(x[feature]))}' cy='{sv.num(py(f1))}' r='3.4' fill='{colours[tool]}' fill-opacity='0.75'>"
-                             f"<title>{sv.esc(tool + ', ' + sample + ': F1 ' + format(f1, '.3f') + ', ' + label + ' ' + format(x[feature], 'g'))}</title></circle>")
+                parts.append(marker((shapes or {}).get(tool, "circle"), px(x[feature]), py(f1), colours[tool],
+                                    tool + ', ' + sample + ': F1 ' + format(f1, '.3f') + ', ' + label + ' ' + format(x[feature], 'g')))
     parts.append(sv.svg_close())
     return "".join(parts)
 
@@ -110,8 +120,9 @@ def panel_svg(track, feature, by_tool, colours):
 def track_html(track, by_tool, display):
     tools = sorted(by_tool)
     colours = {t: PALETTE[i % len(PALETTE)] for i, t in enumerate(tools)}
-    legend = "".join(f"<li style='display:inline-block;margin:0 14px 4px 0'><span style='display:inline-block;width:11px;height:11px;border-radius:50%;background:{colours[t]};vertical-align:-1px'></span> {sv.esc(display(t))}</li>" for t in tools)
-    panels = "".join(f"<div style='flex:1 1 300px;max-width:340px'>{panel_svg(track, f, by_tool, colours)}</div>" for f in PANELS)
+    shapes = {t: SHAPES[(i // len(PALETTE)) % len(SHAPES)] for i, t in enumerate(tools)}
+    legend = "".join(f"<li style='display:inline-block;margin:0 14px 4px 0'><span style='display:inline-block;width:11px;height:11px;border-radius:50%;background:{colours[t]};vertical-align:-1px'></span> {sv.esc(display(t))}{' (' + shapes[t] + ' marker)' if shapes[t] != 'circle' else ''}</li>" for t in tools)
+    panels = "".join(f"<div style='flex:1 1 300px;max-width:340px'>{panel_svg(track, f, by_tool, colours, shapes)}</div>" for f in PANELS)
     rows = []
     for t in tools:
         cells = []

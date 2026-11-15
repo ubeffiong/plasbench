@@ -40,7 +40,11 @@ def classify(tool_row, marker):
         return "no"
     if uses not in ("yes",) or not text:
         return "unknown"
-    if re.search(marker["tool_database_pattern"], text, re.IGNORECASE):
+    try:
+        matched = re.search(marker["tool_database_pattern"], text, re.IGNORECASE)
+    except re.error as exc:
+        raise ValueError(f"the tool_database_pattern of marker {marker.get('marker_caller', marker.get('caller', '?'))!r} is not a valid regular expression: {exc}")
+    if matched:
         return "yes" if marker.get("overlap_kind") == "same_database" else "possible"
     return "no"
 
@@ -64,7 +68,7 @@ def main():
     args = ap.parse_args()
     try:
         rows = overlap_table(read_tsv(args.releases), read_tsv(args.markers))
-    except (OSError, KeyError) as exc:
+    except (OSError, KeyError, ValueError) as exc:
         raise SystemExit(f"ERROR: cannot read the database registries: {exc}")
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")

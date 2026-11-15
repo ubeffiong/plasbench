@@ -2,12 +2,17 @@
 """
 rank_sensitivity.py -- how much does the leaderboard depend on scoring choices?
 
-The leaderboard ranks tools by mean base-level F1 under one set of alignment
+The BASELINE here is the ranking by mean base-level F1 under one set of alignment
 filters (MAPQ >= 20, identity >= 0.90, query coverage >= 0.20 by default) and
 one definition of precision, in which predicted bases that never produce a
 retained alignment are not false positives. A different, equally defensible
 choice can change who is on top. This script measures that, so a ranking is
 never reported without saying how fragile it is.
+
+What the sweeps do and do not cover. The scoring-setting sweeps re-score BASE-LEVEL F1 from the PAFs, so they describe how fragile the base-level ranking is. The headline
+of a reconstruction tool is the length-weighted binning F1 (short read) or the per-isolate CPRR (long read, hybrid), which are not re-scored under other alignment
+filters here (that needs the bins re-matched). The fragility of those headlines is read from the `metric:lw_bin_f1` row (compared with the F1 baseline, so it shows how far the
+two endpoints disagree) and the `cprr@t` rows (compared with the pre-registered threshold). A reader must not take a stable F1 sweep as proof that the reconstruction headline is stable.
 
 Two kinds of variant, per analysis track:
 
@@ -35,7 +40,11 @@ Two kinds of variant, per analysis track:
                      micro_f1 (pooled TP/FP/FN instead of per-isolate mean),
                      public_only / in_house_only (isolates with / without an
                      NCBI sequence report), grade_c_excluded (truth quality
-                     grade C dropped; needs --truth-provenance).
+                     grade C dropped; needs --truth-provenance), audit_clean_only
+                     (isolates whose truth the label audit flagged nothing in:
+                     python/audit_truth_labels.py flags such as chromid_candidate,
+                     collapsed_repeat_candidate or multi_replicon_plasmid; the
+                     sensitivity of the ranking to leaving flagged references out).
 
 For each variant it reports every tool's mean over the samples all tools in
 the track share, its rank (ties broken by tool name), the change from baseline,
@@ -80,10 +89,26 @@ SETTING_VARIANTS = (
 )
 METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge50", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "lw_bin_f1", "contig_f1_bp", "contig_bin_f1_bp")
 CPRR_THRESHOLDS = ("0.80", "0.90", "0.95", "0.99")
-CPRR_BASELINE = "0.95"                     # the pre-registered CPRR_MIN_COVERAGE / CPRR_MIN_SHARE
+
+
+def cprr_baseline(environ=None):
+    """The sweep threshold that equals the configured CPRR criteria (CPRR_MIN_COVERAGE and CPRR_MIN_SHARE, default 0.95), as a label of CPRR_THRESHOLDS, or None.
+
+    The sweep moves coverage and bin share together, so it can be compared with the configured ranking only when the two are equal and on the grid; otherwise the
+    cprr@t rows are not written (a literal 0.95 would label some other ranking as the pre-registered one)."""
+    environ = os.environ if environ is None else environ
+    try:
+        coverage, share = float(environ.get("CPRR_MIN_COVERAGE", "0.95")), float(environ.get("CPRR_MIN_SHARE", "0.95"))
+    except ValueError:
+        return None
+    label = f"{coverage:.2f}"
+    return label if abs(coverage - share) < 1e-9 and label in CPRR_THRESHOLDS else None
+
+
+CPRR_BASELINE = cprr_baseline() or "0.95"   # kept for callers that import the name; cprr_threshold_rows uses cprr_baseline() and writes nothing when it is None
 SCHEME_FILES = {"ncbi": "truth.tsv", "nonchromosomal": "truth.nonchromosomal.tsv", "evidence": "truth.scored.tsv"}
 MIN_CONTIG_VARIANT = ("min_contig=500", 500)
-COHORT_VARIANTS = ("public_only", "in_house_only", "grade_c_excluded")
+COHORT_VARIANTS = ("public_only", "in_house_only", "grade_c_excluded", "audit_clean_only")
 MICRO = "micro_f1"
 BASELINE = "baseline"
 # scores.tsv writes F1 to four decimals, so a faithful re-computation can differ
@@ -197,7 +222,30 @@ def sample_groups(data_dir, results_dir, samples, truth_provenance=None):
             grade = {r["sample"]: (r.get("truth_quality_grade") or "")
                      for r in csv.DictReader(handle, delimiter="\t")}
         groups["grade_c_excluded"] = {s for s in samples if grade.get(s) != "C"}
+    clean = audit_clean_samples(data_dir, results_dir, samples)
+    if clean is not None:
+        groups["audit_clean_only"] = clean
     return groups
+
+
+def audit_clean_samples(data_dir, results_dir, samples):
+    """The samples whose truth the label audit flags nothing in (audit_truth_labels.audit_sample, the same function the audit table uses, with the same size thresholds),
+    or None when no sample's truth files can be found (the variant is then not written). An isolate with no truth.tsv cannot be audited and is left out."""
+    try:
+        import audit_truth_labels as atl
+    except ImportError:
+        return None
+    chromid = int(os.environ.get("CHROMID_MIN_BP", atl.CHROMID_MIN_BP))
+    large = int(os.environ.get("LARGE_PLASMID_BP", atl.LARGE_PLASMID_BP))
+    clean, audited = set(), 0
+    for sample in samples:
+        folder = next((d / sample for d in (data_dir, results_dir) if d and (d / sample / "truth.tsv").is_file()), None)
+        if folder is None:
+            continue
+        audited += 1
+        if not any(row["flags"] for row in atl.audit_sample(sample, folder, chromid, large)):
+            clean.add(sample)
+    return clean if audited else None
 
 
 def build_variants(rows, results_dir, data_dir, base_settings, primary_scheme="ncbi", truth_provenance=None):
@@ -208,6 +256,7 @@ def build_variants(rows, results_dir, data_dir, base_settings, primary_scheme="n
     drift = []
     primary_file = SCHEME_FILES.get(primary_scheme, "truth.tsv")
     other_schemes = [s for s in SCHEME_FILES if s != primary_scheme]
+    fell_back = []
     for row in rows:
         sample, tool = row.get("sample"), row.get("tool")
         track = row.get("analysis_track") or "short_read"
@@ -216,6 +265,8 @@ def build_variants(rows, results_dir, data_dir, base_settings, primary_scheme="n
         counts = counts_from_paf(truth_cache, results_dir, data_dir, sample, tool, base_settings, primary_file)
         if counts is None and primary_file != "truth.tsv":
             counts = counts_from_paf(truth_cache, results_dir, data_dir, sample, tool, base_settings)
+            if counts is not None:
+                fell_back.append(sample)
         if counts is not None:
             baseline = f1_of(counts)
             variants[BASELINE][track][tool][sample] = baseline
@@ -224,6 +275,8 @@ def build_variants(rows, results_dir, data_dir, base_settings, primary_scheme="n
             if recorded is not None:
                 drift.append((abs(recorded - baseline), sample, tool))
             for name, change in SETTING_VARIANTS:
+                if all(base_settings.get(key) == value for key, value in change.items()):
+                    continue   # the configured setting already is this variant: it would only repeat the baseline
                 value = f1_from_paf(truth_cache, results_dir, data_dir, sample, tool,
                                     dict(base_settings, **change), primary_file)
                 if value is not None:
@@ -241,6 +294,9 @@ def build_variants(rows, results_dir, data_dir, base_settings, primary_scheme="n
             value = strict_f1(row) if metric == "strict_f1" else number(row.get(metric))
             if value is not None:
                 variants[f"metric:{metric}"][track][tool][sample] = value
+    if fell_back:
+        sys.stderr.write(f"[rank_sensitivity] WARNING: {len(set(fell_back))} sample(s) have no {primary_file}; their baseline was scored on truth.tsv instead, so the baseline mixes labelling "
+                         "schemes for them (see the drift check).\n")
     samples = {s for per_track in variants[BASELINE].values() for per_tool in per_track.values() for s in per_tool}
     for name, keep in sample_groups(data_dir, results_dir, samples, truth_provenance).items():
         if not keep or keep == samples:
@@ -308,8 +364,13 @@ def cprr_threshold_rows(path):
         return sorted(by_tool, key=lambda tool: (-by_tool[tool][0], tool))
 
     out = []
+    baseline_label = cprr_baseline()
+    if baseline_label is None:
+        sys.stderr.write("[rank_sensitivity] the CPRR threshold sweep is not written: CPRR_MIN_COVERAGE and CPRR_MIN_SHARE are not equal values on the 0.80/0.90/0.95/0.99 grid, so no sweep row can be "
+                         "compared with the configured ranking.\n")
+        return out
     for track in sorted(per_group):
-        base = per_group[track].get(CPRR_BASELINE)
+        base = per_group[track].get(baseline_label)
         if not base:
             continue
         base_order = order(base)
@@ -326,7 +387,7 @@ def cprr_threshold_rows(path):
                             "n_samples": by_tool[tool][1], "rank": ranks[tool], "baseline_rank": base_rank.get(tool, ""),
                             "rank_change": (base_rank[tool] - ranks[tool]) if tool in base_rank else "",
                             "kendall_tau_vs_baseline": "" if tau is None else f"{tau:.3f}", "top_tool": ordered[0],
-                            "top_matches_baseline": "yes" if ordered[0] == base_order[0] else "no", "compared_with": f"cprr@{CPRR_BASELINE}"})
+                            "top_matches_baseline": "yes" if ordered[0] == base_order[0] else "no", "compared_with": f"cprr@{baseline_label}"})
     return out
 
 

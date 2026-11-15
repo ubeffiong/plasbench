@@ -26,18 +26,14 @@ import csv
 import json
 from pathlib import Path
 
-# Per-isolate assembly statistics, computed fresh from the reference by
-# python/compute_assembly_stats.py during stage 2 and written to
-# data/<sample>/assembly_stats.tsv. These were originally computed only for
-# the advisory cohort-QC outlier flagger; feeding them to the model as well is
-# the point of having continuous features at all -- GC content and assembly
-# fragmentation plausibly bear on which reconstruction method wins, and the
-# model can learn its own splits on them rather than being handed a fixed
-# band. Absent for a live isolate that has no reference assembly (operational
-# mode): encode_row() imputes any missing continuous field with the training
-# mean, so a sample without stats simply falls back to average behaviour on
-# those axes instead of being unusable.
-ASSEMBLY_STAT_FIELDS = ("gc_percent", "n50", "contig_count", "assembly_size_bp")
+# Statistics of the isolate's OWN assembly: the contigs the tools are given (data/<sample>/contigs.fasta, stage 3), measured by assembly_stats_of_fasta().
+# GC content and assembly fragmentation plausibly bear on which reconstruction method wins, and an operational isolate has exactly this assembly, so the model can
+# be used on it. Absent when there is no assembly file: encode_row() imputes a missing continuous field with the training mean.
+ASSEMBLY_STAT_FIELDS = ("input_gc_percent", "input_n50", "input_contig_count", "input_assembly_size_bp")
+# The same four numbers measured on the REFERENCE (data/<sample>/assembly_stats.tsv, compute_assembly_stats.py, stage 2) describe the truth: the contig count is the number of
+# replicons, the size includes the true plasmids. They are known only in a retrospective benchmark, so they are forbidden as model inputs (TRUTH_DERIVED_FIELDS), and a
+# model fitted on them (before this release they were fed to the model under these names) is refused at load.
+REFERENCE_STAT_FIELDS = ("gc_percent", "n50", "contig_count", "assembly_size_bp")
 # TRUTH-FREE FEATURES ONLY. The model predicts how a tool will do on an isolate that has no reference, so every feature must be knowable for such an isolate:
 # the read depth measured from the reads, the statistics of its own short-read assembly, and its organism metadata. A feature taken from the truth (the true plasmid
 # size or count, the truth's AMR annotation) is known only in a retrospective benchmark; training on it leaks the answer and the model could not use it on a new
@@ -45,12 +41,22 @@ ASSEMBLY_STAT_FIELDS = ("gc_percent", "n50", "contig_count", "assembly_size_bp")
 SCORE_CONTINUOUS_FIELDS = ("read_depth_x",)
 CONTINUOUS_FIELDS = SCORE_CONTINUOUS_FIELDS + ASSEMBLY_STAT_FIELDS
 CATEGORICAL_FIELDS = ("tool", "organism", "gram_group")
-TRUTH_DERIVED_FIELDS = frozenset({"true_plasmid_bp", "true_plasmid_count", "true_amr_gene_count", "amr_status"})
+TRUTH_DERIVED_FIELDS = frozenset({"true_plasmid_bp", "true_plasmid_count", "true_amr_gene_count", "amr_status", *REFERENCE_STAT_FIELDS})
+# The allowlist: the ONLY fields a model may be fitted on. fit_feature_spec() asserts membership (assert_allowed), so a new column cannot become a model input by accident,
+# and the forbidden list above is a second line of defence, not the only one.
+TRUTH_FREE_FEATURES = frozenset(SCORE_CONTINUOUS_FIELDS + ASSEMBLY_STAT_FIELDS + CATEGORICAL_FIELDS)
 # Models fitted before assembly stats were added stored three continuous fields (two of them truth-derived) and no explicit field list; models before this change stored
 # four categorical fields (one truth-derived). Their coefficient vectors are laid out in these orders, so an old JSON must be decoded against them -- see encode_row() --
 # but a model that used a truth-derived feature is no longer served (see truth_derived_in_spec and load_model).
 LEGACY_CONTINUOUS_FIELDS = ("read_depth_x", "true_plasmid_bp", "true_plasmid_count")
 LEGACY_CATEGORICAL_FIELDS = ("tool", "organism", "gram_group", "amr_status")
+
+
+def assert_allowed(fields):
+    """Raise ValueError when `fields` contains anything outside the allowlist TRUTH_FREE_FEATURES."""
+    unknown = sorted(set(fields) - TRUTH_FREE_FEATURES)
+    if unknown:
+        raise ValueError("not an allowed (truth-free) model input: " + ", ".join(unknown))
 
 
 def assert_truth_free(fields):
@@ -61,24 +67,37 @@ def assert_truth_free(fields):
 TARGETS = ("f1", "plasmid_recall")
 
 
-def load_assembly_stats(data_dir):
-    """Read every data/<sample>/assembly_stats.tsv into {sample_id: {field: value}}.
+def assembly_stats_of_fasta(path):
+    """The ASSEMBLY_STAT_FIELDS of the assembly in `path` (plain or .gz), as strings in the style of the stats files; {} when the file is absent, unreadable or empty.
 
-    Missing files are simply absent from the result (a cohort predating this
-    feature, or a sample whose stage 2 did not run) -- never an error.
-    """
+    Measured on the contigs the tools are given, never on the reference."""
+    try:
+        import compute_assembly_stats as cas
+        lengths, gc, acgt = cas.scan_fasta(str(path))
+    except (OSError, ImportError, UnicodeDecodeError, ValueError):
+        return {}
+    if not lengths:
+        return {}
+    return {"input_gc_percent": f"{100.0 * gc / acgt:.4f}" if acgt else "", "input_n50": str(cas.n50(lengths)),
+            "input_contig_count": str(len(lengths)), "input_assembly_size_bp": str(sum(lengths))}
+
+
+def load_assembly_stats(data_dir):
+    """The statistics of every sample's OWN assembly, {sample: {field: value}}, measured from data/<sample>/contigs.fasta (or .gz).
+
+    Not read from assembly_stats.tsv: that file describes the reference (see REFERENCE_STAT_FIELDS). A sample with no assembly file is simply absent from the
+    result (stage 3 did not run for it) -- never an error."""
     stats = {}
     if not data_dir:
         return stats
-    for path in sorted(Path(data_dir).glob("*/assembly_stats.tsv")):
-        try:
-            with open(path, newline="", encoding="utf-8") as handle:
-                for row in csv.DictReader(handle, delimiter="	"):
-                    sample = (row.get("sample_id") or path.parent.name).strip()
-                    if sample:
-                        stats[sample] = {field: row.get(field) for field in ASSEMBLY_STAT_FIELDS}
-        except (OSError, csv.Error):
-            continue
+    for sample_dir in sorted(p for p in Path(data_dir).iterdir() if p.is_dir()) if Path(data_dir).is_dir() else []:
+        for name in ("contigs.fasta", "contigs.fasta.gz"):
+            path = sample_dir / name
+            if path.is_file():
+                found = assembly_stats_of_fasta(path)
+                if found:
+                    stats[sample_dir.name] = found
+                break
     return stats
 
 
@@ -246,6 +265,7 @@ def fit_feature_spec(rows):
     # serialized model must keep decoding against the layout its coefficients
     # were actually fitted in.
     assert_truth_free(list(CONTINUOUS_FIELDS) + list(CATEGORICAL_FIELDS))
+    assert_allowed(list(CONTINUOUS_FIELDS) + list(CATEGORICAL_FIELDS))
     return {"continuous": list(CONTINUOUS_FIELDS), "categorical": list(CATEGORICAL_FIELDS), "means": means, "stds": stds, "vocab": vocab}
 
 

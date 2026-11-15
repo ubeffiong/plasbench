@@ -283,12 +283,16 @@ def recommender_section(evaluation, verdict, warnings, regret=(), taxon=(), arms
         tables = table(report_3d.EVAL_HEADER, [[r.get(f, "") for f in report_3d.EVAL_FIELDS] for r in evaluation])
         if arms:
             tables += ("<h3>Three ways of choosing a tool</h3><p class='muted'>Single best tool for everyone, best tool for the isolate's organism, and best tool among the most similar training isolates "
-                       "(by features knowable without a reference). An arm adds value only when it beats the single best tool on average and in most studies, with at least three studies.</p>"
+                       "(by features knowable without a reference). An arm adds value only when it beats the single best tool by a real margin on average and in most studies, with at least three studies of two or more isolates, "
+                       "and (for the feature arm) when most isolates were really placed by their neighbours; otherwise the verdict says why not.</p>"
                        + table(["Profile", "Arm", "Isolates", "Studies", "Mean regret", "Top-1", "Near-optimal", "Improvement over single best", "Studies better", "Studies assessed",
-                                "Calibration error", "Calibration bias", "Abstention rate", "Regret when answering", "Verdict", "Note"],
+                                "Calibration error", "Calibration bias", "Abstention rate", "Regret when answering", "Verdict", "Note", "Placed by neighbours"],
                                [[r.get(f, "") for f in ("profile", "arm", "n_isolates", "n_folds", "mean_regret", "top1_rate", "near_optimal_rate", "improvement_over_single_best",
                                                          "folds_better", "folds_assessed", "calibration_mae", "calibration_bias", "abstention_rate", "mean_regret_when_answering",
-                                                         "verdict", "note")] for r in arms]))
+                                                         "verdict", "note", "share_feature_based")] for r in arms]))
+        else:
+            tables += ("<h3>Three ways of choosing a tool</h3><p class='muted'>Not available for this run: benchmark.recommender_arms.tsv was not written "
+                       "(an older run, or evaluate_recommender.py did not finish), so the single-best, organism and feature-conditioned choices cannot be compared.</p>")
     if warnings:
         tables += "<h3>Warnings scored against failed recommendations</h3>" + table(
             ["Warning", "Evaluated", "Fired", "Failed", "Firing rate", "PPV", "Sensitivity", "Could not be applied",
@@ -338,11 +342,22 @@ def amr_section(rows, data_dir=None):
     if not rows:
         return section("amr-placement", "AMR genes on the right plasmid", AMR_LEAD,
                        not_run("AMR placement", "no curated truth_amr.tsv passed validation, or RUN_AMR_PLACEMENT=0"))
+    na = lambda v: v if v not in ("", None) else "not evaluable"  # noqa: E731
     tables = table(["Tool", "Gene class", "Gene copies", "Recovered", "Correct plasmid", "Wrong plasmid",
-                    "Shared contig", "Unassigned contig", "Correct-plasmid rate", "Replicon-type correct"],
+                    "Shared contig", "Unassigned contig", "Correct-plasmid rate", "Replicon-type correct",
+                    "AMR plasmids", "All copies on the right plasmid", "AMR-PRR", "Pairs kept together", "Flank context"],
                    [(r["tool"], r["gene_class"], r["n_gene_copies"], r["n_recovered"], r["n_correct_plasmid"],
                      r["n_wrong_plasmid"], r["n_shared_contig"], r["n_unassigned_contig"], r["correct_plasmid_rate"],
-                     r["replicon_type_correct_rate"]) for r in rows])
+                     r["replicon_type_correct_rate"], r.get("n_amr_plasmids", ""), na(r.get("amr_complete_rate")), na(r.get("amr_prr")),
+                     (f"{r['n_colocalised_pairs']} of {r['n_pairs']} ({na(r.get('colocalisation_rate'))})" if r.get("n_pairs") not in ("", None, "0") else "not evaluable"),
+                     na(r.get("flank_context_rate"))) for r in rows])
+    drafts = sum(int(r.get("draft_truth_copies") or 0) for r in rows if r.get("gene_class") == "all")
+    if drafts:
+        tables += (f"<p class='insight caution'><strong>Uncurated truth.</strong> {drafts} of the gene copies behind this table come from an auto-derived DRAFT (evidence tier auto_derived) that was copied to truth_amr.tsv "
+                   "without being reviewed and promoted. Read every figure here as unreviewed. Promote a reviewed draft with <code>plasbench promote-amr-truth</code>.</p>")
+    tables += ("<p class='muted'>AMR-PRR: of the plasmids that carry a curated AMR copy, the share whose copies all sit on the right plasmid and that the tool also reconstructed "
+               "correctly (the CPRR criteria, with the same identity rule as CPRR). Pairs kept together: recovered copies on one plasmid that the tool put in the same bin. Flank context: the share of the flank "
+               "(AMR_FLANK_BP, 1 kb by default, recorded in the run manifest) either side of each recovered copy that the same record covers. Alignment-derived from curated truth, reported beside the placement, never ranking a tool.</p>")
     payload = report_3d.rings_payload(data_dir)
     scene = report_3d.build_rings(payload) if payload else {"prims": []}
     if not scene["prims"]:

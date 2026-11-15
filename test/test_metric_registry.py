@@ -39,6 +39,20 @@ def main():
         cards = [r["id"] for r in csv.DictReader((line for line in handle if not line.startswith("#")), delimiter="\t")]
     registered = [r["scorecard_id"] for r in rows if r["scorecard_id"]]
     check("every scorecard metric (A1 to E3) is in the registry exactly once, and nothing else is", sorted(registered) == sorted(cards) and len(cards) == 17, (sorted(set(cards) ^ set(registered))))
+    cards_full = {}
+    with open(ROOT / "config" / "scorecard.tsv", newline="", encoding="utf-8") as handle:
+        for r in csv.DictReader((line for line in handle if not line.startswith("#")), delimiter="\t"):
+            cards_full[r["id"]] = r
+    drift = []
+    for r in rows:
+        card = cards_full.get(r["scorecard_id"])
+        if not card or (r["source"], r["column"]) == (card["source"], card["column"]):
+            continue
+        # the one legitimate difference: the scorecard scores a per-isolate scores.tsv column, the registry points at that column's cohort mean in the leaderboard
+        if not (card["source"] == "scores" and r["source"] == "leaderboard" and r["column"] == "mean_" + card["column"]):
+            drift.append((r["scorecard_id"], (card["source"], card["column"]), (r["source"], r["column"])))
+    check("the registry and the scorecard agree on where each scorecard metric lives (only the scores -> leaderboard mean_ pairing may differ)", not drift, drift)
+    check("the ranked CPRR row points at the per-isolate ranking metric, not the pooled rate", next(r for r in rows if r["id"] == "cprr")["column"] == "cprr_isolate_mean")
     check("the metrics used for ranking are exactly the pre-registered endpoints", sorted(r["id"] for r in rows if r["rankable"] == "yes") == ["base_f1", "cprr", "lw_bin_f1"])
     check("the alignment-derived structure metrics are marked unvalidated, the missing truth-variant metrics not available",
           {r["id"]: r["evidence"] for r in rows if r["id"] in ("ngoc", "structural_concordance", "snp_concordance", "sv_f1")}

@@ -232,8 +232,13 @@ def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_
     cannot inflate claims across multiple replicons. This companion diagnostic
     uses secondary mappings only to expose bases with conflicting molecular
     assignments; it never changes TP, FP, or F1.
+
+    Returns None when the ambiguity alignment was NOT made (no file): the column is then written blank, "not measured", because 0 would claim that no base is
+    ambiguous when nobody looked. An EMPTY file is a real result (no secondary alignment at all) and gives 0.
     """
-    if not path or not os.path.isfile(path) or os.path.getsize(path) == 0:
+    if not path or not os.path.isfile(path):
+        return None
+    if os.path.getsize(path) == 0:
         return 0
     by_query = defaultdict(lambda: defaultdict(list))
     with open(path) as handle:
@@ -859,7 +864,8 @@ def main():
     ]
     row = [
         args.sample, args.tool, args.analysis_track, total_plasmid, tp, fp, fn,
-        mapped_pred_bp, max(0, mapped_pred_bp - ambiguous_bp), unmapped_pred_bp, off_truth_pred_bp, ambiguous_bp, len(true_plasmids), recovered_plasmids,
+        mapped_pred_bp, "" if ambiguous_bp is None else max(0, mapped_pred_bp - ambiguous_bp), unmapped_pred_bp, off_truth_pred_bp, "" if ambiguous_bp is None else ambiguous_bp,
+        len(true_plasmids), recovered_plasmids,
         f"{safe_div(recovered_plasmids, len(true_plasmids)):.4f}" if true_plasmids else "", predicted_records,
         len(amr_genes) if args.amr_genes else "", recovered_amr if args.amr_genes else "",
         f"{safe_div(recovered_amr, len(amr_genes)):.4f}" if args.amr_genes else "",

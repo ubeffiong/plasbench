@@ -81,6 +81,7 @@ while IFS=$'\t' read -r SAMPLE _; do
             PLACE_ARGS=()
             [[ -s "$BINS" ]] && binning_capable "$TOOL" && PLACE_ARGS+=(--bins "$BINS")
             [[ -s "$FEATURES" ]] && PLACE_ARGS+=(--features "$FEATURES")
+            [[ -s "$SDIR/${TOOL}.cprr.tsv" ]] && PLACE_ARGS+=(--cprr "$SDIR/${TOOL}.cprr.tsv")
             python3 "$PY/score_amr_placement.py" score --sample "$SAMPLE" --tool "$TOOL" --truth "$TRUTH" \
                 --amr-truth "$AMR" --paf "$PAF" --pred-fasta "$PRED" "${PLACE_ARGS[@]+"${PLACE_ARGS[@]}"}" \
                 --out "$SDIR/${TOOL}.amr_placement.tsv" 2>/dev/null
@@ -186,13 +187,14 @@ python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES
 # Evaluation additions learned from PlasEval, plsMD and GAEMR, same scripts as stage 6 (each says "Not run" without its input).
 python3 "$PY/repeat_content.py" summary --data-dir "$DEMO" --out "$DEMO/benchmark.repeat_content.tsv" || true
 python3 "$PY/characterise_dataset.py" --data-dir "$DEMO" --sample-sheet "$SAMPLES" --out "$DEMO/benchmark.dataset_features.tsv" || true
+python3 "$PY/database_provenance.py" collect --tool-status "$STATUS" --out "$DEMO/benchmark.database_provenance.tsv" || true
 python3 "$PY/assembly_adequacy.py" merge --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_adequacy.tsv" || true
 python3 "$PY/copy_number.py" merge --results-dir "$DEMO" --out "$DEMO/benchmark.copy_number.tsv" || true
 python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" --out "$DEMO/benchmark.tool_agreement.tsv" || true
 # Scoring specification layers, same scripts as stage 6.
 python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark.label_schemes.tsv" \
     --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"
-python3 "$PY/score_amr_placement.py" collect --results-dir "$DEMO" --out "$DEMO/benchmark.amr_placement.tsv"
+python3 "$PY/score_amr_placement.py" collect --results-dir "$DEMO" --truth-provenance "$DEMO/benchmark.truth_provenance.tsv" --out "$DEMO/benchmark.amr_placement.tsv"
 python3 "$PY/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
     --dataset-features "$DEMO/benchmark.dataset_features.tsv" --out-prefix "$DEMO/benchmark" --min-train-samples 1
 python3 "$PY/flag_cohort_outliers.py" --stats-dir "$DEMO" --samples "$SAMPLES" \

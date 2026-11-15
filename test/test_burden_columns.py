@@ -25,6 +25,15 @@ def main():
     check("precision gap is permissive minus strict", abs(f["precision_gap"] - 0.3) < 1e-9, f)
     empty = ar.burden_fields({k: [] for k in d})
     check("missing columns stay blank, never zero", all(v is None for v in empty.values()), empty)
+    partial = ar.burden_fields({"unmapped_pred_bp": [100], "off_truth_pred_bp": [], "mapped_pred_bp": [400], "ambiguously_mapped_pred_bp": [], "precision": [0.9], "strict_precision": [0.8]})
+    check("a missing part gives no shares at all (it must not shrink the denominator)", partial["total_predicted_bp"] is None and partial["unmapped_fraction"] is None, partial)
+    import tempfile
+    import score_plasmids as sp
+    with tempfile.TemporaryDirectory() as t:
+        missing, empty = f"{t}/none.paf", f"{t}/empty.paf"
+        open(empty, "w").close()
+        check("an ambiguity alignment that was not made is not measured (None), never 0", sp.ambiguous_query_bp(missing, {}, {}, 1, 0, 0, 0) is None and sp.ambiguous_query_bp(None, {}, {}, 1, 0, 0, 0) is None)
+        check("an empty ambiguity alignment is a real 0", sp.ambiguous_query_bp(empty, {}, {}, 1, 0, 0, 0) == 0)
     ids = {r["id"] for r in mr.load()}
     check("the registry lists the burden metrics", {"unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap"} <= ids)
     print()

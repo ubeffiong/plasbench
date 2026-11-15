@@ -42,6 +42,7 @@ fi
 # analysis is reported as unavailable and every ranking is provisional (ALLOW_PRIMARY_FALLBACK=1 keeps the numbers as the headline, with the warning).
 DESIGN_ARGS=(--capabilities "$PROJECT_ROOT/config/tool_capabilities.tsv"
              --headline-max-tier "${HEADLINE_MAX_REFERENCE_TIER:-2}"
+             --headline-min-clusters "${HEADLINE_MIN_CLUSTERS:-5}"
              --min-species-clusters "${MIN_SPECIES_CLUSTERS:-20}")
 if [ "${ALLOW_PRIMARY_FALLBACK:-0}" = "1" ]; then DESIGN_ARGS+=(--allow-primary-fallback); fi
 if python3 "$HERE/../python/truth_provenance.py" --sample-sheet "$SAMPLE_SHEET" --data-dir "$DATA_DIR" \
@@ -80,6 +81,7 @@ fi
 # tool and gene class (carbapenemase / ESBL / colistin / ... / all).
 if [[ "${RUN_AMR_PLACEMENT:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/score_amr_placement.py" collect --results-dir "$RESULTS_DIR" \
+        --truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv" \
         --out "$RESULTS_DIR/benchmark.amr_placement.tsv" \
         || warn "AMR placement collection failed; the report shows no AMR placement table"
 fi
@@ -173,6 +175,10 @@ job_repeat_content() {
     python3 "$HERE/../python/repeat_content.py" summary --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.repeat_content.tsv" \
         || warn "could not merge repeat-content tables; that table is not evaluated"
 }
+job_database_provenance() {
+    python3 "$HERE/../python/database_provenance.py" collect --manifest "$RESULTS_DIR/run_manifest.json" --tool-status "$RESULTS_DIR/tool_status.tsv" \
+        --out "$RESULTS_DIR/benchmark.database_provenance.tsv" || warn "could not write the tool and database provenance table"
+}
 job_dataset_features() {
     python3 "$HERE/../python/characterise_dataset.py" --data-dir "$DATA_DIR" --sample-sheet "$SAMPLE_SHEET" --out "$RESULTS_DIR/benchmark.dataset_features.tsv" \
         || warn "could not characterise the dataset; that table is not evaluated"
@@ -254,6 +260,7 @@ advisory_job job_audit_truth_labels
 advisory_job job_copy_number
 advisory_job job_repeat_content
 advisory_job job_dataset_features
+advisory_job job_database_provenance
 advisory_job job_truth_depth_anomalies
 [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]] && advisory_job job_bin_agreement
 wait

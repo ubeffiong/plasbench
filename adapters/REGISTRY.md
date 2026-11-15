@@ -31,6 +31,25 @@ tool's own adapter script). See [docs/ADDING_TOOLS.md](../docs/ADDING_TOOLS.md).
 | PlasBin-flow | binning | applicable | assembly graph; PlasBench adapts the tool's own output | `adapt_plasbin_flow.sh` | optional |
 | plsMD | reassembly | applicable | short-read Unicycler assembly plus a PLSDB BLAST index | `adapt_plsmd.sh` | optional |
 
+## Validation tiers and the interface a tool must meet
+
+`config/tool_capabilities.tsv` records, for every tool, a `validation_status` and the file that is the evidence:
+
+| Tier | Meaning |
+|---|---|
+| `real_binary_checked` | `.github/workflows/real-tools.yml` ran the real tool on a known input and its output validated; the evidence is a record under `test/real_tools/records/` |
+| `adapter_tested` | the adapter is tested against recorded or stand-in output; the real binary is not checked |
+| `untested` | an adapter or recipe exists with no test |
+| `not_applicable` | not a third-party tool (PlasBench's own baselines, the synthetic demo methods) |
+
+A new tool starts at `untested`. `test/test_tool_validation_tiers.py` fails when a tool is added at that tier without being listed as acknowledged, so write
+the adapter test first: an adapter is not supported until its output can be shown to be read correctly.
+
+The interface a tool must meet to be scored and shown: write `pred_<tool>.plasmid.fasta` (an empty file is a valid prediction) and, for a bins table, `pred_<tool>.bins.tsv`
+with the header `bin_id<TAB>sequence_id` (see [BINS.md](BINS.md)); for tools that score contigs, [SCORES.md](SCORES.md). A tool whose output is a subset of the input assembly must keep
+the input's contig names. Stage 5 scores whatever is declared in `config/tool_capabilities.tsv`; the report then lists the tool in the leaderboard, the tool
+drill-down and *Tool and database provenance* with no further change.
+
 The machine-readable source is `config/tool_capabilities.tsv`. Stage 5 only
 computes bin metrics for declared binning methods; the report labels all other
 tools as not applicable rather than assigning a misleading low bin score.

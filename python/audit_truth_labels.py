@@ -26,7 +26,8 @@ Flags (a second column, `flags`, added beside the finding; a sequence can carry 
   chromid_candidate              a SECONDARY chromosome carries a marker (a chromid, or an integrated plasmid)
   secondary_chromosome           a chromosome-labelled replicon that is not the largest and is at least --chromid-min-bp (default 350 kb) with no marker
   large_plasmid                  a PLASMID of at least --large-plasmid-bp (default 500 kb): a megaplasmid, or a chromid labelled plasmid
-  multi_replicon_plasmid         a PLASMID with two or more distinct replicon labels (a co-integrate or a fusion)
+  multi_replicon_plasmid         a PLASMID with two or more distinct replicon labels (a co-integrate or a fusion; also how many genuine IncF plasmids
+                                 look, so it is the noisiest flag: read it as "worth a look", never as an error)
   marker_free_plasmid            a PLASMID with no marker although both callers ran (excluded from the evidence scheme)
   multimer_<k>x                  a plasmid stored as k identical tandem copies (python/detect_dimers.py: dimers, trimers and higher)
   collapsed_repeat_candidate     the read depth of the replicon has high-depth regions (a collapsed repeat or an amplified element; needs RUN_TRUTH_DEPTH_ANOMALIES)

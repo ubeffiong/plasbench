@@ -258,7 +258,7 @@ HELP = {
         "contigs form their own category.",
         "More genes at Level 2 is better. A gene on the wrong plasmid can mislead a resistance spread study.",
         "Resistance genes are the reason many people study plasmids; this tests whether a tool keeps them with the right plasmid.",
-        "Only curated genes are counted."),
+        "Only curated genes are counted. AMR-PRR, pairs kept together and flank context need the same curated truth; a draft from reference annotation is not curated until it is promoted after review."),
     "contig-layer": H(
         "A second, contig-by-contig way of scoring, shown beside the main one.",
         "Assembly contigs labelled against the reference.",

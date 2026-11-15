@@ -47,11 +47,18 @@ def check(name, condition, detail=""):
 
 
 def write_stats(data_dir, sample, gc):
+    """The isolate's OWN assembly (contigs.fasta) with the given GC content: 4 contigs, 5000 bp. The reference's assembly_stats.tsv is written with DIFFERENT numbers
+    to prove it is never read for the model's features."""
     sdir = os.path.join(data_dir, sample)
     os.makedirs(sdir, exist_ok=True)
+    gc_bases = round(1250 * gc / 100.0)
+    contig = "G" * gc_bases + "A" * (1250 - gc_bases)
+    with open(os.path.join(sdir, "contigs.fasta"), "w", encoding="utf-8") as handle:
+        for i in range(4):
+            handle.write(f">c{i}\n{contig}\n")
     with open(os.path.join(sdir, "assembly_stats.tsv"), "w", encoding="utf-8") as handle:
         handle.write("sample_id\tassembly_size_bp\tcontig_count\tn50\tgc_percent\tplasmid_count\n")
-        handle.write(f"{sample}\t5000000\t4\t4800000\t{gc:.4f}\t2\n")
+        handle.write(f"{sample}\t9999999\t77\t1\t11.0000\t2\n")
 
 
 # --- the join itself ---------------------------------------------------------
@@ -66,10 +73,12 @@ with tempfile.TemporaryDirectory() as tmp:
 
     rows = [{"sample": "s1", "tool": "t"}, {"sample": "s2", "tool": "t"}, {"sample": "unknown", "tool": "t"}]
     attach_assembly_stats(rows, stats)
-    check("a row gets its own sample's GC", rows[0]["gc_percent"] == "50.5000", str(rows[0]))
-    check("a different sample gets a different GC", rows[1]["gc_percent"] == "62.0000", str(rows[1]))
+    check("a row gets its own sample's GC, measured from its own assembly (50.5 to the resolution of a 1250 bp contig)", abs(float(rows[0]["input_gc_percent"]) - 50.5) < 0.1, str(rows[0]))
+    check("a different sample gets a different GC", abs(float(rows[1]["input_gc_percent"]) - 62.0) < 0.1, str(rows[1]))
+    check("the contig count, N50 and size are those of the assembly, not the reference's", (rows[0]["input_contig_count"], rows[0]["input_n50"], rows[0]["input_assembly_size_bp"]) == ("4", "1250", "5000"), str(rows[0]))
+    check("the reference's statistics (assembly_stats.tsv) are never read for the features", "gc_percent" not in rows[0] and "n50" not in rows[0], str(rows[0]))
     check("a sample with no stats is left alone (model imputes it later)",
-          "gc_percent" not in rows[2], str(rows[2]))
+          "input_gc_percent" not in rows[2], str(rows[2]))
 
     check("assembly stats are part of the model's continuous features",
           all(field in CONTINUOUS_FIELDS for field in ASSEMBLY_STAT_FIELDS), str(CONTINUOUS_FIELDS))
