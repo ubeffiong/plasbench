@@ -140,6 +140,7 @@ python3 "$PY/aggregate_results.py" --scores "$SCORES" --tool-status "$STATUS" \
 python3 "$PY/stratify_recovery.py" --results-dir "$DEMO" --data-dir "$DEMO" \
     --out "$DEMO/benchmark.recovery_by_replicon.tsv"
 python3 "$PY/audit_truth_labels.py" --data-dir "$DEMO" --out "$DEMO/benchmark.truth_label_audit.tsv"
+python3 "$PY/truth_marker_overlap.py" --out "$DEMO/benchmark.truth_marker_overlap.tsv"
 python3 "$PY/rank_sensitivity.py" --scores "$SCORES" --results-dir "$DEMO" --data-dir "$DEMO" \
     --out-prefix "$DEMO/benchmark" --min-alignment-length 1 --min-alignment-identity 0 \
     --min-alignment-mapq 0 --min-alignment-query-coverage 0   # the demo scores with the scorer's own permissive filters
@@ -218,6 +219,7 @@ python3 "$PY/build_html_report.py" \
     --manifest "$DEMO/run_manifest.json" \
     --recovery-by-replicon "$DEMO/benchmark.recovery_by_replicon.tsv" \
     --truth-label-audit "$DEMO/benchmark.truth_label_audit.tsv" \
+    --truth-marker-overlap "$DEMO/benchmark.truth_marker_overlap.tsv" \
     --dimensions-prefix "$DEMO/benchmark" \
     --comparisons "$DEMO/benchmark.paired_comparisons.tsv" \
     --stratified "$DEMO/benchmark.stratified.tsv" \

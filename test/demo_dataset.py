@@ -57,7 +57,8 @@ FEATURES = {
     "pA": [(0, 1_100, "replicon", "IncFIB"), (30_000, 31_400, "mob", "MOBF"),
            (52_000, 53_100, "insertion_sequence", "ISEcp1")],
     "pC": [(0, 980, "replicon", "IncI1"), (20_000, 21_050, "mob", "MOBP")],
-    "pE": [(0, 1_240, "replicon", "IncFII"), (70_000, 71_200, "mob", "MOBH"),
+    # pE carries two replicons (IncFII and IncFIB): the truth audit flags it multi_replicon_plasmid, so the report's Flags column has a row in the demo
+    "pE": [(0, 1_240, "replicon", "IncFII"), (60_000, 61_100, "replicon", "IncFIB"), (70_000, 71_200, "mob", "MOBH"),
            (120_000, 121_150, "insertion_sequence", "IS26")],
     "pH": [(0, 1_050, "replicon", "IncA/C")],
     "pI": [(0, 900, "replicon", "ColE1"), (9_000, 10_050, "mob", "MOBQ"),

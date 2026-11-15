@@ -152,6 +152,9 @@ job_audit_truth_labels() {
     python3 "$HERE/../python/audit_truth_labels.py" \
         --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.truth_label_audit.tsv" \
         || warn "truth-label audit failed; scores are unaffected"
+    # Which tools share a database with the evidence that labelled the truth (a name-level screen; config/truth_marker_databases.tsv).
+    python3 "$HERE/../python/truth_marker_overlap.py" --out "$RESULTS_DIR/benchmark.truth_marker_overlap.tsv" \
+        || warn "truth-marker overlap failed; scores are unaffected"
 }
 
 # Assembly adequacy (was the short-read assembly good enough to blame a tool?), plasmid
@@ -361,6 +364,7 @@ python3 "$HERE/../python/build_html_report.py" \
     --quast-diagnostics "$RESULTS_DIR/quast_diagnostics.tsv" \
     --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
     --truth-label-audit "$RESULTS_DIR/benchmark.truth_label_audit.tsv" \
+    --truth-marker-overlap "$RESULTS_DIR/benchmark.truth_marker_overlap.tsv" \
     --stratified "$RESULTS_DIR/benchmark.stratified.tsv" \
     --orthogonal-summary "$RESULTS_DIR/orthogonal_validation.summary.json" \
     --dimensions-prefix "$RESULTS_DIR/benchmark" \

@@ -13,6 +13,8 @@ tool_timeout_seconds	7200	TOOL_TIMEOUT_SECONDS	7	yes	proposed	Same wall-time bud
 species_averaging	macro over species with >= MIN_SPECIES_CLUSTERS clusters		8	yes	fixed
 min_species_clusters	20	MIN_SPECIES_CLUSTERS	8	yes	fixed
 min_alignment_identity	0.90	MIN_ALIGNMENT_IDENTITY	7	no	fixed
+chromid_min_bp	350000	CHROMID_MIN_BP	9	yes	proposed	Truth audit: a non-largest chromosome-labelled replicon at least this long is flagged secondary_chromosome (chromids are typically over 350 kb); a flag to review, never a relabel
+large_plasmid_bp	500000	LARGE_PLASMID_BP	9	yes	proposed	Truth audit: a PLASMID at least this long is flagged large_plasmid (a megaplasmid, or a chromid labelled plasmid); a flag to review, never a relabel
 min_clusters_ci	5		8	no	fixed	A bootstrap interval needs at least this many independent units (python/resampling.py MIN_CLUSTERS_CI)
 min_clusters_test	6		8	no	fixed	A sign-flip permutation test needs at least this many independent units: with 5 the smallest two-sided p is 0.0625 and can never reach 0.05 (MIN_CLUSTERS_TEST)
 exact_permutation_max_units	12		8	no	fixed	Up to this many units every sign pattern is enumerated (exact p); above it Monte Carlo (EXACT_MAX_UNITS)

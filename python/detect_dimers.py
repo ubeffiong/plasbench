@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-detect_dimers.py -- find truth plasmids that are tandem dimers of themselves and,
+detect_dimers.py -- find truth plasmids that are tandem multimers of themselves (dimers, trimers and higher, up to 6 copies) and,
 optionally, collapse them to the monomer before anything is scored.
 
 A reference assembler sometimes closes a plasmid as two head-to-tail copies
 (panel edge case D2). Scoring against the dimer halves every tool's recall on
 it: a perfect monomer reconstruction covers only half the "true" sequence.
 
-Detection: split the replicon into halves [0, L/2) and [L/2, L). For a circular
+Higher multimers: the same test is run for k = 6 down to 2 copies (the replicon cut into k equal parts, every part compared with the first) and the LARGEST k that passes
+is reported (`copies`): a tetramer also passes as a dimer, but its copy number is 4. `multimer` stays "yes" and a collapse keeps the first 1/k.
+
+Detection (k = 2): split the replicon into halves [0, L/2) and [L/2, L). For a circular
 dimer M+M every linearisation gives two halves that are copies of M, so the
 halves are compared directly:
 
@@ -40,7 +43,8 @@ import sys
 import tempfile
 
 FIELDS = ["sequence_id", "original_length", "corrected_length", "identity", "half_coverage", "method",
-          "multimer", "action"]
+          "multimer", "action", "copies"]
+MAX_COPIES = 6
 
 
 from plasbench_common import iter_fasta  # noqa: E402
@@ -106,6 +110,32 @@ def test_dimer(sequence, min_identity, min_coverage, use_minimap2=True):
     return identity >= min_identity and coverage >= min_coverage, identity, coverage, method
 
 
+def test_multimer(sequence, min_identity, min_coverage, use_minimap2=True):
+    """(copies, identity, coverage, method): the largest k in 2..MAX_COPIES for which the sequence is k tandem copies (every part against the first), else copies 1."""
+    best_method = "too_short"
+    for k in range(MAX_COPIES, 1, -1):
+        part = len(sequence) // k
+        if part < 100:
+            continue
+        first, identities, coverages, method, ok = sequence[:part], [], [], "hamming", True
+        for i in range(1, k):
+            other = sequence[i * part:(i + 1) * part]
+            result = minimap2_identity(first, other) if use_minimap2 and shutil.which("minimap2") else None
+            used = "minimap2"
+            if result is None:
+                result, used = hamming_identity(first, other), "hamming"
+            method = used
+            if not (result[0] >= min_identity and result[1] >= min_coverage):
+                ok = False
+                break
+            identities.append(result[0])
+            coverages.append(result[1])
+        best_method = method
+        if ok:
+            return k, min(identities), min(coverages), method
+    return 1, 0.0, 0.0, best_method
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--reference", required=True)
@@ -128,17 +158,16 @@ def main():
         if sid not in plasmids:
             new_records.append((header, sequence))
             continue
-        dimer, identity, coverage, method = test_dimer(sequence, args.min_identity, args.min_half_coverage,
-                                                       not args.no_minimap2)
-        if not dimer:
+        copies, identity, coverage, method = test_multimer(sequence, args.min_identity, args.min_half_coverage, not args.no_minimap2)
+        if copies < 2:
             new_records.append((header, sequence))
             continue
-        monomer = sequence[:len(sequence) // 2]
+        monomer = sequence[:len(sequence) // copies]
         action = "collapsed" if args.collapse else "flagged"
         corrections.append({"sequence_id": sid, "original_length": len(sequence),
                             "corrected_length": len(monomer) if args.collapse else len(sequence),
                             "identity": f"{identity:.4f}", "half_coverage": f"{coverage:.4f}", "method": method,
-                            "multimer": "yes", "action": action})
+                            "multimer": "yes", "action": action, "copies": copies})
         new_records.append((header, monomer) if args.collapse else (header, sequence))
 
     collapsed = {c["sequence_id"]: int(c["corrected_length"]) for c in corrections if c["action"] == "collapsed"}
@@ -176,7 +205,7 @@ def main():
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         writer.writerows(corrections)
-    sys.stderr.write(f"[detect_dimers] {len(corrections)} dimer(s) among {len(plasmids)} plasmid(s); "
+    sys.stderr.write(f"[detect_dimers] {len(corrections)} multimer(s) (dimers and higher) among {len(plasmids)} plasmid(s); "
                      f"{len(collapsed)} collapsed\n")
 
 

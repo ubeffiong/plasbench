@@ -1,0 +1,4 @@
+marker_caller	database	tool_database_pattern	overlap_kind	note
+abricate_replicon	PlasmidFinder replicon database (abricate)	PlasmidFinder	same_database	Replicon calls on the truth. A tool whose database is PlasmidFinder shares this evidence.
+mob_typer	MOB-suite database (replicon and relaxase typing, mob_typer)	MOB-suite	same_database	MOB-typing of the truth uses the MOB-suite database; mob_recon and the tools built on it classify with the same database.
+plasmid_reference_match	PlasBench-curated plasmid reference set (Mash sketch of NCBI plasmids)	PLSDB	possible_content_overlap	A different list, but PLSDB-derived databases are also built from NCBI plasmids, so the content may overlap. Not verified at sequence level.

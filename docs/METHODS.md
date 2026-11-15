@@ -541,9 +541,11 @@ truth sequence's PLASMID/CHROMOSOME label against replicon and MOB evidence in
 `truth_features.tsv` and writes `benchmark.truth_label_audit.tsv`. Findings:
 `chromosome_with_plasmid_markers` (candidate chromid or integrated plasmid),
 `plasmid_without_markers` (candidate mislabel, or a cryptic plasmid the databases do not
-know), `consistent`, and `not_evaluated`. Absence of a marker is reported only when both
+know), `consistent`, and `not_evaluated`. A second column, `flags`, adds: integrated_plasmid_candidate, chromid_candidate, secondary_chromosome (>= `CHROMID_MIN_BP`, default 350 kb), large_plasmid (>= `LARGE_PLASMID_BP`, default 500 kb), multi_replicon_plasmid, marker_free_plasmid, multimer_<k>x, collapsed_repeat_candidate and low_depth_region. The flags are heuristics to look at, never relabels. Absence of a marker is reported only when both
 the replicon and MOB callers ran according to `annotation_provenance.json`; otherwise the
 result is `not_evaluated`. The audit never edits `truth.tsv` and never changes a score.
+
+`python/truth_marker_overlap.py` writes `benchmark.truth_marker_overlap.tsv`: for every tool that uses a reference database and every marker caller behind the truth labels (`config/truth_marker_databases.tsv`), whether the database is the same (`yes`), possibly overlapping in content (`possible`), not shared (`no`) or unknown. MOB-suite tools share the MOB-typing database with the truth evidence. It is a name-level screen, not a sequence-level proof (that is the database-leakage analysis).
 
 ```bash
 python3 python/stratify_recovery.py --results-dir results --data-dir data \
@@ -1044,7 +1046,7 @@ label, marked `ncbi_label_field = not_applicable:<truth_source>`, never describe
 `TRUTH_LABEL_SCHEME` selects the scored scheme (default `ncbi`); a missing scheme file falls back to
 `truth.tsv` with a warning.
 
-**Tandem dimers** (`python/detect_dimers.py`, stage 2). The two halves of each PLASMID replicon are
+**Tandem multimers** (`python/detect_dimers.py`, stage 2): dimers, trimers and higher (up to 6 copies; the largest passing copy number is reported in `copies`, so a tetramer is not called a dimer). The replicon is cut into k equal parts and each is
 compared (minimap2 asm5 when available, else Hamming identity). Identity ≥ 0.95 over ≥ 0.90 of the half
 length is a dimer. With `COLLAPSE_DIMERS=1` the reference and `truth.tsv` keep only the first half
 (original kept as `reference.precollapse.fna`; AMR rows on the second copy dropped); with 0 the dimer is
