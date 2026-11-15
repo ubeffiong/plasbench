@@ -119,6 +119,10 @@ with tempfile.TemporaryDirectory() as tmp:
                 "--min-studies", "3", "--min-training-samples", "20"]
         if with_stats:
             args += ["--data-dir", data]
+        verdict = os.path.join(tmp, "verdict.json")   # per-isolate choice shown to add value (the gate this test is not about)
+        with open(verdict, "w", encoding="utf-8") as handle:
+            json.dump({"any_per_isolate_arm_enabled": True}, handle)
+        args += ["--recommender-verdict", verdict]
         subprocess.run(args, check=True, capture_output=True, text=True)
         return json.load(open(out, encoding="utf-8"))
 

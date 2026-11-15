@@ -62,7 +62,11 @@ def card(row, board, provenance, features, verdict):
         interval += f"; lead over the runner-up: {lb['significant_vs_runner_up']}"
     orgs = organisms(features)
     arms = (verdict or {}).get("arms") or {}
-    transfer = (f"choosing by similar isolates: {arms['feature_conditioned'].replace('_', ' ')}" if arms.get("feature_conditioned") else "choosing by similar isolates: not evaluated")
+    labels = {"feature_conditioned": "by dataset features", "taxonomy_knn": "by same-species isolates", "hierarchical_knn": "by species, genus, then Gram group"}
+    shown = [f"{label}: {arms[arm].replace('_', ' ')}" for arm, label in labels.items() if arms.get(arm)]
+    transfer = ("choosing by similar isolates (" + "; ".join(shown) + ")"
+                + (f"; held out by {verdict['strictest_holdout'].replace('_', ' ')}" if (verdict or {}).get("strictest_holdout") else "")
+                if shown else "choosing by similar isolates: not evaluated")
     similarity = (f"a recommendation for this cohort as a whole ({len(features) or 'unknown number of'} isolates"
                   + (f"; organisms: {', '.join(orgs)}" if orgs else "") + f"), not a prediction for a new isolate; {transfer}")
     return [("Recommended tool", _esc(tool)), ("Observed performance", _esc(expected)), ("Independent studies", _esc(studies)),

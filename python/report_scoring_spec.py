@@ -265,7 +265,7 @@ def outcome_states_section(states, status_rows=()):
                    "Failed runs are retried TOOL_RETRIES times; every tool gets the same TOOL_TIMEOUT_SECONDS.", body)
 
 
-def recommender_section(evaluation, verdict, warnings, regret=(), taxon=(), arms=()):
+def recommender_section(evaluation, verdict, warnings, regret=(), taxon=(), arms=(), holdouts=()):
     tables = ""
     if not evaluation:
         body = not_run("recommender evaluation", "RUN_RECOMMENDER_EVAL=0, or evaluate_recommender.py failed")
@@ -282,14 +282,24 @@ def recommender_section(evaluation, verdict, warnings, regret=(), taxon=(), arms
                 body += f"<p><strong>Verdict:</strong> {esc(verdict.get('verdict'))} -- {esc(verdict.get('note'))}</p>"
         tables = table(report_3d.EVAL_HEADER, [[r.get(f, "") for f in report_3d.EVAL_FIELDS] for r in evaluation])
         if arms:
-            tables += ("<h3>Three ways of choosing a tool</h3><p class='muted'>Single best tool for everyone, best tool for the isolate's organism, and best tool among the most similar training isolates "
-                       "(by features knowable without a reference). An arm adds value only when it beats the single best tool by a real margin on average and in most studies, with at least three studies of two or more isolates, "
-                       "and (for the feature arm) when most isolates were really placed by their neighbours; otherwise the verdict says why not.</p>"
+            tables += ("<h3>Ways of choosing a tool</h3><p class='muted'>Single best tool for everyone, best tool for the isolate's organism, and best tool among the most similar training isolates "
+                       "(by features knowable without a reference): by those features alone, among the same species only, or species first then genus, then Gram group. An arm adds value only when it beats the "
+                       "single best tool by a real margin on average and in most studies, with at least three studies of two or more isolates, and (for the neighbour arms) when most isolates were really placed "
+                       "by their neighbours; otherwise the verdict says why not. An isolate farther from the training data than the training isolates are from each other is out of range: it is not "
+                       "recommended from neighbours (the arm abstains to the single best). Neighbour spread is the standard deviation of the chosen tool's scores among the neighbours.</p>"
                        + table(["Profile", "Arm", "Isolates", "Studies", "Mean regret", "Top-1", "Near-optimal", "Improvement over single best", "Studies better", "Studies assessed",
-                                "Calibration error", "Calibration bias", "Abstention rate", "Regret when answering", "Verdict", "Note", "Placed by neighbours"],
+                                "Calibration error", "Calibration bias", "Abstention rate", "Regret when answering", "Verdict", "Note", "Placed by neighbours", "Out of range", "Neighbour spread"],
                                [[r.get(f, "") for f in ("profile", "arm", "n_isolates", "n_folds", "mean_regret", "top1_rate", "near_optimal_rate", "improvement_over_single_best",
                                                          "folds_better", "folds_assessed", "calibration_mae", "calibration_bias", "abstention_rate", "mean_regret_when_answering",
-                                                         "verdict", "note", "share_feature_based")] for r in arms]))
+                                                         "verdict", "note", "share_feature_based", "share_out_of_range", "mean_uncertainty_sd")] for r in arms]))
+            if holdouts:
+                tables += ("<h3>Validation designs</h3><p class='muted'>The same arms with different things held out. They answer different questions and are not interchangeable: "
+                           "<em>isolate</em> (another isolate from represented studies), <em>study</em> (a new study), <em>clonal group</em> (beyond closely related isolates), "
+                           "<em>study and clonal</em> (a study and every isolate clonal with it, the strictest), <em>species</em> (an unseen species). A per-isolate arm is enabled "
+                           f"only when it adds value under leave-one-study-out and under the strictest design this run could build ({esc((verdict or {}).get('strictest_holdout', 'study'))}).</p>"
+                           + table(["Design", "Arm", "Held-out groups", "Isolates", "Mean regret", "Improvement over single best", "Groups better", "Groups assessed", "Verdict", "Note"],
+                                   [[r.get(f, "") for f in ("design", "arm", "n_groups", "n_isolates", "mean_regret", "improvement_over_single_best", "folds_better",
+                                                             "folds_assessed", "verdict", "note")] for r in holdouts]))
         else:
             tables += ("<h3>Three ways of choosing a tool</h3><p class='muted'>Not available for this run: benchmark.recommender_arms.tsv was not written "
                        "(an older run, or evaluate_recommender.py did not finish), so the single-best, organism and feature-conditioned choices cannot be compared.</p>")
@@ -430,6 +440,14 @@ def arms_path(sources):
     return None
 
 
+def sibling(sources, name):
+    """benchmark.<name>.tsv beside benchmark.recommender_eval.tsv, or None."""
+    eval_path = sources.get("recommender_eval")
+    if eval_path and "recommender_eval" in Path(eval_path).name:
+        return Path(eval_path).with_name(Path(eval_path).name.replace("recommender_eval", name))
+    return None
+
+
 def regret_path(sources):
     """benchmark.recommender_regret.tsv sits beside benchmark.recommender_eval.tsv (an explicit source wins)."""
     if sources.get("recommender_regret"):
@@ -458,7 +476,8 @@ def inject(page, sources):
         + contig_layer_section(leaderboard, read_tsv(sources.get("scores")), crosscheck)
         + outcome_states_section(read_tsv(sources.get("outcome_states")), read_tsv(sources.get("tool_status")))
         + recommender_section(evaluation, read_json(sources.get("recommender_verdict")),
-                              read_tsv(sources.get("warning_eval")), read_tsv(regret_path(sources)), taxon, read_tsv(arms_path(sources)))
+                              read_tsv(sources.get("warning_eval")), read_tsv(regret_path(sources)), taxon, read_tsv(arms_path(sources)),
+                              read_tsv(sibling(sources, "recommender_holdouts")))
         + transfer_section(taxon, read_tsv(sources.get("comparisons")))
         + amr_section(read_tsv(sources.get("amr_placement")), sources.get("data_dir"))
         + validity_section(leaderboard, provenance, evaluation, crosscheck))
