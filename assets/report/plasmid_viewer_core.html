@@ -313,12 +313,26 @@ PV.coveredIn = function (intervals, s, e, len) {
   });
   return total;
 };
+/* identity of a covered stretch: the length-weighted mean identity of the tool's alignment blocks over [s, e), null when none carries one (mirror of report_maps.interval_identity) */
+PV.intervalIdentity = function (blocks, s, e) {
+  var num = 0, den = 0;
+  (blocks || []).forEach(function (b) {
+    var ov = Math.min(e, b.end) - Math.max(s, b.start);
+    if (ov > 0 && b.identity !== null && b.identity !== undefined) { num += ov * b.identity; den += ov; }
+  });
+  return den > 0 ? num / den : null;
+};
+PV.identityColour = function (v) {
+  if (v === null) { return null; }
+  for (var k = 0; k < C.IDENTITY.length; k++) { if (v >= C.IDENTITY[k][0]) { return C.IDENTITY[k][1]; } }
+  return C.IDENTITY[C.IDENTITY.length - 1][1];
+};
 PV.geneLength = function (g, len) { return g.start <= g.end ? g.end - g.start : g.end + len - g.start; };
 
 /* compact payload -> model. See report_maps.viewer_payload for the key legend. */
 PV.normalize = function (raw) {
   var m = {id: raw.id, sample: raw.sample, plasmid: raw.plasmid, length: raw.length, circular: raw.circ === undefined ? null : raw.circ,
-           repeatRich: raw.rr === undefined ? null : raw.rr, repeatRegions: raw.rg || [], notes: raw.notes || [], genes: [], tools: [], events: [], blocks: [], gc: null,
+           repeatRich: raw.rr === undefined ? null : raw.rr, repeatRegions: raw.rg || [], resistance: raw.rz || [], notes: raw.notes || [], genes: [], tools: [], events: [], blocks: [], gc: null,
            toolsNotDrawn: raw.nd || []};
   (raw.genes || []).forEach(function (g, i) {
     m.genes.push({i: i, start: g.s, end: g.e, strand: g.t || '', name: g.n || '', product: g.p || '', cls: g.c || 'other', kind: g.k || 'gene', ftype: g.f || ''});
@@ -562,6 +576,17 @@ PV.buildScene = function (model, state, opts) {
     });
     parts.push(pathEl(rd.join(''), '#bbbbbb', 'none', 0, "opacity='0.45' class='repeat-regions'"));
   }
+  /* resistance-region brackets, outside the scale (mirror of report_maps resistance_regions) */
+  (model.resistance || []).forEach(function (rz) {
+    var rs = rz[0], re = Math.max(rz[1], rz[0] + 1);
+    PV.clipPiece(view, rs, re).forEach(function (f) {
+      var a0 = PV.relAngle(view, f.rel0), a1 = PV.relAngle(view, f.rel1);
+      var p1 = polar(cx, cy, C.R_BRACKET - 5, a0), p2 = polar(cx, cy, C.R_BRACKET + 5, a0), p3 = polar(cx, cy, C.R_BRACKET - 5, a1), p4 = polar(cx, cy, C.R_BRACKET + 5, a1);
+      parts.push("<g class='resistance-region' data-start='" + rz[0] + "' data-end='" + rz[1] + "'>" + pathEl(PV.sectorPath(cx, cy, C.R_BRACKET - 1.5, C.R_BRACKET + 1.5, a0, a1), C.BRACKET, 'none', 0, '') +
+        "<line x1='" + num(p1[0]) + "' y1='" + num(p1[1]) + "' x2='" + num(p2[0]) + "' y2='" + num(p2[1]) + "' stroke='" + C.BRACKET + "' stroke-width='1.6'/>" +
+        "<line x1='" + num(p3[0]) + "' y1='" + num(p3[1]) + "' x2='" + num(p4[0]) + "' y2='" + num(p4[1]) + "' stroke='" + C.BRACKET + "' stroke-width='1.6'/><title>Resistance region " + rz[0] + '-' + rz[1] + ' bp: ' + esc(rz[2] || 'resistance genes') + '</title></g>');
+    });
+  });
   /* tool rings */
   var tools = PV.visibleTools(model, state);
   tools.forEach(function (t) {
@@ -570,7 +595,7 @@ PV.buildScene = function (model, state, opts) {
       var s = Math.max(0, iv[0]), e = Math.min(L, iv[1]);
       if (e <= s) { return; }
       PV.clipPiece(view, s, e).forEach(function (f) {
-        cov.push(pathEl(PV.sectorPath(cx, cy, rIn, rOut, PV.relAngle(view, f.rel0), PV.relAngle(view, f.rel1)), pal.cover, '#12355b', 0.6, "class='cov' data-k='t' data-i='" + t.i + "'"));
+        cov.push(pathEl(PV.sectorPath(cx, cy, rIn, rOut, PV.relAngle(view, f.rel0), PV.relAngle(view, f.rel1)), PV.identityColour(PV.intervalIdentity(t.blocks, s, e)) || pal.cover, '#12355b', 0.6, "class='cov' data-k='t' data-i='" + t.i + "'"));
       });
     });
     var evs = [];

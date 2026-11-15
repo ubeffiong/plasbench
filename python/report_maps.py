@@ -56,6 +56,15 @@ LABEL_FONT = 10
 LABEL_PRIORITY = {"amr": 100, "replication": 90, "relaxase": 80, "mobile": 70, "transfer": 50, "integrase": 40}
 BASELINE_PREFIX = "baseline_"
 
+# Identity of the covered stretches (BRIG-style): a tool ring's covered stretch is shaded by the length-weighted identity of the retained alignment blocks over it.
+# Four sequential blues (one hue, so it reads in grayscale and for colour-blind readers); a stretch with no block carrying an identity keeps the plain cover colour.
+IDENTITY_BANDS = ((0.99, "#08306b"), (0.95, "#2171b5"), (0.90, "#6baed6"), (0.0, "#c6dbef"))
+IDENTITY_LABELS = ("99% or more", "95 to 99%", "90 to 95%", "under 90%")
+# Resistance regions: the truth's resistance genes that lie within this many bases of one another are bracketed together outside the scale.
+RESISTANCE_GAP_BP = 5000
+RESISTANCE_BRACKET = "#D55E00"
+R_BRACKET = R_OUT + 26.0
+
 MAP_STYLE = """
 .rpt-map-body{margin:0}
 .rpt-map-body>input{vertical-align:middle;margin:0 3px 0 10px}
@@ -328,6 +337,40 @@ def load_sample(results_dir, data_dir, sample, scores=None, leaderboard=None):
     return models
 
 
+def interval_identity(blocks, start, end):
+    """Length-weighted mean identity of the alignment blocks over [start, end), or None when no overlapping block carries an identity."""
+    num = den = 0.0
+    for b in blocks or []:
+        overlap = min(end, b["te"]) - max(start, b["ts"])
+        if overlap > 0 and b.get("identity") is not None:
+            num += overlap * b["identity"]
+            den += overlap
+    return num / den if den else None
+
+
+def identity_colour(value):
+    """The identity band colour (IDENTITY_BANDS), or the plain cover colour when the identity is unknown."""
+    if value is None:
+        return COVER_FILL
+    return next(colour for floor, colour in IDENTITY_BANDS if value >= floor)
+
+
+def resistance_regions(genes, length, gap=RESISTANCE_GAP_BP):
+    """[{start, end, genes}] : the truth's resistance genes (class amr) merged when within `gap` bases of each other, in position order.
+
+    A gene that wraps the origin is left out (it cannot be one bracket on a line); the brackets say where resistance genes sit, they do not call a mobile element."""
+    amr = sorted((g for g in genes or [] if g.get("cls") == "amr" and int(g["start"]) <= int(g["end"])), key=lambda g: (int(g["start"]), int(g["end"])))
+    regions = []
+    for g in amr:
+        s, e = int(g["start"]), int(g["end"])
+        if regions and s - regions[-1]["end"] <= gap:
+            regions[-1]["end"] = max(regions[-1]["end"], e)
+            regions[-1]["genes"].append(g.get("name") or "")
+        else:
+            regions.append({"start": s, "end": e, "genes": [g.get("name") or ""]})
+    return regions
+
+
 def _plasmid_blocks(blocks, pid):
     """The retained alignment blocks of one tool that land on truth plasmid `pid`, as plain dicts (identity = matches / block length)."""
     out = []
@@ -529,6 +572,15 @@ def render_svg(model, map_id):
                 parts.append(sv.sector_path(CX, CY, r_in, r_out, sv.bp_to_deg(ps, length), pe / length * 360.0))
         out.append(sv.path("".join(parts), "#bbbbbb", "none", 0, f"Repeat-rich regions of {model['plasmid']}", "opacity='0.45' class='repeat-regions'"))
 
+    # resistance-region brackets, outside the scale
+    for region in resistance_regions(genes, length):
+        a0, a1 = sv.bp_to_deg(region["start"], length), max(sv.bp_to_deg(region["start"], length) + 0.6, region["end"] / length * 360.0)
+        names = ", ".join(n for n in region["genes"] if n) or "resistance genes"
+        out.append(f"<g class='resistance-region' data-start='{region['start']}' data-end='{region['end']}'>"
+                   + sv.path(sv.sector_path(CX, CY, R_BRACKET - 1.5, R_BRACKET + 1.5, a0, a1), RESISTANCE_BRACKET, "none", 0,
+                             f"Resistance region {region['start']:,}-{region['end']:,} bp: {names}")
+                   + "".join(sv.line(*sv.polar(CX, CY, R_BRACKET - 5, a), *sv.polar(CX, CY, R_BRACKET + 5, a), RESISTANCE_BRACKET, 1.6) for a in (a0, a1)) + "</g>")
+
     # tool rings
     for i, tool in enumerate(drawn):
         r_in, r_out = rings[f"t{i}"]
@@ -538,8 +590,9 @@ def render_svg(model, map_id):
             if e <= s:
                 continue
             a0, a1 = sv.bp_to_deg(s, length), e / length * 360.0
-            cov.append(sv.path(sv.sector_path(CX, CY, r_in, r_out, a0, a1), COVER_FILL, "#12355b", 0.6,
-                               f"{tool['name']}: truth bases {s}-{e} covered ({e - s:,} bp)",
+            ident = interval_identity(tool.get("blocks"), s, e)
+            cov.append(sv.path(sv.sector_path(CX, CY, r_in, r_out, a0, a1), identity_colour(ident), "#12355b", 0.6,
+                               f"{tool['name']}: truth bases {s}-{e} covered ({e - s:,} bp)" + (f", identity {ident:.1%}" if ident is not None else ", identity not recorded"),
                                f"class='cov' data-start='{s}' data-end='{e}' data-a0='{sv.num(a0, 3)}' data-a1='{sv.num(a1, 3)}'"))
         comp = _pct(tool.get("completeness")) or "n/a"
         out.append(f"<g class='ring-t{i}' data-tool='{rc.esc(tool['name'])}'><title>{rc.esc(tool['name'])}: completeness {comp}, "
@@ -654,6 +707,9 @@ def _legend(meta):
     for cls in meta["classes"]:
         keys.append(f"<span class='rpt-map-key' data-class='{cls}'><i style='background:{sv.CLASS_COLOURS[cls]}'></i>{rc.esc(sv.CLASS_LABELS[cls])}</span>")
     keys.append(f"<span class='rpt-map-key'><i style='background:{COVER_FILL}'></i>Tool ring: truth bases covered (solid)</span>")
+    keys.append("<span class='rpt-map-key'>Identity of the covered stretch: " + " ".join(
+        f"<i style='background:{colour}'></i>{label}" for (_floor, colour), label in zip(IDENTITY_BANDS, IDENTITY_LABELS)) + "</span>")
+    keys.append(f"<span class='rpt-map-key'><i style='background:{RESISTANCE_BRACKET};height:4px'></i>Resistance region (genes within {RESISTANCE_GAP_BP // 1000} kb)</span>")
     keys.append("<span class='rpt-map-key'><i class='hatch'></i>Tool ring: not covered (pale, dashed outline)</span>")
     keys.append("<span class='rpt-map-key'><i style='background:#111;width:3px'></i>Structural event on this plasmid</span>")
     if meta["gc"]:
@@ -726,7 +782,8 @@ def viewer_config():
     default.update({"cover": COVER_FILL, "skewPos": "#009E73", "skewNeg": "#8e4ba0"})
     return {"core": {"W": WIDTH, "H": HEIGHT, "R_OUT": R_OUT, "R_MIN": R_MIN, "GAP": RING_GAP, "TOOL_LABEL_FONT": TOOL_LABEL_FONT,
                      "LABEL_FONT": LABEL_FONT, "COVERAGE_GOOD": COVERAGE_GOOD, "COVER_FILL": COVER_FILL, "EVENT_STROKE": EVENT_STROKE,
-                     "MAX_TOOLS": MAP_MAX_TOOLS, "classes": list(sv.CLASS_COLOURS), "labels": dict(sv.CLASS_LABELS),
+                     "MAX_TOOLS": MAP_MAX_TOOLS, "IDENTITY": [[floor, colour] for floor, colour in IDENTITY_BANDS], "IDENTITY_LABELS": list(IDENTITY_LABELS),
+                     "R_BRACKET": R_BRACKET, "BRACKET": RESISTANCE_BRACKET, "BRACKET_GAP": RESISTANCE_GAP_BP, "classes": list(sv.CLASS_COLOURS), "labels": dict(sv.CLASS_LABELS),
                      "palettes": {"default": default, "cvd": dict(CVD_COLOURS)}, "priority": dict(LABEL_PRIORITY)},
             "maxBp": MAP_MAX_BP}
 
@@ -761,6 +818,7 @@ def viewer_payload(model, map_id=None):
     genes [{s,e,t strand,n name,p product,c class,k kind,f ftype}], tools [{n,dn display name (when it differs),tr track,rk rank,cm completeness,oc outcome,iv [[a,b]],
     at AMR total,ar AMR recovered names,ev [{p,t,r,d}],bl alignment blocks [[record,qlen,qs,qe,strand,ref start,ref end,identity,mapq]],
     bo blocks not sent,cf collinear fraction (tool-wide, structural_calls.json),oc order conflicts,am [{g,c,s,e,pl,rc,r,b}],od outcome detail {b,r,p,n,m,c},d 1 = drawn by default}],
+    rz [[start,end,gene names]] resistance regions (genes of class amr within RESISTANCE_GAP_BP),
     gc {w window,m mean,g [GC per window],k [skew per window]}. Every tool is included (the static map caps at MAP_MAX_TOOLS; the
     viewer starts with the same tools switched on and lets the reader switch the others on).
     """
@@ -784,6 +842,9 @@ def viewer_payload(model, map_id=None):
             item["k"] = "feature"
         genes.append(item)
     out["genes"] = genes
+    regions = resistance_regions(model.get("genes"), int(model["length"]))
+    if regions:
+        out["rz"] = [[r["start"], r["end"], ", ".join(n for n in r["genes"] if n)] for r in regions]
     tools = []
     for t in sorted(model.get("tools") or [], key=_tool_key):
         item = {"n": t["name"], "tr": t.get("track", ""), "iv": [[int(a), int(b)] for a, b in t.get("intervals") or []]}
