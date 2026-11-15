@@ -53,9 +53,19 @@ HEAVY = {
         "*.fasta", "*.fa", "*.fna", "*.ffn", "*.faa", "*.fas", "*.fsa", "*.mfa", "*.frn",
         "*.fasta.gz", "*.fa.gz", "*.fna.gz", "*.faa.gz", "*.ffn.gz",
         "*.gbk", "*.gbff", "*.gb", "*.embl", "*.gff", "*.gff3", "*.gtf", "*.gff.gz", "*.gff3.gz", "*.gbk.gz", "*.gbff.gz",
-        "*.gfa", "*.gfa.gz", "*.fastg", "*.asqg", "*.agp"]),
+        "*.gfa", "*.gfa.gz", "*.fastg", "*.asqg", "*.agp", "*.fai", "*.genbank"]),
 }
 PROGRAM_HEAVY = ("reads", "alignments", "variants", "tracks", "indexes", "archives")
+# A study repository keeps study-level tables and reports only. Per-sample sub-folders (predictions, alignments,
+# truth, reads) and sample-data folders can carry sample identity or clinical detail, and so can files named for
+# patients, clinical data or line lists: they stay out, whatever their format.
+SAMPLE_DATA_IGNORE = ["results/*/", "data/", "reads/", "assembly/", "predictions*/", "metadata/", "clinical/",
+                      "patient*/", "**/*patient*", "**/*clinical*", "**/*linelist*"]
+SAMPLE_DATA_PATTERNS = [
+    (re.compile(r"(^|/)results/[^/]+/"), "per-sample output folder (sequence and sample-level files)"),
+    (re.compile(r"(^|/)(data|reads|assembly|metadata|clinical|predictions[^/]*)/"), "sample data folder"),
+    (re.compile(r"(patient|clinical|linelist)", re.I), "file named for patient or clinical data"),
+]
 RUNS_HEAVY = PROGRAM_HEAVY + ("sequence",)
 
 
@@ -94,14 +104,17 @@ RUNS_IGNORE = ("# --- PlasBench runs block (managed) ---\n"
                "# alignments (BAM/SAM/CRAM), variants, assemblies and sequences, indexes and databases, archives. They are\n"
                "# large, and a rerun re-creates them. Credentials never go in. PlasBench updates this block when its list\n"
                "# grows; add your own rules outside it.\n"
+               "# Per-sample folders and files named for patient or clinical data can identify people: they stay out.\n"
                "tmp/\n**/tmp/\n__pycache__/\n*.pyc\n"
+               + "\n".join(SAMPLE_DATA_IGNORE) + "\n"
                + "\n".join(_globs(RUNS_HEAVY)) + "\n"
                ".env\n*.pem\n*.key\n*.pfx\nid_rsa*\nid_ed25519*\n"
                "# --- end PlasBench runs block ---\n")
 RUNS_MARKER = "PlasBench runs block"
 SAFE_MARKER = "PlasBench safety block"
 # In a runs repository the study's results/ and logs/ ARE what is tracked; heavy data and tmp are not.
-RUN_DATA_PATTERNS = _heavy_patterns(RUNS_HEAVY) + [(re.compile(r"(^|/)tmp/"), "temporary files of a run")]
+RUN_DATA_PATTERNS = (_heavy_patterns(RUNS_HEAVY) + SAMPLE_DATA_PATTERNS
+                     + [(re.compile(r"(^|/)tmp/"), "temporary files of a run")])
 DATA_PATTERNS = _heavy_patterns(PROGRAM_HEAVY) + [
     (re.compile(r"\.(gfa)(\.gz)?$", re.I), "assembly-graph output"),
     (re.compile(r"(^|/)(studies|results|results_[^/]+|data|logs|tmp)/"), "run output or download folder"),
@@ -126,7 +139,8 @@ SECRET_CONTENT = [
 # Isolate metadata can carry patient information (clinical isolates): direct identifier columns block a commit.
 IDENTIFIER_CONTENT = [
     (re.compile(r"(?im)^.*\b(patient[_ ]?name|full[_ ]?name|surname|first[_ ]?name|date[_ ]?of[_ ]?birth|"
-                r"national[_ ]?id|hospital[_ ]?number|home[_ ]?address|telephone|phone[_ ]?number)\b.*$"),
+                r"national[_ ]?id|hospital[_ ]?number|home[_ ]?address|telephone|phone[_ ]?number|"
+                r"patient[_ ]?id|medical[_ ]?record|mrn|nhs[_ ]?number|ward|bed[_ ]?number)\b.*$"),
      "a column of direct patient identifiers"),
 ]
 

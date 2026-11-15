@@ -39,6 +39,14 @@ declare -A SCRIPT=(
 
 log "############ PlasBench ############"
 log "Running stages: ${STAGES[*]}"
+# A run that the terminal, WSL or the computer ended cannot report it at the time. This marker says what was
+# running; it is removed when the run finishes or reports its own error, so finding it means the last run was cut
+# off. The next run says so, and reuses the finished work.
+mkdir -p "$RESULTS_DIR"
+RUN_MARK="$RESULTS_DIR/.run_in_progress"
+if [[ -s "$RUN_MARK" ]]; then
+    warn "the previous run stopped before it finished, without a chance to report why ($(head -1 "$RUN_MARK")): the terminal, WSL or the computer ended it, or it ran out of memory. Finished work is reused; see $LOG_DIR for its last messages."
+fi
 for s in "${STAGES[@]}"; do
     # Stages 1-5 operate on individual samples. Aggregation/reporting can be
     # rerun from an existing scores.tsv, even after the original sheet moved.
@@ -48,8 +56,16 @@ for s in "${STAGES[@]}"; do
     scr="${SCRIPT[$s]:-}"
     [[ -z "$scr" ]] && die "unknown stage '$s'"
     log ">>>>> STAGE $s : $scr"
-    bash "$HERE/$scr"
+    printf 'started %s, stage %s (%s), pid %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$s" "$scr" "$$" > "$RUN_MARK"
+    rc=0
+    bash "$HERE/$scr" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        rm -f "$RUN_MARK"
+        _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: the run stopped in stage $s ($scr): $(explain_exit "$rc") (exit $rc). The messages above say why; logs are in $LOG_DIR."
+        exit "$rc"
+    fi
 done
+rm -f "$RUN_MARK"
 log "############ DONE ############"
 if [[ -f "$RESULTS_DIR/benchmark.leaderboard.md" ]]; then
     echo; echo "Leaderboard:"; cat "$RESULTS_DIR/benchmark.leaderboard.md"
