@@ -72,6 +72,7 @@ while IFS=$'\t' read -r SAMPLE _; do
             "${CONTIG_BIN_ARGS[@]+"${CONTIG_BIN_ARGS[@]}"}" --out "$SDIR/${TOOL}.contig_classification.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$TOOL"; then
             python3 "$PY/score_bins.py" --truth "$TRUTH" --paf "$PAF" --bins "$BINS" \
+                --cprr-out "$SDIR/${TOOL}.cprr.tsv" \
                 --outcomes-out "$SDIR/${TOOL}.plasmid_outcomes.tsv" \
                 --out "$SDIR/${TOOL}.bin_matches.tsv" --summary "$SDIR/${TOOL}.bin_summary.tsv" >/dev/null
         fi

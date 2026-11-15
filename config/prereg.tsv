@@ -59,3 +59,4 @@ scorecard_bands_E2	excellent<=2 good<=8 moderate<=32 floor=256 (GB)		7.10	yes	pr
 scorecard_bands_E3	excellent>=0.99 good>=0.95 moderate>=0.8 floor=0.5		7.10	yes	proposed	Proposed default, panel to confirm. Reconstruction success rate
 scorecard_min_samples	5	SCORECARD_MIN_SAMPLES	7.10	yes	proposed	Proposed default, panel to confirm. Scenario scorecards with fewer samples are flagged underpowered
 map_max_bp	600000		13.3	yes	proposed	Proposed default, panel to confirm. Plasmids longer than this are not drawn as a circular map (constant in python/report_maps.py)
+sv_prr_use	reported beside CPRR, never ranked; counts a CPRR-correct plasmid only when no structural call touches it		7	no	fixed	CPRR excludes order, orientation and circularity by its pre-registered definition; SV-PRR adds the calls without changing CPRR or any rank. Unvalidated: the calls have no read or graph support
