@@ -13,6 +13,17 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- warnings are yellow and errors red, in the window and in a terminal
+- **The window's console** uses one colour code in all three tabs (Job output, Session log, Terminal): errors are
+  red and bold, with a red bar in Job output, and warnings are yellow. A line PlasBench tags `WARNING:` (for example
+  a tolerated `SPAdes failed for ...`) is yellow; `ERROR:`, tracebacks, `No space left on device`, `command not
+  found` and non-zero exits are red. A success line that mentions a failure (`... -> PASS`) and zero counts such as
+  `failed=0` are not flagged. The Terminal tab now colours command output, and the Session log shows failed jobs and
+  terminal commands red, cancelled or interrupted ones yellow.
+- **Runs in a terminal** print `WARNING:` lines yellow and `ERROR:` lines red (`scripts/lib.sh`), only when the
+  output is a terminal, so log files stay plain. `NO_COLOR` or `PLASBENCH_COLOR=never` turns colour off, and
+  `PLASBENCH_COLOR=always` forces it.
+
 ### Added -- a structured evidence record for every reference (review H3)
 - `python/truth_provenance.py` records six evidence fields per reference, additively: assembly technology, circularity evidence, read support, replicon/MOB evidence, structural integrity and independent validation, each `declared` (new optional sample-sheet columns `truth_circularity_evidence`, `truth_read_support`, `truth_structural_integrity`, `truth_independent_validation`), `inferred` (NCBI metadata, `truth_labels.tsv`) or `unknown`; plus `evidence_recorded` and `evidence_sources`. The original columns keep their order. Unknown never demotes a reference; an explicit adverse value (read support none, unresolved repeats) caps Tier 1 at Tier 2 and says why. `validate_cohort.py` checks the new vocabularies; the headline design table gains an *Evidence recorded* column; the demo declares some evidence and now builds the provenance table before aggregating (so the headline and the report read the same references). `test/test_truth_evidence_record.py` covers it. The cohort `truth_quality_tier` column is kept for now: it still feeds the tier and replacing it needs the cohorts re-curated (maintainer-owned).
 

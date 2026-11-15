@@ -299,7 +299,11 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #cstate:empty{display:none}
 #cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
-#clog .c-err{color:#f1938a}#clog .c-warn{color:#e3c27a}#clog .c-ok{color:#8fd1a5}#clog .c-cmd{color:#8cc3ff}#clog .c-you{color:#d7dce2;font-weight:600}
+/* console colour code, all three tabs: errors red, warnings yellow */
+.c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b;font-weight:600}
+.c-warn,#clog .c-warn,#slog .s-warn{color:#ffd24d}
+#clog .c-err,#clog .c-warn{display:inline-block;width:100%;padding-left:6px;margin-left:-9px;border-left:3px solid}
+#clog .c-err{background:rgba(255,107,107,.08)}#clog .c-warn{background:rgba(255,210,77,.07)}#clog .c-ok{color:#8fd1a5}#clog .c-cmd{color:#8cc3ff}#clog .c-you{color:#d7dce2;font-weight:600}
 /* reply row: what the command reads from its "terminal" */
 #cin{display:flex;align-items:center;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
 #cin .pr{font:12px var(--mono);color:#8cc3ff}
@@ -318,9 +322,9 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 #console.term .jobonly,#console.sess .jobonly,#console.term #cin,#console.sess #cin{display:none!important}
 #console:not(.term) .termonly{display:none!important}#console:not(.sess) .sessonly{display:none!important}
 #slog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word}
-#slog .s-t{color:#8a939d}#slog .s-job{color:#8cc3ff}#slog .s-ok{color:#8fd1a5}#slog .s-bad{color:#f1938a}#slog .s-you{color:#e3c27a}#slog .s-term{color:#d7dce2}#slog .s-sys{color:#aab3bd}
+#slog .s-t{color:#8a939d}#slog .s-job{color:#8cc3ff}#slog .s-ok{color:#8fd1a5}#slog .s-you{color:#e3c27a}#slog .s-term{color:#d7dce2}#slog .s-sys{color:#aab3bd}
 #tlog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
-#tlog .t-cmd{color:#8cc3ff}#tlog .t-err{color:#f1938a}#tlog .t-mut{color:#8a939d}
+#tlog .t-cmd{color:#8cc3ff}#tlog .t-mut{color:#8a939d}
 #tin{display:flex;align-items:flex-end;gap:6px;padding:5px 10px;border-top:1px solid var(--term-line);background:var(--term-head);flex:none}
 #tin select{width:auto;min-height:26px;background:var(--term-bg);color:var(--term-fg);border-color:var(--term-line);font-size:12px;padding:1px 6px}
 #tin .pr{font:12px var(--mono);color:#8cc3ff;white-space:nowrap;max-width:32vw;overflow:hidden;text-overflow:ellipsis}
@@ -1054,10 +1058,24 @@ function showConsole(id, expand) {
   if (expand) setConsole(true);
   pollConsole(true);
 }
+// One rule for the whole console: is a line an error (red), a warning (yellow), or a success?
+// Success wins first, so a test line like "one failed sample is tolerated -> PASS" is not painted red.
+const RX_OK = /->\s*PASS\b|^\s*PASS\b|^\s*ok\s|\bALL [A-Z0-9 -]*PASSED\b|\[ok\]/;
+const RX_ERR = /\bERROR\b|\bFATAL\b|Traceback \(most recent call last\)|\b[A-Z][A-Za-z]*Error:|\bException\b|\berror:|\bFAIL(?:ED|URE)?\b(?!\s*[=:]\s*0\b)|\bfailed\b(?!\s*[=:]\s*0\b)|\[exit [1-9]\d*\]|\bexited [1-9]\d*\b|\bKilled\b|No space left on device|Segmentation fault|command not found/i;
+const RX_WARN = /\bWARN(?:ING)?\b|\bwarning:|\bDeprecat|\bcancell?ed\b|\binterrupted\b|\bskipped\b(?!\s*[=:]\s*0\b)/i;
+// An explicit tag decides first: PlasBench writes "WARNING: SPAdes failed ..." for a recorded, tolerated failure,
+// which is a warning (yellow), and "ERROR: ..." for what stops a run (red).
+const RX_TAG_ERR = /\bERROR:|^\s*\[[^\]]*\]\s*ERROR\b/, RX_TAG_WARN = /\bWARNING:|^\s*\[[^\]]*\]\s*WARNING\b/;
+function lineLevel(l) {
+  return RX_OK.test(l) ? "ok" : RX_TAG_ERR.test(l) ? "err" : RX_TAG_WARN.test(l) ? "warn"
+    : RX_ERR.test(l) ? "err" : RX_WARN.test(l) ? "warn" : "";
+}
 function colorize(text) {
-  return esc(text).split("\n").map(l => /ERROR|FAIL|Traceback|error:/i.test(l) ? `<span class="c-err">${l}</span>` :
-     /WARN/i.test(l) ? `<span class="c-warn">${l}</span>` : /PASS|complete|Wrote|\bok\b|\[ok\]/i.test(l) ? `<span class="c-ok">${l}</span>` :
-     l.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : l.startsWith("[you] ") ? `<span class="c-you">${l}</span>` : l).join("\n");
+  // classify the raw line (escaping would turn "->" into "-&gt;"), then escape it for the page
+  return String(text).split("\n").map(raw => { const v = lineLevel(raw), l = esc(raw);
+    return v === "err" ? `<span class="c-err">${l}</span>` : v === "warn" ? `<span class="c-warn">${l}</span>` :
+      v === "ok" || /complete|Wrote/i.test(raw) ? `<span class="c-ok">${l}</span>` :
+      raw.startsWith("$ ") ? `<span class="c-cmd">${l}</span>` : raw.startsWith("[you] ") ? `<span class="c-you">${l}</span>` : l; }).join("\n");
 }
 let polling = false;
 async function pollConsole(force) {
@@ -1137,8 +1155,9 @@ $("#tab_term").onclick = () => setCTab("term");
 
 /* ---- session log ---- */
 const SL = {shown: "", count: -1};
-const sessClass = e => ({job_start: "s-job", job_input: "s-you", job_cancel: "s-bad", terminal: "s-term"})[e.kind]
-  || (e.kind === "job_end" ? (e.state === "done" ? "s-ok" : "s-bad") : "s-sys");
+const sessClass = e => e.kind === "job_end" ? ({done: "s-ok", failed: "s-bad"}[e.state] || "s-warn")
+  : e.kind === "terminal" ? (e.exit ? "s-bad" : "s-term")
+  : ({job_start: "s-job", job_input: "s-you", job_cancel: "s-warn"})[e.kind] || "s-sys";
 const sessName = s => s.id.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)\d\d$/, "$1-$2-$3 $4:$5");
 async function pollSession(force) {
   try {
@@ -1193,7 +1212,7 @@ async function termRun() {
   try {
     const r = await api("terminal/run", {command: cmd});
     const out = (r.output || "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\s+$/, "");
-    if (out) tPrint(esc(out) + "\n");
+    if (out) tPrint(colorize(out) + "\n");
     if (r.exit !== 0) tPrint(`<span class="t-err">[exit ${r.exit}]</span>\n`);
     $("#tpr").textContent = r.prompt || $("#tpr").textContent;
     if (/^(cd|chdir|set-location)\b/i.test(cmd)) termState();
