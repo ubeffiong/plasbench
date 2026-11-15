@@ -388,6 +388,7 @@ score_sample() {
             [[ -s "$FEATURES" ]] && PLACEMENT_ARGS+=(--features "$FEATURES")
             [[ -s "$RDIR/${tool}.cprr.tsv" ]] && PLACEMENT_ARGS+=(--cprr "$RDIR/${tool}.cprr.tsv")
             python3 "$HERE/../python/score_amr_placement.py" score --sample "$SAMPLE" --tool "$tool" \
+                --task "$(capability_task "$CAPABILITIES" "$tool")" \
                 --truth "$SCORE_TRUTH" --amr-truth "$AMR" --paf "$PAF" --pred-fasta "$PRED" \
                 "${PLACEMENT_ARGS[@]+"${PLACEMENT_ARGS[@]}"}" \
                 --min-alignment-length "$MIN_ALIGNMENT_LENGTH" --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \

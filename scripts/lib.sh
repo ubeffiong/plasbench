@@ -245,16 +245,16 @@ sample_column() {
 # and loaded once into associative arrays; background jobs inherit them. A tool
 # missing from the registry, or a registry that fails validation, answers exactly
 # as the per-call lookups did: not binning-capable, no track, not applicable.
-declare -gA PB_CAP_BINNING=() PB_CAP_TRACK=() PB_CAP_LR_TRUTH=()
+declare -gA PB_CAP_BINNING=() PB_CAP_TRACK=() PB_CAP_LR_TRUTH=() PB_CAP_TASK=()
 PB_CAP_LOADED=""
 load_capabilities() {
-    local registry="$1" tool binning track lr
+    local registry="$1" tool binning track lr task
     [[ "$PB_CAP_LOADED" == "$registry" ]] && return 0
-    PB_CAP_BINNING=(); PB_CAP_TRACK=(); PB_CAP_LR_TRUTH=()
-    while IFS=$'\t' read -r tool binning track lr; do
+    PB_CAP_BINNING=(); PB_CAP_TRACK=(); PB_CAP_LR_TRUTH=(); PB_CAP_TASK=()
+    while IFS=$'\t' read -r tool binning track lr task; do
         [[ -n "$tool" ]] || continue
-        lr="${lr%$'\r'}"   # a Windows python3 ends lines with \r\n
-        PB_CAP_BINNING[$tool]="$binning"; PB_CAP_TRACK[$tool]="$track"; PB_CAP_LR_TRUTH[$tool]="$lr"
+        task="${task%$'\r'}"   # a Windows python3 ends lines with \r\n
+        PB_CAP_BINNING[$tool]="$binning"; PB_CAP_TRACK[$tool]="$track"; PB_CAP_LR_TRUTH[$tool]="$lr"; PB_CAP_TASK[$tool]="${task:-binning_reconstruction}"
     done < <(python3 "$PROJECT_ROOT/python/tool_capabilities.py" --registry "$registry" --dump 2>/dev/null)
     PB_CAP_LOADED="$registry"
 }
@@ -264,6 +264,7 @@ capability_track() {
     [[ -n "${PB_CAP_TRACK[$2]:-}" ]] || return 1
     printf '%s\n' "${PB_CAP_TRACK[$2]}"
 }
+capability_task() { load_capabilities "$1"; printf '%s\n' "${PB_CAP_TASK[$2]:-binning_reconstruction}"; }
 capability_requires_lr_truth() { load_capabilities "$1"; [[ "${PB_CAP_LR_TRUTH[$2]:-}" == "yes" ]]; }
 
 # long_read_truth_eligible TOOL SAMPLE

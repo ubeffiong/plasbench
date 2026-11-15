@@ -83,6 +83,7 @@ while IFS=$'\t' read -r SAMPLE _; do
             [[ -s "$FEATURES" ]] && PLACE_ARGS+=(--features "$FEATURES")
             [[ -s "$SDIR/${TOOL}.cprr.tsv" ]] && PLACE_ARGS+=(--cprr "$SDIR/${TOOL}.cprr.tsv")
             python3 "$PY/score_amr_placement.py" score --sample "$SAMPLE" --tool "$TOOL" --truth "$TRUTH" \
+                --task "$(python3 "$PY/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$TOOL" --evaluation-task 2>/dev/null || echo binning_reconstruction)" \
                 --amr-truth "$AMR" --paf "$PAF" --pred-fasta "$PRED" "${PLACE_ARGS[@]+"${PLACE_ARGS[@]}"}" \
                 --out "$SDIR/${TOOL}.amr_placement.tsv" 2>/dev/null
         fi

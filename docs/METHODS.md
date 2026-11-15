@@ -1125,7 +1125,8 @@ in GC between the length-weighted 10th and 90th percentiles. Advisory: stage 8 w
 recommending; stage 6 writes it for every assembly so its warning can be scored.
 
 **AMR placement** (`score_amr_placement.py`). Per curated gene copy (matched by position, ≥ 90% covered
-by one predicted record): correct or wrong plasmid via one-to-one bin-to-plasmid matching, shared or
+by one predicted record): correct or wrong plasmid (attribution depends on the tool's evaluation task: a binner's bins are matched one-to-one with the plasmids, a classifier's or
+reassembler's records are each attributed to the plasmid they overlap most, so two contigs of one plasmid are both correct), shared or
 unassigned contig, or not recovered; level 1 asks whether the matched plasmid shares a replicon type.
 Summarised per gene class from `config/amr_gene_classes.tsv` (unmatched genes: `other`).
 

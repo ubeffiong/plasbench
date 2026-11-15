@@ -74,6 +74,7 @@ def main():
                              "tool, binning_capable, analysis_track, requires_independent_long_read_truth "
                              "(tab-separated; read once by scripts/lib.sh load_capabilities)")
     parser.add_argument("--binning-capable", action="store_true")
+    parser.add_argument("--evaluation-task", action="store_true", help="print the tool's evaluation_task (classification, binning_reconstruction or sequence_reassembly)")
     parser.add_argument("--analysis-track", action="store_true",
                         help="print the tool's declared analysis_track instead of binning_capable")
     parser.add_argument("--requires-independent-long-read-truth", action="store_true",
@@ -86,13 +87,16 @@ def main():
     if args.dump:
         for tool, row in capabilities.items():
             print("\t".join((tool, row["binning_capable"], row["analysis_track"],
-                             row["requires_independent_long_read_truth"])))
+                             row["requires_independent_long_read_truth"], row["evaluation_task"])))
         return
     if not args.tool:
         parser.error("--tool is required unless --dump is given")
     row = capabilities.get(args.tool)
     if row is None:
         raise SystemExit(f"ERROR: tool not declared in capability registry: {args.tool}")
+    if args.evaluation_task:
+        print(row["evaluation_task"])
+        return
     if args.analysis_track:
         print(row["analysis_track"])
         return
