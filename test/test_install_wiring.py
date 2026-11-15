@@ -65,6 +65,20 @@ TABLE = {
 }
 # Used by code but deliberately not installed through PlasBench. Each says why.
 MANUAL = {
+    "pigz": "optional: measure_depth.py decompresses reads with it when installed (faster), else with gzip",
+    # the PlasBench window, its desktop icon and its terminal: each is looked up first and optional
+    "conda": "the window's platform check and the desktop launcher look for it; plasbench install-conda installs it",
+    "micromamba": "an alternative to conda, looked up by the platform check and the desktop launcher",
+    "docker": "optional: the platform check reports it; scripts/docker_run.sh is the documented Docker mode",
+    "gh": "optional: Version control publishes to GitHub with it when present",
+    "gio": "GNOME only: marks the desktop icon trusted when present",
+    "update-desktop-database": "freedesktop only: refreshes the applications menu when present",
+    "notify-send": "optional: the desktop launcher shows an error notification when present",
+    "powershell": "Windows: makes the Start-menu and desktop shortcuts; also a terminal shell",
+    "powershell.exe": "Windows from WSL: makes the Windows desktop shortcut",
+    "wsl": "Windows: the platform check and the terminal's Ubuntu (WSL) shell",
+    "winget": "Windows: plasbench install-git installs Git for Windows (Git Bash) with it, when present",
+    "xcode-select": "macOS: plasbench install-git opens Apple's command line tools installer (includes git)",
     "deadends": "no bioconda package; INSTALL.md documents the manual build",
     "blastn": "only the one-off compare_scoring_methods.py cross-check uses it, and it states its own requirement",
     "timeout": "GNU coreutils; scripts/04_run_tools.sh uses it only when TOOL_TIMEOUT_SECONDS is set and checks for it first",
@@ -100,7 +114,7 @@ def lock_packages():
 def profiles():
     """profile label -> set of conda packages its PKGS=(...) installs; plus the `all` loop members."""
     text = read("env", "install_tools.sh")
-    install_block = text.split('case "$PROFILE" in', 2)[-1]
+    install_block = text.split('case "$PROFILE" in', 2)[-1].replace("\\\n", " ")   # join continued lines
     labels, current = {}, None
     for line in install_block.splitlines():
         label = re.match(r"^ ?([a-z0-9][a-z0-9-]*)\)", line)
@@ -110,6 +124,11 @@ def profiles():
         for packages in re.findall(r"PKGS=\(([^)]*)\)", line):
             if current:
                 labels[current].update(packages.split())
+        # A tool in its own environment: install_isolated NAME LABEL "exes" ... -- pkg pkg (package specs after --)
+        isolated = re.search(r"\binstall_isolated\b.*?\s--\s+(.+)$", line)
+        if isolated and current:
+            labels[current].update(re.sub(r"[=<>].*", "", p.strip("'\"")) for p in isolated.group(1).split()
+                                   if not p.startswith(("-", ";", "|", "&")))
     loop = re.search(r"for installed_profile in ([^;]+);", text)
     return labels, (loop.group(1).split() if loop else [])
 

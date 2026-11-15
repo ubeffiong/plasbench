@@ -5,6 +5,10 @@ FASTA is a valid completed prediction; an adapter must exit non-zero only when
 its output cannot be interpreted safely. The pipeline then records a failure
 rather than assigning an artificial zero score.
 
+User-added tools need no adapter here: a `plasbench-tool.ini` manifest maps their output onto these files through
+`python/user_tool_adapter.py` (contig-bin tables, contig labels with scores, plasmid FASTA, a FASTA folder, or the
+tool's own adapter script). See [docs/ADDING_TOOLS.md](../docs/ADDING_TOOLS.md).
+
 | Tool | Method class | Bin diagnostics | Input | Adapter | Status |
 |---|---|---|---|---|---|
 | MOB-suite | binning | applicable | short-read assembly | `adapt_mob_recon.sh` | supported |

@@ -64,9 +64,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         chunk = 64 << 10
-        for i in range(0, len(payload), chunk):     # throttle each connection
-            self.wfile.write(payload[i:i + chunk])
-            time.sleep(chunk / self.rate)
+        try:
+            for i in range(0, len(payload), chunk):     # throttle each connection
+                self.wfile.write(payload[i:i + chunk])
+                time.sleep(chunk / self.rate)
+        except (BrokenPipeError, ConnectionResetError):
+            # Expected: when this server ignores Range, the fetcher drops its
+            # parallel connections and falls back to one stream. Without this the
+            # server thread prints a traceback per dropped connection, which reads
+            # like a failure although the test passes.
+            return
 
 
 def serve(size=8 << 20, run="SRR1"):

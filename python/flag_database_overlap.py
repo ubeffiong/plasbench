@@ -48,7 +48,12 @@ def parse_date(text):
 def read_rows(path):
     with open(path, newline="", encoding="utf-8") as handle:
         lines = (line for line in handle if line.strip() and not line.lstrip().startswith("#"))
-        return list(csv.DictReader(lines, delimiter="\t"))
+        rows = list(csv.DictReader(lines, delimiter="\t"))
+    try:   # a user tool's [database] release date joins the built-in registry (python/user_tools.py)
+        import user_tools
+    except ImportError:
+        return rows
+    return user_tools.merge_rows(path, rows)
 
 
 def assembly_release_date(data_dir, sample):

@@ -10,21 +10,24 @@
 #   cd plasbench-<version>
 #   ./install.sh            # env + CLI
 #   ./install.sh --tools    # env + CLI + every tool the RUN_* flags need
+#   ./install.sh --no-icon  # skip the PlasBench desktop icon
 #
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
 WITH_TOOLS=0
+WITH_ICON=1
 REFRESH_ENV=0
 ASSUME_YES=""
 for arg in "$@"; do
     case "$arg" in
         --tools) WITH_TOOLS=1 ;;
         --refresh-env) REFRESH_ENV=1 ;;
+        --no-icon) WITH_ICON=0 ;;
         -y|--yes) ASSUME_YES="--yes" ;;
         -h|--help)
-            sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
     esac
@@ -167,11 +170,23 @@ else
 ' "$TOTAL_STEPS"
 fi
 
+# The PlasBench icon (desktop + applications/Start menu): clicking it starts PlasBench and opens its window.
+# Never fatal: a server without a desktop simply gets the menu entry, or nothing.
+if [[ "$WITH_ICON" -eq 1 ]]; then
+    if python3 -m plasbench --project-root "$HERE" desktop-icon >/dev/null 2>&1         || python -m plasbench --project-root "$HERE" desktop-icon >/dev/null 2>&1; then
+        say "PlasBench icon added to the desktop and the applications menu (remove: plasbench desktop-icon --remove)"
+    else
+        say "no desktop icon was made (no desktop here?); start the window with: plasbench ui"
+    fi
+fi
+
 cat <<EOF
 
 [plasbench-install] done.
 
-Next:
+Open PlasBench: double-click the PlasBench icon on your desktop, or type
+    plasbench ui          # the PlasBench window (set up, run, results, terminal)
+Everything also works from this terminal:
     conda activate plasbench
     plasbench test        # offline check of the scoring engine
     plasbench demo        # offline end-to-end demo, no downloads
@@ -179,6 +194,10 @@ Next:
 $( [[ "$WITH_TOOLS" -eq 1 ]] || echo "Then install the tools when you need them:
     plasbench install-tools all
 " )
+Databases: install Platon's and MOB-suite's (README step 7a-7b). AMRFinderPlus,
+RFPlasmid (CheckM data) and Plasmer need their own one-time setup (README step 7d).
+Then run 'plasbench check' to see anything still missing.
+
 Run a benchmark on a shipped cohort:
     plasbench run --samples cohorts/public-v2.tsv
 

@@ -223,7 +223,7 @@ export MEMORY_GB="${MEMORY_GB:-$PLASBENCH_DEFAULT_MEMORY_GB}"   # assembler memo
 # sample at a time, one tool at a time. Raise them only after checking your
 # machine's core/RAM budget below can actually support it -- e.g. 2 parallel
 # samples x 2 parallel tools x THREADS=4 wants 16 CPU threads at once.
-export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 1, 3, 4, 5
+export MAX_PARALLEL_SAMPLES="${MAX_PARALLEL_SAMPLES:-1}"   # stages 1, 2, 3, 4, 5
 export MAX_PARALLEL_TOOLS="${MAX_PARALLEL_TOOLS:-1}"       # independent tools within one sample, stage 4
 # Stage 6's advisory analyses (stratified recovery, truth audits, copy number, repeat
 # content, bin agreement, the dimension tables, rank sensitivity) are independent
@@ -722,6 +722,11 @@ export DEPTH_ANOMALY_Z="${DEPTH_ANOMALY_Z:-3}"
 # PLASBIN_FLOW_OUTPUTS_DIR/<sample>.tsv is the file written by `plasbin_flow.py -outfile`, made from the same assembly.
 export RUN_PLASBIN_FLOW="${RUN_PLASBIN_FLOW:-0}"
 export PLASBIN_FLOW_OUTPUTS_DIR="${PLASBIN_FLOW_OUTPUTS_DIR:-}"
+# User-added tools (docs/ADDING_TOOLS.md): each is a folder with a plasbench-tool.ini manifest, found on
+# $PLASBENCH_TOOLS_PATH, ~/.plasbench/tools or tools.d/. USER_TOOLS selects which run: a comma-separated list of
+# names, or "all". `plasbench run --tool NAME` sets it. USER_TOOL_THREADS is the default {threads} for each.
+export USER_TOOLS="${USER_TOOLS:-}"
+export USER_TOOL_THREADS="${USER_TOOL_THREADS:-${THREADS:-4}}"
 # Optional extra label evidence for the truth (all off unless set; a missing one is "not evaluated", never absent):
 #   ANNOTATION_REPLICON_DB may list several Abricate databases, comma or space separated (default plasmidfinder).
 #   ISFINDER_FASTA is a curated ISFinder IS sequence FASTA you downloaded from ISFinder under its terms (not shipped);
@@ -730,3 +735,8 @@ export ISFINDER_FASTA="${ISFINDER_FASTA:-}"
 export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"
 # 1 embeds the interactive cohort dashboard in the HTML report (about 1 MB; it repeats the heatmap and metric tables). Default 0.
 export REPORT_EMBED_DASHBOARD="${REPORT_EMBED_DASHBOARD:-0}"
+# 1 keeps the all-sample numbers as the headline when no sample has a reference in the headline tiers (status fallback_allowed, warning kept). Default 0: the primary analysis is then unavailable and the ranking is provisional.
+export ALLOW_PRIMARY_FALLBACK="${ALLOW_PRIMARY_FALLBACK:-0}"
+# 1 runs the statistics simulation (python/simulate_validation.py) in stage 6 and shows it in the report (Sensitivity, power and reproducibility). STATS_VALIDATION_MODE is smoke (seconds, indicative) or full (minutes, the evidence).
+export RUN_STATS_VALIDATION="${RUN_STATS_VALIDATION:-0}"
+export STATS_VALIDATION_MODE="${STATS_VALIDATION_MODE:-smoke}"

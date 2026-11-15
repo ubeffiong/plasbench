@@ -22,6 +22,19 @@ stream is consumed in exactly the order the earlier code used, so every interval
 and p-value is unchanged (test/test_resampling_equivalence.py checks this against
 the earlier implementations).
 
+Independent units and exact tests
+---------------------------------
+The number of independent units (clusters: isolates from one study count once) limits what can be claimed, so the thresholds are named, not buried:
+
+  MIN_CLUSTERS_CI    5   a bootstrap interval needs at least this many independent units
+  MIN_CLUSTERS_TEST  6   a sign-flip permutation test needs at least this many: with n units there are 2**n sign patterns, so the smallest two-sided p-value
+                         is 2 / 2**n; with 5 units that is 0.0625, which can never reach 0.05, so no test is reported for 5 or fewer
+  EXACT_MAX_UNITS    12  up to this many units the test enumerates every sign pattern (an exact p-value, no random numbers); above it, the Monte Carlo estimate
+                         is used, drawn exactly as before (the random stream is unchanged)
+
+permutation_method(n_units) says which applies and permutation_floor(n_units) gives the smallest attainable p-value, so a report can say "exact" or "Monte Carlo"
+and flag a comparison as underpowered when that floor is above 0.05.
+
 Standard library only.
 """
 
@@ -29,6 +42,44 @@ import math
 import random
 import statistics
 from collections import defaultdict
+
+
+MIN_CLUSTERS_CI = 5
+MIN_CLUSTERS_TEST = 6
+EXACT_MAX_UNITS = 12
+PERMUTATION_ITERATIONS = 10000
+
+
+def permutation_method(n_units):
+    """'not_estimated' below MIN_CLUSTERS_TEST units, 'exact' up to EXACT_MAX_UNITS, else 'monte_carlo'."""
+    if n_units < MIN_CLUSTERS_TEST:
+        return "not_estimated"
+    return "exact" if n_units <= EXACT_MAX_UNITS else "monte_carlo"
+
+
+def permutation_floor(n_units, iterations=PERMUTATION_ITERATIONS):
+    """The smallest two-sided p-value a sign-flip test on n_units independent units can report (None for no units)."""
+    if n_units < 1:
+        return None
+    exact = min(1.0, 2.0 / (2 ** n_units))
+    if n_units <= EXACT_MAX_UNITS:
+        return exact
+    return max(exact, 1.0 / (iterations + 1))
+
+
+def _exact_paired_pvalue(units, differences):
+    """Exact two-sided sign-flip p-value: every sign pattern of the whole units, integer arithmetic, no random numbers."""
+    denominator = _common_denominator(differences)
+    sums = [s for s, _ in _unit_sums(units, denominator)]
+    observed = abs(sum(sums))
+    n = len(sums)
+    extreme = 0
+    for mask in range(1 << n):
+        total = 0
+        for i in range(n):
+            total += sums[i] if (mask >> i) & 1 else -sums[i]
+        extreme += abs(total) >= observed
+    return extreme / (1 << n)
 
 
 # -- exact means ---------------------------------------------------------------------
@@ -111,11 +162,11 @@ def bootstrap_ci(values, iterations=1000, groups=None):
 
     With groups, whole clusters are resampled (cluster bootstrap), so
     correlated isolates from one study widen the interval instead of
-    narrowing it. At least 5 independent units are required.
+    narrowing it. At least MIN_CLUSTERS_CI (5) independent units are required.
     """
     units = resampling_units(values, groups)
     # Intervals from very small cohorts imply a precision the data do not have.
-    if len(values) < 5 or len(units) < 5:
+    if len(values) < 5 or len(units) < MIN_CLUSTERS_CI:
         return None, None
     rng = random.Random(20260831)
     if not _finite(values):
@@ -145,7 +196,7 @@ def stratified_bootstrap(values, groups, strata, iterations=1000):
         by_stratum[stratum][0].append(value)
         by_stratum[stratum][1].append(group)
     units = {s: resampling_units(v, g) for s, (v, g) in by_stratum.items()}
-    if len(values) < 5 or sum(len(u) for u in units.values()) < 5:
+    if len(values) < 5 or sum(len(u) for u in units.values()) < MIN_CLUSTERS_CI:
         return None, None
     rng = random.Random(20260831)
     order = sorted(units)
@@ -174,7 +225,7 @@ def stratified_bootstrap(values, groups, strata, iterations=1000):
 def ratio_bootstrap(pairs, groups, iterations=1000):
     """Percentile CI of sum(correct)/sum(total), resampling clusters."""
     units = resampling_units(pairs, groups)
-    if len(pairs) < 5 or len(units) < 5:
+    if len(pairs) < 5 or len(units) < MIN_CLUSTERS_CI:
         return None, None
     rng = random.Random(20260902)
     ratios = []
@@ -192,12 +243,17 @@ def paired_permutation_pvalue(differences, iterations=10000, groups=None):
     """Two-sided sign-flip permutation p-value for paired mean differences.
 
     With groups, every difference in a cluster is flipped together, which is
-    the valid null when isolates within a study are correlated. At least 5
-    independent units are required.
+    the valid null when isolates within a study are correlated. At least
+    MIN_CLUSTERS_TEST (6) independent units are required (with 5 the smallest
+    attainable two-sided p is 0.0625). Up to EXACT_MAX_UNITS units every sign
+    pattern is enumerated (an exact p-value); above it the Monte Carlo estimate
+    below is used, with its random stream unchanged.
     """
     units = resampling_units(differences, groups)
-    if len(differences) < 5 or len(units) < 5:
+    if len(differences) < 5 or len(units) < MIN_CLUSTERS_TEST:
         return None
+    if len(units) <= EXACT_MAX_UNITS and _finite(differences):
+        return _exact_paired_pvalue(units, differences)
     observed = abs(exact_mean(differences))
     rng = random.Random(20260901)
     getrandbits = rng.getrandbits
@@ -231,7 +287,7 @@ def stratified_permutation(differences, groups, strata, iterations=10000):
     if strata is None:
         return paired_permutation_pvalue(differences, iterations=iterations, groups=groups)
     units = resampling_units(list(zip(differences, strata)), groups)
-    if len(differences) < 5 or len(units) < 5:
+    if len(differences) < 5 or len(units) < MIN_CLUSTERS_TEST:
         return None
     observed = abs(macro_mean(differences, strata))
     rng = random.Random(20260901)
@@ -263,6 +319,16 @@ def stratified_permutation(differences, groups, strata, iterations=10000):
             counts[k] += 1
         parts.append(list(by.items()))
     scales = [denominator * n for n in counts]
+    if len(units) <= EXACT_MAX_UNITS:            # every sign pattern of the whole units: an exact p-value
+        n_units = len(parts)
+        for mask in range(1 << n_units):
+            totals = [0] * len(index)
+            for i, unit_parts in enumerate(parts):
+                sign = 1 if (mask >> i) & 1 else -1
+                for k, s_ in unit_parts:
+                    totals[k] += sign * s_
+            extreme += abs(exact_mean([totals[k] / scales[k] for k in range(len(totals))])) >= observed
+        return extreme / (1 << n_units)
     for _ in range(iterations):
         totals = [0] * len(index)
         for unit_parts in parts:

@@ -422,11 +422,14 @@ def main():
     root = args.out_dir
     root.mkdir(parents=True, exist_ok=True)
 
+    # Demo evidence record: some references declare their circularity, read support and structure, the rest leave them unrecorded (an unknown never demotes).
+    declared = {"ecoli_a": ("reported", "supported", "resolved"), "kpneu_a": ("independent", "supported", "resolved"), "abauma_a": ("uncertain", "partial", "unresolved_repeats")}
     write_tsv(root / "samples.tsv",
               ["sample_id", "organism", "truth_technology", "sample_origin",
-               "read_depth_x", "source_study", "gram_group", "collection_country"],
+               "read_depth_x", "source_study", "gram_group", "collection_country",
+               "truth_circularity_evidence", "truth_read_support", "truth_structural_integrity"],
               [[s, organism, tech, "synthetic", depth, study,
-                "Gram-negative", country]
+                "Gram-negative", country, *declared.get(s, ("", "", ""))]
                for s, organism, study, depth, tech, country in SAMPLES])
 
     status = [["sample", "tool", "status", "prediction_fasta", "reason",

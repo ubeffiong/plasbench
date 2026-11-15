@@ -16,6 +16,232 @@ history is lost, only the numbering is cleaner. See
 ### Changed -- the sample report link is at the top of the README
 - A link to open the sample HTML report (online preview; a relative path for a clone) now sits directly under the README title, not only in the report section. GitHub removes `target="_blank"` from README links, so the link says to Ctrl/Cmd-click or middle-click to open it in a new tab. `test/test_sample_report.py` keeps it there.
 
+### Added -- statistics validated by simulation (review C4 / C6, plan A7)
+- `python/simulate_validation.py` (also `plasbench analysis simulate-validation`) simulates paired differences with study effects, correlated isolates, unequal study sizes and missing observations and runs the real `resampling.bootstrap_ci` and `resampling.paired_permutation_pvalue` on them, writing `benchmark.stats_validation.tsv`: interval coverage (nominal 95%) with its standard error, the rejection rate at 0.05 (type-I error at effect 0, power above it), how often each could be estimated, the test method and a verdict that never rounds a shortfall up. `smoke` mode (100 replicates, seconds, indicative) and `full` mode (1,000 replicates and the production resampling counts, minutes) share one seed. Stage 6 runs it when `RUN_STATS_VALIDATION=1` (`STATS_VALIDATION_MODE`); the demo runs smoke mode. The report gets a *Statistical validation (simulation)* tab under Sensitivity, power and reproducibility (with an explicit Not run state), a help entry, a glossary term and a file-explorer entry. **First finding:** the percentile cluster bootstrap under-covers with few studies (coverage roughly 0.85 to 0.94 across the smoke scenarios, mostly below 0.95), so its intervals are optimistic for cohorts of that size; the sign-flip test kept type-I error near 0.05. `test/test_simulate_validation.py` covers the generator, the verdicts, the command, the report section and the wiring.
+
+### Changed -- permutation tests need six independent units and are exact for small designs (review C4, plan A6)
+- `python/resampling.py`: named thresholds `MIN_CLUSTERS_CI` (5), `MIN_CLUSTERS_TEST` (6) and `EXACT_MAX_UNITS` (12). A sign-flip test with five units can never report p below 0.0625, so it is no longer reported (six units give 0.03125). Up to 12 independent units every sign pattern is enumerated (an exact p-value in integer arithmetic, no random numbers; the stratified test enumerates the macro-mean the same way); above 12 the Monte Carlo estimate is unchanged, with the same random stream. `permutation_method` and `permutation_floor` expose which applies and the smallest attainable p. Bootstrap intervals still need five units.
+- `benchmark.paired_comparisons.tsv` gains `permutation_method` (exact / monte_carlo / not_estimated), `min_attainable_p` and `p_status` (ok / underpowered / not_estimated), appended last. The report's paired-comparison table gets a *Permutation test* column ("exact, smallest attainable p 0.03125", "underpowered: cannot reach 0.05"). The thresholds are pre-registered rows. `test_resampling_equivalence.py` compares the exact path with an independent enumeration and keeps the Monte Carlo path bit-identical above 12 units; `test/test_permutation_reporting.py` is new.
+
+### Changed -- the pre-registration is a draft until its proposed values are confirmed (plan A5)
+- `config/prereg.tsv` gains a status, `proposed`: a value is proposed (rationale in the note) and awaits the maintainer's confirmation. The rows that were `TO_FIX` with a proposed default (the tool timeout, now proposed at 7200 s with its rationale; the integrated-element depth; the circular-path rule; the scorecard weights and bands; the scorecard minimum; the map size) are `proposed`; the A4/C2 bands, which have nothing to propose, stay `TO_FIX`. `min_alignment_length` (200) is now a pre-registered row.
+- `freeze_prereg.py`: `proposed` and `TO_FIX` are *unfixed* and make the plan a **draft**; `--status` reports `proposed` and `draft`; a draft can be locked with `--write` (so a run records which draft it used) but `--strict` refuses to write it and fails `--verify` (`--require-fixed` now also fails on proposed rows). The manifest and the report's Pre-registration tab show the draft state ("frozen and unchanged, but a DRAFT: N value(s) ...") and list the proposed rows. `REQUIRE_PREREG=1` is unchanged in intent: it refuses a draft. `test/test_prereg_freeze.py` covers it. Nothing is frozen: confirming the values and freezing is the maintainer's decision.
+
+### Changed -- stage 2 (truth) is faster, parallel, resumable and says where its time goes
+- **Each sample's stage-2 steps are timed.** The times go to `data/<sample>/stage2_timing.tsv`, and the log names
+  every step that took 10 s or more, for example `stage 2 for S1 took 21m05s: annotation 20m31s, repeat_content 14s`.
+- **Samples run in parallel** with `MAX_PARALLEL_SAMPLES`, the same setting as stages 1, 3, 4 and 5. The default, 1,
+  stays sequential. An unusable truth table still stops the stage, and the stop names the sample.
+- **Reference annotation** (`RUN_REFERENCE_ANNOTATION=1`) runs its callers at the same time, instead of one after
+  another, and gives them threads. ISEScan, the slowest by far, gets the whole `THREADS` allowance instead of 1;
+  AMRFinderPlus gets half; MOB-typer, abricate and barrnap share a few.
+- `measure_depth.py` counts both mates at the same time, decompresses with pigz/gzip in a separate process, and
+  touches only the sequence lines, in C. That is about 2x faster on a 90x read pair, with identical counts.
+- `repeat_content.py` slices k-mers in C instead of looping over every base in Python. That is 1.5x faster on a
+  5 Mb genome, with identical output.
+- `mash dist` (evidence labels) and `samtools sort` (depth anomalies) use `THREADS` instead of 1 and 2.
+- **Re-runs reuse** repeat content and the depth-anomaly scan when their inputs have not changed, instead of
+  recomputing them every time.
+
+### Fixed -- a run cut off during assembly resumes cleanly
+- **Stage 3 is crash-safe.** fastp now writes `*.trim.partial.fastq.gz` and renames the pair only when it succeeds;
+  a `.fastp.complete` marker records a finished trim. Trimmed reads left by a run that was cut off (a full disk, WSL
+  or the machine stopping) used to be taken for finished reads and assembled truncated; they are now trimmed again,
+  with a log line saying so. An interrupted SPAdes/Unicycler folder is cleared before reassembling, and the contigs
+  and graph are copied under `.partial` names first, so a half-copied `contigs.fasta` is never reused. Finished work
+  is still reused, including samples trimmed and assembled by an earlier PlasBench.
+
+### Changed -- warnings are yellow and errors red, in the window and in a terminal
+- **The window's console** uses one colour code in all three tabs (Job output, Session log, Terminal): errors are
+  red and bold, with a red bar in Job output, and warnings are yellow. A line PlasBench tags `WARNING:` (for example
+  a tolerated `SPAdes failed for ...`) is yellow; `ERROR:`, tracebacks, `No space left on device`, `command not
+  found` and non-zero exits are red. A success line that mentions a failure (`... -> PASS`) and zero counts such as
+  `failed=0` are not flagged. The Terminal tab now colours command output, and the Session log shows failed jobs and
+  terminal commands red, cancelled or interrupted ones yellow.
+- **Runs in a terminal** print `WARNING:` lines yellow and `ERROR:` lines red (`scripts/lib.sh`), only when the
+  output is a terminal, so log files stay plain. `NO_COLOR` or `PLASBENCH_COLOR=never` turns colour off, and
+  `PLASBENCH_COLOR=always` forces it.
+
+### Changed -- heavy files never go into git, and you can edit .gitignore from the window
+- **One catalogue of heavy formats** (`plasbench/gitops.py`, `HEAVY`) drives both the managed `.gitignore` blocks and
+  the commit check, so the two cannot drift apart. It covers:
+  - reads (FASTQ, also bzip2/xz/zstd-compressed; SRA; nanopore FAST5/POD5/BLOW5);
+  - alignments and their indexes (BAM, SAM, CRAM, BAI, CRAI, CSI, PAF);
+  - variants (VCF, BCF, TBI);
+  - coverage tracks (bigWig, bedGraph);
+  - aligner indexes and tool databases (minimap2, Bowtie2, BWA, Kraken2, Mash, DIAMOND, BLAST, HMMER, SQLite, HDF5,
+    model files);
+  - archives (tar, zip, 7z, bz2, xz, zst);
+  - in study repositories, assemblies and sequences (FASTA, GenBank, GFF, GFA).
+  Previously SAM was missing from the developer rules, and VCF, CRAM/BAM indexes, nanopore signal, indexes, databases
+  and archives were not covered at all.
+- **Repositories set up by an earlier PlasBench get the new rules**: the managed block is brought up to date, and
+  lines outside it are never touched.
+- **Heavy files already committed** (before a rule covered them) are listed on Version control, with **Stop
+  tracking** (`git rm --cached`: the files stay on disk).
+- **Edit `.gitignore` in the window** (Version control > Ignored files). PlasBench's block is shown read-only. Your
+  own rules are editable and come after it, so `!results/key_plasmids.fasta` brings back a file the block leaves
+  out. **Test a path** shows whether a file is ignored and by which rule. A sequence file you keep with your own rule
+  is a warning at commit time. Reads, alignments, variants, indexes and archives stay blocked whatever the rules say.
+
+### Added -- a structured evidence record for every reference (review H3)
+- `python/truth_provenance.py` records six evidence fields per reference, additively: assembly technology, circularity evidence, read support, replicon/MOB evidence, structural integrity and independent validation, each `declared` (new optional sample-sheet columns `truth_circularity_evidence`, `truth_read_support`, `truth_structural_integrity`, `truth_independent_validation`), `inferred` (NCBI metadata, `truth_labels.tsv`) or `unknown`; plus `evidence_recorded` and `evidence_sources`. The original columns keep their order. Unknown never demotes a reference; an explicit adverse value (read support none, unresolved repeats) caps Tier 1 at Tier 2 and says why. `validate_cohort.py` checks the new vocabularies; the headline design table gains an *Evidence recorded* column; the demo declares some evidence and now builds the provenance table before aggregating (so the headline and the report read the same references). `test/test_truth_evidence_record.py` covers it. The cohort `truth_quality_tier` column is kept for now: it still feeds the tier and replacing it needs the cohorts re-curated (maintainer-owned).
+
+### Changed -- the primary analysis is unavailable, visibly, when no reference qualifies (review E27 / H4)
+- `headline_design.Design.headline_selection` replaces the silent fallback to all samples. With no reference in tiers 1-2 (or no provenance table) the **primary analysis is unavailable**: the same numbers are computed on all samples but labelled provisional. New append-only leaderboard columns `primary_status` (`available` / `unavailable` / `fallback_allowed`) and `population`; `primary_status` in `benchmark.headline_design.tsv`; a PROVISIONAL banner in the markdown leaderboards; a stdout warning; and in the HTML a banner above the ranking, a "Leading method (provisional)" tile, a "Primary analysis unavailable" finding, and a Primary analysis column in the headline design table. `--allow-primary-fallback` / `ALLOW_PRIMARY_FALLBACK=1` (default off) keeps the numbers as the headline with the warning. An older leaderboard without the columns is read as available. `test/test_primary_eligibility.py` covers the design, the aggregation and the report; the review ledger rows (E26-E29) are re-pointed and E27 is marked fixed. **Public-v3 and the demo are in the unavailable state** (no Tier 1-2 reference / no provenance table).
+
+### Fixed -- the recommendation model used truth-derived features
+- `python/recommendation_model.py` fitted its ridge model on the truth's plasmid size and plasmid count and on the truth's AMR annotation, which are unknown for an isolate with no reference (they were imputed with the training mean there), so the model could learn the answer in a retrospective run. The inputs are now truth-free only: read depth, the isolate's own assembly statistics, tool, organism and Gram group. `TRUTH_DERIVED_FIELDS` lists what is barred, `assert_truth_free` enforces it when fitting, and `load_model` refuses a ready model whose spec used one (with the reason and the refit instruction); older specs still decode. `test/test_recommender_truth_free.py` covers it.
+
+### Added -- reference figures folder (planning for v0.4.0)
+- `docs/images/reference/README.md` (tracked) maps four third-party reference figures to the report features they inspire (map identity rings and resistance-region brackets, numeric heatmap, true/false-positive 3D scatter, radar fingerprint). The images are gitignored and not shipped. `test/test_reference_images.py` keeps the README and the ignore rules in place.
+
+### Added
+- **Study folders.** Every benchmark keeps everything it produces in its own folder, `<workspace>/<study>/`
+  (results, report, logs, tmp and a `study.json` recording the sample sheet with its checksum, the cohort and every
+  command). `plasbench run` names the study after the cohort or sample sheet, or `--study NAME`;
+  `plasbench report --study NAME` rebuilds one. The workspace is `PlasBench/studies` by default, or
+  `PLASBENCH_WORKSPACE`. Downloads, tool environments and databases stay shared between studies.
+- **The window: Workspace & studies.** Choose and check the workspace (writable, free space, drive type, cloud-sync
+  and long-path warnings; a missing chosen folder is reported, never silently replaced), recent workspaces, every
+  study with its report and folder, and New study. The New benchmark wizard shows and names the study folder.
+- **The window: Version control.** Git without the command line, after GenoSuv's design: status, staging, diffs,
+  commit, branches, remote, fetch/pull/push (as console jobs) and history, for the PlasBench folder or the
+  workspace. A managed `.gitignore` block keeps studies, results, downloads, reads and credentials out; every commit
+  is scanned (reads and run folders, `config/local.env` with the NCBI API key, tokens, files over 100 MB); remote
+  addresses may not carry credentials; nothing is force-pushed; AI co-author trailers are removed.
+- **PlasBench starts like a desktop program.** The installer adds a PlasBench icon to the desktop and the
+  applications/Start menu (`plasbench desktop-icon`; `--remove`, `--no-desktop`; `install.sh --no-icon` skips it).
+  On Linux it is a `.desktop` entry, on macOS `~/Applications/PlasBench.app`, and on Windows, with PlasBench
+  installed inside WSL2, a Windows shortcut that starts PlasBench in Ubuntu. Clicking it runs
+  `scripts/plasbench_launcher.sh`, which activates the `plasbench` conda/mamba/micromamba environment and starts the
+  window. A second click brings the running window back (one server per PlasBench folder, recorded in
+  `~/.plasbench/ui/server.json`). The window opens as an app window (Edge/Chrome `--app`; `plasbench ui --tab` for a
+  browser tab). **Quit** in the window stops PlasBench, and asks first if a job is still running.
+- **The PlasBench logo and icon.** A plasmid map holding three rising benchmark bars (`plasbench/data/logo.svg`,
+  `docs/images/plasbench-logo.svg`, `docs/images/plasbench-icon.svg`). It appears in the window's app bar, as its
+  favicon, as the desktop icon (PNG/ICO/ICNS drawn from the same geometry, nothing downloaded) and at the top of the
+  README.
+- **A terminal in the window's console.** The console stays fixed at the bottom of the window and now has two tabs:
+  **Job output** and **Terminal**, after GenoSuv's design. The Terminal runs your own commands in the PlasBench folder,
+  confined to it and the studies workspace. It offers the login shell (Linux, macOS), Ubuntu (WSL) or PowerShell
+  (Windows), keeps a command history, and records each command. `plasbench` there runs this PlasBench folder.
+- **Set up this computer → This computer.** Operating system, WSL, architecture, CPUs and RAM, conda and the
+  `plasbench` environment, Docker. It also gives the recommended way to run PlasBench there (the conda environment,
+  or WSL2 on Windows), the steps still to do, the warnings (Apple Silicon, low RAM, `/mnt/c` speed) and Docker as the
+  alternative, with its command. The checklist also checks for the `plasbench` environment.
+- **Side panel and main-area tabs.** **Panel** (top bar) opens a right-hand panel as wide as the navigation rail,
+  with three tabs. **Studies** (the default) is a folder tree of the workspace's studies: reports open in a report tab,
+  and tables, logs and text files open as read-only tabs. **Jobs** shows running and recent jobs with cancel. **Git**
+  (Ctrl+Shift+G) has changes with stage/unstage, commit, branches, remote, tracked files and history.
+  The main area works like a browser. It opens with an Overview tab, and every page you open is its own tab. Reports
+  (with **Open in browser**; Ctrl+click opens the browser directly), files, diffs (line numbers, Stage/Unstage) and
+  commits (files changed, parents, patch) open in tabs next to the current one. Tabs close with × or a middle-click,
+  and the last one closed brings back Overview.
+- **Git history is colour-coded**: the commit you are on, pushed, not yet pushed, and merge commits, with branch and
+  tag labels. Hovering a commit shows its author, date, labels and whether it is pushed; clicking it opens it in a tab.
+- **Version control tracks your runs, not the program: one repository per study.** Each study folder is its own
+  repository, with its own history and remote. Its managed `runs` `.gitignore` keeps the study's record, tables,
+  reports, figures and logs, and leaves raw sequence data (reads, assemblies, FASTA, alignments), tmp folders and
+  credentials out. Studies show whether they are tracked, with a Git button on Workspace & studies and in the side
+  panel. A new repository can no longer be started in the
+  PlasBench program folder, and a workspace inside a program checkout is no longer mistaken for that checkout.
+- **`plasbench install-git`** (optional; Set up → Git → Install). On Windows it installs Git for Windows with Git Bash
+  through winget, and you answer any prompt in the console. Elsewhere it installs conda-forge git into the plasbench
+  environment, or prints the system command.
+- **The Terminal lists each WSL distribution by name**, plus Git Bash (never the WSL launcher) and PowerShell, and runs
+  `git` in every shell. When WSL does not respond, it says so and suggests `wsl --shutdown`.
+- **Session log and run script.** The console has a third tab, **Session log**. It shows, one line per event, what
+  happened in the session: commands started from the pages and how they ended, answers, cancels, terminal commands,
+  settings, workspace and study changes. Earlier sessions can be chosen too. **Save as script** downloads the session
+  as a bash script that repeats it, with failed commands, PowerShell commands and answers as comments. The log is
+  `~/.plasbench/ui/sessions.jsonl`; secret settings are never written, and hidden answers are masked.
+- **Help on every page.** A Help button on each page header, the **?** in the top bar, and F1 each explain the page:
+  what it is for, the steps, what is good to know, and the command-line equivalent. **Add your own tool** has a full
+  guide (**How it works**) covering the form's five sections, placeholders and output formats. Its worked example
+  adds MOB-recon as a user tool, and **Load this example** fills the form with it.
+- **Cohort details.** On the Cohorts page, **Details** describes each shipped cohort, from its sheet, its lock and
+  `cohorts/README.md`: isolates and species, plasmids in the truth, read depth, BioProjects, Illumina read volume and
+  the download estimate. Breakdowns cover organism, truth tier, truth technology and strategy, origin, country and
+  plasmids per isolate. A searchable sample table has NCBI links and, from the lock, host, isolation source,
+  collection date and how the reference was sequenced and assembled. It also says whether the lock still matches the
+  sheet. Metagenomic sheets show their communities, regimes and truth status (`plasbench/cohort_info.py`).
+- **The window's console answers questions.** A command that asks (for example "Install the missing items now?")
+  shows the question in the console, which highlights it; answer in the reply box or with Yes/No.
+- **Reference figures folder (planning for v0.4.0).** `docs/images/reference/README.md` (tracked) maps four third-party reference figures to the report features they inspire (map identity rings and resistance-region brackets, numeric heatmap, true/false-positive 3D scatter, radar fingerprint). The images are gitignored and not shipped. `test/test_reference_images.py` keeps the README and the ignore rules in place.
+
+### Changed
+- **One `PlasBench` folder, updated in place.** `install_latest.sh` installs into `~/PlasBench` (or
+  `$PLASBENCH_INSTALL_DIR/PlasBench`), and `update.sh` / `plasbench upgrade` update that folder instead of creating
+  `plasbench-<version>` folders. Only files the previous release installed are replaced (`scripts/release_sync.sh`
+  keeps a checksummed list; an edited release file is backed up to `.plasbench-backup/`); studies, settings, own
+  tools, downloads, tool environments and databases are kept. An older versioned install is carried in: its runs
+  move to `PlasBench/studies/`, its settings and own tools are copied, its downloads move to the shared folder once,
+  and the old folder is deleted after confirmation (`--yes`, or kept with `--keep-old`).
+- Script prompts print their question explicitly, so it is visible when the command runs from the window.
+- `scripts/docker_run.sh` mounts the studies workspace (`PLASBENCH_WORKSPACE`, default `./studies`) at
+  `/work/studies`, so a run in the container lands in the same study folder as a native run. An explicit
+  `RESULTS_DIR` in the environment is honoured like `--results-dir`.
+- The console is open by default (a quarter of the window) and remembers its height and whether you closed it.
+- The fixed console never hides the end of a page: the page keeps a bottom margin as tall as the console, and
+  scrolling to a field stops above it. The body was `height:100%`, so that margin used to end at the first screen.
+- `test_install_latest.sh` follows the installer into the one `PlasBench` folder.
+- The Terminal's command box is an expandable text area: one line by default, it grows as you type (Shift+Enter for
+  a new line) and can be dragged taller.
+
+## [0.3.0] - 2026-11-13
+
+A feature release: benchmark your own tools without changing PlasBench's code, and do everything from a window in your browser with `plasbench ui`. No scoring, ranking or report change for the built-in tools. See the [release notes](docs/releases/v0.3.0.md). Compare: [v0.2.3...v0.3.0](https://github.com/ubeffiong/plasbench/compare/v0.2.3...v0.3.0).
+
+### Added
+- **The PlasBench window: `plasbench ui`.** Everything the command line does, from a page in your browser: a setup
+  checklist with one-click fixes, NCBI credentials, the tool catalogue with installs and default switches, a form
+  that writes and installs your own tool's manifest, every setting with its default (saved to `config/local.env`),
+  a five-step New benchmark wizard, your own isolates, cohorts, runs and reports (open, PDF, rebuild), a job console
+  with live logs and cancel, and every `plasbench` command as a form generated from the CLI parser itself. It is
+  served only to this computer, with a per-session key, a Host-header check and same-origin POSTs, and it runs
+  nothing but `plasbench` commands that the real parser has accepted. No network resources; light and dark themes.
+- **Bring your own tool.** Any plasmid reconstruction or classification tool can be benchmarked without changing
+  PlasBench's code: a `plasbench-tool.ini` manifest declares its task and track, how to install it (conda, pip, a
+  script, or nothing), how to run it per sample (a command with `{contigs}`, `{graph}`, `{reads_1}`, `{long_reads}`,
+  `{outdir}`, ... placeholders) or where its existing outputs are, and how to read its output (contig-bin table,
+  contig labels with probabilities, plasmid FASTA, a folder of FASTA files, or its own adapter). New commands:
+  `plasbench tools new|validate|list|show|add|install`, `plasbench install-tools NAME` and `plasbench run --tool NAME`
+  (`USER_TOOLS` in the config). User tools share the built-in tools' timeouts, retries, outcome states, result reuse,
+  leakage check, long-read circularity rule, scoring, ranking and report, and their manifest, checksum and version
+  are recorded in `run_manifest.json`. Guide: docs/ADDING_TOOLS.md; examples: tools.d/examples/.
+
+## [0.2.3] - 2026-11-13
+
+A patch release: database downloads resume, `plasbench check` fetches Platon's database itself, RFPlasmid's CheckM starts again, and `plasbench test` passes on a release install. No scoring, ranking or report change. See the [release notes](docs/releases/v0.2.3.md). Compare: [v0.2.2...v0.2.3](https://github.com/ubeffiong/plasbench/compare/v0.2.2...v0.2.3).
+
+### Fixed
+- **MOB-suite and Platon database downloads resume.** A new `resumable_download` helper (`scripts/lib.sh`) keeps every byte already received, continues with `curl -C -` after a dropped connection or a re-run, pauses while the internet is down instead of spending retries, checks the size, and only then renames the `.part` file. `mob_init` cannot resume (it truncates its archive on every attempt), so PlasBench downloads MOB-suite's archive itself and hands `mob_init` the finished file as a `file://` mirror; `mob_init` then only unpacks and builds.
+- **`plasbench check` downloads Platon's database** from its documented Zenodo file (1,690,687,855 bytes, size-verified) instead of asking for a URL.
+- **RFPlasmid / CheckM start again.** CheckM imports `pkg_resources`, removed in setuptools 81; the `rfplasmid` profile now pins `setuptools<81`.
+- **`plasbench test` passes on a release install.** The review-ledger test no longer fails on `.github/` files, which release archives do not ship (still checked in a git checkout and CI).
+- MOB-suite database paths no longer show conda-forge's `lib/python3.1` alias in messages.
+
+### Added
+- README **Step 7d**: one-time setup for AMRFinderPlus (`amrfinder -u`), RFPlasmid's CheckM data and Plasmer's database (links, checksums, default folder, RAM check). The installer's closing message points to it.
+
+## [0.2.2] - 2026-11-13
+
+A patch release: the `trycycler` install no longer stalls. No scoring, ranking or report change. See the [release notes](docs/releases/v0.2.2.md). Compare: [v0.2.1...v0.2.2](https://github.com/ubeffiong/plasbench/compare/v0.2.1...v0.2.2).
+
+### Fixed
+- **Trycycler and Medaka install into their own environment, `plasbench-trycycler`.** Solving Medaka's PyTorch stack into the large main environment ran for 45+ minutes without finishing during `install-tools all` / `install_latest.sh --tools`; in a fresh environment the same packages install in about 4 minutes. Wrappers for `trycycler`, `medaka` and `medaka_consensus` go into the main environment; the main environment's own `flye` is left untouched.
+
+## [0.2.1] - 2026-11-13
+
+A patch release: `plasbench install-tools all` now completes. No scoring, ranking or report change. See the [release notes](docs/releases/v0.2.1.md). Compare: [v0.2.0...v0.2.1](https://github.com/ubeffiong/plasbench/compare/v0.2.0...v0.2.1).
+
+### Fixed
+- **PlaScope, Plasmer and PlasmidHunter install into their own environments.** None could be solved into the python 3.12 main environment: PlaScope's pinned Centrifuge 1.0.3 is built only for python <= 3.6, Plasmer only for python 3.10, and every PlasmidHunter release requires python 3.10. Each now lives in `plasbench-plascope`, `plasbench-plasmer` or `plasbench-plasmidhunter`, with wrappers in the main environment, as MOB-suite already does. You still only activate `plasbench`.
+- PlasmidHunter is pinned (1.4) with `setuptools<81`, which it needs for `pkg_resources`; the installer now proves each isolated tool starts instead of only checking that its file exists, and rebuilds an environment that does not.
+- Plasmer no longer pulls Anaconda's commercial `defaults` channel.
+
+
 ## [0.2.0] - 2026-11-10
 
 A minor release: rankings, the recommendation output and some column names differ from v0.1.5, and the HTML report is rebuilt. Read **Upgrading from v0.1.5** in the [release notes](docs/releases/v0.2.0.md) first; everything below is the detail behind them. Compare: [v0.1.5...v0.2.0](https://github.com/ubeffiong/plasbench/compare/v0.1.5...v0.2.0).

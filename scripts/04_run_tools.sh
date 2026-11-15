@@ -198,6 +198,7 @@ tool_fingerprint() {
     printf 'database=%s\n' "$(awk -F'\t' -v t="$TOOL" '$1 == t {print $2 "|" $3 "|" $4}' \
         "$PROJECT_ROOT/config/tool_database_releases.tsv" 2>/dev/null)"
     printf 'params=%s\n' "$params"
+    [[ -n "${USER_TOOL_SIGNATURE:-}" ]] && printf 'user_tool=%s\n' "$USER_TOOL_SIGNATURE"
     printf 'contigs=%s\n' "$(file_digest "${CONTIGS:-}")"
     printf 'outfile=%s\n' "$(file_digest "${OUTFILE:-}")"
     printf 'classifier=%s\n' "$(file_digest "${CLASSIFIER:-}")"
@@ -730,6 +731,90 @@ run_plasgraph2() {
 # which does not matter: none of them depend on another's output). Only
 # gplas2_mob is order-sensitive, so it explicitly waits for this sample's own
 # mob_recon job before it is even launched into the pool.
+# -------- user-declared tools (python/user_tools.py; docs/ADDING_TOOLS.md) --------
+# One generic runner for every tool declared by a plasbench-tool.ini manifest. The manifest maps PlasBench's inputs onto
+# the tool's command ([run] command placeholders) or names a folder of outputs the user already produced ([run] mode =
+# import), and maps the tool's output onto pred_<tool>.* ([output], python/user_tool_adapter.py). Outcomes follow the
+# built-in tools exactly: a missing input or an output that does not fit this assembly is `skipped` with the reason, a
+# command that fails is `failed` (timeouts and OOM kills classified as for every tool), and a finished result is reused
+# only while its fingerprint (manifest and its files, rendered command, inputs) is unchanged.
+USER_TOOL_LIST=()
+if [[ -n "${ONLY_TOOL:-}" ]]; then
+    python3 "$PROJECT_ROOT/python/user_tools.py" names --enabled "$ONLY_TOOL" >/dev/null 2>&1 && USER_TOOL_LIST=("$ONLY_TOOL")
+elif [[ -n "${USER_TOOLS:-}" ]]; then
+    USER_TOOL_NAMES="$(python3 "$PROJECT_ROOT/python/user_tools.py" names --enabled "$USER_TOOLS")" \
+        || die "USER_TOOLS=$USER_TOOLS: see the error above (plasbench tools list shows the installed user tools)"
+    [[ -n "$USER_TOOL_NAMES" ]] && mapfile -t USER_TOOL_LIST <<< "$(printf '%s' "$USER_TOOL_NAMES" | tr -d '\r')"
+fi
+[[ ${#USER_TOOL_LIST[@]} -gt 0 ]] && log "User tools: ${USER_TOOL_LIST[*]}"
+
+# The conda-family solver that installed a user tool's environment, to run the command inside it.
+user_tool_runner() {
+    local env="$1" bin
+    for bin in conda mamba micromamba; do
+        if command -v "$bin" >/dev/null 2>&1 && "$bin" env list 2>/dev/null | awk '{print $1}' | grep -qx "$env"; then
+            printf '%s\n' "$bin" run -n "$env"; return 0
+        fi
+    done
+    return 1
+}
+
+run_user_tool() {
+    local TOOL="$1" SAMPLE="$2" SDIR="$3" RDIR="$4" CONTIGS="$5" T1="$6" T2="$7"
+    local OUT="$RDIR/$TOOL" PRED="$RDIR/pred_${TOOL}.plasmid.fasta" DONE="$RDIR/.${TOOL}.complete"
+    local LOGF="$LOG_DIR/${SAMPLE}.${TOOL}.log" key value why
+    local -A SPEC=()
+    while IFS=$'\t' read -r key value; do
+        [[ -n "$key" ]] && SPEC[$key]="${value%$'\r'}"
+    done < <(python3 "$PROJECT_ROOT/python/user_tools.py" run-spec "$TOOL" --sample "$SAMPLE" --contigs "$CONTIGS" \
+                 --graph "$SDIR/assembly_graph.gfa" --reads-1 "$T1" --reads-2 "$T2" \
+                 --long-reads "$SDIR/${LONG_READS_FILE:-long_reads.fastq.gz}" --outdir "$OUT" \
+                 --threads "${USER_TOOL_THREADS:-4}" 2>>"$LOGF")
+    if [[ -z "${SPEC[mode]:-}" ]]; then
+        record_status "$SAMPLE" "$TOOL" "skipped" "" "manifest unusable: plasbench tools validate $TOOL"; return 0
+    fi
+    # Long-read and hybrid user tools obey the same circularity rule as the built-ins (scripts/lib.sh).
+    if ! why="$(long_read_truth_eligible "$TOOL" "$SAMPLE")"; then
+        record_status "$SAMPLE" "$TOOL" "skipped" "" "truth is not independent of the long reads this tool would be given ($why)"
+        return 0
+    fi
+    if [[ -n "${SPEC[missing]:-}" ]]; then
+        record_status "$SAMPLE" "$TOOL" "skipped" "" "${SPEC[missing]}"; return 0
+    fi
+    # Read by tool_fingerprint: the manifest folder's checksum and the exact command (or the imported file).
+    local USER_TOOL_SIGNATURE="${SPEC[checksum]}|${SPEC[command]:-import}"
+    local OUTFILE=""; [[ "${SPEC[mode]}" == "import" ]] && OUTFILE="${SPEC[output]}"
+    if is_complete "$DONE" "$PRED"; then
+        log "  $TOOL: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        return 0
+    fi
+    rm -f "$PRED" "$DONE" "$RDIR/pred_${TOOL}".{bins.tsv,candidates.fasta,scores.tsv}
+    log "  $TOOL ($SAMPLE, user tool, ${SPEC[mode]}) ..."
+    local START; START=$(profile_start)
+    if [[ "${SPEC[mode]}" == "command" ]]; then
+        rm -rf "$OUT"; mkdir -p "$OUT"
+        local -a RUNNER=()
+        if [[ "${SPEC[env]}" != "path" && "${SPEC[install]}" != "none" ]]; then
+            mapfile -t RUNNER < <(user_tool_runner "${SPEC[env_name]}" || true)
+            [[ ${#RUNNER[@]} -gt 0 ]] || warn "$TOOL: environment ${SPEC[env_name]} not found; running from PATH (install it with: plasbench install-tools $TOOL)"
+        fi
+        local TOOL_TIMEOUT_SECONDS="${SPEC[timeout]:-${TOOL_TIMEOUT_SECONDS:-}}"
+        if ! profile_exec_in_dir "$OUT" "${RUNNER[@]}" bash -c "${SPEC[command]}" > "$LOGF" 2>&1; then
+            rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"
+            record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOGF" "$(profile_elapsed "$START")"
+            return 0
+        fi
+    fi
+    if python3 "$PROJECT_ROOT/python/user_tool_adapter.py" --tool "$TOOL" --output "${SPEC[output]}" \
+            --contigs "$CONTIGS" --out-fasta "$PRED" >> "$LOGF" 2>&1; then
+        mark_complete "$DONE"
+        record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "user tool (${SPEC[mode]})" "$(profile_elapsed "$START")"
+    else
+        rm -f "$PRED" "$DONE"; warn "$TOOL output for $SAMPLE does not fit PlasBench's mapping; skipped (see $LOGF)"
+        record_status "$SAMPLE" "$TOOL" "skipped" "" "output unusable for this assembly: see $LOGF"
+    fi
+}
+
 process_sample() {
     local SAMPLE="$1" ASM="$2" SRA="$3"
     local SDIR="$DATA_DIR/$SAMPLE"
@@ -753,6 +838,8 @@ process_sample() {
         tool_enabled RUN_BASELINE_COVERAGE baseline_coverage && record_status "$SAMPLE" "baseline_coverage" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_BASELINE_REFERENCE baseline_reference && record_status "$SAMPLE" "baseline_reference" "skipped" "" "assembly contigs unavailable"
         tool_enabled RUN_BASELINE_REPLICON baseline_replicon && record_status "$SAMPLE" "baseline_replicon" "skipped" "" "assembly contigs unavailable"
+        local ut
+        for ut in "${USER_TOOL_LIST[@]}"; do record_status "$SAMPLE" "$ut" "skipped" "" "assembly contigs unavailable"; done
         return 0
     fi
     log "=== Run tools on $SAMPLE ==="
@@ -774,6 +861,10 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_coverage RUN_BASELINE_COVERAGE &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_reference RUN_BASELINE_REFERENCE &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_replicon RUN_BASELINE_REPLICON &
+    local ut
+    for ut in "${USER_TOOL_LIST[@]}"; do
+        job_slot_wait "$MAX_PARALLEL_TOOLS"; run_user_tool "$ut" "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" "$T1" "$T2" &
+    done
 
     # gplas2_mob's classifier seed comes straight from mob_recon's own output
     # directory, so it must not start until that finished (successfully or
@@ -807,7 +898,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow "${USER_TOOL_LIST[@]}"; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

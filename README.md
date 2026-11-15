@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/plasbench-logo.svg" alt="PlasBench" width="400"></p>
+
 # PlasBench: A Reproducible, Evidence-Calibrated Benchmarking Framework for Plasmid Reconstruction Tools
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
@@ -118,6 +120,11 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- The statistics are checked by simulation (`plasbench analysis simulate-validation`, `RUN_STATS_VALIDATION=1`): interval coverage, type-I error and power under study-to-study differences, correlated isolates, unequal study sizes and missing data, shown in the report under Sensitivity, power and reproducibility. A first smoke run shows the percentile cluster bootstrap under-covers with few studies, so its intervals are optimistic.
+- The pre-registration is a **draft** until its proposed values are confirmed and frozen (`freeze-prereg --write --strict`); the report's Pre-registration tab shows the draft state and lists the proposed values.
+- Each reference carries a structured **evidence record** (technology, circularity, long-read support, replicon evidence, structure, independent validation; declared, inferred or unknown), kept field by field; the reference tier is derived from it.
+
+- The primary analysis is reported **unavailable** when no isolate has a Tier 1-2 reference; the ranking is then labelled provisional, never the headline.
 - Recommendations are advisory and withheld when evidence is thin; PlasBench does not
   identify, cluster or classify the plasmids in your own sample (see the table below).
 - No claim is made here about how any named competing benchmark performs; the
@@ -238,6 +245,7 @@ cannot match. This table states only what was verified in their repositories and
 5. **Leakage made visible.** A tool that searches a database is judged separately on plasmids inside and outside it.
 6. **A recommendation with its evidence.** The operational mode recommends a tool for a sample only when the evidence gates are met, and
    states whether that recommendation has been tested on held-out studies.
+   The optional learned model behind it uses truth-free features only (read depth, the isolate's own assembly statistics, organism metadata); a model fitted on the truth's plasmid size, plasmid count or AMR annotation is refused.
 
 **Where the others are better, or PlasBench is weaker**
 
@@ -650,8 +658,8 @@ none of them prints a note saying so.
   F1 = 0 there, so it cannot rise by failing on hard isolates.
 - Uncertainty: a deterministic 1,000-resample bootstrap CI on mean F1, paired per-sample
   differences with win/tie/loss counts, and `significant_vs_runner_up` (sign-flip
-  permutation test, 10,000 permutations, Holm-corrected; needs at least 5 paired
-  samples, otherwise `not_assessed`).
+  permutation test, Holm-corrected: exact (every sign pattern) for 6 to 12 independent units, 10,000 permutations above that; needs at least 6 independent
+  units, otherwise `not_assessed`).
 
 **Optional diagnostics (never ranked).** Stage 6 also writes
 `benchmark.recovery_by_replicon.tsv`, which breaks per-plasmid recovery down by replicon
@@ -857,6 +865,7 @@ the section-by-section answers to the reviewer question bank, and the list of wh
 | a laboratory benchmarking a mixed community | [Metagenomic workflow](#metagenomic-community-workflow) below, then [`docs/METAGENOMICS.md`](docs/METAGENOMICS.md) | declared community manifest, graph/bin outputs, and truth when scoring is required |
 | a laboratory recording PCR, conjugation, long-read, or Hi-C evidence | [Orthogonal validation](#orthogonal-validation-evidence) below | reviewable evidence TSV with accession, DOI, protocol, or laboratory-record reference |
 | someone who would rather install nothing | [Container](#container) below | Docker only |
+| someone who would rather not use the command line | [The PlasBench window](#the-plasbench-window-no-command-line) below | PlasBench installed, and a web browser |
 | modifying PlasBench, or citing exact source | [Source checkout](#source-checkout) below | git and conda |
 
 **If you are not sure, use [Section 3](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard).**
@@ -874,6 +883,116 @@ plasbench test
 
 …but there are databases and an NCBI key to set up as well, so follow Section 3 rather
 than only these six lines.
+
+---
+
+### The PlasBench window (no command line)
+
+Everything in this README can also be done from the PlasBench window, and the command line stays fully supported:
+every page runs an ordinary `plasbench` command, and the window has its own terminal.
+
+**Starting it.** The installer puts a **PlasBench icon** on your desktop and in the applications (Start) menu.
+Double-click it: PlasBench starts and its window opens. Double-click it again while PlasBench is running and you get the
+same window back; a second copy is not started. **Quit** (top right) stops PlasBench. Its studies, settings and jobs
+are kept. From a terminal the same thing is:
+
+```bash
+plasbench ui                 # start PlasBench and open its window
+plasbench ui --tab           # open it in a normal browser tab instead of an app window
+plasbench ui --no-browser    # only print the address (a server, or another browser)
+plasbench desktop-icon       # (re)make the icon; --remove takes it away, --no-desktop keeps it to the menu
+```
+
+The window is a page served only to this computer (127.0.0.1). Each start gets its own session key, so other programs
+and web pages cannot use it, and nothing is sent anywhere. It opens as an app-style window, with no tabs or address
+bar, in Edge or Chrome when either is installed. Otherwise it opens in your default browser.
+
+**What the icon does on each kind of computer**
+
+| Computer | The icon | Where the tools run |
+|---|---|---|
+| Linux (Ubuntu, Debian, Fedora, ...) | applications menu + desktop (`~/.local/share/applications/plasbench.desktop`) | natively, from the `plasbench` conda environment |
+| macOS (Intel or Apple Silicon) | `~/Applications/PlasBench.app` + a link on the desktop | natively, from the `plasbench` conda environment (Apple Silicon: Rosetta for tools without an arm64 build) |
+| Windows | install PlasBench **inside WSL2 (Ubuntu)**; the installer then puts the icon on the **Windows** desktop and Start menu. It starts PlasBench inside Ubuntu, and the window opens in your Windows browser. | inside WSL2: the benchmark tools are Linux programs and do not run on Windows itself |
+
+The icon runs `scripts/plasbench_launcher.sh`. That script finds conda, mamba or micromamba and activates the
+`plasbench` environment. Then it starts the window and writes its messages to `~/.plasbench/ui/launcher.log`. Every
+check, install and run started from the window finds the environment's tools, however the window was started.
+
+**Conda or Docker?** Conda is the normal way: `plasbench install-tools` (or **Set up this computer**) creates the
+`plasbench` environment in your home folder, without administrator rights. Docker is an alternative, not a
+requirement. The release image `ghcr.io/ubeffiong/plasbench` carries every tool. `scripts/docker_run.sh plasbench run
+...` runs a command in it, with your downloads, settings and studies folder mounted, so results land in the same
+study folders. **Set up this computer → This computer** shows what this computer is, the way PlasBench should run
+there, what is still missing, and the Docker command when Docker is available.
+
+| Page | What you do there |
+|---|---|
+| **Home** | See how ready this computer is, the next setup step, and your latest results. Run the offline demo in one click. |
+| **Set up this computer** | A checklist of everything PlasBench needs (Python, Bash, conda, the core tools, databases, NCBI access, disk space), each with an **Install** or **Fix** button. Enter your NCBI email and API key. Install any tool profile, upgrade PlasBench, or run the test suite. |
+| **Tools** | Every built-in tool and every tool you added: task, track, input, whether it is installed, its reference database, and a switch for whether it runs by default. Install a missing tool from its row. |
+| **Add your own tool** | A form that writes the tool's manifest for you ([Section 5.11](#511-add-your-own-tool-and-benchmark-it)), with insertable `{contigs}`, `{graph}`, … placeholders, a live check that lists anything to fix, and **Save & install**. **How it works** explains every section, placeholder and output format, and walks through a full example (adding MOB-recon as your own tool) that you can load into the form. |
+| **Settings** | Every setting PlasBench reads, its default and its explanation, searchable. Your changes are saved to `config/local.env` on this computer, and clearing one returns to the default. |
+| **Workspace & studies** | Every benchmark is a study with its own folder (results, report, logs and a record of how it was run). Choose and check the workspace that holds them (free space, drive type, cloud-sync warnings), see every study, open its report or folder, start a new one. |
+| **New benchmark** | A five-step wizard: the isolates (demo, a bundled cohort, your own sheet, or the metagenomic track), the tools (built-in on/off and your own), resources, outputs and stages, then a review of the exact command before it starts. |
+| **Your own isolates** | Add an isolate from its FASTQ files and complete reference (`plasbench init-local`), with file pickers. |
+| **Cohorts** | The bundled study sets. **Details** shows what each holds: description, isolates and species, plasmids in the truth, read depth, BioProjects and the download size. Breakdowns cover organism, truth tier, how the truth was assembled, origin and country. A searchable table lists every sample, with NCBI links, host, isolation source, collection date and how its reference was sequenced (from the cohort's lock). Validate a cohort, or benchmark it in one click. |
+| **Runs & reports** | Every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
+| **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
+| **Version control** | Git without the command line, for your **runs**: **each study is its own repository**, holding the study's record, sample sheets, settings, result tables, reports, figures and logs, with its own history and its own remote. The PlasBench program is not tracked, because updates replace it. A managed `.gitignore` keeps heavy data out: reads (FASTQ, SRA, FAST5/POD5), alignments (BAM, SAM, CRAM and their indexes), variants (VCF/BCF), assemblies and sequences (FASTA, GFA, GFF), aligner indexes and tool databases, archives, tmp folders and credentials. You can add your own rules under **Ignored files**, and **Test a path** shows which rule decides. You get status, staging, commit, branches, remote, fetch/pull/push, and a colour-coded history: you are here, pushed, not yet pushed, and merges, with details on hover. Diffs and commits open as tabs, and every commit is checked for raw data, secrets, patient identifiers and files too large for GitHub. Git is optional: `plasbench install-git` installs Git for Windows with Git Bash on Windows, or the conda-forge git elsewhere. |
+| **All commands** | Every `plasbench` command and option as a form, generated from the command line itself, so nothing is missing. Each shows the command it will run before you run it. |
+| **Guides** | This README and every guide, readable in the window. |
+
+**The console** is fixed at the bottom of the window. It opens at a quarter of the window's height; drag its top edge
+to resize it, or collapse it to its title bar. It has two tabs:
+
+* **Job output.** What a command started from the window prints, live. You can keep working, cancel it, or copy its
+  log. When a command asks a question (for example "Install the missing items now? [y/N]"), the console highlights it.
+  Answer in its reply box or with its Yes/No buttons.
+* **Session log.** What happened in this session, one line per event: the window started, commands started from
+  the pages and how they ended, answers typed into their questions, cancels, terminal commands, settings, workspace
+  and study changes. Earlier sessions can be chosen from its list. **Save as script** downloads the session as a
+  bash script that repeats it: every command that succeeded, in order and in its folder. Failed or cancelled
+  commands, PowerShell commands and typed answers are kept as comments, so read the script before running it. The log
+  is kept in `~/.plasbench/ui/sessions.jsonl`. Secret settings are never written to it, and answers typed with "hide"
+  are masked.
+* **Terminal.** Type your own commands, as in any terminal: `ls studies`, `tail -n 40 logs/run.log`, `plasbench
+  check`, `git log`. Commands start in the PlasBench folder, and `cd` moves within it and the studies workspace (not
+  elsewhere on the disk). `plasbench` there always means this PlasBench folder. The command box is one line, grows as you type (Shift+Enter adds a line, Enter runs), and can be dragged taller.
+  Up and Down recall earlier commands,
+  and each command is recorded in `~/.plasbench/ui/terminal_history.jsonl`. On Linux and macOS it is your login shell,
+  with the environment's tools on PATH. On Windows it is Ubuntu (WSL) when installed, with PowerShell as an option.
+  Commands receive no keyboard input, so start interactive or long work from the pages, where its questions are
+  answered in Job output.
+
+**Side panel and tabs.** **Panel** in the top bar opens a panel on the right, as wide as the navigation on the
+left, with three tabs:
+
+* **Studies** (the default) is a folder tree of your studies. Expand a study to see its results, logs and record. A
+  report opens in a report tab, and a table, log or text file opens as a read-only tab. Each study also has buttons
+  for its report, its Git and its folder.
+* **Jobs** lists what is running and what ran, with cancel, and shows a job's output in the console.
+* **Git** (Ctrl+Shift+G) shows the chosen study's changes, commit, branches, remote, tracked files and a
+  colour-coded history.
+
+The main area works like a browser. It opens with an **Overview** tab, and every page you open from the navigation
+becomes its own tab. Reports, files, diffs and commits open in tabs next to the one you are on. A report tab has
+**Open in browser**, and Ctrl+click on any report link opens it in your browser directly. Close a tab with its × or
+a middle-click.
+
+The Terminal tab offers each Linux distribution installed in WSL (Ubuntu, Debian, ...), Git Bash and PowerShell on
+Windows, and your login shell elsewhere. `git` and `plasbench` work in each. If WSL does not respond, the terminal
+says so and suggests `wsl --shutdown`.
+
+**Help on every page.** Each page has a **Help** button, the **?** in the top bar does the same, and so does
+<kbd>F1</kbd>. It explains what the page is for, how to use it step by step, what is good to know, and the
+equivalent command.
+
+The window never does anything the command line cannot, so a colleague can repeat any step by copying its command.
+`--port` chooses the port.
+
+On a remote server, start it there and forward the port to your own computer, then open the printed address
+locally: `ssh -L 8770:127.0.0.1:8770 you@server`, then `plasbench ui --no-browser` on the server.
 
 ---
 
@@ -1019,6 +1138,7 @@ plasbench/
 ├── docs/
 │   ├── FINDING_DATA.md       <- how to find matched complete-assembly + Illumina pairs
 │   └── METHODS.md            <- the scoring model, for your write-up / methods section
+│   └── images/reference/     <- local, uncommitted third-party figures used as report design references (its README maps each to a planned feature)
 ├── config/
 │   ├── config.sh             <- EDIT THIS: paths, threads, which tools to run
 │   └── accessions.tsv        <- EDIT THIS: your sample sheet (isolate → accessions)
@@ -1139,9 +1259,10 @@ This must now print a version number before you continue.
 #### First option: install the latest stable release automatically
 
 This is the recommended path for most laboratory users. It always resolves the
-latest published GitHub release, verifies its SHA-256 checksum, extracts it in
-your home directory, and starts the normal installer. Add `--tools` to install
-the benchmark tools and their databases at the same time.
+latest published GitHub release, verifies its SHA-256 checksum, installs it in
+**one folder, `~/PlasBench`**, and starts the normal installer. Add `--tools` to
+install the benchmark tools and their databases at the same time. Running the same
+command later updates that folder in place (see [Upgrade an existing installation](#upgrade-an-existing-installation)).
 
 ```bash
 cd ~
@@ -1149,18 +1270,18 @@ curl -fL -O https://raw.githubusercontent.com/ubeffiong/plasbench/main/scripts/i
 bash install_latest.sh --tools
 ```
 
-The script prints the installed version and directory when it completes. Save
-that directory for the later commands in this guide. In the same terminal,
-define `PB` once (replace the placeholder with the path the script printed):
+The script prints the installed version and folder when it completes. PlasBench
+always lives in `~/PlasBench`, so define `PB` once for the later commands in this guide:
 
 ```bash
-PB="/path/printed/by-install_latest.sh"
+PB="$HOME/PlasBench"
 cd "$PB"
 ```
 
 In a new terminal, define `PB` again before any command below that uses it.
 To install into another location, set `PLASBENCH_INSTALL_DIR=/path/to/location`
-before running the installer.
+before running the installer; PlasBench then lives in `/path/to/location/PlasBench`
+(use that as `PB`).
 
 #### Alternative: choose or inspect a specific release version
 
@@ -1305,9 +1426,11 @@ populated database directory.
 bash env/download_platon_db.sh
 ```
 
-If it says `already present ... nothing to do`, continue to step 7b. If it
-says the database is missing, use the manual download below. The manual route
-is retained because Platon periodically changes its published database URL.
+If it says `already present ... nothing to do`, continue to step 7b. Otherwise it
+downloads Platon's database (1.69 GB from Zenodo), checks its size and unpacks it.
+The download resumes: run the same command again after an interruption and it
+continues where it stopped. The manual route below does the same by hand, for
+when the script cannot be used.
 
 ```bash
 source config/local.env
@@ -1363,8 +1486,10 @@ If it is already installed, the script tells you so and does nothing:
 [ok]   MOB-suite DB already present at /home/you/miniforge3/envs/plasbench-mobsuite/lib/python3.10/site-packages/mob_suite/databases
 ```
 
-**If this download keeps failing**, see step 7c. Do not keep retrying it: MOB-suite's
-downloader cannot resume, so every attempt restarts from zero.
+The download resumes: if the connection drops, or you stop it, run the same command
+again and it continues from where it stopped. While the internet is down it waits and
+carries on when the connection returns, instead of failing. **If it still cannot
+finish**, see step 7c.
 
 #### 7c — Troubleshooting only: if a database download will not complete
 
@@ -1395,6 +1520,89 @@ MOB_DB="$(bash -c 'source scripts/lib.sh; mobsuite_db_dir')"
 ls "$MOB_DB" | wc -l                                    # expect 31
 ls "$PLASBENCH_DATA_DIR/db/platon/db" | wc -l           # expect 31
 ```
+
+#### 7d — Databases for the optional tools (AMRFinderPlus, RFPlasmid, Plasmer)
+
+`install.sh --tools` installs these three programs, but each needs its own reference data,
+which the installer does not fetch. You need them only for what you use: AMRFinderPlus
+for resistance-gene context in the report, RFPlasmid and Plasmer only when you switch
+those tools on (`--rfplasmid on`, `--plasmer on`). Skip any you do not need;
+`plasbench check` (Step 9) lists whatever is still missing.
+
+Run everything below in the `plasbench` environment, from the PlasBench folder:
+
+```bash
+conda activate plasbench
+cd "$PB"   # the PlasBench folder from step 3
+```
+
+**AMRFinderPlus** (about 1 minute):
+
+```bash
+amrfinder -u
+```
+
+**RFPlasmid** uses CheckM, which needs its reference data (about 1.4 GB) once. Conda
+often downloads the file during the install already, so check first:
+
+```bash
+checkm taxon_list | head -3
+```
+
+If that prints a table of taxa, you are done. If it says the data root is not set, run:
+
+```bash
+DB_DIR="${PLASBENCH_DB_DIR:-$HOME/.plasbench/databases}/checkm_data"
+mkdir -p "$DB_DIR" && cd "$DB_DIR"
+f="$(ls "$CONDA_PREFIX"/staging/checkm_data_2015_01_16.tar.gz 2>/dev/null || true)"
+if [[ -z "$f" ]]; then
+  curl -fL -C - --retry 10 -O https://zenodo.org/records/7401545/files/checkm_data_2015_01_16.tar.gz
+  f=checkm_data_2015_01_16.tar.gz
+fi
+tar -xzf "$f"
+checkm data setRoot "$DB_DIR"
+cd "$PB"
+checkm taxon_list | head -3   # should now print a table
+```
+
+This reuses the file conda already downloaded and only downloads it when it is missing.
+
+**Plasmer** needs **at least 32 GB of RAM** (Plasmer's own documented minimum) and a
+database you download yourself. Check the memory first:
+
+```bash
+free -g
+```
+
+If the `total` in the `Mem:` row is under 32, leave Plasmer off and skip the rest of this
+section. (On WSL, the Linux side only gets part of the computer's RAM; the limit can be
+raised in `%UserProfile%\.wslconfig`.)
+
+1. From [Plasmer's Zenodo record](https://doi.org/10.5281/zenodo.7030674) (or the
+   [Google Drive mirror](https://drive.google.com/drive/folders/1C1XLqTuPVfwyB7N3b5QAU09Rn-Qq7RdD))
+   download both `plasmerMainDB.tar.xz` and `customizedKraken2DB.tar.xz`. On Zenodo you
+   can right-click each Download button, copy the link, and fetch it in the terminal with
+   `curl -fL -C - -O <link>`.
+2. Put both files in the folder PlasBench reads Plasmer's database from, check them, and
+   unpack both there:
+
+```bash
+PLASMER_DIR="$(bash -c 'source config/config.sh; echo "$PLASMER_DB"')"
+echo "$PLASMER_DIR"          # by default ~/.plasbench/databases/plasmer
+mkdir -p "$PLASMER_DIR"
+# move the two downloaded .tar.xz files into "$PLASMER_DIR", then:
+cd "$PLASMER_DIR"
+sha1sum plasmerMainDB.tar.xz customizedKraken2DB.tar.xz
+#   expect 0b08f5c30d60b137f54de6024ab7557031850db6  plasmerMainDB.tar.xz
+#          b14efdd9232fd5f6d066716bd8e3e6ca80c9c0de  customizedKraken2DB.tar.xz
+tar -xJf plasmerMainDB.tar.xz
+tar -xJf customizedKraken2DB.tar.xz
+cd "$PB"
+```
+
+Plasmer expects both archives unpacked into the same folder, and PlasBench passes that
+folder to it. Because this is PlasBench's default location, you do not need to set
+`PLASMER_DB`; set it only if you keep the database somewhere else.
 
 ---
 
@@ -1714,17 +1922,31 @@ plasbench upgrade
 ```
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
-It finds the latest release, downloads and verifies it, unpacks it into a new sibling
-directory (for example `~/plasbench-0.1.3` → `~/plasbench-<new-version>`, your current one is never touched
-or deleted), then reuses one physical data directory for reads and databases. On the
-first upgrade from an older release, it **moves** the old `data/` directory once to
-`~/.local/share/plasbench/data` (or `$XDG_DATA_HOME/plasbench/data`) and replaces it
-with a compatibility link; it never copies or re-downloads the database. It also carries
-over `config/local.tsv` and `.ncbi.env`, then installs the new PlasBench code into the
-existing `plasbench` environment **without refreshing Conda packages or tools**. Finish with:
+It finds the latest release, downloads and verifies it, and **updates your `PlasBench`
+folder in place**. Only the files the previous release installed are replaced (a release
+file you edited is backed up to `.plasbench-backup/` first); everything that is yours stays
+exactly where it is:
+
+| Kept as it is | Where |
+|---|---|
+| Your studies (every run, its results, report and logs) | `PlasBench/studies/`, or your chosen workspace |
+| Your settings for this computer | `config/local.env`, `.ncbi.env`, `config/local.tsv` |
+| Your own tools | `~/.plasbench/tools/` and `tools.d/<your tool>/` |
+| Downloaded reads and references | the shared data folder (`~/.local/share/plasbench/data` by default) |
+| Tool environments and databases | your conda environments and `~/.plasbench/databases` |
+
+The new code is installed into the existing `plasbench` environment **without refreshing
+Conda packages or tools** (`./update.sh --refresh-tools` refreshes them when release notes ask).
+
+**Coming from an older install in a versioned folder** (`~/plasbench-0.2.3` and earlier)?
+Run `./update.sh` there, or run `install_latest.sh` again. Either one installs the new
+release into `~/PlasBench`, moves the old folder's runs into `PlasBench/studies/`, copies
+its settings and own tools, moves its downloads to the shared data folder once (never
+copied, never downloaded again), and then asks before deleting the old folder (`--yes`
+deletes it without asking; `--keep-old` keeps it). Finish with:
 
 ```bash
-cd /path/printed/by-update.sh
+cd ~/PlasBench
 conda activate plasbench
 plasbench --version         # should print the new version
 ```
@@ -2763,7 +2985,7 @@ plasbench run --cohort my-cohort --plasgraph2 on \
 plasbench install-tools rfplasmid       # bioconda; also needs a one-time CheckM data setup, see INSTALL.md
 plasbench run --cohort my-cohort --rfplasmid on
 
-plasbench install-tools plasmidhunter   # installs diamond+prodigal via conda, then `pip install plasmidhunter`
+plasbench install-tools plasmidhunter   # own python 3.10 env (plasbench-plasmidhunter), wrapper in the main env
 plasbench run --cohort my-cohort --plasmidhunter on
 
 plasbench install-tools plasmer         # conda, from Plasmer's own custom channel; documents a ~32GB RAM minimum
@@ -3425,6 +3647,205 @@ too. Two runs into two `--results-dir` directories keeps both honest.
 
 ---
 
+### 5.10a Where each run is kept: study folders
+
+Every benchmark is a **study** with its own folder, so one cohort's results never mix with another's:
+
+```
+$PB/studies/<study>/
+    study.json   the sample sheet (with its checksum), the cohort, and every command run in this study
+    results/     predictions, scores, leaderboard and benchmark.report.html
+    logs/        tool and mapping logs
+    tmp/         scratch space
+```
+
+`plasbench run --cohort cohort1` keeps everything in `studies/cohort1/`; `--samples my_isolates.tsv` in
+`studies/my_isolates/`. Name it yourself with `--study NAME`, and rebuild one study's report with
+`plasbench report --study NAME`. `--results-dir DIR` still writes exactly where you say instead. Downloads, tool
+environments and databases are shared between studies, so a second study of the same isolates downloads nothing
+again.
+
+The folder that holds the studies is the **workspace**: `$PB/studies` by default. Put it on a larger or external
+disk from the window's **Workspace & studies** page, or set `PLASBENCH_WORKSPACE=/path/to/folder` in
+`config/local.env`.
+
+---
+
+### 5.11 Add your own tool and benchmark it
+
+You can benchmark any plasmid reconstruction or classification tool, your own or someone else's, beside the
+built-in ones without changing PlasBench's code. You describe the tool in one small text file, a **manifest**.
+PlasBench then installs it, runs it on every sample, converts its output, and scores, ranks and reports it exactly
+like a built-in tool. The full reference is [docs/ADDING_TOOLS.md](docs/ADDING_TOOLS.md); this section walks
+through the setup.
+
+**What you need:** a working PlasBench (Steps 1–9 above), and the tool's command line, or a folder of outputs you
+already produced from the same assemblies.
+
+**Prefer a form?** `plasbench ui` → **Add your own tool** fills in the same manifest from a form, checks it as you
+type, and saves and installs it ([The PlasBench window](#the-plasbench-window-no-command-line)). The steps below
+are the same either way.
+
+#### Step 1 — Create the manifest
+
+```bash
+plasbench tools new my_binner
+```
+
+This writes a commented template to `~/.plasbench/tools/my_binner/plasbench-tool.ini`. The name must be lower-case
+letters, digits and `_`, and cannot be a built-in tool's name. Any scripts the tool needs can sit in the same folder.
+
+#### Step 2 — Fill it in
+
+A manifest has five sections. Here is a complete one for a graph-based binning tool that writes a table of
+contigs and their plasmid bins:
+
+```ini
+[tool]
+name = my_binner
+display_name = My Binner                 # what the report calls it
+task = reconstruction                    # reconstruction = groups contigs into plasmids; classification = labels contigs
+analysis_track = short_read              # short_read | long_read | hybrid (tools are ranked only within a track)
+version_command = mybinner --version     # recorded with the results
+
+[install]
+method = conda                           # conda | pip | script | none (already on PATH)
+packages = mybinner=1.4.2
+channels = conda-forge, bioconda
+verify_command = mybinner --help
+
+[database]
+uses_reference_database = no             # yes + release_date = YYYY-MM-DD turns on the truth-leakage check
+
+[run]
+mode = command
+command = mybinner --gfa {graph} --contigs {contigs} --threads {threads} --out {outdir}/run
+requires = graph, contigs                # a sample missing one is skipped with the reason
+
+[output]
+format = contig_bins
+path = run/bins.tsv                      # where the tool writes it, relative to {outdir}
+contig_column = contig_id                # column names (or 1-based numbers) in the tool's table
+bin_column = plasmid_bin
+contig_id_strip_regex = _length_.*$      # make the tool's contig ids match the assembly's
+```
+
+**Mapping PlasBench's inputs onto your tool (`[run] command`).** Write the command as you would type it, with
+these placeholders where the sample's files go. PlasBench substitutes each one, safely quoted:
+
+| Placeholder | Becomes |
+|---|---|
+| `{contigs}` | the sample's assembly contigs (FASTA) |
+| `{graph}` | the sample's assembly graph (GFA) |
+| `{reads_1}`, `{reads_2}` | the trimmed short reads |
+| `{long_reads}` | the sample's long reads |
+| `{outdir}` | an empty folder for this tool and sample; write the output here |
+| `{threads}`, `{sample}`, `{db}`, `{tool_dir}` | thread count, sample id, `[database] path`, the manifest's folder |
+
+**Mapping your tool's output onto PlasBench's (`[output] format`).** Pick the shape your tool writes:
+
+| Your tool writes | `format` | Map with |
+|---|---|---|
+| a table: one row per contig with its plasmid bin | `contig_bins` | `contig_column`, `bin_column` |
+| a table: one row per contig with a plasmid/chromosome label and/or a probability | `contig_labels` | `contig_column`, `label_column` + `plasmid_values`, `score_column` (adds a precision–recall curve), `threshold` |
+| one FASTA of predicted plasmid sequence | `plasmid_fasta` | nothing (each record is one plasmid) |
+| a folder with one FASTA per plasmid | `fasta_dir` | `fasta_glob` |
+| anything else | `adapter` | your own small script, which writes PlasBench's files |
+
+Tables may be tab-, comma- or whitespace-separated (`delimiter`), with or without a header (`header`). If the
+tool decorates contig ids (`NODE_1_length_5000_cov_12`, `contig_7 len=4512`), use `contig_id_strip_regex` or
+`contig_id_from = first_token` so they match the assembly's ids. `tools.d/examples/` has a worked manifest for
+every format.
+
+#### Step 3 — Validate it
+
+```bash
+plasbench tools validate my_binner
+```
+
+Every problem is listed with its fix, for example a placeholder the command uses but `requires` does not list, a
+misspelt key, or a `contig_bins` output on a classification task. Nothing is run.
+
+#### Step 4 — Install it
+
+```bash
+plasbench install-tools my_binner
+```
+
+The tool goes into its own environment (`plasbench-my_binner`), so its dependencies never disturb PlasBench's.
+`verify_command` then confirms it works. Use `method = script` with a shipped `install.sh` for anything conda or pip
+cannot install (a git checkout, a licensed tool), or `method = none` if it is already on your `PATH`.
+
+#### Step 5 — Check it with the rest of the installation
+
+```bash
+USER_TOOLS=my_binner plasbench check
+```
+
+The tool is listed as `[ok]`, or as `[MISS]` with the install command. `plasbench check --yes` installs it.
+
+#### Step 6 — Benchmark it
+
+Add `--tool` to the run you would make anyway. The built-in tools run as usual and yours runs beside them:
+
+```bash
+plasbench run --samples config/my_isolates.tsv --tool my_binner
+```
+
+Repeat `--tool` for several tools, or use `--tool all` for every installed user tool. To make it permanent, set
+`USER_TOOLS=my_binner` in `config/config.sh`.
+
+#### Step 7 — Read the results
+
+| Where | What you see |
+|---|---|
+| `benchmark.leaderboard.tsv` and the HTML report | your tool, under its `display_name`, ranked in its task and track with the built-in tools |
+| `tool_status.tsv` | one row per sample: `completed`, `reused`, `skipped` (with the reason) or `failed` (with the exit code) |
+| `results/<sample>/pred_my_binner.*` | the converted predictions, plus a `.provenance.json` saying how the output was read |
+| `run_manifest.json` → `user_tools` | the manifest's path and checksum, task, track and version; the report's *Tool version* column says `(user tool)` |
+
+A result is reused on the next run only while the manifest, the command and the inputs are unchanged. Editing the
+manifest re-runs the tool.
+
+#### Already have the tool's outputs? Use import mode
+
+If you ran the tool yourself, for example on another machine or because it needs a licence, point PlasBench at the
+outputs instead of a command. They must have been made from the **same assemblies** PlasBench scores:
+
+```ini
+[install]
+method = none
+
+[run]
+mode = import
+dir = /data/my_binner_outputs            # one file per sample
+pattern = {sample}.tsv                   # file name for each sample id
+```
+
+The `[output]` mapping is the same as above. An output that names contigs the assembly does not have is skipped
+as unusable, not scored as a failure.
+
+#### When something goes wrong
+
+| Message | Meaning and fix |
+|---|---|
+| `unknown user tool(s): …` | the name after `--tool` or in `USER_TOOLS` has no manifest; `plasbench tools list` shows what PlasBench can see |
+| `skipped … manifest unusable` | run `plasbench tools validate NAME` and fix what it lists |
+| `skipped … input graph unavailable for this sample` | a file in `requires` was not produced for that sample (here the assembly graph) |
+| `skipped … output unusable for this assembly` | the output's contig ids are not the assembly's: see the log in `logs/<sample>.<tool>.log`, then set `contig_id_strip_regex` / `contig_id_from`, or re-run the tool on the same assembly |
+| `failed … exit_code=N` | the command itself failed; its full output is in `logs/<sample>.<tool>.log` |
+| `environment plasbench-NAME not found; running from PATH` | install it first with `plasbench install-tools NAME` |
+
+#### Sharing a tool
+
+Send the tool's folder (manifest plus any scripts). The recipient adds it with
+`plasbench tools add path/to/my_binner`, which validates it and copies it to `~/.plasbench/tools/`. A team can
+instead keep shared tools in one folder and set `PLASBENCH_TOOLS_PATH` to it. In command mode PlasBench runs the
+command the manifest contains, as you, so read a manifest you receive before adding it, as you would any script.
+`PLASBENCH_USER_TOOLS=off` hides every user tool for a run.
+
+---
+
 ## 6. Contributing
 
 Contributions are welcome — bug reports, cohort additions, new tool adapters,
@@ -3642,8 +4063,10 @@ swept across every threshold. It never replaces F1 and never changes it — see
 
 ## 8. Extending it (good hackathon sprints)
 
-- **Add a tool**: write a one-file adapter in `adapters/` that emits a predicted-plasmid
-  FASTA, add a block in `scripts/04_run_tools.sh`, add a `RUN_*` flag. Scoring is automatic.
+- **Add a tool**: no code changes. Describe it in one `plasbench-tool.ini` manifest (how to install it, how to run
+  it on each sample or where its existing outputs are, and how to read its output), then
+  `plasbench install-tools NAME` and `plasbench run --tool NAME`. It is run, scored, ranked and reported like a
+  built-in tool. See [docs/ADDING_TOOLS.md](docs/ADDING_TOOLS.md) and the examples in `tools.d/examples/`.
 - **Add bin-level metrics** (did the tool get the *right number* of distinct plasmids?)
   alongside the base-level metric.
 - **Stratify** results by plasmid size, replicon type (Inc group), or AMR-gene carriage.

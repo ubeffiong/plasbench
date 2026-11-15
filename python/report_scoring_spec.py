@@ -89,14 +89,19 @@ def prereg_section(manifest):
     if not pre or pre.get("error") and not pre.get("sha256"):
         body = not_run("pre-registration status", f"no prereg record in the run manifest {pre.get('error', '')}".strip())
     else:
-        state = ("frozen and unchanged" if pre.get("locked") and pre.get("matches")
+        draft = pre.get("draft") if "draft" in pre else bool(pre.get("to_fix"))
+        open_count = len(pre.get("proposed") or []) + len(pre.get("to_fix") or [])
+        state = ("frozen and unchanged" if pre.get("locked") and pre.get("matches") and not draft
+                 else f"frozen and unchanged, but a DRAFT: {open_count} value(s) still proposed or TO_FIX await confirmation" if pre.get("locked") and pre.get("matches")
                  else "frozen, but prereg.tsv CHANGED after the freeze" if pre.get("locked")
+                 else f"not frozen yet; DRAFT with {open_count} proposed or TO_FIX value(s) (run: plasbench analysis freeze-prereg --write)" if draft
                  else "not frozen yet (run: plasbench analysis freeze-prereg --write)")
         departures = pre.get("env_mismatches") or []
         body = table(["Item", "Value"], [
             ("prereg.tsv SHA-256", pre.get("sha256", "")), ("State", state), ("Frozen at", pre.get("frozen_at") or "-"),
             ("Parameters", pre.get("parameters", "")),
-            ("Still TO_FIX", ", ".join(pre.get("to_fix") or []) or "none"),
+            ("Proposed, awaiting confirmation", ", ".join(pre.get("proposed") or []) or "none"),
+            ("Still TO_FIX (no value yet)", ", ".join(pre.get("to_fix") or []) or "none"),
             ("Settings departing from the plan",
              "; ".join(f"{m['config_variable']}={m['actual']} (planned {m['planned']})" for m in departures) or "none")])
     return section("prereg", "Pre-registration", "Every scoring decision is fixed in config/prereg.tsv before results "
@@ -371,7 +376,7 @@ def markdown(sources):
     lines = ["# Scoring specification summary", "",
              f"- Pre-registration: sha256 {pre.get('sha256', 'n/a')[:12]}..., "
              f"{'frozen' if pre.get('locked') else 'not frozen'}"
-             f"{', matches' if pre.get('matches') else ''}; TO_FIX: {', '.join(pre.get('to_fix') or []) or 'none'}",
+             f"{', matches' if pre.get('matches') else ''}; proposed: {', '.join(pre.get('proposed') or []) or 'none'}; TO_FIX: {', '.join(pre.get('to_fix') or []) or 'none'}",
              f"- Recommender verdict: {verdict.get('verdict', 'not run')} (oracle gap {verdict.get('oracle_gap', 'n/a')}, "
              f"gap closed {verdict.get('gap_closed', 'n/a')})", ""]
     summary = read_tsv(sources.get("label_scheme_summary"))

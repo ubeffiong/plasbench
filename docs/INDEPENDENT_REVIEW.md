@@ -124,7 +124,7 @@
 |---|---|---|---|
 | In `public-v3`, **0 of 98 isolates are Tier 1**, 79 are Tier 2 and 19 are Tier 3; **91 are polished with the benchmark's own reads**, 5 unknown, 2 none (E56). | Tier 1 is almost unreachable under the conservative polish default. | The headline rests on Tier 2 truth. Coverage and labels are not corrupted by read polishing, but the assumption is not quantified. | Per decision D1: keep the headline, add a mandatory sensitivity analysis restricted to independent-polish truth, and state it wherever the headline appears. Grow the independent-polish subset. |
 | `base_level_metrics_valid` is `yes` for only **2 of 98** isolates (E56). | Identity-type metrics need independent truth. | The nucleotide-accuracy dimension (added by this project) is not assessable for 96 of 98 isolates. | Say so in every accuracy table (the report already shows "samples not assessable"); prioritise independent-polish isolates. |
-| If no sample reaches Tier 2 the headline **silently falls back to all samples** (E27). | A convenience default. | A reader could take a Tier-3 headline for a Tier-1/2 one; only a label records it. | Make the fallback a visible warning in the leaderboard and report header, not a label. |
+| If no sample reaches Tier 2 the headline **silently falls back to all samples** (E27). **Fixed in v0.4.0**: the primary analysis is reported unavailable (`primary_status`, a banner above the ranking, provisional labels); `ALLOW_PRIMARY_FALLBACK=1` is the explicit opt-in. | A convenience default. | A reader could take a Tier-3 headline for a Tier-1/2 one; only a label records it. | Make the fallback a visible warning in the leaderboard and report header, not a label. |
 | The cohort column `truth_quality_tier` disagrees with the provenance tier: **8 of 15 short-read-first isolates are cohort tier "A"** but provenance Tier 3 (E56). | Two independent grading systems. | A curator reading the cohort file overestimates quality. | Drop or rename the cohort column; show the provenance tier only. |
 | Marker evidence uses the tools' own databases (E32). | Practical: no independent marker source. | Mob_recon and platon see truth filtered by their own evidence. | Report scores with and without evidence-based exclusion (the label-scheme comparison). |
 | A chromid labelled plasmid with a replicon marker passes as a plasmid; truth multimers and collapsed repeats are not detected. | No core-gene or multimer check. | Correct tools can be penalised; ranking is distorted on such isolates. | Add a core-gene/size sanity check and a multimer check to the truth audit; report the affected isolates. |
@@ -428,35 +428,35 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E17 | CPRR is computed after the match | `python/score_bins.py:316` | `def correct_reconstruction` |
 | E18 | CPRR minimum coverage 0.95 | `config/config.sh:64` | `CPRR_MIN_COVERAGE` |
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
-| E20 | Interval requires at least five clusters | `python/resampling.py:118` | `len(values) < 5 or len(units) < 5` |
-| E21 | Permutation test requires at least five clusters | `python/resampling.py:199` | `len(differences) < 5 or len(units) < 5` |
+| E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:169` | `len(values) < 5 or len(units) < MIN_CLUSTERS_CI` |
+| E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:253` | `len(differences) < 5 or len(units) < MIN_CLUSTERS_TEST` |
 | E22 | Holm adjustment across pairs | `python/aggregate_results.py:657` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:794` | `def attach_significance` |
-| E24 | Percentile cluster bootstrap | `python/resampling.py:109` | `def bootstrap_ci` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:800` | `def attach_significance` |
+| E24 | Percentile cluster bootstrap | `python/resampling.py:160` | `def bootstrap_ci` |
 | E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:81` | `def sample_clusters` |
-| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:101` | `UnionFind()` |
-| E27 | Headline falls back to all samples when no sample reaches the tiers | `python/headline_design.py:142` | `FALLBACK: no sample in reference tiers` |
-| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:81` | `min_species_clusters=20` |
-| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:211` | `def shared_values` |
+| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:109` | `UnionFind()` |
+| E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:80` | `PRIMARY_UNAVAILABLE = "unavailable"` |
+| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:89` | `min_species_clusters=20` |
+| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:236` | `def shared_values` |
 | E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:192` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
-| E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:153` | `--min-long-read-depth` |
-| E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:200` | `reference_tier, tier_reason = tier(` |
-| E34 | Circularity guard for long-read tools | `scripts/lib.sh:272` | `truth_independent_of_long_reads` |
-| E35 | Date-based overlap screen | `python/flag_database_overlap.py:92` | `possible_overlap` |
+| E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:154` | `--min-long-read-depth` |
+| E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:286` | `reference_tier, tier_reason = tier(` |
+| E34 | Circularity guard for long-read tools | `scripts/lib.sh:281` | `truth_independent_of_long_reads` |
+| E35 | Date-based overlap screen | `python/flag_database_overlap.py:97` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:189` | `lambda was selected on the same LOSO folds` |
 | E38 | The bootstrap test re-implements the algorithm | `test/test_robustness_diagnostics.py:48` | `def reference_bootstrap` |
 | E39 | CI installs minimap2 so the aligner test runs for real | `.github/workflows/ci.yml:28` | `apt-get install -y -qq minimap2` |
-| E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:205` | `base_level_metrics_valid` |
+| E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:292` | `base_level_metrics_valid` |
 | E41 | Tool database dates (first row) | `config/tool_database_releases.tsv:2` | `mob_recon` |
 | E42 | Exclusion of possible overlaps is off by default | `config/config.sh:548` | `EXCLUDE_DATABASE_OVERLAP` |
 | E43 | barrnap is in the environment file | `env/environment.yml:25` | `barrnap` |
 | E44 | minimap2 is a hard requirement of scoring | `scripts/05_score.sh:21` | `need minimap2` |
 | E52 | Unresolvable truth sequences are labelled REVIEW | `python/make_truth.py:50` | `REVIEW = "REVIEW"` |
 | E53 | A legacy option restores the chromosome guess | `python/make_truth.py:18` | `--allow-default` |
-| E54 | Conflicting evidence is labelled AMBIGUOUS and excluded | `python/label_truth_evidence.py:125` | `AMBIGUOUS` |
-| E55 | Samples polished with the benchmark's reads | `python/truth_provenance.py:114` | `same_as_benchmark` |
+| E54 | Conflicting evidence is labelled AMBIGUOUS and excluded | `python/label_truth_evidence.py:126` | `AMBIGUOUS` |
+| E55 | Samples polished with the benchmark's reads | `python/truth_provenance.py:133` | `same_as_benchmark` |
 | E56 | Cohort counts and tiers | `cohorts/public-v3.tsv:6` | `sample_id` |
 
 **Reproduce E56's numbers:** `python3 python/truth_provenance.py --sample-sheet cohorts/public-v3.tsv --data-dir <empty dir> --out prov.tsv` reports `tier 2=79, tier 3=19`; the species, BioProject and metadata counts in Part 2 and Part 5.1 come from reading `cohorts/public-v3.tsv` with comment lines removed (98 isolates, 81 BioProjects; 330 of 392 cells blank across `sample_origin`, `read_depth_x`, `assembly_plasmid_count` and `source_study`).

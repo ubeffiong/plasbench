@@ -641,6 +641,8 @@ own truth source (self-built truth is Unicycler, i.e. short-read-first), else NC
 recorded assembly method and sequencing technologies. Derived values are heuristics
 and are labelled as such; set the sheet columns to override them.
 
+**Evidence record** (additive, stage 6). Beside the tier, each reference carries six evidence fields: assembly technology, circularity evidence, long-read support, replicon/MOB evidence, structural integrity and independent validation, each marked `declared` (sample-sheet column), `inferred` (NCBI metadata or `truth_labels.tsv`) or `unknown`. The tier is derived from them and never replaces them: an unknown value never demotes a reference, an explicit adverse value (`read_support` none, `structural_integrity` unresolved_repeats) caps a Tier-1 reference at Tier 2 and says so in `tier_reason`. `evidence_recorded` counts the known fields.
+
 * **Short-read-first hybrids are not headline truth.** Their structure comes from the
   same Illumina assembly graph the tools use, so truth and tools share repeat-resolution
   errors.
@@ -654,8 +656,10 @@ benchmark reads, cohort tier A, evidence-checked labels. Tier 2 = long-read-firs
 failing a Tier-1 condition. Tier 3 = short-read-first, unknown provenance or cohort
 tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2);
 `benchmark.reference_tiers.tsv` and the report's tier-sensitivity chart show results by
-tier. When no sample reaches tier 2, the headline falls back to all samples and says
-so in `benchmark.headline_design.tsv`.
+tier. When no sample reaches tier 2, the **primary analysis is unavailable**: the same numbers are
+computed on all samples but are labelled provisional (`primary_status` and `population` in the leaderboard,
+`primary_status` in `benchmark.headline_design.tsv`, a banner in the report) and are not the headline.
+`ALLOW_PRIMARY_FALLBACK=1` keeps them as the headline with the warning.
 
 **Evidence-based labels** (`python/label_truth_evidence.py`, stage 2). Source labels
 are confirmed with evidence, never assigned by size:
@@ -741,7 +745,10 @@ failures.
 clonal collection) are not independent. When the sample sheet has a `bioproject` column
 (else `source_study`), the bootstrap CI resamples whole clusters and the sign-flip
 permutation test flips every difference in a cluster together. At least five independent
-clusters are required; with fewer, no interval or p-value is reported. The leaderboard's
+clusters are required for an interval and six for a permutation test (with five the smallest
+attainable two-sided p is 0.0625); with fewer, none is reported. Up to twelve clusters the p-value is
+exact (every sign pattern is enumerated); above that, 10,000 random sign flips.
+The calibration of these procedures is checked by simulation (`python/simulate_validation.py`): interval coverage, type-I error and power under correlated, unequal and incomplete data. The leaderboard's
 `n_independent_clusters` and the comparisons' `paired_clusters` show how many there were.
 Without a cluster column every sample is its own cluster and the results are identical to
 plain per-sample resampling.
@@ -760,7 +767,7 @@ the paired per-sample F1 differences (10,000 permutations, a deterministic seed)
 with Holm's method controlling the family-wise error rate across every pairwise
 tool comparison computed within the same analysis track (each track is a separate
 family; comparisons are never made across tracks). `True` only when the Holm-adjusted
-p-value is below 0.05 **and** there are at least 5 paired samples (the permutation
+p-value is below 0.05 **and** there are at least 6 independent units (the permutation
 test's own minimum — fewer than that returns no p-value at all, never a fabricated
 one); otherwise `not_assessed`. This is deliberately **not** based on whether the
 two tools' bootstrap confidence intervals overlap — CI overlap is a weaker,

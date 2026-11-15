@@ -21,7 +21,17 @@ def read_tsv(path: Path) -> list[dict[str, str]]:
         reader = csv.DictReader(handle, delimiter="\t")
         if reader.fieldnames is None or not REQUIRED_COLUMNS.issubset(reader.fieldnames):
             raise ValueError(f"{path} is missing required installer columns")
-        return [{key: (value or "").strip() for key, value in row.items()} for row in reader]
+        rows = [{key: (value or "").strip() for key, value in row.items()} for row in reader]
+    return _with_user_tools(path, rows)
+
+
+def _with_user_tools(path: Path, rows):
+    """User-declared tools (python/user_tools.py) join the built-in registries; any other file is unchanged."""
+    try:
+        import user_tools
+    except ImportError:
+        return rows
+    return user_tools.merge_rows(path, rows)
 
 
 def capability_tools(path: Path) -> set[str]:
@@ -29,7 +39,8 @@ def capability_tools(path: Path) -> set[str]:
         reader = csv.DictReader(handle, delimiter="\t")
         if reader.fieldnames is None or "tool" not in reader.fieldnames:
             raise ValueError(f"{path} has no tool column")
-        return {str(row["tool"]).strip() for row in reader if str(row["tool"]).strip() and not str(row["tool"]).strip().endswith(DEMO_SUFFIX)}
+        rows = _with_user_tools(path, list(reader))
+    return {str(row["tool"]).strip() for row in rows if str(row["tool"]).strip() and not str(row["tool"]).strip().endswith(DEMO_SUFFIX)}
 
 
 def validate(rows: list[dict[str, str]], capabilities: set[str]) -> list[str]:

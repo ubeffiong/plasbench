@@ -38,16 +38,17 @@ fi
 
 # Headline design inputs (python/headline_design.py): how each truth was built
 # (reference tiers; long-read-first vs short-read-first; same-read polishing)
-# and which isolates are clonal. Each is optional; without it the headline
-# falls back to the plain pooled design and says so.
+# and which isolates are clonal. Each is optional; without the provenance table no sample can be shown to meet the reference requirement, so the PRIMARY
+# analysis is reported as unavailable and every ranking is provisional (ALLOW_PRIMARY_FALLBACK=1 keeps the numbers as the headline, with the warning).
 DESIGN_ARGS=(--capabilities "$PROJECT_ROOT/config/tool_capabilities.tsv"
              --headline-max-tier "${HEADLINE_MAX_REFERENCE_TIER:-2}"
              --min-species-clusters "${MIN_SPECIES_CLUSTERS:-20}")
+if [ "${ALLOW_PRIMARY_FALLBACK:-0}" = "1" ]; then DESIGN_ARGS+=(--allow-primary-fallback); fi
 if python3 "$HERE/../python/truth_provenance.py" --sample-sheet "$SAMPLE_SHEET" --data-dir "$DATA_DIR" \
         --out "$RESULTS_DIR/benchmark.truth_provenance.tsv"; then
     DESIGN_ARGS+=(--truth-provenance "$RESULTS_DIR/benchmark.truth_provenance.tsv")
 else
-    warn "truth provenance failed; headline uses every reference tier"
+    warn "truth provenance failed; the primary analysis is unavailable and every ranking is provisional"
 fi
 if python3 "$HERE/../python/clonal_groups.py" --sample-sheet "$SAMPLE_SHEET" --data-dir "$DATA_DIR" \
         --max-distance "${CLONAL_MASH_DISTANCE:-0.0005}" --threads "$THREADS" \
@@ -207,6 +208,11 @@ job_dimension_analyses() {
     python3 "$HERE/../python/scenario_tags.py" --scores "$SCORES" --data-dir "$DATA_DIR" \
         --sample-sheet "$SAMPLE_SHEET" --out "$DIM.scenarios.tsv" \
         --performance-out "$DIM.scenario_performance.tsv" || warn "scenario tags failed; leaderboard is unaffected" &
+    # Calibration of the intervals and tests by simulation (python/simulate_validation.py): off by default (it does not depend on the run's data); smoke takes seconds.
+    if [[ "${RUN_STATS_VALIDATION:-0}" == "1" ]]; then
+        python3 "$HERE/../python/simulate_validation.py" --mode "${STATS_VALIDATION_MODE:-smoke}" --out "$DIM.stats_validation.tsv" \
+            || warn "statistical validation failed; leaderboard is unaffected" &
+    fi
     wait
     local COMPOSITE_ARGS=()
     for pair in "accuracy:accuracy" "feature-preservation:feature_preservation" "ngoc:ngoc" \

@@ -151,9 +151,28 @@ TOOL_DISPLAY_NAMES = {
 }
 
 
+def with_user_tools(path, rows):
+    """Add user-declared tools (python/user_tools.py) to rows read from one of PlasBench's own registry files
+    (config/tool_capabilities.tsv, tool_installers.tsv, tool_database_releases.tsv). Any other file, or a
+    PlasBench without user tools, is returned unchanged."""
+    try:
+        import user_tools
+    except ImportError:
+        return rows
+    return user_tools.merge_rows(path, rows)
+
+
 def display_tool_name(tool):
-    """Reader-facing label for a stable adapter ID; the ID itself never changes."""
-    return TOOL_DISPLAY_NAMES.get(tool, str(tool).replace("_", " ").replace("-", " ").capitalize())
+    """Reader-facing label for a stable adapter ID; the ID itself never changes. A user tool's manifest
+    display_name is honoured."""
+    if tool in TOOL_DISPLAY_NAMES:
+        return TOOL_DISPLAY_NAMES[tool]
+    try:
+        import user_tools
+        declared = user_tools.display_name(tool)
+    except ImportError:
+        declared = None
+    return declared or str(tool).replace("_", " ").replace("-", " ").capitalize()
 
 
 # --- FASTA / truth ---------------------------------------------------------------

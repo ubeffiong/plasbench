@@ -26,6 +26,17 @@ Reference tiers
   3  provisional: short-read-first hybrid, unknown assembly strategy, or
      cohort tier C. Exploratory only; reported as a sensitivity analysis.
 
+Evidence record (additive; every field is kept, the tier is derived from them and never replaces them). For each reference, six pieces of evidence are recorded,
+each as `declared` (a sample-sheet column), `inferred` (from NCBI metadata or the truth-label table) or `unknown`; an unknown value NEVER demotes a reference:
+  assembly_technology      long_read | hybrid | short_read | unknown            (sheet: truth_technology; else inferred from NCBI sequencingTech)
+  circularity_evidence     independent | reported | uncertain | unknown         (sheet: truth_circularity_evidence)
+  read_support             supported | partial | none | unknown                 (sheet: truth_read_support; else inferred from the long-read depth in truth_labels.tsv)
+  replicon_evidence        markers_all | markers_partial | marker_free | unknown (inferred from truth_labels.tsv: replicon / MOB markers on the plasmids)
+  structural_integrity     resolved | unresolved_repeats | unknown              (sheet: truth_structural_integrity)
+  independent_validation   none | long_read_reassembly | pcr | hic | other | unknown (sheet: truth_independent_validation)
+Only an explicit ADVERSE value (read_support none, structural_integrity unresolved_repeats) caps a Tier-1 reference at Tier 2, and says so in tier_reason.
+`evidence_recorded` counts the fields that are not unknown ("3 of 6") and `evidence_sources` says declared / inferred / unknown for each.
+
 Sources, in priority order: the sample sheet's truth_assembly_strategy /
 truth_polish_reads columns; PlasBench's own truth_source (self-built hybrid
 truth is Unicycler, i.e. short-read-first); NCBI's assembly_data_report.jsonl
@@ -44,6 +55,14 @@ import os
 import re
 import sys
 
+TECHNOLOGY = ("long_read", "hybrid", "short_read", "unknown")
+CIRCULARITY = ("independent", "reported", "uncertain", "unknown")
+READ_SUPPORT = ("supported", "partial", "none", "unknown")
+REPLICON_EVIDENCE = ("markers_all", "markers_partial", "marker_free", "unknown")
+STRUCTURAL = ("resolved", "unresolved_repeats", "unknown")
+VALIDATION = ("none", "long_read_reassembly", "pcr", "hic", "other", "unknown")
+EVIDENCE_FIELDS = ("assembly_technology", "circularity_evidence", "read_support", "replicon_evidence", "structural_integrity", "independent_validation")
+ADVERSE = {"read_support": "none", "structural_integrity": "unresolved_repeats"}
 STRATEGIES = ("long_read_only", "long_read_first_hybrid", "short_read_first_hybrid", "unknown")
 POLISH = ("none", "independent", "same_as_benchmark", "unknown")
 
@@ -122,20 +141,84 @@ def classify_method(method, tech):
 
 def label_summary(data_dir, sample):
     """(evidence evaluated?, ambiguous source-plasmids, marker-free plasmids) from truth_labels.tsv."""
-    if not data_dir:
-        return False, 0, 0
-    path = os.path.join(data_dir, sample, "truth_labels.tsv")
-    if not os.path.isfile(path):
-        return False, 0, 0
-    with open(path, newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle, delimiter="\t"))
+    rows = label_rows(data_dir, sample)
     evaluated = bool(rows) and all(row.get("evidence_status") == "evaluated" for row in rows)
     ambiguous = sum(row.get("source_label") == "PLASMID" and row.get("final_label") == "AMBIGUOUS" for row in rows)
     marker_free = sum(row.get("marker_free") == "yes" for row in rows)
     return evaluated, ambiguous, marker_free
 
 
-def tier(strategy, polish, quality, labels_evaluated):
+def label_rows(data_dir, sample):
+    path = os.path.join(data_dir, sample, "truth_labels.tsv") if data_dir else ""
+    if not path or not os.path.isfile(path):
+        return []
+    with open(path, newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle, delimiter="\t"))
+
+
+def evidence_record(row, data_dir, tech_text=""):
+    """({field: value}, {field: declared|inferred|unknown}, adverse reasons) for the six evidence fields; see the module doc."""
+    sample = row["sample_id"]
+    values, sources = {}, {}
+
+    def declared(column, vocabulary):
+        value = (row.get(column) or "").strip()
+        if value and value not in vocabulary:
+            raise ValueError(f"{sample}: {column} must be one of {vocabulary}")
+        return value
+
+    labels = label_rows(data_dir, sample)
+    plasmids = [r for r in labels if r.get("source_label") == "PLASMID"]
+    # assembly technology
+    sheet = (row.get("truth_technology") or "").strip()
+    sheet = sheet if sheet in TECHNOLOGY else ""
+    if sheet:
+        values["assembly_technology"], sources["assembly_technology"] = sheet, "declared"
+    elif tech_text:
+        long_read, short_read = bool(LONG_READ_TECH.search(tech_text)), bool(ILLUMINA.search(tech_text))
+        inferred = "hybrid" if (long_read and short_read) else "long_read" if long_read else "short_read" if short_read else ""
+        values["assembly_technology"], sources["assembly_technology"] = (inferred, "inferred") if inferred else ("unknown", "unknown")
+    else:
+        values["assembly_technology"], sources["assembly_technology"] = "unknown", "unknown"
+    # circularity
+    value = declared("truth_circularity_evidence", CIRCULARITY)
+    values["circularity_evidence"], sources["circularity_evidence"] = (value, "declared") if value else ("unknown", "unknown")
+    # read support: declared, else inferred from the long-read depth recorded per plasmid replicon
+    value = declared("truth_read_support", READ_SUPPORT)
+    if value:
+        values["read_support"], sources["read_support"] = value, "declared"
+    else:
+        depths = []
+        for r in plasmids:
+            try:
+                depths.append(float(r.get("long_read_depth")) if r.get("long_read_depth") not in (None, "") else None)
+            except ValueError:
+                depths.append(None)
+        known = [d for d in depths if d is not None]
+        if plasmids and known and len(known) == len(depths):
+            inferred = "supported" if all(d > 0 for d in known) else "none" if not any(d > 0 for d in known) else "partial"
+            values["read_support"], sources["read_support"] = inferred, "inferred"
+        elif plasmids and known:
+            values["read_support"], sources["read_support"] = "partial", "inferred"
+        else:
+            values["read_support"], sources["read_support"] = "unknown", "unknown"
+    # replicon / MOB evidence, from the evidence-labelled truth
+    evaluated = [r for r in plasmids if r.get("evidence_status") == "evaluated"]
+    if plasmids and len(evaluated) == len(plasmids):
+        free = sum(r.get("marker_free") == "yes" for r in plasmids)
+        inferred = "marker_free" if free == len(plasmids) else "markers_partial" if free else "markers_all"
+        values["replicon_evidence"], sources["replicon_evidence"] = inferred, "inferred"
+    else:
+        values["replicon_evidence"], sources["replicon_evidence"] = "unknown", "unknown"
+    value = declared("truth_structural_integrity", STRUCTURAL)
+    values["structural_integrity"], sources["structural_integrity"] = (value, "declared") if value else ("unknown", "unknown")
+    value = declared("truth_independent_validation", VALIDATION)
+    values["independent_validation"], sources["independent_validation"] = (value, "declared") if value else ("unknown", "unknown")
+    adverse = [f"{name.replace('_', ' ')} {bad.replace('_', ' ')}" for name, bad in ADVERSE.items() if values.get(name) == bad]
+    return values, sources, adverse
+
+
+def tier(strategy, polish, quality, labels_evaluated, adverse=()):
     quality = (quality or "").strip().upper()
     if strategy in ("short_read_first_hybrid", "unknown"):
         return "3", f"{strategy.replace('_', ' ')} truth is provisional"
@@ -148,6 +231,7 @@ def tier(strategy, polish, quality, labels_evaluated):
         reasons.append(f"cohort truth_quality_tier {quality or 'not recorded'}")
     if not labels_evaluated:
         reasons.append("replicon labels not evidence-checked")
+    reasons += [f"evidence: {item}" for item in adverse]
     if reasons:
         return "2", "long-read-first; " + "; ".join(reasons)
     return "1", "long-read-first, independent of benchmark reads, tier A, evidence-checked labels"
@@ -197,8 +281,11 @@ def derive(row, data_dir):
         polish = polish or derived_polish
     polish = polish or "unknown"
     evaluated, ambiguous, marker_free = label_summary(data_dir, sample)
-    reference_tier, tier_reason = tier(strategy, polish, row.get("truth_quality_tier"), evaluated)
+    _method, tech_text = assembly_info(data_dir, sample)
+    evidence, evidence_sources, adverse = evidence_record(row, data_dir, tech_text)
+    reference_tier, tier_reason = tier(strategy, polish, row.get("truth_quality_tier"), evaluated, adverse)
     quality_grade, grade_reason = grade(reference_tier, row.get("same_extraction"))
+    recorded = sum(1 for name in EVIDENCE_FIELDS if evidence[name] != "unknown")
     return {
         "sample": sample, "truth_assembly_strategy": strategy, "truth_polish_reads": polish,
         "provenance_source": source,
@@ -207,12 +294,15 @@ def derive(row, data_dir):
         "reference_tier": reference_tier, "tier_reason": tier_reason, "provenance_reason": reason,
         "ambiguous_plasmids": ambiguous, "marker_free_plasmids": marker_free,
         "truth_quality_grade": quality_grade, "grade_reason": grade_reason,
+        **evidence, "evidence_recorded": f"{recorded} of {len(EVIDENCE_FIELDS)}",
+        "evidence_sources": "; ".join(f"{name}: {evidence_sources[name]}" for name in EVIDENCE_FIELDS),
     }
 
 
 FIELDS = ["sample", "truth_assembly_strategy", "truth_polish_reads", "provenance_source",
           "base_level_metrics_valid", "labels_evidence_checked", "reference_tier", "tier_reason",
-          "provenance_reason", "ambiguous_plasmids", "marker_free_plasmids", "truth_quality_grade", "grade_reason"]
+          "provenance_reason", "ambiguous_plasmids", "marker_free_plasmids", "truth_quality_grade", "grade_reason",
+          *EVIDENCE_FIELDS, "evidence_recorded", "evidence_sources"]
 
 
 def main():
