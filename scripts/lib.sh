@@ -34,8 +34,17 @@ run_with_heartbeat() {
     done
     wait "$pid"
 }
-warn() { printf '[%s] WARNING: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
-die()  { printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; exit 1; }
+# Warnings print yellow and errors red, when they go to a terminal (never into a log file or the window, which
+# colours them itself). NO_COLOR (https://no-color.org) or PLASBENCH_COLOR=never turns colour off;
+# PLASBENCH_COLOR=always forces it.
+if [[ "${PLASBENCH_COLOR:-auto}" == "always" ]] \
+   || { [[ -t 2 && -z "${NO_COLOR:-}" && "${PLASBENCH_COLOR:-auto}" != "never" && "${TERM:-}" != "dumb" ]]; }; then
+    _C_WARN=$'\033[33m'; _C_ERR=$'\033[1;31m'; _C_OFF=$'\033[0m'
+else
+    _C_WARN=""; _C_ERR=""; _C_OFF=""
+fi
+warn() { printf '%s[%s] WARNING: %s%s\n' "$_C_WARN" "$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$_C_OFF" >&2; }
+die()  { printf '%s[%s] ERROR: %s%s\n' "$_C_ERR" "$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$_C_OFF" >&2; exit 1; }
 
 # Check a command exists; die if not.
 need() {

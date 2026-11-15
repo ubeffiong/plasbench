@@ -7,8 +7,29 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need python3
 
-while IFS=$'\t' read -r SAMPLE _ SRA; do
-    [[ -z "${SAMPLE:-}" ]] && continue
+# --- per-step timing: every sample's stage-2 steps are timed into data/<sample>/stage2_timing.tsv, and the log
+# names the slow ones, so a long stage 2 says where its time went.
+fmt_dur() { local s="$1"; if (( s >= 3600 )); then printf '%dh%02dm' $((s / 3600)) $((s % 3600 / 60));
+            elif (( s >= 60 )); then printf '%dm%02ds' $((s / 60)) $((s % 60)); else printf '%ds' "$s"; fi; }
+step_reset() { STEP_T0=$(date +%s); STEP_START=$STEP_T0; STEP_LOG=(); }
+step_mark() { local now; now=$(date +%s); STEP_LOG+=("$1:$(( now - STEP_T0 ))"); STEP_T0=$now; }
+step_report() {
+    local sample="$1" sdir="$2" e name secs slow=() total
+    total=$(( $(date +%s) - STEP_START ))
+    { printf 'step\tseconds\n'; for e in "${STEP_LOG[@]+"${STEP_LOG[@]}"}"; do printf '%s\t%s\n' "${e%%:*}" "${e##*:}"; done
+      printf 'total\t%s\n' "$total"; } > "$sdir/stage2_timing.tsv" 2>/dev/null || true
+    for e in "${STEP_LOG[@]+"${STEP_LOG[@]}"}"; do
+        name="${e%%:*}"; secs="${e##*:}"
+        (( secs >= 10 )) && slow+=("$name $(fmt_dur "$secs")")
+    done
+    if (( total >= 10 )); then
+        log "  stage 2 for $sample took $(fmt_dur "$total")${slow[*]+: ${slow[*]}}"
+    fi
+}
+
+truth_sample() {
+    local SAMPLE="$1" SRA="$2"
+    step_reset
     SDIR="$DATA_DIR/$SAMPLE"
     REF="$SDIR/reference.fna"
     REPORT="$SDIR/sequence_report.jsonl"
@@ -25,7 +46,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
         if [[ ! -s "$TRUTH" ]]; then
             if [[ ! -s "$LONG_READS" || ! -s "$R1" || ! -s "$R2" ]]; then
                 warn "missing long and/or short reads for self_assembled_hybrid sample $SAMPLE; run 01_download.sh first"
-                continue
+                return 0
             fi
             log "=== Building self-assembled hybrid truth for $SAMPLE ==="
             if ! python3 "$HERE/../python/build_hybrid_truth.py" \
@@ -35,14 +56,14 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
                     --min-chromosome-length "$HYBRID_TRUTH_MIN_CHROMOSOME_LENGTH" \
                     --threads "$HYBRID_TRUTH_THREADS" 2> >(tee -a "$LOG_DIR/${SAMPLE}.truth.log" >&2); then
                 warn "self-assembled hybrid truth build failed for $SAMPLE; see $LOG_DIR/${SAMPLE}.truth.log"
-                continue
+                return 0
             fi
             log "  truth -> $TRUTH (self-assembled hybrid; see $SDIR/truth_provenance.json)"
         fi
     else
-        [[ -s "$REF" ]] || { warn "missing reference for $SAMPLE; run 01_download.sh first"; continue; }
+        [[ -s "$REF" ]] || { warn "missing reference for $SAMPLE; run 01_download.sh first"; return 0; }
         if [[ ! -s "$TRUTH" ]]; then
-            [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; continue; }
+            [[ -s "$REPORT" ]] || { warn "missing sequence report and truth.tsv for $SAMPLE"; return 0; }
             log "=== Truth for $SAMPLE ==="
             # An unresolvable sequence is written as REVIEW and stops the run at
             # the validator below. ALLOW_DEFAULTED_TRUTH=1 restores the old
@@ -53,6 +74,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             log "  truth -> $TRUTH"
         fi
     fi
+    step_mark truth
     # Tandem-dimer truth plasmids (python/detect_dimers.py; panel edge case D2):
     # with COLLAPSE_DIMERS=1 a plasmid closed as two head-to-tail copies is
     # replaced by its monomer in reference.fna and truth.tsv before anything is
@@ -71,6 +93,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
                 || warn "dimer check failed for $SAMPLE; truth is scored as built"
         fi
     fi
+    step_mark dimers
     # Validate however the table arrived. A hand-written one is retained as-is,
     # and every way it can be wrong is silent: an id absent from the reference
     # scores as an unrecovered plasmid, a reference sequence absent from the
@@ -79,6 +102,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
     if ! python3 "$HERE/../python/validate_truth_table.py"             --truth "$TRUTH" --reference "$REF" --sample "$SAMPLE"; then
         die "truth table for $SAMPLE is not usable; fix it and re-run (nothing was scored)"
     fi
+    step_mark validate
     # Cohort QC anomaly flagging (advisory-only, see flag_cohort_outliers.sh's
     # invocation at stage 6): stats computed fresh from the actually-downloaded
     # reference, not sourced from NCBI's self-reported assembly metadata.
@@ -88,6 +112,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
     else
         python3 "$HERE/../python/compute_assembly_stats.py" --fasta "$REF" --truth "$TRUTH" --sample-id "$SAMPLE" --out "$STATS" 2>> "$LOG_DIR/${SAMPLE}.truth.log"
     fi
+    step_mark assembly_stats
     R1="$SDIR/${SRA}_1.fastq.gz"; R2="$SDIR/${SRA}_2.fastq.gz"
     # Coverage measurement decompresses both FASTQs, so keep stage 2 resumable:
     # recompute only when the reads or truth table are newer than the result.
@@ -98,6 +123,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             python3 "$HERE/../python/measure_depth.py" --truth "$TRUTH" --r1 "$R1" --r2 "$R2" --out "$DEPTH"
         fi
     fi
+    step_mark read_depth
     # read_quality_band (long-read/hybrid analog of read_depth_band): only
     # when a long-read file is actually staged for this sample -- a
     # short-read-only sample simply keeps annotate()'s "not_recorded"
@@ -111,6 +137,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             python3 "$HERE/../python/measure_read_quality.py" --fastq "$LONG_READS" --out "$QUALITY" 2>> "$LOG_DIR/${SAMPLE}.truth.log" || warn "read-quality measurement failed for $SAMPLE; read_quality_band will be not_recorded"
         fi
     fi
+    step_mark read_quality
     # Derive contextual features from installed annotation callers. A missing
     # caller yields "not evaluated" for its class rather than a false absence.
     FEATURES="$SDIR/truth_features.tsv"
@@ -118,9 +145,10 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
         if [[ -s "$FEATURES" && "$FEATURES" -nt "$REF" ]]; then
             log "  reference annotation already present for $SAMPLE"
         else
-            python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB" --isfinder-fasta "${ISFINDER_FASTA:-}"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
+            python3 "$HERE/../python/annotate_reference.py" --reference "$REF" --out "$FEATURES"                 --provenance "$SDIR/annotation_provenance.json" --amr-database "$ANNOTATION_AMR_DB"                 --replicon-database "$ANNOTATION_REPLICON_DB" --isfinder-fasta "${ISFINDER_FASTA:-}" --threads "$THREADS"                 >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1 ||                 warn "reference annotation failed for $SAMPLE; contextual features are unavailable"
         fi
     fi
+    step_mark annotation
     # Evidence-based replicon labels (python/label_truth_evidence.py): confirm
     # each source label with plasmid markers / rRNA / long-read support and
     # mark conflicting replicons AMBIGUOUS. truth.tsv stays complete (the
@@ -151,6 +179,7 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             2>> "$LOG_DIR/${SAMPLE}.truth.log" \
             || { warn "evidence labelling failed for $SAMPLE; scoring uses source labels"; rm -f "$SDIR/truth.scored.tsv"; }
     fi
+    step_mark evidence_labels
     # Every replicon's label under the three schemes (python/label_schemes.py):
     # writes truth.nonchromosomal.tsv (Scheme 1) and label_schemes.tsv, pinning
     # the NCBI field and the sequence report's SHA-256 behind Scheme 3 labels.
@@ -159,22 +188,27 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
     EVIDENCE_ARGS=()
     [[ -s "$SDIR/truth_labels.tsv" ]] && EVIDENCE_ARGS=(--evidence-labels "$SDIR/truth_labels.tsv")
     python3 "$HERE/../python/label_schemes.py" build --sample "$SAMPLE" --truth "$TRUTH"         --report "$REPORT" --truth-source "${TRUTH_SOURCE:-}"         "${EVIDENCE_ARGS[@]+"${EVIDENCE_ARGS[@]}"}" "${MULTIMER_ARGS[@]+"${MULTIMER_ARGS[@]}"}"         --nonchromosomal-out "$SDIR/truth.nonchromosomal.tsv" --out "$SDIR/label_schemes.tsv"         2>> "$LOG_DIR/${SAMPLE}.truth.log"         || warn "label-scheme table failed for $SAMPLE; scheme sensitivity analyses will skip it"
+    step_mark label_schemes
     # Repeat content of the truth (python/repeat_content.py, k-mer idea from GAEMR): the share of each replicon's
     # canonical k-mers that repeat inside it or are shared with the chromosome. A difficulty descriptor and the
     # repeat_rich scenario tag; it never edits truth. RUN_REPEAT_CONTENT=0 skips it.
-    if [[ "${RUN_REPEAT_CONTENT:-1}" == "1" && -s "$REF" ]]; then
+    if [[ "${RUN_REPEAT_CONTENT:-1}" == "1" && -s "$REF" ]] && [[ ! -s "$SDIR/truth_repeat_content.tsv" \
+            || "$SDIR/truth_repeat_content.tsv" -ot "$REF" || "$SDIR/truth_repeat_content.tsv" -ot "$TRUTH" ]]; then
         python3 "$HERE/../python/repeat_content.py" --reference "$REF" --truth "$TRUTH" --sample "$SAMPLE" \
             --k "$REPEAT_KMER" --out "$SDIR/truth_repeat_content.tsv" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
             || warn "repeat-content analysis failed for $SAMPLE; the repeat_rich tag is unavailable"
     fi
+    step_mark repeat_content
     # Opt-in truth depth anomalies (python/truth_depth_anomalies.py, coverage-anomaly idea from GAEMR): map the
     # benchmark short reads to the truth reference and flag windows whose depth departs from the replicon median by
     # more than DEPTH_ANOMALY_Z robust SD (collapsed repeats, misjoins, integrated elements). Needs minimap2 and samtools.
-    if [[ "${RUN_TRUTH_DEPTH_ANOMALIES:-0}" == "1" && -s "$R1" && -s "$R2" && -s "$REF" ]]; then
+    if [[ "${RUN_TRUTH_DEPTH_ANOMALIES:-0}" == "1" && -s "$R1" && -s "$R2" && -s "$REF" ]] \
+       && [[ ! -s "$SDIR/truth_depth_anomalies.tsv" || "$SDIR/truth_depth_anomalies.tsv" -ot "$REF" \
+             || "$SDIR/truth_depth_anomalies.tsv" -ot "$TRUTH" || "$SDIR/truth_depth_anomalies.tsv" -ot "$R1" ]]; then
         if command -v minimap2 >/dev/null 2>&1 && command -v samtools >/dev/null 2>&1; then
             DEPTH_TSV="$SDIR/truth_depth.tsv"
             if minimap2 -ax sr -t "$THREADS" "$REF" "$R1" "$R2" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
-                    | samtools sort -@ 2 -o "$SDIR/truth_reads.bam" - 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
+                    | samtools sort -@ "$THREADS" -o "$SDIR/truth_reads.bam" - 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
                && samtools depth -a "$SDIR/truth_reads.bam" > "$DEPTH_TSV" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
                && python3 "$HERE/../python/truth_depth_anomalies.py" windows --depth-tsv "$DEPTH_TSV" \
                     --window "$DEPTH_WINDOW_BP" --out "$SDIR/truth_depth_windows.tsv" 2>> "$LOG_DIR/${SAMPLE}.truth.log" \
@@ -191,12 +225,36 @@ while IFS=$'\t' read -r SAMPLE _ SRA; do
             warn "RUN_TRUTH_DEPTH_ANOMALIES=1 needs minimap2 and samtools; skipped for $SAMPLE"
         fi
     fi
+    step_mark depth_anomalies
     # Opt-in: draft AMR truth from the AMRFinderPlus rows annotated on the reference.
     # Written as truth_amr.draft.tsv (evidence_tier=auto_derived), never as truth_amr.tsv:
     # a person must review it and rename it before amr_gene_recall is scored.
     if [[ "${DERIVE_AMR_TRUTH_DRAFT:-0}" -eq 1 && -s "$FEATURES" && -s "$SDIR/truth.tsv" ]]; then
         python3 "$HERE/../python/derive_amr_truth.py" --features "$FEATURES" --truth "$SDIR/truth.tsv"             --out "$SDIR/truth_amr.draft.tsv" >> "$LOG_DIR/${SAMPLE}.annotation.log" 2>&1             || warn "AMR truth draft failed for $SAMPLE; amr_gene_recall stays blank"
     fi
+    step_mark amr_draft
+    step_report "$SAMPLE" "$SDIR"
+}
+
+# Samples are independent, so MAX_PARALLEL_SAMPLES of them run at once (the same setting as stages 1, 3, 4 and 5;
+# 1, the default, is sequential). A sample whose truth table is unusable stops the stage, as before.
+declare -A TRUTH_PIDS=()
+while IFS=$'\t' read -r SAMPLE _ SRA; do
+    [[ -z "${SAMPLE:-}" ]] && continue
+    if [[ "${MAX_PARALLEL_SAMPLES:-1}" -le 1 ]]; then
+        truth_sample "$SAMPLE" "$SRA"
+    else
+        job_slot_wait "$MAX_PARALLEL_SAMPLES"
+        truth_sample "$SAMPLE" "$SRA" &
+        TRUTH_PIDS["$SAMPLE"]=$!
+    fi
 done < <(read_samples "$SAMPLE_SHEET")
+if [[ "${MAX_PARALLEL_SAMPLES:-1}" -gt 1 ]]; then
+    aborted=()
+    for sample in "${!TRUTH_PIDS[@]}"; do
+        wait "${TRUTH_PIDS[$sample]}" || aborted+=("$sample")
+    done
+    [[ ${#aborted[@]} -eq 0 ]] || die "stage 2 stopped for: ${aborted[*]} (see the messages above and logs/<sample>.truth.log)"
+fi
 
 log "Stage 2 (truth) complete."
