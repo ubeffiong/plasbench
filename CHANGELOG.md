@@ -15,7 +15,7 @@ history is lost, only the numbering is cleaner. See
 
 ### Added -- complete statistics simulation study, results by number of studies
 - `simulate_validation.py` now simulates dominant and heavy studies, within-study correlation, missing outputs, resource failures (per isolate and whole studies), a dominant species (stratified functions) and Holm over many comparisons; results are summarised by number of independent studies (`benchmark.stats_validation_by_studies.tsv`) with a status that stays provisional unless a full run supports it. `--workers` runs scenarios in parallel.
-- Full run committed in `docs/stats_validation/` and written up in `docs/STATS_VALIDATION.md`: tests and Holm are calibrated; the percentile cluster-bootstrap intervals under-cover (74-94%), so the statistics stay provisional. No interval change has been made.
+- Full run committed in `docs/stats_validation/` and written up in `docs/STATS_VALIDATION.md`: tests and Holm are calibrated; the percentile cluster-bootstrap intervals under-cover (74-94%). The leaderboard now uses the cluster-t interval, with the other two methods kept; the new structures are not yet measured for it, so the statistics stay provisional.
 
 ### Changed -- reference independence is its own classification (review of the reference standard)
 - `truth_provenance.py` records two separate things per reference: `reference_quality` (validated / partially validated / provisional, the tier) and `evaluation_independence` (independent / partially independent / dependent / unknown, with `independence_reason`). Appended columns; the tier stays.
