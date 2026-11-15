@@ -14,13 +14,14 @@ but raises is NOT hidden: the exception propagates and fails the build, because 
   fig-forest        report_fig_stats          forest plot of CPRR differences by species, plasmid size and reference tier
   fig-pr            report_fig_pr             interactive precision-recall plot
   fig-radar         report_fig_radar          radar fingerprint of each tool per track (a view over the heatmap's data)
+  fig-complexity    report_fig_complexity     F1 of each tool on each isolate against the isolate characteristics (dataset features)
 
 Standard library only.
 """
 import importlib
 
-FIGURE_MODULES = ["report_fig_ladder", "report_fig_landscape", "report_fig_heatmap", "report_fig_stats", "report_fig_pr", "report_fig_radar"]
-FIGURE_SECTIONS = ["fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr", "fig-radar"]
+FIGURE_MODULES = ["report_fig_ladder", "report_fig_landscape", "report_fig_heatmap", "report_fig_stats", "report_fig_pr", "report_fig_radar", "report_fig_complexity"]
+FIGURE_SECTIONS = ["fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr", "fig-radar", "fig-complexity"]
 
 
 def inject(page, results_dir, data_dir, scores_path):

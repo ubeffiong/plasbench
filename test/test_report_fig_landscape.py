@@ -70,8 +70,8 @@ def close(a, b, tol=1e-6):
 
 
 def run(sample, tool, track="short_read", org="E. coli", identity=0.99, precision=0.9, recall=0.8, f1=0.85, plr=0.5, cprr=0.5, ngoc=0.7,
-        collinear=0.9, events=1, aligned=1000000, runtime=100, n_truth=2):
-    return [sample, tool, track, org, identity, precision, recall, f1, plr, cprr, ngoc, collinear, events, aligned, runtime, n_truth]
+        collinear=0.9, events=1, aligned=1000000, runtime=100, n_truth=2, tp_bp=800000, fp_bp=90000):
+    return [sample, tool, track, org, identity, precision, recall, f1, plr, cprr, ngoc, collinear, events, aligned, runtime, n_truth, tp_bp, fp_bp]
 
 
 def payload(rows, absent=None):
@@ -173,7 +173,7 @@ def main():
 
         # JS vs Python scene parity over several settings
         combos = [({}, None), ({"mode": "tools"}, None), ({"range": "zoom"}, None), ({"scale": "rank"}, None), ({"fx": 1, "fz": 1}, None),
-                  ({"pareto_only": 1}, None), ({"size": "runtime", "colour": "runtime"}, None), ({"colour": "track", "labels": 1, "grid": 0}, None),
+                  ({"pareto_only": 1}, None), ({"size": "runtime", "colour": "runtime"}, None), ({"size": "fp_bp", "colour": "tp_bp"}, None), ({"colour": "track", "labels": 1, "grid": 0}, None),
                   ({"z": "events", "y": "cprr", "range": "custom", "cx": [0.9, 1], "cy": [0, 0.8], "cz": [0.1, 1]}, None),
                   ({}, {"T:A": True, "O:drop": True, "O:cent": False}), ({"mode": "tools"}, {"O:sd": True})]
         datasets = [data, flat, miss, pareto]

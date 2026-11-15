@@ -13,6 +13,13 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- figures: complexity, outcome matrix, recommendation evidence, map identity and resistance brackets, TP/FP encodings (plan D3-D7)
+- **D3** new figure `fig-complexity` (*Figures*): per analysis track, base F1 of each tool on each isolate against the isolate characteristics of `benchmark.dataset_features.tsv` (plasmids in the truth, largest repeat fraction, contigs, read depth), each marked as knowable without a reference or needing it; Spearman correlation per tool only with at least five isolates and some spread, otherwise 'not computed'.
+- **D4** the plasmid matrix gains, under each track's coverage table, an outcome table (perfect, partial, fragmented, merged, fragmented and merged, missed; a tool that wrote no bins is 'not assessable', not a miss).
+- **D5** the *Recommendations* section gains an evidence panel (`report_recommend_evidence.py`): expected performance, independent studies, reference quality, dataset similarity and whether choosing by similar isolates beat the single best, uncertainty, and the reason when nothing is recommended or the headline is provisional.
+- **D6** the circular plasmid maps (static and the interactive viewer, kept in parity by `test/test_map_rings.py`) shade each tool ring's covered stretch by alignment identity (four blue bands) and bracket resistance regions (truth resistance genes within 5 kb) outside the scale; legends updated; the viewer payload gains `rz`. The viewer holds at most 300 blocks per tool and plasmid, so its identity can differ slightly from the static map when blocks were omitted.
+- **D7** the 3D landscape can size and colour points by true-positive or false-positive bases (new run fields `tp_bp`, `fp_bp`), reading it as a true/false-positive scatter of the runs; no new 3D code.
+
 ### Added -- a radar fingerprint of each tool (plan D2)
 - New figure `fig-radar` (*Figures*, beside the tool heatmap): one radar per analysis track, one polygon per tool, seven axes (accuracy F1, recovery, CPRR, SV-PRR, verified sequence = 1 - unmapped share, runtime score, reliability). It is a view over the heatmap's own data (`report_fig_radar.py` calls `report_fig_heatmap.build`, which is now kept for the report), validates its axes against `config/metrics.tsv`, skips an axis that is not available instead of drawing 0, and carries the numbers in a table. Help text, glossary term, layout, wiring and `test/test_report_fig_radar.py`.
 
