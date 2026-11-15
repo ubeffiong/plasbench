@@ -317,6 +317,15 @@ HELP = {
         "A tool much better on in-database plasmids is partly remembering, not inferring.",
         "Shows if a score will carry over to new plasmids.",
         "Not checked when no database or tool was available; the section says so."),
+    "stats-validation": H(
+        "A check on the report's own statistics: do the confidence intervals and tests behave the way they claim?",
+        "No benchmark data: simulated paired differences with study-to-study differences, correlated isolates, unequal study sizes and missing observations.",
+        "The real interval and test functions are run on thousands of simulated data sets where the truth is known. Interval coverage is the share of intervals that contain the "
+        "true effect (should be near 95%); the rejection rate is how often the test says 'different' (near 5% when there is no real effect, higher when there is).",
+        "Coverage clearly below 95% means the intervals are too narrow, so treat them as optimistic. A rejection rate far above 5% with no real effect means the test "
+        "raises false alarms. Power tells you how large an effect this many studies could detect.",
+        "It tells you how far the confidence statements elsewhere in the report can be trusted for a cohort of this size.",
+        "A 'smoke' run (100 replicates per scenario) only exposes gross failures; the 'full' run (1,000) is the evidence. Simulated data are not your data."),
     "reproducibility": H(
         "If the benchmark is run again, do we get the same answer?",
         "Two or more results folders from repeat runs.",
