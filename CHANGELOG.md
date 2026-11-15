@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- complete statistics simulation study, results by number of studies
+- `simulate_validation.py` now simulates dominant and heavy studies, within-study correlation, missing outputs, resource failures (per isolate and whole studies), a dominant species (stratified functions) and Holm over many comparisons; results are summarised by number of independent studies (`benchmark.stats_validation_by_studies.tsv`) with a status that stays provisional unless a full run supports it. `--workers` runs scenarios in parallel.
+- Full run committed in `docs/stats_validation/` and written up in `docs/STATS_VALIDATION.md`: tests and Holm are calibrated; the percentile cluster-bootstrap intervals under-cover (74-94%), so the statistics stay provisional. No interval change has been made.
+
 ### Changed -- reference independence is its own classification (review of the reference standard)
 - `truth_provenance.py` records two separate things per reference: `reference_quality` (validated / partially validated / provisional, the tier) and `evaluation_independence` (independent / partially independent / dependent / unknown, with `independence_reason`). Appended columns; the tier stays.
 - The primary analysis needs a reference that is within `HEADLINE_MAX_REFERENCE_TIER` AND independent (`HEADLINE_INDEPENDENCE`, default `independent`), from at least `HEADLINE_MIN_CLUSTERS` independent clusters counted over the qualifying references only. Dependent and unknown references never enter it. Before, a tier-2 reference polished with the benchmark's own reads counted as primary; it is now partially independent and a sensitivity analysis. The pre-registration row `headline_independence` is marked proposed.

@@ -255,7 +255,7 @@ isolate-difficulty.02	isolate-difficulty	text	GFA dead-end count	column	cohort-q
 learn-adequacy.02	learn-adequacy	text	Plasmid adequacy	column	cohort-qc
 learn-copynumber.01	learn-copynumber	text	copy number	Not-run reason or table	bin-diagnostics
 stats-validation.01	stats-validation	heading	Statistical validation (simulation)	section title (tab of Sensitivity, power and reproducibility)	ranking-sensitivity
-stats-validation.02	stats-validation	table_headers	Scenario | Studies | Isolates per study | Between-study sd | Isolate sd | Missing | True effect | Replicates | Interval coverage | Interval verdict | Test rejects at 0.05 | Test | Test verdict	the simulation table keeps its columns	ranking-sensitivity
+stats-validation.02	stats-validation	table_headers	Family | Scenario | Studies | Isolates per study | Within-study correlation (icc) | Missing | Failures | True effect | Replicates | Interval coverage | Interval verdict | Test rejects at 0.05 | Holm family-wise error (adjusted / unadjusted) | Test | Test verdict	the simulation table keeps its columns	ranking-sensitivity
 truth-label-audit.03	truth-label-audit	text	Marker databases shared with benchmarked tools	second table of the Truth labels tab	cohort-qc
 truth-label-audit.04	truth-label-audit	text	Flags	column: chromid, integrated-plasmid, multimer, multi-replicon, large-plasmid and depth flags	cohort-qc
 metric-framework.10	metric-framework	text	The reconstruction evaluation ladder	registry-driven ladder table	methods
