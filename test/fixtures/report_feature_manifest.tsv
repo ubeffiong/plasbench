@@ -257,3 +257,6 @@ stats-validation.01	stats-validation	heading	Statistical validation (simulation)
 stats-validation.02	stats-validation	table_headers	Scenario | Studies | Isolates per study | Between-study sd | Isolate sd | Missing | True effect | Replicates | Interval coverage | Interval verdict | Test rejects at 0.05 | Test | Test verdict	the simulation table keeps its columns	ranking-sensitivity
 truth-label-audit.03	truth-label-audit	text	Marker databases shared with benchmarked tools	second table of the Truth labels tab	cohort-qc
 truth-label-audit.04	truth-label-audit	text	Flags	column: chromid, integrated-plasmid, multimer, multi-replicon, large-plasmid and depth flags	cohort-qc
+metric-framework.10	metric-framework	text	The reconstruction evaluation ladder	registry-driven ladder table	methods
+metric-framework.11	metric-framework	text	Gaps, stated plainly	the ladder's gaps	methods
+keys.10	keys	table_headers	Term | What it measures | Why it matters | Ladder rung | Use	the glossary shows each metric's rung and use	methods

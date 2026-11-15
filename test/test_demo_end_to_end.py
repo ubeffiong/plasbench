@@ -34,7 +34,7 @@ def section(html, name):
 
 
 def main():
-    bash = "bash"
+    bash = os.environ.get("PLASBENCH_BASH") or "bash"      # PLASBENCH_BASH names a working bash where the Windows WSL shim is the first "bash" on the path
     done = subprocess.run([bash, "test/run_demo.sh"], cwd=ROOT, capture_output=True,
                           text=True, env={**os.environ})
     assert done.returncode == 0, done.stderr[-2000:]

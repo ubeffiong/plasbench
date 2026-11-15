@@ -136,6 +136,12 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Evaluation ladder": {
+        "what": "Five questions asked in order of difficulty: did the tool detect plasmid sequence, recover it, bin it correctly, reconstruct the plasmid, and keep its genes in the right place. "
+                "Every metric belongs to one rung (config/metrics.tsv).",
+        "why": "A tool can be excellent at one rung and poor at the next. Listing the metrics by rung stops a detection score being read as proof of reconstruction, and shows which rungs have "
+               "no ranked or independently validated metric yet.",
+    },
     "Chromid candidate": {
         "what": "A replicon labelled chromosome that is not the largest one and carries a plasmid marker (or is a large secondary replicon): it may be a chromid, a replicon with plasmid-like replication but core genes.",
         "why": "A chromid labelled plasmid, or an integrated plasmid labelled chromosome, scores as certain truth although it is not. The audit flags such sequences for review; it never relabels them.",
@@ -448,10 +454,23 @@ def glossary_section():
 
     A table of more than 15 rows gets the report's row filter and a Show all button from report_condense, so a reader finds a term by typing part of it.
     """
+    try:
+        import metric_registry
+        registered = metric_registry.by_term()
+        titles = {rid: title for rid, title, _q in list(metric_registry.RUNGS) + [metric_registry.EFFICIENCY]}
+    except (OSError, ValueError):
+        registered, titles = {}, {}
+
+    def kind(term):
+        row = registered.get(term)
+        if not row:
+            return "-", "-"
+        return titles.get(row["rung"], row["rung"]), ("ranks tools" if row["rankable"] == "yes" else "reported only")
+
     rows = "".join(
-        f"<tr><th scope='row'>{esc(term)}</th><td>{esc(entry['what'])}</td><td>{esc(entry['why'])}</td></tr>"
+        f"<tr><th scope='row'>{esc(term)}</th><td>{esc(entry['what'])}</td><td>{esc(entry['why'])}</td><td>{esc(kind(term)[0])}</td><td>{esc(kind(term)[1])}</td></tr>"
         for term, entry in GLOSSARY.items())
-    return ("<div class='panel'><table class='sortable glossary'><thead><tr><th>Term</th><th>What it measures</th><th>Why it matters</th></tr></thead>"
+    return ("<div class='panel'><table class='sortable glossary'><thead><tr><th>Term</th><th>What it measures</th><th>Why it matters</th><th>Ladder rung</th><th>Use</th></tr></thead>"
             f"<tbody>{rows}</tbody></table></div>")
 
 

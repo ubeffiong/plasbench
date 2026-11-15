@@ -24,6 +24,7 @@ from collections import defaultdict
 from pathlib import Path
 from plasbench_common import number  # noqa: E402
 import report_aliases  # noqa: E402
+import metric_registry  # noqa: E402
 
 SECTIONS = (("metric-framework", "Metrics"),
             ("database-membership", "Database membership"),
@@ -230,6 +231,31 @@ def excluded_replicons_section(data_dir):
             "a marker-based labeller cannot confirm, reported here rather than hidden.</p>" + body + "</section>")
 
 
+def ladder_html():
+    """The reconstruction evaluation ladder from config/metrics.tsv: one row per rung (and the efficiency group), its question, its metrics with whether each ranks tools and how well it is
+    grounded, and the gaps stated plainly. Empty text if the registry cannot be read (the section then says so)."""
+    try:
+        rows = metric_registry.load()
+    except (OSError, ValueError) as exc:
+        return f"<p class='muted'>The metric registry could not be read ({esc(str(exc))}).</p>"
+    body = []
+    for rung, title, question, members in metric_registry.ladder(rows):
+        cells = []
+        for m in members:
+            name = m["term"] or m["id"].replace("_", " ")
+            tags = [("ranks tools" if m["rankable"] == "yes" else "reported only"), metric_registry.EVIDENCE_LABEL[m["evidence"]]]
+            cells.append(f"<li><strong>{esc(name)}</strong> <small>({esc('; '.join(tags))})</small></li>")
+        body.append(f"<tr><th scope='row'>{esc(title)}</th><td>{esc(question)}</td><td><ul>{''.join(cells)}</ul></td></tr>")
+    gap_items = "".join(f"<li>{esc(text)}</li>" for _rid, text in metric_registry.gaps(rows))
+    return ("<h3>The reconstruction evaluation ladder</h3>"
+            "<p class='muted'>Five different questions. A tool can do well on one and badly on the next, so a metric from one rung is never read as an answer to another: "
+            "detecting plasmid sequence is not binning it, and binning it is not reconstructing the plasmid. The cost group sits beside the ladder. "
+            "Every metric is listed in <code>config/metrics.tsv</code> with the table and column that hold it.</p>"
+            "<div class='panel'><table class='sortable'><thead><tr><th>Rung</th><th>The question</th><th>Metrics (how they are used and grounded)</th></tr></thead>"
+            f"<tbody>{''.join(body)}</tbody></table></div>"
+            + (f"<p><strong>Gaps, stated plainly:</strong></p><ul>{gap_items}</ul>" if gap_items else ""))
+
+
 def metric_framework_section(leaderboard, data_dir):
     """The headline metric set, per tool, with how contigs were labelled."""
     rows = [r for r in leaderboard if r.get("tool")]
@@ -261,7 +287,8 @@ def metric_framework_section(leaderboard, data_dir):
         "Reconstruction</strong> (which contigs form one plasmid?): length-weighted binning F1 from a one-to-one "
         "Hungarian match, the same with recall measured against the plasmid length the assembly actually covers, "
         "base-pair-weighted Adjusted Rand Index, and CPRR (share of truth plasmids reconstructed correctly).</p>"
-        "<details class='rpt-collapsible'><summary>Show the contig-labelling rules and the metrics table for every tool</summary>"
+        "<details class='rpt-collapsible'><summary>Show the evaluation ladder, the contig-labelling rules and the metrics table for every tool</summary>"
+        + ladder_html() +
         "<p class='muted'>Contig labels: contigs shorter than CONTIG_MIN_LENGTH (default 1 kb) are excluded; a contig "
         "is PLASMID or CHROMOSOME when at least 80% of it aligns to that kind of truth at 95% identity; one that "
         "aligns that well to both is AMBIGUOUS and excluded, not multi-assigned; one that aligns to neither is "

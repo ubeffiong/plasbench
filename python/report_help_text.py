@@ -534,12 +534,14 @@ HELP = {
         "Depends on the computer used."),
     # ------------------------------------------------------------------ Methods and limits
     "metric-framework": H(
-        "The definitions of the metrics used.",
-        "None; it explains the metrics.",
-        "Two tasks are scored separately: classification (is a contig plasmid?) and reconstruction (which plasmid?). Metrics include F1, MCC and binning F1.",
-        "Use it as a reference.",
-        "Makes sure numbers are not compared across different tasks.",
-        "Labels for short contigs follow stated rules."),
+        "The metrics used, and the five questions they answer: the reconstruction evaluation ladder from detecting plasmid sequence to keeping resistance genes in the right plasmid.",
+        "None; the ladder is built from the metric registry (config/metrics.tsv), which names each metric's table and column.",
+        "Two tasks are scored separately: classification (is a contig plasmid?) and reconstruction (which plasmid?). Each metric is placed on one rung of the ladder and marked as "
+        "ranking tools or reported only, and as a published definition, a PlasBench definition, an unvalidated estimate, or not available.",
+        "Read the rung before the number: detection (F1, MCC) is not binning (binning F1) and binning is not reconstruction (CPRR). The gaps list says which rungs have no ranked or "
+        "published-definition metric.",
+        "Makes sure numbers are not compared across different questions, and states where the evidence is weakest.",
+        "Labels for short contigs follow stated rules. 'Unvalidated' means an alignment-derived estimate with no independent check."),
     "interpretation-limits": H(
         "What the results support and what they do not.",
         "The design, the reference tiers and validation coverage.",
