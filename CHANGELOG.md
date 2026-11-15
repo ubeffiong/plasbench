@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- three-way recommender comparison (plan C2)
+- `evaluate_recommender.py` now also compares, over the same leave-one-study-out folds, the single best tool, the organism recommender and a **feature-conditioned** arm (the best tool among the five most similar training isolates by the truth-free dataset features; a reference-derived column is refused). `benchmark.recommender_arms.tsv` reports per arm: regret, top-1 and near-optimal rates, improvement over the single best, the studies in which it beat it, calibration (error and bias), abstention and the regret when it would answer. An arm adds value only when it beats the single best on average and in most of at least three studies; the verdict JSON gains `arms` and `feature_conditioned_enabled`. The existing recommender outputs are unchanged. The arms table is in the *Recommendations* evaluation detail; `test/test_recommender_arms.py` is new.
+
 ### Added -- a dataset-characterisation table (plan C1)
 - `python/characterise_dataset.py` composes the per-isolate measurements the pipeline already makes (assembly stats, read depth and quality, repeat content of the truth, difficulty signals, organism and Gram group) into `benchmark.dataset_features.tsv`; it measures nothing itself. Every column is marked truth-free (knowable for an isolate with no reference) or truth-derived (benchmark only); a value not measured is blank, never 0. `test/test_dataset_features.py` checks the truth-free columns never include a field the recommender forbids.
 - Stage 6 builds it (an advisory job) and the report shows it as *Dataset characteristics* in the *Isolate difficulty* tab, with each column's basis in its header; file-explorer entry, help text and glossary term.
