@@ -56,7 +56,8 @@ SHORT = {"A1": "Identity", "A2": "Mismatch rate", "A3": "Indel accuracy", "A4": 
          "B2": "Completeness", "B3": "Recovery rate", "C1": "Structure (NGOC)", "C2": "SV F1", "C3": "Circularised",
          "C4": "Repeat resolution", "D1": "Gene recovery", "D2": "Annotation", "D3": "Functional elem.", "E1": "Runtime",
          "E2": "Memory", "E3": "Success rate",
-         "F1": "F1", "MCC": "MCC", "BF1": "Binning F1", "LWB": "LW binning F1", "ARI": "ARI", "CPRR": "CPRR", "CF1": "Contig F1"}
+         "F1": "F1", "MCC": "MCC", "BF1": "Binning F1", "LWB": "LW binning F1", "ARI": "ARI", "CPRR": "CPRR", "CF1": "Contig F1",
+         "SVP": "SV-PRR", "UNM": "Unmapped share", "OFT": "Off-truth share", "AMB": "Multi-mapped share", "PGAP": "Precision gap"}
 
 # leaderboard metric id -> (label, leaderboard column, scores.tsv column or None, definition)
 LEADERBOARD = [
@@ -68,6 +69,15 @@ LEADERBOARD = [
     ("CPRR", "Complete plasmid reconstruction rate", "cprr", None, "Share of truth plasmids reconstructed correctly, pooled over isolates (leaderboard column cprr); see the scoring specification for the exact definition."),
     ("CF1", "Contig-level F1", "mean_contig_f1_count", "contig_f1_count", "Mean over isolates of the contig-level F1 (counts) of the plasmid / chromosome call on assembly contigs; only for assembly-contig tools."),
 ]
+# Columns added by plan B2/B3, read from the registry's leaderboard columns (config/metrics.tsv) like the rest. scores column None = derived per isolate below.
+LEADERBOARD += [
+    ("SVP", "SV-PRR", "sv_prr", None, "Share of truth plasmids that are correct (CPRR criteria) and untouched by an alignment-derived structural call (leaderboard column sv_prr); reported, not ranked; unvalidated."),
+    ("UNM", "Unmapped predicted share", "unmapped_fraction", None, "Share of predicted bases with no retained alignment (unmapped_fraction); not charged as false positives in the permissive precision. Lower is better."),
+    ("OFT", "Off-truth predicted share", "off_truth_fraction", None, "Share of predicted bases whose only retained alignments are off the labelled truth (off_truth_fraction). Lower is better."),
+    ("AMB", "Multi-mapped share of mapped bases", "ambiguous_fraction", None, "Share of the mapped bases that also have an alternative placement (ambiguous_fraction). Lower is better."),
+    ("PGAP", "Precision minus strict precision", "precision_gap", None, "Permissive minus strict precision (precision_gap): how much of the precision depends on ignoring unmapped bases. Lower is better."),
+]
+LOWER_IS_BETTER = {"UNM", "OFT", "AMB", "PGAP"}
 COMPARISON_METRIC = {"f1": "F1", "mcc": "MCC", "bin_f1": "BF1", "lw_bin_f1": "LWB", "ari": "ARI", "bin_ari": "ARI", "cprr": "CPRR"}
 UNVALIDATED = {"C1"}
 
@@ -284,7 +294,7 @@ def _columns(specs):
                      "dir": s["direction"], "unit": s["unit"], "status": s["status"], "bands": bands, "weight": s["weight"],
                      "digits": digits, "src": "scorecard", "unval": s["id"] in UNVALIDATED, "def": s.get("rationale", "")})
     for cid, name, column, _scores_col, definition in LEADERBOARD:
-        cols.append({"id": cid, "short": SHORT[cid], "name": name, "fam": "L", "dir": "higher", "unit": "fraction" if cid != "MCC" else "-1 to 1",
+        cols.append({"id": cid, "short": SHORT[cid], "name": name, "fam": "L", "dir": "lower" if cid in LOWER_IS_BETTER else "higher", "unit": "fraction" if cid != "MCC" else "-1 to 1",
                      "status": "", "bands": None, "weight": None, "digits": 3, "src": "leaderboard", "unval": False, "def": definition,
                      "lbcol": column})
     return cols
@@ -311,10 +321,18 @@ def _leaderboard_per_sample(inp, key, samples, cid):
         r = rows.get(s)
         if r is None:
             vals.append(None)
-        elif cid == "CPRR":
-            plasmids = rc.number(r.get("cprr_plasmids"))
-            correct = rc.number(r.get("cprr_correct"))
+        elif cid in ("CPRR", "SVP"):
+            plasmids = rc.number(r.get("cprr_plasmids" if cid == "CPRR" else "sv_prr_plasmids"))
+            correct = rc.number(r.get("cprr_correct" if cid == "CPRR" else "sv_prr_correct"))
             vals.append(None if not plasmids or correct is None else correct / plasmids)
+        elif cid in ("UNM", "OFT", "AMB"):
+            unmapped, off, mapped, ambiguous = (rc.number(r.get(k)) for k in ("unmapped_pred_bp", "off_truth_pred_bp", "mapped_pred_bp", "ambiguously_mapped_pred_bp"))
+            total = sum(v for v in (unmapped, off, mapped) if v is not None)
+            part, whole = {"UNM": (unmapped, total), "OFT": (off, total), "AMB": (ambiguous, mapped)}[cid]
+            vals.append(None if part is None or not whole else part / whole)
+        elif cid == "PGAP":
+            precision, strict = rc.number(r.get("precision")), rc.number(r.get("strict_precision"))
+            vals.append(None if precision is None or strict is None else precision - strict)
         else:
             vals.append(rc.number(r.get(scols[cid])))
     return vals
