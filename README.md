@@ -449,22 +449,21 @@ where it is not, so CPRR is never penalised for errors that are in the truth rat
 CPRR is defined only for tools that output bins; classification-only tools show "not bin-scored".
 Circularity is still **not** a CPRR criterion.
 
-### Pre-registered endpoints, by track
+### Pre-registered endpoints, by task
 
-The primary endpoint depends on the input track (`config/prereg.tsv`, `primary_endpoint` and
-`primary_endpoint_long_read`; `ranking_metric()` in `python/headline_design.py`):
+Three evaluation tasks answer three different questions and are ranked separately, never against one another. The task of a tool is the `evaluation_task` of its row in
+`config/tool_capabilities.tsv`; the endpoints are in `config/prereg.tsv` (`primary_endpoint`, `primary_endpoint_reassembly`; `ranking_metric()` in `python/headline_design.py`):
 
-| Track and task | Primary endpoint (ranks tools) | Key secondary |
-|---|---|---|
-| Short-read reconstruction | Length-weighted binning F1 (`lw_bin_f1`) | CPRR |
-| Long-read and hybrid reconstruction | **Isolate-level CPRR** (`sample_cprr`): correct plasmids / truth plasmids per isolate, averaged over isolates | Length-weighted binning F1 |
-| Classification (any track) | Base-level F1 | – |
+| Task | Question | Primary endpoint (ranks tools) | Key secondary |
+|---|---|---|---|
+| Classification | Is this sequence plasmid-derived? | Base-level F1 | MCC, precision, recall |
+| Binning reconstruction | Are the existing contigs grouped into the right plasmids? | Length-weighted binning F1 (`lw_bin_f1`) | CPRR |
+| Sequence reassembly | Is the plasmid sequence produced, completely and accurately? | **Isolate-level CPRR** (`sample_cprr`): correct plasmids / truth plasmids per isolate, averaged over isolates | Length-weighted binning F1 |
 
-**Why it differs by track.** Complete, single-bin recovery from short-read assemblies is rare, so a
-pass/fail endpoint would sit near zero for most tools and lose statistical power. The paired tests,
-regret and power analysis are also defined per isolate. Long-read and hybrid tools are built to close
-whole plasmids, so CPRR separates them and answers the question their users ask. Using isolate-level
-CPRR there keeps the same per-isolate bootstrap, species macro-average and paired tests.
+**Why three.** A classifier labels sequence, a binner groups contigs that already exist, a reassembler writes new sequence. Judging a reassembler by whether it labelled sequence, or a
+binner by whether it produced a plasmid, asks a question the tool does not attempt. Before this change (v0.4.0 and earlier) the task was decided by whether a tool was binning-capable, so plasmidSPAdes was ranked as a
+classifier and Plassembler, Hybracter and plsmd shared a track with the binners; that is fixed. CPRR is judged per isolate, which keeps the same per-isolate bootstrap, species macro-average and paired tests.
+From short reads complete recovery is rare, so a reassembler's CPRR can sit near zero there; binning F1 is reported beside it. The revised endpoints are marked *proposed* in the pre-registration until you confirm them.
 
 **CPRR robustness outputs** (descriptive; they never change a rank):
 
@@ -705,7 +704,7 @@ none of them prints a note saying so.
 
 **Aggregation and ranking** (`python/aggregate_results.py`)
 
-- Tools are ranked separately within each track (short-read, long-read, hybrid), on that track's pre-registered endpoint: length-weighted binning F1 for short-read reconstruction, isolate-level CPRR for long-read and hybrid reconstruction, base-level F1 for classification (see [Pre-registered endpoints, by track](#pre-registered-endpoints-by-track)).
+- Tools are ranked separately within each track (short-read, long-read, hybrid), and within each of the three evaluation tasks, on that task's pre-registered endpoint: length-weighted binning F1 for binning reconstruction, isolate-level CPRR for sequence reassembly, base-level F1 for classification (see [Pre-registered endpoints, by task](#pre-registered-endpoints-by-task)).
 - Ranking uses only plasmid-bearing samples that every tool in the track has a result
   for (`ranking_basis = shared_samples`). A tool that crashed on a sample counts as
   F1 = 0 there, so it cannot rise by failing on hard isolates.
@@ -777,7 +776,7 @@ addressed in the implementation. Repeat-aware *matching* is not implemented; rep
 ### The five dimensions
 
 Each dimension is measured, reported on its own, and shown in the HTML report. None of them changes the headline ranking
-(the length-weighted binning F1 for short-read binning-capable tools, isolate-level CPRR for long-read and hybrid reconstruction, base-level F1 for classifiers, with CPRR or binning F1 as the key secondary endpoint).
+(the length-weighted binning F1 for binning reconstruction, isolate-level CPRR for sequence reassembly, base-level F1 for classification, with CPRR or binning F1 as the key secondary endpoint).
 
 | Dimension | Question | Status | What PlasBench reports | Script |
 |---|---|---|---|---|
@@ -1836,8 +1835,8 @@ tool's result, not a free pass.
 task. Binning-capable tools are ranked on **reconstruction** by `ranking_score`, the
 length-weighted binning F1 (the primary endpoint: plasmid bases placed in the
 correct bin), with **CPRR** (`cprr`, the share of truth plasmids reconstructed
-correctly) as the secondary endpoint. Classifier-only tools are ranked separately on
-**classification** by base-level F1. The ranking score is averaged per species when
+correctly) as the secondary endpoint. Reassemblers are ranked on **sequence reassembly** by isolate-level CPRR and
+classifiers on **classification** by base-level F1, each on their own. The ranking score is averaged per species when
 enough independent isolates exist, uses reference tiers 1-2 only, and covers the
 samples every tool in the group was scored on (`n_ranking_samples`). A tool that
 predicts nothing, or fails, on an isolate with plasmids scores 0 there. See

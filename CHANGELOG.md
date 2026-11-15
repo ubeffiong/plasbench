@@ -13,6 +13,13 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- classification, binning and reassembly were conflated (review of the task logic)
+- The task of a tool was decided by `binning_capable` alone, so every tool that was not binning-capable was a classifier even when it reassembles plasmid sequences (plasmidSPAdes, and the demo's `spades_like`), while Plassembler, Hybracter and plsmd, which also reassemble, shared one reconstruction track with the binners. `config/tool_capabilities.tsv` now has an explicit `evaluation_task` column (`classification`, `binning_reconstruction`, `sequence_reassembly`) and the ranking code reads it (`headline_design.Design`, `tool_capabilities.evaluation_task`); `binning_capable` only says whether the output is a set of per-plasmid units that the bin metrics can score (yes for binning and reassembly, no for classification) and the registry reader refuses a row where the two disagree. A registry without the column keeps its old answers, telling a reassembler from a binner.
+- Each task has its own pre-registered primary endpoint on every input track: base F1 (classification), length-weighted binning F1 (binning reconstruction), isolate-level CPRR (sequence reassembly). The track-specific exception that sent long-read and hybrid binners to CPRR is gone. `config/prereg.tsv`: `primary_endpoint` revised and `primary_endpoint_long_read` replaced by `primary_endpoint_reassembly`, both marked *proposed* until you confirm them (they were *fixed*).
+- plasmidSPAdes and the demo's reassembler are now bin-scored (each reassembled record is its own bin, as `adapt_plasmidspades.sh` writes it), so they get a CPRR; the leaderboard shows three task groups.
+- Recommendations are made for one task: `select_operational_method.py --task` takes `binning_reconstruction` (the default, as before minus the reassemblers), `sequence_reassembly`, `classification`, `all`, or the old `reconstruction` (= binning).
+- A user tool's manifest states `task = binning_reconstruction`, `sequence_reassembly` or `classification`; the old `task = reconstruction` still means binning. The setup window lists and filters the three tasks. Results written before the split (task `reconstruction`) still render, labelled as older. `test/test_evaluation_tasks.py` is new.
+
 ## [0.4.0] - 2026-11-15
 
 A feature release that also changes how tools are scored and ranked: **scores and rankings from v0.4.0 are not

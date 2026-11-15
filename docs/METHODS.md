@@ -631,12 +631,19 @@ endpoint would cost power (`headline_design.ranking_metric()`; `config/prereg.ts
   adds pooled CPRR per reference tier, so a tool cannot look strong only on small,
   simple plasmids.
 
-**Task tracks.** Binning-capable tools (`binning_capable=yes` in
-`config/tool_capabilities.tsv`) are ranked on the reconstruction track by
-`lw_bin_f1`. Classifier-only tools (Platon, geNomad, plasmidSPAdes as configured, ...)
-are ranked on a separate classification track by base-level F1. They are never scored
-zero on binning, a task they do not attempt, and the two tracks are never pooled.
-Input tracks (short-read, long-read, hybrid) stay separate as before.
+**Evaluation tasks.** Three different questions, each ranked on its own and never against another. The task of a tool is the `evaluation_task` of its row in
+`config/tool_capabilities.tsv` (`binning_capable` no longer decides it; it only says whether the tool's output is a set of per-plasmid units that the bin metrics can score).
+
+| Task | Question | Tools (examples) | Primary endpoint |
+|---|---|---|---|
+| `classification` | Is this sequence plasmid-derived? | Platon, geNomad, PLASMe, RFPlasmid, PlaScope | base-level F1 (also MCC, precision, recall) |
+| `binning_reconstruction` | Are the existing contigs grouped into the right plasmids? | MOB-recon, gplas2, PlasBin-flow, Flye + MOB-recon | length-weighted binning F1 (also bin precision and recall) |
+| `sequence_reassembly` | Is the plasmid sequence itself produced, completely and accurately? | plasmidSPAdes, Plassembler, Hybracter, plsmd | isolate-level CPRR (also completeness, identity, plasmid-level recovery) |
+
+A tool is never scored zero on a task it does not attempt, and the tasks are never pooled. Before this change (v0.4.0 and earlier) the task was decided by `binning_capable` alone: plasmidSPAdes, which
+reassembles, was ranked as a classifier, and Plassembler, Hybracter and plsmd, which also reassemble, shared one reconstruction track with the binners. A reassembler's records are
+its own bins (`adapt_plasmidspades.sh` writes each contig as its own bin), so it is bin-scored and gets a CPRR. From short reads complete recovery is rare, so a reassembler's CPRR
+can floor out there; binning F1 is reported beside it. Input tracks (short-read, long-read, hybrid) stay separate as before.
 
 ### Reference standard
 

@@ -51,7 +51,7 @@ HELP = {
         "A top rank on this cohort is not proof that a tool is right for every isolate. A failed run on an isolate that has plasmids counts as zero."),
     "leaderboard-main": H(
         "The full ranking table, one row per tool.",
-        "Per-isolate scores of binning-capable tools (those that group contigs into plasmid bins) against the reference.",
+        "Per-isolate scores of tools whose output is a set of per-plasmid units (binners and reassemblers) against the reference.",
         "The ranking score is computed per isolate and averaged. Plasmid recall counts every real plasmid equally, so one huge plasmid cannot dominate. 'Perfect' means "
         "everything found and nothing extra; 'strict' also forbids ambiguous bases.",
         "Compare the ranking score first, then precision (is what it called plasmid really plasmid?) and recall (did it find the plasmid?). The 95% interval shows the "
@@ -551,7 +551,7 @@ HELP = {
     "metric-framework": H(
         "The metrics used, and the five questions they answer: the reconstruction evaluation ladder from detecting plasmid sequence to keeping resistance genes in the right plasmid.",
         "None; the ladder is built from the metric registry (config/metrics.tsv), which names each metric's table and column.",
-        "Two tasks are scored separately: classification (is a contig plasmid?) and reconstruction (which plasmid?). Each metric is placed on one rung of the ladder and marked as "
+        "Three tasks are scored separately: classification (is a contig plasmid?), binning reconstruction (which plasmid does each existing contig belong to?) and sequence reassembly (is the plasmid sequence itself produced?). Each metric is placed on one rung of the ladder and marked as "
         "ranking tools or reported only, and as a published definition, a PlasBench definition, an unvalidated estimate, or not available.",
         "Read the rung before the number: detection (F1, MCC) is not binning (binning F1) and binning is not reconstruction (CPRR). The gaps list says which rungs have no ranked or "
         "published-definition metric.",

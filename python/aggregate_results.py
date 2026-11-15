@@ -13,10 +13,12 @@ Output:
   * <out_prefix>.headline_design.tsv -- which samples/species formed each headline
 
 Headline design (python/headline_design.py, docs/METHODS.md "Endpoints"):
-tools are ranked within (input track, task). Binning-capable tools are ranked
-on the RECONSTRUCTION task by length-weighted binning F1; classifier-only
-tools on the CLASSIFICATION task by base-level F1. The ranking score is a
-species-balanced mean over reference tiers 1-2, with cluster-aware CIs.
+tools are ranked within (input track, task). The task is the registry's
+evaluation_task: BINNING_RECONSTRUCTION tools (they group existing contigs into
+plasmids) by length-weighted binning F1, SEQUENCE_REASSEMBLY tools (they produce
+plasmid sequences) by isolate-level CPRR, CLASSIFICATION tools by base-level F1.
+The ranking score is a species-balanced mean over reference tiers 1-2, with
+cluster-aware CIs.
 
 Standard library only.
 """
@@ -1040,9 +1042,9 @@ def write_md(summary, path, notes=()):
     with open(path, "w") as fh:
         fh.write("# Plasmid reconstruction leaderboard\n\n")
         fh.write("Tools are ranked only within their own input track and task, never across them. "
-                 "**Reconstruction** (binning-capable tools) is ranked by length-weighted binning F1 on the "
-                 "short-read track and by isolate-level CPRR on the long-read and hybrid tracks; "
-                 "**classification** (classifier-only tools) by base-level F1. "
+                 "**Binning reconstruction** (tools that group existing contigs into plasmids) is ranked by length-weighted binning F1; "
+                 "**sequence reassembly** (tools that produce plasmid sequences) by isolate-level CPRR; "
+                 "**classification** (tools that label sequence as plasmid or not) by base-level F1. "
                  "The ranking score averages per-species means when enough independent isolates exist, "
                  "over reference tiers 1-2 only, using the samples every ranked tool shares.\n\n")
         groups = []
@@ -1122,7 +1124,7 @@ def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overl
 
     Returns [(track, task, rows, summary, comparisons)] in a stable order.
     A long-read tool is never ranked against a short-read one, and a
-    classifier-only tool never against a binning tool.
+    classifier never against a binner, and neither against a reassembler.
 
     tool_tracks maps tool -> declared track (the capability registry). It is only
     consulted for a tool with no score rows at all, which is exactly the tool that
