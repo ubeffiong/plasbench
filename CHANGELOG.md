@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- a metric registry and the evaluation ladder (plan B1)
+- `config/metrics.tsv` and `python/metric_registry.py`: every metric with its ladder rung (detection, sequence recovery, binning, sequence reconstruction, biological validity; computational efficiency beside it), the tool types it applies to, its inputs, whether it ranks tools, its evidence grade (published definition / defined by PlasBench / unvalidated estimate / not available), the table and column that hold it, its scorecard id and where it is shown. The glossary keeps the wording of each definition (no second copy); the registry is the metadata, cross-checked by tests.
+- Report: the *Classification and reconstruction metrics* section carries the registry-driven **reconstruction evaluation ladder** and states its gaps (no ranked metric on the sequence-recovery or biological-validity rungs; nothing on biological validity rests on a published definition); the glossary table gains *Ladder rung* and *Use* columns; a help entry and a glossary term. `test/test_metric_registry.py` (validation, glossary, scorecard and endpoint cross-checks) and `test/test_metric_wiring.py` (the demo's leaderboard and scores columns, the report sections, the glossary, the ladder and the docs) are new.
+
 ### Added -- more truth audits (review H3, plan A9)
 - `python/audit_truth_labels.py` adds a `flags` column (the `finding` column is unchanged): `integrated_plasmid_candidate`, `chromid_candidate`, `secondary_chromosome`, `large_plasmid`, `multi_replicon_plasmid`, `marker_free_plasmid`, `multimer_<k>x` (from `truth.corrections.tsv`) and `collapsed_repeat_candidate` / `low_depth_region` (from the depth-anomaly summary). The size thresholds are `CHROMID_MIN_BP` (350 kb) and `LARGE_PLASMID_BP` (500 kb), config variables and pre-registered as proposed.
 - `python/detect_dimers.py` detects higher multimers (up to 6 tandem copies): a new `copies` column, a collapse keeps the first 1/k, and a tetramer is reported as 4, not 2.

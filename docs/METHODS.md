@@ -532,6 +532,10 @@ It never changes `scores.tsv`. `python/stratify_recovery.py` joins it to the rep
 writes `benchmark.recovery_by_replicon.tsv`; a failure there only warns. It can also be
 run by hand:
 
+### The metric registry and the evaluation ladder
+
+`config/metrics.tsv` lists every metric with its ladder rung (detection, sequence recovery, binning, sequence reconstruction, biological validity, plus computational efficiency beside the ladder), the tool types it applies to, its inputs, whether it ranks tools, its evidence grade (published definition, defined by PlasBench, unvalidated estimate, not available), the table and column that hold it and its limitations. The ranking metrics are exactly the pre-registered endpoints (base F1 for classifiers, length-weighted binning F1 for short-read reconstruction, CPRR for long-read and hybrid reconstruction). `python/metric_registry.py` validates the file; `test/test_metric_registry.py` and `test/test_metric_wiring.py` check it against the glossary, the scorecard and the demo output.
+
 ### Truth-label audit (advisory)
 
 Also available as `plasbench audit-truth-labels`; shown in the report's "Truth-label audit" section.

@@ -1,0 +1,39 @@
+id	term	rung	tool_types	required_inputs	rankable	evidence	source	column	scorecard_id	shown_in	limitations
+base_precision	Base precision	detection	all	reference labels; alignments	no	published_definition	leaderboard	mean_precision		leaderboard	Predicted bases with no alignment are not false positives here; strict precision charges them
+base_f1	Base F1	detection	all	reference labels; alignments	yes	published_definition	leaderboard	mean_f1		leaderboard	The ranking metric for classifiers; a secondary reading for reconstruction tools; counts bases, so one large plasmid can mask small missed ones
+mcc	MCC	detection	all	reference labels; alignments	no	published_definition	leaderboard	mean_mcc		scoring-additions	Undefined on isolates with no plasmid
+f_beta	F2 and F0.5	detection	all	reference labels; alignments	no	published_definition	leaderboard	mean_f2		scoring-additions	F2 favours recall, F0.5 precision; beside the headline, never instead of it
+pr_auc	PR-AUC	detection	classification	per-record probability from the tool	no	published_definition	leaderboard	mean_pr_auc		leaderboard	Only for tools that expose a probability
+chromosomal_contamination	Chromosomal contamination	detection	all	reference labels; alignments	no	project_defined	scores	chromosome_fp_bp		scores	Chromosome bases covered by a plasmid call
+zero_plasmid_specificity	Zero-plasmid specificity	detection	all	plasmid-free isolates in the cohort	no	project_defined	leaderboard	mean_zero_plasmid_specificity		zero-plasmid	Needs plasmid-free isolates
+unmapped_pred	Unmapped predicted bp	detection	all	alignments	no	project_defined	scores	unmapped_pred_bp		scores	Not penalised in precision; reported so it can be seen
+base_recall	Base recall	sequence_recovery	all	reference labels; alignments	no	published_definition	leaderboard	mean_recall	B1	leaderboard	Share of reference plasmid bases covered, regardless of which bin they sit in
+plasmid_recall	Plasmid recall	sequence_recovery	all	reference labels; alignments	no	project_defined	leaderboard	mean_plasmid_recall	B3	leaderboard	Counts each plasmid equally above one completeness threshold
+recall_ge50	Recall ≥50% complete	sequence_recovery	all	reference labels; alignments	no	project_defined	leaderboard	mean_plasmid_recall_ge50		graded-tiers	One of three completeness bands
+recall_ge90	Recall ≥90% complete	sequence_recovery	all	reference labels; alignments	no	project_defined	leaderboard	mean_plasmid_recall_ge90	B2	graded-tiers	One of three completeness bands
+completeness	Completeness	sequence_recovery	all	reference labels; alignments	no	project_defined	per_plasmid	completeness	C4	per-plasmid-detail	Per plasmid; says nothing about bin purity
+lw_bin_f1	Length-weighted binning F1	binning	reconstruction	bins; reference labels; alignments	yes	project_defined	leaderboard	mean_lw_bin_f1		leaderboard	The ranking metric for short-read reconstruction; a one-to-one match, so a split plasmid is penalised
+bin_f1	Bin F1	binning	reconstruction	bins; reference labels	no	project_defined	leaderboard	mean_bin_f1		bin-diagnostics	Count-based; kept for continuity, not ranked
+nmi	Mean NMI	binning	reconstruction	bins; reference labels	no	published_definition	leaderboard	mean_nmi		bin-diagnostics	Clustering agreement; insensitive to which plasmid a bin is
+vi	Mean VI	binning	reconstruction	bins; reference labels	no	published_definition	leaderboard	mean_variation_of_information		bin-diagnostics	Lower is better
+split	Split	binning	reconstruction	bins; reference labels	no	project_defined	scores	split_events		bin-diagnostics	One truth plasmid over several bins; threshold set by SPLIT_THRESHOLD
+merge	Merge	binning	reconstruction	bins; reference labels	no	project_defined	scores	merge_events		bin-diagnostics	One bin holding several plasmids
+purity	Purity	binning	reconstruction	bins; alignments	no	project_defined	scores	bin_precision		bin-diagnostics	Share of a bin's aligned bases that belong to its matched plasmid
+cprr	CPRR	sequence_reconstruction	reconstruction	bins; reference labels; alignments	yes	project_defined	leaderboard	cprr		leaderboard	The ranking metric for long-read and hybrid reconstruction; excludes order, orientation and circularity (see the structural metrics); thresholds are pre-registered
+perfect_recovery	Perfect reference recovery	sequence_reconstruction	all	reference labels; alignments	no	project_defined	leaderboard	reference_perfect_recovery_rate		leaderboard	F1 and plasmid recall of 1 with no ambiguous or unmapped bases
+strict_reconstruction	Strict reconstruction	sequence_reconstruction	reconstruction	bins; reference labels; alignments	no	project_defined	leaderboard	strict_reference_reconstruction_rate		leaderboard	Perfect recovery plus perfect bin diagnostics; says nothing about nucleotide identity or circular closure
+circular_recall	Complete + circular recall	sequence_reconstruction	all	circular truth	no	project_defined	leaderboard	mean_complete_circular_plasmid_recall	C3	graded-tiers	Needs circular truth; coverage of a circular plasmid is not proof the tool closed it
+identity		sequence_reconstruction	all	alignments with CIGAR; truth not polished with the benchmark reads	no	published_definition	accuracy	identity	A1	accuracy-dimension	Masked where the truth was polished with the benchmark's own reads
+mismatch_rate		sequence_reconstruction	all	alignments with CIGAR	no	published_definition	accuracy	mismatch_rate	A2	accuracy-dimension	Masked where the truth was polished with the benchmark's own reads
+indel_accuracy		sequence_reconstruction	all	alignments with CIGAR	no	published_definition	accuracy	1-(insertion_rate+deletion_rate)	A3	accuracy-dimension	Masked where the truth was polished with the benchmark's own reads
+snp_concordance		sequence_reconstruction	all	a truth variant set	no	not_available	truth_variants	snp_concordance	A4	scorecard	No truth variant set exists, so it is not available and its weight is excluded
+sv_f1		sequence_reconstruction	all	a truth variant set	no	not_available	truth_variants	sv_f1	C2	scorecard	No truth variant set exists, so it is not available and its weight is excluded
+structural_concordance	Structural concordance	sequence_reconstruction	all	alignment blocks	no	unvalidated	structural_summary	collinear_fraction		feature-preservation	Alignment-derived; no read or graph support; not an independent check of structure
+ngoc	NGOC	sequence_reconstruction	all	alignment blocks; truth annotation	no	unvalidated	ngoc	ngoc	C1	feature-preservation	Alignment-derived and unvalidated; the order of neighbouring genes
+amr_recovery	AMR recovery	biological_validity	all	curated AMR truth	no	project_defined	scores	amr_gene_recall	D1	scores	Needs curated AMR truth; says nothing about which plasmid carries the gene
+amr_placement		biological_validity	reconstruction	curated AMR truth; bins	no	project_defined	amr_placement	correct_plasmid_rate		amr-placement	Needs a validated truth_amr.tsv (promoted from the draft by a person)
+annotation_concordance		biological_validity	all	alignment blocks; truth annotation	no	unvalidated	alignment_blocks	protein_features	D2	scorecard	Coordinate projection only, not orthology
+feature_preservation		biological_validity	all	truth annotation; alignments	no	project_defined	feature_preservation	mean_covered_fraction	D3	feature-preservation	Projection through the alignments; a truncated gene is not counted as recovered
+runtime		efficiency	all	run records	no	project_defined	performance	median_runtime_seconds	E1	performance	Depends on the computer used
+memory		efficiency	all	run records	no	project_defined	performance	median_peak_memory_gb	E2	performance	Depends on the computer used and on whether the host profiler recorded memory
+success_rate		efficiency	all	run records	no	project_defined	performance	success_rate	E3	performance	Completed over attempted runs; a skipped run is not a failure
