@@ -14,10 +14,15 @@ standard", "Species balance") explains the rules; in short:
   A tool is never scored zero on a task it does not attempt. Before this split every
   binning-capable tool, reassemblers included, shared one reconstruction track, and a
   reassembler without bins was ranked as a classifier (ranking_metric(); config/prereg.tsv).
-* Reference standard. Only reference tiers <= HEADLINE_MAX_REFERENCE_TIER
-  (default 2) enter the headline; tier 3 (short-read-first or unknown
-  provenance) is a sensitivity analysis. If no sample qualifies, the
-  headline falls back to all samples and says so.
+* Reference standard, two separate questions (truth_provenance.py): reference QUALITY
+  (validated / partially validated / provisional = tier 1 / 2 / 3) and evaluation
+  INDEPENDENCE (independent / partially independent / dependent / unknown). The primary
+  analysis takes references that are BOTH within HEADLINE_MAX_REFERENCE_TIER (default 2)
+  AND independent (HEADLINE_INDEPENDENCE, default "independent"), from at least
+  HEADLINE_MIN_CLUSTERS independent clusters (default 5). Sensitivity 1 adds partially
+  independent references; sensitivity 2 is every reference. Dependent and unknown
+  references never enter the primary analysis. If the primary analysis is unavailable the
+  numbers are shown as provisional (no silent fallback).
 * Species balance. The ranking score is the mean of per-species means over
   species with >= MIN_SPECIES_CLUSTERS independent clusters, so one
   over-represented species cannot dominate. Smaller species are described
@@ -37,6 +42,7 @@ from pathlib import Path
 
 from plasbench_common import UnionFind, CPRR_SWEEP_THRESHOLDS, cprr_sweep_auc  # noqa: E402
 from tool_capabilities import evaluation_task as registry_task  # noqa: E402
+from truth_provenance import independence as derive_independence, INDEPENDENCE  # noqa: E402
 # Resampling primitives live in resampling.py (shared with aggregate_results.py,
 # which used to be imported back from here, a circular dependency). Re-exported so
 # existing `headline_design.exact_mean` / `hd.stratified_bootstrap` callers keep working.
@@ -77,6 +83,8 @@ def normalise_species(organism):
     return " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "")
 
 
+PRIMARY_INDEPENDENCE = ("independent",)
+SENSITIVITY_INDEPENDENCE = ("independent", "partially_independent")
 PRIMARY_AVAILABLE = "available"
 PRIMARY_UNAVAILABLE = "unavailable"
 PRIMARY_FALLBACK = "fallback_allowed"
@@ -87,8 +95,10 @@ class Design:
     """Everything the headline needs to know about samples and tools."""
 
     def __init__(self, sample_sheet=None, capabilities=None, provenance=None, clonal_groups=None,
-                 max_tier=2, min_species_clusters=20, min_primary_clusters=1):
+                 max_tier=2, min_species_clusters=20, min_primary_clusters=1, independence=PRIMARY_INDEPENDENCE):
         self.max_tier = int(max_tier)
+        # the evaluation-independence classes the PRIMARY analysis accepts (a string "independent,partially_independent" or a tuple); dependent and unknown are not accepted by default
+        self.required_independence = self.parse_independence(independence)
         # independent clusters (BioProjects / clonal groups) the qualifying references must come from before the primary analysis counts as available; below it a headline would
         # carry no interval and no test. The pipeline passes HEADLINE_MIN_CLUSTERS (default 5, the interval minimum); the library default of 1 keeps old callers unchanged.
         self.min_primary_clusters = int(min_primary_clusters)
@@ -105,6 +115,14 @@ class Design:
         self.provenance = {r["sample"]: r for r in read_rows(provenance) if r.get("sample")}
         clonal = {r["sample"]: r.get("clonal_group", "") for r in read_rows(clonal_groups) if r.get("sample")}
         self.clusters = self._join_clusters(sheet, clonal)
+
+    @staticmethod
+    def parse_independence(value):
+        items = [v.strip() for v in (value.split(",") if isinstance(value, str) else value) if v and v.strip()]
+        bad = [v for v in items if v not in INDEPENDENCE]
+        if bad or not items:
+            raise ValueError(f"HEADLINE_INDEPENDENCE must list one or more of {INDEPENDENCE}, got {value!r}")
+        return tuple(items)
 
     @staticmethod
     def _join_clusters(sheet, clonal):
@@ -143,23 +161,51 @@ class Design:
     def tier(self, sample):
         return (self.provenance.get(sample) or {}).get("reference_tier", "")
 
+    def independence(self, sample):
+        """The evaluation-independence class of a sample's reference. A provenance table written before the column existed is read through the same rule from its strategy and polishing
+        columns; a sample with no record is 'unknown' (never assumed independent)."""
+        record = self.provenance.get(sample)
+        if not record:
+            return "unknown"
+        value = (record.get("evaluation_independence") or "").strip()
+        return value if value in INDEPENDENCE else derive_independence((record.get("truth_assembly_strategy") or "").strip(),
+                                                                       (record.get("truth_polish_reads") or "").strip())[0]
+
+    def eligible(self, sample, allowed=None):
+        """Does this reference qualify: quality tier within the maximum AND evaluation independence among `allowed` (default: the primary requirement)?"""
+        tier = self.tier(sample)
+        return bool(tier) and int(tier) <= self.max_tier and self.independence(sample) in (allowed or self.required_independence)
+
+    def requirement_label(self, allowed=None):
+        allowed = allowed or self.required_independence
+        return f"reference tiers 1-{self.max_tier}, {' or '.join(a.replace('_', ' ') for a in allowed)}"
+
+    def populations(self, rows):
+        """The three pre-specified populations as [(key, label, rows)]: the primary analysis (independent references), sensitivity 1 (plus partially independent), sensitivity 2
+        (every reference, including dependent and unknown; exploratory only)."""
+        return [("primary", "primary: " + self.requirement_label(self.required_independence), [r for r in rows if self.eligible(r["sample"])]),
+                ("sensitivity_1", "sensitivity 1: " + self.requirement_label(SENSITIVITY_INDEPENDENCE),
+                 [r for r in rows if self.eligible(r["sample"], SENSITIVITY_INDEPENDENCE)]),
+                ("sensitivity_2", "sensitivity 2: all references (including dependent and unknown independence)", list(rows))]
+
     def headline_selection(self, rows, allow_fallback=False):
         """The headline population and whether the PRIMARY analysis is available: a Selection(rows, basis, status, reason, population).
 
-        The primary analysis needs references the pre-specified criteria accept (reference tiers 1 to `max_tier`). When none exists the primary analysis is UNAVAILABLE:
+        The primary analysis needs references the pre-specified criteria accept: quality tiers 1 to `max_tier` AND an accepted evaluation independence (by default `independent`
+        only), from at least `min_primary_clusters` independent clusters. When none exists the primary analysis is UNAVAILABLE:
         the same numbers are still computed on all samples, but they are labelled provisional everywhere (`primary_status`, `population`, the report banner) and are never
         the headline. This replaces a silent fallback to all samples. `allow_fallback` (ALLOW_PRIMARY_FALLBACK=1) keeps the numbers as the headline, with status
         'fallback_allowed' and the warning kept in every label."""
         if not self.provenance:
             reason = "no truth-provenance table, so no sample can be shown to meet the reference requirement"
         else:
-            kept = [r for r in rows if self.tier(r["sample"]) and int(self.tier(r["sample"])) <= self.max_tier]
+            kept = [r for r in rows if self.eligible(r["sample"])]
             clusters = len({self.cluster(r["sample"]) for r in kept})
+            need = self.requirement_label()
             if kept and clusters >= self.min_primary_clusters:
-                label = f"reference tiers 1-{self.max_tier}"
-                return Selection(kept, label, PRIMARY_AVAILABLE, "", f"primary: {label}")
-            reason = (f"no sample has a reference in tiers 1-{self.max_tier}" if not kept else
-                      f"only {clusters} independent cluster(s) have a reference in tiers 1-{self.max_tier}; at least {self.min_primary_clusters} are needed for the headline to carry an interval")
+                return Selection(kept, need, PRIMARY_AVAILABLE, "", f"primary: {need}")
+            reason = (f"no sample has a reference meeting the primary requirement ({need})" if not kept else
+                      f"only {clusters} independent cluster(s) have a reference meeting the primary requirement ({need}); at least {self.min_primary_clusters} are needed for the headline to carry an interval")
         if allow_fallback:
             return Selection(rows, f"all samples (FALLBACK ALLOWED: {reason})", PRIMARY_FALLBACK, reason,
                              f"fallback allowed: all samples ({reason})")
@@ -412,6 +458,16 @@ def species_table(track, task, rows, metric, design, failed_samples, known_tools
                         "mean_metric": statistics.mean(by_tool[tool][s] for s in members),
                         "metric": metric, "in_headline": "yes" if species in qualifying else "no"})
     return out
+
+
+def independence_table(track, task, rows, metric, design):
+    """Per tool x evaluation-independence class: n and mean ranking metric (sensitivity: how much the ranking leans on dependent or partly independent references)."""
+    by = defaultdict(list)
+    for r in rows:
+        if r.get(metric) is not None:
+            by[(r["tool"], design.independence(r["sample"]))].append(r[metric])
+    return [{"analysis_track": track, "task": task, "tool": tool, "evaluation_independence": cls, "n_samples": len(v), "mean_metric": statistics.mean(v), "metric": metric}
+            for (tool, cls), v in sorted(by.items())]
 
 
 def tier_table(track, task, rows, metric, design):

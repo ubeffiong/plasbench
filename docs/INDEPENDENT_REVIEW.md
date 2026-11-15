@@ -430,25 +430,25 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
 | E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:175` | `or len(units) < MIN_CLUSTERS_CI or _has_nan(values)` |
 | E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:259` | `or len(units) < MIN_CLUSTERS_TEST or _has_nan(differences)` |
-| E22 | Holm adjustment across pairs | `python/aggregate_results.py:711` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:863` | `def attach_significance` |
+| E22 | Holm adjustment across pairs | `python/aggregate_results.py:712` | `def holm_adjust` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:864` | `def attach_significance` |
 | E24 | Percentile cluster bootstrap | `python/resampling.py:166` | `def bootstrap_ci` |
-| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:83` | `def sample_clusters` |
-| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:112` | `UnionFind()` |
-| E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:81` | `PRIMARY_UNAVAILABLE = "unavailable"` |
-| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:90` | `min_species_clusters=20` |
-| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:241` | `def shared_values` |
-| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:251` | `def build_variants` |
+| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:84` | `def sample_clusters` |
+| E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:130` | `UnionFind()` |
+| E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:89` | `PRIMARY_UNAVAILABLE = "unavailable"` |
+| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:98` | `min_species_clusters=20` |
+| E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:287` | `def shared_values` |
+| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:268` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:154` | `--min-long-read-depth` |
-| E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:286` | `reference_tier, tier_reason = tier(` |
-| E34 | Circularity guard for long-read tools | `scripts/lib.sh:281` | `truth_independent_of_long_reads` |
+| E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:311` | `reference_tier, tier_reason = tier(` |
+| E34 | Circularity guard for long-read tools | `scripts/lib.sh:228` | `truth_independent_of_long_reads` |
 | E35 | Date-based overlap screen | `python/flag_database_overlap.py:97` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:189` | `lambda was selected on the same LOSO folds` |
 | E38 | The bootstrap test re-implements the algorithm | `test/test_robustness_diagnostics.py:48` | `def reference_bootstrap` |
 | E39 | CI installs minimap2 so the aligner test runs for real | `.github/workflows/ci.yml:28` | `apt-get install -y -qq minimap2` |
-| E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:292` | `base_level_metrics_valid` |
+| E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:16` | `base_level_metrics_valid` |
 | E41 | Tool database dates (first row) | `config/tool_database_releases.tsv:2` | `mob_recon` |
 | E42 | Exclusion of possible overlaps is off by default | `config/config.sh:548` | `EXCLUDE_DATABASE_OVERLAP` |
 | E43 | barrnap is in the environment file | `env/environment.yml:25` | `barrnap` |
@@ -456,7 +456,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E52 | Unresolvable truth sequences are labelled REVIEW | `python/make_truth.py:50` | `REVIEW = "REVIEW"` |
 | E53 | A legacy option restores the chromosome guess | `python/make_truth.py:18` | `--allow-default` |
 | E54 | Conflicting evidence is labelled AMBIGUOUS and excluded | `python/label_truth_evidence.py:126` | `AMBIGUOUS` |
-| E55 | Samples polished with the benchmark's reads | `python/truth_provenance.py:133` | `same_as_benchmark` |
+| E55 | Samples polished with the benchmark's reads | `python/truth_provenance.py:81` | `same_as_benchmark` |
 | E56 | Cohort counts and tiers | `cohorts/public-v3.tsv:6` | `sample_id` |
 
 **Reproduce E56's numbers:** `python3 python/truth_provenance.py --sample-sheet cohorts/public-v3.tsv --data-dir <empty dir> --out prov.tsv` reports `tier 2=79, tier 3=19`; the species, BioProject and metadata counts in Part 2 and Part 5.1 come from reading `cohorts/public-v3.tsv` with comment lines removed (98 isolates, 81 BioProjects; 330 of 392 cells blank across `sample_origin`, `read_depth_x`, `assembly_plasmid_count` and `source_study`).

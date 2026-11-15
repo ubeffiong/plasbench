@@ -1366,6 +1366,7 @@ def headline_design_section(out_dir):
     provenance = read_tsv(out_dir / "benchmark.truth_provenance.tsv") if (out_dir / "benchmark.truth_provenance.tsv").is_file() else []
     species = read_tsv(out_dir / "benchmark.species.tsv") if (out_dir / "benchmark.species.tsv").is_file() else []
     tiers = read_tsv(out_dir / "benchmark.reference_tiers.tsv") if (out_dir / "benchmark.reference_tiers.tsv").is_file() else []
+    independence = read_tsv(out_dir / "benchmark.reference_independence.tsv") if (out_dir / "benchmark.reference_independence.tsv").is_file() else []
     if not (design or provenance or species or tiers):
         return ""
     design_rows = "".join(
@@ -1377,11 +1378,21 @@ def headline_design_section(out_dir):
     tier_counts = Counter(r.get("reference_tier") for r in provenance)
     provenance_rows = "".join(
         f"<tr><td>{esc(r.get('sample'))}</td><td>{esc(r.get('reference_tier'))}</td>"
+        f"<td>{esc((r.get('reference_quality') or '').replace('_', ' ') or 'not recorded')}</td>"
+        f"<td title='{esc(r.get('independence_reason') or '')}'>{esc((r.get('evaluation_independence') or '').replace('_', ' ') or 'not recorded')}</td>"
         f"<td>{esc(r.get('truth_assembly_strategy'))}</td><td>{esc(r.get('truth_polish_reads'))}</td>"
         f"<td>{esc(r.get('base_level_metrics_valid'))}</td><td>{esc(r.get('labels_evidence_checked'))}</td>"
         f"<td>{esc(r.get('ambiguous_plasmids') or '0')}</td><td>{esc(r.get('tier_reason'))}</td>"
         f"<td title='{esc(r.get('evidence_sources') or 'not recorded')}'>{esc(provenance_evidence(r))}</td></tr>"
-        for r in provenance) or "<tr><td colspan='9'>No provenance table.</td></tr>"
+        for r in provenance) or "<tr><td colspan='11'>No provenance table.</td></tr>"
+    independence_by_tool = defaultdict(dict)
+    for r in independence:
+        independence_by_tool[(r.get("analysis_track"), r.get("task"), r.get("tool"))][r.get("evaluation_independence")] = (r.get("mean_metric"), r.get("n_samples"))
+    independence_rows = "".join(
+        f"<tr><td>{esc(track)} / {esc(TASK_LABELS.get(task, task))}</td><td>{esc(tool)}</td>"
+        + "".join(f"<td>{esc(f'{optional_number(v[0]):.3f} (n={v[1]})' if v and optional_number(v[0]) is not None else 'none')}</td>"
+                  for v in (cells.get(c) for c in ("independent", "partially_independent", "dependent", "unknown"))) + "</tr>"
+        for (track, task, tool), cells in sorted(independence_by_tool.items())) or "<tr><td colspan='6'>No independence table for this run.</td></tr>"
     species_rows = "".join(
         f"<tr><td>{esc(r.get('analysis_track'))} / {esc(r.get('task'))}</td><td>{esc(r.get('tool'))}</td>"
         f"<td><em>{esc(r.get('species'))}</em></td><td>{esc(r.get('n_samples'))}</td><td>{esc(r.get('n_clusters'))}</td>"
@@ -1403,7 +1414,11 @@ def headline_design_section(out_dir):
                            "No tool was scored on both headline-tier and tier-3 truth in this run.")
     return (
         "<section id='headline-design'><h2>Headline design and reference standard</h2>"
-        "<p class='lead'>Which samples and species the headline ranking rests on. Truth assemblies are graded: "
+        "<p class='lead'>Which samples and species the headline ranking rests on. Two separate questions are asked of each reference. "
+        "<strong>Reference quality</strong> (validated, partially validated, provisional) is the tier. <strong>Evaluation independence</strong> asks whether the reference is independent of the evidence the "
+        "benchmarked tools use: <em>independent</em> (long-read-first, polished with no reads or reads independent of the benchmark), <em>partially independent</em> (long-read-first structure, polished "
+        "with the benchmark's own reads), <em>dependent</em> (short-read-first hybrid) or <em>unknown</em>. The primary analysis needs a reference that is within the tier limit AND independent, from at "
+        "least the minimum number of independent clusters; dependent and unknown references never enter it. The tiers: "
         "<strong>Tier 1</strong> long-read-first truth independent of the benchmark reads with evidence-checked "
         "labels; <strong>Tier 2</strong> long-read-first truth that fails a Tier-1 condition (for example, "
         "polished with the benchmark's own Illumina reads, so identity-based criteria are not applied); "
@@ -1418,10 +1433,14 @@ def headline_design_section(out_dir):
         + (", ".join(f"tier {esc(t)}: {n}" for t, n in sorted(tier_counts.items()) if t) or "none")
         + ". Derived values are heuristics from NCBI assembly metadata; set truth_assembly_strategy and "
         "truth_polish_reads in the sample sheet to override.</p>"
-        "<div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tier</th><th>Assembly strategy</th>"
+        "<div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tier</th><th>Reference quality</th><th>Evaluation independence</th><th>Assembly strategy</th>"
         "<th>Polishing reads</th><th>Identity criteria valid</th><th>Labels evidence-checked</th>"
         f"<th>AMBIGUOUS plasmids</th><th>Reason</th><th>Evidence recorded</th></tr></thead><tbody>{provenance_rows}</tbody></table></div>"
         "<h3>Reference-tier sensitivity</h3><div class='chart-card'>" + chart + "</div>"
+        "<h3>Reference-independence sensitivity</h3><p class='muted'>The ranking metric of each tool on references of each evaluation-independence class. The primary analysis uses the independent "
+        "column only; partially independent references are sensitivity 1 and every reference is sensitivity 2. A tool that does much better on dependent references than on independent ones is "
+        "benefiting from a reference that shares its evidence.</p><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th><th>Independent</th>"
+        f"<th>Partially independent</th><th>Dependent</th><th>Unknown</th></tr></thead><tbody>{independence_rows}</tbody></table></div>"
         "<h3>Species balance</h3><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th>"
         "<th>Tool</th><th>Species</th><th>Samples</th><th>Independent clusters</th><th>Mean ranking metric</th>"
         f"<th>In headline</th></tr></thead><tbody>{species_rows}</tbody></table></div></details></section>"

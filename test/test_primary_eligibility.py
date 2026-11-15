@@ -40,7 +40,8 @@ def main():
 
     def provenance(tmp, tiers):
         path = Path(tmp) / "prov.tsv"
-        path.write_text("sample\treference_tier\n" + "".join(f"{s}\t{t}\n" for s, t in tiers.items()), encoding="utf-8")
+        # evaluation independence follows the tier here (tiers 1-2 independent, tier 3 dependent); the independence rules have their own tests below
+        path.write_text("sample\treference_tier\tevaluation_independence\n" + "".join(f"{s}\t{t}\t{'independent' if t in ('1', '2') else 'dependent'}\n" for s, t in tiers.items()), encoding="utf-8")
         return str(path)
 
     print("the design")
@@ -52,16 +53,49 @@ def main():
         d3 = hd.Design(provenance=provenance(tmp, {"s1": "3", "s2": "3"}))
         sel = d3.headline_selection(rows)
         check("only tier-3 references: unavailable, provisional, names the tier requirement",
-              sel.status == hd.PRIMARY_UNAVAILABLE and sel.rows == rows and "no sample has a reference in tiers 1-2" in sel.reason, sel)
+              sel.status == hd.PRIMARY_UNAVAILABLE and sel.rows == rows and "no sample has a reference meeting the primary requirement" in sel.reason and "tiers 1-2" in sel.reason, sel)
         d1 = hd.Design(provenance=provenance(tmp, {"s1": "1", "s2": "3"}))
         sel = d1.headline_selection(rows)
         check("a tier-1 sample: available, and only the qualifying sample is the headline",
-              sel.status == hd.PRIMARY_AVAILABLE and [r["sample"] for r in sel.rows] == ["s1"] and sel.population == "primary: reference tiers 1-2" and not sel.reason, sel)
+              sel.status == hd.PRIMARY_AVAILABLE and [r["sample"] for r in sel.rows] == ["s1"] and sel.population == "primary: reference tiers 1-2, independent" and not sel.reason, sel)
         sel = d3.headline_selection(rows, allow_fallback=True)
         check("allow_fallback: status fallback_allowed and the warning stays in the label",
               sel.status == hd.PRIMARY_FALLBACK and "FALLBACK ALLOWED" in sel.basis and sel.rows == rows, sel)
         check("allow_fallback changes nothing when a reference qualifies", d1.headline_selection(rows, allow_fallback=True).status == hd.PRIMARY_AVAILABLE)
         check("headline_rows still returns (rows, basis) with the same labels", d3.headline_rows(rows) == (rows, d3.headline_selection(rows).basis))
+
+    print("evaluation independence (quality and independence are separate questions)")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "prov.tsv"
+        # s1 independent tier 1; s2 independent but tier 2 (cohort tier B); s3 partially independent tier 2 (polished with the benchmark reads); s4 dependent tier 3; s5 unknown tier 3
+        path.write_text("sample\treference_tier\tevaluation_independence\ns1\t1\tindependent\ns2\t2\tindependent\ns3\t2\tpartially_independent\ns4\t3\tdependent\ns5\t3\tunknown\n", encoding="utf-8")
+        five = [{"sample": f"s{i}", "tool": "t"} for i in range(1, 6)]
+        design = hd.Design(provenance=str(path))
+        sel = design.headline_selection(five)
+        check("primary = independent references within the maximum tier (a tier-2 independent reference qualifies; partially independent, dependent and unknown do not)",
+              sel.status == hd.PRIMARY_AVAILABLE and [r["sample"] for r in sel.rows] == ["s1", "s2"], sel)
+        pops = {key: [r["sample"] for r in rows] for key, _label, rows in design.populations(five)}
+        check("sensitivity 1 adds the partially independent reference; sensitivity 2 is every reference",
+              pops == {"primary": ["s1", "s2"], "sensitivity_1": ["s1", "s2", "s3"], "sensitivity_2": ["s1", "s2", "s3", "s4", "s5"]}, pops)
+        wide = hd.Design(provenance=str(path), independence="independent,partially_independent")
+        check("HEADLINE_INDEPENDENCE can widen the primary requirement (as a comma-separated setting)", [r["sample"] for r in wide.headline_selection(five).rows] == ["s1", "s2", "s3"])
+        try:
+            hd.Design(independence="mostly_independent")
+            rejected = False
+        except ValueError as error:
+            rejected = "HEADLINE_INDEPENDENCE" in str(error)
+        check("an unknown independence class is an error that names the setting", rejected)
+        only_dependent = tmp + "/dep.tsv"
+        Path(only_dependent).write_text("sample\treference_tier\tevaluation_independence\ns1\t3\tdependent\ns2\t2\tpartially_independent\n", encoding="utf-8")
+        sel = hd.Design(provenance=only_dependent).headline_selection(five[:2])
+        check("dependent or partially independent references only: the primary analysis is unavailable", sel.status == hd.PRIMARY_UNAVAILABLE and "independent" in sel.reason, sel)
+        # a provenance table from before the column existed is read through the same rule from its strategy and polishing columns; a sample with no record is unknown
+        old = Path(tmp) / "old.tsv"
+        old.write_text("sample\treference_tier\ttruth_assembly_strategy\ttruth_polish_reads\n"
+                       "s1\t1\tlong_read_only\tnone\ns2\t2\tlong_read_first_hybrid\tsame_as_benchmark\ns3\t3\tshort_read_first_hybrid\tsame_as_benchmark\ns4\t3\tunknown\tunknown\n", encoding="utf-8")
+        legacy = hd.Design(provenance=str(old))
+        check("an older provenance table is classified from strategy and polish; no record or unknown strategy is 'unknown'",
+              [legacy.independence(s) for s in ("s1", "s2", "s3", "s4", "s9")] == ["independent", "partially_independent", "dependent", "unknown", "unknown"])
 
     print("the cluster minimum")
     with tempfile.TemporaryDirectory() as tmp:
@@ -73,6 +107,10 @@ def main():
         sel = three.headline_selection(many)
         check("references from only 3 independent clusters are not enough for a minimum of 5: unavailable, with the reason",
               sel.status == hd.PRIMARY_UNAVAILABLE and "only 3 independent cluster(s)" in sel.reason and "at least 5" in sel.reason, sel)
+        mixed = Path(tmp) / "mixed.tsv"   # cluster PRJ0 (s0, s1) independent; the other four isolates (clusters PRJ1, PRJ2) are dependent tier 3
+        mixed.write_text("sample\treference_tier\tevaluation_independence\n" + "".join(f"s{i}\t{'1' if i < 2 else '3'}\t{'independent' if i < 2 else 'dependent'}\n" for i in range(6)), encoding="utf-8")
+        check("the clusters are counted over the qualifying (independent) references only",
+              hd.Design(sample_sheet=str(sheet), provenance=mixed, min_primary_clusters=2).headline_selection(many).status == hd.PRIMARY_UNAVAILABLE)
         check("enough clusters: available", hd.Design(sample_sheet=str(sheet), provenance=prov, min_primary_clusters=3).headline_selection(many).status == hd.PRIMARY_AVAILABLE)
         check("the library default keeps old callers unchanged (one qualifying cluster is enough)", hd.Design(sample_sheet=str(sheet), provenance=prov).headline_selection(many).status == hd.PRIMARY_AVAILABLE)
         check("allow_fallback keeps the numbers with the warning when the cluster minimum is not met", three.headline_selection(many, allow_fallback=True).status == hd.PRIMARY_FALLBACK)

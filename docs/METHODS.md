@@ -675,6 +675,13 @@ computed on all samples but are labelled provisional (`primary_status` and `popu
 `primary_status` in `benchmark.headline_design.tsv`, a banner in the report) and are not the headline.
 `ALLOW_PRIMARY_FALLBACK=1` keeps them as the headline with the warning.
 
+**Statistics validation** (`simulate_validation.py`). Scenarios: balanced, unbalanced, dominant and heavy studies; within-study correlation; missing outputs and resource failures (per isolate and whole studies); a dominant species with the stratified functions; Holm over 6 and 15 comparisons. Results are grouped by the number of independent studies; `by_studies()` marks a number 'supported' only for a full run with no shortfall, and `overall_status()` keeps the procedures provisional otherwise. A full-mode simulation (75 scenario rows, 1,000 replicates each, production resampling counts, seed 20261114; results in docs/stats_validation/) found that the paired tests (exact sign-flip up to 12 studies, Monte Carlo above) and the Holm adjustment are calibrated in every structure simulated, and that the percentile cluster-bootstrap intervals are NOT: coverage of the nominal 95% was 82-85% at 5-6 studies, 87-92% at 8-20 studies, 94% at 30 balanced studies, and as low as 74% with one dominant species. Intervals are therefore optimistic (too narrow) at every number of studies tested below 30, and the statistical procedures stay provisional.
+
+**Reference quality and evaluation independence** (`truth_provenance.py`; separate columns `reference_quality` and `evaluation_independence`, with `independence_reason`).
+Quality is the tier (validated / partially validated / provisional). Independence is derived from the assembly strategy and the polishing reads: independent = long-read-only or
+long-read-first with polishing none or independent; partially independent = long-read-first polished with the benchmark's reads (or unrecorded); dependent = short-read-first
+hybrid; unknown = unrecorded strategy. The primary analysis requires both: its **reference quality** is within the tier limit (`HEADLINE_MAX_REFERENCE_TIER`, default 2: validated or partially validated) AND its **evaluation independence** is `independent` (`HEADLINE_INDEPENDENCE`). Independent means long-read-only or long-read-first truth polished with no reads or reads independent of the benchmark; partially independent is long-read-first truth polished with the benchmark's own reads (or unrecorded); dependent is a short-read-first hybrid; unknown is an unrecorded strategy, never assumed independent. The qualifying references must come from at least `HEADLINE_MIN_CLUSTERS` (default 5, the interval minimum) independent clusters (BioProjects or clonal groups), counted over the qualifying references only. Sensitivity analysis 1 adds partially independent references; sensitivity analysis 2 uses every reference; dependent and unknown references never enter the primary analysis. If the primary analysis is unavailable the ranking is shown as provisional, never as the headline. `benchmark.reference_independence.tsv` gives each tool's ranking metric per class; a provenance table written before the column existed is classified from its strategy and polishing columns.
+
 **Evidence-based labels** (`python/label_truth_evidence.py`, stage 2). Source labels
 are confirmed with evidence, never assigned by size:
 
@@ -1125,7 +1132,8 @@ in GC between the length-weighted 10th and 90th percentiles. Advisory: stage 8 w
 recommending; stage 6 writes it for every assembly so its warning can be scored.
 
 **AMR placement** (`score_amr_placement.py`). Per curated gene copy (matched by position, ≥ 90% covered
-by one predicted record): correct or wrong plasmid via one-to-one bin-to-plasmid matching, shared or
+by one predicted record): correct or wrong plasmid (attribution depends on the tool's evaluation task: a binner's bins are matched one-to-one with the plasmids, a classifier's or
+reassembler's records are each attributed to the plasmid they overlap most, so two contigs of one plasmid are both correct), shared or
 unassigned contig, or not recovered; level 1 asks whether the matched plasmid shares a replicon type.
 Summarised per gene class from `config/amr_gene_classes.tsv` (unmatched genes: `other`).
 

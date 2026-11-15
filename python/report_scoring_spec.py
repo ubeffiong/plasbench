@@ -348,13 +348,19 @@ def amr_section(rows, data_dir=None):
                     "AMR plasmids", "All copies on the right plasmid", "AMR-PRR", "Pairs kept together", "Flank context"],
                    [(r["tool"], r["gene_class"], r["n_gene_copies"], r["n_recovered"], r["n_correct_plasmid"],
                      r["n_wrong_plasmid"], r["n_shared_contig"], r["n_unassigned_contig"], r["correct_plasmid_rate"],
-                     r["replicon_type_correct_rate"], r.get("n_amr_plasmids", ""), na(r.get("amr_complete_rate")), na(r.get("amr_prr")),
-                     (f"{r['n_colocalised_pairs']} of {r['n_pairs']} ({na(r.get('colocalisation_rate'))})" if r.get("n_pairs") not in ("", None, "0") else "not evaluable"),
+                     r["replicon_type_correct_rate"], r.get("n_amr_plasmids", ""), na(r.get("amr_complete_rate")),
+                     "not applicable (classifier)" if r.get("evaluation_task") == "classification" else na(r.get("amr_prr")),
+                     ("not applicable (classifier)" if r.get("evaluation_task") == "classification"
+                      else f"{r['n_colocalised_pairs']} of {r['n_pairs']} ({na(r.get('colocalisation_rate'))})" if r.get("n_pairs") not in ("", None, "0") else "not evaluable"),
                      na(r.get("flank_context_rate"))) for r in rows])
     drafts = sum(int(r.get("draft_truth_copies") or 0) for r in rows if r.get("gene_class") == "all")
     if drafts:
         tables += (f"<p class='insight caution'><strong>Uncurated truth.</strong> {drafts} of the gene copies behind this table come from an auto-derived DRAFT (evidence tier auto_derived) that was copied to truth_amr.tsv "
                    "without being reviewed and promoted. Read every figure here as unreviewed. Promote a reviewed draft with <code>plasbench promote-amr-truth</code>.</p>")
+    if any(r.get("evaluation_task") in ("classification", "sequence_reassembly") for r in rows):
+        tables += ("<p class='muted'>How a gene copy is attributed to a plasmid depends on the tool's task. A binner's bins are matched one-to-one with the plasmids. A classifier's or reassembler's "
+                   "records are each attributed to the plasmid they overlap most, so two contigs carrying two genes of one plasmid are both correct; for a classifier that says which plasmid "
+                   "the evidence points at, not that it linked the genes or reconstructed the plasmid, so it has no AMR-PRR and no pairs-kept-together figure.</p>")
     tables += ("<p class='muted'>AMR-PRR: of the plasmids that carry a curated AMR copy, the share whose copies all sit on the right plasmid and that the tool also reconstructed "
                "correctly (the CPRR criteria, with the same identity rule as CPRR). Pairs kept together: recovered copies on one plasmid that the tool put in the same bin. Flank context: the share of the flank "
                "(AMR_FLANK_BP, 1 kb by default, recorded in the run manifest) either side of each recovered copy that the same record covers. Alignment-derived from curated truth, reported beside the placement, never ranking a tool.</p>")
