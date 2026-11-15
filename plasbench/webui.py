@@ -116,6 +116,13 @@ class Project:
                 unique.append(row)
         return unique
 
+    def settings_resolved(self) -> list[dict]:
+        """settings(), each location default also resolved to the path it means on this computer."""
+        rows = self.settings()
+        for row in rows:
+            row.update(self.resolve_setting_default(row))
+        return rows
+
     def local_env_path(self) -> Path:
         return Path(os.environ.get("PLASBENCH_LOCAL_SETTINGS", self.root / "config" / "local.env"))
 
@@ -298,8 +305,6 @@ class Project:
         that is already installed is visibly reused instead of looking like a blank to fill in.
         """
         local = self.local_env()
-        store = Path(os.environ.get("PLASBENCH_DB_DIR") or local.get("PLASBENCH_DB_DIR") or Path.home() / ".plasbench" / "databases")
-        data = self.path_setting("DATA_DIR", "data")
         out = {}
         for dest, var, rel in self.DB_FIELDS:
             explicit = os.environ.get(var) or local.get(var)
@@ -308,16 +313,47 @@ class Project:
             elif rel is None:
                 out[dest] = {"path": "", "found": False, "source": "none"}
                 continue
-            elif (data / "db" / rel).exists() and not (store / rel).exists():
-                path, source = data / "db" / rel, "project"
             else:
-                path, source = store / rel, "store"
-            try:
-                found = path.is_dir() and any(path.iterdir())
-            except OSError:
-                found = False
-            out[dest] = {"path": str(path), "found": found, "source": source}
+                path, source = self.db_location(rel)
+            out[dest] = {"path": str(path), "found": self.installed(path), "source": source}
         return out
+
+    def db_location(self, rel: str) -> tuple:
+        """config.sh's plasbench_db_path: the machine-wide store, unless only DATA_DIR/db has it."""
+        local = self.local_env()
+        store = Path(os.environ.get("PLASBENCH_DB_DIR") or local.get("PLASBENCH_DB_DIR") or Path.home() / ".plasbench" / "databases")
+        data = self.path_setting("DATA_DIR", "data")
+        if (data / "db" / rel).exists() and not (store / rel).exists():
+            return data / "db" / rel, "project"
+        return store / rel, "store"
+
+    @staticmethod
+    def installed(path: Path) -> bool:
+        """A database folder that exists and is not empty, or a database file that is not empty."""
+        try:
+            return (path.is_dir() and any(path.iterdir())) or (path.is_file() and path.stat().st_size > 0)
+        except OSError:
+            return False
+
+    def resolve_setting_default(self, row: dict) -> dict:
+        """What a setting left at its default actually points to on this computer.
+
+        config.sh writes several defaults as shell code (``$(plasbench_db_path platon/db)``,
+        ``${PLASBENCH_DATA_DIR:-$PROJECT_ROOT/data}``); shown raw, nobody can tell where a database
+        is or whether it is installed. Returns {"resolved": path, "found": bool or None}.
+        """
+        key, default = row["key"], row["default"]
+        m = re.fullmatch(r"\$\(plasbench_db_path ([^)]+)\)", default.strip())
+        if m:
+            path, _ = self.db_location(m.group(1).strip())
+            return {"resolved": str(path), "found": self.installed(path)}
+        if key == "DATA_DIR":
+            return {"resolved": str(self.path_setting("DATA_DIR", "data")), "found": None}
+        if key == "PLASBENCH_DB_DIR":
+            return {"resolved": str(Path(default.replace("$HOME", str(Path.home()))).expanduser()), "found": None}
+        if re.fullmatch(r"\$PROJECT_ROOT/[\w./-]+", default):
+            return {"resolved": str(self.root / default[len("$PROJECT_ROOT/"):]), "found": None}
+        return {}
 
     def info(self) -> dict:
         cpus = os.cpu_count() or 1
@@ -768,7 +804,7 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "tools":
                 return self.jsend(200, {"tools": project.tools()})
             if route == "settings":
-                return self.jsend(200, {"settings": project.settings(), "local_env": str(project.local_env_path())})
+                return self.jsend(200, {"settings": project.settings_resolved(), "local_env": str(project.local_env_path())})
             if route == "cohorts":
                 return self.jsend(200, {"cohorts": project.cohorts()})
             if route == "cohorts/info":

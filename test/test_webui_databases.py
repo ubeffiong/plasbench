@@ -69,6 +69,19 @@ def main():
         print("the window's info carries it")
         check("info() includes databases", "databases" in p.info() and "platon_db" in p.info()["databases"])
 
+        print("Settings shows what shell-code defaults mean on this computer")
+        os.environ.pop("GENOMAD_DB", None)
+        rows = {r["key"]: r for r in p.settings_resolved()}
+        check("PLATON_DB resolves to the store and is installed",
+              rows["PLATON_DB"].get("resolved") == str(store / "platon" / "db") and rows["PLATON_DB"].get("found") is True, rows["PLATON_DB"])
+        check("PLASMER_DB resolves and is not installed",
+              rows["PLASMER_DB"].get("resolved") == str(store / "plasmer") and rows["PLASMER_DB"].get("found") is False, rows["PLASMER_DB"])
+        check("a database file (reference sketch) resolves too",
+              rows["PLASMID_REFERENCE_SKETCH"].get("resolved") == str(store / "plasmid_reference" / "reference.msh"))
+        check("DATA_DIR shows the real data folder, not shell code", rows["DATA_DIR"].get("resolved") == str(data))
+        check("LOG_DIR shows a path under the install", rows["LOG_DIR"].get("resolved") == str(ROOT / "logs"))
+        check("a plain setting gets nothing extra", "resolved" not in rows.get("THREADS", {}) or not rows["THREADS"].get("resolved"))
+
     for k, v in keep.items():
         if v is None:
             os.environ.pop(k, None)
@@ -78,6 +91,10 @@ def main():
     print("the run form uses it")
     check("database fields show their status", "function dbStatusHTML" in ui and "${dbStatusHTML(a.dest)}" in ui)
     check("the wizard refreshes it on open", 'S.info = await api("info")' in ui.split("async function loadWizard", 1)[1][:400])
+    check("the settings route sends resolved locations", "project.settings_resolved()" in (ROOT / "plasbench" / "webui.py").read_text(encoding="utf-8"))
+    check("Settings shows installed / not installed and the path", "r.resolved ?" in ui and "Not installed yet</span> at" in ui)
+    check("data, results and log folders say what empty means",
+          "leave empty: the shared data folder" in ui and "leave empty: the run's own study folder" in ui and "leave empty: the logs folder" in ui)
     check("database paths are an optional fold, closed unless one is filled in",
           "Use a different database copy (optional)" in ui and 'dbArgs.some(a => V[a.dest]) ? "open" : ""' in ui
           and "groupedFields(io, V, \"w\", true)}${dbBlock}" in ui)
