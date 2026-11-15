@@ -414,7 +414,7 @@ HELP = {
         "The file is hashed and this run's settings are checked against it.",
         "'Frozen' and matching means no changes after the fact.",
         "Protects against tuning the scoring to favour a tool.",
-        "If it says 'not frozen', the protection is not in force."),
+        "If it says 'not frozen' or 'DRAFT', the protection is not fully in force: some values are still proposed and await confirmation."),
     "truth-label-audit": H(
         "Are the plasmid and chromosome labels in the truth actually right?",
         "Truth sequences and their replicon and MOB evidence.",
