@@ -124,6 +124,54 @@ def main():
                                "--out-prefix", str(Path(tmp) / "o")], capture_output=True, text=True)
         check("a missing PAF is a clear error, not a crash", done.returncode != 0 and "nothing to re-score" in done.stderr)
 
+    print("alignment length, the headline metrics and the CPRR thresholds (plan A8)")
+    with tempfile.TemporaryDirectory() as tmp:
+        results = Path(tmp) / "results" / "s1"
+        results.mkdir(parents=True)
+        (results / "truth.tsv").write_text("sequence_id\tmolecule_type\tlength\nchromosome\tCHROMOSOME\t10000\nplasmidA\tPLASMID\t2000\n")
+        (results / "pred_tool_short.plasmid.fasta").write_text(">c\n" + "A" * 300 + "\n")
+        (results / "tool_short.pred_vs_ref.paf").write_text(paf("c", 300, 0, 300, "plasmidA", 2000, 0, 300, 60))
+        (results / "pred_tool_long.plasmid.fasta").write_text(">c\n" + "A" * 1500 + "\n")
+        (results / "tool_long.pred_vs_ref.paf").write_text(paf("c", 1500, 0, 1500, "plasmidA", 2000, 0, 1500, 60))
+        scores = Path(tmp) / "scores.tsv"
+        with open(scores, "w", newline="") as handle:
+            w = csv.writer(handle, delimiter="\t", lineterminator="\n")
+            w.writerow(["sample", "tool", "analysis_track", "f1", "recall", "strict_precision", "plasmid_recall", "plasmid_recall_ge90", "plasmid_recall_ge50", "lw_bin_f1"])
+            w.writerow(["s1", "tool_short", "short_read", "0.2609", "0.15", "1.0", "0.0", "0.0", "0.0", "0.30"])
+            w.writerow(["s1", "tool_long", "short_read", "0.8571", "0.75", "1.0", "0.0", "0.0", "1.0", "0.20"])
+        prefix = str(Path(tmp) / "out")
+        sweep = Path(prefix + ".cprr_threshold_sweep.tsv")
+        sweep_rows = [("0.80", "tool_x", 0.5), ("0.80", "tool_y", 0.4), ("0.95", "tool_x", 0.2), ("0.95", "tool_y", 0.3), ("0.99", "tool_x", 0.1), ("0.99", "tool_y", 0.2), ("0.90", "tool_x", 0.3), ("0.90", "tool_y", 0.35)]
+        sweep.write_text("analysis_track\ttask\ttool\tthreshold\tcprr\tcprr_isolate_mean\tn_isolates\tn_plasmids\n"
+                         + "".join(f"short_read\treconstruction\t{tool}\t{t}\t{v}\t{v}\t6\t11\n" for t, tool, v in sweep_rows)
+                         + "short_read\tclassification\ttool_z\t0.95\t0.9\t0.9\t6\t11\n")
+        done = subprocess.run([sys.executable, SCRIPT, "--scores", str(scores), "--results-dir", str(Path(tmp) / "results"), "--out-prefix", prefix,
+                               "--min-alignment-length", "1", "--min-alignment-identity", "0.0", "--min-alignment-mapq", "0", "--min-alignment-query-coverage", "0.0"],
+                              capture_output=True, text=True)
+        table = list(csv.DictReader(open(prefix + ".rank_robustness.tsv", newline="", encoding="utf-8"), delimiter="\t"))
+        by = {(r["variant"], r["tool"]): r for r in table}
+        check("the script succeeds and the table ends with compared_with", done.returncode == 0 and list(table[0])[-1] == "compared_with")
+        check("min_length=100 keeps a 300 bp alignment: the same F1 as the baseline", by[("min_length=100", "tool_short")]["mean_value"] == by[("baseline", "tool_short")]["mean_value"] == "0.2609")
+        check("min_length=500 drops it: tool_short has no retained alignment, F1 0", by[("min_length=500", "tool_short")]["mean_value"] == "0.0000"
+              and by[("min_length=500", "tool_long")]["mean_value"] == by[("baseline", "tool_long")]["mean_value"])
+        check("the headline short-read endpoint is an alternative ranking: tool_short first on lw_bin_f1, tool_long first on the baseline",
+              by[("metric:lw_bin_f1", "tool_short")]["rank"] == "1" and by[("baseline", "tool_long")]["rank"] == "1" and by[("metric:lw_bin_f1", "tool_short")]["top_matches_baseline"] == "no")
+        check("the 50% recovery band is an alternative ranking", ("metric:plasmid_recall_ge50", "tool_long") in by and by[("metric:plasmid_recall_ge50", "tool_long")]["rank"] == "1")
+        check("the baseline-family rows say they are compared with the baseline", all(r["compared_with"] == "baseline" for r in table if not r["variant"].startswith("cprr@")))
+        cprr = [r for r in table if r["variant"].startswith("cprr@")]
+        check("CPRR thresholds 0.80, 0.90, 0.95 and 0.99 are re-ranked, for reconstruction only (the classification row is ignored)",
+              sorted({r["variant"] for r in cprr}) == ["cprr@0.80", "cprr@0.90", "cprr@0.95", "cprr@0.99"] and "tool_z" not in {r["tool"] for r in cprr})
+        by = {(r["variant"], r["tool"]): r for r in cprr}
+        check("they are compared with the pre-registered 0.95 ranking, not with the F1 baseline", all(r["compared_with"] == "cprr@0.95" for r in cprr)
+              and by[("cprr@0.95", "tool_x")]["kendall_tau_vs_baseline"] == "1.000" and by[("cprr@0.95", "tool_x")]["top_matches_baseline"] == "yes")
+        check("a reversed order at 0.80 gives tau -1 and a changed top tool; the same order at 0.99 gives tau 1",
+              by[("cprr@0.80", "tool_x")]["kendall_tau_vs_baseline"] == "-1.000" and by[("cprr@0.80", "tool_x")]["top_tool"] == "tool_x"
+              and by[("cprr@0.80", "tool_x")]["top_matches_baseline"] == "no" and by[("cprr@0.99", "tool_x")]["kendall_tau_vs_baseline"] == "1.000")
+        check("the summary flags the changed rankings", "cprr@0.80" in done.stdout and "ranking changes" in done.stdout)
+    # the report's table shows the new column
+    source = (Path(SCRIPT).parent / "build_html_report.py").read_text(encoding="utf-8")
+    check("the report's sensitivity table has a Compared with column", "<th>Compared with</th>" in source and "versus=esc(row.get(\"compared_with\") or \"baseline\")" in source)
+
     print()
     if not ok:
         print("RANK SENSITIVITY TESTS FAILED")

@@ -438,7 +438,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:80` | `PRIMARY_UNAVAILABLE = "unavailable"` |
 | E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:89` | `min_species_clusters=20` |
 | E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:236` | `def shared_values` |
-| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:192` | `def build_variants` |
+| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:203` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:154` | `--min-long-read-depth` |
 | E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:286` | `reference_tier, tier_reason = tier(` |

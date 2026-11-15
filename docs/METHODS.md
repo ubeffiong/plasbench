@@ -298,9 +298,10 @@ same input costs 800 false-positive bases.
 
 **Ranking robustness.** `python/rank_sensitivity.py` (stage 6, `RUN_RANK_SENSITIVITY=0` skips
 it) writes `benchmark.rank_robustness.tsv`. Per analysis track it re-scores every PAF already on
-disk with one filter changed at a time (MAPQ 0 and 30, identity 0.80 and 0.95, query coverage 0),
-and re-ranks from the recorded columns under strict F1, per-plasmid recovery and recovery at
-90% completeness. For each variant it gives every tool's mean, rank, change from baseline,
+disk with one filter changed at a time (MAPQ 0 and 30, identity 0.80 and 0.95, query coverage 0,
+minimum alignment length 100 and 500 bp), and re-ranks from the recorded columns under strict F1,
+per-plasmid recovery (50% and 90% completeness) and the length-weighted binning F1. It also re-ranks
+CPRR at thresholds 0.80, 0.90, 0.95 and 0.99, compared with the pre-registered 0.95 ranking. For each variant it gives every tool's mean, rank, change from baseline,
 Kendall's tau against the baseline ordering, and whether the top tool is unchanged. Read a
 leaderboard together with this table: a first place that does not survive a defensible
 change of filter is not a finding. The analysis uses the samples that have a PAF, so the
