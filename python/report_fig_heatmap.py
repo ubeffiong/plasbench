@@ -392,8 +392,28 @@ def _significance(block_rows, cells, cols, track, comps):
     return sig
 
 
+_BUILD_CACHE = {}
+
+
 def build(results_dir, data_dir, scores_path):
-    """The figure's data, or ValueError('reason') when it cannot be built."""
+    """The figure's data, or ValueError('reason') when it cannot be built.
+
+    The radar (report_fig_radar) reads the same data, so the build is kept for one report: keyed by the inputs and their modification times, so a changed file rebuilds."""
+    def stamp(path):
+        try:
+            return os.stat(path).st_mtime_ns
+        except OSError:
+            return None
+    d = _resolve_dir(results_dir, data_dir)
+    key = (results_dir, data_dir, scores_path, stamp(scores_path), stamp(os.path.join(d, "benchmark.leaderboard.tsv")) if d else None,
+           stamp(os.path.join(d, "benchmark.paired_comparisons.tsv")) if d else None)
+    if key not in _BUILD_CACHE:
+        _BUILD_CACHE.clear()
+        _BUILD_CACHE[key] = _build(results_dir, data_dir, scores_path)
+    return _BUILD_CACHE[key]
+
+
+def _build(results_dir, data_dir, scores_path):
     try:
         specs = rs.load_config()
     except ValueError as exc:

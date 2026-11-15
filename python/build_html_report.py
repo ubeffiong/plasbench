@@ -136,6 +136,14 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Recommendation evidence": {
+        "what": "The facts behind the recommended tool: its expected performance and the isolates it rests on, the independent studies, the quality of the references, what the recommendation covers and whether choosing by similar isolates beat the single best tool, the uncertainty, and the reason when nothing is recommended.",
+        "why": "A recommendation is a claim. This panel lets a reader see how much stands behind it, and says plainly when the evidence is too thin to recommend.",
+    },
+    "Fingerprint": {
+        "what": "A radar chart of one tool across seven questions: accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability, each from 0 (centre) to 1 (rim).",
+        "why": "It shows a tool's trade-offs at a glance. It is a picture of the numbers beneath it, not a score: the area ranks nothing, and an axis that is not available is skipped, never drawn as zero.",
+    },
     "Dataset characteristics": {
         "what": "One row per isolate with its organism, read depth and quality, its own assembly's size, contigs, N50 and GC, and (from the reference) its plasmid count, repeat content and difficulty signals. "
                 "Every column is marked as knowable without a reference or as needing the reference.",
@@ -2667,6 +2675,17 @@ def main():
     ) or "<tr><td colspan='12'>No coverage-gated recommendation was produced for this cohort or stratum.</td></tr>"
 
     recommendation_why = recommendation_note(recommendations, headline_leaderboard[0] if headline_leaderboard else None)
+    import report_recommend_evidence as rre
+    evidence_verdict = {}
+    if getattr(args, "recommender_verdict", None) and Path(args.recommender_verdict).is_file():
+        try:
+            evidence_verdict = json.loads(Path(args.recommender_verdict).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            evidence_verdict = {}
+    recommendation_evidence = rre.panel_html(
+        recommendations, headline_leaderboard,
+        read_tsv(args.truth_provenance) if getattr(args, "truth_provenance", None) and Path(args.truth_provenance).is_file() else [],
+        feature_rows, evidence_verdict)
     # Recommendations are made for ONE task. Choosing a winner across the reconstruction and classification tasks compared tools that the rest of the report
     # never ranks against each other (a re-assembler could be "recommended overall" above a binner). Older results have no task column: no sentence then.
     recommendation_task_note = (
@@ -2876,7 +2895,7 @@ def main():
 <section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div>{optional_not_run_html}</div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
 <section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Perfect reference recovery requires F1 and plasmid recall of 1 with no ambiguous, unmapped, or off-truth predicted bases. Strict reconstruction additionally requires perfect available bin diagnostics; neither label proves nucleotide identity or circular closure. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p>{leaderboard_panels}</section>
-<section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p>{recommendation_task_note}{recommendation_why}<div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th><th>Decision score</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
+<section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p>{recommendation_task_note}{recommendation_why}{recommendation_evidence}<div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th><th>Decision score</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
 <section id='validation'><h2>Leave-one-study-out validation</h2><p class='lead'>For each source study, the method is selected using all other studies and then evaluated only on the held-out study. A withheld result means the cohort does not yet have enough independent study evidence; it is not a failed method.</p><div class='panel'><table class='sortable'><thead><tr><th>Held-out study</th><th>Held-out samples</th><th>Training-selected method</th><th>Training samples</th><th>Held-out mean F1</th><th>Status</th><th>Interpretation</th></tr></thead><tbody>{validation_rows}</tbody></table></div></section>
 {extended_section}
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>

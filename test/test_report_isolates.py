@@ -70,6 +70,14 @@ def main():
     two = ri.matrix_html(ROWS + [row("s1", "pA", "toolD", "0.5", track="long_read")], str)
     check("a second analysis track gets its own table", two.count("<h4>Analysis track:") == 2 and "long_read" in two)
     check("no rows gives a visible Not run note", "Not run" in ri.matrix_html([], str))
+    print("the outcome matrix")
+    oc = ri.matrix_html([row("s1", "pA", "toolA", "1.0", outcome="perfect"), row("s1", "pA", "toolB", "0.6", outcome="fragmented_and_merged"),
+                         row("s1", "pB", "toolA", "0.2", outcome="missed"), row("s1", "pB", "toolB", "0.9")], str)
+    check("an outcome table sits under each track's coverage table", oc.count("class='pb-matrix pb-outcomes") == 1 and "How each plasmid ended" in oc)
+    check("each outcome has its class, glyph and words", "pb-o pb-good" in oc and "pb-o pb-frag" in oc and "pb-o pb-miss" in oc and "fragmented and merged" in oc)
+    check("a tool with no outcome is not assessable, not a miss", "not assessable: the tool wrote no bins" in oc and oc.count("pb-o pb-none") == 1)
+    check("the footer counts outcomes over the plasmids that were assessable", "<td>1 of 2</td>" in oc)
+    check("the outcome table does not disturb the coverage matrix cells", len(re.findall(r"<td class='pb-c (pb-[a-z]+)'", oc)) == 4)
 
     print("helpers")
     check("humanise replaces whole ids in text only", ri.humanise("<td title='toolA'>toolA and toolAB</td>", {"toolA": "Tool A"}) == "<td title='toolA'>Tool A and toolAB</td>")
@@ -107,7 +115,9 @@ def main():
         check("one template per isolate and slot (6 isolates x 4 slots)", len(isolates) == 6 and text.count("<template data-iso-for=") == 24,
               (len(isolates), text.count("<template data-iso-for=")))
         matrix = text[text.index("id='summary-plasmids'"):text.index("<h3>Report card")]
-        check("the cohort matrix has one row per truth plasmid (11)", len(re.findall(r"<td><strong>p[A-Z]</strong>", matrix)) == 11)
+        coverage_only = re.sub(r"<details class='pb-outcome-view'[^>]*>.*?</details>", "", matrix, flags=re.S)   # the outcome view repeats the rows
+        check("the cohort matrix has one row per truth plasmid (11)", len(re.findall(r"<td><strong>p[A-Z]</strong>", coverage_only)) == 11)
+        check("and its outcome view has the same 11 rows", len(re.findall(r"<tr class='pb-orow'><td>", matrix)) == 11, len(re.findall(r"<tr class='pb-orow'><td>", matrix)))
         check("a per-isolate template does not carry window markers that would hide rows",
               "rpt-wh" not in "".join(re.findall(r"<template data-iso-for.*?</template>", text, re.S)))
         check("the scope label sits on the four views", text.count("data-iso-scope>All isolates") >= 4)

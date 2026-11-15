@@ -179,6 +179,20 @@ HELP = {
         "Scan rows for an all-bright tool and columns for a metric nobody does well.",
         "A fast overview of strengths and weaknesses across families of metrics.",
         "Colours are relative within a column unless you choose raw values; gaps ('not measured') are not zeros."),
+    "fig-radar": H(
+        "Each tool's strengths and weaknesses as one shape, per analysis track.",
+        "The same numbers as the tool heatmap: accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability.",
+        "One axis per question, 0 at the centre and 1 at the rim; a polygon joins a tool's values. Runtime is drawn as its scorecard score over 100.",
+        "A tool that reaches far on every axis is strong all round; a dent shows where it is weak.",
+        "Shows trade-offs, for example a fast tool that reconstructs little, that a single ranking hides.",
+        "An axis that is not available is skipped, never drawn as zero. Polygon area is not a score and ranks nothing; the table beneath is the record."),
+    "fig-complexity": H(
+        "Whether harder isolates are harder for every tool.",
+        "Each tool's base F1 on each isolate, against characteristics of the isolates: plasmids in the truth, repeat content, contigs and read depth.",
+        "One point per tool and isolate in a small chart for each characteristic, with the rank correlation per tool underneath.",
+        "A downward slope shows a tool struggling as the characteristic grows; a flat cloud shows it does not matter for that tool.",
+        "Explains low scores by the kind of isolate, and shows which characteristics could be known in advance.",
+        "Each chart says whether the characteristic is knowable without a reference or needs it. With few isolates the correlation is a description, not evidence of cause; under five isolates it is not computed."),
     "fig-pr": H(
         "The trade-off between finding plasmid sequence (recall) and not calling chromosome by mistake (precision).",
         "Plasmid bases recovered and falsely called, from tools that write a score for each call.",

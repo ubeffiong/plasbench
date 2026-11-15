@@ -241,7 +241,7 @@ def main():
                   "fig-landscape" not in html or html.index("PBLandscapeUI") > html.index("PBLandscape = ") and "P = P || root.PB3D" in html)
             ids_now = re.findall(r"<section id='([a-z-]+)'", html)
             check("every figure section is on the page in the Figures order, after the maps",
-                  [i for i in ids_now if i.startswith("fig-")] == [i for i in ("fig-forest", "fig-distributions", "fig-heatmap", "fig-pr", "fig-ladder", "fig-landscape") if i in ids_now]
+                  [i for i in ids_now if i.startswith("fig-")] == [i for i in ("fig-forest", "fig-distributions", "fig-heatmap", "fig-radar", "fig-complexity", "fig-pr", "fig-ladder", "fig-landscape") if i in ids_now]
                   and ids_now.index("fig-forest") < ids_now.index("plasmid-maps"))   # the figures that answer the main question first, the exploratory 3D view last; figures before maps
             for sid, marker in (("headline-design", "<table"), ("metric-framework", "<table"), ("scorecard-definitions", "<table"),
                                 ("interpretation-limits", "These results do NOT show"),

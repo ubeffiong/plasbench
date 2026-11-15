@@ -30,7 +30,7 @@ ENGINE_MARK = "root.PB3D = api"
 S = 6.0
 STACK = 0.02
 FIELDS = ["sample", "tool", "track", "org", "identity", "precision", "recall", "f1", "plasmid_recall", "cprr", "ngoc", "collinear", "events",
-          "aligned_bp", "runtime", "n_truth"]
+          "aligned_bp", "runtime", "n_truth", "tp_bp", "fp_bp"]
 SHAPE = {"short_read": "circle", "long_read": "triangle", "hybrid": "square"}
 TOOL_COLOURS = ["#0072B2", "#E69F00", "#009E73", "#D55E00", "#CC79A7", "#56B4E9", "#555555"]
 RAMP = ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"]
@@ -39,7 +39,8 @@ AXN = {"identity": "accuracy (identity, or precision)", "precision": "precision"
 AXT = {"identity": "Accuracy (identity)", "precision": "Accuracy (precision)", "recall": "Completeness (recall)",
        "plasmid_recall": "Completeness (plasmid recall)", "cprr": "Completeness (CPRR)", "ngoc": "Structure: NGOC*",
        "collinear": "Structure: collinear*", "events": "Structure: 1/(1+events/Mb)*"}
-CONT = {"runtime": "runtime", "n_truth": "n_truth", "f1": "f1"}
+# Colour and size encodings that are numbers on the run: true- and false-positive bases (plan D7) let the 3D scene read as a true/false-positive scatter of the runs.
+CONT = {"runtime": "runtime", "n_truth": "n_truth", "f1": "f1", "tp_bp": "tp_bp", "fp_bp": "fp_bp"}
 
 LEAD = ("A 3D scatter of how accurate, how complete and how structurally faithful each reconstruction is. Each point is one tool run on one isolate "
         "(switch to tool means in the Points tab). Horizontal axis: accuracy (alignment identity, or precision where identity is absent, "
@@ -115,7 +116,7 @@ def load_runs(results_dir, data_dir, scores_path):
                      _r6(identity.get(key)), _r6(_num(r.get("precision"))), _r6(_num(r.get("recall"))), _r6(_num(r.get("f1"))),
                      _r6(_num(r.get("plasmid_recall"))), _r6(correct / plasmids) if plasmids and correct is not None else None,
                      _r6(ng.get(key)), _r6(_num(st.get("collinear_fraction"))), _num(st.get("events_total")), _num(st.get("aligned_bp")),
-                     runtime.get(key), _num(r.get("true_plasmid_count"))])
+                     runtime.get(key), _num(r.get("true_plasmid_count")), _num(r.get("TP_bp")), _num(r.get("FP_bp"))])
     rows.sort(key=lambda row: (str(row[0]), str(row[1]), str(row[2])))
     absent = {}
     if acc is None:
@@ -261,7 +262,7 @@ def _reason(data, key):
 
 
 def _size_of(r, key):
-    return r["runtime"] if key == "runtime" else r["n_truth"] if key == "n_truth" else None
+    return r[key] if key in ("runtime", "n_truth", "tp_bp", "fp_bp") else None
 
 
 def py_build(data, vals=None, hidden=None):

@@ -88,6 +88,44 @@ def humanise(markup, labels):
     return re.sub(r">([^<>]+)<", lambda m: ">" + pattern.sub(lambda t: labels[t.group(1)], m.group(1)) + "<", markup)
 
 
+# How each truth plasmid ended for each tool (score_bins.plasmid_outcomes, carried on the per-plasmid rows as `outcome`): the class, a glyph and its reader-facing words.
+# A tool that wrote no bins has no outcome for any plasmid: that is "not assessable", not a miss.
+OUTCOMES = {
+    "perfect": ("pb-good", "✓", "perfect: one bin, nearly all of the plasmid and nearly nothing else"),
+    "partial": ("pb-part", "◐", "partial: most of the plasmid in one bin, but short of perfect"),
+    "fragmented": ("pb-frag", "÷", "fragmented: the plasmid is split across bins"),
+    "merged": ("pb-frag", "+", "merged: its bin also holds another plasmid"),
+    "fragmented_and_merged": ("pb-frag", "±", "fragmented and merged"),
+    "missed": ("pb-miss", "✕", "missed: no bin holds half of it"),
+}
+NOT_ASSESSABLE = ("pb-none", "–", "not assessable: the tool wrote no bins, so there is no outcome")
+
+
+def outcome_table(sub, tools, plasmids, label, length):
+    """The outcome matrix of one analysis track: the same rows and columns as the coverage matrix, each cell the outcome class (glyph and words, never colour alone)."""
+    by_key = {((r["sample"], r["plasmid"]), r["tool"]): r for r in sub}
+    counts = {t: {o: 0 for o in OUTCOMES} for t in tools}
+    assessed = {t: 0 for t in tools}
+    body = []
+    for key in plasmids:
+        cells = []
+        for t in tools:
+            outcome = (by_key.get((key, t)) or {}).get("outcome") or ""
+            klass, glyph, words = OUTCOMES.get(outcome, NOT_ASSESSABLE)
+            if outcome in OUTCOMES:
+                counts[t][outcome] += 1
+                assessed[t] += 1
+            name = outcome.replace("_", " ") if outcome in OUTCOMES else "not assessable"
+            cells.append(f"<td class='pb-o {klass}' title='{_esc(key[1] + ' in ' + key[0] + ': ' + label(t) + ', ' + words)}'><span aria-hidden='true'>{glyph}</span> {_esc(name)}"
+                         f"<span class='rpt-sr'> ({_esc(words)})</span></td>")
+        body.append(f"<tr class='pb-orow'><td>{_esc(key[0])}</td><td><strong>{_esc(key[1])}</strong></td><td class='rpt-num'>{_esc(length.get(key, ''))}</td>" + "".join(cells) + "</tr>")
+    head = "<tr><th>Isolate</th><th>Plasmid</th><th>Length (bp)</th>" + "".join(f"<th>{_esc(label(t))}</th>" for t in tools) + "</tr>"
+    foot = "".join(
+        f"<tr><th colspan='3'>{_esc(o.replace('_', ' ').capitalize())}</th>" + "".join(f"<td>{counts[t][o]} of {assessed[t]}</td>" if assessed[t] else "<td>not assessable</td>" for t in tools) + "</tr>"
+        for o in OUTCOMES)
+    return f"<div class='panel'><table class='pb-matrix pb-outcomes rpt-nowindow'><thead>{head}</thead><tbody>{''.join(body)}</tbody><tfoot>{foot}</tfoot></table></div>"
+
+
 def matrix_html(rows, label=lambda tool: tool, downloads=None):
     """The plasmid matrix (one table per analysis track) for per-plasmid `rows`; a visible Not run note when there are none."""
     rows = [r for r in rows if r.get("tool") and r.get("plasmid")]
@@ -145,7 +183,10 @@ def matrix_html(rows, label=lambda tool: tool, downloads=None):
                 + "".join(f"<td><strong>{recovered[t]}</strong> of {total}</td>" for t in tools) + "<td></td></tr>"
                 f"<tr><th colspan='3'>Plasmids on which the tool was best</th>" + "".join(f"<td>{best_on[t]}</td>" for t in tools) + "<td></td></tr>")
         out.append(f"<h4>Analysis track: {_esc(track)}</h4><div class='panel'><table class='pb-matrix rpt-nowindow'><thead>{head}</thead>"
-                   f"<tbody>{''.join(body)}</tbody><tfoot>{foot}</tfoot></table></div>")
+                   f"<tbody>{''.join(body)}</tbody><tfoot>{foot}</tfoot></table></div>"
+                   f"<details class='pb-outcome-view' data-closed='1'><summary>How each plasmid ended (outcome class) for the {_esc(track)} track</summary>"
+                   f"<p class='muted'>Perfect, partial, fragmented, merged, or missed, from the bin matching; a tool that wrote no bins is shown as not assessable, never as a miss.</p>"
+                   f"{outcome_table(sub, tools, plasmids, label, length)}</details>")
     return "".join(out)
 
 

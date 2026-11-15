@@ -120,6 +120,8 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- More figures: isolate complexity against performance, an outcome view of the plasmid matrix, identity shading and resistance-region brackets on the circular maps, true/false-positive encodings in the 3D landscape, and an evidence panel under the recommendation.
+- A radar fingerprint per analysis track shows each tool's accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability as one shape (a picture of the table beside it, not a score).
 - The numeric tool x metric heatmap (one block per analysis track) now includes SV-PRR and the predicted-sequence burden columns beside F1, MCC, binning F1 and CPRR.
 - The recommender evaluation compares the single best tool, an organism recommender and a feature-conditioned one (nearest similar isolates, truth-free features), with calibration and abstention; an arm adds value only when it beats the single best tool on average and in most of at least three studies.
 - A dataset-characterisation table describes every isolate (organism, depth, read quality, assembly, repeat content), marking each column as knowable without a reference or benchmark-only; it appears in the *Isolate difficulty* tab.

@@ -46,8 +46,8 @@ VIEWS = [
      'Which reconstruction method to use where, and the validation behind that advice. The validation is method research, not the benchmark result.', True,
      'recommendations recommender-eval'),
     ('figures', 'Figures', 'Figures', 'chart',
-     'The comparison drawn: CPRR differences and distributions, the tool heatmap, precision-recall, the reconstruction ladder, the 3D landscape and the interactive cohort dashboard.', True,
-     'fig-forest fig-distributions fig-heatmap fig-pr fig-ladder fig-landscape enterprise'),
+     'The comparison drawn: CPRR differences and distributions, the tool heatmap, the tool fingerprint radar, precision-recall, the reconstruction ladder, the 3D landscape and the interactive cohort dashboard.', True,
+     'fig-forest fig-distributions fig-heatmap fig-radar fig-complexity fig-pr fig-ladder fig-landscape enterprise'),
     ('maps', 'Plasmid maps', 'Plasmid maps', 'ring',
      'Reconstructions drawn back onto the truth plasmids: the maps with every per-plasmid result, the evidence explorer, antimicrobial-resistance gene placement and the contig layer.', True,
      'plasmid-maps evidence-explorer amr-placement contig-layer'),
@@ -90,7 +90,7 @@ ICONS = {
 
 SHORT_LABELS = {
     "fig-landscape": "3D landscape", "fig-ladder": "Reconstruction ladder", "fig-forest": "CPRR differences", "fig-distributions": "CPRR distributions",
-    "fig-heatmap": "Tool heatmap", "fig-pr": "Precision-recall", "per-plasmid-detail": "Per-plasmid detail", "assembly-quality": "Assembly quality",
+    "fig-heatmap": "Tool heatmap", "fig-radar": "Tool fingerprint", "fig-complexity": "Complexity", "fig-pr": "Precision-recall", "per-plasmid-detail": "Per-plasmid detail", "assembly-quality": "Assembly quality",
     "appendix-reference": "Reference tables", "enterprise": "Interactive dashboard", "evidence-explorer": "Evidence explorer", "ranking-sensitivity": "Sensitivity and power",
 }
 
