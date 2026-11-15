@@ -1298,16 +1298,19 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
 
 METRIC_LABELS = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level F1",
                  "sample_cprr": "isolate-level CPRR"}
-TASK_LABELS = {"reconstruction": "Plasmid reconstruction", "classification": "Plasmid classification"}
+TASK_LABELS = {"binning_reconstruction": "Plasmid binning (reconstruction)", "sequence_reassembly": "Plasmid sequence reassembly",
+               "classification": "Plasmid classification",
+               "reconstruction": "Plasmid reconstruction (older results: binning and reassembly were one task)"}
 TASK_BLURBS = {
-    "reconstruction": ("Binning-capable tools. On the short-read track they are ranked by length-weighted "
-                       "binning F1 (primary endpoint): bases placed in the correct one-to-one matched bin, with "
-                       "CPRR, the share of truth plasmids reconstructed correctly, as the key secondary endpoint. "
-                       "On the long-read and hybrid tracks, whose tools aim to close whole plasmids, the "
-                       "primary endpoint is isolate-level CPRR and binning F1 is secondary. The CPRR cell also "
-                       "gives the per-isolate rate and the area under the CPRR curve over thresholds 0.80-0.99."),
-    "classification": ("Classifier-only tools, ranked by base-level plasmid/chromosome F1. They are not scored "
-                       "on binning, a task they do not attempt."),
+    "binning_reconstruction": ("Tools that group the contigs of an existing assembly into individual plasmids. Ranked by length-weighted binning F1 (primary "
+                               "endpoint): bases placed in the correct one-to-one matched bin, with CPRR, the share of truth plasmids reconstructed correctly, "
+                               "as the key secondary endpoint. The CPRR cell also gives the per-isolate rate and the area under the CPRR curve over thresholds 0.80-0.99."),
+    "sequence_reassembly": ("Tools that produce plasmid sequences of their own (new records, not the input contigs). Ranked by isolate-level CPRR (primary "
+                            "endpoint): the share of truth plasmids reconstructed completely and accurately, with binning F1 as the secondary endpoint. From short reads "
+                            "complete recovery is rare, so expect a floor effect there."),
+    "classification": ("Tools that label sequence as plasmid-derived or not, ranked by base-level plasmid/chromosome F1. They are not scored "
+                       "on binning or reassembly, tasks they do not attempt."),
+    "reconstruction": ("Results written before binning and reassembly were separated: every bin-scoring tool was ranked together."),
 }
 
 
@@ -1323,9 +1326,9 @@ def headline_label(row):
 
 
 def primary_task_rows(rows):
-    """Rows of the primary task present (reconstruction first), else all rows."""
+    """Rows of the primary task present (binning first, then reassembly, then classification), else all rows."""
     tasks = [row.get("task") or "" for row in rows]
-    for task in ("reconstruction", "classification"):
+    for task in ("binning_reconstruction", "sequence_reassembly", "reconstruction", "classification"):
         if task in tasks:
             return [row for row in rows if (row.get("task") or "") == task]
     return rows
@@ -2711,11 +2714,14 @@ def main():
         feature_rows, evidence_verdict)
     # Recommendations are made for ONE task. Choosing a winner across the reconstruction and classification tasks compared tools that the rest of the report
     # never ranks against each other (a re-assembler could be "recommended overall" above a binner). Older results have no task column: no sentence then.
+    recommended_task = next((row.get("task") for row in recommendations if row.get("task") in TASK_LABELS), "")
     recommendation_task_note = (
-        "<p class='lead'><strong>One task.</strong> Recommendations cover the reconstruction task only: tools that group contigs into plasmid bins. "
-        "Classifiers and re-assemblers are ranked on their own task in the leaderboard and are never compared with reconstruction tools here, so the method "
-        "recommended overall is a reconstruction method, like the headline result.</p>"
-        if any(row.get("task") == "reconstruction" for row in recommendations) else "")
+        "<p class='lead'><strong>One task.</strong> Recommendations cover the " + esc(TASK_LABELS[recommended_task].split(" (")[0].lower()) + " task only: "
+        + {"binning_reconstruction": "tools that group the contigs of an existing assembly into plasmid bins", "sequence_reassembly": "tools that produce plasmid sequences of their own",
+           "classification": "tools that label sequence as plasmid-derived or not", "reconstruction": "tools that were ranked together as one reconstruction task"}[recommended_task]
+        + ". The other tasks are ranked on their own in the leaderboard and are never compared with these tools here, so the method recommended overall belongs to this task, "
+        "like the headline result.</p>"
+        if recommended_task else "")
 
     validation_rows = "".join(
         "<tr><td>{study}</td><td>{held}</td><td>{tool}</td><td>{train}</td><td>{f1}</td><td>{status}</td><td>{note}</td></tr>".format(

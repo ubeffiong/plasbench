@@ -5,14 +5,15 @@ headline_design.py -- the benchmark's pre-specified headline design.
 Used by aggregate_results.py. docs/METHODS.md ("Endpoints", "Reference
 standard", "Species balance") explains the rules; in short:
 
-* Task tracks. Tools that group contigs into plasmids (binning_capable=yes
-  in config/tool_capabilities.tsv) are ranked on the RECONSTRUCTION track by
-  length-weighted binning F1 (lw_bin_f1, the primary endpoint). Tools that
-  only classify contigs are ranked on a separate CLASSIFICATION track by
-  base-level F1 -- they are never scored zero on a binning task they do not
-  attempt. On the long-read and hybrid input tracks, reconstruction tools are
-  ranked instead by isolate-level CPRR (sample_cprr), because those tools aim
-  to close whole plasmids (ranking_metric(); config/prereg.tsv).
+* Evaluation tasks. Three different scientific questions, each ranked on its
+  own and never against another (config/tool_capabilities.tsv `evaluation_task`,
+  which decides the task; binning_capable does not):
+    classification          labels sequence as plasmid-derived or not  -> base-level F1
+    binning_reconstruction  groups existing contigs into plasmids       -> length-weighted binning F1 (lw_bin_f1)
+    sequence_reassembly     produces plasmid sequences (new records)    -> isolate-level CPRR (sample_cprr)
+  A tool is never scored zero on a task it does not attempt. Before this split every
+  binning-capable tool, reassemblers included, shared one reconstruction track, and a
+  reassembler without bins was ranked as a classifier (ranking_metric(); config/prereg.tsv).
 * Reference standard. Only reference tiers <= HEADLINE_MAX_REFERENCE_TIER
   (default 2) enter the headline; tier 3 (short-read-first or unknown
   provenance) is a sensitivity analysis. If no sample qualifies, the
@@ -35,6 +36,7 @@ from collections import defaultdict, namedtuple
 from pathlib import Path
 
 from plasbench_common import UnionFind, CPRR_SWEEP_THRESHOLDS, cprr_sweep_auc  # noqa: E402
+from tool_capabilities import evaluation_task as registry_task  # noqa: E402
 # Resampling primitives live in resampling.py (shared with aggregate_results.py,
 # which used to be imported back from here, a circular dependency). Re-exported so
 # existing `headline_design.exact_mean` / `hd.stratified_bootstrap` callers keep working.
@@ -42,15 +44,14 @@ from resampling import (  # noqa: E402,F401
     exact_mean, macro_mean, resampling_units, stratified_bootstrap, stratified_permutation, ratio_bootstrap,
 )
 
-TASK_RECONSTRUCTION = "reconstruction"
 TASK_CLASSIFICATION = "classification"
-TASK_METRIC = {TASK_RECONSTRUCTION: "lw_bin_f1", TASK_CLASSIFICATION: "f1"}
-# Track-specific primary endpoint (config/prereg.tsv, primary_endpoint_long_read):
-# long-read and hybrid reconstruction tools are built to close whole plasmids, so
-# they are ranked on isolate-level CPRR. Short-read reconstruction stays on
-# lw_bin_f1, where complete recovery is rare enough that CPRR would floor out.
-TRACK_TASK_METRIC = {("long_read", TASK_RECONSTRUCTION): "sample_cprr",
-                     ("hybrid", TASK_RECONSTRUCTION): "sample_cprr"}
+TASK_BINNING = "binning_reconstruction"
+TASK_REASSEMBLY = "sequence_reassembly"
+TASKS = (TASK_BINNING, TASK_REASSEMBLY, TASK_CLASSIFICATION)   # the order the report lists them in
+# The pre-registered primary endpoint of each task (config/prereg.tsv: primary_endpoint, primary_endpoint_reassembly). It depends on the task alone: a reassembler
+# is judged on whether it produced the plasmid on every input track, a binner on whether it grouped the contigs.
+TASK_METRIC = {TASK_BINNING: "lw_bin_f1", TASK_REASSEMBLY: "sample_cprr", TASK_CLASSIFICATION: "f1"}
+TRACK_TASK_METRIC = {}   # no track-specific exception any more (it used to send long-read and hybrid reconstruction to CPRR)
 METRIC_LABEL = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level classification F1",
                 "sample_cprr": "isolate-level CPRR"}
 
@@ -100,8 +101,7 @@ class Design:
         for row in read_rows(capabilities):
             if row.get("tool"):
                 self.method_class[row["tool"]] = (row.get("method_class") or "").strip()
-                capable = (row.get("binning_capable") or "").strip().lower() == "yes"
-                self.task_of[row["tool"]] = TASK_RECONSTRUCTION if capable else TASK_CLASSIFICATION
+                self.task_of[row["tool"]] = registry_task(row)
         self.provenance = {r["sample"]: r for r in read_rows(provenance) if r.get("sample")}
         clonal = {r["sample"]: r.get("clonal_group", "") for r in read_rows(clonal_groups) if r.get("sample")}
         self.clusters = self._join_clusters(sheet, clonal)
@@ -137,7 +137,7 @@ class Design:
         if tool in self.task_of:
             return self.task_of[tool]
         has_bins = any(r.get("lw_bin_f1") is not None for r in rows if r["tool"] == tool)
-        return TASK_RECONSTRUCTION if has_bins else TASK_CLASSIFICATION
+        return TASK_BINNING if has_bins else TASK_CLASSIFICATION   # a tool outside the registry: the old guess (bins mean binning); every registered tool states its task
 
     # -- reference standard ----------------------------------------------------
     def tier(self, sample):

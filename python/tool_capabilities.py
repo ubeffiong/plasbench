@@ -6,6 +6,26 @@ import csv
 from pathlib import Path
 
 ANALYSIS_TRACKS = ("short_read", "long_read", "hybrid")
+# The three evaluation tasks: three different scientific questions, ranked separately and never against each other.
+#   classification          labels sequence as plasmid-derived or not                      -> base-level F1
+#   binning_reconstruction  groups EXISTING contigs into individual plasmids                -> length-weighted binning F1
+#   sequence_reassembly     produces plasmid SEQUENCES (new records, not the input contigs) -> isolate-level CPRR
+EVALUATION_TASKS = ("classification", "binning_reconstruction", "sequence_reassembly")
+BIN_SCORED_TASKS = ("binning_reconstruction", "sequence_reassembly")   # their output is per-plasmid units: scored with the bin metrics (binning_capable = yes)
+LEGACY_TASKS = {"reconstruction": "binning_reconstruction"}              # the name before the three-way split
+
+
+def derived_task(row):
+    """The task of a registry row that does not name one (an older registry, a test fixture): the answer it always gave, now with reassemblers told apart."""
+    if (row.get("binning_capable") or "").strip().lower() != "yes":
+        return "classification"
+    return "sequence_reassembly" if (row.get("method_class") or "").strip() == "reassembly" else "binning_reconstruction"
+
+
+def evaluation_task(row):
+    """The evaluation task of a registry row: its explicit evaluation_task, else derived_task(). THIS decides where a tool is ranked; binning_capable does not."""
+    explicit = (row.get("evaluation_task") or "").strip()
+    return LEGACY_TASKS.get(explicit, explicit) or derived_task(row)
 # How far a tool has been validated (python/database_provenance.py explains each tier; test/test_tool_validation_tiers.py enforces them).
 VALIDATION_TIERS = ("real_binary_checked", "adapter_tested", "untested", "not_applicable")
 
@@ -20,6 +40,13 @@ def read_capabilities(path):
                 raise ValueError(f"invalid or duplicate capability row: {tool!r}")
             if row.get("binning_capable") not in {"yes", "no"}:
                 raise ValueError(f"{tool}: binning_capable must be yes/no")
+            task = evaluation_task(row)
+            if task not in EVALUATION_TASKS:
+                raise ValueError(f"{tool}: evaluation_task must be one of {EVALUATION_TASKS}")
+            if (row.get("evaluation_task") or "").strip() and (task == "classification") != (row.get("binning_capable") == "no"):
+                raise ValueError(f"{tool}: evaluation_task {task} contradicts binning_capable={row.get('binning_capable')} "
+                                 "(a classification tool is not bin-scored; a binning or reassembly tool is)")
+            row["evaluation_task"] = task
             if row.get("analysis_track") not in ANALYSIS_TRACKS:
                 raise ValueError(f"{tool}: analysis_track must be one of {ANALYSIS_TRACKS}")
             if row.get("requires_independent_long_read_truth") not in {"yes", "no"}:

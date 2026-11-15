@@ -1113,7 +1113,7 @@ def write_md_table(fh, summary, track=None, task=None):
 TRACK_ORDER = ("short_read", "long_read", "hybrid")
 
 
-TASK_ORDER = (hd.TASK_RECONSTRUCTION, hd.TASK_CLASSIFICATION)
+TASK_ORDER = hd.TASKS
 
 
 def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None,
@@ -1280,7 +1280,7 @@ def main():
                                                "and mean_f1_after_database.")
     ap.add_argument("--exclude-database-overlap", action="store_true",
                     help="drop sample x tool rows flagged possible_overlap before ranking.")
-    ap.add_argument("--capabilities", help="config/tool_capabilities.tsv; binning_capable decides the task track.")
+    ap.add_argument("--capabilities", help="config/tool_capabilities.tsv; evaluation_task decides the task (classification, binning_reconstruction or sequence_reassembly) each tool is ranked on.")
     ap.add_argument("--truth-provenance", help="truth_provenance.py output (reference tiers).")
     ap.add_argument("--clonal-groups", help="clonal_groups.py output.")
     ap.add_argument("--database-containment", help="database_containment.py output (truth plasmids in tool databases).")
