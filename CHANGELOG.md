@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- a radar fingerprint of each tool (plan D2)
+- New figure `fig-radar` (*Figures*, beside the tool heatmap): one radar per analysis track, one polygon per tool, seven axes (accuracy F1, recovery, CPRR, SV-PRR, verified sequence = 1 - unmapped share, runtime score, reliability). It is a view over the heatmap's own data (`report_fig_radar.py` calls `report_fig_heatmap.build`, which is now kept for the report), validates its axes against `config/metrics.tsv`, skips an axis that is not available instead of drawing 0, and carries the numbers in a table. Help text, glossary term, layout, wiring and `test/test_report_fig_radar.py`.
+
 ### Added -- the numeric tool x metric heatmap carries the new metrics (plan D1)
 - *Performance of every tool across every metric* (figure `fig-heatmap`, one block per analysis track, numbers in the cells) gains five leaderboard columns: SV-PRR, the unmapped, off-truth and multi-mapped predicted-base shares and the precision gap. The shares and the gap are marked lower-is-better (colour flipped); every column has a per-isolate drill-down derived from `scores.tsv`, and a blank stays 'not available', never 0. No new figure code: the existing heatmap reads the leaderboard.
 

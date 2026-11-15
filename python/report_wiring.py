@@ -453,6 +453,6 @@ def inject(page, results_dir, data_dir=None, scores_path=None):
 
 def finish(page):
     """After every section exists: move the scorecard and maps up. (The navigation is now the view rail of report_layout.py.)"""
-    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps", "fig-ladder", "fig-landscape", "fig-heatmap", "fig-distributions", "fig-forest", "fig-pr"],
+    page = move_after(page, ["scorecard", "scorecard-definitions", "scorecard-scenarios", "plasmid-maps", "fig-ladder", "fig-landscape", "fig-heatmap", "fig-radar", "fig-distributions", "fig-forest", "fig-pr"],
                       ["robustness", "leaderboard"])
     return page

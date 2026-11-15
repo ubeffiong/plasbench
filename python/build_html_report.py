@@ -136,6 +136,10 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Fingerprint": {
+        "what": "A radar chart of one tool across seven questions: accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability, each from 0 (centre) to 1 (rim).",
+        "why": "It shows a tool's trade-offs at a glance. It is a picture of the numbers beneath it, not a score: the area ranks nothing, and an axis that is not available is skipped, never drawn as zero.",
+    },
     "Dataset characteristics": {
         "what": "One row per isolate with its organism, read depth and quality, its own assembly's size, contigs, N50 and GC, and (from the reference) its plasmid count, repeat content and difficulty signals. "
                 "Every column is marked as knowable without a reference or as needing the reference.",
