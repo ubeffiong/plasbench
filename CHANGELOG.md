@@ -13,6 +13,17 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- warnings are yellow and errors red, in the window and in a terminal
+- **The window's console** uses one colour code in all three tabs (Job output, Session log, Terminal): errors are
+  red and bold, with a red bar in Job output, and warnings are yellow. A line PlasBench tags `WARNING:` (for example
+  a tolerated `SPAdes failed for ...`) is yellow; `ERROR:`, tracebacks, `No space left on device`, `command not
+  found` and non-zero exits are red. A success line that mentions a failure (`... -> PASS`) and zero counts such as
+  `failed=0` are not flagged. The Terminal tab now colours command output, and the Session log shows failed jobs and
+  terminal commands red, cancelled or interrupted ones yellow.
+- **Runs in a terminal** print `WARNING:` lines yellow and `ERROR:` lines red (`scripts/lib.sh`), only when the
+  output is a terminal, so log files stay plain. `NO_COLOR` or `PLASBENCH_COLOR=never` turns colour off, and
+  `PLASBENCH_COLOR=always` forces it.
+
 ### Changed -- heavy files never go into git, and you can edit .gitignore from the window
 - **One catalogue of heavy formats** (`plasbench/gitops.py`, `HEAVY`) drives both the managed `.gitignore` blocks and
   the commit check, so the two cannot drift apart. It covers:
