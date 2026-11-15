@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- the sample report link is at the top of the README
+- A link to open the sample HTML report (online preview; a relative path for a clone) now sits directly under the README title, not only in the report section. GitHub removes `target="_blank"` from README links, so the link says to Ctrl/Cmd-click or middle-click to open it in a new tab. `test/test_sample_report.py` keeps it there.
+
 ### Added -- statistics validated by simulation (review C4 / C6, plan A7)
 - `python/simulate_validation.py` (also `plasbench analysis simulate-validation`) simulates paired differences with study effects, correlated isolates, unequal study sizes and missing observations and runs the real `resampling.bootstrap_ci` and `resampling.paired_permutation_pvalue` on them, writing `benchmark.stats_validation.tsv`: interval coverage (nominal 95%) with its standard error, the rejection rate at 0.05 (type-I error at effect 0, power above it), how often each could be estimated, the test method and a verdict that never rounds a shortfall up. `smoke` mode (100 replicates, seconds, indicative) and `full` mode (1,000 replicates and the production resampling counts, minutes) share one seed. Stage 6 runs it when `RUN_STATS_VALIDATION=1` (`STATS_VALIDATION_MODE`); the demo runs smoke mode. The report gets a *Statistical validation (simulation)* tab under Sensitivity, power and reproducibility (with an explicit Not run state), a help entry, a glossary term and a file-explorer entry. **First finding:** the percentile cluster bootstrap under-covers with few studies (coverage roughly 0.85 to 0.94 across the smoke scenarios, mostly below 0.95), so its intervals are optimistic for cohorts of that size; the sign-flip test kept type-I error near 0.05. `test/test_simulate_validation.py` covers the generator, the verdicts, the command, the report section and the wiring.
 
@@ -237,6 +240,7 @@ A patch release: `plasbench install-tools all` now completes. No scoring, rankin
 - **PlaScope, Plasmer and PlasmidHunter install into their own environments.** None could be solved into the python 3.12 main environment: PlaScope's pinned Centrifuge 1.0.3 is built only for python <= 3.6, Plasmer only for python 3.10, and every PlasmidHunter release requires python 3.10. Each now lives in `plasbench-plascope`, `plasbench-plasmer` or `plasbench-plasmidhunter`, with wrappers in the main environment, as MOB-suite already does. You still only activate `plasbench`.
 - PlasmidHunter is pinned (1.4) with `setuptools<81`, which it needs for `pkg_resources`; the installer now proves each isolated tool starts instead of only checking that its file exists, and rebuilds an environment that does not.
 - Plasmer no longer pulls Anaconda's commercial `defaults` channel.
+
 
 ## [0.2.0] - 2026-11-10
 
