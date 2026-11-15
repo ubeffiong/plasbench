@@ -42,13 +42,14 @@ from pathlib import Path
 
 from plasbench_common import UnionFind, CPRR_SWEEP_THRESHOLDS, cprr_sweep_auc  # noqa: E402
 from tool_capabilities import evaluation_task as registry_task  # noqa: E402
-from truth_provenance import independence as derive_independence, INDEPENDENCE  # noqa: E402
+from truth_provenance import independence as derive_independence, reference_group, INDEPENDENCE  # noqa: E402
 # Resampling primitives live in resampling.py (shared with aggregate_results.py,
 # which used to be imported back from here, a circular dependency). Re-exported so
 # existing `headline_design.exact_mean` / `hd.stratified_bootstrap` callers keep working.
 from resampling import (  # noqa: E402,F401
     exact_mean, macro_mean, resampling_units, stratified_bootstrap, stratified_permutation, ratio_bootstrap,
 )
+from resampling import interval as resampling_interval, INTERVAL_METHOD  # noqa: E402,F401
 
 TASK_CLASSIFICATION = "classification"
 TASK_BINNING = "binning_reconstruction"
@@ -60,6 +61,13 @@ TASK_METRIC = {TASK_BINNING: "lw_bin_f1", TASK_REASSEMBLY: "sample_cprr", TASK_C
 TRACK_TASK_METRIC = {}   # no track-specific exception any more (it used to send long-read and hybrid reconstruction to CPRR)
 METRIC_LABEL = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level classification F1",
                 "sample_cprr": "isolate-level CPRR"}
+# A reassembler's base-level F1 measures recovered plasmid sequence, not contig labels.
+TASK_METRIC_LABEL = {(TASK_REASSEMBLY, "f1"): "base-level sequence-recovery F1"}
+
+
+def metric_label(task, metric):
+    """Human label of a ranking metric within its task."""
+    return TASK_METRIC_LABEL.get((task, metric)) or METRIC_LABEL.get(metric, metric)
 
 
 def ranking_metric(track, task):
@@ -83,6 +91,10 @@ def normalise_species(organism):
     return " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "")
 
 
+# names the second-review branch used for the same concepts: the three tasks are tool_capabilities.EVALUATION_TASKS (binning_reconstruction, sequence_reassembly, classification)
+TASK_RECONSTRUCTION = TASK_BINNING
+EVALUATION_TASKS = tuple(TASKS)
+evaluation_task = registry_task
 PRIMARY_INDEPENDENCE = ("independent",)
 SENSITIVITY_INDEPENDENCE = ("independent", "partially_independent")
 PRIMARY_AVAILABLE = "available"
@@ -95,8 +107,12 @@ class Design:
     """Everything the headline needs to know about samples and tools."""
 
     def __init__(self, sample_sheet=None, capabilities=None, provenance=None, clonal_groups=None,
-                 max_tier=2, min_species_clusters=20, min_primary_clusters=1, independence=PRIMARY_INDEPENDENCE):
+                 max_tier=2, min_species_clusters=20, min_primary_clusters=1, independence=PRIMARY_INDEPENDENCE, reference_independence=None):
         self.max_tier = int(max_tier)
+        if reference_independence is not None:   # the older two-valued form: 'any' accepts every class, 'independent' the primary class
+            if reference_independence not in ("independent", "any"):
+                raise ValueError(f"reference_independence must be 'independent' or 'any', got {reference_independence!r}")
+            independence = INDEPENDENCE if reference_independence == "any" else PRIMARY_INDEPENDENCE
         # the evaluation-independence classes the PRIMARY analysis accepts (a string "independent,partially_independent" or a tuple); dependent and unknown are not accepted by default
         self.required_independence = self.parse_independence(independence)
         # independent clusters (BioProjects / clonal groups) the qualifying references must come from before the primary analysis counts as available; below it a headline would
@@ -115,6 +131,11 @@ class Design:
         self.provenance = {r["sample"]: r for r in read_rows(provenance) if r.get("sample")}
         clonal = {r["sample"]: r.get("clonal_group", "") for r in read_rows(clonal_groups) if r.get("sample")}
         self.clusters = self._join_clusters(sheet, clonal)
+
+    @property
+    def reference_independence(self):
+        """The independence requirement as recorded in benchmark.headline_design.tsv: 'independent' (the default), 'any' (every class) or the list."""
+        return "any" if set(self.required_independence) == set(INDEPENDENCE) else ",".join(self.required_independence)
 
     @staticmethod
     def parse_independence(value):
@@ -168,8 +189,31 @@ class Design:
         if not record:
             return "unknown"
         value = (record.get("evaluation_independence") or "").strip()
-        return value if value in INDEPENDENCE else derive_independence((record.get("truth_assembly_strategy") or "").strip(),
-                                                                       (record.get("truth_polish_reads") or "").strip())[0]
+        if value in INDEPENDENCE:
+            return value
+        strategy, polish = (record.get("truth_assembly_strategy") or "").strip(), (record.get("truth_polish_reads") or "").strip()
+        if not strategy and not polish and record.get("reference_tier") == "1":
+            return "independent"   # tier 1 requires long-read-first truth with independent polishing (truth_provenance.tier), so a table that records only the tier is independent there
+        if not strategy and record.get("reference_tier") in ("1", "2"):
+            # a table that records the polishing reads but not the strategy: a tier 1-2 reference is long-read-first by construction (truth_provenance.tier), so the polishing decides
+            if polish in ("none", "independent") or (not polish and (record.get("base_level_metrics_valid") or "").strip() == "yes"):
+                return "independent"
+            if polish == "same_as_benchmark":
+                return "partially_independent"
+            return "unknown"
+        return derive_independence(strategy, polish)[0]
+
+    def reference_group(self, sample):
+        """tier1_independent | tier2_independent | tier2_partially_independent | tier2_unknown | tier3 | unrecorded: tier and independence together (the interpretation group)."""
+        tier = self.tier(sample)
+        return "unrecorded" if not tier else reference_group(tier, self.independence(sample))
+
+    def composition(self, rows):
+        """'tier1_independent 4; tier2_partially_independent 2' over the distinct samples of rows."""
+        counts = defaultdict(int)
+        for sample in {r["sample"] for r in rows}:
+            counts[self.reference_group(sample)] += 1
+        return "; ".join(f"{group} {n}" for group, n in sorted(counts.items()))
 
     def eligible(self, sample, allowed=None):
         """Does this reference qualify: quality tier within the maximum AND evaluation independence among `allowed` (default: the primary requirement)?"""
@@ -262,7 +306,7 @@ def pair_statistics(diffs, groups, strata):
     worker processes; every resampling call seeds its own RNG, so the result
     does not depend on which process runs it or in what order.
     """
-    low, high = stratified_bootstrap(diffs, groups, strata)
+    low, high = resampling_interval(diffs, groups, strata)   # INTERVAL_METHOD (PLASBENCH_CI_METHOD), chosen by simulation
     return low, high, stratified_permutation(diffs, groups, strata)
 
 
@@ -334,7 +378,7 @@ def ranking_fields(tool, by_tool, shared, design, metric):
         basis = "pooled (no species with enough independent clusters)" if design and design.species else "pooled"
     values = [values_by_sample[s] for s in samples]
     groups = [design.cluster(s) if design else f"sample:{s}" for s in samples]
-    low, high = stratified_bootstrap(values, groups, strata)
+    low, high = resampling_interval(values, groups, strata)
     return {"ranking_metric": metric, "ranking_score": macro_mean(values, strata),
             "ranking_ci_low": low, "ranking_ci_high": high, "ranking_species_basis": basis,
             "n_headline_species": len(set(strata)) if strata else 0, "n_ranking_clusters": len(set(groups))}
@@ -460,16 +504,6 @@ def species_table(track, task, rows, metric, design, failed_samples, known_tools
     return out
 
 
-def independence_table(track, task, rows, metric, design):
-    """Per tool x evaluation-independence class: n and mean ranking metric (sensitivity: how much the ranking leans on dependent or partly independent references)."""
-    by = defaultdict(list)
-    for r in rows:
-        if r.get(metric) is not None:
-            by[(r["tool"], design.independence(r["sample"]))].append(r[metric])
-    return [{"analysis_track": track, "task": task, "tool": tool, "evaluation_independence": cls, "n_samples": len(v), "mean_metric": statistics.mean(v), "metric": metric}
-            for (tool, cls), v in sorted(by.items())]
-
-
 def tier_table(track, task, rows, metric, design):
     """Per tool x reference tier: n, mean ranking metric and pooled CPRR (sensitivity)."""
     by, cprr = defaultdict(list), defaultdict(list)
@@ -489,3 +523,30 @@ def tier_table(track, task, rows, metric, design):
              "cprr": pooled(cprr.get((tool, tier), [])),
              "cprr_plasmids": sum(t for _, t in cprr.get((tool, tier), []))}
             for (tool, tier), v in sorted(by.items())]
+
+
+def independence_table(track, task, rows, metric, design):
+    """Reference-independence sensitivity, per tool x evaluation-independence class (independent, partially_independent, dependent, unknown).
+
+    For each class: samples, independent clusters, mean ranking metric, the tool's rank within the class, and the difference in mean and in rank from the independent class.
+    It answers how much a tool's apparent performance depends on how its references were built. Descriptive: means are over each tool's own scored samples in the class,
+    it never changes the leaderboard, and a class with few clusters says little."""
+    values = defaultdict(lambda: defaultdict(dict))   # class -> tool -> sample -> value
+    for r in rows:
+        if r.get(metric) is not None:
+            values[design.independence(r["sample"])][r["tool"]][r["sample"]] = r[metric]
+    means, ranks = {}, {}
+    for cls, by_tool in values.items():
+        means[cls] = {tool: statistics.mean(v.values()) for tool, v in by_tool.items()}
+        order = sorted(means[cls], key=lambda tool: (-means[cls][tool], tool))
+        ranks[cls] = {tool: i + 1 for i, tool in enumerate(order)}
+    out = []
+    for cls in INDEPENDENCE:
+        for tool in sorted(values.get(cls, {})):
+            samples = values[cls][tool]
+            ref_mean, ref_rank = means.get("independent", {}).get(tool), ranks.get("independent", {}).get(tool)
+            out.append({"analysis_track": track, "task": task, "tool": tool, "evaluation_independence": cls, "n_samples": len(samples),
+                        "n_clusters": len({design.cluster(s) for s in samples}), "metric": metric, "mean_metric": means[cls][tool], "rank_in_group": ranks[cls][tool],
+                        "difference_vs_independent": None if ref_mean is None or cls == "independent" else means[cls][tool] - ref_mean,
+                        "rank_change_vs_independent": None if ref_rank is None or cls == "independent" else ranks[cls][tool] - ref_rank})
+    return out

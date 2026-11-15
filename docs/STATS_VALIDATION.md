@@ -16,9 +16,9 @@ Paired differences d = effect + study effect + isolate noise. Structures: 5, 6, 
 
 ## What this means for the report
 - The tests and the Holm-adjusted tests can be read as calibrated for 6 or more independent studies under these structures.
-- The confidence intervals are optimistic. A "95% interval" from fewer than about 30 independent studies behaves like a roughly 80-90% interval. Read them as a lower bound on the uncertainty.
-- The statistical procedures stay **provisional**: `simulate_validation.overall_status()` says so, and the report shows the status above the by-studies table. They become "supported" for a number of studies only when a full run shows no shortfall there.
-- The cause is the percentile bootstrap with few clusters, a known weakness, not a coding fault (the same functions are exact in `test_resampling_equivalence.py`). A better interval (for example a studentised or cluster-t interval) would be a separate change that this simulation can then validate; it has not been made.
+- This run measured the percentile cluster bootstrap only, and it under-covers (a "95% interval" behaves like roughly 80-90% below about 30 studies).
+- After this run, the leaderboard interval became the cluster-robust t interval (`PLASBENCH_CI_METHOD=cluster_t`); the percentile and studentised cluster bootstraps stay selectable and are measured beside it by the current `simulate_validation.py`. The second-review simulation (`docs/validation/stats_validation_full.tsv`) found cluster t covers 94-97% with balanced studies.
+- **Not yet measured:** cluster t under the structures added here (a dominant study, two heavy studies, resource failures, a dominant species). Re-run `python python/simulate_validation.py --mode full --workers 6 --out ... --by-studies-out ...` (about an hour with all three methods) and replace the files in this folder. Until then the procedures stay **provisional** (`simulate_validation.overall_status()`).
 
 ## Limits of this study
 Monte Carlo error is about 0.007 for a rate near 0.05 and 0.011 near 0.9 with 1,000 replicates; the Holm comparisons are independent (real tool pairs share tools, which makes Holm more conservative); species effects were equal across species; the simulated structures are not the shipped cohorts, so a conclusion about a particular cohort needs a run with its own number of studies and structure.

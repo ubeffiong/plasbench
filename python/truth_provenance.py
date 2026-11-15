@@ -262,6 +262,14 @@ def independence(strategy, polish):
     return "unknown", "assembly strategy not recorded or not recognised"
 
 
+def reference_group(reference_tier, independence_value):
+    """The interpretation group of a reference, tier and independence together:
+    tier1_independent (primary), tier2_independent (primary), tier2_partially_independent (sensitivity 1), tier2_unknown, and tier3 (provisional, exploratory)."""
+    if reference_tier == "3":
+        return "tier3"
+    return f"tier{reference_tier}_{independence_value}"
+
+
 def grade(reference_tier, same_extraction):
     """Truth quality grade A/B/C (scoring specification, WP2).
 
@@ -323,13 +331,14 @@ def derive(row, data_dir):
         **evidence, "evidence_recorded": f"{recorded} of {len(EVIDENCE_FIELDS)}",
         "evidence_sources": "; ".join(f"{name}: {evidence_sources[name]}" for name in EVIDENCE_FIELDS),
         "reference_quality": QUALITY[reference_tier], "evaluation_independence": eval_independence, "independence_reason": independence_reason,
+        "reference_group": reference_group(reference_tier, eval_independence),
     }
 
 
 FIELDS = ["sample", "truth_assembly_strategy", "truth_polish_reads", "provenance_source",
           "base_level_metrics_valid", "labels_evidence_checked", "reference_tier", "tier_reason",
           "provenance_reason", "ambiguous_plasmids", "marker_free_plasmids", "truth_quality_grade", "grade_reason",
-          *EVIDENCE_FIELDS, "evidence_recorded", "evidence_sources", "reference_quality", "evaluation_independence", "independence_reason"]
+          *EVIDENCE_FIELDS, "evidence_recorded", "evidence_sources", "reference_quality", "evaluation_independence", "independence_reason", "reference_group"]
 
 
 def main():
@@ -351,6 +360,9 @@ def main():
     for row in derived:
         counts[row["reference_tier"]] = counts.get(row["reference_tier"], 0) + 1
     summary = ", ".join(f"tier {k}={v}" for k, v in sorted(counts.items())) or "no samples"
+    dependent = sum(1 for row in derived if row["reference_tier"] != "3" and row["evaluation_independence"] != "independent")
+    if dependent:
+        summary += f"; {dependent} tier 1-2 reference(s) not independent of the benchmark reads"
     sys.stderr.write(f"[truth_provenance] {summary} -> {args.out}\n")
 
 

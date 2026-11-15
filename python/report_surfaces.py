@@ -84,7 +84,7 @@ LEADERBOARD_COLUMN_GROUPS = {
     "Rank and basis": [
         "rank", "analysis_track", "task", "tool", "is_baseline", "beats_best_baseline", "ranking_metric", "ranking_score",
         "ranking_ci_low", "ranking_ci_high", "ranking_basis", "ranking_species_basis", "n_headline_species", "n_ranking_clusters",
-        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population"],
+        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population", "ci_method"],
     "Predicted-sequence burden": [
         "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp", "unmapped_fraction", "off_truth_fraction",
         "ambiguous_fraction", "precision_gap"],
@@ -322,6 +322,14 @@ def _file_entries():
         S("benchmark.recommender_verdict.json", ag, "Recommender verdict", "evaluate_recommender.py", "recommender-eval", "shown", "Verdict text."),
         S("benchmark.recommender_arms.tsv", ag, "Recommender: three ways of choosing a tool", "evaluate_recommender.py", "recommender-eval", "shown",
           "Single best vs organism vs feature-conditioned, with calibration and abstention, in the detail tab."),
+        S("benchmark.recommender_holdouts.tsv", ag, "Recommender: holdout designs", "evaluate_recommender.py", "recommender-eval", "shown",
+          "Isolate, study, clonal-group, study-and-clonal and species holdouts, with verdicts, in the detail tab."),
+        S("benchmark.recommender_knn.tsv", ag, "Recommender: nearest-neighbour detail", "evaluate_recommender.py", "recommender-eval", "partly",
+          "Per-recommendation uncertainty and abstention feed the evidence panel; the detail table is not tabulated."),
+        S("benchmark.recommender_sensitivity.tsv", ag, "Recommender: sensitivity to K, scaling and features", "evaluate_recommender.py", "recommender-eval", "partly",
+          "Summarised in the evaluation verdict; the table is not tabulated."),
+        S("benchmark.recommender_feature_correlation.tsv", ag, "Recommender: feature correlation", "evaluate_recommender.py", "recommender-eval", "partly",
+          "Used for the correlated-feature warning; the table is not tabulated."),
         S("benchmark.recommender_regret.tsv", ag, "Recommender regret per isolate", "evaluate_recommender.py", "recommender-eval", "shown",
           "Each isolate is a column of bars in the 3D strategy scene (recommender, single best, oracle) with regret gaps; rows in the detail panel."),
         S("benchmark.warning_eval.tsv", ag, "Evaluation of the warnings", "evaluate_warnings.py", "recommender-eval", "shown", "Tab in the recommender detail panel (CSV export), table collapsed under the view."),

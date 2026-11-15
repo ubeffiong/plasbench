@@ -55,3 +55,67 @@ def group_samples_by_study(scores_rows, metadata):
             f"[study_groups] {len(unassigned)} of {len(samples)} scored sample(s) have neither "
             f"source_study nor bioproject and are excluded from leave-one-study-out folds: {shown}\n")
     return studies
+
+
+# -- further validation designs (second review, section 6B / 3B) -------------------------------------------------------
+# Leave-one-study-out alone can leak: two closely related isolates from different studies can sit on either side of a fold.
+# These designs answer different questions and are reported side by side, never interchanged:
+#   isolate             leave one isolate out: performance on another isolate from represented studies
+#   study               leave one study out (group_samples_by_study): generalisation to a new study
+#   clonal_group        leave one clonal group out: generalisation beyond closely related isolates
+#   study_and_clonal    a study and every isolate clonal with it held out together (union of both relations): the strictest
+#   species             leave one species out: transfer to an unseen species (genus and phylum: leave_taxon_out.py)
+# Temporal and external-cohort holdouts need collection dates or a second cohort and are not derived here.
+HOLDOUT_DESIGNS = ("isolate", "study", "clonal_group", "study_and_clonal", "species")
+
+
+def read_clonal_groups(path):
+    """{sample: clonal group} from benchmark.clonal_groups.tsv; an 'isolate:' group means no clonal partner."""
+    import csv
+    import os
+    if not path or not os.path.isfile(path):
+        return {}
+    with open(path, newline="", encoding="utf-8") as handle:
+        rows = csv.DictReader((l for l in handle if l.strip() and not l.startswith("#")), delimiter="\t")
+        return {r["sample"]: (r.get("clonal_group") or "").strip() for r in rows
+                if r.get("sample") and (r.get("clonal_group") or "").strip() and not (r.get("clonal_group") or "").startswith("isolate:")}
+
+
+def species_of(organism):
+    words = (organism or "").replace("[", "").replace("]", "").split()
+    return " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "")
+
+
+def group_samples(design, scores_rows, metadata, clonal=None):
+    """{group: {sample, ...}} for one HOLDOUT_DESIGNS entry; samples that cannot be placed are left out (and said so for 'study')."""
+    clonal = clonal or {}
+    samples = list(dict.fromkeys(row["sample"] for row in scores_rows))
+    if design == "isolate":
+        return {f"isolate:{s}": {s} for s in samples}
+    if design == "study":
+        return group_samples_by_study(scores_rows, metadata)
+    if design == "species":
+        out = defaultdict(set)
+        for s in samples:
+            species = species_of(_text(metadata, s, "organism"))
+            if species:
+                out[species].add(s)
+        return out
+    if design == "clonal_group":
+        return {**{f"clonal:{g}": {s for s in samples if clonal.get(s) == g} for g in {clonal[s] for s in samples if s in clonal}},
+                **{f"isolate:{s}": {s} for s in samples if s not in clonal}}
+    if design == "study_and_clonal":
+        from plasbench_common import UnionFind
+        uf = UnionFind()
+        for study, members in group_samples_by_study(scores_rows, metadata).items():
+            for s in members:
+                uf.union(f"s:{s}", f"study:{study}")
+        for s in samples:
+            uf.find(f"s:{s}")
+            if s in clonal:
+                uf.union(f"s:{s}", f"clonal:{clonal[s]}")
+        out = defaultdict(set)
+        for s in samples:
+            out[uf.find(f"s:{s}")].add(s)
+        return dict(out)
+    raise ValueError(f"unknown holdout design {design!r}; one of {HOLDOUT_DESIGNS}")

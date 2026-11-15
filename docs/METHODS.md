@@ -668,14 +668,21 @@ and are labelled as such; set the sheet columns to override them.
 **Reference tiers.** Tier 1 = long-read-first or long-read-only, independent of the
 benchmark reads, cohort tier A, evidence-checked labels. Tier 2 = long-read-first but
 failing a Tier-1 condition. Tier 3 = short-read-first, unknown provenance or cohort
-tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2);
+tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2), and by default
+(`HEADLINE_REFERENCE_INDEPENDENCE=independent`) only those references independent of the
+benchmark reads: reference quality (the tier) and independence are separate variables
+(`reference_independence`, `reference_group` in the provenance table). A tier-2 reference
+polished with the benchmark's own reads is a dependent reference and enters only the
+reference-independence sensitivity analysis (`benchmark.reference_independence.tsv`: each
+tool's mean and rank on independent, same-read-polished and unrecorded references, and the
+change from the independent group); the headline design table records the composition;
 `benchmark.reference_tiers.tsv` and the report's tier-sensitivity chart show results by
 tier. When no sample reaches tier 2, the **primary analysis is unavailable**: the same numbers are
 computed on all samples but are labelled provisional (`primary_status` and `population` in the leaderboard,
 `primary_status` in `benchmark.headline_design.tsv`, a banner in the report) and are not the headline.
 `ALLOW_PRIMARY_FALLBACK=1` keeps them as the headline with the warning.
 
-**Statistics validation** (`simulate_validation.py`). Scenarios: balanced, unbalanced, dominant and heavy studies; within-study correlation; missing outputs and resource failures (per isolate and whole studies); a dominant species with the stratified functions; Holm over 6 and 15 comparisons. Results are grouped by the number of independent studies; `by_studies()` marks a number 'supported' only for a full run with no shortfall, and `overall_status()` keeps the procedures provisional otherwise. A full-mode simulation (75 scenario rows, 1,000 replicates each, production resampling counts, seed 20261114; results in docs/stats_validation/) found that the paired tests (exact sign-flip up to 12 studies, Monte Carlo above) and the Holm adjustment are calibrated in every structure simulated, and that the percentile cluster-bootstrap intervals are NOT: coverage of the nominal 95% was 82-85% at 5-6 studies, 87-92% at 8-20 studies, 94% at 30 balanced studies, and as low as 74% with one dominant species. Intervals are therefore optimistic (too narrow) at every number of studies tested below 30, and the statistical procedures stay provisional.
+**Statistics validation** (`simulate_validation.py`). Scenarios: balanced, unbalanced, dominant and heavy studies; within-study correlation; missing outputs and resource failures (per isolate and whole studies); a dominant species with the stratified functions; Holm over 6 and 15 comparisons. Results are grouped by the number of independent studies; `by_studies()` marks a number 'supported' only for a full run with no shortfall, and `overall_status()` keeps the procedures provisional otherwise. Two full-mode simulations (1,000 replicates per scenario, production resampling counts, seed 20261114) are in docs/stats_validation/. The first measured the percentile cluster bootstrap only: the paired tests (exact sign-flip up to 12 studies, Monte Carlo above) and the Holm adjustment were calibrated in every structure, but the percentile intervals covered only 74-94% of the nominal 95% (82-85% at 5-6 studies, 94% at 30 balanced studies, lowest with one dominant species). The leaderboard interval is now the cluster-robust t interval (`PLASBENCH_CI_METHOD=cluster_t`, with the percentile and studentised bootstrap kept and measured beside it), which the second-review simulation found covers 94-97% with balanced studies. The dominant-study, failure and dominant-species structures have NOT yet been measured for the cluster-t interval in a committed run, so the statistical procedures stay provisional until that run supports them.
 
 **Reference quality and evaluation independence** (`truth_provenance.py`; separate columns `reference_quality` and `evaluation_independence`, with `independence_reason`).
 Quality is the tier (validated / partially validated / provisional). Independence is derived from the assembly strategy and the polishing reads: independent = long-read-only or
@@ -774,10 +781,18 @@ The calibration of these procedures is checked by simulation (`python/simulate_v
 Without a cluster column every sample is its own cluster and the results are identical to
 plain per-sample resampling.
 
-A deterministic 1,000-resample bootstrap interval is emitted for each mean F1,
-and `benchmark.paired_comparisons.tsv` reports paired per-sample F1
-differences and win/tie/loss counts. These are descriptive uncertainty aids,
-not formal claims of clinical or statistical superiority.
+An interval is emitted for each mean F1 and ranking score by `PLASBENCH_CI_METHOD`
+(default `cluster_t`: a CR1 cluster-robust standard error with a t critical value on
+G−1 degrees of freedom, chosen because it held near-nominal coverage in
+`simulate_validation.py` where the percentile cluster bootstrap under-covered; the
+percentile and studentized bootstrap remain selectable), and
+`benchmark.paired_comparisons.tsv` reports paired per-sample F1 differences, their
+interval, the effect status against `SMALLEST_DIFFERENCE` (equivalent, practically
+different, different but of unclear size, inconclusive, not assessable), whether the pair
+was testable, and win/tie/loss counts. The effect and its interval are the primary reading;
+significance is beside them, and a non-significant comparison is never reported as equal
+performance. These are descriptive uncertainty aids, not formal claims of clinical or
+statistical superiority.
 
 **Significance vs. the runner-up.** The leaderboard's `significant_vs_runner_up`
 column asks one specific, narrow question: on the samples the top-ranked and

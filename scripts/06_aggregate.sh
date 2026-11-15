@@ -43,6 +43,7 @@ fi
 DESIGN_ARGS=(--capabilities "$PROJECT_ROOT/config/tool_capabilities.tsv"
              --headline-max-tier "${HEADLINE_MAX_REFERENCE_TIER:-2}"
              --headline-independence "${HEADLINE_INDEPENDENCE:-independent}"
+             --headline-reference-independence "${HEADLINE_REFERENCE_INDEPENDENCE:-independent}"
              --headline-min-clusters "${HEADLINE_MIN_CLUSTERS:-5}"
              --min-species-clusters "${MIN_SPECIES_CLUSTERS:-20}")
 if [ "${ALLOW_PRIMARY_FALLBACK:-0}" = "1" ]; then DESIGN_ARGS+=(--allow-primary-fallback); fi
@@ -298,6 +299,7 @@ if [[ "${RUN_RECOMMENDER_EVAL:-1}" -eq 1 ]]; then
     if python3 "$HERE/../python/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLE_SHEET" \
             --tool-status "$RESULTS_DIR/tool_status.tsv" --out-prefix "$RESULTS_DIR/benchmark" \
             --dataset-features "$RESULTS_DIR/benchmark.dataset_features.tsv" \
+            --clonal-groups "$RESULTS_DIR/benchmark.clonal_groups.tsv" \
             --min-train-samples "$RECOMMENDATION_MIN_SAMPLES"; then
         python3 "$HERE/../python/evaluate_warnings.py" --regret "$RESULTS_DIR/benchmark.recommender_regret.tsv" \
             --cohort-qc-flags "$RESULTS_DIR/benchmark.cohort_qc_flags.tsv" \
@@ -327,6 +329,7 @@ if [[ "${RUN_RECOMMENDATION_MODEL:-0}" -eq 1 ]]; then
         --nested-min-training-samples "$RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES" \
         --nested-min-studies "$RECOMMENDATION_MODEL_NESTED_MIN_STUDIES" \
         --model-card "$RESULTS_DIR/benchmark.recommendation_model.card.md" \
+        --recommender-verdict "$RESULTS_DIR/benchmark.recommender_verdict.json" \
         --out "$RESULTS_DIR/benchmark.recommendation_model.json"
     RECOMMENDATION_MODEL_ARGS=(--recommendation-model "$RESULTS_DIR/benchmark.recommendation_model.json")
 fi

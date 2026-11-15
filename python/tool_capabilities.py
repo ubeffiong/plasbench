@@ -25,7 +25,10 @@ def derived_task(row):
 def evaluation_task(row):
     """The evaluation task of a registry row: its explicit evaluation_task, else derived_task(). THIS decides where a tool is ranked; binning_capable does not."""
     explicit = (row.get("evaluation_task") or "").strip()
-    return LEGACY_TASKS.get(explicit, explicit) or derived_task(row)
+    explicit = LEGACY_TASKS.get(explicit, explicit)
+    if explicit and explicit not in EVALUATION_TASKS:
+        raise ValueError(f"{row.get('tool', '?')}: evaluation_task must be one of {sorted(EVALUATION_TASKS)}, got {explicit!r}")
+    return explicit or derived_task(row)
 # How far a tool has been validated (python/database_provenance.py explains each tier; test/test_tool_validation_tiers.py enforces them).
 VALIDATION_TIERS = ("real_binary_checked", "adapter_tested", "untested", "not_applicable")
 

@@ -26,7 +26,7 @@ def main():
     check("all six facts are listed", all(k in html for k in ("Observed performance", "Independent studies", "Reference quality", "Dataset similarity", "Uncertainty", "Reason withheld")))
     check("the numbers come from the tables", "mean F1 0.910 over 6 scored isolate(s), in this cohort" in html and "4 independent cluster" in html and "95% CI 0.8 to 0.95" in html)
     check("reference quality counts the tiers and the evidence recorded", "tier 1: 1, tier 3: 1" in html and "3.0 of 6 on average" in html)
-    check("the dataset line says it is for the cohort and reports the similarity arm", "not a prediction for a new isolate" in html and "choosing by similar isolates: no better" in html and "E. coli" in html)
+    check("the dataset line says it is for the cohort and reports the similarity arm", "not a prediction for a new isolate" in html and "choosing by similar isolates (by dataset features: no better)" in html and "E. coli" in html)
     check("a met gate says there is nothing withheld", "none: the coverage gate was met" in html)
     bare = rre.panel_html(recs, [], [], [], None)
     check("missing tables are 'not recorded', never a number", bare.count("not recorded") >= 2 and "choosing by similar isolates: not evaluated" in bare)

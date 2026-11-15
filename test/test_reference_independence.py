@@ -43,7 +43,7 @@ def main():
     tier_b = tp.derive({"sample_id": "s2", "truth_assembly_strategy": "long_read_only", "truth_polish_reads": "none", "truth_quality_tier": "B"}, None)
     check("quality and independence differ: a tier-2 reference (cohort tier B) can be fully independent",
           tier_b["reference_tier"] == "2" and tier_b["evaluation_independence"] == "independent", tier_b)
-    check("the new columns are appended last", tp.FIELDS[-3:] == ["reference_quality", "evaluation_independence", "independence_reason"])
+    check("the new columns are appended last", tp.FIELDS[-4:] == ["reference_quality", "evaluation_independence", "independence_reason", "reference_group"])
 
     print("aggregation and sensitivity populations")
     with tempfile.TemporaryDirectory() as tmp:

@@ -1360,6 +1360,16 @@ def permutation_note(row):
     return text
 
 
+# aggregate_results.effect_status: the estimate and its interval come first; significance is beside them (second review, 5B).
+EFFECT_STATUS_TEXT = {
+    "equivalent": "equivalent: the whole interval is within the smallest difference of interest",
+    "practically_different": "a practical difference: the whole interval is beyond the smallest difference of interest",
+    "different_size_unclear": "a difference, but it may be smaller than the smallest difference of interest",
+    "inconclusive": "inconclusive: neither a difference nor equivalence is shown (not evidence of equal performance)",
+    "not_assessable": "not assessable: too few independent units for an interval",
+}
+
+
 def headline_design_section(out_dir):
     """Reference standard, provenance tiers and species balance behind the headline."""
     design = read_tsv(out_dir / "benchmark.headline_design.tsv") if (out_dir / "benchmark.headline_design.tsv").is_file() else []
@@ -1373,8 +1383,18 @@ def headline_design_section(out_dir):
         f"<tr><td>{esc(r.get('analysis_track'))}</td><td>{esc(TASK_LABELS.get(r.get('task'), r.get('task')))}</td>"
         f"<td>{esc(METRIC_LABELS.get(r.get('ranking_metric'), r.get('ranking_metric')))}</td>"
         f"<td>{esc(r.get('reference_basis'))}</td><td>{esc(r.get('species_basis') or 'pooled')}</td>"
-        f"<td>{esc(r.get('primary_status') or 'available')}</td></tr>"
-        for r in design) or "<tr><td colspan='5'>Not recorded.</td></tr>"
+        f"<td>{esc(r.get('primary_status') or 'available')}</td><td>{esc(r.get('reference_composition') or 'not recorded')}</td></tr>"
+        for r in design) or "<tr><td colspan='7'>Not recorded.</td></tr>"
+    def signed(value, digits=3):
+        number_value = optional_number(value)
+        return "" if number_value is None else f"{number_value:+.{digits}f}" if digits else f"{int(number_value):+d}"
+    independence_rows = "".join(
+        f"<tr><td>{esc(r.get('analysis_track'))} / {esc(TASK_LABELS.get(r.get('task'), r.get('task')))}</td><td>{esc(r.get('tool'))}</td>"
+        f"<td>{esc((r.get('evaluation_independence') or '').replace('_', ' '))}</td>"
+        f"<td>{esc(r.get('n_samples'))}</td><td>{esc(r.get('n_clusters'))}</td><td>{esc(r.get('mean_metric'))}</td>"
+        f"<td>{esc(r.get('rank_in_group'))}</td><td>{esc(signed(r.get('difference_vs_independent')))}</td>"
+        f"<td>{esc(signed(r.get('rank_change_vs_independent'), 0))}</td></tr>"
+        for r in independence) or "<tr><td colspan='9'>No provenance table, so no reference can be shown to be independent of the benchmark reads.</td></tr>"
     tier_counts = Counter(r.get("reference_tier") for r in provenance)
     provenance_rows = "".join(
         f"<tr><td>{esc(r.get('sample'))}</td><td>{esc(r.get('reference_tier'))}</td>"
@@ -1385,14 +1405,6 @@ def headline_design_section(out_dir):
         f"<td>{esc(r.get('ambiguous_plasmids') or '0')}</td><td>{esc(r.get('tier_reason'))}</td>"
         f"<td title='{esc(r.get('evidence_sources') or 'not recorded')}'>{esc(provenance_evidence(r))}</td></tr>"
         for r in provenance) or "<tr><td colspan='11'>No provenance table.</td></tr>"
-    independence_by_tool = defaultdict(dict)
-    for r in independence:
-        independence_by_tool[(r.get("analysis_track"), r.get("task"), r.get("tool"))][r.get("evaluation_independence")] = (r.get("mean_metric"), r.get("n_samples"))
-    independence_rows = "".join(
-        f"<tr><td>{esc(track)} / {esc(TASK_LABELS.get(task, task))}</td><td>{esc(tool)}</td>"
-        + "".join(f"<td>{esc(f'{optional_number(v[0]):.3f} (n={v[1]})' if v and optional_number(v[0]) is not None else 'none')}</td>"
-                  for v in (cells.get(c) for c in ("independent", "partially_independent", "dependent", "unknown"))) + "</tr>"
-        for (track, task, tool), cells in sorted(independence_by_tool.items())) or "<tr><td colspan='6'>No independence table for this run.</td></tr>"
     species_rows = "".join(
         f"<tr><td>{esc(r.get('analysis_track'))} / {esc(r.get('task'))}</td><td>{esc(r.get('tool'))}</td>"
         f"<td><em>{esc(r.get('species'))}</em></td><td>{esc(r.get('n_samples'))}</td><td>{esc(r.get('n_clusters'))}</td>"
@@ -1422,13 +1434,14 @@ def headline_design_section(out_dir):
         "<strong>Tier 1</strong> long-read-first truth independent of the benchmark reads with evidence-checked "
         "labels; <strong>Tier 2</strong> long-read-first truth that fails a Tier-1 condition (for example, "
         "polished with the benchmark's own Illumina reads, so identity-based criteria are not applied); "
+        "a Tier 2 reference polished with the benchmark's own reads is partially independent, so it is in the sensitivity analyses, not the primary analysis (HEADLINE_INDEPENDENCE); "
         "<strong>Tier 3</strong> short-read-first hybrid or unknown provenance, provisional and outside the "
         "headline. Replicons whose plasmid/chromosome label conflicts with marker, rRNA or long-read evidence are "
         "AMBIGUOUS and excluded from scoring. The ranking score averages per-species means over species with "
         "enough independent (non-clonal) isolates; smaller species are described only.</p>"
         "<details class='rpt-collapsible'><summary>Show the reference standard, truth provenance, tier sensitivity and species balance</summary>"
         "<div class='panel'><table><thead><tr><th>Track</th><th>Task</th><th>Ranking metric</th>"
-        f"<th>Reference standard</th><th>Species basis</th><th>Primary analysis</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
+        f"<th>Reference standard</th><th>Species basis</th><th>Primary analysis</th><th>References by tier and independence</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
         f"<h3>Truth provenance</h3><p class='muted'>Tier counts: "
         + (", ".join(f"tier {esc(t)}: {n}" for t, n in sorted(tier_counts.items()) if t) or "none")
         + ". Derived values are heuristics from NCBI assembly metadata; set truth_assembly_strategy and "
@@ -1437,10 +1450,13 @@ def headline_design_section(out_dir):
         "<th>Polishing reads</th><th>Identity criteria valid</th><th>Labels evidence-checked</th>"
         f"<th>AMBIGUOUS plasmids</th><th>Reason</th><th>Evidence recorded</th></tr></thead><tbody>{provenance_rows}</tbody></table></div>"
         "<h3>Reference-tier sensitivity</h3><div class='chart-card'>" + chart + "</div>"
-        "<h3>Reference-independence sensitivity</h3><p class='muted'>The ranking metric of each tool on references of each evaluation-independence class. The primary analysis uses the independent "
-        "column only; partially independent references are sensitivity 1 and every reference is sensitivity 2. A tool that does much better on dependent references than on independent ones is "
-        "benefiting from a reference that shares its evidence.</p><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th><th>Independent</th>"
-        f"<th>Partially independent</th><th>Dependent</th><th>Unknown</th></tr></thead><tbody>{independence_rows}</tbody></table></div>"
+        "<h3>Reference-independence sensitivity</h3><p class='muted'>How much each tool's apparent performance depends on how its references were built: the same tools on references of "
+        "each evaluation-independence class, with the difference in mean and rank from the independent class. The primary analysis uses the independent class only; partially independent "
+        "references are sensitivity 1 and every reference is sensitivity 2. <strong>Descriptive only: it never changes the leaderboard.</strong> Each mean is over the tool's own scored "
+        "samples in the class, so read it with the sample and cluster counts.</p>"
+        "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th><th>Evaluation independence</th><th>Samples</th>"
+        "<th>Independent clusters</th><th>Mean ranking metric</th><th>Rank in class</th><th>Difference from independent</th>"
+        f"<th>Rank change from independent</th></tr></thead><tbody>{independence_rows}</tbody></table></div>"
         "<h3>Species balance</h3><div class='panel'><table class='sortable'><thead><tr><th>Track / task</th>"
         "<th>Tool</th><th>Species</th><th>Samples</th><th>Independent clusters</th><th>Mean ranking metric</th>"
         f"<th>In headline</th></tr></thead><tbody>{species_rows}</tbody></table></div></details></section>"
@@ -2756,8 +2772,10 @@ def main():
         equivalent = row.get("equivalent") or ""
         equivalence = ({"yes": "yes", "no": "no"}.get(equivalent, "not assessed")
                        + (f" (delta {delta})" if delta and equivalent in ("yes", "no") else ""))
+        supports = EFFECT_STATUS_TEXT.get(row.get("effect_status") or "", "not recorded")
         return ("<tr><td>{track}</td><td>{task}</td><td>{metric}</td><td>{a}</td><td>{b}</td><td>{n}</td><td>{difference}</td>"
-                "<td>{ci}</td><td>{p}</td><td>{holm}</td><td>{wholm}</td><td>{equiv}</td><td>{wins}/{ties}/{losses}</td><td>{method}</td></tr>").format(
+                "<td>{ci}</td><td>{supports}</td><td>{p}</td><td>{holm}</td><td>{wholm}</td><td>{equiv}</td><td>{wins}/{ties}/{losses}</td><td>{method}</td></tr>").format(
+            supports=esc(supports),
             track=esc(row.get("analysis_track") or "not recorded"), task=esc(row.get("task") or "not recorded"),
             metric=esc(row.get("metric") or "f1"),
             a=esc(row["tool_a"]), b=esc(row["tool_b"]),
@@ -2775,7 +2793,7 @@ def main():
             method=esc(permutation_note(row)))
 
     comparison_head = ("<thead><tr><th>Track</th><th>Task</th><th>Metric</th><th>Tool A</th><th>Tool B</th><th>Pairs</th>"
-                       "<th>Mean difference (A minus B)</th><th>95% bootstrap CI</th><th>Permutation p</th><th>Holm-adjusted p</th>"
+                       "<th>Mean difference (A minus B)</th><th>95% interval</th><th>What the difference supports</th><th>Permutation p</th><th>Holm-adjusted p</th>"
                        "<th>Wilcoxon p (Holm)</th><th>Equivalent within delta</th><th>A wins / ties / B wins</th><th>Permutation test</th></tr></thead>")
     comparison_tracks = []
     for row in comparisons:

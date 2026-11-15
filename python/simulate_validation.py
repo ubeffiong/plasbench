@@ -27,6 +27,12 @@ Every number carries its standard error, a fixed seed makes a run repeatable, an
 calibration, only expose a gross failure, and its verdicts say "indicative"). A verdict tests the observed rate against the nominal one with the standard error EXPECTED UNDER
 THE NOMINAL RATE (sqrt(0.95 x 0.05 / n) for coverage, sqrt(0.05 x 0.95 / n) for the type-I error), two of them either way.
 
+INTERVAL METHODS. Every interval scenario measures all three of resampling.INTERVAL_METHODS on the same simulated data -- the percentile cluster bootstrap, the cluster-robust t
+interval (CR1, t on G-1 degrees of freedom) and the studentized cluster bootstrap -- with coverage and mean width each. They are all kept: the leaderboard uses resampling.INTERVAL_METHOD
+(PLASBENCH_CI_METHOD, default cluster_t), the others stay selectable and are reported beside it. The ci_* columns describe the method in use; the per-method columns sit beside them.
+Further scopes: STRATIFIED scenarios (a species macro-average over two strata with different means) and a HOLM_PAIRS scenario (all pairwise sign-flip tests among K tools that truly
+do not differ, Holm-adjusted: the family-wise error rate).
+
 STATUS. The statistical procedures stay PROVISIONAL until a full-mode run supports them for the number of independent studies and the cohort structure they are used on:
 by_studies() groups the rows by the number of studies and says, per number, "supported", "shortfall" (with the scenario that fails) or "indicative only (smoke run)", and
 overall_status() is the one-line state the report and the leaderboard notes quote. A shortfall is a limit, not a failure to hide: read the interval as optimistic there.
@@ -46,6 +52,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import resampling  # noqa: E402
+
+METHODS = resampling.INTERVAL_METHODS
 from aggregate_results import holm_adjust  # noqa: E402
 
 ALPHA = 0.05
@@ -53,7 +61,8 @@ NOMINAL = 0.95
 FAILURE_MAGNITUDE = 0.7     # a failed tool scores 0 where the other scores about 0.7 (a typical F1): the paired difference is +-0.7
 FIELDS = ("mode", "scenario", "n_clusters", "isolates_per_cluster", "tau", "sigma", "missing", "effect", "replicates", "ci_estimated", "ci_coverage", "ci_coverage_se",
           "ci_verdict", "test_estimated", "rejection_rate", "rejection_se", "test_method", "test_verdict",
-          "family", "sizes", "icc", "failure", "species", "comparisons", "fwer_unadjusted", "fwer_holm", "power_unadjusted", "power_holm")
+          "family", "sizes", "icc", "failure", "species", "comparisons", "fwer_unadjusted", "fwer_holm", "power_unadjusted", "power_holm", "kind", "ci_method",
+          *(f"{m}_{k}" for m in METHODS for k in ("coverage", "width")))
 
 Scenario = namedtuple("Scenario", "name family clusters per_cluster tau sigma missing sizes failure clustered species comparisons")
 
@@ -160,6 +169,16 @@ def _verdicts(coverage, ci_n, rate, test_n, effect, replicates, mode):
     return ci_verdict, test_verdict
 
 
+def _method_columns(per_method):
+    """The per-method coverage and width columns, and the ci_* triple of the method the leaderboard uses: ({column: text}, (covered, estimated))."""
+    columns = {"ci_method": resampling.INTERVAL_METHOD if per_method else ""}
+    for method in METHODS:
+        hit, n, width = (per_method or {}).get(method, (0, 0, 0.0))
+        columns[f"{method}_coverage"] = f"{hit / n:.3f}" if n else ""
+        columns[f"{method}_width"] = f"{width / n:.4f}" if n else ""
+    return columns
+
+
 def _row(scn, mode, effect, replicates, **values):
     icc = (scn.tau ** 2 / (scn.tau ** 2 + scn.sigma ** 2)) if (scn.tau or scn.sigma) else 0.0
     base = {"mode": mode, "scenario": scn.name, "n_clusters": scn.clusters, "tau": scn.tau, "sigma": scn.sigma, "missing": scn.missing, "effect": effect, "replicates": replicates,
@@ -167,6 +186,7 @@ def _row(scn, mode, effect, replicates, **values):
             "failure": ("" if not scn.failure else f"{scn.failure:g}" + (" (whole studies)" if scn.clustered else "")), "species": scn.species or "",
             "comparisons": scn.comparisons if scn.family == "holm" else ""}
     base.update({name: "" for name in FIELDS if name not in base})
+    base["kind"] = "holm" if scn.family == "holm" else "stratified" if scn.species else "unstratified"
     base.update(values)
     return base
 
@@ -174,28 +194,32 @@ def _row(scn, mode, effect, replicates, **values):
 def run_scenario(name, clusters, per_cluster, tau, sigma, missing, effect, replicates, bootstrap, permutations, seed, mode, **options):
     scn = S(name, clusters, per_cluster, tau, sigma, missing, **{k: v for k, v in options.items() if k in ("sizes", "failure", "clustered", "species", "family", "comparisons")})
     rng = random.Random(seed)
-    covered = ci_n = rejected = test_n = 0
+    rejected = test_n = 0
     sizes = []
     methods = set()
+    per_method = {m: [0, 0, 0.0] for m in METHODS}   # covered, estimated, summed width
     for _ in range(replicates):
         values, groups, strata = draw(rng, clusters, per_cluster, tau, sigma, missing, effect, scn.sizes, scn.failure, scn.clustered, scn.species)
         if not values:
             continue
         sizes.append(len(values) / max(1, len(set(groups))))
-        low, high = resampling.stratified_bootstrap(values, groups, strata, iterations=bootstrap)
-        if low is not None:
-            ci_n += 1
-            covered += low <= effect <= high
+        for method in METHODS:
+            low, high = resampling.interval(values, groups, strata, method=method, iterations=bootstrap)
+            if low is not None:
+                per_method[method][1] += 1
+                per_method[method][0] += low <= effect <= high
+                per_method[method][2] += high - low
         units = len(set(groups))
         p = resampling.stratified_permutation(values, groups, strata, iterations=permutations)
         if p is not None:
             test_n += 1
             rejected += p <= ALPHA
             methods.add(resampling.permutation_method(units))
+    covered, ci_n, _width = per_method[resampling.INTERVAL_METHOD]
     coverage = covered / ci_n if ci_n else None
     rate = rejected / test_n if test_n else None
     ci_verdict, test_verdict = _verdicts(coverage, ci_n, rate, test_n, effect, replicates, mode)
-    row = _row(scn, mode, effect, replicates, isolates_per_cluster=(f"{sum(sizes) / len(sizes):.1f}" if sizes else ""), ci_estimated=f"{ci_n / replicates:.2f}",
+    row = _row(scn, mode, effect, replicates, **_method_columns(per_method), isolates_per_cluster=(f"{sum(sizes) / len(sizes):.1f}" if sizes else ""), ci_estimated=f"{ci_n / replicates:.2f}",
                ci_coverage="" if coverage is None else f"{coverage:.3f}", ci_coverage_se="" if coverage is None else f"{binomial_se(coverage, ci_n):.3f}", ci_verdict=ci_verdict,
                test_estimated=f"{test_n / replicates:.2f}", rejection_rate="" if rate is None else f"{rate:.3f}", rejection_se="" if rate is None else f"{binomial_se(rate, test_n):.3f}",
                test_method="/".join(sorted(methods)) or "not_estimated", test_verdict=test_verdict)
@@ -240,8 +264,103 @@ def run_holm(scn, effect, replicates, permutations, seed, mode):
                 rejection_rate="" if not n else f"{false_holm / n:.3f}", rejection_se="" if not n else f"{binomial_se(false_holm / n, n):.3f}")
 
 
+STRATIFIED_SMOKE = (("stratified, 2 x 4 studies", 4, 3, 0.05, 0.10, 0.0), ("stratified, 2 x 8 studies", 8, 3, 0.05, 0.10, 0.0))
+STRATIFIED_FULL = STRATIFIED_SMOKE + (("stratified, 2 x 12 studies, unbalanced", 12, None, 0.08, 0.10, 0.10),)
+HOLM_PAIRS_SMOKE = (("Holm family, 4 tools, 12 studies", 4, 12, 3, 0.05, 0.10),)
+HOLM_PAIRS_FULL = HOLM_PAIRS_SMOKE + (("Holm family, 8 tools, 20 studies", 8, 20, 3, 0.05, 0.10),)
+SETTINGS["smoke"].update(stratified=STRATIFIED_SMOKE, holm_pairs=HOLM_PAIRS_SMOKE)
+SETTINGS["full"].update(stratified=STRATIFIED_FULL, holm_pairs=HOLM_PAIRS_FULL)
+
+
+def _plain_row(mode, name, kind, clusters, sizes, tau, sigma, missing, effect, replicates, per_method, rejected, test_n, methods, family):
+    """A row for the stratified and Holm-pairs scenarios (they have no isolate-structure options)."""
+    scn = S(name, clusters, 3, tau, sigma, missing, family=family)
+    covered, ci_n, _ = per_method.get(resampling.INTERVAL_METHOD, [0, 0, 0.0]) if per_method else (0, 0, 0.0)
+    coverage = covered / ci_n if ci_n else None
+    rate = rejected / test_n if test_n else None
+    ci_verdict, test_verdict = _verdicts(coverage, ci_n, rate, test_n, effect, replicates, mode)
+    if not per_method:
+        ci_verdict = "not applicable (a test-only scenario)"
+    row = _row(scn, mode, effect, replicates, **_method_columns(per_method), isolates_per_cluster=(f"{sum(sizes) / len(sizes):.1f}" if sizes else ""),
+               ci_estimated=f"{ci_n / replicates:.2f}", ci_coverage="" if coverage is None else f"{coverage:.3f}", ci_coverage_se="" if coverage is None else f"{binomial_se(coverage, ci_n):.3f}",
+               ci_verdict=ci_verdict, test_estimated=f"{test_n / replicates:.2f}", rejection_rate="" if rate is None else f"{rate:.3f}",
+               rejection_se="" if rate is None else f"{binomial_se(rate, test_n):.3f}", test_method="/".join(sorted(methods)) or "not_estimated", test_verdict=test_verdict)
+    row["kind"] = kind
+    return row
+
+
+def run_stratified(name, clusters, per_cluster, tau, sigma, missing, effect, replicates, bootstrap, permutations, seed, mode):
+    """Two strata (species) with different means; the target is the macro mean of the stratum means (= effect)."""
+    rng = random.Random(seed)
+    rejected = test_n = 0
+    sizes, methods = [], set()
+    per_method = {m: [0, 0, 0.0] for m in ("percentile", "cluster_t")}
+    for _ in range(replicates):
+        values, groups, strata = [], [], []
+        for stratum, shift in (("A", -0.1), ("B", 0.1)):
+            v, g = simulate(rng, clusters, per_cluster, tau, sigma, missing, effect + shift)
+            values += v
+            groups += [f"{stratum}:{x}" for x in g]
+            strata += [stratum] * len(v)
+        if len(set(strata)) < 2:
+            continue
+        sizes.append(len(values) / max(1, len(set(groups))))
+        for method in per_method:
+            low, high = resampling.interval(values, groups, strata, method=method, iterations=bootstrap)
+            if low is not None:
+                per_method[method][1] += 1
+                per_method[method][0] += low <= effect <= high
+                per_method[method][2] += high - low
+        p = resampling.stratified_permutation(values, groups, strata, iterations=permutations)
+        if p is not None:
+            test_n += 1
+            rejected += p <= ALPHA
+            methods.add(resampling.permutation_method(len(set(groups))))
+    per_method["bootstrap_t"] = list(per_method["cluster_t"])   # bootstrap_t has no stratified form (resampling.interval falls back to cluster_t)
+    return _plain_row(mode, name, "stratified", 2 * clusters, sizes, tau, sigma, missing, effect, replicates, per_method, rejected, test_n, methods, "stratified species")
+
+
+def run_holm_pairs(name, tools, clusters, per_cluster, tau, sigma, replicates, permutations, seed, mode):
+    """Family-wise error: all pairwise sign-flip tests among tools with equal true performance, Holm-adjusted."""
+    rng = random.Random(seed)
+    any_rejected = families = 0
+    methods = set()
+    for _ in range(replicates):
+        study = [rng.gauss(0.0, tau) for _ in range(clusters)]
+        scores = {t: [] for t in range(tools)}
+        groups = []
+        for k in range(clusters):
+            for _ in range(per_cluster):
+                shared = study[k] + rng.gauss(0.0, sigma)   # the isolate's difficulty, common to every tool
+                for t in range(tools):
+                    scores[t].append(shared + rng.gauss(0.0, sigma))
+                groups.append(f"study{k}")
+        pvalues = []
+        for a in range(tools):
+            for b in range(a + 1, tools):
+                pvalues.append(resampling.paired_permutation_pvalue([x - y for x, y in zip(scores[a], scores[b])], iterations=permutations, groups=groups))
+        if any(p is None for p in pvalues):
+            continue
+        families += 1
+        methods.add(resampling.permutation_method(clusters))
+        any_rejected += any(p <= ALPHA for p in holm_adjust(pvalues))
+    row = _plain_row(mode, name, "holm", clusters, [per_cluster], tau, sigma, 0.0, 0.0, replicates, None, any_rejected, families, methods, "holm all pairs")
+    if families:
+        rate = any_rejected / families
+        tag = " (indicative: smoke run)" if mode == "smoke" else ""
+        row["test_verdict"] = ((f"Holm controls the family-wise error ({rate:.3f})" if rate <= ALPHA + 2 * math.sqrt(ALPHA * (1 - ALPHA) / families)
+                                else f"Holm does NOT control the family-wise error ({rate:.3f})") + tag + f" over {tools * (tools - 1) // 2} pairwise comparisons")
+        row["fwer_holm"] = f"{rate:.3f}"
+    return row
+
+
 def _job(args):
     scn, effect, config, replicates, seed, mode = args
+    if isinstance(scn, tuple) and scn and scn[0] in ("stratified", "holm_pairs"):
+        kind, spec = scn
+        if kind == "stratified":
+            return run_stratified(*spec, effect, replicates, config["bootstrap"], config["permutations"], seed, mode)
+        return run_holm_pairs(*spec, replicates, config["permutations"], seed, mode)
     if scn.family == "holm":
         return run_holm(scn, effect, replicates, config["permutations"], seed, mode)
     return run_scenario(scn.name, scn.clusters, scn.per_cluster, scn.tau, scn.sigma, scn.missing, effect, replicates, config["bootstrap"], config["permutations"], seed, mode,
@@ -257,13 +376,18 @@ def run(mode="smoke", replicates=None, seed=20261114, workers=1):
         effects = (0.0, config["effects"][-1]) if scn.family == "holm" else config["effects"]
         for effect in effects:
             jobs.append((scn, effect, config, replicates, seed + 1000 * index + int(round(effect * 1000)), mode))
+    for index, spec in enumerate(config["stratified"]):
+        for effect in config["effects"]:
+            jobs.append((("stratified", spec), effect, config, replicates, seed + 50000 + 1000 * index + int(round(effect * 1000)), mode))
+    for index, spec in enumerate(config["holm_pairs"]):
+        jobs.append((("holm_pairs", spec), 0.0, config, replicates, seed + 90000 + index, mode))
     if workers > 1:
         with ProcessPoolExecutor(max_workers=workers) as pool:
             return list(pool.map(_job, jobs))
     return [_job(job) for job in jobs]
 
 
-BY_STUDIES_FIELDS = ("n_studies", "mode", "scenarios", "intervals_checked", "lowest_coverage", "interval_status", "tests_checked", "highest_type_i_error", "test_status",
+BY_STUDIES_FIELDS = ("n_studies", "mode", "scenarios", "intervals_checked", "lowest_coverage", "lowest_coverage_percentile", "lowest_coverage_cluster_t", "lowest_coverage_bootstrap_t", "interval_status", "tests_checked", "highest_type_i_error", "test_status",
                      "holm_status", "status", "limiting_scenarios")
 
 
@@ -273,16 +397,19 @@ def by_studies(rows):
     out = []
     for n in sorted({int(r["n_clusters"]) for r in rows}):
         group = [r for r in rows if int(r["n_clusters"]) == n]
+        for r in group:
+            r.setdefault("kind", "holm" if r.get("family") == "holm" else "unstratified")
         mode = group[0]["mode"]
-        coverages = [float(r["ci_coverage"]) for r in group if r["ci_coverage"] != "" and r["family"] != "holm"]
-        type_one = [float(r["rejection_rate"]) for r in group if r["family"] != "holm" and r["effect"] in (0, 0.0, "0", "0.0") and r["rejection_rate"] != ""]
+        coverages = [float(r["ci_coverage"]) for r in group if r["ci_coverage"] != "" and r["kind"] != "holm"]
+        per_method_low = {m: [float(r[f"{m}_coverage"]) for r in group if r.get(f"{m}_coverage") not in ("", None) and r["kind"] != "holm"] for m in METHODS}
+        type_one = [float(r["rejection_rate"]) for r in group if r["kind"] != "holm" and r["effect"] in (0, 0.0, "0", "0.0") and r["rejection_rate"] != ""]
         low = [r for r in group if r["ci_verdict"].startswith("below nominal")]
         high = [r for r in group if r["test_verdict"].startswith("anti-conservative")]
-        holm = [r for r in group if r["family"] == "holm"]
+        holm = [r for r in group if r["kind"] == "holm"]
         holm_bad = [r for r in holm if "does NOT control" in r["test_verdict"]]
-        estimable = [r for r in group if r["family"] != "holm" and not r["ci_verdict"].startswith("not estimable")]
+        estimable = [r for r in group if r["kind"] != "holm" and not r["ci_verdict"].startswith("not estimable")]
         interval = ("not estimable" if not estimable else "shortfall" if low else "consistent with 95%")
-        test = ("not estimable" if not any(r["test_verdict"][0] in "vap" for r in group if r["family"] != "holm") else "shortfall" if high else "valid")
+        test = ("not estimable" if not any(r["test_verdict"][0] in "vap" for r in group if r["kind"] != "holm") else "shortfall" if high else "valid")
         holm_status = ("not run at this number" if not holm else "shortfall" if holm_bad else "controls the family-wise error")
         limiting = sorted({r["scenario"] for r in low + high + holm_bad})
         if interval == "not estimable":
@@ -294,7 +421,8 @@ def by_studies(rows):
         else:
             status = "supported"
         out.append({"n_studies": n, "mode": mode, "scenarios": len({r["scenario"] for r in group}), "intervals_checked": len(coverages),
-                    "lowest_coverage": f"{min(coverages):.3f}" if coverages else "", "interval_status": interval, "tests_checked": len(type_one),
+                    "lowest_coverage": f"{min(coverages):.3f}" if coverages else "",
+                    **{f"lowest_coverage_{m}": (f"{min(v):.3f}" if v else "") for m, v in per_method_low.items()}, "interval_status": interval, "tests_checked": len(type_one),
                     "highest_type_i_error": f"{max(type_one):.3f}" if type_one else "", "test_status": test, "holm_status": holm_status, "status": status,
                     "limiting_scenarios": "; ".join(limiting)})
     return out

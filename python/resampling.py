@@ -349,3 +349,169 @@ def stratified_permutation(differences, groups, strata, iterations=10000):
                     totals[k] -= s
         extreme += abs(exact_mean([totals[k] / scales[k] for k in range(len(totals))])) >= observed
     return (extreme + 1) / (iterations + 1)
+
+
+# -- small-cluster interval methods (second review, issues 1 and 5A) ----------------------------------
+#
+# The percentile cluster bootstrap above under-covers with few independent clusters (python/simulate_validation.py measured
+# roughly 0.85-0.94 for a nominal 95%). More iterations do not fix that: they only shrink Monte Carlo error. Two alternatives
+# are implemented here and compared with it by simulation; the leaderboard's interval method is the one the simulation supports
+# (INTERVAL_METHOD, set by PLASBENCH_CI_METHOD):
+#
+#   percentile    the cluster percentile bootstrap above (bootstrap_ci / stratified_bootstrap), kept for comparison and old runs
+#   cluster_t     a cluster-robust (CR1) standard error of the mean with the small-sample factor G/(G-1) and a Student t critical
+#                 value on G-1 degrees of freedom (stratified: the macro mean's variance is the sum of the strata variances over
+#                 S**2, on sum(G_s - 1) degrees of freedom). Deterministic, no random numbers.
+#   bootstrap_t   the studentized cluster bootstrap: resample clusters, studentize each replicate with its own CR1 standard error,
+#                 and invert the quantiles of t*. Second-order accurate in principle; can be unstable with very few clusters.
+#
+# The sign-flip permutation test is already the wild cluster (Rademacher) bootstrap test under the null, with the exact
+# enumeration below EXACT_MAX_UNITS, so the testing side needs no separate wild-bootstrap implementation.
+
+INTERVAL_METHODS = ("percentile", "cluster_t", "bootstrap_t")
+
+
+def _betacf(a, b, x):
+    """Continued fraction for the regularized incomplete beta function (Lentz's method)."""
+    tiny, eps = 1e-300, 3e-16
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    d = 1.0 / (d if abs(d) > tiny else tiny)
+    h = d
+    for m in range(1, 300):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        d = 1.0 / (d if abs(d) > tiny else tiny)
+        c = 1.0 + aa / c
+        c = c if abs(c) > tiny else tiny
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        d = 1.0 / (d if abs(d) > tiny else tiny)
+        c = 1.0 + aa / c
+        c = c if abs(c) > tiny else tiny
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < eps:
+            break
+    return h
+
+
+def _betai(a, b, x):
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    front = math.exp(math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log1p(-x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _betacf(a, b, x) / a
+    return 1.0 - front * _betacf(b, a, 1.0 - x) / b
+
+
+def t_cdf(t, df):
+    """Student t cumulative distribution function."""
+    x = df / (df + t * t)
+    tail = 0.5 * _betai(df / 2.0, 0.5, x)
+    return 1.0 - tail if t >= 0 else tail
+
+
+def t_quantile(p, df):
+    """Student t quantile by bisection on t_cdf (accurate to ~1e-10)."""
+    if not 0.0 < p < 1.0:
+        raise ValueError("p must be in (0, 1)")
+    low, high = -1e3, 1e3
+    for _ in range(200):
+        mid = (low + high) / 2.0
+        if t_cdf(mid, df) < p:
+            low = mid
+        else:
+            high = mid
+    return (low + high) / 2.0
+
+
+def _cr1(units):
+    """(mean, CR1 standard error, clusters) of the pooled mean over cluster units (lists of values)."""
+    n = sum(len(u) for u in units)
+    g = len(units)
+    mean = sum(sum(u) for u in units) / n
+    residuals = [sum(v - mean for v in u) for u in units]
+    variance = (g / (g - 1)) * sum(r * r for r in residuals) / (n * n)
+    return mean, math.sqrt(variance), g
+
+
+def _stratified_cr1(values, groups, strata):
+    """(macro mean, standard error, degrees of freedom) with CR1 within each stratum."""
+    by_stratum = defaultdict(lambda: ([], []))
+    for value, group, stratum in zip(values, groups, strata):
+        by_stratum[stratum][0].append(value)
+        by_stratum[stratum][1].append(group)
+    means, variance, df = [], 0.0, 0
+    for stratum in sorted(by_stratum):
+        units = resampling_units(*by_stratum[stratum])
+        if len(units) < 2:
+            return None
+        mean, se, g = _cr1(units)
+        means.append(mean)
+        variance += se * se
+        df += g - 1
+    s = len(means)
+    return sum(means) / s, math.sqrt(variance) / s, df
+
+
+def cluster_t_ci(values, groups=None, strata=None, level=0.95):
+    """Cluster-robust t interval for the (macro) mean; (None, None) below MIN_CLUSTERS_CI units."""
+    units = resampling_units(values, groups)
+    if len(values) < MIN_CLUSTERS_CI or len(units) < MIN_CLUSTERS_CI or _has_nan(values) or not _finite(values):
+        return None, None
+    if strata is None:
+        mean, se, g = _cr1(units)
+        df = g - 1
+    else:
+        result = _stratified_cr1(values, groups if groups is not None else list(range(len(values))), strata)
+        if result is None:
+            return None, None
+        mean, se, df = result
+    q = t_quantile(0.5 + level / 2.0, max(1, df))
+    return mean - q * se, mean + q * se
+
+
+def bootstrap_t_ci(values, groups=None, iterations=1000, level=0.95):
+    """Studentized cluster bootstrap interval for the pooled mean; (None, None) below MIN_CLUSTERS_CI units."""
+    units = resampling_units(values, groups)
+    if len(values) < MIN_CLUSTERS_CI or len(units) < MIN_CLUSTERS_CI or _has_nan(values) or not _finite(values):
+        return None, None
+    mean, se, _ = _cr1(units)
+    if se == 0:
+        return mean, mean
+    rng = random.Random(20261115)
+    stats = []
+    for _ in range(iterations):
+        drawn = rng.choices(units, k=len(units))
+        m, s, _ = _cr1(drawn)
+        if s > 0:
+            stats.append((m - mean) / s)
+    if len(stats) < iterations // 2:
+        return None, None
+    stats.sort()
+    alpha = (1.0 - level) / 2.0
+    low_q = stats[int(alpha * len(stats))]
+    high_q = stats[int((1.0 - alpha) * len(stats)) - 1]
+    return mean - high_q * se, mean - low_q * se
+
+
+def interval(values, groups=None, strata=None, method=None, iterations=1000):
+    """The leaderboard's interval for the (macro) mean, by INTERVAL_METHOD unless method is given.
+
+    bootstrap_t has no stratified form here: with strata it falls back to cluster_t (both are studentized)."""
+    method = method or INTERVAL_METHOD
+    if method == "percentile":
+        return stratified_bootstrap(values, groups, strata, iterations=iterations)
+    if method == "bootstrap_t" and strata is None:
+        return bootstrap_t_ci(values, groups, iterations=iterations)
+    return cluster_t_ci(values, groups, strata)
+
+
+INTERVAL_METHOD = __import__("os").environ.get("PLASBENCH_CI_METHOD", "cluster_t")
+if INTERVAL_METHOD not in INTERVAL_METHODS:
+    raise SystemExit(f"PLASBENCH_CI_METHOD must be one of {INTERVAL_METHODS}, got {INTERVAL_METHOD!r}")

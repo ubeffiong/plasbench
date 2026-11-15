@@ -39,6 +39,12 @@ def main():
     comparisons = {(c["tool_a"], c["tool_b"]): c for c in ar.compute_comparisons(rows)}
     assert comparisons[("a", "b")]["equivalent"] == "yes", comparisons[("a", "b")]
     assert comparisons[("a", "c")]["equivalent"] == "no"
+    assert comparisons[("a", "b")]["effect_status"] == "equivalent" and comparisons[("a", "c")]["effect_status"] == "practically_different"
+    # no interval (fewer than 5 units): a small mean difference is not evidence of equal performance
+    assert ar.effect_status(0.001, None, None, 0.05) == "not_assessable"
+    assert ar.effect_status(0.0, -0.08, 0.08, 0.05) == "inconclusive" and ar.effect_status(0.03, 0.01, 0.06, 0.05) == "different_size_unclear"
+    few = {(c["tool_a"], c["tool_b"]): c for c in ar.compute_comparisons([r for r in rows if r["sample"] in ("s0", "s1", "s2")])}
+    assert few[("a", "b")]["equivalent"] == "not_assessed" and few[("a", "b")]["testable"] == "no", few[("a", "b")]
     assert abs(comparisons[("a", "c")]["wilcoxon_p_value"] - 2 / 1024) < 1e-12
     assert comparisons[("a", "c")]["wilcoxon_p_value_holm"] is not None
     with tempfile.TemporaryDirectory() as tmp:

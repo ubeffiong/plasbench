@@ -12,10 +12,25 @@ reference, its predicted FASTA and, when it bins, its bins TSV. Per gene copy:
                   does not stand in for it.
   placement       not_recovered | shared_contig | unassigned_contig |
                   wrong_plasmid | correct_plasmid
-                  The covering record's bin (or the record itself when the tool
-                  does not bin) is matched one-to-one to a truth plasmid with
-                  score_bins.maximum_weight over aligned bases. correct_plasmid
-                  when that plasmid is the gene's (level 2). A record that the
+                  Two attribution modes (attribution_mode), by what the tool's
+                  output can claim (second review, section 7):
+                    bin_matching        a tool that bins (--bins): the covering
+                                        record's bin is matched one-to-one to a
+                                        truth plasmid with score_bins.maximum_weight
+                                        over aligned bases. correct_plasmid when that
+                                        plasmid is the gene's (level 2).
+                    contig_attribution  a tool that does not bin (a classifier, a
+                                        reassembler): there is no plasmid-level
+                                        grouping to match, and one truth plasmid may
+                                        rightly be spread over several records, so a
+                                        one-to-one matching would wrongly leave all but
+                                        one of them unmatched. Each gene-bearing record
+                                        is attributed to the truth sequence it aligns
+                                        to most (many records may share one plasmid).
+                                        correct_plasmid then means plasmid-associated
+                                        sequence attribution, NOT a reconstructed
+                                        plasmid: AMR-PRR and co-localisation are not
+                                        applicable and stay blank. A record that the
                   contig layer labelled AMBIGUOUS (shared with the chromosome or
                   another plasmid) or UNPLACED is its own category, never
                   counted right or wrong.
@@ -66,10 +81,10 @@ import tool_capabilities as tc  # noqa: E402
 
 GENE_FIELDS = ["sample", "tool", "copy_id", "gene_name", "gene_class", "sequence_id", "start", "end",
                "covering_record", "assigned_bin", "matched_plasmid", "placement", "replicon_type_correct", "flank_covered", "plasmid_cprr_correct",
-               "plasmid_cprr_correct_no_identity", "truth_evidence_tier", "evaluation_task", "attribution"]
+               "plasmid_cprr_correct_no_identity", "truth_evidence_tier", "evaluation_task", "attribution", "attribution_mode"]
 SUMMARY_FIELDS = ["tool", "gene_class", "n_gene_copies", "n_recovered", "n_correct_plasmid", "n_wrong_plasmid",
                   "n_shared_contig", "n_unassigned_contig", "correct_plasmid_rate", "replicon_type_correct_rate",
-                  "n_samples", "n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate", "draft_truth_copies", "evaluation_task"]
+                  "n_samples", "n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate", "draft_truth_copies", "evaluation_task", "attribution_mode"]
 DEFAULT_CLASSES = Path(__file__).resolve().parents[1] / "config" / "amr_gene_classes.tsv"
 
 
@@ -164,8 +179,16 @@ def cmd_score(args):
             continue
         for query, start, end in intervals:
             overlaps[(membership.get(query, query), target)] += max(0, end - start)
-    matched = attribute_units(overlaps, plasmids, task)
-    attribution = "one_to_one_bin" if task in ONE_TO_ONE_TASKS else "best_plasmid_per_record"
+    # bin_matching: a binner with bins, matched one-to-one. contig_attribution: a classifier or reassembler (or a binner that wrote no bins): each record is attributed to the truth sequence
+    # (plasmid or chromosome) it aligns to most, many records may share one plasmid, and a record that is mostly chromosome is wrong for a plasmid gene.
+    mode = "bin_matching" if task in ONE_TO_ONE_TASKS and membership else "contig_attribution"
+    if mode == "bin_matching":
+        matched = attribute_units(overlaps, plasmids, task)
+    else:
+        matched = dominant_targets(covered_by_query)
+    attribution = "one_to_one_bin" if mode == "bin_matching" else "best_plasmid_per_record"
+    if mode == "contig_attribution" and task != "sequence_reassembly":
+        cprr, cprr_no_identity = {}, {}   # no plasmid-level reconstruction to judge (a classifier, or a binner that wrote no bins): AMR-PRR is not applicable
 
     out = []
     for row in amr:
@@ -181,10 +204,11 @@ def cmd_score(args):
                   "sequence_id": sid, "start": start, "end": end, "covering_record": "", "assigned_bin": "",
                   "matched_plasmid": "", "placement": "not_recovered", "replicon_type_correct": "", "flank_covered": "",
                   "plasmid_cprr_correct": cprr.get(sid, ""), "plasmid_cprr_correct_no_identity": cprr_no_identity.get(sid, ""),
-                  "truth_evidence_tier": (row.get("evidence_tier") or "").strip(), "evaluation_task": task, "attribution": attribution}
+                  "truth_evidence_tier": (row.get("evidence_tier") or "").strip(), "evaluation_task": task, "attribution": attribution, "attribution_mode": mode}
         if best and best_bp / length >= args.min_gene_coverage:
-            bin_id = membership.get(best, best)
-            target = matched.get(bin_id, "")
+            # contig_attribution: the record is attributed on its own; there is no bin, so no co-localisation claim
+            bin_id = membership.get(best, best) if mode == "bin_matching" else ""
+            target = matched.get(bin_id if mode == "bin_matching" else best, "")
             label = labels.get(best, "")
             if label == "AMBIGUOUS":
                 placement = "shared_contig"
@@ -203,8 +227,18 @@ def cmd_score(args):
         writer = csv.DictWriter(handle, fieldnames=GENE_FIELDS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         writer.writerows(out)
-    sys.stderr.write(f"[score_amr_placement] {args.sample}/{args.tool}: "
-                     f"{sum(r['placement'] == 'correct_plasmid' for r in out)}/{len(out)} gene copies on the right plasmid\n")
+    sys.stderr.write(f"[score_amr_placement] {args.sample}/{args.tool} ({mode}): "
+                     f"{sum(r['placement'] == 'correct_plasmid' for r in out)}/{len(out)} gene copies on the right plasmid"
+                     + (" sequence (not a reconstructed plasmid)" if mode == "contig_attribution" else "") + "\n")
+
+
+def dominant_targets(covered_by_query):
+    """record -> the truth sequence (plasmid or chromosome) it has the most aligned bases on; ties go to the lower id."""
+    totals = defaultdict(lambda: defaultdict(int))
+    for target, intervals in covered_by_query.items():
+        for query, start, end in intervals:
+            totals[query][target] += max(0, end - start)
+    return {query: sorted(by_target.items(), key=lambda item: (-item[1], item[0]))[0][0] for query, by_target in totals.items() if by_target}
 
 
 def context(items, invalid_identity=frozenset()):
@@ -264,7 +298,8 @@ def summarise(rows, invalid_identity=frozenset()):
                     "n_samples": len({r["sample"] for r in items}),
                     **summary_context(items, invalid_identity),
                     "draft_truth_copies": sum(1 for r in items if (r.get("truth_evidence_tier") or "") == "auto_derived"),
-                    "evaluation_task": items[0].get("evaluation_task") or "binning_reconstruction"})
+                    "evaluation_task": items[0].get("evaluation_task") or "binning_reconstruction",
+                    "attribution_mode": "/".join(sorted({r.get("attribution_mode") or "bin_matching" for r in items}))})
     return out
 
 

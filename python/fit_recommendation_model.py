@@ -147,6 +147,59 @@ def nested_leave_one_study_out(rows, studies, target):
             mean_absolute_error(baseline_predicted, actual), None, selected_lambdas)
 
 
+CALIBRATION_LEVEL = 0.90          # nominal coverage of the prediction interval checked out of study
+MIN_CALIBRATION_COVERAGE = 0.80   # below this the model's stated uncertainty is too narrow to use
+
+
+def loso_calibration(rows, studies, target, lambda_):
+    """Out-of-study calibration of the ridge model (second review, 6D): fit on the training studies, predict the held-out study, and
+    report the slope and intercept of realised on predicted (1 and 0 when calibrated) and how often the realised score falls in a
+    90% prediction interval built from the training residuals. Assessed separately from the recommender evaluation's arms."""
+    predicted, actual, inside, n_interval = [], [], 0, 0
+    z = 1.6449
+    for held_samples in studies.values():
+        training_rows = [row for row in rows if row["sample"] not in held_samples]
+        held_rows = [row for row in rows if row["sample"] in held_samples]
+        if not training_rows or not held_rows:
+            continue
+        spec = fit_feature_spec(training_rows)
+        try:
+            fold = fold_predict(training_rows, held_rows, target, spec, lambda_)
+            fitted = fold_predict(training_rows, training_rows, target, spec, lambda_)
+        except ValueError:
+            continue
+        residual_sd = statistics.pstdev([target_value(r, target) - f for r, f in zip(training_rows, fitted)]) if len(training_rows) > 1 else 0.0
+        for row, p in zip(held_rows, fold):
+            y = target_value(row, target)
+            predicted.append(p)
+            actual.append(y)
+            n_interval += 1
+            inside += abs(y - p) <= z * residual_sd
+    if len(predicted) < 3:
+        return {"n": len(predicted), "status": "not_assessed"}
+    mp, ma = statistics.mean(predicted), statistics.mean(actual)
+    sxx = sum((p - mp) ** 2 for p in predicted)
+    slope = sum((p - mp) * (a - ma) for p, a in zip(predicted, actual)) / sxx if sxx else None
+    coverage = inside / n_interval
+    return {"n": len(predicted), "slope": None if slope is None else round(slope, 4),
+            "intercept": None if slope is None else round(ma - slope * mp, 4),
+            "interval_level": CALIBRATION_LEVEL, "interval_coverage": round(coverage, 4),
+            "status": "calibrated" if coverage >= MIN_CALIBRATION_COVERAGE else "overconfident"}
+
+
+def recommender_evidence(path):
+    """(shown, reason) from evaluate_recommender's verdict JSON: has choosing per isolate beaten the single best tool out of study?"""
+    if not path or not Path(path).is_file():
+        return None, "no recommender evaluation verdict"
+    verdict = json.loads(Path(path).read_text(encoding="utf-8"))
+    if "any_per_isolate_arm_enabled" in verdict:
+        shown = bool(verdict["any_per_isolate_arm_enabled"])
+    else:   # an older verdict file: the arms' own verdicts
+        shown = any(v == "adds_value" for k, v in (verdict.get("arms") or {}).items() if k != "single_best")
+    return shown, ("" if shown else "the recommender evaluation has not shown that choosing a tool per isolate beats the single best tool "
+                                    f"out of study (strictest holdout: {verdict.get('strictest_holdout', 'study')})")
+
+
 def write_model_card(path, payload, score_path, sample_sheet, rows):
     """Write a reviewable companion artifact for every fitted-model attempt."""
     validation = payload.get("validation", {})
@@ -209,6 +262,9 @@ def main():
     ap.add_argument("--nested-min-studies", type=int, default=5,
                     help="use unbiased nested LOSO only at or above this many source studies (default: 5)")
     ap.add_argument("--model-card", help="Markdown model-card path (default: <out>.card.md)")
+    ap.add_argument("--recommender-verdict",
+                    help="benchmark.recommender_verdict.json (evaluate_recommender.py): the model is activated only when a per-isolate arm has beaten the single best "
+                         "tool out of study (second review, 6D). Without it the model is never ready.")
     args = ap.parse_args()
 
     metadata = sample_metadata(args.sample_sheet)
@@ -259,6 +315,19 @@ def main():
                     f"{target}: model LOSO MAE {mae:.4f} does not beat the fixed-weight baseline's "
                     f"{baseline:.4f} by at least {args.min_relative_improvement:.0%}"
                 )
+        # Calibration, assessed separately from accuracy: an accurate model whose stated uncertainty is too narrow is not ready.
+        for target, lambda_ in lambda_by_target.items():
+            calibration = loso_calibration(rows, studies, target, lambda_)
+            validation.setdefault("calibration", {})[target] = calibration
+            if calibration.get("status") == "overconfident":
+                reasons.append(f"{target}: out-of-study {CALIBRATION_LEVEL:.0%} prediction intervals covered only "
+                               f"{calibration['interval_coverage']:.0%} (needs {MIN_CALIBRATION_COVERAGE:.0%})")
+    # The model is the operational form of per-isolate recommendation: it is activated only after the evaluation shows that
+    # choosing per isolate beats the single best tool on held-out studies (and clonal groups, when known).
+    shown, why = recommender_evidence(args.recommender_verdict)
+    validation["recommender_evidence"] = "shown" if shown else why
+    if not shown:
+        reasons.append(why)
 
     model_ready = not reasons
     if model_ready:

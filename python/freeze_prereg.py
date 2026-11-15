@@ -6,8 +6,10 @@ config/prereg.tsv lists every scoring decision fixed before results are seen
 (docs/PREREGISTRATION.md): parameter, value, config_variable, spec_section,
 revise_after_pilot, status (fixed | proposed | TO_FIX), note.
 
-Status vocabulary: `fixed` (decided), `proposed` (a value is proposed, with its rationale in the note, and awaits the maintainer's confirmation) and `TO_FIX`
-(no value yet). Proposed and TO_FIX rows are UNFIXED: a plan with any unfixed row is a DRAFT.
+Status vocabulary: `fixed` (decided), `proposed` (a value is proposed, with its rationale in the note, and awaits the maintainer's confirmation), `TO_FIX`
+(no value yet) and `unavailable` (decided: no defensible value exists -- for example a metric whose truth does not exist -- so the metric is reported as
+unavailable and excluded, never given an invented threshold; second review, section 11C). Proposed and TO_FIX rows are UNFIXED: a plan with any unfixed
+row is a DRAFT; an unavailable row is resolved.
 
   --write    hash prereg.tsv (SHA-256) and write config/prereg.lock.json with the
              hash, the UTC freeze time, and the parameters still proposed or TO_FIX.
@@ -38,7 +40,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TSV = ROOT / "config" / "prereg.tsv"
 DEFAULT_LOCK = ROOT / "config" / "prereg.lock.json"
-STATUSES = ("fixed", "proposed", "TO_FIX")
+STATUSES = ("fixed", "proposed", "TO_FIX", "unavailable")
 UNSET = ("", "unset")
 
 
@@ -52,7 +54,7 @@ def read_rows(path):
         if not (row.get("parameter") or "").strip():
             raise ValueError(f"{path} row {number}: parameter is empty")
         if row.get("status") not in STATUSES:
-            raise ValueError(f"{path} row {number}: status must be fixed, proposed or TO_FIX (got '{row.get('status')}')")
+            raise ValueError(f"{path} row {number}: status must be fixed, proposed, TO_FIX or unavailable (got '{row.get('status')}')")
     names = [r["parameter"] for r in rows]
     duplicates = sorted(n for n, seen in Counter(names).items() if seen > 1)   # one counting pass
     if duplicates:

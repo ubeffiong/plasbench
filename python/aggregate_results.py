@@ -10,7 +10,7 @@ Output:
   * <out_prefix>.leaderboard.md    -- same, as a Markdown table (for README/pitch)
   * <out_prefix>.species.tsv       -- per tool x species (species balance)
   * <out_prefix>.reference_tiers.tsv -- per tool x reference tier (sensitivity)
-  * <out_prefix>.reference_independence.tsv -- per tool x evaluation-independence class (sensitivity)
+  * <out_prefix>.reference_independence.tsv -- per tool x evaluation-independence class: n, clusters, mean metric, rank within the class, change from the independent class (sensitivity)
   * <out_prefix>.headline_design.tsv -- which samples/species formed each headline
 
 Headline design (python/headline_design.py, docs/METHODS.md "Endpoints"):
@@ -38,7 +38,7 @@ import headline_design as hd
 # Resampling primitives (resampling.py); re-exported because validate_recommendations.py
 # and the tests import bootstrap_ci / paired_permutation_pvalue from this module.
 from resampling import (  # noqa: E402,F401
-    bootstrap_ci, paired_permutation_pvalue, resampling_units, exact_mean as fast_mean, permutation_method, permutation_floor, MIN_CLUSTERS_CI,
+    bootstrap_ci, paired_permutation_pvalue, resampling_units, interval as resampling_interval, INTERVAL_METHOD, exact_mean as fast_mean, permutation_method, permutation_floor, MIN_CLUSTERS_CI,
 )
 
 # Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
@@ -540,7 +540,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
             ranking_samples = [r["sample"] for r in rows if r["tool"] == tool and r["f1"] is not None]
             ranking_f1 = list(d["f1"])
         groups = cluster_labels(ranking_samples, clusters)
-        f1_ci_low, f1_ci_high = bootstrap_ci(ranking_f1, groups=groups)
+        f1_ci_low, f1_ci_high = resampling_interval(ranking_f1, groups)
         summary.append({
             "tool": tool,
             "n_samples": d["n"],
@@ -852,13 +852,37 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
     for row in comparisons:
         # Equivalence flag: the mean difference AND its interval lie inside
         # +/- SMALLEST_DIFFERENCE, the pre-registered smallest difference of interest.
+        # It needs the interval: without one (fewer than MIN_CLUSTERS_CI units) a small mean difference is
+        # not evidence that two tools perform alike, so it is 'not_assessed', never 'yes' (second review, 5B).
         low, high = row.get("difference_ci_low"), row.get("difference_ci_high")
-        inside = abs(row["mean_f1_difference"]) < smallest
-        if low is not None and high is not None:
-            inside = inside and -smallest < low and high < smallest
-        row["equivalent"] = "yes" if inside else "no"
         row["smallest_difference"] = smallest
+        row["effect_status"] = effect_status(row["mean_f1_difference"], low, high, smallest)
+        if low is None or high is None:
+            row["equivalent"] = "not_assessed"
+        else:
+            row["equivalent"] = "yes" if abs(row["mean_f1_difference"]) < smallest and -smallest < low and high < smallest else "no"
+        row["testable"] = "yes" if row.get("permutation_p_value") is not None else "no"
     return comparisons
+
+
+def effect_status(mean, low, high, smallest):
+    """What a paired difference supports, from its interval against the smallest difference of interest.
+
+    not_assessable          no interval (too few independent units)
+    equivalent              the whole interval lies inside +/- smallest
+    practically_different   the whole interval lies beyond +smallest or beyond -smallest
+    different_size_unclear  the interval excludes 0 but reaches inside +/- smallest
+    inconclusive            the interval includes 0 and reaches beyond +/- smallest: neither a difference nor equivalence is shown
+    A non-significant comparison is never reported as equal performance (second review, 5B)."""
+    if low is None or high is None:
+        return "not_assessable"
+    if -smallest < low and high < smallest:
+        return "equivalent"
+    if low >= smallest or high <= -smallest:
+        return "practically_different"
+    if low > 0 or high < 0:
+        return "different_size_unclear"
+    return "inconclusive"
 
 
 def attach_significance(summary, comparisons, alpha=0.05):
@@ -891,7 +915,8 @@ def write_comparisons(rows, path, comparisons=None):
         comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
         handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\tpaired_clusters\ttask\tmetric"
-                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\tpermutation_method\tmin_attainable_p\tp_status\tholm_min_attainable_p\n")
+                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\tpermutation_method\tmin_attainable_p\tp_status\tholm_min_attainable_p"
+                     "\teffect_status\ttestable\tci_method\n")
         for row in comparisons:
             low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
             high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
@@ -907,7 +932,8 @@ def write_comparisons(rows, path, comparisons=None):
                 f"{row.get('task', '')}\t{row.get('metric', 'f1')}\t"
                 f"{fmt6(row.get('wilcoxon_p_value'))}\t{fmt6(row.get('wilcoxon_p_value_holm'))}\t"
                 f"{row.get('equivalent', '')}\t{row.get('smallest_difference', '')}\t"
-                f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\t{fmt6(row.get('holm_min_attainable_p'))}\n"
+                f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\t{fmt6(row.get('holm_min_attainable_p'))}\t"
+                f"{row.get('effect_status', '')}\t{row.get('testable', '')}\t{INTERVAL_METHOD}\n"
             )
 
 
@@ -948,7 +974,8 @@ def write_tsv(summary, path):
             "primary_status", "population",
             "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp",
             "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap",
-            "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates"]
+            "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates",
+            "ci_method"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -1023,6 +1050,8 @@ def write_tsv(summary, path):
                 *(fmt4(s.get(k)) for k in ("unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap")),
                 fmt4(s.get("sv_prr")), s.get("sv_prr_correct") if s.get("sv_prr_correct") is not None else "", s.get("sv_prr_plasmids") if s.get("sv_prr_plasmids") is not None else "",
                 s.get("sv_prr_isolates") if s.get("sv_prr_isolates") is not None else "", fmt4(s.get("cprr_on_sv_isolates")),
+                # how the ranking and F1 intervals were made (resampling.INTERVAL_METHOD); pooled CPRR keeps its percentile ratio bootstrap
+                INTERVAL_METHOD,
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
@@ -1074,9 +1103,12 @@ def write_md_table(fh, summary, track=None, task=None):
         title.append(f"Track: {track}")
     if task:
         metric = summary[0].get("ranking_metric", "") if summary else ""
-        title.append(f"{task} (ranked by {hd.METRIC_LABEL.get(metric, metric)})")
+        title.append(f"{task} (ranked by {hd.metric_label(task, metric)})")
     if title:
         fh.write("## " + " · ".join(title) + "\n\n")
+    note = ENDPOINT_NOTES.get(summary[0].get("ranking_metric", "") if summary else "") if task else None
+    if note:
+        fh.write(f"> {note}\n\n")
     if summary and summary[0].get("primary_status") not in (None, "", hd.PRIMARY_AVAILABLE):
         fh.write(f"> **{'PROVISIONAL: primary analysis unavailable' if summary[0]['primary_status'] == hd.PRIMARY_UNAVAILABLE else 'FALLBACK ALLOWED: primary analysis unavailable'}.** "
                  f"Population: {summary[0].get('population', '')}. This is not the primary result.\n\n")
@@ -1117,6 +1149,16 @@ TRACK_ORDER = ("short_read", "long_read", "hybrid")
 
 
 TASK_ORDER = hd.TASKS
+
+# What each ranking endpoint does and does not measure: detection, grouping into plasmids and complete plasmid recovery are three questions, never one score.
+ENDPOINT_NOTES = {
+    "lw_bin_f1": ("Length-weighted binning F1 measures how correctly plasmid sequence is grouped into individual plasmids. "
+                  "It is not a measure of complete plasmid reconstruction: that is CPRR, shown beside it."),
+    "sample_cprr": ("Isolate-level CPRR is the share of each isolate's plasmids reconstructed completely, alone and accurately "
+                    "(complete plasmid recovery). Base F1 (detection) and binning F1 (grouping) are reported beside it, not folded in."),
+    "f1": ("Base-level F1 measures detection: how much plasmid sequence is recovered or labelled correctly. "
+           "It says nothing about whether the sequence is grouped into individual plasmids."),
+}
 
 
 def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None,
@@ -1295,6 +1337,9 @@ def main():
     ap.add_argument("--headline-independence", default=os.environ.get("HEADLINE_INDEPENDENCE", "independent"),
                     help="evaluation-independence classes the primary analysis accepts, comma-separated from independent, partially_independent, dependent, unknown (default independent; "
                          "HEADLINE_INDEPENDENCE). A reference must ALSO be within --headline-max-tier.")
+    ap.add_argument("--headline-reference-independence", choices=("independent", "any"), default=os.environ.get("HEADLINE_REFERENCE_INDEPENDENCE", ""),
+                    help="the older two-valued form of --headline-independence: 'any' accepts every independence class (the tier alone decides); 'independent' or unset leaves "
+                         "--headline-independence in force. HEADLINE_REFERENCE_INDEPENDENCE sets it.")
     ap.add_argument("--headline-min-clusters", type=int, default=int(os.environ.get("HEADLINE_MIN_CLUSTERS", MIN_CLUSTERS_CI)),
                     help="independent clusters the references in the headline tiers must come from for the primary analysis to be available (default 5, the interval minimum; HEADLINE_MIN_CLUSTERS).")
     ap.add_argument("--min-species-clusters", type=int, default=20,
@@ -1343,12 +1388,16 @@ def main():
             raise SystemExit("ERROR: every score row was excluded as a possible database overlap")
     default_registry = Path(__file__).resolve().parent.parent / "config" / "tool_capabilities.tsv"
     design = hd.Design(args.sample_sheet, args.capabilities or (str(default_registry) if default_registry.is_file() else None), args.truth_provenance, args.clonal_groups,
-                       args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters, args.headline_independence)
+                       args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters,
+                       "independent,partially_independent,dependent,unknown" if args.headline_reference_independence == "any" else args.headline_independence)
     all_rows = rows
     selection = design.headline_selection(rows, allow_fallback=args.allow_primary_fallback)
     rows, reference_basis = selection.rows, selection.basis
     print(f"[aggregate] headline reference standard: {reference_basis} "
           f"({len({r['sample'] for r in rows})} of {len({r['sample'] for r in all_rows})} sample(s)).")
+    reference_composition = design.composition(rows) if design.provenance else ""
+    if reference_composition:
+        print(f"[aggregate] headline references by tier and independence: {reference_composition}")
     if selection.status != hd.PRIMARY_AVAILABLE:
         print(f"{chr(10)}[aggregate] WARNING: PRIMARY ANALYSIS UNAVAILABLE ({selection.reason}). Every ranking below is PROVISIONAL (all samples) and is "
               f"not the primary result; add references meeting the primary requirement ({design.requirement_label()}: long-read-first, polished with no reads or independent reads), from at least {args.headline_min_clusters} independent clusters, to obtain it."
@@ -1432,13 +1481,16 @@ def main():
         independence_rows.extend(hd.independence_table(track, task, all_group, metric, design))
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,
                             "reference_basis": reference_basis, "primary_status": selection.status,
+                            "reference_independence_rule": design.reference_independence, "interval_method": INTERVAL_METHOD,
+                            "reference_composition": reference_composition,
                             "species_basis": track_summary[0].get("ranking_species_basis", "") if track_summary else "",
                             "min_species_clusters": design.min_species_clusters})
     write_rows(species_rows, args.out_prefix + ".species.tsv",
                ["analysis_track", "task", "tool", "species", "n_samples", "n_clusters", "metric", "mean_metric",
                 "in_headline"])
     write_rows(independence_rows, args.out_prefix + ".reference_independence.tsv",
-               ["analysis_track", "task", "tool", "evaluation_independence", "n_samples", "metric", "mean_metric"])
+               ["analysis_track", "task", "tool", "evaluation_independence", "n_samples", "n_clusters", "metric", "mean_metric", "rank_in_group", "difference_vs_independent",
+                "rank_change_vs_independent"])
     write_rows(tier_rows, args.out_prefix + ".reference_tiers.tsv",
                ["analysis_track", "task", "tool", "reference_tier", "n_samples", "metric", "mean_metric",
                 "cprr", "cprr_plasmids"])
@@ -1450,7 +1502,7 @@ def main():
                 "n_isolates", "n_plasmids"])
     write_rows(design_rows, args.out_prefix + ".headline_design.tsv",
                ["analysis_track", "task", "ranking_metric", "reference_basis", "species_basis",
-                "min_species_clusters", "primary_status"])
+                "min_species_clusters", "primary_status", "reference_independence_rule", "reference_composition", "interval_method"])
     if args.sample_sheet:
         completeness = metadata_completeness(args.sample_sheet, {r["sample"] for r in all_rows})
         write_rows(completeness, args.out_prefix + ".metadata_completeness.tsv",
@@ -1464,7 +1516,7 @@ def main():
     def fmt3(value):
         return f"{value:.3f}" if value is not None else "n/a"
     for track, task, _, track_summary, _ in per_track:
-        metric = hd.METRIC_LABEL.get(hd.ranking_metric(track, task), "")
+        metric = hd.metric_label(task, hd.ranking_metric(track, task))
         print(f"\n=== LEADERBOARD [{track} / {task}] ranked by {metric} ===")
         for s in track_summary:
             print(f"{s['rank']:>2}. {s['tool']:<16} "
