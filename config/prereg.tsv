@@ -46,7 +46,7 @@ scorecard_overall_bands	excellent>=90 good>=75 moderate>=55 else poor		7.10	yes	
 scorecard_bands_A1	excellent>=99.9 good>=99.0 moderate>=95.0 floor=90 (percent)		7.10	no	fixed	The stated identity definition
 scorecard_bands_A2	excellent<=0.1 good<=0.5 moderate<=2.0 floor=10 (per 100 aligned columns)		7.10	yes	proposed	Proposed default, panel to confirm. Mismatch rate, lower is better
 scorecard_bands_A3	excellent>=99.9 good>=99.5 moderate>=98 floor=90 (percent)		7.10	yes	proposed	Proposed default, panel to confirm. Insertion/deletion accuracy
-scorecard_bands_A4_C2	no bands defined (status undefined)		7.10	yes	TO_FIX	Proposed default, panel to confirm. No truth variant set exists; metrics not available and excluded from the overall; no thresholds invented
+scorecard_bands_A4_C2	none: no independent truth variant set exists		7.10	yes	unavailable	A4 (SNP concordance) and C2 (structural variant F1) need an independent truth variant set, which no cohort has. No grade band is invented: both are reported as unavailable and excluded from the scorecard (never counted as zero) until such truth exists, when bands are pre-registered before results are seen
 scorecard_bands_B1	excellent>=0.99 good>=0.95 moderate>=0.8 floor=0.5		7.10	yes	proposed	Proposed default, panel to confirm. Reference coverage
 scorecard_bands_B2_B3	excellent>=0.95 good>=0.85 moderate>=0.6 floor=0.2		7.10	yes	proposed	Proposed default, panel to confirm. Reconstruction completeness (B2) and plasmid recovery rate (B3)
 scorecard_bands_C1	excellent>=0.95 good>=0.85 moderate>=0.7 floor=0.4		7.10	yes	proposed	Proposed default, panel to confirm. Structural accuracy, alignment-derived and unvalidated

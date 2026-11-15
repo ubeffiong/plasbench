@@ -10,7 +10,7 @@ PlasBench fixes its scoring decisions before results are seen. They live in
 | `config_variable` | The `config/config.sh` variable that implements it, when there is one |
 | `spec_section` | Section of the scoring specification it comes from |
 | `revise_after_pilot` | Whether the pilot may change it (before the freeze only) |
-| `status` | `fixed` (decided); `proposed` (a value is proposed, rationale in the note, awaiting the maintainer's confirmation); `TO_FIX` (no value yet). `proposed` and `TO_FIX` are *unfixed*: a plan with any is a **draft** |
+| `status` | `fixed` (decided); `proposed` (a value is proposed, rationale in the note, awaiting the maintainer's confirmation); `TO_FIX` (no value yet); `unavailable` (decided: no defensible value exists, so the metric is reported as unavailable and excluded, never given an invented threshold). `proposed` and `TO_FIX` are *unfixed*: a plan with any is a **draft**; `unavailable` is resolved |
 
 ## Freezing and checking
 
@@ -56,7 +56,8 @@ which draft it used, but `REQUIRE_PREREG=1` and `--strict` refuse it.
 | `integrated_element_min_depth` | 3x | Integrated-element / unverified-candidate stratum; needs real data | proposed |
 | `unverified_candidate_requires_circular_path` | yes | Same stratum | proposed |
 | `scorecard_weights`, `scorecard_overall_bands`, `scorecard_bands_*`, `scorecard_min_samples`, `map_max_bp` | see `config/prereg.tsv` | Proposed defaults for the exploratory scorecard and map; the identity bands (A1) are fixed | proposed |
-| `scorecard_bands_A4_C2` | none | No truth variant set exists, so there is nothing to propose | TO_FIX |
+| `scorecard_bands_A4_C2` | none | No independent truth variant set exists: SNP concordance (A4) and structural variant F1 (C2) are reported as unavailable and excluded until one does, when their bands are pre-registered before results are seen | unavailable |
+| `headline_reference_independence` | independent | A tier 1-2 reference enters the primary analysis only if it was not polished with the benchmark's own reads; dependent references are the reference-independence sensitivity analysis (second external review, section 4) | proposed |
 
 ## Not adopted from the specification
 

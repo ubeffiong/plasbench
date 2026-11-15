@@ -440,12 +440,27 @@ def _overall_cell(res):
     if res["score"] is None:
         return rc.missing("no metric could be scored")
     tail = " (provisional)" if res["provisional"] else ""
-    return rc.Raw(f"<strong>{res['score']:.1f}</strong> {rc.band_chip(res['band'])}{rc.esc(tail)}")
+    common = res.get("common_score")
+    shared = (f" | on the {res['n_common']} metric(s) every tool has: {common:.1f}" if common is not None and res.get("differs") else "")
+    return rc.Raw(f"<strong>{res['score']:.1f}</strong> {rc.band_chip(res['band'])}{rc.esc(tail)}{rc.esc(shared)}")
 
 
 def _ranked(specs, per_tool):
+    """Order tools by the score on the metrics EVERY tool in the group could be scored on (second review, 11B).
+
+    Each tool's own overall renormalises the weights over the metrics IT could be scored on; two tools scored on different
+    metric sets are then not comparable, so that overall is shown but never used to order them. 'differs' marks a tool whose
+    own metric set is larger than the common one."""
     results = {key: overall(specs, vals) for key, vals in per_tool.items()}
-    order = sorted(results, key=lambda k: (results[k]["score"] is None, -(results[k]["score"] or 0), k[1]))
+    scored = {k: {i for i, (score, _band) in r["per_metric"].items() if score is not None} for k, r in results.items()}
+    common = set.intersection(*scored.values()) if scored else set()
+    common_specs = [s for s in specs if s["id"] in common]
+    for key, res in results.items():
+        res["common_score"] = overall(common_specs, per_tool[key])["score"] if common_specs else None
+        res["n_common"] = len(common_specs)
+        res["differs"] = scored[key] != common
+    order = sorted(results, key=lambda k: (results[k]["common_score"] is None, -(results[k]["common_score"] or 0),
+                                           results[k]["score"] is None, -(results[k]["score"] or 0), k[1]))
     return order, results
 
 
@@ -544,6 +559,9 @@ def scorecard_body(specs, per_tool):
             f"scored share {results[k]['scored_share']:.2f}</figcaption></figure>" for k in order) + "</div>"
     body += rc.note("Overall = weighted mean of the scored metrics with weights renormalised (a metric that cannot be scored is "
                     "left out, never counted as zero); the scored weight share says how much of the 100 weights it rests on. "
+                    "Tools are ORDERED by the score on the metrics every tool could be scored on, shown after the overall when a tool "
+                    "has more; two overalls resting on different metrics are not compared. The scorecard is an exploratory summary: "
+                    "it never ranks tools scientifically and never recommends one. "
                     "Structural accuracy is alignment-derived and unvalidated; annotation concordance is coordinate-based, not "
                     "orthology; runtime is hardware-dependent.", "")
     return body

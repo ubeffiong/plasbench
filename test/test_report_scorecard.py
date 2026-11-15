@@ -266,6 +266,17 @@ def main():
     else:
         print("results_demo not built here; skipped (run bash test/run_demo.sh to include it)")
 
+    print("comparable ordering (second review, 11B)")
+    specs = sc.load_config()
+    # A is scored on A1 (100) and B1 (0.95 -> 85): its own overall is 92.5. B is scored on B1 only (0.96 -> 88.75).
+    # By their own overalls A leads; on the one metric both have, B leads, and that is the order shown.
+    per_tool = {("short_read", "A"): {"A1": {"value": 99.9}, "B1": {"value": 0.95}}, ("short_read", "B"): {"B1": {"value": 0.96}}}
+    order, results = sc._ranked(specs, per_tool)
+    check("tools are ordered on the metrics every tool has, not on overalls resting on different metrics",
+          [k[1] for k in order] == ["B", "A"] and results[("short_read", "A")]["score"] > results[("short_read", "B")]["score"])
+    check("a tool scored on more metrics says so, with its common-metric score",
+          results[("short_read", "A")]["differs"] and results[("short_read", "A")]["n_common"] == 1 and "every tool has" in str(sc._overall_cell(results[("short_read", "A")])))
+
     print()
     if not ok:
         print("REPORT SCORECARD TESTS FAILED")

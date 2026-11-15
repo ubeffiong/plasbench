@@ -8,7 +8,9 @@ build_html_report.py, and the two are cross-checked by test/test_metric_wiring.p
   id              stable snake_case identifier
   term            the glossary term that defines it (blank when the metric has no glossary term; the scorecard name is its name then)
   rung            where it sits on the reconstruction evaluation ladder (RUNGS) or `efficiency` (cost, outside the ladder)
-  tool_types      reconstruction | classification | all: whose output it can score
+  tool_types      the evaluation tasks whose output it can score (headline_design.TASKS, the capability registry's evaluation_task):
+                  all, or one or more of reconstruction | reassembly | classification joined by '+'. A metric is never read for a task
+                  it does not list (applies_to); a reassembler is neither a binner nor a contig classifier (second review, section 3)
   required_inputs what must exist for it to be computed
   rankable        yes when it is an endpoint a ranking is built on, no when it is only reported
   evidence        published_definition (a published definition, re-implemented and tested) | project_defined (defined by PlasBench) | unvalidated (an alignment-derived
@@ -37,7 +39,18 @@ RUNGS = (("detection", "Detection", "Did the tool identify plasmid-derived seque
          ("biological_validity", "Biological validity", "Were resistance genes and other features kept, in the right plasmid?"))
 EFFICIENCY = ("efficiency", "Computational efficiency", "What the answer cost in time and memory, and how reliably it was produced.")
 RUNG_IDS = tuple(r[0] for r in RUNGS) + (EFFICIENCY[0],)
-TOOL_TYPES = ("reconstruction", "classification", "all")
+TASK_TYPES = ("reconstruction", "reassembly", "classification")
+TOOL_TYPES = ("reconstruction", "classification", "all")   # the earlier single-value vocabulary, still accepted
+
+
+def tasks_of(value):
+    """The tasks a tool_types value covers."""
+    return set(TASK_TYPES) if value == "all" else set(value.split("+"))
+
+
+def applies_to(row, task):
+    """True when the metric row can score a tool of this evaluation task."""
+    return task in tasks_of(row["tool_types"])
 EVIDENCE = ("published_definition", "project_defined", "unvalidated", "not_available")
 EVIDENCE_LABEL = {"published_definition": "published definition", "project_defined": "defined by PlasBench", "unvalidated": "unvalidated estimate", "not_available": "not available"}
 
@@ -58,9 +71,12 @@ def load(path=None):
         if name in seen:
             raise ValueError(f"{path} row {number}: duplicate id {name}")
         seen.add(name)
-        for column, allowed in (("rung", RUNG_IDS), ("tool_types", TOOL_TYPES), ("rankable", ("yes", "no")), ("evidence", EVIDENCE)):
+        for column, allowed in (("rung", RUNG_IDS), ("rankable", ("yes", "no")), ("evidence", EVIDENCE)):
             if row[column] not in allowed:
                 raise ValueError(f"{path} row {number} ({name}): {column} must be one of {', '.join(allowed)} (got '{row[column]}')")
+        types = row["tool_types"]
+        if types != "all" and (not types or not set(types.split("+")) <= set(TASK_TYPES) or len(types.split("+")) != len(set(types.split("+")))):
+            raise ValueError(f"{path} row {number} ({name}): tool_types must be 'all' or one or more of {', '.join(TASK_TYPES)} joined by '+' (got '{types}')")
         for column in ("source", "column", "shown_in", "limitations", "required_inputs"):
             if not row[column].strip():
                 raise ValueError(f"{path} row {number} ({name}): {column} is empty")

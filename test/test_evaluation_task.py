@@ -86,6 +86,26 @@ def main():
         check("a reassembler is labelled by sequence recovery",
               hd.metric_label(hd.TASK_REASSEMBLY, hd.ranking_metric("short_read", hd.TASK_REASSEMBLY)) == "base-level sequence-recovery F1")
 
+    print("metrics say which tasks they can score")
+    import metric_registry as mr
+    metrics = {r["id"]: r for r in mr.load()}
+    check("the registry's task vocabulary is the ranking's", set(mr.TASK_TYPES) == set(hd.TASKS))
+    check("binning metrics never apply to a reassembler or a classifier",
+          all(not mr.applies_to(metrics[m], t) for m in ("lw_bin_f1", "bin_f1", "cprr", "amr_prr") for t in ("reassembly", "classification")))
+    check("base-level F1 applies to every task", all(mr.applies_to(metrics["base_f1"], t) for t in mr.TASK_TYPES))
+    check("AMR placement applies to every task (sequence attribution without bins)", mr.applies_to(metrics["amr_placement"], "reassembly"))
+    with tempfile.TemporaryDirectory() as d:
+        bad = os.path.join(d, "metrics.tsv")
+        with open(os.path.join(ROOT, "config", "metrics.tsv"), encoding="utf-8") as fh:
+            text = fh.read()
+        with open(bad, "w", encoding="utf-8") as fh:
+            fh.write(text.replace("\tall\t", "\tbinning+all\t", 1))   # 'binning' is not a task
+        try:
+            mr.load(bad)
+            check("an unknown task in tool_types is rejected", False)
+        except ValueError:
+            check("an unknown task in tool_types is rejected", True)
+
     print("ALL EVALUATION TASK TESTS PASSED" if not FAILED else f"EVALUATION TASK TESTS FAILED: {FAILED}")
     return 1 if FAILED else 0
 
