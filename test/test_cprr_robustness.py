@@ -83,7 +83,7 @@ def test_long_read_ranked_on_cprr(tmp):
     write("sheet.tsv", "sample_id\torganism\tbioproject\n" + "".join(f"{s}\tEscherichia coli\tPRJ{s}\n"
                                                                       for s in samples))
     write("caps.tsv", "tool\tmethod_class\tbinning_capable\tanalysis_track\n"
-                      "lr_a\tbinning\tyes\tlong_read\nlr_b\tbinning\tyes\tlong_read\n"
+                      "lr_a\treassembly\tyes\tlong_read\nlr_b\treassembly\tyes\tlong_read\n"
                       "sr_a\tbinning\tyes\tshort_read\nsr_b\tbinning\tyes\tshort_read\n")
     header = ["sample", "tool", "analysis_track", "true_plasmid_count", "precision", "recall", "f1",
               "lw_bin_f1", "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",

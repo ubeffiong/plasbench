@@ -193,7 +193,9 @@ def main():
         return
     p = test_payload(d_demo)
     got = {x["id"]: (x["num"], x["den"]) for x in p["distinctions"]}
-    assert got == {1: (0, 10), 2: (5, 11)}, got                       # the bundled demo, counted by hand from structural_calls.json
+    # the bundled demo, counted by hand from structural_calls.json; distinction 1 counts perfect clean bins, and the demo's reassembler (spades_like) is bin-scored since the
+    # three-task split (its records are its own bins), which adds its two perfect plasmids: 10 -> 12
+    assert got == {1: (0, 12), 2: (5, 11)}, got
     test_svg(p)
     test_node()
     size = test_section(d_demo)

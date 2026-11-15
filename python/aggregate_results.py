@@ -1337,7 +1337,8 @@ def main():
               f"with the tool's own reference database.")
         if not rows:
             raise SystemExit("ERROR: every score row was excluded as a possible database overlap")
-    design = hd.Design(args.sample_sheet, args.capabilities, args.truth_provenance, args.clonal_groups,
+    default_registry = Path(__file__).resolve().parent.parent / "config" / "tool_capabilities.tsv"
+    design = hd.Design(args.sample_sheet, args.capabilities or (str(default_registry) if default_registry.is_file() else None), args.truth_provenance, args.clonal_groups,
                        args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters)
     all_rows = rows
     selection = design.headline_selection(rows, allow_fallback=args.allow_primary_fallback)
