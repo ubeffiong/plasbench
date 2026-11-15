@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- SV-PRR, CPRR with the structural calls beside it (plan B3)
+- `call_structural_variants.py` now counts, per tool and isolate, the CPRR-correct plasmids that no structural call touches (`sv_prr_correct` / `sv_prr_plasmids` in `structural_summary.tsv`); `merge_bin_metrics.py` carries them into `scores.tsv`; the leaderboard gains `sv_prr`, `sv_prr_correct`, `sv_prr_plasmids` (appended last). CPRR itself, its definition and every rank are unchanged; SV-PRR is reported, never ranked, and as unvalidated as the calls (no read or graph support).
+- Report: the CPRR cell of the leaderboard shows SV-PRR; a glossary term, a registry row, a pre-registration row (`sv_prr_use`) and column groups in the explorer. `test/test_sv_prr.py` is new.
+
 ### Added -- the burden of unverified predicted sequence reaches the leaderboard and the report (review, plan B2)
 - `score_plasmids.py` already wrote `unmapped_pred_bp`, `off_truth_pred_bp`, `mapped_pred_bp` and `ambiguously_mapped_pred_bp`, but the aggregation dropped them. The leaderboard gains (appended last, pooled over the isolates): `total_predicted_bp`, `total_unmapped_pred_bp`, `total_off_truth_pred_bp`, `total_ambiguous_pred_bp`, `unmapped_fraction`, `off_truth_fraction`, `ambiguous_fraction` (the multi-mapping burden) and `precision_gap` (permissive minus strict precision). A column the scores do not carry is blank, never 0. The ambiguity alignment is already on by default (`REPORT_MAPPING_AMBIGUITY=1`).
 - Report: four columns in *Ranking confidence* (unmapped, off-truth, alternative placement, precision gap), four registry rows (`config/metrics.tsv`), a leaderboard column group in the file explorer, a glossary term and help text. `test/test_burden_columns.py` is new.

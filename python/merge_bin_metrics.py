@@ -38,6 +38,10 @@ FIELDS = [
 ]
 
 
+# Owned by call_structural_variants.py (structural_summary.tsv, one file per sample, one row per tool): SV-PRR counts.
+SV_FIELDS = ["sv_prr_correct", "sv_prr_plasmids"]
+
+
 def value(row, field):
     try:
         return float(row.get(field, ""))
@@ -79,9 +83,21 @@ def main():
         sample = path.parent.name
         with open(path) as handle:
             summaries[(sample, tool)] = next(csv.DictReader(handle, delimiter="\t"))
+    structural = {}
+    for path in Path(args.results_dir).glob("*/structural_summary.tsv"):
+        with open(path, newline="") as handle:
+            for record in csv.DictReader(handle, delimiter="\t"):
+                structural[(path.parent.name, record.get("tool", ""))] = record
     with open(args.scores) as handle:
         rows = list(csv.DictReader(handle, delimiter="\t"))
         fieldnames = list(rows[0]) if rows else []
+    for field in SV_FIELDS:
+        if field not in fieldnames:
+            fieldnames.append(field)
+    for row in rows:
+        record = structural.get((row["sample"], row["tool"]), {})
+        for field in SV_FIELDS:
+            row[field] = record.get(field, "")
     for field in FIELDS:
         if field not in fieldnames:
             fieldnames.append(field)

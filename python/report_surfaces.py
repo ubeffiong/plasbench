@@ -55,7 +55,7 @@ SCORE_COLUMN_GROUPS = {
     "Graded recovery": [
         "recovered_plasmid_count_ge50", "plasmid_recall_ge50", "recovered_plasmid_count_ge90", "plasmid_recall_ge90",
         "outcome_perfect", "outcome_fragmented", "outcome_merged", "outcome_fragmented_and_merged", "outcome_partial", "outcome_missed",
-        "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity", "cprr_sweep_correct", "cprr_sweep_correct_without_identity"],
+        "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity", "sv_prr_correct", "sv_prr_plasmids", "cprr_sweep_correct", "cprr_sweep_correct_without_identity"],
     "Confusion and abstention": [
         "TN_bp", "mcc", "f2", "f0_5", "abstention_rate", "isolate_specificity", "chromosome_fp_bp", "fp_predicted_record_count",
         "strict_precision", "redundant_pred_bp"],
@@ -99,7 +99,7 @@ LEADERBOARD_COLUMN_GROUPS = {
         "mean_plasmid_recall", "mean_plasmid_recall_ge50", "mean_plasmid_recall_ge90", "n_complete_circular_assessed",
         "mean_complete_circular_plasmid_recall", "n_reference_perfect_assessed", "reference_perfect_recovery_rate",
         "n_strict_reconstruction_assessed", "strict_reference_reconstruction_rate", "cprr", "cprr_ci_low", "cprr_ci_high",
-        "cprr_correct", "cprr_plasmids", "cprr_isolate_mean", "cprr_isolates", "cprr_auc", "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
+        "cprr_correct", "cprr_plasmids", "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "cprr_isolate_mean", "cprr_isolates", "cprr_auc", "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
         "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed"],
     "Bins": ["n_bin_scored", "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "mean_lw_bin_f1", "mean_bin_ari",
              "mean_lw_bin_f1_assembly_aware"],

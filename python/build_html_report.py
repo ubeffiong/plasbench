@@ -136,6 +136,12 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "SV-PRR": {
+        "what": "Structurally verified plasmid reconstruction rate: the share of truth plasmids that meet every CPRR criterion AND have no alignment-derived structural call (inversion, relocation, "
+                "deletion, insertion, duplication, chimeric junction) touching them. Shown in the CPRR cell of the leaderboard as SV-PRR.",
+        "why": "CPRR leaves order, orientation and circularity out on purpose. SV-PRR shows how many of the 'correct' plasmids also keep their structure. It is reported beside CPRR, never ranked, and is as "
+               "unvalidated as the calls it uses: a call can be a tool misassembly, a real rearrangement in the isolate or a reference error.",
+    },
     "Predicted-sequence burden": {
         "what": "The share of a tool's predicted sequence that precision does not charge: bases with no alignment (unmapped), bases aligned only off the labelled truth, and mapped bases that also "
                 "have an alternative placement (multi-mapping). Shown in Ranking confidence beside strict precision.",
@@ -2272,6 +2278,7 @@ def main():
                 cprr=esc((f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
                           + (f"; per isolate {number(row['cprr_isolate_mean']):.1%}"
                              if row.get("cprr_isolate_mean") else "")
+                          + (f"; SV-PRR {number(row['sv_prr']):.1%}" if row.get("sv_prr") else "")
                           + (f"; AUC {number(row['cprr_auc']):.3f}" if row.get("cprr_auc") else ""))
                          if row.get("cprr") else "not bin-scored"),
                 ranked_on=(f"<small class='muted'> on {esc(row['n_ranking_samples'])} shared"

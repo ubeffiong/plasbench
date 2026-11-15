@@ -222,6 +222,7 @@ def read_scores(path):
                 "lw_bin_f1": float(f[idx["lw_bin_f1"]]) if "lw_bin_f1" in idx and f[idx["lw_bin_f1"]] else None,
                 "cprr_plasmids": int(f[idx["cprr_plasmids"]]) if "cprr_plasmids" in idx and f[idx["cprr_plasmids"]] else None,
                 "cprr_correct": int(f[idx["cprr_correct"]]) if "cprr_correct" in idx and f[idx["cprr_correct"]] else None,
+                **{name: int(f[idx[name]]) if name in idx and f[idx[name]] not in ("", None) else None for name in ("sv_prr_correct", "sv_prr_plasmids")},
                 "cprr_correct_without_identity": (int(f[idx["cprr_correct_without_identity"]])
                                                   if "cprr_correct_without_identity" in idx and f[idx["cprr_correct_without_identity"]] else None),
                 "recall_ceiling": float(f[idx["recall_ceiling"]]) if "recall_ceiling" in idx and f[idx["recall_ceiling"]] else None,
@@ -605,6 +606,10 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
     for row in summary:
         row.update(hd.ranking_fields(row["tool"], by_metric, shared_metric, design, metric))
         row.update(hd.cprr_fields(row["tool"], rows, design))
+        sv = [r for r in rows if r["tool"] == row["tool"] and r.get("sv_prr_plasmids")]
+        row["sv_prr_correct"] = sum(r["sv_prr_correct"] for r in sv) if sv else None
+        row["sv_prr_plasmids"] = sum(r["sv_prr_plasmids"] for r in sv) if sv else None
+        row["sv_prr"] = row["sv_prr_correct"] / row["sv_prr_plasmids"] if sv and row["sv_prr_plasmids"] else None
         lw = [r["lw_bin_f1"] for r in rows if r["tool"] == row["tool"] and r.get("lw_bin_f1") is not None]
         row["mean_lw_bin_f1"] = statistics.mean(lw) if lw else None
         brier = [r["brier_score"] for r in rows if r["tool"] == row["tool"] and r.get("brier_score") is not None]
@@ -913,7 +918,8 @@ def write_tsv(summary, path):
             "cprr_isolate_mean", "cprr_isolates", "cprr_auc",
             "primary_status", "population",
             "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp",
-            "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap"]
+            "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap",
+            "sv_prr", "sv_prr_correct", "sv_prr_plasmids"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -986,6 +992,7 @@ def write_tsv(summary, path):
                 s.get("primary_status", ""), s.get("population", ""),
                 *(s[k] if s.get(k) is not None else "" for k in ("total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp")),
                 *(fmt4(s.get(k)) for k in ("unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap")),
+                fmt4(s.get("sv_prr")), s.get("sv_prr_correct") if s.get("sv_prr_correct") is not None else "", s.get("sv_prr_plasmids") if s.get("sv_prr_plasmids") is not None else "",
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
@@ -1058,6 +1065,8 @@ def write_md_table(fh, summary, track=None, task=None):
                 if s.get("cprr") is not None else "not bin-scored")
         if s.get("cprr_isolate_mean") is not None:
             cprr += f"; per isolate {s['cprr_isolate_mean']:.1%}"
+        if s.get("sv_prr") is not None:
+            cprr += f"; without structural calls {s['sv_prr']:.1%}"
         if s.get("cprr_auc") is not None:
             cprr += f"; AUC 0.80–0.99 {s['cprr_auc']:.3f}"
         basis = s.get("ranking_species_basis") or "pooled"

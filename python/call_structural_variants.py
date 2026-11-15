@@ -26,6 +26,12 @@ reference_deletion       reference advances far more than the query
 reference_insertion      query advances far more than the reference
 tandem_duplication       one record covers the same reference interval twice
 
+SV-PRR
+------
+`sv_prr_correct` / `sv_prr_plasmids` (structural_summary.tsv, then scores.tsv): the truth plasmids that meet every CPRR criterion AND have no call
+touching them, over the plasmids scored. CPRR deliberately leaves order, orientation and circularity out; SV-PRR adds the calls above beside it.
+It is reported, never ranked, and is exactly as unvalidated as the calls (see Scope and honesty).
+
 Origin wrap
 -----------
 A circular replicon has no fixed start, so a faithful reconstruction can begin anywhere on the circle. Its alignment then
@@ -191,6 +197,31 @@ def call_record(record_id, blocks, thresholds, truth=None):
     return events
 
 
+def sv_free_plasmids(events, plasmids):
+    """The truth plasmids that no structural call touches: neither side of any call is that plasmid.
+
+    A call on a replicon other than the plasmid (for example a junction between two chromosome blocks) does not count against it.
+    Origin wraps are never calls, so a rotated circular plasmid stays free."""
+    touched = {event["left_target"] for event in events} | {event["right_target"] for event in events}
+    return {plasmid for plasmid in plasmids if plasmid not in touched}
+
+
+def sv_prr_counts(cprr_path, events):
+    """SV-PRR numerator and denominator for one tool and sample from its CPRR table: (correct and structurally clean, plasmids scored).
+
+    CPRR ignores order, orientation and circularity by design (the pre-registered definition); SV-PRR is CPRR with the alignment-derived
+    structural calls added, so a plasmid counts only when it is both correct and free of calls. Reported beside CPRR, never ranked, and as unvalidated as the calls.
+    Returns None when the tool has no CPRR table (not bin-scored)."""
+    path = Path(cprr_path)
+    if not path.is_file():
+        return None
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    correct = {row["true_plasmid"] for row in rows if row.get("correct") == "yes"}
+    clean = sv_free_plasmids(events, correct)
+    return len(clean), len(rows)
+
+
 def summarise(blocks, events, thresholds, truth=None):
     aligned = sum(block["block_length"] for block in blocks)
     by_record = defaultdict(list)
@@ -249,6 +280,8 @@ def main():
         for event in events:
             all_events.append({"tool": tool, **event})
         summary = summarise(blocks, events, thresholds, truth)
+        counts = sv_prr_counts(sample_dir / f"{tool}.cprr.tsv", events)
+        summary["sv_prr_correct"], summary["sv_prr_plasmids"] = counts if counts else ("", "")
         summaries.append({"tool": tool, **{k: v for k, v in summary.items()
                                            if k not in ("thresholds",)}})
         payload[tool] = {"summary": summary, "events": events}
@@ -264,7 +297,7 @@ def main():
     summary_fields = ["tool", "aligned_bp", "collinear_bp", "collinear_fraction", "records",
                       "events_total", "origin_wraps", "inter_replicon_junction", "inversion_junction", "relocation",
                       "reference_deletion", "reference_insertion", "tandem_duplication",
-                      "validated", "meaning"]
+                      "sv_prr_correct", "sv_prr_plasmids", "validated", "meaning"]
     args.summary_out.parent.mkdir(parents=True, exist_ok=True)
     with args.summary_out.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=summary_fields, delimiter="\t", extrasaction="ignore")
