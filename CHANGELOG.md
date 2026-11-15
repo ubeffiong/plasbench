@@ -13,6 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- reference independence is its own classification (review of the reference standard)
+- `truth_provenance.py` records two separate things per reference: `reference_quality` (validated / partially validated / provisional, the tier) and `evaluation_independence` (independent / partially independent / dependent / unknown, with `independence_reason`). Appended columns; the tier stays.
+- The primary analysis needs a reference that is within `HEADLINE_MAX_REFERENCE_TIER` AND independent (`HEADLINE_INDEPENDENCE`, default `independent`), from at least `HEADLINE_MIN_CLUSTERS` independent clusters counted over the qualifying references only. Dependent and unknown references never enter it. Before, a tier-2 reference polished with the benchmark's own reads counted as primary; it is now partially independent and a sensitivity analysis. The pre-registration row `headline_independence` is marked proposed.
+- Sensitivity populations: sensitivity 1 adds partially independent references, sensitivity 2 is every reference (`independent_references_only` and `independent_or_partial_references` cohort variants in the rank-sensitivity table; `benchmark.reference_independence.tsv`; per-class table and the two columns in the report's Headline design tab). README and the Scientific guide state the full rule.
+
 ### Fixed -- AMR placement forced one record per plasmid on classifiers
 - `score_amr_placement.py` matched every tool's records to plasmids one-to-one, so a classifier that reported two contigs of one plasmid had the second contig marked wrong. It now takes `--task` (the registry's `evaluation_task`; stage 5 and the demo pass it): binners stay one-to-one; classifiers and reassemblers attribute each record to the plasmid it overlaps most.
 - AMR-PRR and the pairs-kept-together figure are blank for classifiers (no plasmid-level reconstruction claim); the report says "not applicable (classifier)" and explains the rule. New columns `evaluation_task` and `attribution` (appended). Regression test `test/test_amr_placement_by_task.py`: one plasmid, two resistance genes on two contigs.

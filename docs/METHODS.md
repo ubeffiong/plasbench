@@ -675,6 +675,11 @@ computed on all samples but are labelled provisional (`primary_status` and `popu
 `primary_status` in `benchmark.headline_design.tsv`, a banner in the report) and are not the headline.
 `ALLOW_PRIMARY_FALLBACK=1` keeps them as the headline with the warning.
 
+**Reference quality and evaluation independence** (`truth_provenance.py`; separate columns `reference_quality` and `evaluation_independence`, with `independence_reason`).
+Quality is the tier (validated / partially validated / provisional). Independence is derived from the assembly strategy and the polishing reads: independent = long-read-only or
+long-read-first with polishing none or independent; partially independent = long-read-first polished with the benchmark's reads (or unrecorded); dependent = short-read-first
+hybrid; unknown = unrecorded strategy. The primary analysis requires both: its **reference quality** is within the tier limit (`HEADLINE_MAX_REFERENCE_TIER`, default 2: validated or partially validated) AND its **evaluation independence** is `independent` (`HEADLINE_INDEPENDENCE`). Independent means long-read-only or long-read-first truth polished with no reads or reads independent of the benchmark; partially independent is long-read-first truth polished with the benchmark's own reads (or unrecorded); dependent is a short-read-first hybrid; unknown is an unrecorded strategy, never assumed independent. The qualifying references must come from at least `HEADLINE_MIN_CLUSTERS` (default 5, the interval minimum) independent clusters (BioProjects or clonal groups), counted over the qualifying references only. Sensitivity analysis 1 adds partially independent references; sensitivity analysis 2 uses every reference; dependent and unknown references never enter the primary analysis. If the primary analysis is unavailable the ranking is shown as provisional, never as the headline. `benchmark.reference_independence.tsv` gives each tool's ranking metric per class; a provenance table written before the column existed is classified from its strategy and polishing columns.
+
 **Evidence-based labels** (`python/label_truth_evidence.py`, stage 2). Source labels
 are confirmed with evidence, never assigned by size:
 

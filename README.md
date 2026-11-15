@@ -123,7 +123,7 @@ for the incremental precision-recall sweep.
 - Every tool carries a validation tier (real binary checked, adapter tested, untested) and every database a version, source, release date and checksum (blank = not recorded); a weekly workflow runs the real MOB-suite, Platon and plasmidSPAdes on a known plasmid. Shown in *Truth plasmids in tool databases*.
 - AMR placement attributes genes by the tool's evaluation task (one-to-one bin matching for binners, best plasmid per record for classifiers and reassemblers; classifiers get no AMR-PRR). It also reports flank context, resistance genes kept together and AMR-PRR; `plasbench promote-amr-truth` turns a reviewed draft into curated AMR truth (name, database version and confirmation required).
 - More figures: isolate complexity against performance, an outcome view of the plasmid matrix, identity shading and resistance-region brackets on the circular maps, true/false-positive encodings in the 3D landscape, and an evidence panel under the recommendation.
-- Settings new in 0.4, all in `config/config.sh` and recorded in the run manifest: `HEADLINE_MIN_CLUSTERS`, `ALLOW_PRIMARY_FALLBACK`, `RUN_STATS_VALIDATION`, `STATS_VALIDATION_MODE`, `CHROMID_MIN_BP`, `LARGE_PLASMID_BP`, `AMR_FLANK_BP`, `RUN_RANK_SENSITIVITY` (see the Scientific guide's settings tables).
+- Settings new in 0.4, all in `config/config.sh` and recorded in the run manifest: `HEADLINE_INDEPENDENCE`, `HEADLINE_MIN_CLUSTERS`, `ALLOW_PRIMARY_FALLBACK`, `RUN_STATS_VALIDATION`, `STATS_VALIDATION_MODE`, `CHROMID_MIN_BP`, `LARGE_PLASMID_BP`, `AMR_FLANK_BP`, `RUN_RANK_SENSITIVITY` (see the Scientific guide's settings tables).
 - A radar fingerprint per analysis track shows each tool's accuracy, recovery, reconstruction, structure, verified sequence, efficiency and reliability as one shape (a picture of the table beside it, not a score).
 - The numeric tool x metric heatmap (one block per analysis track) now includes SV-PRR and the predicted-sequence burden columns beside F1, MCC, binning F1 and CPRR.
 - The recommender evaluation compares the single best tool, an organism recommender and a feature-conditioned one (nearest similar isolates, truth-free features), with calibration and abstention; an arm adds value only when it beats the single best tool on average and in most of at least three studies.
@@ -136,7 +136,7 @@ for the incremental precision-recall sweep.
 - The pre-registration is a **draft** until its proposed values are confirmed and frozen (`freeze-prereg --write --strict`); the report's Pre-registration tab shows the draft state and lists the proposed values.
 - Each reference carries a structured **evidence record** (technology, circularity, long-read support, replicon evidence, structure, independent validation; declared, inferred or unknown), kept field by field; the reference tier is derived from it.
 
-- The primary analysis is reported **unavailable** when no isolate has a Tier 1-2 reference; the ranking is then labelled provisional, never the headline.
+- A reference qualifies for the **primary analysis** only if it passes BOTH of two separate checks: its **reference quality** is within the tier limit (`HEADLINE_MAX_REFERENCE_TIER`, default 2: validated or partially validated) AND its **evaluation independence** is `independent` (`HEADLINE_INDEPENDENCE`). Independent means long-read-only or long-read-first truth polished with no reads or reads independent of the benchmark; partially independent is long-read-first truth polished with the benchmark's own reads (or unrecorded); dependent is a short-read-first hybrid; unknown is an unrecorded strategy, never assumed independent. The qualifying references must come from at least `HEADLINE_MIN_CLUSTERS` (default 5, the interval minimum) independent clusters (BioProjects or clonal groups), counted over the qualifying references only. Sensitivity analysis 1 adds partially independent references; sensitivity analysis 2 uses every reference; dependent and unknown references never enter the primary analysis. If the primary analysis is unavailable the ranking is shown as provisional, never as the headline.
 - Recommendations are advisory and withheld when evidence is thin; PlasBench does not
   identify, cluster or classify the plasmids in your own sample (see the table below).
 - No claim is made here about how any named competing benchmark performs; the
@@ -1837,7 +1837,7 @@ length-weighted binning F1 (the primary endpoint: plasmid bases placed in the
 correct bin), with **CPRR** (`cprr`, the share of truth plasmids reconstructed
 correctly) as the secondary endpoint. Reassemblers are ranked on **sequence reassembly** by isolate-level CPRR and
 classifiers on **classification** by base-level F1, each on their own. The ranking score is averaged per species when
-enough independent isolates exist, uses reference tiers 1-2 only, and covers the
+enough independent isolates exist, uses independent references within reference tiers 1-2 only (from at least `HEADLINE_MIN_CLUSTERS` independent clusters), and covers the
 samples every tool in the group was scored on (`n_ranking_samples`). A tool that
 predicts nothing, or fails, on an isolate with plasmids scores 0 there. See
 [docs/METHODS.md](docs/METHODS.md#research-design-endpoints-reference-standard-and-species-balance).
