@@ -429,10 +429,11 @@ HELP = {
     "truth-label-audit": H(
         "Are the plasmid and chromosome labels in the truth actually right?",
         "Truth sequences and their replicon and MOB evidence.",
-        "Each label is compared with replicon, relaxase and related evidence.",
-        "'Consistent' is good; conflicts are flagged.",
-        "Wrong truth gives wrong scores.",
-        "It does not change a score."),
+        "Each label is compared with replicon, relaxase and related evidence. Flags add size checks (large plasmids, secondary chromosomes), plasmids with two replicons, tandem copies "
+        "(dimers, trimers and more) and read-depth anomalies. A second table lists tools whose database is the same as, or may overlap with, the one that labelled the truth.",
+        "'Consistent' is good; conflicts and flags mark sequences to look at. 'Shared: yes' means a tool and the truth evidence use the same database.",
+        "Wrong truth gives wrong scores, and a tool that shares the truth's evidence can look better than it is.",
+        "It never relabels a sequence or changes a score. Size flags are heuristics. The overlap table compares database names, not sequences."),
     "label-schemes": H(
         "How the truth was labelled, and what happens if it were labelled differently.",
         "Three labelling schemes: the pre-registered NCBI scheme, one that calls every non-main replicon a plasmid, and an evidence-checked scheme.",

@@ -13,6 +13,12 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- more truth audits (review H3, plan A9)
+- `python/audit_truth_labels.py` adds a `flags` column (the `finding` column is unchanged): `integrated_plasmid_candidate`, `chromid_candidate`, `secondary_chromosome`, `large_plasmid`, `multi_replicon_plasmid`, `marker_free_plasmid`, `multimer_<k>x` (from `truth.corrections.tsv`) and `collapsed_repeat_candidate` / `low_depth_region` (from the depth-anomaly summary). The size thresholds are `CHROMID_MIN_BP` (350 kb) and `LARGE_PLASMID_BP` (500 kb), config variables and pre-registered as proposed.
+- `python/detect_dimers.py` detects higher multimers (up to 6 tandem copies): a new `copies` column, a collapse keeps the first 1/k, and a tetramer is reported as 4, not 2.
+- `python/truth_marker_overlap.py` writes `benchmark.truth_marker_overlap.tsv` from `config/truth_marker_databases.tsv` and `config/tool_database_releases.tsv`: which tools share a database with the evidence that labelled the truth (`yes` / `possible` / `no` / `unknown`; MOB-suite tools share the MOB-typing evidence). A name-level screen.
+- Report: the *Truth labels* tab gets a Flags column, flagged-only rows and a *Marker databases shared with benchmarked tools* table (with a Not run state); help text, a glossary term, a file-explorer entry and feature-manifest rows. Stage 6 and the demo run the new steps. `test/test_truth_audits.py` is new.
+
 ### Changed -- the ranking-sensitivity analysis covers the headline endpoints and the alignment length (review C6 / H1, plan A8)
 - `python/rank_sensitivity.py` adds: a minimum-alignment-length sweep (`min_length=100`, `min_length=500`; the pre-registered value is 200); the headline short-read endpoint (`metric:lw_bin_f1`) and the 50% recovery band (`metric:plasmid_recall_ge50`) as alternative rankings; and CPRR re-ranked at coverage/bin-share thresholds 0.80, 0.90, 0.95 and 0.99 (`cprr@...`, read from `benchmark.cprr_threshold_sweep.tsv`; compared with the pre-registered 0.95 ranking). The table gains a last column `compared_with` (the F1 `baseline`, or `cprr@0.95`), and the report's *Filter and metric sensitivity* table shows it. Existing columns and variants are unchanged. `test/test_rank_sensitivity.py` is extended.
 

@@ -287,6 +287,7 @@ def _file_entries():
           "Only the area under the sweep (cprr_auc) is shown, in the leaderboard; the per-threshold table is a downloadable file."),
         S("benchmark.recovery_by_replicon.tsv", ag, "Recovery by replicon type", "stratify_recovery.py", "replicon-recovery", "shown", "Table."),
         S("benchmark.truth_label_audit.tsv", ag, "Truth-label audit", "audit_truth_labels.py", "truth-label-audit", "shown", "Table."),
+        S("benchmark.truth_marker_overlap.tsv", ag, "Truth-marker databases shared with tools", "truth_marker_overlap.py", "truth-label-audit", "shown", "Table."),
         S("benchmark.truth_provenance.tsv", ag, "Truth provenance", "truth_provenance.py", "headline-design", "shown", "Tier shown with the design."),
         S("benchmark.stratified.tsv", ag, "Performance by stratum", "select_operational_method.py", "stratified", "shown", "Table."),
         S("benchmark.recommendations.tsv", ag, "Recommendations", "select_operational_method.py", "recommendations", "shown", "Table."),

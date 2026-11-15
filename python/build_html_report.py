@@ -136,6 +136,10 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Chromid candidate": {
+        "what": "A replicon labelled chromosome that is not the largest one and carries a plasmid marker (or is a large secondary replicon): it may be a chromid, a replicon with plasmid-like replication but core genes.",
+        "why": "A chromid labelled plasmid, or an integrated plasmid labelled chromosome, scores as certain truth although it is not. The audit flags such sequences for review; it never relabels them.",
+    },
     "Interval coverage": {
         "what": "How often a 95% confidence interval contains the true value, measured on simulated data where the truth is known.",
         "why": "An interval is only worth reading if it covers about 95% of the time. With few independent studies the percentile bootstrap covers less, "
@@ -2112,6 +2116,7 @@ def main():
     ap.add_argument("--quast-diagnostics", help="Optional QUAST supplementary diagnostics TSV (run_quast_diagnostics.py, RUN_QUAST_DIAGNOSTICS=1).")
     ap.add_argument("--rank-robustness", help="Optional ranking-robustness TSV (rank_sensitivity.py).")
     ap.add_argument("--truth-label-audit", help="Optional advisory truth-label audit TSV (audit_truth_labels.py).")
+    ap.add_argument("--truth-marker-overlap", help="Optional benchmark.truth_marker_overlap.tsv (truth_marker_overlap.py): which tools share a database with the truth evidence.")
     ap.add_argument("--stratified", help="Optional evidence-gated stratified performance TSV (select_operational_method.py).")
     ap.add_argument("--orthogonal-summary", help="Optional orthogonal-validation summary JSON (validate_orthogonal_evidence.py).")
     ap.add_argument("--embed-dashboard", action="store_true", default=os.environ.get("REPORT_EMBED_DASHBOARD", "0") == "1",
@@ -2489,18 +2494,34 @@ def main():
         audit_counts[row.get("finding", "")] = audit_counts.get(row.get("finding", ""), 0) + 1
     audit_summary = ", ".join("{}: {}".format(esc(k), v) for k, v in sorted(audit_counts.items())) or "no audit table"
     audit_flagged = [r for r in truth_label_audit
-                     if r.get("finding") in ("chromosome_with_plasmid_markers", "plasmid_without_markers")]
+                     if r.get("finding") in ("chromosome_with_plasmid_markers", "plasmid_without_markers") or r.get("flags")]
     truth_label_audit_html = "".join(
         "<tr><td>{sample}</td><td>{seq}</td><td>{mol}</td><td>{length}</td><td>{rep}</td><td>{mob}</td>"
-        "<td>{finding}</td></tr>".format(
+        "<td>{finding}</td><td>{flags}</td></tr>".format(
             sample=esc(r.get("sample", "-")), seq=esc(r.get("sequence_id", "-")),
             mol=esc(r.get("molecule_type", "-")), length=esc(r.get("length", "-")),
             rep=esc(r.get("replicon_labels") or "-"), mob=esc(r.get("mob_labels") or "-"),
-            finding=esc(r.get("finding", "-"))) for r in audit_flagged
-    ) or ("<tr><td colspan='7'>No truth sequence was flagged"
+            finding=esc(r.get("finding", "-")), flags=esc((r.get("flags") or "-").replace(";", ", "))) for r in audit_flagged
+    ) or ("<tr><td colspan='8'>No truth sequence was flagged"
           + (" (sequences with no annotation are not evaluated, not cleared)." if truth_label_audit
              else "; no audit table was available (stage 6 writes it from the truth annotation: RUN_TRUTH_LABEL_EVIDENCE=1 "
                                    "or RUN_REFERENCE_ANNOTATION=1).") + "</td></tr>")
+    marker_overlap = (read_tsv(args.truth_marker_overlap)
+                      if getattr(args, "truth_marker_overlap", None) and Path(args.truth_marker_overlap).is_file() else [])
+    shared_rows = [r for r in marker_overlap if r.get("shared") in ("yes", "possible")]
+    marker_overlap_html = (
+        "<h3>Marker databases shared with benchmarked tools</h3>"
+        "<p class='muted'>The truth labels use replicon and MOB-typing evidence. A tool that classifies with the same database can agree with the truth through shared evidence, "
+        "not because it is right. <em>yes</em> = the same database; <em>possible</em> = a different database whose content may overlap. A name-level screen, not a sequence-level proof "
+        "(that is the database-leakage tab).</p>"
+        + ("<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Tool database</th><th>Truth marker caller</th><th>Shared</th></tr></thead><tbody>"
+           + "".join("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+               esc(display_tool_name(r.get("tool", "-"))), esc(r.get("tool_database") or "-"), esc(r.get("marker_caller", "-")), esc(r.get("shared", "-"))) for r in shared_rows)
+           + "</tbody></table></div>"
+           if shared_rows else
+           ("<div class='panel'><p>No benchmarked tool shares a database with the truth evidence.</p></div>" if marker_overlap else
+            "<div class='panel'><p>Not run: no marker-overlap table was available (stage 6 writes it with python/truth_marker_overlap.py).</p></div>"))
+        + ((" <p><a href='{}' download>Download the full overlap table</a>.</p>".format(relative_link(Path(args.truth_marker_overlap), out))) if marker_overlap else ""))
     truth_label_audit_download = ""
     if args.truth_label_audit and Path(args.truth_label_audit).is_file():
         truth_label_audit_download = " <a href='{}' download>Download the full audit</a>.".format(
@@ -2810,7 +2831,7 @@ def main():
 <section id='replicon-recovery'><h2>Recovery by plasmid type</h2><p class='lead'>Which kinds of plasmid each tool recovers, by Inc/rep and relaxase (MOB) label annotated on the truth references, by plasmid size band, and by antimicrobial-resistance-gene carriage. Per-plasmid recovery is skewed, so the median and interquartile range sit beside the mean. <strong>Descriptive only: it never ranks tools and never changes the leaderboard.</strong> A plasmid with several labels counts once under each. A plasmid with no label of that type is <em>untyped</em>; plasmids in samples with no annotation are left out rather than called untyped. Groups with few plasmids are flagged, so read patterns, not ranks. <strong>CPRR</strong> is the share of the group's plasmids reconstructed correctly (whole, alone and accurately), so a tool cannot look good only on small, simple plasmids. Tracks are never mixed.{replicon_recovery_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Tool</th><th>Label type</th><th>Label</th><th>Plasmids</th><th>Samples</th><th>Mean completeness</th><th>Median (IQR)</th><th>Recovered fraction</th><th>CPRR</th><th>Note</th></tr></thead><tbody>{replicon_recovery_html}</tbody></table></div></section>
 <section id='quast-diagnostics'><h2>QUAST structural diagnostics</h2><p class='lead'>Optional supplementary check of each tool's predicted plasmid sequence against the truth, run three ways: <em>combined</em> (all truth plasmids), <em>individual</em> (one run per truth plasmid) and <em>chromosome</em> (chromosome only). A high chromosome genome fraction means the tool's plasmid call contains chromosome sequence; misassemblies and duplication ratio flag structural problems that base-level F1 cannot see. <strong>Descriptive only: it never changes the ranking.</strong> Misassembly counts are alignment-derived and are not validated against read or graph support. Means skip blank values.{quast_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Reference</th><th>Comparisons</th><th>Mean genome fraction (%)</th><th>Total misassemblies</th><th>Mean duplication ratio</th></tr></thead><tbody>{quast_html}</tbody></table></div></section>
 <section id='rank-robustness'><h2>Ranking robustness</h2><p class='lead'>How much the order of tools depends on scoring choices: each row re-scores the saved alignments with one filter changed (MAPQ, identity, query coverage, minimum alignment length), or ranks by another metric (strict precision, per-plasmid recovery, length-weighted binning F1), or re-ranks the correct plasmid reconstruction rate (CPRR) at other thresholds, and reports Kendall tau against the baseline order and whether the top tool holds. The CPRR rows are compared with the pre-registered 0.95 ranking, as the last column says. <strong>Advisory only: it never changes the leaderboard.</strong> A low tau or a changed top tool means the ranking is sensitive to that choice.{rank_robustness_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Track</th><th>Variant</th><th>Kendall tau vs baseline</th><th>Top tool</th><th>Top tool unchanged</th><th>Compared with</th></tr></thead><tbody>{rank_robustness_html}</tbody></table></div></section>
-<section id='truth-label-audit'><h2>Truth-label audit</h2><p class='lead'>Does each PLASMID or CHROMOSOME label agree with replicon and MOB evidence on the reference? Findings: {audit_summary}. Only sequences to review are listed. A flagged sequence may be a chromid, an integrated plasmid, a cryptic plasmid the databases do not know, or a database false positive. <strong>Advisory only: it never edits truth or changes a score.</strong> <em>not_evaluated</em> means the annotation callers did not run, which is not the same as consistent.{truth_label_audit_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Sequence</th><th>Truth label</th><th>Length</th><th>Replicon</th><th>MOB</th><th>Finding</th></tr></thead><tbody>{truth_label_audit_html}</tbody></table></div></section>
+<section id='truth-label-audit'><h2>Truth-label audit</h2><p class='lead'>Does each PLASMID or CHROMOSOME label agree with replicon and MOB evidence on the reference? Findings: {audit_summary}. Only sequences to review are listed, with flags for chromid and integrated-plasmid candidates, secondary chromosomes, very large plasmids, multi-replicon and marker-free plasmids, tandem multimers and read-depth anomalies. A flagged sequence may be a chromid, an integrated plasmid, a cryptic plasmid the databases do not know, or a database false positive. <strong>Advisory only: it never edits truth or changes a score.</strong> <em>not_evaluated</em> means the annotation callers did not run, which is not the same as consistent.{truth_label_audit_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Sequence</th><th>Truth label</th><th>Length</th><th>Replicon</th><th>MOB</th><th>Finding</th><th>Flags</th></tr></thead><tbody>{truth_label_audit_html}</tbody></table></div>{marker_overlap_html}</section>
 <section id='stratified'><h2>Performance by stratum</h2><p class='lead'>The detail behind the recommendations: each tool's coverage and mean F1 within an organism, size, depth or AMR group, and whether the evidence gate allowed a recommendation. <strong>Advisory only: it never changes the leaderboard.</strong> A stratum with few samples is withheld, not guessed.{stratified_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Tool</th><th>Samples scored</th><th>Coverage</th><th>Mean F1</th><th>Recommendation</th><th>Reason</th></tr></thead><tbody>{stratified_html}</tbody></table></div></section>
 <section id='orthogonal-evidence'><h2>Orthogonal evidence</h2><p class='lead'>Optional laboratory or independent-technology evidence recorded alongside the run. {orthogonal_boundary}</p><div class='panel'><table><tbody>{orthogonal_html}</tbody></table></div></section>
 {dimension_sections_html}

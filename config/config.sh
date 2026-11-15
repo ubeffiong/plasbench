@@ -740,3 +740,6 @@ export ALLOW_PRIMARY_FALLBACK="${ALLOW_PRIMARY_FALLBACK:-0}"
 # 1 runs the statistics simulation (python/simulate_validation.py) in stage 6 and shows it in the report (Sensitivity, power and reproducibility). STATS_VALIDATION_MODE is smoke (seconds, indicative) or full (minutes, the evidence).
 export RUN_STATS_VALIDATION="${RUN_STATS_VALIDATION:-0}"
 export STATS_VALIDATION_MODE="${STATS_VALIDATION_MODE:-smoke}"
+# Truth audit size flags (python/audit_truth_labels.py): a non-largest chromosome at least CHROMID_MIN_BP is flagged secondary_chromosome; a PLASMID at least LARGE_PLASMID_BP is flagged large_plasmid.
+export CHROMID_MIN_BP="${CHROMID_MIN_BP:-350000}"
+export LARGE_PLASMID_BP="${LARGE_PLASMID_BP:-500000}"
