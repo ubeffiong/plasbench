@@ -504,7 +504,7 @@ HELP = {
         "Features like graph dead ends and plasmid-to-chromosome depth ratio.",
         "Higher difficulty means every tool should struggle.",
         "Helps explain low scores.",
-        "Never a tool measure and not used in recommendations. Off by default."),
+        "Never a tool measure and not used in recommendations. The signals are off by default (RUN_DIFFICULTY_FEATURES); the dataset-characteristics table below them is always built and marks every column as knowable without a reference or not."),
     "health": H(
         "How every run ended and what it cost.",
         "Execution status, runtime and memory records.",

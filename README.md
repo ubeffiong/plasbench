@@ -120,6 +120,7 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- A dataset-characterisation table describes every isolate (organism, depth, read quality, assembly, repeat content), marking each column as knowable without a reference or benchmark-only; it appears in the *Isolate difficulty* tab.
 - SV-PRR sits beside CPRR in the leaderboard: the share of truth plasmids that are correct and also untouched by an alignment-derived structural call (reported, never ranked, unvalidated).
 - The leaderboard reports the burden of predicted sequence that precision does not charge (unmapped, off-truth and multi-mapped shares, and the gap between permissive and strict precision), shown in the report beside strict precision.
 - Every metric is registered in `config/metrics.tsv` (rung of a five-step evaluation ladder from detection to biological validity, whether it ranks tools, how well it is grounded, where its column lives); the report shows the ladder and its gaps, and a test keeps the registry, the glossary and the output in step.

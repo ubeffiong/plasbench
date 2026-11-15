@@ -173,6 +173,10 @@ job_repeat_content() {
     python3 "$HERE/../python/repeat_content.py" summary --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.repeat_content.tsv" \
         || warn "could not merge repeat-content tables; that table is not evaluated"
 }
+job_dataset_features() {
+    python3 "$HERE/../python/characterise_dataset.py" --data-dir "$DATA_DIR" --sample-sheet "$SAMPLE_SHEET" --out "$RESULTS_DIR/benchmark.dataset_features.tsv" \
+        || warn "could not characterise the dataset; that table is not evaluated"
+}
 job_truth_depth_anomalies() {
     python3 "$HERE/../python/merge_tables.py" --results-dir "$DATA_DIR" --suffix "truth_depth_anomaly_summary.tsv" \
         --out "$RESULTS_DIR/benchmark.truth_depth_anomalies.tsv" || warn "could not merge truth depth-anomaly tables"
@@ -249,6 +253,7 @@ advisory_job job_audit_truth_labels
 [[ "${RUN_ASSEMBLY_ADEQUACY:-1}" == "1" ]] && advisory_job job_assembly_adequacy
 advisory_job job_copy_number
 advisory_job job_repeat_content
+advisory_job job_dataset_features
 advisory_job job_truth_depth_anomalies
 [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]] && advisory_job job_bin_agreement
 wait
@@ -365,6 +370,7 @@ python3 "$HERE/../python/build_html_report.py" \
     --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
     --truth-label-audit "$RESULTS_DIR/benchmark.truth_label_audit.tsv" \
     --truth-marker-overlap "$RESULTS_DIR/benchmark.truth_marker_overlap.tsv" \
+    --dataset-features "$RESULTS_DIR/benchmark.dataset_features.tsv" \
     --stratified "$RESULTS_DIR/benchmark.stratified.tsv" \
     --orthogonal-summary "$RESULTS_DIR/orthogonal_validation.summary.json" \
     --dimensions-prefix "$RESULTS_DIR/benchmark" \

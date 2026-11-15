@@ -185,6 +185,7 @@ python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES
     --out "$DEMO/benchmark.recommendation_validation.tsv" --min-train-samples 1
 # Evaluation additions learned from PlasEval, plsMD and GAEMR, same scripts as stage 6 (each says "Not run" without its input).
 python3 "$PY/repeat_content.py" summary --data-dir "$DEMO" --out "$DEMO/benchmark.repeat_content.tsv" || true
+python3 "$PY/characterise_dataset.py" --data-dir "$DEMO" --sample-sheet "$SAMPLES" --out "$DEMO/benchmark.dataset_features.tsv" || true
 python3 "$PY/assembly_adequacy.py" merge --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_adequacy.tsv" || true
 python3 "$PY/copy_number.py" merge --results-dir "$DEMO" --out "$DEMO/benchmark.copy_number.tsv" || true
 python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" --out "$DEMO/benchmark.tool_agreement.tsv" || true
@@ -221,6 +222,7 @@ python3 "$PY/build_html_report.py" \
     --recovery-by-replicon "$DEMO/benchmark.recovery_by_replicon.tsv" \
     --truth-label-audit "$DEMO/benchmark.truth_label_audit.tsv" \
     --truth-marker-overlap "$DEMO/benchmark.truth_marker_overlap.tsv" \
+    --dataset-features "$DEMO/benchmark.dataset_features.tsv" \
     --dimensions-prefix "$DEMO/benchmark" \
     --comparisons "$DEMO/benchmark.paired_comparisons.tsv" \
     --stratified "$DEMO/benchmark.stratified.tsv" \
