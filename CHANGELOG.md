@@ -13,6 +13,30 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- stage 2 (truth) is faster, parallel, resumable and says where its time goes
+- **Each sample's stage-2 steps are timed.** The times go to `data/<sample>/stage2_timing.tsv`, and the log names
+  every step that took 10 s or more, for example `stage 2 for S1 took 21m05s: annotation 20m31s, repeat_content 14s`.
+- **Samples run in parallel** with `MAX_PARALLEL_SAMPLES`, the same setting as stages 1, 3, 4 and 5. The default, 1,
+  stays sequential. An unusable truth table still stops the stage, and the stop names the sample.
+- **Reference annotation** (`RUN_REFERENCE_ANNOTATION=1`) runs its callers at the same time, instead of one after
+  another, and gives them threads. ISEScan, the slowest by far, gets the whole `THREADS` allowance instead of 1;
+  AMRFinderPlus gets half; MOB-typer, abricate and barrnap share a few.
+- `measure_depth.py` counts both mates at the same time, decompresses with pigz/gzip in a separate process, and
+  touches only the sequence lines, in C. That is about 2x faster on a 90x read pair, with identical counts.
+- `repeat_content.py` slices k-mers in C instead of looping over every base in Python. That is 1.5x faster on a
+  5 Mb genome, with identical output.
+- `mash dist` (evidence labels) and `samtools sort` (depth anomalies) use `THREADS` instead of 1 and 2.
+- **Re-runs reuse** repeat content and the depth-anomaly scan when their inputs have not changed, instead of
+  recomputing them every time.
+
+### Fixed -- a run cut off during assembly resumes cleanly
+- **Stage 3 is crash-safe.** fastp now writes `*.trim.partial.fastq.gz` and renames the pair only when it succeeds;
+  a `.fastp.complete` marker records a finished trim. Trimmed reads left by a run that was cut off (a full disk, WSL
+  or the machine stopping) used to be taken for finished reads and assembled truncated; they are now trimmed again,
+  with a log line saying so. An interrupted SPAdes/Unicycler folder is cleared before reassembling, and the contigs
+  and graph are copied under `.partial` names first, so a half-copied `contigs.fasta` is never reused. Finished work
+  is still reused, including samples trimmed and assembled by an earlier PlasBench.
+
 ### Changed -- warnings are yellow and errors red, in the window and in a terminal
 - **The window's console** uses one colour code in all three tabs (Job output, Session log, Terminal): errors are
   red and bold, with a red bar in Job output, and warnings are yellow. A line PlasBench tags `WARNING:` (for example
