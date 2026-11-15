@@ -101,11 +101,18 @@ classify_failure() {
 # TOOL_RETRIES automatic retries of a failed run. A timeout (124) or OOM kill
 # (137) is not retried: the same budget would fail the same way.
 with_budget() {
-    if [[ -n "${TOOL_TIMEOUT_SECONDS:-}" ]] && command -v timeout >/dev/null 2>&1; then
-        timeout "$TOOL_TIMEOUT_SECONDS" "$@"
-    else
-        "$@"
+    if [[ -n "${TOOL_TIMEOUT_SECONDS:-}" ]]; then
+        if command -v timeout >/dev/null 2>&1; then
+            timeout "$TOOL_TIMEOUT_SECONDS" "$@"
+            return
+        fi
+        # A limit was asked for but cannot be applied: say so (once per process) instead of silently running without it, which would break "the same budget for every tool".
+        if [[ -z "${TIMEOUT_MISSING_WARNED:-}" ]]; then
+            warn "TOOL_TIMEOUT_SECONDS=$TOOL_TIMEOUT_SECONDS is set but the 'timeout' command is not installed: tools run WITHOUT a time limit"
+            TIMEOUT_MISSING_WARNED=1
+        fi
     fi
+    "$@"
 }
 retry_exec() {
     local attempts_file="$LOG_DIR/${SAMPLE}.${TOOL}.attempts" attempt=1 rc=0

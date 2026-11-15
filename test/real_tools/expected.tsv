@@ -1,0 +1,9 @@
+# Known-output expectations for the real-binary check (test/real_tools/check_real_tool.py, .github/workflows/real-tools.yml).
+# min_plasmid_share: the least share of the input (a plasmid) that the tool must call plasmid. 0 means "recorded in the summary, not yet enforced":
+# no real run had been reviewed when this file was written, so a floor would be a guess. After the first scheduled run, read its summary artifact
+# and set the floor from the observed value (a little below it), in a reviewed commit. A tool that rewrites contig names or breaks its output
+# format fails regardless of the floor.
+tool	min_plasmid_share	note
+mob_recon	0	set from the first reviewed scheduled run
+platon	0	set from the first reviewed scheduled run
+plasmidspades	0	set from the first reviewed scheduled run

@@ -40,9 +40,12 @@ Three arms (plan C2). The same folds also compare, per profile, three ways of ch
                        reference is refused). Falls back to the single best when fewer than two neighbours have the tool.
 Per arm: mean regret, top-1 and near-optimal rates, improvement over the single best, the share of studies (folds) in which it
 beat the single best, calibration (mean |predicted - realised| score and the bias), and abstention (the share whose predicted
-score is under the floor, with the regret on the isolates it would have answered). An arm "adds value" only when it beats the
-single best on average AND in a majority of at least MIN_FOLDS_ADVANTAGE studies; otherwise it is reported as not better, or not
-assessed. The feature-conditioned arm is an EVALUATION: nothing recommends with it unless this says it adds value.
+score is under the floor, with the regret on the isolates it would have answered). An arm "adds value" only when ALL of these hold: its mean
+regret is lower than the single best's by at least MIN_IMPROVEMENT (a negligible gain on noisy data is not value); it beats the single best in a majority
+of the studies that count, and at least MIN_FOLDS_ADVANTAGE studies count (a study counts with at least MIN_ISOLATES_PER_FOLD held-out isolates: a
+study of one isolate says almost nothing); and, for the feature-conditioned arm, at least MIN_FEATURE_SHARE of the held-out isolates were actually
+placed by their neighbours (an arm that fell back to the single best for most isolates has not been tested). Otherwise it is reported as not better, or
+not assessed, with the reason. The criteria are descriptive evidence on a handful of studies, not a significance test. The feature-conditioned arm is an EVALUATION: nothing recommends with it unless this says it adds value.
 Outputs: <prefix>.recommender_arms.tsv (one row per profile and arm), <prefix>.recommender_eval.tsv (one row per profile),
 <prefix>.recommender_regret.tsv (one row per held-out isolate and profile),
 <prefix>.recommender_verdict.json. Standard library only.
@@ -69,9 +72,13 @@ ARMS = ("single_best", "organism", "feature_conditioned")
 KNN_K = 5                 # neighbours used by the feature-conditioned arm
 MIN_NEIGHBOURS = 2        # a tool needs at least this many scored neighbours to be recommended
 MIN_FOLDS_ADVANTAGE = 3   # studies needed before an arm can be said to add value (fewer: not_assessed)
-NUMERIC_FEATURES = ("read_depth_x", "assembly_size_bp", "contig_count", "n50", "gc_percent", "mean_read_quality")
+MIN_ISOLATES_PER_FOLD = 2 # held-out isolates a study needs to count toward that
+MIN_IMPROVEMENT = 0.01    # least drop in mean regret, against the single best, that counts as value
+MIN_FEATURE_SHARE = 0.5   # share of held-out isolates the feature arm must place by neighbours (not by the single-best fallback) to be assessed
+NUMERIC_FEATURES = ("read_depth_x",) + rm.ASSEMBLY_STAT_FIELDS + ("mean_read_quality",)
 ARM_FIELDS = ["profile", "arm", "n_isolates", "n_folds", "mean_regret", "top1_rate", "near_optimal_rate", "improvement_over_single_best",
-              "folds_better", "folds_assessed", "calibration_mae", "calibration_bias", "abstention_rate", "mean_regret_when_answering", "verdict", "note"]
+              "folds_better", "folds_assessed", "calibration_mae", "calibration_bias", "abstention_rate", "mean_regret_when_answering", "verdict", "note",
+              "n_feature_based", "share_feature_based"]
 EVAL_FIELDS = ["profile", "metric", "n_isolates", "n_folds", "n_tools", "mean_regret", "p95_regret",
                "near_optimal_rate", "top1_rate", "mean_kendall_tau", "single_best_mean_regret",
                "oracle_mean_score", "single_best_mean_score", "recommender_mean_score", "oracle_gap", "gap_closed",
@@ -243,26 +250,33 @@ def arm_summary(profile, arm, items, single_by_study, floor, near_margin):
     for i in items:
         by_study[i["study"]].append(i["regret"])
     folds = {s: statistics.mean(v) for s, v in by_study.items()}
-    better = sum(1 for s, v in folds.items() if v < single_by_study.get(s, float("inf")) - 1e-12)
+    counted = {s: v for s, v in folds.items() if len(by_study[s]) >= MIN_ISOLATES_PER_FOLD}     # a study of one isolate does not count toward the verdict
+    better = sum(1 for s, v in counted.items() if v < single_by_study.get(s, float("inf")) - 1e-12)
+    feature_based = [i for i in items if i.get("basis") == "neighbours"] if arm == "feature_conditioned" else None
+    share = None if feature_based is None else len(feature_based) / len(items)
     single_mean = statistics.mean(single_by_study[i["study"]] for i in items)
     improvement = single_mean - statistics.mean(regrets)
     answering = [i["regret"] for i in items if i["predicted"] >= floor]
     row = {**base, "n_folds": len(folds), "mean_regret": fmt(statistics.mean(regrets)),
            "top1_rate": fmt(sum(r <= 1e-12 for r in regrets) / len(regrets)),
            "near_optimal_rate": fmt(sum(r <= near_margin + 1e-12 for r in regrets) / len(regrets)),
-           "improvement_over_single_best": fmt(improvement), "folds_better": better, "folds_assessed": len(folds),
+           "improvement_over_single_best": fmt(improvement), "folds_better": better, "folds_assessed": len(counted),
            "calibration_mae": fmt(statistics.mean(abs(i["predicted"] - i["score"]) for i in items)),
            "calibration_bias": fmt(statistics.mean(i["predicted"] - i["score"] for i in items)),
            "abstention_rate": fmt(1 - len(answering) / len(items)),
-           "mean_regret_when_answering": fmt(statistics.mean(answering) if answering else None)}
+           "mean_regret_when_answering": fmt(statistics.mean(answering) if answering else None),
+           "n_feature_based": "" if feature_based is None else len(feature_based), "share_feature_based": "" if share is None else f"{share:.3f}"}
     if arm == "single_best":
         row.update(verdict="reference", note="the comparison baseline")
-    elif len(folds) < MIN_FOLDS_ADVANTAGE:
-        row.update(verdict="not_assessed", note=f"needs at least {MIN_FOLDS_ADVANTAGE} studies; this cohort has {len(folds)}")
-    elif improvement > 0 and better > len(folds) / 2:
-        row.update(verdict="adds_value", note=f"lower regret than the single best on average and in {better} of {len(folds)} studies")
+    elif share is not None and share < MIN_FEATURE_SHARE:
+        row.update(verdict="not_assessed", note=(f"only {share:.0%} of the held-out isolates were placed by their neighbours (the rest fell back to the single best): "
+                                                 "no dataset features, or too few shared ones"))
+    elif len(counted) < MIN_FOLDS_ADVANTAGE:
+        row.update(verdict="not_assessed", note=f"needs at least {MIN_FOLDS_ADVANTAGE} studies with {MIN_ISOLATES_PER_FOLD} or more held-out isolates; this cohort has {len(counted)}")
+    elif improvement >= MIN_IMPROVEMENT and better > len(counted) / 2:
+        row.update(verdict="adds_value", note=f"lower regret than the single best by {improvement:.3f} on average and in {better} of {len(counted)} studies")
     else:
-        row.update(verdict="no_better", note=f"better than the single best in {better} of {len(folds)} studies; improvement {improvement:+.4f}")
+        row.update(verdict="no_better", note=f"better than the single best in {better} of {len(counted)} studies; improvement {improvement:+.4f} (needs {MIN_IMPROVEMENT:g} or more)")
     return row
 
 
@@ -281,7 +295,8 @@ def arms_for_profile(profile, table, studies, organism, features, rows, min_trai
         arms["organism"].append({"study": r["held_out_study"], "regret": number(r["regret"]), "predicted": predicted, "score": number(r["recommended_score"]), "best": best})
     for f in feature_arm(table, studies, features, min_train, near_margin, floor):
         if f["sample"] in by_sample:
-            arms["feature_conditioned"].append({"study": f["held_out_study"], "regret": f["best"] - f["score"], "predicted": f["predicted"], "score": f["score"], "best": f["best"]})
+            arms["feature_conditioned"].append({"study": f["held_out_study"], "regret": f["best"] - f["score"], "predicted": f["predicted"], "score": f["score"], "best": f["best"],
+                                                "basis": f["basis"]})
     return [arm_summary(profile, arm, arms[arm], single_by_study, floor, near_margin) for arm in ARMS]
 
 

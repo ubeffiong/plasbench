@@ -171,6 +171,27 @@ def main():
     # the report's table shows the new column
     source = (Path(SCRIPT).parent / "build_html_report.py").read_text(encoding="utf-8")
     check("the report's sensitivity table has a Compared with column", "<th>Compared with</th>" in source and "versus=esc(row.get(\"compared_with\") or \"baseline\")" in source)
+    print("the CPRR baseline follows the configured criteria")
+    check("the default configuration is the 0.95 line", rs.cprr_baseline({}) == "0.95")
+    check("a configured 0.90 moves the baseline with it", rs.cprr_baseline({"CPRR_MIN_COVERAGE": "0.90", "CPRR_MIN_SHARE": "0.90"}) == "0.90")
+    check("coverage and share set apart, or off the grid, give no baseline (no sweep is labelled pre-registered)",
+          rs.cprr_baseline({"CPRR_MIN_COVERAGE": "0.90", "CPRR_MIN_SHARE": "0.95"}) is None and rs.cprr_baseline({"CPRR_MIN_COVERAGE": "0.97", "CPRR_MIN_SHARE": "0.97"}) is None
+          and rs.cprr_baseline({"CPRR_MIN_COVERAGE": "x"}) is None)
+    check("the docstring says what the sweeps cover", "BASE-LEVEL F1" in rs.__doc__ and "metric:lw_bin_f1" in rs.__doc__)
+    print("the audit-clean cohort variant")
+    check("audit_clean_only is a cohort variant", "audit_clean_only" in rs.COHORT_VARIANTS and "audit_clean_only" in rs.variant_order())
+    with tempfile.TemporaryDirectory() as t:
+        t = Path(t)
+        tab, nl = chr(9), chr(10)
+        for sample, flagged in (("clean", False), ("odd", True)):
+            (t / sample).mkdir()
+            rows = ["sequence_id" + tab + "molecule_type" + tab + "length", "chr" + tab + "CHROMOSOME" + tab + "4000000"]
+            rows += ["chr2" + tab + "CHROMOSOME" + tab + "600000"] if flagged else []
+            rows += ["p1" + tab + "PLASMID" + tab + "5000"]
+            (t / sample / "truth.tsv").write_text(nl.join(rows) + nl)
+        found = rs.audit_clean_samples(t, None, {"clean", "odd", "nodata"})
+        check("a sample the audit flags (a second large chromosome) is left out, an unflagged one kept, one without truth files is not audited", found == {"clean"})
+        check("no truth files at all: the variant is not written", rs.audit_clean_samples(t, None, {"nodata"}) is None)
 
     print()
     if not ok:

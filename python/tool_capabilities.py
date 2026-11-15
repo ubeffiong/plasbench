@@ -6,6 +6,8 @@ import csv
 from pathlib import Path
 
 ANALYSIS_TRACKS = ("short_read", "long_read", "hybrid")
+# How far a tool has been validated (python/database_provenance.py explains each tier; test/test_tool_validation_tiers.py enforces them).
+VALIDATION_TIERS = ("real_binary_checked", "adapter_tested", "untested", "not_applicable")
 
 
 def read_capabilities(path):
@@ -22,6 +24,8 @@ def read_capabilities(path):
                 raise ValueError(f"{tool}: analysis_track must be one of {ANALYSIS_TRACKS}")
             if row.get("requires_independent_long_read_truth") not in {"yes", "no"}:
                 raise ValueError(f"{tool}: requires_independent_long_read_truth must be yes/no")
+            if row.get("validation_status", "untested") not in VALIDATION_TIERS:
+                raise ValueError(f"{tool}: validation_status must be one of {VALIDATION_TIERS}")
             capabilities[tool] = row
     try:   # user-declared tools join the built-in registry (python/user_tools.py); fixtures are untouched
         import user_tools

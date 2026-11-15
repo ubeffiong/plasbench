@@ -26,9 +26,10 @@ def main():
         path = Path(tmp) / "t.cprr.tsv"
         with path.open("w", newline="") as handle:
             writer = csv.writer(handle, delimiter="\t")
-            writer.writerow(["true_plasmid", "correct"])
-            writer.writerows([["pA", "yes"], ["pB", "yes"], ["pC", "no"], ["pD", "yes"]])
-        check("only correct and untouched plasmids count; denominator is every plasmid scored", csv_calls.sv_prr_counts(path, events) == (1, 4), csv_calls.sv_prr_counts(path, events))
+            writer.writerow(["true_plasmid", "correct", "correct_without_identity"])
+            writer.writerows([["pA", "yes", "yes"], ["pB", "yes", "yes"], ["pC", "no", "yes"], ["pD", "yes", "yes"]])
+        check("only correct and untouched plasmids count; denominator is every plasmid scored", csv_calls.sv_prr_counts(path, events) == (1, 2, 4), csv_calls.sv_prr_counts(path, events))
+        check("the numerator without the identity criterion counts plasmids that fail only identity (pC), for samples whose truth cannot judge identity", csv_calls.sv_prr_counts(path, events)[1] == 2)
         check("no CPRR table (not bin-scored) gives None, not zero", csv_calls.sv_prr_counts(Path(tmp) / "none.tsv", events) is None)
     print()
     if not ok:

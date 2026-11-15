@@ -150,6 +150,14 @@ def recommendation_model_status(results_dir):
     }
 
 
+def database_registry(project_root):
+    try:
+        import database_provenance
+        return database_provenance.registry_summary(project_root)
+    except (ImportError, OSError, ValueError, KeyError, TypeError) as exc:    # a malformed registry row must not abort the manifest
+        return {"unavailable": f"{type(exc).__name__}: {exc}"}
+
+
 def directory_identity(path):
     """Identify a database without hashing multi-gigabyte contents on every run."""
     if not path:
@@ -241,7 +249,9 @@ def main():
                 # ranking or a reported number must be recorded, or the run cannot be
                 # reproduced from its manifest (question bank Q36/Q38).
                 "CPRR_MIN_COVERAGE", "CPRR_MIN_SHARE", "CPRR_MIN_IDENTITY",
-                "HEADLINE_MAX_REFERENCE_TIER", "MIN_SPECIES_CLUSTERS", "CLONAL_MASH_DISTANCE",
+                "HEADLINE_MAX_REFERENCE_TIER", "HEADLINE_MIN_CLUSTERS", "ALLOW_PRIMARY_FALLBACK", "MIN_SPECIES_CLUSTERS", "CLONAL_MASH_DISTANCE",
+                # release 0.4: the settings behind the statistics validation, the truth audits, the AMR context and the rank-sensitivity sweeps
+                "RUN_STATS_VALIDATION", "STATS_VALIDATION_MODE", "CHROMID_MIN_BP", "LARGE_PLASMID_BP", "AMR_FLANK_BP", "RUN_RANK_SENSITIVITY",
                 "RUN_TRUTH_LABEL_EVIDENCE", "TRUTH_LABEL_SCHEME", "READ_SOURCE", "PRESERVE_DOWNLOADS", "RUN_DIMER_DETECTION", "COLLAPSE_DIMERS", "DIMER_MIN_IDENTITY",
                 "DIMER_MIN_HALF_COVERAGE",
                 "REQUIRE_PREREG", "PERFECT_THRESHOLD", "FRAGMENT_SHARE", "MISSED_RECALL", "TOOL_RETRIES",
@@ -292,6 +302,9 @@ def main():
         # optional -- unlike PLASGRAPH2_MODEL_DIR, nothing else in the
         # pipeline requires the PLASMe checkout's path, so this entry is only
         # ever populated if the user chooses to record it.
+        # The registries as they were when the run was made (python/database_provenance.py): database version, source and checksum, and the
+        # validation tier of each tool. A blank is "not recorded", never a guess.
+        "database_registry": database_registry(args.project_root),
         "models": {"plasgraph2": directory_identity(os.environ.get("PLASGRAPH2_MODEL_DIR", "")),
                    "plasme": directory_identity(os.environ.get("PLASME_CHECKOUT_DIR", "")),
                    "recommendation": recommendation_model_status(args.results_dir)},

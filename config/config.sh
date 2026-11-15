@@ -735,11 +735,23 @@ export ISFINDER_FASTA="${ISFINDER_FASTA:-}"
 export SCORECARD_MIN_SAMPLES="${SCORECARD_MIN_SAMPLES:-5}"
 # 1 embeds the interactive cohort dashboard in the HTML report (about 1 MB; it repeats the heatmap and metric tables). Default 0.
 export REPORT_EMBED_DASHBOARD="${REPORT_EMBED_DASHBOARD:-0}"
+# ---- Release 0.4: primary analysis, statistics validation, truth audits and AMR context (new settings are kept at the end of the file so the line citations of the review ledger stay valid) ----
 # 1 keeps the all-sample numbers as the headline when no sample has a reference in the headline tiers (status fallback_allowed, warning kept). Default 0: the primary analysis is then unavailable and the ranking is provisional.
 export ALLOW_PRIMARY_FALLBACK="${ALLOW_PRIMARY_FALLBACK:-0}"
 # 1 runs the statistics simulation (python/simulate_validation.py) in stage 6 and shows it in the report (Sensitivity, power and reproducibility). STATS_VALIDATION_MODE is smoke (seconds, indicative) or full (minutes, the evidence).
 export RUN_STATS_VALIDATION="${RUN_STATS_VALIDATION:-0}"
+# smoke (seconds, indicative: its verdicts are labelled so) or full (minutes, the evidence). Anything else is refused by simulate_validation.py.
 export STATS_VALIDATION_MODE="${STATS_VALIDATION_MODE:-smoke}"
 # Truth audit size flags (python/audit_truth_labels.py): a non-largest chromosome at least CHROMID_MIN_BP is flagged secondary_chromosome; a PLASMID at least LARGE_PLASMID_BP is flagged large_plasmid.
 export CHROMID_MIN_BP="${CHROMID_MIN_BP:-350000}"
+# A PLASMID of at least this many bases is flagged large_plasmid by the truth audit (advisory; it never excludes a sample).
 export LARGE_PLASMID_BP="${LARGE_PLASMID_BP:-500000}"
+# Bases either side of an AMR gene copy whose coverage by the same predicted record is its flank context (python/score_amr_placement.py). Descriptive, never ranks a tool; pre-registration row amr_flank_bp (proposed).
+export AMR_FLANK_BP="${AMR_FLANK_BP:-1000}"
+# Highest reference tier the primary analysis accepts (1 = long-read-first and independently validated, 2 = long-read-first, 3 = anything else). Pre-registration row headline_max_reference_tier.
+export HEADLINE_MAX_REFERENCE_TIER="${HEADLINE_MAX_REFERENCE_TIER:-2}"
+# Independent clusters (BioProjects or clonal groups) the references in those tiers must come from for the primary analysis to be available. Below it the ranking is shown as provisional:
+# a headline from fewer clusters has no interval and no test. Default 5 is the interval minimum (MIN_CLUSTERS_CI). Pre-registration row headline_min_clusters (proposed).
+export HEADLINE_MIN_CLUSTERS="${HEADLINE_MIN_CLUSTERS:-5}"
+# 1 (default) runs the ranking-robustness sweeps (python/rank_sensitivity.py) in stage 6; 0 skips them.
+export RUN_RANK_SENSITIVITY="${RUN_RANK_SENSITIVITY:-1}"

@@ -11,13 +11,17 @@ This script answers that by simulation, with the real functions (resampling.boot
   data       paired differences d = effect + study effect + isolate noise; study effects ~ N(0, tau), isolate noise ~ N(0, sigma); study sizes balanced or unbalanced;
              a share of observations dropped at random (missing); a study that loses every observation disappears
   measured   interval coverage of the true effect (nominal 0.95), the rate at which the test rejects at alpha 0.05 (the type-I error when effect = 0, the power when
-             effect > 0), and the share of replicates in which a test or interval could be estimated at all (it needs 6 and 5 independent units)
+             effect > 0), and the share of replicates in which a test or interval could be estimated at all (it needs MIN_CLUSTERS_TEST and MIN_CLUSTERS_CI independent units, 6 and 5)
 
   --mode smoke   a few scenarios, 100 replicates, light resampling: seconds; indicative, with its Monte Carlo standard error shown
   --mode full    more scenarios, 1,000 replicates, the production resampling counts: minutes; for a nightly run or before a release
 
 Every number carries its standard error, a fixed seed makes a run repeatable, and the verdict says what the data can and cannot support (a smoke run cannot certify
-calibration, only expose a gross failure). Output: one TSV (benchmark.stats_validation.tsv) that the report shows under Sensitivity, power and reproducibility.
+calibration, only expose a gross failure, and its verdicts say "indicative"). A verdict tests the observed rate against the nominal one with the standard error EXPECTED UNDER
+THE NOMINAL RATE (sqrt(0.95 x 0.05 / n) for coverage, sqrt(0.05 x 0.95 / n) for the type-I error), two of them either way: the observed rate's own standard error would let a
+coverage of 0.90 pass in a 100-replicate run.
+Scope: it exercises the UNSTRATIFIED paths of bootstrap_ci and paired_permutation_pvalue, which the headline uses when no species stratification applies. The stratified, ratio
+and Holm steps are covered by exactness tests (test_resampling_equivalence.py), not by this calibration. Output: one TSV (benchmark.stats_validation.tsv) that the report shows under Sensitivity, power and reproducibility.
 Advisory: it never changes a score or a rank. Standard library only.
 """
 import argparse
@@ -87,18 +91,22 @@ def run_scenario(name, clusters, per_cluster, tau, sigma, missing, effect, repli
     rate = rejected / test_n if test_n else None
     coverage_se = binomial_se(coverage, ci_n) if ci_n else None
     rate_se = binomial_se(rate, test_n) if test_n else None
-    # The verdict compares the observed coverage with the nominal 95% using two standard errors, and never rounds a shortfall up: a percentile cluster bootstrap with
-    # few studies is known to under-cover, and the table must say so rather than call 0.86 "adequate". 'not estimable' when too few replicates had an interval.
+    # The verdict compares the observed rate with the nominal one using the standard error expected UNDER the nominal rate (a coverage of 0.90 over 100 replicates is below
+    # 0.95 - 2 x 0.0218 = 0.906, so it is flagged; using the observed rate's own standard error would let it pass), and never rounds a shortfall up: a percentile cluster
+    # bootstrap with few studies is known to under-cover, and the table must say so rather than call 0.86 "adequate". 'not estimable' when too few replicates had an interval.
+    # A smoke run is labelled indicative: its verdicts can expose a gross failure but cannot certify calibration.
+    tag = " (indicative: smoke run)" if mode == "smoke" else ""
     if coverage is None or ci_n < replicates * 0.5:
         ci_verdict = "not estimable (too few independent units)"
-    elif coverage + 2 * coverage_se >= NOMINAL:
-        ci_verdict = "consistent with 95%"
+    elif coverage >= NOMINAL - 2 * math.sqrt(NOMINAL * (1 - NOMINAL) / ci_n):
+        ci_verdict = "consistent with 95%" + tag
     else:
-        ci_verdict = f"below nominal ({coverage:.0%}): the interval is too narrow"
+        ci_verdict = f"below nominal ({coverage:.0%}): the interval is too narrow" + tag
     if rate is None or test_n < replicates * 0.5:
-        test_verdict = "not estimable (needs 6 independent units)"
+        test_verdict = f"not estimable (needs {resampling.MIN_CLUSTERS_TEST} independent units)"
     elif effect == 0:
-        test_verdict = "valid (type-I error within tolerance)" if rate <= ALPHA + 2 * rate_se + 0.01 else "anti-conservative (type-I error too high)"
+        test_verdict = ("valid (type-I error within tolerance)" + tag if rate <= ALPHA + 2 * math.sqrt(ALPHA * (1 - ALPHA) / test_n)
+                        else "anti-conservative (type-I error too high)" + tag)
     else:
         test_verdict = f"power {rate:.2f}"
     return {"mode": mode, "scenario": name, "n_clusters": clusters,

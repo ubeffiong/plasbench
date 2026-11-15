@@ -23,7 +23,7 @@ CATEGORIES = [
      ["depth-ladder", "depth-report", "read-quality-ladder", "read-quality-report"]),
     ("cohorts", "Cohorts and truth", "Find, curate and validate isolates and their reference truth.",
      ["discover-cohort", "discover-design-cohort", "review-candidates", "curate-cohort", "validate-cohort",
-      "build-ledger", "collect-truth-provenance", "derive-amr-truth", "audit-truth-labels", "prepare-contribution"]),
+      "build-ledger", "collect-truth-provenance", "derive-amr-truth", "promote-amr-truth", "audit-truth-labels", "prepare-contribution"]),
     ("results", "Results and analysis", "Reports, PDFs and standalone analyses of a completed run.",
      ["open-report", "report-pdf", "analysis", "candidate-dataset", "import-external-benchmark",
       "validate-orthogonal-evidence"]),

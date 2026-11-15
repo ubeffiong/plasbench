@@ -57,7 +57,7 @@ SHORT = {"A1": "Identity", "A2": "Mismatch rate", "A3": "Indel accuracy", "A4": 
          "C4": "Repeat resolution", "D1": "Gene recovery", "D2": "Annotation", "D3": "Functional elem.", "E1": "Runtime",
          "E2": "Memory", "E3": "Success rate",
          "F1": "F1", "MCC": "MCC", "BF1": "Binning F1", "LWB": "LW binning F1", "ARI": "ARI", "CPRR": "CPRR", "CF1": "Contig F1",
-         "SVP": "SV-PRR", "UNM": "Unmapped share", "OFT": "Off-truth share", "AMB": "Multi-mapped share", "PGAP": "Precision gap"}
+         "SVP": "SV-PRR", "UNM": "Unmapped share", "OFT": "Off-truth share", "AMB": "Plasmid+chromosome share", "PGAP": "Precision gap"}
 
 # leaderboard metric id -> (label, leaderboard column, scores.tsv column or None, definition)
 LEADERBOARD = [
@@ -74,7 +74,7 @@ LEADERBOARD += [
     ("SVP", "SV-PRR", "sv_prr", None, "Share of truth plasmids that are correct (CPRR criteria) and untouched by an alignment-derived structural call (leaderboard column sv_prr); reported, not ranked; unvalidated."),
     ("UNM", "Unmapped predicted share", "unmapped_fraction", None, "Share of predicted bases with no retained alignment (unmapped_fraction); not charged as false positives in the permissive precision. Lower is better."),
     ("OFT", "Off-truth predicted share", "off_truth_fraction", None, "Share of predicted bases whose only retained alignments are off the labelled truth (off_truth_fraction). Lower is better."),
-    ("AMB", "Multi-mapped share of mapped bases", "ambiguous_fraction", None, "Share of the mapped bases that also have an alternative placement (ambiguous_fraction). Lower is better."),
+    ("AMB", "Plasmid-and-chromosome share of mapped bases", "ambiguous_fraction", None, "Share of the mapped predicted bases that align to BOTH a plasmid and a chromosome (conflicting molecular assignment; ambiguous_fraction). Blank when the ambiguity alignment was not made. Lower is better."),
     ("PGAP", "Precision minus strict precision", "precision_gap", None, "Permissive minus strict precision (precision_gap): how much of the precision depends on ignoring unmapped bases. Lower is better."),
 ]
 LOWER_IS_BETTER = {"UNM", "OFT", "AMB", "PGAP"}

@@ -39,7 +39,7 @@ FIELDS = [
 
 
 # Owned by call_structural_variants.py (structural_summary.tsv, one file per sample, one row per tool): SV-PRR counts.
-SV_FIELDS = ["sv_prr_correct", "sv_prr_plasmids"]
+SV_FIELDS = ["sv_prr_correct", "sv_prr_correct_without_identity", "sv_prr_plasmids"]
 
 
 def value(row, field):

@@ -39,11 +39,10 @@ def scan_fasta(path):
             else:
                 stripped = line.strip()
                 length += len(stripped)
-                for base in stripped.upper():
-                    if base in "ACGT":
-                        acgt += 1
-                        if base in "GC":
-                            gc += 1
+                upper = stripped.upper()
+                counts = [upper.count(base) for base in "ACGT"]
+                acgt += sum(counts)
+                gc += counts[1] + counts[2]
         if seen_record:
             lengths.append(length)
     return lengths, gc, acgt

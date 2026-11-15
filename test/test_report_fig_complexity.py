@@ -32,11 +32,11 @@ def main():
     check("an isolate with no F1 is not plotted as 0", [p[0] for p in pts[track]["A"]] == ["s1", "s3"])
     check("a blank characteristic is left out of that isolate, not made 0", pts[track]["A"][1][1] == {})
     print("the drawing")
-    by_tool = {"A": [("s1", {"plasmid_count": 2.0, "contig_count": 10.0}, 0.9), ("s2", {"plasmid_count": 4.0}, 0.5)]}
+    by_tool = {"A": [("s1", {"plasmid_count": 2.0, "input_contig_count": 10.0}, 0.9), ("s2", {"plasmid_count": 4.0}, 0.5)]}
     svg = cx.panel_svg("short_read", "plasmid_count", by_tool, {"A": "#000"})
     ET.fromstring(svg)
     check("the panel is well formed, has a point per measured pair and names its basis", svg.count("<circle") == 2 and "needs the reference: benchmark only" in svg)
-    check("a truth-free characteristic says so", "knowable without a reference" in cx.panel_svg("short_read", "contig_count", by_tool, {"A": "#000"}))
+    check("a truth-free characteristic says so", "knowable without a reference" in cx.panel_svg("short_read", "input_contig_count", by_tool, {"A": "#000"}))
     check("a characteristic nobody measured says not available", "Not available" in cx.panel_svg("short_read", "read_depth_x", by_tool, {"A": "#000"}))
     demo = ROOT / "results_demo" / "benchmark.report.html"
     if demo.is_file():

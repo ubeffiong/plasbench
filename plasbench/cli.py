@@ -243,6 +243,9 @@ ANALYSES = {
     "composite-score": ("composite_score.py", "Optional five-dimension composite with gates and weight sensitivity"),
     "compare-runs": ("compare_runs.py", "Compare repeated runs for reproducibility"),
     "simulate-validation": ("simulate_validation.py", "Check by simulation that the intervals and tests are calibrated (smoke or full)"),
+    "characterise-dataset": ("characterise_dataset.py", "One table of every isolate's characteristics, each marked knowable without a reference or not"),
+    "truth-marker-overlap": ("truth_marker_overlap.py", "Which tools share a database with the truth's marker evidence"),
+    "database-provenance": ("database_provenance.py", "Tool and database provenance table (collect), or the checksum of a database (checksum PATH)"),
 }
 
 
@@ -371,6 +374,14 @@ def build_parser():
     amr_draft_parser.add_argument("--features", type=Path, required=True, help="truth_features.tsv from annotate_reference.py.")
     amr_draft_parser.add_argument("--truth", type=Path, required=True, help="truth.tsv for the same reference.")
     amr_draft_parser.add_argument("--out", type=Path, required=True, help="Draft TSV, e.g. data/<sample>/truth_amr.draft.tsv.")
+    promote_parser = sub.add_parser("promote-amr-truth", help="Promote a reviewed AMR truth draft to truth_amr.tsv (a deliberate human step).")
+    promote_parser.add_argument("--draft", type=Path, required=True, help="truth_amr.draft.tsv from derive-amr-truth, after you have reviewed it.")
+    promote_parser.add_argument("--truth", type=Path, required=True, help="truth.tsv for the same reference.")
+    promote_parser.add_argument("--out", type=Path, help="Default: truth_amr.tsv beside the draft.")
+    promote_parser.add_argument("--reviewed-by", required=True, help="Who reviewed the draft.")
+    promote_parser.add_argument("--database-version", required=True, help="The real AMR database version (the draft holds only the caller's version).")
+    promote_parser.add_argument("--confirm-reviewed", action="store_true", help="Required: states that the draft was reviewed gene by gene.")
+    promote_parser.add_argument("--force", action="store_true", help="Overwrite an existing truth_amr.tsv.")
     audit_labels_parser = sub.add_parser("audit-truth-labels", help="Screen PLASMID/CHROMOSOME truth labels against replicon/MOB evidence (advisory).")
     audit_labels_parser.add_argument("--data-dir", type=Path, default=Path("data"), help="Directory of per-sample truth folders.")
     audit_labels_parser.add_argument("--out", type=Path, default=Path("results/benchmark.truth_label_audit.tsv"))
@@ -817,6 +828,16 @@ def main(argv=None):
     elif args.command == "derive-amr-truth":
         code = run([sys.executable, "python/derive_amr_truth.py", "--features", str(args.features),
                     "--truth", str(args.truth), "--out", str(args.out)], root)
+    elif args.command == "promote-amr-truth":
+        command = [sys.executable, "python/promote_amr_truth.py", "--draft", str(args.draft), "--truth", str(args.truth), "--reviewed-by", args.reviewed_by,
+                   "--database-version", args.database_version]
+        if args.out:
+            command.extend(["--out", str(args.out)])
+        if args.confirm_reviewed:
+            command.append("--confirm-reviewed")
+        if args.force:
+            command.append("--force")
+        code = run(command, root)
     elif args.command == "audit-truth-labels":
         code = run([sys.executable, "python/audit_truth_labels.py", "--data-dir", str(args.data_dir),
                     "--out", str(args.out)], root)

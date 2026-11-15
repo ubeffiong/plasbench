@@ -84,6 +84,12 @@ def _exact_paired_pvalue(units, differences):
 
 # -- exact means ---------------------------------------------------------------------
 
+def _has_nan(values):
+    """True when any value is NaN. A NaN is 'not measured': no interval or p-value can be made from it (an unguarded NaN made `abs(x) >= nan` false for every
+    permutation, which reported a p-value of about 1e-4 for data that has no result). An infinite value keeps its documented behaviour."""
+    return any(v != v for v in values)
+
+
 def _finite(values):
     return all(math.isfinite(v) for v in values)
 
@@ -166,7 +172,7 @@ def bootstrap_ci(values, iterations=1000, groups=None):
     """
     units = resampling_units(values, groups)
     # Intervals from very small cohorts imply a precision the data do not have.
-    if len(values) < 5 or len(units) < MIN_CLUSTERS_CI:
+    if len(values) < MIN_CLUSTERS_CI or len(units) < MIN_CLUSTERS_CI or _has_nan(values):
         return None, None
     rng = random.Random(20260831)
     if not _finite(values):
@@ -196,7 +202,7 @@ def stratified_bootstrap(values, groups, strata, iterations=1000):
         by_stratum[stratum][0].append(value)
         by_stratum[stratum][1].append(group)
     units = {s: resampling_units(v, g) for s, (v, g) in by_stratum.items()}
-    if len(values) < 5 or sum(len(u) for u in units.values()) < MIN_CLUSTERS_CI:
+    if len(values) < MIN_CLUSTERS_CI or sum(len(u) for u in units.values()) < MIN_CLUSTERS_CI or _has_nan(values):
         return None, None
     rng = random.Random(20260831)
     order = sorted(units)
@@ -225,7 +231,7 @@ def stratified_bootstrap(values, groups, strata, iterations=1000):
 def ratio_bootstrap(pairs, groups, iterations=1000):
     """Percentile CI of sum(correct)/sum(total), resampling clusters."""
     units = resampling_units(pairs, groups)
-    if len(pairs) < 5 or len(units) < MIN_CLUSTERS_CI:
+    if len(pairs) < MIN_CLUSTERS_CI or len(units) < MIN_CLUSTERS_CI or _has_nan([v for pair in pairs for v in pair]):
         return None, None
     rng = random.Random(20260902)
     ratios = []
@@ -250,7 +256,7 @@ def paired_permutation_pvalue(differences, iterations=10000, groups=None):
     below is used, with its random stream unchanged.
     """
     units = resampling_units(differences, groups)
-    if len(differences) < 5 or len(units) < MIN_CLUSTERS_TEST:
+    if len(differences) < MIN_CLUSTERS_TEST or len(units) < MIN_CLUSTERS_TEST or _has_nan(differences):
         return None
     if len(units) <= EXACT_MAX_UNITS and _finite(differences):
         return _exact_paired_pvalue(units, differences)
@@ -287,7 +293,7 @@ def stratified_permutation(differences, groups, strata, iterations=10000):
     if strata is None:
         return paired_permutation_pvalue(differences, iterations=iterations, groups=groups)
     units = resampling_units(list(zip(differences, strata)), groups)
-    if len(differences) < 5 or len(units) < MIN_CLUSTERS_TEST:
+    if len(differences) < MIN_CLUSTERS_TEST or len(units) < MIN_CLUSTERS_TEST or _has_nan(differences):
         return None
     observed = abs(macro_mean(differences, strata))
     rng = random.Random(20260901)

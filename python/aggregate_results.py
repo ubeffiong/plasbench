@@ -35,7 +35,7 @@ import headline_design as hd
 # Resampling primitives (resampling.py); re-exported because validate_recommendations.py
 # and the tests import bootstrap_ci / paired_permutation_pvalue from this module.
 from resampling import (  # noqa: E402,F401
-    bootstrap_ci, paired_permutation_pvalue, resampling_units, exact_mean as fast_mean, permutation_method, permutation_floor,
+    bootstrap_ci, paired_permutation_pvalue, resampling_units, exact_mean as fast_mean, permutation_method, permutation_floor, MIN_CLUSTERS_CI,
 )
 
 # Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
@@ -222,7 +222,7 @@ def read_scores(path):
                 "lw_bin_f1": float(f[idx["lw_bin_f1"]]) if "lw_bin_f1" in idx and f[idx["lw_bin_f1"]] else None,
                 "cprr_plasmids": int(f[idx["cprr_plasmids"]]) if "cprr_plasmids" in idx and f[idx["cprr_plasmids"]] else None,
                 "cprr_correct": int(f[idx["cprr_correct"]]) if "cprr_correct" in idx and f[idx["cprr_correct"]] else None,
-                **{name: int(f[idx[name]]) if name in idx and f[idx[name]] not in ("", None) else None for name in ("sv_prr_correct", "sv_prr_plasmids")},
+                **{name: int(f[idx[name]]) if name in idx and f[idx[name]] not in ("", None) else None for name in ("sv_prr_correct", "sv_prr_correct_without_identity", "sv_prr_plasmids")},
                 "cprr_correct_without_identity": (int(f[idx["cprr_correct_without_identity"]])
                                                   if "cprr_correct_without_identity" in idx and f[idx["cprr_correct_without_identity"]] else None),
                 "recall_ceiling": float(f[idx["recall_ceiling"]]) if "recall_ceiling" in idx and f[idx["recall_ceiling"]] else None,
@@ -421,7 +421,7 @@ def burden_fields(d):
     precision_gap      permissive precision minus strict precision: how much of the precision depends on ignoring unmapped bases
     All None (never 0) when the scores did not carry the columns."""
     unmapped, off, mapped, ambiguous = (sum(d[k]) if d[k] else None for k in ("unmapped_pred_bp", "off_truth_pred_bp", "mapped_pred_bp", "ambiguously_mapped_pred_bp"))
-    predicted = (mapped or 0) + (unmapped or 0) + (off or 0) if (mapped is not None or unmapped is not None or off is not None) else None
+    predicted = mapped + unmapped + off if None not in (mapped, unmapped, off) else None   # all three parts or nothing: a missing part would shrink the denominator and inflate the shares
 
     def share(part, whole):
         return part / whole if part is not None and whole else None
@@ -606,10 +606,27 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
     for row in summary:
         row.update(hd.ranking_fields(row["tool"], by_metric, shared_metric, design, metric))
         row.update(hd.cprr_fields(row["tool"], rows, design))
-        sv = [r for r in rows if r["tool"] == row["tool"] and r.get("sv_prr_plasmids")]
-        row["sv_prr_correct"] = sum(r["sv_prr_correct"] for r in sv) if sv else None
-        row["sv_prr_plasmids"] = sum(r["sv_prr_plasmids"] for r in sv) if sv else None
-        row["sv_prr"] = row["sv_prr_correct"] / row["sv_prr_plasmids"] if sv and row["sv_prr_plasmids"] else None
+        # SV-PRR follows CPRR's rule exactly: per isolate, the numerator WITH the identity criterion where the truth can judge identity, without it where it cannot
+        # (headline_design.cprr_counts); and CPRR is also given over exactly the isolates SV-PRR covers, so the two are comparable even if structural calling failed for some isolate.
+        sv, sv_correct, sv_total, cprr_correct_same, cprr_total_same = [], 0, 0, 0, 0
+        for r in rows:
+            if r["tool"] != row["tool"] or not r.get("sv_prr_plasmids"):
+                continue
+            valid = design.identity_valid(r["sample"]) if design else True
+            correct = r.get("sv_prr_correct") if valid else r.get("sv_prr_correct_without_identity")
+            same = hd.cprr_counts(r, design)
+            if correct is None or same is None:
+                continue
+            sv.append(r)
+            sv_correct += correct
+            sv_total += r["sv_prr_plasmids"]
+            cprr_correct_same += same[0]
+            cprr_total_same += same[1]
+        row["sv_prr_correct"] = sv_correct if sv else None
+        row["sv_prr_plasmids"] = sv_total if sv else None
+        row["sv_prr"] = sv_correct / sv_total if sv and sv_total else None
+        row["sv_prr_isolates"] = len(sv) if sv else None
+        row["cprr_on_sv_isolates"] = cprr_correct_same / cprr_total_same if sv and cprr_total_same else None
         lw = [r["lw_bin_f1"] for r in rows if r["tool"] == row["tool"] and r.get("lw_bin_f1") is not None]
         row["mean_lw_bin_f1"] = statistics.mean(lw) if lw else None
         brier = [r["brier_score"] for r in rows if r["tool"] == row["tool"] and r.get("brier_score") is not None]
@@ -812,11 +829,20 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
         # how the p-value was made and what the smallest attainable value is for this many independent units (an underpowered comparison is flagged, not hidden)
         units = row.get("paired_clusters") or 0
         floor = permutation_floor(units)
-        row["permutation_method"] = permutation_method(units)
+        row["permutation_method"] = permutation_method(units) if pvalue is not None else "not_estimated"
         row["min_attainable_p"] = floor
-        row["p_status"] = ("not_estimated" if pvalue is None else "underpowered" if floor is not None and floor > 0.05 else "ok")
+        row["p_status"] = "not_estimated" if pvalue is None else "ok"
     for row, adjusted in zip(comparisons, holm_adjust([x["permutation_p_value"] for x in comparisons])):
         row["permutation_p_value_holm"] = adjusted
+    # Significance is judged on the Holm-adjusted p over ALL m comparisons that have a p-value, so the smallest p a comparison can ever reach is m times its own floor
+    # (capped at 1). A comparison that cannot get under 0.05 that way is `underpowered` however large the effect: for 28 pairs even a 12-unit exact test cannot be
+    # significant. (With one comparison this is the plain floor.)
+    tested = sum(1 for x in comparisons if x["permutation_p_value"] is not None)
+    for row in comparisons:
+        floor = row.get("min_attainable_p")
+        row["holm_min_attainable_p"] = min(1.0, floor * tested) if floor is not None and row["permutation_p_value"] is not None else None
+        if row["p_status"] == "ok" and row["holm_min_attainable_p"] is not None and row["holm_min_attainable_p"] > 0.05:
+            row["p_status"] = "underpowered"
     for row, adjusted in zip(comparisons, holm_adjust([x["wilcoxon_p_value"] for x in comparisons])):
         row["wilcoxon_p_value_holm"] = adjusted
     smallest = float(os.environ.get("SMALLEST_DIFFERENCE", 0.05))
@@ -838,7 +864,7 @@ def attach_significance(summary, comparisons, alpha=0.05):
     adjusted) already computed by compute_comparisons() -- never a bootstrap-
     CI-overlap heuristic, which is a weaker and different claim for a paired
     comparison. Every row gets a value: "not_assessed" when there is no
-    runner-up, or the pair was never tested (fewer than 5 shared samples,
+    runner-up, or the pair was never tested (fewer than MIN_CLUSTERS_TEST (6) independent units,
     paired_permutation_pvalue's own existing gate); True/False otherwise.
     Mutates summary in place; also returns it."""
     for row in summary:
@@ -862,7 +888,7 @@ def write_comparisons(rows, path, comparisons=None):
         comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
         handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\tpaired_clusters\ttask\tmetric"
-                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\tpermutation_method\tmin_attainable_p\tp_status\n")
+                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\tpermutation_method\tmin_attainable_p\tp_status\tholm_min_attainable_p\n")
         for row in comparisons:
             low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
             high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
@@ -878,7 +904,7 @@ def write_comparisons(rows, path, comparisons=None):
                 f"{row.get('task', '')}\t{row.get('metric', 'f1')}\t"
                 f"{fmt6(row.get('wilcoxon_p_value'))}\t{fmt6(row.get('wilcoxon_p_value_holm'))}\t"
                 f"{row.get('equivalent', '')}\t{row.get('smallest_difference', '')}\t"
-                f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\n"
+                f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\t{fmt6(row.get('holm_min_attainable_p'))}\n"
             )
 
 
@@ -919,7 +945,7 @@ def write_tsv(summary, path):
             "primary_status", "population",
             "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp",
             "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap",
-            "sv_prr", "sv_prr_correct", "sv_prr_plasmids"]
+            "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -993,6 +1019,7 @@ def write_tsv(summary, path):
                 *(s[k] if s.get(k) is not None else "" for k in ("total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp")),
                 *(fmt4(s.get(k)) for k in ("unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap")),
                 fmt4(s.get("sv_prr")), s.get("sv_prr_correct") if s.get("sv_prr_correct") is not None else "", s.get("sv_prr_plasmids") if s.get("sv_prr_plasmids") is not None else "",
+                s.get("sv_prr_isolates") if s.get("sv_prr_isolates") is not None else "", fmt4(s.get("cprr_on_sv_isolates")),
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
@@ -1066,7 +1093,7 @@ def write_md_table(fh, summary, track=None, task=None):
         if s.get("cprr_isolate_mean") is not None:
             cprr += f"; per isolate {s['cprr_isolate_mean']:.1%}"
         if s.get("sv_prr") is not None:
-            cprr += f"; without structural calls {s['sv_prr']:.1%}"
+            cprr += f"; without structural calls {s['sv_prr']:.1%} (CPRR on the same {s['sv_prr_isolates']} isolate(s): {s['cprr_on_sv_isolates']:.1%})"
         if s.get("cprr_auc") is not None:
             cprr += f"; AUC 0.80–0.99 {s['cprr_auc']:.3f}"
         basis = s.get("ranking_species_basis") or "pooled"
@@ -1262,6 +1289,8 @@ def main():
                          "Default off: the primary analysis is then reported as unavailable and the numbers are provisional. ALLOW_PRIMARY_FALLBACK=1 sets it.")
     ap.add_argument("--headline-max-tier", type=int, default=2,
                     help="highest reference tier included in the headline (default 2).")
+    ap.add_argument("--headline-min-clusters", type=int, default=int(os.environ.get("HEADLINE_MIN_CLUSTERS", MIN_CLUSTERS_CI)),
+                    help="independent clusters the references in the headline tiers must come from for the primary analysis to be available (default 5, the interval minimum; HEADLINE_MIN_CLUSTERS).")
     ap.add_argument("--min-species-clusters", type=int, default=20,
                     help="independent clusters a species needs to enter the species-balanced headline.")
     ap.add_argument("--resource-failures", choices=("score-zero", "exclude"), default="score-zero",
@@ -1307,7 +1336,7 @@ def main():
         if not rows:
             raise SystemExit("ERROR: every score row was excluded as a possible database overlap")
     design = hd.Design(args.sample_sheet, args.capabilities, args.truth_provenance, args.clonal_groups,
-                       args.headline_max_tier, args.min_species_clusters)
+                       args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters)
     all_rows = rows
     selection = design.headline_selection(rows, allow_fallback=args.allow_primary_fallback)
     rows, reference_basis = selection.rows, selection.basis
@@ -1315,7 +1344,7 @@ def main():
           f"({len({r['sample'] for r in rows})} of {len({r['sample'] for r in all_rows})} sample(s)).")
     if selection.status != hd.PRIMARY_AVAILABLE:
         print(f"{chr(10)}[aggregate] WARNING: PRIMARY ANALYSIS UNAVAILABLE ({selection.reason}). Every ranking below is PROVISIONAL (all samples) and is "
-              f"not the primary result; add references in tiers 1-{args.headline_max_tier} (independent, long-read-first, evidence-checked) to obtain it."
+              f"not the primary result; add references in tiers 1-{args.headline_max_tier}, from at least {args.headline_min_clusters} independent clusters (long-read-first, evidence-checked) to obtain it."
               + (" ALLOW_PRIMARY_FALLBACK=1 keeps the numbers as the headline." if selection.status == hd.PRIMARY_FALLBACK else "") + chr(10))
     # A sample whose only plasmids were evidence-labelled AMBIGUOUS is not a
     # plasmid-free negative control.

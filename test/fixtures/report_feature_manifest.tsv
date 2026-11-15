@@ -260,3 +260,12 @@ truth-label-audit.04	truth-label-audit	text	Flags	column: chromid, integrated-pl
 metric-framework.10	metric-framework	text	The reconstruction evaluation ladder	registry-driven ladder table	methods
 metric-framework.11	metric-framework	text	Gaps, stated plainly	the ladder's gaps	methods
 keys.10	keys	table_headers	Term | What it measures | Why it matters | Ladder rung | Use	the glossary shows each metric's rung and use	methods
+fig-radar.01	fig-radar	text	Numbers behind the chart	the radar figure keeps the table that is its record	figures
+fig-complexity.01	fig-complexity	text	Rank correlation of F1 with each characteristic	the complexity figure keeps its correlation table	figures
+summary.outcome-view	summary	text	How each plasmid ended (outcome class)	the plasmid matrix has an outcome view under each coverage table	summary
+recommendations.evidence	recommendations	text	Evidence behind the recommendation	the recommendation lists what stands behind it	recommender-eval
+recommendations.arms	recommender-eval	text	Three ways of choosing a tool	single best vs organism vs feature-conditioned, with calibration and abstention	recommender-eval
+amr-placement.context	amr-placement	text	AMR-PRR	AMR-PRR, pairs kept together and flank context sit beside the placement	amr-placement
+database-membership.provenance	database-membership	text	Tool and database provenance	validation tier and database version, source and checksum of each tool	robustness
+isolate-difficulty.dataset	isolate-difficulty	text	Dataset characteristics	one table of every isolate, each column marked knowable without a reference or not	cohort-qc
+robustness.burden	robustness-main	text	Predicted bases with an alternative placement	the burden of predicted sequence that precision does not charge, beside strict precision	robustness

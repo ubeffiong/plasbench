@@ -710,6 +710,7 @@ def _legend(meta):
     keys.append("<span class='rpt-map-key'>Identity of the covered stretch: " + " ".join(
         f"<i style='background:{colour}'></i>{label}" for (_floor, colour), label in zip(IDENTITY_BANDS, IDENTITY_LABELS)) + "</span>")
     keys.append(f"<span class='rpt-map-key'><i style='background:{RESISTANCE_BRACKET};height:4px'></i>Resistance region (genes within {RESISTANCE_GAP_BP // 1000} kb)</span>")
+    keys.append("<span class='rpt-map-key muted'>Not drawn: resistance genes that span the origin (not bracketed); in the interactive viewer, identity is measured on the 300 longest alignment blocks per tool.</span>")
     keys.append("<span class='rpt-map-key'><i class='hatch'></i>Tool ring: not covered (pale, dashed outline)</span>")
     keys.append("<span class='rpt-map-key'><i style='background:#111;width:3px'></i>Structural event on this plasmid</span>")
     if meta["gc"]:

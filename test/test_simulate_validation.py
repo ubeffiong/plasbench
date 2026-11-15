@@ -5,7 +5,7 @@ The statistics simulation (python/simulate_validation.py) and where it is wired.
   - simulate(): repeatable for a seed; study sizes balanced or unbalanced; missing observations are dropped; no study effect when tau is 0;
   - run_scenario(): the row has every column; too few studies give 'not estimable' (an interval needs 5, a test 6); with 6 to 12 studies the test is exact;
     a large true effect is almost always detected and no effect is rarely detected (power and type-I error are separate readings); the interval verdict
-    never rounds a shortfall up: 'consistent with 95%' exactly when coverage + 2 SE reaches 0.95, otherwise 'below nominal';
+    never rounds a shortfall up: 'consistent with 95%' exactly when coverage reaches 0.95 minus two standard errors expected under the nominal rate, otherwise 'below nominal';
   - the command writes the TSV with the documented columns, in smoke mode, quickly;
   - the report: a 'Statistical validation (simulation)' section with the table, an explicit Not run empty state that says how to run it, and a tab in the Sensitivity group;
   - the wiring: the CLI command, stage 6 and its setting, the file registry, the pre-registration-free config variable, the demo.
@@ -67,10 +67,15 @@ def main():
     honest = True
     for r in (six, five, null, power):
         if r["ci_coverage"]:
-            cov, se = float(r["ci_coverage"]), float(r["ci_coverage_se"])
-            consistent = r["ci_verdict"] == "consistent with 95%"
-            honest &= consistent == (cov + 2 * se >= 0.95) and (consistent or r["ci_verdict"].startswith("below nominal"))
-    check("the interval verdict never rounds a shortfall up (consistent only when coverage + 2 SE reaches 0.95)", honest)
+            cov = float(r["ci_coverage"])
+            n = round(float(r["replicates"]) * float(r["ci_estimated"]))
+            consistent = r["ci_verdict"].startswith("consistent with 95%")
+            honest &= consistent == (cov >= 0.95 - 2 * (0.95 * 0.05 / n) ** 0.5) and (consistent or r["ci_verdict"].startswith("below nominal"))
+    check("the interval verdict never rounds a shortfall up (consistent only when coverage reaches 0.95 minus two standard errors expected under the nominal rate)", honest)
+    smoke = row(12, 0.0, tau=0.02, replicates=40)
+    check("a smoke verdict says it is indicative", "indicative" in smoke["ci_verdict"] and "indicative" in smoke["test_verdict"], (smoke["ci_verdict"], smoke["test_verdict"]))
+    import math
+    check("a coverage of 0.90 over 100 replicates is below the line (0.95 - 2 x 0.0218 = 0.906); the old rule let it pass", 0.90 < 0.95 - 2 * math.sqrt(0.95 * 0.05 / 100) and 0.90 + 2 * math.sqrt(0.9 * 0.1 / 100) >= 0.95)
 
     print("the command")
     with tempfile.TemporaryDirectory() as tmp:

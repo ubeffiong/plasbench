@@ -572,6 +572,7 @@ function syncLegend() {
     legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = '#eef1f4'; i.style.borderStyle = 'dashed'; return i; })(), 'not covered']));
     legend.appendChild(el('span', {'class': 'pv-key'}, ['Identity: '].concat(C.IDENTITY.map(function (b, k) { var i = el('i'); i.style.background = b[1]; return [i, ' ' + C.IDENTITY_LABELS[k] + ' ']; }).reduce(function (a, b) { return a.concat(b); }, []))));
     legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = C.BRACKET; i.style.height = '4px'; return i; })(), 'resistance region']));
+    legend.appendChild(el('span', {'class': 'pv-key'}, 'Genes spanning the origin are not bracketed; identity uses the 300 longest alignment blocks per tool'));
     legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = '#111'; i.style.width = '3px'; return i; })(), 'structural event']));
     if (M.gc) { legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = pal().skewPos; return i; })(), 'GC skew +']));
                 legend.appendChild(el('span', {'class': 'pv-key'}, [(function () { var i = el('i'); i.style.background = pal().skewNeg; return i; })(), 'GC skew -'])); }
