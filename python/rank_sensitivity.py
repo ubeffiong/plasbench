@@ -13,13 +13,20 @@ Two kinds of variant, per analysis track:
 
   scoring settings   Re-score every (sample, tool) from the PAF already on disk
                      (no minimap2 re-run) with one setting changed at a time:
-                     MAPQ 0 / 30, identity 0.80 / 0.95, query coverage 0.
+                     MAPQ 0 / 30, identity 0.80 / 0.95, query coverage 0,
+                     minimum alignment length 100 / 500 bp.
   metrics            Re-rank from the recorded scores.tsv columns: strict F1
                      (precision charged for unmapped predicted bases), per-
                      plasmid recovery at the configured threshold, and
-                     per-plasmid recovery at >= 90% completeness, MCC, F2,
-                     F0.5, and the contig-level length-weighted F1 (the
+                     per-plasmid recovery at >= 50% and >= 90% completeness, MCC, F2,
+                     F0.5, the length-weighted binning F1 (the short-read reconstruction
+                     headline endpoint), and the contig-level length-weighted F1 (the
                      parallel contig layer; never the headline).
+  CPRR thresholds    The correct plasmid reconstruction rate (the headline for long-read and
+                     hybrid reconstruction, key secondary for short-read) is re-ranked at
+                     coverage and bin-share thresholds 0.80 / 0.90 / 0.95 / 0.99 from
+                     benchmark.cprr_threshold_sweep.tsv; these rows are compared with the
+                     pre-registered 0.95 ranking (column compared_with), not with the F1 baseline.
   label schemes      Re-score every PAF against each other labelling scheme's
                      truth (python/label_schemes.py): the primary is
                      TRUTH_LABEL_SCHEME (ncbi, pre-registered); the others are
@@ -68,8 +75,12 @@ SETTING_VARIANTS = (
     ("identity=0.80", {"min_identity": 0.80}),
     ("identity=0.95", {"min_identity": 0.95}),
     ("query_coverage=0", {"min_query_coverage": 0.0}),
+    ("min_length=100", {"min_length": 100}),
+    ("min_length=500", {"min_length": 500}),
 )
-METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "contig_f1_bp", "contig_bin_f1_bp")
+METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge50", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "lw_bin_f1", "contig_f1_bp", "contig_bin_f1_bp")
+CPRR_THRESHOLDS = ("0.80", "0.90", "0.95", "0.99")
+CPRR_BASELINE = "0.95"                     # the pre-registered CPRR_MIN_COVERAGE / CPRR_MIN_SHARE
 SCHEME_FILES = {"ncbi": "truth.tsv", "nonchromosomal": "truth.nonchromosomal.tsv", "evidence": "truth.scored.tsv"}
 MIN_CONTIG_VARIANT = ("min_contig=500", 500)
 COHORT_VARIANTS = ("public_only", "in_house_only", "grade_c_excluded")
@@ -270,12 +281,53 @@ def analyse(variants):
                     "kendall_tau_vs_baseline": "" if tau is None else f"{tau:.3f}",
                     "top_tool": top,
                     "top_matches_baseline": "" if baseline_top is None else ("yes" if top == baseline_top else "no"),
+                    "compared_with": BASELINE,
                 })
     return out
 
 
 COLUMNS = ["analysis_track", "variant", "tool", "mean_value", "n_samples", "rank", "baseline_rank",
-           "rank_change", "kendall_tau_vs_baseline", "top_tool", "top_matches_baseline"]
+           "rank_change", "kendall_tau_vs_baseline", "top_tool", "top_matches_baseline", "compared_with"]
+
+
+def cprr_threshold_rows(path):
+    """Rows (same columns as analyse) that re-rank the tools by pooled CPRR at each threshold, compared with the ranking at the pre-registered threshold."""
+    if not path or not os.path.isfile(path):
+        return []
+    per_group = defaultdict(lambda: defaultdict(dict))
+    for r in read_score_rows(path):
+        value, threshold = number(r.get("cprr")), r.get("threshold")
+        if value is None or threshold not in CPRR_THRESHOLDS or not r.get("tool"):
+            continue
+        task = r.get("task") or ""
+        if task and task != "reconstruction":
+            continue
+        per_group[r.get("analysis_track") or "short_read"][threshold][r["tool"]] = (value, r.get("n_isolates", ""))
+
+    def order(by_tool):
+        return sorted(by_tool, key=lambda tool: (-by_tool[tool][0], tool))
+
+    out = []
+    for track in sorted(per_group):
+        base = per_group[track].get(CPRR_BASELINE)
+        if not base:
+            continue
+        base_order = order(base)
+        base_rank = {tool: i for i, tool in enumerate(base_order, start=1)}
+        for threshold in CPRR_THRESHOLDS:
+            by_tool = per_group[track].get(threshold)
+            if not by_tool:
+                continue
+            ordered = order(by_tool)
+            ranks = {tool: i for i, tool in enumerate(ordered, start=1)}
+            tau = kendall_tau(base_rank, ranks)
+            for tool in ordered:
+                out.append({"analysis_track": track, "variant": f"cprr@{threshold}", "tool": tool, "mean_value": f"{by_tool[tool][0]:.4f}",
+                            "n_samples": by_tool[tool][1], "rank": ranks[tool], "baseline_rank": base_rank.get(tool, ""),
+                            "rank_change": (base_rank[tool] - ranks[tool]) if tool in base_rank else "",
+                            "kendall_tau_vs_baseline": "" if tau is None else f"{tau:.3f}", "top_tool": ordered[0],
+                            "top_matches_baseline": "yes" if ordered[0] == base_order[0] else "no", "compared_with": f"cprr@{CPRR_BASELINE}"})
+    return out
 
 
 def summarise(rows):
@@ -306,6 +358,7 @@ def main():
     ap.add_argument("--label-scheme", default=os.environ.get("TRUTH_LABEL_SCHEME", "ncbi"),
                     choices=tuple(SCHEME_FILES), help="primary labelling scheme the baseline is scored on")
     ap.add_argument("--truth-provenance", help="truth_provenance.py TSV (truth_quality_grade) for grade_c_excluded")
+    ap.add_argument("--cprr-sweep", help="benchmark.cprr_threshold_sweep.tsv (default: <out-prefix>.cprr_threshold_sweep.tsv when present): adds the CPRR threshold rows")
     ap.add_argument("--min-alignment-length", type=int, default=int(os.environ.get("MIN_ALIGNMENT_LENGTH", 200)))
     ap.add_argument("--min-alignment-identity", type=float, default=float(os.environ.get("MIN_ALIGNMENT_IDENTITY", 0.90)))
     ap.add_argument("--min-alignment-mapq", type=int, default=int(os.environ.get("MIN_ALIGNMENT_MAPQ", 20)))
@@ -330,7 +383,7 @@ def main():
               f"probably not these filters, so this baseline is not the leaderboard's. Pass the same "
               f"--min-alignment-* values.", file=sys.stderr)
 
-    table = analyse(variants)
+    table = analyse(variants) + cprr_threshold_rows(args.cprr_sweep or f"{args.out_prefix}.cprr_threshold_sweep.tsv")
     out_path = f"{args.out_prefix}.rank_robustness.tsv"
     with open(out_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS, delimiter="\t", lineterminator="\n")

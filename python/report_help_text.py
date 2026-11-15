@@ -302,7 +302,7 @@ HELP = {
         "Each row changes one filter, or ranks by strict precision or per-plasmid recovery, and reports Kendall tau against the baseline order.",
         "Tau near 1 means the same order. 'Top tool unchanged' says whether the leader holds.",
         "Shows if the winner depends on a technical choice.",
-        "It never changes the leaderboard."),
+        "It never changes the leaderboard. The 'Compared with' column says which ranking each row is compared to: the F1 baseline, or (for CPRR rows) the pre-registered 0.95 ranking."),
     "power": H(
         "How big a difference between two tools this cohort could actually detect.",
         "Paired differences between tools, grouped by study.",
