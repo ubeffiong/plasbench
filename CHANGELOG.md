@@ -17,6 +17,63 @@ history is lost, only the numbering is cleaner. See
 - `config/prereg.tsv` gains a status, `proposed`: a value is proposed (rationale in the note) and awaits the maintainer's confirmation. The rows that were `TO_FIX` with a proposed default (the tool timeout, now proposed at 7200 s with its rationale; the integrated-element depth; the circular-path rule; the scorecard weights and bands; the scorecard minimum; the map size) are `proposed`; the A4/C2 bands, which have nothing to propose, stay `TO_FIX`. `min_alignment_length` (200) is now a pre-registered row.
 - `freeze_prereg.py`: `proposed` and `TO_FIX` are *unfixed* and make the plan a **draft**; `--status` reports `proposed` and `draft`; a draft can be locked with `--write` (so a run records which draft it used) but `--strict` refuses to write it and fails `--verify` (`--require-fixed` now also fails on proposed rows). The manifest and the report's Pre-registration tab show the draft state ("frozen and unchanged, but a DRAFT: N value(s) ...") and list the proposed rows. `REQUIRE_PREREG=1` is unchanged in intent: it refuses a draft. `test/test_prereg_freeze.py` covers it. Nothing is frozen: confirming the values and freezing is the maintainer's decision.
 
+### Changed -- stage 2 (truth) is faster, parallel, resumable and says where its time goes
+- **Each sample's stage-2 steps are timed.** The times go to `data/<sample>/stage2_timing.tsv`, and the log names
+  every step that took 10 s or more, for example `stage 2 for S1 took 21m05s: annotation 20m31s, repeat_content 14s`.
+- **Samples run in parallel** with `MAX_PARALLEL_SAMPLES`, the same setting as stages 1, 3, 4 and 5. The default, 1,
+  stays sequential. An unusable truth table still stops the stage, and the stop names the sample.
+- **Reference annotation** (`RUN_REFERENCE_ANNOTATION=1`) runs its callers at the same time, instead of one after
+  another, and gives them threads. ISEScan, the slowest by far, gets the whole `THREADS` allowance instead of 1;
+  AMRFinderPlus gets half; MOB-typer, abricate and barrnap share a few.
+- `measure_depth.py` counts both mates at the same time, decompresses with pigz/gzip in a separate process, and
+  touches only the sequence lines, in C. That is about 2x faster on a 90x read pair, with identical counts.
+- `repeat_content.py` slices k-mers in C instead of looping over every base in Python. That is 1.5x faster on a
+  5 Mb genome, with identical output.
+- `mash dist` (evidence labels) and `samtools sort` (depth anomalies) use `THREADS` instead of 1 and 2.
+- **Re-runs reuse** repeat content and the depth-anomaly scan when their inputs have not changed, instead of
+  recomputing them every time.
+
+### Fixed -- a run cut off during assembly resumes cleanly
+- **Stage 3 is crash-safe.** fastp now writes `*.trim.partial.fastq.gz` and renames the pair only when it succeeds;
+  a `.fastp.complete` marker records a finished trim. Trimmed reads left by a run that was cut off (a full disk, WSL
+  or the machine stopping) used to be taken for finished reads and assembled truncated; they are now trimmed again,
+  with a log line saying so. An interrupted SPAdes/Unicycler folder is cleared before reassembling, and the contigs
+  and graph are copied under `.partial` names first, so a half-copied `contigs.fasta` is never reused. Finished work
+  is still reused, including samples trimmed and assembled by an earlier PlasBench.
+
+### Changed -- warnings are yellow and errors red, in the window and in a terminal
+- **The window's console** uses one colour code in all three tabs (Job output, Session log, Terminal): errors are
+  red and bold, with a red bar in Job output, and warnings are yellow. A line PlasBench tags `WARNING:` (for example
+  a tolerated `SPAdes failed for ...`) is yellow; `ERROR:`, tracebacks, `No space left on device`, `command not
+  found` and non-zero exits are red. A success line that mentions a failure (`... -> PASS`) and zero counts such as
+  `failed=0` are not flagged. The Terminal tab now colours command output, and the Session log shows failed jobs and
+  terminal commands red, cancelled or interrupted ones yellow.
+- **Runs in a terminal** print `WARNING:` lines yellow and `ERROR:` lines red (`scripts/lib.sh`), only when the
+  output is a terminal, so log files stay plain. `NO_COLOR` or `PLASBENCH_COLOR=never` turns colour off, and
+  `PLASBENCH_COLOR=always` forces it.
+
+### Changed -- heavy files never go into git, and you can edit .gitignore from the window
+- **One catalogue of heavy formats** (`plasbench/gitops.py`, `HEAVY`) drives both the managed `.gitignore` blocks and
+  the commit check, so the two cannot drift apart. It covers:
+  - reads (FASTQ, also bzip2/xz/zstd-compressed; SRA; nanopore FAST5/POD5/BLOW5);
+  - alignments and their indexes (BAM, SAM, CRAM, BAI, CRAI, CSI, PAF);
+  - variants (VCF, BCF, TBI);
+  - coverage tracks (bigWig, bedGraph);
+  - aligner indexes and tool databases (minimap2, Bowtie2, BWA, Kraken2, Mash, DIAMOND, BLAST, HMMER, SQLite, HDF5,
+    model files);
+  - archives (tar, zip, 7z, bz2, xz, zst);
+  - in study repositories, assemblies and sequences (FASTA, GenBank, GFF, GFA).
+  Previously SAM was missing from the developer rules, and VCF, CRAM/BAM indexes, nanopore signal, indexes, databases
+  and archives were not covered at all.
+- **Repositories set up by an earlier PlasBench get the new rules**: the managed block is brought up to date, and
+  lines outside it are never touched.
+- **Heavy files already committed** (before a rule covered them) are listed on Version control, with **Stop
+  tracking** (`git rm --cached`: the files stay on disk).
+- **Edit `.gitignore` in the window** (Version control > Ignored files). PlasBench's block is shown read-only. Your
+  own rules are editable and come after it, so `!results/key_plasmids.fasta` brings back a file the block leaves
+  out. **Test a path** shows whether a file is ignored and by which rule. A sequence file you keep with your own rule
+  is a warning at commit time. Reads, alignments, variants, indexes and archives stay blocked whatever the rules say.
+
 ### Added -- a structured evidence record for every reference (review H3)
 - `python/truth_provenance.py` records six evidence fields per reference, additively: assembly technology, circularity evidence, read support, replicon/MOB evidence, structural integrity and independent validation, each `declared` (new optional sample-sheet columns `truth_circularity_evidence`, `truth_read_support`, `truth_structural_integrity`, `truth_independent_validation`), `inferred` (NCBI metadata, `truth_labels.tsv`) or `unknown`; plus `evidence_recorded` and `evidence_sources`. The original columns keep their order. Unknown never demotes a reference; an explicit adverse value (read support none, unresolved repeats) caps Tier 1 at Tier 2 and says why. `validate_cohort.py` checks the new vocabularies; the headline design table gains an *Evidence recorded* column; the demo declares some evidence and now builds the provenance table before aggregating (so the headline and the report read the same references). `test/test_truth_evidence_record.py` covers it. The cohort `truth_quality_tier` column is kept for now: it still feeds the tier and replacing it needs the cohorts re-curated (maintainer-owned).
 
