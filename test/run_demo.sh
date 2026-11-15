@@ -194,7 +194,7 @@ python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark
     --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"
 python3 "$PY/score_amr_placement.py" collect --results-dir "$DEMO" --out "$DEMO/benchmark.amr_placement.tsv"
 python3 "$PY/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
-    --out-prefix "$DEMO/benchmark" --min-train-samples 1
+    --dataset-features "$DEMO/benchmark.dataset_features.tsv" --out-prefix "$DEMO/benchmark" --min-train-samples 1
 python3 "$PY/flag_cohort_outliers.py" --stats-dir "$DEMO" --samples "$SAMPLES" \
     --out "$DEMO/benchmark.cohort_qc_flags.tsv"
 python3 "$PY/assembly_qc_gate.py" --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_qc.tsv" 2>/dev/null

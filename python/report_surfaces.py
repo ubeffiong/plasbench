@@ -317,6 +317,8 @@ def _file_entries():
         S("benchmark.tool_agreement.tsv", ag, "Tool-versus-tool dissimilarity", "bin_agreement.py", "learn-agreement", "shown", "Matrix."),
         S("benchmark.recommender_eval.tsv", ag, "Recommender evaluation", "evaluate_recommender.py", "recommender-eval", "shown", "Profile selector and summary beside the 3D strategy scene; table in a detail tab."),
         S("benchmark.recommender_verdict.json", ag, "Recommender verdict", "evaluate_recommender.py", "recommender-eval", "shown", "Verdict text."),
+        S("benchmark.recommender_arms.tsv", ag, "Recommender: three ways of choosing a tool", "evaluate_recommender.py", "recommender-eval", "shown",
+          "Single best vs organism vs feature-conditioned, with calibration and abstention, in the detail tab."),
         S("benchmark.recommender_regret.tsv", ag, "Recommender regret per isolate", "evaluate_recommender.py", "recommender-eval", "shown",
           "Each isolate is a column of bars in the 3D strategy scene (recommender, single best, oracle) with regret gaps; rows in the detail panel."),
         S("benchmark.warning_eval.tsv", ag, "Evaluation of the warnings", "evaluate_warnings.py", "recommender-eval", "shown", "Tab in the recommender detail panel (CSV export), table collapsed under the view."),

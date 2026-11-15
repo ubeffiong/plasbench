@@ -288,6 +288,7 @@ fi
 if [[ "${RUN_RECOMMENDER_EVAL:-1}" -eq 1 ]]; then
     if python3 "$HERE/../python/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLE_SHEET" \
             --tool-status "$RESULTS_DIR/tool_status.tsv" --out-prefix "$RESULTS_DIR/benchmark" \
+            --dataset-features "$RESULTS_DIR/benchmark.dataset_features.tsv" \
             --min-train-samples "$RECOMMENDATION_MIN_SAMPLES"; then
         python3 "$HERE/../python/evaluate_warnings.py" --regret "$RESULTS_DIR/benchmark.recommender_regret.tsv" \
             --cohort-qc-flags "$RESULTS_DIR/benchmark.cohort_qc_flags.tsv" \

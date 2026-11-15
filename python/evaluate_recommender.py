@@ -32,7 +32,18 @@ when gap closed > 0 and "recommender_no_better" when not.
 Profiles: regret is computed for F1 (primary) and, when scores.tsv has them,
 F2 (recall-weighted) and F0.5 (precision-weighted).
 
-Outputs: <prefix>.recommender_eval.tsv (one row per profile),
+Three arms (plan C2). The same folds also compare, per profile, three ways of choosing a tool for a held-out isolate:
+  single_best          the training studies' best tool for everyone
+  organism             the recommender above (best tool in the isolate's organism stratum)
+  feature_conditioned  the best tool among the --knn nearest training isolates, by the TRUTH-FREE dataset features
+                       (benchmark.dataset_features.tsv: depth, read quality, assembly size/contigs/N50/GC; a column that needs the
+                       reference is refused). Falls back to the single best when fewer than two neighbours have the tool.
+Per arm: mean regret, top-1 and near-optimal rates, improvement over the single best, the share of studies (folds) in which it
+beat the single best, calibration (mean |predicted - realised| score and the bias), and abstention (the share whose predicted
+score is under the floor, with the regret on the isolates it would have answered). An arm "adds value" only when it beats the
+single best on average AND in a majority of at least MIN_FOLDS_ADVANTAGE studies; otherwise it is reported as not better, or not
+assessed. The feature-conditioned arm is an EVALUATION: nothing recommends with it unless this says it adds value.
+Outputs: <prefix>.recommender_arms.tsv (one row per profile and arm), <prefix>.recommender_eval.tsv (one row per profile),
 <prefix>.recommender_regret.tsv (one row per held-out isolate and profile),
 <prefix>.recommender_verdict.json. Standard library only.
 """
@@ -49,16 +60,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rank_sensitivity import kendall_tau  # noqa: E402
+import recommendation_model as rm  # noqa: E402
+import characterise_dataset as cd  # noqa: E402
 from study_groups import group_samples_by_study  # noqa: E402
 
 PROFILES = (("f1", "f1"), ("f2", "f2"), ("f0_5", "f0_5"))
+ARMS = ("single_best", "organism", "feature_conditioned")
+KNN_K = 5                 # neighbours used by the feature-conditioned arm
+MIN_NEIGHBOURS = 2        # a tool needs at least this many scored neighbours to be recommended
+MIN_FOLDS_ADVANTAGE = 3   # studies needed before an arm can be said to add value (fewer: not_assessed)
+NUMERIC_FEATURES = ("read_depth_x", "assembly_size_bp", "contig_count", "n50", "gc_percent", "mean_read_quality")
+ARM_FIELDS = ["profile", "arm", "n_isolates", "n_folds", "mean_regret", "top1_rate", "near_optimal_rate", "improvement_over_single_best",
+              "folds_better", "folds_assessed", "calibration_mae", "calibration_bias", "abstention_rate", "mean_regret_when_answering", "verdict", "note"]
 EVAL_FIELDS = ["profile", "metric", "n_isolates", "n_folds", "n_tools", "mean_regret", "p95_regret",
                "near_optimal_rate", "top1_rate", "mean_kendall_tau", "single_best_mean_regret",
                "oracle_mean_score", "single_best_mean_score", "recommender_mean_score", "oracle_gap", "gap_closed",
                "floor_flagged", "floor_true_best_below_floor", "verdict", "note"]
 REGRET_FIELDS = ["profile", "sample", "held_out_study", "organism", "recommended_tool", "recommended_score",
                  "predicted_score", "best_tool", "best_score", "regret", "near_optimal", "single_best_tool",
-                 "single_best_score", "single_best_regret", "floor_flag", "basis"]
+                 "single_best_score", "single_best_regret", "floor_flag", "basis", "single_best_predicted"]
 
 
 from plasbench_common import number  # noqa: E402,F401
@@ -151,8 +171,118 @@ def evaluate(table, studies, organism, min_train, near_margin, floor, profile, m
                          "regret": f"{regret:.4f}", "near_optimal": "yes" if regret <= near_margin + 1e-12 else "no",
                          "single_best_tool": single_best, "single_best_score": f"{sb_score:.4f}",
                          "single_best_regret": f"{best - sb_score:.4f}",
-                         "floor_flag": "yes" if predicted < floor else "no", "basis": basis})
+                         "floor_flag": "yes" if predicted < floor else "no", "basis": basis,
+                         "single_best_predicted": f"{overall[single_best]:.4f}"})
     return regrets, rows, taus, len(tools)
+
+
+def read_features(path):
+    """{sample: {feature: float}} from benchmark.dataset_features.tsv, TRUTH-FREE numeric columns only (a reference-derived column is never used)."""
+    allowed = [f for f in NUMERIC_FEATURES if f in cd.TRUTH_FREE]
+    rm.assert_truth_free(allowed)
+    out = {}
+    for row in read_tsv(path):
+        values = {f: number(row.get(f)) for f in allowed}
+        out[row.get("sample", "")] = {f: v for f, v in values.items() if v is not None}
+    return out
+
+
+def standardise(features, train):
+    """Per-feature mean and spread from the TRAINING isolates only (nothing from the held-out isolate leaks into the scale)."""
+    scale = {}
+    for name in NUMERIC_FEATURES:
+        values = [features[s][name] for s in train if name in features.get(s, {})]
+        if len(values) >= 2:
+            spread = statistics.pstdev(values)
+            if spread > 0:
+                scale[name] = (statistics.mean(values), spread)
+    return scale
+
+
+def distance(a, b, scale):
+    shared = [f for f in scale if f in a and f in b]
+    if len(shared) < 2:
+        return None
+    return math.sqrt(sum(((a[f] - b[f]) / scale[f][1]) ** 2 for f in shared) / len(shared))
+
+
+def feature_arm(table, studies, features, min_train, near_margin, floor, k=KNN_K):
+    """Per held-out isolate: the tool the nearest training isolates (truth-free features) did best with, with its predicted and realised score."""
+    tools = sorted({t for per in table.values() for t in per})
+    out = []
+    for study, held in sorted(studies.items()):
+        train = [s for s in table if s not in held]
+        test = [s for s in sorted(held) if s in table]
+        overall = {t: statistics.mean(v) for t in tools if len(v := [table[s][t] for s in train if t in table[s]]) >= min_train}
+        if not train or not test or not overall:
+            continue
+        single_best = min(overall, key=lambda t: (-overall[t], t))
+        scale = standardise(features, train)
+        for sample in test:
+            near = sorted(((d, s) for s in train if (d := distance(features.get(sample, {}), features.get(s, {}), scale)) is not None))[:k]
+            means = {t: statistics.mean(v) for t in tools if len(v := [table[s][t] for _d, s in near if t in table[s]]) >= MIN_NEIGHBOURS}
+            if means:
+                tool, basis = min(means, key=lambda t: (-means[t], t)), "neighbours"
+                predicted = means[tool]
+            else:
+                tool, basis, predicted = single_best, "single_best", overall[single_best]
+            per = table[sample]
+            best = max(per.values())
+            out.append({"sample": sample, "held_out_study": study, "tool": tool, "predicted": predicted, "score": per.get(tool, 0.0), "best": best, "basis": basis})
+    return out
+
+
+def arm_summary(profile, arm, items, single_by_study, floor, near_margin):
+    """items: [{study, regret, predicted, score, best}]; single_by_study: {study: mean regret of the single best on that fold}."""
+    base = {"profile": profile, "arm": arm, "n_isolates": len(items)}
+    if not items:
+        return {**{f: "" for f in ARM_FIELDS}, **base, "verdict": "not_assessed", "note": "no held-out isolates"}
+    fmt = lambda v: "" if v is None else f"{v:.4f}"  # noqa: E731
+    regrets = [i["regret"] for i in items]
+    by_study = defaultdict(list)
+    for i in items:
+        by_study[i["study"]].append(i["regret"])
+    folds = {s: statistics.mean(v) for s, v in by_study.items()}
+    better = sum(1 for s, v in folds.items() if v < single_by_study.get(s, float("inf")) - 1e-12)
+    single_mean = statistics.mean(single_by_study[i["study"]] for i in items)
+    improvement = single_mean - statistics.mean(regrets)
+    answering = [i["regret"] for i in items if i["predicted"] >= floor]
+    row = {**base, "n_folds": len(folds), "mean_regret": fmt(statistics.mean(regrets)),
+           "top1_rate": fmt(sum(r <= 1e-12 for r in regrets) / len(regrets)),
+           "near_optimal_rate": fmt(sum(r <= near_margin + 1e-12 for r in regrets) / len(regrets)),
+           "improvement_over_single_best": fmt(improvement), "folds_better": better, "folds_assessed": len(folds),
+           "calibration_mae": fmt(statistics.mean(abs(i["predicted"] - i["score"]) for i in items)),
+           "calibration_bias": fmt(statistics.mean(i["predicted"] - i["score"] for i in items)),
+           "abstention_rate": fmt(1 - len(answering) / len(items)),
+           "mean_regret_when_answering": fmt(statistics.mean(answering) if answering else None)}
+    if arm == "single_best":
+        row.update(verdict="reference", note="the comparison baseline")
+    elif len(folds) < MIN_FOLDS_ADVANTAGE:
+        row.update(verdict="not_assessed", note=f"needs at least {MIN_FOLDS_ADVANTAGE} studies; this cohort has {len(folds)}")
+    elif improvement > 0 and better > len(folds) / 2:
+        row.update(verdict="adds_value", note=f"lower regret than the single best on average and in {better} of {len(folds)} studies")
+    else:
+        row.update(verdict="no_better", note=f"better than the single best in {better} of {len(folds)} studies; improvement {improvement:+.4f}")
+    return row
+
+
+def arms_for_profile(profile, table, studies, organism, features, rows, min_train, near_margin, floor):
+    """The three arms for one profile. single_best and organism come from `rows` (evaluate() output); only the feature arm is computed here."""
+    by_sample = {r["sample"]: r for r in rows}
+    single_by_study = defaultdict(list)
+    for r in rows:
+        single_by_study[r["held_out_study"]].append(number(r["single_best_regret"]))
+    single_by_study = {s: statistics.mean(v) for s, v in single_by_study.items()}
+    arms = {"single_best": [], "organism": [], "feature_conditioned": []}
+    for r in rows:
+        best, predicted = number(r["best_score"]), number(r["predicted_score"])
+        arms["single_best"].append({"study": r["held_out_study"], "regret": number(r["single_best_regret"]), "predicted": number(r["single_best_predicted"]),
+                                    "score": number(r["single_best_score"]), "best": best})
+        arms["organism"].append({"study": r["held_out_study"], "regret": number(r["regret"]), "predicted": predicted, "score": number(r["recommended_score"]), "best": best})
+    for f in feature_arm(table, studies, features, min_train, near_margin, floor):
+        if f["sample"] in by_sample:
+            arms["feature_conditioned"].append({"study": f["held_out_study"], "regret": f["best"] - f["score"], "predicted": f["predicted"], "score": f["score"], "best": f["best"]})
+    return [arm_summary(profile, arm, arms[arm], single_by_study, floor, near_margin) for arm in ARMS]
 
 
 def summarise(profile, metric, regrets, rows, taus, n_tools, n_folds, near_margin, gap_floor, floor):
@@ -200,6 +330,7 @@ def main():
     ap.add_argument("--scores", required=True)
     ap.add_argument("--samples", required=True)
     ap.add_argument("--tool-status", help="tool_status.tsv: failed runs score 0 (D6)")
+    ap.add_argument("--dataset-features", help="benchmark.dataset_features.tsv (characterise_dataset.py): the truth-free features of the feature-conditioned arm")
     ap.add_argument("--out-prefix", required=True)
     ap.add_argument("--min-train-samples", type=int, default=int(os.environ.get("RECOMMENDATION_MIN_SAMPLES", 5)))
     ap.add_argument("--near-optimal-margin", type=float, default=float(os.environ.get("NEAR_OPTIMAL_MARGIN", 0.05)))
@@ -213,7 +344,8 @@ def main():
     organism = {s: (m.get("organism") or "not_recorded") for s, m in metadata.items()}
     studies = group_samples_by_study(scores, metadata)
     failed = read_failed(args.tool_status)
-    eval_rows, regret_rows = [], []
+    eval_rows, regret_rows, arm_rows = [], [], []
+    features = read_features(args.dataset_features) if args.dataset_features else {}
     for profile, metric in PROFILES:
         if metric != "f1" and not any(number(r.get(metric)) is not None for r in scores):
             continue
@@ -224,14 +356,19 @@ def main():
         eval_rows.append(summarise(profile, metric, regrets, rows, taus, n_tools, n_folds, args.near_optimal_margin,
                                    args.oracle_gap_floor, args.min_expected_score))
         regret_rows.extend(rows)
+        if rows:
+            arm_rows.extend(arms_for_profile(profile, table, studies, organism, features, rows, args.min_train_samples, args.near_optimal_margin, args.min_expected_score))
+    write(f"{args.out_prefix}.recommender_arms.tsv", ARM_FIELDS, arm_rows)
     write(f"{args.out_prefix}.recommender_eval.tsv", EVAL_FIELDS, eval_rows)
     write(f"{args.out_prefix}.recommender_regret.tsv", REGRET_FIELDS, regret_rows)
     primary = next((r for r in eval_rows if r["profile"] == "f1"), {})
+    arm_verdicts = {r["arm"]: r["verdict"] for r in arm_rows if r["profile"] == "f1"}
     verdict = {"verdict": primary.get("verdict", "not_assessed"), "note": primary.get("note", ""),
                "oracle_gap": primary.get("oracle_gap", ""), "gap_closed": primary.get("gap_closed", ""),
                "oracle_gap_floor": args.oracle_gap_floor, "near_optimal_margin": args.near_optimal_margin,
                "min_expected_score": args.min_expected_score, "n_isolates": primary.get("n_isolates", 0),
-               "n_folds": primary.get("n_folds", 0)}
+               "n_folds": primary.get("n_folds", 0), "arms": arm_verdicts,
+               "feature_conditioned_enabled": arm_verdicts.get("feature_conditioned") == "adds_value"}
     Path(f"{args.out_prefix}.recommender_verdict.json").write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
     print(f"[evaluate_recommender] verdict {verdict['verdict']} over {verdict['n_isolates']} held-out isolate(s) "
           f"in {verdict['n_folds']} fold(s) -> {args.out_prefix}.recommender_eval.tsv")

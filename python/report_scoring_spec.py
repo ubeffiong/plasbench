@@ -265,7 +265,7 @@ def outcome_states_section(states, status_rows=()):
                    "Failed runs are retried TOOL_RETRIES times; every tool gets the same TOOL_TIMEOUT_SECONDS.", body)
 
 
-def recommender_section(evaluation, verdict, warnings, regret=(), taxon=()):
+def recommender_section(evaluation, verdict, warnings, regret=(), taxon=(), arms=()):
     tables = ""
     if not evaluation:
         body = not_run("recommender evaluation", "RUN_RECOMMENDER_EVAL=0, or evaluate_recommender.py failed")
@@ -281,6 +281,14 @@ def recommender_section(evaluation, verdict, warnings, regret=(), taxon=()):
             if verdict:
                 body += f"<p><strong>Verdict:</strong> {esc(verdict.get('verdict'))} -- {esc(verdict.get('note'))}</p>"
         tables = table(report_3d.EVAL_HEADER, [[r.get(f, "") for f in report_3d.EVAL_FIELDS] for r in evaluation])
+        if arms:
+            tables += ("<h3>Three ways of choosing a tool</h3><p class='muted'>Single best tool for everyone, best tool for the isolate's organism, and best tool among the most similar training isolates "
+                       "(by features knowable without a reference). An arm adds value only when it beats the single best tool on average and in most studies, with at least three studies.</p>"
+                       + table(["Profile", "Arm", "Isolates", "Studies", "Mean regret", "Top-1", "Near-optimal", "Improvement over single best", "Studies better", "Studies assessed",
+                                "Calibration error", "Calibration bias", "Abstention rate", "Regret when answering", "Verdict", "Note"],
+                               [[r.get(f, "") for f in ("profile", "arm", "n_isolates", "n_folds", "mean_regret", "top1_rate", "near_optimal_rate", "improvement_over_single_best",
+                                                         "folds_better", "folds_assessed", "calibration_mae", "calibration_bias", "abstention_rate", "mean_regret_when_answering",
+                                                         "verdict", "note")] for r in arms]))
     if warnings:
         tables += "<h3>Warnings scored against failed recommendations</h3>" + table(
             ["Warning", "Evaluated", "Fired", "Failed", "Firing rate", "PPV", "Sensitivity", "Could not be applied",
@@ -394,6 +402,14 @@ def markdown(sources):
     return "\n".join(lines) + "\n"
 
 
+def arms_path(sources):
+    """benchmark.recommender_arms.tsv sits beside benchmark.recommender_eval.tsv."""
+    eval_path = sources.get("recommender_eval")
+    if eval_path and "recommender_eval" in Path(eval_path).name:
+        return Path(eval_path).with_name(Path(eval_path).name.replace("recommender_eval", "recommender_arms"))
+    return None
+
+
 def regret_path(sources):
     """benchmark.recommender_regret.tsv sits beside benchmark.recommender_eval.tsv (an explicit source wins)."""
     if sources.get("recommender_regret"):
@@ -422,7 +438,7 @@ def inject(page, sources):
         + contig_layer_section(leaderboard, read_tsv(sources.get("scores")), crosscheck)
         + outcome_states_section(read_tsv(sources.get("outcome_states")), read_tsv(sources.get("tool_status")))
         + recommender_section(evaluation, read_json(sources.get("recommender_verdict")),
-                              read_tsv(sources.get("warning_eval")), read_tsv(regret_path(sources)), taxon)
+                              read_tsv(sources.get("warning_eval")), read_tsv(regret_path(sources)), taxon, read_tsv(arms_path(sources)))
         + transfer_section(taxon, read_tsv(sources.get("comparisons")))
         + amr_section(read_tsv(sources.get("amr_placement")), sources.get("data_dir"))
         + validity_section(leaderboard, provenance, evaluation, crosscheck))
