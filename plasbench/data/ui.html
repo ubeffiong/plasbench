@@ -2084,14 +2084,23 @@ function renderWizard() {
       `<div class="note info" style="margin-bottom:14px">${icon("info", "ico")}<div>This computer: <b>${S.info.cpus} CPU threads</b>${S.info.memory_gb ? `, <b>${S.info.memory_gb} GB memory</b>` : ""}. Threads apply per tool; parallel samples × parallel tools × threads should not exceed the CPU count.</div></div>
        <div class="card" id="wform">${groupedFields(byGroup("resources and assembly"), V, "w", true)}</div>`;
   } else if (W.step === 3) {
-    const io = byGroup("inputs and outputs").filter(a => !["samples","cohort","local_inputs","open_report","no_report_prompt"].includes(a.dest));
+    // Database paths are overrides, not inputs: a run left blank reuses the installed copy, so
+    // they sit in a closed "optional" fold with a one-line summary instead of in the main form.
+    const DB_DESTS = ["platon_db", "genomad_db", "plasme_db", "plasgraph2_model_dir"];
+    const allIo = byGroup("inputs and outputs").filter(a => !["samples","cohort","local_inputs","open_report","no_report_prompt"].includes(a.dest));
+    const io = allIo.filter(a => !DB_DESTS.includes(a.dest)), dbArgs = allIo.filter(a => DB_DESTS.includes(a.dest));
+    const dbName = {platon_db: "Platon", genomad_db: "geNomad", plasme_db: "PLASMe"};
+    const dbSummary = Object.entries(dbName).map(([d, n]) => { const s = S.info?.databases?.[d];
+      return s ? `${n} ${s.found ? "found" : "not installed"}` : n; }).join(" · ");
+    const dbBlock = dbArgs.length ? `<details class="fgroup" ${dbArgs.some(a => V[a.dest]) ? "open" : ""}><summary>Use a different database copy (optional) <span class="n">— ${esc(dbSummary)}</span></summary><div class="fb">
+        <p class="mut small" style="margin:0 0 10px">Leave these empty: each run uses the database where PlasBench installed it. Fill one in only to use another copy.</p>${dbArgs.map(a => fieldHTML(a, V, "w")).join("")}</div></details>` : "";
     html = W.source === "demo" ? `<div class="card"><div class="bd">${fieldHTML(command("demo").args.find(a => a.dest === "open_report"), V, "w")}</div></div>` :
       `<div class="card"><div class="hd"><h3>Stages</h3><span class="sub">leave all off to run the whole pipeline</span></div><div class="bd"><div class="chips" id="wstages">${
         [["0","Check"],["1","Download"],["2","Truth"],["3","Assemble"],["4","Run tools"],["5","Score"],["6","Aggregate & report"],["7","Long-read tools"]].map(([s, l]) =>
         `<button type="button" class="chip ${(V.stages || []).includes(s) ? "on" : ""}" data-stage="${s}">${s} · ${l}</button>`).join("")}</div>
         <p class="mut small" style="margin:10px 0 0">Choose stages to resume or re-run part of a benchmark, e.g. 5 and 6 to re-score and rebuild the report.</p></div></div>
-       <div class="note info" style="margin-top:16px">${icon("info", "ico")}<div><b>Nothing here needs filling in to reuse what you have.</b> Installed tools, tool databases and downloaded reads are shared by every benchmark on this computer: reads and assemblies in <code>${esc(S.info?.data_dir || "the data folder")}</code>, databases where each field below shows. Leave a field empty to reuse them; fill one in only to use a different copy.</div></div>
-       <div class="card" style="margin-top:16px" id="wform">${groupedFields(io, V, "w", true)}${groupedFields(run.args.filter(a => a.group === "" && !["stages","mode","predictions_dir"].includes(a.dest)), V, "w", true)}</div>`;
+       <div class="note info" style="margin-top:16px">${icon("info", "ico")}<div><b>Nothing here needs filling in to reuse what you have.</b> Installed tools, tool databases and downloaded reads are shared by every benchmark on this computer: reads and assemblies in <code>${esc(S.info?.data_dir || "the data folder")}</code>, databases where PlasBench installed them. You do not need to know where that is: a run finds them itself.</div></div>
+       <div class="card" style="margin-top:16px" id="wform">${groupedFields(io, V, "w", true)}${dbBlock}${groupedFields(run.args.filter(a => a.group === "" && !["stages","mode","predictions_dir"].includes(a.dest)), V, "w", true)}</div>`;
   } else {
     const argv = wizArgv();
     html = `<div class="card"><div class="hd"><h3>Review</h3></div><div class="bd">

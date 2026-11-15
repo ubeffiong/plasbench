@@ -78,6 +78,9 @@ def main():
     print("the run form uses it")
     check("database fields show their status", "function dbStatusHTML" in ui and "${dbStatusHTML(a.dest)}" in ui)
     check("the wizard refreshes it on open", 'S.info = await api("info")' in ui.split("async function loadWizard", 1)[1][:400])
+    check("database paths are an optional fold, closed unless one is filled in",
+          "Use a different database copy (optional)" in ui and 'dbArgs.some(a => V[a.dest]) ? "open" : ""' in ui
+          and "groupedFields(io, V, \"w\", true)}${dbBlock}" in ui)
 
     print("ALL WEBUI DATABASE TESTS PASSED" if not FAILED else f"WEBUI DATABASE TESTS FAILED: {FAILED}")
     return 1 if FAILED else 0
