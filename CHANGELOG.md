@@ -13,6 +13,20 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Fixed -- a run never stops silently
+- **Every way a stage can stop is reported on the console, in red, and in `logs/run_errors.log`.**
+  - A command failing under `set -e` without a message of its own now prints which script stopped, the command, the
+    exit code and what it usually means. Before, the stage just ended.
+  - A stage stopped by a signal says so: Ctrl+C, a closed terminal, Cancel in the window, or SIGTERM from the system.
+  - A stage killed outright by SIGKILL, which is what the out-of-memory killer sends and cannot be caught, is
+    reported by `run_all.sh`: `the run stopped in stage 3 (03_assemble.sh): killed (SIGKILL): usually out of memory,
+    or WSL or the system ended it`. `run_all.sh` used to end without a word when a stage failed.
+- **A run cut off with no chance to report** (WSL or the computer stopping) is reported by the next run: `the
+  previous run stopped before it finished ... (started <time>, stage 3 ...)`, with a note that finished work is reused.
+- **The `plasbench` command** explains a death by signal when the pipeline itself was killed. **The window**
+  appends to the job's console how and why the command stopped, for example `killed (SIGKILL): usually out of
+  memory`, so a failed job never ends on a blank line.
+
 ### Changed -- the sample report link is at the top of the README
 - A link to open the sample HTML report (online preview; a relative path for a clone) now sits directly under the README title, not only in the report section. GitHub removes `target="_blank"` from README links, so the link says to Ctrl/Cmd-click or middle-click to open it in a new tab. `test/test_sample_report.py` keeps it there.
 

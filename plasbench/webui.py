@@ -467,6 +467,15 @@ class Jobs:
             job = self.jobs[job_id]
             job.update(ended=time.time(), exit=code,
                        state="cancelled" if job["state"] == "cancelling" else ("done" if code == 0 else "failed"))
+            if code != 0:
+                # Never end silently: the console's last line says how and why the command stopped.
+                from .exitcodes import explain
+                reason = "cancelled from the window" if job["state"] == "cancelled" else explain(code)
+                try:
+                    with open(self.dir / f"{job_id}.log", "ab") as tail:
+                        tail.write(f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n".encode())
+                except OSError:
+                    pass
             self.procs.pop(job_id, None)
             self._save()
         session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code,
