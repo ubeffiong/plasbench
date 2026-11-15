@@ -115,7 +115,9 @@ def main():
         check("one template per isolate and slot (6 isolates x 4 slots)", len(isolates) == 6 and text.count("<template data-iso-for=") == 24,
               (len(isolates), text.count("<template data-iso-for=")))
         matrix = text[text.index("id='summary-plasmids'"):text.index("<h3>Report card")]
-        check("the cohort matrix has one row per truth plasmid (11)", len(re.findall(r"<td><strong>p[A-Z]</strong>", matrix)) == 11)
+        coverage_only = re.sub(r"<details class='pb-outcome-view'[^>]*>.*?</details>", "", matrix, flags=re.S)   # the outcome view repeats the rows
+        check("the cohort matrix has one row per truth plasmid (11)", len(re.findall(r"<td><strong>p[A-Z]</strong>", coverage_only)) == 11)
+        check("and its outcome view has the same 11 rows", len(re.findall(r"<tr class='pb-orow'><td>", matrix)) == 11, len(re.findall(r"<tr class='pb-orow'><td>", matrix)))
         check("a per-isolate template does not carry window markers that would hide rows",
               "rpt-wh" not in "".join(re.findall(r"<template data-iso-for.*?</template>", text, re.S)))
         check("the scope label sits on the four views", text.count("data-iso-scope>All isolates") >= 4)

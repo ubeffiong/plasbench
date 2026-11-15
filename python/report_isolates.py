@@ -184,7 +184,7 @@ def matrix_html(rows, label=lambda tool: tool, downloads=None):
                 f"<tr><th colspan='3'>Plasmids on which the tool was best</th>" + "".join(f"<td>{best_on[t]}</td>" for t in tools) + "<td></td></tr>")
         out.append(f"<h4>Analysis track: {_esc(track)}</h4><div class='panel'><table class='pb-matrix rpt-nowindow'><thead>{head}</thead>"
                    f"<tbody>{''.join(body)}</tbody><tfoot>{foot}</tfoot></table></div>"
-                   f"<details class='pb-outcome-view'><summary>How each plasmid ended (outcome class) for the {_esc(track)} track</summary>"
+                   f"<details class='pb-outcome-view' data-closed='1'><summary>How each plasmid ended (outcome class) for the {_esc(track)} track</summary>"
                    f"<p class='muted'>Perfect, partial, fragmented, merged, or missed, from the bin matching; a tool that wrote no bins is shown as not assessable, never as a miss.</p>"
                    f"{outcome_table(sub, tools, plasmids, label, length)}</details>")
     return "".join(out)
