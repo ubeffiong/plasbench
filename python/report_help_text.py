@@ -340,7 +340,7 @@ HELP = {
         "Coverage clearly below 95% means the intervals are too narrow, so treat them as optimistic. A rejection rate far above 5% with no real effect means the test "
         "raises false alarms. Power tells you how large an effect this many studies could detect.",
         "It tells you how far the confidence statements elsewhere in the report can be trusted for a cohort of this size.",
-        "A 'smoke' run (100 replicates per scenario) only exposes gross failures; the 'full' run (1,000) is the evidence. Results are grouped by the number of independent studies, and the procedures stay provisional until a full run supports them at the number you have. In the committed percentile-bootstrap run the tests and Holm are calibrated but the 95% intervals covered only about 74-94%; the leaderboard now uses the cluster-t interval, not yet measured under every structure here, so read intervals with care. Simulated data are not your data."),
+        "A 'smoke' run (100 replicates per scenario) only exposes gross failures; the 'full' run (1,000) is the evidence. Results are grouped by the number of independent studies, and the procedures stay provisional until a full run supports them at the number you have. In the committed full run the tests and Holm are calibrated; the default cluster-t interval covers 94-96% with balanced or moderately unbalanced studies but only 64-79% when one or two studies hold most of the isolates, so read intervals from such a cohort as optimistic. Simulated data are not your data."),
     "reproducibility": H(
         "If the benchmark is run again, do we get the same answer?",
         "Two or more results folders from repeat runs.",

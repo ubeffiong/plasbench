@@ -1,8 +1,9 @@
-n_studies	mode	scenarios	intervals_checked	lowest_coverage	interval_status	tests_checked	highest_type_i_error	test_status	holm_status	status	limiting_scenarios
-5	full	1	3	0.823	shortfall	0		not estimable	not run at this number	shortfall	balanced, 5 studies
-6	full	1	3	0.849	shortfall	1	0.041	valid	not run at this number	shortfall	balanced, few studies
-8	full	1	3	0.865	shortfall	1	0.051	valid	not run at this number	shortfall	balanced, 8 studies
-12	full	14	36	0.738	shortfall	12	0.062	valid	controls the family-wise error	shortfall	10% resource failures, 12 studies; 30% missing outputs, 12 studies; a study fails entirely (10% of studies), 12 studies; balanced, 12 studies; moderate correlation (icc 0.5), 12 studies; no within-study correlation, 12 studies; one dominant species of 3, 12 studies; one dominant study, 12 studies; one isolate per study, 12 studies; strong correlation (icc 0.8), 12 studies; two heavy studies (80% of isolates), 12 studies; unbalanced, 12 studies, 10% missing
-20	full	7	18	0.872	shortfall	6	0.058	valid	controls the family-wise error	shortfall	10% resource failures, 20 studies; a study fails entirely (10% of studies), 20 studies; balanced, 20 studies; one dominant study, 20 studies; two heavy studies (80% of isolates), 20 studies; unbalanced, 20 studies, 20% missing
-24	full	1	3	0.839	shortfall	1	0.043	valid	not run at this number	shortfall	one dominant species of 3, 24 studies
-30	full	1	3	0.927	shortfall	1	0.045	valid	not run at this number	shortfall	balanced, 30 studies
+n_studies	mode	scenarios	intervals_checked	lowest_coverage	lowest_coverage_percentile	lowest_coverage_cluster_t	lowest_coverage_bootstrap_t	interval_status	tests_checked	highest_type_i_error	test_status	holm_status	status	limiting_scenarios
+5	full	1	3	0.944	0.823	0.944	0.937	consistent with 95%	0		not estimable	not run at this number	supported	
+6	full	1	3	0.937	0.849	0.937	0.934	consistent with 95%	1	0.041	valid	not run at this number	supported	
+8	full	2	6	0.946	0.850	0.946	0.938	consistent with 95%	2	0.051	valid	not run at this number	supported	
+12	full	15	36	0.723	0.738	0.723	0.824	shortfall	12	0.062	valid	controls the family-wise error	shortfall	30% missing outputs, 12 studies; one dominant species of 3, 12 studies; one dominant study, 12 studies; two heavy studies (80% of isolates), 12 studies; unbalanced, 12 studies, 10% missing
+16	full	1	3	0.953	0.913	0.953	0.953	consistent with 95%	1	0.000	valid	not run at this number	supported	
+20	full	8	18	0.642	0.872	0.642	0.785	shortfall	6	0.058	valid	controls the family-wise error	shortfall	one dominant study, 20 studies; two heavy studies (80% of isolates), 20 studies; unbalanced, 20 studies, 20% missing
+24	full	2	6	0.911	0.839	0.911	0.911	shortfall	2	0.043	valid	not run at this number	shortfall	one dominant species of 3, 24 studies; stratified, 2 x 12 studies, unbalanced
+30	full	1	3	0.951	0.927	0.951	0.949	consistent with 95%	1	0.045	valid	not run at this number	supported	
