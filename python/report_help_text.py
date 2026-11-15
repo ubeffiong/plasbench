@@ -88,7 +88,9 @@ HELP = {
         "the sample sheet records them. Holm adjustment corrects for making many comparisons.",
         "A small adjusted p-value and an interval that excludes zero point to a real difference. 'Equivalent within delta' means the tools are practically the same.",
         "Stops you from over-reading small gaps.",
-        "With fewer than five independent units a test is 'not estimated'. A p-value says a difference is unlikely to be chance, not that it matters in practice."),
+        "With fewer than six independent units (studies, not isolates) a test is 'not estimated': five units can never reach p below 0.05. The 'Permutation test' column says "
+        "whether the p-value is exact or an estimate and the smallest p it could ever report; 'underpowered' means the data cannot show significance whatever the effect. "
+        "A p-value says a difference is unlikely to be chance, not that it matters in practice."),
     "metadata": H(
         "What was run: the folder, the cohort, when the report was made, which inputs were used, and which analyses were not run.",
         "The run's own records (manifest, execution status and the files it wrote).",
@@ -315,6 +317,15 @@ HELP = {
         "A tool much better on in-database plasmids is partly remembering, not inferring.",
         "Shows if a score will carry over to new plasmids.",
         "Not checked when no database or tool was available; the section says so."),
+    "stats-validation": H(
+        "A check on the report's own statistics: do the confidence intervals and tests behave the way they claim?",
+        "No benchmark data: simulated paired differences with study-to-study differences, correlated isolates, unequal study sizes and missing observations.",
+        "The real interval and test functions are run on thousands of simulated data sets where the truth is known. Interval coverage is the share of intervals that contain the "
+        "true effect (should be near 95%); the rejection rate is how often the test says 'different' (near 5% when there is no real effect, higher when there is).",
+        "Coverage clearly below 95% means the intervals are too narrow, so treat them as optimistic. A rejection rate far above 5% with no real effect means the test "
+        "raises false alarms. Power tells you how large an effect this many studies could detect.",
+        "It tells you how far the confidence statements elsewhere in the report can be trusted for a cohort of this size.",
+        "A 'smoke' run (100 replicates per scenario) only exposes gross failures; the 'full' run (1,000) is the evidence. Simulated data are not your data."),
     "reproducibility": H(
         "If the benchmark is run again, do we get the same answer?",
         "Two or more results folders from repeat runs.",
@@ -414,7 +425,7 @@ HELP = {
         "The file is hashed and this run's settings are checked against it.",
         "'Frozen' and matching means no changes after the fact.",
         "Protects against tuning the scoring to favour a tool.",
-        "If it says 'not frozen', the protection is not in force."),
+        "If it says 'not frozen' or 'DRAFT', the protection is not fully in force: some values are still proposed and await confirmation."),
     "truth-label-audit": H(
         "Are the plasmid and chromosome labels in the truth actually right?",
         "Truth sequences and their replicon and MOB evidence.",

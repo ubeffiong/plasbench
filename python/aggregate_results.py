@@ -35,7 +35,7 @@ import headline_design as hd
 # Resampling primitives (resampling.py); re-exported because validate_recommendations.py
 # and the tests import bootstrap_ci / paired_permutation_pvalue from this module.
 from resampling import (  # noqa: E402,F401
-    bootstrap_ci, paired_permutation_pvalue, resampling_units, exact_mean as fast_mean,
+    bootstrap_ci, paired_permutation_pvalue, resampling_units, exact_mean as fast_mean, permutation_method, permutation_floor,
 )
 
 # Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
@@ -774,6 +774,12 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
         row["difference_ci_low"] = low
         row["difference_ci_high"] = high
         row["permutation_p_value"] = pvalue
+        # how the p-value was made and what the smallest attainable value is for this many independent units (an underpowered comparison is flagged, not hidden)
+        units = row.get("paired_clusters") or 0
+        floor = permutation_floor(units)
+        row["permutation_method"] = permutation_method(units)
+        row["min_attainable_p"] = floor
+        row["p_status"] = ("not_estimated" if pvalue is None else "underpowered" if floor is not None and floor > 0.05 else "ok")
     for row, adjusted in zip(comparisons, holm_adjust([x["permutation_p_value"] for x in comparisons])):
         row["permutation_p_value_holm"] = adjusted
     for row, adjusted in zip(comparisons, holm_adjust([x["wilcoxon_p_value"] for x in comparisons])):
@@ -821,7 +827,7 @@ def write_comparisons(rows, path, comparisons=None):
         comparisons = compute_comparisons(rows)
     with open(path, "w") as handle:
         handle.write("tool_a\ttool_b\tpaired_samples\tmean_f1_difference\tdifference_ci_low\tdifference_ci_high\tpermutation_p_value\tpermutation_p_value_holm\twins_a\tties\twins_b\tanalysis_track\tpaired_clusters\ttask\tmetric"
-                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\n")
+                     "\twilcoxon_p_value\twilcoxon_p_value_holm\tequivalent\tsmallest_difference\tpermutation_method\tmin_attainable_p\tp_status\n")
         for row in comparisons:
             low = f"{row['difference_ci_low']:.4f}" if row["difference_ci_low"] is not None else ""
             high = f"{row['difference_ci_high']:.4f}" if row["difference_ci_high"] is not None else ""
@@ -836,7 +842,8 @@ def write_comparisons(rows, path, comparisons=None):
                 f"{row.get('analysis_track', '')}\t{row.get('paired_clusters', '')}\t"
                 f"{row.get('task', '')}\t{row.get('metric', 'f1')}\t"
                 f"{fmt6(row.get('wilcoxon_p_value'))}\t{fmt6(row.get('wilcoxon_p_value_holm'))}\t"
-                f"{row.get('equivalent', '')}\t{row.get('smallest_difference', '')}\n"
+                f"{row.get('equivalent', '')}\t{row.get('smallest_difference', '')}\t"
+                f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\n"
             )
 
 

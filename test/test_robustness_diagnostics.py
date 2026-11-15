@@ -59,6 +59,15 @@ def reference_permutation(differences, iterations=10000):
     return (extreme + 1) / (iterations + 1)
 
 
+def reference_exact(differences):
+    """Every sign pattern of the differences (up to 12 units the production code enumerates them instead of sampling)."""
+    import itertools
+    observed = abs(statistics.mean(differences))
+    extreme = sum(abs(statistics.mean(sign * x for sign, x in zip(signs, differences))) >= observed
+                  for signs in itertools.product((1, -1), repeat=len(differences)))
+    return extreme / 2 ** len(differences)
+
+
 def main():
     ok = True
     rng = random.Random(3)
@@ -67,8 +76,13 @@ def main():
     values = [rng.random() for _ in range(15)]
     diffs = [rng.uniform(-0.2, 0.3) for _ in range(12)]
     ok = check(ok, "no clusters == per-sample bootstrap", aggregate_results.bootstrap_ci(values) == reference_bootstrap(values))
-    ok = check(ok, "no clusters == per-sample permutation",
-               aggregate_results.paired_permutation_pvalue(diffs) == reference_permutation(diffs))
+    ok = check(ok, "no clusters, 12 units == exact enumeration of every sign pattern",
+               aggregate_results.paired_permutation_pvalue(diffs) == reference_exact(diffs))
+    many = [random.Random(11).uniform(-0.2, 0.3) for _ in range(1)] + [random.Random(100 + i).uniform(-0.2, 0.3) for i in range(19)]
+    ok = check(ok, "no clusters, 20 units == the per-sample Monte Carlo permutation (random stream unchanged above 12 units)",
+               aggregate_results.paired_permutation_pvalue(many) == reference_permutation(many))
+    ok = check(ok, "5 units: no permutation test (the smallest attainable p, 0.0625, cannot reach 0.05)",
+               aggregate_results.paired_permutation_pvalue(many[:5]) is None)
     clustered, groups = [], []
     for group in range(6):
         effect = rng.uniform(0.4, 1.0)

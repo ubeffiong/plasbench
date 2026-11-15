@@ -11,6 +11,7 @@ bit-identical, including on tie-heavy and cancellation-heavy inputs.
 import math
 import os
 import random
+import itertools
 import statistics
 import sys
 from collections import defaultdict
@@ -125,6 +126,50 @@ def ref_stratified_permutation(differences, groups, strata, iterations=10000):
     return (extreme + 1) / (iterations + 1)
 
 
+# -- the exact path (up to EXACT_MAX_UNITS units): every sign pattern, enumerated here independently with exact fractions ---------
+
+def ref_enum_paired(values, groups):
+    units = resampling.resampling_units(values, groups)
+    observed = abs(ref_exact_mean(values))
+    extreme = 0
+    for signs in itertools.product((1, -1), repeat=len(units)):
+        signed = [sign * v for sign, unit in zip(signs, units) for v in unit]
+        extreme += abs(ref_exact_mean(signed)) >= observed
+    return extreme / 2 ** len(units)
+
+
+def ref_enum_stratified(values, groups, strata):
+    units = resampling.resampling_units(list(zip(values, strata)), groups)
+    observed = abs(ref_macro_mean(values, strata))
+    extreme = 0
+    for signs in itertools.product((1, -1), repeat=len(units)):
+        vals = [sign * v for sign, unit in zip(signs, units) for v, _ in unit]
+        labels = [s for unit in units for _, s in unit]
+        extreme += abs(ref_macro_mean(vals, labels)) >= observed
+    return extreme / 2 ** len(units)
+
+
+def expect_paired(values, groups, iterations):
+    """What paired_permutation_pvalue must return: None below MIN_CLUSTERS_TEST units, the enumeration up to EXACT_MAX_UNITS, else the unchanged Monte Carlo."""
+    units = len(resampling.resampling_units(values, groups))
+    if units < resampling.MIN_CLUSTERS_TEST:
+        return None
+    if units > resampling.EXACT_MAX_UNITS:
+        return ref_paired_permutation_pvalue(values, iterations=iterations, groups=groups)
+    return ref_enum_paired(values, groups)
+
+
+def expect_stratified(values, groups, strata, iterations):
+    if strata is None:
+        return expect_paired(values, groups, iterations)
+    units = len(resampling.resampling_units(list(zip(values, strata)), groups))
+    if units < resampling.MIN_CLUSTERS_TEST:
+        return None
+    if units > resampling.EXACT_MAX_UNITS:
+        return ref_stratified_permutation(values, groups, strata, iterations=iterations)
+    return ref_enum_stratified(values, groups, strata)
+
+
 # -- generators -----------------------------------------------------------------------
 
 def sample_values(rng, n):
@@ -163,11 +208,11 @@ def main():
         assert resampling.bootstrap_ci(values, iterations=iters, groups=groups) == \
             ref_bootstrap_ci(values, iterations=iters, groups=groups), case
         assert resampling.paired_permutation_pvalue(values, iterations=iters, groups=groups) == \
-            ref_paired_permutation_pvalue(values, iterations=iters, groups=groups), case
+            expect_paired(values, groups, iters), case
         assert resampling.stratified_bootstrap(values, g, strata, iterations=iters) == \
             ref_stratified_bootstrap(values, g, strata, iterations=iters), case
         assert resampling.stratified_permutation(values, g, strata, iterations=iters) == \
-            ref_stratified_permutation(values, g, strata, iterations=iters), case
+            expect_stratified(values, g, strata, iters), case
         assert resampling.macro_mean(values, strata) == ref_macro_mean(values, strata), case
     # Full-size runs: the production iteration counts cross many block refills of the
     # bulk word stream, so stream boundaries are exercised, not just the first block.
@@ -181,6 +226,22 @@ def main():
     assert resampling.stratified_bootstrap(values, groups, strata) == \
         ref_stratified_bootstrap(values, groups, strata)
     assert resampling.bootstrap_ci(values, groups=groups) == ref_bootstrap_ci(values, groups=groups)
+    # the exact path on its own: 6 to 12 independent units, with and without strata, against the independent enumeration
+    exact_cases = 0
+    for units in (6, 7, 9, 12):
+        for with_strata in (False, True):
+            values = [round(rng.uniform(-1, 1), 3) for _ in range(units * 2)]
+            groups = [f"g{i // 2}" for i in range(units * 2)]
+            strata = [("E", "K", "A")[i % 3] for i in range(units * 2)] if with_strata else None
+            got = resampling.stratified_permutation(values, groups, strata) if with_strata else resampling.paired_permutation_pvalue(values, groups=groups)
+            want = ref_enum_stratified(values, groups, strata) if with_strata else ref_enum_paired(values, groups)
+            assert got == want, (units, with_strata, got, want)
+            exact_cases += 1
+    assert resampling.paired_permutation_pvalue([0.1, 0.2, 0.3, 0.4, 0.5], groups=list("abcde")) is None     # 5 units: no test
+    assert resampling.permutation_method(5) == "not_estimated" and resampling.permutation_method(6) == "exact"
+    assert resampling.permutation_method(12) == "exact" and resampling.permutation_method(13) == "monte_carlo"
+    assert resampling.permutation_floor(5) == 0.0625 and resampling.permutation_floor(6) == 0.03125
+    print(f"test_resampling_equivalence: {exact_cases} exact-path designs identical to the independent enumeration")
     print(f"test_resampling_equivalence: {checked} means, 16 resampling designs and 4 full-size runs identical")
 
 

@@ -62,7 +62,8 @@ MERGES = [
      "blurb": "How the ranking changes under other choices and how much data it rests on: filter and metric sensitivity, statistical power, leakage from tool "
               "databases (one tab for both screens) and reproducibility across runs.",
      "tabs": [("rank-robustness", "Filter and metric sensitivity"), ("power", "Statistical power"),
-              (("database-membership", "learn-plsmd"), "Database leakage"), ("reproducibility", "Reproducibility")]},
+              (("database-membership", "learn-plsmd"), "Database leakage"), ("reproducibility", "Reproducibility"),
+              ("stats-validation", "Statistical validation")]},
     {"id": "scores", "title": None, "rail": "All scores", "first": "All scores",
      "tabs": [("tools", "By tool"), ("samples", "By sample")]},
     {"id": "bin-diagnostics", "title": None, "rail": "Bin diagnostics", "first": "Matching",

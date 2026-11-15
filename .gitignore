@@ -74,3 +74,10 @@ accessions.local.tsv
 !docs/**
 !assets/
 !assets/**
+
+# The re-includes above must not bring back the third-party reference figures (#48): the last matching rule wins,
+# so they are excluded again here.
+docs/images/reference/*.jpg
+docs/images/reference/*.jpeg
+docs/images/reference/*.png
+!docs/images/reference/README.md

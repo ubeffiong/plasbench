@@ -236,6 +236,7 @@ ANALYSES = {
     "scenario-tags": ("scenario_tags.py", "Tag isolates by scenario and report performance per scenario"),
     "composite-score": ("composite_score.py", "Optional five-dimension composite with gates and weight sensitivity"),
     "compare-runs": ("compare_runs.py", "Compare repeated runs for reproducibility"),
+    "simulate-validation": ("simulate_validation.py", "Check by simulation that the intervals and tests are calibrated (smoke or full)"),
 }
 
 
