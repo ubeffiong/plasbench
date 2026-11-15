@@ -291,8 +291,8 @@ def recommender_section(evaluation, verdict, warnings, regret=(), taxon=(), arms
                                                          "folds_better", "folds_assessed", "calibration_mae", "calibration_bias", "abstention_rate", "mean_regret_when_answering",
                                                          "verdict", "note", "share_feature_based")] for r in arms]))
         else:
-            tables += ("<h3>Three ways of choosing a tool</h3>" + str(not_run("the three-way recommender comparison", "benchmark.recommender_arms.tsv was not written "
-                                                                             "(an older run, or evaluate_recommender.py did not finish)")))
+            tables += ("<h3>Three ways of choosing a tool</h3><p class='muted'>Not available for this run: benchmark.recommender_arms.tsv was not written "
+                       "(an older run, or evaluate_recommender.py did not finish), so the single-best, organism and feature-conditioned choices cannot be compared.</p>")
     if warnings:
         tables += "<h3>Warnings scored against failed recommendations</h3>" + table(
             ["Warning", "Evaluated", "Fired", "Failed", "Firing rate", "PPV", "Sensitivity", "Could not be applied",

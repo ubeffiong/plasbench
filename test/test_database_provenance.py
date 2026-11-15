@@ -74,9 +74,11 @@ def main():
         check("the demo table has every column", header == dp.FIELDS, header)
         page = report.read_text(encoding="utf-8")
         check("the report shows the provenance table with the validation tier and what is not recorded", "Tool and database provenance" in page and "adapter tested" in page and "not recorded" in page)
-        manifest = demo / "run_manifest.json"
-        if manifest.is_file():
-            check("the manifest records the registries", "database_registry" in json.loads(manifest.read_text(encoding="utf-8")))
+    import write_manifest as wm
+    recorded = wm.database_registry(ROOT)
+    check("the manifest writer records the registries: every tool with its provenance status and validation tier (the demo's own manifest is synthetic, made by the demo generator)",
+          "unavailable" not in recorded and recorded["platon"]["provenance_status"] == "partly" and recorded["platon"]["validation_status"] == "adapter_tested", list(recorded)[:3])
+    check("a malformed registry is reported in the manifest, not raised", "unavailable" in wm.database_registry(ROOT / "no_such_project"))
     print()
     if not ok:
         print("DATABASE PROVENANCE TESTS FAILED")

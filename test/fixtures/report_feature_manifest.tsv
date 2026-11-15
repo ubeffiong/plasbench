@@ -268,4 +268,4 @@ recommendations.arms	recommender-eval	text	Three ways of choosing a tool	single 
 amr-placement.context	amr-placement	text	AMR-PRR	AMR-PRR, pairs kept together and flank context sit beside the placement	amr-placement
 database-membership.provenance	database-membership	text	Tool and database provenance	validation tier and database version, source and checksum of each tool	robustness
 isolate-difficulty.dataset	isolate-difficulty	text	Dataset characteristics	one table of every isolate, each column marked knowable without a reference or not	cohort-qc
-robustness.burden	robustness-main	text	Predicted bases with an alternative placement	the burden of predicted sequence that precision does not charge, beside strict precision	robustness
+robustness.burden	robustness-main	text	Mapped bases that align to both a plasmid and a chromosome	the burden of predicted sequence that precision does not charge, beside strict precision	robustness
