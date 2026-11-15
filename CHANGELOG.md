@@ -13,6 +13,27 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-15
+
+A feature release that also changes how tools are scored and ranked: **scores and rankings from v0.4.0 are not
+directly comparable with v0.3.0 or earlier**. New: the correct plasmid reconstruction rate (CPRR) with SV-PRR and
+AMR plasmid context, the burden of unverified predicted sequence, a metric registry and evaluation ladder, more truth
+audits, a structured evidence record per reference, real-binary checks, database provenance and validation tiers,
+new report figures, a three-way recommender comparison, study folders, and a window that reuses what is already
+installed. Changed: permutation tests need six independent units, the primary analysis is reported unavailable
+instead of silently falling back, and the recommendation model uses truth-free features only. See the
+[release notes](docs/releases/v0.4.0.md). Compare: [v0.3.0...v0.4.0](https://github.com/ubeffiong/plasbench/compare/v0.3.0...v0.4.0).
+
+### Changed -- the window shows and reuses what is already installed
+- Database paths in the New benchmark wizard and the command forms are an optional fold, *Use a different database
+  copy*, closed unless one is filled in. Each field shows whether the database is installed and where; an empty
+  field uses the installed copy, resolved like `config/config.sh` does: an explicit setting, then the machine-wide
+  store (`PLASBENCH_DB_DIR`, default `~/.plasbench/databases`), then a copy under `DATA_DIR/db`. Databases are
+  downloaded once per computer and reused by every benchmark.
+- Settings shows what a shell-code default means on this computer (the resolved path, with *Installed* or *Not
+  installed yet*), and the data, results and log folder fields say what leaving them empty does.
+  `test/test_webui_databases.py` covers it.
+
 ### Fixed -- smaller findings of the end-to-end review
 - The ranked CPRR registry row pointed at the pooled rate (`cprr`); the ranking metric is the per-isolate CPRR, so it now points at `cprr_isolate_mean`. `test_metric_registry.py` now cross-checks the registry against the scorecard for source and column (it checked only the id sets), so the two cannot drift apart.
 - `test_tool_validation_tiers.py` accepted any record file containing the tool's name and the text 'pass' (so 'bypass' counted); it now needs a row for the tool whose status is exactly `pass`. The real-binary checker catches a tool timeout and still writes its summary row. `database_registry` in the manifest survives a malformed registry row. The documentation says that 'recorded' means recorded in the registry, not that this run used that database.
