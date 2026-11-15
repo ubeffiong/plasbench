@@ -13,6 +13,8 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-15
+
 ### Added -- complete statistics simulation study, results by number of studies
 - `simulate_validation.py` now simulates dominant and heavy studies, within-study correlation, missing outputs, resource failures (per isolate and whole studies), a dominant species (stratified functions) and Holm over many comparisons; results are summarised by number of independent studies (`benchmark.stats_validation_by_studies.tsv`) with a status that stays provisional unless a full run supports it. `--workers` runs scenarios in parallel.
 - Full run (86 rows, all three interval methods) committed in `docs/stats_validation/` and written up in `docs/STATS_VALIDATION.md`: tests and Holm are calibrated; cluster-t (the default) covers 94-96% with balanced or moderately unbalanced studies but only 64-79% with a dominant study or two heavy studies; the percentile bootstrap under-covers elsewhere. The statistics stay provisional.
@@ -33,7 +35,7 @@ history is lost, only the numbering is cleaner. See
 - Recommendations are made for one task: `select_operational_method.py --task` takes `binning_reconstruction` (the default, as before minus the reassemblers), `sequence_reassembly`, `classification`, `all`, or the old `reconstruction` (= binning).
 - A user tool's manifest states `task = binning_reconstruction`, `sequence_reassembly` or `classification`; the old `task = reconstruction` still means binning. The setup window lists and filters the three tasks. Results written before the split (task `reconstruction`) still render, labelled as older. `test/test_evaluation_tasks.py` is new.
 
-## [0.4.0] - 2026-11-15
+### Release summary
 
 A feature release that also changes how tools are scored and ranked: **scores and rankings from v0.4.0 are not
 directly comparable with v0.3.0 or earlier**. New: the correct plasmid reconstruction rate (CPRR) with SV-PRR and
