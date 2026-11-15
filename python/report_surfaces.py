@@ -310,6 +310,8 @@ def _file_entries():
         S("benchmark.assembly_qc.tsv", ag, "Assembly quality gate, all samples", "assembly_qc_gate.py", "assembly-quality", "shown",
           "The gate result of every sample is tabulated."),
         S("benchmark.copy_number.tsv", ag, "Copy number", "copy_number.py", "learn-copynumber", "shown", "Table."),
+        S("benchmark.dataset_features.tsv", ag, "Dataset characteristics", "characterise_dataset.py", "isolate-difficulty", "shown",
+          "One row per isolate; every column marked as knowable without a reference or not (Isolate difficulty tab)."),
         S("benchmark.repeat_content.tsv", ag, "Repeat content of the truth", "repeat_content.py", "learn-truthqc", "shown", "Table."),
         S("benchmark.truth_depth_anomalies.tsv", ag, "Depth anomalies of the truth", "truth_depth_anomalies.py", "learn-truthqc", "shown", "Table."),
         S("benchmark.tool_agreement.tsv", ag, "Tool-versus-tool dissimilarity", "bin_agreement.py", "learn-agreement", "shown", "Matrix."),

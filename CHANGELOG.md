@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- a dataset-characterisation table (plan C1)
+- `python/characterise_dataset.py` composes the per-isolate measurements the pipeline already makes (assembly stats, read depth and quality, repeat content of the truth, difficulty signals, organism and Gram group) into `benchmark.dataset_features.tsv`; it measures nothing itself. Every column is marked truth-free (knowable for an isolate with no reference) or truth-derived (benchmark only); a value not measured is blank, never 0. `test/test_dataset_features.py` checks the truth-free columns never include a field the recommender forbids.
+- Stage 6 builds it (an advisory job) and the report shows it as *Dataset characteristics* in the *Isolate difficulty* tab, with each column's basis in its header; file-explorer entry, help text and glossary term.
+
 ### Added -- SV-PRR, CPRR with the structural calls beside it (plan B3)
 - `call_structural_variants.py` now counts, per tool and isolate, the CPRR-correct plasmids that no structural call touches (`sv_prr_correct` / `sv_prr_plasmids` in `structural_summary.tsv`); `merge_bin_metrics.py` carries them into `scores.tsv`; the leaderboard gains `sv_prr`, `sv_prr_correct`, `sv_prr_plasmids` (appended last). CPRR itself, its definition and every rank are unchanged; SV-PRR is reported, never ranked, and as unvalidated as the calls (no read or graph support).
 - Report: the CPRR cell of the leaderboard shows SV-PRR; a glossary term, a registry row, a pre-registration row (`sv_prr_use`) and column groups in the explorer. `test/test_sv_prr.py` is new.
