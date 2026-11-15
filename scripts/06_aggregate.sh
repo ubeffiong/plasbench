@@ -42,6 +42,7 @@ fi
 # analysis is reported as unavailable and every ranking is provisional (ALLOW_PRIMARY_FALLBACK=1 keeps the numbers as the headline, with the warning).
 DESIGN_ARGS=(--capabilities "$PROJECT_ROOT/config/tool_capabilities.tsv"
              --headline-max-tier "${HEADLINE_MAX_REFERENCE_TIER:-2}"
+             --headline-independence "${HEADLINE_INDEPENDENCE:-independent}"
              --headline-min-clusters "${HEADLINE_MIN_CLUSTERS:-5}"
              --min-species-clusters "${MIN_SPECIES_CLUSTERS:-20}")
 if [ "${ALLOW_PRIMARY_FALLBACK:-0}" = "1" ]; then DESIGN_ARGS+=(--allow-primary-fallback); fi

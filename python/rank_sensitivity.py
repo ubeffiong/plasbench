@@ -44,7 +44,11 @@ Two kinds of variant, per analysis track:
                      (isolates whose truth the label audit flagged nothing in:
                      python/audit_truth_labels.py flags such as chromid_candidate,
                      collapsed_repeat_candidate or multi_replicon_plasmid; the
-                     sensitivity of the ranking to leaving flagged references out).
+                     sensitivity of the ranking to leaving flagged references out),
+                     independent_references_only (the PRIMARY population: reference tier
+                     1-2 and evaluation independence "independent") and
+                     independent_or_partial_references (sensitivity 1: plus partially
+                     independent); both need --truth-provenance, see truth_provenance.py.
 
 For each variant it reports every tool's mean over the samples all tools in
 the track share, its rank (ties broken by tool name), the change from baseline,
@@ -76,6 +80,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import score_plasmids as sp  # noqa: E402
+import truth_provenance as tp  # noqa: E402
 
 # One change at a time from the baseline filters.
 SETTING_VARIANTS = (
@@ -108,7 +113,7 @@ def cprr_baseline(environ=None):
 CPRR_BASELINE = cprr_baseline() or "0.95"   # kept for callers that import the name; cprr_threshold_rows uses cprr_baseline() and writes nothing when it is None
 SCHEME_FILES = {"ncbi": "truth.tsv", "nonchromosomal": "truth.nonchromosomal.tsv", "evidence": "truth.scored.tsv"}
 MIN_CONTIG_VARIANT = ("min_contig=500", 500)
-COHORT_VARIANTS = ("public_only", "in_house_only", "grade_c_excluded", "audit_clean_only")
+COHORT_VARIANTS = ("public_only", "in_house_only", "grade_c_excluded", "audit_clean_only", "independent_references_only", "independent_or_partial_references")
 MICRO = "micro_f1"
 BASELINE = "baseline"
 # scores.tsv writes F1 to four decimals, so a faithful re-computation can differ
@@ -222,6 +227,18 @@ def sample_groups(data_dir, results_dir, samples, truth_provenance=None):
             grade = {r["sample"]: (r.get("truth_quality_grade") or "")
                      for r in csv.DictReader(handle, delimiter="\t")}
         groups["grade_c_excluded"] = {s for s in samples if grade.get(s) != "C"}
+        with open(truth_provenance, newline="", encoding="utf-8") as handle:
+            records = {r["sample"]: r for r in csv.DictReader(handle, delimiter="\t")}
+
+        def independence_of(sample):
+            record = records.get(sample) or {}
+            value = (record.get("evaluation_independence") or "").strip()
+            return value or tp.independence((record.get("truth_assembly_strategy") or "").strip(), (record.get("truth_polish_reads") or "").strip())[0]
+
+        def within(allowed):
+            return {s for s in samples if (records.get(s) or {}).get("reference_tier") in ("1", "2") and independence_of(s) in allowed}
+        groups["independent_references_only"] = within(("independent",))
+        groups["independent_or_partial_references"] = within(("independent", "partially_independent"))
     clean = audit_clean_samples(data_dir, results_dir, samples)
     if clean is not None:
         groups["audit_clean_only"] = clean

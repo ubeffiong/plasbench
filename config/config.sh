@@ -755,3 +755,6 @@ export HEADLINE_MAX_REFERENCE_TIER="${HEADLINE_MAX_REFERENCE_TIER:-2}"
 export HEADLINE_MIN_CLUSTERS="${HEADLINE_MIN_CLUSTERS:-5}"
 # 1 (default) runs the ranking-robustness sweeps (python/rank_sensitivity.py) in stage 6; 0 skips them.
 export RUN_RANK_SENSITIVITY="${RUN_RANK_SENSITIVITY:-1}"
+# Evaluation independence the primary analysis accepts (comma-separated from independent, partially_independent, dependent, unknown), in ADDITION to reference tier <= HEADLINE_MAX_REFERENCE_TIER.
+# Default "independent": long-read-first truth polished with no reads or reads independent of the benchmark. Sensitivity analyses add partially independent, then every reference. Pre-registration row headline_independence (proposed).
+export HEADLINE_INDEPENDENCE="${HEADLINE_INDEPENDENCE:-independent}"

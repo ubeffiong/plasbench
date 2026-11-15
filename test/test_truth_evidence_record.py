@@ -89,8 +89,8 @@ def main():
         except ValueError as error:
             named = column in str(error)
         check(f"{column}: an unknown value is an error that names the column", named)
-    check("the original provenance columns keep their order; the evidence columns are appended", tp.FIELDS[:len(ORIGINAL)] == ORIGINAL and tp.FIELDS[-8:-2] == list(tp.EVIDENCE_FIELDS)
-          and tp.FIELDS[-2:] == ["evidence_recorded", "evidence_sources"], tp.FIELDS)
+    check("the original provenance columns keep their order; the evidence columns are appended", tp.FIELDS[:len(ORIGINAL)] == ORIGINAL and tp.FIELDS[-11:-5] == list(tp.EVIDENCE_FIELDS)
+          and tp.FIELDS[-5:-3] == ["evidence_recorded", "evidence_sources"] and tp.FIELDS[-3:] == ["reference_quality", "evaluation_independence", "independence_reason"], tp.FIELDS)
 
     print("the command, the report and the demo")
     with tempfile.TemporaryDirectory() as tmp:

@@ -10,6 +10,7 @@ Output:
   * <out_prefix>.leaderboard.md    -- same, as a Markdown table (for README/pitch)
   * <out_prefix>.species.tsv       -- per tool x species (species balance)
   * <out_prefix>.reference_tiers.tsv -- per tool x reference tier (sensitivity)
+  * <out_prefix>.reference_independence.tsv -- per tool x evaluation-independence class (sensitivity)
   * <out_prefix>.headline_design.tsv -- which samples/species formed each headline
 
 Headline design (python/headline_design.py, docs/METHODS.md "Endpoints"):
@@ -1291,6 +1292,9 @@ def main():
                          "Default off: the primary analysis is then reported as unavailable and the numbers are provisional. ALLOW_PRIMARY_FALLBACK=1 sets it.")
     ap.add_argument("--headline-max-tier", type=int, default=2,
                     help="highest reference tier included in the headline (default 2).")
+    ap.add_argument("--headline-independence", default=os.environ.get("HEADLINE_INDEPENDENCE", "independent"),
+                    help="evaluation-independence classes the primary analysis accepts, comma-separated from independent, partially_independent, dependent, unknown (default independent; "
+                         "HEADLINE_INDEPENDENCE). A reference must ALSO be within --headline-max-tier.")
     ap.add_argument("--headline-min-clusters", type=int, default=int(os.environ.get("HEADLINE_MIN_CLUSTERS", MIN_CLUSTERS_CI)),
                     help="independent clusters the references in the headline tiers must come from for the primary analysis to be available (default 5, the interval minimum; HEADLINE_MIN_CLUSTERS).")
     ap.add_argument("--min-species-clusters", type=int, default=20,
@@ -1339,7 +1343,7 @@ def main():
             raise SystemExit("ERROR: every score row was excluded as a possible database overlap")
     default_registry = Path(__file__).resolve().parent.parent / "config" / "tool_capabilities.tsv"
     design = hd.Design(args.sample_sheet, args.capabilities or (str(default_registry) if default_registry.is_file() else None), args.truth_provenance, args.clonal_groups,
-                       args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters)
+                       args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters, args.headline_independence)
     all_rows = rows
     selection = design.headline_selection(rows, allow_fallback=args.allow_primary_fallback)
     rows, reference_basis = selection.rows, selection.basis
@@ -1347,7 +1351,7 @@ def main():
           f"({len({r['sample'] for r in rows})} of {len({r['sample'] for r in all_rows})} sample(s)).")
     if selection.status != hd.PRIMARY_AVAILABLE:
         print(f"{chr(10)}[aggregate] WARNING: PRIMARY ANALYSIS UNAVAILABLE ({selection.reason}). Every ranking below is PROVISIONAL (all samples) and is "
-              f"not the primary result; add references in tiers 1-{args.headline_max_tier}, from at least {args.headline_min_clusters} independent clusters (long-read-first, evidence-checked) to obtain it."
+              f"not the primary result; add references meeting the primary requirement ({design.requirement_label()}: long-read-first, polished with no reads or independent reads), from at least {args.headline_min_clusters} independent clusters, to obtain it."
               + (" ALLOW_PRIMARY_FALLBACK=1 keeps the numbers as the headline." if selection.status == hd.PRIMARY_FALLBACK else "") + chr(10))
     # A sample whose only plasmids were evidence-labelled AMBIGUOUS is not a
     # plasmid-free negative control.
@@ -1414,7 +1418,7 @@ def main():
     write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv", comparisons=comparisons)
 
     # Species balance and reference-tier sensitivity tables.
-    species_rows, tier_rows, design_rows, sweep_rows = [], [], [], []
+    species_rows, tier_rows, independence_rows, design_rows, sweep_rows = [], [], [], [], []
     hd.attach_sample_cprr(all_rows, design)
     for track, task, group_rows, track_summary, _ in per_track:
         metric = hd.ranking_metric(track, task)
@@ -1425,6 +1429,7 @@ def main():
             eligible_samples={r["sample"] for r in rows if r["f1"] is not None}))
         all_group = [r for r in all_rows if r["analysis_track"] == track and design.task(r["tool"], all_rows) == task]
         tier_rows.extend(hd.tier_table(track, task, all_group, metric, design))
+        independence_rows.extend(hd.independence_table(track, task, all_group, metric, design))
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,
                             "reference_basis": reference_basis, "primary_status": selection.status,
                             "species_basis": track_summary[0].get("ranking_species_basis", "") if track_summary else "",
@@ -1432,6 +1437,8 @@ def main():
     write_rows(species_rows, args.out_prefix + ".species.tsv",
                ["analysis_track", "task", "tool", "species", "n_samples", "n_clusters", "metric", "mean_metric",
                 "in_headline"])
+    write_rows(independence_rows, args.out_prefix + ".reference_independence.tsv",
+               ["analysis_track", "task", "tool", "evaluation_independence", "n_samples", "metric", "mean_metric"])
     write_rows(tier_rows, args.out_prefix + ".reference_tiers.tsv",
                ["analysis_track", "task", "tool", "reference_tier", "n_samples", "metric", "mean_metric",
                 "cprr", "cprr_plasmids"])

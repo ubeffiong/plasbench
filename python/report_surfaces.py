@@ -283,6 +283,7 @@ def _file_entries():
         S("benchmark.metadata_completeness.tsv", ag, "Metadata completeness", "aggregate_results.py", "metadata-completeness", "shown", "Table."),
         S("benchmark.outcome_states.tsv", ag, "Run outcome states", "aggregate_results.py", "outcome-states", "shown", "Table."),
         S("benchmark.paired_comparisons.tsv", ag, "Paired tool comparisons", "aggregate_results.py", "statistics", "shown", "Table."),
+        S("benchmark.reference_independence.tsv", ag, "Reference independence", "aggregate_results.py", "headline-design", "shown", "Per tool and evaluation-independence class."),
         S("benchmark.reference_tiers.tsv", ag, "Reference tiers", "aggregate_results.py", "headline-design", "partly", "Tier counts are shown."),
         S("benchmark.species.tsv", ag, "Species of the cohort", "aggregate_results.py", "headline-design", "partly", "Species counts are shown."),
         S("benchmark.rank_robustness.tsv", ag, "Rank robustness", "rank_sensitivity.py", "rank-robustness", "shown", "Table."),
