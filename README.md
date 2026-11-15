@@ -120,6 +120,7 @@ for the incremental precision-recall sweep.
   cohort here; they depend on your hardware and cohort and will dominate wall time.
 - Scores are only as good as the reference assemblies; the truth tiers and audits
   exist to make that visible, not to remove it.
+- The leaderboard reports the burden of predicted sequence that precision does not charge (unmapped, off-truth and multi-mapped shares, and the gap between permissive and strict precision), shown in the report beside strict precision.
 - Every metric is registered in `config/metrics.tsv` (rung of a five-step evaluation ladder from detection to biological validity, whether it ranks tools, how well it is grounded, where its column lives); the report shows the ladder and its gaps, and a test keeps the registry, the glossary and the output in step.
 - The truth audit flags chromid and integrated-plasmid candidates, very large plasmids, fusions, tandem multimers (dimers and higher) and read-depth anomalies, and lists which tools share a database with the evidence that labelled the truth.
 - The statistics are checked by simulation (`plasbench analysis simulate-validation`, `RUN_STATS_VALIDATION=1`): interval coverage, type-I error and power under study-to-study differences, correlated isolates, unequal study sizes and missing data, shown in the report under Sensitivity, power and reproducibility. A first smoke run shows the percentile cluster bootstrap under-covers with few studies, so its intervals are optimistic.

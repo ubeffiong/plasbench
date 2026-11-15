@@ -136,6 +136,12 @@ def read_difficulty_features(data_dir, samples):
 # "what" is the measurement. "why" is the reason a reader should care, which is
 # the half a label can never carry and the half that was missing.
 GLOSSARY = {
+    "Predicted-sequence burden": {
+        "what": "The share of a tool's predicted sequence that precision does not charge: bases with no alignment (unmapped), bases aligned only off the labelled truth, and mapped bases that also "
+                "have an alternative placement (multi-mapping). Shown in Ranking confidence beside strict precision.",
+        "why": "A tool can look precise because the sequence it got wrong never aligned anywhere. These shares show how much of its output is unverified; the precision gap is how much its "
+               "precision would drop if unmapped bases were charged.",
+    },
     "Evaluation ladder": {
         "what": "Five questions asked in order of difficulty: did the tool detect plasmid sequence, recover it, bin it correctly, reconstruct the plasmid, and keep its genes in the right place. "
                 "Every metric belongs to one rung (config/metrics.tsv).",
@@ -1185,10 +1191,15 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
                     if unknown > 0:
                         overlap += f" / {int(unknown)} unknown"
             redundant = optional_number(row.get("total_redundant_pred_bp"))
+
+            def share(key):
+                value = optional_number(row.get(key))
+                return f"{100 * value:.1f}%" if value is not None else "not recorded"
             body.append(
                 "<tr><td>{tool}</td><td><strong>{f1}</strong></td><td>{ranked_on}</td><td>{clusters}</td>"
                 "<td>{f1_all}</td><td>{zeros}</td><td>{precision}</td><td>{strict}</td><td>{recall}</td>"
-                "<td>{ceiling}</td><td>{adjusted}</td><td>{redundant}</td><td>{overlap}</td><td>{f1_after}</td></tr>".format(
+                "<td>{ceiling}</td><td>{adjusted}</td><td>{redundant}</td><td>{overlap}</td><td>{f1_after}</td>"
+                "<td>{unmapped}</td><td>{off_truth}</td><td>{ambiguous}</td><td>{gap}</td></tr>".format(
                     tool=esc(row["tool"]), f1=_value_or(row, "mean_f1"), ranked_on=ranked_on,
                     clusters=_value_or(row, "n_independent_clusters"),
                     f1_all=_value_or(row, "mean_f1_all_scored"),
@@ -1201,12 +1212,15 @@ def robustness_section(track_leaderboards, ordered_tracks, overlap_statuses=None
                     redundant=f"{int(redundant):,}" if redundant is not None else "-",
                     overlap=overlap,
                     f1_after=_value_or(row, "mean_f1_after_database", "not assessed"),
+                    unmapped=share("unmapped_fraction"), off_truth=share("off_truth_fraction"), ambiguous=share("ambiguous_fraction"),
+                    gap=_value_or(row, "precision_gap", "not recorded"),
                 ))
         table = ("<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Mean base F1 (shared samples)</th>"
                  "<th>Ranked on samples</th><th>Independent clusters</th><th>Mean F1, all scored</th>"
                  "<th>Failed runs scored 0</th><th>Mean precision</th><th>Strict precision</th><th>Base recall</th>"
                  "<th>Recall ceiling</th><th>Ceiling-adjusted recall</th><th>Redundant predicted bp</th>"
-                 "<th>Database overlap (samples)</th><th>Mean F1 after database</th></tr></thead>"
+                 "<th>Database overlap (samples)</th><th>Mean F1 after database</th><th>Unmapped predicted bases</th><th>Off-truth predicted bases</th>"
+                 "<th>Predicted bases with an alternative placement</th><th>Precision minus strict precision</th></tr></thead>"
                  f"<tbody>{''.join(body)}</tbody></table></div>")
         charts = (
             "<div class='chart-card'><h4>Recall against what was reachable</h4>" + ceiling_chart(rows) + "</div>"

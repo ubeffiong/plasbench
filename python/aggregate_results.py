@@ -227,6 +227,10 @@ def read_scores(path):
                 "recall_ceiling": float(f[idx["recall_ceiling"]]) if "recall_ceiling" in idx and f[idx["recall_ceiling"]] else None,
                 "ceiling_adjusted_recall": float(f[idx["ceiling_adjusted_recall"]]) if "ceiling_adjusted_recall" in idx and f[idx["ceiling_adjusted_recall"]] else None,
                 "redundant_pred_bp": int(f[idx["redundant_pred_bp"]]) if "redundant_pred_bp" in idx and f[idx["redundant_pred_bp"]] else None,
+                # The burden of predicted sequence that the precision does not charge (score_plasmids.py): bases with no retained alignment, bases whose only alignments
+                # are off the labelled truth, bases mapped to the truth, and the share of those with alternative placements. Reported beside precision, never inside it.
+                **{name: int(f[idx[name]]) if name in idx and f[idx[name]] not in ("", None) else None
+                   for name in ("unmapped_pred_bp", "off_truth_pred_bp", "mapped_pred_bp", "ambiguously_mapped_pred_bp")},
                 "plasmid_recall_ge50": float(f[idx["plasmid_recall_ge50"]]) if "plasmid_recall_ge50" in idx and f[idx["plasmid_recall_ge50"]] else None,
                 "plasmid_recall_ge90": float(f[idx["plasmid_recall_ge90"]]) if "plasmid_recall_ge90" in idx and f[idx["plasmid_recall_ge90"]] else None,
                 "complete_circular_plasmid_recall": float(f[idx["complete_circular_plasmid_recall"]]) if "complete_circular_plasmid_recall" in idx and f[idx["complete_circular_plasmid_recall"]] else None,
@@ -407,6 +411,27 @@ def read_database_overlap(path):
     return overlap
 
 
+def burden_fields(d):
+    """Pooled burden of predicted sequence: totals, and the shares a reader needs. total_predicted_bp = mapped + unmapped + off-truth predicted bases.
+
+    unmapped_fraction  share of predicted bases with no retained alignment (not charged as false positives in the permissive precision)
+    off_truth_fraction share of predicted bases whose only retained alignments are off the labelled truth
+    ambiguous_fraction share of the MAPPED bases that also have an alternative placement (the multi-mapping burden)
+    precision_gap      permissive precision minus strict precision: how much of the precision depends on ignoring unmapped bases
+    All None (never 0) when the scores did not carry the columns."""
+    unmapped, off, mapped, ambiguous = (sum(d[k]) if d[k] else None for k in ("unmapped_pred_bp", "off_truth_pred_bp", "mapped_pred_bp", "ambiguously_mapped_pred_bp"))
+    predicted = (mapped or 0) + (unmapped or 0) + (off or 0) if (mapped is not None or unmapped is not None or off is not None) else None
+
+    def share(part, whole):
+        return part / whole if part is not None and whole else None
+
+    precision = statistics.mean(d["precision"]) if d["precision"] else None
+    strict = statistics.mean(d["strict_precision"]) if d["strict_precision"] else None
+    return {"total_predicted_bp": predicted, "total_unmapped_pred_bp": unmapped, "total_off_truth_pred_bp": off, "total_ambiguous_pred_bp": ambiguous,
+            "unmapped_fraction": share(unmapped, predicted), "off_truth_fraction": share(off, predicted), "ambiguous_fraction": share(ambiguous, mapped),
+            "precision_gap": (precision - strict) if precision is not None and strict is not None else None}
+
+
 def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None, metric="f1",
               plasmid_samples=None, resource_failures=None):
     by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0,
@@ -414,6 +439,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
                                    "nmi": [], "vi": [],
                                    "plasmid_recall_ge50": [], "plasmid_recall_ge90": [], "complete_circular_plasmid_recall": [],
                                    "strict_precision": [], "redundant_pred_bp": [],
+                                   "unmapped_pred_bp": [], "off_truth_pred_bp": [], "mapped_pred_bp": [], "ambiguously_mapped_pred_bp": [],
                                    "recall_ceiling": [], "ceiling_adjusted_recall": []})
     for r in rows:
         t = by_tool[r["tool"]]
@@ -433,6 +459,9 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
             t["ceiling_adjusted_recall"].append(r["ceiling_adjusted_recall"])
         if r.get("redundant_pred_bp") is not None:
             t["redundant_pred_bp"].append(r["redundant_pred_bp"])
+        for name in ("unmapped_pred_bp", "off_truth_pred_bp", "mapped_pred_bp", "ambiguously_mapped_pred_bp"):
+            if r.get(name) is not None:
+                t[name].append(r[name])
         if r["plasmid_recall_ge50"] is not None:
             t["plasmid_recall_ge50"].append(r["plasmid_recall_ge50"])
         if r["plasmid_recall_ge90"] is not None:
@@ -528,6 +557,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
             # Supplementary robustness diagnostics (never ranking metrics).
             "mean_strict_precision": statistics.mean(d["strict_precision"]) if d["strict_precision"] else None,
             "total_redundant_pred_bp": sum(d["redundant_pred_bp"]) if d["redundant_pred_bp"] else None,
+            **burden_fields(d),
             "mean_recall_ceiling": statistics.mean(d["recall_ceiling"]) if d["recall_ceiling"] else None,
             # Reference-database overlap screen (flag_database_overlap.py):
             # how many of this tool's samples may already be inside its own
@@ -881,7 +911,9 @@ def write_tsv(summary, path):
             "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed",
             "n_failed_tool", "n_infrastructure_failure", "n_not_applicable", "mean_contig_bin_f1_bp",
             "cprr_isolate_mean", "cprr_isolates", "cprr_auc",
-            "primary_status", "population"]
+            "primary_status", "population",
+            "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp",
+            "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -952,6 +984,8 @@ def write_tsv(summary, path):
                 # area under the CPRR threshold-sweep curve (0.80-0.99).
                 fmt4(s.get("cprr_isolate_mean")), s.get("cprr_isolates", ""), fmt4(s.get("cprr_auc")),
                 s.get("primary_status", ""), s.get("population", ""),
+                *(s[k] if s.get(k) is not None else "" for k in ("total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp")),
+                *(fmt4(s.get(k)) for k in ("unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap")),
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
