@@ -177,7 +177,7 @@ python3 "$PY/power_analysis.py" --scores "$SCORES" --sample-sheet "$SAMPLES" --l
 python3 "$PY/scenario_tags.py" --scores "$SCORES" --data-dir "$DEMO" --sample-sheet "$SAMPLES" \
     --out "$DIM.scenarios.tsv" --performance-out "$DIM.scenario_performance.tsv"
 # Calibration of the intervals and tests by simulation (smoke mode: seconds); same script and arguments as stage 6 with RUN_STATS_VALIDATION=1.
-python3 "$PY/simulate_validation.py" --mode smoke --out "$DIM.stats_validation.tsv"
+python3 "$PY/simulate_validation.py" --mode smoke --out "$DIM.stats_validation.tsv" --by-studies-out "$DIM.stats_validation_by_studies.tsv" --workers 4
 python3 "$PY/composite_score.py" --scores "$SCORES" --accuracy "$DIM.accuracy.tsv" \
     --feature-preservation "$DIM.feature_preservation.tsv" --ngoc "$DIM.ngoc.tsv" \
     --bin-quality "$DIM.bin_quality.tsv" --performance "$DIM.performance.tsv" \

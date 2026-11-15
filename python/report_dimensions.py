@@ -8,7 +8,7 @@ produced (a missing table means "not evaluated", never "zero"), and links the ra
 
 Tables read, all written beside the leaderboard as <prefix>.<name>.tsv:
   accuracy, missing_regions, feature_preservation, ngoc, bin_quality, performance, power,
-  scenarios, scenario_performance, composite, composite_sensitivity, reproducibility_tools, stats_validation
+  scenarios, scenario_performance, composite, composite_sensitivity, reproducibility_tools, stats_validation, stats_validation_by_studies
 """
 import csv
 import os
@@ -16,7 +16,7 @@ from collections import defaultdict
 from plasbench_common import number as num  # noqa: E402
 
 TABLES = ("accuracy", "missing_regions", "feature_preservation", "ngoc", "bin_quality", "performance", "power",
-          "scenarios", "scenario_performance", "composite", "composite_sensitivity", "reproducibility_tools", "stats_validation")
+          "scenarios", "scenario_performance", "composite", "composite_sensitivity", "reproducibility_tools", "stats_validation", "stats_validation_by_studies")
 
 
 def read_tsv(path):
@@ -286,18 +286,33 @@ def render(prefix, esc, link, scores_path=None, samples_path=None):
         "reproducibility_tools")
 
     # 9. Statistical validation (simulation) --------------------------------------------------
-    rows = [[r.get("scenario", ""), r.get("n_clusters", ""), r.get("isolates_per_cluster", ""), r.get("tau", ""), r.get("sigma", ""), r.get("missing", ""),
-             r.get("effect", ""), r.get("replicates", ""), r.get("ci_coverage", "") + (f" (SE {r['ci_coverage_se']})" if r.get("ci_coverage_se") else ""),
-             r.get("ci_verdict", ""), (r.get("rejection_rate", "") + (f" (SE {r['rejection_se']})" if r.get("rejection_se") else "")) or "-",
-             r.get("test_method", ""), r.get("test_verdict", "")] for r in data["stats_validation"]]
+    rows = [[r.get("family", "") or "studies", r.get("scenario", ""), r.get("n_clusters", ""), r.get("isolates_per_cluster", ""), r.get("icc", ""), r.get("missing", ""),
+             r.get("failure", "") or "-", r.get("effect", ""), r.get("replicates", ""), (r.get("ci_coverage", "") + (f" (SE {r['ci_coverage_se']})" if r.get("ci_coverage_se") else "")) or "-",
+             r.get("ci_verdict", "") or "-", (r.get("rejection_rate", "") + (f" (SE {r['rejection_se']})" if r.get("rejection_se") else "")) or "-",
+             (f"{r['fwer_holm']} / {r['fwer_unadjusted']}" if r.get("fwer_holm") else "-"), r.get("test_method", ""), r.get("test_verdict", "")] for r in data["stats_validation"]]
+    by_studies_rows = [[r.get("n_studies", ""), r.get("mode", ""), r.get("scenarios", ""), r.get("lowest_coverage", "") or "-", r.get("interval_status", ""), r.get("highest_type_i_error", "") or "-",
+                        r.get("test_status", ""), r.get("holm_status", ""), r.get("status", ""), r.get("limiting_scenarios", "") or "-"] for r in data["stats_validation_by_studies"]]
+    if rows and not by_studies_rows:
+        import simulate_validation as sv   # an older run wrote only the scenario table: the summary is derived from it
+        by_studies_rows = [[r["n_studies"], r["mode"], r["scenarios"], r["lowest_coverage"] or "-", r["interval_status"], r["highest_type_i_error"] or "-", r["test_status"], r["holm_status"],
+                            r["status"], r["limiting_scenarios"] or "-"] for r in sv.by_studies(data["stats_validation"])]
+    status_line = ""
+    if rows:
+        import simulate_validation as sv
+        status_line = f"<p><strong>Status of the statistical procedures: {esc(sv.overall_status(data['stats_validation']))}.</strong></p>"
     add("stats-validation", "Statistical validation (simulation)",
-        "Do the intervals and tests behave as they claim? Data are simulated with study-to-study differences, correlated isolates, unequal study sizes and missing "
-        "observations, and the report's own functions are run on them. <em>Interval coverage</em> should be near 95%; <em>rejection rate</em> is the type-I error "
+        "Do the intervals and tests behave as they claim? Data are simulated with study-to-study differences, correlated isolates, unequal study sizes, one dominant study or "
+        "species, missing outputs, resource failures (a tool scored 0, also a whole study failing) and many tools compared at once with Holm, and the report's own functions are run on "
+        "them. Results are summarised <strong>by the number of independent studies</strong>, because that limits what the statistics can show. The procedures stay "
+        "<strong>provisional</strong> until a full run supports them for the number of studies and the cohort structure they are used on. <em>Interval coverage</em> should be near 95%; <em>rejection rate</em> is the type-I error "
         "when the true effect is 0 (it should be near 5%) and the power when the effect is above 0. A run of <code>smoke</code> mode (100 replicates) can only expose a "
         "gross failure; <code>full</code> mode (1,000) is the evidence. <strong>Read a shortfall as a limit:</strong> an interval that covers less than 95% is too narrow, "
         "so treat it as optimistic. It never changes a score or a rank.",
-        table(esc, ["Scenario", "Studies", "Isolates per study", "Between-study sd", "Isolate sd", "Missing", "True effect", "Replicates", "Interval coverage",
-                    "Interval verdict", "Test rejects at 0.05", "Test", "Test verdict"], rows)
+        (status_line + "<h3>By number of independent studies</h3>"
+         + table(esc, ["Studies", "Run", "Scenarios", "Lowest interval coverage", "Interval", "Highest type-I error", "Test", "Holm", "Status", "Limiting scenarios"], by_studies_rows)
+         + "<h3>Every scenario</h3>"
+         + table(esc, ["Family", "Scenario", "Studies", "Isolates per study", "Within-study correlation (icc)", "Missing", "Failures", "True effect", "Replicates", "Interval coverage",
+                       "Interval verdict", "Test rejects at 0.05", "Holm family-wise error (adjusted / unadjusted)", "Test", "Test verdict"], rows))
         if rows else empty("Not run: no simulation table was produced. Run <code>plasbench analysis simulate-validation --mode smoke --out benchmark.stats_validation.tsv</code> "
                            "or set <code>RUN_STATS_VALIDATION=1</code> for stage 6 (<code>STATS_VALIDATION_MODE=full</code> for the full run)."),
         "stats_validation")

@@ -225,6 +225,7 @@ job_dimension_analyses() {
     # Calibration of the intervals and tests by simulation (python/simulate_validation.py): off by default (it does not depend on the run's data); smoke takes seconds.
     if [[ "${RUN_STATS_VALIDATION:-0}" == "1" ]]; then
         python3 "$HERE/../python/simulate_validation.py" --mode "${STATS_VALIDATION_MODE:-smoke}" --out "$DIM.stats_validation.tsv" \
+            --by-studies-out "$DIM.stats_validation_by_studies.tsv" --workers "${STATS_VALIDATION_WORKERS:-1}" \
             || warn "statistical validation failed; leaderboard is unaffected" &
     fi
     wait
