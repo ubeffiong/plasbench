@@ -51,7 +51,7 @@ change a benchmark. Comments start with `#` or `;`, also at the end of a line.
 |---|---|
 | `name` | **required.** The tool's id in every table: lower-case letters, digits and `_`. |
 | `display_name` | The name readers see in the report (default: `name`). |
-| `task` | **required.** `reconstruction` (groups contigs into plasmids: bin metrics, CPRR, ranked by length-weighted binning F1) or `classification` (labels contigs plasmid/chromosome: ranked by base-level F1). |
+| `task` | **required.** `reconstruction` (groups contigs into plasmids: bin metrics, CPRR, ranked by length-weighted binning F1), `reassembly` (writes plasmid-enriched sequence without saying which pieces form one plasmid, like plasmidSPAdes: ranked on its own by base-level sequence-recovery F1) or `classification` (labels contigs plasmid/chromosome: ranked by base-level F1). Choose by what the tool's output says, not by how it works inside. |
 | `analysis_track` | **required.** `short_read`, `long_read` or `hybrid`. Tools are only ranked within their track. |
 | `requires_independent_long_read_truth` | `auto` (default: yes for long_read/hybrid), `yes` or `no`. When yes, a sample whose truth was built from the same long reads is skipped unless the sample sheet says `truth_independent_of_long_reads=yes` (or `<NAME>_ALLOW_CIRCULAR_TRUTH=1`). |
 | `method_class`, `description`, `citation`, `url` | Shown in the registry, the run manifest and the report. |

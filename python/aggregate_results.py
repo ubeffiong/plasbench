@@ -11,6 +11,7 @@ Output:
   * <out_prefix>.species.tsv       -- per tool x species (species balance)
   * <out_prefix>.reference_tiers.tsv -- per tool x reference tier (sensitivity)
   * <out_prefix>.headline_design.tsv -- which samples/species formed each headline
+  * <out_prefix>.reference_independence.tsv -- per tool x reference group (independent vs same-read-polished; sensitivity)
 
 Headline design (python/headline_design.py, docs/METHODS.md "Endpoints"):
 tools are ranked within (input track, task). Binning-capable tools are ranked
@@ -1071,9 +1072,12 @@ def write_md_table(fh, summary, track=None, task=None):
         title.append(f"Track: {track}")
     if task:
         metric = summary[0].get("ranking_metric", "") if summary else ""
-        title.append(f"{task} (ranked by {hd.METRIC_LABEL.get(metric, metric)})")
+        title.append(f"{task} (ranked by {hd.metric_label(task, metric)})")
     if title:
         fh.write("## " + " · ".join(title) + "\n\n")
+    note = ENDPOINT_NOTES.get(summary[0].get("ranking_metric", "") if summary else "") if task else None
+    if note:
+        fh.write(f"> {note}\n\n")
     if summary and summary[0].get("primary_status") not in (None, "", hd.PRIMARY_AVAILABLE):
         fh.write(f"> **{'PROVISIONAL: primary analysis unavailable' if summary[0]['primary_status'] == hd.PRIMARY_UNAVAILABLE else 'FALLBACK ALLOWED: primary analysis unavailable'}.** "
                  f"Population: {summary[0].get('population', '')}. This is not the primary result.\n\n")
@@ -1113,7 +1117,18 @@ def write_md_table(fh, summary, track=None, task=None):
 TRACK_ORDER = ("short_read", "long_read", "hybrid")
 
 
-TASK_ORDER = (hd.TASK_RECONSTRUCTION, hd.TASK_CLASSIFICATION)
+TASK_ORDER = hd.TASKS   # reconstruction, reassembly, classification
+
+# What each ranking endpoint does and does not measure (second review, issue 2): detection,
+# grouping into plasmids and complete plasmid recovery are three questions, never one score.
+ENDPOINT_NOTES = {
+    "lw_bin_f1": ("Length-weighted binning F1 measures how correctly plasmid sequence is grouped into individual plasmids. "
+                  "It is not a measure of complete plasmid reconstruction: that is CPRR, shown beside it."),
+    "sample_cprr": ("Isolate-level CPRR is the share of each isolate's plasmids reconstructed completely, alone and accurately "
+                    "(complete plasmid recovery). Base F1 (detection) and binning F1 (grouping) are reported beside it, not folded in."),
+    "f1": ("Base-level F1 measures detection: how much plasmid sequence is recovered or labelled correctly. "
+           "It says nothing about whether the sequence is grouped into individual plasmids."),
+}
 
 
 def ranked_tracks(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None,
@@ -1289,6 +1304,11 @@ def main():
                          "Default off: the primary analysis is then reported as unavailable and the numbers are provisional. ALLOW_PRIMARY_FALLBACK=1 sets it.")
     ap.add_argument("--headline-max-tier", type=int, default=2,
                     help="highest reference tier included in the headline (default 2).")
+    ap.add_argument("--headline-reference-independence", choices=hd.INDEPENDENCE_RULES,
+                    default=os.environ.get("HEADLINE_REFERENCE_INDEPENDENCE", "independent"),
+                    help="independent (default): the primary analysis accepts only tier 1-2 references not polished with the benchmark's own reads; "
+                         "same-read-polished and unrecorded ones are the dependent-reference sensitivity analysis. any: the tier alone decides. "
+                         "HEADLINE_REFERENCE_INDEPENDENCE sets it.")
     ap.add_argument("--headline-min-clusters", type=int, default=int(os.environ.get("HEADLINE_MIN_CLUSTERS", MIN_CLUSTERS_CI)),
                     help="independent clusters the references in the headline tiers must come from for the primary analysis to be available (default 5, the interval minimum; HEADLINE_MIN_CLUSTERS).")
     ap.add_argument("--min-species-clusters", type=int, default=20,
@@ -1336,12 +1356,16 @@ def main():
         if not rows:
             raise SystemExit("ERROR: every score row was excluded as a possible database overlap")
     design = hd.Design(args.sample_sheet, args.capabilities, args.truth_provenance, args.clonal_groups,
-                       args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters)
+                       args.headline_max_tier, args.min_species_clusters, args.headline_min_clusters,
+                       reference_independence=args.headline_reference_independence)
     all_rows = rows
     selection = design.headline_selection(rows, allow_fallback=args.allow_primary_fallback)
     rows, reference_basis = selection.rows, selection.basis
     print(f"[aggregate] headline reference standard: {reference_basis} "
           f"({len({r['sample'] for r in rows})} of {len({r['sample'] for r in all_rows})} sample(s)).")
+    reference_composition = design.composition(rows) if design.provenance else ""
+    if reference_composition:
+        print(f"[aggregate] headline references by tier and independence: {reference_composition}")
     if selection.status != hd.PRIMARY_AVAILABLE:
         print(f"{chr(10)}[aggregate] WARNING: PRIMARY ANALYSIS UNAVAILABLE ({selection.reason}). Every ranking below is PROVISIONAL (all samples) and is "
               f"not the primary result; add references in tiers 1-{args.headline_max_tier}, from at least {args.headline_min_clusters} independent clusters (long-read-first, evidence-checked) to obtain it."
@@ -1411,7 +1435,7 @@ def main():
     write_comparisons(rows, args.out_prefix + ".paired_comparisons.tsv", comparisons=comparisons)
 
     # Species balance and reference-tier sensitivity tables.
-    species_rows, tier_rows, design_rows, sweep_rows = [], [], [], []
+    species_rows, tier_rows, design_rows, sweep_rows, independence_rows = [], [], [], [], []
     hd.attach_sample_cprr(all_rows, design)
     for track, task, group_rows, track_summary, _ in per_track:
         metric = hd.ranking_metric(track, task)
@@ -1422,8 +1446,12 @@ def main():
             eligible_samples={r["sample"] for r in rows if r["f1"] is not None}))
         all_group = [r for r in all_rows if r["analysis_track"] == track and design.task(r["tool"], all_rows) == task]
         tier_rows.extend(hd.tier_table(track, task, all_group, metric, design))
+        if design.provenance:
+            independence_rows.extend(hd.independence_table(track, task, all_group, metric, design))
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,
                             "reference_basis": reference_basis, "primary_status": selection.status,
+                            "reference_independence_rule": design.reference_independence,
+                            "reference_composition": reference_composition,
                             "species_basis": track_summary[0].get("ranking_species_basis", "") if track_summary else "",
                             "min_species_clusters": design.min_species_clusters})
     write_rows(species_rows, args.out_prefix + ".species.tsv",
@@ -1440,7 +1468,13 @@ def main():
                 "n_isolates", "n_plasmids"])
     write_rows(design_rows, args.out_prefix + ".headline_design.tsv",
                ["analysis_track", "task", "ranking_metric", "reference_basis", "species_basis",
-                "min_species_clusters", "primary_status"])
+                "min_species_clusters", "primary_status", "reference_independence_rule", "reference_composition"])
+    # Reference-independence sensitivity: how much each tool's apparent performance depends on how its
+    # references were built (independent vs polished with the benchmark's own reads). Descriptive.
+    if independence_rows:
+        write_rows(independence_rows, args.out_prefix + ".reference_independence.tsv",
+                   ["analysis_track", "task", "tool", "reference_group", "description", "n_samples", "n_clusters",
+                    "metric", "mean_metric", "rank_in_group", "difference_vs_independent", "rank_change_vs_independent"])
     if args.sample_sheet:
         completeness = metadata_completeness(args.sample_sheet, {r["sample"] for r in all_rows})
         write_rows(completeness, args.out_prefix + ".metadata_completeness.tsv",
@@ -1454,7 +1488,7 @@ def main():
     def fmt3(value):
         return f"{value:.3f}" if value is not None else "n/a"
     for track, task, _, track_summary, _ in per_track:
-        metric = hd.METRIC_LABEL.get(hd.ranking_metric(track, task), "")
+        metric = hd.metric_label(task, hd.ranking_metric(track, task))
         print(f"\n=== LEADERBOARD [{track} / {task}] ranked by {metric} ===")
         for s in track_summary:
             print(f"{s['rank']:>2}. {s['tool']:<16} "

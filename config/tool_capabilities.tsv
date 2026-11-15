@@ -1,28 +1,28 @@
-tool	method_class	binning_capable	primary_input	description	analysis_track	requires_independent_long_read_truth	validation_status	validation_evidence
-mob_recon	binning	yes	assembly	Groups contigs into MOB plasmid reconstructions.	short_read	no	adapter_tested	test/test_real_tool_checks.py
-platon	classification	no	assembly	Classifies individual assembly contigs.	short_read	no	adapter_tested	test/test_real_tool_checks.py
-plasmidspades	reassembly	no	paired_reads	Reassembles plasmid-enriched contigs; contigs are not bins.	short_read	no	adapter_tested	test/test_real_tool_checks.py
-gplas2_mob	binning	yes	assembly_graph	Graph binning seeded from validated MOB membership.	short_read	no	adapter_tested	test/test_gplas_adapter.sh
-gplas2_external	binning	yes	assembly_graph	Graph binning with externally validated classifier labels.	short_read	no	adapter_tested	test/test_gplas_adapter.sh
-flye_mob_recon	binning	yes	long_reads	Flye long-read assembly followed by MOB-Recon plasmid bins.	long_read	yes	adapter_tested	test/test_real_tool_checks.py
-plassembler	reassembly	yes	hybrid_reads	Hybrid long+short plasmid assembly; each output contig is one plasmid.	hybrid	yes	untested	
-hybracter_long	reassembly	yes	long_reads	Hybracter long-read-only assembly with Plassembler-based plasmid recovery.	long_read	yes	adapter_tested	test/test_hybracter_adapter.sh
-hybracter_hybrid	reassembly	yes	hybrid_reads	Hybracter hybrid assembly with Plassembler-based plasmid recovery.	hybrid	yes	adapter_tested	test/test_hybracter_adapter.sh
-trycycler_mob_recon	binning	yes	long_reads	Trycycler consensus long-read assembly followed by MOB-Recon plasmid bins.	long_read	yes	adapter_tested	test/test_real_tool_checks.py
-genomad	ml_classification	no	assembly	Gene-based neural classifier for plasmid/virus detection on assembly contigs.	short_read	no	adapter_tested	test/test_genomad_adapter.sh
-plasme	ml_classification	no	assembly	Alignment+transformer hybrid classifier for plasmid contigs (short-read assemblies in this delivery).	short_read	no	adapter_tested	test/test_plasme_adapter.sh
-rfplasmid	ml_classification	no	assembly	Random-forest classifier over single-copy marker genes, plasmid genes, and kmers, per species/genus model.	short_read	no	adapter_tested	test/test_rfplasmid_adapter.sh
-plasmidhunter	ml_classification	no	assembly	Diamond+Prodigal gene-content classifier (Naive Bayes) for plasmid/chromosome contigs; species-agnostic single model.	short_read	no	adapter_tested	test/test_plasmidhunter_adapter.sh
-plasmer	ml_classification	no	assembly	Multi-tool ensemble (kmer-db/Prodigal/HMMER/BLAST/Infernal/Diamond/Kraken2) feeding a random-forest classifier; requires a custom conda channel and a documented 32GB RAM minimum.	short_read	no	adapter_tested	test/test_plasmer_adapter.sh
-plascope	classification	no	assembly	Centrifuge-based hard classification (chromosome/plasmid/unclassified) against a species-specific database; E. coli and Klebsiella only.	short_read	no	adapter_tested	test/test_plascope_adapter.sh
-plasgraph2	ml_classification	no	assembly_graph	GNN per-node classifier over the assembly graph; no derived multi-contig grouping in its own output.	short_read	no	adapter_tested	test/test_plasgraph2_adapter.sh
-mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.	short_read	no	not_applicable	
-platon_like	classification	no	assembly	Demo contig classifier; declares no bins.	short_read	no	not_applicable	
-spades_like	reassembly	no	paired_reads	Demo re-assembler; contigs are not bins.	short_read	no	not_applicable	
-gplas_like	binning	yes	assembly_graph	Demo graph binner that splits and merges.	short_read	no	not_applicable	
-weak_like	classification	no	assembly	Demo weak classifier; partial, ambiguous output.	short_read	no	not_applicable	
-baseline_coverage	baseline	no	assembly	Trivial baseline: contigs with depth >= 1.5x the median called plasmid.	short_read	no	not_applicable	
-baseline_reference	baseline	no	assembly	Trivial baseline: contigs aligning >= 80% to the local plasmid reference set called plasmid.	short_read	no	not_applicable	
-plsmd	reassembly	yes	assembly	Reference-guided reconstruction: BLAST to PLSDB plus replicon typing; each output record is one plasmid.	short_read	no	adapter_tested	test/test_plsmd_adapter.sh
-baseline_replicon	baseline	no	assembly	Trivial baseline: contigs carrying a replicon marker (PlasmidFinder), Col dropped when Inc is on the same contig.	short_read	no	not_applicable	
-plasbin_flow	binning	yes	assembly_graph	Flow-based MILP binning of an assembly graph; PlasBench adapts the tool's own output.	short_read	no	adapter_tested	test/test_plasbin_flow_adapter.py
+tool	method_class	binning_capable	primary_input	description	analysis_track	requires_independent_long_read_truth	validation_status	validation_evidence	evaluation_task	output_unit
+mob_recon	binning	yes	assembly	Groups contigs into MOB plasmid reconstructions.	short_read	no	adapter_tested	test/test_real_tool_checks.py	binning_reconstruction	plasmid_bins
+platon	classification	no	assembly	Classifies individual assembly contigs.	short_read	no	adapter_tested	test/test_real_tool_checks.py	classification	contig_labels
+plasmidspades	reassembly	no	paired_reads	Reassembles plasmid-enriched contigs; contigs are not bins.	short_read	no	adapter_tested	test/test_real_tool_checks.py	sequence_reassembly	enriched_contigs
+gplas2_mob	binning	yes	assembly_graph	Graph binning seeded from validated MOB membership.	short_read	no	adapter_tested	test/test_gplas_adapter.sh	binning_reconstruction	plasmid_bins
+gplas2_external	binning	yes	assembly_graph	Graph binning with externally validated classifier labels.	short_read	no	adapter_tested	test/test_gplas_adapter.sh	binning_reconstruction	plasmid_bins
+flye_mob_recon	binning	yes	long_reads	Flye long-read assembly followed by MOB-Recon plasmid bins.	long_read	yes	adapter_tested	test/test_real_tool_checks.py	binning_reconstruction	plasmid_bins
+plassembler	reassembly	yes	hybrid_reads	Hybrid long+short plasmid assembly; each output contig is one plasmid.	hybrid	yes	untested		binning_reconstruction	plasmid_records
+hybracter_long	reassembly	yes	long_reads	Hybracter long-read-only assembly with Plassembler-based plasmid recovery.	long_read	yes	adapter_tested	test/test_hybracter_adapter.sh	binning_reconstruction	plasmid_records
+hybracter_hybrid	reassembly	yes	hybrid_reads	Hybracter hybrid assembly with Plassembler-based plasmid recovery.	hybrid	yes	adapter_tested	test/test_hybracter_adapter.sh	binning_reconstruction	plasmid_records
+trycycler_mob_recon	binning	yes	long_reads	Trycycler consensus long-read assembly followed by MOB-Recon plasmid bins.	long_read	yes	adapter_tested	test/test_real_tool_checks.py	binning_reconstruction	plasmid_bins
+genomad	ml_classification	no	assembly	Gene-based neural classifier for plasmid/virus detection on assembly contigs.	short_read	no	adapter_tested	test/test_genomad_adapter.sh	classification	contig_labels
+plasme	ml_classification	no	assembly	Alignment+transformer hybrid classifier for plasmid contigs (short-read assemblies in this delivery).	short_read	no	adapter_tested	test/test_plasme_adapter.sh	classification	contig_labels
+rfplasmid	ml_classification	no	assembly	Random-forest classifier over single-copy marker genes, plasmid genes, and kmers, per species/genus model.	short_read	no	adapter_tested	test/test_rfplasmid_adapter.sh	classification	contig_labels
+plasmidhunter	ml_classification	no	assembly	Diamond+Prodigal gene-content classifier (Naive Bayes) for plasmid/chromosome contigs; species-agnostic single model.	short_read	no	adapter_tested	test/test_plasmidhunter_adapter.sh	classification	contig_labels
+plasmer	ml_classification	no	assembly	Multi-tool ensemble (kmer-db/Prodigal/HMMER/BLAST/Infernal/Diamond/Kraken2) feeding a random-forest classifier; requires a custom conda channel and a documented 32GB RAM minimum.	short_read	no	adapter_tested	test/test_plasmer_adapter.sh	classification	contig_labels
+plascope	classification	no	assembly	Centrifuge-based hard classification (chromosome/plasmid/unclassified) against a species-specific database; E. coli and Klebsiella only.	short_read	no	adapter_tested	test/test_plascope_adapter.sh	classification	contig_labels
+plasgraph2	ml_classification	no	assembly_graph	GNN per-node classifier over the assembly graph; no derived multi-contig grouping in its own output.	short_read	no	adapter_tested	test/test_plasgraph2_adapter.sh	classification	contig_labels
+mob_like	binning	yes	assembly	Demo binner: clean full-length reconstructions.	short_read	no	not_applicable		binning_reconstruction	plasmid_bins
+platon_like	classification	no	assembly	Demo contig classifier; declares no bins.	short_read	no	not_applicable		classification	contig_labels
+spades_like	reassembly	no	paired_reads	Demo re-assembler; contigs are not bins.	short_read	no	not_applicable		sequence_reassembly	enriched_contigs
+gplas_like	binning	yes	assembly_graph	Demo graph binner that splits and merges.	short_read	no	not_applicable		binning_reconstruction	plasmid_bins
+weak_like	classification	no	assembly	Demo weak classifier; partial, ambiguous output.	short_read	no	not_applicable		classification	contig_labels
+baseline_coverage	baseline	no	assembly	Trivial baseline: contigs with depth >= 1.5x the median called plasmid.	short_read	no	not_applicable		classification	contig_labels
+baseline_reference	baseline	no	assembly	Trivial baseline: contigs aligning >= 80% to the local plasmid reference set called plasmid.	short_read	no	not_applicable		classification	contig_labels
+plsmd	reassembly	yes	assembly	Reference-guided reconstruction: BLAST to PLSDB plus replicon typing; each output record is one plasmid.	short_read	no	adapter_tested	test/test_plsmd_adapter.sh	binning_reconstruction	plasmid_records
+baseline_replicon	baseline	no	assembly	Trivial baseline: contigs carrying a replicon marker (PlasmidFinder), Col dropped when Inc is on the same contig.	short_read	no	not_applicable		classification	contig_labels
+plasbin_flow	binning	yes	assembly_graph	Flow-based MILP binning of an assembly graph; PlasBench adapts the tool's own output.	short_read	no	adapter_tested	test/test_plasbin_flow_adapter.py	binning_reconstruction	plasmid_bins

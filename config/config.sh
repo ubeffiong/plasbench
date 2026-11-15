@@ -750,6 +750,10 @@ export LARGE_PLASMID_BP="${LARGE_PLASMID_BP:-500000}"
 export AMR_FLANK_BP="${AMR_FLANK_BP:-1000}"
 # Highest reference tier the primary analysis accepts (1 = long-read-first and independently validated, 2 = long-read-first, 3 = anything else). Pre-registration row headline_max_reference_tier.
 export HEADLINE_MAX_REFERENCE_TIER="${HEADLINE_MAX_REFERENCE_TIER:-2}"
+# Whether a tier 1-2 reference must also be independent of the benchmark reads to enter the primary analysis. independent (default): a reference polished with the
+# benchmark's own Illumina reads is a dependent reference and goes to the reference-independence sensitivity table, not the primary analysis. any: the tier alone decides.
+# Pre-registration row headline_reference_independence.
+export HEADLINE_REFERENCE_INDEPENDENCE="${HEADLINE_REFERENCE_INDEPENDENCE:-independent}"
 # Independent clusters (BioProjects or clonal groups) the references in those tiers must come from for the primary analysis to be available. Below it the ranking is shown as provisional:
 # a headline from fewer clusters has no interval and no test. Default 5 is the interval minimum (MIN_CLUSTERS_CI). Pre-registration row headline_min_clusters (proposed).
 export HEADLINE_MIN_CLUSTERS="${HEADLINE_MIN_CLUSTERS:-5}"

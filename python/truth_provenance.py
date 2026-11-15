@@ -237,6 +237,37 @@ def tier(strategy, polish, quality, labels_evaluated, adverse=()):
     return "1", "long-read-first, independent of benchmark reads, tier A, evidence-checked labels"
 
 
+# Reference independence is a separate axis from reference quality (second review, section 4): a
+# long-read-first reference polished with the benchmark's own Illumina reads can be structurally
+# sound (tier 2) and still not independent of the data it is used to score.
+INDEPENDENCE = ("independent", "same_read_polished", "unknown")
+
+
+def independence(polish):
+    """independent | same_read_polished | unknown, from truth_polish_reads."""
+    if polish in ("none", "independent"):
+        return "independent"
+    if polish == "same_as_benchmark":
+        return "same_read_polished"
+    return "unknown"
+
+
+def reference_group(reference_tier, independence_value):
+    """The interpretation group of a reference: tier and independence together.
+
+    tier1_independent           primary independent validation
+    tier2_independent           secondary reference-qualified analysis
+    tier2_same_read_polished    dependent-reference sensitivity analysis
+    tier2_unknown_independence  not shown to be independent; sensitivity only
+    tier3                       provisional, exploratory
+    """
+    if reference_tier == "3":
+        return "tier3"
+    if independence_value == "independent":
+        return f"tier{reference_tier}_independent"
+    return f"tier{reference_tier}_{'same_read_polished' if independence_value == 'same_read_polished' else 'unknown_independence'}"
+
+
 def grade(reference_tier, same_extraction):
     """Truth quality grade A/B/C (scoring specification, WP2).
 
@@ -296,13 +327,15 @@ def derive(row, data_dir):
         "truth_quality_grade": quality_grade, "grade_reason": grade_reason,
         **evidence, "evidence_recorded": f"{recorded} of {len(EVIDENCE_FIELDS)}",
         "evidence_sources": "; ".join(f"{name}: {evidence_sources[name]}" for name in EVIDENCE_FIELDS),
+        "reference_independence": independence(polish),
+        "reference_group": reference_group(reference_tier, independence(polish)),
     }
 
 
 FIELDS = ["sample", "truth_assembly_strategy", "truth_polish_reads", "provenance_source",
           "base_level_metrics_valid", "labels_evidence_checked", "reference_tier", "tier_reason",
           "provenance_reason", "ambiguous_plasmids", "marker_free_plasmids", "truth_quality_grade", "grade_reason",
-          *EVIDENCE_FIELDS, "evidence_recorded", "evidence_sources"]
+          *EVIDENCE_FIELDS, "evidence_recorded", "evidence_sources", "reference_independence", "reference_group"]
 
 
 def main():
@@ -324,6 +357,9 @@ def main():
     for row in derived:
         counts[row["reference_tier"]] = counts.get(row["reference_tier"], 0) + 1
     summary = ", ".join(f"tier {k}={v}" for k, v in sorted(counts.items())) or "no samples"
+    dependent = sum(1 for row in derived if row["reference_tier"] != "3" and row["reference_independence"] != "independent")
+    if dependent:
+        summary += f"; {dependent} tier 1-2 reference(s) not independent of the benchmark reads"
     sys.stderr.write(f"[truth_provenance] {summary} -> {args.out}\n")
 
 

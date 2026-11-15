@@ -177,7 +177,9 @@ def headline(ok):
         writer.writerows(rows)
     run([os.path.join(PY, "aggregate_results.py"), "--scores", "hscores.tsv", "--sample-sheet", "hsheet.tsv",
          "--capabilities", "caps.tsv", "--truth-provenance", "hprov.tsv", "--min-species-clusters", "3",
-         "--out-prefix", "h"])
+         # The Klebsiella references are tier 2 and not independent of the reads: this block tests species balance and
+         # the identity rule on them, so it uses the tier-only rule (test_reference_independence.py tests the default).
+         "--headline-reference-independence", "any", "--out-prefix", "h"])
     board = {r["tool"]: r for r in read("h.leaderboard.tsv")}
     ok = check(ok, "tasks assigned from the capability registry",
                board["binner"]["task"] == "reconstruction" and board["classy"]["task"] == "classification")

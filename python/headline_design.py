@@ -5,18 +5,33 @@ headline_design.py -- the benchmark's pre-specified headline design.
 Used by aggregate_results.py. docs/METHODS.md ("Endpoints", "Reference
 standard", "Species balance") explains the rules; in short:
 
-* Task tracks. Tools that group contigs into plasmids (binning_capable=yes
-  in config/tool_capabilities.tsv) are ranked on the RECONSTRUCTION track by
-  length-weighted binning F1 (lw_bin_f1, the primary endpoint). Tools that
-  only classify contigs are ranked on a separate CLASSIFICATION track by
-  base-level F1 -- they are never scored zero on a binning task they do not
-  attempt. On the long-read and hybrid input tracks, reconstruction tools are
-  ranked instead by isolate-level CPRR (sample_cprr), because those tools aim
-  to close whole plasmids (ranking_metric(); config/prereg.tsv).
+* Task tracks. Each tool's evaluation task is declared in
+  config/tool_capabilities.tsv (evaluation_task), from its output contract,
+  never inferred from binning_capable alone:
+    binning_reconstruction  groups sequence into individual plasmids (bins or
+                            one-plasmid-per-record output): RECONSTRUCTION,
+                            ranked by length-weighted binning F1 (lw_bin_f1);
+    sequence_reassembly     produces plasmid-enriched sequence without saying
+                            which pieces form one plasmid (plasmidSPAdes):
+                            REASSEMBLY, ranked by base-level sequence F1;
+    classification          labels the input contigs: CLASSIFICATION, ranked
+                            by base-level F1.
+  No tool is scored zero on a task it does not attempt, and a reassembler is
+  never ranked as if it were a contig classifier. On the long-read and hybrid
+  input tracks, reconstruction tools are ranked instead by isolate-level CPRR
+  (sample_cprr), because those tools aim to close whole plasmids
+  (ranking_metric(); config/prereg.tsv). A row without evaluation_task (an
+  older registry or a user tool) falls back to binning_capable and
+  method_class.
 * Reference standard. Only reference tiers <= HEADLINE_MAX_REFERENCE_TIER
   (default 2) enter the headline; tier 3 (short-read-first or unknown
-  provenance) is a sensitivity analysis. If no sample qualifies, the
-  headline falls back to all samples and says so.
+  provenance) is a sensitivity analysis. Reference quality and reference
+  independence are separate: with HEADLINE_REFERENCE_INDEPENDENCE=independent
+  (the default) a tier 1-2 reference enters the primary analysis only if it
+  was not polished with the benchmark's own reads; same-read-polished and
+  not-shown-independent references form the dependent-reference sensitivity
+  analysis (independence_table). If no sample qualifies, the primary analysis
+  is unavailable and every ranking is labelled provisional.
 * Species balance. The ranking score is the mean of per-species means over
   species with >= MIN_SPECIES_CLUSTERS independent clusters, so one
   over-represented species cannot dominate. Smaller species are described
@@ -43,8 +58,32 @@ from resampling import (  # noqa: E402,F401
 )
 
 TASK_RECONSTRUCTION = "reconstruction"
+TASK_REASSEMBLY = "reassembly"
 TASK_CLASSIFICATION = "classification"
-TASK_METRIC = {TASK_RECONSTRUCTION: "lw_bin_f1", TASK_CLASSIFICATION: "f1"}
+TASKS = (TASK_RECONSTRUCTION, TASK_REASSEMBLY, TASK_CLASSIFICATION)
+TASK_METRIC = {TASK_RECONSTRUCTION: "lw_bin_f1", TASK_REASSEMBLY: "f1", TASK_CLASSIFICATION: "f1"}
+# config/tool_capabilities.tsv evaluation_task -> ranking task.
+EVALUATION_TASKS = {"binning_reconstruction": TASK_RECONSTRUCTION, "sequence_reassembly": TASK_REASSEMBLY,
+                    "classification": TASK_CLASSIFICATION}
+
+
+def evaluation_task(row):
+    """The ranking task of one capability-registry row.
+
+    The declared evaluation_task wins. Without it (an older registry, a user tool
+    manifest) binning_capable=yes means reconstruction, a reassembly method class
+    that declares no bins means reassembly, and anything else classification.
+    An unknown declared value is an error, never a silent default."""
+    declared = (row.get("evaluation_task") or "").strip()
+    if declared:
+        if declared not in EVALUATION_TASKS:
+            raise ValueError(f"{row.get('tool', '?')}: evaluation_task must be one of {sorted(EVALUATION_TASKS)}, got {declared!r}")
+        return EVALUATION_TASKS[declared]
+    if (row.get("binning_capable") or "").strip().lower() == "yes":
+        return TASK_RECONSTRUCTION
+    if (row.get("method_class") or "").strip() == "reassembly":
+        return TASK_REASSEMBLY
+    return TASK_CLASSIFICATION
 # Track-specific primary endpoint (config/prereg.tsv, primary_endpoint_long_read):
 # long-read and hybrid reconstruction tools are built to close whole plasmids, so
 # they are ranked on isolate-level CPRR. Short-read reconstruction stays on
@@ -53,6 +92,13 @@ TRACK_TASK_METRIC = {("long_read", TASK_RECONSTRUCTION): "sample_cprr",
                      ("hybrid", TASK_RECONSTRUCTION): "sample_cprr"}
 METRIC_LABEL = {"lw_bin_f1": "length-weighted binning F1", "f1": "base-level classification F1",
                 "sample_cprr": "isolate-level CPRR"}
+# A reassembler's base-level F1 measures recovered plasmid sequence, not contig labels.
+TASK_METRIC_LABEL = {(TASK_REASSEMBLY, "f1"): "base-level sequence-recovery F1"}
+
+
+def metric_label(task, metric):
+    """Human label of a ranking metric within its task."""
+    return TASK_METRIC_LABEL.get((task, metric)) or METRIC_LABEL.get(metric, metric)
 
 
 def ranking_metric(track, task):
@@ -76,6 +122,27 @@ def normalise_species(organism):
     return " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "")
 
 
+INDEPENDENT = "independent"
+SAME_READ_POLISHED = "same_read_polished"
+UNKNOWN_INDEPENDENCE = "unknown"
+INDEPENDENCE_RULES = ("independent", "any")   # HEADLINE_REFERENCE_INDEPENDENCE
+
+
+def record_independence(record):
+    """independent | same_read_polished | unknown for one provenance row (older tables carry only truth_polish_reads)."""
+    value = (record.get("reference_independence") or "").strip()
+    if value in (INDEPENDENT, SAME_READ_POLISHED, UNKNOWN_INDEPENDENCE):
+        return value
+    polish = (record.get("truth_polish_reads") or "").strip()
+    if polish in ("none", "independent"):
+        return INDEPENDENT
+    if polish == "same_as_benchmark":
+        return SAME_READ_POLISHED
+    if not polish and (record.get("base_level_metrics_valid") or "").strip() == "yes":
+        return INDEPENDENT   # truth_provenance sets it yes exactly when the polishing reads were none or independent
+    return UNKNOWN_INDEPENDENCE
+
+
 PRIMARY_AVAILABLE = "available"
 PRIMARY_UNAVAILABLE = "unavailable"
 PRIMARY_FALLBACK = "fallback_allowed"
@@ -86,8 +153,13 @@ class Design:
     """Everything the headline needs to know about samples and tools."""
 
     def __init__(self, sample_sheet=None, capabilities=None, provenance=None, clonal_groups=None,
-                 max_tier=2, min_species_clusters=20, min_primary_clusters=1):
+                 max_tier=2, min_species_clusters=20, min_primary_clusters=1, reference_independence="any"):
         self.max_tier = int(max_tier)
+        # "independent": the primary analysis accepts only references not polished with the benchmark's reads (the pipeline default,
+        # HEADLINE_REFERENCE_INDEPENDENCE). "any": tier alone decides; the library default, so older callers are unchanged.
+        if reference_independence not in INDEPENDENCE_RULES:
+            raise ValueError(f"reference_independence must be one of {INDEPENDENCE_RULES}")
+        self.reference_independence = reference_independence
         # independent clusters (BioProjects / clonal groups) the qualifying references must come from before the primary analysis counts as available; below it a headline would
         # carry no interval and no test. The pipeline passes HEADLINE_MIN_CLUSTERS (default 5, the interval minimum); the library default of 1 keeps old callers unchanged.
         self.min_primary_clusters = int(min_primary_clusters)
@@ -100,8 +172,7 @@ class Design:
         for row in read_rows(capabilities):
             if row.get("tool"):
                 self.method_class[row["tool"]] = (row.get("method_class") or "").strip()
-                capable = (row.get("binning_capable") or "").strip().lower() == "yes"
-                self.task_of[row["tool"]] = TASK_RECONSTRUCTION if capable else TASK_CLASSIFICATION
+                self.task_of[row["tool"]] = evaluation_task(row)
         self.provenance = {r["sample"]: r for r in read_rows(provenance) if r.get("sample")}
         clonal = {r["sample"]: r.get("clonal_group", "") for r in read_rows(clonal_groups) if r.get("sample")}
         self.clusters = self._join_clusters(sheet, clonal)
@@ -143,6 +214,43 @@ class Design:
     def tier(self, sample):
         return (self.provenance.get(sample) or {}).get("reference_tier", "")
 
+    def independence(self, sample):
+        record = self.provenance.get(sample)
+        if not record:
+            return UNKNOWN_INDEPENDENCE
+        value = record_independence(record)
+        # Tier 1 requires reads independent of the benchmark (truth_provenance.tier), so an older table that
+        # records only the tier is still independent there.
+        if value == UNKNOWN_INDEPENDENCE and not record.get("truth_polish_reads") and record.get("reference_tier") == "1":
+            return INDEPENDENT
+        return value
+
+    def reference_group(self, sample):
+        """tier1_independent | tier2_independent | tier2_same_read_polished | tier2_unknown_independence | tier3 | unrecorded."""
+        tier = self.tier(sample)
+        if not tier:
+            return "unrecorded"
+        if tier == "3":
+            return "tier3"
+        independence = self.independence(sample)
+        return f"tier{tier}_{independence if independence != UNKNOWN_INDEPENDENCE else 'unknown_independence'}"
+
+    def in_reference_standard(self, sample, require_independent=None):
+        """True when the sample's reference is in tiers 1..max_tier and, when required, independent of the benchmark reads."""
+        tier = self.tier(sample)
+        if not tier or int(tier) > self.max_tier:
+            return False
+        if require_independent is None:
+            require_independent = self.reference_independence == "independent"
+        return not require_independent or self.independence(sample) == INDEPENDENT
+
+    def composition(self, rows):
+        """'tier1_independent 4; tier2_same_read_polished 2' over the distinct samples of rows."""
+        counts = defaultdict(int)
+        for sample in {r["sample"] for r in rows}:
+            counts[self.reference_group(sample)] += 1
+        return "; ".join(f"{group} {n}" for group, n in sorted(counts.items()))
+
     def headline_selection(self, rows, allow_fallback=False):
         """The headline population and whether the PRIMARY analysis is available: a Selection(rows, basis, status, reason, population).
 
@@ -153,13 +261,23 @@ class Design:
         if not self.provenance:
             reason = "no truth-provenance table, so no sample can be shown to meet the reference requirement"
         else:
-            kept = [r for r in rows if self.tier(r["sample"]) and int(self.tier(r["sample"])) <= self.max_tier]
+            independent_only = self.reference_independence == "independent"
+            in_tiers = [r for r in rows if self.in_reference_standard(r["sample"], require_independent=False)]
+            kept = [r for r in in_tiers if self.in_reference_standard(r["sample"])]
             clusters = len({self.cluster(r["sample"]) for r in kept})
+            scope = f"tiers 1-{self.max_tier}" + (", independent of the benchmark reads" if independent_only else "")
             if kept and clusters >= self.min_primary_clusters:
-                label = f"reference tiers 1-{self.max_tier}"
+                label = f"reference {scope}"
                 return Selection(kept, label, PRIMARY_AVAILABLE, "", f"primary: {label}")
-            reason = (f"no sample has a reference in tiers 1-{self.max_tier}" if not kept else
-                      f"only {clusters} independent cluster(s) have a reference in tiers 1-{self.max_tier}; at least {self.min_primary_clusters} are needed for the headline to carry an interval")
+            dependent = len({r["sample"] for r in in_tiers}) - len({r["sample"] for r in kept})
+            if not in_tiers:
+                reason = f"no sample has a reference in tiers 1-{self.max_tier}"
+            elif not kept:
+                reason = (f"no reference in tiers 1-{self.max_tier} is shown to be independent of the benchmark reads "
+                          f"({dependent} sample(s) polished with them or not recorded; they are in the reference-independence sensitivity table)")
+            else:
+                reason = (f"only {clusters} independent cluster(s) have a reference in {scope}; at least {self.min_primary_clusters} are needed for the headline to carry an interval"
+                          + (f" ({dependent} dependent-reference sample(s) left out)" if dependent else ""))
         if allow_fallback:
             return Selection(rows, f"all samples (FALLBACK ALLOWED: {reason})", PRIMARY_FALLBACK, reason,
                              f"fallback allowed: all samples ({reason})")
@@ -433,3 +551,59 @@ def tier_table(track, task, rows, metric, design):
              "cprr": pooled(cprr.get((tool, tier), [])),
              "cprr_plasmids": sum(t for _, t in cprr.get((tool, tier), []))}
             for (tool, tier), v in sorted(by.items())]
+
+
+INDEPENDENCE_GROUPS = (
+    ("eligible_any_independence", "tiers 1-max, any independence (the reference-tier rule alone)"),
+    ("independent", "tiers 1-max, independent of the benchmark reads"),
+    ("same_read_polished", "tiers 1-max, polished with the benchmark's own reads (dependent reference)"),
+    ("unknown_independence", "tiers 1-max, independence not recorded"),
+    ("tier3", "tier 3: provisional, exploratory"),
+)
+
+
+def independence_table(track, task, rows, metric, design):
+    """Reference-independence sensitivity (second review, section 4), per tool x reference group.
+
+    For each group: samples, independent clusters, mean ranking metric, the tool's rank within
+    the group, and the difference in mean and in rank from the independent-reference group. It
+    answers how much a tool's apparent performance depends on how its references were built.
+    Descriptive: means are over each tool's own scored samples in the group, it never changes
+    the leaderboard, and a group with few clusters says little.
+    """
+    def member(sample, group):
+        tier = design.tier(sample)
+        if group == "tier3":
+            return tier == "3"
+        if not design.in_reference_standard(sample, require_independent=False):
+            return False
+        return group == "eligible_any_independence" or design.independence(sample) == {
+            "independent": INDEPENDENT, "same_read_polished": SAME_READ_POLISHED,
+            "unknown_independence": UNKNOWN_INDEPENDENCE}[group]
+
+    values = defaultdict(lambda: defaultdict(dict))   # group -> tool -> sample -> value
+    for r in rows:
+        if r.get(metric) is None:
+            continue
+        for group, _ in INDEPENDENCE_GROUPS:
+            if member(r["sample"], group):
+                values[group][r["tool"]][r["sample"]] = r[metric]
+    means, ranks = {}, {}
+    for group, by_tool in values.items():
+        means[group] = {tool: statistics.mean(v.values()) for tool, v in by_tool.items()}
+        order = sorted(means[group], key=lambda tool: (-means[group][tool], tool))
+        ranks[group] = {tool: i + 1 for i, tool in enumerate(order)}
+    out = []
+    labels = dict(INDEPENDENCE_GROUPS)
+    for group, _ in INDEPENDENCE_GROUPS:
+        for tool in sorted(values.get(group, {})):
+            samples = values[group][tool]
+            ref_mean = means.get("independent", {}).get(tool)
+            ref_rank = ranks.get("independent", {}).get(tool)
+            out.append({"analysis_track": track, "task": task, "tool": tool, "reference_group": group,
+                        "description": labels[group], "n_samples": len(samples),
+                        "n_clusters": len({design.cluster(s) for s in samples}), "metric": metric,
+                        "mean_metric": means[group][tool], "rank_in_group": ranks[group][tool],
+                        "difference_vs_independent": None if ref_mean is None or group == "independent" else means[group][tool] - ref_mean,
+                        "rank_change_vs_independent": None if ref_rank is None or group == "independent" else ranks[group][tool] - ref_rank})
+    return out
