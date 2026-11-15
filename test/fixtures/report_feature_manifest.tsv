@@ -124,8 +124,8 @@ chart.01	chart	svg_count>=1	chart	precision/recall/F1 bars still drawn (inside l
 chart.02	chart	text	Precision	legend	leaderboard
 leaderboard.13	leaderboard	text	not applicable	"""not applicable is not a zero"" caveat"	leaderboard
 leaderboard.14	leaderboard	text	Plasmid binning (reconstruction)	binning-reconstruction table heading (the three tasks have their own tables)	leaderboard
-leaderboard.15	leaderboard	text	Plasmid sequence reassembly	reassembly table heading	leaderboard
-leaderboard.15	leaderboard	text	Plasmid classification	classification table heading	leaderboard
+leaderboard.task-reassembly	leaderboard	text	Plasmid sequence reassembly	reassembly table heading	leaderboard
+leaderboard.task-classification	leaderboard	text	Plasmid classification	classification table heading	leaderboard
 leaderboard.16	leaderboard	preset	Headline	default column preset = the 20 headline columns	leaderboard
 leaderboard.17	metric-framework	element_id	metric-framework	section for the metric-framework columns (Methods and limits)	leaderboard
 leaderboard.18	more-metrics	tab	MCC and F-beta	tab of Additional ranking metrics	leaderboard
