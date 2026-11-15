@@ -430,13 +430,13 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
 | E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:175` | `or len(units) < MIN_CLUSTERS_CI or _has_nan(values)` |
 | E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:259` | `or len(units) < MIN_CLUSTERS_TEST or _has_nan(differences)` |
-| E22 | Holm adjustment across pairs | `python/aggregate_results.py:709` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:861` | `def attach_significance` |
+| E22 | Holm adjustment across pairs | `python/aggregate_results.py:711` | `def holm_adjust` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:863` | `def attach_significance` |
 | E24 | Percentile cluster bootstrap | `python/resampling.py:166` | `def bootstrap_ci` |
-| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:81` | `def sample_clusters` |
+| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:83` | `def sample_clusters` |
 | E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:112` | `UnionFind()` |
-| E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:80` | `PRIMARY_UNAVAILABLE = "unavailable"` |
-| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:89` | `min_species_clusters=20` |
+| E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:81` | `PRIMARY_UNAVAILABLE = "unavailable"` |
+| E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:90` | `min_species_clusters=20` |
 | E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:241` | `def shared_values` |
 | E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:251` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |

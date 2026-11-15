@@ -34,7 +34,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = "plasbench-tool.ini"
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
-TASKS = ("reconstruction", "classification")
+TASKS = ("binning_reconstruction", "sequence_reassembly", "classification")
+LEGACY_TASKS = {"reconstruction": "binning_reconstruction"}   # the manifest value before the three-way split: it always meant binning
 TRACKS = ("short_read", "long_read", "hybrid")
 RUN_MODES = ("command", "import")
 FORMATS = ("contig_bins", "contig_labels", "plasmid_fasta", "fasta_dir", "adapter")
@@ -134,7 +135,8 @@ class UserTool:
 
     @property
     def task(self):
-        return self.get("tool", "task")
+        value = self.get("tool", "task")
+        return LEGACY_TASKS.get(value, value)
 
     @property
     def track(self):
@@ -230,7 +232,7 @@ class UserTool:
         if fmt and fmt not in FORMATS:
             problems.append(f"[output] format must be one of {', '.join(FORMATS)}")
         if fmt == "contig_bins" and self.task == "classification":
-            problems.append("[output] format = contig_bins groups contigs into plasmids: set [tool] task = reconstruction "
+            problems.append("[output] format = contig_bins groups contigs into plasmids: set [tool] task = binning_reconstruction "
                             "(or use contig_labels for a classifier)")
         if fmt in ("contig_bins", "contig_labels", "plasmid_fasta", "adapter") and mode == "command" and not self.get("output", "path"):
             problems.append(f"[output] format = {fmt} needs path (where the tool writes it, relative to {{outdir}})")
@@ -267,8 +269,9 @@ class UserTool:
         if lr == "auto":
             lr = "yes" if self.track in ("long_read", "hybrid") else "no"
         return {"tool": self.name,
-                "method_class": self.get("tool", "method_class") or ("binning" if self.task == "reconstruction" else "classification"),
-                "binning_capable": "yes" if self.task == "reconstruction" else "no",
+                "method_class": self.get("tool", "method_class") or {"binning_reconstruction": "binning", "sequence_reassembly": "reassembly"}.get(self.task, "classification"),
+                "binning_capable": "no" if self.task == "classification" else "yes",
+                "evaluation_task": self.task or "classification",
                 "primary_input": ",".join(_split(self.get("run", "requires"))) or "precomputed",
                 "description": self.get("tool", "description") or f"user-supplied tool ({self.path})",
                 "analysis_track": self.track,

@@ -884,7 +884,7 @@ body.gd-open #gdrawer{transform:none}
   <pre class="hman">[tool]
 name = my_mob_recon
 display_name = MOB-recon (my copy)
-task = reconstruction
+task = binning_reconstruction
 analysis_track = short_read
 description = MOB-suite's plasmid reconstruction, added as a user tool
 citation = Robertson &amp; Nash (2018) Microbial Genomics. doi:10.1099/mgen.0.000206
@@ -1381,10 +1381,10 @@ async function loadTools(force) {
     const tools = await getTools(force);
     const real = tools.filter(t => t.source !== "demo");
     const kp = [["Registered tools", real.length, "built-in and your own"], ["Installed here", real.filter(t => t.installed).length, "found on this computer"],
-                ["Reconstruction tools", real.filter(t => t.task === "reconstruction").length, `${real.filter(t => t.task !== "reconstruction").length} classification`],
+                ["Binning tools", real.filter(t => t.task === "binning_reconstruction").length, `${real.filter(t => t.task === "sequence_reassembly").length} reassembly · ${real.filter(t => t.task === "classification").length} classification`],
                 ["Your own tools", real.filter(t => t.source === "user").length, "added with a manifest"]];
     $("#toolkpis").innerHTML = kp.map(([l, v, d]) => `<div><label>${l}</label><b>${v}</b><span>${d}</span></div>`).join("");
-    const chips = [["all","All"],["reconstruction","Reconstruction"],["classification","Classification"],["short_read","Short-read"],["long_read","Long-read"],["hybrid","Hybrid"],["installed","Installed"],["missing","Not installed"],["user","Your tools"],["demo","Demo"]];
+    const chips = [["all","All"],["binning_reconstruction","Binning"],["sequence_reassembly","Reassembly"],["classification","Classification"],["short_read","Short-read"],["long_read","Long-read"],["hybrid","Hybrid"],["installed","Installed"],["missing","Not installed"],["user","Your tools"],["demo","Demo"]];
     $("#toolchips").innerHTML = chips.map(([k, l]) => `<button class="chip ${TF.chip === k ? "on" : ""}" data-chip="${k}">${l}</button>`).join("");
     renderToolTable();
     $("#s_tools").textContent = `${real.filter(t => t.installed).length} of ${real.length} installed`;
@@ -1398,7 +1398,7 @@ function renderToolTable() {
   $("#tooltb").innerHTML = rows.map(t => `<tr>
     <td><b>${esc(t.display)}</b> ${t.source === "user" ? `<span class="tag user">your tool</span>` : t.source === "demo" ? `<span class="tag">demo</span>` : ""}<div class="mut small">${esc(t.tool)} · ${esc(t.method_class || "")}</div>
       ${t.description ? `<div class="mut small" style="max-width:420px">${esc(t.description.slice(0, 160))}</div>` : ""}</td>
-    <td><span class="tag ${t.task === "reconstruction" ? "rec" : "cls"}">${esc(t.task)}</span><div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div></td>
+    <td><span class="tag ${t.task !== "classification" ? "rec" : "cls"}">${esc((t.task || "").replace(/_/g, " "))}</span><div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div></td>
     <td>${t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
     <td class="small" style="max-width:260px">${esc(t.database || "–")}${t.database_release ? `<div class="mut">released ${esc(t.database_release)}</div>` : ""}</td>
     <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label>` :
@@ -1420,7 +1420,7 @@ $("#toolsref").onclick = () => loadTools(true);
 const UT_FIELDS = {
   tool: [["name","Name","text","Lower-case letters, digits and _; becomes the tool's id in every table.",true],
          ["display_name","Display name","text","What the report calls it."],
-         ["task","Task","select:reconstruction|classification","reconstruction groups contigs into plasmids (bins, CPRR); classification labels contigs.",true],
+         ["task","Task","select:binning_reconstruction|sequence_reassembly|classification","binning_reconstruction groups existing contigs into plasmids (ranked by binning F1); sequence_reassembly produces plasmid sequences (ranked by CPRR); classification labels contigs (ranked by base F1).",true],
          ["analysis_track","Analysis track","select:short_read|long_read|hybrid","Tools are ranked only within their track.",true],
          ["description","Description","text","One line, shown in the tool catalogue."],
          ["citation","Citation","text","Shown with the results."],
@@ -1463,7 +1463,7 @@ const UT_FIELDS = {
          ["contig_id_strip_regex","Strip from contig ids","text","Regular expression removed from each id, e.g. _length_.*$","contig_bins|contig_labels"]]};
 const UT_TITLES = {tool:["What it is","name, task and track"], install:["How to install it","plasbench install-tools NAME"], database:["Reference database","for the leakage check"],
                    run:["How to run it","mode, command and inputs"], output:["How to read its output","maps it onto PlasBench's predictions"]};
-let UT = {tool:{task:"reconstruction", analysis_track:"short_read"}, install:{method:"conda", verify_command:""}, database:{uses_reference_database:"no"},
+let UT = {tool:{task:"binning_reconstruction", analysis_track:"short_read"}, install:{method:"conda", verify_command:""}, database:{uses_reference_database:"no"},
           run:{mode:"command", requires:"contigs"}, output:{format:"contig_bins", header:"yes", delimiter:"tab"}}, utSync = false, utTimer = null;
 function utVisible(cond) {
   if (!cond) return true;
@@ -1832,7 +1832,7 @@ $("#helpbtn").onclick = () => openPageHelp();
 addEventListener("keydown", e => { if (e.key === "F1") { e.preventDefault(); openPageHelp(); } });
 
 /* help: how the form works, with MOB-recon as a worked example */
-const UT_EXAMPLE = "[tool]\nname = my_mob_recon\ndisplay_name = MOB-recon (my copy)\ntask = reconstruction\nanalysis_track = short_read\ndescription = MOB-suite's plasmid reconstruction, added as a user tool\ncitation = Robertson & Nash (2018) Microbial Genomics. doi:10.1099/mgen.0.000206\nversion_command = mob_recon --version\n\n[install]\nmethod = conda\npackages = mob_suite=3.1.9 python=3.10 pandas<=1.5.3 numpy<1.23.5\nchannels = conda-forge, bioconda\nverify_command = mob_recon --help\n\n[database]\nuses_reference_database = yes\ndatabase = MOB-suite plasmid database\n\n[run]\nmode = command\ncommand = mob_recon --infile {contigs} --outdir {outdir}/mob --num_threads {threads} --force\nrequires = contigs\n\n[output]\nformat = fasta_dir\npath = mob\nfasta_glob = plasmid_*.fasta\n";
+const UT_EXAMPLE = "[tool]\nname = my_mob_recon\ndisplay_name = MOB-recon (my copy)\ntask = binning_reconstruction\nanalysis_track = short_read\ndescription = MOB-suite's plasmid reconstruction, added as a user tool\ncitation = Robertson & Nash (2018) Microbial Genomics. doi:10.1099/mgen.0.000206\nversion_command = mob_recon --version\n\n[install]\nmethod = conda\npackages = mob_suite=3.1.9 python=3.10 pandas<=1.5.3 numpy<1.23.5\nchannels = conda-forge, bioconda\nverify_command = mob_recon --help\n\n[database]\nuses_reference_database = yes\ndatabase = MOB-suite plasmid database\n\n[run]\nmode = command\ncommand = mob_recon --infile {contigs} --outdir {outdir}/mob --num_threads {threads} --force\nrequires = contigs\n\n[output]\nformat = fasta_dir\npath = mob\nfasta_glob = plasmid_*.fasta\n";
 function openUtHelp() { $("#uthelp").showModal(); $("#uthelp .bd").scrollTop = 0; }
 $("#ut_help").onclick = openUtHelp;
 document.addEventListener("click", e => { if (e.target.closest("[data-uthelp]")) openUtHelp(); });
@@ -1866,7 +1866,7 @@ async function utLoadList() {
 }
 $("#ut_load").onchange = async e => { if (!e.target.value) { utReset(); return; }
   const r = await api(`usertools/get?name=${encodeURIComponent(e.target.value)}`); $("#ut_text").value = r.text; $("#ut_where").textContent = r.path; utChanged(true); };
-function utReset() { UT = {tool:{task:"reconstruction", analysis_track:"short_read"}, install:{method:"conda"}, database:{uses_reference_database:"no"},
+function utReset() { UT = {tool:{task:"binning_reconstruction", analysis_track:"short_read"}, install:{method:"conda"}, database:{uses_reference_database:"no"},
   run:{mode:"command", requires:"contigs", command:"mytool --contigs {contigs} --out {outdir} --threads {threads}"}, output:{format:"contig_bins", path:"bins.tsv", header:"yes", delimiter:"tab", contig_column:"contig", bin_column:"bin"}};
   $("#ut_where").textContent = "saved to ~/.plasbench/tools/<name>/"; utRender(); utChanged(false); }
 window.editUserTool = async name => { go("addtool"); setTimeout(async () => { $("#ut_load").value = name; $("#ut_load").dispatchEvent(new Event("change")); }, 200); };

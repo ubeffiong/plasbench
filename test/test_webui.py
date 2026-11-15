@@ -115,7 +115,8 @@ def main():
           and {"python", "bash", "conda", "minimap2"} <= {c["id"] for c in env})
     tools = json.loads(call("/api/tools")[1])["tools"]
     check("the tool catalogue lists the registry with task, track and install profile",
-          any(t["tool"] == "mob_recon" and t["task"] == "reconstruction" and t["profile"] for t in tools))
+          any(t["tool"] == "mob_recon" and t["task"] == "binning_reconstruction" and t["profile"] for t in tools)
+          and any(t["tool"] == "plasmidspades" and t["task"] == "sequence_reassembly" for t in tools) and any(t["tool"] == "platon" and t["task"] == "classification" for t in tools))
     settings = json.loads(call("/api/settings")[1])["settings"]
     keys = {s["key"]: s for s in settings}
     check("settings come from config/config.sh with defaults and sections", "THREADS" in keys and "RESULTS_DIR" in keys
