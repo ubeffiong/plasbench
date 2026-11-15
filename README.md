@@ -655,8 +655,8 @@ none of them prints a note saying so.
   F1 = 0 there, so it cannot rise by failing on hard isolates.
 - Uncertainty: a deterministic 1,000-resample bootstrap CI on mean F1, paired per-sample
   differences with win/tie/loss counts, and `significant_vs_runner_up` (sign-flip
-  permutation test, 10,000 permutations, Holm-corrected; needs at least 5 paired
-  samples, otherwise `not_assessed`).
+  permutation test, Holm-corrected: exact (every sign pattern) for 6 to 12 independent units, 10,000 permutations above that; needs at least 6 independent
+  units, otherwise `not_assessed`).
 
 **Optional diagnostics (never ranked).** Stage 6 also writes
 `benchmark.recovery_by_replicon.tsv`, which breaks per-plasmid recovery down by replicon
