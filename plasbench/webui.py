@@ -770,6 +770,12 @@ def make_handler(project: Project, jobs: Jobs):
                     return self.jsend(200, gitops.commit_detail(repo, q.get("rev", "")))
                 if what == "scan":
                     return self.jsend(200, {"findings": gitops.scan_staged(repo)})
+                if what == "heavy":
+                    return self.jsend(200, {"files": gitops.heavy_tracked(repo)})
+                if what == "gitignore":
+                    return self.jsend(200, gitops.gitignore_parts(repo))
+                if what == "checkignore":
+                    return self.jsend(200, gitops.check_ignore(repo, q.get("path", "")))
                 raise FileNotFoundError(f"no such API: {route}")
             if route == "terminal":
                 return self.jsend(200, terminal.state())
@@ -1032,6 +1038,10 @@ def make_handler(project: Project, jobs: Jobs):
             if op == "unstage":
                 gitops.unstage(repo, body.get("paths") or None)
                 return {"ok": True}
+            if op == "untrack":
+                return gitops.untrack(repo, body.get("paths") or [])
+            if op == "gitignore_save":
+                return gitops.save_gitignore(repo, body.get("text", ""))
             if op == "commit":
                 return gitops.commit(repo, body.get("message", ""), body.get("override", ""))
             if op == "branch_create":
