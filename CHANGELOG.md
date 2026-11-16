@@ -16,6 +16,7 @@ history is lost, only the numbering is cleaner. See
 ### Added -- a configurable leakage screen
 - `LEAKAGE_CUTOFF_POLICY` (`per_tool` default, or `fixed_date` with `LEAKAGE_CUTOFF_DATE`) and `LEAKAGE_DATE_BASIS` (`earliest_public` default, `assembly`, `read`) in `config/config.sh`, so they appear in `plasbench ui` Settings; `python/flag_database_overlap.py` and stage 6 use them, `benchmark.database_overlap.tsv` gains `date_basis` and `cutoff_policy` columns, the manifest records them, and the report states the policy above the overlap counts. Defaults reproduce the earlier behaviour for sheets without `first_read_year`.
 
+
 ### Added -- the contributed RefSeq/SRA candidate pool and a seeded, cluster-aware importer
 - `cohorts/candidates/contributed-refseq-sra/`: 8,812 RefSeq Complete Genome / SRA pairs (and their 24,606 plasmids) from a collaborator, stored gzipped with SHA-256 pins and a `SOURCE.md` that lists what it does and does not establish.
 - `plasbench import-contributed-cohort` (`python/import_contributed_cohort.py`): long-read-first, one isolate per read-BioProject cluster (the pool's `bioproject` column is the RefSeq umbrella on every row), seeded and order-independent, with a reason for every rejected row, `--released-after/--released-before` and a `--date-basis` (`assembly`, `read`, `earliest_public`). Output is unverified until `validate-cohort --online`.
