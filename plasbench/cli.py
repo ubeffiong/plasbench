@@ -456,6 +456,19 @@ def build_parser():
     review_parser.add_argument("--out-dir", type=Path, required=True)
     review_parser.add_argument("--max-per-bioproject", type=int, default=3)
     review_parser.add_argument("--max-per-organism", type=int, default=8)
+    import_parser = sub.add_parser("import-contributed-cohort", help="Select a seeded, cluster-aware candidate cohort from the contributed RefSeq/SRA pool (unverified until validate-cohort --online).")
+    import_parser.add_argument("--out-dir", type=Path, required=True)
+    import_parser.add_argument("--pool", type=Path, help="Candidate pool TSV or .gz (default: the copy shipped in cohorts/candidates/contributed-refseq-sra).")
+    import_parser.add_argument("--released-after", default="", help="YYYY-MM-DD; keep genomes public on or after this date (on --date-basis).")
+    import_parser.add_argument("--released-before", default="", help="YYYY-MM-DD; build the older comparison arm.")
+    import_parser.add_argument("--date-basis", choices=("earliest_public", "assembly", "read"), help="Default: LEAKAGE_DATE_BASIS, else earliest_public.")
+    import_parser.add_argument("--species", action="append", default=[])
+    import_parser.add_argument("--country", action="append", default=[])
+    import_parser.add_argument("--region", action="append", default=[])
+    import_parser.add_argument("--allow-short-read-first", action="store_true")
+    import_parser.add_argument("--max-clusters-per-species", type=int, default=0)
+    import_parser.add_argument("--min-clusters", type=int, default=20)
+    import_parser.add_argument("--seed", type=int, default=20260916)
     conda_parser = sub.add_parser(
         "install-conda",
         help="Check for conda/mamba/micromamba; offer to install Miniforge if none is found.",
@@ -907,6 +920,21 @@ def main(argv=None):
         code = run(command, root)
     elif args.command == "review-candidates":
         code = run([sys.executable, "python/review_candidate_cohort.py", "--candidates", str(args.candidates), "--out-dir", str(args.out_dir), "--max-per-bioproject", str(args.max_per_bioproject), "--max-per-organism", str(args.max_per_organism)], root)
+    elif args.command == "import-contributed-cohort":
+        command = [sys.executable, "python/import_contributed_cohort.py", "--out-dir", str(args.out_dir),
+                   "--released-after", args.released_after, "--released-before", args.released_before,
+                   "--min-clusters", str(args.min_clusters), "--max-clusters-per-species", str(args.max_clusters_per_species),
+                   "--seed", str(args.seed)]
+        if args.pool:
+            command.extend(["--pool", str(args.pool)])
+        if args.date_basis:
+            command.extend(["--date-basis", args.date_basis])
+        for flag, values in (("--species", args.species), ("--country", args.country), ("--region", args.region)):
+            for value in values:
+                command.extend([flag, value])
+        if args.allow_short_read_first:
+            command.append("--allow-short-read-first")
+        code = run(command, root)
     elif args.command == "install-conda":
         command = [bash_command(), "env/bootstrap_conda.sh"]
         if args.yes:

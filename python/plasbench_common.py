@@ -10,6 +10,7 @@ sys.path, so a plain `from plasbench_common import ...` works. Standard library 
 """
 
 import csv
+import datetime as dt
 import gzip
 import hashlib
 import os
@@ -325,3 +326,43 @@ def union_length(intervals):
         total += max(0, stop - max(end, start))
         end = max(end, stop)
     return total
+
+
+# --- leakage dates --------------------------------------------------------------------------------
+# One definition of "when did this genome become public", shared by the cohort importer
+# (--released-after) and python/flag_database_overlap.py, so the two cannot disagree. The
+# contributed pool records the assembly release as a full date but the first read release only as a
+# YEAR, so a read year is read as 1 January of that year: the earliest the reads can have been public,
+# which is the conservative direction for a leakage screen.
+LEAKAGE_DATE_BASES = ("earliest_public", "assembly", "read")
+
+
+def parse_iso_date(text):
+    """YYYY-MM-DD (optionally followed by a time, as NCBI writes it; '/' accepted), else None."""
+    text = (text or "").strip().replace("/", "-")
+    try:
+        return dt.date.fromisoformat(text[:10])
+    except ValueError:
+        return None
+
+
+def leakage_release_date(assembly_date, read_year, basis="earliest_public"):
+    """ISO date text for the chosen basis, or '' when that basis has no usable value.
+
+    assembly | read | earliest_public (the earlier of the two, so a genome whose reads were public long
+    before the assembly counts as old). A basis that is missing one input falls back to the other only
+    for earliest_public, never silently for assembly or read.
+    """
+    if basis not in LEAKAGE_DATE_BASES:
+        raise ValueError(f"unknown leakage date basis {basis!r}; expected one of {LEAKAGE_DATE_BASES}")
+    assembled = parse_iso_date(assembly_date)
+    year = str(read_year or "").strip()
+    read = parse_iso_date(f"{year}-01-01") if year.isdigit() and len(year) == 4 else None
+    if basis == "assembly":
+        chosen = assembled
+    elif basis == "read":
+        chosen = read
+    else:
+        known = [date for date in (assembled, read) if date]
+        chosen = min(known) if known else None
+    return chosen.isoformat() if chosen else ""

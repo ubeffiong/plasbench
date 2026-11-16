@@ -37,6 +37,7 @@ from .sessionlog import SessionLog, describe as describe_event
 
 TOKEN = secrets.token_urlsafe(24)
 PAGE_FILE = Path(__file__).resolve().parent / "data" / "ui.html"
+PAGE_SEEN = {"t": 0.0}   # when a window last loaded the page: the launcher uses it to check that clicking the icon really produced a window
 LOGO_FILE = Path(__file__).resolve().parent / "data" / "logo.svg"
 _SESSION: dict = {}
 
@@ -504,13 +505,9 @@ class Jobs:
         self.watchers: set[str] = set()
         self.deleted: set[str] = set()
         self._progress_cache: dict = {}
-        index = self.dir / "jobs.json"
-        if index.is_file():
-            try:
-                for job in json.loads(index.read_text(encoding="utf-8")):
-                    self.jobs[job["id"]] = job
-            except (ValueError, KeyError):
-                pass
+        for job in self._read_index():
+            if isinstance(job, dict) and "id" in job:
+                self.jobs[job["id"]] = job
         for job in list(self.jobs.values()):
             if job.get("state") == "interrupted" and jobrunner.is_alive(str(self.dir), job["id"]):
                 job.update(state="running", ended=None, exit=None)   # an earlier window called it lost before its runner had written a heartbeat; it is plainly going
@@ -519,10 +516,22 @@ class Jobs:
         self._save()
 
     # -- persistence -------------------------------------------------------------------------------------------
+    def _read_index(self) -> list:
+        """The saved job list. The file is replaced atomically, but a reader on another filesystem or an older writer could still meet a half-written one: retry briefly before giving up."""
+        path = self.dir / "jobs.json"
+        for attempt in range(40):
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                return []
+            except (OSError, ValueError):
+                time.sleep(0.05)
+        return []
+
     def _save(self):
         # Another window on the same folder (plasbench ui --new-instance) may have started jobs this one has not seen: keep them, so one window never erases another's runs.
         try:
-            for job in json.loads((self.dir / "jobs.json").read_text(encoding="utf-8")):
+            for job in self._read_index():
                 if job.get("id") not in self.jobs and job.get("id") not in self.deleted:
                     self.jobs[job["id"]] = job
                 elif job.get("id") in self.jobs and job.get("state") in ("done", "failed", "cancelled") and self.jobs[job["id"]]["state"] in ("running", "cancelling"):
@@ -532,7 +541,16 @@ class Jobs:
         keep = sorted(self.jobs.values(), key=lambda j: j["started"])
         running = [j for j in keep if j["state"] in ("running", "cancelling")]
         recent = [j for j in keep if j["state"] not in ("running", "cancelling")][-KEEP_JOBS:] + running
-        (self.dir / "jobs.json").write_text(json.dumps(sorted(recent, key=lambda j: j["started"]), indent=1), encoding="utf-8")
+        tmp = self.dir / f"jobs.json.{os.getpid()}.{threading.get_ident()}.tmp"   # written whole, then renamed over the index: a reader sees the old file or the new one, never half
+        tmp.write_text(json.dumps(sorted(recent, key=lambda j: j["started"]), indent=1), encoding="utf-8")
+        for attempt in range(40):   # on Windows the rename fails with "Access denied" while another process has the index open to read it: wait a moment and try again
+            try:
+                os.replace(tmp, self.dir / "jobs.json")
+                break
+            except PermissionError:
+                if attempt == 39:
+                    raise
+                time.sleep(0.05)
 
     def _paths(self, job_id: str) -> dict:
         return jobrunner.paths(str(self.dir), job_id)
@@ -911,6 +929,49 @@ def browse(path: str, files: bool) -> dict:
     return {"path": str(p), "parent": parent, "entries": entries}
 
 
+class UIServer(ThreadingHTTPServer):
+    """The window's HTTP server, built not to drop a connection under a burst.
+
+    The standard server listens with a backlog of 5. The page fires many requests at once (and polls every second), and on Windows a connection that finds the backlog full is
+    REFUSED outright (WinError 10061), which the page saw as "PlasBench disconnected" at random. A backlog of 256 absorbs any burst a person can cause; keep-alive (below) means
+    far fewer connections are opened in the first place. A client that goes away mid-response (a closed tab, a sleeping laptop) is not an error worth a traceback."""
+    request_queue_size = 256
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionError, TimeoutError, BrokenPipeError)) or (isinstance(exc, OSError) and getattr(exc, "winerror", 0) in (10053, 10054, 10058)):
+            return   # the other end went away
+        try:
+            session_log().event("server_error", error=f"{type(exc).__name__}: {exc}"[:300])
+        except Exception:
+            pass
+
+
+KEY_PAGE = """<!doctype html><meta charset="utf-8"><title>PlasBench: this window needs its key</title>
+<body style="font-family:system-ui,sans-serif;max-width:640px;margin:48px auto;padding:0 20px;line-height:1.5;color:#1d2b25">
+<script>
+/* A reload of the SAME tab has lost its key from the address (the page removes it for privacy) and, for a browser that forgot its cookie, from the request. The tab itself still holds
+   the key in its own session storage, which only this tab on this address can read: use it once. If the key is stale (PlasBench was restarted) the second answer arrives with the key
+   in the address and this does not run again, so there is no loop. */
+try { var t = sessionStorage.getItem("pb_t"); if (t && !location.search) { document.body.style.visibility = "hidden"; location.replace("/?t=" + encodeURIComponent(t)); } } catch (e) {}
+</script>
+<h2 style="margin-bottom:4px">This PlasBench window needs to be reopened</h2>
+<p>PlasBench is running, but this address does not carry the key that protects it. That happens when PlasBench was restarted (it makes a new key every time it starts), or when this tab was
+opened from an old bookmark or from the browser's history.</p>
+<h3>To get back in</h3>
+<ol>
+<li><b>Click the PlasBench icon again.</b> It finds the running PlasBench and opens a new window with the right key. Nothing is lost: runs you started keep going.</li>
+<li>Or run <code>plasbench ui</code> in a terminal: if PlasBench is already running it prints the full link and opens the window.</li>
+<li>Or open the link PlasBench printed when it started (it ends with <code>?t=</code> and the key). The link is also in <code>~/.plasbench/ui/server.json</code>.</li>
+</ol>
+<p style="color:#5b6b63;font-size:14px">The key stops other programs and websites on this computer from using PlasBench on your behalf, which is why the bare address is refused.</p>
+<p><button onclick="location.reload()" style="padding:6px 14px;font:inherit">Check again</button></p>
+</body>"""
+REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+REPLAY_SECONDS = 300
+
+
 def make_handler(project: Project, jobs: Jobs):
     page_cache = {"mtime": 0, "body": b""}
     from . import studies
@@ -924,16 +985,38 @@ def make_handler(project: Project, jobs: Jobs):
             page_cache.update(mtime=mtime, body=html.replace("__VERSION__", __version__).encode("utf-8"))
         return page_cache["body"]
 
+    # A request the page repeats after a dropped connection must not run twice (a second "start the benchmark"): the page sends a fresh id with each POST and repeats the SAME id
+    # when it retries, and the server answers a repeat with the response of the first run instead of running it again.
+    replays: dict = {}
+    replay_lock = threading.Lock()
+
+    def replay_prune():
+        now = time.time()
+        for key in [k for k, v in replays.items() if now - v["t"] > REPLAY_SECONDS]:
+            replays.pop(key, None)
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "PlasBenchUI"
+        protocol_version = "HTTP/1.1"   # keep-alive: one connection carries many requests (every response has a Content-Length)
+        timeout = 60                    # an idle keep-alive connection is closed after a minute, so threads do not pile up
 
         def log_message(self, *args):
             pass
 
         def send(self, code, body: bytes, ctype="application/json; charset=utf-8", cookie=False, extra=None):
+            rid = getattr(self, "_rid", None)
+            if rid:
+                with replay_lock:
+                    entry = replays.get(rid)
+                if entry is not None:
+                    entry["resp"] = (code, body, ctype)
+                    entry["event"].set()
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("X-PlasBench-Instance", str(int(SERVER_STARTED)))
+            if self.close_connection:
+                self.send_header("Connection", "close")   # tell the client, or it reuses a connection that is about to be closed
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Cache-Control", "no-store")
@@ -941,10 +1024,12 @@ def make_handler(project: Project, jobs: Jobs):
                 self.send_header("Content-Security-Policy",
                                  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
                                  "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+            if (extra or {}).get("page_seen") is not None:
+                self.send_header("X-PlasBench-Page-Seen", extra["page_seen"])
             if (extra or {}).get("disposition"):
                 self.send_header("Content-Disposition", f'attachment; filename="{extra["disposition"]}"')
             if cookie:
-                self.send_header("Set-Cookie", f"plasbench_token={TOKEN}; Path=/; SameSite=Strict; HttpOnly")
+                self.send_header("Set-Cookie", f"{self.cookie_name()}={TOKEN}; Path=/; SameSite=Strict; HttpOnly; Max-Age=2592000")
             self.end_headers()
             self.wfile.write(body)
 
@@ -955,12 +1040,16 @@ def make_handler(project: Project, jobs: Jobs):
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
             return host in ("127.0.0.1", "localhost", "::1")
 
+        def cookie_name(self):
+            """Cookies are shared by every port of 127.0.0.1, so each server keeps its key under its own name: two PlasBench windows (or a stale server) can no longer overwrite each other's key."""
+            return f"plasbench_token_{self.server.server_address[1]}"
+
         def token_ok(self):
             tok = self.headers.get("X-PlasBench-Token") or parse_qs(urlparse(self.path).query).get("t", [""])[0]
             if not tok:
                 for part in (self.headers.get("Cookie") or "").split(";"):
                     k, _, v = part.strip().partition("=")
-                    if k == "plasbench_token":
+                    if k == self.cookie_name():
                         tok = v
             return secrets.compare_digest(tok or "", TOKEN)
 
@@ -982,21 +1071,16 @@ def make_handler(project: Project, jobs: Jobs):
             u = urlparse(self.path)
             path, q = unquote(u.path), {k: v[0] for k, v in parse_qs(u.query).items()}
             if path == "/healthz":
-                return self.send(200, b"ok", "text/plain; charset=utf-8")
+                return self.send(200, b"ok", "text/plain; charset=utf-8", extra={"page_seen": f"{PAGE_SEEN['t']:.3f}"})
             if path in ("/logo.svg", "/favicon.ico", "/icon.png"):   # the PlasBench mark: public, holds nothing private
                 if path == "/logo.svg":
                     return self.send(200, LOGO_FILE.read_bytes(), "image/svg+xml")
                 from . import desktop
                 return self.send(200, desktop.png_bytes(64) if path == "/favicon.ico" else desktop.png_bytes(192), "image/png")
             if not self.token_ok():
-                return self.send(403, ("<!doctype html><title>PlasBench</title><body style='font-family:system-ui;padding:40px'>"
-                                       "<h2>Open PlasBench from the link <code>plasbench ui</code> printed</h2><p>This address "
-                                       "needs the session key that was printed with it (the part after <code>?t=</code>). "
-                                       "The key is new every time PlasBench starts, so an old tab or bookmark stops working.</p>"
-                                       "<p>To get the full link again, run <code>plasbench ui</code> in a terminal: if PlasBench is "
-                                       "already running it prints the full link and reopens the window. The link is also in "
-                                       "<code>~/.plasbench/ui/server.json</code>.</p></body>").encode(), "text/html; charset=utf-8")
+                return self.send(403, KEY_PAGE.encode("utf-8"), "text/html; charset=utf-8")
             if path == "/":
+                PAGE_SEEN["t"] = time.time()   # a window loaded the page
                 return self.send(200, page(), "text/html; charset=utf-8", cookie=True)
             if path.startswith("/view/"):
                 return self.serve_run_file(path[len("/view/"):])
@@ -1157,12 +1241,45 @@ def make_handler(project: Project, jobs: Jobs):
             return self.send(200, target.read_bytes(), ctype, extra={"report": True})
 
         # ---------------------------------------------------------------- POST
+        def drain_body(self):
+            """Read and discard the request body of a request that is about to be refused. A client that is still sending when the server answers and closes sees a connection abort
+            (Windows) instead of the 403; reading the body first lets it finish, and keeps the connection in step for the next request. A huge body is not read: the connection closes."""
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = 0
+            if length > 5 * 2**20:
+                self.close_connection = True
+                return
+            while length > 0:
+                chunk = self.rfile.read(min(length, 65536))
+                if not chunk:
+                    self.close_connection = True
+                    return
+                length -= len(chunk)
+
         def do_POST(self):
             if not self.host_ok() or not self.same_origin():
+                self.drain_body()
                 return self.jsend(403, {"error": "request refused (not from this window)"})
             if not self.token_ok():
+                self.drain_body()
                 return self.jsend(403, {"error": "missing or wrong session token"})
             route = unquote(urlparse(self.path).path)[len("/api/"):]
+            rid = self.headers.get("X-PlasBench-Req") or ""
+            if REQUEST_ID.match(rid):
+                with replay_lock:
+                    replay_prune()
+                    entry = replays.get(rid)
+                    if entry is None:
+                        replays[rid] = {"t": time.time(), "event": threading.Event(), "resp": None}
+                        self._rid = rid
+                if entry is not None:   # the page is repeating a request: answer with the first run's response
+                    self.body()   # read (and discard) the body so the connection stays in step
+                    if entry["event"].wait(REPLAY_SECONDS) and entry["resp"]:
+                        code, body, ctype = entry["resp"]
+                        return self.send(code, body, ctype)
+                    return self.jsend(504, {"error": "the first attempt of this request did not finish"})
             try:
                 data = self.body()
                 return self.api_post(route, data)
@@ -1444,8 +1561,23 @@ def _instance_file() -> Path:
     return UI_HOME / "server.json"
 
 
+def _page_seen_of(port: int):
+    """(alive, instance, page_seen) of the PlasBench server on `port`, from its /healthz (None, None, 0.0 when it does not answer)."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{int(port)}/healthz", timeout=3) as r:
+            if r.status == 200 and r.read(8).startswith(b"ok"):
+                return True, r.headers.get("X-PlasBench-Instance"), float(r.headers.get("X-PlasBench-Page-Seen") or 0)
+    except (OSError, ValueError):
+        pass
+    return None, None, 0.0
+
+
 def running_instance(root: Path):
-    """The URL of a PlasBench window already serving this PlasBench folder, or None."""
+    """The URL of a PlasBench window already serving this PlasBench folder, or None.
+
+    The record file (server.json) can outlive its server, and another program can take over its port; so the server must answer /healthz AND be the one the record names (the
+    record holds the server's start time, which /healthz repeats). A record left by a crashed server is removed."""
     try:
         info = json.loads(_instance_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -1453,13 +1585,54 @@ def running_instance(root: Path):
     if Path(info.get("root", "")).resolve() != Path(root).resolve():
         return None
     try:
-        import urllib.request
-        with urllib.request.urlopen(f"http://127.0.0.1:{int(info['port'])}/healthz", timeout=2) as r:
-            if r.status == 200:
-                return info["url"]
-    except (OSError, ValueError, KeyError):
+        alive, instance, _seen = _page_seen_of(info["port"])
+    except (ValueError, KeyError):
         return None
+    if alive and (info.get("started") is None or str(info.get("started")) == str(instance)):
+        return info["url"]
+    if not alive:
+        try:   # nothing is serving: the record is stale
+            _instance_file().unlink()
+        except OSError:
+            pass
     return None
+
+
+class _LaunchLock:
+    """One launch at a time: a second click while the first is still starting PlasBench waits for it (and then only brings the window back) instead of starting a second server."""
+    def __init__(self, wait: float = 40.0):
+        self.path = UI_HOME / "launch.lock"
+        self.wait = wait
+        self.held = False
+
+    def __enter__(self):
+        UI_HOME.mkdir(parents=True, exist_ok=True)
+        end = time.time() + self.wait
+        while True:
+            try:
+                fd = os.open(str(self.path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                self.held = True
+                return self
+            except FileExistsError:
+                try:
+                    if time.time() - self.path.stat().st_mtime > 60:   # a launch that died: do not wait for it
+                        self.path.unlink()
+                        continue
+                except OSError:
+                    continue
+                if time.time() > end:
+                    return self   # give up waiting; carry on without the lock rather than doing nothing
+                time.sleep(0.3)
+
+    def __exit__(self, *exc):
+        if self.held:
+            self.held = False
+            try:
+                self.path.unlink()
+            except OSError:
+                pass
 
 
 def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: bool = True, tab: bool = False,
@@ -1468,32 +1641,47 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
         raise SystemExit("ERROR: the PlasBench window only listens on this computer (127.0.0.1).")
     from . import appwindow, platform_info
     # One window per PlasBench folder: a second start (a second click on the desktop icon) brings it back.
+    lock = _LaunchLock() if not new_instance else None
+    if lock:
+        lock.__enter__()
     existing = None if new_instance else running_instance(root)
     if existing:
+        if lock:
+            lock.__exit__()
         print(f"PlasBench is already running: {existing}", flush=True)
         if open_browser:
-            print("Opened: " + appwindow.open_app_window(existing, UI_HOME / "app-window", tab), flush=True)
+            port = int(urlparse(existing).port or 0)
+            print("Opened: " + appwindow.open_app_window(existing, UI_HOME / "app-window", tab, seen=lambda since: _page_seen_of(port)[2] > since), flush=True)
         return
     # Every check and command started from the window finds the plasbench environment's tools, however the window was
     # started (a desktop icon does not run `conda activate`).
     os.environ["PATH"] = platform_info.tools_path()
+    if hasattr(signal, "SIGHUP"):
+        try:   # closing the terminal that started `plasbench ui` sends SIGHUP and would stop PlasBench (and the window with it); Quit in the window or Ctrl+C still stop it
+            signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        except (ValueError, OSError):
+            pass
     project = Project(root)
     jobs = Jobs(project)
     handler = make_handler(project, jobs)
     server = None
     for candidate in range(port, port + 20):
         try:
-            server = ThreadingHTTPServer((host, candidate), handler)
+            server = UIServer((host, candidate), handler)
             break
         except OSError:
             continue
     if server is None:
+        if lock:
+            lock.__exit__()
         raise SystemExit(f"ERROR: no free port between {port} and {port + 19}")
     url = f"http://127.0.0.1:{server.server_address[1]}/?t={quote(TOKEN)}"
     UI_HOME.mkdir(parents=True, exist_ok=True)
     record = _instance_file()
-    record.write_text(json.dumps({"url": url, "port": server.server_address[1], "pid": os.getpid(),
+    record.write_text(json.dumps({"url": url, "port": server.server_address[1], "pid": os.getpid(), "started": int(SERVER_STARTED),
                                   "root": str(Path(root).resolve())}), encoding="utf-8")
+    if lock:
+        lock.__exit__()   # the record exists: a second click now finds this server
     try:
         os.chmod(record, 0o600)   # it holds this session's key
     except OSError:
@@ -1503,13 +1691,27 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     print(f"PlasBench {__version__} window: {url}", flush=True)
     print("Keep this running while you use the window; close it with Quit in the window, or Ctrl+C here.", flush=True)
     if open_browser:
-        threading.Timer(0.6, lambda: print("Opened: " + appwindow.open_app_window(url, UI_HOME / "app-window", tab),
+        threading.Timer(0.6, lambda: print("Opened: " + appwindow.open_app_window(url, UI_HOME / "app-window", tab, seen=lambda since: PAGE_SEEN["t"] > since),
                                            flush=True)).start()
     try:
-        server.serve_forever()
+        failures = 0
+        while True:   # an unexpected error in the accept loop must not take the window down with it
+            try:
+                server.serve_forever()
+                break
+            except KeyboardInterrupt:
+                raise
+            except Exception as exc:
+                failures += 1
+                session_log().event("server_error", error=f"serve loop: {type(exc).__name__}: {exc}"[:300])
+                if failures > 20:
+                    raise
+                time.sleep(0.5)
     except KeyboardInterrupt:
         print("\nClosed the PlasBench window.")
     finally:
+        if lock:
+            lock.__exit__()
         server.server_close()
         session_log().event("server_stop")
         try:

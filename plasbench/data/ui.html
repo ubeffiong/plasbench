@@ -995,47 +995,107 @@ const S = {info:null, schema:null, env:null, tools:null, user:null, settings:nul
 const $ = (s, el=document) => el.querySelector(s), $$ = (s, el=document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const icon = (n, cls="ico sm") => `<svg class="${cls}"><use href="#i-${n}"/></svg>`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const newReqId = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Array.from({length: 24}, () => Math.floor(Math.random() * 36).toString(36)).join(""));
+const RETRY_DELAYS = [200, 500, 1000, 2000, 3500];   // ms: about 7 s of patience (with jitter) before the page says the connection is lost
+/* One call to the PlasBench server. A network failure is retried quietly (the burst or hiccup that caused it is usually over in a second); a POST repeats the SAME request id, and the
+   server answers a repeat with the first run's response, so "start the benchmark" can never start it twice. Only when the retries are used up does the page show the reconnect banner. */
 async function api(path, body) {
-  const opt = {headers:{"X-PlasBench-Token":TOKEN}};
-  if (body !== undefined) { opt.method = "POST"; opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; }
+  const opt = {headers: {"X-PlasBench-Token": TOKEN}};
+  if (body !== undefined) { opt.method = "POST"; opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; opt.headers["X-PlasBench-Req"] = newReqId(); }
   let r;
-  try { r = await fetch("/api/" + path, opt); }
-  catch { connLost(); throw new Error("PlasBench is not reachable (reconnecting)"); }
-  if (S.conn) connBack();
+  for (let attempt = 0; ; attempt++) {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 180000);
+    try { r = await fetch("/api/" + path, {...opt, signal: ctl.signal}); clearTimeout(timer); break; }
+    catch (e) {
+      clearTimeout(timer);
+      if (S.quit) throw e;
+      if (attempt >= RETRY_DELAYS.length) { connLost(); throw new Error("PlasBench is not reachable (this window keeps trying to reconnect)"); }
+      await sleep(RETRY_DELAYS[attempt] * (0.8 + Math.random() * 0.4));
+    }
+  }
+  if (S.conn) connBack(true);
   if (r.status === 403 && !/request refused/.test(await r.clone().text())) {
-    sessionEnded("This window's session has ended (PlasBench was restarted). Open the new link printed by plasbench ui. Runs you started are not lost: they keep going without the window, and they are listed under Runs & reports > Run sessions.");
+    sessionEnded();
     throw new Error("session ended");
   }
   let data; try { data = await r.json(); } catch { data = {error: `HTTP ${r.status}`}; }
   if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
   return data;
 }
-/* A lost connection is not the end: show a banner and keep trying. Runs are detached from the server (plasbench/jobrunner.py), so nothing is lost while it is down. Only after
-   ~45 s without an answer does the full-screen notice appear, and it says how to get back to the runs. */
+/* ---- a lost connection is not the end ----
+   Runs are detached from the server (plasbench/jobrunner.py), so nothing is lost while it is down. The page shows a banner, probes /healthz with a growing delay (2 s up to 10 s),
+   probes at once when the computer wakes up, the network returns or the tab is shown again, and reconnects by itself. After ~45 s it adds a full notice with a Retry now button
+   that does a real check (is the server answering? is this window's key still valid?) instead of reloading a page that may have nothing to load. */
+const LOST_DOWN = "PlasBench is not responding. It may have been closed, or the computer was asleep. This window keeps trying and will reconnect by itself as soon as PlasBench is running. "
+  + "If it was closed, start it again from its desktop icon or with the command below. Runs you started keep going without it and are listed under Runs & reports > Run sessions.";
+const LOST_EXPIRED = "PlasBench was restarted, so this window's key is no longer valid and it cannot reconnect. Open the new window: start PlasBench from its desktop icon, or run the command below "
+  + "and open the link it prints. Your runs are not lost: they are listed under Runs & reports > Run sessions.";
+function setLostStatus(text) { const a = document.getElementById("connmsg"), b = document.getElementById("lost_status"); if (a) a.textContent = text; if (b) b.textContent = text; }
 function connLost() {
   if (S.quit || S.conn) return;
-  S.conn = {since: Date.now(), timer: setInterval(connProbe, 2500)};
-  $("#connbar").hidden = false;
+  S.conn = {since: Date.now(), tries: 0, delay: 2000, timer: null, probing: false};
+  $("#connbar").hidden = false; setLostStatus("Connection to PlasBench lost. Reconnecting… Your runs keep going in the background.");
+  connSchedule();
 }
-async function connProbe() {
-  try { const r = await fetch("/healthz", {cache: "no-store"}); if (r.ok) { connBack(true); return; } } catch {}
-  if (S.conn && Date.now() - S.conn.since > 45000)
-    sessionEnded("PlasBench is not running (the window that started it was closed, or the computer went to sleep). Start it again with plasbench ui and open the link it prints. Runs you started keep going without it, and they are listed under Runs & reports > Run sessions.");
+function connSchedule() { if (!S.conn) return; clearTimeout(S.conn.timer); S.conn.timer = setTimeout(() => connProbe(false), S.conn.delay); }
+async function connCheck() {   // "up" (answering and the key is valid), "expired" (answering, key refused) or "down"
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
+    const h = await fetch("/healthz", {cache: "no-store", signal: ctl.signal}); clearTimeout(t);
+    if (!h.ok) return "down";
+    const i = await fetch("/api/info", {headers: {"X-PlasBench-Token": TOKEN}, cache: "no-store"});
+    return i.status === 403 ? "expired" : i.ok ? "up" : "down";
+  } catch { return "down"; }
+}
+async function connProbe(manual) {
+  if (!S.conn || S.conn.probing) return;
+  S.conn.probing = true; S.conn.tries++;
+  if (manual) setLostStatus("Trying to reach PlasBench…");
+  const state = await connCheck();
+  if (!S.conn) return;
+  S.conn.probing = false;
+  if (state === "up") { connBack(true); return; }
+  if (state === "expired") { clearTimeout(S.conn.timer); showLost("expired"); return; }
+  S.conn.delay = Math.min(10000, Math.round(S.conn.delay * 1.5));
+  if (manual || Date.now() - S.conn.since > 45000) showLost("down");
+  setLostStatus(`Still not reachable (attempt ${S.conn.tries}). Trying again in ${Math.round(S.conn.delay / 1000)} s.`);
+  connSchedule();
 }
 function connBack(announce) {
   if (!S.conn) return;
-  clearInterval(S.conn.timer); S.conn = null; $("#connbar").hidden = true;
-  if (announce) { toast("Reconnected to PlasBench", "ok"); refreshJobs(); }
+  clearTimeout(S.conn.timer); S.conn = null; $("#connbar").hidden = true;
+  const d = document.getElementById("ended"); if (d) d.remove();
+  if (announce) { toast("Reconnected to PlasBench", "ok"); refreshJobs(); refreshSessions(); if (!$("#v_runs").hidden) loadRuns(); }
 }
-function sessionEnded(msg) {
-  if (S.quit || document.getElementById("ended")) return;
-  const d = document.createElement("div"); d.id = "ended";
-  d.style.cssText = "position:fixed;inset:0;z-index:200;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:20px";
-  d.innerHTML = `<div class="card" style="max-width:520px"><div class="hd">${icon("alert", "ico")}<h3>Reconnect to PlasBench</h3></div>
-    <div class="bd"><p style="margin-top:0">${esc(msg)}</p><div class="cmdline"><span class="p">$</span><code>plasbench ui</code></div></div>
-    <div class="ft"><button class="btn" onclick="location.reload()">${icon("refresh")}Try again</button></div></div>`;
-  document.body.append(d);
+function showLost(kind) {
+  if (S.quit) return;
+  let d = document.getElementById("ended");
+  if (!d) { d = document.createElement("div"); d.id = "ended"; d.style.cssText = "position:fixed;inset:0;z-index:200;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:20px"; document.body.append(d); }
+  d.dataset.kind = kind;
+  d.innerHTML = `<div class="card" style="max-width:540px" role="alertdialog" aria-labelledby="lost_t"><div class="hd">${icon("alert", "ico")}<h3 id="lost_t">${kind === "expired" ? "This window needs to be reopened" : "Reconnecting to PlasBench"}</h3></div>
+    <div class="bd"><p style="margin-top:0">${esc(kind === "expired" ? LOST_EXPIRED : LOST_DOWN)}</p><div class="cmdline"><span class="p">$</span><code>plasbench ui</code></div>
+      <p id="lost_status" class="mut small" role="status" aria-live="polite" style="margin-bottom:0"></p></div>
+    <div class="ft"><button class="btn" id="lost_retry">${icon("refresh")}${kind === "expired" ? "Check again" : "Retry now"}</button></div></div>`;
+  d.querySelector("#lost_retry").onclick = retryNow;
+  if (S.conn) setLostStatus(S.conn.tries ? `Still not reachable (attempt ${S.conn.tries}). Trying again automatically.` : "Trying automatically…");
 }
+async function retryNow() {
+  const btn = document.getElementById("lost_retry"); if (btn) { btn.disabled = true; btn.textContent = "Trying…"; }
+  if (!S.conn) S.conn = {since: Date.now(), tries: 0, delay: 2000, timer: null, probing: false};
+  clearTimeout(S.conn.timer); S.conn.probing = false;
+  await connProbe(true);
+  const again = document.getElementById("lost_retry");
+  if (again) { again.disabled = false; again.innerHTML = icon("refresh") + (document.getElementById("ended").dataset.kind === "expired" ? "Check again" : "Retry now"); }
+}
+function sessionEnded(msg) {   // the server answered, but refused this window's key (PlasBench was restarted)
+  if (S.quit) return;
+  S.conn = S.conn || {since: Date.now(), tries: 0, delay: 2000, timer: null, probing: false};
+  clearTimeout(S.conn.timer); showLost("expired");
+}
+window.addEventListener("online", () => { if (S.conn) { S.conn.delay = 2000; connProbe(false); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.conn) { S.conn.delay = 2000; connProbe(false); } });
+window.addEventListener("pageshow", () => { if (S.conn) connProbe(false); });
 function toast(msg, kind="") {
   const t = document.createElement("div"); t.className = "toast " + kind;
   t.innerHTML = icon(kind === "bad" ? "alert" : kind === "ok" ? "check" : "info") + `<span>${esc(msg)}</span>`;
@@ -1114,6 +1174,7 @@ const attnKey = "plasbench.seenAttention";
 const seenAttn = () => { try { return new Set(JSON.parse(localStorage.getItem(attnKey) || "[]")); } catch { return new Set(); } };
 const markSeen = ids => { try { const s = seenAttn(); ids.forEach(i => s.add(i)); localStorage.setItem(attnKey, JSON.stringify([...s].slice(-300))); } catch {} };
 async function refreshSessions() {
+  if (S.conn) return;
   try { S.sessions = (await api("run-sessions")).sessions; } catch { return; }
   renderSessions(); updateAttention();
 }
@@ -1233,6 +1294,7 @@ function renderRunToast() {
 }
 setInterval(renderRunToast, 1000);
 async function refreshJobs() {
+  if (S.conn) return;
   try { S.jobs = (await api("jobs")).jobs; } catch { return; }
   renderRunToast();
   if (!$("#v_runs").hidden || S.jobs.some(j => j.state === "running" || j.state === "cancelling") || !S.sessionsLoaded) { S.sessionsLoaded = true; refreshSessions(); }
@@ -1277,6 +1339,7 @@ function colorize(text) {
 }
 let polling = false;
 async function pollConsole(force) {
+  if (S.conn) return;
   if (!S.consJob || polling) return; polling = true;
   try {
     const j = await api(`jobs/${S.consJob}?offset=${S.consOffset}`);

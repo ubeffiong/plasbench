@@ -1902,6 +1902,8 @@ None of these actions are required for a successful ordinary benchmark run.
 | `set: pipefail: invalid option name` | Archive from before v0.1.1 | Reinstall using the latest-release command in step 3 |
 | `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.1 | Reinstall the latest release, then revalidate the cohort lock |
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
+| Clicking the PlasBench icon opens nothing | A window that could not open (a stale lock in its browser profile, or no Chrome/Edge) | PlasBench now clears stale locks, checks that the window appeared, and retries with a fresh profile and then your default browser by itself. If nothing opens, the launcher shows a notification and `~/.plasbench/ui/launcher.log` says what happened and gives the address to open by hand |
+| The window says it is reconnecting | The connection to PlasBench was interrupted (a busy moment, the computer asleep, PlasBench closed) | Wait: it retries and reconnects by itself, and your runs keep going meanwhile. **Retry now** checks at once. If it says the window must be reopened, PlasBench was restarted: start it again from the icon or with `plasbench ui` |
 | `[MISS] Platon DB not found` | Step 7a incomplete | `plasbench check` and answer `y` (it downloads and resumes), or redo step 7a |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
 | Stage 2 stops: `truth table ... still says REVIEW` | A reference sequence could not be labelled plasmid or chromosome | Open `truth.tsv`, replace each `REVIEW` after inspecting that sequence, re-run |
@@ -2386,6 +2388,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |
+| `import-contributed-cohort` | Select a seeded, one-per-read-BioProject candidate cohort from the contributed RefSeq/SRA pool (unverified until `validate-cohort --online`). | *`--out-dir`*, `--released-after`, `--released-before`, `--date-basis`, `--species`, `--max-clusters-per-species`, `--seed` |
 | `build-ledger` | Regenerate the cross-cohort BioSample dedup ledger from every `cohorts/*.lock.json`. | `--cohorts-dir`, `--out` |
 | `prepare-contribution` | Validate a new isolate and stage it on a local git branch, ready for a PR. | *`--cohort`*, *`--new-rows`*, *`--scores`*, `--tool-status` |
 | `select-candidates` | Recompute recommendations from an existing `scores.tsv` (what stage 6 calls internally). | `--scores`, `--samples`, `--results-dir`, `--min-samples`, `--min-coverage` |
@@ -2408,7 +2411,8 @@ write one by hand:
   appends a correctly-formed row to `config/local.tsv` for you.
 - **A cohort from public data:** `plasbench discover-cohort --organism "..."` followed by
   `plasbench curate-cohort` produces `accepted.tsv` in exactly this schema — see
-  [4.2](#42-build-a-cohort-of-your-own) for the full walkthrough.
+  [4.2](#42-build-a-cohort-of-your-own) for the full walkthrough. Offline, `plasbench import-contributed-cohort`
+  selects candidates from the shipped contributed pool (see `docs/COHORTS.md`); they still need `validate-cohort --online`.
 - **A cohort PlasBench already ships:** `cohorts/public-v1.tsv` and `cohorts/public-v2.tsv`
   are ordinary examples of this same schema — open either one directly to see real,
   filled-in rows.
