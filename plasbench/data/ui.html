@@ -282,6 +282,16 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 .fs-list button .ico{color:var(--mut)}
 #toasts{position:fixed;right:16px;bottom:calc(var(--cons) + 16px);display:flex;flex-direction:column;gap:6px;z-index:90}
 .toast{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-left:3px solid var(--primary);padding:8px 12px;border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:13px;max-width:420px;display:flex;gap:8px;align-items:flex-start}
+/* The persistent "benchmark running" toast: lives in the page shell, so it stays while the user moves between pages, until the benchmark ends. */
+.runtoast{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-left:3px solid var(--primary);padding:10px 12px 12px;border-radius:var(--radius);box-shadow:var(--shadow-lg);font-size:13px;width:340px;max-width:calc(100vw - 32px);display:flex;gap:10px;align-items:flex-start;cursor:pointer;position:relative;overflow:hidden}
+.runtoast[hidden]{display:none}
+.runtoast .rt-spin{flex:none;width:18px;height:18px;margin-top:1px;border:2px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:rtspin .9s linear infinite}
+.runtoast .rt-body{min-width:0;flex:1}.runtoast .rt-title{font-weight:600}.runtoast .rt-sub{color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.runtoast .rt-hint{color:var(--muted);font-size:12px;margin-top:2px}
+.runtoast .rt-bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--line);overflow:hidden}
+.runtoast .rt-bar::after{content:"";position:absolute;top:0;bottom:0;width:35%;background:var(--primary);border-radius:3px;animation:rtslide 1.4s ease-in-out infinite}
+@keyframes rtspin{to{transform:rotate(360deg)}}@keyframes rtslide{0%{left:-35%}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){.runtoast .rt-spin{animation:none;border-top-color:var(--line);border-right-color:var(--primary)}.runtoast .rt-bar::after{animation:none;width:100%;opacity:.5}}
 .toast .ico{margin-top:2px;color:var(--primary)}.toast.bad{border-left-color:var(--bad)}.toast.bad .ico{color:var(--bad)}.toast.ok{border-left-color:var(--ok)}.toast.ok .ico{color:var(--ok)}
 
 /* ---------- job console ---------- */
@@ -1032,14 +1042,45 @@ function confirmRun(argv, label, env) {
 }
 $("#cf_ok").onclick = async () => { $("#confirm").close(); if (pendingRun) await startJob(pendingRun.argv, pendingRun.label, pendingRun.env); };
 async function startJob(argv, label, env) {
+  const bench = isBenchArgv(argv);
+  if (bench) { S.pendingBench = {label: label || cmdText(argv), t0: Date.now()}; renderRunToast(); }   // the toast appears the moment the button is clicked
   try {
     const job = await api("jobs", {argv, label, env});
     toast(`Started: ${label || cmdText(argv)}`, "ok");
     await refreshJobs(); showConsole(job.id, true); return job;
   } catch (e) { toast(e.message, "bad"); }
+  finally { S.pendingBench = null; renderRunToast(); }
 }
+
+/* ---- the persistent "benchmarking is running" toast ----
+   A benchmark is a job whose command is `run` or `demo`. The toast is created once in #toasts, outside every page, so it is still there after navigating; it is driven by the
+   job list (refreshJobs, every 4 s and right after a start) and its clock by a one-second tick, and it goes away when the last benchmark ends (the normal done/failed toast follows). */
+const isBenchArgv = argv => Array.isArray(argv) && ["run", "demo"].includes(argv[0]);
+const isBenchJob = j => isBenchArgv(j.argv) && (j.state === "running" || j.state === "cancelling");
+const fmtElapsed = sec => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), r = sec % 60; return h ? `${h}h ${String(m).padStart(2, "0")}m` : m ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`; };
+function renderRunToast() {
+  let el = document.getElementById("runtoast");
+  const running = (S.jobs || []).filter(isBenchJob);
+  const pending = S.pendingBench && !running.length ? S.pendingBench : null;
+  if (!running.length && !pending) { if (el) el.hidden = true; return; }
+  if (!el) {
+    el = document.createElement("div"); el.id = "runtoast"; el.className = "runtoast"; el.setAttribute("role", "status"); el.tabIndex = 0;
+    el.title = "Open the console to follow the run";
+    el.innerHTML = `<span class="rt-spin" aria-hidden="true"></span><div class="rt-body"><div class="rt-title"></div><div class="rt-sub"></div><div class="rt-hint">Stays here while you use other pages. Click to open the console.</div></div><span class="rt-bar" aria-hidden="true"></span>`;
+    const open = () => { const j = (S.jobs || []).find(isBenchJob); if (j) showConsole(j.id, true); };
+    el.onclick = open; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+    $("#toasts").prepend(el);
+  }
+  el.hidden = false;
+  const first = running[0];
+  const started = first ? first.started * 1000 : pending.t0;
+  el.querySelector(".rt-title").textContent = !first ? "Starting the benchmark…" : running.length > 1 ? `${running.length} benchmarks are running` : first.state === "cancelling" ? "Cancelling the benchmark…" : "Benchmarking is running";
+  el.querySelector(".rt-sub").textContent = `${first ? first.label : pending.label} · ${fmtElapsed((Date.now() - started) / 1000)}`;
+}
+setInterval(renderRunToast, 1000);
 async function refreshJobs() {
   try { S.jobs = (await api("jobs")).jobs; } catch { return; }
+  renderRunToast();
   const running = S.jobs.filter(j => j.state === "running" || j.state === "cancelling");
   $("#jobpill").hidden = !running.length; $("#jobpilltx").textContent = `${running.length} job${running.length>1?"s":""} running`;
   $("#b_jobs").hidden = !running.length; $("#b_jobs").textContent = running.length;
@@ -1108,6 +1149,7 @@ function afterJob(j) {
 }
 setInterval(() => { pollConsole(); }, 1000);
 setInterval(refreshJobs, 4000);
+refreshJobs();   // a benchmark that is already running (the window was reloaded or reopened) shows its toast straight away
 $("#cjob").onchange = e => showConsole(e.target.value);
 async function sendAnswer(text) {
   if (!S.consJob) return;

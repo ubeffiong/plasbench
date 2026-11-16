@@ -19,6 +19,7 @@ history is lost, only the numbering is cleaner. See
 - `test/test_plaseval_crosscheck.py` now compares the dissimilarity in every case, including hand-built and seeded random cases with repeated contigs. Run on Linux against `github.com/acme92/PlasEval` (commit 8238356) it agreed on all 59 cases, 44 with repeated contigs. It still only runs when `PLASEVAL_SRC` points at a PlasEval checkout.
 
 ### Added
+- **A persistent "benchmarking is running" toast in the window.** Starting a benchmark (or the demo) from `plasbench ui` shows an animated toast (spinner, sweeping bar, live elapsed time) the moment the button is clicked. It lives in the page shell, so it stays while you move between pages, is restored when the window is reloaded, says "Cancelling…" during a cancel, goes away when the run ends (the done or failed message follows) and opens the console when clicked. Reduced-motion settings are respected.
 - **Check for updates in the window** (Setup, Maintenance): asks GitHub whether a newer release exists, only when pressed, and offers a confirmed one-click upgrade. `plasbench --help` and the README upgrade section now also cover the offline `--archive` install, `plasbench ui --tab` and `plasbench desktop-icon`.
 
 ## [0.4.1] - 2026-11-16
