@@ -1897,6 +1897,8 @@ None of these actions are required for a successful ordinary benchmark run.
 | `set: pipefail: invalid option name` | Archive from before v0.1.1 | Reinstall using the latest-release command in step 3 |
 | `sample-sheet checksum differs from verification lock` | Cohort file altered, or from before v0.1.1 | Reinstall the latest release, then revalidate the cohort lock |
 | SPAdes: `needs approx N GB` | Isolate too deep for your RAM | Raise `--memory-gb`, or use `--parallel-samples 1` |
+| Clicking the PlasBench icon opens nothing | A window that could not open (a stale lock in its browser profile, or no Chrome/Edge) | PlasBench now clears stale locks, checks that the window appeared, and retries with a fresh profile and then your default browser by itself. If nothing opens, the launcher shows a notification and `~/.plasbench/ui/launcher.log` says what happened and gives the address to open by hand |
+| The window says it is reconnecting | The connection to PlasBench was interrupted (a busy moment, the computer asleep, PlasBench closed) | Wait: it retries and reconnects by itself, and your runs keep going meanwhile. **Retry now** checks at once. If it says the window must be reopened, PlasBench was restarted: start it again from the icon or with `plasbench ui` |
 | `[MISS] Platon DB not found` | Step 7a incomplete | `plasbench check` and answer `y` (it downloads and resumes), or redo step 7a |
 | `command unavailable` for a tool | Tool not installed | `plasbench install-tools all` |
 | Stage 2 stops: `truth table ... still says REVIEW` | A reference sequence could not be labelled plasmid or chromosome | Open `truth.tsv`, replace each `REVIEW` after inspecting that sequence, re-run |
