@@ -30,7 +30,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
-from . import ui_schema
+from . import jobrunner, runprogress, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -454,8 +454,17 @@ class Project:
 
 
 # --------------------------------------------------------------------------------------------- jobs
+SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that make a benchmark run session (everything else stays on the Jobs page)
+RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
+KEEP_JOBS = 500
+SERVER_STARTED = time.time()
+
+
 class Jobs:
-    """Each job is one `plasbench` command in its own process; its output goes to a log file the page tails."""
+    """Each job is one `plasbench` command, started through the detached runner (plasbench/jobrunner.py), so it outlives this server.
+
+    Its output goes to a log file the page tails; its pid, heartbeat and exit code are small files beside the log. When this server starts again it finds the runs that are still going
+    (fresh heartbeat), picks up the ones that ended while it was away (an exit file), and only calls a run `interrupted` when the runner is gone without having recorded an exit."""
 
     def __init__(self, project: Project):
         self.project = project
@@ -463,22 +472,113 @@ class Jobs:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.lock = threading.Lock()
         self.jobs: dict[str, dict] = {}
-        self.procs: dict[str, subprocess.Popen] = {}
-        self.logs: dict = {}
+        self.watchers: set[str] = set()
+        self.deleted: set[str] = set()
+        self._progress_cache: dict = {}
         index = self.dir / "jobs.json"
         if index.is_file():
             try:
                 for job in json.loads(index.read_text(encoding="utf-8")):
-                    if job.get("state") == "running":
-                        job["state"] = "interrupted"   # the window was closed while it ran
                     self.jobs[job["id"]] = job
             except (ValueError, KeyError):
                 pass
+        for job in list(self.jobs.values()):
+            if job.get("state") in ("running", "cancelling"):
+                self._reconcile(job)
+        self._save()
 
+    # -- persistence -------------------------------------------------------------------------------------------
     def _save(self):
-        recent = sorted(self.jobs.values(), key=lambda j: j["started"])[-100:]
-        (self.dir / "jobs.json").write_text(json.dumps(recent, indent=1), encoding="utf-8")
+        # Another window on the same folder (plasbench ui --new-instance) may have started jobs this one has not seen: keep them, so one window never erases another's runs.
+        try:
+            for job in json.loads((self.dir / "jobs.json").read_text(encoding="utf-8")):
+                if job.get("id") not in self.jobs and job.get("id") not in self.deleted:
+                    self.jobs[job["id"]] = job
+                elif job.get("id") in self.jobs and job.get("state") in ("done", "failed", "cancelled", "interrupted") and self.jobs[job["id"]]["state"] in ("running", "cancelling"):
+                    self.jobs[job["id"]].update(job)   # another window already recorded how it ended
+        except (OSError, ValueError, KeyError):
+            pass
+        keep = sorted(self.jobs.values(), key=lambda j: j["started"])
+        running = [j for j in keep if j["state"] in ("running", "cancelling")]
+        recent = [j for j in keep if j["state"] not in ("running", "cancelling")][-KEEP_JOBS:] + running
+        (self.dir / "jobs.json").write_text(json.dumps(sorted(recent, key=lambda j: j["started"]), indent=1), encoding="utf-8")
 
+    def _paths(self, job_id: str) -> dict:
+        return jobrunner.paths(str(self.dir), job_id)
+
+    def _append_log(self, job_id: str, text: str):
+        try:
+            with open(self._paths(job_id)["log"], "ab") as handle:
+                handle.write(text.encode("utf-8"))
+        except OSError:
+            pass
+
+    # -- finding runs again after a restart --------------------------------------------------------------------
+    def _reconcile(self, job: dict):
+        """A job the index calls running: still going (watch it), finished while no server was watching (read its exit), or gone (interrupted)."""
+        job_id = job["id"]
+        exit_info = jobrunner.read_json(self._paths(job_id)["exit"])
+        if exit_info is not None:
+            self._finish(job_id, exit_info.get("code"), exit_info.get("ended"), save=False)
+        elif jobrunner.is_alive(str(self.dir), job_id):
+            job["reattached"] = True
+            self._watch(job_id)
+        else:
+            job.update(state="cancelled" if job["state"] == "cancelling" else "interrupted", ended=job.get("ended") or self._last_sign_of_life(job_id), exit=None)
+            self._append_log(job_id, "\n[PlasBench] The run stopped without recording how it ended (the computer was shut down or the process was killed). "
+                                     "Use Resume: finished work is kept and reused.\n")
+
+    def _last_sign_of_life(self, job_id: str) -> float:
+        times = []
+        for key in ("alive", "log"):
+            try:
+                times.append(os.path.getmtime(self._paths(job_id)[key]))
+            except OSError:
+                pass
+        return max(times) if times else time.time()
+
+    def _watch(self, job_id: str):
+        if job_id in self.watchers:
+            return
+        self.watchers.add(job_id)
+        threading.Thread(target=self._watch_loop, args=(job_id,), daemon=True).start()
+
+    def _watch_loop(self, job_id: str):
+        while True:
+            time.sleep(1.0)
+            job = self.jobs.get(job_id)
+            if not job or job["state"] not in ("running", "cancelling"):
+                break
+            exit_info = jobrunner.read_json(self._paths(job_id)["exit"])
+            if exit_info is not None:
+                self._finish(job_id, exit_info.get("code"), exit_info.get("ended"))
+                break
+            if not jobrunner.is_alive(str(self.dir), job_id):
+                with self.lock:
+                    job.update(state="cancelled" if job["state"] == "cancelling" else "interrupted", ended=self._last_sign_of_life(job_id), exit=None)
+                    self._save()
+                self._append_log(job_id, "\n[PlasBench] " + ("The run was cancelled." if job["state"] == "cancelled" else
+                                 "The run stopped without recording how it ended. Use Resume: finished work is kept and reused.") + "\n")
+                session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=None, seconds=round(job["ended"] - job["started"], 1))
+                break
+        self.watchers.discard(job_id)
+
+    def _finish(self, job_id: str, code, ended, save: bool = True):
+        with self.lock:
+            job = self.jobs[job_id]
+            code = int(code) if isinstance(code, (int, float)) else None
+            state = "cancelled" if job["state"] == "cancelling" else ("done" if code == 0 else "failed")
+            job.update(ended=ended or time.time(), exit=code, state=state)
+            if save:
+                self._save()
+        if code not in (0, None):
+            # Never end silently: the console's last line says how and why the command stopped.
+            from .exitcodes import explain
+            reason = "cancelled from the window" if state == "cancelled" else explain(code)
+            self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
+        session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code, seconds=round(job["ended"] - job["started"], 1))
+
+    # -- starting, answering, cancelling, resuming -------------------------------------------------------------
     def start(self, argv: list[str], label: str = "", env: dict | None = None) -> dict:
         ok, message = ui_schema.validate_argv(argv)
         if not ok:
@@ -496,111 +596,133 @@ class Jobs:
         env = {"GIT_TERMINAL_PROMPT": "0"}
         return self._launch(list(command), shown, label, env, [], "git", cwd)
 
-    def _launch(self, command, shown, label, env, argv, kind, cwd) -> dict:
+    def _launch(self, command, shown, label, env, argv, kind, cwd, resumes: str | None = None) -> dict:
         job_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
-        log = self.dir / f"{job_id}.log"
+        p = self._paths(job_id)
         child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
         for key, value in (env or {}).items():
             if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
                 raise ValueError(f"not a setting name: {key}")
             child_env[key] = str(value)
-        # Append mode: the command and this server (echoing the answers typed in the window) both write to it.
-        handle = open(log, "ab")
-        handle.write(f"$ {shown}\n".encode())
-        if env:
-            handle.write(("  with " + " ".join(f"{k}={shlex.quote(str(v))}" for k, v in env.items()) + "\n").encode())
-        handle.flush()
-        kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
-        # stdin is a pipe the window can type into (answer()): a command that asks a question waits for the answer
-        # typed in the console instead of being handed an empty one.
-        proc = subprocess.Popen(command, cwd=str(cwd), stdin=subprocess.PIPE, stdout=handle,
-                                stderr=subprocess.STDOUT, env=child_env, **kwargs)
+        with open(p["log"], "ab") as handle:   # the command line first; the runner then appends the command's own output
+            handle.write(f"$ {shown}\n".encode())
+            if env:
+                handle.write(("  with " + " ".join(f"{k}={shlex.quote(str(v))}" for k, v in env.items()) + "\n").encode())
+        kwargs = {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+        runner = subprocess.Popen([sys.executable, "-u", "-m", "plasbench.jobrunner", str(self.dir), job_id, str(cwd), "--"] + list(command), cwd=str(cwd),
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=child_env, **kwargs)
         job = {"id": job_id, "label": label or shown, "argv": list(argv), "command": shown, "env": env or {}, "kind": kind,
-               "state": "running", "started": time.time(), "ended": None, "exit": None, "pid": proc.pid}
+               "state": "running", "started": time.time(), "ended": None, "exit": None, "pid": runner.pid, "results": self._results_dir(argv)}
+        if resumes:
+            job["resumes"] = resumes
         with self.lock:
             self.jobs[job_id] = job
-            self.procs[job_id] = proc
-            self.logs[job_id] = handle
             self._save()
-        threading.Thread(target=self._wait, args=(job_id, proc, handle), daemon=True).start()
-        session_log().event("job_start", job=job_id, label=job["label"], command=shown, env=env or None, cwd=str(cwd),
-                            job_kind=kind)
+        threading.Thread(target=runner.wait, daemon=True).start()   # reap the runner; the outcome comes from its exit file
+        self._watch(job_id)
+        session_log().event("job_start", job=job_id, label=job["label"], command=shown, env=env or None, cwd=str(cwd), job_kind=kind)
         return job
 
-    def _wait(self, job_id, proc, handle):
-        code = proc.wait()
-        with self.lock:
-            self.logs.pop(job_id, None)
-            handle.close()
-            try:
-                proc.stdin.close()
-            except (OSError, AttributeError, ValueError):
-                pass
-            job = self.jobs[job_id]
-            job.update(ended=time.time(), exit=code,
-                       state="cancelled" if job["state"] == "cancelling" else ("done" if code == 0 else "failed"))
-            if code != 0:
-                # Never end silently: the console's last line says how and why the command stopped.
-                from .exitcodes import explain
-                reason = "cancelled from the window" if job["state"] == "cancelled" else explain(code)
+    def _results_dir(self, argv: list) -> str:
+        """The results folder a run writes to, from its options (empty for a command that does not make one)."""
+        if not argv or argv[0] not in SESSION_COMMANDS:
+            return ""
+        root = self.project.root
+        for i, a in enumerate(argv):
+            if a == "--results-dir" and i + 1 < len(argv):
+                return str((root / argv[i + 1]) if not os.path.isabs(argv[i + 1]) else Path(argv[i + 1]))
+            if a.startswith("--results-dir="):
+                return str(root / a.split("=", 1)[1])
+        for i, a in enumerate(argv):
+            if a == "--study" and i + 1 < len(argv):
                 try:
-                    with open(self.dir / f"{job_id}.log", "ab") as tail:
-                        tail.write(f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n".encode())
-                except OSError:
+                    from . import studies
+                    for st in studies.list_studies(root):
+                        if st.get("name") == argv[i + 1]:
+                            return str(Path(st["results"]))
+                except Exception:
                     pass
-            self.procs.pop(job_id, None)
-            self._save()
-        session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code,
-                            seconds=round(job["ended"] - job["started"], 1))
+                return ""
+        return str(root / "results_demo") if argv[0] == "demo" else str(root / "results")
 
     def answer(self, job_id: str, text: str, secret: bool = False) -> dict:
-        """Type one line into a running command, as if at its terminal, and record it in the log (masked if secret)."""
+        """Type one line into a running command, as if at its terminal, and record it in the log (masked if secret). Works for a run this window did not start."""
         if "\n" in text or "\r" in text:
             raise ValueError("one line at a time")
         if len(text) > 4096:
             raise ValueError("answer too long")
+        job = self.jobs.get(job_id)
+        if not job or job["state"] != "running" or not jobrunner.is_alive(str(self.dir), job_id):
+            raise ValueError("this job is not running")
         with self.lock:
-            proc, handle = self.procs.get(job_id), self.logs.get(job_id)
-            if not proc or proc.poll() is not None:
-                raise ValueError("this job is not running")
+            shown = "\u2022" * len(text) if secret else text
             try:
-                proc.stdin.write((text + "\n").encode("utf-8"))
-                proc.stdin.flush()
-            except (BrokenPipeError, OSError, ValueError) as exc:
+                with open(self._paths(job_id)["input"], "ab") as handle:   # the runner forwards it and records `[you] ...` in the log
+                    handle.write((json.dumps({"text": text, "shown": shown}) + "\n").encode("utf-8"))
+            except OSError as exc:
                 raise ValueError(f"the command is no longer reading input ({exc})")
-            shown = "•" * len(text) if secret else text
-            if handle:
-                handle.write(f"\n[you] {shown}\n".encode("utf-8"))
-                handle.flush()
-        session_log().event("job_input", job=job_id, label=self.jobs.get(job_id, {}).get("label", ""), answer=shown)
+        session_log().event("job_input", job=job_id, label=job.get("label", ""), answer=shown)
         return {"ok": True}
+
+    def _kill(self, job_id: str, job: dict):
+        info = jobrunner.read_json(self._paths(job_id)["pid"]) or {}
+        pid = int(info.get("runner") or job.get("pid") or 0)
+        if not pid:
+            return
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
+        else:
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except OSError:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except OSError:
+                    pass
 
     def cancel(self, job_id: str) -> dict:
         with self.lock:
-            proc = self.procs.get(job_id)
             job = self.jobs.get(job_id)
-            if not proc or not job:
+            if not job or job["state"] not in ("running", "cancelling"):
                 raise KeyError(job_id)
             job["state"] = "cancelling"
+            self._save()
         session_log().event("job_cancel", job=job_id, label=job["label"])
-        if os.name == "nt":
-            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
-        else:
-            try:
-                os.killpg(proc.pid, signal.SIGTERM)
-            except OSError:
-                proc.terminate()
+        self._kill(job_id, job)
+        self._watch(job_id)
         return job
 
+    def resume(self, job_id: str) -> dict:
+        """Start the same command again for a run that failed, was interrupted or was cancelled. Finished work is reused (docs/SCIENTIFIC_GUIDE.md: an interrupted run resumes), so this
+        picks up where it stopped. The new job is linked to the old one both ways."""
+        job = self.jobs.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        if job["state"] not in RESUMABLE_STATES or job.get("kind") != "plasbench" or not job.get("argv"):
+            raise ValueError("only a failed, interrupted or cancelled plasbench run can be resumed")
+        if any(j["state"] in ("running", "cancelling") and j.get("argv") == job["argv"] for j in self.jobs.values()):
+            raise ValueError("the same command is already running")
+        command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(job["argv"])
+        label = job["label"] if job["label"].startswith("Resumed: ") else "Resumed: " + job["label"]
+        new = self._launch(command, job["command"], label, job.get("env") or None, list(job["argv"]), "plasbench", self.project.root, resumes=job_id)
+        with self.lock:
+            job["resumed_by"] = new["id"]
+            self._save()
+        return new
+
+    def running(self) -> list[dict]:
+        return [j for j in self.jobs.values() if j["state"] in ("running", "cancelling")]
+
+    # -- reading -----------------------------------------------------------------------------------------------
     def get(self, job_id: str, offset: int = 0) -> dict:
         job = self.jobs.get(job_id)
         if not job:
             raise KeyError(job_id)
-        log = self.dir / f"{job_id}.log"
+        log = self._paths(job_id)["log"]
         text, size = "", 0
-        if log.is_file():
-            size = log.stat().st_size
-            with log.open("rb") as handle:
+        if os.path.isfile(log):
+            size = os.path.getsize(log)
+            with open(log, "rb") as handle:
                 handle.seek(max(0, offset))
                 text = handle.read(MAX_LOG_CHUNK).decode("utf-8", "replace")
         return dict(job, log=text, offset=min(size, max(0, offset) + MAX_LOG_CHUNK), size=size)
@@ -608,13 +730,69 @@ class Jobs:
     def list(self) -> list[dict]:
         return sorted(self.jobs.values(), key=lambda j: -j["started"])
 
+    def progress(self, job_id: str) -> dict:
+        """The parsed progress of a job's log, cached until the log changes."""
+        log = self._paths(job_id)["log"]
+        try:
+            stat = os.stat(log)
+        except OSError:
+            return runprogress.parse("")
+        key = (stat.st_size, int(stat.st_mtime))
+        cached = self._progress_cache.get(job_id)
+        if cached and cached[0] == key:
+            return cached[1]
+        with open(log, "rb") as handle:
+            data = handle.read(8 * 2**20) if stat.st_size <= 8 * 2**20 else handle.read(2**20) + b"\n" + _tail_bytes(log, 6 * 2**20)
+        result = runprogress.parse(data.decode("utf-8", "replace"))
+        self._progress_cache[job_id] = (key, result)
+        return result
+
+    def sessions(self, run_index: dict | None = None) -> list[dict]:
+        """The benchmark run sessions, newest first, each with the group it belongs in, its progress, where its results are and what can be done with it.
+
+        group: ongoing (running or cancelling), attention (failed, interrupted or cancelled: can be resumed), completed. `run_index` maps a results folder to its index in the
+        Runs list so the page can open that run's report."""
+        out = []
+        for job in self.list():
+            if job.get("kind") != "plasbench" or not job.get("argv") or job["argv"][0] not in SESSION_COMMANDS:
+                continue
+            state = job["state"]
+            group = "ongoing" if state in ("running", "cancelling") else "completed" if state == "done" else "attention"
+            results = job.get("results") or self._results_dir(job["argv"])
+            idx = (run_index or {}).get(str(Path(results).resolve())) if results else None
+            progress = self.progress(job["id"])
+            if state == "done":
+                progress = dict(progress, percent=100)
+            log = self._paths(job["id"])["log"]
+            try:
+                activity = os.path.getmtime(log)
+            except OSError:
+                activity = job["started"]
+            out.append(dict(job, group=group, progress=progress, results=results, run_index=idx, last_activity=activity,
+                            resumable=state in RESUMABLE_STATES and not any(j["state"] in ("running", "cancelling") and j.get("argv") == job["argv"] for j in self.jobs.values()),
+                            reattached=bool(job.get("reattached"))))
+        return out
+
     def delete(self, job_id: str):
         with self.lock:
-            if job_id in self.procs:
+            job = self.jobs.get(job_id)
+            if job and job["state"] in ("running", "cancelling"):
                 raise ValueError("cancel the job before removing it")
             self.jobs.pop(job_id, None)
+            self.deleted.add(job_id)
             self._save()
-        (self.dir / f"{job_id}.log").unlink(missing_ok=True)
+        for path in self._paths(job_id).values():
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+
+def _tail_bytes(path: str, n: int) -> bytes:
+    with open(path, "rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        handle.seek(max(0, handle.tell() - n))
+        return handle.read()
 
 
 # --------------------------------------------------------------------------------------------- HTTP
@@ -897,6 +1075,10 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, workspace.check(q.get("path", "")))
             if route == "jobs":
                 return self.jsend(200, {"jobs": jobs.list()})
+            if route == "sessions":
+                index = {r["path"]: i for i, r in enumerate(project.runs(state.get("runs", [])))}
+                index = {str(Path(k).resolve()): v for k, v in index.items()}
+                return self.jsend(200, {"sessions": jobs.sessions(index), "server_started": SERVER_STARTED})
             if route.startswith("jobs/"):
                 return self.jsend(200, jobs.get(route[len("jobs/"):], int(q.get("offset", 0))))
             if route == "usertools":
@@ -962,6 +1144,8 @@ def make_handler(project: Project, jobs: Jobs):
                 if not isinstance(text, str):
                     raise ValueError("text must be a string")
                 return self.jsend(200, jobs.answer(route[len("jobs/"):-len("/input")], text, bool(data.get("secret"))))
+            if route.startswith("jobs/") and route.endswith("/resume"):
+                return self.jsend(200, jobs.resume(route[len("jobs/"):-len("/resume")]))
             if route.startswith("jobs/") and route.endswith("/cancel"):
                 return self.jsend(200, jobs.cancel(route[len("jobs/"):-len("/cancel")]))
             if route.startswith("jobs/") and route.endswith("/delete"):
@@ -989,14 +1173,15 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, terminal.state())
             if route == "shutdown":
                 running = [j for j in jobs.list() if j["state"] in ("running", "cancelling")]
-                if running and not data.get("force"):
+                keep = bool(data.get("keep"))   # leave the runs going: they are detached, and the next window finds them again
+                if running and not data.get("force") and not keep:
                     return self.jsend(200, {"ok": False, "running": [j["label"] for j in running]})
-                for job in running:
+                for job in ([] if keep else running):
                     try:
                         jobs.cancel(job["id"])
                     except (KeyError, ValueError):
                         pass
-                session_log().event("quit", forced=bool(running) or None)
+                session_log().event("quit", forced=bool(running) and not keep or None, kept_running=len(running) if keep else None)
                 threading.Timer(0.3, self.server.shutdown).start()
                 return self.jsend(200, {"ok": True})
             if route == "workspace/set":
