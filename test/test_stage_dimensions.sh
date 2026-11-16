@@ -58,6 +58,19 @@ for shard in accuracy missing_regions feature_preservation ngoc; do
     [[ -s "$R/mob_recon.${shard}.tsv" ]] || { echo "FAIL: stage 5 wrote no ${shard} shard" >&2; cat "$TMP/stage5.log" >&2; exit 1; }
 done
 echo "stage 5 writes the accuracy, missing-region, feature-preservation and NGOC shards -> PASS"
+for shard in multiplicity multiplicity_candidates; do
+    [[ -s "$R/mob_recon.${shard}.tsv" ]] || { echo "FAIL: stage 5 wrote no ${shard} shard" >&2; cat "$TMP/stage5.log" >&2; exit 1; }
+done
+python3 - "$R" <<'PYEOF'
+import csv, sys
+rows = list(csv.DictReader(open(f"{sys.argv[1]}/mob_recon.multiplicity.tsv"), delimiter="	"))
+assert rows and rows[0]["plasmid"] == "p1" and rows[0]["outcome"] == "single", rows
+assert abs(float(rows[0]["combined_coverage"]) - 5000 / 6000) < 1e-3 and abs(float(rows[0]["best_candidate_coverage"]) - 5000 / 6000) < 1e-3, rows
+assert rows[0]["redundant_bp"] == "0" and rows[0]["n_candidates"] == "1", rows
+cands = list(csv.DictReader(open(f"{sys.argv[1]}/mob_recon.multiplicity_candidates.tsv"), delimiter="	"))
+assert [c["relationship"] for c in cands] == ["primary"], cands
+print("stage 5 writes the candidate-multiplicity shards (one candidate, 5000 of 6000 bp, no redundancy) -> PASS")
+PYEOF
 
 python3 - "$R" <<'PYEOF'
 import csv, sys
@@ -81,6 +94,12 @@ for table in accuracy missing_regions feature_preservation ngoc performance powe
     [[ -e "$TMP/results/benchmark.${table}.tsv" ]] || { echo "FAIL: stage 6 wrote no benchmark.${table}.tsv" >&2; tail -30 "$TMP/stage6.log" >&2; exit 1; }
 done
 echo "stage 6 merges the shards and writes every dimension table -> PASS"
+for table in candidate_multiplicity candidates; do
+    [[ -s "$TMP/results/benchmark.${table}.tsv" ]] || { echo "FAIL: stage 6 wrote no benchmark.${table}.tsv" >&2; tail -30 "$TMP/stage6.log" >&2; exit 1; }
+done
+[[ -s "$TMP/results/benchmark.plaseval_gate.json" ]] || { echo "FAIL: stage 6 wrote no PlasEval gate verdict" >&2; tail -30 "$TMP/stage6.log" >&2; exit 1; }
+grep -q '"status": "\(NOT_RUN\|PASS\|NO_DATA\)"' "$TMP/results/benchmark.plaseval_gate.json"     || { echo "FAIL: the PlasEval gate verdict is not one of the expected states here" >&2; cat "$TMP/results/benchmark.plaseval_gate.json" >&2; exit 1; }
+echo "stage 6 merges the multiplicity tables and records the PlasEval gate verdict -> PASS"
 HTML="$TMP/results/benchmark.report.html"
 for section in accuracy-dimension feature-preservation bin-quality performance power scenarios composite reproducibility; do
     # Most of these are tabs of a merged container now: the old id is the panel id, so the old link still lands on it.

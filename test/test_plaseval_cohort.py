@@ -88,10 +88,39 @@ try:
     check("tool-by-tool and tool-by-truth agreement are written (6 pairs + 4 truth rows)", len(matrix) == 10)
     page = open(os.path.join(out, "plaseval_replication.html"), encoding="utf-8").read()
     check("the report page has the charts, the data credit and says the original was not run",
-          "Error profile by tool." in page and "Zenodo 10.5281/zenodo.10785150" in page and "was not run here" in page
+          "Error profile by tool." in page and "Zenodo 10.5281/zenodo.10785150" in page and "was not run on these bins" in page
           and page.count("<svg") >= 6)
+    print("rebuilding the page from a run's saved tables")
+    progress = os.path.join(out, "plaseval_replication.original_progress.tsv")
+    with open(os.path.join(out, "plaseval_replication.scores.tsv"), newline="", encoding="utf-8") as handle:
+        first = list(csv.DictReader(handle, delimiter=chr(9)))
+    T, N = chr(9), chr(10)
+    with open(progress, "w", encoding="utf-8") as handle:
+        handle.write(T.join(["sample", "tool", "original_dissimilarity", "status"]) + N)
+        for i, r in enumerate(first):
+            if i == 0:
+                handle.write(T.join([r["sample"], r["tool"], "", "timeout"]) + N)                        # the original timed out on this pair
+            else:
+                handle.write(T.join([r["sample"], r["tool"], f"{float(r['bin_dissimilarity']):.6f}", "ok"]) + N)   # and agreed on the rest
+    out2 = os.path.join(tmp, "rebuilt")
+    code = pr.main(["--out-dir", out2, "--from-tsv", out, "--bins-dir", subset])
+    page2 = open(os.path.join(out2, "plaseval_replication.html"), encoding="utf-8").read()
+    check("--from-tsv rebuilds the page and merges the streamed original results", code == 0 and "Comparison with the original PlasEval program: PARTIAL" in page2
+          and "19 of 20 isolate-tool pairs were compared" in page2, page2[page2.find("Comparison with"):][:300])
+    check("the pair the original did not finish is listed, not filled in", "Pairs the original program did not finish" in page2 and "timeout" in page2)
+    check("the rebuilt page draws the PlasBench-against-original scatter", "PlasBench against the original program" in page2)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
+print("recorded reference run of the original program")
+with open(pr.REFERENCE, encoding="utf-8") as handle:
+    ref = [r for r in csv.DictReader((x for x in handle if not x.startswith("#")), delimiter="	")]
+check("the shipped reference covers all 212 pairs, 211 answered", len(ref) == 212 and sum(r["status"] == "ok" for r in ref) == 211)
+demo = [{"sample": ref[0]["sample"], "tool": ref[0]["tool"], "bin_dissimilarity": "0.5"},
+        {"sample": ref[1]["sample"], "tool": ref[1]["tool"], "bin_dissimilarity": "0.5", "original_status": "ok", "original_dissimilarity": "0.1"}]
+check("apply_reference fills a pair and never overwrites a live answer",
+      pr.apply_reference(demo) == 1 and demo[0]["original_status"] == ref[0]["status"] and demo[1]["original_dissimilarity"] == "0.1")
+
 print("ALL PLASEVAL COHORT TESTS PASSED" if ok else "PLASEVAL COHORT TESTS FAILED")
 sys.exit(0 if ok else 1)
+

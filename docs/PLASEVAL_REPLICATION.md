@@ -29,8 +29,14 @@ contigs (hand-built and seeded random bin sets, and PlasEval's own examples).
 | PlasBin-flow | 0.370 | 0.728 | missing contigs (66%) |
 | HyAsP | 0.479 | 0.565 | extra contigs (69%) |
 
-These are PlasBench's numbers on the paper's published bins. **They have not yet been compared with the original program on these bins, nor
-with the figures in the paper** (the paper's text was read for definitions, not for these numbers). That comparison is the gate's job.
+These are PlasBench's numbers on the paper's published bins. They have **not been compared with the figures printed in the paper** (the paper's text was read for definitions, not for these numbers).
+
+## Comparison with the original program
+
+**Result against the original program (reference run, 16 Nov 2026, PlasEval commit 8238356, alpha 0.5):** on the paper's 53 isolates and four tools (212 isolate-tool pairs) the original finished 211 pairs and PlasBench's dissimilarity **agreed within 0.001 on 210 of them** (gplas2, HyAsP and MOB-recon on all 53 isolates each, differences 0.000000; PlasBin-flow on 51 of 52). There were **no disagreements**. One pair, EC_9226_3S1_D with PlasBin-flow (26 repeat families), differs by 0.003 (PlasBench 0.5415, original 0.5385): PlasBench's repeat search hit its call cap there, so its value is a stated upper bound, not an error. One pair, EC_9226_C5_H with PlasBin-flow, did not finish in the original within 900 s and is not compared. The original's answers are kept in `cohorts/plaseval_ecoli53/original_reference.tsv`.
+
+**Confirm it yourself.** `python python/plaseval_replication.py --out-dir out` re-scores the cohort and writes `out/plaseval_replication.html`; its section *Comparison with the original PlasEval program* shows the verdict, a per-tool table, the agreement scatter and the pairs not compared. Without a PlasEval checkout it compares with the recorded reference run (and says so on the page); with `--plaseval-src` it re-runs the original. The finished page from the reference run is `cohorts/plaseval_ecoli53/replication_report.html`.
+
 Facts about the data worth knowing: repeated contigs are common (87 of the 212 pairs have at least one repeat family, and 246 contigs sit in more
 than one truth bin), so the repeat-aware matching matters here; two searches (PlasBin-flow, large repeat families) reached the call cap
 (`DISSIMILARITY_MAX_CALLS`, default 200,000) and are upper bounds; and the tool order depends on the length exponent (at alpha 0 PlasBin-flow

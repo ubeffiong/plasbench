@@ -339,6 +339,21 @@ score_sample() {
                 --min-length "$CONTIG_MIN_LENGTH" --out "$RDIR/${tool}.contig_classification.tsv" \
                 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "contig-level scoring failed for $SAMPLE/$tool"
         fi
+        # Candidate multiplicity (python/candidate_multiplicity.py): every predicted record is accounted for, so several candidates
+        # for one plasmid (fragments, duplicates, chimeras, off-target or unmapped records) are visible instead of hidden behind the
+        # best hit. Descriptive: it never changes the score above.
+        rm -f "$RDIR/${tool}.multiplicity.tsv" "$RDIR/${tool}.multiplicity_candidates.tsv" "$RDIR/${tool}.multiplicity_intervals.tsv"
+        if [[ "${RUN_CANDIDATE_MULTIPLICITY:-1}" == "1" && -f "$PAF" && -f "$PRED" ]]; then
+            python3 "$HERE/../python/candidate_multiplicity.py" --truth "$SCORE_TRUTH" --paf "$PAF" --pred-fasta "$PRED" \
+                --sample "$SAMPLE" --tool "$tool" \
+                --min-alignment-length "$MIN_ALIGNMENT_LENGTH" --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \
+                --min-alignment-mapq "$MIN_ALIGNMENT_MAPQ" --min-alignment-query-coverage "$MIN_ALIGNMENT_QUERY_COVERAGE" \
+                --new-fraction "$MULTIPLICITY_NEW_FRACTION" --chimera-min-bp "$MULTIPLICITY_CHIMERA_MIN_BP" \
+                --chimera-fraction "$MULTIPLICITY_CHIMERA_FRACTION" \
+                --out-plasmids "$RDIR/${tool}.multiplicity.tsv" --out-candidates "$RDIR/${tool}.multiplicity_candidates.tsv" \
+                --out-intervals "$RDIR/${tool}.multiplicity_intervals.tsv" \
+                2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "candidate multiplicity failed for $SAMPLE/$tool; the score is unaffected"
+        fi
         # PlasEval-style bin agreement (python/bin_agreement.py, reimplemented from the published definitions): best-match
         # (not one-to-one) precision/recall/F1 and the split/join dissimilarity, on the contig labels. Shards are merged
         # into scores.tsv below; a tool that outputs reassembled sequences is recorded as not applicable.
