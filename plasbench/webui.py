@@ -477,13 +477,9 @@ class Jobs:
         self.watchers: set[str] = set()
         self.deleted: set[str] = set()
         self._progress_cache: dict = {}
-        index = self.dir / "jobs.json"
-        if index.is_file():
-            try:
-                for job in json.loads(index.read_text(encoding="utf-8")):
-                    self.jobs[job["id"]] = job
-            except (ValueError, KeyError):
-                pass
+        for job in self._read_index():
+            if isinstance(job, dict) and "id" in job:
+                self.jobs[job["id"]] = job
         for job in list(self.jobs.values()):
             if job.get("state") == "interrupted" and jobrunner.is_alive(str(self.dir), job["id"]):
                 job.update(state="running", ended=None, exit=None)   # an earlier window called it lost before its runner had written a heartbeat; it is plainly going
@@ -492,10 +488,22 @@ class Jobs:
         self._save()
 
     # -- persistence -------------------------------------------------------------------------------------------
+    def _read_index(self) -> list:
+        """The saved job list. The file is replaced atomically, but a reader on another filesystem or an older writer could still meet a half-written one: retry briefly before giving up."""
+        path = self.dir / "jobs.json"
+        for attempt in range(6):
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                return []
+            except (OSError, ValueError):
+                time.sleep(0.05 * (attempt + 1))
+        return []
+
     def _save(self):
         # Another window on the same folder (plasbench ui --new-instance) may have started jobs this one has not seen: keep them, so one window never erases another's runs.
         try:
-            for job in json.loads((self.dir / "jobs.json").read_text(encoding="utf-8")):
+            for job in self._read_index():
                 if job.get("id") not in self.jobs and job.get("id") not in self.deleted:
                     self.jobs[job["id"]] = job
                 elif job.get("id") in self.jobs and job.get("state") in ("done", "failed", "cancelled") and self.jobs[job["id"]]["state"] in ("running", "cancelling"):
@@ -505,7 +513,9 @@ class Jobs:
         keep = sorted(self.jobs.values(), key=lambda j: j["started"])
         running = [j for j in keep if j["state"] in ("running", "cancelling")]
         recent = [j for j in keep if j["state"] not in ("running", "cancelling")][-KEEP_JOBS:] + running
-        (self.dir / "jobs.json").write_text(json.dumps(sorted(recent, key=lambda j: j["started"]), indent=1), encoding="utf-8")
+        tmp = self.dir / f"jobs.json.{os.getpid()}.{threading.get_ident()}.tmp"   # written whole, then renamed over the index: a reader sees the old file or the new one, never half
+        tmp.write_text(json.dumps(sorted(recent, key=lambda j: j["started"]), indent=1), encoding="utf-8")
+        os.replace(tmp, self.dir / "jobs.json")
 
     def _paths(self, job_id: str) -> dict:
         return jobrunner.paths(str(self.dir), job_id)
@@ -903,6 +913,26 @@ class UIServer(ThreadingHTTPServer):
             pass
 
 
+KEY_PAGE = """<!doctype html><meta charset="utf-8"><title>PlasBench: this window needs its key</title>
+<body style="font-family:system-ui,sans-serif;max-width:640px;margin:48px auto;padding:0 20px;line-height:1.5;color:#1d2b25">
+<script>
+/* A reload of the SAME tab has lost its key from the address (the page removes it for privacy) and, for a browser that forgot its cookie, from the request. The tab itself still holds
+   the key in its own session storage, which only this tab on this address can read: use it once. If the key is stale (PlasBench was restarted) the second answer arrives with the key
+   in the address and this does not run again, so there is no loop. */
+try { var t = sessionStorage.getItem("pb_t"); if (t && !location.search) { document.body.style.visibility = "hidden"; location.replace("/?t=" + encodeURIComponent(t)); } } catch (e) {}
+</script>
+<h2 style="margin-bottom:4px">This PlasBench window needs to be reopened</h2>
+<p>PlasBench is running, but this address does not carry the key that protects it. That happens when PlasBench was restarted (it makes a new key every time it starts), or when this tab was
+opened from an old bookmark or from the browser's history.</p>
+<h3>To get back in</h3>
+<ol>
+<li><b>Click the PlasBench icon again.</b> It finds the running PlasBench and opens a new window with the right key. Nothing is lost: runs you started keep going.</li>
+<li>Or run <code>plasbench ui</code> in a terminal: if PlasBench is already running it prints the full link and opens the window.</li>
+<li>Or open the link PlasBench printed when it started (it ends with <code>?t=</code> and the key). The link is also in <code>~/.plasbench/ui/server.json</code>.</li>
+</ol>
+<p style="color:#5b6b63;font-size:14px">The key stops other programs and websites on this computer from using PlasBench on your behalf, which is why the bare address is refused.</p>
+<p><button onclick="location.reload()" style="padding:6px 14px;font:inherit">Check again</button></p>
+</body>"""
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 REPLAY_SECONDS = 300
 
@@ -964,7 +994,7 @@ def make_handler(project: Project, jobs: Jobs):
             if (extra or {}).get("disposition"):
                 self.send_header("Content-Disposition", f'attachment; filename="{extra["disposition"]}"')
             if cookie:
-                self.send_header("Set-Cookie", f"plasbench_token={TOKEN}; Path=/; SameSite=Strict; HttpOnly")
+                self.send_header("Set-Cookie", f"{self.cookie_name()}={TOKEN}; Path=/; SameSite=Strict; HttpOnly; Max-Age=2592000")
             self.end_headers()
             self.wfile.write(body)
 
@@ -975,12 +1005,16 @@ def make_handler(project: Project, jobs: Jobs):
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
             return host in ("127.0.0.1", "localhost", "::1")
 
+        def cookie_name(self):
+            """Cookies are shared by every port of 127.0.0.1, so each server keeps its key under its own name: two PlasBench windows (or a stale server) can no longer overwrite each other's key."""
+            return f"plasbench_token_{self.server.server_address[1]}"
+
         def token_ok(self):
             tok = self.headers.get("X-PlasBench-Token") or parse_qs(urlparse(self.path).query).get("t", [""])[0]
             if not tok:
                 for part in (self.headers.get("Cookie") or "").split(";"):
                     k, _, v = part.strip().partition("=")
-                    if k == "plasbench_token":
+                    if k == self.cookie_name():
                         tok = v
             return secrets.compare_digest(tok or "", TOKEN)
 
@@ -1009,13 +1043,7 @@ def make_handler(project: Project, jobs: Jobs):
                 from . import desktop
                 return self.send(200, desktop.png_bytes(64) if path == "/favicon.ico" else desktop.png_bytes(192), "image/png")
             if not self.token_ok():
-                return self.send(403, ("<!doctype html><title>PlasBench</title><body style='font-family:system-ui;padding:40px'>"
-                                       "<h2>Open PlasBench from the link <code>plasbench ui</code> printed</h2><p>This address "
-                                       "needs the session key that was printed with it (the part after <code>?t=</code>). "
-                                       "The key is new every time PlasBench starts, so an old tab or bookmark stops working.</p>"
-                                       "<p>To get the full link again, run <code>plasbench ui</code> in a terminal: if PlasBench is "
-                                       "already running it prints the full link and reopens the window. The link is also in "
-                                       "<code>~/.plasbench/ui/server.json</code>.</p></body>").encode(), "text/html; charset=utf-8")
+                return self.send(403, KEY_PAGE.encode("utf-8"), "text/html; charset=utf-8")
             if path == "/":
                 PAGE_SEEN["t"] = time.time()   # a window loaded the page
                 return self.send(200, page(), "text/html; charset=utf-8", cookie=True)
@@ -1176,12 +1204,29 @@ def make_handler(project: Project, jobs: Jobs):
             return self.send(200, target.read_bytes(), ctype, extra={"report": True})
 
         # ---------------------------------------------------------------- POST
+        def drain_body(self):
+            """Read and discard the request body of a request that is about to be refused. A client that is still sending when the server answers and closes sees a connection abort
+            (Windows) instead of the 403; reading the body first lets it finish, and keeps the connection in step for the next request. A huge body is not read: the connection closes."""
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = 0
+            if length > 5 * 2**20:
+                self.close_connection = True
+                return
+            while length > 0:
+                chunk = self.rfile.read(min(length, 65536))
+                if not chunk:
+                    self.close_connection = True
+                    return
+                length -= len(chunk)
+
         def do_POST(self):
             if not self.host_ok() or not self.same_origin():
-                self.close_connection = True   # the body was not read: do not reuse this connection
+                self.drain_body()
                 return self.jsend(403, {"error": "request refused (not from this window)"})
             if not self.token_ok():
-                self.close_connection = True
+                self.drain_body()
                 return self.jsend(403, {"error": "missing or wrong session token"})
             route = unquote(urlparse(self.path).path)[len("/api/"):]
             rid = self.headers.get("X-PlasBench-Req") or ""
@@ -1564,6 +1609,11 @@ def serve(root: Path, host: str = "127.0.0.1", port: int = 8770, open_browser: b
     # Every check and command started from the window finds the plasbench environment's tools, however the window was
     # started (a desktop icon does not run `conda activate`).
     os.environ["PATH"] = platform_info.tools_path()
+    if hasattr(signal, "SIGHUP"):
+        try:   # closing the terminal that started `plasbench ui` sends SIGHUP and would stop PlasBench (and the window with it); Quit in the window or Ctrl+C still stop it
+            signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        except (ValueError, OSError):
+            pass
     project = Project(root)
     jobs = Jobs(project)
     handler = make_handler(project, jobs)

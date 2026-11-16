@@ -8,9 +8,11 @@ Server (a real one, in a subprocess):
   - a burst of concurrent requests (60 threads x 30) is all answered;
   - HTTP/1.1 keep-alive: many requests on ONE connection;
   - a request repeated with the same X-PlasBench-Req id runs once (a retried "start the benchmark" cannot start it twice) and returns the first run's answer;
-  - a request refused before its body was read closes the connection (no desynchronised keep-alive);
+  - a refused POST (wrong key, foreign origin) has its body read and discarded before the 403, so the client finishes sending cleanly and the connection stays in step;
   - a client that vanishes mid-request does not hurt the server;
-  - /healthz says when a page last loaded and which server instance it is.
+  - /healthz says when a page last loaded and which server instance it is;
+  - "This address needs the session key": the bare address is refused with a page that explains how to get back in (and never contains the key); the key cookie is named per port, so two
+    PlasBench servers cannot overwrite each other's key; the page recovers a reload of the same tab from that tab's own storage.
 Page (static checks; the browser behaviour is exercised by test/ui_connection_browser.mjs when a browser is available):
   - api() retries a network failure quietly with backoff, repeats the same request id, and only then shows the banner; pollers stand down while the connection is down;
   - the popup has a Retry now button that runs a real check (server answering? key valid?) rather than reloading, and the page reconnects by itself.
@@ -24,6 +26,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -110,14 +113,19 @@ def main():
         check("a request with a different id is a new request", s3 == 200 and other["id"] != first["id"])
 
         c = http.client.HTTPConnection("127.0.0.1", real_port, timeout=10)
-        c.request("POST", "/api/jobs", body=json.dumps({"argv": ["demo"]}), headers={"X-PlasBench-Token": "wrong", "Content-Type": "application/json"})
+        c.request("POST", "/api/jobs", body=json.dumps({"argv": ["demo"], "pad": "x" * 200000}), headers={"X-PlasBench-Token": "wrong", "Content-Type": "application/json"})
         r = c.getresponse()
         r.read()
-        check("a refused POST (wrong key) answers 403 and closes the connection, so the unread body cannot corrupt the next request", r.status == 403 and r.getheader("Connection", "").lower() == "close", r.getheaders())
+        check("a refused POST (wrong key) with a large body answers 403 cleanly (no connection abort)", r.status == 403, r.status)
         c.request("GET", "/api/jobs", headers={"X-PlasBench-Token": token})
         r2 = c.getresponse()
         r2.read()
-        check("the next request on that client then works (a new connection)", r2.status == 200)
+        check("the next request on the SAME connection then works (the body was drained, so it stayed in step)", r2.status == 200)
+        evil = http.client.HTTPConnection("127.0.0.1", real_port, timeout=10)
+        evil.request("POST", "/api/settings", body=json.dumps({"changes": {"X": "1"}}), headers={"X-PlasBench-Token": token, "Content-Type": "application/json", "Origin": "http://evil.example"})
+        r3 = evil.getresponse()
+        r3.read()
+        check("a foreign-origin POST is refused with 403 even with a valid key", r3.status == 403, r3.status)
 
         for _ in range(20):   # clients that go away mid-request, mid-body and straight after connecting
             s = socket.create_connection(("127.0.0.1", real_port), timeout=3)
@@ -133,6 +141,24 @@ def main():
         after = float(get("/healthz")[2]["X-PlasBench-Page-Seen"])
         check("/healthz says which server this is and when a window last loaded the page", body.startswith(b"ok") and headers["X-PlasBench-Instance"].isdigit() and after > before, (before, after))
 
+        def bare(cookie=None):
+            req = urllib.request.Request(base + "/", headers={"Cookie": cookie} if cookie else {})
+            try:
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    return r.status, r.read().decode("utf-8"), r.headers
+            except urllib.error.HTTPError as exc:
+                return exc.code, exc.read().decode("utf-8"), exc.headers
+        code, body, _ = bare()
+        check("the bare address (no key) is refused with a page that explains how to get back in, and the page never contains the key",
+              code == 403 and "needs to be reopened" in body and "Click the PlasBench icon again" in body and token not in body and "sessionStorage" in body, (code, body[:100]))
+        code, _, headers = bare(f"plasbench_token_{real_port}={token}")
+        check("the address with this server's key cookie is accepted", code == 200)
+        check("a cookie under the old shared name, or another port's name, is not accepted (servers cannot overwrite each other's key)",
+              bare(f"plasbench_token={token}")[0] == 403 and bare(f"plasbench_token_{real_port + 1}={token}")[0] == 403)
+        with urllib.request.urlopen(urllib.request.Request(base + "/?t=" + token), timeout=10) as r:
+            cookie = r.headers.get("Set-Cookie", "")
+        check("loading the page with the key sets a cookie named for this port, kept for 30 days, HttpOnly and SameSite=Strict",
+              cookie.startswith(f"plasbench_token_{real_port}=") and "Max-Age=2592000" in cookie and "HttpOnly" in cookie and "SameSite=Strict" in cookie, cookie)
         for j in json.loads(get("/api/jobs")[1])["jobs"]:   # tidy
             if j["state"] == "running":
                 post(f"/api/jobs/{j['id']}/cancel", {})
@@ -144,6 +170,9 @@ def main():
         time.sleep(1)
         proc.kill()
 
+    src = (ROOT / "plasbench" / "webui.py").read_text(encoding="utf-8")
+    check("closing the terminal that started `plasbench ui` does not stop it (SIGHUP is ignored; Quit and Ctrl+C still stop it)", "signal.signal(signal.SIGHUP, signal.SIG_IGN)" in src)
+    check("the launcher script uses only tools PlasBench already declares (no zenity)", "zenity" not in (ROOT / "scripts" / "plasbench_launcher.sh").read_text(encoding="utf-8"))
     print("the page")
     html = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
     check("api() retries network failures with a growing, jittered delay before it shows the banner", "RETRY_DELAYS = [200, 500, 1000, 2000, 3500]" in html and "Math.random() * 0.4" in html and "attempt >= RETRY_DELAYS.length" in html)

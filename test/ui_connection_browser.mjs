@@ -55,7 +55,16 @@ await offline(false);
 let back = false; for (let i = 0; i < 20 && !back; i++) { await sleep(1000); back = await ev("S.conn == null && !document.getElementById('ended')"); }
 check("when PlasBench returns the window reconnects by itself within 20 s", back);
 
-// 7. the server refuses the key (restarted): the popup says so and Check again is honest
+// 7. "This address needs the session key": a reload of the SAME tab with no cookie recovers from the tab's own storage; a stale key shows the explanation
+await send("Network.clearBrowserCookies");
+await send("Page.reload"); await sleep(4000);
+check("reloading the tab after the browser forgot its cookie still loads PlasBench (the tab's own storage supplies the key)", (await ev("typeof S !== 'undefined' && !!document.getElementById('v_home')")) === true, await ev("document.body.innerText.slice(0, 80)"));
+await ev("sessionStorage.setItem('pb_t', 'a-stale-key'); 1"); await send("Network.clearBrowserCookies");
+await send("Page.navigate", {url: url.split("?")[0]}); await sleep(3500);
+const txt = await ev("document.body.innerText");
+check("a stale key shows the explanation page (not a bare error), with the way back in", /needs to be reopened/.test(txt) && /Click the PlasBench icon again/.test(txt), txt.slice(0, 120));
+
+// 8. the server refuses the key (restarted): the popup says so and Check again is honest
 await ev("TOKEN_BAK = TOKEN; 1").catch(() => 0);
 console.log(results.every(Boolean) ? "ALL CONNECTION CHECKS PASSED" : "CONNECTION CHECKS FAILED");
 ws.close(); process.exit(results.every(Boolean) ? 0 : 1);

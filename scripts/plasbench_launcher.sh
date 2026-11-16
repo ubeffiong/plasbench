@@ -84,8 +84,6 @@ if [ "$CODE" -ne 0 ]; then
   MSG="PlasBench could not start or stopped unexpectedly (exit code $CODE). Details: $LOG"
   if command -v notify-send >/dev/null 2>&1; then
     notify-send "PlasBench" "$MSG"
-  elif command -v zenity >/dev/null 2>&1; then
-    zenity --error --title="PlasBench" --text="$MSG" 2>/dev/null
   else
     echo "$MSG" >&2
   fi
