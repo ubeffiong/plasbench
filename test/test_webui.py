@@ -243,7 +243,7 @@ def main():
     # The persistent "benchmarking is running" toast: created in #toasts (outside every page), shown the moment a benchmark is started, driven by the job list, still there after a
     # page change or a reload, clock ticking, animated, reduced-motion respected, and keyboard/click opens the console.
     check("a running benchmark shows a persistent animated toast that lives outside the pages",
-          'id="runtoast"' in html and '$("#toasts").prepend(el)' in html and "isBenchJob" in html and 'role", "status"' in html and "@keyframes rtspin" in html and "@keyframes rtslide" in html
+          'el.id = "runtoast"' in html and '$("#toasts").prepend(el)' in html and "isBenchJob" in html and 'role", "status"' in html and "@keyframes rtspin" in html and "@keyframes rtslide" in html
           and "@media (prefers-reduced-motion:reduce){.runtoast" in html and "Benchmarking is running" in html)
     check("the toast appears on click (before the server answers), follows the job list, ticks every second and is restored on load",
           "S.pendingBench = {label" in html and "renderRunToast();\n  const running = S.jobs.filter" in html and "setInterval(renderRunToast, 1000)" in html
