@@ -117,6 +117,19 @@ def main():
               (p.stderr or "") + ((home / "ui" / "launcher.log").read_text(encoding="utf-8")
                                   if (home / "ui" / "launcher.log").is_file() else ""))
 
+    print("browser window never uses the everyday profile")
+    from plasbench import appwindow
+    with_profile = appwindow.app_args("/x/msedge.exe", "http://127.0.0.1:1/?t=k", (800, 600, 10, 10), "C:\\p")
+    check("a dedicated profile with extensions, sync and notifications off",
+          "--user-data-dir=C:\\p" in with_profile and "--disable-extensions" in with_profile
+          and "--disable-sync" in with_profile and "--disable-notifications" in with_profile
+          and "--no-first-run" in with_profile and "--app=http://127.0.0.1:1/?t=k" in with_profile, with_profile)
+    edge_private = appwindow.app_args("/x/msedge.exe", "http://127.0.0.1:1/", (1, 1, 0, 0), "")
+    chrome_private = appwindow.app_args("/x/chrome.exe", "http://127.0.0.1:1/", (1, 1, 0, 0), "")
+    check("with no separate profile Edge uses a private window and Chrome an incognito one",
+          "--inprivate" in edge_private and "--incognito" in chrome_private
+          and not any(a.startswith("--user-data-dir") for a in edge_private + chrome_private))
+
     print("terminal")
     proj = tmp / "pb"
     (proj / "sub").mkdir(parents=True)
