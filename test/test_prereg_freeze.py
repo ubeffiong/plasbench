@@ -98,14 +98,16 @@ def main():
 
     shipped = freeze_prereg.read_rows(ROOT / "config" / "prereg.tsv")
     names = {r["parameter"]: r for r in shipped}
-    assert names["tool_timeout_seconds"]["status"] == "proposed" and names["tool_timeout_seconds"]["value"] == "7200"
-    assert "rationale" in names["tool_timeout_seconds"]["note"].lower() or "proposed" in names["tool_timeout_seconds"]["note"].lower()
+    # confirmed by the project owner on 16 November 2026 (config/prereg_decisions.tsv): the decision is fixed and the program's default follows it
+    # confirmed on 2026-11-16 and changed the same day to no limit (config/prereg_decisions.tsv): a decision, and the program default, say "no limit"
+    assert names["tool_timeout_seconds"]["status"] == "fixed" and names["tool_timeout_seconds"]["value"] == "unset"
+    assert 'TOOL_TIMEOUT_SECONDS="${TOOL_TIMEOUT_SECONDS:-}"' in (ROOT / "config" / "config.sh").read_text(encoding="utf-8")
     # second review, 11C: no truth variant set exists, so A4/C2 are resolved as unavailable (no invented threshold), not left TO_FIX
     assert names["scorecard_bands_A4_C2"]["status"] == "unavailable" and "no independent truth variant set" in names["scorecard_bands_A4_C2"]["value"]
     assert not [r for r in shipped if r["status"] == "TO_FIX"], "nothing is left TO_FIX"
     assert names["min_alignment_length"]["status"] == "fixed" and names["min_alignment_length"]["value"] == "200"
     assert not [r for r in shipped if r["status"] == "TO_FIX" and r["parameter"] != "scorecard_bands_A4_C2" and (r["note"] or "").startswith("Proposed default")], "a proposed default must be status proposed"
-    print("  PASS: the shipped plan proposes the tool timeout (7200 s) with its rationale, resolves A4/C2 as unavailable, pre-registers min_alignment_length")
+    print("  PASS: the shipped plan decides the tool timeout (no limit, changed from 7200 s on the day of confirmation) with its rationale, resolves A4/C2 as unavailable, pre-registers min_alignment_length")
 
     import report_scoring_spec as spec
     html = str(spec.prereg_section({"preregistration": {"sha256": "ab" * 32, "locked": True, "matches": True, "frozen_at": "2026-01-01", "parameters": 3,

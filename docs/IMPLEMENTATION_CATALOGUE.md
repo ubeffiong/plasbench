@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 167 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
-outputs, 49 run switches, 314 test files and 88 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 168 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
+outputs, 49 run switches, 315 test files and 89 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -350,7 +350,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 6. Every module
 
-167 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+168 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -563,6 +563,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | Module | What it does |
 |---|---|
 | `audit_three_class_scoring.py` | One-off three-class scoring audit (Phase E, Part 14 of the sibling-repo |
+| `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
 
 
 ## 7. Every output file and where the report shows it
@@ -831,7 +832,7 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 
 ## 9. History: every merged change
 
-88 merged pull requests, in order. Each is a reviewed, tested change; the title says what it did.
+89 merged pull requests, in order. Each is a reviewed, tested change; the title says what it did.
 
 | PR | Merged | What it did |
 |---|---|---|
@@ -920,6 +921,7 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 | #90 | 2026-11-16 | Third review: strict task derivation, dominated-cohort interval fallback, documentation sync |
 | #91 | 2026-11-16 | feat(bins): the PlasEval-paper cohort, binning error-profile charts and a comparison gate against the original program |
 | #92 | 2026-11-16 | Window: fix random disconnects, make Retry work, make the icon always open a window |
+| #93 | 2026-11-16 | Record the confirmed scoring decisions; a way to change them; lock |
 | #94 | 2026-11-16 | feat: short-read QC gate, assembly selection policy, candidate multiplicity analysis and an external review log |
 | #95 | 2026-11-16 | Contributed RefSeq/SRA candidate pool and a seeded, cluster-aware cohort importer |
 | #96 | 2026-11-16 | Configurable leakage screen (cutoff policy, fixed date, date basis), settable in plasbench ui |

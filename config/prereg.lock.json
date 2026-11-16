@@ -1,0 +1,9 @@
+{
+  "sha256": "a1410b911dceb3aba0e49992e356858302b54d8382b9cbb471005283659dbff0",
+  "frozen_at": "2026-11-16T17:51:22+00:00",
+  "prereg_file": "config/prereg.tsv",
+  "parameters": 69,
+  "to_fix": [],
+  "proposed": [],
+  "draft": false
+}

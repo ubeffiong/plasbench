@@ -83,6 +83,7 @@
 90	2026-11-16	Third review: strict task derivation, dominated-cohort interval fallback, documentation sync
 91	2026-11-16	feat(bins): the PlasEval-paper cohort, binning error-profile charts and a comparison gate against the original program
 92	2026-11-16	Window: fix random disconnects, make Retry work, make the icon always open a window
+93	2026-11-16	Record the confirmed scoring decisions; a way to change them; lock
 94	2026-11-16	feat: short-read QC gate, assembly selection policy, candidate multiplicity analysis and an external review log
 95	2026-11-16	Contributed RefSeq/SRA candidate pool and a seeded, cluster-aware cohort importer
 96	2026-11-16	Configurable leakage screen (cutoff policy, fixed date, date basis), settable in plasbench ui
