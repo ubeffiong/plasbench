@@ -22,7 +22,7 @@ check(f"every file the log cites exists ({len(paths)} cited)", not missing, miss
 
 rows = [line for line in text.splitlines() if re.match(r"^\| R\d+ \|", line)]
 ids = [re.match(r"^\| (R\d+) \|", r).group(1) for r in rows]
-check("the register lists R1 to R9 with no gaps or repeats", ids == [f"R{i}" for i in range(1, 10)], ids)
+check("the register lists R1 to R10 with no gaps or repeats", ids == [f"R{i}" for i in range(1, 11)], ids)
 types = {"Human reviewer", "Question bank", "AI-assisted", "Automated", "Human (project lead", "Human reviewers"}
 check("every review has a date and a source type from the key",
       all(re.search(r"\| 20\d\d-\d\d-\d\d", r) and any(t in r for t in types) for r in rows), [r[:60] for r in rows

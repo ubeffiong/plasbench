@@ -13,6 +13,12 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- literature and public-data review: AMR regions, synteny ribbons, publication cohorts (16 November 2026)
+- `python/report_amr_regions.py`: interactive AMR regions view (truth resistance regions with mobile context, a lane per tool with per-gene placement and flank coverage, a verdict per region, a funnel of where resistance information is lost); report section *AMR regions*.
+- `python/report_synteny.py`: interactive synteny ribbons (order and orientation of each tool's records on a truth plasmid, identity shading, strand and identity filters, details panel); report section *Synteny ribbons*.
+- Candidate cohorts adopted from publications: plsMD filtered (80 isolates, 244 plasmids), plsMD novel (68, 269), MOB-suite benchmark (133, 377), with supplement tables, ENA run metadata and a Teixeira ground-truth summary (`cohorts/candidates/PUBLICATION_COHORTS.md`, `python/build_publication_cohort_candidates.py`). Candidates only: assemblies are not resolved.
+- FAQ Q43, external review log entry R10. Phylogeny, clustering and relatedness figures were not adopted (outside the benchmark).
+
 ### Added -- 215-question reviewer assessment: ranking stability, assembler sensitivity, reference evidence audit (16 November 2026)
 - `python/ranking_stability.py` (stage 6, `RUN_RANKING_STABILITY`): leave-one-study-out, leave-one-species-out and equal-study-weighted rankings, the largest study's share, Kendall tau and a verdict; `benchmark.study_sensitivity.tsv`, `.species_sensitivity.tsv`, `.ranking_stability.tsv`; report section *Ranking stability*.
 - `python/assembler_sensitivity.py`: re-ranks the tools across runs that differ only in the assembly and says whether the leader depends on it; optional standalone HTML.

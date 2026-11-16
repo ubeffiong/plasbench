@@ -32,6 +32,7 @@ benchmark (see "Not yet done").
 | R7 | 2026-11-16 | Reviewers' three questions: can the assembly be chosen; is there QC of the short reads and a rejection policy; how is noise picked up when a tool reports several sequences for one plasmid | Human reviewers, with an AI-assisted analysis and plan supplied by the project lead | Input control and ambiguous reconstruction output | FAQ Q32 to Q35 |
 | R8 | 2026-11-15 to 11-16 | Field testing by the project lead on two Windows computers using WSL: first install, launch, upgrade, git use | Human (project lead, as user) | Whether it installs and starts on a machine that is not the developer's | v0.4.1 and `docs/PLASEVAL_REPLICATION.md` |
 | R9 | 2026-11-16 | Scientific reviewer interrogation: a 215-question bank in 15 domains, twelve oral-defence questions, a roadmap (PB-01 to PB-12) and a four-test assessment (truth, attribution, scoring and generalisation validity) | AI-assisted, supplied by the project lead; it states it did not inspect the live repository | Whether the metrics, references, inputs and statistics support the conclusions | [`REVIEWER_ASSESSMENT_MATRIX.md`](REVIEWER_ASSESSMENT_MATRIX.md), FAQ Q36 to Q42 |
+| R10 | 2026-11-16 | Literature and public-data review (PlasEval, Teixeira 2025, plsMD 2026, MOB-suite) with published AMR-context and relatedness figures | AI-assisted, supplied by the project lead; it states it could not run the code | Which public cohorts and evaluation dimensions to adopt; which published visual designs to adopt | [`cohorts/candidates/PUBLICATION_COHORTS.md`](../cohorts/candidates/PUBLICATION_COHORTS.md), FAQ Q43 |
 
 ## What each review found, what was done, and what remains
 
@@ -103,6 +104,15 @@ evidence audit (`python/reference_evidence_audit.py`); each is built, tested and
 plasmid cannot be told from an incorrect reconstruction). The matrix is the project's own reading of its code, not an independent review. Not done:
 a seven-step tool validation ladder beyond what exists (FAQ Q40), a real multi-assembler run, and real independent cohorts.
 
+### R10. The literature and public-data review: what was found and done
+
+The review proposed seven evaluation domains and four phases and asked for the published cohorts and figures to be adopted. Checked against the code, most reconstruction, AMR
+and structure dimensions already exist (FAQ Q43). Added: the AMR regions view, the synteny ribbons and an AMR information funnel (all interactive, descriptive), and the
+cohorts of plsMD (filtered and novel) and the MOB-suite benchmark as candidates, with their supplement tables, ENA run metadata and the caveats found when adopting them (for
+example 23 of the 68 plsMD novel runs were public before the stated sequencing date, so "novel" is the paper's claim). Not adopted: phylogeny, clustering and relatedness,
+pangenome, host-range and transmission analyses, which are outside the benchmark by an earlier decision. Open: resolving the candidates to assemblies and reads, and a
+performance-drivers regression.
+
 ## Validation evidence
 
 | Evidence | What it shows | Status |
@@ -115,10 +125,12 @@ a seven-step tool validation ladder beyond what exists (FAQ Q40), a real multi-a
 | PlasEval replication on the paper's real bins (212 isolate-tool pairs) | PlasBench's numbers on real bins; agreement with the original on them | Done 16 Nov 2026: 211 of 212 pairs compared with the original program, **210 agree within 0.001, 0 disagree**, 1 capped-search upper bound (0.003), 1 original timeout; rerunnable by any user, see `docs/PLASEVAL_REPLICATION.md` |
 | Short-read QC, assembly selection and candidate multiplicity tests, including stage-level tests with stand-in tools | Each gate, policy and table behaves as specified, including enforce, report and off | Done on constructed data |
 | Ranking stability, assembler sensitivity, reference evidence audit and reviewer matrix tests | Each module on constructed cohorts, including a cohort whose leader changes when one study is removed; the matrix's 215 rows, statuses and file references | Done; real-cohort results **Open** |
+| AMR regions, synteny ribbons and publication-cohort candidate tests | Both views on constructed data (well-formed SVG, valid script, escaping, caps, not-run states) and in the demo report; the candidate tables' counts against the papers | Done on constructed data; not yet looked at on a real cohort |
 | Field install and upgrade on two Windows/WSL machines | It installs and starts on a machine other than the developer's | Done for v0.4.1; the desktop icon is open |
 
 ## Not yet done
 
+- **Resolving the publication candidate cohorts** to assemblies, reads and verified truth, and **looking at the new views on a real cohort**.
 - A **real multi-assembler comparison** with `assembler_sensitivity.py`, and a **real-cohort ranking-stability** result.
 - A **real-data run** of the benchmark on `public-v3`, published with intervals and the manifest. Nothing about ranking or generalisation is demonstrated until then.
 - An **independent third-party re-run** of a benchmark, and an **external validation cohort**.
