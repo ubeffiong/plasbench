@@ -33,7 +33,7 @@ check("it says reviewer identities and wording are not in the repository", "Revi
 check("open items are listed, not only successes", "## Not yet done" in text and text.count("**Open**") + text.count("open") >= 5
       and "real-data run" in text and "independent third-party re-run" in text)
 check("the validation table gives an honest status to each row", "## Validation evidence" in text and text.count("| Done") >= 5
-      and "in progress" in text)
+      and "1 original timeout" in text)
 check("the three reviewer questions are each answered with a status",
       all(q in text for q in ("Can the assembly be chosen?", "Is there short-read QC", "How is noise picked up")))
 check("a reply to the reviewers is given and says what is not yet done", "Suggested wording for a reply" in text and "Not yet done: running every tool" in text)

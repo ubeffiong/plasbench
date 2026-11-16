@@ -68,8 +68,8 @@ The analysis recommended adopting PlasEval's repeat-aware dissimilarity as a bin
 against the paper's full text and the code showed several of its "missing" claims were already implemented (normalised dissimilarity, the four components,
 tool-versus-tool agreement, a configurable length exponent). The real gap, repeat-aware pairing of repeated contigs, is now implemented and **agrees with
 the original program on 59 constructed and random cases (44 with repeats)**. The 53-isolate cohort and the paper's published bins ship; a gate compares PlasBench
-with the original program wherever it is installed. **The comparison on the paper's real bins** is the result still to be produced
-(`docs/PLASEVAL_REPLICATION.md`).
+with the original program wherever it is installed. **The comparison on the paper's real bins is done**: PlasBench agreed with the original within 0.001
+on 210 of the 211 pairs the original finished, with no disagreement (the one difference, 0.003, is a capped-search upper bound); see `docs/PLASEVAL_REPLICATION.md`.
 
 ### R7. Reviewers' three questions
 | Question | Answer in one line | Status |
@@ -100,7 +100,7 @@ with the desktop icon not opening the window is open and is being handled by the
 | Statistics simulation (`docs/STATS_VALIDATION.md`) | Interval coverage and the type I error of the paired tests, by design | Done; unbalanced designs fall below nominal and are reported |
 | Cross-check of the scoring against a BLASTN scoring (`python/compare_scoring_methods.py`) | The minimap2-based scoring is not an artefact of the aligner | Done once; not part of CI |
 | PlasEval cross-check against the original program, 59 cases | PlasBench's best-match scores and repeat-aware dissimilarity equal the original's | Done on Linux; runs only with a PlasEval checkout |
-| PlasEval replication on the paper's real bins (212 isolate-tool pairs) | PlasBench's numbers on real bins; agreement with the original on them | PlasBench's own numbers done; **comparison with the original run in progress** (bounded by a per-pair timeout); result to be added here |
+| PlasEval replication on the paper's real bins (212 isolate-tool pairs) | PlasBench's numbers on real bins; agreement with the original on them | Done 16 Nov 2026: 211 of 212 pairs compared with the original program, **210 agree within 0.001, 0 disagree**, 1 capped-search upper bound (0.003), 1 original timeout; rerunnable by any user, see `docs/PLASEVAL_REPLICATION.md` |
 | Short-read QC, assembly selection and candidate multiplicity tests, including stage-level tests with stand-in tools | Each gate, policy and table behaves as specified, including enforce, report and off | Done on constructed data |
 | Field install and upgrade on two Windows/WSL machines | It installs and starts on a machine other than the developer's | Done for v0.4.1; the desktop icon is open |
 
@@ -108,7 +108,6 @@ with the desktop icon not opening the window is open and is being handled by the
 
 - A **real-data run** of the benchmark on `public-v3`, published with intervals and the manifest. Nothing about ranking or generalisation is demonstrated until then.
 - An **independent third-party re-run** of a benchmark, and an **external validation cohort**.
-- The **result of the PlasEval comparison on the paper's real bins** (in progress).
 - **Frozen thresholds** for the short-read QC, assembly eligibility and candidate relationships, set from pilot data.
 - An **independent audit of the references**, plasmid-free and hard-structure isolates, and taxonomic contamination screening.
 - Reviewer names, affiliations and original text, with consent.

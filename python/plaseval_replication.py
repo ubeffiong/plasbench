@@ -170,8 +170,35 @@ def html_page(scores, matrix, alpha, n_samples, comparison):
             f"{note}{comparison}{body}</body></html>")
 
 
-def comparison_html(scores):
-    return fig.original_comparison_html(scores)
+REFERENCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cohorts", "plaseval_ecoli53", "original_reference.tsv")
+
+
+def apply_reference(scores, path=REFERENCE):
+    """Fill in the original program's recorded answers (a reference run kept in the repository) for the pairs it covers. Returns how many."""
+    if not os.path.isfile(path):
+        return 0
+    with open(path, newline="", encoding="utf-8") as handle:
+        got = {(r["sample"], r["tool"]): r for r in csv.DictReader((x for x in handle if not x.startswith("#")), delimiter=TAB)}
+    n = 0
+    for r in scores:
+        hit = got.get((r["sample"], r["tool"]))
+        if hit and not r.get("original_status"):
+            r["original_dissimilarity"], r["original_status"] = hit["original_dissimilarity"], hit["status"]
+            r["abs_difference"] = ("" if hit["original_dissimilarity"] == "" else
+                                   f"{abs(float(hit['original_dissimilarity']) - float(r['bin_dissimilarity'])):.6f}")
+            n += 1
+    return n
+
+
+def reference_note(n):
+    return ("<div class='insight'><p><strong>Source of the original's numbers: a recorded reference run.</strong> The original PlasEval program was not "
+            f"installed here, so PlasBench's scores were compared with the answers it gave on these same bins in the project's reference run ({n} pairs, "
+            "<code>cohorts/plaseval_ecoli53/original_reference.tsv</code>; PlasEval commit 8238356). Install a PlasEval checkout "
+            "(<code>--plaseval-src</code>) to re-run the original yourself.</p></div>")
+
+
+def comparison_html(scores, from_reference=0):
+    return (reference_note(from_reference) if from_reference else "") + fig.original_comparison_html(scores)
 
 
 def _legacy_comparison_html(scores):
@@ -205,11 +232,12 @@ def rebuild(a):
                 r["original_dissimilarity"], r["original_status"] = hit["original_dissimilarity"], hit["status"]
                 r["abs_difference"] = ("" if hit["original_dissimilarity"] == "" else
                                        f"{abs(float(hit['original_dissimilarity']) - float(r['bin_dissimilarity'])):.6f}")
+    from_reference = 0 if a.no_original else apply_reference(scores)
     matrix = rows(os.path.join(a.from_tsv, "benchmark.tool_agreement.tsv"))
     os.makedirs(a.out_dir, exist_ok=True)
     write_tsv(os.path.join(a.out_dir, "plaseval_replication.scores.tsv"), scores)
     with open(os.path.join(a.out_dir, "plaseval_replication.html"), "w", encoding="utf-8") as handle:
-        handle.write(html_page(scores, matrix, a.alpha, len({r["sample"] for r in scores}), comparison_html(scores)))
+        handle.write(html_page(scores, matrix, a.alpha, len({r["sample"] for r in scores}), comparison_html(scores, from_reference)))
     print(f"rebuilt the page from {a.from_tsv}: {len(scores)} pairs, {sum(1 for r in scores if r.get('original_status'))} with the original's answer")
     return 0
 
@@ -244,12 +272,15 @@ def main(argv=None):
         if a.fresh or not os.path.isfile(progress):
             open(progress, "w", encoding="utf-8").write(TAB.join(["sample", "tool", "original_dissimilarity", "status"]) + NL)
         compare_original(scores, a.bins_dir, src, a.plaseval_python, a.alpha, a.original_timeout, a.workers, progress)
+    from_reference = 0
+    if not src and not a.no_original and a.bins_dir == DEFAULT_BINS:      # no original installed: use the recorded reference run
+        from_reference = apply_reference(scores)
     os.makedirs(a.out_dir, exist_ok=True)       # recreated: a temporary folder may have been cleaned up during a long run
     write_tsv(os.path.join(a.out_dir, "plaseval_replication.scores.tsv"), scores)
     write_tsv(os.path.join(a.out_dir, "benchmark.tool_agreement.tsv"), matrix)
     n_samples = len({r["sample"] for r in scores})
     with open(os.path.join(a.out_dir, "plaseval_replication.html"), "w", encoding="utf-8") as handle:
-        handle.write(html_page(scores, matrix, a.alpha, n_samples, comparison_html(scores)))
+        handle.write(html_page(scores, matrix, a.alpha, n_samples, comparison_html(scores, from_reference)))
     agg = fig.aggregate(scores)
     print(f"{n_samples} isolates, {len(scores)} isolate-tool pairs -> {a.out_dir}")
     for e in agg:
