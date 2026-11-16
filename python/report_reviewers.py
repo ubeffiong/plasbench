@@ -22,7 +22,8 @@ import os
 
 from report_svg import OKABE_ITO, esc, line, num, svg_close, svg_open, text
 
-SECTIONS = [("learn-readqc", "Short-read QC"), ("learn-assembly", "Assembly selection"), ("learn-multiplicity", "Reconstruction multiplicity")]
+SECTIONS = [("learn-readqc", "Short-read QC"), ("learn-assembly", "Assembly selection"), ("learn-multiplicity", "Reconstruction multiplicity"),
+            ("learn-stability", "Ranking stability"), ("learn-refaudit", "Reference evidence")]
 BLUE, VERM, ORANGE, GREEN, PURPLE, GREY = (OKABE_ITO["blue"], OKABE_ITO["vermillion"], OKABE_ITO["orange"], OKABE_ITO["green"],
                                            OKABE_ITO["purple"], "#8c8c8c")
 RELATION_STYLE = {   # relationship -> (fill, label)
@@ -435,11 +436,66 @@ def multiplicity_section(plasmids, candidates, intervals):
                    + table + fig_html + tracks)
 
 
+def stability_section(summary, study_rows=None, species_rows=None):
+    lead = ("Does the order of the tools survive removing one study or one species, or giving every study the same weight? "
+            "<strong>Descriptive; it never changes the leaderboard.</strong> A ranking dominated by one study is reported as fragile.")
+    if not summary:
+        return section("learn-stability", "Ranking stability", lead, note(
+            "Not run: results/benchmark.ranking_stability.tsv was not produced (RUN_RANKING_STABILITY=0, or no task had two tools with scores)."))
+    rows = []
+    for s in summary:
+        fragile = s.get("verdict", "").startswith("fragile")
+        chip = ("rv-warn" if fragile else "rv-pass") if s.get("verdict", "").startswith(("fragile", "stable")) else ""
+        word = s.get("verdict", "").split(":")[0]
+        rows.append(
+            f"<tr><td>{esc(s['analysis_track'])}</td><td>{esc(s['evaluation_task'])}</td><td>{esc(s['n_isolates'])}</td>"
+            f"<td>{esc(s['n_studies'])}</td><td>{esc(s['n_species'])}</td>"
+            f"<td>{esc(s['largest_study'])} ({esc(s['largest_study_share'])})</td><td>{esc(s['baseline_leader'])}</td>"
+            f"<td>{esc(s['study_leader_changes'] or '-')}/{esc(s['study_leave_outs'])}</td>"
+            f"<td>{esc(s['species_leader_changes'] or '-')}/{esc(s['species_leave_outs'])}</td>"
+            f"<td>{esc(s['equal_study_leader'] or '-')}</td><td><span class='rv-chip {chip}'>{esc(word)}</span> {esc(s['verdict'].partition(': ')[2])}</td></tr>")
+    table = ("<div class='panel'><table><thead><tr><th>Track</th><th>Task</th><th>Isolates</th><th>Studies</th><th>Species</th>"
+             "<th>Largest study (share)</th><th>Leader</th><th>Leader changes, study leave-outs</th><th>Leader changes, species leave-outs</th>"
+             "<th>Leader with equal study weights</th><th>Verdict</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>")
+    changed = [r for r in (study_rows or []) + (species_rows or []) if r.get("leader_changed") == "yes"]
+    detail = ""
+    if changed:
+        detail = ("<h3>Leave-outs that change the leader</h3><div class='panel'><table><thead><tr><th>Task</th><th>Left out</th><th>Isolates removed</th>"
+                  "<th>New leader</th><th>Kendall tau</th></tr></thead><tbody>"
+                  + "".join(f"<tr><td>{esc(r['evaluation_task'])}</td><td>{esc(r['left_out'])}</td><td>{esc(r['isolates_removed'])}</td>"
+                            f"<td>{esc(r['leader'])}</td><td>{esc(r['kendall_tau'])}</td></tr>" for r in changed) + "</tbody></table></div>")
+    return section("learn-stability", "Ranking stability", lead, table + detail)
+
+
+def refaudit_section(rows):
+    lead = ("How far can each isolate's truth assembly be trusted? <strong>Descriptive; it never changes a score.</strong> A weak reference is "
+            "kept in the tables and named here, so a reader can see what a headline rests on.")
+    if not rows:
+        return section("learn-refaudit", "Reference evidence", lead, note(
+            "Not run: results/benchmark.reference_evidence_audit.tsv was not produced (RUN_REFERENCE_EVIDENCE_AUDIT=0, or no truth provenance table)."))
+    counts = {k: sum(1 for r in rows if r.get("audit_status") == k) for k in ("strong", "usable_with_caveats", "weak")}
+    eligible = sum(1 for r in rows if r.get("headline_eligible") == "yes")
+    chips = " ".join(f"<span class='rv-chip {cls}'>{counts[k]} {label}</span>" for k, label, cls in
+                     (("strong", "strong", "rv-pass"), ("usable_with_caveats", "usable with caveats", "rv-warn"), ("weak", "weak", "rv-reject")))
+    head = f"<p>{chips} of {len(rows)} isolates; {eligible} meet the headline reference rule.</p>"
+    order = {"weak": 0, "usable_with_caveats": 1, "strong": 2}
+    shown = sorted(rows, key=lambda r: (order.get(r.get("audit_status"), 3), r.get("sample", "")))[:40]
+    body = "".join(f"<tr><td>{esc(r['sample'])}</td><td>{esc(r['audit_status'])}</td><td>{esc(r['reference_tier'])}</td>"
+                   f"<td>{esc(r['evaluation_independence'])}</td><td>{esc(r['evidence_recorded'])}</td><td>{esc(r['audit_reasons'] or '-')}</td></tr>"
+                   for r in shown)
+    table = ("<div class='panel'><table><thead><tr><th>Isolate</th><th>Status</th><th>Tier</th><th>Independence</th><th>Evidence recorded</th>"
+             f"<th>Reasons</th></tr></thead><tbody>{body}</tbody></table></div>")
+    more = f"<p class='small'>Showing the {len(shown)} least trusted of {len(rows)}; the full table is benchmark.reference_evidence_audit.tsv.</p>" if len(rows) > len(shown) else ""
+    return section("learn-refaudit", "Reference evidence", lead, head + table + more)
+
+
 def inject(page, results_dir):
     r = lambda name: read_tsv(os.path.join(results_dir, name))  # noqa: E731
     sections = (readqc_section(r("short_read_qc.tsv")) + assembly_section(r("assembly_candidates.tsv"))
                 + multiplicity_section(r("benchmark.candidate_multiplicity.tsv"), r("benchmark.candidates.tsv"),
-                                       r("benchmark.candidate_intervals.tsv")))
+                                       r("benchmark.candidate_intervals.tsv"))
+                + refaudit_section(r("benchmark.reference_evidence_audit.tsv"))
+                + stability_section(r("benchmark.ranking_stability.tsv"), r("benchmark.study_sensitivity.tsv"), r("benchmark.species_sensitivity.tsv")))
     anchor = "<section id='recommendations'>"
     if anchor in page:
         page = page.replace(anchor, CSS + sections + anchor, 1)

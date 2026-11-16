@@ -31,6 +31,7 @@ benchmark (see "Not yet done").
 | R6 | 2026-11-16 | Comparison of PlasBench with the PlasEval paper (Mane et al. 2024) and a recommendation to adopt its framework | AI-assisted (supplied by the project lead) | Whether PlasBench captures PlasEval's bin dissimilarity, repeat-aware matching and error decomposition | FAQ Q2 and Q31; `docs/PLASEVAL_REPLICATION.md`; PRs #87 and #91 |
 | R7 | 2026-11-16 | Reviewers' three questions: can the assembly be chosen; is there QC of the short reads and a rejection policy; how is noise picked up when a tool reports several sequences for one plasmid | Human reviewers, with an AI-assisted analysis and plan supplied by the project lead | Input control and ambiguous reconstruction output | FAQ Q32 to Q35 |
 | R8 | 2026-11-15 to 11-16 | Field testing by the project lead on two Windows computers using WSL: first install, launch, upgrade, git use | Human (project lead, as user) | Whether it installs and starts on a machine that is not the developer's | v0.4.1 and `docs/PLASEVAL_REPLICATION.md` |
+| R9 | 2026-11-16 | Scientific reviewer interrogation: a 215-question bank in 15 domains, twelve oral-defence questions, a roadmap (PB-01 to PB-12) and a four-test assessment (truth, attribution, scoring and generalisation validity) | AI-assisted, supplied by the project lead; it states it did not inspect the live repository | Whether the metrics, references, inputs and statistics support the conclusions | [`REVIEWER_ASSESSMENT_MATRIX.md`](REVIEWER_ASSESSMENT_MATRIX.md), FAQ Q36 to Q42 |
 
 ## What each review found, what was done, and what remains
 
@@ -91,6 +92,17 @@ Problems found on two machines were fixed in v0.4.1: the launcher exited on a co
 optional environment ran out of memory, a failed download did not say why, and the window's browser profile and session-key page were unclear. A further problem
 with the desktop icon not opening the window is open and is being handled by the project lead.
 
+### R9. The 215-question assessment: what was found and done
+
+The review judged PlasBench a substantially developed framework whose strongest claims still need real-data evidence, and named input integrity,
+reconstruction multiplicity and independent real-data validation as the next priorities. Input integrity and multiplicity were already closed in R7.
+Checked against the code, the genuinely missing pieces were: leave-one-study/species-out and equal-study-weighted rankings
+(`python/ranking_stability.py`), an assembler-sensitivity comparison (`python/assembler_sensitivity.py`), and a single per-isolate reference
+evidence audit (`python/reference_evidence_audit.py`); each is built, tested and wired into the report. The assessment of all 215 questions is in
+[`REVIEWER_ASSESSMENT_MATRIX.md`](REVIEWER_ASSESSMENT_MATRIX.md): 77 satisfied, 86 partially satisfied, 51 needing validation, 1 major gap (a novel
+plasmid cannot be told from an incorrect reconstruction). The matrix is the project's own reading of its code, not an independent review. Not done:
+a seven-step tool validation ladder beyond what exists (FAQ Q40), a real multi-assembler run, and real independent cohorts.
+
 ## Validation evidence
 
 | Evidence | What it shows | Status |
@@ -102,10 +114,12 @@ with the desktop icon not opening the window is open and is being handled by the
 | PlasEval cross-check against the original program, 59 cases | PlasBench's best-match scores and repeat-aware dissimilarity equal the original's | Done on Linux; runs only with a PlasEval checkout |
 | PlasEval replication on the paper's real bins (212 isolate-tool pairs) | PlasBench's numbers on real bins; agreement with the original on them | Done 16 Nov 2026: 211 of 212 pairs compared with the original program, **210 agree within 0.001, 0 disagree**, 1 capped-search upper bound (0.003), 1 original timeout; rerunnable by any user, see `docs/PLASEVAL_REPLICATION.md` |
 | Short-read QC, assembly selection and candidate multiplicity tests, including stage-level tests with stand-in tools | Each gate, policy and table behaves as specified, including enforce, report and off | Done on constructed data |
+| Ranking stability, assembler sensitivity, reference evidence audit and reviewer matrix tests | Each module on constructed cohorts, including a cohort whose leader changes when one study is removed; the matrix's 215 rows, statuses and file references | Done; real-cohort results **Open** |
 | Field install and upgrade on two Windows/WSL machines | It installs and starts on a machine other than the developer's | Done for v0.4.1; the desktop icon is open |
 
 ## Not yet done
 
+- A **real multi-assembler comparison** with `assembler_sensitivity.py`, and a **real-cohort ranking-stability** result.
 - A **real-data run** of the benchmark on `public-v3`, published with intervals and the manifest. Nothing about ranking or generalisation is demonstrated until then.
 - An **independent third-party re-run** of a benchmark, and an **external validation cohort**.
 - **Frozen thresholds** for the short-read QC, assembly eligibility and candidate relationships, set from pilot data.

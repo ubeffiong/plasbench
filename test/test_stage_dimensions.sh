@@ -100,6 +100,11 @@ done
 [[ -s "$TMP/results/benchmark.plaseval_gate.json" ]] || { echo "FAIL: stage 6 wrote no PlasEval gate verdict" >&2; tail -30 "$TMP/stage6.log" >&2; exit 1; }
 grep -q '"status": "\(NOT_RUN\|PASS\|NO_DATA\)"' "$TMP/results/benchmark.plaseval_gate.json"     || { echo "FAIL: the PlasEval gate verdict is not one of the expected states here" >&2; cat "$TMP/results/benchmark.plaseval_gate.json" >&2; exit 1; }
 echo "stage 6 merges the multiplicity tables and records the PlasEval gate verdict -> PASS"
+for table in ranking_stability study_sensitivity species_sensitivity; do
+    [[ -f "$TMP/results/benchmark.$table.tsv" ]] || { echo "FAIL: stage 6 wrote no benchmark.$table.tsv" >&2; tail -30 "$TMP/stage6.log" >&2; exit 1; }
+done
+[[ -f "$TMP/results/benchmark.reference_evidence_audit.tsv" ]] || { echo "FAIL: stage 6 wrote no reference evidence audit" >&2; tail -30 "$TMP/stage6.log" >&2; exit 1; }
+echo "stage 6 writes the ranking-stability tables and the reference evidence audit -> PASS"
 HTML="$TMP/results/benchmark.report.html"
 for section in accuracy-dimension feature-preservation bin-quality performance power scenarios composite reproducibility; do
     # Most of these are tabs of a merged container now: the old id is the panel id, so the old link still lands on it.
