@@ -97,6 +97,26 @@ def main():
     check("plasbench desktop-icon is a command", "desktop-icon" in names)
     check("desktop-icon is offered in the window", ui_schema.validate_argv(["desktop-icon", "--no-desktop"])[0])
 
+    if bash:
+        home = tmp / "fakehome"
+        (home / "miniforge3" / "etc" / "profile.d").mkdir(parents=True)
+        (home / "bin").mkdir()
+        # activating the environment reads a variable nothing set, as conda's gcc activate.d script does
+        (home / "miniforge3" / "etc" / "profile.d" / "conda.sh").write_text(
+            'conda() { if [ "$1" = activate ]; then echo "$SYS_SYSROOT_NOT_SET" >/dev/null; fi; return 0; }\n',
+            encoding="utf-8")
+        marker = tmp / "launcher_started"
+        fake_python = home / "bin" / "python"
+        fake_python.write_text(
+            '#!/usr/bin/env bash\n[ "$1" = "-c" ] && exit 0\necho "$*" > "%s"\n' % marker, encoding="utf-8")
+        fake_python.chmod(0o755)
+        env = {"HOME": str(home), "PATH": f"{home / 'bin'}:/usr/bin:/bin", "PLASBENCH_UI_HOME": str(home / "ui")}
+        p = subprocess.run([bash, str(launcher)], capture_output=True, text=True, env=env, timeout=60)
+        check("launcher still starts the window when conda activation reads an unset variable",
+              marker.is_file() and " ui" in marker.read_text(encoding="utf-8"),
+              (p.stderr or "") + ((home / "ui" / "launcher.log").read_text(encoding="utf-8")
+                                  if (home / "ui" / "launcher.log").is_file() else ""))
+
     print("terminal")
     proj = tmp / "pb"
     (proj / "sub").mkdir(parents=True)
