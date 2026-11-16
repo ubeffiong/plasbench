@@ -1,0 +1,254 @@
+# Delta from github.com/broadinstitute/plasmid-detection-benchmark (MIT licence), data/predictions.xlsx sheets Ground-truth, Plasmid Characteristics, Species (file ~2.8 MB; not committed).
+# Per-isolate summary derived 2026-11-16: hybrid contigs counted once per Hybrid contig ID; plasmid_hybrid_contigs = Ground-truth class plasmid.
+# repo_sample_id differs from ST1 paper_identifier for 2 isolates (UCICRE123/UCICRE141 in repo vs UCI123/UCI141 in ST1). max_mash_identity_to_plsdb is the repo column "Mash identity to closest PLSDB plasmid" (max over plasmid contigs with a value; semicolon-joined values are split). sample_id joins teixeira2025_candidates.tsv.
+sample_id	paper_identifier	repo_sample_id	species	chromosome_hybrid_contigs	plasmid_hybrid_contigs	plasmid_total_bp	sr_contigs	has_complete_hybrid_assembly	max_mash_identity_to_plsdb	plasmids_with_mash_value
+enterobacter_hormaechei_bidmc100_001	BIDMC100	BIDMC100	Enterobacter hormaechei	1	6	351350	79	true	1.0000	6
+escherichia_coli_bidmc106_002	BIDMC106	BIDMC106	Escherichia coli	7	4	388383	189	false		0
+citrobacter_freundii_complex_species_a_bidmc107_003	BIDMC107	BIDMC107	Citrobacter freundii complex (species A)	1	3	398532	51	true	0.8957	3
+citrobacter_portucalensis_bidmc108_004	BIDMC108	BIDMC108	Citrobacter portucalensis	1	2	472500	68	true	0.9997	2
+enterobacter_hormaechei_bidmc110_005	BIDMC110	BIDMC110	Enterobacter hormaechei	2	3	338325	75	false		0
+escherichia_coli_bidmc113_006	BIDMC113	BIDMC113	Escherichia coli	1	5	509959	124	false		0
+escherichia_coli_bidmc19a_007	BIDMC19A	BIDMC19A	Escherichia coli	1	3	392823	107	true	0.9998	3
+escherichia_coli_bidmc82_008	BIDMC82	BIDMC82	Escherichia coli	1	7	888767	99	true	0.9999	8
+enterobacter_hormaechei_bidmc87_009	BIDMC87	BIDMC87	Enterobacter hormaechei	1	2	7398	61	true	1.0000	2
+klebsiella_pneumoniae_bidmc89_010	BIDMC89	BIDMC89	Klebsiella pneumoniae	7	8	1777850	125	false		0
+enterobacter_hormaechei_bidmc94_011	BIDMC94	BIDMC94	Enterobacter hormaechei	1	7	914344	65	false		0
+escherichia_coli_bidmc98_012	BIDMC98	BIDMC98	Escherichia coli	1	4	249318	100	false		0
+enterobacter_hormaechei_bwh27_013	BWH27	BWH27	Enterobacter hormaechei	3	2	439347	53	false		0
+enterobacter_asburiae_bwh31_014	BWH31	BWH31	Enterobacter asburiae	1	5	209823	90	false		0
+enterobacter_hormaechei_bwh37_015	BWH37	BWH37	Enterobacter hormaechei	1	5	1378427	73	false		0
+escherichia_coli_bwh49_016	BWH49	BWH49	Escherichia coli	5	6	144704	130	false		0
+escherichia_coli_bwh50_017	BWH50	BWH50	Escherichia coli	1	5	104812	126	true	0.9999	5
+serratia_marcescens_bwh56_018	BWH56	BWH56	Serratia marcescens	1	4	287254	164	true	0.9999	4
+serratia_marcescens_bwh57_019	BWH57	BWH57	Serratia marcescens	1	4	287254	166	true	1.0000	4
+escherichia_coli_bwh69_020	BWH69	BWH69	Escherichia coli	7	4	209611	111	false		0
+escherichia_coli_bwh73_021	BWH73	BWH73	Escherichia coli	1	5	690786	72	false		0
+serratia_marcescens_bwh77_022	BWH77	BWH77	Serratia marcescens	1	0	0	20	true		0
+klebsiella_pneumoniae_bwh78_023	BWH78	BWH78	Klebsiella pneumoniae	1	5	201890	44	false		0
+klebsiella_pneumoniae_mgh101_025	MGH101	MGH101	Klebsiella pneumoniae	8	3	168940	73	false		0
+citrobacter_freundii_complex_species_a_mgh103_026	MGH103	MGH103	Citrobacter freundii complex (species A)	1	4	483243	85	true	0.9997	4
+citrobacter_portucalensis_mgh105_027	MGH105	MGH105	Citrobacter portucalensis	1	7	1320690	49	true	0.9997	9
+citrobacter_freundii_complex_species_a_mgh109_028	MGH109	MGH109	Citrobacter freundii complex (species A)	1	6	941927	97	false		0
+klebsiella_quasipneumoniae_mgh113_029	MGH113	MGH113	Klebsiella quasipneumoniae	1	8	2192142	129	true	1.0000	12
+enterobacter_hormaechei_mgh119_030	MGH119	MGH119	Enterobacter hormaechei	1	3	185229	41	false		0
+escherichia_coli_mgh121_031	MGH121	MGH121	Escherichia coli	1	14	936901	166	true	0.9999	17
+klebsiella_quasipneumoniae_mgh123_032	MGH123	MGH123	Klebsiella quasipneumoniae	1	12	588912	134	false		0
+escherichia_coli_mgh129_033	MGH129	MGH129	Escherichia coli	2	3	200831	183	false		0
+enterobacter_roggenkampii_mgh132_034	MGH132	MGH132	Enterobacter roggenkampii	7	5	294680	145	false		0
+escherichia_coli_mgh143_036	MGH143	MGH143	Escherichia coli	1	7	369487	165	false		0
+klebsiella_pneumoniae_mgh147_037	MGH147	MGH147	Klebsiella pneumoniae	8	3	381143	149	false		0
+klebsiella_pneumoniae_mgh149_038	MGH149	MGH149	Klebsiella pneumoniae	3	2	345243	134	false		0
+enterobacter_hormaechei_mgh14_035	MGH14	MGH14	Enterobacter hormaechei	1	7	640691	74	true	0.9997	7
+citrobacter_amalonaticus_mgh151_040	MGH151	MGH151	Citrobacter amalonaticus	11	0	0	98	false		0
+klebsiella_pneumoniae_mgh153_041	MGH153	MGH153	Klebsiella pneumoniae	11	2	48393	130	false		0
+enterobacter_hormaechei_mgh159_042	MGH159	MGH159	Enterobacter hormaechei	3	3	181905	109	false		0
+enterobacter_hormaechei_mgh15_039	MGH15	MGH15	Enterobacter hormaechei	1	5	1649457	77	true	0.9998	9
+klebsiella_pneumoniae_mgh161_043	MGH161	MGH161	Klebsiella pneumoniae	1	4	569141	132	false		0
+enterobacter_hormaechei_mgh177_044	MGH177	MGH177	Enterobacter hormaechei	3	7	1016867	146	false		0
+pluralibacter_gergoviae_mgh183_045	MGH183	MGH183	Pluralibacter gergoviae	5	6	1288928	266	false		0
+klebsiella_pneumoniae_mgh189_046	MGH189	MGH189	Klebsiella pneumoniae	1	2	173594	63	false		0
+klebsiella_pneumoniae_mgh193_047	MGH193	MGH193	Klebsiella pneumoniae	1	4	297137	62	true	1.0000	4
+enterobacter_hormaechei_mgh197_048	MGH197	MGH197	Enterobacter hormaechei	1	3	1006344	86	true	1.0000	4
+enterobacter_hormaechei_mgh1_024	MGH1	MGH1	Enterobacter hormaechei	1	1	83748	58	true	1.0000	1
+klebsiella_pneumoniae_mgh211_049	MGH211	MGH211	Klebsiella pneumoniae	1	7	220801	73	false		0
+citrobacter_freundii_complex_species_a_mgh214_050	MGH214	MGH214	Citrobacter freundii complex (species A)	1	1	171780	51	true	0.8957	1
+escherichia_coli_mgh217_051	MGH217	MGH217	Escherichia coli	1	7	276104	84	false		0
+enterobacter_hormaechei_mgh219_052	MGH219	MGH219	Enterobacter hormaechei	2	6	131429	44	false		0
+serratia_marcescens_mgh225_053	MGH225	MGH225	Serratia marcescens	4	0	0	29	false		0
+klebsiella_pneumoniae_mgh230_054	MGH230	MGH230	Klebsiella pneumoniae	1	4	2013592	60	false		0
+klebsiella_aerogenes_mgh233_055	MGH233	MGH233	Klebsiella aerogenes	5	1	43255	38	false		0
+enterobacter_roggenkampii_mgh239_056	MGH239	MGH239	Enterobacter roggenkampii	4	2	227225	47	false		0
+enterobacter_kobei_mgh240_057	MGH240	MGH240	Enterobacter kobei	1	2	207829	60	true	0.9999	2
+enterobacter_asburiae_mgh243_058	MGH243	MGH243	Enterobacter asburiae	12	6	448901	59	false		0
+serratia_marcescens_mgh245_059	MGH245	MGH245	Serratia marcescens	1	1	4374	26	true	0.7991	1
+klebsiella_aerogenes_mgh247_060	MGH247	MGH247	Klebsiella aerogenes	1	1	9294	38	true	0.9999	1
+citrobacter_freundii_mgh279_061	MGH279	MGH279	Citrobacter freundii	1	3	439024	43	true	0.9997	3
+citrobacter_freundii_mgh281c_063	MGH281c	MGH281c	Citrobacter freundii	1	2	439852	39	true	0.9997	2
+citrobacter_freundii_mgh281_062	MGH281	MGH281	Citrobacter freundii	1	3	439024	38	true	0.9997	3
+citrobacter_freundii_mgh283_064	MGH283	MGH283	Citrobacter freundii	1	2	143214	40	true	0.9997	2
+enterobacter_kobei_mgh37_066	MGH37	MGH37	Enterobacter kobei	1	3	121215	63	true	0.9999	3
+klebsiella_pneumoniae_mgh39_067	MGH39	MGH39	Klebsiella pneumoniae	1	4	714884	50	true	0.9997	5
+enterobacter_hormaechei_mgh3_065	MGH3	MGH3	Enterobacter hormaechei	1	7	261131	81	true	0.9997	7
+klebsiella_pneumoniae_mgh43_068	MGH43	MGH43	Klebsiella pneumoniae	1	0	0	56	true		0
+enterobacter_hormaechei_mgh6_069	MGH6	MGH6	Enterobacter hormaechei	1	1	83855	62	true	1.0000	1
+enterobacter_hormaechei_mgh7_070	MGH7	MGH7	Enterobacter hormaechei	1	3	425008	64	true	0.9997	3
+klebsiella_pneumoniae_mgh83_071	MGH83	MGH83	Klebsiella pneumoniae	1	7	1503308	65	true	0.9997	9
+klebsiella_pneumoniae_mgh89_072	MGH89	MGH89	Klebsiella pneumoniae	1	2	162585	52	true	1.0000	2
+klebsiella_pneumoniae_mgh97_073	MGH97	MGH97	Klebsiella pneumoniae	1	0	0	46	true		0
+citrobacter_freundii_complex_species_a_mgh99_074	MGH99	MGH99	Citrobacter freundii complex (species A)	1	6	300954	72	false		0
+enterobacter_hormaechei_uci101_075	UCI101	UCI101	Enterobacter hormaechei	1	2	7348	66	false		0
+klebsiella_pneumoniae_uci105_076	UCI105	UCI105	Klebsiella pneumoniae	1	10	881473	85	true	1.0000	13
+klebsiella_pneumoniae_uci107_077	UCI107	UCI107	Klebsiella pneumoniae	4	3	243135	135	false		0
+klebsiella_pneumoniae_uci117_078	UCI117	UCI117	Klebsiella pneumoniae	6	2	84110	106	false		0
+escherichia_coli_uci121_079	UCI121	UCI121	Escherichia coli	3	2	280837	138	false		0
+enterobacter_hormaechei_uci147_082	UCI147	UCI147	Enterobacter hormaechei	1	2	117744	47	true	0.9999	2
+enterobacter_hormaechei_uci148_083	UCI148	UCI148	Enterobacter hormaechei	1	1	108361	48	true	0.8957	1
+citrobacter_freundii_complex_species_a_uci151_084	UCI151	UCI151	Citrobacter freundii complex (species A)	1	2	225396	42	false		0
+enterobacter_hormaechei_uci161_085	UCI161	UCI161	Enterobacter hormaechei	1	0	0	34	true		0
+klebsiella_aerogenes_uci179_086	UCI179	UCI179	Klebsiella aerogenes	1	1	9294	38	true	1.0000	1
+klebsiella_pneumoniae_uci187_087	UCI187	UCI187	Klebsiella pneumoniae	1	4	277336	65	true	0.9998	4
+escherichia_coli_uci191_088	UCI191	UCI191	Escherichia coli	1	12	879959	131	false		0
+enterobacter_asburiae_uci193_089	UCI193	UCI193	Enterobacter asburiae	1	5	1240602	67	true	1.0000	7
+klebsiella_pneumoniae_uci75_090	UCI75	UCI75	Klebsiella pneumoniae	1	5	338137	93	true	1.0000	5
+enterobacter_hormaechei_uci85_091	UCI85	UCI85	Enterobacter hormaechei	1	2	43097	46	false		0
+klebsiella_aerogenes_uci89_092	UCI89	UCI89	Klebsiella aerogenes	1	0	0	39	true		0
+klebsiella_pneumoniae_uci93_093	UCI93	UCI93	Klebsiella pneumoniae	1	6	256886	83	true	1.0000	7
+klebsiella_pneumoniae_uci123_080	UCI123	UCICRE123	Klebsiella pneumoniae	1	0	0	58	true		0
+citrobacter_freundii_complex_species_a_uci141_081	UCI141	UCICRE141	Citrobacter freundii complex (species A)	1	6	1868132	85	true	1.0000	11
+enterococcus_faecalis_az008_111	AZ008	AZ008	Enterococcus faecalis	1	3	144212	12	true	0.7991	3
+enterococcus_casseliflavus_az015_095	AZ015	AZ015	Enterococcus casseliflavus	1	1	118525	18	true	0.8921	1
+enterococcus_faecalis_az029_112	AZ029	AZ029	Enterococcus faecalis	1	4	287383	16	true	0.7991	4
+enterococcus_gallinarum_az034_204	AZ034	AZ034	Enterococcus gallinarum	1	1	62492	31	true	0.8957	1
+enterococcus_casseliflavus_az040_096	AZ040	AZ040	Enterococcus casseliflavus	1	1	69954	13	true	0.8921	1
+enterococcus_pernyi_az045_223	AZ045	AZ045	Enterococcus pernyi	1	4	191196	28	true	0.7991	4
+enterococcus_casseliflavus_az046_097	AZ046	AZ046	Enterococcus casseliflavus	1	2	177338	25	true	0.8872	2
+enterococcus_gilvus_az048_206	AZ048	AZ048	Enterococcus gilvus	1	2	1091237	18	true	0.9774	2
+enterococcus_casseliflavus_az049_098	AZ049	AZ049	Enterococcus casseliflavus	1	1	132364	29	true	0.7991	1
+enterococcus_casseliflavus_az051_099	AZ051	AZ051	Enterococcus casseliflavus	1	3	136637	38	true	0.7991	3
+enterococcus_mundtii_az062_224	AZ062	AZ062	Enterococcus mundtii	1	2	148766	34	true	0.7991	2
+enterococcus_flavescens_az063_199	AZ063	AZ063	Enterococcus flavescens	1	2	76552	36	true	0.8949	2
+enterococcus_hirae_az077_207	AZ077	AZ077	Enterococcus hirae	1	1	143988	18	true	0.8957	1
+enterococcus_hirae_az078_208	AZ078	AZ078	Enterococcus hirae	1	5	589764	39	true	0.8957	7
+enterococcus_pernyi_az080_225	AZ080	AZ080	Enterococcus pernyi	1	1	137089	18	true	0.8957	1
+enterococcus_faecalis_az081_113	AZ081	AZ081	Enterococcus faecalis	1	2	78040	27	true	0.9823	2
+enterococcus_hirae_az082_209	AZ082	AZ082	Enterococcus hirae	1	4	229898	24	true	0.9014	4
+enterococcus_casseliflavus_az083_100	AZ083	AZ083	Enterococcus casseliflavus	1	1	66819	19	true	0.7991	1
+enterococcus_pernyi_az084_226	AZ084	AZ084	Enterococcus pernyi	1	5	364719	42	true	0.8944	6
+enterococcus_hirae_az085_210	AZ085	AZ085	Enterococcus hirae	1	4	229898	24	true	0.9014	4
+enterococcus_faecalis_az088_114	AZ088	AZ088	Enterococcus faecalis	1	1	97279	31	true	0.8944	1
+enterococcus_pernyi_az093_227	AZ093	AZ093	Enterococcus pernyi	1	1	62075	37	true	0.8940	1
+enterococcus_pernyi_az095b_228	AZ095b	AZ095b	Enterococcus pernyi	1	3	274406	28	true	0.8940	4
+enterococcus_faecalis_az107_115	AZ107	AZ107	Enterococcus faecalis	1	1	109365	17	true	0.8944	1
+enterococcus_angrensis_az109_248	AZ109	AZ109	Enterococcus angrensis	1	1	1223742	30	true	0.7583	1
+enterococcus_faecalis_az112_116	AZ112	AZ112	Enterococcus faecalis	1	2	87933	31	true	0.8949	2
+enterococcus_faecalis_az129_117	AZ129	AZ129	Enterococcus faecalis	1	5	397741	39	true	0.8949	6
+enterococcus_faecalis_az134_118	AZ134	AZ134	Enterococcus faecalis	1	1	109388	18	true	0.8957	1
+enterococcus_casseliflavus_az136_101	AZ136	AZ136	Enterococcus casseliflavus	1	1	56633	26	true	0.8897	1
+enterococcus_faecium_az146_182	AZ146	AZ146	Enterococcus faecium	1	1	65831	56	true	0.8957	1
+enterococcus_pernyi_az147_229	AZ147	AZ147	Enterococcus pernyi	1	5	334981	32	true	0.8944	6
+enterococcus_casseliflavus_az149_109	AZ149	AZ149	Enterococcus casseliflavus	1	2	119877	21	true	0.8944	2
+enterococcus_faecalis_az151_119	AZ151	AZ151	Enterococcus faecalis	1	1	59982	22	true	0.8957	1
+enterococcus_pernyi_az153_230	AZ153	AZ153	Enterococcus pernyi	1	1	6942	24	true	0.7688	1
+enterococcus_pernyi_az156_231	AZ156	AZ156	Enterococcus pernyi	1	1	6942	22	true	0.7688	1
+enterococcus_pernyi_az161_232	AZ161	AZ161	Enterococcus pernyi	1	4	282734	31	true	0.8944	5
+enterococcus_pernyi_az162_233	AZ162	AZ162	Enterococcus pernyi	1	4	283166	31	true	0.8949	5
+enterococcus_pernyi_az171_234	AZ171	AZ171	Enterococcus pernyi	1	1	7010	38	true	0.7991	1
+enterococcus_pernyi_az172_235	AZ172	AZ172	Enterococcus pernyi	1	1	7010	40	true	0.7991	1
+enterococcus_casseliflavus_az173_102	AZ173	AZ173	Enterococcus casseliflavus	1	1	91636	12	true	0.7991	1
+enterococcus_faecalis_az180_120	AZ180	AZ180	Enterococcus faecalis	1	1	140471	15	true	0.7438	1
+enterococcus_faecalis_az183_121	AZ183	AZ183	Enterococcus faecalis	1	3	317256	29	true	0.8953	4
+enterococcus_faecium_div0007_183	DIV0007	DIV0007	Enterococcus faecium	1	1	24362	115	true	0.9998	1
+enterococcus_faecalis_div0188_122	DIV0188	DIV0188	Enterococcus faecalis	1	3	242906	49	true	0.8957	4
+enterococcus_faecalis_div0198e_123	DIV0198e	DIV0198e	Enterococcus faecalis	1	1	55077	23	true	0.8957	1
+enterococcus_faecalis_div0206e_124	DIV0206e	DIV0206e	Enterococcus faecalis	1	5	312916	21	true	0.8957	5
+enterococcus_faecalis_div0238e_125	DIV0238e	DIV0238e	Enterococcus faecalis	1	1	19205	31	true	0.8957	1
+enterococcus_faecium_div0436a_184	DIV0436a	DIV0436a	Enterococcus faecium	1	7	88387	73	true	0.9999	7
+enterococcus_faecium_div0673_185	DIV0673	DIV0673	Enterococcus faecium	1	1	182702	147	true	0.9998	1
+enterococcus_faecalis_div0682_126	DIV0682	DIV0682	Enterococcus faecalis	1	1	57428	37	true	0.8957	1
+enterococcus_faecalis_div0719d_127	DIV0719d	DIV0719d	Enterococcus faecalis	1	1	19213	15	true	0.8957	1
+enterococcus_canintestini_div0755b_094	DIV0755b	DIV0755b	Enterococcus canintestini	1	5	75820	33	true	0.8940	5
+enterococcus_flavescens_div0755f_103	DIV0755f	DIV0755f	Enterococcus flavescens	1	2	128352	17	true	0.8957	2
+enterococcus_casseliflavus_div0765a_104	DIV0765a	DIV0765a	Enterococcus casseliflavus	1	1	79405	20	true	0.7991	1
+enterococcus_mundtii_div0806c_236	DIV0806c	DIV0806c	Enterococcus mundtii	1	2	289788	50	true	0.8957	2
+enterococcus_faecium_div0837a_186	DIV0837a	DIV0837a	Enterococcus faecium	1	2	179971	129	true	0.9998	2
+enterococcus_faecalis_div0839b_128	DIV0839b	DIV0839b	Enterococcus faecalis	1	3	143910	20	true	1.0000	3
+enterococcus_faecalis_div0841a_129	DIV0841a	DIV0841a	Enterococcus faecalis	1	3	152602	21	true	0.9976	3
+enterococcus_lactis_div0872a_187	DIV0872a	DIV0872a	Enterococcus lactis	1	1	198770	50	true	0.8957	1
+enterococcus_faecium_div0901a_188	DIV0901a	DIV0901a	Enterococcus faecium	1	6	421601	79	true	0.9984	7
+enterococcus_flavescens_div0970a_200	DIV0970a	DIV0970a	Enterococcus flavescens	1	8	314101	61	true	0.9995	10
+enterococcus_pernyi_div0996a_237	DIV0996a	DIV0996a	Enterococcus pernyi	1	3	179878	18	true	0.8940	3
+enterococcus_flavescens_div1083b_105	DIV1083b	DIV1083b	Enterococcus flavescens	1	1	89892	31	true	0.8953	1
+enterococcus_casseliflavus_div1096b_106	DIV1096b	DIV1096b	Enterococcus casseliflavus	1	1	56953	25	true	0.8931	1
+enterococcus_faecium_div1248a_189	DIV1248a	DIV1248a	Enterococcus faecium	1	2	200354	126	true	0.9999	2
+enterococcus_lactis_div1283b_218	DIV1283b	DIV1283b	Enterococcus lactis	1	2	314337	18	true	0.8957	2
+enterococcus_pernyi_div1286c_238	DIV1286c	DIV1286c	Enterococcus pernyi	1	2	148446	22	true	0.8949	2
+enterococcus_mundtii_div1288f_239	DIV1288f	DIV1288f	Enterococcus mundtii	1	1	246467	40	true	0.8957	1
+enterococcus_casseliflavus_div1297f_107	DIV1297f	DIV1297f	Enterococcus casseliflavus	1	1	91944	26	true	0.7991	1
+enterococcus_faecalis_div1315a_130	DIV1315a	DIV1315a	Enterococcus faecalis	1	1	53631	13	true	0.8957	1
+enterococcus_faecalis_div1318a_131	DIV1318a	DIV1318a	Enterococcus faecalis	1	2	155318	16	true	0.9999	2
+enterococcus_faecalis_div1325a_132	DIV1325a	DIV1325a	Enterococcus faecalis	1	2	66317	22	true	1.0000	2
+enterococcus_faecalis_div1337a_133	DIV1337a	DIV1337a	Enterococcus faecalis	1	2	128435	23	true	0.9999	2
+enterococcus_faecalis_div1347a_134	DIV1347a	DIV1347a	Enterococcus faecalis	1	3	168489	21	true	0.8957	3
+enterococcus_pernyi_div1368e_240	DIV1368e	DIV1368e	Enterococcus pernyi	1	1	97514	26	true	0.8949	1
+enterococcus_faecalis_div1368f_135	DIV1368f	DIV1368f	Enterococcus faecalis	1	1	66514	19	true	0.8957	1
+enterococcus_hirae_div1371a_211	DIV1371a	DIV1371a	Enterococcus hirae	1	3	418044	28	true	0.8957	4
+enterococcus_faecalis_div1375a_136	DIV1375a	DIV1375a	Enterococcus faecalis	1	2	125130	44	true	0.8926	2
+enterococcus_faecalis_div1406a_137	DIV1406a	DIV1406a	Enterococcus faecalis	1	3	197546	24	true	0.8957	4
+enterococcus_faecalis_div1409a_138	DIV1409a	DIV1409a	Enterococcus faecalis	1	3	102566	16	true	0.8957	3
+enterococcus_hirae_div1421a_212	DIV1421a	DIV1421a	Enterococcus hirae	1	1	62253	25	true	0.0000	1
+enterococcus_faecalis_div1444a_139	DIV1444a	DIV1444a	Enterococcus faecalis	1	2	139197	17	true	0.8957	2
+enterococcus_faecalis_div1537a_140	DIV1537a	DIV1537a	Enterococcus faecalis	1	1	104441	24	true	0.8940	1
+enterococcus_faecalis_div1614a_141	DIV1614a	DIV1614a	Enterococcus faecalis	1	2	127303	17	true	0.8957	2
+enterococcus_hirae_div1682a_213	DIV1682a	DIV1682a	Enterococcus hirae	1	1	67313	19	true	0.7946	1
+enterococcus_hirae_div1726a_214	DIV1726a	DIV1726a	Enterococcus hirae	1	1	30515	17	true	0.8798	1
+enterococcus_pernyi_div2316_242	DIV2316	DIV2316	Enterococcus pernyi	1	3	121956	40	true	0.7991	3
+enterococcus_pernyi_div2357_243	DIV2357	DIV2357	Enterococcus pernyi	1	3	132283	47	true	0.7991	3
+enterococcus_mangumiae_div2359_219	DIV2359	DIV2359	Enterococcus mangumiae	1	3	68231	39	true	0.8953	3
+enterococcus_mangumiae_div2371_220	DIV2371	DIV2371	Enterococcus mangumiae	1	3	11264	35	true	0.8957	3
+enterococcus_faecalis_div2372_142	DIV2372	DIV2372	Enterococcus faecalis	1	1	51615	22	true	0.8957	1
+enterococcus_lactis_div2377_190	DIV2377	DIV2377	Enterococcus lactis	1	1	240216	57	true	0.8957	1
+enterococcus_mangumiae_div2381_221	DIV2381	DIV2381	Enterococcus mangumiae	1	4	124632	36	true	0.8940	4
+enterococcus_lactis_div2383_191	DIV2383	DIV2383	Enterococcus lactis	1	1	176950	56	true	0.8957	1
+enterococcus_faecalis_div2385_143	DIV2385	DIV2385	Enterococcus faecalis	1	1	79436	23	true	0.8953	1
+enterococcus_faecalis_div2386_144	DIV2386	DIV2386	Enterococcus faecalis	1	1	59252	30	true	0.8957	1
+enterococcus_pernyi_div2389_241	DIV2389	DIV2389	Enterococcus pernyi	1	7	324119	31	true	0.9996	8
+enterococcus_lactis_div2391_192	DIV2391	DIV2391	Enterococcus lactis	1	1	240216	57	true	0.8957	1
+enterococcus_faecalis_div2416_145	DIV2416	DIV2416	Enterococcus faecalis	1	2	114685	11	true	0.8957	2
+enterococcus_mangumiae_div2417_222	DIV2417	DIV2417	Enterococcus mangumiae	1	3	68231	34	true	0.8957	3
+enterococcus_faecalis_div2419_146	DIV2419	DIV2419	Enterococcus faecalis	1	1	122953	26	true	0.8957	1
+enterococcus_faecium_div2446a_193	DIV2446a	DIV2446a	Enterococcus faecium	1	1	177123	108	true	0.8957	1
+enterococcus_flavescens_div2449a_201	DIV2449a	DIV2449a	Enterococcus flavescens	1	5	272324	34	true	0.8957	6
+enterococcus_faecalis_div2454a_147	DIV2454a	DIV2454a	Enterococcus faecalis	1	1	60826	13	true	0.8957	1
+enterococcus_faecalis_div2455a_148	DIV2455a	DIV2455a	Enterococcus faecalis	1	2	95081	27	true	0.8957	2
+enterococcus_faecalis_div2461a_149	DIV2461a	DIV2461a	Enterococcus faecalis	1	2	95081	27	true	0.8957	2
+enterococcus_faecalis_div2463a_150	DIV2463a	DIV2463a	Enterococcus faecalis	1	1	60826	9	true	0.8957	1
+enterococcus_faecalis_div2468a_151	DIV2468a	DIV2468a	Enterococcus faecalis	1	2	95081	27	true	0.8957	2
+enterococcus_flavescens_div2469a_202	DIV2469a	DIV2469a	Enterococcus flavescens	1	5	272320	33	true	0.8957	6
+enterococcus_flavescens_div2472a_203	DIV2472a	DIV2472a	Enterococcus flavescens	1	5	272320	38	true	0.8957	6
+enterococcus_hirae_gcid_2549_215	GCID-2549	GCID-2549	Enterococcus hirae	1	1	101752	22	true	0.8940	1
+enterococcus_faecalis_gcid_2553_152	GCID-2553	GCID-2553	Enterococcus faecalis	1	2	155220	22	true	0.8957	2
+enterococcus_raffinosus_gcid_2558_247	GCID-2558	GCID-2558	Enterococcus raffinosus	1	1	1173992	39	true	0.8917	1
+enterococcus_faecalis_gcid_2561_153	GCID-2561	GCID-2561	Enterococcus faecalis	1	1	99695	23	true	0.8957	1
+enterococcus_casseliflavus_gcid_2564_108	GCID-2564	GCID-2564	Enterococcus casseliflavus	1	2	215260	24	true	0.8949	2
+enterococcus_faecalis_gcid_2573_154	GCID-2573	GCID-2573	Enterococcus faecalis	1	1	99695	23	true	0.8957	1
+enterococcus_faecalis_gcid_2583_155	GCID-2583	GCID-2583	Enterococcus faecalis	1	1	79436	24	true	0.8953	1
+enterococcus_hirae_gcid_2585_216	GCID-2585	GCID-2585	Enterococcus hirae	1	3	213509	30	true	0.8957	3
+enterococcus_pernyi_gcid_2587_244	GCID-2587	GCID-2587	Enterococcus pernyi	1	2	64516	20	true	0.7991	2
+enterococcus_faecalis_gcid_2608_156	GCID-2608	GCID-2608	Enterococcus faecalis	1	1	99695	23	true	0.8957	1
+enterococcus_faecalis_gcid_2611_157	GCID-2611	GCID-2611	Enterococcus faecalis	1	1	99900	32	true	0.8957	1
+enterococcus_faecalis_gcid_2612_158	GCID-2612	GCID-2612	Enterococcus faecalis	1	1	55077	18	true	0.8957	1
+enterococcus_thailandicus_gcid_2628_250	GCID-2628	GCID-2628	Enterococcus thailandicus	1	1	41340	15	true	0.8957	1
+enterococcus_faecalis_gcid_2636_159	GCID-2636	GCID-2636	Enterococcus faecalis	1	1	108055	18	true	0.8957	1
+enterococcus_faecalis_gcid_2646_160	GCID-2646	GCID-2646	Enterococcus faecalis	1	2	131436	14	true	0.8957	2
+enterococcus_faecalis_gcid_2648_161	GCID-2648	GCID-2648	Enterococcus faecalis	1	2	122096	15	true	0.8957	2
+enterococcus_lactis_gcid_2651_194	GCID-2651	GCID-2651	Enterococcus lactis	1	1	240216	57	true	0.8957	1
+enterococcus_faecalis_gcid_2653_162	GCID-2653	GCID-2653	Enterococcus faecalis	1	2	100160	33	true	0.8953	2
+enterococcus_faecalis_gcid_2660_163	GCID-2660	GCID-2660	Enterococcus faecalis	1	2	128945	20	true	0.8957	2
+enterococcus_faecalis_gcid_2662_164	GCID-2662	GCID-2662	Enterococcus faecalis	1	1	99695	20	true	0.8957	1
+enterococcus_faecalis_gcid_2664_165	GCID-2664	GCID-2664	Enterococcus faecalis	1	1	49200	28	true	0.7991	1
+enterococcus_hirae_gcid_2672_217	GCID-2672	GCID-2672	Enterococcus hirae	1	1	67313	24	true	0.7946	1
+enterococcus_faecalis_gcid_2674_166	GCID-2674	GCID-2674	Enterococcus faecalis	1	1	80419	21	true	0.9998	1
+enterococcus_lactis_gcid_2675_195	GCID-2675	GCID-2675	Enterococcus lactis	1	1	240216	56	true	0.8957	1
+enterococcus_faecalis_gcid_2676_167	GCID-2676	GCID-2676	Enterococcus faecalis	1	2	78374	32	true	0.8944	2
+enterococcus_faecalis_gcid_2680_168	GCID-2680	GCID-2680	Enterococcus faecalis	1	2	63629	40	true	1.0000	2
+enterococcus_faecalis_gcid_2685_169	GCID-2685	GCID-2685	Enterococcus faecalis	1	2	104543	22	true	0.8957	2
+enterococcus_sp_gcid_2686_249	GCID-2686	GCID-2686	Enterococcus sp.	1	1	1458615	37	true	0.7991	1
+enterococcus_faecalis_gcid_2687_170	GCID-2687	GCID-2687	Enterococcus faecalis	1	1	123159	26	true	0.8957	1
+enterococcus_faecalis_gcid_2694_171	GCID-2694	GCID-2694	Enterococcus faecalis	1	1	1251	26	true	0.8867	1
+enterococcus_faecium_gcid_2696_196	GCID-2696	GCID-2696	Enterococcus faecium	1	1	156342	53	true	1.0000	1
+enterococcus_faecalis_gcid_2700_172	GCID-2700	GCID-2700	Enterococcus faecalis	1	2	78374	26	true	0.8944	2
+enterococcus_faecalis_gcid_2705_173	GCID-2705	GCID-2705	Enterococcus faecalis	1	1	125419	17	true	1.0000	1
+enterococcus_faecalis_gcid_2708_174	GCID-2708	GCID-2708	Enterococcus faecalis	1	1	99695	20	true	0.8957	1
+enterococcus_faecalis_gcid_2709_175	GCID-2709	GCID-2709	Enterococcus faecalis	1	2	110007	27	true	1.0000	2
+enterococcus_faecalis_gcid_2712_176	GCID-2712	GCID-2712	Enterococcus faecalis	1	1	43111	36	true	1.0000	1
+enterococcus_faecalis_gcid_2718_177	GCID-2718	GCID-2718	Enterococcus faecalis	1	2	101182	21	true	0.9999	2
+enterococcus_faecium_gcid_2719_197	GCID-2719	GCID-2719	Enterococcus faecium	1	1	159788	29	true	0.8957	1
+enterococcus_faecalis_gcid_2720_178	GCID-2720	GCID-2720	Enterococcus faecalis	1	1	99695	22	true	0.8957	1
+enterococcus_faecalis_gcid_2723_179	GCID-2723	GCID-2723	Enterococcus faecalis	1	1	69680	23	true	0.8957	1
+enterococcus_gallinarum_gcid_2724_205	GCID-2724	GCID-2724	Enterococcus gallinarum	1	1	54974	34	true	0.8940	1
+enterococcus_devriesei_gcid_2726_110	GCID-2726	GCID-2726	Enterococcus devriesei	1	2	790413	12	true	0.7991	2
+enterococcus_faecalis_gcid_2730_180	GCID-2730	GCID-2730	Enterococcus faecalis	1	2	129150	22	true	0.8957	2
+enterococcus_pernyi_gcid_2731_245	GCID-2731	GCID-2731	Enterococcus pernyi	1	6	463900	50	true	0.8957	7
+enterococcus_faecalis_gcid_2732_181	GCID-2732	GCID-2732	Enterococcus faecalis	1	1	99695	21	true	0.8957	1
+enterococcus_faecium_gcid_2733_198	GCID-2733	GCID-2733	Enterococcus faecium	1	2	42157	49	true	0.9990	2
+enterococcus_mundtii_gcid_2734_246	GCID-2734	GCID-2734	Enterococcus mundtii	1	7	324119	33	true	0.9996	8

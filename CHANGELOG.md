@@ -13,6 +13,12 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- literature and public-data review: AMR regions, synteny ribbons, publication cohorts (16 November 2026)
+- `python/report_amr_regions.py`: interactive AMR regions view (truth resistance regions with mobile context, a lane per tool with per-gene placement and flank coverage, a verdict per region, a funnel of where resistance information is lost); report section *AMR regions*.
+- `python/report_synteny.py`: interactive synteny ribbons (order and orientation of each tool's records on a truth plasmid, identity shading, strand and identity filters, details panel); report section *Synteny ribbons*.
+- Candidate cohorts adopted from publications: plsMD filtered (80 isolates, 244 plasmids), plsMD novel (68, 269), MOB-suite benchmark (133, 377), with supplement tables, ENA run metadata and a Teixeira ground-truth summary (`cohorts/candidates/PUBLICATION_COHORTS.md`, `python/build_publication_cohort_candidates.py`). Candidates only: assemblies are not resolved.
+- FAQ Q43, external review log entry R10. Phylogeny, clustering and relatedness figures were not adopted (outside the benchmark).
+
 ### Added -- your own isolates: a template, a folder scan, a quick test, and a plain way out of every error
 - **`plasbench intake`** (`python/intake.py`) and a rebuilt **Your own isolates** page. `template local|cohort|truth` writes a sheet to fill in with the rules written at the top (downloadable in the window); `scan FOLDER...` finds isolates under the folders you name (read pairs by `_1/_2`, `_R1/_R2`, Illumina lane names; lanes joined; the isolate named from the file or the folder), matches each reference FASTA to its isolate by name or folder **with a stated confidence**, and gives one FASTA to several isolates to none; `stage` places the files with the same code as `init-local` (now one shared function), compresses uncompressed reads, joins lanes, writes the sheet with a guessed organism and `NA` for reads-only isolates; `check` is the quick test.
 - **The quick test** opens every file the way a run will: FASTQ validity, mates in step, short-read length, reference readable / DNA / unique names / not a draft, truth table against the reference, and **reads versus reference by 21-mer containment**, which catches a reference from a different strain or species that no file name or format check can see (80% or more passes, 30-80% warns, less fails).

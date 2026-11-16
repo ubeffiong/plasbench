@@ -142,8 +142,9 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
   `score_amr_placement.py` scores each gene copy at its position: not recovered, shared contig, unassigned contig, on the wrong plasmid or correctly placed, by output type.
   `feature_preservation.py` reports full-length versus partial recovery of replicon, mobility, IS and AMR features and gene-order conservation. SV-PRR reports CPRR counting
   structural discordance, beside CPRR, as an unvalidated descriptive measure.
-- **Where.** `python/score_amr_placement.py`, `feature_preservation.py`, `call_structural_variants.py`, `annotate_reference.py`, `stratify_recovery.py` (recovery by replicon,
-  MOB, size and AMR carriage). **Tests.** `test_amr_truth.py`, `test_derive_amr_truth.py`, `test_feature_preservation.py`, `test_stratify_recovery.py`.
+- **AMR regions view (new).** `report_amr_regions.py` draws every resistance region of the truth (genes coloured by class, with insertion sequences, integrase or integron, replicon, mobility, transfer and metal-resistance context around them) with one lane per tool showing, gene by gene, correct plasmid, wrong plasmid, shared or unassigned contig, or not recovered, plus whether the flank is covered, and a verdict per region (intact, partial, lost; "attributed" for tools that do not bin). A funnel table shows where resistance information is lost: recovered, on the correct plasmid, flank covered, region intact. Interactive: choose a region, show or hide tools and gene classes, zoom, hover or focus to highlight a gene across every lane, click to pin its details. It re-draws what `score_amr_placement.py` already scored and changes no score.
+- **Where.** `python/score_amr_placement.py`, `report_amr_regions.py`, `feature_preservation.py`, `call_structural_variants.py`, `annotate_reference.py`, `stratify_recovery.py` (recovery by replicon,
+  MOB, size and AMR carriage). **Tests.** `test_amr_truth.py`, `test_derive_amr_truth.py`, `test_feature_preservation.py`, `test_stratify_recovery.py`, `test_report_amr_regions.py`.
 - **Limits.** Mobile-element context and gene-neighbourhood preservation go only as far as the element and order checks; per-plasmid consistency of replicon, MOB and AMR is not cross-checked.
 
 ### 3.12 The recommender and the operational path
@@ -177,7 +178,8 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
   locking cohorts, a cross-cohort accession ledger, and a path for contributing a new isolate on a local git branch.
 - **Where.** `cohorts/`, `python/discover_ncbi_cohort.py`, `curate_cohort.py`, `validate_cohort.py`, `build_accession_ledger.py`, `import_contributed_cohort.py`, `prepare_contribution.py`.
   **Tests.** `test_cohort_validation.py`, `test_accession_ledger.py`, `test_import_contributed_cohort.py`.
-- **Limits.** Cohorts are small and taxonomically narrow, mostly Gram-negative, with no plasmid-free isolates in the released cohort.
+- **Candidate cohorts from publications (new).** The cohorts of three publications are adopted as *candidates*, not released benchmarks: plsMD filtered (80 isolates, 244 plasmids), plsMD novel (68 isolates, 269 plasmids, reported absent from PLSDB) and the MOB-suite benchmark (133 closed genomes, 377 plasmids), with the raw supplement tables, ENA run metadata, and a per-isolate ground-truth summary from the Teixeira repository. Every unresolved field is blank, never guessed: assembly accessions are not resolved, truth independence is unverified, and the caveats found while adopting them are written down (the plsMD filtered set is a subset of the MOB-suite set; 23 of 68 novel runs were public before the stated sequencing date; the novel runs fall in only 6 BioProjects, so they need dependence-aware holdouts). Files: `cohorts/candidates/PUBLICATION_COHORTS.md`, `python/build_publication_cohort_candidates.py`. **Tests.** `test_publication_cohort_candidates.py`.
+- **Limits.** Cohorts are small and taxonomically narrow, mostly Gram-negative, with no plasmid-free isolates in the released cohort. The adopted candidates have no resolved assemblies yet.
 
 ### 3.16 Bring your own tool
 
@@ -190,11 +192,11 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 - **What.** One self-contained page with a left rail of views, the headline and recommendation first, then analytics in story order. It includes: the leaderboard and scorecard,
   radar fingerprints, precision-recall, a heat table of every metric, CPRR distributions and a forest plot, circular plasmid maps and an interactive map viewer, 3D views, the
   plasmid matrix with per-isolate FASTA download, the binning error profile (PlasEval cohort), the MultiQC-style QC table, the QUAST-style assembly heat table and the Alvis-style
-  candidate tracks (new), ranking stability and reference evidence (new), and a "?" help dialog on every section. Nothing is hidden: a section with nothing to show says "Not run" and
+  candidate tracks (new), ranking stability and reference evidence (new), the interactive AMR regions view and synteny ribbons (new: how each tool's records sit on a truth plasmid in order and orientation, with forward and reverse blocks, identity shading, filters and a details panel), and a "?" help dialog on every section. Nothing is hidden: a section with nothing to show says "Not run" and
   why, and every output file is registered with the section that shows it (section 7). Export to PDF with headless Edge or Chrome; a sample report built from offline demo data is
   linked from the README.
 - **Where.** `python/build_html_report.py` and the `report_*` modules (section 6), `report_surfaces.py` (the registry), `docs/images/`. PRs #24-#38, #70, #94, #97.
-  **Tests.** `test_report_javascript.py`, `test_visual_report.py`, `test_report_surfaces.py`, `test_report_reviewers.py`, `test_stage_dimensions.sh`.
+  **Tests.** `test_report_javascript.py`, `test_visual_report.py`, `test_report_surfaces.py`, `test_report_reviewers.py`, `test_report_amr_regions.py`, `test_report_synteny.py`, `test_stage_dimensions.sh`.
 
 ### 3.18 The PlasBench window
 
