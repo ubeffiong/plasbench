@@ -201,7 +201,7 @@ page with every fold open and every note printed in full). Besides the leaderboa
 > and why, in terms a microbiologist, bioinformatician, AMR scientist, programme lead or reviewer can
 > judge without reading the code. It states the scope plainly, defines every metric, lists what has
 > A sceptical outside assessment, with every claim tied to a file and line, is in the [independent review](docs/INDEPENDENT_REVIEW.md);
-> every review received and what validated each answer is in the [external review and validation log](docs/EXTERNAL_REVIEW_LOG.md).
+> every review received and what validated each answer is in the [external review and validation log](docs/EXTERNAL_REVIEW_LOG.md). The 215-question reviewer assessment, with a status and the evidence for each question, is the [reviewer assessment matrix](docs/REVIEWER_ASSESSMENT_MATRIX.md).
 > and has not been validated, and tells each kind of expert how to check the claims themselves.
 
 **In one paragraph.** PlasBench benchmarks plasmid-*reconstruction* tools. For isolates that have a

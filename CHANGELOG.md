@@ -13,6 +13,13 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- 215-question reviewer assessment: ranking stability, assembler sensitivity, reference evidence audit (16 November 2026)
+- `python/ranking_stability.py` (stage 6, `RUN_RANKING_STABILITY`): leave-one-study-out, leave-one-species-out and equal-study-weighted rankings, the largest study's share, Kendall tau and a verdict; `benchmark.study_sensitivity.tsv`, `.species_sensitivity.tsv`, `.ranking_stability.tsv`; report section *Ranking stability*.
+- `python/assembler_sensitivity.py`: re-ranks the tools across runs that differ only in the assembly and says whether the leader depends on it; optional standalone HTML.
+- `python/reference_evidence_audit.py` (stage 6, `RUN_REFERENCE_EVIDENCE_AUDIT`): one row per isolate with tier, independence, evidence recorded, flags and a strong / usable with caveats / weak status with reasons; report section *Reference evidence*.
+- `docs/REVIEWER_ASSESSMENT_MATRIX.md` and `.tsv`: all 215 questions with component, status, evidence and what is still needed (a self-assessment, not independent review); FAQ section K (Q36 to Q42); external review log entry R9.
+- Descriptive only: none of these change a score or a ranking.
+
 ### Fixed -- the window disconnecting at random, and the icon that did nothing
 - **Random "PlasBench disconnected".** The window's server listened with the standard backlog of 5, and the page opens many connections at once; on Windows a connection that finds the backlog full is refused outright, which the page took for a dead server (measured: 39 of 1,800 concurrent requests refused). The server now listens with a backlog of 256, speaks HTTP/1.1 keep-alive (one connection carries many requests), ignores clients that vanish mid-request, closes a refused POST's connection so an unread body cannot corrupt the next request, survives an error in its accept loop, and answers a repeated POST with the first run's response (`X-PlasBench-Req`), so a retried "start the benchmark" can never start it twice. The page retries a network failure quietly with backoff before it says anything, stands its pollers down while the connection is down, and reconnects by itself (probes grow from 2 s to 10 s, and run at once on wake, network return and tab focus).
 - **The Retry button works.** It used to reload the page, which does nothing useful when the server is down. It now runs a real check (is the server answering? is this window's key still valid?), says honestly what it found ("Still not reachable, attempt 3, trying again in 5 s"), reconnects without a reload when PlasBench is back, and when PlasBench was restarted (new key) says the window must be reopened instead of pretending a retry can help.
