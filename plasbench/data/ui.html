@@ -555,6 +555,7 @@ body.gd-open #gdrawer{transform:none}
   <button class="nav" data-view="setup"><svg class="ico"><use href="#i-wrench"/></svg><span class="t"><b>Set up this computer</b><small id="s_setup">Checking…</small></span><span class="badge" id="b_setup" hidden></span></button>
   <button class="nav" data-view="tools"><svg class="ico"><use href="#i-box"/></svg><span class="t"><b>Tools</b><small id="s_tools">Catalogue and installs</small></span></button>
   <button class="nav" data-view="addtool"><svg class="ico"><use href="#i-plus"/></svg><span class="t"><b>Add your own tool</b><small id="s_addtool">Manifest builder</small></span></button>
+  <button class="nav" data-view="prereg"><svg class="ico"><use href="#i-check"/></svg><span class="t"><b>Scoring decisions</b><small id="s_prereg">The rules, fixed in advance</small></span><span class="badge warn" id="b_prereg" hidden title="Settings that differ from a confirmed decision">0</span></button>
   <button class="nav" data-view="settings"><svg class="ico"><use href="#i-sliders"/></svg><span class="t"><b>Settings</b><small id="s_settings">Paths, threads, defaults</small></span></button>
   <h6>Benchmark</h6>
   <button class="nav" data-view="workspace"><svg class="ico"><use href="#i-folder"/></svg><span class="t"><b>Workspace &amp; studies</b><small id="s_workspace">Where runs are kept</small></span><span class="badge warn" id="b_workspace" hidden>!</span></button>
@@ -670,6 +671,15 @@ body.gd-open #gdrawer{transform:none}
   </section>
 
   <!-- SETTINGS ------------------------------------------------------------------------------------ -->
+  <section class="view" id="v_prereg" hidden>
+   <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Scoring decisions</h1>
+    <p>Before any result is looked at, PlasBench fixes how tools are scored and ranked. These are those rules, each in plain words. They are confirmed and recorded so that nobody, including you, can quietly change a rule after seeing which tool wins. You can still change one: PlasBench asks why, records it, and warns that results from before and after the change cannot be compared.</p></div>
+    <div class="row"><button class="btn sec" id="pr_hist">Decision record</button><button class="btn" id="pr_lock">Lock the decisions</button></div></div>
+   <div class="card" id="pr_status" style="margin-bottom:12px"></div>
+   <div class="card"><div class="toolbar"><input type="search" id="pr_q" placeholder="Search the decisions…" aria-label="Search the decisions"><label class="row small" style="gap:6px"><input type="checkbox" id="pr_only"> Only the ones I can change here</label><div class="chips" id="pr_topics" role="tablist" aria-label="Topics"></div></div>
+    <div id="pr_list"></div></div>
+  </section>
+
   <section class="view" id="v_settings" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Settings</h1>
     <p>Every setting PlasBench reads (from <code>config/config.sh</code>), its default, and your value for this computer. Changes are saved to <code id="set_where">config/local.env</code>, which upgrades keep; clear a value to return to the default.</p></div>
@@ -1099,7 +1109,7 @@ const cmdText = argv => "plasbench " + argv.map(quote).join(" ");
 /* ===================================================================================================
    Navigation
    =================================================================================================== */
-const VIEWS = ["home","setup","tools","addtool","settings","workspace","git","wizard","isolates","cohorts","runs","jobs","commands","help"];
+const VIEWS = ["home","setup","tools","addtool","prereg","settings","workspace","git","wizard","isolates","cohorts","runs","jobs","commands","help"];
 function go(view, sub) { location.hash = sub ? `${view}/${sub}` : view; }
 function route() {
   const [view, ...rest] = (location.hash.slice(1) || "home").split("/");
@@ -1111,7 +1121,7 @@ function route() {
   window.scrollTo(0, 0);
   if (window.mtOnRoute) mtOnRoute(v);
   const sub = rest.join("/");
-  ({home:loadHome, setup:loadSetup, tools:loadTools, addtool:loadAddTool, settings:loadSettings, wizard:loadWizard,
+  ({home:loadHome, setup:loadSetup, tools:loadTools, addtool:loadAddTool, settings:loadSettings, prereg:loadPrereg, wizard:loadWizard,
     workspace:loadWorkspace, git:loadGit, isolates:loadIsolates, cohorts:loadCohorts, runs:() => { if (["ongoing", "attention", "completed", "all"].includes(sub)) S.sessTab = sub; loadRuns(); }, jobs:renderJobs, commands:() => loadCommands(sub), help:() => loadHelp(sub)})[v]();
 }
 document.addEventListener("click", e => {
@@ -1895,6 +1905,18 @@ const PAGE_HELP = {
 "plasbench tools list"
 ]
 },
+"prereg": {
+"title": "Scoring decisions",
+"what": "The rules for how tools are scored and ranked, fixed before any result is looked at, each explained in plain words. They are confirmed and recorded so nobody can quietly change a rule after seeing which tool wins.",
+"steps": [
+"Read the two boxes at the top: whether every decision is confirmed, and whether they are locked. Locking records a fingerprint of the decisions in every run.",
+"Use the search box or the topic buttons to find a decision. Each card says what it means, the value that was decided, and what would change if it were changed.",
+"To change one, press <b>Change</b> (only decisions that are settings have the button). Enter the new value, say why, and give your name. Both are kept in the <b>Decision record</b>.",
+"After a change, results made before it cannot be compared with results made after it. Press <b>Lock the decisions</b> again when you are happy.",
+"A yellow box means a setting on this computer differs from the decision, so a run here would not follow the plan. Change the setting back on the Settings page, or record a decision to change it.",
+"Decisions that are built into the scoring code cannot be changed here: the card says so. They need a new version of PlasBench."
+]
+},
 "settings": {
 "title": "Settings",
 "what": "Every setting PlasBench reads, with its default and an explanation. Your changes apply to this computer only.",
@@ -2160,6 +2182,101 @@ async function loadAddTool() { try { await getUser(); if (!utLoaded) { utLoaded 
    SETTINGS
    =================================================================================================== */
 const SET = {q:"", only:false, edits:{}};
+
+/* ===================================================================================================
+   SCORING DECISIONS (pre-registration): python/prereg_admin.py
+   =================================================================================================== */
+const PR = {data: null, topic: "all", q: "", only: false};
+const prValue = r => r.value === "unset" ? "no limit" : r.value;
+const prDate = d => { try { return new Date(d + "T00:00:00").toLocaleDateString([], {day: "numeric", month: "short", year: "numeric"}); } catch { return d; } };
+async function loadPrereg(force) {
+  try { PR.data = await api("prereg"); } catch (e) { toast(e.message, "bad"); return; }
+  renderPrereg();
+}
+function prUpdateBadge() {
+  const n = PR.data ? PR.data.rows.filter(r => r.departs).length : 0, b = $("#b_prereg");
+  if (b) { b.hidden = !n; b.textContent = n; }
+}
+function renderPrereg() {
+  const d = PR.data; if (!d) return;
+  const st = d.status, open = st.counts.proposed + st.counts.TO_FIX, depart = d.rows.filter(r => r.departs);
+  const lockLine = !st.locked ? `<b>Not locked yet.</b> Locking records a fingerprint of the decisions in every run, so a later change is noticed.`
+    : st.matches ? `<b>Locked</b> on ${esc(prDate((st.frozen_at || "").slice(0, 10)))}. Every run records that these decisions were in force.`
+    : `<b>Changed since they were locked.</b> The record of the lock no longer matches. Lock the decisions again when you are happy with the change.`;
+  $("#pr_status").innerHTML = `<div class="bd"><div class="note ${open ? "warn" : "ok"}" style="border-left-color:var(--${open ? "warn" : "ok"})">${icon(open ? "alert" : "check", "ico")}<div>
+    <b>${open ? `${open} of ${st.decisions} decisions still need confirming.` : `All ${st.decisions} decisions are confirmed.`}</b> ${esc(String(st.recorded))} of them have a record of who confirmed them and when; the rest were settled before the record began.</div></div>
+    <div class="note ${st.locked && st.matches ? "ok" : "info"}" style="margin-top:8px">${icon("info", "ico")}<div>${lockLine}</div></div>
+    ${depart.length ? `<div class="note warn" style="margin-top:8px;border-left-color:var(--warn)">${icon("alert", "ico")}<div><b>${depart.length} setting${depart.length > 1 ? "s" : ""} on this computer differ${depart.length > 1 ? "" : "s"} from the confirmed decision:</b>
+      ${depart.map(r => `${esc(r.title)} (decided ${esc(r.value)}, this computer uses ${esc(String(r.current))})`).join("; ")}. A run on this computer would not follow the plan. Change the setting back on the Settings page, or record a decision to change it here.</div></div>` : ""}</div>`;
+  $("#pr_lock").disabled = open > 0 || (st.locked && st.matches);
+  $("#pr_lock").title = open ? "Confirm every decision first" : st.locked && st.matches ? "Already locked" : "Record the decisions as they are now";
+  $("#s_prereg").textContent = open ? `${open} to confirm` : st.locked && st.matches ? "Confirmed and locked" : "Confirmed";
+  prUpdateBadge();
+  $("#pr_topics").innerHTML = ["all", ...d.topics].map(t => `<button class="chip ${PR.topic === t ? "on" : ""}" data-pt="${esc(t)}">${t === "all" ? "All" : esc(t)}</button>`).join("");
+  const q = PR.q.toLowerCase();
+  const rows = d.rows.filter(r => (PR.topic === "all" || r.topic === PR.topic) && (!PR.only || r.where === "setting") && (!q || (r.title + " " + r.meaning + " " + r.parameter + " " + r.value).toLowerCase().includes(q)));
+  $("#pr_list").innerHTML = rows.length ? d.topics.filter(t => rows.some(r => r.topic === t)).map(t => `<div class="grp"><h3 style="margin:14px 14px 6px">${esc(t)}</h3>
+    ${rows.filter(r => r.topic === t).map(prCard).join("")}</div>`).join("") : `<div class="bd mut">No decision matches.</div>`;
+}
+function prCard(r) {
+  const badge = r.status === "fixed" ? `<span class="badge ok">Confirmed${r.decided_on ? " " + esc(prDate(r.decided_on)) : ""}</span>` : r.status === "unavailable" ? `<span class="badge">Unavailable by design</span>` : `<span class="badge warn">${esc(r.status)}</span>`;
+  const how = r.where === "setting" ? `<button class="btn sec sm" data-pe="${esc(r.parameter)}">Change</button>` : r.where === "file" ? `<span class="mut small">Edit <code>config/scorecard.tsv</code> to change this.</span>` : `<span class="mut small">Built into the program: it cannot be changed here.</span>`;
+  const by = r.decided_by ? `<div class="mut small">${esc(r.last_action === "changed" ? "Changed" : "Confirmed")} by ${esc(r.decided_by)}: ${esc(r.decision_reason)}</div>` : "";
+  return `<div class="run" style="padding:10px 14px;border-top:1px solid var(--line)"><div style="flex:1;min-width:0"><h4 style="margin:0;font-family:inherit">${esc(r.title)} ${badge}${r.departs ? ` <span class="badge warn">this computer differs</span>` : ""}</h4>
+    <div style="margin-top:4px">${esc(r.meaning)}</div>
+    <div class="small" style="margin-top:4px"><b>Decided:</b> <code>${esc(prValue(r))}</code>${r.where === "setting" && r.current != null && r.departs ? ` · this computer uses <code>${esc(String(r.current) === "" ? "no limit" : String(r.current))}</code>` : ""}</div>
+    <div class="mut small" style="margin-top:2px"><b>If it were changed:</b> ${esc(r.if_changed)}</div>${by}</div>
+    <div style="flex:none;align-self:flex-start">${how}</div></div>`;
+}
+$("#pr_topics").onclick = e => { const b = e.target.closest("[data-pt]"); if (b) { PR.topic = b.dataset.pt; renderPrereg(); } };
+$("#pr_q").oninput = e => { PR.q = e.target.value; renderPrereg(); };
+$("#pr_only").onchange = e => { PR.only = e.target.checked; renderPrereg(); };
+$("#pr_list").onclick = e => { const b = e.target.closest("[data-pe]"); if (b) prEdit(PR.data.rows.find(r => r.parameter === b.dataset.pe)); };
+$("#pr_lock").onclick = async () => {
+  if (!confirm("Lock the decisions?\n\nPlasBench records a fingerprint of them. Every later run notes that these decisions were in force, and a change to the decisions is noticed. You can change a decision later; you would then lock again.")) return;
+  try { PR.data = await api("prereg/lock", {}); toast("Decisions locked", "ok"); renderPrereg(); } catch (e) { toast(e.message, "bad"); }
+};
+$("#pr_hist").onclick = () => {
+  const d = document.createElement("dialog"); d.className = "card"; d.style.cssText = "max-width:760px;width:92vw;padding:0;border:1px solid var(--line)";
+  const log = (PR.data.history || []).slice().reverse();
+  d.innerHTML = `<div class="hd"><h3>Decision record</h3></div><div class="bd" style="max-height:60vh;overflow:auto">${log.length ? log.map(h => `<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>${esc(prDate(h.date))}</b> · ${esc(h.parameter)} · ${esc(h.action)} by ${esc(h.decided_by)}
+    ${h.action === "changed" ? `<div class="small mono">${esc(h.old_value)} → ${esc(h.new_value)}</div>` : ""}<div class="mut small">${esc(h.reason)}</div></div>`).join("") : "<div class='mut'>Nothing recorded yet.</div>"}
+    <p class="mut small" style="margin-bottom:0">Decisions settled before the record began are not listed. The same record is in <code>config/prereg_decisions.tsv</code>.</p></div><div class="ft"><button class="btn" data-c>Close</button></div>`;
+  d.onclick = ev => { if (ev.target.closest("[data-c]")) { d.close(); d.remove(); } }; d.oncancel = () => d.remove();
+  document.body.append(d); d.showModal();
+};
+function prEdit(r) {
+  if (!r) return;
+  const d = document.createElement("dialog"); d.className = "card"; d.style.cssText = "max-width:600px;width:92vw;padding:0;border:1px solid var(--line)";
+  const saved = (() => { try { return localStorage.getItem("plasbench.decider") || ""; } catch { return ""; } })();
+  const many = r.type === "text" && r.choices.length;
+  const input = r.type === "yesno" ? `<select id="pe_v">${[["1", "Yes (1)"], ["0", "No (0)"]].map(([v, l]) => `<option value="${v}" ${String(r.value) === v ? "selected" : ""}>${l}</option>`).join("")}</select>`
+    : r.choices.length && !many ? `<select id="pe_v">${r.choices.map(c => `<option ${c === r.value ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`
+    : `<input id="pe_v" value="${esc(r.value === "unset" ? "none" : r.value)}" ${r.type === "int" || r.type === "float" || r.type === "int_or_none" ? 'inputmode="decimal"' : ""} style="width:100%">`;
+  d.innerHTML = `<div class="hd">${icon("alert", "ico")}<h3>Change: ${esc(r.title)}</h3></div><div class="bd">
+    <p style="margin-top:0">${esc(r.meaning)}</p>
+    <div class="note warn" style="border-left-color:var(--warn)">${icon("alert", "ico")}<div><b>This changes a confirmed decision.</b> ${esc(r.if_changed)}<br>Results made before this change cannot be compared with results made after it. The decisions will need to be locked again.</div></div>
+    <div class="field" style="margin-top:12px"><label for="pe_v"><b>New value</b> <span class="mut small">(now <code>${esc(prValue(r))}</code>${r.type === "int_or_none" ? "; a whole number of seconds, or none for no limit" : ""}${many ? `; choose from ${esc(r.choices.join(", "))}, several allowed, separated by commas` : ""})</span></label>${input}</div>
+    <div class="field" style="margin-top:10px"><label for="pe_why"><b>Why are you changing it?</b> <span class="mut small">(kept in the decision record)</span></label><textarea id="pe_why" rows="3" style="width:100%"></textarea></div>
+    <div class="field" style="margin-top:10px"><label for="pe_by"><b>Your name</b> <span class="mut small">(kept in the decision record)</span></label><input id="pe_by" value="${esc(saved)}" style="width:100%"></div>
+    <p id="pe_err" class="bad-t small" style="margin:8px 0 0" role="alert"></p></div>
+    <div class="ft"><button class="btn ghost" data-c>Cancel</button><button class="btn" id="pe_save">Record the change</button></div>`;
+  d.onclick = async ev => {
+    if (ev.target.closest("[data-c]")) { d.close(); d.remove(); return; }
+    if (!ev.target.closest("#pe_save")) return;
+    const v = $("#pe_v", d).value.trim(), why = $("#pe_why", d).value.trim(), by = $("#pe_by", d).value.trim();
+    $("#pe_err", d).textContent = "";
+    try {
+      try { localStorage.setItem("plasbench.decider", by); } catch {}
+      PR.data = await api("prereg/set", {parameter: r.parameter, value: v, reason: why, by});
+      d.close(); d.remove(); toast("Decision changed and recorded. Lock the decisions again when ready.", "ok"); renderPrereg();
+      S.settings = null;
+    } catch (err) { $("#pe_err", d).textContent = err.message; }
+  };
+  d.oncancel = () => d.remove();
+  document.body.append(d); d.showModal(); $("#pe_v", d).focus();
+}
+
 async function loadSettings(force) {
   try { const st = await getSettings(force); $("#set_where").textContent = st.local_env; renderSettings(); } catch (e) { toast(e.message, "bad"); }
 }
@@ -3341,7 +3458,7 @@ document.addEventListener("click", e => { if (!e.target.closest(".search")) $("#
     $("#h_sys").textContent = `${S.info.platform} · Python ${S.info.python} · ${S.info.cpus} threads${S.info.memory_gb ? " · " + S.info.memory_gb + " GB" : ""}`;
     S.settings = null; await getSettings(); S.settings._local = Object.fromEntries(S.settings.settings.filter(s => s.override != null).map(s => [s.key, s.override]));
   } catch (e) { document.body.innerHTML = `<div style="padding:40px;font-family:system-ui"><h2>PlasBench could not start the window</h2><p>${esc(e.message)}</p><p>Start it again with <code>plasbench ui</code> and open the link it prints.</p></div>`; return; }
-  route(); refreshJobs();
+  route(); refreshJobs(); setTimeout(() => { if (!PR.data) loadPrereg(); }, 1500);   // the Scoring decisions badge
   getWorkspace().then(renderWorkspaceNav).catch(() => {});
   getEnv().then(renderEnv).catch(() => {});
   getRuns().then(r => $("#s_runs").textContent = r.length ? `${r.length} found` : "None yet").catch(() => {});
