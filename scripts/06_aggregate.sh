@@ -28,7 +28,9 @@ DB_REGISTRY="$PROJECT_ROOT/config/tool_database_releases.tsv"
 if [[ -s "$DB_REGISTRY" ]]; then
     if python3 "$HERE/../python/flag_database_overlap.py" \
             --sample-sheet "$SAMPLE_SHEET" --registry "$DB_REGISTRY" --scores "$SCORES" \
-            --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.database_overlap.tsv"; then
+            --data-dir "$DATA_DIR" --out "$RESULTS_DIR/benchmark.database_overlap.tsv" \
+            --policy "${LEAKAGE_CUTOFF_POLICY:-per_tool}" --cutoff-date "${LEAKAGE_CUTOFF_DATE:-}" \
+            --date-basis "${LEAKAGE_DATE_BASIS:-earliest_public}"; then
         OVERLAP_ARGS=(--database-overlap "$RESULTS_DIR/benchmark.database_overlap.tsv")
         [[ "${EXCLUDE_DATABASE_OVERLAP:-0}" == "1" ]] && OVERLAP_ARGS+=(--exclude-database-overlap)
     else

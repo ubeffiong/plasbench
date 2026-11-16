@@ -328,6 +328,26 @@ def provenance_table(rows):
             f"<th>Checksum (SHA-256)</th><th>Provenance</th></tr></thead><tbody>{body}</tbody></table></div>")
 
 
+def leakage_policy_note(out_dir):
+    """One paragraph saying which date screen produced the overlap counts (LEAKAGE_* settings), or '' without the file."""
+    rows = read_tsv(Path(out_dir) / "benchmark.database_overlap.tsv")
+    if not rows:
+        return ""
+    policy = rows[0].get("cutoff_policy") or "per_tool"
+    basis = rows[0].get("date_basis") or "assembly"
+    counts = {}
+    for row in rows:
+        counts[row.get("overlap_status", "")] = counts.get(row.get("overlap_status", ""), 0) + 1
+    cutoff = rows[0].get("database_release_date") if policy == "fixed_date" else ""
+    how = (f"every database-using tool against the fixed cutoff {cutoff or '(not set)'}" if policy == "fixed_date"
+           else "each tool against its own database release date")
+    basis_text = {"earliest_public": "the earlier of the assembly release and the first read run's year",
+                  "assembly": "the assembly release date", "read": "the first read run's year (as 1 January)"}.get(basis, basis)
+    tally = ", ".join(f"{counts[k]} {k.replace('_', ' ')}" for k in sorted(counts) if k)
+    return ("<p class='muted' id='leakage-policy'>Date screen (settings LEAKAGE_CUTOFF_POLICY, LEAKAGE_CUTOFF_DATE, LEAKAGE_DATE_BASIS): "
+            f"{esc(how)}; a genome counts as public on {esc(basis_text)}. Sample x tool pairs: {esc(tally)}.</p>")
+
+
 def database_membership_section(leaderboard, out_dir):
     """Recovery of truth plasmids inside vs outside each tool's own database."""
     rows = [r for r in leaderboard if r.get("n_plasmids_in_tool_database") not in (None, "")]
@@ -349,6 +369,7 @@ def database_membership_section(leaderboard, out_dir):
                           f"<td><strong>{esc(gap(r))}</strong></td></tr>" for r in rows)
                 + "</tbody></table></div>")
     inside = sum(1 for r in containment if r.get("in_database") == "yes")
+    body += leakage_policy_note(out_dir)
     body += provenance_table(read_tsv(Path(out_dir) / "benchmark.database_provenance.tsv"))
     return ("<section id='database-membership'><h2>Truth plasmids in tool databases</h2>"
             "<p class='lead'>Sequence-level leakage check: a truth plasmid is <em>in</em> a tool's database when one "

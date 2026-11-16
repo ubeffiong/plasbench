@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- a configurable leakage screen
+- `LEAKAGE_CUTOFF_POLICY` (`per_tool` default, or `fixed_date` with `LEAKAGE_CUTOFF_DATE`) and `LEAKAGE_DATE_BASIS` (`earliest_public` default, `assembly`, `read`) in `config/config.sh`, so they appear in `plasbench ui` Settings; `python/flag_database_overlap.py` and stage 6 use them, `benchmark.database_overlap.tsv` gains `date_basis` and `cutoff_policy` columns, the manifest records them, and the report states the policy above the overlap counts. Defaults reproduce the earlier behaviour for sheets without `first_read_year`.
+
+
 ### Fixed -- the window disconnecting at random, and the icon that did nothing
 - **Random "PlasBench disconnected".** The window's server listened with the standard backlog of 5, and the page opens many connections at once; on Windows a connection that finds the backlog full is refused outright, which the page took for a dead server (measured: 39 of 1,800 concurrent requests refused). The server now listens with a backlog of 256, speaks HTTP/1.1 keep-alive (one connection carries many requests), ignores clients that vanish mid-request, closes a refused POST's connection so an unread body cannot corrupt the next request, survives an error in its accept loop, and answers a repeated POST with the first run's response (`X-PlasBench-Req`), so a retried "start the benchmark" can never start it twice. The page retries a network failure quietly with backoff before it says anything, stands its pollers down while the connection is down, and reconnects by itself (probes grow from 2 s to 10 s, and run at once on wake, network return and tab focus).
 - **The Retry button works.** It used to reload the page, which does nothing useful when the server is down. It now runs a real check (is the server answering? is this window's key still valid?), says honestly what it found ("Still not reachable, attempt 3, trying again in 5 s"), reconnects without a reload when PlasBench is back, and when PlasBench was restarted (new key) says the window must be reopened instead of pretending a retry can help.
