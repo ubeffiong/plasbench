@@ -124,6 +124,24 @@ def main():
     check("a completed run cannot be resumed", refused)
     wait(lambda: sixth.jobs[resumed["id"]]["state"] != "running", 60)
 
+    print("a runner that is slow to start, and a falsely interrupted run")
+    slow_start = {"id": "20261116-000000-slowst", "label": "slow start", "argv": ["demo"], "command": "plasbench demo", "env": {}, "kind": "plasbench", "state": "running",
+                  "started": time.time(), "ended": None, "exit": None, "pid": 1, "results": ""}
+    sixth.jobs[slow_start["id"]] = slow_start
+    check("a run whose runner has not written a heartbeat yet is not called lost for the first minute", sixth._alive(slow_start))
+    old = dict(slow_start, started=time.time() - 600)
+    check("...but one that never did, a long time later, is", not sixth._alive(old))
+    sixth.jobs.pop(slow_start["id"])
+    false_alarm = launch(first, "import time\ntime.sleep(25)\nprint('done', flush=True)", label="false alarm")
+    wait(lambda: jobrunner.is_alive(str(first.dir), false_alarm["id"]))
+    first.jobs[false_alarm["id"]].update(state="interrupted", ended=time.time())   # an earlier window gave up on it too soon
+    first._save()
+    seventh = server()
+    check("a new server revives a run called interrupted when its heartbeat is plainly fresh", seventh.jobs[false_alarm["id"]]["state"] == "running" and seventh.jobs[false_alarm["id"]].get("reattached"),
+          seventh.jobs[false_alarm["id"]]["state"])
+    check("another window's stale 'interrupted' record cannot overwrite a running job", (seventh._save(), seventh.jobs[false_alarm["id"]]["state"])[1] == "running")
+    wait(lambda: seventh.jobs[false_alarm["id"]]["state"] == "done", 60)
+
     print("the sessions list")
     marker = launch(first, "print('[2026-11-16 10:00:00] Running stages: 0 1 2 3 4 5 6')\nprint('[2026-11-16 10:00:01] >>>>> STAGE 1 : 01_download.sh')\n"
                     "print('[2026-11-16 10:00:02] === Sample a : assembly=x ===')\nprint('[2026-11-16 10:00:09] Stage 1 (download) complete: 1 ok, 0 failed.')\n"

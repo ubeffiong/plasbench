@@ -457,6 +457,7 @@ class Project:
 SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that make a benchmark run session (everything else stays on the Jobs page)
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
 KEEP_JOBS = 500
+STARTUP_GRACE = 60   # seconds a freshly started runner may take to write its first heartbeat
 SERVER_STARTED = time.time()
 
 
@@ -483,6 +484,8 @@ class Jobs:
             except (ValueError, KeyError):
                 pass
         for job in list(self.jobs.values()):
+            if job.get("state") == "interrupted" and jobrunner.is_alive(str(self.dir), job["id"]):
+                job.update(state="running", ended=None, exit=None)   # an earlier window called it lost before its runner had written a heartbeat; it is plainly going
             if job.get("state") in ("running", "cancelling"):
                 self._reconcile(job)
         self._save()
@@ -494,7 +497,7 @@ class Jobs:
             for job in json.loads((self.dir / "jobs.json").read_text(encoding="utf-8")):
                 if job.get("id") not in self.jobs and job.get("id") not in self.deleted:
                     self.jobs[job["id"]] = job
-                elif job.get("id") in self.jobs and job.get("state") in ("done", "failed", "cancelled", "interrupted") and self.jobs[job["id"]]["state"] in ("running", "cancelling"):
+                elif job.get("id") in self.jobs and job.get("state") in ("done", "failed", "cancelled") and self.jobs[job["id"]]["state"] in ("running", "cancelling"):
                     self.jobs[job["id"]].update(job)   # another window already recorded how it ended
         except (OSError, ValueError, KeyError):
             pass
@@ -505,6 +508,13 @@ class Jobs:
 
     def _paths(self, job_id: str) -> dict:
         return jobrunner.paths(str(self.dir), job_id)
+
+    def _alive(self, job: dict) -> bool:
+        """Is the job's runner going? A fresh heartbeat says yes. A runner that has not written its first one yet (a slow start on a busy machine) is given STARTUP_GRACE seconds."""
+        if jobrunner.is_alive(str(self.dir), job["id"]):
+            return True
+        p = self._paths(job["id"])
+        return not os.path.exists(p["alive"]) and not os.path.exists(p["exit"]) and time.time() - job["started"] < STARTUP_GRACE
 
     def _append_log(self, job_id: str, text: str):
         try:
@@ -520,7 +530,7 @@ class Jobs:
         exit_info = jobrunner.read_json(self._paths(job_id)["exit"])
         if exit_info is not None:
             self._finish(job_id, exit_info.get("code"), exit_info.get("ended"), save=False)
-        elif jobrunner.is_alive(str(self.dir), job_id):
+        elif self._alive(job):
             job["reattached"] = True
             self._watch(job_id)
         else:
@@ -553,7 +563,7 @@ class Jobs:
             if exit_info is not None:
                 self._finish(job_id, exit_info.get("code"), exit_info.get("ended"))
                 break
-            if not jobrunner.is_alive(str(self.dir), job_id):
+            if not self._alive(job):
                 with self.lock:
                     job.update(state="cancelled" if job["state"] == "cancelling" else "interrupted", ended=self._last_sign_of_life(job_id), exit=None)
                     self._save()
@@ -652,7 +662,7 @@ class Jobs:
         if len(text) > 4096:
             raise ValueError("answer too long")
         job = self.jobs.get(job_id)
-        if not job or job["state"] != "running" or not jobrunner.is_alive(str(self.dir), job_id):
+        if not job or job["state"] != "running" or not self._alive(job):
             raise ValueError("this job is not running")
         with self.lock:
             shown = "\u2022" * len(text) if secret else text
@@ -1075,7 +1085,7 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, workspace.check(q.get("path", "")))
             if route == "jobs":
                 return self.jsend(200, {"jobs": jobs.list()})
-            if route == "sessions":
+            if route == "run-sessions":
                 index = {r["path"]: i for i, r in enumerate(project.runs(state.get("runs", [])))}
                 index = {str(Path(k).resolve()): v for k, v in index.items()}
                 return self.jsend(200, {"sessions": jobs.sessions(index), "server_started": SERVER_STARTED})

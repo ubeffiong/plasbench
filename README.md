@@ -990,11 +990,29 @@ there, what is still missing, and the Docker command when Docker is available.
 | **New benchmark** | A five-step wizard: the isolates (demo, a bundled cohort, your own sheet, or the metagenomic track), the tools (built-in on/off and your own), resources, outputs and stages, then a review of the exact command before it starts. |
 | **Your own isolates** | Add an isolate from its FASTQ files and complete reference (`plasbench init-local`), with file pickers. |
 | **Cohorts** | The bundled study sets. **Details** shows what each holds: description, isolates and species, plasmids in the truth, read depth, BioProjects and the download size. Breakdowns cover organism, truth tier, how the truth was assembled, origin and country. A searchable table lists every sample, with NCBI links, host, isolation source, collection date and how its reference was sequenced (from the cohort's lock). Validate a cohort, or benchmark it in one click. |
-| **Runs & reports** | Every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
+| **Runs & reports** | **Run sessions**: every benchmark you started, grouped as ongoing (with stage, isolate and percentage progress), needing attention (failed, interrupted or cancelled: one click to **Resume**, finished work is kept) and completed (open the report, run again). Runs are detached from the window, so closing it, losing the connection or quitting with *Quit and keep running* does not stop them, and a new window finds them again. Below, every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
 | **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
 | **Version control** | Git without the command line, for your **runs**: **each study is its own repository**, holding the study's record, sample sheets, settings, result tables, reports, figures and logs, with its own history and its own remote. The PlasBench program is not tracked, because updates replace it. A managed `.gitignore` keeps heavy data out: reads (FASTQ, SRA, FAST5/POD5), alignments (BAM, SAM, CRAM and their indexes), variants (VCF/BCF), assemblies and sequences (FASTA, GFA, GFF), aligner indexes and tool databases, archives, tmp folders and credentials. You can add your own rules under **Ignored files**, and **Test a path** shows which rule decides. You get status, staging, commit, branches, remote, fetch/pull/push, and a colour-coded history: you are here, pushed, not yet pushed, and merges, with details on hover. Diffs and commits open as tabs, and every commit is checked for raw data, secrets, patient identifiers and files too large for GitHub. Git is optional: `plasbench install-git` installs Git for Windows with Git Bash on Windows, or the conda-forge git elsewhere. |
 | **All commands** | Every `plasbench` command and option as a form, generated from the command line itself, so nothing is missing. Each shows the command it will run before you run it. |
 | **Guides** | This README and every guide, readable in the window. |
+
+**Run sessions: following, resuming and never losing a run.** Every benchmark you start from the window (`plasbench run`, the demo, a report build) runs under a **detached runner**
+(`plasbench/jobrunner.py`) that is not a child of the window, so a run keeps going if the window is closed, the connection drops, the terminal that started `plasbench ui` is closed, or you
+choose **Quit and keep running**. Beside each run's log the runner keeps its process id, a heartbeat and its exit code, and a new window reads them and finds the run again. On
+**Runs & reports > Run sessions**:
+
+| Group | What it holds | What you can do |
+|---|---|---|
+| **Ongoing** | runs going now, including ones started by an earlier window | follow progress (stage, isolate, percentage, last log line), open the live log, answer a question the run asks, Cancel |
+| **Needs attention** | failed, interrupted (the computer or PlasBench went away) or cancelled runs | **Resume** (the same command again: finished work is kept and reused), read the log, open the folder, Remove |
+| **Completed** | finished runs | open the report, read the log, Run again, open the folder |
+
+*Details* on a card shows the stages (done, current, waiting), the exact command, the results folder and, for a resumed run, the run it continues. A run that stopped while nobody was looking is
+announced once with a **Resume** button, and the *Runs & reports* entry shows a badge with the number; `#runs/attention` opens that group directly. Progress is read from the run's own log (`Running
+stages`, `STAGE n`, `=== ... on <isolate> ===`, `Stage n ... complete`), so it works for a run started earlier and for one that has ended. It is an estimate for a person watching, never a
+measurement: a log without markers (the offline demo) gives an indeterminate bar and the last log line, and a run that has not ended never shows 100%. If the connection drops the window shows a
+banner and keeps retrying; the full-screen notice appears only after about 45 seconds and says the runs are not lost. A run whose runner disappeared without recording an exit (the machine was shut
+down) is shown as *interrupted*, never as still running.
 
 **The console** is fixed at the bottom of the window. It opens at a quarter of the window's height; drag its top edge
 to resize it, or collapse it to its title bar. It has two tabs:
