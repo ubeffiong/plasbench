@@ -2383,6 +2383,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |
+| `import-contributed-cohort` | Select a seeded, one-per-read-BioProject candidate cohort from the contributed RefSeq/SRA pool (unverified until `validate-cohort --online`). | *`--out-dir`*, `--released-after`, `--released-before`, `--date-basis`, `--species`, `--max-clusters-per-species`, `--seed` |
 | `build-ledger` | Regenerate the cross-cohort BioSample dedup ledger from every `cohorts/*.lock.json`. | `--cohorts-dir`, `--out` |
 | `prepare-contribution` | Validate a new isolate and stage it on a local git branch, ready for a PR. | *`--cohort`*, *`--new-rows`*, *`--scores`*, `--tool-status` |
 | `select-candidates` | Recompute recommendations from an existing `scores.tsv` (what stage 6 calls internally). | `--scores`, `--samples`, `--results-dir`, `--min-samples`, `--min-coverage` |
@@ -2405,7 +2406,8 @@ write one by hand:
   appends a correctly-formed row to `config/local.tsv` for you.
 - **A cohort from public data:** `plasbench discover-cohort --organism "..."` followed by
   `plasbench curate-cohort` produces `accepted.tsv` in exactly this schema — see
-  [4.2](#42-build-a-cohort-of-your-own) for the full walkthrough.
+  [4.2](#42-build-a-cohort-of-your-own) for the full walkthrough. Offline, `plasbench import-contributed-cohort`
+  selects candidates from the shipped contributed pool (see `docs/COHORTS.md`); they still need `validate-cohort --online`.
 - **A cohort PlasBench already ships:** `cohorts/public-v1.tsv` and `cohorts/public-v2.tsv`
   are ordinary examples of this same schema — open either one directly to see real,
   filled-in rows.
