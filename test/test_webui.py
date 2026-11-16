@@ -240,6 +240,14 @@ def main():
                                  capture_output=True).returncode == 0
         check("git tracks plasbench/data/ui.html", tracked)
     html = page_file.read_text(encoding="utf-8")
+    # The persistent "benchmarking is running" toast: created in #toasts (outside every page), shown the moment a benchmark is started, driven by the job list, still there after a
+    # page change or a reload, clock ticking, animated, reduced-motion respected, and keyboard/click opens the console.
+    check("a running benchmark shows a persistent animated toast that lives outside the pages",
+          'id="runtoast"' in html and '$("#toasts").prepend(el)' in html and "isBenchJob" in html and 'role", "status"' in html and "@keyframes rtspin" in html and "@keyframes rtslide" in html
+          and "@media (prefers-reduced-motion:reduce){.runtoast" in html and "Benchmarking is running" in html)
+    check("the toast appears on click (before the server answers), follows the job list, ticks every second and is restored on load",
+          "S.pendingBench = {label" in html and "renderRunToast();\n  const running = S.jobs.filter" in html and "setInterval(renderRunToast, 1000)" in html
+          and "refreshJobs();   // a benchmark that is already running" in html and 'isBenchArgv = argv => Array.isArray(argv) && ["run", "demo"].includes(argv[0])' in html)
     views = ["home", "setup", "tools", "addtool", "settings", "wizard", "isolates", "cohorts", "runs", "jobs", "commands", "help"]
     check("every page the rail links to exists", all(f'id="v_{v}"' in html and f'data-view="{v}"' in html for v in views))
     check("the page loads nothing from the network", "http://" not in html.split("<script>")[0].replace("http://www.w3.org", "")
