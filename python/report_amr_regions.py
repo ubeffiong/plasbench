@@ -441,7 +441,7 @@ show(0);
 def section(regions, tools, per, modes, gap):
     lead = ("Counting resistance genes is not enough: a gene on the wrong plasmid, or without the integron or insertion sequences around it, can change "
             "a transmission conclusion. Each region below is a group of truth resistance genes on one plasmid (no more than "
-            f"{gap // 1000} kb apart). <strong>Descriptive: it re-draws what the AMR placement scores already say and changes no score.</strong>")
+            f"{gap // 1000} kb apart). <strong>Descriptive; it changes no score.</strong>")
     if not regions:
         return (f"<section id='{SECTION_ID}' class='ar'><h2>AMR regions</h2><p class='lead'>{lead}</p><div class='insight caution'><p>Not run: no "
                 "results/&lt;sample&gt;/&lt;tool&gt;.amr_placement.tsv exists. It needs curated AMR truth (truth_amr.tsv) and RUN_AMR_PLACEMENT=1; without it the "

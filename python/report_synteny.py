@@ -195,7 +195,7 @@ show(0);
 
 def section(views, total=None):
     lead = ("Coverage and identity do not show whether a plasmid was put back together in the right order and orientation. Each ribbon joins a stretch of the "
-            "truth plasmid to the stretch of a predicted record that matches it. <strong>Descriptive: it re-draws alignments already scored and changes no score.</strong>")
+            "truth plasmid to the stretch of a predicted record that matches it. <strong>Descriptive; it changes no score.</strong>")
     if not views:
         return (f"<section id='{SECTION_ID}' class='sy'><h2>Synteny ribbons</h2><p class='lead'>{lead}</p><div class='insight caution'><p>Not run: no "
                 "results/&lt;sample&gt;/visualization/alignment_blocks.json exists. It is written by the visual-data step of stage 5 "
