@@ -470,6 +470,105 @@ def findings(agg, rows):
     return out
 
 
+def comparison_rows(rows, mine="bin_dissimilarity", theirs="original_dissimilarity", tolerance=1e-3):
+    """Rows that carry the original program's answer, with the verdict for each: agree, capped_upper_bound, disagree or not_compared."""
+    out = []
+    for r in rows or []:
+        status = r.get("original_status") or ("ok" if number(r.get(theirs)) is not None else "")
+        if not status and number(r.get(theirs)) is None:
+            continue
+        a, b = number(r.get(mine)), number(r.get(theirs))
+        if status != "ok" or a is None or b is None:
+            verdict = "not_compared"
+        elif abs(a - b) < tolerance:
+            verdict = "agree"
+        elif r.get("dissim_repeat_search") == "capped" and a > b:
+            verdict = "capped_upper_bound"
+        else:
+            verdict = "disagree"
+        out.append({"sample": r.get("sample", ""), "tool": r.get("tool", ""), "mine": a, "theirs": b, "verdict": verdict, "status": status,
+                    "families": r.get("dissim_repeat_families", ""), "search": r.get("dissim_repeat_search", "")})
+    return out
+
+
+def agreement_scatter(items):
+    pts = [i for i in items if i["mine"] is not None and i["theirs"] is not None]
+    if not pts:
+        return ""
+    tools = sorted({i["tool"] for i in pts})
+    col = tool_colours(tools)
+    W, H, l, t, r_, b = 520, 470, 62, 20, 20, 58
+    x0, y0, x1, y1 = l, t, W - r_, H - b
+    out = [svg_open(W, H, "PlasBench against the original program",
+                    "Each point is one isolate-tool pair: the original program's normalised dissimilarity on the horizontal axis and PlasBench's on "
+                    "the vertical axis. Points on the diagonal agree. A hollow point is a PlasBench search that reached its cap, which is an upper bound.")]
+    out.append(f"<rect x='{x0}' y='{y0}' width='{x1 - x0}' height='{y1 - y0}' fill='none' stroke='currentColor' stroke-opacity='0.35'/>")
+    for tt in (0, 0.25, 0.5, 0.75, 1):
+        gx, gy = x0 + (x1 - x0) * tt, y1 - (y1 - y0) * tt
+        out.append(line(gx, y1, gx, y1 + 3, "currentColor", 1, "opacity='0.6'"))
+        out.append(line(x0 - 3, gy, x0, gy, "currentColor", 1, "opacity='0.6'"))
+        out.append(text(gx, y1 + 15, f"{tt:g}", 10, "middle"))
+        out.append(text(x0 - 7, gy + 3.5, f"{tt:g}", 10, "end"))
+    out.append(line(x0, y1, x1, y0, "currentColor", 1, "opacity='0.55' stroke-dasharray='5 4'"))
+    out.append(text((x0 + x1) / 2, y1 + 36, "Original program: normalised dissimilarity", 11, "middle"))
+    out.append(text(14, (y0 + y1) / 2, "PlasBench: normalised dissimilarity", 11, "middle", extra=f"transform='rotate(-90 14 {num((y0 + y1) / 2)})'"))
+    for i in pts:
+        cx, cy = x0 + (x1 - x0) * i["theirs"], y1 - (y1 - y0) * i["mine"]
+        hollow = i["verdict"] == "capped_upper_bound"
+        fill = "none" if hollow else col[i["tool"]]
+        stroke = "#000000" if i["verdict"] == "disagree" else col[i["tool"]]
+        out.append(f"<circle cx='{num(cx)}' cy='{num(cy)}' r='3.6' fill='{fill}' fill-opacity='0.55' stroke='{stroke}' stroke-width='{1.8 if hollow or i['verdict'] == 'disagree' else 0.8}'>"
+                   f"<title>{esc(i['sample'])} / {esc(i['tool'])}: original {i['theirs']:.4f}, PlasBench {i['mine']:.4f} ({esc(i['verdict'].replace('_', ' '))})</title></circle>")
+    for k, tool in enumerate(tools):
+        out.append(f"<circle cx='{x0 + 12 + k * 118}' cy='{y0 + 12}' r='4.5' fill='{col[tool]}'/>" + text(x0 + 22 + k * 118, y0 + 16, tool, 10.5))
+    out.append(svg_close())
+    return "".join(out)
+
+
+def original_comparison_html(rows, tolerance=1e-3, mine="bin_dissimilarity", theirs="original_dissimilarity"):
+    """The replication's comparison with the original program: verdict, per-tool table, scatter and the pairs that could not be compared."""
+    items = comparison_rows(rows, mine, theirs, tolerance)
+    if not items:
+        return ("<div class='insight caution'><p>The original PlasEval program was not run on these bins, so PlasBench's agreement with it here is "
+                "not shown. Run it with a PlasEval checkout (see docs/PLASEVAL_REPLICATION.md).</p></div>")
+    n = len(items)
+    c = {v: sum(1 for i in items if i["verdict"] == v) for v in ("agree", "capped_upper_bound", "disagree", "not_compared")}
+    compared = n - c["not_compared"]
+    diffs = [abs(i["mine"] - i["theirs"]) for i in items if i["mine"] is not None and i["theirs"] is not None]
+    worst = max(diffs) if diffs else 0.0
+    if c["disagree"]:
+        verdict, cls = "FAIL", "insight caution"
+    elif c["not_compared"] and not compared:
+        verdict, cls = "NOT RUN", "insight caution"
+    elif c["not_compared"]:
+        verdict, cls = "PARTIAL", "insight caution"
+    else:
+        verdict, cls = "PASS", "insight"
+    head = (f"<div class='{cls}'><p><strong>Comparison with the original PlasEval program: {verdict}.</strong> {compared} of {n} isolate-tool pairs were compared "
+            f"({c['agree']} agree within {tolerance:g}, {c['capped_upper_bound']} PlasBench upper bound(s) from a capped search, {c['disagree']} disagree); "
+            f"largest absolute difference {worst:.6f}. {c['not_compared']} pair(s) could not be compared because the original timed out or failed.</p></div>")
+    tools = sorted({i["tool"] for i in items})
+    body = []
+    for tool in tools:
+        g = [i for i in items if i["tool"] == tool]
+        d = [abs(i["mine"] - i["theirs"]) for i in g if i["mine"] is not None and i["theirs"] is not None]
+        body.append(f"<tr><td>{esc(tool)}</td><td>{len(g)}</td><td>{len(d)}</td><td>{sum(1 for i in g if i['verdict'] == 'agree')}</td>"
+                    f"<td>{sum(1 for i in g if i['verdict'] == 'capped_upper_bound')}</td><td>{sum(1 for i in g if i['verdict'] == 'disagree')}</td>"
+                    f"<td>{sum(1 for i in g if i['verdict'] == 'not_compared')}</td><td>{max(d) if d else 0:.6f}</td><td>{(sum(d) / len(d)) if d else 0:.6f}</td></tr>")
+    table = ("<div class='panel'><table><thead><tr><th>Tool</th><th>Pairs</th><th>Compared</th><th>Agree</th><th>Capped (upper bound)</th><th>Disagree</th>"
+             "<th>Not compared</th><th>Max difference</th><th>Mean difference</th></tr></thead><tbody>" + "".join(body) + "</tbody></table></div>")
+    missed = [i for i in items if i["verdict"] == "not_compared"]
+    listing = ""
+    if missed:
+        listing = ("<h3>Pairs the original program did not finish</h3><div class='panel'><table><thead><tr><th>Isolate</th><th>Tool</th><th>Result</th>"
+                   "<th>Repeat families (PlasBench)</th></tr></thead><tbody>"
+                   + "".join(f"<tr><td>{esc(i['sample'])}</td><td>{esc(i['tool'])}</td><td>{esc(i['status'])}</td><td>{esc(i['families'])}</td></tr>" for i in missed)
+                   + "</tbody></table></div><p class='small'>These are the pairs with the largest repeat families: the original's exhaustive pairing search is slow in "
+                     "pure Python. Their absence is stated, not filled in.</p>")
+    scatter = agreement_scatter(items)
+    return head + table + (f"<figure class='binfig'><div style='overflow-x:auto'>{scatter}</div></figure>" if scatter else "") + listing
+
+
 def figure(svg, title, caption):
     if not svg:
         return ""
