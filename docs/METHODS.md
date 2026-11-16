@@ -341,6 +341,18 @@ database cannot contain). With `EXCLUDE_DATABASE_OVERLAP=1`, `possible_overlap` 
 dropped before ranking (and the shared-sample rule then applies). This is a date-based
 screen, not proof that a genome is in a database.
 
+The screen is configurable (also in `plasbench ui`, Settings, which writes `config/local.env`):
+`LEAKAGE_CUTOFF_POLICY=per_tool` (default, recommended) uses each tool's own database date;
+`fixed_date` uses one `LEAKAGE_CUTOFF_DATE` (for example `2025-01-01`) for every tool that may
+use a database, to ask "was this genome public before that date?". `LEAKAGE_DATE_BASIS` chooses
+what "public" means: `earliest_public` (default: the earlier of the assembly release and the
+first paired read run's year, read as 1 January), `assembly`, or `read`. A cohort sheet from
+`plasbench import-contributed-cohort` carries `first_read_year`; a sheet without it behaves as
+`assembly`. Reads can be public years before the assembly is released (957 of the 2,430
+"2025-26" genomes in the contributed pool), so a deposit-year cutoff alone understates leakage.
+The settings, and the counts they produce, are recorded in `run_manifest.json` and shown at the
+top of the report's "Truth plasmids in tool databases" section.
+
 ## Base-level confusion matrix (positive class = plasmid)
 Let `C` be the set of reference bases covered by predicted-plasmid alignments.
 - **TP** = |{plasmid reference bases} ∩ C|

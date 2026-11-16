@@ -825,3 +825,15 @@ export STATS_VALIDATION_WORKERS="${STATS_VALIDATION_WORKERS:-1}"
 # PLASBENCH_DOMINANT_FALLBACK=0 turns the fallback off. Pre-registration row dominant_study_share (proposed).
 export PLASBENCH_DOMINANT_SHARE="${PLASBENCH_DOMINANT_SHARE:-0.30}"
 export PLASBENCH_DOMINANT_FALLBACK="${PLASBENCH_DOMINANT_FALLBACK:-1}"
+
+# Leakage screen (python/flag_database_overlap.py, stage 6): when does a truth genome count as "possibly in a tool's database"?
+# LEAKAGE_CUTOFF_POLICY: per_tool (default, recommended) compares each genome with each tool's own database date in
+# config/tool_database_releases.tsv; fixed_date compares every database-using tool with LEAKAGE_CUTOFF_DATE instead
+# (e.g. 2025-01-01, to ask "was this genome public before 2025?"). fixed_date needs LEAKAGE_CUTOFF_DATE as YYYY-MM-DD.
+export LEAKAGE_CUTOFF_POLICY="${LEAKAGE_CUTOFF_POLICY:-per_tool}"
+# LEAKAGE_CUTOFF_DATE: YYYY-MM-DD, used only when LEAKAGE_CUTOFF_POLICY=fixed_date (suggested 2025-01-01).
+export LEAKAGE_CUTOFF_DATE="${LEAKAGE_CUTOFF_DATE:-}"
+# LEAKAGE_DATE_BASIS: which date counts as "public": earliest_public (default; the earlier of the assembly release and the
+# first paired read run's year, read as 1 January), assembly, or read. Sheets without first_read_year behave as assembly.
+# The screen only flags; EXCLUDE_DATABASE_OVERLAP=1 (above) is what drops the flagged rows before ranking.
+export LEAKAGE_DATE_BASIS="${LEAKAGE_DATE_BASIS:-earliest_public}"

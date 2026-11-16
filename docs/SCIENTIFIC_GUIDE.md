@@ -525,7 +525,7 @@ The organism arm uses the leave-one-study-out folds. In each fold the recommende
 |---|---|---|
 | Truth labels wrong or uncertain (chromids, integrated plasmids, mislabels) | Evidence labels; ambiguous replicons set aside; `REVIEW` for unresolvable sequences. | Sections 4.3 to 4.5 |
 | Truth not trustworthy because of how it was built | Reference tiers; tier 3 excluded from the headline and shown as a sensitivity analysis. | `benchmark.truth_provenance.tsv`, `benchmark.reference_tiers.tsv` |
-| Tools may have seen the truth genomes (database or training overlap) | Date screen: each truth assembly's release date against each tool's database release date. | `flag_database_overlap.py`, `benchmark.database_overlap.tsv` |
+| Tools may have seen the truth genomes (database or training overlap) | Date screen: each truth assembly's public date (assembly or first read, `LEAKAGE_DATE_BASIS`) against each tool's database release date, or one fixed `LEAKAGE_CUTOFF_DATE`. | `flag_database_overlap.py`, `benchmark.database_overlap.tsv` |
 | Non-independent isolates | Clusters by study and clone. | Section 4.6 |
 | One species dominating | Species-balanced headline. | Section 8.2 |
 | Sampling and repeats limit what any tool can score | Recall ceiling. | Section 7.3 |

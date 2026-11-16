@@ -20,29 +20,33 @@ cannot be ("after_database"). Dates come from:
   * database release date: config/tool_database_releases.tsv, which the user
     fills with the release date of the database version actually installed.
 
+The screen is configurable (settings in config/config.sh, shown in `plasbench ui`):
+  * --policy per_tool (default) compares each genome with each tool's own database
+    date; --policy fixed_date compares every database-using tool with one
+    --cutoff-date, for "was this public before <date>?" questions;
+  * --date-basis picks which date counts as "public": assembly, read (the first
+    read run's year, read as 1 January), or earliest_public (the earlier of the
+    two, the default; identical to assembly for a sheet with no first_read_year).
+
 Output TSV columns: sample, tool, truth_release_date, database_release_date,
 overlap_status (possible_overlap | after_database | no_reference_database |
-unknown), reason.
+unknown), reason, date_basis, cutoff_policy.
 
 Standard library only.
 """
 
 import argparse
 import csv
-import datetime as dt
 import glob
 import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from plasbench_common import LEAKAGE_DATE_BASES, leakage_release_date, parse_iso_date  # noqa: E402
 
-def parse_date(text):
-    """YYYY-MM-DD (optionally followed by a time, as NCBI writes it), else None."""
-    text = (text or "").strip().replace("/", "-")
-    try:
-        return dt.date.fromisoformat(text[:10])
-    except ValueError:
-        return None
+
+parse_date = parse_iso_date
 
 
 def read_rows(path):
@@ -105,7 +109,19 @@ def main():
     ap.add_argument("--scores", required=True, help="scores.tsv; defines which sample x tool pairs to flag")
     ap.add_argument("--data-dir", help="DATA_DIR holding <sample>/assembly_data_report.jsonl")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--policy", choices=("per_tool", "fixed_date"),
+                    default=os.environ.get("LEAKAGE_CUTOFF_POLICY") or "per_tool",
+                    help="per_tool: each tool's database date (default); fixed_date: one --cutoff-date for every database-using tool")
+    ap.add_argument("--cutoff-date", default=os.environ.get("LEAKAGE_CUTOFF_DATE", ""),
+                    help="YYYY-MM-DD; required by --policy fixed_date")
+    ap.add_argument("--date-basis", choices=LEAKAGE_DATE_BASES,
+                    default=os.environ.get("LEAKAGE_DATE_BASIS") or "earliest_public",
+                    help="which date counts as public: assembly, read, or earliest_public (default)")
     args = ap.parse_args()
+    cutoff = parse_date(args.cutoff_date)
+    if args.policy == "fixed_date" and cutoff is None:
+        ap.error("LEAKAGE_CUTOFF_POLICY=fixed_date needs LEAKAGE_CUTOFF_DATE as YYYY-MM-DD "
+                 f"(got {args.cutoff_date!r}); set it, or use per_tool")
 
     registry = {row["tool"]: row for row in read_rows(args.registry) if row.get("tool")}
     sheet = {row["sample_id"]: row for row in read_rows(args.sample_sheet) if row.get("sample_id")}
@@ -115,19 +131,29 @@ def main():
     truth_dates = {}
     for sample in sorted({sample for sample, _ in pairs}):
         row = sheet.get(sample, {})
-        truth_dates[sample] = parse_date(row.get("truth_release_date", "")) or \
-            assembly_release_date(args.data_dir, sample)
+        assembled = parse_date(row.get("truth_release_date", "")) or assembly_release_date(args.data_dir, sample)
+        truth_dates[sample] = parse_date(leakage_release_date(
+            assembled.isoformat() if assembled else "", row.get("first_read_year", ""), args.date_basis))
 
     counts = {}
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-        writer.writerow(["sample", "tool", "truth_release_date", "database_release_date", "overlap_status", "reason"])
+        writer.writerow(["sample", "tool", "truth_release_date", "database_release_date", "overlap_status", "reason",
+                         "date_basis", "cutoff_policy"])
         for sample, tool in pairs:
             entry = registry.get(tool, {})
-            db_date = parse_date(entry.get("database_release_date", ""))
-            status, reason = classify(truth_dates.get(sample), entry.get("uses_reference_database"), db_date)
+            if args.policy == "fixed_date":
+                # One cutoff for every tool that may use a database; a tool the registry says uses none stays
+                # "no_reference_database", and an unlisted tool is assumed to use one (the cautious reading).
+                db_date = cutoff
+                uses_db = entry.get("uses_reference_database") or "unknown"
+            else:
+                db_date = parse_date(entry.get("database_release_date", ""))
+                uses_db = entry.get("uses_reference_database")
+            status, reason = classify(truth_dates.get(sample), uses_db, db_date)
             counts[status] = counts.get(status, 0) + 1
-            writer.writerow([sample, tool, truth_dates.get(sample) or "", db_date or "", status, reason])
+            writer.writerow([sample, tool, truth_dates.get(sample) or "", db_date or "", status, reason,
+                             args.date_basis, args.policy])
     summary = ", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "no scored pairs"
     sys.stderr.write(f"[flag_database_overlap] {summary} -> {args.out}\n")
 
