@@ -257,7 +257,10 @@ def build_parser():
         description="PlasBench: benchmark plasmid-reconstruction tools against complete references.",
         epilog="Examples:\n"
                "  plasbench install-conda\n"
-               "  plasbench upgrade\n"
+               "  plasbench upgrade                 (latest release; also: Setup > Check for updates in the window)\n"
+               "  plasbench ui --tab                (open the window in a normal browser tab)\n"
+               "  plasbench desktop-icon            (put the PlasBench icon on the desktop; --remove undoes it)\n"
+               "  bash install_latest.sh --archive plasbench-<version>.tar.gz   (install a downloaded release with no network)\n"
                "  plasbench check --yes\n"
                "  plasbench install-tools core\n"
                "  plasbench install-tools all\n"

@@ -803,6 +803,9 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, info)
             if route == "schema":
                 return self.jsend(200, ui_schema.schema())
+            if route == "update-check":
+                from . import updatecheck
+                return self.jsend(200, updatecheck.check(__version__, updatecheck.fetch_latest))
             if route == "env":
                 return self.jsend(200, {"checks": project.env_checks()})
             if route == "tools":
