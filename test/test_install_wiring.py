@@ -129,7 +129,7 @@ def profiles():
         if isolated and current:
             labels[current].update(re.sub(r"[=<>].*", "", p.strip("'\"")) for p in isolated.group(1).split()
                                    if not p.startswith(("-", ";", "|", "&")))
-    loop = re.search(r"for installed_profile in ([^;]+);", text)
+    loop = re.search(r'ALL_PROFILES="([^"]+)"', text)
     return labels, (loop.group(1).split() if loop else [])
 
 
