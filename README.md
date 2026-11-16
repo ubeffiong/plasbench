@@ -1871,6 +1871,7 @@ None of these actions are required for a successful ordinary benchmark run.
 |---|---|---|
 | `plasbench: command not found` | Environment not active | `conda activate plasbench` |
 | `conda: command not found` | Step 2 not done, or shell not restarted | Run step 2, then `exec bash` |
+| `curl: (6) Could not resolve host: raw.githubusercontent.com` (or `api.github.com`) | This computer's DNS is not working, common in WSL2 or behind a VPN; not a PlasBench problem | In PowerShell run `wsl --shutdown`, reopen Ubuntu and retry; turn a VPN off or on. With no internet here, download `plasbench-<version>.tar.gz` and its `.sha256` from the Releases page on another computer, then `tar -xzf` it and run `bash plasbench-<version>/scripts/install_latest.sh --archive <path to the .tar.gz> --tools` |
 | `sha256sum: no properly formatted checksum lines found` | Download returned an error page | `rm` both files, redo step 3 |
 | `curl: (22) ... 404` | Wrong version in the URL | Check the Releases page for the current version |
 | `set: pipefail: invalid option name` | Archive from before v0.1.1 | Reinstall using the latest-release command in step 3 |
