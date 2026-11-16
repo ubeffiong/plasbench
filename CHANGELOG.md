@@ -13,6 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- repeat-aware PlasEval dissimilarity, checked against the original program
+- `bin_agreement.py` now pairs the copies of a contig that sits in several bins, as PlasEval does (a maximal matching per repeat family, the lowest total dissimilarity found by branch and bound; every copy counts in the normaliser). `--repeats drop` keeps the earlier first-copy behaviour; `DISSIMILARITY_REPEATS` and `DISSIMILARITY_MAX_CALLS` configure it. A search that reaches the cap keeps the best pairing found and is marked `capped` in the new `dissim_repeat_search` column; `dissim_repeat_families` counts the repeat families.
+- `scores.tsv` also records the dissimilarity at length exponent 0 and 1 (`bin_dissimilarity_alpha0`, `bin_dissimilarity_alpha1`) beside the configured alpha (default 0.5), so a reader can see whether a verdict depends on how contig length is weighted.
+- `test/test_plaseval_crosscheck.py` now compares the dissimilarity in every case, including hand-built and seeded random cases with repeated contigs. Run on Linux against `github.com/acme92/PlasEval` (commit 8238356) it agreed on all 59 cases, 44 with repeated contigs. It still only runs when `PLASEVAL_SRC` points at a PlasEval checkout.
+
 ### Added
 - **Check for updates in the window** (Setup, Maintenance): asks GitHub whether a newer release exists, only when pressed, and offers a confirmed one-click upgrade. `plasbench --help` and the README upgrade section now also cover the offline `--archive` install, `plasbench ui --tab` and `plasbench desktop-icon`.
 
