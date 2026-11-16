@@ -709,6 +709,11 @@ export PLSMD_THREADS="${PLSMD_THREADS:-$THREADS}"
 #   RUN_TRUTH_DEPTH_ANOMALIES (off) windows of unusual read depth on the truth (DEPTH_WINDOW_BP, DEPTH_ANOMALY_Z).
 export RUN_BIN_AGREEMENT="${RUN_BIN_AGREEMENT:-1}"
 export DISSIMILARITY_ALPHA="${DISSIMILARITY_ALPHA:-0.5}"
+#   DISSIMILARITY_REPEATS  aware (default) pairs a contig that sits in several bins as PlasEval does (branch and bound);
+#                          drop scores the first copy only. DISSIMILARITY_MAX_CALLS caps the search; a capped search
+#                          keeps the best pairing found and is marked capped in dissim_repeat_search.
+export DISSIMILARITY_REPEATS="${DISSIMILARITY_REPEATS:-aware}"
+export DISSIMILARITY_MAX_CALLS="${DISSIMILARITY_MAX_CALLS:-200000}"
 export RUN_COPY_NUMBER="${RUN_COPY_NUMBER:-1}"
 export RUN_ASSEMBLY_ADEQUACY="${RUN_ASSEMBLY_ADEQUACY:-1}"
 export MIN_ASSEMBLY_ADEQUACY="${MIN_ASSEMBLY_ADEQUACY:-0.90}"

@@ -21,9 +21,17 @@ Conventions
     cells costs sum(L(cell)^alpha) - max(L(cell)^alpha) (split); a truth bin
     assembled from k cells costs the same way (join). L(cell) is the summed bp.
     Normaliser = sum over both sides of sum_c len(c)^alpha.
+  * Repeats (default `--repeats aware`): a contig that sits in more than one bin, on either side, forms a repeat
+    family. As in PlasEval, its copies are paired (a maximal matching: min(k1, k2) pairs, the rest are extra or
+    missing) and the pairing that gives the lowest total dissimilarity is found by branch and bound, using the
+    fact that adding contigs never lowers the dissimilarity. Every copy counts in the normaliser. The search is
+    capped (`--max-calls`); a capped search returns the best pairing found and says so (dissim_repeat_search =
+    capped). `--repeats drop` keeps the first copy of each contig only (the earlier behaviour).
 """
 import argparse
 import csv
+import itertools
+import math
 import sys
 from pathlib import Path
 
@@ -201,8 +209,97 @@ def _unique(bins, repeats):
     return out
 
 
-def dissimilarity(pred_bins, truth, lengths, alpha=0.5):
-    """Dissimilarity between two bin sets over unique contigs. Returns a dict."""
+def _bin_costs(matched, alpha):
+    """(split cost, join cost) of matched contig copies [(predicted bin, truth bin, length)]: each bin is cut into
+    the cells it shares with the other side, and pays the sum of the cells' length^alpha minus the largest."""
+    cells = {}
+    for pb, tb, n in matched:
+        cells[(pb, tb)] = cells.get((pb, tb), 0) + n
+    split, join = {}, {}
+    for (pb, tb), v in cells.items():
+        w = v ** alpha
+        split.setdefault(pb, []).append(w)
+        join.setdefault(tb, []).append(w)
+    return (sum(sum(v) - max(v) for v in split.values()), sum(sum(v) - max(v) for v in join.values()))
+
+
+def _matchings(ka, kb):
+    """Every maximal matching of ka predicted copies with kb truth copies, as (predicted index, truth index) pairs."""
+    if ka >= kb:
+        for perm in itertools.permutations(range(ka), kb):
+            yield [(perm[i], i) for i in range(kb)]
+    else:
+        for perm in itertools.permutations(range(kb), ka):
+            yield [(i, perm[i]) for i in range(ka)]
+
+
+MAX_FAMILIES = 200   # deeper than this the search is not attempted (recursion depth); the first pairing is used
+
+
+def dissimilarity_aware(pred_bins, truth, lengths, alpha=0.5, max_calls=200000):
+    """Repeat-aware dissimilarity (PlasEval's definition). Returns the same dict as dissimilarity() plus
+    repeat_families, search ('none', 'exact' or 'capped') and calls."""
+    copies = ({}, {})
+    for side, bins in enumerate((pred_bins, truth)):
+        for b in sorted(bins):
+            for c in sorted(set(bins[b])):
+                copies[side].setdefault(c, []).append(b)
+    extra = missing = norm = 0.0
+    fixed, families = [], []
+    for c in sorted(set(copies[0]) | set(copies[1])):
+        pa, ta = copies[0].get(c, []), copies[1].get(c, [])
+        w = lengths[c] ** alpha
+        extra += max(len(pa) - len(ta), 0) * w
+        missing += max(len(ta) - len(pa), 0) * w
+        norm += (len(pa) + len(ta)) * w
+        if pa and ta:
+            if len(pa) == 1 and len(ta) == 1:
+                fixed.append((pa[0], ta[0], lengths[c]))
+            else:
+                families.append((math.perm(max(len(pa), len(ta)), min(len(pa), len(ta))), c, pa, ta, lengths[c]))
+    families.sort(key=lambda f: (f[0], f[1]))
+    # An upper bound first: the first pairing of every family. The search can only improve on it.
+    first = list(fixed)
+    for _, _, pa, ta, n in families:
+        first.extend((pa[i], ta[j], n) for i, j in next(_matchings(len(pa), len(ta))))
+    best = _bin_costs(first, alpha)
+    calls, capped = 0, len(families) > MAX_FAMILIES
+    items = list(fixed)
+
+    def search(level):
+        nonlocal best, calls, capped
+        _, _, pa, ta, n = families[level]
+        for m in _matchings(len(pa), len(ta)):
+            if capped:
+                return
+            calls += 1
+            if calls > max_calls:
+                capped = True
+                return
+            added = [(pa[i], ta[j], n) for i, j in m]
+            items.extend(added)
+            s, j = _bin_costs(items, alpha)
+            if s + j < sum(best):          # a partial instance is a lower bound for every completion
+                if level + 1 == len(families):
+                    best = (s, j)
+                else:
+                    search(level + 1)
+            del items[-len(added):]
+
+    if families and not capped:
+        search(0)
+    split, join = best
+    total = split + join + extra + missing
+    return {"split": split, "join": join, "extra": extra, "missing": missing, "norm": norm,
+            "dissim": 0.0 if norm == 0 else total / norm, "repeats_dropped": 0, "repeat_families": len(families),
+            "search": "none" if not families else ("capped" if capped else "exact"), "calls": calls}
+
+
+def dissimilarity(pred_bins, truth, lengths, alpha=0.5, repeats="aware", max_calls=200000):
+    """Dissimilarity between two bin sets. Returns a dict. repeats='aware' pairs repeated contigs as PlasEval does;
+    'drop' scores the first copy of each contig only."""
+    if repeats == "aware":
+        return dissimilarity_aware(pred_bins, truth, lengths, alpha, max_calls)
     rep = [0]
     P, T = _unique(pred_bins, rep), _unique(truth, rep)
     cp = {c: b for b, cs in P.items() for c in cs}
@@ -223,27 +320,33 @@ def dissimilarity(pred_bins, truth, lengths, alpha=0.5):
     jc = sum(sum(v) - max(v) for v in join.values())
     total = sc + jc + extra + missing
     return {"split": sc, "join": jc, "extra": extra, "missing": missing, "norm": norm,
-            "dissim": 0.0 if norm == 0 else total / norm, "repeats_dropped": rep[0]}
+            "dissim": 0.0 if norm == 0 else total / norm, "repeats_dropped": rep[0], "repeat_families": 0,
+            "search": "dropped" if rep[0] else "none", "calls": 0}
 
 
-def pairwise_dissimilarity(bins_a, bins_b, lengths, alpha=0.5):
+def pairwise_dissimilarity(bins_a, bins_b, lengths, alpha=0.5, repeats="aware", max_calls=200000):
     """Dissimilarity between two tools' bin sets (restricted to contigs with a length)."""
     ra = {b: [c for c in cs if c in lengths] for b, cs in bins_a.items()}
     rb = {b: [c for c in cs if c in lengths] for b, cs in bins_b.items()}
-    return dissimilarity(ra, rb, lengths, alpha)["dissim"]
+    return dissimilarity(ra, rb, lengths, alpha, repeats, max_calls)["dissim"]
 
 
-def dissim_row(pred_bins, labels, alpha=0.5, min_length=0):
+def dissim_row(pred_bins, labels, alpha=0.5, min_length=0, repeats="aware", max_calls=200000):
     row = {"status": "ok", "dissim": None, "split": None, "join": None, "extra": None,
-           "missing": None, "norm": None, "repeats": 0}
+           "missing": None, "norm": None, "repeats": 0, "families": 0, "search": "", "alpha0": None, "alpha1": None}
     if not is_assembly(pred_bins, labels):
         row["status"] = NOT_ASSEMBLY
         return row
     pred = _filter_pred(pred_bins, labels, min_length)
     truth = truth_bins(labels, min_length)
-    d = dissimilarity(pred, truth, lengths_of(labels), alpha)
+    lengths = lengths_of(labels)
+    d = dissimilarity(pred, truth, lengths, alpha, repeats, max_calls)
     row.update(dissim=d["dissim"], split=d["split"], join=d["join"], extra=d["extra"],
-               missing=d["missing"], norm=d["norm"], repeats=d["repeats_dropped"])
+               missing=d["missing"], norm=d["norm"], repeats=d["repeats_dropped"], families=d["repeat_families"],
+               search=d["search"])
+    # How much the verdict depends on the length exponent: no length weight, and full length weight.
+    row["alpha0"] = dissimilarity(pred, truth, lengths, 0.0, repeats, max_calls)["dissim"]
+    row["alpha1"] = dissimilarity(pred, truth, lengths, 1.0, repeats, max_calls)["dissim"]
     return row
 
 
@@ -289,11 +392,13 @@ def cmd_eval(a):
 
 def cmd_dissim(a):
     labels, bins = read_labels(a.labels), read_bins(a.bins)
-    r = dissim_row(bins, labels, a.alpha, a.min_length)
+    r = dissim_row(bins, labels, a.alpha, a.min_length, a.repeats, a.max_calls)
     hdr = ["sample", "tool", "dissim_status", "bin_dissimilarity", "dissim_split_cost", "dissim_join_cost",
-           "dissim_extra_cost", "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped"]
+           "dissim_extra_cost", "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped",
+           "dissim_repeat_families", "dissim_repeat_search", "bin_dissimilarity_alpha0", "bin_dissimilarity_alpha1"]
     _write(a.out, hdr, [[a.sample, a.tool, r["status"]] + [_fmt(r[k]) for k in (
-        "dissim", "split", "join", "extra", "missing", "norm")] + [r["repeats"]]])
+        "dissim", "split", "join", "extra", "missing", "norm")] + [r["repeats"], r["families"], r["search"]]
+        + [_fmt(r["alpha0"]), _fmt(r["alpha1"])]])
     if a.export_prefix and r["status"] != NOT_ASSEMBLY:
         export_plaseval(a.export_prefix, bins, labels, a.min_length)
     return 0
@@ -315,12 +420,13 @@ def cmd_matrix(a):
                 tools[f.name[len("pred_"):-len(".bins.tsv")]] = b
         truth = truth_bins(labels)
         for t, b in tools.items():
-            d = dissimilarity(_filter_pred(b, labels, 0), truth, lengths, a.alpha)["dissim"]
+            d = dissimilarity(_filter_pred(b, labels, 0), truth, lengths, a.alpha, a.repeats, a.max_calls)["dissim"]
             acc.setdefault((t, "truth"), []).append(d)
         names = sorted(tools)
         for i, x in enumerate(names):
             for y in names[i + 1:]:
-                acc.setdefault((x, y), []).append(pairwise_dissimilarity(tools[x], tools[y], lengths, a.alpha))
+                acc.setdefault((x, y), []).append(pairwise_dissimilarity(tools[x], tools[y], lengths, a.alpha,
+                                                                         a.repeats, a.max_calls))
     rows = [[x, y, len(v), _fmt(sum(v) / len(v) if v else None)] for (x, y), v in sorted(acc.items())]
     _write(a.out, ["tool_a", "tool_b", "n_samples", "mean_dissimilarity"], rows)
     return 0
@@ -346,7 +452,8 @@ def cmd_merge(a):
     added = ["bestmatch_status", "bestmatch_precision_count", "bestmatch_recall_count", "bestmatch_f1_count",
              "bestmatch_precision_bp", "bestmatch_recall_bp", "bestmatch_f1_bp", "bestmatch_contigs_excluded",
              "dissim_status", "bin_dissimilarity", "dissim_split_cost", "dissim_join_cost", "dissim_extra_cost",
-             "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped"]
+             "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped", "dissim_repeat_families",
+             "dissim_repeat_search", "bin_dissimilarity_alpha0", "bin_dissimilarity_alpha1"]
     fields += [c for c in added if c not in fields]
     for row in rows:
         shard = shards.get((row["sample"], row["tool"]), {})
@@ -371,12 +478,16 @@ def main(argv=None):
             p.add_argument("--per-bin-out")
         else:
             p.add_argument("--alpha", type=float, default=0.5)
+            p.add_argument("--repeats", choices=("aware", "drop"), default="aware")
+            p.add_argument("--max-calls", type=int, default=200000)
             p.add_argument("--export-prefix")
         p.set_defaults(fn=fn)
     p = sub.add_parser("matrix")
     for k in ("results-dir", "data-dir", "out"):
         p.add_argument("--" + k, required=True)
     p.add_argument("--alpha", type=float, default=0.5)
+    p.add_argument("--repeats", choices=("aware", "drop"), default="aware")
+    p.add_argument("--max-calls", type=int, default=200000)
     p.set_defaults(fn=cmd_matrix)
     p = sub.add_parser("merge")
     p.add_argument("--scores", required=True)

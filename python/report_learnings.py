@@ -93,8 +93,8 @@ def agreement_section(scores, matrix):
     body += note("Best match is per bin and not one-to-one, so one truth plasmid can be credited to several predicted bins; the "
                  "primary bin score matches one-to-one. Split cost is a predicted bin that spans several truth plasmids "
                  "(over-merging); join cost is a truth plasmid spread over several predicted bins (over-splitting). Shared "
-                 "(AMBIGUOUS) and misjoined (CHIMERIC) contigs are excluded and counted; PlasEval keeps repeated contigs "
-                 "in several bins, which this layer does not.")
+                 "(AMBIGUOUS) and misjoined (CHIMERIC) contigs are excluded and counted; Repeated contigs are kept in "
+                 "several bins and paired as PlasEval pairs them (dissim_repeat_search says whether the search was exact or capped).")
     if matrix:
         mrows = [[r["tool_a"], r["tool_b"], r["n_samples"], r["mean_dissimilarity"] or "-"] for r in matrix]
         body += "<h3>Do tools agree with each other?</h3>" + panel(

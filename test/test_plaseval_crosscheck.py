@@ -13,8 +13,9 @@ example bin files (read in place). For each pair of predicted and truth bins bot
 
   eval   overall best-match precision, recall and F1, contig-weighted and base-weighted      must agree to 4 decimals
   comp   normalised dissimilarity at alpha 0.5                                                must agree to 4 decimals
-         (compared only when no contig appears in more than one bin on either side: this module drops repeated contigs
-         where PlasEval pairs them by branch and bound, which is a documented difference)
+         (also when a contig appears in more than one bin: bin_agreement.py pairs repeated copies by branch and bound
+         as PlasEval does; the cases include hand-built repeats and a seeded random set, whose reference value is
+         always the original program's answer)
 
 PlasBench's input is a contig label table, so each PlasEval-format pair is converted: contigs in a truth bin are PLASMID
 contigs listing every truth plasmid they belong to; a contig only in the prediction is a CHROMOSOME contig (a false positive).
@@ -47,9 +48,42 @@ CASES = [
     ("mixed", {"P1": [("a", 2000), ("b", 1500), ("x", 1200)], "P2": [("c", 3000), ("d", 800)], "P3": [("e", 5000)]},
               {"T1": [("a", 2000), ("c", 3000)], "T2": [("b", 1500), ("d", 800), ("e", 5000)], "T3": [("m", 2200)]}),
     ("disjoint", {"P1": [("x", 2000)]}, {"T1": [("a", 2000)]}),
-    ("repeat in truth (eval only)", {"P1": [("a", 2000), ("r", 900)], "P2": [("b", 1500)]},
-                                    {"T1": [("a", 2000), ("r", 900)], "T2": [("b", 1500), ("r", 900)]}),
+    ("repeat in truth", {"P1": [("a", 2000), ("r", 900)], "P2": [("b", 1500)]},
+                        {"T1": [("a", 2000), ("r", 900)], "T2": [("b", 1500), ("r", 900)]}),
+    ("repeat in prediction", {"P1": [("a", 2000), ("r", 900)], "P2": [("b", 1500), ("r", 900)]},
+                             {"T1": [("a", 2000), ("r", 900), ("b", 1500)]}),
+    ("repeat on both sides, two copies each",
+     {"P1": [("a", 2000), ("r", 900)], "P2": [("b", 1500), ("r", 900)], "P3": [("c", 700)]},
+     {"T1": [("a", 2000), ("r", 900)], "T2": [("b", 1500), ("c", 700), ("r", 900)]}),
+    ("three copies against one",
+     {"P1": [("a", 2000), ("r", 800)], "P2": [("b", 1500), ("r", 800)], "P3": [("c", 700), ("r", 800)]},
+     {"T1": [("a", 2000), ("b", 1500), ("c", 700), ("r", 800)]}),
+    ("two repeat families",
+     {"P1": [("a", 2000), ("r", 900), ("s", 400)], "P2": [("b", 1500), ("r", 900), ("s", 400)]},
+     {"T1": [("a", 2000), ("r", 900)], "T2": [("b", 1500), ("s", 400)], "T3": [("r", 900), ("s", 400)]}),
 ]
+
+
+def random_cases(count=40, seed=20261116):
+    """Small random bin sets in which contigs may sit in several bins on either side."""
+    import random
+    rng = random.Random(seed)
+    out = []
+    for index in range(count):
+        lengths = {f"c{i}": rng.choice([300, 700, 900, 1500, 2000, 3500, 5000]) for i in range(rng.randint(4, 9))}
+        pred_n, truth_n = rng.randint(1, 4), rng.randint(1, 4)
+        pred = {f"P{i}": [] for i in range(pred_n)}
+        truth = {f"T{i}": [] for i in range(truth_n)}
+        for contig, length in lengths.items():
+            for bins, n_bins in ((pred, pred_n), (truth, truth_n)):
+                copies = rng.choices([0, 1, 2], weights=[1, 5, 2])[0]
+                for name in rng.sample(sorted(bins), min(copies, n_bins)):
+                    bins[name].append((contig, length))
+        pred = {k: v for k, v in pred.items() if v}
+        truth = {k: v for k, v in truth.items() if v}
+        if pred and truth:
+            out.append((f"random case {index}", pred, truth))
+    return out
 
 
 def write_plaseval(path, bins):
@@ -153,13 +187,14 @@ def main():
         return
     ok = True
     compared = 0
+    with_repeats = 0
 
     def check(label, condition):
         nonlocal ok
         ok &= bool(condition)
         print(f"  {'PASS' if condition else 'FAIL'}: {label}")
 
-    cases = list(CASES)
+    cases = list(CASES) + random_cases()
     example = os.path.join(SRC, "..", "examples", "input")
     if os.path.isdir(example):
         preds = sorted(f for f in os.listdir(example) if f.startswith("pred_bins"))
@@ -178,14 +213,14 @@ def main():
         check(f"{name}: best-match P/R/F1 (count and bp) agree", agree)
         if not agree:
             print("    mine:", mine_eval, " PlasEval:", overall)
-        if has_repeats(pred) or has_repeats(truth):
-            print(f"  note: {name}: repeated contigs, dissimilarity not compared (documented difference)")
-        else:
-            close = abs(float(d["bin_dissimilarity"]) - dissimilarity) < 1e-3
-            check(f"{name}: normalised dissimilarity agrees ({float(d['bin_dissimilarity']):.4f} vs {dissimilarity:.4f})", close)
-            compared += 1
+        close = abs(float(d["bin_dissimilarity"]) - dissimilarity) < 1e-3
+        repeated = has_repeats(pred) or has_repeats(truth)
+        check(f"{name}: normalised dissimilarity agrees ({float(d['bin_dissimilarity']):.4f} vs {dissimilarity:.4f})"
+              + (" [repeated contigs]" if repeated else ""), close)
+        compared += 1
+        with_repeats += 1 if repeated else 0
 
-    print(f"  dissimilarity compared on {compared} case(s) without repeated contigs")
+    print(f"  dissimilarity compared on {compared} case(s), {with_repeats} of them with repeated contigs")
     print()
     if not ok:
         print("PLASEVAL CROSS-CHECK FAILED")
