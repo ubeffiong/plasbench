@@ -12,13 +12,17 @@ Rules applied, in order (each rejected row records its reason in rejected.tsv):
   1. a BioSample appears once (13 duplicates in the pool);
   2. BioSamples already released by an earlier cohort (cohorts/accepted_accessions.tsv,
      --existing) are skipped;
-  3. truth is long-read-first (truth_provenance.classify_method: long_read_only or
+  3. the sequencing evidence names a long-read platform (validate_cohort.derive_truth_technology,
+     the same rule `validate-cohort --online` enforces), and truth is long-read-first (truth_provenance.classify_method: long_read_only or
      long_read_first_hybrid) unless --allow-short-read-first;
   4. the release date, on the chosen --date-basis, is inside
      [--released-after, --released-before]  (the same dates and basis the leakage
      settings LEAKAGE_DATE_BASIS / LEAKAGE_CUTOFF_DATE use, see plasbench_common);
   5. optional --country / --region / --species filters;
-  6. ONE isolate per independent cluster. The cluster key is `read_bioprojects`
+  6. when plasmids.tsv(.gz) is next to the pool (or --plasmids), its plasmid rows must
+     agree with the assembly's own plasmid list (same accessions and count); the
+     plasmid names are carried into plasmid_names;
+  7. ONE isolate per independent cluster. The cluster key is `read_bioprojects`
      (the study that deposited the reads), NOT the `bioproject` column, which is
      the RefSeq umbrella PRJNA224116 on every row of the pool.
 
@@ -47,13 +51,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from plasbench_common import (LEAKAGE_DATE_BASES, leakage_release_date, parse_iso_date)  # noqa: E402
 from truth_provenance import classify_method  # noqa: E402
+from validate_cohort import derive_truth_technology  # noqa: E402
 
 COLUMNS = ["sample_id", "assembly_accession", "sra_run", "organism", "truth_technology", "truth_quality_tier",
            "biosample", "bioproject", "sample_origin", "read_depth_x", "assembly_plasmid_count", "source_study",
            "truth_assembly_strategy", "truth_polish_reads", "alternate_paired_runs",
            "truth_release_date", "first_read_year", "cluster_key", "region", "africa_subregion",
            "isolation_source_category", "assembly_method", "assembly_sequencing_technology", "plasmid_accessions",
-           "genome_size", "selection_arm"]
+           "genome_size", "selection_arm", "plasmid_names"]
 LONG_READ_FIRST = ("long_read_only", "long_read_first_hybrid")
 REQUIRED_POOL_COLUMNS = ("assembly_accession", "organism_name", "biosample", "seq_rel_date", "assembly_method",
                          "assembly_sequencing_technology", "sra_runs", "read_bioprojects", "first_matching_read_year")
@@ -103,8 +108,7 @@ def origin_text(row):
 def to_cohort_row(row, strategy, polish):
     species = species_of(row["organism_name"])
     runs = [run for run in (row.get("sra_runs") or "").split(";") if run]
-    technology = "hybrid" if re.search(r"illumina|miseq|nextseq|hiseq|novaseq|dnbseq|bgi", row.get("assembly_sequencing_technology") or "", re.I) \
-        and strategy != "long_read_only" else "long_read"
+    technology = derive_truth_technology(row.get("assembly_sequencing_technology") or "") or ""
     return {
         "sample_id": f"{slug(species)}_{slug(row['biosample'])}",
         "assembly_accession": row["assembly_accession"],
@@ -137,7 +141,26 @@ def to_cohort_row(row, strategy, polish):
     }
 
 
-def screen(pool, args, taken_biosamples):
+def read_plasmid_table(path):
+    """assembly accession -> [(plasmid_accession, plasmid_name)] from plasmids.tsv(.gz); {} when absent."""
+    table = {}
+    for row in read_tsv(path):
+        table.setdefault(row["assembly_accession"], []).append((row.get("plasmid_accession", ""), row.get("plasmid_name", "")))
+    return table
+
+
+def plasmid_disagreement(row, table):
+    """'' when plasmids.tsv agrees with the assembly row's plasmid list, else the reason."""
+    if not table:
+        return ""
+    listed = [item for item in (row.get("plasmid_accessions") or "").split(";") if item]
+    rows = table.get(row["assembly_accession"], [])
+    if sorted(listed) != sorted(accession for accession, _ in rows):
+        return f"plasmids.tsv lists {len(rows)} plasmid(s) but the assembly row lists {len(listed)}, or the accessions differ"
+    return ""
+
+
+def screen(pool, args, taken_biosamples, plasmid_table=None):
     """Yield (row, cohort_row_or_None, reason). Order of rejection reasons is the order of the rules above."""
     after = parse_iso_date(args.released_after)
     before = parse_iso_date(args.released_before)
@@ -154,6 +177,9 @@ def screen(pool, args, taken_biosamples):
         seen.add(biosample)
         if biosample in taken_biosamples:
             yield row, None, "BioSample already released by an earlier cohort"
+            continue
+        if not derive_truth_technology(row.get("assembly_sequencing_technology") or ""):
+            yield row, None, "no explicit long-read platform in the sequencing evidence (online validation would reject it)"
             continue
         strategy, polish, _reason = classify_method(row.get("assembly_method", ""), row.get("assembly_sequencing_technology", ""))
         if not args.allow_short_read_first and strategy not in LONG_READ_FIRST:
@@ -184,11 +210,31 @@ def screen(pool, args, taken_biosamples):
         if not cluster_key(row):
             yield row, None, "no read BioProject or SRA study to cluster on"
             continue
-        yield row, to_cohort_row(row, strategy, polish), ""
+        disagreement = plasmid_disagreement(row, plasmid_table)
+        if disagreement:
+            yield row, None, disagreement
+            continue
+        cohort_row = to_cohort_row(row, strategy, polish)
+        cohort_row["plasmid_names"] = ";".join(name for _, name in (plasmid_table or {}).get(row["assembly_accession"], []))
+        yield row, cohort_row, ""
 
 
 def select(passing, args):
-    """One isolate per cluster, then at most --max-clusters-per-species clusters per species, seeded hash order."""
+    """One isolate per cluster, then at most --max-clusters-per-species clusters per species, seeded hash order.
+
+    With --all-members every passing isolate is kept (cluster_key still names its study, so the analysis resamples
+    studies, not isolates): the caps and the one-per-cluster rule are not applied.
+    """
+    if args.all_members:
+        keep = sorted((row for _, row in passing), key=lambda row: (species_of(row["organism"]), order_key(args.seed, row["assembly_accession"])))
+        counts = {}
+        for row in keep:
+            counts.setdefault(species_of(row["organism"]), []).append(row)
+        summary = [{"species": species, "passing_rows": len(rows), "clusters_available": len({r["cluster_key"] for r in rows}),
+                    "clusters_selected": len({r["cluster_key"] for r in rows}),
+                    "short_of_target": max(0, args.min_clusters - len({r["cluster_key"] for r in rows})) if args.min_clusters else 0}
+                   for species, rows in sorted(counts.items())]
+        return keep, [], summary
     by_species = {}
     for source, row in passing:
         by_species.setdefault(species_of(row["organism"]), {}).setdefault(row["cluster_key"], []).append((source, row))
@@ -237,7 +283,11 @@ def main():
     ap.add_argument("--max-clusters-per-species", type=int, default=0, help="0 = no cap")
     ap.add_argument("--min-clusters", type=int, default=20, help="species below this are listed as short (headline MIN_SPECIES_CLUSTERS)")
     ap.add_argument("--seed", type=int, default=20260916)
-    ap.add_argument("--arm", default="", help="label written to selection_arm (for example recent / older) so two runs can be combined")
+    ap.add_argument("--plasmids", default="", help="plasmids.tsv(.gz); default: plasmids.tsv.gz beside --pool when it exists")
+    ap.add_argument("--arm", default="", help="label written to selection_arm (for example recent / older) so two runs can be combined; "
+                    "'auto' labels each row recent or older from its own release date against --arm-cutoff")
+    ap.add_argument("--arm-cutoff", default="2025-01-01", help="with --arm auto: rows public on or after this date (on --date-basis) are 'recent'")
+    ap.add_argument("--all-members", action="store_true", help="keep every passing isolate: no one-per-cluster rule and no per-species cap")
     args = ap.parse_args()
     for flag, value in (("--released-after", args.released_after), ("--released-before", args.released_before)):
         if value and parse_iso_date(value) is None:
@@ -255,7 +305,9 @@ def main():
     taken.discard("")
 
     passing, rejected = [], []
-    for source, cohort_row, reason in screen(pool, args, taken):
+    plasmid_path = args.plasmids or os.path.join(os.path.dirname(os.path.abspath(args.pool)), "plasmids.tsv.gz")
+    plasmid_table = read_plasmid_table(plasmid_path) if os.path.isfile(plasmid_path) else {}
+    for source, cohort_row, reason in screen(pool, args, taken, plasmid_table):
         if cohort_row is None:
             rejected.append((source, reason))
         else:
@@ -264,8 +316,13 @@ def main():
     rejected.extend(cluster_rejected)
 
     os.makedirs(args.out_dir, exist_ok=True)
+    cutoff = parse_iso_date(args.arm_cutoff)
     for row in selected:
-        row["selection_arm"] = args.arm
+        if args.arm == "auto":
+            released = parse_iso_date(leakage_release_date(row["truth_release_date"], row["first_read_year"], args.date_basis))
+            row["selection_arm"] = "recent" if released and cutoff and released >= cutoff else "older"
+        else:
+            row["selection_arm"] = args.arm
     selected.sort(key=lambda row: (species_of(row["organism"]), order_key(args.seed, row["cluster_key"])))
     write_tsv(os.path.join(args.out_dir, "candidates.tsv"), selected, COLUMNS)
     pool_fields = list(pool[0].keys()) + ["reason"]

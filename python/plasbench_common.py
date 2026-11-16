@@ -366,3 +366,67 @@ def leakage_release_date(assembly_date, read_year, basis="earliest_public"):
         known = [date for date in (assembled, read) if date]
         chosen = min(known) if known else None
     return chosen.isoformat() if chosen else ""
+
+
+# --- balanced isolate order -------------------------------------------------------------------------
+# A cohort sheet is read top to bottom, so `plasbench run --max-isolates N` (the first N) is only a fair
+# miniature of the cohort when every prefix is spread across species, studies and the recent / older arms.
+# balanced_order() gives that order. It depends only on the rows' own values (never on file order), so
+# the same cohort always gives the same order, and an already-ordered sheet is unchanged by it.
+BALANCE_MAIN_MIN = 10     # a species with at least this many isolates is a "main" species: it takes part in the rotation first
+
+
+def balanced_order(rows, seed=20260916, main_min=BALANCE_MAIN_MIN):
+    """Indices of `rows` (dicts) in balanced order.
+
+    Species rotate (main species, those with at least main_min isolates, largest first; then the small ones); inside a species the rows alternate
+    between the `selection_arm` values (recent first), prefer long-read-first truths, and take one isolate per
+    study (cluster_key / bioproject) before taking a second from any study.
+    """
+    def species_of(row):
+        return " ".join((row.get("organism") or "").split()[:2]) or "unknown"
+
+    def study_of(row):
+        return row.get("cluster_key") or row.get("bioproject") or row.get("sample_id") or ""
+
+    def tie(row):
+        return hashlib.sha256(f"{seed}:{row.get('assembly_accession') or row.get('sample_id') or ''}".encode()).hexdigest()
+
+    by_species = {}
+    for index, row in enumerate(rows):
+        by_species.setdefault(species_of(row), []).append(index)
+
+    def species_queue(indices):
+        seen = {}
+        keyed = []
+        for index in sorted(indices, key=lambda i: tie(rows[i])):
+            row = rows[index]
+            study = study_of(row)
+            seen[study] = seen.get(study, -1) + 1
+            long_first = row.get("truth_assembly_strategy") in ("long_read_first_hybrid", "long_read_only")
+            keyed.append(((0 if long_first else 1, seen[study]), index))
+        keyed.sort(key=lambda item: item[0])
+        arms = {}
+        for _, index in keyed:
+            arms.setdefault(rows[index].get("selection_arm") or "", []).append(index)
+        names = sorted(arms, key=lambda name: (name != "recent", name))
+        merged, cursors = [], {name: 0 for name in names}
+        while len(merged) < len(indices):
+            for name in names:
+                if cursors[name] < len(arms[name]):
+                    merged.append(arms[name][cursors[name]])
+                    cursors[name] += 1
+        return merged
+
+    queues = {species: species_queue(indices) for species, indices in by_species.items()}
+    main = sorted((s for s in queues if len(queues[s]) >= main_min), key=lambda s: (-len(queues[s]), s))
+    minor = sorted((s for s in queues if s not in main), key=lambda s: (-len(queues[s]), s))
+    order = []
+    for group in (main, minor):
+        position = 0
+        while any(position < len(queues[s]) for s in group):
+            for species in group:
+                if position < len(queues[species]):
+                    order.append(queues[species][position])
+            position += 1
+    return order

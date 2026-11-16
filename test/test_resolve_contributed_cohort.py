@@ -97,5 +97,28 @@ check("a species short of the target is reported, not padded", [r for r in repor
 small, _ = rc.final_choice(rows[:8] + rows[16:], target=5, min_recent=5)
 check("with no older rows the recent arm tops the species up", sum(1 for r in small if r["organism"] == "Escherichia coli") == 5)
 
+
+print("extending a locked panel: every verified row, shared BioProjects, existing rows first")
+existing = [{"sample_id": "e0", "organism": "Escherichia coli", "selection_arm": "recent", "bioproject": "PRJR0"}]
+extra = [{"sample_id": "x1", "organism": "Escherichia coli", "selection_arm": "older", "bioproject": "PRJR0"},     # same BioProject as an existing row
+         {"sample_id": "x2", "organism": "Escherichia coli", "selection_arm": "older", "bioproject": "PRJX"},
+         {"sample_id": "x3", "organism": "Salmonella enterica", "selection_arm": "recent", "bioproject": "PRJX"}]
+all_rows, _ = rc.final_choice(extra, target=0, min_recent=0, existing=existing, unique_projects=False)
+check("target 0 keeps the existing row and every verified row, even a repeated BioProject",
+      [r["sample_id"] for r in all_rows] == ["e0", "x2", "x1", "x3"] or sorted(r["sample_id"] for r in all_rows) == ["e0", "x1", "x2", "x3"], [r["sample_id"] for r in all_rows])
+one, _ = rc.final_choice(extra, target=0, min_recent=0, existing=existing)
+check("with unique BioProjects the existing row's project is not reused", "x1" not in [r["sample_id"] for r in one] and "e0" in [r["sample_id"] for r in one])
+capped, _ = rc.final_choice([dict(r, bioproject=f"P{i}") for i, r in enumerate(extra * 3)], target=3, min_recent=0, existing=existing)
+check("existing rows count toward a species' target", sum(1 for r in capped if r["organism"] == "Escherichia coli") == 3)
+
+print("very deep runs are a last resort")
+RUNS.update({"SRR1": run_info(bases=5_000_000_000), "SRR2": run_info(bases=900_000_000), "SRR3": run_info(bases=60_000_000)})
+ASSEMBLY.update(biosample="SAMN1", bioprojects=["PRJNA224116", "PRJNA100"], has_plasmid=True, assembly_status="Complete Genome")
+sheet, out = rc.resolve(ROW, THRESHOLDS, None, None, 0, max_depth=300)
+check("a 180x run is chosen over a 1000x run", sheet and sheet["sra_run"] == "SRR2", out)
+RUNS.update({"SRR2": run_info(bases=4_000_000_000), "SRR3": run_info(bases=5_000_000_000)})
+sheet, out = rc.resolve(ROW, THRESHOLDS, None, None, 0, max_depth=300)
+check("with only very deep runs the shallowest is used and the row says so", sheet and sheet["sra_run"] == "SRR2" and "very deep" in sheet["qc_precheck_notes"], out)
+
 print("ALL RESOLVE CONTRIBUTED COHORT TESTS PASSED" if not failures else "RESOLVE CONTRIBUTED COHORT TESTS FAILED: " + "; ".join(failures))
 sys.exit(1 if failures else 0)

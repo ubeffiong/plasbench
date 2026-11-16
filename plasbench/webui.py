@@ -468,7 +468,8 @@ class Project:
                 n = 0
             name = path.stem
             out.append({"name": name, "path": str(path), "rows": max(n, 0), "locked": (path.parent / f"{name}.lock.json").is_file(),
-                        "metagenomic": name.startswith("metagenomics")})
+                        "metagenomic": name.startswith("metagenomics"),
+                        "selection": (path.parent / f"{name}.selection.json").is_file()})
         return out
 
     def docs(self) -> list[dict]:

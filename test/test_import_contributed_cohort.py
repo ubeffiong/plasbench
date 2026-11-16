@@ -103,6 +103,44 @@ check("and is excluded on the earliest_public basis", "GCF_6.1" not in by_earlie
 older = {r["assembly_accession"] for r in run(POOL, "--released-before", "2024-12-31", "--date-basis", "assembly")[0]}
 check("--released-before builds the older comparison arm", older == {"GCF_7.1"}, older)
 
+print("--all-members, --arm auto and the long-read platform pre-filter")
+all_rows, rej, err = run(POOL, "--all-members", "--arm", "auto", "--arm-cutoff", "2025-04-15", "--date-basis", "assembly")
+ids = {r["assembly_accession"] for r in all_rows}
+check("--all-members keeps every passing isolate, several per cluster", {"GCF_1.1", "GCF_2.1"} <= ids, err)
+arm = {r["assembly_accession"]: r["selection_arm"] for r in all_rows}
+check("--arm auto labels rows recent or older from their own date", arm["GCF_1.1"] == "older" and arm["GCF_3.1"] == "recent", arm)
+illumina_only = row("GCF_20.1", "Escherichia coli", "SAMN20", "2025-03-01", "PRJNA120", "2025", method=("SPAdes v. 3.15", "Illumina HiSeq"))
+rows_, rej_, _ = run(POOL + [illumina_only], "--all-members")
+check("a genome with no long-read platform is rejected before any NCBI call",
+      "GCF_20.1" not in {r["assembly_accession"] for r in rows_} and any("long-read platform" in r["reason"] for r in rej_ if r["assembly_accession"] == "GCF_20.1"))
+check("truth_technology is the validator's derived value", all(r["truth_technology"] in ("hybrid", "long_read") for r in all_rows))
+
+print("plasmids.tsv cross-check")
+import gzip
+with tempfile.TemporaryDirectory() as tmp:
+    pool_path = os.path.join(tmp, "assemblies.tsv")
+    with open(pool_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(POOL[:3])
+    with gzip.open(os.path.join(tmp, "plasmids.tsv.gz"), "wt", encoding="utf-8", newline="") as handle:
+        handle.write("assembly_accession\tplasmid_accession\tplasmid_name\n")
+        handle.write("GCF_1.1\tNZ_A.1\tpA\nGCF_1.1\tNZ_B.1\tpB\n")             # agrees with the assembly row
+        handle.write("GCF_2.1\tNZ_A.1\tpA\n")                                    # one plasmid short of the assembly row
+    ledger = os.path.join(tmp, "ledger.tsv")
+    with open(ledger, "w", encoding="utf-8") as handle:
+        handle.write("biosample\tsample_id\n")
+    out_dir = os.path.join(tmp, "out")
+    done = subprocess.run([sys.executable, SCRIPT, "--pool", pool_path, "--ledger", ledger, "--out-dir", out_dir, "--all-members"],
+                          capture_output=True, text=True)
+    with open(os.path.join(out_dir, "candidates.tsv"), encoding="utf-8") as handle:
+        sel = list(csv.DictReader(handle, delimiter="\t"))
+    with open(os.path.join(out_dir, "rejected.tsv"), encoding="utf-8") as handle:
+        rj = {r["assembly_accession"]: r["reason"] for r in csv.DictReader(handle, delimiter="\t")}
+    check("plasmids.tsv beside the pool is used and its names are carried",
+          [r["plasmid_names"] for r in sel if r["assembly_accession"] == "GCF_1.1"] == ["pA;pB"], done.stderr)
+    check("a genome whose plasmid rows disagree with its assembly row is rejected", "plasmids.tsv" in rj.get("GCF_2.1", ""), rj)
+
 print("determinism and filters")
 first = run(POOL, "--seed", "7")[0]
 second = run(list(reversed(POOL)), "--seed", "7")[0]

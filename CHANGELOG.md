@@ -13,6 +13,10 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- run only the first N isolates, and the cohort Selection report
+- `plasbench run --max-isolates N` (any N; *How many isolates* in New benchmark) runs a balanced N isolates of a cohort or sample sheet: species take turns, recent and older alternate, long-read-first truths first, one isolate per study before a second (`plasbench_common.balanced_order`); `--isolate-order file` takes the first N rows instead. The cohort file is untouched and a copy with the chosen rows is used (`plasbench/sheet_limit.py`). `public-v4` is written in this order (`balance_rank`).
+- The window's **Cohorts** page has a **Selection report** pop-up for a cohort built from the candidate pool: where the genomes came from, the criteria, available / passed / selected, why the others failed, a per-species table and the sequence information of the selected genomes. It reads `cohorts/<name>.selection.json`, written by `plasbench selection-report` (`python/build_selection_report.py`) from the importer's and resolver's output.
+
 ### Added -- public-v4 and the read-QC pre-check (contributed pool, verified at NCBI)
 - `cohorts/public-v4.tsv` (+ lock): 98 isolates, verified online: 20 each of *E. coli*, *K. pneumoniae*, *S. enterica*, *S. aureus* and 18 *E. hormaechei* (only 22 long-read-first clusters in the pool, 18 verified); 37 public from 2025-01-01 (`selection_arm=recent`) and 61 older; one isolate per BioProject; long-read-first truth; all tier B. The design is recorded in `docs/COHORTS.md` and `cohorts/README.md`. The accession ledger now covers it.
 - `plasbench resolve-contributed-cohort` (`python/resolve_contributed_cohort.py`): verifies candidates at NCBI, replaces the pool's umbrella BioProject with the real one, picks the best SRA run, and runs the pre-download read-QC check (depth, read pairs, read length from SRA run-info, graded against `config/short_read_qc_thresholds.tsv`). It cannot see base quality or pair integrity: stage 3's `short_read_qc.py` still decides on the downloaded reads.

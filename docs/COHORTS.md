@@ -149,6 +149,8 @@ clusters in the pool); at least 10 per species public on or after 2025-01-01 on 
 rest older, so the leakage comparison has both arms in every species; one isolate per BioProject; long-read-first
 truth only; seed 20260916. A species that cannot reach 20 is reported short, never padded.
 
+The window's **Cohorts** page shows a **Selection report** pop-up for a cohort built this way: where the genomes came from, the criteria, how many were available and how many passed each stage, why the others failed (offline filters and NCBI / read-QC), a per-species table, and the sequence information of the selected genomes. It is read from `cohorts/<name>.selection.json`, written by `plasbench selection-report` from the importer's and resolver's output, so it states only what the selection run produced.
+
 ```bash
 plasbench import-contributed-cohort --arm recent --released-after 2025-01-01 --max-clusters-per-species 20   --species "Escherichia coli" --species "Klebsiella pneumoniae" --species "Salmonella enterica"   --species "Staphylococcus aureus" --species "Enterobacter hormaechei" --out-dir curation/v4/recent
 plasbench import-contributed-cohort --arm older --released-before 2024-12-31 --max-clusters-per-species 30   (same --species) --out-dir curation/v4/older
