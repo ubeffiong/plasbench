@@ -3047,6 +3047,10 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     # Reviewer-driven dashboards (python/report_reviewers.py): short-read QC, assembly selection, reconstruction multiplicity.
     import report_reviewers
     page = report_reviewers.inject(page, str(results_dir))
+    import report_amr_regions
+    page = report_amr_regions.inject(page, str(results_dir), args.data_dir)
+    import report_synteny
+    page = report_synteny.inject(page, str(results_dir))
     # Report overhaul: scorecard, circular plasmid maps and the "Data in this report" inventory
     # (python/report_scorecard.py, report_maps.py, report_surfaces.py; shared helpers in report_common.py).
     # The workflow figure is in the README (python/report_workflow.py writes docs/images/workflow.svg).
