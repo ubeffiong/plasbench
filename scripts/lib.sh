@@ -154,7 +154,9 @@ read_samples() {
         /^[[:space:]]*$/ {next}
         {
             if (!seen_header) { seen_header=1; next }  # drop header row
-            print $1"\t"$2"\t"$3
+            # An empty accession (a reads-only, "operational" row) must stay a field: bash `read` with a tab separator would otherwise
+            # collapse the two tabs and shift the read prefix into the accession column. NA is what the stages already treat as "no reference".
+            print $1"\t"($2 == "" ? "NA" : $2)"\t"$3
         }
     ' "$sheet"
 }

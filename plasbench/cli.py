@@ -354,6 +354,15 @@ def build_parser():
                               help="How to place the input files (default: copy).")
     local_parser.add_argument("--force", action="store_true", help="Overwrite an existing truth.tsv.")
 
+    intake_parser = sub.add_parser(
+        "intake",
+        help="Your own isolates: write a sheet template, find isolates in a folder, place them, and quick-test that PlasBench can use them.",
+        description="template: write a sheet to fill in.  scan FOLDER...: find isolates (changes nothing).  stage FOLDER...: place them and write the sheet.  "
+                    "check [--fix]: open every file the way a run will. Guide: docs/INPUT_GUIDE.md",
+    )
+    intake_parser.add_argument("action", choices=("template", "scan", "stage", "check"), help="What to do.")
+    intake_parser.add_argument("intake_args", nargs=argparse.REMAINDER, help="Arguments of that action (try: plasbench intake scan --help).")
+
     cohort_parser = sub.add_parser("validate-cohort", help="Validate a cohort schema or verify its NCBI-linked pairs.")
     cohort_parser.add_argument("--samples", type=Path, required=True, help="Cohort TSV to validate.")
     cohort_parser.add_argument("--online", action="store_true", help="Verify NCBI assembly/SRA linkage and library metadata.")
@@ -816,6 +825,11 @@ def main(argv=None):
             command.append("--force")
         code = run(command, root)
 
+    elif args.command == "intake":
+        extra = list(args.intake_args)
+        if args.action in ("stage", "check") and "--data-dir" not in extra and "-h" not in extra and "--help" not in extra:
+            extra += ["--data-dir", str(configured_data_dir(root))]
+        code = run([sys.executable, "python/intake.py", args.action, *extra], root)
     elif args.command == "validate-cohort":
         command = [sys.executable, "python/validate_cohort.py", "--samples", str(args.samples)]
         if args.online:

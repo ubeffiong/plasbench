@@ -20,6 +20,7 @@ This guide is for the people who must decide whether to trust and use the tool: 
   - [4.5 Evidence labels, and what is set aside](#45-evidence-labels-and-what-is-set-aside)
   - [4.6 Independence of observations](#46-independence-of-observations)
   - [4.7 The shipped cohorts](#47-the-shipped-cohorts)
+  - [4.8 Bringing your own isolates](#48-bringing-your-own-isolates)
 - [5. The pipeline, stage by stage](#5-the-pipeline-stage-by-stage)
 - [6. The tools evaluated](#6-the-tools-evaluated)
 - [7. Scoring: what is measured, how, and why](#7-scoring-what-is-measured-how-and-why)
@@ -177,7 +178,7 @@ Plasmids carry much of the antimicrobial-resistance (AMR) burden, but they are h
 | A complete reference | A long-read or hybrid assembly of **the same isolate**, with plasmids present. |
 | Metadata | `sample_id`, `assembly_accession`, `sra_run`, `organism`, `truth_technology`, `truth_quality_tier`, `biosample`, `bioproject`. Optional: origin, read depth, plasmid count, source study, clonal group, provenance columns. |
 
-You can use public NCBI data (PlasBench downloads and checks it) or your own files (`plasbench init-local`). Cohort rules are in [docs/COHORTS.md](COHORTS.md).
+You can use public NCBI data (PlasBench downloads and checks it) or your own files (`plasbench intake`, [Section 4.8](#48-bringing-your-own-isolates); one isolate at a time, `plasbench init-local`). Cohort rules are in [docs/COHORTS.md](COHORTS.md).
 
 ### 4.2 Where truth comes from
 
@@ -244,6 +245,17 @@ Isolates from one study or one clone are not independent. A **cluster** joins is
 Neither public panel declares truth independence, so the long-read and hybrid tools are skipped on them unless explicitly overridden (section 10). Discovery of candidate cohorts is covered in [docs/COHORTS.md](COHORTS.md). `plasbench discover-cohort` rejects any assembly that is not a Complete Genome, does not declare plasmid replicons, lacks explicit long-read evidence, or has no linked paired-Illumina run from the same BioSample and BioProject, so many public genomes do not qualify.
 
 ---
+
+### 4.8 Bringing your own isolates
+
+Your own sequencing data enters through `plasbench intake` (or **Your own isolates** in the window), which is built to fail early and plainly: a wrong input that is not caught changes the leaderboard without any error appearing.
+
+* **Find, do not assume.** `scan` pairs read files by name (several lanes become one isolate), matches each reference FASTA to its isolate by name or folder with a stated confidence, and refuses to give one FASTA to several isolates. It reads the organism off the FASTA header and labels it a guess.
+* **Never decide the ground truth.** Which reference sequences are plasmids is set from what the FASTA header states, and otherwise left as `REVIEW` for a person; the run refuses to start while any remains. Sequence length is never used to decide.
+* **Check the one thing a file name cannot show.** The quick test compares a sample of the reads with the reference by 21-mer containment (no aligner needed). Reads of the same isolate are found in the reference almost completely (pass at 80% or more); a close relative partly (warning, 30-80%); another organism hardly at all (failure). A scored benchmark against the genome of a different strain would otherwise run to completion and report meaningless recall.
+* **Every message has a code, steps and a guide section** ([docs/INPUT_GUIDE.md](INPUT_GUIDE.md)); `check --fix` repairs only what has one right answer and records what it did. A reference that is a draft assembly, protein, ambiguous, or from the wrong isolate is explained, not repaired.
+
+Reads-only isolates (`assembly_accession` = `NA`) are reconstructed but cannot be scored.
 
 ## 5. The pipeline, stage by stage
 
@@ -849,7 +861,7 @@ All settings are environment variables read by `config/config.sh` (override them
 |---|---|
 | Run | `run`, `report`, `reconstruct`, `select-candidates`, `select-unknown`, `open-report`, `report-pdf` |
 | Set up and check | `check`, `install-conda`, `install-tools`, `upgrade`, `test`, `demo`, `docs`, `concept-note` |
-| Cohorts | `init-local`, `validate-cohort`, `curate-cohort`, `discover-cohort`, `review-candidates`, `build-ledger`, `prepare-contribution` |
+| Cohorts | `init-local`, `intake`, `validate-cohort`, `curate-cohort`, `discover-cohort`, `review-candidates`, `build-ledger`, `prepare-contribution` |
 | Experiments | `depth-ladder`, `depth-report`, `read-quality-ladder`, `read-quality-report` |
 | Evidence | `validate-orthogonal-evidence`, `import-external-benchmark`, `candidate-dataset` |
 | Evaluation additions (run as `plasbench analysis <name>`) | `bin-agreement`, `assembly-adequacy`, `copy-number`, `repeat-content`, `truth-depth-anomalies` |

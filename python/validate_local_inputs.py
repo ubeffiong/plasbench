@@ -187,7 +187,7 @@ def check_sample(row, data_dir: Path, problems, warnings):
     # --- reference and truth ----------------------------------------------
     reference, truth = sdir / "reference.fna", sdir / "truth.tsv"
     report = sdir / "sequence_report.jsonl"
-    if not accession:
+    if not accession or accession == "NA":
         return  # operational sample: reads only, nothing to score against
 
     if not reference.is_file():
