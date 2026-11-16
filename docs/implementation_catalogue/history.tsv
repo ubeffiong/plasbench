@@ -1,0 +1,88 @@
+5	2026-11-08	Fix leaderboard ranking fairness and add robustness diagnostics
+6	2026-11-08	feat(diagnostics): AMR truth drafting, recovery by replicon/MOB, QUAST report section
+7	2026-11-08	Research design: binning-F1 headline, CPRR, reference tiers, evidence labels, species balance
+8	2026-11-08	fix(audit): truth labelling, ranking integrity, leakage visibility, rank robustness; Scientific Guide
+9	2026-11-08	fix(report): list a tool that failed on every sample in benchmark.species.tsv
+10	2026-11-08	Close the review gaps: accuracy, feature preservation, bin quality, performance, power, scenarios, optional composite; FAQ for the 500-question bank
+11	2026-11-08	Question-bank gaps, verified database dates, and the public-v3 cohort
+12	2026-11-08	Metric rubric: contig-level classification with MCC, ARI, assembly-aware binning, micro averaging, database membership
+13	2026-11-08	docs: remove capabilities that are not part of the benchmarking pipeline
+14	2026-11-08	Panel examination and scoring specification: NCBI-label primary, pre-registration, outcome states, recommender evaluation
+15	2026-11-08	fix(install): wire mash, samtools, barrnap and the annotation callers into the install pipeline
+16	2026-11-08	perf: faster exact statistics, shared helpers, leaner report builder
+17	2026-11-08	Contig cross-check scorer, ENA read fallback and demo coverage
+19	2026-11-08	plsMD adapter, replicon baseline, bin agreement and truth-QC analyses (PlasEval/GAEMR learnings)
+20	2026-11-08	Finish the plsMD/PlasEval/GAEMR follow-ups: PlasBin-flow adapter, PlasEval cross-check, ISFinder evidence, repeat_rich fix
+21	2026-11-08	Track-specific endpoints, CPRR robustness, README evaluation framework
+22	2026-11-09	Re-point review ledger rows after #21
+23	2026-11-09	docs(readme): make the step-by-step lab guide findable again
+24	2026-11-09	HTML report overhaul: plasmid maps, weighted scorecard, workflow figure, data inventory and wiring fixes
+25	2026-11-09	Interactive plasmid map viewer, 3D views for contig layer, recommender and AMR placement, collapsed tables, workflow figure in the README
+26	2026-11-09	Report overhaul: left-rail views, merged analytics, figure gallery, info tooltips, full PDF export
+27	2026-11-09	Performance audit fixes: faster matching, exact statistics, streaming, parallel downloads
+28	2026-11-09	Keep downloads for future runs; catch tools that cannot start
+29	2026-11-09	MOB-suite in its own pinned environment; databases kept once per machine
+30	2026-11-09	Load the two interactive explorers when first shown (page opens about 3x faster)
+31	2026-11-10	Report order for readers who are deciding: recommendation second, one set of numbers, phone menu, explorers out of the Appendix, display names at build time
+32	2026-11-10	Section review: one home per result, reconstruction-only recommendation, Not-run sections listed once
+34	2026-11-10	Out-of-memory failures are resource failures; PDF export from WSL
+35	2026-11-10	Help "?" button on every section and tab, and the 3D-chart fix
+36	2026-11-10	Add a sample report (offline demo data) and link it from the README
+37	2026-11-10	Per-isolate FASTA download button in the plasmid matrix; matrix and report-card notes as tooltips
+38	2026-11-10	Every generated demo report replaces the sample report
+39	2026-11-10	Release v0.2.0
+40	2026-11-15	README: link to open the sample report, directly under the title
+41	2026-11-13	Isolated environments for PlaScope, Plasmer and PlasmidHunter; release v0.2.1
+42	2026-11-13	Trycycler and Medaka in their own environment; release v0.2.2
+43	2026-11-13	Resumable database downloads, Platon auto-download, CheckM fix, README Step 7d; release v0.2.3
+44	2026-11-13	Fix the doubled size in the download resume message
+45	2026-11-13	Quiet the fake server's disconnect tracebacks in test_fetch_ena_parallel
+46	2026-11-13	v0.3.0: bring your own tool, and the PlasBench window (plasbench ui)
+47	2026-11-14	Ship the plasbench ui page (plasbench/data/ui.html was gitignored)
+48	2026-11-14	Reference figures folder (local images, tracked README)
+49	2026-11-14	Recommendation model: truth-free features only
+50	2026-11-14	Strict eligibility: primary analysis unavailable when no reference qualifies
+51	2026-11-14	PlasBench window: desktop icon, studies, one install folder, terminal, session log, help, cohort details
+52	2026-11-14	Structured evidence record for every reference
+53	2026-11-15	chore: keep sample-level data out of git by default
+54	2026-11-15	fix(git): keep per-sample folders, sequence and clinical files out of study repositories
+55	2026-11-15	Pre-registration: proposed values, draft state and a strict freeze
+56	2026-11-15	Git: never track heavy files; edit .gitignore from the window
+57	2026-11-15	Statistics core: six-unit minimum and exact permutation tests (stacked on #55)
+58	2026-11-15	Statistics validated by simulation (stacked on #57)
+59	2026-11-15	Crash-safe stage 3; faster, parallel, timed and resumable stage 2
+60	2026-11-15	Console colours: warnings yellow, errors red
+61	2026-11-15	Runs never stop silently: every stop is reported on the console
+62	2026-11-15	Rank sensitivity covers alignment length, headline endpoints and CPRR thresholds (stacked on #58)
+63	2026-11-15	More truth audits: flags, higher multimers, marker-database overlap (stacked on #62)
+64	2026-11-15	Metric registry and the evaluation ladder (stacked on #63)
+65	2026-11-15	B2: burden of unverified predicted sequence in the leaderboard and report
+66	2026-11-15	B3: SV-PRR beside CPRR
+67	2026-11-15	C1: dataset characteristics (truth-free vs truth-derived columns)
+68	2026-11-15	C2: single best vs organism vs feature-conditioned recommender
+69	2026-11-15	D1: numeric heatmap gains SV-PRR and burden columns
+70	2026-11-15	D2-D7: radar, complexity, outcome matrix, recommendation evidence, map identity and resistance brackets, TP/FP encodings
+71	2026-11-15	README: document the features merged in #61-#70
+72	2026-11-15	Window: show and reuse what is already installed (databases, data and study folders)
+73	2026-11-15	Make main green; AMR context, real-binary check, provenance and tiers, integration audit, and the end-to-end review fixes
+74	2026-11-15	Release v0.4.0
+75	2026-11-15	Three explicit evaluation tasks: classification, binning reconstruction, sequence reassembly
+76	2026-11-15	Second external review: P0 and P1 fixes
+77	2026-11-15	AMR placement by output type, reference independence, full statistics simulation
+78	2026-11-15	Full interval-method simulation results and write-up
+80	2026-11-15	Release v0.4.0: changelog and release notes
+81	2026-11-16	fix(install): explain a DNS or network failure and add an offline --archive install
+82	2026-11-16	fix(launcher): do not abort on conda activate scripts that read unset variables
+83	2026-11-16	fix(ui): open the window in its own clean browser profile and explain the session-key page
+84	2026-11-16	fix(install): an optional tool that cannot install no longer fails install-tools all
+85	2026-11-16	Release v0.4.1
+86	2026-11-16	feat(ui): check for updates and one-click upgrade in the window
+87	2026-11-16	feat(bins): repeat-aware PlasEval dissimilarity, checked against the original; FAQ updated
+88	2026-11-16	Window: persistent animated toast while a benchmark is running
+89	2026-11-16	Run sessions: runs survive disconnects; list, follow, resume and open every run
+90	2026-11-16	Third review: strict task derivation, dominated-cohort interval fallback, documentation sync
+91	2026-11-16	feat(bins): the PlasEval-paper cohort, binning error-profile charts and a comparison gate against the original program
+92	2026-11-16	Window: fix random disconnects, make Retry work, make the icon always open a window
+94	2026-11-16	feat: short-read QC gate, assembly selection policy, candidate multiplicity analysis and an external review log
+95	2026-11-16	Contributed RefSeq/SRA candidate pool and a seeded, cluster-aware cohort importer
+96	2026-11-16	Configurable leakage screen (cutoff policy, fixed date, date basis), settable in plasbench ui

@@ -15,7 +15,7 @@ cannot be fixed in software.
 | **Documented** | Stated in the docs, not enforced or tested by code. |
 | **Open** | Not done. The reason is given (usually: it needs real data, not code). |
 
-The 215-question reviewer assessment is [docs/REVIEWER_ASSESSMENT_MATRIX.md](docs/REVIEWER_ASSESSMENT_MATRIX.md) (Q36-Q42). A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
+The 215-question reviewer assessment is [docs/REVIEWER_ASSESSMENT_MATRIX.md](docs/REVIEWER_ASSESSMENT_MATRIX.md) (Q36-Q42). Everything implemented, with where to find it and what checks it, is in [docs/IMPLEMENTATION_CATALOGUE.md](docs/IMPLEMENTATION_CATALOGUE.md). A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
 cross-references the question numbers here.
 
 Evidence basis: [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md) (independent review and audit; every review and what validated it is
