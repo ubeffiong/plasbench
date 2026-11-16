@@ -13,6 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- the contributed RefSeq/SRA candidate pool and a seeded, cluster-aware importer
+- `cohorts/candidates/contributed-refseq-sra/`: 8,812 RefSeq Complete Genome / SRA pairs (and their 24,606 plasmids) from a collaborator, stored gzipped with SHA-256 pins and a `SOURCE.md` that lists what it does and does not establish.
+- `plasbench import-contributed-cohort` (`python/import_contributed_cohort.py`): long-read-first, one isolate per read-BioProject cluster (the pool's `bioproject` column is the RefSeq umbrella on every row), seeded and order-independent, with a reason for every rejected row, `--released-after/--released-before` and a `--date-basis` (`assembly`, `read`, `earliest_public`). Output is unverified until `validate-cohort --online`.
+- `plasbench_common.leakage_release_date` / `parse_iso_date`: the one definition of "when did this genome become public", for the importer and, next, the leakage screen.
+
 ### Added -- the PlasEval-paper cohort, binning error-profile charts, and a comparison gate against the original program
 - `cohorts/plaseval-ecoli53.tsv`: the 53 *E. coli* isolates of the PlasEval paper (accessions from its `Ecoli_samples.csv`), with the paper's published ground truth and tool bins (MOB-recon, HyAsP, gplas2, PlasBin-flow) in `cohorts/plaseval_ecoli53/bins` (CC BY 4.0, credited). Schema-validated; the online NCBI check has not been run. Reference tier 3 (Unicycler hybrid on the same reads): a replication panel, not a headline one.
 - `plasbench plaseval-replication` scores the paper's bins with PlasBench and writes tables and an HTML page; with the original program found it runs it on the same pairs. PlasBench alone, on the real bins: mean dissimilarity 0.253 (MOB-recon), 0.316 (gplas2), 0.370 (PlasBin-flow), 0.479 (HyAsP) at alpha 0.5. Not yet compared with the original on these bins.

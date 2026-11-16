@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "note": "sha256 is of the original uncompressed file as received; gz_sha256 is of the stored .gz",
+  "files": {
+    "assemblies.tsv": {
+      "sha256": "c514561e28b6c29c64b1823b3661a93ab28a8ecc3c6840f6cf1858e1e64a510d",
+      "bytes": 7663456,
+      "rows": 8812,
+      "gz_sha256": "0f8cf55c68fa12dcd02d6cf6dd5ab58c34806b95c74eaa2d607b291ebf4b0359"
+    },
+    "plasmids.tsv": {
+      "sha256": "5003e5ba131c166e9611d75567b1ca86cf6884e9af79770fe0dd1d1b8e8222bd",
+      "bytes": 23171357,
+      "rows": 24606,
+      "gz_sha256": "1f28a50a5723a9694455743feb9466be166b8839c5c3462af6cb6a3c436319fe"
+    }
+  }
+}
