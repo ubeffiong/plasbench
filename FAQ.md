@@ -18,7 +18,8 @@ cannot be fixed in software.
 A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
 cross-references the question numbers here.
 
-Evidence basis: [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md) (independent review and audit), the source files named in
+Evidence basis: [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md) (independent review and audit; every review and what validated it is
+listed in [docs/EXTERNAL_REVIEW_LOG.md](docs/EXTERNAL_REVIEW_LOG.md)), the source files named in
 each answer, and the test suite. A full run of `test/run_tests.sh` is the check on the
 "Verified" claims; see Q24 for its result. Nothing here has been checked against a
 real-cohort run, because none exists yet (Q22).
@@ -48,8 +49,8 @@ imported as a labelled, non-ranking cross-check (`plasbench import-external-benc
 with a BLASTN scoring (`python/compare_scoring_methods.py`).
 **Evidence.** `python/bin_agreement.py`; `test/test_plaseval_crosscheck.py`; `test/test_bin_agreement.py` (hand-computed repeat cases and a
 capped search); `docs/METHODS.md`, "External evaluator cross-checks".
-**Status.** Verified on constructed and random cases. **Open:** agreement on real data (the paper's 53 *E. coli* isolates are public) and a
-first-class adapter that runs the original program as a scorer. The dissimilarity is a secondary endpoint: it compares which contigs are in
+**Status.** Verified on constructed and random cases. The paper's 53 *E. coli* isolates ship as a cohort with the paper's published bins, and a
+comparison gate (Q31) repeats the check against the original program on real bins wherever it is installed; **Result:** on the 53-isolate cohort 210 of 211 pairs agree within 0.001 and none disagree (Q31). **Open:** a first-class adapter that runs the original as the scorer. The dissimilarity is a secondary endpoint: it compares which contigs are in
 which bin, says nothing about sequence accuracy, and does not apply to tools that output reassembled sequences.
 
 ---
@@ -248,9 +249,9 @@ structural calls (`python/call_structural_variants.py`, deliberately `validated:
 QUAST diagnostics (`RUN_QUAST_DIAGNOSTICS`, off by default), now shown in the HTML report.
 None affect the ranking. The PlasEval-style dissimilarity (Q2) adds the split and join costs, and the extra and missing costs, per tool
 and sample (`dissim_split_cost`, `dissim_join_cost`, `dissim_extra_cost`, `dissim_missing_cost`), so a binner that over-merges plasmids can
-be told apart from one that over-fragments them even when their F1 is similar. The report table currently shows the split and join costs
-only; charts of all four parts are **Open**.
-**Evidence.** `test/test_report_replicon_quast.py`, `test/test_run_quast_diagnostics.py`, `test/test_bin_agreement.py`.
+be told apart from one that over-fragments them even when their F1 is similar. The report draws all four parts as charts (an error profile by tool, a tool-by-part grid, precision against recall, F1 against agreement
+with the truth, error composition per isolate, an isolate-by-tool grid and a tool-agreement matrix), beside the table of split and join costs.
+**Evidence.** `test/test_report_replicon_quast.py`, `test/test_run_quast_diagnostics.py`, `test/test_bin_agreement.py`, `test/test_report_fig_binerrors.py`.
 **Status.** Verified as diagnostics. A structural metric that feeds the ranking is **Open** by design.
 
 ---
@@ -370,6 +371,105 @@ number, NHS number, ward, bed number and similar. Age, sex and collection date a
 can identify a person; use de-identified metadata. Files committed before the upgrade stay tracked until `git rm --cached`.
 **Evidence.** `plasbench/gitops.py`; `test/test_study_git_data_rules.py`.
 **Status.** Fixed in v0.4.1. This is a safety net, not a substitute for governance of patient data.
+
+---
+
+## I. The PlasEval cohort and the comparison gate
+
+### Q31. How does PlasBench know its PlasEval-style scores match the original program on real data?
+**Answer.** It checks, wherever the original is installed, and says plainly when it has not. PlasBench's best-match scores and repeat-aware
+dissimilarity are reimplemented from the paper (the PlasEval repository has no licence, so none of its code is used or shipped). Three pieces
+test them against the original: the 59-case cross-check (Q2); the **`plaseval-ecoli53` cohort**, the paper's 53 *E. coli* isolates with their
+accessions and the paper's published ground truth and tool bins (`cohorts/plaseval_ecoli53/bins`, CC BY 4.0), scored by
+`plasbench plaseval-replication`; and the **comparison gate** (`python/plaseval_gate.py`, `RUN_PLASEVAL_GATE`), which in stage 6 runs the original
+on every pair of exported bins and compares dissimilarity and best-match precision, recall and F1. The verdict (PASS, FAIL, PARTIAL, NOT_RUN or
+NO_DATA) is written to `benchmark.plaseval_gate.json` and shown in the report. With `RUN_PLASEVAL_GATE=auto` (the default) it compares when the
+original is found and otherwise records NOT_RUN; with `on`, a missing original or a disagreement stops the run. It never changes a score.
+**What has and has not been measured.** PlasBench's own numbers on the paper's real bins exist (mean dissimilarity 0.253 MOB-recon, 0.316 gplas2,
+0.370 PlasBin-flow, 0.479 HyAsP at alpha 0.5; `docs/PLASEVAL_REPLICATION.md`). **Result against the original program (reference run, 16 Nov 2026, PlasEval commit 8238356, alpha 0.5):** on the paper's 53 isolates and four tools (212 isolate-tool pairs) the original finished 211 pairs and PlasBench's dissimilarity **agreed within 0.001 on 210 of them** (gplas2, HyAsP and MOB-recon on all 53 isolates each, differences 0.000000; PlasBin-flow on 51 of 52). There were **no disagreements**. One pair, EC_9226_3S1_D with PlasBin-flow (26 repeat families), differs by 0.003 (PlasBench 0.5415, original 0.5385): PlasBench's repeat search hit its call cap there, so its value is a stated upper bound, not an error. One pair, EC_9226_C5_H with PlasBin-flow, did not finish in the original within 900 s and is not compared. The original's answers are kept in `cohorts/plaseval_ecoli53/original_reference.tsv`. The tool order depends on the length exponent. **Confirm it yourself.** `python python/plaseval_replication.py --out-dir out` re-scores the cohort and writes `out/plaseval_replication.html`; its section *Comparison with the original PlasEval program* shows the verdict, a per-tool table, the agreement scatter and the pairs not compared. Without a PlasEval checkout it compares with the recorded reference run (and says so on the page); with `--plaseval-src` it re-runs the original. The finished page from the reference run is `cohorts/plaseval_ecoli53/replication_report.html`.
+**Evidence.** `python/plaseval_gate.py`; `test/test_plaseval_gate.py` (every verdict, strict exit codes, the capped case, discovery);
+`test/test_plaseval_cohort.py` (cohort sheet consistent with the shipped data; replication on real bins); `docs/PLASEVAL_REPLICATION.md`.
+**Status.** Gate and cohort built and tested; gate result on real bins **Open**. The cohort is schema-validated only: its online NCBI check has not
+been run, its truth is a Unicycler hybrid built on the same reads (reference tier 3), and it covers one species.
+
+---
+
+## J. Reviewer questions on inputs and outputs (16 November 2026)
+
+Three questions came from reviewers about how PlasBench controls input quality, chooses an assembly and treats a tool that reports several
+sequences for one plasmid. The answers below say what already existed, what was added, what is provisional and what is still open. The full
+register of reviews and what validated each is in [docs/EXTERNAL_REVIEW_LOG.md](docs/EXTERNAL_REVIEW_LOG.md).
+
+### Q32. Can you choose the assembly?
+**Answer.** "The assembly" means two different things. **The reference assembly** (the truth) is chosen by evidence, not by preference: reference
+tiers, polish independence and evidence-checked labels decide whether it enters the primary analysis (Q3, Q6). **The input assembly** (what the
+tools run on) was chosen only by the `ASSEMBLER` setting (`spades` or `unicycler`). It is now chosen by a declared policy from evidence about the
+assembly itself, never from the truth or a score (`python/assembly_selection.py`, stage 3):
+- every candidate is measured and kept (contigs, N50, L50, largest contig, total length, GC, bases in contigs of 1 kb and 10 kb or more, and, when
+  minimap2 and reads are available, the share of sampled reads that map to it) in `results/assembly_candidates.tsv`;
+- a candidate is **eligible** only if its total length is plausible for a bacterium plus plasmids (1 to 10 Mb by default) and, when measured, its
+  read support is at least 0.80;
+- policy `fixed` (default) selects the configured assembler if it is eligible; policy `quality` selects, among the eligible, the highest N50, then the
+  fewest contigs. When nothing is eligible **nothing is substituted silently**: the sample is reported as having no eligible assembly;
+- `ASSEMBLY_SELECTION_MODE=report` (default) records the choice and acts on nothing; `enforce` makes the choice the assembly the tools run on
+  and excludes a sample with no eligible assembly (status `rejected`, never scored as a tool failure); `ASSEMBLY_ALSO=unicycler` runs an extra
+  assembler as an alternative candidate. The report shows a QUAST-style comparison table with the selected assembly marked.
+**What this is not.** When assemblers are being *compared*, the right design is one input condition per assembler, not a selection. The
+alternatives are retained, but running every tool on every alternative assembly (a sensitivity analysis by assembler) is **Open**.
+**Evidence.** `python/assembly_selection.py`; `test/test_assembly_selection.py` (policies, no silent substitution, independence from any score
+column, read support on real alignments); `test/test_assembly_selection_stage.sh` (report, enforce, fixed, nothing eligible, off).
+**Status.** Implemented and tested. The size limits and the 0.80 read-support minimum are **provisional**: freeze them before the main
+benchmark. The default is report-only with the `fixed` policy, so existing runs are unchanged.
+
+### Q33. Is there QC of the short reads before the pipeline, and should poor reads be rejected?
+**Answer.** Before this change the pipeline trimmed with fastp (`MIN_READ_LEN`, adapters), checked that both read files existed and were non-empty,
+and flagged a mixed or oversized *assembly* afterwards (`assembly_qc_gate.py`, advisory). There was no decision about the reads themselves. Now
+`python/short_read_qc.py` measures each raw read pair before stage 3 and decides **PASS, WARN or REJECT**, with the reason recorded:
+- measured from a sample of the pairs (the total is exact for small files and an estimate, labelled, otherwise): file integrity, read pairs,
+  estimated depth, mean quality and Q20/Q30 share, median read length, GC and N fraction, adapter-carrying reads, duplicate pairs, read-name
+  synchrony between the two files, and a GC deviation when the expected GC is given;
+- an unreadable, truncated, empty or malformed file, or files with unequal read counts, is **always** rejected; every other metric has a warn and a
+  reject limit in `config/short_read_qc_thresholds.tsv`;
+- `SHORT_READ_QC_MODE=report` (default) records the decision and flags the sample but excludes only an integrity failure; `enforce` also excludes a
+  threshold REJECT (status `rejected`: not assembled, tools skipped as "short-read QC rejected", never scored as a tool failure); `off` skips it;
+- outputs: `results/short_read_qc.tsv`, `short_read_qc_status.tsv` and a MultiQC-style table in the report with a cohort PASS/WARN/REJECT summary.
+**Not done.** Taxonomic contamination screening (it needs a database; the table says `not_evaluated`), and an automatic with-and-without-warned-samples
+sensitivity analysis (the report gives the counts so it can be done).
+**Evidence.** `python/short_read_qc.py`; `test/test_short_read_qc.py` (good, warning-level and reject-level reads, every integrity failure, the
+shipped thresholds, and that every threshold row names a metric that is really measured); `test/test_short_read_qc_stage.sh` (stage 3 and stage 4
+in all three modes).
+**Status.** Implemented and tested. **The thresholds are provisional**: they are conservative starting points, not universal cut-offs. They must be set
+from pilot data on the intended platform and then frozen (mark every row `frozen`; the file's hash is written to every QC row) before the main
+benchmark. That is why `enforce` is not the default.
+
+### Q34. How is noise picked up when a tool reports more than one sequence for a plasmid?
+**Answer.** Already present: a one-to-one bin match (Hungarian), split and merge outcomes, per-plasmid recovery states, CPRR, and the predicted-sequence
+burden (`redundant_pred_bp`, unmapped and off-truth bases). What was missing was a candidate-level account. `python/candidate_multiplicity.py` (stage 5,
+descriptive) now accounts for **every predicted record**, using the scorer's own alignment filters. For each truth plasmid it separates
+- **best-candidate coverage** (the single best record),
+- **combined coverage** (the union of all records' alignments, so reference bases are counted once; it equals the base-level recall), and
+- **redundancy** (candidate-aligned bases that other candidates already cover, and its share);
+and it labels each candidate **primary**, **complementary fragment** (adds at least 10% new bases), **redundant** (adds almost nothing: a duplicate or an
+alternative reconstruction), **chimeric** (two replicons each carry at least 1 kb and 10% of its aligned bases), **off-target** (mostly chromosome)
+or **unmapped**, with an outcome per plasmid (single, fragmented, duplicated, fragmented and duplicated, missed). A worked case: three candidates of 60,
+35 and 30 kb on a 100 kb plasmid give 60% best coverage and 100% combined coverage, not 125%, with 35 kb redundant. The report draws each candidate as
+a track against the reference with a strip separating reference covered once, covered by several candidates, and not represented, and shows where
+each tool's predicted sequence went (unique plasmid, redundant, chromosome, unmapped).
+**It cannot be gamed.** The primary score is untouched: extra candidates do not raise it, and this table is where they show up.
+**Limits.** A candidate here is a predicted sequence record, so for a binner the bin-level view stays with the bin metrics. "Redundant" cannot tell
+a duplicate from an alternative reconstruction (alignment shows the overlap, not which). The 10%, 1 kb and 10% limits are provisional.
+**Evidence.** `python/candidate_multiplicity.py`; `test/test_candidate_multiplicity.py` (fragment, duplicate, alternative, chimera, off-target and
+unmapped candidates with hand-worked numbers; a tool that predicted nothing); `test/test_stage_dimensions.sh` (stages 5 and 6 on real alignments).
+**Status.** Implemented and tested on constructed cases and a stage run; not yet run on a real cohort.
+
+### Q35. What is done and what is open across the three?
+| Phase | Deliverable | Status |
+|---|---|---|
+| 1 Input QC | Short-read gate, thresholds file, QC tables, report table, pipeline enforcement | **Done** (default report-only; thresholds provisional) |
+| 2 Assembly | Candidate metrics, declared policy, selection recorded, alternatives kept | **Done**; running every tool on every alternative **Open** |
+| 3 Multiplicity | Candidate table, best versus combined versus redundancy, relationships, chimeric/off-target/unmapped | **Done** on constructed cases; real cohort **Open** |
+| 4 Reporting and validation | Three dashboards, synthetic fixtures, existing scores unchanged | **Done**; a documented with-and-without-flagged-samples analysis **Open** |
+Nothing here was tuned against which tool wins; freeze the thresholds before the main benchmark.
 
 ---
 
@@ -658,7 +758,7 @@ Still open, and why:
 3. **Independent audit of references, and read support for every truth replicon** (Q3, Q4): needs reads and curation.
 4. **External validation cohort and a coverage simulation for the intervals** (Q14).
 5. **Plasmid-free, hard-structure and taxonomically broader isolates** in the released cohorts (Q12, Part 2 section 18): data curation.
-6. **PlasEval on real data, and a first-class adapter** (Q2, Part 2 section 9): the repeat-aware dissimilarity is implemented and agrees with the original program on 59 constructed and random cases; agreement on the paper's 53 public *E. coli* isolates, charts of the four error parts, and an adapter that runs the original as a scorer need the data, compute and the external tool.
+6. **The result of the PlasEval comparison gate on the 53-isolate cohort, and a first-class adapter** (Q2, Q31): the cohort, the paper's bins, the gate and the error-profile charts are built and tested; on the cohort the original program finished 211 of 212 pairs and PlasBench agreed within 0.001 on 210 with no disagreement (Q31). Remaining: the one pair the original could not finish, and the paper's own printed figures.
 7. **Abstention rate, NGA50 and AMI**: no wrapped tool reports an explicit "unclassified" call, NGA50 needs contig-level
    misassembly breaks, and AMI's expected-information term is impractical over base counts. Contig-level classification
    (count-based and length-weighted precision, recall, F1 and MCC) is done; ambiguous contigs are excluded, not multi-assigned.

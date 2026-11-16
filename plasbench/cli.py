@@ -212,6 +212,7 @@ ANALYSES = {
     "stratify-recovery": ("stratify_recovery.py", "Per-plasmid recovery by replicon, MOB, size band and AMR carriage"),
     "rank-sensitivity": ("rank_sensitivity.py", "How much the ranking depends on scoring choices"),
     "bin-agreement": ("bin_agreement.py", "PlasEval-style best-match scores and split/join dissimilarity between bin sets"),
+    "plaseval-replication": ("plaseval_replication.py", "Score the PlasEval paper's published bins (53 E. coli isolates) with PlasBench and draw the error profile; optionally compare with the original program"),
     "assembly-adequacy": ("assembly_adequacy.py", "Whether each short-read assembly contains the plasmids it is judged against"),
     "copy-number": ("copy_number.py", "Tool versus truth plasmid copy number per matched bin"),
     "repeat-content": ("repeat_content.py", "K-mer repeat content of the truth replicons"),

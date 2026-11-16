@@ -715,6 +715,54 @@ export DISSIMILARITY_ALPHA="${DISSIMILARITY_ALPHA:-0.5}"
 #                          keeps the best pairing found and is marked capped in dissim_repeat_search.
 export DISSIMILARITY_REPEATS="${DISSIMILARITY_REPEATS:-aware}"
 export DISSIMILARITY_MAX_CALLS="${DISSIMILARITY_MAX_CALLS:-200000}"
+#   RUN_PLASEVAL_GATE      the comparison gate (python/plaseval_gate.py): runs the ORIGINAL PlasEval program on this run's exported
+#                          bins and compares it with PlasBench's reimplementation. auto (default) compares when the original is
+#                          found and otherwise records NOT_RUN; on also stops the run when it is missing or disagrees (use it for
+#                          the plaseval-ecoli53 replication cohort and on a machine that has the original); off skips it.
+#                          PLASEVAL_SRC is the src/ folder of a PlasEval checkout (found automatically in $DATA_DIR/tools/PlasEval,
+#                          ~/.local/share/plasbench/tools/PlasEval or ~/PlasEval; PlasEval has no licence, so it is never bundled).
+#                          PLASEVAL_PYTHON runs it (needs networkx, pandas, bidict, psutil); PLASEVAL_TIMEOUT is seconds per pair.
+#   SHORT_READ_QC_MODE     the short-read QC gate (python/short_read_qc.py), before assembly. report (default): measure, decide PASS, WARN or
+#                          REJECT and flag, but exclude only an integrity failure (unreadable, truncated, empty, malformed or unequal
+#                          files); enforce: also exclude a threshold REJECT (status `rejected`, never scored as a tool failure); off: skip.
+#                          SHORT_READ_QC_THRESHOLDS is the pre-registered threshold file (PROVISIONAL until frozen on pilot data; its hash
+#                          is written to every QC row). SHORT_READ_QC_MAX_PAIRS is the sampled read pairs; SHORT_READ_QC_GENOME_MB the
+#                          genome size for the depth estimate (5 Mb is assumed, and flagged, when empty).
+export SHORT_READ_QC_MODE="${SHORT_READ_QC_MODE:-report}"
+export SHORT_READ_QC_THRESHOLDS="${SHORT_READ_QC_THRESHOLDS:-$PROJECT_ROOT/config/short_read_qc_thresholds.tsv}"
+export SHORT_READ_QC_MAX_PAIRS="${SHORT_READ_QC_MAX_PAIRS:-200000}"
+export SHORT_READ_QC_GENOME_MB="${SHORT_READ_QC_GENOME_MB:-}"
+#   ASSEMBLY_SELECTION_MODE  which short-read assembly the tools run on (python/assembly_selection.py). Every candidate is measured (contigs,
+#                          N50, total length, GC, optional read support) and kept in results/assembly_candidates.tsv. report (default):
+#                          record the policy's choice and act on nothing; enforce: the chosen assembly is the one the tools run on, and
+#                          a sample with no eligible assembly is excluded (status `rejected`, nothing substituted silently); off: skip.
+#                          ASSEMBLY_SELECTION_POLICY: fixed (the configured ASSEMBLER) or quality (highest N50 among the eligible, then
+#                          fewest contigs). The policy never sees the truth or a score. ASSEMBLY_ALSO lists extra assemblers
+#                          (spades, unicycler) to run as alternatives beside the primary. Do not select when COMPARING assemblers: keep
+#                          each as its own input condition. Eligibility: total length in [ASSEMBLY_MIN_TOTAL_MB, ASSEMBLY_MAX_TOTAL_MB]
+#                          and read support >= ASSEMBLY_MIN_MAPPED_FRACTION (ASSEMBLY_READ_SUPPORT=1 maps a sample of the trimmed reads).
+export ASSEMBLY_SELECTION_MODE="${ASSEMBLY_SELECTION_MODE:-report}"
+export ASSEMBLY_SELECTION_POLICY="${ASSEMBLY_SELECTION_POLICY:-fixed}"
+export ASSEMBLY_ALSO="${ASSEMBLY_ALSO:-}"
+export ASSEMBLY_MIN_TOTAL_MB="${ASSEMBLY_MIN_TOTAL_MB:-1.0}"
+export ASSEMBLY_MAX_TOTAL_MB="${ASSEMBLY_MAX_TOTAL_MB:-10.0}"
+export ASSEMBLY_MIN_MAPPED_FRACTION="${ASSEMBLY_MIN_MAPPED_FRACTION:-0.80}"
+export ASSEMBLY_READ_SUPPORT="${ASSEMBLY_READ_SUPPORT:-1}"
+#   RUN_CANDIDATE_MULTIPLICITY  account for EVERY predicted record: per truth plasmid the number of candidates, the best candidate's
+#                          coverage, the combined (union) coverage, redundancy, and per candidate its relationship (primary,
+#                          complementary_fragment, redundant, chimeric, off_target, unmapped). Descriptive; never changes a score.
+#                          MULTIPLICITY_NEW_FRACTION: a candidate with less than this share of new bases is redundant (0.10).
+#                          MULTIPLICITY_CHIMERA_MIN_BP / _FRACTION: two replicons each carrying at least this much make it chimeric.
+export RUN_CANDIDATE_MULTIPLICITY="${RUN_CANDIDATE_MULTIPLICITY:-1}"
+export MULTIPLICITY_NEW_FRACTION="${MULTIPLICITY_NEW_FRACTION:-0.10}"
+export MULTIPLICITY_CHIMERA_MIN_BP="${MULTIPLICITY_CHIMERA_MIN_BP:-1000}"
+export MULTIPLICITY_CHIMERA_FRACTION="${MULTIPLICITY_CHIMERA_FRACTION:-0.10}"
+export RUN_PLASEVAL_GATE="${RUN_PLASEVAL_GATE:-auto}"
+export PLASEVAL_SRC="${PLASEVAL_SRC:-}"
+export PLASEVAL_PYTHON="${PLASEVAL_PYTHON:-python3}"
+export PLASEVAL_TIMEOUT="${PLASEVAL_TIMEOUT:-300}"
+export PLASEVAL_GATE_TOLERANCE="${PLASEVAL_GATE_TOLERANCE:-0.001}"
+export PLASEVAL_GATE_WORKERS="${PLASEVAL_GATE_WORKERS:-2}"
 export RUN_COPY_NUMBER="${RUN_COPY_NUMBER:-1}"
 export RUN_ASSEMBLY_ADEQUACY="${RUN_ASSEMBLY_ADEQUACY:-1}"
 export MIN_ASSEMBLY_ADEQUACY="${MIN_ASSEMBLY_ADEQUACY:-0.90}"

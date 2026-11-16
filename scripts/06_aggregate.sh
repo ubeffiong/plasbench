@@ -189,6 +189,14 @@ job_truth_depth_anomalies() {
     python3 "$HERE/../python/merge_tables.py" --results-dir "$DATA_DIR" --suffix "truth_depth_anomaly_summary.tsv" \
         --out "$RESULTS_DIR/benchmark.truth_depth_anomalies.tsv" || warn "could not merge truth depth-anomaly tables"
 }
+job_candidate_multiplicity() {
+    python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix .multiplicity.tsv \
+        --out "$RESULTS_DIR/benchmark.candidate_multiplicity.tsv" || warn "could not merge candidate-multiplicity tables"
+    python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix .multiplicity_candidates.tsv \
+        --out "$RESULTS_DIR/benchmark.candidates.tsv" || warn "could not merge the per-candidate tables"
+    python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix .multiplicity_intervals.tsv \
+        --out "$RESULTS_DIR/benchmark.candidate_intervals.tsv" || warn "could not merge the candidate-interval tables"
+}
 job_bin_agreement() {
     python3 "$HERE/../python/bin_agreement.py" matrix --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
         --alpha "$DISSIMILARITY_ALPHA" --repeats "$DISSIMILARITY_REPEATS" --max-calls "$DISSIMILARITY_MAX_CALLS" \
@@ -267,7 +275,21 @@ advisory_job job_dataset_features
 advisory_job job_database_provenance
 advisory_job job_truth_depth_anomalies
 [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]] && advisory_job job_bin_agreement
+[[ "${RUN_CANDIDATE_MULTIPLICITY:-1}" == "1" ]] && advisory_job job_candidate_multiplicity
 wait
+
+# The comparison gate runs after the other jobs: it needs the bins stage 5 exported and scores.tsv, and with RUN_PLASEVAL_GATE=on
+# its verdict can stop the run, so it is not a background job. auto compares when the original program is found, else records NOT_RUN.
+if [[ "${RUN_PLASEVAL_GATE:-auto}" != "off" && "${RUN_BIN_AGREEMENT:-1}" == "1" ]]; then
+    gate_status=0
+    python3 "$HERE/../python/plaseval_gate.py" results --results-dir "$RESULTS_DIR" --scores "$SCORES" \
+        --out-prefix "$RESULTS_DIR/benchmark.plaseval_gate" --data-dir "$DATA_DIR" --mode "${RUN_PLASEVAL_GATE:-auto}" \
+        --plaseval-src "${PLASEVAL_SRC:-}" --plaseval-python "${PLASEVAL_PYTHON:-python3}" --alpha "$DISSIMILARITY_ALPHA" \
+        --tolerance "$PLASEVAL_GATE_TOLERANCE" --timeout "$PLASEVAL_TIMEOUT" --workers "$PLASEVAL_GATE_WORKERS" || gate_status=$?
+    if [[ "$gate_status" -ne 0 ]]; then
+        die "PlasEval comparison gate (RUN_PLASEVAL_GATE=on) did not pass (exit $gate_status): see $RESULTS_DIR/benchmark.plaseval_gate.tsv"
+    fi
+fi
 
 if [[ "${COHORT_QC_FLAGS_ENABLED:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/flag_cohort_outliers.py" \
