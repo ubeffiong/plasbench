@@ -109,8 +109,9 @@ export FRAGMENT_SHARE="${FRAGMENT_SHARE:-0.20}"
 export MISSED_RECALL="${MISSED_RECALL:-0.50}"
 # Outcome states (stage 4): a failed run is retried TOOL_RETRIES times; an
 # infrastructure failure (exit 125/126/127, out of disk) is never scored.
-# TOOL_TIMEOUT_SECONDS (blank = no limit) is the same wall-time budget for
-# every tool; a run that exceeds it fails with exit 124 (resource failure).
+# TOOL_TIMEOUT_SECONDS is the same wall-time budget for every tool, per tool per isolate. Blank = no limit, the confirmed default (a limit scores a slow tool
+# zero, and large isolates or many tools make runs of many hours normal). Set one only to stop a truly stuck run, and make it generous (172800 = two days);
+# a run that exceeds it fails with exit 124 (resource failure).
 export TOOL_RETRIES="${TOOL_RETRIES:-1}"
 export TOOL_TIMEOUT_SECONDS="${TOOL_TIMEOUT_SECONDS:-}"
 # Recommender evaluation (python/evaluate_recommender.py, stage 6).
@@ -756,6 +757,11 @@ export RUN_CANDIDATE_MULTIPLICITY="${RUN_CANDIDATE_MULTIPLICITY:-1}"
 export MULTIPLICITY_NEW_FRACTION="${MULTIPLICITY_NEW_FRACTION:-0.10}"
 export MULTIPLICITY_CHIMERA_MIN_BP="${MULTIPLICITY_CHIMERA_MIN_BP:-1000}"
 export MULTIPLICITY_CHIMERA_FRACTION="${MULTIPLICITY_CHIMERA_FRACTION:-0.10}"
+export RUN_REFERENCE_EVIDENCE_AUDIT="${RUN_REFERENCE_EVIDENCE_AUDIT:-1}"   # per-isolate reference evidence audit (python/reference_evidence_audit.py)
+#   ASSEMBLER_SENSITIVITY_RUNS   "name=path/to/scores.tsv ..." of other runs of this cohort that differ only in the assembly; stage 6 then writes
+#                                benchmark.assembler_sensitivity.tsv/.html (python/assembler_sensitivity.py). Unset: skipped.
+export ASSEMBLER_SENSITIVITY_RUNS="${ASSEMBLER_SENSITIVITY_RUNS:-}"
+export RUN_RANKING_STABILITY="${RUN_RANKING_STABILITY:-1}"   # leave-one-study/species-out ranking stability (python/ranking_stability.py)
 export RUN_PLASEVAL_GATE="${RUN_PLASEVAL_GATE:-auto}"
 export PLASEVAL_SRC="${PLASEVAL_SRC:-}"
 export PLASEVAL_PYTHON="${PLASEVAL_PYTHON:-python3}"

@@ -1,0 +1,4 @@
+COHORT COMPOSITION WARNING: species below 20 isolates are described only, not in the species-balanced headline: Enterobacter hormaechei (18), Salmonella enterica (13)
+COHORT VALIDATION FAILED
+staphylococcus_aureus_samd00888980: NCBI verification failed: NCBI assembly report request failed after 4 attempt(s): <urlopen error [Errno 11001] getaddrinfo failed>
+exit 1

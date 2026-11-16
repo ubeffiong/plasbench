@@ -217,6 +217,7 @@ ANALYSES = {
     "copy-number": ("copy_number.py", "Tool versus truth plasmid copy number per matched bin"),
     "repeat-content": ("repeat_content.py", "K-mer repeat content of the truth replicons"),
     "truth-depth-anomalies": ("truth_depth_anomalies.py", "Windows of unusual read depth on the truth reference"),
+    "prereg": ("prereg_admin.py", "List, confirm and change the pre-registered scoring decisions, with a record of who decided what and when"),
     "freeze-prereg": ("freeze_prereg.py", "Freeze (--write) or verify (--verify) the pre-registered scoring parameters"),
     "label-schemes": ("label_schemes.py", "Truth labels under the three labelling schemes (NCBI primary)"),
     "detect-dimers": ("detect_dimers.py", "Find (and optionally collapse) tandem-dimer truth plasmids"),

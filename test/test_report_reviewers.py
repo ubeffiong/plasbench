@@ -148,6 +148,30 @@ check("tool names are escaped in every figure and table",
 check("no plasmid with several candidates means no tracks and says so",
       "no tracks to draw" in rv.multiplicity_section([plasmids[2]], [candidates[5]], []))
 
+print("ranking stability section")
+summary = [{"analysis_track": "short_read", "evaluation_task": "binning_reconstruction", "n_isolates": "16", "n_studies": "3", "n_species": "2",
+            "largest_study": "S1", "largest_study_share": "0.625", "baseline_leader": "mob_recon", "study_leader_changes": "1", "study_leave_outs": "3",
+            "species_leader_changes": "0", "species_leave_outs": "2", "equal_study_leader": "gplas2_mob",
+            "verdict": "fragile: the leader changes in 2 leave-out(s); report the ranking with this caveat"}]
+leaves = [{"evaluation_task": "binning_reconstruction", "left_out": "S1", "isolates_removed": "10", "leader": "gplas2_mob", "kendall_tau": "-1.000",
+           "leader_changed": "yes"}]
+stab = rv.stability_section(summary, leaves, [])
+check("the table shows the verdict as a chip and the largest study's share", "rv-warn" in stab and "S1 (0.625)" in stab and "fragile" in stab)
+check("the leave-outs that change the leader are listed", "Leave-outs that change the leader" in stab and "gplas2_mob" in stab)
+check("a missing table says it was not run", "Not run" in rv.stability_section(None))
+check("a name is escaped", "<script>" not in rv.stability_section([dict(summary[0], largest_study="<script>x</script>")]))
+
+print("reference evidence section")
+audit_rows = [{"sample": "A1", "audit_status": "weak", "reference_tier": "3", "evaluation_independence": "dependent", "evidence_recorded": "1 of 6",
+               "audit_reasons": "short-read-first assembly", "headline_eligible": "no"},
+              {"sample": "B2", "audit_status": "strong", "reference_tier": "2", "evaluation_independence": "independent", "evidence_recorded": "6 of 6",
+               "audit_reasons": "", "headline_eligible": "yes"}]
+ref = rv.refaudit_section(audit_rows)
+check("the counts, the headline-eligible number and the reasons are shown, weakest first", "1 weak" in ref and "1 strong" in ref and "1 meet the headline" in ref
+      and ref.index("A1") < ref.index("B2") and "short-read-first assembly" in ref)
+check("a missing table says it was not run", "Not run" in rv.refaudit_section(None))
+check("a name is escaped", "<script>" not in rv.refaudit_section([dict(audit_rows[0], sample="<script>x</script>")]))
+
 print("injection")
 page = "<html><nav><a href='#recommendations'>Recommendations</a></nav><section id='recommendations'></section></html>"
 import tempfile

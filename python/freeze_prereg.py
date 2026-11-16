@@ -135,7 +135,7 @@ def main():
                          + (" ..." if len(open_rows) > 8 else "") + "). Confirm each value in config/prereg.tsv (status fixed), then freeze.")
     if args.write:
         lock = {"sha256": digest, "frozen_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-                "prereg_file": os.path.relpath(args.prereg, ROOT) if Path(args.prereg).resolve().is_relative_to(ROOT)
+                "prereg_file": os.path.relpath(args.prereg, ROOT).replace(os.sep, "/") if Path(args.prereg).resolve().is_relative_to(ROOT)
                 else args.prereg, "parameters": len(rows), "to_fix": to_fix, "proposed": proposed, "draft": bool(open_rows)}
         Path(args.lock).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
         print(f"[freeze_prereg] froze {len(rows)} parameter(s), sha256 {digest[:12]}..., "

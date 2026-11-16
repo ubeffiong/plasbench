@@ -75,8 +75,8 @@ def main():
     print("configuration")
     config = (ROOT / "config" / "config.sh").read_text(encoding="utf-8")
     prereg = (ROOT / "config" / "prereg.tsv").read_text(encoding="utf-8")
-    check("setting in config.sh, pre-registration (proposed), stage 6 and the manifest",
-          'HEADLINE_INDEPENDENCE="${HEADLINE_INDEPENDENCE:-independent}"' in config and any(l.startswith("headline_independence\t") and "\tproposed\t" in l for l in prereg.splitlines())
+    check("setting in config.sh, pre-registration (confirmed), stage 6 and the manifest",
+          'HEADLINE_INDEPENDENCE="${HEADLINE_INDEPENDENCE:-independent}"' in config and any(l.startswith("headline_independence\t") and "\tfixed\t" in l for l in prereg.splitlines())
           and "HEADLINE_INDEPENDENCE" in (ROOT / "scripts" / "06_aggregate.sh").read_text(encoding="utf-8") and "HEADLINE_INDEPENDENCE" in (ROOT / "python" / "write_manifest.py").read_text(encoding="utf-8"))
     print("ALL REFERENCE INDEPENDENCE TESTS PASSED" if ok else "REFERENCE INDEPENDENCE TESTS FAILED")
     sys.exit(0 if ok else 1)

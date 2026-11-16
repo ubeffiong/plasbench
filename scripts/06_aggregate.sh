@@ -265,9 +265,17 @@ job_rank_sensitivity() {
         || warn "rank-sensitivity analysis failed; leaderboard is unaffected"
 }
 
+# Does the leaderboard survive removing one study or one species, or weighting every study equally?
+# (python/ranking_stability.py: benchmark.study_sensitivity.tsv, .species_sensitivity.tsv, .ranking_stability.tsv.)
+# Descriptive only. RUN_RANKING_STABILITY=0 skips it.
+job_ranking_stability() {
+    python3 "$HERE/../python/ranking_stability.py" --scores "$SCORES" --sample-sheet "$SAMPLE_SHEET"         --out-prefix "$RESULTS_DIR/benchmark"         || warn "ranking-stability analysis failed; leaderboard is unaffected"
+}
+
 # The two longest jobs start first.
 [[ "${RUN_RANK_SENSITIVITY:-1}" == "1" ]] && advisory_job job_rank_sensitivity
 [[ "${RUN_DIMENSION_ANALYSES:-1}" -eq 1 ]] && advisory_job job_dimension_analyses
+[[ "${RUN_RANKING_STABILITY:-1}" == "1" ]] && advisory_job job_ranking_stability
 advisory_job job_stratify_recovery
 advisory_job job_audit_truth_labels
 [[ "${RUN_ASSEMBLY_ADEQUACY:-1}" == "1" ]] && advisory_job job_assembly_adequacy
@@ -279,6 +287,23 @@ advisory_job job_truth_depth_anomalies
 [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]] && advisory_job job_bin_agreement
 [[ "${RUN_CANDIDATE_MULTIPLICITY:-1}" == "1" ]] && advisory_job job_candidate_multiplicity
 wait
+
+# One row per isolate on how far its reference can be trusted and why (python/reference_evidence_audit.py): joins the truth
+# provenance, repeat-content and depth-anomaly tables the jobs above wrote, so it runs after them. Descriptive only.
+# RUN_REFERENCE_EVIDENCE_AUDIT=0 skips it.
+wait
+if [[ "${RUN_REFERENCE_EVIDENCE_AUDIT:-1}" == "1" ]]; then
+    python3 "$HERE/../python/reference_evidence_audit.py" --results-dir "$RESULTS_DIR"         --max-tier "${HEADLINE_MAX_REFERENCE_TIER:-2}" --independence "${HEADLINE_REFERENCE_INDEPENDENCE:-independent}"         --out "$RESULTS_DIR/benchmark.reference_evidence_audit.tsv"         || warn "reference evidence audit was not written (no truth provenance table)"
+fi
+
+# Does the ranking depend on the assembly? (python/assembler_sensitivity.py.) Needs the scores.tsv of other runs of the same cohort that
+# differ only in the assembly; ASSEMBLER_SENSITIVITY_RUNS lists them as "name=path/to/scores.tsv" separated by spaces, and this run is the
+# first condition (named by ASSEMBLER_SENSITIVITY_NAME, default "this_run"). Unset: skipped. Descriptive only.
+if [[ -n "${ASSEMBLER_SENSITIVITY_RUNS:-}" ]]; then
+    sens_args=(--condition "${ASSEMBLER_SENSITIVITY_NAME:-this_run}=$SCORES")
+    for run_spec in $ASSEMBLER_SENSITIVITY_RUNS; do sens_args+=(--condition "$run_spec"); done
+    python3 "$HERE/../python/assembler_sensitivity.py" "${sens_args[@]}" --out-prefix "$RESULTS_DIR/benchmark"         --html "$RESULTS_DIR/benchmark.assembler_sensitivity.html"         || warn "assembler sensitivity analysis failed; the other results are unaffected"
+fi
 
 # The comparison gate runs after the other jobs: it needs the bins stage 5 exported and scores.tsv, and with RUN_PLASEVAL_GATE=on
 # its verdict can stop the run, so it is not a background job. auto compares when the original program is found, else records NOT_RUN.
