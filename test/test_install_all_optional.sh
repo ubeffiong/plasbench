@@ -22,6 +22,7 @@ EOF
 chmod +x "$TMP/bin/conda"
 
 run_all() {
+    [[ -n "${DEBUG_OUT:-}" && -f "$TMP/out" ]] && { echo "--- previous output:"; cat "$TMP/out"; }
     PATH="$TMP/bin:/usr/bin:/bin" CONDA_PREFIX="$TMP/conda/envs/plasbench" HEARTBEAT_DELAY_SECONDS=999 \
         PLASBENCH_ALL_PROFILES="$1" FAKE_FAIL="$2" bash "$ROOT/env/install_tools.sh" --env plasbench all > "$TMP/out" 2>&1
 }
