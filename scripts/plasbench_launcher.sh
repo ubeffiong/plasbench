@@ -75,4 +75,17 @@ if [ -z "$PY" ]; then
 fi
 
 cd "$HERE" || exit 1
-exec "$PY" -m plasbench --project-root "$HERE" ui "$@" >>"$LOG" 2>&1
+# Not `exec`: a desktop icon has no terminal, so when PlasBench cannot start (or stops unexpectedly) the person would see nothing at all. Say so, with the log to read.
+STARTED=$(date +%s)
+"$PY" -m plasbench --project-root "$HERE" ui "$@" >>"$LOG" 2>&1
+CODE=$?
+if [ "$CODE" -ne 0 ]; then
+  echo "PlasBench stopped with exit code $CODE after $(( $(date +%s) - STARTED )) s" >>"$LOG"
+  MSG="PlasBench could not start or stopped unexpectedly (exit code $CODE). Details: $LOG"
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send "PlasBench" "$MSG"
+  else
+    echo "$MSG" >&2
+  fi
+fi
+exit "$CODE"
