@@ -48,8 +48,9 @@ imported as a labelled, non-ranking cross-check (`plasbench import-external-benc
 with a BLASTN scoring (`python/compare_scoring_methods.py`).
 **Evidence.** `python/bin_agreement.py`; `test/test_plaseval_crosscheck.py`; `test/test_bin_agreement.py` (hand-computed repeat cases and a
 capped search); `docs/METHODS.md`, "External evaluator cross-checks".
-**Status.** Verified on constructed and random cases. **Open:** agreement on real data (the paper's 53 *E. coli* isolates are public) and a
-first-class adapter that runs the original program as a scorer. The dissimilarity is a secondary endpoint: it compares which contigs are in
+**Status.** Verified on constructed and random cases. The paper's 53 *E. coli* isolates ship as a cohort with the paper's published bins, and a
+comparison gate (Q31) repeats the check against the original program on real bins wherever it is installed; **Open:** the result of that
+comparison (it needs a machine that can run the original), and a first-class adapter that runs the original as the scorer. The dissimilarity is a secondary endpoint: it compares which contigs are in
 which bin, says nothing about sequence accuracy, and does not apply to tools that output reassembled sequences.
 
 ---
@@ -248,9 +249,9 @@ structural calls (`python/call_structural_variants.py`, deliberately `validated:
 QUAST diagnostics (`RUN_QUAST_DIAGNOSTICS`, off by default), now shown in the HTML report.
 None affect the ranking. The PlasEval-style dissimilarity (Q2) adds the split and join costs, and the extra and missing costs, per tool
 and sample (`dissim_split_cost`, `dissim_join_cost`, `dissim_extra_cost`, `dissim_missing_cost`), so a binner that over-merges plasmids can
-be told apart from one that over-fragments them even when their F1 is similar. The report table currently shows the split and join costs
-only; charts of all four parts are **Open**.
-**Evidence.** `test/test_report_replicon_quast.py`, `test/test_run_quast_diagnostics.py`, `test/test_bin_agreement.py`.
+be told apart from one that over-fragments them even when their F1 is similar. The report draws all four parts as charts (an error profile by tool, a tool-by-part grid, precision against recall, F1 against agreement
+with the truth, error composition per isolate, an isolate-by-tool grid and a tool-agreement matrix), beside the table of split and join costs.
+**Evidence.** `test/test_report_replicon_quast.py`, `test/test_run_quast_diagnostics.py`, `test/test_bin_agreement.py`, `test/test_report_fig_binerrors.py`.
 **Status.** Verified as diagnostics. A structural metric that feeds the ranking is **Open** by design.
 
 ---
@@ -370,6 +371,29 @@ number, NHS number, ward, bed number and similar. Age, sex and collection date a
 can identify a person; use de-identified metadata. Files committed before the upgrade stay tracked until `git rm --cached`.
 **Evidence.** `plasbench/gitops.py`; `test/test_study_git_data_rules.py`.
 **Status.** Fixed in v0.4.1. This is a safety net, not a substitute for governance of patient data.
+
+---
+
+## I. The PlasEval cohort and the comparison gate
+
+### Q31. How does PlasBench know its PlasEval-style scores match the original program on real data?
+**Answer.** It checks, wherever the original is installed, and says plainly when it has not. PlasBench's best-match scores and repeat-aware
+dissimilarity are reimplemented from the paper (the PlasEval repository has no licence, so none of its code is used or shipped). Three pieces
+test them against the original: the 59-case cross-check (Q2); the **`plaseval-ecoli53` cohort**, the paper's 53 *E. coli* isolates with their
+accessions and the paper's published ground truth and tool bins (`cohorts/plaseval_ecoli53/bins`, CC BY 4.0), scored by
+`plasbench plaseval-replication`; and the **comparison gate** (`python/plaseval_gate.py`, `RUN_PLASEVAL_GATE`), which in stage 6 runs the original
+on every pair of exported bins and compares dissimilarity and best-match precision, recall and F1. The verdict (PASS, FAIL, PARTIAL, NOT_RUN or
+NO_DATA) is written to `benchmark.plaseval_gate.json` and shown in the report. With `RUN_PLASEVAL_GATE=auto` (the default) it compares when the
+original is found and otherwise records NOT_RUN; with `on`, a missing original or a disagreement stops the run. It never changes a score.
+**What has and has not been measured.** PlasBench's own numbers on the paper's real bins exist (mean dissimilarity 0.253 MOB-recon, 0.316 gplas2,
+0.370 PlasBin-flow, 0.479 HyAsP at alpha 0.5; `docs/PLASEVAL_REPLICATION.md`). They have **not yet been compared with the original program on
+those bins**, because the original's search is slow in pure Python on the largest repeat families and was not run here. That comparison is the
+open result, to be revisited on a computer that can run it. Two searches hit PlasBench's call cap and are upper bounds, and the tool order
+depends on the length exponent.
+**Evidence.** `python/plaseval_gate.py`; `test/test_plaseval_gate.py` (every verdict, strict exit codes, the capped case, discovery);
+`test/test_plaseval_cohort.py` (cohort sheet consistent with the shipped data; replication on real bins); `docs/PLASEVAL_REPLICATION.md`.
+**Status.** Gate and cohort built and tested; gate result on real bins **Open**. The cohort is schema-validated only: its online NCBI check has not
+been run, its truth is a Unicycler hybrid built on the same reads (reference tier 3), and it covers one species.
 
 ---
 
@@ -658,7 +682,7 @@ Still open, and why:
 3. **Independent audit of references, and read support for every truth replicon** (Q3, Q4): needs reads and curation.
 4. **External validation cohort and a coverage simulation for the intervals** (Q14).
 5. **Plasmid-free, hard-structure and taxonomically broader isolates** in the released cohorts (Q12, Part 2 section 18): data curation.
-6. **PlasEval on real data, and a first-class adapter** (Q2, Part 2 section 9): the repeat-aware dissimilarity is implemented and agrees with the original program on 59 constructed and random cases; agreement on the paper's 53 public *E. coli* isolates, charts of the four error parts, and an adapter that runs the original as a scorer need the data, compute and the external tool.
+6. **The result of the PlasEval comparison gate on the 53-isolate cohort, and a first-class adapter** (Q2, Q31): the cohort, the paper's bins, the gate and the error-profile charts are built and tested; the gate needs the original program and a machine that can run it, and its result is to be revisited. Agreement is shown on 59 constructed and random cases.
 7. **Abstention rate, NGA50 and AMI**: no wrapped tool reports an explicit "unclassified" call, NGA50 needs contig-level
    misassembly breaks, and AMI's expected-information term is impractical over base counts. Contig-level classification
    (count-based and length-weighted precision, recall, F1 and MCC) is done; ambiguous contigs are excluded, not multi-assigned.

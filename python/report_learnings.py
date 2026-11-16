@@ -68,7 +68,39 @@ def per_tool(scores):
     return dict(sorted(groups.items()))
 
 
-def agreement_section(scores, matrix):
+def gate_card(gate):
+    """The comparison-gate verdict: PlasBench against the original PlasEval program on this run's bins."""
+    summary, rows = (gate or (None, None))
+    if not summary:
+        return note("PlasEval comparison gate: no verdict was written (RUN_PLASEVAL_GATE=off, an older stage 6, or the run stopped "
+                    "before it).")
+    status = summary.get("status", "")
+    counts = summary.get("counts") or {}
+    detail = ", ".join(f"{n} {k.replace('_', ' ')}" for k, n in sorted(counts.items())) or "no pairs"
+    worst = summary.get("max_abs_difference")
+    head = (f"PlasEval comparison gate: <strong>{esc(status)}</strong>. Tolerance {esc(summary.get('tolerance'))}; "
+            f"{esc(summary.get('pairs'))} isolate-tool pair(s) ({esc(detail)})"
+            + (f"; largest dissimilarity difference {worst:.6f}" if worst is not None else "")
+            + (f"; original program at commit {esc(summary['original_commit'])}" if summary.get("original_commit") else "") + ".")
+    if status == "PASS":
+        text = head + (" PlasBench's reimplementation and the original program agree on the dissimilarity and the best-match "
+                       "scores of every compared pair, on this run's real bins.")
+    elif status == "FAIL":
+        bad = [r for r in (rows or []) if r.get("status") == "disagree"]
+        text = head + (" At least one pair disagrees: treat PlasBench's dissimilarity as unverified for this run and report it. "
+                       "Disagreeing pairs: " + "; ".join(f"{esc(r['sample'])} / {esc(r['tool'])} ({esc(r['plasbench_dissimilarity'])} "
+                                                         f"vs {esc(r['original_dissimilarity'])})" for r in bad[:10]) + ".")
+    elif status == "PARTIAL":
+        text = head + " Pairs that could be compared agree; the others timed out or failed in the original program."
+    elif status == "NOT_RUN":
+        text = head + " Not run: " + esc(summary.get("reason") or "the original program was not available") + "."
+    else:
+        text = head
+    cls = "insight" if status == "PASS" else "insight caution"
+    return f"<div class='{cls}'><p>{text}</p></div>"
+
+
+def agreement_section(scores, matrix, gate=None):
     have = [r for r in (scores or []) if r.get("bestmatch_status") or r.get("dissim_status")]
     if not have:
         return section("learn-agreement", "Bin agreement (PlasEval-style)",
@@ -101,6 +133,11 @@ def agreement_section(scores, matrix):
             ["Tool A", "Tool B (or truth)", "Samples", "Mean dissimilarity"], mrows)
     else:
         body += note("Tool-vs-tool agreement not run: benchmark.tool_agreement.tsv was not produced.")
+    # The error profile: which kind of binning error each tool makes (extra, missing, over-merged, fragmented), drawn from
+    # the same columns. Descriptive only; it never changes a ranking.
+    import report_fig_binerrors
+    body += gate_card(gate)
+    body += "<h3>Error profile: what kind of error does each tool make?</h3>" + report_fig_binerrors.section_html(scores, matrix)
     return section("learn-agreement", "Bin agreement (PlasEval-style)",
                    "Reimplemented from PlasEval's published definitions: best-match precision, recall and F1, and a "
                    "length-weighted dissimilarity separating splits from joins. It cross-checks the one-to-one bin score and "
@@ -210,7 +247,13 @@ def plsmd_section(scores):
 def inject(page, results_dir, scores_path):
     scores = read_tsv(scores_path) or []
     r = lambda name: read_tsv(os.path.join(results_dir, "benchmark." + name + ".tsv"))  # noqa: E731
-    sections = (agreement_section(scores, r("tool_agreement")) + adequacy_section(r("assembly_adequacy"))
+    gate_json = os.path.join(results_dir, "benchmark.plaseval_gate.json")
+    gate = None
+    if os.path.isfile(gate_json):
+        import json
+        with open(gate_json, encoding="utf-8") as handle:
+            gate = (json.load(handle), r("plaseval_gate") or [])
+    sections = (agreement_section(scores, r("tool_agreement"), gate) + adequacy_section(r("assembly_adequacy"))
                 + copynumber_section(r("copy_number")) + truthqc_section(r("repeat_content"), r("truth_depth_anomalies"))
                 + plsmd_section(scores))
     anchor = "<section id='recommendations'>"
