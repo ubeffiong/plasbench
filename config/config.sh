@@ -795,6 +795,7 @@ export PLASBENCH_DOMINANT_FALLBACK="${PLASBENCH_DOMINANT_FALLBACK:-1}"
 # config/tool_database_releases.tsv; fixed_date compares every database-using tool with LEAKAGE_CUTOFF_DATE instead
 # (e.g. 2025-01-01, to ask "was this genome public before 2025?"). fixed_date needs LEAKAGE_CUTOFF_DATE as YYYY-MM-DD.
 export LEAKAGE_CUTOFF_POLICY="${LEAKAGE_CUTOFF_POLICY:-per_tool}"
+# LEAKAGE_CUTOFF_DATE: YYYY-MM-DD, used only when LEAKAGE_CUTOFF_POLICY=fixed_date (suggested 2025-01-01).
 export LEAKAGE_CUTOFF_DATE="${LEAKAGE_CUTOFF_DATE:-}"
 # LEAKAGE_DATE_BASIS: which date counts as "public": earliest_public (default; the earlier of the assembly release and the
 # first paired read run's year, read as 1 January), assembly, or read. Sheets without first_read_year behave as assembly.
