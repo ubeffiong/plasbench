@@ -109,21 +109,111 @@ def app_args(exe: str, url: str, geometry, profile: str) -> list:
     return args
 
 
-def open_app_window(url: str, profile_dir: Path, tab: bool = False) -> str:
-    """Open the window; returns a short description of what was opened."""
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except (PermissionError, OSError):
+        return True
+    return True
+
+
+def _pid_is_browser(pid: int, profile: str) -> bool:
+    """Is process `pid` a Chromium browser using this profile? (Linux /proc; elsewhere: assume yes when it is alive.)"""
+    try:
+        cmd = Path(f"/proc/{pid}/cmdline").read_bytes().decode("utf-8", "replace").replace("\0", " ").lower()
+    except OSError:
+        return _pid_alive(pid) and not Path("/proc").is_dir()
+    return any(n in cmd for n in ("chrome", "chromium", "edge")) and Path(profile).name.lower() in cmd
+
+
+def _read_lock(lock: Path) -> str:
+    """The "host-pid" a browser recorded in SingletonLock (a symlink), or "" when there is no such lock."""
+    try:
+        return os.readlink(lock) if lock.is_symlink() else ""
+    except OSError:
+        return ""
+
+
+def clear_stale_profile_locks(profile: str) -> list:
+    """Remove the lock files a crashed or killed Chromium browser left in the window's profile, and return what was removed.
+
+    On Linux and macOS a browser records its host and process id in <profile>/SingletonLock. If that process is gone, or the id now belongs to some other program (ids are reused),
+    the next start believes the profile is in use, hands the URL to a browser that does not exist and exits without opening anything: the icon seems to do nothing, however often it
+    is clicked. A lock whose process really is this browser is left alone."""
+    removed = []
+    base = Path(profile)
+    target = _read_lock(base / "SingletonLock")
+    if target:
+        pid = int(target.rsplit("-", 1)[-1]) if target.rsplit("-", 1)[-1].isdigit() else 0
+        if not pid or not _pid_alive(pid) or not _pid_is_browser(pid, str(base)):
+            for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+                try:
+                    (base / name).unlink()
+                    removed.append(name)
+                except OSError:
+                    pass
+    return removed
+
+
+def _launch(exe: str, url: str, profile: str, from_wsl: bool) -> subprocess.Popen:
+    if not from_wsl:
+        Path(profile).mkdir(parents=True, exist_ok=True)
+    args = app_args(exe, url, window_geometry(*screen_size()), profile)
+    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=os.name != "nt")
+
+
+def _wait_for_page(seen, since: float, seconds: float) -> bool:
+    import time
+    end = time.time() + seconds
+    while time.time() < end:
+        try:
+            if seen(since):
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(0.4)
+    return False
+
+
+def open_app_window(url: str, profile_dir: Path, tab: bool = False, seen=None, wait: float = 10.0) -> str:
+    """Open the window; returns a short description of what was opened.
+
+    With `seen` (a function: has the page loaded since this time?) the window is VERIFIED, and a launch that did not produce a window is retried a different way instead of being
+    repeated: 1. the app window, after clearing stale profile locks; 2. an app window with a fresh profile (a corrupt or locked profile cannot affect it); 3. the default browser in a
+    tab. The last line of the answer says which one worked, or that none did, with the address to open by hand. Without `seen` (a test) it launches once, as before."""
+    import time
     if not tab:
         exe, from_wsl = find_browser()
         if exe:
             profile = _windows_profile_dir() if from_wsl else str(profile_dir)
-            if not from_wsl:
-                Path(profile).mkdir(parents=True, exist_ok=True)
-            args = app_args(exe, url, window_geometry(*screen_size()), profile)
+            cleared = [] if from_wsl else clear_stale_profile_locks(profile)
+            note = f" (cleared stale profile locks: {', '.join(cleared)})" if cleared else ""
+            since = time.time()
             try:
-                subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
-                                 start_new_session=os.name != "nt")
-                return f"app window via {Path(exe).name}" + (" (Windows, from WSL)" if from_wsl else "")
+                _launch(exe, url, profile, from_wsl)
             except OSError:
-                pass
+                note += " (the browser could not be started)"
+            else:
+                if seen is None or _wait_for_page(seen, since, wait):
+                    return f"app window via {Path(exe).name}" + (" (Windows, from WSL)" if from_wsl else "") + note
+                note += " (no window appeared; trying a fresh profile)"
+            if not from_wsl:   # attempt 2: a profile that has never been used
+                fresh = str(Path(profile_dir).parent / f"{Path(profile_dir).name}-{int(time.time())}")
+                since = time.time()
+                try:
+                    _launch(exe, url, fresh, False)
+                    if seen is None or _wait_for_page(seen, since, wait):
+                        return f"app window via {Path(exe).name} with a fresh profile" + note
+                except OSError:
+                    pass
+                note += " (still no window; opening the default browser)"
+            since = time.time()
+            webbrowser.open(url)
+            if seen is None or _wait_for_page(seen, since, 6.0):
+                return "default browser" + note
+            return f"NO WINDOW APPEARED{note}. Open this address in a browser: {url}"
     if _in_wsl() and shutil.which("wslview"):
         subprocess.Popen(["wslview", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return "Windows default browser (wslview)"
