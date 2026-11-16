@@ -143,7 +143,7 @@ The importer only selects. `plasbench resolve-contributed-cohort` then checks ev
 This check cannot see base quality, adapters or pair integrity. Stage 3's `short_read_qc.py` does, on the downloaded
 reads, and can still exclude a sample. Then `plasbench validate-cohort --online --write-lock` verifies the final sheet.
 
-The design (decided 2026-11-16, `config/prereg.tsv` row `cohort_v4_design`, still `proposed`): 20 clusters for each of
+The design (decided 2026-11-16 on the project owner's instruction to take the decision; it is a cohort-selection choice, not a scoring decision, so it is not in `config/prereg.tsv`): 20 clusters for each of
 *E. coli*, *K. pneumoniae*, *S. enterica*, *S. aureus* and *E. hormaechei* (the species with at least 20 long-read-first
 clusters in the pool); at least 10 per species public on or after 2025-01-01 on the `earliest_public` basis and the
 rest older, so the leakage comparison has both arms in every species; one isolate per BioProject; long-read-first

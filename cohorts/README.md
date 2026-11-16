@@ -64,7 +64,7 @@ Known limitations, stated plainly:
 
 98 isolates selected from the contributed RefSeq/SRA pool (`candidates/contributed-refseq-sra/`) with
 `plasbench import-contributed-cohort` and `plasbench resolve-contributed-cohort`, then verified at NCBI
-(`validate-cohort --online`, lock `public-v4.lock.json`, all 98 passed). Every row is tier B (no source publication reviewed).
+(`validate-cohort --online`, lock `public-v4.lock.json`, all 98 passed). Every row is tier B (no source publication reviewed). The selection design (20 clusters per species, at least 10 recent, one per BioProject, long-read-first, seed 20260916) was decided on 2026-11-16 on the project owner's instruction to take the decision; it is a cohort choice and is not a pre-registered scoring decision.
 
 * **Species:** *E. coli* 20, *K. pneumoniae* 20, *S. enterica* 20, *S. aureus* 20, *E. hormaechei* 18. The pool had only 22
   long-read-first *E. hormaechei* clusters and 18 survived verification, so it stays below the headline's 20.
