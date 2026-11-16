@@ -200,7 +200,8 @@ page with every fold open and every note printed in full). Besides the leaderboa
 > The **[Scientific Guide](docs/SCIENTIFIC_GUIDE.md)** explains what PlasBench does, how it does it,
 > and why, in terms a microbiologist, bioinformatician, AMR scientist, programme lead or reviewer can
 > judge without reading the code. It states the scope plainly, defines every metric, lists what has
-> A sceptical outside assessment, with every claim tied to a file and line, is in the [independent review](docs/INDEPENDENT_REVIEW.md).
+> A sceptical outside assessment, with every claim tied to a file and line, is in the [independent review](docs/INDEPENDENT_REVIEW.md);
+> every review received and what validated each answer is in the [external review and validation log](docs/EXTERNAL_REVIEW_LOG.md).
 > and has not been validated, and tells each kind of expert how to check the claims themselves.
 
 **In one paragraph.** PlasBench benchmarks plasmid-*reconstruction* tools. For isolates that have a
@@ -289,7 +290,9 @@ cannot match. This table states only what was verified in their repositories and
   cross-check cases, 44 of them with repeated contigs (`test/test_plaseval_crosscheck.py`, run against a PlasEval checkout). That is
   agreement on small constructed and random cases, not on real data, and the original program remains the reference. The paper's 53 isolates ship as the `plaseval-ecoli53` cohort with the paper's published bins, and a
   comparison gate (`RUN_PLASEVAL_GATE`) repeats this check against the original program on every run where it is installed
-  (`docs/PLASEVAL_REPLICATION.md`); its result on those bins is still to be produced.
+  (`docs/PLASEVAL_REPLICATION.md`).
+  **Result against the original program (reference run, 16 Nov 2026, PlasEval commit 8238356, alpha 0.5):** on the paper's 53 isolates and four tools (212 isolate-tool pairs) the original finished 211 pairs and PlasBench's dissimilarity **agreed within 0.001 on 210 of them** (gplas2, HyAsP and MOB-recon on all 53 isolates each, differences 0.000000; PlasBin-flow on 51 of 52). There were **no disagreements**. One pair, EC_9226_3S1_D with PlasBin-flow (26 repeat families), differs by 0.003 (PlasBench 0.5415, original 0.5385): PlasBench's repeat search hit its call cap there, so its value is a stated upper bound, not an error. One pair, EC_9226_C5_H with PlasBin-flow, did not finish in the original within 900 s and is not compared. The original's answers are kept in `cohorts/plaseval_ecoli53/original_reference.tsv`.
+  **Confirm it yourself.** `python python/plaseval_replication.py --out-dir out` re-scores the cohort and writes `out/plaseval_replication.html`; its section *Comparison with the original PlasEval program* shows the verdict, a per-tool table, the agreement scatter and the pairs not compared. Without a PlasEval checkout it compares with the recorded reference run (and says so on the page); with `--plaseval-src` it re-runs the original. The finished page from the reference run is `cohorts/plaseval_ecoli53/replication_report.html`.
 - **plsMD reconstructs** ordered, overlap-trimmed plasmids from references and reports copy number and mob-typing for each; PlasBench only
   evaluates such output, and its plsMD wrapper has been tested with a stand-in binary, not the real tool.
 - **GAEMR is broader as assembly QC** (contamination screening by BLAST taxonomy, gap analysis, insert sizes). PlasBench takes a few of its
@@ -2383,6 +2386,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `discover-cohort` | Search NCBI for candidate complete-assembly/paired-Illumina pairs. | *`--organism`* (repeatable), `--country`, `--max-assemblies`, `--out-dir` |
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |
+| `import-contributed-cohort` | Select a seeded, one-per-read-BioProject candidate cohort from the contributed RefSeq/SRA pool (unverified until `validate-cohort --online`). | *`--out-dir`*, `--released-after`, `--released-before`, `--date-basis`, `--species`, `--max-clusters-per-species`, `--seed` |
 | `build-ledger` | Regenerate the cross-cohort BioSample dedup ledger from every `cohorts/*.lock.json`. | `--cohorts-dir`, `--out` |
 | `prepare-contribution` | Validate a new isolate and stage it on a local git branch, ready for a PR. | *`--cohort`*, *`--new-rows`*, *`--scores`*, `--tool-status` |
 | `select-candidates` | Recompute recommendations from an existing `scores.tsv` (what stage 6 calls internally). | `--scores`, `--samples`, `--results-dir`, `--min-samples`, `--min-coverage` |
@@ -2405,7 +2409,8 @@ write one by hand:
   appends a correctly-formed row to `config/local.tsv` for you.
 - **A cohort from public data:** `plasbench discover-cohort --organism "..."` followed by
   `plasbench curate-cohort` produces `accepted.tsv` in exactly this schema — see
-  [4.2](#42-build-a-cohort-of-your-own) for the full walkthrough.
+  [4.2](#42-build-a-cohort-of-your-own) for the full walkthrough. Offline, `plasbench import-contributed-cohort`
+  selects candidates from the shipped contributed pool (see `docs/COHORTS.md`); they still need `validate-cohort --online`.
 - **A cohort PlasBench already ships:** `cohorts/public-v1.tsv` and `cohorts/public-v2.tsv`
   are ordinary examples of this same schema — open either one directly to see real,
   filled-in rows.

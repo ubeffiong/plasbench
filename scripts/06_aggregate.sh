@@ -191,6 +191,14 @@ job_truth_depth_anomalies() {
     python3 "$HERE/../python/merge_tables.py" --results-dir "$DATA_DIR" --suffix "truth_depth_anomaly_summary.tsv" \
         --out "$RESULTS_DIR/benchmark.truth_depth_anomalies.tsv" || warn "could not merge truth depth-anomaly tables"
 }
+job_candidate_multiplicity() {
+    python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix .multiplicity.tsv \
+        --out "$RESULTS_DIR/benchmark.candidate_multiplicity.tsv" || warn "could not merge candidate-multiplicity tables"
+    python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix .multiplicity_candidates.tsv \
+        --out "$RESULTS_DIR/benchmark.candidates.tsv" || warn "could not merge the per-candidate tables"
+    python3 "$HERE/../python/merge_tables.py" --results-dir "$RESULTS_DIR" --suffix .multiplicity_intervals.tsv \
+        --out "$RESULTS_DIR/benchmark.candidate_intervals.tsv" || warn "could not merge the candidate-interval tables"
+}
 job_bin_agreement() {
     python3 "$HERE/../python/bin_agreement.py" matrix --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
         --alpha "$DISSIMILARITY_ALPHA" --repeats "$DISSIMILARITY_REPEATS" --max-calls "$DISSIMILARITY_MAX_CALLS" \
@@ -269,6 +277,7 @@ advisory_job job_dataset_features
 advisory_job job_database_provenance
 advisory_job job_truth_depth_anomalies
 [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]] && advisory_job job_bin_agreement
+[[ "${RUN_CANDIDATE_MULTIPLICITY:-1}" == "1" ]] && advisory_job job_candidate_multiplicity
 wait
 
 # The comparison gate runs after the other jobs: it needs the bins stage 5 exported and scores.tsv, and with RUN_PLASEVAL_GATE=on
