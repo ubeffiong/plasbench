@@ -73,8 +73,12 @@ def main():
     with open(ROOT / "config" / "prereg.tsv", newline="", encoding="utf-8") as handle:
         proposed = [r["parameter"] for r in csv.DictReader((l for l in handle if l.strip() and not l.startswith("#")), delimiter="\t") if r["status"] == "proposed"]
     named = [p for p in proposed if p in guide or p.replace("_", " ") in guide]
-    check("every proposed pre-registration row the documents rely on is named in the guide's limitation (none is mistaken for frozen)",
-          proposed and all(p in guide for p in ("primary_endpoint", "primary_endpoint_reassembly", "headline_independence", "dominant_study_share", "interval method")) and "await confirmation" in guide, proposed)
+    if proposed:   # a decision still awaiting confirmation must be named as such where a reader looks
+        check("every proposed pre-registration row is named in the guide's limitation (none is mistaken for frozen)",
+              all(p in guide for p in proposed) and "await confirmation" in guide, proposed)
+    else:          # every decision is confirmed: the documents must say so, and point to the record and to how to change one
+        check("every decision is confirmed, and the guide and README say so and point to the plain-language guide", "confirmed" in guide and "PREREGISTRATION.md" in guide and "PREREGISTRATION.md" in FLAT["README.md"]
+              and "await confirmation" not in guide and (ROOT / "config" / "prereg_decisions.tsv").is_file())
     for tier in tc.VALIDATION_TIERS:
         check(f"the guide or README names the validation tier {tier}", tier in FLAT["README.md"] or tier in guide or tier.replace("_", " ") in FLAT["README.md"] or tier.replace("_", " ") in guide)
 

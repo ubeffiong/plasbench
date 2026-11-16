@@ -167,6 +167,34 @@ class Project:
         path.write_text("\n".join(kept) + "\n", encoding="utf-8", newline="\n")
         return self.local_env()
 
+    # -- pre-registered scoring decisions (python/prereg_admin.py) --------------------------------------------------
+    def prereg_admin(self):
+        import importlib
+        python_dir = str(self.root / "python")
+        if python_dir not in sys.path:
+            sys.path.insert(0, python_dir)
+        return importlib.import_module("prereg_admin")
+
+    def prereg(self) -> dict:
+        """Every decision with its plain-language text, status, record and (for a setting) the value this computer is actually using, plus the lock state."""
+        admin = self.prereg_admin()
+        settings = {s["key"]: s for s in self.settings()}
+        local = self.local_env()
+        rows = []
+        for r in admin.load(self.root):
+            var = (r.get("config_variable") or "").strip()
+            current = None
+            if var:
+                current = local.get(var)
+                if current is None:
+                    current = os.environ.get(var)
+                if current is None:
+                    current = (settings.get(var) or {}).get("default")
+            rows.append({k: r[k] for k in ("parameter", "topic", "title", "meaning", "if_changed", "type", "choices", "where", "value", "status", "config_variable", "last_action",
+                                           "decided_on", "decided_by", "decision_reason", "note")} | {"current": current,
+                         "departs": bool(var and current is not None and str(current).strip() != str(r["value"]).strip() and not admin.freeze_prereg_equal(r["value"], current))})
+        return {"rows": rows, "status": admin.status(self.root), "topics": list(dict.fromkeys(r["topic"] for r in rows)), "history": admin.history(self.root)[-200:]}
+
     def setting(self, key: str, fallback: str = "") -> str:
         local = self.local_env()
         if os.environ.get(key):
@@ -998,6 +1026,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"checks": project.env_checks()})
             if route == "tools":
                 return self.jsend(200, {"tools": project.tools()})
+            if route == "prereg":
+                return self.jsend(200, project.prereg())
             if route == "settings":
                 return self.jsend(200, {"settings": project.settings_resolved(), "local_env": str(project.local_env_path())})
             if route == "cohorts":
@@ -1164,6 +1194,16 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "validate":
                 ok, message = ui_schema.validate_argv(data.get("argv") or [])
                 return self.jsend(200, {"ok": ok, "message": message})
+            if route == "prereg/set":
+                admin = project.prereg_admin()
+                entry = admin.set_value(project.root, str(data.get("parameter", "")), str(data.get("value", "")), str(data.get("reason", "")), str(data.get("by", "")))
+                session_log().event("prereg_changed", parameter=entry["parameter"], old=entry["old_value"], new=entry["new_value"], by=entry["decided_by"])
+                return self.jsend(200, {"entry": entry, **project.prereg()})
+            if route == "prereg/lock":
+                admin = project.prereg_admin()
+                admin.lock(project.root)
+                session_log().event("prereg_locked")
+                return self.jsend(200, project.prereg())
             if route == "settings":
                 changes = data.get("changes") or {}
                 if not isinstance(changes, dict):

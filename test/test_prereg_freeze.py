@@ -98,8 +98,9 @@ def main():
 
     shipped = freeze_prereg.read_rows(ROOT / "config" / "prereg.tsv")
     names = {r["parameter"]: r for r in shipped}
-    assert names["tool_timeout_seconds"]["status"] == "proposed" and names["tool_timeout_seconds"]["value"] == "7200"
-    assert "rationale" in names["tool_timeout_seconds"]["note"].lower() or "proposed" in names["tool_timeout_seconds"]["note"].lower()
+    # confirmed by the project owner on 16 November 2026 (config/prereg_decisions.tsv): the decision is fixed and the program's default follows it
+    assert names["tool_timeout_seconds"]["status"] == "fixed" and names["tool_timeout_seconds"]["value"] == "7200"
+    assert 'TOOL_TIMEOUT_SECONDS:-7200' in (ROOT / "config" / "config.sh").read_text(encoding="utf-8")
     # second review, 11C: no truth variant set exists, so A4/C2 are resolved as unavailable (no invented threshold), not left TO_FIX
     assert names["scorecard_bands_A4_C2"]["status"] == "unavailable" and "no independent truth variant set" in names["scorecard_bands_A4_C2"]["value"]
     assert not [r for r in shipped if r["status"] == "TO_FIX"], "nothing is left TO_FIX"

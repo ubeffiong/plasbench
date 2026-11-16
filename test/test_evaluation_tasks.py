@@ -168,7 +168,8 @@ def main():
     pre = {r["parameter"]: r for r in read(ROOT / "config" / "prereg.tsv")}
     check("the pre-registration names an endpoint for each task and the old track-specific row is gone", "primary_endpoint_reassembly" in pre and "primary_endpoint_long_read" not in pre
           and "binning reconstruction" in pre["primary_endpoint"]["value"] and "sample_cprr" in pre["primary_endpoint_reassembly"]["value"])
-    check("the revised endpoints are proposed, not fixed, until confirmed (a frozen plan must not silently change)", pre["primary_endpoint"]["status"] == "proposed" and pre["primary_endpoint_reassembly"]["status"] == "proposed")
+    check("the task endpoints are confirmed decisions (fixed), with a dated record of who confirmed them", pre["primary_endpoint"]["status"] == "fixed" and pre["primary_endpoint_reassembly"]["status"] == "fixed"
+          and "primary_endpoint_reassembly\tconfirmed" in (ROOT / "config" / "prereg_decisions.tsv").read_text(encoding="utf-8").replace("2026-11-16\t", ""))
     ui = (ROOT / "plasbench" / "data" / "ui.html").read_text(encoding="utf-8")
     check("the setup window offers the three tasks", all(t in ui for t in tc.EVALUATION_TASKS) and 'select:binning_reconstruction|sequence_reassembly|classification' in ui)
     demo = ROOT / "results_demo" / "benchmark.leaderboard.tsv"
