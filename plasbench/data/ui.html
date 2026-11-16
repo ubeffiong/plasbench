@@ -292,6 +292,26 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 .runtoast .rt-bar::after{content:"";position:absolute;top:0;bottom:0;width:35%;background:var(--primary);border-radius:3px;animation:rtslide 1.4s ease-in-out infinite}
 @keyframes rtspin{to{transform:rotate(360deg)}}@keyframes rtslide{0%{left:-35%}100%{left:100%}}
 @media (prefers-reduced-motion:reduce){.runtoast .rt-spin{animation:none;border-top-color:var(--line);border-right-color:var(--primary)}.runtoast .rt-bar::after{animation:none;width:100%;opacity:.5}}
+/* run sessions */
+.sess{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:10px 12px;margin-bottom:8px}
+.sess.ongoing{border-left-color:var(--primary)}.sess.attention{border-left-color:var(--bad)}.sess.completed{border-left-color:var(--ok)}
+.sess .sh{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.sess h4{margin:0;font-size:14px}
+.sess h4 .badge{display:inline-block;vertical-align:middle;margin-left:8px;padding:1px 8px;height:auto;min-width:0;line-height:18px;border-radius:10px;font-weight:600}
+.sess .sm{color:var(--muted);font-size:12px;margin-top:2px;display:flex;gap:12px;flex-wrap:wrap}
+.sess .sbar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:8px 0 4px;position:relative}
+.sess .sbar i{display:block;height:100%;background:var(--primary);border-radius:3px;transition:width .6s ease}
+.sess .sbar.ind i{position:absolute;width:35%;animation:rtslide 1.4s ease-in-out infinite}
+.sess.completed .sbar i{background:var(--ok)}.sess.attention .sbar i{background:var(--bad)}
+.sess .last{font-family:var(--mono,monospace);font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sess .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.sess .det{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px;font-size:12.5px}
+.sess .stg{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}.sess .stg span{padding:1px 8px;border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--muted)}
+.sess .stg span.d{border-color:var(--ok);color:var(--ok)}.sess .stg span.c{border-color:var(--primary);color:var(--primary);font-weight:600}
+#connbar{position:fixed;top:0;left:0;right:0;z-index:150;background:var(--warn-soft,#fff4d6);color:var(--fg);border-bottom:2px solid var(--warn,#b7791f);padding:8px 16px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:center}
+#connbar[hidden]{display:none}#connbar .rt-spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--warn,#b7791f);border-radius:50%;animation:rtspin .9s linear infinite}
+.runtoast.attn{border-left-color:var(--bad)}.runtoast.attn .rt-bar{display:none}.runtoast .rt-x{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+.runtoast .rt-act{margin-top:6px;display:flex;gap:6px}
+@media (prefers-reduced-motion:reduce){#connbar .rt-spin{animation:none}.sess .sbar.ind i{animation:none;width:100%;opacity:.4}}
 .toast .ico{margin-top:2px;color:var(--primary)}.toast.bad{border-left-color:var(--bad)}.toast.bad .ico{color:var(--bad)}.toast.ok{border-left-color:var(--ok)}.toast.ok .ico{color:var(--ok)}
 
 /* ---------- job console ---------- */
@@ -542,7 +562,7 @@ body.gd-open #gdrawer{transform:none}
   <button class="nav" data-view="isolates"><svg class="ico"><use href="#i-flask"/></svg><span class="t"><b>Your own isolates</b><small>Add FASTQ + reference</small></span></button>
   <button class="nav" data-view="cohorts"><svg class="ico"><use href="#i-users"/></svg><span class="t"><b>Cohorts</b><small id="s_cohorts">Bundled study sets</small></span></button>
   <h6>Results</h6>
-  <button class="nav" data-view="runs"><svg class="ico"><use href="#i-chart"/></svg><span class="t"><b>Runs &amp; reports</b><small id="s_runs">Finding results…</small></span></button>
+  <button class="nav" data-view="runs"><svg class="ico"><use href="#i-chart"/></svg><span class="t"><b>Runs &amp; reports</b><small id="s_runs">Finding results…</small></span><span class="badge bad" id="b_runs" hidden title="Runs that failed or were interrupted since you last looked">0</span></button>
   <button class="nav" data-view="jobs"><svg class="ico"><use href="#i-list"/></svg><span class="t"><b>Jobs</b><small id="s_jobs">Nothing running</small></span><span class="badge run" id="b_jobs" hidden></span></button>
   <h6>Advanced</h6>
   <button class="nav" data-view="git"><svg class="ico"><use href="#i-git"/></svg><span class="t"><b>Version control</b><small id="s_git">Git for your work</small></span><span class="badge" id="b_git" hidden></span></button>
@@ -733,8 +753,11 @@ body.gd-open #gdrawer{transform:none}
   <!-- RUNS ---------------------------------------------------------------------------------------- -->
   <section class="view" id="v_runs" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Results</div><h1>Runs &amp; reports</h1>
-    <p>Every results folder found in this installation, newest first, with the leader of each task. Open the interactive report, export a PDF, or rebuild the report after changing settings.</p></div>
+    <p>Your benchmark runs: the ones going now, the ones that failed or were interrupted (resume them: finished work is kept), and the completed ones with their reports. Below, every results folder found in this installation.</p></div>
     <div class="row"><button class="btn sec" id="runadd"><svg class="ico sm"><use href="#i-folder"/></svg>Add a results folder</button><button class="btn sec" id="runref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button></div></div>
+   <div class="card" id="sesscard" style="margin-bottom:14px"><div class="hd"><h3>Run sessions</h3><span class="mut small" id="sessnote"></span><div class="chips" id="sesstabs" role="tablist" aria-label="Run sessions"></div></div>
+    <div class="bd" id="sesslist"><div class="mut">Looking for runs…</div></div></div>
+   <h3 style="margin:14px 0 8px">Results folders</h3>
    <div class="card" id="runlist"><div class="bd mut">Looking for results…</div></div>
   </section>
 
@@ -946,6 +969,7 @@ fasta_glob = plasmid_*.fasta
 <dialog id="confirm"><div class="hd"><h3 id="cf_t">Run this command?</h3></div><div class="bd"><p id="cf_p" class="mut" style="margin-top:0"></p><div class="cmdline"><span class="p">$</span><code id="cf_cmd"></code></div></div>
  <div class="ft"><button class="btn sec" data-close>Cancel</button><button class="btn" id="cf_ok"><svg class="ico sm"><use href="#i-play"/></svg>Run</button></div></dialog>
 
+<div id="connbar" hidden role="status"><span class="rt-spin" aria-hidden="true"></span><span id="connmsg">Connection to PlasBench lost. Retrying… Your runs keep going in the background.</span></div>
 <div id="toasts" aria-live="polite"></div>
 
 <script>
@@ -966,14 +990,32 @@ async function api(path, body) {
   if (body !== undefined) { opt.method = "POST"; opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; }
   let r;
   try { r = await fetch("/api/" + path, opt); }
-  catch { sessionEnded("PlasBench is not running. Start it again with plasbench ui and open the link it prints."); throw new Error("PlasBench is not running"); }
+  catch { connLost(); throw new Error("PlasBench is not reachable (reconnecting)"); }
+  if (S.conn) connBack();
   if (r.status === 403 && !/request refused/.test(await r.clone().text())) {
-    sessionEnded("This window's session has ended (PlasBench was restarted). Open the new link printed by plasbench ui.");
+    sessionEnded("This window's session has ended (PlasBench was restarted). Open the new link printed by plasbench ui. Runs you started are not lost: they keep going without the window, and they are listed under Runs & reports > Run sessions.");
     throw new Error("session ended");
   }
   let data; try { data = await r.json(); } catch { data = {error: `HTTP ${r.status}`}; }
   if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
   return data;
+}
+/* A lost connection is not the end: show a banner and keep trying. Runs are detached from the server (plasbench/jobrunner.py), so nothing is lost while it is down. Only after
+   ~45 s without an answer does the full-screen notice appear, and it says how to get back to the runs. */
+function connLost() {
+  if (S.quit || S.conn) return;
+  S.conn = {since: Date.now(), timer: setInterval(connProbe, 2500)};
+  $("#connbar").hidden = false;
+}
+async function connProbe() {
+  try { const r = await fetch("/healthz", {cache: "no-store"}); if (r.ok) { connBack(true); return; } } catch {}
+  if (S.conn && Date.now() - S.conn.since > 45000)
+    sessionEnded("PlasBench is not running (the window that started it was closed, or the computer went to sleep). Start it again with plasbench ui and open the link it prints. Runs you started keep going without it, and they are listed under Runs & reports > Run sessions.");
+}
+function connBack(announce) {
+  if (!S.conn) return;
+  clearInterval(S.conn.timer); S.conn = null; $("#connbar").hidden = true;
+  if (announce) { toast("Reconnected to PlasBench", "ok"); refreshJobs(); }
 }
 function sessionEnded(msg) {
   if (S.quit || document.getElementById("ended")) return;
@@ -1010,7 +1052,7 @@ function route() {
   if (window.mtOnRoute) mtOnRoute(v);
   const sub = rest.join("/");
   ({home:loadHome, setup:loadSetup, tools:loadTools, addtool:loadAddTool, settings:loadSettings, wizard:loadWizard,
-    workspace:loadWorkspace, git:loadGit, isolates:loadIsolates, cohorts:loadCohorts, runs:loadRuns, jobs:renderJobs, commands:() => loadCommands(sub), help:() => loadHelp(sub)})[v]();
+    workspace:loadWorkspace, git:loadGit, isolates:loadIsolates, cohorts:loadCohorts, runs:() => { if (["ongoing", "attention", "completed", "all"].includes(sub)) S.sessTab = sub; loadRuns(); }, jobs:renderJobs, commands:() => loadCommands(sub), help:() => loadHelp(sub)})[v]();
 }
 document.addEventListener("click", e => {
   const g = e.target.closest("[data-go]"); if (g) { e.preventDefault(); go(g.dataset.go); }
@@ -1055,6 +1097,108 @@ async function startJob(argv, label, env) {
 /* ---- the persistent "benchmarking is running" toast ----
    A benchmark is a job whose command is `run` or `demo`. The toast is created once in #toasts, outside every page, so it is still there after navigating; it is driven by the
    job list (refreshJobs, every 4 s and right after a start) and its clock by a one-second tick, and it goes away when the last benchmark ends (the normal done/failed toast follows). */
+/* ---- run sessions: ongoing, needing attention (failed, interrupted, cancelled), completed ---- */
+S.sessions = []; S.sessTab = null; S.sessOpen = new Set();
+const SESS_TABS = [["ongoing", "Ongoing"], ["attention", "Needs attention"], ["completed", "Completed"], ["all", "All"]];
+const attnKey = "plasbench.seenAttention";
+const seenAttn = () => { try { return new Set(JSON.parse(localStorage.getItem(attnKey) || "[]")); } catch { return new Set(); } };
+const markSeen = ids => { try { const s = seenAttn(); ids.forEach(i => s.add(i)); localStorage.setItem(attnKey, JSON.stringify([...s].slice(-300))); } catch {} };
+async function refreshSessions() {
+  try { S.sessions = (await api("run-sessions")).sessions; } catch { return; }
+  renderSessions(); updateAttention();
+}
+const ago = t => { const d = Date.now() / 1000 - t; return d < 90 ? "just now" : d < 5400 ? `${Math.round(d / 60)} min ago` : d < 172800 ? `${Math.round(d / 3600)} h ago` : fmtTime(t); };
+function stageLine(s) {
+  const pr = s.progress || {};
+  if (!pr.known) return pr.last_line ? "" : "Waiting for output…";
+  const idx = pr.stages.findIndex(x => x.current), n = pr.stages.length;
+  const bits = [];
+  if (s.group === "completed") return `All ${n} stages done`;
+  if (idx >= 0) bits.push(`Stage ${idx + 1} of ${n}: ${pr.current_name}`);
+  else if (pr.done.length) bits.push(`${pr.done.length} of ${n} stages done`);
+  if (pr.isolates && pr.isolates_in_stage) bits.push(`isolate ${pr.isolates_in_stage} of ${pr.isolates}`);
+  return bits.join(" · ");
+}
+function sessCard(s) {
+  const pr = s.progress || {}, open = S.sessOpen.has(s.id);
+  const dur = fmtDur((s.ended || Date.now() / 1000) - s.started);
+  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : "Running", completed: "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
+  const pct = s.group === "completed" ? 100 : pr.percent;
+  const bar = s.group === "ongoing" && pct == null ? `<div class="sbar ind"><i></i></div>` : `<div class="sbar"><i style="width:${pct == null ? (s.group === "attention" ? 8 : 0) : pct}%"></i></div>`;
+  const run = s.run_index != null ? (S.runs || [])[s.run_index] : null;
+  const leaders = run && run.leaders && run.leaders.length ? "Leading: " + run.leaders.map(l => `${esc(l.display || l.tool)} <span class="mut">(${esc(l.task || "leader")})</span>`).join(", ") : "";
+  const why = s.group === "attention" ? (s.state === "interrupted" ? "Stopped without finishing (the computer or PlasBench went away)." : s.state === "cancelled" ? "Cancelled." : `Failed${s.exit != null ? ` (exit ${s.exit})` : ""}.`) : "";
+  const acts = [];
+  if (s.group === "ongoing") acts.push(`<button class="btn sec sm" data-sa="log">${icon("list")}Follow progress</button>`, s.state === "running" ? `<button class="btn danger sm" data-sa="cancel">Cancel</button>` : "");
+  if (s.group === "attention") acts.push(s.resumable ? `<button class="btn sm" data-sa="resume">${icon("play")}Resume</button>` : (s.resumed_by ? `<span class="mut small">Resumed in a newer run</span>` : ""),
+    `<button class="btn sec sm" data-sa="log">${icon("list")}Log</button>`, `<button class="btn ghost sm" data-sa="remove">Remove</button>`);
+  if (s.group === "completed") acts.push(s.run_index != null && run && run.report ? `<a class="btn sm" href="/view/${s.run_index}/benchmark.report.html" title="Open the report in a tab">${icon("chart")}Open report</a>` : `<span class="mut small">${s.argv[0] === "demo" || s.argv[0] === "run" ? "Report not found in the results folder" : ""}</span>`,
+    `<button class="btn sec sm" data-sa="log">${icon("list")}Log</button>`, s.argv[0] === "run" || s.argv[0] === "demo" ? `<button class="btn ghost sm" data-sa="rerun">${icon("refresh")}Run again</button>` : "");
+  if (s.results) acts.push(`<button class="btn ghost sm" data-sa="folder" title="${esc(s.results)}">${icon("folder")}Folder</button>`);
+  acts.push(`<button class="btn ghost sm" data-sa="details">${open ? "Hide details" : "Details"}</button>`);
+  const stages = pr.known ? `<div class="stg">${pr.stages.map(x => `<span class="${x.done ? "d" : x.current ? "c" : ""}">${x.done ? "✓ " : x.current ? "● " : ""}${esc(x.name)}</span>`).join("")}</div>` : "";
+  const detail = open ? `<div class="det">${stages}<div class="mut" style="margin-top:6px">Command</div><div class="mono small" style="word-break:break-all">${esc(s.command)}</div>
+    ${s.results ? `<div class="mut" style="margin-top:6px">Results folder</div><div class="mono small" style="word-break:break-all">${esc(s.results)}</div>` : ""}
+    ${s.resumes ? `<div class="mut" style="margin-top:6px">Resumes an earlier run (${esc(s.resumes)})</div>` : ""}${s.resumed_by ? `<div class="mut" style="margin-top:6px">Resumed as ${esc(s.resumed_by)}</div>` : ""}
+    <div class="mut" style="margin-top:6px">Started ${esc(fmtTime(s.started))}${s.ended ? ` · ended ${esc(fmtTime(s.ended))}` : ""}${s.reattached ? " · found again after PlasBench restarted" : ""}</div>
+    <div style="margin-top:6px"><button class="btn ghost sm" data-sa="copy">${icon("copy")}Copy command</button></div></div>` : "";
+  return `<div class="sess ${s.group}" data-id="${esc(s.id)}"><div class="sh"><div style="min-width:0"><h4>${esc(s.label)} <span class="badge ${s.group === "ongoing" ? "run" : s.group === "completed" ? "ok" : "bad"}">${chip}</span></h4>
+    <div class="sm"><span>${esc(ago(s.started))}</span><span>${esc(dur)}${s.group === "ongoing" ? " so far" : ""}</span>${leaders ? `<span>${leaders}</span>` : ""}${why ? `<span class="bad-t">${esc(why)}</span>` : ""}</div></div></div>
+    ${s.group === "completed" ? "" : bar}${stageLine(s) ? `<div class="small">${esc(stageLine(s))}${pct != null && s.group === "ongoing" ? ` · about ${pct}%` : ""}</div>` : ""}
+    ${s.group !== "completed" && pr.last_line ? `<div class="last" title="${esc(pr.last_line)}">${esc(pr.last_line)}</div>` : ""}
+    <div class="acts">${acts.filter(Boolean).join("")}</div>${detail}</div>`;
+}
+function renderSessions() {
+  if (!$("#sesslist")) return;
+  const by = g => S.sessions.filter(x => g === "all" || x.group === g), n = g => by(g).length;
+  if (!S.sessTab) S.sessTab = n("ongoing") ? "ongoing" : n("attention") ? "attention" : "completed";
+  $("#sesstabs").innerHTML = SESS_TABS.map(([k, l]) => `<button class="chip ${S.sessTab === k ? "on" : ""}" role="tab" aria-selected="${S.sessTab === k}" data-st="${k}">${l} (${n(k)})</button>`).join("");
+  $("#sessnote").textContent = n("ongoing") ? `${n("ongoing")} running now` : n("attention") ? `${n("attention")} need${n("attention") === 1 ? "s" : ""} attention` : "";
+  const list = by(S.sessTab);
+  $("#sesslist").innerHTML = list.length ? list.map(sessCard).join("") : `<div class="mut">${S.sessTab === "ongoing" ? "Nothing is running. Start one from New benchmark or run the demo." : S.sessTab === "attention" ? "No failed or interrupted runs." : S.sessTab === "completed" ? "No completed runs yet." : "No runs started from this window yet."}</div>`;
+  if ($("#v_runs") && !$("#v_runs").hidden) markSeen(S.sessions.filter(x => x.group === "attention").map(x => x.id));
+}
+document.addEventListener("click", async e => {
+  const t = e.target.closest("[data-st]");
+  if (t && $("#sesstabs").contains(t)) { S.sessTab = t.dataset.st; renderSessions(); return; }
+  const b = e.target.closest("[data-sa]"); if (!b || !$("#sesslist").contains(b)) return;
+  const id = b.closest(".sess").dataset.id, s = S.sessions.find(x => x.id === id); if (!s) return;
+  try {
+    switch (b.dataset.sa) {
+      case "log": showConsole(id, true); break;
+      case "cancel": if (confirm("Cancel this run? Finished work is kept and you can resume it later.")) { await api(`jobs/${id}/cancel`, {}); await refreshJobs(); refreshSessions(); } break;
+      case "resume": { const j = await api(`jobs/${id}/resume`, {}); toast(`Resumed: ${s.label}`, "ok"); S.sessTab = "ongoing"; await refreshJobs(); showConsole(j.id, true); refreshSessions(); break; }
+      case "rerun": confirmRun(s.argv, s.label.replace(/^Resumed: /, ""), s.env); break;
+      case "folder": await api("reveal", {path: s.results}); break;
+      case "remove": await api(`jobs/${id}/delete`, {}); refreshJobs(); refreshSessions(); break;
+      case "details": S.sessOpen.has(id) ? S.sessOpen.delete(id) : S.sessOpen.add(id); renderSessions(); break;
+      case "copy": navigator.clipboard.writeText(s.command); toast("Command copied"); break;
+    }
+  } catch (err) { toast(err.message, "bad"); }
+});
+/* A notice for runs that stopped while nobody was looking: shown once per run, with Resume one click away. */
+function updateAttention() {
+  const attn = S.sessions.filter(x => x.group === "attention" && (x.state === "interrupted" || x.state === "failed") && x.resumable);
+  const unseen = attn.filter(x => !seenAttn().has(x.id));
+  const badge = $("#b_runs"); if (badge) { badge.hidden = !unseen.length; badge.textContent = unseen.length; }
+  let el = document.getElementById("attntoast");
+  if (!unseen.length || ($("#v_runs") && !$("#v_runs").hidden)) { if (el) el.hidden = true; return; }
+  const first = unseen[0];
+  if (!el) {
+    el = document.createElement("div"); el.id = "attntoast"; el.className = "runtoast attn"; el.setAttribute("role", "alert");
+    el.innerHTML = `<button class="rt-x" aria-label="Dismiss" title="Dismiss">×</button><div class="rt-body"><div class="rt-title"></div><div class="rt-sub"></div><div class="rt-act"><button class="btn sm" data-at="resume">Resume</button><button class="btn sec sm" data-at="view">View runs</button></div></div>`;
+    el.onclick = ev => {
+      const a = ev.target.closest("[data-at]"), x = ev.target.closest(".rt-x"), cur = el._first;
+      if (x) { markSeen(el._ids); el.hidden = true; updateAttention(); }
+      else if (a && a.dataset.at === "view") { markSeen(el._ids); go("runs"); }
+      else if (a && a.dataset.at === "resume" && cur) { markSeen([cur.id]); api(`jobs/${cur.id}/resume`, {}).then(async j => { toast(`Resumed: ${cur.label}`, "ok"); await refreshJobs(); showConsole(j.id, true); refreshSessions(); }).catch(err => toast(err.message, "bad")); }
+    };
+    $("#toasts").append(el);
+  }
+  el._first = first; el._ids = unseen.map(x => x.id); el.hidden = false;
+  el.querySelector(".rt-title").textContent = unseen.length > 1 ? `${unseen.length} runs did not finish` : `A run did not finish`;
+  el.querySelector(".rt-sub").textContent = `${first.label} · ${first.state === "interrupted" ? "interrupted" : "failed"} ${ago(first.ended || first.started)}. Finished work is kept.`;
+}
 const isBenchArgv = argv => Array.isArray(argv) && ["run", "demo"].includes(argv[0]);
 const isBenchJob = j => isBenchArgv(j.argv) && (j.state === "running" || j.state === "cancelling");
 const fmtElapsed = sec => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), r = sec % 60; return h ? `${h}h ${String(m).padStart(2, "0")}m` : m ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`; };
@@ -1081,6 +1225,7 @@ setInterval(renderRunToast, 1000);
 async function refreshJobs() {
   try { S.jobs = (await api("jobs")).jobs; } catch { return; }
   renderRunToast();
+  if (!$("#v_runs").hidden || S.jobs.some(j => j.state === "running" || j.state === "cancelling") || !S.sessionsLoaded) { S.sessionsLoaded = true; refreshSessions(); }
   const running = S.jobs.filter(j => j.state === "running" || j.state === "cancelling");
   $("#jobpill").hidden = !running.length; $("#jobpilltx").textContent = `${running.length} job${running.length>1?"s":""} running`;
   $("#b_jobs").hidden = !running.length; $("#b_jobs").textContent = running.length;
@@ -1281,20 +1426,35 @@ $("#tsh").onchange = async e => {
 };
 $("#tclear").onclick = () => { $("#tlog").innerHTML = ""; };
 
+function askQuit(running) {
+  return new Promise(resolve => {
+    const d = document.createElement("dialog"); d.className = "card"; d.style.cssText = "max-width:480px;padding:0;border:1px solid var(--line)";
+    d.innerHTML = `<div class="hd">${icon("alert", "ico")}<h3>${running.length > 1 ? running.length + " runs are" : "A run is"} still going</h3></div>
+      <div class="bd"><p style="margin-top:0">${running.map(x => `<b>${esc(x)}</b>`).join("<br>")}</p>
+      <p><b>Quit and keep running</b> closes the window and PlasBench but leaves the run going in the background. Start PlasBench again to follow it; it is listed under Runs &amp; reports.</p>
+      <p><b>Stop and quit</b> cancels it. Finished work is kept, and you can resume the run later.</p></div>
+      <div class="ft"><button class="btn ghost" data-c="">Cancel</button><button class="btn danger" data-c="stop">Stop and quit</button><button class="btn" data-c="keep">Quit and keep running</button></div>`;
+    d.onclick = e => { const b = e.target.closest("[data-c]"); if (b) { d.close(); d.remove(); resolve(b.dataset.c); } };
+    d.oncancel = () => { d.remove(); resolve(""); };
+    document.body.append(d); d.showModal();
+  });
+}
 /* ---- Quit: stop PlasBench (the server) and close the window ---- */
 $("#quitbtn").onclick = async () => {
   if (!confirm("Quit PlasBench?\n\nThis stops PlasBench and closes the window. Your studies, results and settings are kept. Start it again from the desktop icon or with: plasbench ui")) return;
   try {
     let r = await api("shutdown", {});
     if (!r.ok) {
-      if (!confirm(`Still running:\n  ${r.running.join("\n  ")}\n\nStop ${r.running.length > 1 ? "them" : "it"} and quit?`)) return;
-      r = await api("shutdown", {force: true});
+      const choice = await askQuit(r.running);
+      if (!choice) return;
+      r = await api("shutdown", choice === "keep" ? {keep: true} : {force: true});
+      S.keptRuns = choice === "keep" ? r.running ? r.running.length : 1 : 0;
     }
   } catch (e) { toast(e.message, "bad"); return; }
   S.quit = true;
   document.body.innerHTML = `<div style="display:grid;place-items:center;height:100vh;font-family:system-ui;color:#3c4650;text-align:center">
     <div><svg viewBox="0 0 64 64" width="56" height="56"><use href="#pb-mark"/></svg><h2 style="font-weight:600;margin:12px 0 6px">PlasBench has stopped</h2>
-    <p>You can close this window. Start PlasBench again from its desktop icon or with <code>plasbench ui</code>.</p></div></div>` + document.querySelector("svg[aria-hidden]").outerHTML;
+    <p>${S.keptRuns ? "Your run keeps going in the background. " : ""}You can close this window. Start PlasBench again from its desktop icon or with <code>plasbench ui</code>${S.keptRuns ? " to follow it" : ""}.</p></div></div>` + document.querySelector("svg[aria-hidden]").outerHTML;
   setTimeout(() => window.close(), 600);
 };
 
@@ -2999,7 +3159,7 @@ function runBrief(r) {
 }
 window.reveal = async p => { try { await api("reveal", {path: p}); } catch (e) { toast(e.message, "bad"); } };
 async function loadRuns(force) {
-  try { const runs = await getRuns(true);
+  try { const runs = await getRuns(true); refreshSessions();
     $("#s_runs").textContent = runs.length ? `${runs.length} found` : "None yet";
     $("#runlist").innerHTML = runs.length ? runs.map(runRow).join("") : `<div class="bd"><div class="note info">${icon("info", "ico")}<div>No results yet. <a href="#" data-act="demo">Run the demo</a> to see a report in about a minute.</div></div></div>`;
   } catch (e) { toast(e.message, "bad"); }
