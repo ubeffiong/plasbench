@@ -233,12 +233,54 @@ def _matchings(ka, kb):
             yield [(i, perm[i]) for i in range(ka)]
 
 
-MAX_FAMILIES = 200   # deeper than this the search is not attempted (recursion depth); the first pairing is used
+MAX_FAMILIES = 400   # deeper than this the search is not attempted (recursion depth); the first pairing is used
+
+
+class _Cells:
+    """Split and join cost of a growing set of matched contig copies, kept incrementally.
+
+    Each (predicted bin, truth bin) cell holds the bp of the copies matched into it. A predicted bin pays the sum of its cells'
+    length^alpha minus the largest (its split cost); a truth bin pays the same over its cells (its join cost). Adding or removing
+    copies changes only the bins they touch, so a search node costs a few bins, not the whole instance."""
+
+    def __init__(self, alpha):
+        self.alpha = alpha
+        self.by_p, self.by_t = {}, {}
+        self.split = self.join = 0.0
+
+    def _cost(self, cells):
+        if not cells:
+            return 0.0
+        w = [v ** self.alpha for v in cells.values()]
+        return sum(w) - max(w)
+
+    def apply(self, items, sign):
+        before_p = {pb: self._cost(self.by_p.get(pb)) for pb, _, _ in items}
+        before_t = {tb: self._cost(self.by_t.get(tb)) for _, tb, _ in items}
+        for pb, tb, n in items:
+            v = self.by_p.get(pb, {}).get(tb, 0) + sign * n
+            if v:
+                self.by_p.setdefault(pb, {})[tb] = v
+                self.by_t.setdefault(tb, {})[pb] = v
+            else:
+                self.by_p[pb].pop(tb, None)
+                self.by_t[tb].pop(pb, None)
+        for pb, old in before_p.items():
+            self.split += self._cost(self.by_p.get(pb)) - old
+        for tb, old in before_t.items():
+            self.join += self._cost(self.by_t.get(tb)) - old
+
+    def total(self):
+        return self.split + self.join
 
 
 def dissimilarity_aware(pred_bins, truth, lengths, alpha=0.5, max_calls=200000):
     """Repeat-aware dissimilarity (PlasEval's definition). Returns the same dict as dissimilarity() plus
-    repeat_families, search ('none', 'exact' or 'capped') and calls."""
+    repeat_families, search ('none', 'exact' or 'capped') and calls.
+
+    The pairing of every repeat family that gives the lowest dissimilarity is found by branch and bound: adding contigs never
+    lowers the dissimilarity, so a partial pairing already costing as much as the best complete one is dropped. At each level the
+    cheapest pairing is tried first, so a good complete answer is found early and most of the tree is cut."""
     copies = ({}, {})
     for side, bins in enumerate((pred_bins, truth)):
         for b in sorted(bins):
@@ -258,17 +300,20 @@ def dissimilarity_aware(pred_bins, truth, lengths, alpha=0.5, max_calls=200000):
             else:
                 families.append((math.perm(max(len(pa), len(ta)), min(len(pa), len(ta))), c, pa, ta, lengths[c]))
     families.sort(key=lambda f: (f[0], f[1]))
-    # An upper bound first: the first pairing of every family. The search can only improve on it.
-    first = list(fixed)
+    state = _Cells(alpha)
+    state.apply(fixed, +1)
+    # The first pairing of every family is the starting upper bound; the search can only improve on it.
+    best_items = list(fixed)
     for _, _, pa, ta, n in families:
-        first.extend((pa[i], ta[j], n) for i, j in next(_matchings(len(pa), len(ta))))
-    best = _bin_costs(first, alpha)
+        best_items.extend((pa[i], ta[j], n) for i, j in next(_matchings(len(pa), len(ta))))
+    best = sum(_bin_costs(best_items, alpha))
     calls, capped = 0, len(families) > MAX_FAMILIES
-    items = list(fixed)
+    chosen = []
 
     def search(level):
-        nonlocal best, calls, capped
+        nonlocal best, best_items, calls, capped
         _, _, pa, ta, n = families[level]
+        options = []
         for m in _matchings(len(pa), len(ta)):
             if capped:
                 return
@@ -277,18 +322,26 @@ def dissimilarity_aware(pred_bins, truth, lengths, alpha=0.5, max_calls=200000):
                 capped = True
                 return
             added = [(pa[i], ta[j], n) for i, j in m]
-            items.extend(added)
-            s, j = _bin_costs(items, alpha)
-            if s + j < sum(best):          # a partial instance is a lower bound for every completion
-                if level + 1 == len(families):
-                    best = (s, j)
-                else:
-                    search(level + 1)
-            del items[-len(added):]
+            state.apply(added, +1)
+            options.append((state.total(), added))     # a partial pairing is a lower bound for every completion
+            state.apply(added, -1)
+        options.sort(key=lambda o: o[0])
+        for total, added in options:
+            if capped or total >= best - 1e-9:
+                continue
+            state.apply(added, +1)
+            chosen.append(added)
+            if level + 1 == len(families):
+                best = state.total()
+                best_items = list(fixed) + [item for group in chosen for item in group]
+            else:
+                search(level + 1)
+            chosen.pop()
+            state.apply(added, -1)
 
     if families and not capped:
         search(0)
-    split, join = best
+    split, join = _bin_costs(best_items, alpha)
     total = split + join + extra + missing
     return {"split": split, "join": join, "extra": extra, "missing": missing, "norm": norm,
             "dissim": 0.0 if norm == 0 else total / norm, "repeats_dropped": 0, "repeat_families": len(families),

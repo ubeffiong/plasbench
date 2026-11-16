@@ -1,0 +1,68 @@
+# PlasBench replication cohort: the 53 Escherichia coli isolates of the PlasEval paper
+# (Mane et al. 2024, BMC Bioinformatics 25:365, doi 10.1186/s12859-024-05941-0; data: Zenodo 10.5281/zenodo.10785150, CC BY 4.0).
+# Isolates are from Saskatchewan broiler farms (Sanderson et al. 2023, Microbiol Resour Announc 12:e0011023,
+# doi 10.1128/mra.00110-23; BioProject PRJNA912639). The accessions come from the paper's Ecoli_samples.csv.
+# assembly_plasmid_count is the number of plasmid bins in the ground truth released on Zenodo (184 over 53 isolates).
+# The paper's text reports 190 plasmids with a mean length of 48,365 bp; the released files give 184 bins with a mean of 48,908 bp,
+# so the two differ slightly (the released version may have been filtered). In the released truth 246 contigs sit in more than one bin.
+# Truth: Unicycler hybrid assemblies. Unicycler builds on the short-read graph and the same Illumina reads are the benchmark input,
+# so truth_assembly_strategy is short_read_first_hybrid and truth_polish_reads is same_as_benchmark: this cohort is a replication
+# panel for the binning comparison, not a headline panel (reference tier 3; base-level identity metrics do not apply).
+# long_read_sra_run is carried for provenance; it is not used for the default short-read benchmark.
+# NOT yet validated online: run  plasbench validate-cohort --samples cohorts/plaseval-ecoli53.tsv --online --write-lock
+# (needs your NCBI email) before citing a result. truth_quality_tier is B (no reviewed source study) until that review is done.
+
+sample_id	assembly_accession	sra_run	organism	truth_technology	truth_quality_tier	biosample	bioproject	sample_origin	read_depth_x	assembly_plasmid_count	source_study	truth_assembly_strategy	truth_polish_reads	long_read_sra_run
+EC_0012_3S1_D	GCA_027279255.1	SRR22784491	Escherichia coli	hybrid	B	SAMN32247291	PRJNA912639	broiler_farm		9	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784490
+EC_0012_C1_H	GCA_027274605.1	SRR22784446	Escherichia coli	hybrid	B	SAMN32247430	PRJNA912639	broiler_farm		5	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784445
+EC_0012_C5_H	GCA_027276285.1	SRR22784901	Escherichia coli	hybrid	B	SAMN32247353	PRJNA912639	broiler_farm		5	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784900
+EC_0038_1S2_D	GCA_027274885.1	SRR22784558	Escherichia coli	hybrid	B	SAMN32247466	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784557
+EC_0038_2L3_D	GCA_027276665.1	SRR22784612	Escherichia coli	hybrid	B	SAMN32247399	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784611
+EC_0038_3S2_D	GCA_027275225.1	SRR22784687	Escherichia coli	hybrid	B	SAMN32247508	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784686
+EC_0205_2L2_D	GCA_027273885.1	SRR22784582	Escherichia coli	hybrid	B	SAMN32247441	PRJNA912639	broiler_farm		9	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784581
+EC_0205_3H1_D	GCA_027276365.1	SRR22784734	Escherichia coli	hybrid	B	SAMN32247347	PRJNA912639	broiler_farm		5	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784733
+EC_0205_3S1_D	GCA_027275545.1	SRR22784620	Escherichia coli	hybrid	B	SAMN32247396	PRJNA912639	broiler_farm		5	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784619
+EC_0205_C4_H	GCA_027278085.1	SRR22784731	Escherichia coli	hybrid	B	SAMN32247348	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784730
+EC_0205_C9_H	GCA_027278365.1	SRR22784912	Escherichia coli	hybrid	B	SAMN32247335	PRJNA912639	broiler_farm		6	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784911
+EC_0731_1H1_D	GCA_027275325.1	SRR22784523	Escherichia coli	hybrid	B	SAMN32247496	PRJNA912639	broiler_farm		8	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784522
+EC_2655_2S2_D	GCA_027271665.1	SRR22784811	Escherichia coli	hybrid	B	SAMN32247519	PRJNA912639	broiler_farm		5	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784810
+EC_3862_S1_D	GCA_027279305.1	SRR22784959	Escherichia coli	hybrid	B	SAMN32247267	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784948
+EC_4957_C1_H	GCA_027278175.1	SRR22784738	Escherichia coli	hybrid	B	SAMN32247345	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784737
+EC_4957_C6_H	GCA_027274365.1	SRR22784805	Escherichia coli	hybrid	B	SAMN32247522	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784804
+EC_4984_6H1_D	GCA_027276155.1	SRR22784898	Escherichia coli	hybrid	B	SAMN32247354	PRJNA912639	broiler_farm		7	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784897
+EC_6041_C5_H	GCA_027274445.1	SRR22784528	Escherichia coli	hybrid	B	SAMN32247494	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784526
+EC_6041_C9_H	GCA_027279145.1	SRR22784489	Escherichia coli	hybrid	B	SAMN32247292	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784488
+EC_6245_1H1_D	GCA_027271385.1	SRR22784665	Escherichia coli	hybrid	B	SAMN32247518	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784664
+EC_6245_1S2_D	GCA_027279125.1	SRR22784494	Escherichia coli	hybrid	B	SAMN32247290	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784493
+EC_6245_2L1_D	GCA_027279365.1	SRR22784880	Escherichia coli	hybrid	B	SAMN32247272	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784655
+EC_6245_C4_H	GCA_027276685.1	SRR22784617	Escherichia coli	hybrid	B	SAMN32247397	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784616
+EC_6245_C5_H	GCA_027275385.1	SRR22784536	Escherichia coli	hybrid	B	SAMN32247476	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784535
+EC_7578_1L2_D	GCA_027278685.1	SRR22784962	Escherichia coli	hybrid	B	SAMN32247314	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784961
+EC_8630_1H1_D	GCA_027279285.1	SRR22784937	Escherichia coli	hybrid	B	SAMN32247268	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784926
+EC_8630_1S1_D	GCA_027273615.1	SRR22784431	Escherichia coli	hybrid	B	SAMN32247480	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784430
+EC_8630_3H2_D	GCA_027275235.1	SRR22784712	Escherichia coli	hybrid	B	SAMN32247411	PRJNA912639	broiler_farm		1	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784711
+EC_9226_1H3_D	GCA_027276575.1	SRR22784609	Escherichia coli	hybrid	B	SAMN32247400	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784608
+EC_9226_3S1_D	GCA_027273925.1	SRR22784576	Escherichia coli	hybrid	B	SAMN32247444	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784575
+EC_9226_C2_H	GCA_027275905.1	SRR22784659	Escherichia coli	hybrid	B	SAMN32247365	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784658
+EC_9226_C5_H	GCA_027278465.1	SRR22784932	Escherichia coli	hybrid	B	SAMN32247327	PRJNA912639	broiler_farm		6	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784931
+EC_9503_1H3_D	GCA_027274275.1	SRR22784530	Escherichia coli	hybrid	B	SAMN32247493	PRJNA912639	broiler_farm		1	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784529
+EC_9503_1L1_D	GCA_027274295.1	SRR22784693	Escherichia coli	hybrid	B	SAMN32247505	PRJNA912639	broiler_farm		1	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784692
+EC_9503_1S2_D	GCA_027278645.1	SRR22784775	Escherichia coli	hybrid	B	SAMN32247303	PRJNA912639	broiler_farm		1	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784774
+EC_9619_1H1_D	GCA_027274625.1	SRR22784457	Escherichia coli	hybrid	B	SAMN32247425	PRJNA912639	broiler_farm		1	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784456
+EC_9619_1H3_D	GCA_027274345.1	SRR22784803	Escherichia coli	hybrid	B	SAMN32247523	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784801
+EC_9619_C1_H	GCA_027271535.1	SRR22784781	Escherichia coli	hybrid	B	SAMN32247534	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784501
+EC_9619_C6_H	GCA_027278865.1	SRR22784763	Escherichia coli	hybrid	B	SAMN32247308	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784762
+EC_E11BE_1_E	GCA_027278395.1	SRR22784917	Escherichia coli	hybrid	B	SAMN32247333	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784916
+EC_E12DN_1_E	GCA_027273585.1	SRR22784538	Escherichia coli	hybrid	B	SAMN32247475	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784537
+EC_E12F_1_E	GCA_027274045.1	SRR22784842	Escherichia coli	hybrid	B	SAMN32247449	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784840
+EC_E12F_2_E	GCA_027273535.1	SRR22784413	Escherichia coli	hybrid	B	SAMN32247488	PRJNA912639	broiler_farm		1	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784412
+EC_E13DN_1_E	GCA_027278805.1	SRR22784771	Escherichia coli	hybrid	B	SAMN32247305	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784770
+EC_E13DN_4_E	GCA_027274325.1	SRR22784678	Escherichia coli	hybrid	B	SAMN32247512	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784677
+EC_E13FP_1_E	GCA_027276905.1	SRR22784601	Escherichia coli	hybrid	B	SAMN32247404	PRJNA912639	broiler_farm		5	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784600
+EC_E13L_1_E	GCA_027278965.1	SRR22784777	Escherichia coli	hybrid	B	SAMN32247302	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784776
+EC_E16BF_1_E	GCA_027274165.1	SRR22784671	Escherichia coli	hybrid	B	SAMN32247515	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784670
+EC_E4BF_2_E	GCA_027276125.1	SRR22784877	Escherichia coli	hybrid	B	SAMN32247363	PRJNA912639	broiler_farm		2	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784662
+EC_E5F_2_E	GCA_027274895.1	SRR22784547	Escherichia coli	hybrid	B	SAMN32247471	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784546
+EC_E8BE_1_E	GCA_027271405.1	SRR22784809	Escherichia coli	hybrid	B	SAMN32247520	PRJNA912639	broiler_farm		4	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784808
+EC_E8FP_1_E	GCA_027278635.1	SRR22784950	Escherichia coli	hybrid	B	SAMN32247319	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784949
+EC_E8L_1_E	GCA_027275065.1	SRR22784425	Escherichia coli	hybrid	B	SAMN32247483	PRJNA912639	broiler_farm		3	Sanderson_2023_broiler_Ecoli	short_read_first_hybrid	same_as_benchmark	SRR22784424
