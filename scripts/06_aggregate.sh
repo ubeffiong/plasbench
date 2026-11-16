@@ -191,7 +191,8 @@ job_truth_depth_anomalies() {
 }
 job_bin_agreement() {
     python3 "$HERE/../python/bin_agreement.py" matrix --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" \
-        --alpha "$DISSIMILARITY_ALPHA" --out "$RESULTS_DIR/benchmark.tool_agreement.tsv" \
+        --alpha "$DISSIMILARITY_ALPHA" --repeats "$DISSIMILARITY_REPEATS" --max-calls "$DISSIMILARITY_MAX_CALLS" \
+        --out "$RESULTS_DIR/benchmark.tool_agreement.tsv" \
         || warn "tool agreement matrix failed; the leaderboard is unaffected"
 }
 

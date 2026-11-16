@@ -141,8 +141,41 @@ def main():
         check("pure split a.5", near(ps5["split"], 300 ** 0.5) and near(ps5["dissim"], 300 ** 0.5 / norm5))
         pj = ba.dissimilarity(tb, {"P": {"a", "b", "c", "d"}}, lengths, 1.0)
         check("pure join", near(pj["join"], 300) and pj["split"] == 0 and near(pj["dissim"], 0.15))
-        rp = ba.dissimilarity({"P1": ["a", "b"], "P2": ["b", "c"]}, tb, lengths, 1.0)
-        check("repeats dropped", rp["repeats_dropped"] == 1)
+        rp = ba.dissimilarity({"P1": ["a", "b"], "P2": ["b", "c"]}, tb, lengths, 1.0, repeats="drop")
+        check("repeats dropped (drop mode)", rp["repeats_dropped"] == 1 and rp["search"] == "dropped")
+
+        # repeat-aware dissimilarity (PlasEval's definition), values worked out by hand at alpha 1
+        rl = {"a": 100, "b": 200, "r": 50}
+        # r sits in two predicted bins and one truth bin: one copy is extra, and the pairing that leaves the
+        # smaller cut wins (r with P2: truth plasmid joins 100 and 250, cost 100; r with P1 would cost 150)
+        ra = ba.dissimilarity({"P1": ["a", "r"], "P2": ["b", "r"]}, {"T1": ["a", "b", "r"]}, rl, 1.0)
+        check("repeat in prediction: extra copy, best pairing", near(ra["extra"], 50) and near(ra["join"], 100)
+              and near(ra["split"], 0) and near(ra["norm"], 750) and near(ra["dissim"], 0.2)
+              and ra["repeats_dropped"] == 0 and ra["repeat_families"] == 1 and ra["search"] == "exact")
+        rd = ba.dissimilarity({"P1": ["a", "r"], "P2": ["b", "r"]}, {"T1": ["a", "b", "r"]}, rl, 1.0, repeats="drop")
+        check("dropping the second copy scores differently (0.2143, not 0.2)", near(rd["dissim"], 150 / 700))
+        # crossed copies: P1 matches T2 and P2 matches T1 through the repeated contig; the first-copy pairing would
+        # score 0.1429, the right pairing scores 0
+        cross_p = {"P1": ["a", "r"], "P2": ["b", "r"]}
+        cross_t = {"T1": ["b", "r"], "T2": ["a", "r"]}
+        check("crossed repeat copies are paired correctly",
+              near(ba.dissimilarity(cross_p, cross_t, rl, 1.0)["dissim"], 0.0)
+              and near(ba.dissimilarity(cross_p, cross_t, rl, 1.0, repeats="drop")["dissim"], 100 / 700))
+        check("identical bins with repeats are 0", near(ba.dissimilarity(cross_p, cross_p, rl, 0.5)["dissim"], 0.0))
+        # a capped search says so, and never reports a lower dissimilarity than the exact one
+        many = {c: 100 + i for i, c in enumerate("abcdef")}
+        many_p = {"P1": ["a", "c", "e", "r1", "r2", "r3"], "P2": ["b", "d", "f", "r1", "r2", "r3"]}
+        many_t = {"T1": ["b", "d", "f", "r1", "r2", "r3"], "T2": ["a", "c", "e", "r1", "r2", "r3"]}
+        many.update({"r1": 40, "r2": 50, "r3": 60})
+        exact = ba.dissimilarity(many_p, many_t, many, 1.0)
+        capped = ba.dissimilarity(many_p, many_t, many, 1.0, max_calls=1)
+        check("exact search finds the perfect pairing across three repeat families",
+              exact["search"] == "exact" and exact["repeat_families"] == 3 and near(exact["dissim"], 0.0))
+        check("a capped search is labelled and not better than the exact one",
+              capped["search"] == "capped" and capped["dissim"] >= exact["dissim"] - 1e-12)
+        check("a capped search with no calls still returns the first pairing's value",
+              ba.dissimilarity(many_p, many_t, many, 1.0, max_calls=0)["search"] == "capped")
+        check("no repeats means no search", ba.dissimilarity({"P": ["a"]}, {"T": ["a"]}, rl)["search"] == "none")
         check("pairwise", near(ba.pairwise_dissimilarity({"P": ["a", "b", "c", "d"]}, tb, lengths, 1.0), 0.15))
 
         # CLI: eval, per-bin, dissim, export
@@ -163,8 +196,13 @@ def main():
         row = read_tsv(dout)[0]
         check("dissim cols", list(row) == ["sample", "tool", "dissim_status", "bin_dissimilarity",
                                            "dissim_split_cost", "dissim_join_cost", "dissim_extra_cost",
-                                           "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped"])
-        check("dissim value", row["bin_dissimilarity"] == "0.440000" and row["dissim_repeats_dropped"] == "0")
+                                           "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped",
+                                           "dissim_repeat_families", "dissim_repeat_search",
+                                           "bin_dissimilarity_alpha0", "bin_dissimilarity_alpha1"])
+        check("dissim value", row["bin_dissimilarity"] == "0.440000" and row["dissim_repeats_dropped"] == "0"
+              and row["dissim_repeat_search"] == "none" and row["dissim_repeat_families"] == "0")
+        check("alpha sensitivity columns are filled and differ from alpha 1",
+              row["bin_dissimilarity_alpha0"] != "" and row["bin_dissimilarity_alpha1"] == row["bin_dissimilarity"])
         for n in ("truth_bins", "pred_bins"):
             first = (tmp / ("exp.%s.tsv" % n)).read_text().splitlines()[0]
             check("export header " + n, first == "plasmid\tcontig\tcontig_len")
