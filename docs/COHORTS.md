@@ -126,6 +126,35 @@ clusters) and *K. pneumoniae* (22) reach 20 independent long-read-first clusters
 (122), *K. pneumoniae* (70), *S. enterica* (55), *S. aureus* (39) and *E. hormaechei* (22) do. Use an older
 comparison arm if more species are wanted.
 
+### From candidates to a verified cohort (public-v4)
+
+The importer only selects. `plasbench resolve-contributed-cohort` then checks every candidate at NCBI (it needs
+`NCBI_API_KEY`; export it or keep it in the ignored `.ncbi.env`) and does the **pre-download read-QC check**:
+
+* the assembly must be a Complete Genome that declares plasmid replicons and has a long-read platform in its
+  sequencing evidence; `truth_technology` becomes NCBI's derived value;
+* the row's BioProject is the SRA run's, and it must also be one of the assembly's BioProjects (the pool's own
+  `bioproject` is the RefSeq umbrella);
+* each listed run must be the same BioSample, ILLUMINA, PAIRED. Depth (bases / genome size), read pairs and mean read
+  length are estimated from SRA run-info and graded against `config/short_read_qc_thresholds.tsv`, the same provisional
+  limits the post-download gate uses: below `reject` the run is dropped, below `warn` it is kept and flagged. The best run
+  (pass before warn, then deepest) becomes `sra_run`; the rest stay in `alternate_paired_runs`.
+
+This check cannot see base quality, adapters or pair integrity. Stage 3's `short_read_qc.py` does, on the downloaded
+reads, and can still exclude a sample. Then `plasbench validate-cohort --online --write-lock` verifies the final sheet.
+
+The design (decided 2026-11-16, `config/prereg.tsv` row `cohort_v4_design`, still `proposed`): 20 clusters for each of
+*E. coli*, *K. pneumoniae*, *S. enterica*, *S. aureus* and *E. hormaechei* (the species with at least 20 long-read-first
+clusters in the pool); at least 10 per species public on or after 2025-01-01 on the `earliest_public` basis and the
+rest older, so the leakage comparison has both arms in every species; one isolate per BioProject; long-read-first
+truth only; seed 20260916. A species that cannot reach 20 is reported short, never padded.
+
+```bash
+plasbench import-contributed-cohort --arm recent --released-after 2025-01-01 --max-clusters-per-species 20   --species "Escherichia coli" --species "Klebsiella pneumoniae" --species "Salmonella enterica"   --species "Staphylococcus aureus" --species "Enterobacter hormaechei" --out-dir curation/v4/recent
+plasbench import-contributed-cohort --arm older --released-before 2024-12-31 --max-clusters-per-species 30   (same --species) --out-dir curation/v4/older
+plasbench resolve-contributed-cohort --candidates curation/v4/recent/candidates.tsv   --candidates curation/v4/older/candidates.tsv --out-dir curation/v4/resolved --cache curation/v4/resolve_cache.json
+```
+
 ## Candidate Review And Balance
 
 Keep raw discoveries as candidates. To detect study dependence and create a
@@ -152,6 +181,7 @@ apply identical evidence rules and differ only in curation grade. Read
 | [`public-v1.tsv`](../cohorts/public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](../cohorts/public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
 | [`public-v3.tsv`](../cohorts/public-v3.tsv) | 98 | 10 A + 88 B | the species-balanced headline design; recorded truth provenance |
+| [`public-v4.tsv`](../cohorts/public-v4.tsv) | 98 | all B | species-balanced, leakage-aware (recent and older arms); from the contributed pool, verified online; see [`cohorts/README.md`](../cohorts/README.md) |
 
 These are versioned **input cohort manifests**, not a substitute for released
 performance evidence. A public performance claim requires a reproducible run,

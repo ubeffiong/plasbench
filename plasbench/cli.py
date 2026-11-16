@@ -468,6 +468,13 @@ def build_parser():
     import_parser.add_argument("--max-clusters-per-species", type=int, default=0)
     import_parser.add_argument("--min-clusters", type=int, default=20)
     import_parser.add_argument("--seed", type=int, default=20260916)
+    import_parser.add_argument("--arm", default="", help="Label for selection_arm (for example recent or older) so two runs can be combined by resolve-contributed-cohort.")
+    resolve_parser = sub.add_parser("resolve-contributed-cohort", help="Verify importer candidates at NCBI, run the pre-download read-QC check, and choose the final per-species rows.")
+    resolve_parser.add_argument("--candidates", type=Path, action="append", required=True, help="Importer candidates.tsv; repeat for the recent and older arms.")
+    resolve_parser.add_argument("--out-dir", type=Path, required=True)
+    resolve_parser.add_argument("--target-per-species", type=int, default=20)
+    resolve_parser.add_argument("--min-recent", type=int, default=10)
+    resolve_parser.add_argument("--cache", type=Path, help="JSON cache of earlier per-candidate results.")
     conda_parser = sub.add_parser(
         "install-conda",
         help="Check for conda/mamba/micromamba; offer to install Miniforge if none is found.",
@@ -933,6 +940,16 @@ def main(argv=None):
                 command.extend([flag, value])
         if args.allow_short_read_first:
             command.append("--allow-short-read-first")
+        if args.arm:
+            command.extend(["--arm", args.arm])
+        code = run(command, root)
+    elif args.command == "resolve-contributed-cohort":
+        command = [sys.executable, "python/resolve_contributed_cohort.py", "--out-dir", str(args.out_dir),
+                   "--target-per-species", str(args.target_per_species), "--min-recent", str(args.min_recent)]
+        for path in args.candidates:
+            command.extend(["--candidates", str(path)])
+        if args.cache:
+            command.extend(["--cache", str(args.cache)])
         code = run(command, root)
     elif args.command == "install-conda":
         command = [bash_command(), "env/bootstrap_conda.sh"]

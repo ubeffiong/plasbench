@@ -8,6 +8,7 @@ evidence rules applied to them — every row in both files passes the same
 |---|---:|---|---|
 | [`public-v1.tsv`](public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
+| [`public-v4.tsv`](public-v4.tsv) | 98 | all B | the species-balanced, leakage-aware panel: 20 clusters each for *E. coli*, *K. pneumoniae*, *S. enterica*, *S. aureus* (18 for *E. hormaechei*), recent and older arms, long-read-first truth; see below |
 | [`plaseval-ecoli53.tsv`](plaseval-ecoli53.tsv) | 53 | all B | replicating the PlasEval paper's binning comparison and its comparison gate; not a headline panel (truth is a Unicycler hybrid on the same reads; one species). See [`docs/PLASEVAL_REPLICATION.md`](../docs/PLASEVAL_REPLICATION.md) |
 
 `public-v1` is frozen. Do not add rows to it: published results reference it by
@@ -58,6 +59,23 @@ Known limitations, stated plainly:
 - **No `read_depth_x`** on the added rows. Stage 2 measures observed coverage
   into `observed_depth.tsv`; run it before any depth-ladder work.
 - **Geography is from deposited metadata**, not curator-verified provenance.
+
+## public-v4 — species-balanced, leakage-aware panel (contributed pool)
+
+98 isolates selected from the contributed RefSeq/SRA pool (`candidates/contributed-refseq-sra/`) with
+`plasbench import-contributed-cohort` and `plasbench resolve-contributed-cohort`, then verified at NCBI
+(`validate-cohort --online`, lock `public-v4.lock.json`, all 98 passed). Every row is tier B (no source publication reviewed).
+
+* **Species:** *E. coli* 20, *K. pneumoniae* 20, *S. enterica* 20, *S. aureus* 20, *E. hormaechei* 18. The pool had only 22
+  long-read-first *E. hormaechei* clusters and 18 survived verification, so it stays below the headline's 20.
+* **Arms (`selection_arm`):** `recent` (public on or after 2025-01-01 on the earliest of assembly and first-read dates) 37 rows,
+  `older` 61. The target was 10 recent per species; the pool had only 6 *S. aureus* and 2 *S. enterica* recent clusters that verified.
+* **Truth:** long-read-first only (57 hybrid, 41 long-read-only), one isolate per BioProject. `bioproject` is the SRA run's (the pool's
+  own column is the RefSeq umbrella), and it is one of the assembly's BioProjects.
+* **Read QC:** the cheap pre-download check passed 96 rows and flagged 2 (`qc_precheck=warn`, depth 19.9x and 27.2x, under the 30x warn
+  limit). Estimated depth runs from 19.9x to 2590x (median 122x; 17 rows above 300x, which are slow to download and assemble: consider the
+  depth ladder). The post-download gate (stage 3 `short_read_qc.py`) has **not** been run and may still exclude samples.
+* **Not done:** no tool has been run on this panel; `truth_polish_reads` is NCBI-derived, not curator-checked.
 
 ## Verification
 

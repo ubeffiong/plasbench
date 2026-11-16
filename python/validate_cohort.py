@@ -178,7 +178,8 @@ def run_metadata(run, email=None, api_key=None):
     row = rows[0]
     return {"run": run, "biosample": row.get("BioSample", ""), "bioproject": row.get("BioProject", ""),
             "sample_name": row.get("SampleName", ""), "platform": row.get("Platform", ""),
-            "layout": row.get("LibraryLayout", ""), "bases": row.get("bases", "")}
+            "layout": row.get("LibraryLayout", ""), "bases": row.get("bases", ""),
+            "spots": row.get("spots", ""), "avg_length": row.get("avgLength", "")}
 
 
 def read_ledger(path):

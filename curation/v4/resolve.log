@@ -1,0 +1,197 @@
+[resolve] 1/191 GCF_053691565.1 pass
+[resolve] 2/191 GCF_055901415.2 pass
+[resolve] 3/191 GCF_053699795.1 pass
+[resolve] 4/191 GCF_056157925.1 pass
+[resolve] 5/191 GCF_060580365.1 pass
+[resolve] 6/191 GCF_056665865.1 pass
+[resolve] 7/191 GCF_988243525.1 pass
+[resolve] 8/191 GCF_057812585.1 pass
+[resolve] 9/191 GCF_057962515.1 pass
+[resolve] 10/191 GCF_049950195.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 11/191 GCF_056269765.1 pass
+[resolve] 12/191 GCF_977064555.1 pass
+[resolve] 13/191 GCF_054171505.3 pass
+[resolve] 14/191 GCF_054048085.1 pass
+[resolve] 15/191 GCF_053690285.1 pass
+[resolve] 16/191 GCF_053323875.1 pass
+[resolve] 17/191 GCF_051359655.1 pass
+[resolve] 18/191 GCF_056493885.2 pass
+[resolve] 19/191 GCF_965319085.1 pass
+[resolve] 20/191 GCF_058350665.1 pass
+[resolve] 21/191 GCF_057587655.1 pass
+[resolve] 22/191 GCF_053699555.1 pass
+[resolve] 23/191 GCF_052885615.1 pass
+[resolve] 24/191 GCF_056157895.1 pass
+[resolve] 25/191 GCF_055661385.1 pass
+[resolve] 26/191 GCF_988242935.1 pass
+[resolve] 27/191 GCF_057813415.1 pass
+[resolve] 28/191 GCF_057960855.1 pass
+[resolve] 29/191 GCF_053668395.1 pass
+[resolve] 30/191 GCF_984572935.1 pass
+[resolve] 31/191 GCF_965282925.1 pass
+[resolve] 32/191 GCF_053691435.1 pass
+[resolve] 33/191 GCF_051414825.1 warn: estimated depth 27.2 is below the warn limit 30
+[resolve] 34/191 GCF_055901055.2 pass
+[resolve] 35/191 GCF_055397695.1 pass
+[resolve] 36/191 GCF_053803415.1 pass
+[resolve] 37/191 GCF_054354115.2 pass
+[resolve] 38/191 GCF_049200385.1 pass
+[resolve] 39/191 GCF_965244935.1 pass
+[resolve] 40/191 GCF_056155125.1 pass
+[resolve] 41/191 GCF_056665805.1 pass
+[resolve] 42/191 GCF_059705285.1 reject: no usable run: DRR911409: run BioProject  is not one of the assembly's ['PRJDB40491']
+[resolve] 43/191 GCF_988242735.1 pass
+[resolve] 44/191 GCF_057813175.1 pass
+[resolve] 45/191 GCF_057961125.1 pass
+[resolve] 46/191 GCF_062052460.1 pass
+[resolve] 47/191 GCF_054900415.1 pass
+[resolve] 48/191 GCF_059100145.1 pass
+[resolve] 49/191 GCF_965318305.1 pass
+[resolve] 50/191 GCF_055901675.1 pass
+[resolve] 51/191 GCF_984572975.1 pass
+[resolve] 52/191 GCF_055392225.1 pass
+[resolve] 53/191 GCF_050632115.1 pass
+[resolve] 54/191 GCF_965319415.1 pass
+[resolve] 55/191 GCF_965641735.1 pass
+[resolve] 56/191 GCF_058680775.1 pass
+[resolve] 57/191 GCF_988325505.1 pass
+[resolve] 58/191 GCF_055394555.1 pass
+[resolve] 59/191 GCF_000750225.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 60/191 GCF_000750275.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 61/191 GCF_032302155.1 pass
+[resolve] 62/191 GCF_032351815.1 pass
+[resolve] 63/191 GCF_038627045.1 reject: no usable run: SRR28816070: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']
+[resolve] 64/191 GCF_040735515.1 pass
+[resolve] 65/191 GCF_019048245.1 pass
+[resolve] 66/191 GCF_053523415.1 pass
+[resolve] 67/191 GCF_029070185.2 pass
+[resolve] 68/191 GCF_024918215.1 pass
+[resolve] 69/191 GCF_003408595.1 pass
+[resolve] 70/191 GCF_003186565.1 reject: no usable run: SRR5504142: run BioProject PRJNA389451 is not one of the assembly's ['PRJNA224116', 'PRJNA278886']
+[resolve] 71/191 GCF_003186415.1 pass
+[resolve] 72/191 GCF_007990655.1 pass
+[resolve] 73/191 GCF_008124005.1 pass
+[resolve] 74/191 GCF_055814345.1 warn: estimated depth 19.9 is below the warn limit 30
+[resolve] 75/191 GCF_049569765.1 pass
+[resolve] 76/191 GCF_001969285.3 pass
+[resolve] 77/191 GCF_022494625.1 pass
+[resolve] 78/191 GCF_002844165.1 pass
+[resolve] 79/191 GCF_030515575.1 pass
+[resolve] 80/191 GCF_021166435.1 pass
+[resolve] 81/191 GCF_023539035.1 pass
+[resolve] 82/191 GCF_060478075.1 reject: no usable run: SRR24751117: run BioProject PRJNA976817 is not one of the assembly's ['PRJNA1417792', 'PRJNA224116']
+[resolve] 83/191 GCF_003204155.1 pass
+[resolve] 84/191 GCF_049666535.1 pass
+[resolve] 85/191 GCF_004526255.1 pass
+[resolve] 86/191 GCF_038396695.1 pass
+[resolve] 87/191 GCF_001651945.2 reject: no usable run: SRR2914455: run BioProject PRJNA298331 is not one of the assembly's ['PRJNA224116', 'PRJNA322195']
+[resolve] 88/191 GCF_003112185.1 pass
+[resolve] 89/191 GCF_003176855.1 pass
+[resolve] 90/191 GCF_007922655.1 pass
+[resolve] 91/191 GCF_021534925.1 pass
+[resolve] 92/191 GCF_013402855.1 pass
+[resolve] 93/191 GCF_002787215.1 pass
+[resolve] 94/191 GCF_046272025.1 pass
+[resolve] 95/191 GCF_003203755.1 pass
+[resolve] 96/191 GCF_030419085.1 pass
+[resolve] 97/191 GCF_003399795.2 pass
+[resolve] 98/191 GCF_019969605.1 pass
+[resolve] 99/191 GCF_000978815.2 pass
+[resolve] 100/191 GCF_032351055.1 pass
+[resolve] 101/191 GCF_016767775.1 pass
+[resolve] 102/191 GCF_032759475.1 pass
+[resolve] 103/191 GCF_012029895.2 pass
+[resolve] 104/191 GCF_018283505.2 pass
+[resolve] 105/191 GCF_004322995.1 reject: no usable run: SRR8778553: could not retrieve run-info row for SRR8778553 | SRR8778554: could not retrieve run-info row for SRR8778554
+[resolve] 106/191 GCF_903936275.2 pass
+[resolve] 107/191 GCF_010586985.1 pass
+[resolve] 108/191 GCF_020525905.1 pass
+[resolve] 109/191 GCF_000406765.2 pass
+[resolve] 110/191 GCF_023538975.1 pass
+[resolve] 111/191 GCF_003571745.1 pass
+[resolve] 112/191 GCF_054693465.1 pass
+[resolve] 113/191 GCF_902723705.1 pass
+[resolve] 114/191 GCF_000417265.2 pass
+[resolve] 115/191 GCF_036542045.1 pass
+[resolve] 116/191 GCF_021497265.1 pass
+[resolve] 117/191 GCF_001663295.1 pass
+[resolve] 118/191 GCF_000281535.2 reject: sequencing evidence has no explicit long-read platform
+[resolve] 119/191 GCF_032348595.1 pass
+[resolve] 120/191 GCF_014170015.1 pass
+[resolve] 121/191 GCF_014905815.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 122/191 GCF_030020765.1 pass
+[resolve] 123/191 GCF_035557615.1 reject: no usable run: SRR27482347: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']
+[resolve] 124/191 GCF_002156745.1 pass
+[resolve] 125/191 GCF_056488085.2 pass
+[resolve] 126/191 GCF_040735615.1 pass
+[resolve] 127/191 GCF_000695935.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 128/191 GCF_000714675.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 129/191 GCF_016903955.1 pass
+[resolve] 130/191 GCF_002180295.1 pass
+[resolve] 131/191 GCF_904863335.2 reject: no usable run: SRR5082451: run BioProject PRJNA351909 is not one of the assembly's ['PRJNA224116', 'PRJNA646837']
+[resolve] 132/191 GCF_002128365.1 pass
+[resolve] 133/191 GCF_008124445.1 pass
+[resolve] 134/191 GCF_059739445.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 135/191 GCF_004847885.1 reject: no usable run: SRR4243004: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498433: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972868: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 136/191 GCF_004848685.1 reject: no usable run: SRR4121060: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202535: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498403: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972872: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 137/191 GCF_004848885.1 reject: no usable run: SRR4242798: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498399: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972867: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 138/191 GCF_004848545.1 reject: no usable run: SRR4242799: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498402: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972865: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 139/191 GCF_034447935.1 pass
+[resolve] 140/191 GCF_002234735.2 pass
+[resolve] 141/191 GCF_003231095.1 pass
+[resolve] 142/191 GCF_002947135.1 pass
+[resolve] 143/191 GCF_002208315.1 reject: sequencing evidence has no explicit long-read platform
+[resolve] 144/191 GCF_009650395.1 pass
+[resolve] 145/191 GCF_004847605.1 reject: no usable run: SRR4123060: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202541: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498442: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972860: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 146/191 GCF_004847005.1 reject: no usable run: SRR1258440: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4243005: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972862: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 147/191 GCF_004847145.1 reject: no usable run: SRR1258443: run BioProject PRJNA170555 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972839: run BioProject PRJNA170555 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 148/191 GCF_004847585.1 reject: no usable run: SRR4121267: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202537: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498423: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972870: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 149/191 GCF_022870605.1 pass
+[resolve] 150/191 GCF_003032035.1 pass
+[resolve] 151/191 GCF_003312565.1 reject: no usable run: SRR39504618: run BioProject PRJNA523425 is not one of the assembly's ['PRJNA224116', 'PRJNA230403']
+[resolve] 152/191 GCF_016454645.1 pass
+[resolve] 153/191 GCF_004847505.1 reject: no usable run: SRR1258442: run BioProject PRJNA170563 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972869: run BioProject PRJNA170563 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 154/191 GCF_004848405.1 reject: no usable run: SRR4242800: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498404: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970539: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 155/191 GCF_004848145.1 reject: no usable run: SRR4121328: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202538: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498431: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972874: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 156/191 GCF_004847525.1 reject: no usable run: SRR1258439: run BioProject PRJNA170562 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970547: run BioProject PRJNA170562 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 157/191 GCF_004847345.1 reject: no usable run: SRR4243003: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498425: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972863: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 158/191 GCF_016026715.1 pass
+[resolve] 159/191 GCF_003571625.1 pass
+[resolve] 160/191 GCF_028596185.1 pass
+[resolve] 161/191 GCF_004847545.1 reject: no usable run: SRR4123219: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202542: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498444: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972838: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+[resolve] 162/191 GCF_047359885.1 pass
+[resolve] 163/191 GCF_001717705.1 pass
+[resolve] 164/191 GCF_023170025.1 pass
+[resolve] 165/191 GCF_003573835.1 reject: no usable run: DRR160049: run BioProject PRJDB7268 is not one of the assembly's ['PRJDB7266', 'PRJNA224116']
+[resolve] 166/191 GCF_010364725.2 pass
+[resolve] 167/191 GCF_040047685.1 pass
+[resolve] 168/191 GCF_030064005.1 pass
+[resolve] 169/191 GCF_002633865.1 pass
+[resolve] 170/191 GCF_046272165.1 pass
+[resolve] 171/191 GCF_017088385.1 pass
+[resolve] 172/191 GCF_037993065.1 pass
+[resolve] 173/191 GCF_023170045.1 pass
+[resolve] 174/191 GCF_001717975.2 pass
+[resolve] 175/191 GCF_003111725.1 pass
+[resolve] 176/191 GCF_050916375.1 pass
+[resolve] 177/191 GCF_000144955.2 pass
+[resolve] 178/191 GCF_028596045.1 reject: no usable run: SRR23198383: run BioProject PRJNA533550 is not one of the assembly's ['PRJNA224116', 'PRJNA288601']
+[resolve] 179/191 GCF_016727585.1 pass
+[resolve] 180/191 GCF_028596145.1 pass
+[resolve] 181/191 GCF_049857195.1 pass
+[resolve] 182/191 GCF_040315025.1 pass
+[resolve] 183/191 GCF_045347025.1 pass
+[resolve] 184/191 GCF_023658665.1 pass
+[resolve] 185/191 GCF_016894285.1 pass
+[resolve] 186/191 GCF_003193705.1 pass
+[resolve] 187/191 GCF_008244725.1 pass
+[resolve] 188/191 GCF_054392195.1 pass
+[resolve] 189/191 GCF_003203615.1 reject: no usable run: SRR39666810: run BioProject PRJNA391514 is not one of the assembly's ['PRJNA224116', 'PRJNA316321']
+[resolve] 190/191 GCF_018093105.1 reject: no usable run: SRR13745243: run BioProject PRJNA703008 is not one of the assembly's ['PRJNA224116', 'PRJNA703966']
+[resolve] 191/191 GCF_002025145.1 pass
+[resolve] Enterobacter hormaechei: 18 verified, 18 chosen (9 recent)  SHORT of 20
+[resolve] Escherichia coli: 47 verified, 20 chosen (10 recent)
+[resolve] Klebsiella pneumoniae: 40 verified, 20 chosen (10 recent)
+[resolve] Salmonella enterica: 16 verified, 13 chosen (2 recent)  SHORT of 20
+[resolve] Staphylococcus aureus: 34 verified, 20 chosen (6 recent)
+[resolve] 91 rows -> curation/v4/resolved/resolved.tsv; next: plasbench validate-cohort --online --write-lock, then post-download QC (stage 3 short_read_qc.py) decides what runs.

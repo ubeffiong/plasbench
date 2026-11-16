@@ -52,7 +52,8 @@ COLUMNS = ["sample_id", "assembly_accession", "sra_run", "organism", "truth_tech
            "biosample", "bioproject", "sample_origin", "read_depth_x", "assembly_plasmid_count", "source_study",
            "truth_assembly_strategy", "truth_polish_reads", "alternate_paired_runs",
            "truth_release_date", "first_read_year", "cluster_key", "region", "africa_subregion",
-           "isolation_source_category", "assembly_method", "assembly_sequencing_technology", "plasmid_accessions"]
+           "isolation_source_category", "assembly_method", "assembly_sequencing_technology", "plasmid_accessions",
+           "genome_size", "selection_arm"]
 LONG_READ_FIRST = ("long_read_only", "long_read_first_hybrid")
 REQUIRED_POOL_COLUMNS = ("assembly_accession", "organism_name", "biosample", "seq_rel_date", "assembly_method",
                          "assembly_sequencing_technology", "sra_runs", "read_bioprojects", "first_matching_read_year")
@@ -131,6 +132,8 @@ def to_cohort_row(row, strategy, polish):
         "assembly_method": row.get("assembly_method", ""),
         "assembly_sequencing_technology": row.get("assembly_sequencing_technology", ""),
         "plasmid_accessions": row.get("plasmid_accessions", ""),
+        "genome_size": row.get("genome_size", ""),
+        "selection_arm": "",
     }
 
 
@@ -234,6 +237,7 @@ def main():
     ap.add_argument("--max-clusters-per-species", type=int, default=0, help="0 = no cap")
     ap.add_argument("--min-clusters", type=int, default=20, help="species below this are listed as short (headline MIN_SPECIES_CLUSTERS)")
     ap.add_argument("--seed", type=int, default=20260916)
+    ap.add_argument("--arm", default="", help="label written to selection_arm (for example recent / older) so two runs can be combined")
     args = ap.parse_args()
     for flag, value in (("--released-after", args.released_after), ("--released-before", args.released_before)):
         if value and parse_iso_date(value) is None:
@@ -260,7 +264,9 @@ def main():
     rejected.extend(cluster_rejected)
 
     os.makedirs(args.out_dir, exist_ok=True)
-    selected.sort(key=lambda row: (species_of(row["organism"]), row["cluster_key"]))
+    for row in selected:
+        row["selection_arm"] = args.arm
+    selected.sort(key=lambda row: (species_of(row["organism"]), order_key(args.seed, row["cluster_key"])))
     write_tsv(os.path.join(args.out_dir, "candidates.tsv"), selected, COLUMNS)
     pool_fields = list(pool[0].keys()) + ["reason"]
     write_tsv(os.path.join(args.out_dir, "rejected.tsv"), [dict(source, reason=reason) for source, reason in rejected], pool_fields)

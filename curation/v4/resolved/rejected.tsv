@@ -1,0 +1,197 @@
+sample_id	assembly_accession	organism	selection_arm	status	reasons
+escherichia_coli_samn47407291	GCF_049950195.1	Escherichia coli	recent	reject	sequencing evidence has no explicit long-read platform
+escherichia_coli_samn50779107	GCF_053690285.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn46342649	GCF_056493885.2	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn51335556	GCF_053699555.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn50713113	GCF_056157895.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd01706134	GCF_055661385.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samea118770152	GCF_988242935.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn53300881	GCF_057813415.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn53177136	GCF_057960855.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn53269467	GCF_053668395.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn54493235	GCF_058106385.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn54198424	GCF_055790905.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samea117852473	GCF_965641715.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn61880624	GCF_062052461.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd01616572	GCF_053902985.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd00855527	GCF_055390215.1	Escherichia coli O103:H2	recent	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn56542579	GCF_061271975.1	Escherichia coli	recent	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn51215381	GCF_053691435.1	Klebsiella pneumoniae	recent	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn46342761	GCF_055901055.2	Klebsiella pneumoniae	recent	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn50713146	GCF_056155125.1	Klebsiella pneumoniae	recent	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn50584032	GCF_056665805.1	Klebsiella pneumoniae	recent	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samd01824729	GCF_059705285.1	Klebsiella pneumoniae	recent	reject	no usable run: DRR911409: run BioProject  is not one of the assembly's ['PRJDB40491']
+klebsiella_pneumoniae_samea118770097	GCF_988242735.1	Klebsiella pneumoniae	recent	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn53300893	GCF_057813175.1	Klebsiella pneumoniae	recent	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn53177127	GCF_057961125.1	Klebsiella pneumoniae	recent	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samea117852469	GCF_965318305.1	Salmonella enterica subsp. enterica serovar Senftenberg	recent	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samea122715354	GCF_984572975.1	Staphylococcus aureus	recent	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samea117852471	GCF_965319415.1	Staphylococcus aureus	recent	pass	not chosen: species already at its target or BioProject already used
+enterobacter_hormaechei_samn02713683	GCF_000750225.1	Enterobacter hormaechei subsp. hoffmannii ECNIH3	older	reject	sequencing evidence has no explicit long-read platform
+enterobacter_hormaechei_samn02713646	GCF_000750275.1	Enterobacter hormaechei subsp. hoffmannii ECR091	older	reject	sequencing evidence has no explicit long-read platform
+enterobacter_hormaechei_samn41094953	GCF_038627045.1	Enterobacter hormaechei	older	reject	no usable run: SRR28816070: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']
+enterobacter_hormaechei_samn06887342	GCF_003186565.1	Enterobacter hormaechei	older	reject	no usable run: SRR5504142: run BioProject PRJNA389451 is not one of the assembly's ['PRJNA224116', 'PRJNA278886']
+escherichia_coli_samn35442802	GCF_060478075.1	Escherichia coli	older	reject	no usable run: SRR24751117: run BioProject PRJNA976817 is not one of the assembly's ['PRJNA1417792', 'PRJNA224116']
+escherichia_coli_samn04014926	GCF_003204155.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn45084045	GCF_049666535.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn10986381	GCF_004526255.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn39992808	GCF_038396695.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn04191553	GCF_001651945.2	Escherichia coli O157:H7	older	reject	no usable run: SRR2914455: run BioProject PRJNA298331 is not one of the assembly's ['PRJNA224116', 'PRJNA322195']
+escherichia_coli_samn08724651	GCF_003112185.1	Escherichia coli O26 str. RM8426	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn08724662	GCF_003176855.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn12261986	GCF_007922655.1	Escherichia coli O157:H7	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn20824181	GCF_021534925.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn15402835	GCF_013402855.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn04014847	GCF_002787215.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn41071119	GCF_046272025.1	Escherichia coli O121	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn09278797	GCF_003203755.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn33425314	GCF_030419085.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn06928084	GCF_003399795.2	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn18446033	GCF_019969605.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn03470769	GCF_000978815.2	Escherichia coli O157:H7	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn37529175	GCF_032351055.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn14503865	GCF_016767775.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd00231967	GCF_023167605.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn39980286	GCF_052748625.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd00056132	GCF_002357875.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd00496013	GCF_025996735.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samea112856589	GCF_949786305.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn39334900	GCF_035557515.1	Escherichia coli	older	reject	no usable run: SRR27482348: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']
+escherichia_coli_samn29503669	GCF_055901515.2	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd00566112	GCF_030295505.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn20437390	GCF_021166415.1	Escherichia coli O157:H7	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn38049409	GCF_040735505.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn11997559	GCF_019585545.2	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn10141488	GCF_030991425.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn06209720	GCF_022559685.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samea115110143	GCF_963924185.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn16357428	GCF_016903375.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samea112356748	GCF_951802865.1	Escherichia coli O25b:H4-ST131	older	reject	sequencing evidence has no explicit long-read platform
+escherichia_coli_samn04014990	GCF_002180055.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn32977649	GCF_028596225.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn38673178	GCF_034642955.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn04158281	GCF_006337025.1	Escherichia coli	older	reject	no usable run: SRR2724080: run BioProject PRJNA295003 is not one of the assembly's ['PRJNA224116', 'PRJNA547487']
+escherichia_coli_samn08737532	GCF_004771135.1	Escherichia coli O18:H1	older	reject	no usable run: SRR8924821: run BioProject PRJNA533466 is not one of the assembly's ['PRJNA224116', 'PRJNA230969']
+escherichia_coli_samn27988043	GCF_023277345.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn13613895	GCF_014170735.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn11229489	GCF_013167775.1	Escherichia coli O157:H7	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn32977832	GCF_029855165.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn22896043	GCF_020868245.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn11787763	GCF_005885915.1	Escherichia coli O157:H7	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn46014670	GCF_060478235.1	Escherichia coli	older	reject	no usable run: SRR31850151: run BioProject PRJNA1204161 is not one of the assembly's ['PRJNA1417792', 'PRJNA224116']
+escherichia_coli_samn04159541	GCF_001469815.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd00077842	GCF_059997555.1	Escherichia coli	older	reject	no usable run: DRR089863: run BioProject PRJDB4303 is not one of the assembly's ['PRJNA1417792', 'PRJNA224116']
+escherichia_coli_samn41036272	GCF_046713585.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn05414625	GCF_002105735.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn11230749	GCF_007012305.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn08724661	GCF_003586065.1	Escherichia coli O145 str. RM9872	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn28174088	GCF_024917815.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn09729056	GCF_003355175.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn04549845	GCF_004010675.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn01112512	GCF_036923335.1	Escherichia coli PA8	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn07291527	GCF_003073955.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn08724616	GCF_003112245.1	Escherichia coli O111 str. RM9322	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn13948685	GCF_024918915.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn07162922	GCF_002193095.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samea6471236	GCF_013201525.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn08724650	GCF_003112165.1	Escherichia coli O103 str. RM8385	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn08165042	GCF_003112205.1	Escherichia coli O43 str. RM10042	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn04448503	GCF_003410275.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn40123740	GCF_037225585.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn10531264	GCF_009931235.1	Escherichia coli O157:H7	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samn08724618	GCF_003112145.1	Escherichia coli O121 str. RM8352	older	pass	not chosen: species already at its target or BioProject already used
+escherichia_coli_samd00297130	GCF_018323825.1	Escherichia coli	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn03455995	GCF_004322995.1	Klebsiella pneumoniae	older	reject	no usable run: SRR8778553: could not retrieve run-info row for SRR8778553 | SRR8778554: could not retrieve run-info row for SRR8778554
+klebsiella_pneumoniae_samn28404990	GCF_023538975.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn02141972	GCF_000417265.2	Klebsiella pneumoniae UHKPC07	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn39725114	GCF_036542045.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn13874936	GCF_021497265.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn03455930	GCF_001663295.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn01057611	GCF_000281535.2	Klebsiella pneumoniae subsp. pneumoniae KPNIH1	older	reject	sequencing evidence has no explicit long-read platform
+klebsiella_pneumoniae_samn37529176	GCF_032348595.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn15086847	GCF_014170015.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samd00237915	GCF_014905815.1	Klebsiella pneumoniae	older	reject	sequencing evidence has no explicit long-read platform
+klebsiella_pneumoniae_samn34258006	GCF_030020765.1	Klebsiella pneumoniae subsp. pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn39334901	GCF_035557615.1	Klebsiella pneumoniae	older	reject	no usable run: SRR27482347: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']
+klebsiella_pneumoniae_samn06438459	GCF_002156745.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn29503774	GCF_056488085.2	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn38049405	GCF_040735615.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn02713685	GCF_000695935.1	Klebsiella pneumoniae subsp. pneumoniae KPNIH27	older	reject	sequencing evidence has no explicit long-read platform
+klebsiella_pneumoniae_samn02786855	GCF_000714675.1	Klebsiella pneumoniae subsp. pneumoniae KPNIH24	older	reject	sequencing evidence has no explicit long-read platform
+klebsiella_pneumoniae_samn16357451	GCF_016903955.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn04014970	GCF_002180295.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn06112194	GCF_904863335.2	Klebsiella pneumoniae	older	reject	no usable run: SRR5082451: run BioProject PRJNA351909 is not one of the assembly's ['PRJNA224116', 'PRJNA646837']
+klebsiella_pneumoniae_samn03733793	GCF_001902255.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn21399028	GCF_020080145.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn02141981	GCF_000417225.2	Klebsiella pneumoniae DMC1097	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn28173997	GCF_024917935.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn07265011	GCF_002211905.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn16197931	GCF_014788765.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn07291531	GCF_003073675.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn15547544	GCF_023703875.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn03455989	GCF_004322955.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn13324146	GCF_058119555.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn18874709	GCF_019928625.2	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn04448505	GCF_003408615.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn42440391	GCF_041004885.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn02786856	GCF_000717515.1	Klebsiella pneumoniae subsp. pneumoniae KPR0928	older	reject	sequencing evidence has no explicit long-read platform
+klebsiella_pneumoniae_samn40123773	GCF_037283275.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn18487814	GCF_020172745.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn06040387	GCF_002935085.1	Klebsiella pneumoniae	older	reject	no usable run: SRR6519356: could not retrieve run-info row for SRR6519356 | SRR6519357: could not retrieve run-info row for SRR6519357
+klebsiella_pneumoniae_samn04448219	GCF_001704235.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn01057614	GCF_000281435.2	Klebsiella pneumoniae subsp. pneumoniae KPNIH10	older	reject	sequencing evidence has no explicit long-read platform
+klebsiella_pneumoniae_samn07766632	GCF_027941975.1	Klebsiella pneumoniae subsp. pneumoniae	older	reject	no usable run: SRR6165292: run BioProject PRJNA413541 is not one of the assembly's ['PRJNA224116', 'PRJNA472804']
+klebsiella_pneumoniae_samn07503096	GCF_002812365.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+klebsiella_pneumoniae_samn44266223	GCF_049354595.1	Klebsiella pneumoniae	older	reject	no usable run: SRR30971645: run BioProject PRJNA1172271 is not one of the assembly's ['PRJNA1178099']
+klebsiella_pneumoniae_samn05774083	GCF_003186535.1	Klebsiella pneumoniae	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn12603253	GCF_008124445.1	Salmonella enterica subsp. enterica serovar Bredeney	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samd00264093	GCF_059739445.1	Salmonella enterica	older	reject	sequencing evidence has no explicit long-read platform
+salmonella_enterica_samn01942254	GCF_004847885.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000960	older	reject	no usable run: SRR4243004: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498433: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972868: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn00991047	GCF_004848685.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000752	older	reject	no usable run: SRR4121060: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202535: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498403: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972872: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn00991044	GCF_004848885.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000669	older	reject	no usable run: SRR4242798: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498399: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972867: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn00991046	GCF_004848545.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000700	older	reject	no usable run: SRR4242799: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498402: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972865: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn04160828	GCF_002208315.1	Salmonella enterica subsp. enterica serovar Quebec str. S-1267	older	reject	sequencing evidence has no explicit long-read platform
+salmonella_enterica_samn01942268	GCF_004847605.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000968	older	reject	no usable run: SRR4123060: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202541: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498442: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972860: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn01816352	GCF_004847005.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001140	older	reject	no usable run: SRR1258440: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4243005: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972862: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn01816351	GCF_004847145.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001118	older	reject	no usable run: SRR1258443: run BioProject PRJNA170555 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972839: run BioProject PRJNA170555 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn01942313	GCF_004847585.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000952	older	reject	no usable run: SRR4121267: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202537: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498423: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972870: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn09534371	GCF_003312565.1	Salmonella enterica subsp. enterica serovar Enteritidis	older	reject	no usable run: SRR39504618: run BioProject PRJNA523425 is not one of the assembly's ['PRJNA224116', 'PRJNA230403']
+salmonella_enterica_samn01816359	GCF_004847505.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001115	older	reject	no usable run: SRR1258442: run BioProject PRJNA170563 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972869: run BioProject PRJNA170563 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn00991048	GCF_004848405.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000753	older	reject	no usable run: SRR4242800: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498404: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970539: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn01942300	GCF_004848145.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000958	older	reject	no usable run: SRR4121328: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202538: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498431: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972874: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn01816358	GCF_004847525.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001112	older	reject	no usable run: SRR1258439: run BioProject PRJNA170562 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970547: run BioProject PRJNA170562 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn01942244	GCF_004847345.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000954	older	reject	no usable run: SRR4243003: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498425: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972863: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn13450458	GCF_016026715.1	Salmonella enterica	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn01942296	GCF_004847545.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000970	older	reject	no usable run: SRR4123219: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202542: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498444: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972838: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn20057411	GCF_019105565.1	Salmonella enterica	older	reject	no usable run: SRR15038761: run BioProject PRJNA230403 is not one of the assembly's ['PRJNA224116', 'PRJNA812595']
+salmonella_enterica_samn02261218	GCF_001535315.2	Salmonella enterica subsp. enterica serovar Tennessee	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn03988471	GCF_001931595.1	Salmonella enterica subsp. enterica serovar Infantis	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn02568587	GCF_001612515.1	Salmonella enterica subsp. enterica serovar Weltevreden str. 1655	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn08274661	GCF_003986675.1	Salmonella enterica subsp. enterica serovar Typhimurium var. 5-	older	reject	no usable run: SRR6428559: run BioProject PRJNA215355 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn03485833	GCF_001448485.2	Salmonella enterica subsp. enterica serovar Kentucky str. SA20030505	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn11030399	GCF_030863765.1	Salmonella enterica subsp. enterica serovar 4,12:i:-	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn11877932	GCF_024266245.1	Salmonella enterica subsp. enterica serovar Newport	older	warn	estimated depth 28.7 is below the warn limit 30
+salmonella_enterica_samn01041085	GCF_000335875.2	Salmonella enterica subsp. enterica serovar Enteritidis str. 18569	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn05414452	GCF_001973275.2	Salmonella enterica subsp. enterica serovar Enteritidis	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn00991042	GCF_000698515.2	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000661	older	reject	no usable run: SRR4121020: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202534: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498397: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970548: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+salmonella_enterica_samn13191647	GCF_009664595.1	Salmonella enterica subsp. enterica serovar Typhimurium	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn13002952	GCF_009650375.1	Salmonella enterica subsp. enterica serovar Muenchen	older	pass	not chosen: species already at its target or BioProject already used
+salmonella_enterica_samn38321309	GCF_045287905.1	Salmonella enterica	older	reject	no usable run: SRR26899135: run BioProject PRJNA1042815 is not one of the assembly's ['PRJNA1087001'] | SRR26899147: run BioProject PRJNA1042815 is not one of the assembly's ['PRJNA1087001']
+salmonella_enterica_samn01823701	GCF_000439415.2	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000189	older	reject	no usable run: SRR498276: run BioProject PRJNA159279 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']
+staphylococcus_aureus_samd00134209	GCF_003573835.1	Staphylococcus aureus	older	reject	no usable run: DRR160049: run BioProject PRJDB7268 is not one of the assembly's ['PRJDB7266', 'PRJNA224116']
+staphylococcus_aureus_samn02604217	GCF_000144955.2	Staphylococcus aureus subsp. aureus JKD6159	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn32885235	GCF_028596045.1	Staphylococcus aureus	older	reject	no usable run: SRR23198383: run BioProject PRJNA533550 is not one of the assembly's ['PRJNA224116', 'PRJNA288601']
+staphylococcus_aureus_samn16357255	GCF_016727585.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn32977648	GCF_028596145.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn26198721	GCF_049857195.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn39141515	GCF_040315025.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn40554538	GCF_045347025.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn27101937	GCF_023658665.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn15354353	GCF_016894285.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn04901609	GCF_003193705.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn11157607	GCF_008244725.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn23247394	GCF_054392195.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn07291561	GCF_003203615.1	Staphylococcus aureus	older	reject	no usable run: SRR39666810: run BioProject PRJNA391514 is not one of the assembly's ['PRJNA224116', 'PRJNA316321']
+staphylococcus_aureus_samn17983076	GCF_018093105.1	Staphylococcus aureus	older	reject	no usable run: SRR13745243: run BioProject PRJNA703008 is not one of the assembly's ['PRJNA224116', 'PRJNA703966']
+staphylococcus_aureus_samn06480665	GCF_002025145.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used
+staphylococcus_aureus_samn09220587	GCF_003991015.1	Staphylococcus aureus	older	pass	not chosen: species already at its target or BioProject already used

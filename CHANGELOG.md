@@ -13,6 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- public-v4 and the read-QC pre-check (contributed pool, verified at NCBI)
+- `cohorts/public-v4.tsv` (+ lock): 98 isolates, verified online: 20 each of *E. coli*, *K. pneumoniae*, *S. enterica*, *S. aureus* and 18 *E. hormaechei* (only 22 long-read-first clusters in the pool, 18 verified); 37 public from 2025-01-01 (`selection_arm=recent`) and 61 older; one isolate per BioProject; long-read-first truth; all tier B. Design recorded in `config/prereg.tsv` (`cohort_v4_design`, proposed). The accession ledger now covers it.
+- `plasbench resolve-contributed-cohort` (`python/resolve_contributed_cohort.py`): verifies candidates at NCBI, replaces the pool's umbrella BioProject with the real one, picks the best SRA run, and runs the pre-download read-QC check (depth, read pairs, read length from SRA run-info, graded against `config/short_read_qc_thresholds.tsv`). It cannot see base quality or pair integrity: stage 3's `short_read_qc.py` still decides on the downloaded reads.
+- `plasbench import-contributed-cohort --arm` labels a selection so two runs can be combined; `validate_cohort.run_metadata` also returns `spots` and `avg_length`.
+
 ### Added -- a configurable leakage screen
 - `LEAKAGE_CUTOFF_POLICY` (`per_tool` default, or `fixed_date` with `LEAKAGE_CUTOFF_DATE`) and `LEAKAGE_DATE_BASIS` (`earliest_public` default, `assembly`, `read`) in `config/config.sh`, so they appear in `plasbench ui` Settings; `python/flag_database_overlap.py` and stage 6 use them, `benchmark.database_overlap.tsv` gains `date_basis` and `cutoff_policy` columns, the manifest records them, and the report states the policy above the overlap counts. Defaults reproduce the earlier behaviour for sheets without `first_read_year`.
 

@@ -1,0 +1,295 @@
+sample_id	assembly_accession	organism	selection_arm	status	reasons	sra_run	bioproject	est_depth_x	est_read_pairs	est_mean_read_length
+enterobacter_hormaechei_samn51215384	GCF_053691565.1	Enterobacter hormaechei	recent	pass		SRR35295320	PRJNA1097666	82.5	1463092	149
+enterobacter_hormaechei_samn46343228	GCF_055901415.2	Enterobacter hormaechei subsp. xiangfangensis	recent	pass		SRR32114623	PRJNA855907	115.5	1925502	143
+enterobacter_hormaechei_samn51335550	GCF_053699795.1	Enterobacter hormaechei	recent	pass		SRR35395876	PRJNA1328436	57.3	712241	201
+enterobacter_hormaechei_samn50713112	GCF_056157925.1	Enterobacter hormaechei	recent	pass		SRR35156831	PRJNA1308800	177.8	2774265	151
+enterobacter_hormaechei_samn61888054	GCF_060580365.1	Enterobacter hormaechei	recent	pass		SRR39781501	PRJNA1499732	282.4	4945736	150
+enterobacter_hormaechei_samn50584030	GCF_056665865.1	Enterobacter hormaechei	recent	pass		SRR34970226	PRJNA1305022	129.5	2371554	135
+enterobacter_hormaechei_samea118770159	GCF_988243525.1	Enterobacter hormaechei	recent	pass		ERR15422900	PRJEB93885	314.8	5520847	150
+enterobacter_hormaechei_samn53300922	GCF_057812585.1	Enterobacter hormaechei	recent	pass		SRR36093573	PRJNA1365971	108.5	2031203	134
+enterobacter_hormaechei_samn53177105	GCF_057962515.1	Enterobacter hormaechei	recent	pass		SRR36382636	PRJNA1359770	56.9	929203	147
+escherichia_coli_samn47407291	GCF_049950195.1	Escherichia coli	recent	reject	sequencing evidence has no explicit long-read platform					
+escherichia_coli_samn49035624	GCF_056269765.1	Escherichia coli	recent	pass		SRR33966213	PRJNA1276128	254.0	4795671	151
+escherichia_coli_samea120421548	GCF_977064555.1	Escherichia coli	recent	pass		ERR15871612	PRJEB101410	38.4	370503	282
+escherichia_coli_samn53536566	GCF_054171505.3	Escherichia coli	recent	pass		SRR36273485	PRJNA1178821	864.2	14579380	151
+escherichia_coli_samn50685448	GCF_054048085.1	Escherichia coli	recent	pass		SRR40502615	PRJNA1308153	68.5	639154	275
+escherichia_coli_samn50779107	GCF_053690285.1	Escherichia coli	recent	pass		SRR35127878	PRJNA1097666	110.8	2014876	149
+escherichia_coli_samn52951588	GCF_053323875.1	Escherichia coli	recent	pass		SRR35919568	PRJNA1354680	261.2	4412659	150
+escherichia_coli_samn48718398	GCF_051359655.1	Escherichia coli	recent	pass		SRR33690890	PRJNA1266646	46.3	795769	142
+escherichia_coli_samn46342649	GCF_056493885.2	Escherichia coli	recent	pass		SRR32114578	PRJNA855907	40.4	740898	136
+escherichia_coli_samea117852466	GCF_965319085.1	Escherichia coli	recent	pass		ERR15075901	PRJEB86005	172.3	2983154	150
+escherichia_coli_samn55387717	GCF_058350665.1	Escherichia coli	recent	pass		SRR37605234	PRJNA1424553	339.6	6016238	150
+escherichia_coli_samn59192668	GCF_057587655.1	Escherichia coli	recent	pass		SRR38560246	PRJNA1463007	225.7	3954080	150
+escherichia_coli_samn51335556	GCF_053699555.1	Escherichia coli	recent	pass		SRR35395841	PRJNA1328436	114.6	2106296	149
+escherichia_coli_samn41579881	GCF_052885615.1	Escherichia coli	recent	pass		SRR29213378	PRJNA1117783	326.5	5325569	151
+escherichia_coli_samn50713113	GCF_056157895.1	Escherichia coli	recent	pass		SRR35156819	PRJNA1308800	108.7	1820310	151
+escherichia_coli_samd01706134	GCF_055661385.1	Escherichia coli	recent	pass		DRR794474	PRJDB37405	182.4	3099656	151
+escherichia_coli_samea118770152	GCF_988242935.1	Escherichia coli	recent	pass		ERR15422853	PRJEB93885	162.3	2874501	150
+escherichia_coli_samn53300881	GCF_057813415.1	Escherichia coli	recent	pass		SRR36093669	PRJNA1365971	155.1	2565566	149
+escherichia_coli_samn53177136	GCF_057960855.1	Escherichia coli	recent	pass		SRR36382637	PRJNA1359770	64.5	1116125	147
+escherichia_coli_samn53269467	GCF_053668395.1	Escherichia coli	recent	pass		SRR36079250	PRJNA1365059	526.8	8741785	151
+escherichia_coli_samn54493235	GCF_058106385.1	Escherichia coli	recent	pass		SRR36707359	PRJNA1399404	102.6	1059404	251
+escherichia_coli_samn54198424	GCF_055790905.1	Escherichia coli	recent	pass		SRR36506198	PRJNA1390743	72.2	1449033	143
+escherichia_coli_samea117852473	GCF_965641715.1	Escherichia coli	recent	pass		ERR15204800	PRJEB86006	53.9	998943	148
+escherichia_coli_samn61880624	GCF_062052461.1	Escherichia coli	recent	pass		SRR39775179	PRJNA1499451	48.8	510174	247
+escherichia_coli_samd01616572	GCF_053902985.1	Escherichia coli	recent	pass		DRR726434	PRJDB36006	58.2	974282	151
+escherichia_coli_samd00855527	GCF_055390215.1	Escherichia coli O103:H2	recent	pass		DRR628062	PRJDB19807	69.2	778194	255
+escherichia_coli_samn56542579	GCF_061271975.1	Escherichia coli	recent	pass		SRR37659224	PRJNA1438619	379.4	6517077	150
+klebsiella_pneumoniae_samea122715351	GCF_984572935.1	Klebsiella pneumoniae	recent	pass		ERR17325271	PRJEB113419	66.5	1299974	148
+klebsiella_pneumoniae_samea117982249	GCF_965282925.1	Klebsiella pneumoniae	recent	pass		ERR14823814	PRJEB88171	112.6	2051699	151
+klebsiella_pneumoniae_samn51215381	GCF_053691435.1	Klebsiella pneumoniae	recent	pass		SRR35295323	PRJNA1097666	143.3	2679228	149
+klebsiella_pneumoniae_samn46778010	GCF_051414825.1	Klebsiella pneumoniae	recent	warn	estimated depth 27.2 is below the warn limit 30	SRR32399095	PRJNA1084250	27.2	750734	99
+klebsiella_pneumoniae_samn46342761	GCF_055901055.2	Klebsiella pneumoniae	recent	pass		SRR32114315	PRJNA855907	64.7	1407605	129
+klebsiella_pneumoniae_samd01704710	GCF_055397695.1	Klebsiella pneumoniae	recent	pass		DRR792927	PRJDB9509	136.2	2485757	148
+klebsiella_pneumoniae_samn48324032	GCF_053803415.1	Klebsiella pneumoniae	recent	pass		SRR33418226	PRJNA1258574	91.2	1759883	150
+klebsiella_pneumoniae_samn48634104	GCF_054354115.2	Klebsiella pneumoniae	recent	pass		SRR33677415	PRJNA1265869	277.8	5394112	150
+klebsiella_pneumoniae_samn47561074	GCF_049200385.1	Klebsiella pneumoniae subsp. pneumoniae	recent	pass		SRR32896259	PRJNA1241691	261.8	4687410	151
+klebsiella_pneumoniae_samea117996173	GCF_965244935.1	Klebsiella pneumoniae	recent	pass		ERR14846376	PRJEB88497	143.0	5453235	74
+klebsiella_pneumoniae_samn50713146	GCF_056155125.1	Klebsiella pneumoniae	recent	pass		SRR35156766	PRJNA1308800	158.8	2785212	151
+klebsiella_pneumoniae_samn50584032	GCF_056665805.1	Klebsiella pneumoniae	recent	pass		SRR34970232	PRJNA1305022	91.5	1909117	138
+klebsiella_pneumoniae_samd01824729	GCF_059705285.1	Klebsiella pneumoniae	recent	reject	no usable run: DRR911409: run BioProject  is not one of the assembly's ['PRJDB40491']					
+klebsiella_pneumoniae_samea118770097	GCF_988242735.1	Klebsiella pneumoniae	recent	pass		ERR15422796	PRJEB93885	332.9	6128220	150
+klebsiella_pneumoniae_samn53300893	GCF_057813175.1	Klebsiella pneumoniae	recent	pass		SRR36093637	PRJNA1365971	96.5	1819363	150
+klebsiella_pneumoniae_samn53177127	GCF_057961125.1	Klebsiella pneumoniae	recent	pass		SRR36382647	PRJNA1359770	48.9	987574	143
+klebsiella_pneumoniae_samn61880625	GCF_062052460.1	Klebsiella pneumoniae	recent	pass		SRR39775178	PRJNA1499451	42.6	477199	246
+klebsiella_pneumoniae_samn53681262	GCF_054900415.1	Klebsiella pneumoniae	recent	pass		SRR36316113	PRJNA1374223	74.5	1430978	150
+salmonella_enterica_samn51024918	GCF_059100145.1	Salmonella enterica subsp. enterica serovar Paratyphi B var. L(+) tartrate +	recent	pass		SRR35249808	PRJNA937468	93.4	1566579	146
+salmonella_enterica_samea117852469	GCF_965318305.1	Salmonella enterica subsp. enterica serovar Senftenberg	recent	pass		ERR15075953	PRJEB86005	211.3	3666894	150
+salmonella_enterica_samn56333552	GCF_055901675.1	Salmonella enterica	recent	pass		SRR37503338	PRJNA1431981	839.5	13363078	151
+staphylococcus_aureus_samea122715354	GCF_984572975.1	Staphylococcus aureus	recent	pass		ERR17325314	PRJEB113419	275.2	2811495	139
+staphylococcus_aureus_samd00592163	GCF_055392225.1	Staphylococcus aureus	recent	pass		DRR457777	PRJDB15626	62.2	370982	240
+staphylococcus_aureus_samn41430741	GCF_050632115.1	Staphylococcus aureus	recent	pass		SRR33038299	PRJNA1112560	220.8	2060972	151
+staphylococcus_aureus_samea117852471	GCF_965319415.1	Staphylococcus aureus	recent	pass		ERR15076233	PRJEB86005	474.6	4393022	150
+staphylococcus_aureus_samea117852475	GCF_965641735.1	Staphylococcus aureus	recent	pass		ERR15204804	PRJEB86006	249.0	2442700	146
+staphylococcus_aureus_samn60913321	GCF_058680775.1	Staphylococcus aureus	recent	pass		SRR39215577	PRJNA1478877	485.0	4878564	149
+staphylococcus_aureus_samea122657418	GCF_988325505.1	Staphylococcus aureus	recent	pass		ERR18006682	PRJEB92323	97.3	1457099	100
+staphylococcus_aureus_samd00888980	GCF_055394555.1	Staphylococcus aureus	recent	pass		DRR660486	PRJDB20339	62.8	896529	101
+enterobacter_hormaechei_samn02713683	GCF_000750225.1	Enterobacter hormaechei subsp. hoffmannii ECNIH3	older	reject	sequencing evidence has no explicit long-read platform					
+enterobacter_hormaechei_samn02713646	GCF_000750275.1	Enterobacter hormaechei subsp. hoffmannii ECR091	older	reject	sequencing evidence has no explicit long-read platform					
+enterobacter_hormaechei_samn37527804	GCF_032302155.1	Enterobacter hormaechei	older	pass		SRR26201650	PRJNA1020684	111.2	1974317	146
+enterobacter_hormaechei_samn37529174	GCF_032351815.1	Enterobacter hormaechei	older	pass		SRR26162838	PRJNA1020811	84.1	966018	221
+enterobacter_hormaechei_samn41094953	GCF_038627045.1	Enterobacter hormaechei	older	reject	no usable run: SRR28816070: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']					
+enterobacter_hormaechei_samn38049408	GCF_040735515.1	Enterobacter hormaechei	older	pass		SRR26595502	PRJNA1034027	37.8	754578	130
+enterobacter_hormaechei_samn16357575	GCF_019048245.1	Enterobacter hormaechei	older	pass		SRR15075453	PRJNA231221	772.7	12577538	151
+enterobacter_hormaechei_samn41036221	GCF_053523415.1	Enterobacter hormaechei	older	pass		SRR28760590	PRJNA1102395	56.5	984370	149
+enterobacter_hormaechei_samn06330210	GCF_029070185.2	Enterobacter hormaechei	older	pass		SRR21017995	PRJNA867733	255.3	4345124	151
+enterobacter_hormaechei_samn28174038	GCF_024918215.1	Enterobacter hormaechei	older	pass		SRR19165508	PRJNA836696	305.3	5397320	147
+enterobacter_hormaechei_samn04448499	GCF_003408595.1	Enterobacter hormaechei	older	pass		SRR3305282	PRJNA302185	82.1	951209	232
+enterobacter_hormaechei_samn06887342	GCF_003186565.1	Enterobacter hormaechei	older	reject	no usable run: SRR5504142: run BioProject PRJNA389451 is not one of the assembly's ['PRJNA224116', 'PRJNA278886']					
+enterobacter_hormaechei_samn05510455	GCF_003186415.1	Enterobacter hormaechei	older	pass		SRR4019402	PRJNA278886	163.7	1804485	214
+escherichia_coli_samd00172295	GCF_007990655.1	Escherichia coli O111:H-	older	pass		DRR179471	PRJDB8343	131.5	2947462	124
+escherichia_coli_samn12603254	GCF_008124005.1	Escherichia coli O80:H26	older	pass		SRR10013882	PRJNA560883	162.6	1901813	228
+escherichia_coli_samn40323368	GCF_055814345.1	Escherichia coli	older	warn	estimated depth 19.9 is below the warn limit 30	SRR30712546	PRJNA779404	19.9	346345	148
+escherichia_coli_samn19645631	GCF_049569765.1	Escherichia coli O111:NM	older	pass		SRR14865941	PRJNA736395	84.4	809886	301
+escherichia_coli_samn06197014	GCF_001969285.3	Escherichia coli	older	pass		SRR6942783	PRJNA418674	119.6	2044814	150
+escherichia_coli_samn25236401	GCF_022494625.1	Escherichia coli	older	pass		SRR17731591	PRJNA800231	697.7	6971758	251
+escherichia_coli_samn07339706	GCF_002844165.1	Escherichia coli O121:H19	older	pass		SRR5816151	PRJNA393703	108.6	1234586	241
+escherichia_coli_samn20934288	GCF_030515575.1	Escherichia coli	older	pass		SRR21979973	PRJNA757133	70.1	1299090	144
+escherichia_coli_samn07666420	GCF_021166435.1	Escherichia coli O157:H7	older	pass		SRR6118142	PRJNA407949	53.7	664150	225
+escherichia_coli_samn28404986	GCF_023539035.1	Escherichia coli	older	pass		SRR19213040	PRJNA838107	219.9	3697439	147
+escherichia_coli_samn35442802	GCF_060478075.1	Escherichia coli	older	reject	no usable run: SRR24751117: run BioProject PRJNA976817 is not one of the assembly's ['PRJNA1417792', 'PRJNA224116']					
+escherichia_coli_samn04014926	GCF_003204155.1	Escherichia coli	older	pass		SRR3112331	PRJNA292904	113.4	3130793	101
+escherichia_coli_samn45084045	GCF_049666535.1	Escherichia coli	older	pass		SRR31540345	PRJNA1097666	105.4	1879976	146
+escherichia_coli_samn10986381	GCF_004526255.1	Escherichia coli	older	pass		SRR8610346	PRJNA523709	810.8	12590209	151
+escherichia_coli_samn39992808	GCF_038396695.1	Escherichia coli	older	pass		SRR28012668	PRJNA1078256	211.4	3322498	151
+escherichia_coli_samn04191553	GCF_001651945.2	Escherichia coli O157:H7	older	reject	no usable run: SRR2914455: run BioProject PRJNA298331 is not one of the assembly's ['PRJNA224116', 'PRJNA322195']					
+escherichia_coli_samn08724651	GCF_003112185.1	Escherichia coli O26 str. RM8426	older	pass		SRR7827094	PRJNA69927	66.2	759097	250
+escherichia_coli_samn08724662	GCF_003176855.1	Escherichia coli	older	pass		SRR7828259	PRJNA438708	69.5	733877	250
+escherichia_coli_samn12261986	GCF_007922655.1	Escherichia coli O157:H7	older	pass		SRR9694420	PRJNA294158	322.0	3535356	251
+escherichia_coli_samn20824181	GCF_021534925.1	Escherichia coli	older	pass		SRR15497538	PRJNA755469	242.4	4002466	150
+escherichia_coli_samn15402835	GCF_013402855.1	Escherichia coli	older	pass		SRR12123270	PRJNA643009	69.5	751571	247
+escherichia_coli_samn04014847	GCF_002787215.1	Escherichia coli	older	pass		SRR3112258	PRJNA292901	145.7	3861499	101
+escherichia_coli_samn41071119	GCF_046272025.1	Escherichia coli O121	older	pass		SRR11508024	PRJNA1101017	106.5	1274494	230
+escherichia_coli_samn09278797	GCF_003203755.1	Escherichia coli	older	pass		SRR7826316	PRJNA473579	98.9	1710658	163
+escherichia_coli_samn33425314	GCF_030419085.1	Escherichia coli	older	pass		SRR23601487	PRJNA938096	55.1	1055695	141
+escherichia_coli_samn06928084	GCF_003399795.2	Escherichia coli	older	pass		SRR5688545	PRJNA230969	148.5	1796941	210
+escherichia_coli_samn18446033	GCF_019969605.1	Escherichia coli	older	pass		SRR14347962	PRJNA716667	186.0	3132329	151
+escherichia_coli_samn03470769	GCF_000978815.2	Escherichia coli O157:H7	older	pass		SRR14419385	PRJNA280853	86.2	823070	301
+escherichia_coli_samn37529175	GCF_032351055.1	Escherichia coli	older	pass		SRR26162833	PRJNA1020811	68.8	701336	245
+escherichia_coli_samn14503865	GCF_016767775.1	Escherichia coli	older	pass		SRR11476987	PRJNA622257	239.9	3993564	150
+escherichia_coli_samd00231967	GCF_023167605.1	Escherichia coli	older	pass		DRR233591	PRJDB5126	248.4	4278254	151
+escherichia_coli_samn39980286	GCF_052748625.1	Escherichia coli	older	pass		SRR28002306	PRJNA1077717	82.6	1483244	151
+escherichia_coli_samd00056132	GCF_002357875.1	Escherichia coli	older	pass		DRR065948	PRJDB5007	158.3	1377131	300
+escherichia_coli_samd00496013	GCF_025996735.1	Escherichia coli	older	pass		DRR381749	PRJDB13729	57.2	529460	298
+escherichia_coli_samea112856589	GCF_949786305.1	Escherichia coli	older	pass		ERR11181258	PRJEB58678	215.9	5345607	99
+escherichia_coli_samn39334900	GCF_035557515.1	Escherichia coli	older	reject	no usable run: SRR27482348: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']					
+escherichia_coli_samn29503669	GCF_055901515.2	Escherichia coli	older	pass		SRR20994960	PRJNA855907	91.0	1510861	150
+escherichia_coli_samd00566112	GCF_030295505.1	Escherichia coli	older	pass		DRR489893	PRJDB14917	66.2	578778	292
+escherichia_coli_samn20437390	GCF_021166415.1	Escherichia coli O157:H7	older	pass		SRR15277995	PRJNA750123	39.2	568147	198
+escherichia_coli_samn38049409	GCF_040735505.1	Escherichia coli	older	pass		SRR26595501	PRJNA1034027	39.4	781417	122
+escherichia_coli_samn11997559	GCF_019585545.2	Escherichia coli	older	pass		SRR27967204	PRJNA548004	85.5	788698	277
+escherichia_coli_samn10141488	GCF_030991425.1	Escherichia coli	older	pass		SRR7912362	PRJNA493523	204.9	3613847	149
+escherichia_coli_samn06209720	GCF_022559685.1	Escherichia coli	older	pass		SRR5153281	PRJNA418674	129.3	3677392	90
+escherichia_coli_samea115110143	GCF_963924185.1	Escherichia coli	older	pass		ERR12492372	PRJEB71895	40.7	1425814	74
+escherichia_coli_samn16357428	GCF_016903375.1	Escherichia coli	older	pass		SRR13672887	PRJNA231221	468.8	8023036	151
+escherichia_coli_samea112356748	GCF_951802865.1	Escherichia coli O25b:H4-ST131	older	reject	sequencing evidence has no explicit long-read platform					
+escherichia_coli_samn04014990	GCF_002180055.1	Escherichia coli	older	pass		SRR4025997	PRJNA292902	198.9	2244421	218
+escherichia_coli_samn32977649	GCF_028596225.1	Escherichia coli	older	pass		SRR23290089	PRJNA929966	86.0	924523	242
+escherichia_coli_samn38673178	GCF_034642955.1	Escherichia coli	older	pass		SRR27089202	PRJNA1049017	287.2	4978405	147
+escherichia_coli_samn04158281	GCF_006337025.1	Escherichia coli	older	reject	no usable run: SRR2724080: run BioProject PRJNA295003 is not one of the assembly's ['PRJNA224116', 'PRJNA547487']					
+escherichia_coli_samn08737532	GCF_004771135.1	Escherichia coli O18:H1	older	reject	no usable run: SRR8924821: run BioProject PRJNA533466 is not one of the assembly's ['PRJNA224116', 'PRJNA230969']					
+escherichia_coli_samn27988043	GCF_023277345.1	Escherichia coli	older	pass		SRR18972738	PRJNA833419	78.0	911654	230
+escherichia_coli_samn13613895	GCF_014170735.1	Escherichia coli	older	pass		SRR10834214	PRJNA596173	83.2	1314272	150
+escherichia_coli_samn11229489	GCF_013167775.1	Escherichia coli O157:H7	older	pass		SRR15415539	PRJNA528413	111.9	1056717	301
+escherichia_coli_samn32977832	GCF_029855165.1	Escherichia coli	older	pass		SRR24782006	PRJNA924946	253.1	4183380	150
+escherichia_coli_samn22896043	GCF_020868245.1	Escherichia coli	older	pass		SRR16777110	PRJNA630096	119.2	2076896	151
+escherichia_coli_samn11787763	GCF_005885915.1	Escherichia coli O157:H7	older	pass		SRR10258231	PRJNA507262	164.2	2274758	200
+escherichia_coli_samn46014670	GCF_060478235.1	Escherichia coli	older	reject	no usable run: SRR31850151: run BioProject PRJNA1204161 is not one of the assembly's ['PRJNA1417792', 'PRJNA224116']					
+escherichia_coli_samn04159541	GCF_001469815.1	Escherichia coli	older	pass		SRR2970646	PRJNA297860	60.8	1595375	100
+escherichia_coli_samd00077842	GCF_059997555.1	Escherichia coli	older	reject	no usable run: DRR089863: run BioProject PRJDB4303 is not one of the assembly's ['PRJNA1417792', 'PRJNA224116']					
+escherichia_coli_samn41036272	GCF_046713585.1	Escherichia coli	older	pass		SRR28760499	PRJNA1102395	71.2	1225228	149
+escherichia_coli_samn05414625	GCF_002105735.1	Escherichia coli	older	pass		SRR3931165	PRJNA312475	96.2	1249243	190
+escherichia_coli_samn11230749	GCF_007012305.1	Escherichia coli	older	pass		SRR8767398	PRJNA324573	60.9	687632	227
+escherichia_coli_samn08724661	GCF_003586065.1	Escherichia coli O145 str. RM9872	older	pass		SRR7828323	PRJNA69939	64.0	702351	250
+escherichia_coli_samn28174088	GCF_024917815.1	Escherichia coli	older	pass		SRR19165554	PRJNA836696	216.7	3720856	142
+escherichia_coli_samn09729056	GCF_003355175.1	Escherichia coli	older	pass		SRR11850982	PRJNA482002	43.6	1081026	99
+escherichia_coli_samn04549845	GCF_004010675.1	Escherichia coli	older	pass		SRR3224814	PRJNA218110	167.9	1884350	251
+escherichia_coli_samn01112512	GCF_036923335.1	Escherichia coli PA8	older	pass		SRR27967418	PRJNA680392	80.1	790758	282
+escherichia_coli_samn07291527	GCF_003073955.1	Escherichia coli	older	pass		SRR6994977	PRJNA316321	459.5	7293432	151
+escherichia_coli_samn08724616	GCF_003112245.1	Escherichia coli O111 str. RM9322	older	pass		SRR7827093	PRJNA69929	46.0	486091	250
+escherichia_coli_samn13948685	GCF_024918915.1	Escherichia coli	older	pass		SRR11148635	PRJNA603908	96.8	3562937	75
+escherichia_coli_samn07162922	GCF_002193095.1	Escherichia coli	older	pass		SRR8182925	PRJNA387731	190.1	2586514	188
+escherichia_coli_samea6471236	GCF_013201525.1	Escherichia coli	older	pass		ERR3931062	PRJEB36175	92.0	1523770	150
+escherichia_coli_samn08724650	GCF_003112165.1	Escherichia coli O103 str. RM8385	older	pass		SRR7828044	PRJNA69931	63.3	725057	250
+escherichia_coli_samn08165042	GCF_003112205.1	Escherichia coli O43 str. RM10042	older	pass		SRR7828257	PRJNA69937	100.9	1066287	249
+escherichia_coli_samn04448503	GCF_003410275.1	Escherichia coli	older	pass		SRR3305404	PRJNA302185	114.7	1243588	230
+escherichia_coli_samn40123740	GCF_037225585.1	Escherichia coli	older	pass		SRR39132931	PRJNA1007270	161.5	2891907	146
+escherichia_coli_samn10531264	GCF_009931235.1	Escherichia coli O157:H7	older	pass		SRR8292155	PRJNA508805	90.5	1020228	251
+escherichia_coli_samn08724618	GCF_003112145.1	Escherichia coli O121 str. RM8352	older	pass		SRR7828054	PRJNA69933	70.7	772778	250
+escherichia_coli_samd00297130	GCF_018323825.1	Escherichia coli	older	pass		DRR286856	PRJDB11508	51.2	878837	150
+klebsiella_pneumoniae_samn37684971	GCF_032759475.1	Klebsiella pneumoniae	older	pass		SRR26280620	PRJNA1023934	471.0	8971185	151
+klebsiella_pneumoniae_samn14453497	GCF_012029895.2	Klebsiella pneumoniae	older	pass		SRR14532150	PRJNA395086	105.2	1921741	151
+klebsiella_pneumoniae_samn18913844	GCF_018283505.2	Klebsiella pneumoniae subsp. pneumoniae	older	pass		SRR14348061	PRJNA725484	53.7	1053021	151
+klebsiella_pneumoniae_samn03455995	GCF_004322995.1	Klebsiella pneumoniae	older	reject	no usable run: SRR8778553: could not retrieve run-info row for SRR8778553 | SRR8778554: could not retrieve run-info row for SRR8778554					
+klebsiella_pneumoniae_samea6990795	GCF_903936275.2	Klebsiella pneumoniae	older	pass		ERR4280209	PRJEB38818	292.9	5902876	148
+klebsiella_pneumoniae_samn11618737	GCF_010586985.1	Klebsiella pneumoniae	older	pass		SRR9861757	PRJNA542320	415.9	7948408	151
+klebsiella_pneumoniae_samn22024798	GCF_020525905.1	Klebsiella pneumoniae	older	pass		SRR16202841	PRJNA768294	263.0	4929457	145
+klebsiella_pneumoniae_samn02141993	GCF_000406765.2	Klebsiella pneumoniae 500_1420	older	pass		SRR849554	PRJNA193167	285.1	7830703	101
+klebsiella_pneumoniae_samn28404990	GCF_023538975.1	Klebsiella pneumoniae	older	pass		SRR19213007	PRJNA838107	168.7	3228914	147
+klebsiella_pneumoniae_samn04014887	GCF_003571745.1	Klebsiella pneumoniae	older	pass		SRR3112314	PRJNA292904	103.4	2952859	101
+klebsiella_pneumoniae_samn38194382	GCF_054693465.1	Klebsiella pneumoniae	older	pass		SRR26779474	PRJNA1037605	228.9	4419707	150
+klebsiella_pneumoniae_samea6081871	GCF_902723705.1	Klebsiella pneumoniae	older	pass		ERR3589645	PRJEB34867	81.5	1589445	145
+klebsiella_pneumoniae_samn02141972	GCF_000417265.2	Klebsiella pneumoniae UHKPC07	older	pass		SRR849533	PRJNA187296	265.0	7246857	101
+klebsiella_pneumoniae_samn39725114	GCF_036542045.1	Klebsiella pneumoniae	older	pass		SRR27842369	PRJNA1072026	74.6	1330917	151
+klebsiella_pneumoniae_samn13874936	GCF_021497265.1	Klebsiella pneumoniae	older	pass		SRR11747685	PRJNA601835	220.2	4219802	150
+klebsiella_pneumoniae_samn03455930	GCF_001663295.1	Klebsiella pneumoniae	older	pass		SRR3217430	PRJNA279611	415.2	4000000	300
+klebsiella_pneumoniae_samn01057611	GCF_000281535.2	Klebsiella pneumoniae subsp. pneumoniae KPNIH1	older	reject	sequencing evidence has no explicit long-read platform					
+klebsiella_pneumoniae_samn37529176	GCF_032348595.1	Klebsiella pneumoniae	older	pass		SRR26162832	PRJNA1020811	72.5	1438164	138
+klebsiella_pneumoniae_samn15086847	GCF_014170015.1	Klebsiella pneumoniae	older	pass		SRR11909882	PRJNA636827	95.4	1124989	239
+klebsiella_pneumoniae_samd00237915	GCF_014905815.1	Klebsiella pneumoniae	older	reject	sequencing evidence has no explicit long-read platform					
+klebsiella_pneumoniae_samn34258006	GCF_030020765.1	Klebsiella pneumoniae subsp. pneumoniae	older	pass		SRR25867762	PRJNA957586	55.8	616907	251
+klebsiella_pneumoniae_samn39334901	GCF_035557615.1	Klebsiella pneumoniae	older	reject	no usable run: SRR27482347: run BioProject PRJNA288601 is not one of the assembly's ['PRJNA812595']					
+klebsiella_pneumoniae_samn06438459	GCF_002156745.1	Klebsiella pneumoniae	older	pass		SRR5386689	PRJNA376414	59.9	1891450	94
+klebsiella_pneumoniae_samn29503774	GCF_056488085.2	Klebsiella pneumoniae	older	pass		SRR20994906	PRJNA855907	54.5	1093537	144
+klebsiella_pneumoniae_samn38049405	GCF_040735615.1	Klebsiella pneumoniae	older	pass		SRR26595505	PRJNA1034027	30.8	711991	126
+klebsiella_pneumoniae_samn02713685	GCF_000695935.1	Klebsiella pneumoniae subsp. pneumoniae KPNIH27	older	reject	sequencing evidence has no explicit long-read platform					
+klebsiella_pneumoniae_samn02786855	GCF_000714675.1	Klebsiella pneumoniae subsp. pneumoniae KPNIH24	older	reject	sequencing evidence has no explicit long-read platform					
+klebsiella_pneumoniae_samn16357451	GCF_016903955.1	Klebsiella pneumoniae	older	pass		SRR13673978	PRJNA231221	480.8	8923491	151
+klebsiella_pneumoniae_samn04014970	GCF_002180295.1	Klebsiella pneumoniae	older	pass		SRR4025987	PRJNA292902	67.7	832817	237
+klebsiella_pneumoniae_samn06112194	GCF_904863335.2	Klebsiella pneumoniae	older	reject	no usable run: SRR5082451: run BioProject PRJNA351909 is not one of the assembly's ['PRJNA224116', 'PRJNA646837']					
+klebsiella_pneumoniae_samn03733793	GCF_001902255.1	Klebsiella pneumoniae	older	pass		SRR2965692	PRJNA246471	126.0	2335055	151
+klebsiella_pneumoniae_samn21399028	GCF_020080145.1	Klebsiella pneumoniae	older	pass		SRR16069088	PRJNA757181	366.0	6902278	150
+klebsiella_pneumoniae_samn02141981	GCF_000417225.2	Klebsiella pneumoniae DMC1097	older	pass		SRR849542	PRJNA187290	271.7	7681233	101
+klebsiella_pneumoniae_samn28173997	GCF_024917935.1	Klebsiella pneumoniae	older	pass		SRR19165516	PRJNA836696	188.9	3621838	147
+klebsiella_pneumoniae_samn07265011	GCF_002211905.1	Klebsiella pneumoniae	older	pass		SRR6317420	PRJNA391323	107.1	1377583	226
+klebsiella_pneumoniae_samn16197931	GCF_014788765.1	Klebsiella pneumoniae	older	pass		SRR12662231	PRJNA664089	78.6	949663	232
+klebsiella_pneumoniae_samn07291531	GCF_003073675.1	Klebsiella pneumoniae	older	pass		SRR6985677	PRJNA316321	445.9	8599086	151
+klebsiella_pneumoniae_samn15547544	GCF_023703875.1	Klebsiella pneumoniae	older	pass		SRR12233577	PRJNA646592	77.3	1376796	149
+klebsiella_pneumoniae_samn03455989	GCF_004322955.1	Klebsiella pneumoniae	older	pass		SRR8778550	PRJNA279669	426.3	3990935	300
+klebsiella_pneumoniae_samn13324146	GCF_058119555.1	Klebsiella pneumoniae	older	pass		SRR10491331	PRJNA590288	478.6	8415943	150
+klebsiella_pneumoniae_samn18874709	GCF_019928625.2	Klebsiella pneumoniae	older	pass		SRR26412269	PRJNA717739	183.6	1675071	299
+klebsiella_pneumoniae_samn04448505	GCF_003408615.1	Klebsiella pneumoniae	older	pass		SRR3305477	PRJNA302185	79.3	1029050	234
+klebsiella_pneumoniae_samn42440391	GCF_041004885.1	Klebsiella pneumoniae	older	pass		SRR39926708	PRJNA1135755	296.8	5747846	151
+klebsiella_pneumoniae_samn02786856	GCF_000717515.1	Klebsiella pneumoniae subsp. pneumoniae KPR0928	older	reject	sequencing evidence has no explicit long-read platform					
+klebsiella_pneumoniae_samn40123773	GCF_037283275.1	Klebsiella pneumoniae	older	pass		SRR39132944	PRJNA1007270	269.4	4976369	145
+klebsiella_pneumoniae_samn18487814	GCF_020172745.1	Klebsiella pneumoniae	older	pass		SRR20215787	PRJNA717148	307.6	5863336	150
+klebsiella_pneumoniae_samn06040387	GCF_002935085.1	Klebsiella pneumoniae	older	reject	no usable run: SRR6519356: could not retrieve run-info row for SRR6519356 | SRR6519357: could not retrieve run-info row for SRR6519357					
+klebsiella_pneumoniae_samn04448219	GCF_001704235.1	Klebsiella pneumoniae	older	pass		SRR3219268	PRJNA296771	117.0	1300151	250
+klebsiella_pneumoniae_samn01057614	GCF_000281435.2	Klebsiella pneumoniae subsp. pneumoniae KPNIH10	older	reject	sequencing evidence has no explicit long-read platform					
+klebsiella_pneumoniae_samn07766632	GCF_027941975.1	Klebsiella pneumoniae subsp. pneumoniae	older	reject	no usable run: SRR6165292: run BioProject PRJNA413541 is not one of the assembly's ['PRJNA224116', 'PRJNA472804']					
+klebsiella_pneumoniae_samn07503096	GCF_002812365.1	Klebsiella pneumoniae	older	pass		SRR5931376	PRJNA397262	119.5	1418143	237
+klebsiella_pneumoniae_samn44266223	GCF_049354595.1	Klebsiella pneumoniae	older	reject	no usable run: SRR30971645: run BioProject PRJNA1172271 is not one of the assembly's ['PRJNA1178099']					
+klebsiella_pneumoniae_samn05774083	GCF_003186535.1	Klebsiella pneumoniae	older	pass		SRR4245476	PRJNA278886	94.2	1299795	195
+salmonella_enterica_samn03702839	GCF_002128365.1	Salmonella enterica subsp. enterica serovar Enteritidis	older	pass		SRR2074998	PRJNA242847	83.0	1316870	149
+salmonella_enterica_samn12603253	GCF_008124445.1	Salmonella enterica subsp. enterica serovar Bredeney	older	pass		SRR10013892	PRJNA560883	188.5	1750107	273
+salmonella_enterica_samd00264093	GCF_059739445.1	Salmonella enterica	older	reject	sequencing evidence has no explicit long-read platform					
+salmonella_enterica_samn01942254	GCF_004847885.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000960	older	reject	no usable run: SRR4243004: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498433: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972868: run BioProject PRJNA162837 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn00991047	GCF_004848685.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000752	older	reject	no usable run: SRR4121060: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202535: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498403: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972872: run BioProject PRJNA162811 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn00991044	GCF_004848885.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000669	older	reject	no usable run: SRR4242798: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498399: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972867: run BioProject PRJNA162805 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn00991046	GCF_004848545.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000700	older	reject	no usable run: SRR4242799: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498402: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972865: run BioProject PRJNA162809 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn36398950	GCF_034447935.1	Salmonella enterica subsp. enterica serovar Abortusovis	older	pass		SRR25229471	PRJNA993380	287.7	4767286	146
+salmonella_enterica_samn06045033	GCF_002234735.2	Salmonella enterica subsp. enterica serovar Saintpaul	older	pass		SRR5056552	PRJNA354244	65.8	545561	296
+salmonella_enterica_samn09373897	GCF_003231095.1	Salmonella enterica subsp. enterica serovar Anatum	older	pass		SRR7665547	PRJNA474787	59.6	480428	298
+salmonella_enterica_samn04014872	GCF_002947135.1	Salmonella enterica subsp. enterica serovar Typhimurium	older	pass		SRR3112281	PRJNA292901	113.8	2796631	101
+salmonella_enterica_samn04160828	GCF_002208315.1	Salmonella enterica subsp. enterica serovar Quebec str. S-1267	older	reject	sequencing evidence has no explicit long-read platform					
+salmonella_enterica_samn13002973	GCF_009650395.1	Salmonella enterica subsp. enterica serovar Muenchen	older	pass		SRR11101397	PRJNA576706	45.6	509284	236
+salmonella_enterica_samn01942268	GCF_004847605.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000968	older	reject	no usable run: SRR4123060: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202541: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498442: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972860: run BioProject PRJNA163181 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn01816352	GCF_004847005.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001140	older	reject	no usable run: SRR1258440: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4243005: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972862: run BioProject PRJNA170556 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn01816351	GCF_004847145.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001118	older	reject	no usable run: SRR1258443: run BioProject PRJNA170555 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972839: run BioProject PRJNA170555 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn01942313	GCF_004847585.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000952	older	reject	no usable run: SRR4121267: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202537: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498423: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972870: run BioProject PRJNA162819 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn15350026	GCF_022870605.1	Salmonella enterica	older	pass		SRR12084634	PRJNA641324	275.0	4696392	150
+salmonella_enterica_samn08125525	GCF_003032035.1	Salmonella enterica subsp. enterica serovar Enteritidis	older	pass		SRR6347377	PRJNA420913	540.1	6048073	213
+salmonella_enterica_samn09534371	GCF_003312565.1	Salmonella enterica subsp. enterica serovar Enteritidis	older	reject	no usable run: SRR39504618: run BioProject PRJNA523425 is not one of the assembly's ['PRJNA224116', 'PRJNA230403']					
+salmonella_enterica_samn14504560	GCF_016454645.1	Salmonella enterica subsp. enterica serovar Heidelberg	older	pass		SRR11457568	PRJNA622256	51.6	499301	264
+salmonella_enterica_samn01816359	GCF_004847505.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001115	older	reject	no usable run: SRR1258442: run BioProject PRJNA170563 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972869: run BioProject PRJNA170563 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn00991048	GCF_004848405.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000753	older	reject	no usable run: SRR4242800: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498404: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970539: run BioProject PRJNA162813 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn01942300	GCF_004848145.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000958	older	reject	no usable run: SRR4121328: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202538: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498431: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972874: run BioProject PRJNA162833 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn01816358	GCF_004847525.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN001112	older	reject	no usable run: SRR1258439: run BioProject PRJNA170562 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970547: run BioProject PRJNA170562 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn01942244	GCF_004847345.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000954	older	reject	no usable run: SRR4243003: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498425: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972863: run BioProject PRJNA162823 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn13450458	GCF_016026715.1	Salmonella enterica	older	pass		SRR12046724	PRJNA231221	424.6	6961923	151
+salmonella_enterica_samn04014968	GCF_003571625.1	Salmonella enterica subsp. enterica serovar Senftenberg	older	pass		SRR3112287	PRJNA292902	127.7	3265036	101
+salmonella_enterica_samn32977646	GCF_028596185.1	Salmonella enterica subsp. enterica serovar Typhimurium	older	pass		SRR23290092	PRJNA929966	60.8	633226	238
+salmonella_enterica_samn01942296	GCF_004847545.1	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000970	older	reject	no usable run: SRR4123219: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202542: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498444: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5972838: run BioProject PRJNA163185 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn22551429	GCF_020736305.1	Salmonella enterica	older	pass		SRR17276216	PRJNA774121	121.9	1241442	247
+salmonella_enterica_samn40577691	GCF_059100645.1	Salmonella enterica subsp. enterica serovar 4,5,12:i:-	older	pass		SRR31567514	PRJNA1090884	36.5	620160	146
+salmonella_enterica_samn11787767	GCF_005885855.1	Salmonella enterica subsp. enterica serovar Typhimurium	older	pass		SRR10252857	PRJNA507262	200.9	2091840	236
+salmonella_enterica_samn01805332	GCF_000487035.2	Salmonella enterica subsp. enterica serovar Muenster str. 0315	older	pass		SRR5819474	PRJNA78397	78.8	842602	232
+salmonella_enterica_samn04285042	GCF_001931555.1	Salmonella enterica subsp. enterica serovar Infantis	older	pass		SRR2939562	PRJNA292666	53.8	1011106	134
+salmonella_enterica_samn08868685	GCF_003589845.1	Salmonella enterica subsp. enterica serovar Dublin	older	pass		SRR6952646	PRJNA448882	80.2	799483	255
+salmonella_enterica_samn13002763	GCF_009650355.1	Salmonella enterica subsp. enterica serovar Muenchen	older	pass		SRR11101341	PRJNA576703	58.3	643988	238
+salmonella_enterica_samn20057411	GCF_019105565.1	Salmonella enterica	older	reject	no usable run: SRR15038761: run BioProject PRJNA230403 is not one of the assembly's ['PRJNA224116', 'PRJNA812595']					
+salmonella_enterica_samn02261218	GCF_001535315.2	Salmonella enterica subsp. enterica serovar Tennessee	older	pass		SRR965704	PRJNA183850	92.4	967535	236
+salmonella_enterica_samn03988471	GCF_001931595.1	Salmonella enterica subsp. enterica serovar Infantis	older	pass		SRR2407791	PRJNA292661	81.8	755939	273
+salmonella_enterica_samn02568587	GCF_001612515.1	Salmonella enterica subsp. enterica serovar Weltevreden str. 1655	older	pass		SRR3173804	PRJNA161807	102.6	1121370	235
+salmonella_enterica_samn08274661	GCF_003986675.1	Salmonella enterica subsp. enterica serovar Typhimurium var. 5-	older	reject	no usable run: SRR6428559: run BioProject PRJNA215355 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn03485833	GCF_001448485.2	Salmonella enterica subsp. enterica serovar Kentucky str. SA20030505	older	pass		SRR1976227	PRJNA177315	79.2	768000	250
+salmonella_enterica_samn11030399	GCF_030863765.1	Salmonella enterica subsp. enterica serovar 4,12:i:-	older	pass		SRR22858477	PRJNA417863	126.3	1189003	264
+salmonella_enterica_samn11877932	GCF_024266245.1	Salmonella enterica subsp. enterica serovar Newport	older	warn	estimated depth 28.7 is below the warn limit 30	SRR9140734	PRJNA478278	28.7	244815	295
+salmonella_enterica_samn01041085	GCF_000335875.2	Salmonella enterica subsp. enterica serovar Enteritidis str. 18569	older	pass		SRR2544673	PRJNA41929	129.7	1473164	209
+salmonella_enterica_samn05414452	GCF_001973275.2	Salmonella enterica subsp. enterica serovar Enteritidis	older	pass		SRR5064816	PRJNA186035	227.4	3687209	146
+salmonella_enterica_samn00991042	GCF_000698515.2	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000661	older	reject	no usable run: SRR4121020: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR4202534: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR498397: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116'] | SRR5970548: run BioProject PRJNA162801 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+salmonella_enterica_samn13191647	GCF_009664595.1	Salmonella enterica subsp. enterica serovar Typhimurium	older	pass		SRR10520186	PRJNA556438	204.1	3486129	148
+salmonella_enterica_samn13002952	GCF_009650375.1	Salmonella enterica subsp. enterica serovar Muenchen	older	pass		SRR11101395	PRJNA576705	52.7	580058	238
+salmonella_enterica_samn38321309	GCF_045287905.1	Salmonella enterica	older	reject	no usable run: SRR26899135: run BioProject PRJNA1042815 is not one of the assembly's ['PRJNA1087001'] | SRR26899147: run BioProject PRJNA1042815 is not one of the assembly's ['PRJNA1087001']					
+salmonella_enterica_samn01823701	GCF_000439415.2	Salmonella enterica subsp. enterica serovar Bareilly str. CFSAN000189	older	reject	no usable run: SRR498276: run BioProject PRJNA159279 is not one of the assembly's ['PRJNA186035', 'PRJNA224116']					
+staphylococcus_aureus_samn45134312	GCF_047359885.1	Staphylococcus aureus	older	pass		SRR31579295	PRJNA1193226	123.6	1602094	111
+staphylococcus_aureus_samn04966149	GCF_001717705.1	Staphylococcus aureus	older	pass		SRR6484430	PRJNA321120	385.9	3519933	161
+staphylococcus_aureus_samd00436748	GCF_023170025.1	Staphylococcus aureus	older	pass		DRR359630	PRJDB12844	2590.0	14601157	250
+staphylococcus_aureus_samd00134209	GCF_003573835.1	Staphylococcus aureus	older	reject	no usable run: DRR160049: run BioProject PRJDB7268 is not one of the assembly's ['PRJDB7266', 'PRJNA224116']					
+staphylococcus_aureus_samn13948039	GCF_010364725.2	Staphylococcus aureus	older	pass		SRR14923825	PRJNA604020	60.0	575791	144
+staphylococcus_aureus_samn38221212	GCF_040047685.1	Staphylococcus aureus	older	pass		SRR26799573	PRJNA1039545	922.8	8448529	151
+staphylococcus_aureus_samn35018951	GCF_030064005.1	Staphylococcus aureus	older	pass		SRR24520268	PRJNA971005	136.2	788652	238
+staphylococcus_aureus_samn03763989	GCF_002633865.1	Staphylococcus aureus	older	pass		SRR5912682	PRJNA494566	224.4	1360687	227
+staphylococcus_aureus_samn41071129	GCF_046272165.1	Staphylococcus aureus	older	pass		SRR28565969	PRJNA1101017	155.1	906131	236
+staphylococcus_aureus_samn14225473	GCF_017088385.1	Staphylococcus aureus	older	pass		SRR14933396	PRJNA703736	99.7	941642	148
+staphylococcus_aureus_samn38504044	GCF_037993065.1	Staphylococcus aureus	older	pass		SRR26992869	PRJNA1046639	105.5	1006787	145
+staphylococcus_aureus_samd00225532	GCF_023170045.1	Staphylococcus aureus	older	pass		DRR227240	PRJDB9778	163.5	1171986	205
+staphylococcus_aureus_samn04966147	GCF_001717975.2	Staphylococcus aureus	older	pass		SRR6484424	PRJNA321118	421.7	3520956	173
+staphylococcus_aureus_samn08999370	GCF_003111725.1	Staphylococcus aureus	older	pass		SRR7445585	PRJNA454172	57.7	282338	301
+staphylococcus_aureus_samn38194530	GCF_050916375.1	Staphylococcus aureus	older	pass		SRR26779606	PRJNA1037612	420.2	3983607	150
+staphylococcus_aureus_samn02604217	GCF_000144955.2	Staphylococcus aureus subsp. aureus JKD6159	older	pass		SRR21386014	PRJNA50759	351.5	3422121	146
+staphylococcus_aureus_samn32885235	GCF_028596045.1	Staphylococcus aureus	older	reject	no usable run: SRR23198383: run BioProject PRJNA533550 is not one of the assembly's ['PRJNA224116', 'PRJNA288601']					
+staphylococcus_aureus_samn16357255	GCF_016727585.1	Staphylococcus aureus	older	pass		SRR12934882	PRJNA231221	1204.6	11074619	151
+staphylococcus_aureus_samn32977648	GCF_028596145.1	Staphylococcus aureus	older	pass		SRR23290090	PRJNA929966	52.3	307496	234
+staphylococcus_aureus_samn26198721	GCF_049857195.1	Staphylococcus aureus	older	pass		SRR18507868	PRJNA800017	214.2	1204981	251
+staphylococcus_aureus_samn39141515	GCF_040315025.1	Staphylococcus aureus	older	pass		SRR27362901	PRJNA1057774	459.7	4308956	150
+staphylococcus_aureus_samn40554538	GCF_045347025.1	Staphylococcus aureus	older	pass		SRR28396802	PRJNA1090044	51.8	381016	196
+staphylococcus_aureus_samn27101937	GCF_023658665.1	Staphylococcus aureus	older	pass		SRR26205258	PRJNA607328	402.6	2036034	276
+staphylococcus_aureus_samn15354353	GCF_016894285.1	Staphylococcus aureus	older	pass		SRR12079188	PRJNA641487	199.0	1889856	148
+staphylococcus_aureus_samn04901609	GCF_003193705.1	Staphylococcus aureus	older	pass		SRR6985639	PRJNA316321	526.8	5064731	151
+staphylococcus_aureus_samn11157607	GCF_008244725.1	Staphylococcus aureus	older	pass		SRR10040052	PRJNA527676	147.1	891465	238
+staphylococcus_aureus_samn23247394	GCF_054392195.1	Staphylococcus aureus	older	pass		SRR16971212	PRJNA781402	159.1	1908060	122
+staphylococcus_aureus_samn07291561	GCF_003203615.1	Staphylococcus aureus	older	reject	no usable run: SRR39666810: run BioProject PRJNA391514 is not one of the assembly's ['PRJNA224116', 'PRJNA316321']					
+staphylococcus_aureus_samn17983076	GCF_018093105.1	Staphylococcus aureus	older	reject	no usable run: SRR13745243: run BioProject PRJNA703008 is not one of the assembly's ['PRJNA224116', 'PRJNA703966']					
+staphylococcus_aureus_samn06480665	GCF_002025145.1	Staphylococcus aureus	older	pass		SRR5320244	PRJNA378149	110.1	545473	283
+staphylococcus_aureus_samn09220587	GCF_003991015.1	Staphylococcus aureus	older	pass		SRR7179412	PRJNA471840	436.1	8660629	70
