@@ -17,12 +17,22 @@ Paired differences d = effect + study effect + isolate noise. Structures: 5, 6, 
 | **Two heavy studies (80% of isolates)** | **Cluster t 79%, 69%**; studentised 85%, 81%; percentile 88%, 87%. |
 | One dominant species of 3 (stratified), 12 and 24 studies | Cluster t 88%, 93%; percentile 74%, 86%. |
 
+## The percentile fallback, and its validation
+Because cluster t cannot cover when one study dominates, `resampling.interval()` now uses the percentile cluster bootstrap whenever one study holds more than 30% of the observations (`PLASBENCH_DOMINANT_SHARE`; `PLASBENCH_DOMINANT_FALLBACK=0` turns it off; pre-registration row `dominant_study_share`, proposed). The leaderboard and the paired tables record the method used (`ci_method`), the largest study share (`max_cluster_share`) and a `dominant_study` flag, and the report's Headline design tab shows them. The second full run measured this rule as its own column (`leaderboard_*`):
+
+| Structure | Cluster t alone | Leaderboard rule (with fallback) |
+|---|---|---|
+| Balanced, 5-30 studies | 94-96% | unchanged (94-96%) |
+| One dominant study, 12 / 20 studies | 72% / 64% | 90% / 91% |
+| Two heavy studies, 12 / 20 studies | 79% / 69% | 88% / 87% |
+| One dominant species (stratified), 12 / 24 studies | 88% / 93% | unchanged (the dominance rule is per study, not per species) |
+
 ## What this means for the report
 - The tests and Holm-adjusted tests can be read as calibrated for 6 or more independent studies under these structures.
-- The cluster-t interval is the best method for balanced and moderately unbalanced cohorts and the worst when one or two studies hold most of the isolates. No method is adequate everywhere.
-- A cohort where one study holds roughly a third or more of the isolates should have its intervals read as optimistic, or be analysed with the percentile bootstrap (`PLASBENCH_CI_METHOD=percentile`), which is the least bad there.
-- The procedures stay **provisional** (`simulate_validation.overall_status()` says so, per number of studies).
-- Not changed here: an automatic fallback to the percentile bootstrap when one study dominates would be a separate decision.
+- The fallback removes the worst under-coverage (64-79%) but not the shortfall: the percentile bootstrap is still below 95% with a dominant study (87-91%). Intervals from such a cohort are optimistic, and the report says so.
+- A dominant species is a separate weakness (88-93% with a stratified interval) that this rule does not address.
+- The procedures stay **provisional** (`simulate_validation.overall_status()`, per number of studies).
+- This is statistical calibration under simulated structures; validation on a real multi-study cohort is still outstanding.
 
 ## Limits of this study
 Monte Carlo error is about 0.007 for a rate near 0.05 and 0.011 near 0.9 with 1,000 replicates; the Holm comparisons are independent (real tool pairs share tools, which makes Holm more conservative); species effects were equal across species; the simulated structures are not the shipped cohorts, so a conclusion about a particular cohort needs a run with its own number of studies and structure.

@@ -49,7 +49,7 @@ from truth_provenance import independence as derive_independence, reference_grou
 from resampling import (  # noqa: E402,F401
     exact_mean, macro_mean, resampling_units, stratified_bootstrap, stratified_permutation, ratio_bootstrap,
 )
-from resampling import interval as resampling_interval, INTERVAL_METHOD  # noqa: E402,F401
+from resampling import interval as resampling_interval, interval_method_used, dominant_share, INTERVAL_METHOD  # noqa: E402,F401
 
 TASK_CLASSIFICATION = "classification"
 TASK_BINNING = "binning_reconstruction"
@@ -306,8 +306,8 @@ def pair_statistics(diffs, groups, strata):
     worker processes; every resampling call seeds its own RNG, so the result
     does not depend on which process runs it or in what order.
     """
-    low, high = resampling_interval(diffs, groups, strata)   # INTERVAL_METHOD (PLASBENCH_CI_METHOD), chosen by simulation
-    return low, high, stratified_permutation(diffs, groups, strata)
+    low, high = resampling_interval(diffs, groups, strata)   # INTERVAL_METHOD (PLASBENCH_CI_METHOD), or the percentile bootstrap when one study dominates
+    return low, high, stratified_permutation(diffs, groups, strata), interval_method_used(diffs, groups, strata)
 
 
 def map_pair_statistics(jobs, workers=None):
@@ -381,6 +381,7 @@ def ranking_fields(tool, by_tool, shared, design, metric):
     low, high = resampling_interval(values, groups, strata)
     return {"ranking_metric": metric, "ranking_score": macro_mean(values, strata),
             "ranking_ci_low": low, "ranking_ci_high": high, "ranking_species_basis": basis,
+            "ci_method": interval_method_used(values, groups, strata), "max_cluster_share": dominant_share(values, groups),
             "n_headline_species": len(set(strata)) if strata else 0, "n_ranking_clusters": len(set(groups))}
 
 

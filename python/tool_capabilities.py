@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import sys
 from pathlib import Path
 
 ANALYSIS_TRACKS = ("short_read", "long_read", "hybrid")
@@ -15,11 +16,27 @@ BIN_SCORED_TASKS = ("binning_reconstruction", "sequence_reassembly")   # their o
 LEGACY_TASKS = {"reconstruction": "binning_reconstruction"}              # the name before the three-way split
 
 
+CLASSIFIER_CLASSES = ("classification", "ml_classification", "baseline")
+
+
 def derived_task(row):
-    """The task of a registry row that does not name one (an older registry, a test fixture): the answer it always gave, now with reassemblers told apart."""
-    if (row.get("binning_capable") or "").strip().lower() != "yes":
-        return "classification"
-    return "sequence_reassembly" if (row.get("method_class") or "").strip() == "reassembly" else "binning_reconstruction"
+    """The task of a registry row that does not name one (an older registry, a user tool, a test fixture), from its method class and binning_capable. Strict: a row whose two
+    declarations contradict each other is an error, never silently a classifier.
+
+      method_class reassembly                 -> sequence_reassembly (a reassembler is never a classifier, whatever binning_capable says)
+      binning_capable yes                     -> binning_reconstruction
+      binning_capable no                      -> classification
+      binning/reassembly class that is not bin-scored, or a classifier that is -> ValueError"""
+    method, bins = (row.get("method_class") or "").strip(), (row.get("binning_capable") or "").strip().lower()
+    if method == "reassembly":
+        return "sequence_reassembly"
+    if bins == "yes":
+        if method in CLASSIFIER_CLASSES:
+            raise ValueError(f"{row.get('tool', '?')}: method_class {method} contradicts binning_capable=yes; state evaluation_task explicitly")
+        return "binning_reconstruction"
+    if method == "binning":
+        raise ValueError(f"{row.get('tool', '?')}: method_class binning contradicts binning_capable={bins or 'missing'}; state evaluation_task explicitly")
+    return "classification"
 
 
 def evaluation_task(row):
@@ -44,6 +61,9 @@ def read_capabilities(path):
             if row.get("binning_capable") not in {"yes", "no"}:
                 raise ValueError(f"{tool}: binning_capable must be yes/no")
             task = evaluation_task(row)
+            if not (row.get("evaluation_task") or "").strip():
+                sys.stderr.write(f"[tool_capabilities] WARNING: {tool} declares no evaluation_task; derived {task} from method_class={row.get('method_class', '')!r} "
+                                 f"and binning_capable={row.get('binning_capable')}. State it explicitly in the registry.\n")
             if task not in EVALUATION_TASKS:
                 raise ValueError(f"{tool}: evaluation_task must be one of {EVALUATION_TASKS}")
             if (row.get("evaluation_task") or "").strip() and (task == "classification") != (row.get("binning_capable") == "no"):
