@@ -349,6 +349,7 @@ score_sample() {
                 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "best-match bin scoring failed for $SAMPLE/$tool"
             python3 "$HERE/../python/bin_agreement.py" dissim --labels "$CONTIG_LABELS" --bins "$RDIR/pred_${tool}.bins.tsv" \
                 --sample "$SAMPLE" --tool "$tool" --min-length "$CONTIG_MIN_LENGTH" --alpha "$DISSIMILARITY_ALPHA" \
+                --repeats "$DISSIMILARITY_REPEATS" --max-calls "$DISSIMILARITY_MAX_CALLS" \
                 --export-prefix "$RDIR/${tool}.plaseval" --out "$RDIR/${tool}.dissim.tsv" \
                 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log" || warn "bin dissimilarity failed for $SAMPLE/$tool"
         fi

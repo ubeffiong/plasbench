@@ -20,6 +20,38 @@ history is lost, only the numbering is cleaner. See
 - Documentation: the Methods document no longer describes the retired track-specific CPRR endpoint or the three-class independence names; the guide lists `public-v3`; `test_docs_consistency.py` checks tasks, endpoints, independence classes, cohorts, the interval defaults and the proposed pre-registration rows against the code.
 - AMR placement: a regression fixture shows that agreement of the replicon type does not make a placement correct.
 
+### Added -- repeat-aware PlasEval dissimilarity, checked against the original program
+- `bin_agreement.py` now pairs the copies of a contig that sits in several bins, as PlasEval does (a maximal matching per repeat family, the lowest total dissimilarity found by branch and bound; every copy counts in the normaliser). `--repeats drop` keeps the earlier first-copy behaviour; `DISSIMILARITY_REPEATS` and `DISSIMILARITY_MAX_CALLS` configure it. A search that reaches the cap keeps the best pairing found and is marked `capped` in the new `dissim_repeat_search` column; `dissim_repeat_families` counts the repeat families.
+- `scores.tsv` also records the dissimilarity at length exponent 0 and 1 (`bin_dissimilarity_alpha0`, `bin_dissimilarity_alpha1`) beside the configured alpha (default 0.5), so a reader can see whether a verdict depends on how contig length is weighted.
+- `test/test_plaseval_crosscheck.py` now compares the dissimilarity in every case, including hand-built and seeded random cases with repeated contigs. Run on Linux against `github.com/acme92/PlasEval` (commit 8238356) it agreed on all 59 cases, 44 with repeated contigs. It still only runs when `PLASEVAL_SRC` points at a PlasEval checkout.
+
+### Added
+- **A persistent "benchmarking is running" toast in the window.** Starting a benchmark (or the demo) from `plasbench ui` shows an animated toast (spinner, sweeping bar, live elapsed time) the moment the button is clicked. It lives in the page shell, so it stays while you move between pages, is restored when the window is reloaded, says "Cancelling…" during a cancel, goes away when the run ends (the done or failed message follows) and opens the console when clicked. Reduced-motion settings are respected.
+- **Check for updates in the window** (Setup, Maintenance): asks GitHub whether a newer release exists, only when pressed, and offers a confirmed one-click upgrade. `plasbench --help` and the README upgrade section now also cover the offline `--archive` install, `plasbench ui --tab` and `plasbench desktop-icon`.
+
+## [0.4.1] - 2026-11-16
+
+A fixes-only release: first-run problems reported from two Windows/WSL machines. Scores and rankings are unchanged from v0.4.0.
+
+### Fixed -- first install and first launch
+- **The desktop icon did nothing.** The launcher ran with `set -u`, and conda's own activate scripts (gcc and others) read variables they never set, so the shell exited with `SYS_SYSROOT: unbound variable` before the window started. `set -u` is now relaxed only around activation (`scripts/plasbench_launcher.sh`), with a regression test that fails without the fix.
+- **`plasbench install-tools all` failed on a small PC.** The Trycycler environment (Trycycler, Flye and Medaka's PyTorch stack) is a very large solve and was killed for memory (exit 137), which failed the whole install although every other tool had installed. The base profiles (core, assembly, mobsuite, reconstruction) are still required; any other tool that cannot install is listed with how to retry, and `all` exits 0. A kill explains how to give WSL more memory (`.wslconfig`), and a warning appears before the Trycycler solve when under about 8 GB is free.
+- `env/install_tools.sh` was stored as non-executable in git although its `all` loop re-invokes it; a plain git checkout failed every profile with "Permission denied". It is now executable.
+- **A failed download now says why.** `scripts/install_latest.sh` reports curl's status; for a DNS failure ("Could not resolve host", common in WSL2 and behind VPNs) it says the network is the problem and gives the fixes. The new `--archive FILE` option installs a release file already on disk with no network, checking the `.sha256` beside it. README troubleshooting has a row for it.
+
+### Fixed -- the window and the browser
+- The PlasBench window opens in its own browser profile with extensions, sync and notifications off, or in a private window when no separate profile can be made; it never uses the everyday profile (`plasbench/appwindow.py`). PlasBench's page loads nothing from the internet, so unrelated advertising pages that open alongside it come from the browser or the computer, not from PlasBench.
+- The "session key" page now says the key is new at every start, so an old tab or bookmark stops working, and how to get the full link again.
+
+### Changed -- sample-level data stays out of git
+- A study repository's managed `.gitignore` now ignores per-sample sub-folders (`results/*/`), `data/`, `reads/`, `assembly/`, `predictions*/`, `metadata/`, `clinical/` and files named for patient, clinical or line-list data, and more sequence and variant formats. The commit scan blocks the same files if forced in and blocks more direct-identifier columns (patient id, medical record number, NHS number, ward, bed number). A study repository made with the older block is upgraded the next time the block is ensured. Files already committed stay tracked until `git rm --cached`.
+- The program repository's own `.gitignore` keeps sample-level sequence, alignment and metadata files untracked.
+
+### Added
+- `docs/INDEPENDENT_REVIEW.md`: an independent scientific review of PlasBench with an evidence ledger checked by `test/test_independent_review_ledger.py`.
+- The README links the step-by-step lab guide from the top and its section links are fixed.
+- `test/test_install_wiring.py` fails when the code calls an external tool no install route declares; mash, samtools, barrnap and the annotation callers are now wired into `install-tools` profiles and the setup check.
+
 ## [0.4.0] - 2026-11-15
 
 ### Added -- complete statistics simulation study, results by number of studies

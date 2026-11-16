@@ -81,14 +81,32 @@ def find_browser():
 
 def _windows_profile_dir() -> str:
     """From WSL, the app profile must be a Windows path (the browser is a Windows program)."""
-    try:
-        out = subprocess.run(["cmd.exe", "/c", "echo", "%LOCALAPPDATA%"], capture_output=True, text=True, timeout=10,
-                             cwd="/mnt/c").stdout.strip()
-        if out and "%" not in out:
+    for command in (["cmd.exe", "/c", "echo", "%LOCALAPPDATA%"], ["wslvar", "LOCALAPPDATA"]):
+        try:
+            out = subprocess.run(command, capture_output=True, text=True, timeout=10, cwd="/mnt/c").stdout.strip()
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if out and "%" not in out and ":" in out:
             return out + "\\PlasBench\\app-window"
-    except (OSError, subprocess.TimeoutExpired):
-        pass
     return ""
+
+
+def app_args(exe: str, url: str, geometry, profile: str) -> list:
+    """The browser command line for the PlasBench window.
+
+    The window must never share the user's everyday browser profile (its extensions, sync, start pages and saved
+    session are not PlasBench's to run), so it gets its own profile folder with extensions, sync and notifications
+    off. When no separate profile can be made, a private window is used instead, which also runs without extensions.
+    """
+    w, h, x, y = geometry
+    args = [exe, f"--app={url}", f"--window-size={w},{h}", f"--window-position={x},{y}",
+            "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-sync",
+            "--disable-notifications"]
+    if profile:
+        args.append(f"--user-data-dir={profile}")
+    else:
+        args.append("--inprivate" if "edge" in Path(exe).name.lower() else "--incognito")
+    return args
 
 
 def open_app_window(url: str, profile_dir: Path, tab: bool = False) -> str:
@@ -96,12 +114,10 @@ def open_app_window(url: str, profile_dir: Path, tab: bool = False) -> str:
     if not tab:
         exe, from_wsl = find_browser()
         if exe:
-            w, h, x, y = window_geometry(*screen_size())
             profile = _windows_profile_dir() if from_wsl else str(profile_dir)
             if not from_wsl:
                 Path(profile).mkdir(parents=True, exist_ok=True)
-            args = [exe, f"--app={url}", f"--window-size={w},{h}", f"--window-position={x},{y}",
-                    "--no-first-run", "--no-default-browser-check"] + ([f"--user-data-dir={profile}"] if profile else [])
+            args = app_args(exe, url, window_geometry(*screen_size()), profile)
             try:
                 subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
                                  start_new_session=os.name != "nt")

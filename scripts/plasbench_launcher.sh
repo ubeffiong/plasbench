@@ -53,7 +53,11 @@ activate_env() {
   return 1
 }
 
+# Conda's own activate.d scripts (gcc, gfortran, ...) read variables they never set, which kills a shell running
+# with `set -u` ("SYS_SYSROOT: unbound variable") before the window can start. Relax it only around activation.
+set +u
 activate_env || true
+set -u
 
 PY=""
 for cand in python python3; do

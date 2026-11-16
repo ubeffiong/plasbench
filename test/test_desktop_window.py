@@ -97,6 +97,39 @@ def main():
     check("plasbench desktop-icon is a command", "desktop-icon" in names)
     check("desktop-icon is offered in the window", ui_schema.validate_argv(["desktop-icon", "--no-desktop"])[0])
 
+    if bash:
+        home = tmp / "fakehome"
+        (home / "miniforge3" / "etc" / "profile.d").mkdir(parents=True)
+        (home / "bin").mkdir()
+        # activating the environment reads a variable nothing set, as conda's gcc activate.d script does
+        (home / "miniforge3" / "etc" / "profile.d" / "conda.sh").write_text(
+            'conda() { if [ "$1" = activate ]; then echo "$SYS_SYSROOT_NOT_SET" >/dev/null; fi; return 0; }\n',
+            encoding="utf-8")
+        marker = tmp / "launcher_started"
+        fake_python = home / "bin" / "python"
+        fake_python.write_text(
+            '#!/usr/bin/env bash\n[ "$1" = "-c" ] && exit 0\necho "$*" > "%s"\n' % marker, encoding="utf-8")
+        fake_python.chmod(0o755)
+        env = {"HOME": str(home), "PATH": f"{home / 'bin'}:/usr/bin:/bin", "PLASBENCH_UI_HOME": str(home / "ui")}
+        p = subprocess.run([bash, str(launcher)], capture_output=True, text=True, env=env, timeout=60)
+        check("launcher still starts the window when conda activation reads an unset variable",
+              marker.is_file() and " ui" in marker.read_text(encoding="utf-8"),
+              (p.stderr or "") + ((home / "ui" / "launcher.log").read_text(encoding="utf-8")
+                                  if (home / "ui" / "launcher.log").is_file() else ""))
+
+    print("browser window never uses the everyday profile")
+    from plasbench import appwindow
+    with_profile = appwindow.app_args("/x/msedge.exe", "http://127.0.0.1:1/?t=k", (800, 600, 10, 10), "C:\\p")
+    check("a dedicated profile with extensions, sync and notifications off",
+          "--user-data-dir=C:\\p" in with_profile and "--disable-extensions" in with_profile
+          and "--disable-sync" in with_profile and "--disable-notifications" in with_profile
+          and "--no-first-run" in with_profile and "--app=http://127.0.0.1:1/?t=k" in with_profile, with_profile)
+    edge_private = appwindow.app_args("/x/msedge.exe", "http://127.0.0.1:1/", (1, 1, 0, 0), "")
+    chrome_private = appwindow.app_args("/x/chrome.exe", "http://127.0.0.1:1/", (1, 1, 0, 0), "")
+    check("with no separate profile Edge uses a private window and Chrome an incognito one",
+          "--inprivate" in edge_private and "--incognito" in chrome_private
+          and not any(a.startswith("--user-data-dir") for a in edge_private + chrome_private))
+
     print("terminal")
     proj = tmp / "pb"
     (proj / "sub").mkdir(parents=True)

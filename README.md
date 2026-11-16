@@ -283,9 +283,11 @@ cannot match. This table states only what was verified in their repositories and
 
 - **No benchmark result on real data ships with PlasBench.** The bundled leaderboards come from a synthetic demo. plsMD and PlasEval
   report results on real data in their publications; PlasBench provides the instrument, and the run is still to be done.
-- **PlasEval handles repeated contigs** by pairing copies across bins (branch and bound) and has a peer-reviewed description. PlasBench's
-  re-implementation excludes shared contigs and counts them. It matches the original program on best-match precision, recall and F1 and on the
-  dissimilarity where no contig repeats (`test/test_plaseval_crosscheck.py`, run against a PlasEval checkout), but not on real data.
+- **PlasEval is the peer-reviewed reference for bin dissimilarity.** PlasBench now computes the same dissimilarity itself, repeat-aware: a contig
+  that sits in several bins is paired copy by copy (branch and bound, capped by `DISSIMILARITY_MAX_CALLS`). Run against the original program
+  (`github.com/acme92/PlasEval`, commit 8238356) on Linux, it agreed on best-match precision, recall and F1 and on the dissimilarity in all 59
+  cross-check cases, 44 of them with repeated contigs (`test/test_plaseval_crosscheck.py`, run against a PlasEval checkout). That is
+  agreement on small constructed and random cases, not on real data, and the original program remains the reference.
 - **plsMD reconstructs** ordered, overlap-trimmed plasmids from references and reports copy number and mob-typing for each; PlasBench only
   evaluates such output, and its plsMD wrapper has been tested with a stand-in binary, not the real tool.
 - **GAEMR is broader as assembly QC** (contamination screening by BLAST taxonomy, gap analysis, insert sizes). PlasBench takes a few of its
@@ -393,8 +395,8 @@ unclaimed chromosome left out. **Bin quality tiers**: *high* is ≥ 90% complete
 *medium* is ≥ 50% complete and ≤ 10% contaminated (`benchmark.bin_quality.tsv`).
 
 **PlasEval.** PlasEval results can be imported as an external cross-check with
-`plasbench import-external-benchmark`. A first-class PlasEval adapter and repeat-aware matching are
-still open (see [What is still open](#what-is-still-open)).
+`plasbench import-external-benchmark`. PlasBench also computes the PlasEval-style dissimilarity itself, repeat-aware; a first-class adapter
+that runs the original program as a scorer, and a run on real data, are still open (see [What is still open](#what-is-still-open)).
 
 ### 3. Sequence reconstruction
 
@@ -772,7 +774,7 @@ bins. PlasBench does this with a Hungarian maximum-weight bipartite match (`pyth
 length), are inflated by the huge chromosome bin, and are not repeat-aware (an IS element can legitimately sit in several
 plasmids). PlasBench reports NMI, variation of information, homogeneity, completeness and V-measure only as **descriptive**
 secondary metrics, weighted by base pairs and with the unclaimed chromosome left out, so two of those three objections are
-addressed in the implementation. Repeat-aware *matching* is not implemented; repeat effects are reported as diagnostics.
+addressed in the implementation. Repeat-aware matching is implemented for the PlasEval-style dissimilarity (`python/bin_agreement.py`), not for these clustering statistics; repeat effects are also reported as diagnostics.
 
 ### The five dimensions
 
@@ -840,7 +842,7 @@ scorecard is not used.
 | NGOC (gene-order conservation) | Done | Projection of truth features through the alignments; gene-order with a gene table, landmark-order with landmarks only. | `benchmark.ngoc.tsv` |
 | Feature and gene recovery | Done | Full length, truncated, missed. | `benchmark.feature_preservation.tsv` |
 | Median and IQR by size band and ARG status | Done | Per-plasmid completeness within <10 kb, 10-50 kb, >50 kb and by resistance-gene carriage. | `benchmark.recovery_by_replicon.tsv` |
-| Repeat-aware matching | Partial | Repeat effects reported as diagnostics (recall ceiling, ambiguity); matching is not repeat-aware; PlasEval only as an imported cross-check. | `repeat_ambiguity_bp`; `plasbench import-external-benchmark` |
+| Repeat-aware matching | Done for the PlasEval-style dissimilarity | Branch-and-bound pairing of repeated contig copies in `bin_agreement.py`, with a labelled cap; agrees with the original program on 59 cross-check cases (44 with repeats). Not applied to the one-to-one binning F1 or the clustering statistics, whose repeat effects remain diagnostics. | `bin_agreement.py`; `repeat_ambiguity_bp`; `test/test_plaseval_crosscheck.py` |
 | Base-level MCC, F2, F0.5, abstention rate | Done | MCC with chromosome bases not predicted as true negatives (blank, never 0, when undefined); F2 and F0.5; abstention rate = share of isolates where the tool returned nothing. | `mean_mcc`, `mean_f2`, `mean_f0_5`, `mean_abstention_rate` |
 | Per-plasmid outcome states | Done (binning tools) | Perfect, fragmented, merged, partial, missed per truth plasmid, with contamination of its best bin; thresholds pre-registered. | `<tool>.plasmid_outcomes.tsv`; `total_outcome_*` |
 | Contig-level binning F1; shared and unassigned contig lengths | Done (parallel layer) | Hungarian matching over PLASMID contigs; never the headline. | `contig_bin_f1_bp`; `contigs_ambiguous_bp`, `contigs_unplaced_bp` |
@@ -875,7 +877,7 @@ These need data, compute or an external tool, not code, or are being done elsewh
 | 3 | **Independent audit of references, and read support for every truth replicon** | Needs the reads and curation. |
 | 4 | **An external validation cohort, and a simulation that the intervals have their nominal coverage under clustered sampling** | Needs data and a study design. |
 | 5 | **Plasmid-free, hard-structure and taxonomically broader isolates** | Data curation. |
-| 6 | **A first-class PlasEval adapter and repeat-aware matching** | Needs the external tool and real data to validate. |
+| 6 | **PlasEval on real data (the paper's 53 *E. coli* isolates) and a first-class adapter** | Needs the public data, compute and the external tool; repeat-aware matching itself is done. |
 | 7 | **Contig-level abstention (unclassified) rate** | No wrapped tool reports an explicit "unclassified" contig call; isolate-level abstention is reported. |
 | 7b | **Freeze the pre-registration** | Three parameters are `TO_FIX` (tool timeout, integrated-element depth, circular-path rule) and await the panel; then `plasbench analysis freeze-prereg --write`. |
 | 7c | **Recommender on a multi-study real cohort** | `public-v1` has few independent studies; the recommender's verdict needs a broader real cohort. The contig layer is now cross-checked every run against an independent alignment-free scorer. |
@@ -1871,6 +1873,7 @@ None of these actions are required for a successful ordinary benchmark run.
 |---|---|---|
 | `plasbench: command not found` | Environment not active | `conda activate plasbench` |
 | `conda: command not found` | Step 2 not done, or shell not restarted | Run step 2, then `exec bash` |
+| `curl: (6) Could not resolve host: raw.githubusercontent.com` (or `api.github.com`) | This computer's DNS is not working, common in WSL2 or behind a VPN; not a PlasBench problem | In PowerShell run `wsl --shutdown`, reopen Ubuntu and retry; turn a VPN off or on. With no internet here, download `plasbench-<version>.tar.gz` and its `.sha256` from the Releases page on another computer, then `tar -xzf` it and run `bash plasbench-<version>/scripts/install_latest.sh --archive <path to the .tar.gz> --tools` |
 | `sha256sum: no properly formatted checksum lines found` | Download returned an error page | `rm` both files, redo step 3 |
 | `curl: (22) ... 404` | Wrong version in the URL | Check the Releases page for the current version |
 | `set: pipefail: invalid option name` | Archive from before v0.1.1 | Reinstall using the latest-release command in step 3 |
@@ -1978,6 +1981,13 @@ One command, run from inside your current install directory:
 # Equivalent when you are in the PlasBench install directory:
 plasbench upgrade
 ```
+
+**From the window:** `plasbench ui`, then **Setup, Maintenance, Check for updates**. It asks GitHub whether a newer
+release exists (only when you press it) and offers **Upgrade to <version>**; close and reopen PlasBench afterwards.
+
+**No internet on this computer?** On another computer download `plasbench-<version>.tar.gz` and its `.sha256` from the
+Releases page, copy both here, then `tar -xzf plasbench-<version>.tar.gz` and run
+`bash plasbench-<version>/scripts/install_latest.sh --archive "$PWD/plasbench-<version>.tar.gz"`.
 
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, and **updates your `PlasBench`

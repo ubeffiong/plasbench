@@ -37,13 +37,20 @@ plasmid bases missed are FN (`python/score_plasmids.py`, `scripts/05_score.sh`).
 **Status.** Verified. The scope statement is in the docs.
 
 ### Q2. Is the scorer checked against an independent evaluator?
-**Answer.** Partly. PlasEval (Mane et al., *BMC Bioinformatics* 2024) is a framework for evaluating plasmid binning that is
-aware of contig length and of repeats. PlasBench can import a PlasEval run as a labelled, non-ranking cross-check
-(`plasbench import-external-benchmark`) but does not run it, and a one-off script compares the minimap2 scoring with a BLASTN
-scoring (`python/compare_scoring_methods.py`).
-**Evidence.** `docs/METHODS.md`, "External evaluator cross-checks"; `python/compare_scoring_methods.py`.
-**Status.** Cross-check import done; a first-class PlasEval adapter is **Open** (it needs the external tool and real data to
-validate).
+**Answer.** Partly, and more than before. PlasEval (Mane et al., *BMC Bioinformatics* 2024) is a framework for comparing plasmid bin sets
+that is aware of contig length and of repeats. PlasBench computes the same quantities itself, reimplemented from the published definitions
+(no PlasEval code is used): best-match precision, recall and F1, and the normalised dissimilarity with its four parts (extra, missing,
+splits and joins), including the paper's repeat-aware pairing of repeated contigs. `test/test_plaseval_crosscheck.py` runs both programs
+on the same inputs. Run on Linux against the original program (`github.com/acme92/PlasEval`, commit 8238356) it agreed on best-match
+P/R/F1 and on the normalised dissimilarity in all 59 cases, 44 of them with repeated contigs (hand-built and seeded random bin sets, and
+PlasEval's own examples). It runs only when `PLASEVAL_SRC` points at a PlasEval checkout, so CI skips it. A PlasEval run can also be
+imported as a labelled, non-ranking cross-check (`plasbench import-external-benchmark`), and a one-off script compares the minimap2 scoring
+with a BLASTN scoring (`python/compare_scoring_methods.py`).
+**Evidence.** `python/bin_agreement.py`; `test/test_plaseval_crosscheck.py`; `test/test_bin_agreement.py` (hand-computed repeat cases and a
+capped search); `docs/METHODS.md`, "External evaluator cross-checks".
+**Status.** Verified on constructed and random cases. **Open:** agreement on real data (the paper's 53 *E. coli* isolates are public) and a
+first-class adapter that runs the original program as a scorer. The dissimilarity is a secondary endpoint: it compares which contigs are in
+which bin, says nothing about sequence accuracy, and does not apply to tools that output reassembled sequences.
 
 ---
 
@@ -239,8 +246,11 @@ that uses the same database as the truth caller would still be favoured; that is
 **Answer.** Base-level F1 does not. Separate layers do: bin split/merge metrics, alignment-derived
 structural calls (`python/call_structural_variants.py`, deliberately `validated: false`), and optional
 QUAST diagnostics (`RUN_QUAST_DIAGNOSTICS`, off by default), now shown in the HTML report.
-None affect the ranking.
-**Evidence.** `test/test_report_replicon_quast.py`, `test/test_run_quast_diagnostics.py`.
+None affect the ranking. The PlasEval-style dissimilarity (Q2) adds the split and join costs, and the extra and missing costs, per tool
+and sample (`dissim_split_cost`, `dissim_join_cost`, `dissim_extra_cost`, `dissim_missing_cost`), so a binner that over-merges plasmids can
+be told apart from one that over-fragments them even when their F1 is similar. The report table currently shows the split and join costs
+only; charts of all four parts are **Open**.
+**Evidence.** `test/test_report_replicon_quast.py`, `test/test_run_quast_diagnostics.py`, `test/test_bin_agreement.py`.
 **Status.** Verified as diagnostics. A structural metric that feeds the ranking is **Open** by design.
 
 ---
@@ -300,6 +310,66 @@ use a Linux checkout or CI for a full run.
 | Could near-identical isolates be screened out of the cohort? | Adjacent opportunity | Redundant samples inflate the apparent sample count; the clonal-group analysis already groups them for the statistics. |
 | Outbreak or surveillance inference | Outside scope | PlasBench evaluates reconstruction, not epidemiology. |
 | Phage-plasmids, virulence plasmids, host range | Outside scope | Not evaluated. |
+
+---
+
+## H. Installing, upgrading and first launch (v0.4.1)
+
+### Q25. The installer says "Could not resolve host". Is PlasBench broken?
+**Answer.** No: this computer's DNS is not working, which is common in WSL2 and behind a VPN. `install_latest.sh` now says so and gives the
+fixes (`wsl --shutdown` in PowerShell, turning a VPN off or on, or setting a DNS server by hand). With no internet in that terminal, download
+`plasbench-<version>.tar.gz` and its `.sha256` from the Releases page on another computer, extract the archive and run
+`bash plasbench-<version>/scripts/install_latest.sh --archive <path to the .tar.gz>`; the checksum beside the file is verified.
+**Evidence.** `scripts/install_latest.sh`; `test/test_install_latest.sh` (a DNS failure is explained and leaves no install; `--archive` installs
+offline; a tampered archive is refused).
+**Status.** Fixed in v0.4.1. The first command in the README downloads the script from GitHub, so it still needs working DNS.
+
+### Q26. `plasbench install-tools all` ended with "killed (SIGKILL)". Did the install fail?
+**Answer.** One optional tool failed; the rest installed. The Trycycler environment (Trycycler, Flye and Medaka's PyTorch stack) is a very
+large solve and the system kills it on a PC with little memory (exit 137). Since v0.4.1 the base profiles (core, assembly, mobsuite,
+reconstruction) are required, every other tool that cannot install is listed with how to retry (`plasbench install-tools trycycler`), and the
+command exits 0. A kill prints how to give WSL more memory (`memory=8GB` and `swap=8GB` in `C:\Users\<you>\.wslconfig`, then `wsl --shutdown`),
+and a warning appears before the Trycycler solve when under about 8 GB is free. `env/install_tools.sh` is also executable in git now; its
+`all` loop re-runs itself, which failed with "Permission denied" in a plain git checkout.
+**Evidence.** `env/install_tools.sh`; `test/test_install_all_optional.sh`; `test/test_install_wiring.py`.
+**Status.** Fixed in v0.4.1.
+
+### Q27. Why did the desktop icon do nothing?
+**Answer.** The launcher ran with `set -u`, and conda's own activation scripts (for gcc and others) read variables they never set, so the
+shell exited with `SYS_SYSROOT: unbound variable` before the window started. The log is `~/.plasbench/ui/launcher.log`. `set -u` is now
+relaxed only around the activation step. Every start creates a new session key, which the window reads from the link; the icon starts
+`plasbench ui` exactly as typing it does.
+**Evidence.** `scripts/plasbench_launcher.sh`; `test/test_desktop_window.py` (a fake conda whose activation reads an unset variable).
+**Status.** Fixed in v0.4.1. To work around it on an older install: `sed -i 's/^activate_env || true$/set +u; activate_env || true; set -u/' ~/PlasBench/scripts/plasbench_launcher.sh`.
+
+### Q28. The window says "This address needs the session key". And why did advertising sites open?
+**Answer.** The page appears when the address is opened without the `?t=...` part: the key is new at every start, so an old tab or bookmark
+stops working. Run `plasbench ui` again; if PlasBench is already running it prints the full link and reopens the window (the link is also in
+`~/.plasbench/ui/server.json`). PlasBench's page loads nothing from the internet and the program opens one window, so advertising pages that
+open alongside it come from the browser or the computer (an extension, a hijacked start page or adware), not from PlasBench. Since v0.4.1 the
+window opens in its own browser profile with extensions, sync and notifications off, or in a private window when no separate profile can
+be made, and never in the everyday profile. Check Edge or Chrome for extensions you do not recognise and run a Windows Security scan.
+**Evidence.** `plasbench/appwindow.py` (`app_args`); `plasbench/webui.py`; `test/test_desktop_window.py`.
+**Status.** Fixed in v0.4.1 as far as PlasBench controls it; the flags are tested, not exercised in a real browser.
+
+### Q29. How do I upgrade, and can PlasBench tell me an update exists?
+**Answer.** `plasbench upgrade` (or `./update.sh`) replaces the release files in place and keeps your studies, settings, databases and tools.
+In the window, **Setup, Maintenance, Check for updates** asks GitHub whether a newer release exists, only when you press it, and offers
+**Upgrade to <version>**, which runs the same confirmed upgrade; close and reopen PlasBench afterwards. The button is on `main` and
+reaches users with the release after v0.4.1.
+**Evidence.** `plasbench/updatecheck.py`; `test/test_update_check.py` (a fake release lookup: newer, same, ahead, DNS failure; the route needs
+the session key; the window never checks by itself); `test/test_update_script.sh`.
+**Status.** Verified on `main`; not in v0.4.1.
+
+### Q30. Can sample data or patient details end up in git?
+**Answer.** PlasBench puts each study folder under its own git repository, tracking the study record, the study-level tables, the report and
+the logs. Since v0.4.1 its managed `.gitignore` also keeps out per-sample folders (`results/*/`), `data/`, `reads/`, `assembly/`,
+`predictions*/`, `metadata/`, `clinical/`, anything named for patient, clinical or line-list data, and sequence, alignment and variant
+files. The commit scan blocks the same files if someone forces them in, and blocks columns for patient name, patient id, medical record
+number, NHS number, ward, bed number and similar. Age, sex and collection date are not blocked, because cohorts need them, but together they
+can identify a person; use de-identified metadata. Files committed before the upgrade stay tracked until `git rm --cached`.
+**Evidence.** `plasbench/gitops.py`; `test/test_study_git_data_rules.py`.
+**Status.** Fixed in v0.4.1. This is a safety net, not a substitute for governance of patient data.
 
 ---
 
@@ -405,8 +475,8 @@ binning F1 from an ungated one-to-one Hungarian match, with CPRR per plasmid (Gu
 statistics (NMI, variation of information) are descriptive only, and, **implemented here**, homogeneity, completeness and
 V-measure are reported beside them, base-pair weighted and clearly secondary. Contigs shared between similar plasmids and
 contigs mixing plasmid and chromosome are visible as ambiguity and contamination. PlasEval is accepted as an imported
-cross-check, not run: a first-class adapter is **Open** (it needs the external tool and real data to validate). Repeat-aware
-*matching* is not implemented; repeat effects are reported as diagnostics. **Answered / Open.**
+cross-check, and PlasBench computes the same dissimilarity itself, including the repeat-aware pairing of repeated contigs (Q2); the
+first-class adapter and a run on real data are **Open**. **Answered / Open.**
 
 ### Part V. Sequence similarity (Q137-154)
 
@@ -588,7 +658,7 @@ Still open, and why:
 3. **Independent audit of references, and read support for every truth replicon** (Q3, Q4): needs reads and curation.
 4. **External validation cohort and a coverage simulation for the intervals** (Q14).
 5. **Plasmid-free, hard-structure and taxonomically broader isolates** in the released cohorts (Q12, Part 2 section 18): data curation.
-6. **A first-class PlasEval adapter** (Part 2 section 9): needs the external tool and real data to validate.
+6. **PlasEval on real data, and a first-class adapter** (Q2, Part 2 section 9): the repeat-aware dissimilarity is implemented and agrees with the original program on 59 constructed and random cases; agreement on the paper's 53 public *E. coli* isolates, charts of the four error parts, and an adapter that runs the original as a scorer need the data, compute and the external tool.
 7. **Abstention rate, NGA50 and AMI**: no wrapped tool reports an explicit "unclassified" call, NGA50 needs contig-level
    misassembly breaks, and AMI's expected-information term is impractical over base counts. Contig-level classification
    (count-based and length-weighted precision, recall, F1 and MCC) is done; ambiguous contigs are excluded, not multi-assigned.

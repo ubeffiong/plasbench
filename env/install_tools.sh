@@ -136,6 +136,23 @@ write_wrappers() {
 # PROBE (optional) is a command line run inside the environment to prove the tool
 # starts, not merely that its file exists. The environment is reused when every
 # command is present and the probe passes; otherwise it is (re)created.
+# Gigabytes of memory (free RAM plus free swap) this computer has for a large solve, or empty when unknown.
+available_memory_gb() {
+    awk '/^(MemAvailable|SwapFree):/ {kb += $2} END {if (kb > 0) printf "%d", kb / 1048576}' /proc/meminfo 2>/dev/null || true
+}
+
+# Say how to give WSL more memory; a solve killed by the kernel (exit 137) is almost always this.
+memory_advice() {
+    cat >&2 <<'EOF'
+  What to do: the machine ran out of memory while Conda solved this environment. Close other programs and retry,
+  or give more memory to WSL. In Windows, create or edit  C:\Users\<you>\.wslconfig  with
+      [wsl2]
+      memory=8GB
+      swap=8GB
+  then run  wsl --shutdown  in PowerShell, reopen Ubuntu, and run the same install-tools command again.
+EOF
+}
+
 install_isolated() {
     local suffix="$1" label="$2" cmds="$3" pip_pkg="$4" probe="$5" main_prefix iso_prefix cmd ok=1
     shift 5
@@ -157,6 +174,13 @@ install_isolated() {
         echo "[plasbench] $label environment already present: $iso_prefix"
     else
         echo "[plasbench] creating the $label environment (separate from the main one): $iso_prefix"
+        local need="${ISOLATED_MIN_GB:-0}" have
+        have="$(available_memory_gb)"
+        if [[ -n "$have" && "$need" -gt 0 && "$have" -lt "$need" ]]; then
+            echo "[plasbench] WARNING: only about ${have} GB of memory (RAM plus swap) is free and solving $label needs about ${need} GB;" >&2
+            echo "[plasbench]          it may be killed. If it is, the rest of PlasBench is unaffected." >&2
+            memory_advice
+        fi
         run_with_heartbeat "Conda is solving/linking $label's own environment" \
             "$SOLVER_BIN" create -y -p "$iso_prefix" "${channels[@]}" "${spec[@]}"
         if [[ -n "$pip_pkg" ]]; then
@@ -251,7 +275,7 @@ EOF
     # their own environment. Flye is included there for Trycycler's own use,
     # but is not wrapped: the long-read profile installs flye into the main
     # environment and that copy is left alone.
-    install_isolated trycycler Trycycler "trycycler medaka medaka_consensus" "" "trycycler --version" \
+    ISOLATED_MIN_GB=8 install_isolated trycycler Trycycler "trycycler medaka medaka_consensus" "" "trycycler --version" \
         -c conda-forge -c bioconda -- trycycler flye medaka
     exit $?
     ;;
@@ -423,13 +447,34 @@ EOF
  # planned until their pin, checksum, and smoke test have been validated.
  all)
     failures=0
+    # The profiles every benchmark needs. Every other profile is an optional tool: if it cannot install (a large
+    # solve killed for memory, a tool whose channel is unavailable) it is reported with how to retry, and the rest
+    # of PlasBench is still installed and usable.
+    required_profiles=" core assembly mobsuite reconstruction "
+    failed_optional=() oom=0
     # `metagenomics` is deliberately absent: its two baseline dependencies are
     # already covered by `assembly` and `genomad` below. Keeping it out avoids
     # a redundant second solver transaction during install-tools all.
-    for installed_profile in core assembly mobsuite reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast utilities reference-annotation annotation annotation-prokka; do
+    ALL_PROFILES="core assembly mobsuite reconstruction simulate long-read plassembler hybracter trycycler genomad rfplasmid plasmidhunter plasmer plascope quast utilities reference-annotation annotation annotation-prokka"
+    # shellcheck disable=SC2086
+    for installed_profile in ${PLASBENCH_ALL_PROFILES:-$ALL_PROFILES}; do
         echo "[plasbench] ===== install-tools $installed_profile ====="
-        "$0" --env "$ENV_NAME" "$installed_profile" || failures=1
+        profile_status=0
+        "$0" --env "$ENV_NAME" "$installed_profile" || profile_status=$?
+        if [[ "$profile_status" -ne 0 ]]; then
+            if [[ "$required_profiles" == *" $installed_profile "* ]]; then
+                failures=1
+            else
+                failed_optional+=("$installed_profile")
+                [[ "$profile_status" -eq 137 ]] && oom=1
+            fi
+        fi
     done
+    if [[ ${#failed_optional[@]} -gt 0 ]]; then
+        echo "[plasbench] WARNING: these optional tools were not installed: ${failed_optional[*]}" >&2
+        echo "[plasbench] The rest of PlasBench is installed and works. Retry one with:  plasbench install-tools <name>" >&2
+        [[ "$oom" -eq 1 ]] && memory_advice
+    fi
     if [[ "$ASSUME_YES" -eq 1 ]]; then
         echo "[plasbench] Automatic package installation complete. Run 'plasbench check --yes' to install and verify databases supported by your enabled tools."
     else

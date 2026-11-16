@@ -73,7 +73,8 @@ SCORE_COLUMN_GROUPS = {
     "Agreement": [
         "bestmatch_status", "bestmatch_precision_count", "bestmatch_recall_count", "bestmatch_f1_count", "bestmatch_precision_bp",
         "bestmatch_recall_bp", "bestmatch_f1_bp", "bestmatch_contigs_excluded", "dissim_status", "bin_dissimilarity",
-        "dissim_split_cost", "dissim_join_cost", "dissim_extra_cost", "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped"],
+        "dissim_split_cost", "dissim_join_cost", "dissim_extra_cost", "dissim_missing_cost", "dissim_norm", "dissim_repeats_dropped",
+        "dissim_repeat_families", "dissim_repeat_search", "bin_dissimilarity_alpha0", "bin_dissimilarity_alpha1"],
     "Calibration": ["pr_auc", "pr_n_thresholds", "brier_score", "expected_calibration_error", "calibration_records"],
     "Diagnostics": [
         "mapped_pred_bp", "unambiguously_mapped_pred_bp", "unmapped_pred_bp", "off_truth_pred_bp", "ambiguously_mapped_pred_bp",
