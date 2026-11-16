@@ -8,6 +8,7 @@ evidence rules applied to them — every row in both files passes the same
 |---|---:|---|---|
 | [`public-v1.tsv`](public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
+| [`plaseval-ecoli53.tsv`](plaseval-ecoli53.tsv) | 53 | all B | replicating the PlasEval paper's binning comparison and its comparison gate; not a headline panel (truth is a Unicycler hybrid on the same reads; one species). See [`docs/PLASEVAL_REPLICATION.md`](../docs/PLASEVAL_REPLICATION.md) |
 
 `public-v1` is frozen. Do not add rows to it: published results reference it by
 name, and its lock file certifies that exact sheet. New isolates go into

@@ -714,6 +714,19 @@ export DISSIMILARITY_ALPHA="${DISSIMILARITY_ALPHA:-0.5}"
 #                          keeps the best pairing found and is marked capped in dissim_repeat_search.
 export DISSIMILARITY_REPEATS="${DISSIMILARITY_REPEATS:-aware}"
 export DISSIMILARITY_MAX_CALLS="${DISSIMILARITY_MAX_CALLS:-200000}"
+#   RUN_PLASEVAL_GATE      the comparison gate (python/plaseval_gate.py): runs the ORIGINAL PlasEval program on this run's exported
+#                          bins and compares it with PlasBench's reimplementation. auto (default) compares when the original is
+#                          found and otherwise records NOT_RUN; on also stops the run when it is missing or disagrees (use it for
+#                          the plaseval-ecoli53 replication cohort and on a machine that has the original); off skips it.
+#                          PLASEVAL_SRC is the src/ folder of a PlasEval checkout (found automatically in $DATA_DIR/tools/PlasEval,
+#                          ~/.local/share/plasbench/tools/PlasEval or ~/PlasEval; PlasEval has no licence, so it is never bundled).
+#                          PLASEVAL_PYTHON runs it (needs networkx, pandas, bidict, psutil); PLASEVAL_TIMEOUT is seconds per pair.
+export RUN_PLASEVAL_GATE="${RUN_PLASEVAL_GATE:-auto}"
+export PLASEVAL_SRC="${PLASEVAL_SRC:-}"
+export PLASEVAL_PYTHON="${PLASEVAL_PYTHON:-python3}"
+export PLASEVAL_TIMEOUT="${PLASEVAL_TIMEOUT:-300}"
+export PLASEVAL_GATE_TOLERANCE="${PLASEVAL_GATE_TOLERANCE:-0.001}"
+export PLASEVAL_GATE_WORKERS="${PLASEVAL_GATE_WORKERS:-2}"
 export RUN_COPY_NUMBER="${RUN_COPY_NUMBER:-1}"
 export RUN_ASSEMBLY_ADEQUACY="${RUN_ASSEMBLY_ADEQUACY:-1}"
 export MIN_ASSEMBLY_ADEQUACY="${MIN_ASSEMBLY_ADEQUACY:-0.90}"

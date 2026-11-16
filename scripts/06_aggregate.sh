@@ -269,6 +269,19 @@ advisory_job job_truth_depth_anomalies
 [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]] && advisory_job job_bin_agreement
 wait
 
+# The comparison gate runs after the other jobs: it needs the bins stage 5 exported and scores.tsv, and with RUN_PLASEVAL_GATE=on
+# its verdict can stop the run, so it is not a background job. auto compares when the original program is found, else records NOT_RUN.
+if [[ "${RUN_PLASEVAL_GATE:-auto}" != "off" && "${RUN_BIN_AGREEMENT:-1}" == "1" ]]; then
+    gate_status=0
+    python3 "$HERE/../python/plaseval_gate.py" results --results-dir "$RESULTS_DIR" --scores "$SCORES" \
+        --out-prefix "$RESULTS_DIR/benchmark.plaseval_gate" --data-dir "$DATA_DIR" --mode "${RUN_PLASEVAL_GATE:-auto}" \
+        --plaseval-src "${PLASEVAL_SRC:-}" --plaseval-python "${PLASEVAL_PYTHON:-python3}" --alpha "$DISSIMILARITY_ALPHA" \
+        --tolerance "$PLASEVAL_GATE_TOLERANCE" --timeout "$PLASEVAL_TIMEOUT" --workers "$PLASEVAL_GATE_WORKERS" || gate_status=$?
+    if [[ "$gate_status" -ne 0 ]]; then
+        die "PlasEval comparison gate (RUN_PLASEVAL_GATE=on) did not pass (exit $gate_status): see $RESULTS_DIR/benchmark.plaseval_gate.tsv"
+    fi
+fi
+
 if [[ "${COHORT_QC_FLAGS_ENABLED:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/flag_cohort_outliers.py" \
         --stats-dir "$DATA_DIR" --samples "$SAMPLE_SHEET" \

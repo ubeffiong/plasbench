@@ -287,7 +287,9 @@ cannot match. This table states only what was verified in their repositories and
   that sits in several bins is paired copy by copy (branch and bound, capped by `DISSIMILARITY_MAX_CALLS`). Run against the original program
   (`github.com/acme92/PlasEval`, commit 8238356) on Linux, it agreed on best-match precision, recall and F1 and on the dissimilarity in all 59
   cross-check cases, 44 of them with repeated contigs (`test/test_plaseval_crosscheck.py`, run against a PlasEval checkout). That is
-  agreement on small constructed and random cases, not on real data, and the original program remains the reference.
+  agreement on small constructed and random cases, not on real data, and the original program remains the reference. The paper's 53 isolates ship as the `plaseval-ecoli53` cohort with the paper's published bins, and a
+  comparison gate (`RUN_PLASEVAL_GATE`) repeats this check against the original program on every run where it is installed
+  (`docs/PLASEVAL_REPLICATION.md`); its result on those bins is still to be produced.
 - **plsMD reconstructs** ordered, overlap-trimmed plasmids from references and reports copy number and mob-typing for each; PlasBench only
   evaluates such output, and its plsMD wrapper has been tested with a stand-in binary, not the real tool.
 - **GAEMR is broader as assembly QC** (contamination screening by BLAST taxonomy, gap analysis, insert sizes). PlasBench takes a few of its
@@ -877,7 +879,7 @@ These need data, compute or an external tool, not code, or are being done elsewh
 | 3 | **Independent audit of references, and read support for every truth replicon** | Needs the reads and curation. |
 | 4 | **An external validation cohort, and a simulation that the intervals have their nominal coverage under clustered sampling** | Needs data and a study design. |
 | 5 | **Plasmid-free, hard-structure and taxonomically broader isolates** | Data curation. |
-| 6 | **PlasEval on real data (the paper's 53 *E. coli* isolates) and a first-class adapter** | Needs the public data, compute and the external tool; repeat-aware matching itself is done. |
+| 6 | **The result of the PlasEval comparison gate on the 53-isolate cohort, and a first-class adapter** | The cohort, the paper's bins, the gate and the error-profile charts are built; the gate needs the original program and a machine that can run it. |
 | 7 | **Contig-level abstention (unclassified) rate** | No wrapped tool reports an explicit "unclassified" contig call; isolate-level abstention is reported. |
 | 7b | **Freeze the pre-registration** | Three parameters are `TO_FIX` (tool timeout, integrated-element depth, circular-path rule) and await the panel; then `plasbench analysis freeze-prereg --write`. |
 | 7c | **Recommender on a multi-study real cohort** | `public-v1` has few independent studies; the recommender's verdict needs a broader real cohort. The contig layer is now cross-checked every run against an independent alignment-free scorer. |
