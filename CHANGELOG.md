@@ -21,6 +21,11 @@ history is lost, only the numbering is cleaner. See
 - **Closing the terminal no longer stops PlasBench.** `plasbench ui` ignores SIGHUP (Quit in the window and Ctrl+C still stop it), so a closed terminal can no longer take the server, and with it the window, away.
 - Tests: `test_ui_connection.py` (real server: burst, keep-alive, request replay, aborted clients), `test_app_launch.py` (stale locks, the verified ladder, stale records, the launch lock), and `test_ui_connection_browser.py` (a real browser with the network cut; `PLASBENCH_BROWSER_TESTS=1`).
 
+### Added -- the contributed RefSeq/SRA candidate pool and a seeded, cluster-aware importer
+- `cohorts/candidates/contributed-refseq-sra/`: 8,812 RefSeq Complete Genome / SRA pairs (and their 24,606 plasmids) from a collaborator, stored gzipped with SHA-256 pins and a `SOURCE.md` that lists what it does and does not establish.
+- `plasbench import-contributed-cohort` (`python/import_contributed_cohort.py`): long-read-first, one isolate per read-BioProject cluster (the pool's `bioproject` column is the RefSeq umbrella on every row), seeded and order-independent, with a reason for every rejected row, `--released-after/--released-before` and a `--date-basis` (`assembly`, `read`, `earliest_public`). Output is unverified until `validate-cohort --online`.
+- `plasbench_common.leakage_release_date` / `parse_iso_date`: the one definition of "when did this genome become public", for the importer and, next, the leakage screen.
+
 ### Added -- PlasEval cohort result, confirmable by any user (16 November 2026)
 - The 53-isolate comparison with the original PlasEval program finished: 211 of 212 pairs compared, 210 agree within 0.001, 0 disagree, 1 capped-search upper bound (0.003), 1 original timeout. The original's answers are kept in `cohorts/plaseval_ecoli53/original_reference.tsv`; `python/plaseval_replication.py` compares with them when no PlasEval checkout is installed and says so on the page, so any user who re-runs the cohort can confirm the result in the HTML. Finished page: `cohorts/plaseval_ecoli53/replication_report.html`.
 
