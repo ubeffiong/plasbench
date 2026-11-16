@@ -18,7 +18,8 @@ cannot be fixed in software.
 A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
 cross-references the question numbers here.
 
-Evidence basis: [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md) (independent review and audit), the source files named in
+Evidence basis: [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md) (independent review and audit; every review and what validated it is
+listed in [docs/EXTERNAL_REVIEW_LOG.md](docs/EXTERNAL_REVIEW_LOG.md)), the source files named in
 each answer, and the test suite. A full run of `test/run_tests.sh` is the check on the
 "Verified" claims; see Q24 for its result. Nothing here has been checked against a
 real-cohort run, because none exists yet (Q22).
@@ -394,6 +395,85 @@ depends on the length exponent.
 `test/test_plaseval_cohort.py` (cohort sheet consistent with the shipped data; replication on real bins); `docs/PLASEVAL_REPLICATION.md`.
 **Status.** Gate and cohort built and tested; gate result on real bins **Open**. The cohort is schema-validated only: its online NCBI check has not
 been run, its truth is a Unicycler hybrid built on the same reads (reference tier 3), and it covers one species.
+
+---
+
+## J. Reviewer questions on inputs and outputs (16 November 2026)
+
+Three questions came from reviewers about how PlasBench controls input quality, chooses an assembly and treats a tool that reports several
+sequences for one plasmid. The answers below say what already existed, what was added, what is provisional and what is still open. The full
+register of reviews and what validated each is in [docs/EXTERNAL_REVIEW_LOG.md](docs/EXTERNAL_REVIEW_LOG.md).
+
+### Q32. Can you choose the assembly?
+**Answer.** "The assembly" means two different things. **The reference assembly** (the truth) is chosen by evidence, not by preference: reference
+tiers, polish independence and evidence-checked labels decide whether it enters the primary analysis (Q3, Q6). **The input assembly** (what the
+tools run on) was chosen only by the `ASSEMBLER` setting (`spades` or `unicycler`). It is now chosen by a declared policy from evidence about the
+assembly itself, never from the truth or a score (`python/assembly_selection.py`, stage 3):
+- every candidate is measured and kept (contigs, N50, L50, largest contig, total length, GC, bases in contigs of 1 kb and 10 kb or more, and, when
+  minimap2 and reads are available, the share of sampled reads that map to it) in `results/assembly_candidates.tsv`;
+- a candidate is **eligible** only if its total length is plausible for a bacterium plus plasmids (1 to 10 Mb by default) and, when measured, its
+  read support is at least 0.80;
+- policy `fixed` (default) selects the configured assembler if it is eligible; policy `quality` selects, among the eligible, the highest N50, then the
+  fewest contigs. When nothing is eligible **nothing is substituted silently**: the sample is reported as having no eligible assembly;
+- `ASSEMBLY_SELECTION_MODE=report` (default) records the choice and acts on nothing; `enforce` makes the choice the assembly the tools run on
+  and excludes a sample with no eligible assembly (status `rejected`, never scored as a tool failure); `ASSEMBLY_ALSO=unicycler` runs an extra
+  assembler as an alternative candidate. The report shows a QUAST-style comparison table with the selected assembly marked.
+**What this is not.** When assemblers are being *compared*, the right design is one input condition per assembler, not a selection. The
+alternatives are retained, but running every tool on every alternative assembly (a sensitivity analysis by assembler) is **Open**.
+**Evidence.** `python/assembly_selection.py`; `test/test_assembly_selection.py` (policies, no silent substitution, independence from any score
+column, read support on real alignments); `test/test_assembly_selection_stage.sh` (report, enforce, fixed, nothing eligible, off).
+**Status.** Implemented and tested. The size limits and the 0.80 read-support minimum are **provisional**: freeze them before the main
+benchmark. The default is report-only with the `fixed` policy, so existing runs are unchanged.
+
+### Q33. Is there QC of the short reads before the pipeline, and should poor reads be rejected?
+**Answer.** Before this change the pipeline trimmed with fastp (`MIN_READ_LEN`, adapters), checked that both read files existed and were non-empty,
+and flagged a mixed or oversized *assembly* afterwards (`assembly_qc_gate.py`, advisory). There was no decision about the reads themselves. Now
+`python/short_read_qc.py` measures each raw read pair before stage 3 and decides **PASS, WARN or REJECT**, with the reason recorded:
+- measured from a sample of the pairs (the total is exact for small files and an estimate, labelled, otherwise): file integrity, read pairs,
+  estimated depth, mean quality and Q20/Q30 share, median read length, GC and N fraction, adapter-carrying reads, duplicate pairs, read-name
+  synchrony between the two files, and a GC deviation when the expected GC is given;
+- an unreadable, truncated, empty or malformed file, or files with unequal read counts, is **always** rejected; every other metric has a warn and a
+  reject limit in `config/short_read_qc_thresholds.tsv`;
+- `SHORT_READ_QC_MODE=report` (default) records the decision and flags the sample but excludes only an integrity failure; `enforce` also excludes a
+  threshold REJECT (status `rejected`: not assembled, tools skipped as "short-read QC rejected", never scored as a tool failure); `off` skips it;
+- outputs: `results/short_read_qc.tsv`, `short_read_qc_status.tsv` and a MultiQC-style table in the report with a cohort PASS/WARN/REJECT summary.
+**Not done.** Taxonomic contamination screening (it needs a database; the table says `not_evaluated`), and an automatic with-and-without-warned-samples
+sensitivity analysis (the report gives the counts so it can be done).
+**Evidence.** `python/short_read_qc.py`; `test/test_short_read_qc.py` (good, warning-level and reject-level reads, every integrity failure, the
+shipped thresholds, and that every threshold row names a metric that is really measured); `test/test_short_read_qc_stage.sh` (stage 3 and stage 4
+in all three modes).
+**Status.** Implemented and tested. **The thresholds are provisional**: they are conservative starting points, not universal cut-offs. They must be set
+from pilot data on the intended platform and then frozen (mark every row `frozen`; the file's hash is written to every QC row) before the main
+benchmark. That is why `enforce` is not the default.
+
+### Q34. How is noise picked up when a tool reports more than one sequence for a plasmid?
+**Answer.** Already present: a one-to-one bin match (Hungarian), split and merge outcomes, per-plasmid recovery states, CPRR, and the predicted-sequence
+burden (`redundant_pred_bp`, unmapped and off-truth bases). What was missing was a candidate-level account. `python/candidate_multiplicity.py` (stage 5,
+descriptive) now accounts for **every predicted record**, using the scorer's own alignment filters. For each truth plasmid it separates
+- **best-candidate coverage** (the single best record),
+- **combined coverage** (the union of all records' alignments, so reference bases are counted once; it equals the base-level recall), and
+- **redundancy** (candidate-aligned bases that other candidates already cover, and its share);
+and it labels each candidate **primary**, **complementary fragment** (adds at least 10% new bases), **redundant** (adds almost nothing: a duplicate or an
+alternative reconstruction), **chimeric** (two replicons each carry at least 1 kb and 10% of its aligned bases), **off-target** (mostly chromosome)
+or **unmapped**, with an outcome per plasmid (single, fragmented, duplicated, fragmented and duplicated, missed). A worked case: three candidates of 60,
+35 and 30 kb on a 100 kb plasmid give 60% best coverage and 100% combined coverage, not 125%, with 35 kb redundant. The report draws each candidate as
+a track against the reference with a strip separating reference covered once, covered by several candidates, and not represented, and shows where
+each tool's predicted sequence went (unique plasmid, redundant, chromosome, unmapped).
+**It cannot be gamed.** The primary score is untouched: extra candidates do not raise it, and this table is where they show up.
+**Limits.** A candidate here is a predicted sequence record, so for a binner the bin-level view stays with the bin metrics. "Redundant" cannot tell
+a duplicate from an alternative reconstruction (alignment shows the overlap, not which). The 10%, 1 kb and 10% limits are provisional.
+**Evidence.** `python/candidate_multiplicity.py`; `test/test_candidate_multiplicity.py` (fragment, duplicate, alternative, chimera, off-target and
+unmapped candidates with hand-worked numbers; a tool that predicted nothing); `test/test_stage_dimensions.sh` (stages 5 and 6 on real alignments).
+**Status.** Implemented and tested on constructed cases and a stage run; not yet run on a real cohort.
+
+### Q35. What is done and what is open across the three?
+| Phase | Deliverable | Status |
+|---|---|---|
+| 1 Input QC | Short-read gate, thresholds file, QC tables, report table, pipeline enforcement | **Done** (default report-only; thresholds provisional) |
+| 2 Assembly | Candidate metrics, declared policy, selection recorded, alternatives kept | **Done**; running every tool on every alternative **Open** |
+| 3 Multiplicity | Candidate table, best versus combined versus redundancy, relationships, chimeric/off-target/unmapped | **Done** on constructed cases; real cohort **Open** |
+| 4 Reporting and validation | Three dashboards, synthetic fixtures, existing scores unchanged | **Done**; a documented with-and-without-flagged-samples analysis **Open** |
+Nothing here was tuned against which tool wins; freeze the thresholds before the main benchmark.
 
 ---
 

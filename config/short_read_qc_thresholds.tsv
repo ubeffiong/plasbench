@@ -1,0 +1,19 @@
+# Short-read QC thresholds (python/short_read_qc.py). PROVISIONAL: conservative starting points, not universal cut-offs.
+#
+# Set them from pilot data on the intended sequencing platform and organisms, then mark every row `frozen` and record the
+# file's hash (it is written to every QC row as thresholds_sha) BEFORE the main benchmark is run. Do not tune them against
+# which tool wins. direction min: the metric must not fall below the limit; max: must not rise above it.
+# warn: the sample proceeds, flagged. reject: the sample is excluded from the primary benchmark when SHORT_READ_QC_MODE=enforce.
+# A blank reject means there is no rejection limit for that metric. Integrity failures (unreadable, truncated, empty, malformed
+# FASTQ, unequal read counts) always reject and are not listed here.
+metric	direction	warn	reject	status	rationale
+read_pairs	min	100000	10000	provisional	Fewer pairs cannot cover a bacterial genome at useful depth.
+estimated_depth_x	min	30	10	provisional	Uses the genome size given, or 5 Mb when not given (flagged genome_size_assumed). Plasmid recovery needs depth beyond the chromosome's.
+mean_quality	min	28	20	provisional	Mean Phred of the sampled bases.
+q30_fraction	min	0.75	0.50	provisional	Share of bases at Q30 or better.
+median_read_length	min	70	35	provisional	Median over the shorter mate; very short reads assemble poorly.
+adapter_fraction	max	0.10	0.50	provisional	Reads carrying an adapter: stage 3 trims them, so only a large share is a concern.
+duplication_fraction	max	0.50	0.90	provisional	Read with caution: very high depth also duplicates reads.
+n_fraction	max	0.01	0.10	provisional	Share of N bases.
+pair_mismatch_fraction	max	0	0.001	provisional	Read names that disagree between R1 and R2 at the same position: the files are out of sync.
+gc_deviation	max	0.10	0.20	provisional	Absolute GC difference from the expected organism GC; only evaluated when --expected-gc is given.

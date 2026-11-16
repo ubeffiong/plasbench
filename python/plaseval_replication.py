@@ -107,9 +107,26 @@ def run_original(src, python, sample_dir, tool, alpha, timeout):
                                        os.path.join(sample_dir, "ground_truth_bins.tsv"), alpha, timeout)
 
 
-def compare_original(scores, bins_dir, src, python, alpha, timeout, workers):
+def compare_original(scores, bins_dir, src, python, alpha, timeout, workers, progress=None):
+    """Run the original program on every pair. Each finished pair is appended to `progress` at once, so a run that is interrupted, or
+    whose output folder disappears, keeps what it has already measured."""
+    done = {}
+    if progress and os.path.isfile(progress):          # resume: pairs the original already answered are not run again
+        with open(progress, newline="", encoding="utf-8") as handle:
+            for r in csv.DictReader(handle, delimiter=TAB):
+                if r.get("status") == "ok" and r.get("original_dissimilarity"):
+                    done[(r["sample"], r["tool"])] = float(r["original_dissimilarity"])
+        if done:
+            print(f"resuming: {len(done)} pair(s) already answered by the original program are kept")
+
     def one(row):
+        if (row["sample"], row["tool"]) in done:
+            return row, done[(row["sample"], row["tool"])], "ok"
         value, status = run_original(src, python, os.path.join(bins_dir, row["sample"]), row["tool"], alpha, timeout)
+        if progress:
+            os.makedirs(os.path.dirname(progress), exist_ok=True)
+            with open(progress, "a", encoding="utf-8") as handle:
+                handle.write(TAB.join([row["sample"], row["tool"], "" if value is None else f"{value:.6f}", status]) + NL)
         return row, value, status
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         for row, value, status in pool.map(one, scores):
@@ -154,6 +171,10 @@ def html_page(scores, matrix, alpha, n_samples, comparison):
 
 
 def comparison_html(scores):
+    return fig.original_comparison_html(scores)
+
+
+def _legacy_comparison_html(scores):
     rows = [r for r in scores if r.get("original_status")]
     if not rows:
         return ("<div class='insight caution'><p>The original PlasEval program was not run here, so agreement with it on these "
@@ -169,6 +190,30 @@ def comparison_html(scores):
     return f"<div class='insight{'' if worst < 1e-3 and not any(other.values()) else ' caution'}'><p>{text}</p></div>"
 
 
+def rebuild(a):
+    """Re-render the page from saved tables, merging the original program's streamed results into the scores."""
+    def rows(path):
+        with open(path, newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle, delimiter=TAB))
+    scores = rows(os.path.join(a.from_tsv, "plaseval_replication.scores.tsv"))
+    progress = os.path.join(a.from_tsv, "plaseval_replication.original_progress.tsv")
+    if os.path.isfile(progress):
+        got = {(r["sample"], r["tool"]): r for r in rows(progress)}
+        for r in scores:
+            hit = got.get((r["sample"], r["tool"]))
+            if hit:
+                r["original_dissimilarity"], r["original_status"] = hit["original_dissimilarity"], hit["status"]
+                r["abs_difference"] = ("" if hit["original_dissimilarity"] == "" else
+                                       f"{abs(float(hit['original_dissimilarity']) - float(r['bin_dissimilarity'])):.6f}")
+    matrix = rows(os.path.join(a.from_tsv, "benchmark.tool_agreement.tsv"))
+    os.makedirs(a.out_dir, exist_ok=True)
+    write_tsv(os.path.join(a.out_dir, "plaseval_replication.scores.tsv"), scores)
+    with open(os.path.join(a.out_dir, "plaseval_replication.html"), "w", encoding="utf-8") as handle:
+        handle.write(html_page(scores, matrix, a.alpha, len({r["sample"] for r in scores}), comparison_html(scores)))
+    print(f"rebuilt the page from {a.from_tsv}: {len(scores)} pairs, {sum(1 for r in scores if r.get('original_status'))} with the original's answer")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--bins-dir", default=DEFAULT_BINS)
@@ -178,15 +223,28 @@ def main(argv=None):
     ap.add_argument("--max-calls", type=int, default=200000)
     ap.add_argument("--plaseval-src", help="src/ of a PlasEval checkout; found automatically when omitted (see plaseval_gate.py)")
     ap.add_argument("--no-original", action="store_true", help="do not look for or run the original program")
+    ap.add_argument("--fresh", action="store_true", help="discard the original program's saved results and run every pair again "
+                    "(by default a run resumes from plaseval_replication.original_progress.tsv)")
+    ap.add_argument("--from-tsv", metavar="DIR", help="rebuild the HTML page from the tables a finished (or interrupted) run left in DIR; "
+                    "merges plaseval_replication.original_progress.tsv into the scores")
     ap.add_argument("--plaseval-python", default=sys.executable)
     ap.add_argument("--original-timeout", type=int, default=300)
     ap.add_argument("--workers", type=int, default=2)
     a = ap.parse_args(argv)
     os.makedirs(a.out_dir, exist_ok=True)
+    if a.from_tsv:
+        return rebuild(a)
     scores, matrix = score_all(a.bins_dir, a.alpha, a.repeats, a.max_calls)
+    os.makedirs(a.out_dir, exist_ok=True)
+    write_tsv(os.path.join(a.out_dir, "plaseval_replication.scores.tsv"), [dict(r) for r in scores])   # PlasBench's own numbers, kept at once
+    write_tsv(os.path.join(a.out_dir, "benchmark.tool_agreement.tsv"), matrix)
     src = None if a.no_original else gate.find_original(a.plaseval_src)
     if src:
-        compare_original(scores, a.bins_dir, src, a.plaseval_python, a.alpha, a.original_timeout, a.workers)
+        progress = os.path.join(a.out_dir, "plaseval_replication.original_progress.tsv")
+        if a.fresh or not os.path.isfile(progress):
+            open(progress, "w", encoding="utf-8").write(TAB.join(["sample", "tool", "original_dissimilarity", "status"]) + NL)
+        compare_original(scores, a.bins_dir, src, a.plaseval_python, a.alpha, a.original_timeout, a.workers, progress)
+    os.makedirs(a.out_dir, exist_ok=True)       # recreated: a temporary folder may have been cleaned up during a long run
     write_tsv(os.path.join(a.out_dir, "plaseval_replication.scores.tsv"), scores)
     write_tsv(os.path.join(a.out_dir, "benchmark.tool_agreement.tsv"), matrix)
     n_samples = len({r["sample"] for r in scores})

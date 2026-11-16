@@ -127,5 +127,28 @@ check("the whole section parses with its SVGs", all(well_formed(s)[0] for s in
                                                     [x + "</svg>" for x in html.split("</svg>")[:-1] if "<svg" in x
                                                      for x in [x[x.index("<svg"):]]]))
 
+print("comparison with the original program")
+cmp_rows = [
+    {"sample": "a", "tool": "t1", "bin_dissimilarity": "0.300000", "original_dissimilarity": "0.300000", "original_status": "ok"},
+    {"sample": "b", "tool": "t1", "bin_dissimilarity": "0.400000", "original_dissimilarity": "0.405000", "original_status": "ok"},
+    {"sample": "c", "tool": "t2", "bin_dissimilarity": "0.500000", "original_dissimilarity": "0.450000", "original_status": "ok", "dissim_repeat_search": "capped"},
+    {"sample": "d", "tool": "t2", "bin_dissimilarity": "0.200000", "original_dissimilarity": "", "original_status": "timeout", "dissim_repeat_families": "79"},
+    {"sample": "e", "tool": "t2", "bin_dissimilarity": "0.100000", "original_dissimilarity": "0.100000", "original_status": "ok"},
+]
+items = {i["sample"]: i for i in fig.comparison_rows(cmp_rows)}
+check("each pair gets a verdict: agree, disagree, capped upper bound, or not compared",
+      (items["a"]["verdict"], items["b"]["verdict"], items["c"]["verdict"], items["d"]["verdict"], items["e"]["verdict"])
+      == ("agree", "disagree", "capped_upper_bound", "not_compared", "agree"), {k: v["verdict"] for k, v in items.items()})
+page = fig.original_comparison_html(cmp_rows)
+check("a disagreement makes the verdict FAIL and counts every outcome", "Comparison with the original PlasEval program: FAIL" in page
+      and "4 of 5 isolate-tool pairs were compared" in page and "1 disagree" in page and "1 PlasBench upper bound(s)" in page, page[:400])
+check("the pair that timed out is listed with its repeat families, not hidden", "Pairs the original program did not finish" in page and "<td>79</td>" in page)
+check("the scatter is well-formed SVG with the diagonal", well_formed(page[page.index("<svg"):page.index("</svg>") + 6])[0] and "stroke-dasharray" in page)
+agree_only = [r for r in cmp_rows if r["sample"] in ("a", "e")]
+check("all compared pairs agreeing is PASS", "Comparison with the original PlasEval program: PASS" in fig.original_comparison_html(agree_only))
+check("no original results says so, rather than showing nothing", "was not run on these bins" in fig.original_comparison_html([{"sample": "a", "tool": "t"}]))
+check("every pair timing out is NOT RUN, never PASS", "NOT RUN" in fig.original_comparison_html(
+    [{"sample": "a", "tool": "t", "bin_dissimilarity": "0.1", "original_dissimilarity": "", "original_status": "timeout"}]))
+
 print("ALL BINNING ERROR CHART TESTS PASSED" if ok else "BINNING ERROR CHART TESTS FAILED")
 sys.exit(0 if ok else 1)
