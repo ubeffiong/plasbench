@@ -13,6 +13,11 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- the contributed RefSeq/SRA candidate pool and a seeded, cluster-aware importer
+- `cohorts/candidates/contributed-refseq-sra/`: 8,812 RefSeq Complete Genome / SRA pairs (and their 24,606 plasmids) from a collaborator, stored gzipped with SHA-256 pins and a `SOURCE.md` that lists what it does and does not establish.
+- `plasbench import-contributed-cohort` (`python/import_contributed_cohort.py`): long-read-first, one isolate per read-BioProject cluster (the pool's `bioproject` column is the RefSeq umbrella on every row), seeded and order-independent, with a reason for every rejected row, `--released-after/--released-before` and a `--date-basis` (`assembly`, `read`, `earliest_public`). Output is unverified until `validate-cohort --online`.
+- `plasbench_common.leakage_release_date` / `parse_iso_date`: the one definition of "when did this genome become public", for the importer and, next, the leakage screen.
+
 ### Added -- PlasEval cohort result, confirmable by any user (16 November 2026)
 - The 53-isolate comparison with the original PlasEval program finished: 211 of 212 pairs compared, 210 agree within 0.001, 0 disagree, 1 capped-search upper bound (0.003), 1 original timeout. The original's answers are kept in `cohorts/plaseval_ecoli53/original_reference.tsv`; `python/plaseval_replication.py` compares with them when no PlasEval checkout is installed and says so on the page, so any user who re-runs the cohort can confirm the result in the HTML. Finished page: `cohorts/plaseval_ecoli53/replication_report.html`.
 

@@ -102,6 +102,30 @@ replaces the placeholder `source_study` with a real study identifier, which
 that has not been verified online at all; online verification always resolves a
 row to A or B.
 
+## Contributed RefSeq/SRA candidate pool
+
+`cohorts/candidates/contributed-refseq-sra/` holds a pool of 8,812 RefSeq Complete Genomes paired to SRA runs
+(`assemblies.tsv.gz`, plus `plasmids.tsv.gz`, the same rows once per plasmid), supplied by a collaborator and
+pinned by SHA-256 in `contributed.lock.json`. Read its `SOURCE.md` first. It is a **candidate pool, not a cohort**:
+nothing in it is verified against NCBI, read quality is unassessed, there are no plasmid-free genomes, and its
+`bioproject` column is the RefSeq umbrella project on every row, so independence is judged on `read_bioprojects`.
+
+```bash
+plasbench import-contributed-cohort --out-dir curation/contributed   --released-after 2025-01-01 --date-basis earliest_public --max-clusters-per-species 25 --seed 20260916
+plasbench validate-cohort --online ...   # required before any row is used
+```
+
+The importer is deterministic for a given seed. It keeps long-read-first truths (add `--allow-short-read-first`
+for tier-3 truths), one isolate per read-BioProject cluster, skips BioSamples already released
+(`cohorts/accepted_accessions.tsv`), and writes `candidates.tsv`, `rejected.tsv` (with the reason for every
+row) and `selection_summary.tsv` (clusters per species against the headline's `MIN_SPECIES_CLUSTERS`).
+`--released-before` builds an older comparison arm. `--date-basis` is `assembly`, `read`, or `earliest_public`
+(the earlier of the two; the pool records the read release only as a year, so it is read as 1 January, the
+conservative direction). Measured on this pool: with the 2025 cutoff on the assembly date only *E. coli* (35
+clusters) and *K. pneumoniae* (22) reach 20 independent long-read-first clusters; over all years *E. coli*
+(122), *K. pneumoniae* (70), *S. enterica* (55), *S. aureus* (39) and *E. hormaechei* (22) do. Use an older
+comparison arm if more species are wanted.
+
 ## Candidate Review And Balance
 
 Keep raw discoveries as candidates. To detect study dependence and create a
