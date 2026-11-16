@@ -168,6 +168,23 @@ class Project:
         path.write_text("\n".join(kept) + "\n", encoding="utf-8", newline="\n")
         return self.local_env()
 
+    # -- your own isolates: sheet template, folder scan, staging, quick check (python/intake.py) -------------------------
+    def intake(self):
+        import importlib
+        python_dir = str(self.root / "python")
+        if python_dir not in sys.path:
+            sys.path.insert(0, python_dir)
+        return importlib.import_module("intake")
+
+    def intake_defaults(self) -> dict:
+        from .cli import configured_data_dir
+        return {"data_dir": str(configured_data_dir(self.root)), "samples": str(self.root / "config" / "local.tsv"),
+                "templates": [{"kind": k, "file": v[0], "label": v[1]} for k, v in self.intake().TEMPLATES.items()]}
+
+    def intake_paths(self, data) -> tuple:
+        d = self.intake_defaults()
+        return Path(str(data.get("data_dir") or d["data_dir"])).expanduser(), Path(str(data.get("samples") or d["samples"])).expanduser()
+
     # -- pre-registered scoring decisions (python/prereg_admin.py) --------------------------------------------------
     def prereg_admin(self):
         import importlib
@@ -1110,6 +1127,14 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"checks": project.env_checks()})
             if route == "tools":
                 return self.jsend(200, {"tools": project.tools()})
+            if route == "intake/defaults":
+                return self.jsend(200, project.intake_defaults())
+            if route == "intake/template":
+                kind = q.get("kind", "local")
+                module = project.intake()
+                if kind not in module.TEMPLATES:
+                    raise ValueError(f"unknown template '{kind}'")
+                return self.jsend(200, {"kind": kind, "file": module.TEMPLATES[kind][0], "text": module.template_text(kind, project.root)})
             if route == "prereg":
                 return self.jsend(200, project.prereg())
             if route == "settings":
@@ -1311,6 +1336,42 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "validate":
                 ok, message = ui_schema.validate_argv(data.get("argv") or [])
                 return self.jsend(200, {"ok": ok, "message": message})
+            if route.startswith("intake/"):
+                module = project.intake()
+                what = route[len("intake/"):]
+                if what == "scan":
+                    paths = [str(p).strip() for p in (data.get("paths") or []) if str(p).strip()]
+                    if not paths:
+                        raise ValueError("choose at least one folder to look in")
+                    return self.jsend(200, module.scan(paths, int(data.get("depth") or 3)))
+                data_dir, samples = project.intake_paths(data)
+                if what == "stage":
+                    paths = [str(p).strip() for p in (data.get("paths") or []) if str(p).strip()]
+                    if not paths:
+                        raise ValueError("choose at least one folder to look in")
+                    found = module.scan(paths, int(data.get("depth") or 3))
+                    done = module.stage(found, data_dir, samples, data.get("only") or None, data.get("rename") or {}, data.get("organism") or {},
+                                        str(data.get("link") or "copy"))
+                    session_log().event("intake_staged", isolates=len(done["staged"]), samples=str(samples))
+                    return self.jsend(200, done)
+                if what == "sheet":
+                    from validate_local_inputs import read_sheet
+                    if not samples.is_file():
+                        return self.jsend(200, {"exists": False, "samples": str(samples), "data_dir": str(data_dir), "rows": []})
+                    rows = [{"sample_id": (r.get("sample_id") or "").strip(), "assembly_accession": (r.get("assembly_accession") or "").strip(),
+                             "organism": (r.get("organism") or "").strip()} for r in read_sheet(samples) if (r.get("sample_id") or "").strip()]
+                    return self.jsend(200, {"exists": True, "samples": str(samples), "data_dir": str(data_dir), "rows": rows})
+                if what == "check":
+                    return self.jsend(200, module.check(samples, data_dir, str(data.get("sample") or ""), deep=bool(data.get("deep", True)),
+                                                        root=project.root, fix=bool(data.get("fix"))))
+                if what == "labels":
+                    return self.jsend(200, module.truth_rows(data_dir / str(data.get("sample") or "")))
+                if what == "labels/save":
+                    result = module.save_truth(data_dir / str(data.get("sample") or ""), data.get("labels") or {})
+                    if result["ok"]:
+                        session_log().event("intake_labels_saved", sample=str(data.get("sample")))
+                    return self.jsend(200, result)
+                raise FileNotFoundError(f"no such API: {route}")
             if route == "prereg/set":
                 admin = project.prereg_admin()
                 entry = admin.set_value(project.root, str(data.get("parameter", "")), str(data.get("value", "")), str(data.get("reason", "")), str(data.get("by", "")))
