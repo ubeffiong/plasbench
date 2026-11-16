@@ -240,6 +240,24 @@ def main():
                                  capture_output=True).returncode == 0
         check("git tracks plasbench/data/ui.html", tracked)
     html = page_file.read_text(encoding="utf-8")
+    # The persistent "benchmarking is running" toast: created in #toasts (outside every page), shown the moment a benchmark is started, driven by the job list, still there after a
+    # page change or a reload, clock ticking, animated, reduced-motion respected, and keyboard/click opens the console.
+    check("a running benchmark shows a persistent animated toast that lives outside the pages",
+          'el.id = "runtoast"' in html and '$("#toasts").prepend(el)' in html and "isBenchJob" in html and 'role", "status"' in html and "@keyframes rtspin" in html and "@keyframes rtslide" in html
+          and "@media (prefers-reduced-motion:reduce){.runtoast" in html and "Benchmarking is running" in html)
+    check("the toast appears on click (before the server answers), follows the job list, ticks every second and is restored on load",
+          "S.pendingBench = {label" in html and "renderRunToast();\n  if (!$(\"#v_runs\").hidden" in html and "setInterval(renderRunToast, 1000)" in html
+          and "refreshJobs();   // a benchmark that is already running" in html and 'isBenchArgv = argv => Array.isArray(argv) && ["run", "demo"].includes(argv[0])' in html)
+    # Run sessions: the page lists ongoing, failed/interrupted and completed runs, with progress, Resume, Open report and a reconnecting banner instead of a dead end
+    check("the Runs page has a Run sessions list with Ongoing, Needs attention, Completed and All, and the data route exists",
+          'id="sesslist"' in html and "SESS_TABS" in html and '"run-sessions"' in html and 'api("run-sessions")' in html and "Needs attention" in html and "Completed" in html)
+    check("each session offers Follow progress, Cancel, Resume, Open report, Run again, Remove, Folder and Details",
+          all(f'data-sa="{a}"' in html for a in ("log", "cancel", "resume", "rerun", "remove", "folder", "details")) and "Open report" in html and "jobs/${id}/resume" in html)
+    check("a lost connection shows a retry banner and probes /healthz; the full-screen notice waits 45 s and says runs are not lost",
+          'id="connbar"' in html and "connProbe" in html and "/healthz" in html and "45000" in html and "keep going without it" in html)
+    check("Quit offers to keep runs going or stop them, and a run that stopped while nobody looked gets a notice with Resume",
+          "askQuit" in html and "Quit and keep running" in html and '{keep: true}' in html and 'id = "attntoast"' in html and 'data-at="resume"' in html)
+    check("the Runs tab opens straight to a group (#runs/attention) and the nav badge counts unseen runs that need attention", '"ongoing", "attention", "completed", "all"' in html and 'id="b_runs"' in html)
     views = ["home", "setup", "tools", "addtool", "settings", "wizard", "isolates", "cohorts", "runs", "jobs", "commands", "help"]
     check("every page the rail links to exists", all(f'id="v_{v}"' in html and f'data-view="{v}"' in html for v in views))
     check("the page loads nothing from the network", "http://" not in html.split("<script>")[0].replace("http://www.w3.org", "")

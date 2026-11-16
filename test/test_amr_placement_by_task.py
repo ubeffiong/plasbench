@@ -86,6 +86,26 @@ def main():
         assert rows["bin2"]["evaluation_task"] == "binning_reconstruction" and rows["bin2"]["correct_plasmid_rate"] == "0.5000", rows["bin2"]
         print("  PASS: summary: the classifier has gene recovery 1.0 but no AMR-PRR and no pairs-kept-together; the fragmented binner has 0.5")
 
+    # A shared replicon type is supporting evidence, not proof of the right plasmid (third review): two plasmids carry the same replicon type, the gene is on pA, but its record is
+    # in a bin that the matching assigns to pB. The placement is wrong_plasmid although the replicon type agrees.
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        (tmp / "truth.tsv").write_text("sequence_id\tmolecule_type\tlength\nchr\tCHROMOSOME\t20000\npA\tPLASMID\t6000\npB\tPLASMID\t6000\n")
+        (tmp / "amr.tsv").write_text("sequence_id\tstart\tend\tgene_name\tgene_id\tcopy_id\tdatabase\tdatabase_version\npA\t100\t900\tblaKPC-2\tg1\tc1\tcard\t1\n")
+        (tmp / "pred.fasta").write_text(">r1\n" + "A" * 1500 + "\n>r2\n" + "A" * 5000 + "\n")
+        (tmp / "pred.paf").write_text("r1\t1500\t0\t1500\t+\tpA\t6000\t0\t1500\t1500\t1500\t60\nr2\t5000\t0\t5000\t+\tpB\t6000\t0\t5000\t5000\t5000\t60\n")
+        (tmp / "bins.tsv").write_text("sequence_id\tbin_id\nr1\tb1\nr2\tb1\n")
+        (tmp / "features.tsv").write_text("sequence_id\tstart\tend\tfeature_type\tlabel\tsource\tversion\npA\t0\t6000\treplicon\tIncX3\tmob\t1\npB\t0\t6000\treplicon\tIncX3\tmob\t1\n")
+        results = tmp / "results" / "S1"
+        results.mkdir(parents=True)
+        subprocess.run([sys.executable, str(SCRIPT), "score", "--sample", "S1", "--tool", "t", "--task", "binning_reconstruction", "--truth", str(tmp / "truth.tsv"), "--amr-truth", str(tmp / "amr.tsv"),
+                        "--paf", str(tmp / "pred.paf"), "--pred-fasta", str(tmp / "pred.fasta"), "--bins", str(tmp / "bins.tsv"), "--features", str(tmp / "features.tsv"),
+                        "--out", str(results / "t.amr_placement.tsv")], check=True, capture_output=True)
+        with open(results / "t.amr_placement.tsv", newline="") as handle:
+            gene = next(csv.DictReader(handle, delimiter="\t"))
+        assert gene["placement"] == "wrong_plasmid" and gene["matched_plasmid"] == "pB", gene
+        assert gene["replicon_type_correct"] == "yes", gene     # the replicon type agrees; the plasmid is still wrong
+        print("  PASS: two plasmids with the same replicon type: the gene is on the wrong plasmid although the replicon type matches (replicon agreement is not identity)")
     print("ALL AMR PLACEMENT BY TASK TESTS PASSED")
 
 

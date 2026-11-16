@@ -85,7 +85,7 @@ LEADERBOARD_COLUMN_GROUPS = {
     "Rank and basis": [
         "rank", "analysis_track", "task", "tool", "is_baseline", "beats_best_baseline", "ranking_metric", "ranking_score",
         "ranking_ci_low", "ranking_ci_high", "ranking_basis", "ranking_species_basis", "n_headline_species", "n_ranking_clusters",
-        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population", "ci_method"],
+        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population", "ci_method", "max_cluster_share", "dominant_study"],
     "Predicted-sequence burden": [
         "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp", "unmapped_fraction", "off_truth_fraction",
         "ambiguous_fraction", "precision_gap"],

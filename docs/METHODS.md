@@ -606,15 +606,7 @@ because plasmids from one isolate are not independent. Circular closure of the
 prediction is reported separately (`complete_circular_plasmid_recall`) and is not
 part of CPRR, since most tools do not report topology.
 
-**Track-specific primary endpoint.** On the **long-read** and **hybrid** input tracks,
-reconstruction tools are ranked by **isolate-level CPRR** (`sample_cprr` = correct
-plasmids / truth plasmids for each isolate, with the same identity rule), averaged
-across isolates like any other ranking metric, so the species macro-average, cluster
-bootstrap and paired tests apply unchanged; `lw_bin_f1` is secondary there. Those tools
-are built to close whole plasmids, so CPRR does not sit at a floor. Short-read
-reconstruction stays on `lw_bin_f1`, where complete recovery is rare and a pass/fail
-endpoint would cost power (`headline_design.ranking_metric()`; `config/prereg.tsv`,
-`primary_endpoint_long_read`).
+**One primary endpoint per task, on every input track.** There is no track-specific exception: classification is ranked on base-level F1, binning and reconstruction on length-weighted binning F1 (`lw_bin_f1`), and sequence reassembly on isolate-level CPRR (`sample_cprr` = correct plasmids / truth plasmids for each isolate, with the same identity rule), averaged across isolates like any other ranking metric so the species macro-average, cluster bootstrap and paired tests apply unchanged (`headline_design.ranking_metric()`; `config/prereg.tsv` `primary_endpoint` and `primary_endpoint_reassembly`). CPRR is the key secondary endpoint of the binning task and the primary endpoint of the reassembly task. An earlier design ranked long-read and hybrid reconstruction tools on CPRR by input track (`primary_endpoint_long_read`); that row was replaced when the three tasks were separated, so a long-read binner is ranked on binning F1 and a long-read reassembler on CPRR.
 
 **CPRR robustness and weighting** (descriptive; never change a rank):
 
@@ -671,18 +663,17 @@ failing a Tier-1 condition. Tier 3 = short-read-first, unknown provenance or coh
 tier C (provisional). The headline uses tiers <= `HEADLINE_MAX_REFERENCE_TIER` (2), and by default
 (`HEADLINE_REFERENCE_INDEPENDENCE=independent`) only those references independent of the
 benchmark reads: reference quality (the tier) and independence are separate variables
-(`reference_independence`, `reference_group` in the provenance table). A tier-2 reference
-polished with the benchmark's own reads is a dependent reference and enters only the
-reference-independence sensitivity analysis (`benchmark.reference_independence.tsv`: each
-tool's mean and rank on independent, same-read-polished and unrecorded references, and the
-change from the independent group); the headline design table records the composition;
+(`reference_quality`, `evaluation_independence`, `reference_group` in the provenance table). A tier-2 reference
+polished with the benchmark's own reads is partially independent and enters only the sensitivity analyses
+(`benchmark.reference_independence.tsv`: each tool's mean and rank on each evaluation-independence class, and the
+change from the independent class); the headline design table records the composition;
 `benchmark.reference_tiers.tsv` and the report's tier-sensitivity chart show results by
 tier. When no sample reaches tier 2, the **primary analysis is unavailable**: the same numbers are
 computed on all samples but are labelled provisional (`primary_status` and `population` in the leaderboard,
 `primary_status` in `benchmark.headline_design.tsv`, a banner in the report) and are not the headline.
 `ALLOW_PRIMARY_FALLBACK=1` keeps them as the headline with the warning.
 
-**Statistics validation** (`simulate_validation.py`). Scenarios: balanced, unbalanced, dominant and heavy studies; within-study correlation; missing outputs and resource failures (per isolate and whole studies); a dominant species with the stratified functions; Holm over 6 and 15 comparisons. Results are grouped by the number of independent studies; `by_studies()` marks a number 'supported' only for a full run with no shortfall, and `overall_status()` keeps the procedures provisional otherwise. The committed full run (docs/stats_validation/, 86 scenario rows, 1,000 replicates each, production resampling counts, seed 20261114, all three interval methods) found: the paired tests (exact sign-flip up to 12 studies, Monte Carlo above) and the Holm adjustment are calibrated in every structure; the cluster-robust t interval (the leaderboard default, `PLASBENCH_CI_METHOD=cluster_t`) covers 94-96% of the nominal 95% with balanced or moderately unbalanced studies, but only 64-79% when one study holds about 60% of the isolates or two hold 80%, where the percentile (87-91%) and studentised bootstrap (79-85%) do better; the percentile bootstrap under-covers everywhere else (74-94%). No method is adequate for every structure, so the statistical procedures stay provisional, and intervals from a cohort dominated by one or two studies should be read as optimistic.
+**Statistics validation** (`simulate_validation.py`). Scenarios: balanced, unbalanced, dominant and heavy studies; within-study correlation; missing outputs and resource failures (per isolate and whole studies); a dominant species with the stratified functions; Holm over 6 and 15 comparisons. Results are grouped by the number of independent studies; `by_studies()` marks a number 'supported' only for a full run with no shortfall, and `overall_status()` keeps the procedures provisional otherwise. The committed full run (docs/stats_validation/, 86 scenario rows, 1,000 replicates each, production resampling counts, seed 20261114, all three interval methods and the leaderboard rule) found: the paired tests and the Holm adjustment are calibrated in every structure; the cluster-robust t interval covers 94-96% of a nominal 95% with balanced or moderately unbalanced studies but only 64-79% when one study holds about 60% of the isolates or two hold 80%. The leaderboard therefore falls back to the percentile cluster bootstrap when one study holds more than 30% of the isolates (`PLASBENCH_DOMINANT_SHARE`), which lifts coverage there to 87-91%: better, still below 95%. A dominant species (stratified) reaches 88-93%. No method is adequate for every structure, so the statistical procedures stay provisional and intervals from a cohort dominated by one or two studies are optimistic.
 
 **Reference quality and evaluation independence** (`truth_provenance.py`; separate columns `reference_quality` and `evaluation_independence`, with `independence_reason`).
 Quality is the tier (validated / partially validated / provisional). Independence is derived from the assembly strategy and the polishing reads: independent = long-read-only or

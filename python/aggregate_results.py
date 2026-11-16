@@ -38,7 +38,7 @@ import headline_design as hd
 # Resampling primitives (resampling.py); re-exported because validate_recommendations.py
 # and the tests import bootstrap_ci / paired_permutation_pvalue from this module.
 from resampling import (  # noqa: E402,F401
-    bootstrap_ci, paired_permutation_pvalue, resampling_units, interval as resampling_interval, INTERVAL_METHOD, exact_mean as fast_mean, permutation_method, permutation_floor, MIN_CLUSTERS_CI,
+    bootstrap_ci, paired_permutation_pvalue, resampling_units, interval as resampling_interval, INTERVAL_METHOD, DOMINANT_STUDY_SHARE, exact_mean as fast_mean, permutation_method, permutation_floor, MIN_CLUSTERS_CI,
 )
 
 # Depth-ladder ids are "<parent>__<depth>x"; used only when a sheet has lost its
@@ -825,7 +825,8 @@ def compute_comparisons(rows, failed_samples=None, clusters=None, metric="f1", d
             })
     # The bootstrap CI and permutation test dominate runtime and are independent
     # per pair (each seeds its own RNG), so they run in parallel; order is kept.
-    for row, (low, high, pvalue) in zip(comparisons, hd.map_pair_statistics(jobs)):
+    for row, (low, high, pvalue, ci_used) in zip(comparisons, hd.map_pair_statistics(jobs)):
+        row["ci_method"] = ci_used
         row["difference_ci_low"] = low
         row["difference_ci_high"] = high
         row["permutation_p_value"] = pvalue
@@ -933,7 +934,7 @@ def write_comparisons(rows, path, comparisons=None):
                 f"{fmt6(row.get('wilcoxon_p_value'))}\t{fmt6(row.get('wilcoxon_p_value_holm'))}\t"
                 f"{row.get('equivalent', '')}\t{row.get('smallest_difference', '')}\t"
                 f"{row.get('permutation_method', '')}\t{fmt6(row.get('min_attainable_p'))}\t{row.get('p_status', '')}\t{fmt6(row.get('holm_min_attainable_p'))}\t"
-                f"{row.get('effect_status', '')}\t{row.get('testable', '')}\t{INTERVAL_METHOD}\n"
+                f"{row.get('effect_status', '')}\t{row.get('testable', '')}\t{row.get('ci_method') or INTERVAL_METHOD}\n"
             )
 
 
@@ -975,7 +976,7 @@ def write_tsv(summary, path):
             "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp",
             "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap",
             "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates",
-            "ci_method"]
+            "ci_method", "max_cluster_share", "dominant_study"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -1050,8 +1051,10 @@ def write_tsv(summary, path):
                 *(fmt4(s.get(k)) for k in ("unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap")),
                 fmt4(s.get("sv_prr")), s.get("sv_prr_correct") if s.get("sv_prr_correct") is not None else "", s.get("sv_prr_plasmids") if s.get("sv_prr_plasmids") is not None else "",
                 s.get("sv_prr_isolates") if s.get("sv_prr_isolates") is not None else "", fmt4(s.get("cprr_on_sv_isolates")),
-                # how the ranking and F1 intervals were made (resampling.INTERVAL_METHOD); pooled CPRR keeps its percentile ratio bootstrap
-                INTERVAL_METHOD,
+                # how the ranking and F1 intervals were made (resampling.INTERVAL_METHOD, or the percentile bootstrap when one study dominates); pooled CPRR keeps its percentile ratio bootstrap
+                s.get("ci_method") or INTERVAL_METHOD,
+                fmt4(s.get("max_cluster_share")),
+                "yes" if (s.get("max_cluster_share") or 0) > DOMINANT_STUDY_SHARE else ("no" if s.get("max_cluster_share") is not None else ""),
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
@@ -1482,6 +1485,7 @@ def main():
         design_rows.append({"analysis_track": track, "task": task, "ranking_metric": metric,
                             "reference_basis": reference_basis, "primary_status": selection.status,
                             "reference_independence_rule": design.reference_independence, "interval_method": INTERVAL_METHOD,
+                            "dominant_study_share_limit": DOMINANT_STUDY_SHARE,
                             "reference_composition": reference_composition,
                             "species_basis": track_summary[0].get("ranking_species_basis", "") if track_summary else "",
                             "min_species_clusters": design.min_species_clusters})
@@ -1502,7 +1506,7 @@ def main():
                 "n_isolates", "n_plasmids"])
     write_rows(design_rows, args.out_prefix + ".headline_design.tsv",
                ["analysis_track", "task", "ranking_metric", "reference_basis", "species_basis",
-                "min_species_clusters", "primary_status", "reference_independence_rule", "reference_composition", "interval_method"])
+                "min_species_clusters", "primary_status", "reference_independence_rule", "reference_composition", "interval_method", "dominant_study_share_limit"])
     if args.sample_sheet:
         completeness = metadata_completeness(args.sample_sheet, {r["sample"] for r in all_rows})
         write_rows(completeness, args.out_prefix + ".metadata_completeness.tsv",

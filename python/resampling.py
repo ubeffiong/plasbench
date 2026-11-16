@@ -500,11 +500,32 @@ def bootstrap_t_ci(values, groups=None, iterations=1000, level=0.95):
     return mean - high_q * se, mean - low_q * se
 
 
+def dominant_share(values, groups=None):
+    """The largest share of the observations held by one independent cluster (0 with no cluster labels). One study that holds most of the isolates is what the
+    full simulation found the cluster-t interval cannot handle (python/simulate_validation.py: 64-79% coverage of a nominal 95%)."""
+    if not groups or not len(values):
+        return 0.0
+    counts = {}
+    for group in groups:
+        counts[group] = counts.get(group, 0) + 1
+    return max(counts.values()) / len(groups)
+
+
+def interval_method_used(values, groups=None, strata=None, method=None):
+    """The method interval() will use. An explicit `method` is honoured. With none given the leaderboard's INTERVAL_METHOD applies, EXCEPT that a study holding more than
+    DOMINANT_STUDY_SHARE of the observations switches a studentised interval to the percentile cluster bootstrap, which the simulation found the least bad there."""
+    if method:
+        return method
+    if DOMINANT_FALLBACK and INTERVAL_METHOD != "percentile" and dominant_share(values, groups) > DOMINANT_STUDY_SHARE:
+        return "percentile"
+    return INTERVAL_METHOD
+
+
 def interval(values, groups=None, strata=None, method=None, iterations=1000):
-    """The leaderboard's interval for the (macro) mean, by INTERVAL_METHOD unless method is given.
+    """The leaderboard's interval for the (macro) mean, by INTERVAL_METHOD unless method is given (or a dominant study triggers the percentile fallback: interval_method_used).
 
     bootstrap_t has no stratified form here: with strata it falls back to cluster_t (both are studentized)."""
-    method = method or INTERVAL_METHOD
+    method = interval_method_used(values, groups, strata, method)
     if method == "percentile":
         return stratified_bootstrap(values, groups, strata, iterations=iterations)
     if method == "bootstrap_t" and strata is None:
@@ -513,5 +534,10 @@ def interval(values, groups=None, strata=None, method=None, iterations=1000):
 
 
 INTERVAL_METHOD = __import__("os").environ.get("PLASBENCH_CI_METHOD", "cluster_t")
+# A study that holds more than this share of the observations makes the default interval fall back to the percentile bootstrap (PLASBENCH_DOMINANT_SHARE, pre-registration row
+# dominant_study_share; PLASBENCH_DOMINANT_FALLBACK=0 turns the fallback off). 0.30 is above what unbalanced designs of 1-6 isolates per study reach and far below the 40-60% of
+# the structures the simulation showed cluster-t cannot cover.
+DOMINANT_STUDY_SHARE = float(__import__("os").environ.get("PLASBENCH_DOMINANT_SHARE", "0.30"))
+DOMINANT_FALLBACK = __import__("os").environ.get("PLASBENCH_DOMINANT_FALLBACK", "1") != "0"
 if INTERVAL_METHOD not in INTERVAL_METHODS:
     raise SystemExit(f"PLASBENCH_CI_METHOD must be one of {INTERVAL_METHODS}, got {INTERVAL_METHOD!r}")
