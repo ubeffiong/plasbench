@@ -600,7 +600,9 @@ body.gd-open #gdrawer{transform:none}
      </div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Maintenance</h3></div><div class="bd grid" style="gap:10px">
       <button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b><span>Only if no conda, mamba or micromamba is present.</span></span></button>
-      <button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b><span>Latest release; keeps your reads and databases.</span></span></button>
+      <button class="action" id="updcheck"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b><span>Asks GitHub whether a newer release exists. Nothing is installed.</span></span></button>
+      <div id="updresult" class="small" aria-live="polite" style="display:none"></div>
+      <button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b><span>Latest release; keeps your reads, databases and studies. Close and reopen PlasBench afterwards to use the new version.</span></span></button>
       <button class="action" data-run='["test"]' data-label="Run the offline test suite"><span class="aico"><svg class="ico"><use href="#i-check"/></svg></span><span><b>Run the test suite</b><span>Offline regression checks of this installation.</span></span></button>
      </div></div>
     </div>
@@ -1363,6 +1365,21 @@ function renderEnv(env) {
   }).join("")).join("");
 }
 $("#envref").onclick = async () => { $("#envlist").innerHTML = `<div class="bd mut">Checking…</div>`; await loadSetup(true); toast("Checked"); };
+$("#updcheck").onclick = async () => {
+  const box = $("#updresult"); box.style.display = ""; box.innerHTML = `<span class="mut">Checking GitHub…</span>`;
+  try {
+    const u = await api("update-check");
+    if (u.error) { box.innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>${esc(u.error)}</div></div>`; return; }
+    if (u.newer) {
+      box.innerHTML = `<div class="note">${icon("info", "ico")}<div><b>PlasBench ${esc(u.latest)} is available</b> (you have ${esc(u.current)}).
+        <a href="${esc(u.url)}" target="_blank" rel="noopener noreferrer">What changed</a>
+        <div style="margin-top:8px"><button class="btn sm" id="updgo">Upgrade to ${esc(u.latest)}</button></div></div></div>`;
+      $("#updgo").onclick = () => confirmRun(["upgrade", "--yes"], `Upgrade PlasBench to ${u.latest}`);
+    } else {
+      box.innerHTML = `<div class="note">${icon("check", "ico")}<div>PlasBench ${esc(u.current)} is the latest release.</div></div>`;
+    }
+  } catch (e) { box.innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>${esc(e.message)}</div></div>`; }
+};
 $("#profgo").onclick = () => { const p = $("#profile").value; confirmRun(["install-tools", p, "--yes"], `Install the ${p} profile`); };
 $("#ncbi_show").onclick = () => { const k = $("#ncbi_key"); k.type = k.type === "password" ? "text" : "password"; $("#ncbi_show").textContent = k.type === "password" ? "Show" : "Hide"; };
 $("#ncbi_save").onclick = async () => {
@@ -1583,7 +1600,8 @@ const PAGE_HELP = {
 "Optional items, shown in grey, are only needed for some analyses. A benchmark runs without them.",
 "<b>Add desktop icon</b> puts a PlasBench icon on your desktop and in the applications menu. Clicking it starts PlasBench.",
 "Conda is the normal way to get the tools. Docker is an alternative: the card shows the command when Docker is available.",
-"<b>Upgrade PlasBench</b> updates this folder in place. Your studies, settings, downloads and tools are kept.",
+"<b>Check for updates</b> asks GitHub whether a newer release exists and offers the upgrade; it only runs when you press it.",
+"<b>Upgrade PlasBench</b> updates this folder in place. Your studies, settings, downloads and tools are kept. Close and reopen PlasBench afterwards.",
 "<b>Git</b> (optional) keeps a history of your runs. On Windows, Git for Windows also provides Git Bash, which runs PlasBench's scripts and is a Terminal shell."
 ],
 "cli": [

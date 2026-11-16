@@ -1980,6 +1980,13 @@ One command, run from inside your current install directory:
 plasbench upgrade
 ```
 
+**From the window:** `plasbench ui`, then **Setup, Maintenance, Check for updates**. It asks GitHub whether a newer
+release exists (only when you press it) and offers **Upgrade to <version>**; close and reopen PlasBench afterwards.
+
+**No internet on this computer?** On another computer download `plasbench-<version>.tar.gz` and its `.sha256` from the
+Releases page, copy both here, then `tar -xzf plasbench-<version>.tar.gz` and run
+`bash plasbench-<version>/scripts/install_latest.sh --archive "$PWD/plasbench-<version>.tar.gz"`.
+
 That's it — remember `./update.sh`, the same way you already remember `./install.sh`.
 It finds the latest release, downloads and verifies it, and **updates your `PlasBench`
 folder in place**. Only the files the previous release installed are replaced (a release

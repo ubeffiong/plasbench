@@ -13,6 +13,9 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added
+- **Check for updates in the window** (Setup, Maintenance): asks GitHub whether a newer release exists, only when pressed, and offers a confirmed one-click upgrade. `plasbench --help` and the README upgrade section now also cover the offline `--archive` install, `plasbench ui --tab` and `plasbench desktop-icon`.
+
 ## [0.4.1] - 2026-11-16
 
 A fixes-only release: first-run problems reported from two Windows/WSL machines. Scores and rankings are unchanged from v0.4.0.
