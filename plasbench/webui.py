@@ -775,7 +775,11 @@ def make_handler(project: Project, jobs: Jobs):
             if not self.token_ok():
                 return self.send(403, ("<!doctype html><title>PlasBench</title><body style='font-family:system-ui;padding:40px'>"
                                        "<h2>Open PlasBench from the link <code>plasbench ui</code> printed</h2><p>This address "
-                                       "needs the session key that was printed with it.</p></body>").encode(), "text/html; charset=utf-8")
+                                       "needs the session key that was printed with it (the part after <code>?t=</code>). "
+                                       "The key is new every time PlasBench starts, so an old tab or bookmark stops working.</p>"
+                                       "<p>To get the full link again, run <code>plasbench ui</code> in a terminal: if PlasBench is "
+                                       "already running it prints the full link and reopens the window. The link is also in "
+                                       "<code>~/.plasbench/ui/server.json</code>.</p></body>").encode(), "text/html; charset=utf-8")
             if path == "/":
                 return self.send(200, page(), "text/html; charset=utf-8", cookie=True)
             if path.startswith("/view/"):
