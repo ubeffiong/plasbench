@@ -65,7 +65,21 @@ def classify(description: str) -> str:
     return "REVIEW"
 
 
-def place(source: Path, destination: Path, mode: str) -> None:
+def place(source, destination: Path, mode: str) -> None:
+    """Put `source` at `destination`. `source` may be a list of files (one isolate sequenced over several lanes): they are joined in order. Gzip files can be
+    concatenated byte for byte, and the result is one valid gzip file, so nothing is decompressed."""
+    if isinstance(source, (list, tuple)):
+        if len(source) == 1:
+            source = source[0]
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if destination.exists() or destination.is_symlink():
+                destination.unlink()
+            with open(destination, "wb") as out:
+                for part in source:
+                    with open(part, "rb") as handle:
+                        shutil.copyfileobj(handle, out, 1 << 20)
+            return
     if destination.exists() and destination.samefile(source):
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -82,27 +96,103 @@ def place(source: Path, destination: Path, mode: str) -> None:
         shutil.copy2(source, destination)
 
 
-def append_sheet_row(sheet: Path, sample: str, prefix: str, accession: str) -> str:
-    """Add the sample's row, creating the sheet if needed. Returns a note."""
-    existing = []
+def append_sheet_row(sheet: Path, sample: str, prefix: str, accession: str, extra: dict | None = None) -> str:
+    """Add the sample's row, creating the sheet if needed. Returns a note.
+
+    `extra` holds optional columns (organism, gram_group, ...). They are written under the sheet's own header names; a column the sheet does not have yet is
+    added to the header (earlier rows get an empty value), so a sheet made by `init-local` and a sheet downloaded from the template both accept them.
+    The template's EXAMPLE_ row is dropped the first time a real isolate is added.
+    """
+    values = {"sample_id": sample, "assembly_accession": accession, "sra_run": prefix}
+    values.update({k: v for k, v in (extra or {}).items() if v})
+    lines = []
     if sheet.is_file():
         with open(sheet, newline="", encoding="utf-8") as handle:
-            existing = [line for line in handle
-                        if line.strip() and not line.lstrip().startswith("#")]
-    if not existing:
+            lines = [line.rstrip("\r\n") for line in handle]
+    data = [(i, line) for i, line in enumerate(lines) if line.strip() and not line.lstrip().startswith("#")]
+    if not data:
         sheet.parent.mkdir(parents=True, exist_ok=True)
+        header = list(SHEET_COLUMNS) + [k for k in values if k not in SHEET_COLUMNS]
+        out = [line for line in lines if line.lstrip().startswith("#")]
+        out += ["\t".join(header), "\t".join(values.get(c, "") for c in header)]
         with open(sheet, "w", newline="", encoding="utf-8") as handle:
-            handle.write("\t".join(SHEET_COLUMNS) + "\n")
-            handle.write(f"{sample}\t{accession}\t{prefix}\n")
+            handle.write("\n".join(out) + "\n")
         return f"created {sheet} with one row"
-    for line in existing[1:]:
+    header_at, header_line = data[0]
+    header = header_line.split("\t")
+    for _, line in data[1:]:
         if line.split("\t")[0].strip() == sample:
             return f"{sheet} already has a row for '{sample}'; left unchanged"
-    with open(sheet, "a", newline="", encoding="utf-8") as handle:
-        if not existing[-1].endswith("\n"):
-            handle.write("\n")
-        handle.write(f"{sample}\t{accession}\t{prefix}\n")
+    new_columns = [k for k in values if k not in header]
+    keep = []
+    for i, line in enumerate(lines):
+        if i == header_at:
+            keep.append("\t".join(header + new_columns))
+        elif (i, line) in data[1:]:
+            if line.split("\t")[0].startswith("EXAMPLE_"):
+                continue   # the template's illustration, not an isolate
+            keep.append(line + "\t" * len(new_columns) if line.strip() else line)
+        else:
+            keep.append(line)
+    header = header + new_columns
+    keep.append("\t".join(values.get(c, "") for c in header))
+    with open(sheet, "w", newline="", encoding="utf-8") as handle:
+        handle.write("\n".join(keep) + "\n")
     return f"appended a row to {sheet}"
+
+
+def stage_isolate(sample, prefix, reads1, reads2, reference_arg, report_arg, data_dir, samples, accession, link, force, truth_arg=None, extra=None) -> int:
+    """Place one isolate's files, write its truth table when there is none, and add its sheet row. Returns how many truth rows still say REVIEW.
+
+    Shared by `plasbench init-local` (one isolate you name) and `plasbench intake stage` (every isolate found in a folder), so both place files the same way.
+    `reads1`/`reads2` may each be one file or a list of lane files to join."""
+    sample_dir = Path(data_dir) / sample
+    sample_dir.mkdir(parents=True, exist_ok=True)
+
+    place(reads1, sample_dir / f"{prefix}_1.fastq.gz", link)
+    place(reads2, sample_dir / f"{prefix}_2.fastq.gz", link)
+    print(f"reads      -> {sample_dir}/{prefix}_1.fastq.gz , {prefix}_2.fastq.gz")
+
+    review_rows = 0
+    if reference_arg:
+        reference = Path(reference_arg)
+        if not reference.is_file():
+            raise SystemExit(f"ERROR: no such file: {reference}")
+        place(reference, sample_dir / "reference.fna", link)
+        print(f"reference  -> {sample_dir}/reference.fna")
+
+        if report_arg:
+            report = Path(report_arg)
+            if not report.is_file():
+                raise SystemExit(f"ERROR: no such file: {report}")
+            place(report, sample_dir / "sequence_report.jsonl", link)
+            print(f"report     -> {sample_dir}/sequence_report.jsonl "
+                  "(truth table will be built from this; nothing to edit)")
+        elif truth_arg:
+            place(Path(truth_arg), sample_dir / "truth.tsv", link)
+            print(f"truth      -> {sample_dir}/truth.tsv (your own table, copied as it is; check it with `plasbench intake check`)")
+        else:
+            truth = sample_dir / "truth.tsv"
+            if truth.is_file() and not force:
+                print(f"truth      -> {truth} already exists; left unchanged (use --force to rewrite)")
+            else:
+                records = list(read_fasta_records(reference))
+                if not records:
+                    raise SystemExit(f"ERROR: no FASTA records found in {reference}")
+                with open(truth, "w", newline="", encoding="utf-8") as handle:
+                    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+                    writer.writerow(["sequence_id", "molecule_type", "length"])
+                    for seq_id, description, length in records:
+                        molecule = classify(description)
+                        review_rows += molecule == "REVIEW"
+                        writer.writerow([seq_id, molecule, length])
+                print(f"truth      -> {truth} ({len(records)} sequence(s), "
+                      f"{review_rows} needing review)")
+    else:
+        print("reference  -> not supplied; this sample can be reconstructed but NOT scored")
+
+    print(append_sheet_row(Path(samples), sample, prefix, accession, extra))
+    return review_rows
 
 
 def main() -> int:
@@ -161,49 +251,9 @@ def main() -> int:
     if reads1.resolve() == reads2.resolve():
         sys.exit("ERROR: --reads-1 and --reads-2 are the same file; PlasBench needs paired reads.")
 
+    review_rows = stage_isolate(args.sample, prefix, reads1, reads2, args.reference, args.sequence_report,
+                                Path(args.data_dir), Path(args.samples), args.accession, args.link, args.force)
     sample_dir = Path(args.data_dir) / args.sample
-    sample_dir.mkdir(parents=True, exist_ok=True)
-
-    place(reads1, sample_dir / f"{prefix}_1.fastq.gz", args.link)
-    place(reads2, sample_dir / f"{prefix}_2.fastq.gz", args.link)
-    print(f"reads      -> {sample_dir}/{prefix}_1.fastq.gz , {prefix}_2.fastq.gz")
-
-    review_rows = 0
-    if args.reference:
-        reference = Path(args.reference)
-        if not reference.is_file():
-            sys.exit(f"ERROR: no such file: {reference}")
-        place(reference, sample_dir / "reference.fna", args.link)
-        print(f"reference  -> {sample_dir}/reference.fna")
-
-        if args.sequence_report:
-            report = Path(args.sequence_report)
-            if not report.is_file():
-                sys.exit(f"ERROR: no such file: {report}")
-            place(report, sample_dir / "sequence_report.jsonl", args.link)
-            print(f"report     -> {sample_dir}/sequence_report.jsonl "
-                  "(truth table will be built from this; nothing to edit)")
-        else:
-            truth = sample_dir / "truth.tsv"
-            if truth.is_file() and not args.force:
-                print(f"truth      -> {truth} already exists; left unchanged (use --force to rewrite)")
-            else:
-                records = list(read_fasta_records(reference))
-                if not records:
-                    sys.exit(f"ERROR: no FASTA records found in {reference}")
-                with open(truth, "w", newline="", encoding="utf-8") as handle:
-                    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-                    writer.writerow(["sequence_id", "molecule_type", "length"])
-                    for seq_id, description, length in records:
-                        molecule = classify(description)
-                        review_rows += molecule == "REVIEW"
-                        writer.writerow([seq_id, molecule, length])
-                print(f"truth      -> {truth} ({len(records)} sequence(s), "
-                      f"{review_rows} needing review)")
-    else:
-        print("reference  -> not supplied; this sample can be reconstructed but NOT scored")
-
-    print(append_sheet_row(Path(args.samples), args.sample, prefix, args.accession))
 
     print()
     if review_rows:

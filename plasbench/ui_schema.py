@@ -18,7 +18,7 @@ CATEGORIES = [
     ("setup", "Set up", "Install, check and update PlasBench and its tools.",
      ["ui", "desktop-icon", "check", "install-conda", "install-git", "install-tools", "tools", "upgrade", "test"]),
     ("benchmark", "Benchmark", "Run benchmarks on cohorts or your own isolates.",
-     ["demo", "run", "init-local", "report", "reconstruct", "select-candidates", "select-unknown"]),
+     ["demo", "run", "init-local", "intake", "report", "reconstruct", "select-candidates", "select-unknown"]),
     ("sweeps", "Depth and quality sweeps", "How far sequencing can be cut before recovery degrades.",
      ["depth-ladder", "depth-report", "read-quality-ladder", "read-quality-report"]),
     ("cohorts", "Cohorts and truth", "Find, curate and validate isolates and their reference truth.",
