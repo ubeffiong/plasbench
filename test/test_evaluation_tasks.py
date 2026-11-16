@@ -79,9 +79,9 @@ def main():
     check("an unknown task is refused", unknown)
     check("the old name 'reconstruction' written in a registry means binning", load(head + "\tevaluation_task\nx\tbinning\tyes\tshort_read\tno\treconstruction\n")["x"]["evaluation_task"] == "binning_reconstruction")
     legacy = load(head + "\nb\tbinning\tyes\tshort_read\tno\nr\treassembly\tyes\tshort_read\tno\nc\tclassification\tno\tshort_read\tno\nq\treassembly\tno\tshort_read\tno\n")
-    check("a registry without the column keeps its old answers and tells a reassembler from a binner (older fixtures, user registries)",
+    check("a registry without the column tells a reassembler from a binner and never calls a reassembler a classifier (older fixtures, user registries)",
           (legacy["b"]["evaluation_task"], legacy["r"]["evaluation_task"], legacy["c"]["evaluation_task"], legacy["q"]["evaluation_task"])
-          == ("binning_reconstruction", "sequence_reassembly", "classification", "classification"))
+          == ("binning_reconstruction", "sequence_reassembly", "classification", "sequence_reassembly"))   # q: a reassembler without bins is still a reassembler (the old fallback made it a classifier)
 
     print("the ranking endpoint of each task")
     check("binning is ranked by length-weighted binning F1, classification by base F1, reassembly by isolate-level CPRR, on every input track",

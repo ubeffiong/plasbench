@@ -1377,6 +1377,7 @@ def headline_design_section(out_dir):
     species = read_tsv(out_dir / "benchmark.species.tsv") if (out_dir / "benchmark.species.tsv").is_file() else []
     tiers = read_tsv(out_dir / "benchmark.reference_tiers.tsv") if (out_dir / "benchmark.reference_tiers.tsv").is_file() else []
     independence = read_tsv(out_dir / "benchmark.reference_independence.tsv") if (out_dir / "benchmark.reference_independence.tsv").is_file() else []
+    board = read_tsv(out_dir / "benchmark.leaderboard.tsv") if (out_dir / "benchmark.leaderboard.tsv").is_file() else []
     if not (design or provenance or species or tiers):
         return ""
     design_rows = "".join(
@@ -1395,6 +1396,17 @@ def headline_design_section(out_dir):
         f"<td>{esc(r.get('rank_in_group'))}</td><td>{esc(signed(r.get('difference_vs_independent')))}</td>"
         f"<td>{esc(signed(r.get('rank_change_vs_independent'), 0))}</td></tr>"
         for r in independence) or "<tr><td colspan='9'>No provenance table, so no reference can be shown to be independent of the benchmark reads.</td></tr>"
+    structure, seen = [], set()
+    for r in board:   # one row per (track, task): the study structure is the same for every tool that shares the ranking set
+        key = (r.get("analysis_track"), r.get("task"))
+        if key in seen:
+            continue
+        seen.add(key)
+        flagged = r.get("dominant_study") == "yes"
+        structure.append(f"<tr><td>{esc(r.get('analysis_track'))} / {esc(TASK_LABELS.get(r.get('task'), r.get('task')))}</td><td>{esc(r.get('n_ranking_clusters') or r.get('n_independent_clusters') or '')}</td>"
+                         f"<td>{esc(r.get('max_cluster_share') or 'not recorded')}</td><td>{esc((r.get('ci_method') or 'not recorded').replace('_', ' '))}</td>"
+                         f"<td>{'<strong>yes: one study holds most of the isolates; intervals fall back to the percentile bootstrap and should be read as optimistic</strong>' if flagged else 'no' if r.get('dominant_study') else 'not recorded'}</td></tr>")
+    structure_rows = "".join(structure) or "<tr><td colspan='5'>No leaderboard for this run.</td></tr>"
     tier_counts = Counter(r.get("reference_tier") for r in provenance)
     provenance_rows = "".join(
         f"<tr><td>{esc(r.get('sample'))}</td><td>{esc(r.get('reference_tier'))}</td>"
@@ -1442,6 +1454,12 @@ def headline_design_section(out_dir):
         "<details class='rpt-collapsible'><summary>Show the reference standard, truth provenance, tier sensitivity and species balance</summary>"
         "<div class='panel'><table><thead><tr><th>Track</th><th>Task</th><th>Ranking metric</th>"
         f"<th>Reference standard</th><th>Species basis</th><th>Primary analysis</th><th>References by tier and independence</th></tr></thead><tbody>{design_rows}</tbody></table></div>"
+        "<h3>Study structure and interval method</h3><p class='muted'>The number of independent studies behind each ranking, the largest share of the isolates held by one study, and the interval "
+        "method used. The default interval (cluster-robust t) covers about 94-96% of a nominal 95% with balanced or moderately unbalanced studies but only 64-79% when one study holds about "
+        "60% of the isolates; above 30% in one study the interval switches to the percentile bootstrap (still below 95% there). The statistical procedures stay provisional "
+        "(see Sensitivity, power and reproducibility).</p>"
+        "<div class='panel'><table><thead><tr><th>Track / task</th><th>Independent studies</th><th>Largest study share</th><th>Interval method</th><th>Dominated by one study</th></tr></thead>"
+        f"<tbody>{structure_rows}</tbody></table></div>"
         f"<h3>Truth provenance</h3><p class='muted'>Tier counts: "
         + (", ".join(f"tier {esc(t)}: {n}" for t, n in sorted(tier_counts.items()) if t) or "none")
         + ". Derived values are heuristics from NCBI assembly metadata; set truth_assembly_strategy and "

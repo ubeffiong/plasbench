@@ -54,6 +54,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import resampling  # noqa: E402
 
 METHODS = resampling.INTERVAL_METHODS
+LEADERBOARD = "leaderboard"   # the interval the leaderboard actually uses: resampling.INTERVAL_METHOD, or the percentile bootstrap when one study dominates
+COLUMN_METHODS = METHODS + (LEADERBOARD,)
 from aggregate_results import holm_adjust  # noqa: E402
 
 ALPHA = 0.05
@@ -62,7 +64,7 @@ FAILURE_MAGNITUDE = 0.7     # a failed tool scores 0 where the other scores abou
 FIELDS = ("mode", "scenario", "n_clusters", "isolates_per_cluster", "tau", "sigma", "missing", "effect", "replicates", "ci_estimated", "ci_coverage", "ci_coverage_se",
           "ci_verdict", "test_estimated", "rejection_rate", "rejection_se", "test_method", "test_verdict",
           "family", "sizes", "icc", "failure", "species", "comparisons", "fwer_unadjusted", "fwer_holm", "power_unadjusted", "power_holm", "kind", "ci_method",
-          *(f"{m}_{k}" for m in METHODS for k in ("coverage", "width")))
+          *(f"{m}_{k}" for m in COLUMN_METHODS for k in ("coverage", "width")))
 
 Scenario = namedtuple("Scenario", "name family clusters per_cluster tau sigma missing sizes failure clustered species comparisons")
 
@@ -171,8 +173,8 @@ def _verdicts(coverage, ci_n, rate, test_n, effect, replicates, mode):
 
 def _method_columns(per_method):
     """The per-method coverage and width columns, and the ci_* triple of the method the leaderboard uses: ({column: text}, (covered, estimated))."""
-    columns = {"ci_method": resampling.INTERVAL_METHOD if per_method else ""}
-    for method in METHODS:
+    columns = {"ci_method": f"{resampling.INTERVAL_METHOD}, percentile when one study holds more than {resampling.DOMINANT_STUDY_SHARE:.0%}" if per_method else ""}
+    for method in COLUMN_METHODS:
         hit, n, width = (per_method or {}).get(method, (0, 0, 0.0))
         columns[f"{method}_coverage"] = f"{hit / n:.3f}" if n else ""
         columns[f"{method}_width"] = f"{width / n:.4f}" if n else ""
@@ -197,14 +199,14 @@ def run_scenario(name, clusters, per_cluster, tau, sigma, missing, effect, repli
     rejected = test_n = 0
     sizes = []
     methods = set()
-    per_method = {m: [0, 0, 0.0] for m in METHODS}   # covered, estimated, summed width
+    per_method = {m: [0, 0, 0.0] for m in COLUMN_METHODS}   # covered, estimated, summed width
     for _ in range(replicates):
         values, groups, strata = draw(rng, clusters, per_cluster, tau, sigma, missing, effect, scn.sizes, scn.failure, scn.clustered, scn.species)
         if not values:
             continue
         sizes.append(len(values) / max(1, len(set(groups))))
-        for method in METHODS:
-            low, high = resampling.interval(values, groups, strata, method=method, iterations=bootstrap)
+        for method in COLUMN_METHODS:
+            low, high = resampling.interval(values, groups, strata, method=None if method == LEADERBOARD else method, iterations=bootstrap)
             if low is not None:
                 per_method[method][1] += 1
                 per_method[method][0] += low <= effect <= high
@@ -215,7 +217,7 @@ def run_scenario(name, clusters, per_cluster, tau, sigma, missing, effect, repli
             test_n += 1
             rejected += p <= ALPHA
             methods.add(resampling.permutation_method(units))
-    covered, ci_n, _width = per_method[resampling.INTERVAL_METHOD]
+    covered, ci_n, _width = per_method[LEADERBOARD]
     coverage = covered / ci_n if ci_n else None
     rate = rejected / test_n if test_n else None
     ci_verdict, test_verdict = _verdicts(coverage, ci_n, rate, test_n, effect, replicates, mode)
@@ -275,7 +277,7 @@ SETTINGS["full"].update(stratified=STRATIFIED_FULL, holm_pairs=HOLM_PAIRS_FULL)
 def _plain_row(mode, name, kind, clusters, sizes, tau, sigma, missing, effect, replicates, per_method, rejected, test_n, methods, family):
     """A row for the stratified and Holm-pairs scenarios (they have no isolate-structure options)."""
     scn = S(name, clusters, 3, tau, sigma, missing, family=family)
-    covered, ci_n, _ = per_method.get(resampling.INTERVAL_METHOD, [0, 0, 0.0]) if per_method else (0, 0, 0.0)
+    covered, ci_n, _ = per_method.get(LEADERBOARD, [0, 0, 0.0]) if per_method else (0, 0, 0.0)
     coverage = covered / ci_n if ci_n else None
     rate = rejected / test_n if test_n else None
     ci_verdict, test_verdict = _verdicts(coverage, ci_n, rate, test_n, effect, replicates, mode)
@@ -294,7 +296,7 @@ def run_stratified(name, clusters, per_cluster, tau, sigma, missing, effect, rep
     rng = random.Random(seed)
     rejected = test_n = 0
     sizes, methods = [], set()
-    per_method = {m: [0, 0, 0.0] for m in ("percentile", "cluster_t")}
+    per_method = {m: [0, 0, 0.0] for m in ("percentile", "cluster_t", LEADERBOARD)}
     for _ in range(replicates):
         values, groups, strata = [], [], []
         for stratum, shift in (("A", -0.1), ("B", 0.1)):
@@ -306,7 +308,7 @@ def run_stratified(name, clusters, per_cluster, tau, sigma, missing, effect, rep
             continue
         sizes.append(len(values) / max(1, len(set(groups))))
         for method in per_method:
-            low, high = resampling.interval(values, groups, strata, method=method, iterations=bootstrap)
+            low, high = resampling.interval(values, groups, strata, method=None if method == LEADERBOARD else method, iterations=bootstrap)
             if low is not None:
                 per_method[method][1] += 1
                 per_method[method][0] += low <= effect <= high
@@ -387,7 +389,7 @@ def run(mode="smoke", replicates=None, seed=20261114, workers=1):
     return [_job(job) for job in jobs]
 
 
-BY_STUDIES_FIELDS = ("n_studies", "mode", "scenarios", "intervals_checked", "lowest_coverage", "lowest_coverage_percentile", "lowest_coverage_cluster_t", "lowest_coverage_bootstrap_t", "interval_status", "tests_checked", "highest_type_i_error", "test_status",
+BY_STUDIES_FIELDS = ("n_studies", "mode", "scenarios", "intervals_checked", "lowest_coverage", "lowest_coverage_percentile", "lowest_coverage_cluster_t", "lowest_coverage_bootstrap_t", "lowest_coverage_leaderboard", "interval_status", "tests_checked", "highest_type_i_error", "test_status",
                      "holm_status", "status", "limiting_scenarios")
 
 
@@ -401,7 +403,7 @@ def by_studies(rows):
             r.setdefault("kind", "holm" if r.get("family") == "holm" else "unstratified")
         mode = group[0]["mode"]
         coverages = [float(r["ci_coverage"]) for r in group if r["ci_coverage"] != "" and r["kind"] != "holm"]
-        per_method_low = {m: [float(r[f"{m}_coverage"]) for r in group if r.get(f"{m}_coverage") not in ("", None) and r["kind"] != "holm"] for m in METHODS}
+        per_method_low = {m: [float(r[f"{m}_coverage"]) for r in group if r.get(f"{m}_coverage") not in ("", None) and r["kind"] != "holm"] for m in COLUMN_METHODS}
         type_one = [float(r["rejection_rate"]) for r in group if r["kind"] != "holm" and r["effect"] in (0, 0.0, "0", "0.0") and r["rejection_rate"] != ""]
         low = [r for r in group if r["ci_verdict"].startswith("below nominal")]
         high = [r for r in group if r["test_verdict"].startswith("anti-conservative")]

@@ -438,7 +438,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:175` | `or len(units) < MIN_CLUSTERS_CI or _has_nan(values)` |
 | E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:259` | `or len(units) < MIN_CLUSTERS_TEST or _has_nan(differences)` |
 | E22 | Holm adjustment across pairs | `python/aggregate_results.py:712` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:888` | `def attach_significance` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:889` | `def attach_significance` |
 | E24 | Percentile cluster bootstrap | `python/resampling.py:166` | `def bootstrap_ci` |
 | E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:84` | `def sample_clusters` |
 | E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:151` | `UnionFind()` |

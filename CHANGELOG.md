@@ -13,6 +13,13 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Changed -- third review (registry, intervals, documentation)
+- `tool_capabilities.derived_task()` is strict: a reassembler is never derived to be a classifier (the old fallback did that for a reassembler with `binning_capable=no`), contradictory rows are errors, and a derived task is reported on stderr. The shipped registry declares `evaluation_task` for every tool; `test_registry_tasks.py` pins it (plasmidSPAdes is `sequence_reassembly`).
+- Percentile fallback for dominated cohorts: when one study holds more than 30% of the observations (`PLASBENCH_DOMINANT_SHARE`, `PLASBENCH_DOMINANT_FALLBACK`), the leaderboard and paired intervals use the percentile cluster bootstrap instead of cluster t. New leaderboard columns `max_cluster_share`, `dominant_study` (appended after `ci_method`; `ci_method` now records the method actually used); a Headline design table of study structure. A new full simulation (committed in `docs/stats_validation/`) measures the rule: dominant-study coverage rises from 64-79% to 87-91%; the statistics stay provisional.
+- `PLASBENCH_CI_METHOD`, `PLASBENCH_DOMINANT_SHARE`, `PLASBENCH_DOMINANT_FALLBACK` and `HEADLINE_REFERENCE_INDEPENDENCE` are now recorded in the run manifest (the first and last were missing).
+- Documentation: the Methods document no longer describes the retired track-specific CPRR endpoint or the three-class independence names; the guide lists `public-v3`; `test_docs_consistency.py` checks tasks, endpoints, independence classes, cohorts, the interval defaults and the proposed pre-registration rows against the code.
+- AMR placement: a regression fixture shows that agreement of the replicon type does not make a placement correct.
+
 ### Added -- repeat-aware PlasEval dissimilarity, checked against the original program
 - `bin_agreement.py` now pairs the copies of a contig that sits in several bins, as PlasEval does (a maximal matching per repeat family, the lowest total dissimilarity found by branch and bound; every copy counts in the normaliser). `--repeats drop` keeps the earlier first-copy behaviour; `DISSIMILARITY_REPEATS` and `DISSIMILARITY_MAX_CALLS` configure it. A search that reaches the cap keeps the best pairing found and is marked `capped` in the new `dissim_repeat_search` column; `dissim_repeat_families` counts the repeat families.
 - `scores.tsv` also records the dissimilarity at length exponent 0 and 1 (`bin_dissimilarity_alpha0`, `bin_dissimilarity_alpha1`) beside the configured alpha (default 0.5), so a reader can see whether a verdict depends on how contig length is weighted.

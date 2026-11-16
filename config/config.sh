@@ -772,3 +772,7 @@ export RUN_RANK_SENSITIVITY="${RUN_RANK_SENSITIVITY:-1}"
 export HEADLINE_INDEPENDENCE="${HEADLINE_INDEPENDENCE:-independent}"
 # Processes the statistics simulation (python/simulate_validation.py) uses in stage 6 (1 = one process). It never changes a number; the full mode takes minutes with 8 or more.
 export STATS_VALIDATION_WORKERS="${STATS_VALIDATION_WORKERS:-1}"
+# A study that holds more than this share of the isolates makes the default interval fall back to the percentile cluster bootstrap (the full simulation found cluster-t covers only 64-79% then).
+# PLASBENCH_DOMINANT_FALLBACK=0 turns the fallback off. Pre-registration row dominant_study_share (proposed).
+export PLASBENCH_DOMINANT_SHARE="${PLASBENCH_DOMINANT_SHARE:-0.30}"
+export PLASBENCH_DOMINANT_FALLBACK="${PLASBENCH_DOMINANT_FALLBACK:-1}"
