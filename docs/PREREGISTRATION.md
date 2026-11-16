@@ -28,7 +28,7 @@ The decisions that matter most for how to read a result:
 | Fewest independent studies for the main ranking | 5 | with fewer, the ranking is marked provisional |
 | How uncertainty ranges are drawn | cluster-robust t | treats each independent study as one unit |
 | When that is replaced | one study holds more than 30% of the isolates | the simulation found the default too narrow then, so a different method is used |
-| How long one tool may run on one isolate | 7200 seconds (2 hours) | a longer run is stopped and counted as a failure |
+| How long one tool may run on one isolate | no limit | 7200 seconds was confirmed and then changed the same day: a limit scores a slow tool zero, and big isolates and many tools make runs of many hours normal. Set a generous limit only to stop a truly stuck run |
 
 ## All the decisions
 
@@ -67,7 +67,7 @@ Each row says what the decision means, the value that was decided, and whether y
 | **What a tool scores when it crashes or gives no output** (`failed_tool_score`) | A tool that crashes or produces nothing on an isolate scores zero for that isolate and is still ranked. A tool cannot move up by failing on hard isolates. | `0` | no (written into the program) |
 | **What happens when the computer, not the tool, fails** (`infrastructure_failure_scored`) | If the run was killed by the computer (out of memory, a timeout, a lost disk) it is re-run and not scored against the tool. | `no` | no (written into the program) |
 | **How many times a failed run is retried automatically** (`tool_retries`) | A tool that fails is run once more before it is counted as failed. | `1` | yes, in the window or with `plasbench analysis prereg set` |
-| **How long a tool may run on one isolate** (`tool_timeout_seconds`) | Every tool gets the same time limit (7200 seconds is two hours). A tool that exceeds it is stopped. | `7200` | yes, in the window or with `plasbench analysis prereg set` |
+| **How long one tool may run on one isolate** (`tool_timeout_seconds`) | By default there is no limit. If you set one, a tool that runs longer on one isolate is stopped and counted as failed, and a failure scores zero for that tool. The limit is per tool per isolate, the same for every tool, not for the whole pipeline. | `unset` | yes, in the window or with `plasbench analysis prereg set` |
 
 ### Alignment filters
 
@@ -158,7 +158,6 @@ Each row says what the decision means, the value that was decided, and whether y
 | Decision | What it means | Value | Can be changed |
 |---|---|---|---|
 | **Region around a resistance gene that must also be recovered** (`amr_flank_bp`) | A resistance gene counts as recovered with its context when this many bases on either side are also covered by the same contig. | `1000` | yes, in the window or with `plasbench analysis prereg set` |
-
 <!-- prereg-table:end -->
 
 ## How to look at them

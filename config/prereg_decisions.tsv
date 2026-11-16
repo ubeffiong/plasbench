@@ -28,3 +28,4 @@ date	parameter	action	old_value	new_value	decided_by	reason
 2026-11-16	interval_method	confirmed	cluster_t	cluster_t	ubeffiong (project owner)	Accepted as proposed by the project owner after reading the plain-language description of each decision.
 2026-11-16	dominant_study_share	confirmed	0.30	0.30	ubeffiong (project owner)	Accepted as proposed by the project owner after reading the plain-language description of each decision.
 2026-11-16	headline_min_clusters	confirmed	5	5	ubeffiong (project owner)	Accepted as proposed by the project owner after reading the plain-language description of each decision.
+2026-11-16	tool_timeout_seconds	changed	7200	unset	ubeffiong (project owner)	A 2-hour limit per tool per isolate is not realistic: slow tools and large isolates take many hours, a pipeline with many tools and inputs can run for days, and a timeout scores the tool zero, which biases the ranking.

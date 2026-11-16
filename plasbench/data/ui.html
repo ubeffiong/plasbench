@@ -1842,6 +1842,18 @@ const PAGE_HELP = {
 "plasbench tools list"
 ]
 },
+"prereg": {
+"title": "Scoring decisions",
+"what": "The rules for how tools are scored and ranked, fixed before any result is looked at, each explained in plain words. They are confirmed and recorded so nobody can quietly change a rule after seeing which tool wins.",
+"steps": [
+"Read the two boxes at the top: whether every decision is confirmed, and whether they are locked. Locking records a fingerprint of the decisions in every run.",
+"Use the search box or the topic buttons to find a decision. Each card says what it means, the value that was decided, and what would change if it were changed.",
+"To change one, press <b>Change</b> (only decisions that are settings have the button). Enter the new value, say why, and give your name. Both are kept in the <b>Decision record</b>.",
+"After a change, results made before it cannot be compared with results made after it. Press <b>Lock the decisions</b> again when you are happy.",
+"A yellow box means a setting on this computer differs from the decision, so a run here would not follow the plan. Change the setting back on the Settings page, or record a decision to change it.",
+"Decisions that are built into the scoring code cannot be changed here: the card says so. They need a new version of PlasBench."
+]
+},
 "settings": {
 "title": "Settings",
 "what": "Every setting PlasBench reads, with its default and an explanation. Your changes apply to this computer only.",
@@ -2112,6 +2124,7 @@ const SET = {q:"", only:false, edits:{}};
    SCORING DECISIONS (pre-registration): python/prereg_admin.py
    =================================================================================================== */
 const PR = {data: null, topic: "all", q: "", only: false};
+const prValue = r => r.value === "unset" ? "no limit" : r.value;
 const prDate = d => { try { return new Date(d + "T00:00:00").toLocaleDateString([], {day: "numeric", month: "short", year: "numeric"}); } catch { return d; } };
 async function loadPrereg(force) {
   try { PR.data = await api("prereg"); } catch (e) { toast(e.message, "bad"); return; }
@@ -2148,7 +2161,7 @@ function prCard(r) {
   const by = r.decided_by ? `<div class="mut small">${esc(r.last_action === "changed" ? "Changed" : "Confirmed")} by ${esc(r.decided_by)}: ${esc(r.decision_reason)}</div>` : "";
   return `<div class="run" style="padding:10px 14px;border-top:1px solid var(--line)"><div style="flex:1;min-width:0"><h4 style="margin:0;font-family:inherit">${esc(r.title)} ${badge}${r.departs ? ` <span class="badge warn">this computer differs</span>` : ""}</h4>
     <div style="margin-top:4px">${esc(r.meaning)}</div>
-    <div class="small" style="margin-top:4px"><b>Decided:</b> <code>${esc(r.value)}</code>${r.where === "setting" && r.current != null && r.departs ? ` · this computer uses <code>${esc(String(r.current))}</code>` : ""}</div>
+    <div class="small" style="margin-top:4px"><b>Decided:</b> <code>${esc(prValue(r))}</code>${r.where === "setting" && r.current != null && r.departs ? ` · this computer uses <code>${esc(String(r.current) === "" ? "no limit" : String(r.current))}</code>` : ""}</div>
     <div class="mut small" style="margin-top:2px"><b>If it were changed:</b> ${esc(r.if_changed)}</div>${by}</div>
     <div style="flex:none;align-self:flex-start">${how}</div></div>`;
 }
@@ -2176,11 +2189,11 @@ function prEdit(r) {
   const many = r.type === "text" && r.choices.length;
   const input = r.type === "yesno" ? `<select id="pe_v">${[["1", "Yes (1)"], ["0", "No (0)"]].map(([v, l]) => `<option value="${v}" ${String(r.value) === v ? "selected" : ""}>${l}</option>`).join("")}</select>`
     : r.choices.length && !many ? `<select id="pe_v">${r.choices.map(c => `<option ${c === r.value ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`
-    : `<input id="pe_v" value="${esc(r.value)}" ${r.type === "int" || r.type === "float" ? 'inputmode="decimal"' : ""} style="width:100%">`;
+    : `<input id="pe_v" value="${esc(r.value === "unset" ? "none" : r.value)}" ${r.type === "int" || r.type === "float" || r.type === "int_or_none" ? 'inputmode="decimal"' : ""} style="width:100%">`;
   d.innerHTML = `<div class="hd">${icon("alert", "ico")}<h3>Change: ${esc(r.title)}</h3></div><div class="bd">
     <p style="margin-top:0">${esc(r.meaning)}</p>
     <div class="note warn" style="border-left-color:var(--warn)">${icon("alert", "ico")}<div><b>This changes a confirmed decision.</b> ${esc(r.if_changed)}<br>Results made before this change cannot be compared with results made after it. The decisions will need to be locked again.</div></div>
-    <div class="field" style="margin-top:12px"><label for="pe_v"><b>New value</b> <span class="mut small">(now <code>${esc(r.value)}</code>${many ? `; choose from ${esc(r.choices.join(", "))}, several allowed, separated by commas` : ""})</span></label>${input}</div>
+    <div class="field" style="margin-top:12px"><label for="pe_v"><b>New value</b> <span class="mut small">(now <code>${esc(prValue(r))}</code>${r.type === "int_or_none" ? "; a whole number of seconds, or none for no limit" : ""}${many ? `; choose from ${esc(r.choices.join(", "))}, several allowed, separated by commas` : ""})</span></label>${input}</div>
     <div class="field" style="margin-top:10px"><label for="pe_why"><b>Why are you changing it?</b> <span class="mut small">(kept in the decision record)</span></label><textarea id="pe_why" rows="3" style="width:100%"></textarea></div>
     <div class="field" style="margin-top:10px"><label for="pe_by"><b>Your name</b> <span class="mut small">(kept in the decision record)</span></label><input id="pe_by" value="${esc(saved)}" style="width:100%"></div>
     <p id="pe_err" class="bad-t small" style="margin:8px 0 0" role="alert"></p></div>

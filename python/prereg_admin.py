@@ -51,7 +51,8 @@ PLAIN = "config/prereg_plain.tsv"
 DECISIONS = "config/prereg_decisions.tsv"
 LOCK = "config/prereg.lock.json"
 DECISION_FIELDS = ("date", "parameter", "action", "old_value", "new_value", "decided_by", "reason")
-TYPES = ("int", "float", "yesno", "choice", "text")
+TYPES = ("int", "int_or_none", "float", "yesno", "choice", "text")
+NONE_WORDS = ("none", "unset", "no limit", "nolimit", "off")   # for a setting that may be switched off: 'unset' is how prereg.tsv writes it, and the program reads it as blank
 
 
 def _read(path):
@@ -107,9 +108,16 @@ def validate_value(row, value):
     """The value as it will be written, or ValueError with a plain sentence."""
     value = str(value).strip()
     kind, choices = row["type"], row["choices"]
-    if value == "":
+    if value == "" and row["type"] != "int_or_none":
         raise ValueError("a value is required")
-    if kind == "int":
+    if value == "":
+        value = "none"
+    if kind == "int_or_none":
+        if value.lower() in NONE_WORDS:
+            return "unset"
+        if not re.fullmatch(r"\d+", value) or int(value) == 0:
+            raise ValueError(f"{row['title']}: enter a whole number of seconds, or none for no limit")
+    elif kind == "int":
         if not re.fullmatch(r"\d+", value):
             raise ValueError(f"{row['title']}: enter a whole number (for example 5)")
     elif kind == "float":
@@ -137,6 +145,11 @@ def _need(reason, by):
         raise ValueError("say why in at least a few words (the reason is kept in the decision record)")
     if not (by or "").strip():
         raise ValueError("say who is deciding (your name is kept in the decision record)")
+
+
+def program_value(value):
+    """How a decision's value is written into the program's settings: 'unset' (no limit) is a blank setting."""
+    return "" if str(value).strip().lower() == "unset" else str(value)
 
 
 def _local_env_path(root):
@@ -207,9 +220,9 @@ def set_value(root, parameter, value, reason, by, update_default=False, today=No
     entry = {"date": today or datetime.date.today().isoformat(), "parameter": parameter, "action": "changed", "old_value": row["value"], "new_value": new,
              "decided_by": by.strip(), "reason": reason.strip()}
     _rewrite_prereg(root, {parameter: {"value": new, "status": "fixed"}})
-    _write_local_env(root, row["config_variable"], new)
+    _write_local_env(root, row["config_variable"], program_value(new))
     if update_default:
-        _update_default(root, row["config_variable"], new)
+        _update_default(root, row["config_variable"], program_value(new))
     _append_decision(root, [entry])
     return entry
 
@@ -233,7 +246,9 @@ def confirm(root, parameters, reason, by, today=None):
 
 
 def freeze_prereg_equal(planned, actual):
-    """Do a planned value and a setting's value mean the same (0.30 and 0.3, 5 and 5.0)?"""
+    """Do a planned value and a setting's value mean the same (0.30 and 0.3, 5 and 5.0, 'unset' and blank)?"""
+    if str(planned).strip().lower() in ("", "unset") and str(actual).strip().lower() in ("", "unset"):
+        return True
     try:
         return float(str(planned).strip()) == float(str(actual).strip())
     except ValueError:

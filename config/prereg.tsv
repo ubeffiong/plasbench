@@ -9,7 +9,7 @@ truth_construction	long-read-first only for the headline		9	no	fixed	Tier 3 (sho
 failed_tool_score	0		7	no	fixed	Decision D6: a crash or missing output scores F1 = 0 and is ranked
 infrastructure_failure_scored	no		7	no	fixed	Rerun, never scored (04_run_tools.sh infrastructure_failure)
 tool_retries	1	TOOL_RETRIES	7	yes	fixed	One automatic retry of a failed run, logged in reason
-tool_timeout_seconds	7200	TOOL_TIMEOUT_SECONDS	7	yes	fixed	Same wall-time budget for every tool. PROPOSED 7200 s (2 h): far above the minutes a short-read tool needs on a typical isolate and short enough to catch a hung run. Confirm after the pilot from the slowest tool on the largest isolate, then set TOOL_TIMEOUT_SECONDS to the same value.
+tool_timeout_seconds	unset	TOOL_TIMEOUT_SECONDS	7	yes	fixed	Same wall-time budget for every tool, per tool per isolate. DECISION: no limit by default (unset). 7200 s (2 h) was proposed and confirmed on 2026-11-16, then changed the same day to no limit (see config/prereg_decisions.tsv): a hard limit scores a slow tool zero, which biases the ranking, and large isolates and many tools make long runs normal. A user may still set a generous limit to stop a truly stuck run.
 species_averaging	macro over species with >= MIN_SPECIES_CLUSTERS clusters		8	yes	fixed
 min_species_clusters	20	MIN_SPECIES_CLUSTERS	8	yes	fixed
 min_alignment_identity	0.90	MIN_ALIGNMENT_IDENTITY	7	no	fixed

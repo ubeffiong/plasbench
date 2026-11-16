@@ -109,11 +109,11 @@ export FRAGMENT_SHARE="${FRAGMENT_SHARE:-0.20}"
 export MISSED_RECALL="${MISSED_RECALL:-0.50}"
 # Outcome states (stage 4): a failed run is retried TOOL_RETRIES times; an
 # infrastructure failure (exit 125/126/127, out of disk) is never scored.
-# TOOL_TIMEOUT_SECONDS is the same wall-time budget for every tool (7200 s = two hours,
-# the pre-registered and confirmed limit; blank = no limit); a run that exceeds it fails
-# with exit 124 (resource failure).
+# TOOL_TIMEOUT_SECONDS is the same wall-time budget for every tool, per tool per isolate. Blank = no limit, the confirmed default (a limit scores a slow tool
+# zero, and large isolates or many tools make runs of many hours normal). Set one only to stop a truly stuck run, and make it generous (172800 = two days);
+# a run that exceeds it fails with exit 124 (resource failure).
 export TOOL_RETRIES="${TOOL_RETRIES:-1}"
-export TOOL_TIMEOUT_SECONDS="${TOOL_TIMEOUT_SECONDS:-7200}"
+export TOOL_TIMEOUT_SECONDS="${TOOL_TIMEOUT_SECONDS:-}"
 # Recommender evaluation (python/evaluate_recommender.py, stage 6).
 export RUN_RECOMMENDER_EVAL="${RUN_RECOMMENDER_EVAL:-1}"
 export NEAR_OPTIMAL_MARGIN="${NEAR_OPTIMAL_MARGIN:-0.05}"

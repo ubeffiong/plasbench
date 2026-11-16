@@ -6,7 +6,7 @@ The shipped state
   - every decision has a plain-language description, and the three files are consistent (`prereg_admin.py check`);
   - the project owner confirmed all 29 decisions that were proposed (none is proposed or TO_FIX), each with a dated record that names who and why;
   - every decision that is a setting has, as its program default in config/config.sh, the value that was decided (a decision that the program does not follow is not a decision:
-    tool_timeout_seconds was 7200 on paper and 'no limit' in the program until this test existed).
+    tool_timeout_seconds was 7200 on paper and 'no limit' in the program until a check like this one found it; the owner then decided on no limit, 'unset' on paper).
 Changing a decision
   - `set` changes one decision that is a setting: exactly one row of prereg.tsv, a new line in the record (old value, new value, who, why), this computer's setting, and optionally the
     default in config.sh; it refuses a decision that is built into the code or a scorecard table, a missing reason or name, a value of the wrong kind, and a no-op;
@@ -79,6 +79,14 @@ def main():
     state = admin.status(ROOT)
     check("the shipped lock matches the shipped decisions (a decision edited without locking again is caught here)", state["locked"] and state["matches"] and not state["draft"], state)
     check("the lock names its file with forward slashes (the same lock on every system)", json.loads((ROOT / "config" / "prereg.lock.json").read_text(encoding="utf-8"))["prereg_file"] == "config/prereg.tsv")
+    nolimit = {"title": "t", "type": "int_or_none", "choices": []}
+    check("a decision that may be switched off reads 'none' as 'unset' on paper and blank in the program, and a number of seconds otherwise",
+          admin.validate_value(nolimit, "none") == "unset" and admin.validate_value(nolimit, "") == "unset" and admin.validate_value(nolimit, "172800") == "172800"
+          and admin.program_value("unset") == "" and admin.freeze_prereg_equal("unset", "")
+          and refuses(lambda: admin.validate_value(nolimit, "soon"), "or none for no limit") and refuses(lambda: admin.validate_value(nolimit, "0"), "or none for no limit"))
+    check("the record shows the time limit was confirmed at 7200 and then changed to no limit, with the reason",
+          [e["action"] for e in admin.history(ROOT, "tool_timeout_seconds")] == ["confirmed", "changed"] and admin.history(ROOT, "tool_timeout_seconds")[-1]["new_value"] == "unset"
+          and "not realistic" in admin.history(ROOT, "tool_timeout_seconds")[-1]["reason"])
     kinds = {k: sum(1 for r in rows if r["where"] == k) for k in ("setting", "file", "built-in")}
     check("each decision says whether it can be changed (setting), is a scorecard table (file) or is in the code (built-in)", sum(kinds.values()) == len(rows) and kinds["setting"] >= 30 and kinds["file"] >= 10, kinds)
     doc = admin.markdown(ROOT)
