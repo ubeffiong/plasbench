@@ -757,6 +757,11 @@ export RUN_CANDIDATE_MULTIPLICITY="${RUN_CANDIDATE_MULTIPLICITY:-1}"
 export MULTIPLICITY_NEW_FRACTION="${MULTIPLICITY_NEW_FRACTION:-0.10}"
 export MULTIPLICITY_CHIMERA_MIN_BP="${MULTIPLICITY_CHIMERA_MIN_BP:-1000}"
 export MULTIPLICITY_CHIMERA_FRACTION="${MULTIPLICITY_CHIMERA_FRACTION:-0.10}"
+export RUN_REFERENCE_EVIDENCE_AUDIT="${RUN_REFERENCE_EVIDENCE_AUDIT:-1}"   # per-isolate reference evidence audit (python/reference_evidence_audit.py)
+#   ASSEMBLER_SENSITIVITY_RUNS   "name=path/to/scores.tsv ..." of other runs of this cohort that differ only in the assembly; stage 6 then writes
+#                                benchmark.assembler_sensitivity.tsv/.html (python/assembler_sensitivity.py). Unset: skipped.
+export ASSEMBLER_SENSITIVITY_RUNS="${ASSEMBLER_SENSITIVITY_RUNS:-}"
+export RUN_RANKING_STABILITY="${RUN_RANKING_STABILITY:-1}"   # leave-one-study/species-out ranking stability (python/ranking_stability.py)
 export RUN_PLASEVAL_GATE="${RUN_PLASEVAL_GATE:-auto}"
 export PLASEVAL_SRC="${PLASEVAL_SRC:-}"
 export PLASEVAL_PYTHON="${PLASEVAL_PYTHON:-python3}"

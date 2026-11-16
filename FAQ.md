@@ -15,7 +15,7 @@ cannot be fixed in software.
 | **Documented** | Stated in the docs, not enforced or tested by code. |
 | **Open** | Not done. The reason is given (usually: it needs real data, not code). |
 
-A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
+The 215-question reviewer assessment is [docs/REVIEWER_ASSESSMENT_MATRIX.md](docs/REVIEWER_ASSESSMENT_MATRIX.md) (Q36-Q42). Everything implemented, with where to find it and what checks it, is in [docs/IMPLEMENTATION_CATALOGUE.md](docs/IMPLEMENTATION_CATALOGUE.md). A companion file, [docs/FAQ_QUESTION_BANK.md](docs/FAQ_QUESTION_BANK.md), answers the longer reviewer question bank and
 cross-references the question numbers here.
 
 Evidence basis: [docs/INDEPENDENT_REVIEW.md](docs/INDEPENDENT_REVIEW.md) (independent review and audit; every review and what validated it is
@@ -470,6 +470,74 @@ unmapped candidates with hand-worked numbers; a tool that predicted nothing); `t
 | 3 Multiplicity | Candidate table, best versus combined versus redundancy, relationships, chimeric/off-target/unmapped | **Done** on constructed cases; real cohort **Open** |
 | 4 Reporting and validation | Three dashboards, synthetic fixtures, existing scores unchanged | **Done**; a documented with-and-without-flagged-samples analysis **Open** |
 Nothing here was tuned against which tool wins; freeze the thresholds before the main benchmark.
+
+## K. The 215-question reviewer assessment (16 November 2026)
+
+A second reviewer bank of 215 questions, grouped into 15 scientific domains, was put to PlasBench. Every question is recorded with its status,
+the evidence in the repository and what is still needed in [docs/REVIEWER_ASSESSMENT_MATRIX.md](docs/REVIEWER_ASSESSMENT_MATRIX.md) (table:
+[REVIEWER_ASSESSMENT_MATRIX.tsv](docs/REVIEWER_ASSESSMENT_MATRIX.tsv)). **That matrix is the project's own reading of its code and tests, not an
+independent review.** The answers below cover what the review added.
+
+### Q36. Where does PlasBench stand against the 215 questions?
+Of 215: 77 satisfied (a capability exists and a test exercises it), 86 partially satisfied, 51 need validation on real data, 1 is a major gap, none is
+out of scope. *Satisfied* does not mean validated on real cohorts: the biggest single limit is still that no real-data run of the full tool set
+exists (Q22). The review's four tests are answered like this. **Truth validity:** tiers, independence classes and a per-isolate audit (Q39) exist; an
+independently validated subset does not. **Attribution validity** (reads, assembly, classification, binning): QC gate (Q33), assembly policy (Q32),
+assembly adequacy and the sensitivity script (Q38) exist; a real multi-assembler result does not. **Scoring validity:** task-specific endpoints,
+CPRR beside F1, multiplicity (Q34) and threshold sweeps exist; expert-reviewed thresholds do not. **Generalisation validity:** held-out-study
+validation and ranking stability (Q37) exist; independent real studies do not. **Status: Verified** for the matrix itself
+(`test/test_reviewer_matrix.py`); the statuses inside it are a self-assessment.
+
+### Q37. Does the ranking survive removing one study or one species?
+`python/ranking_stability.py` (stage 6, `RUN_RANKING_STABILITY`, report section *Ranking stability*) re-ranks the tools on each task's pre-registered
+metric after leaving out each study, then each species, and after giving every study equal weight. It writes `benchmark.study_sensitivity.tsv`,
+`benchmark.species_sensitivity.tsv` and `benchmark.ranking_stability.tsv` with the largest study's and species' share of the cohort, whether the leader
+changes, Kendall tau against the full ranking and a one-line verdict (stable, fragile, or not assessed when there is no sample sheet). A cohort
+dominated by one study is reported as fragile. It never changes the leaderboard. **Status: Verified** on constructed cohorts
+(`test/test_ranking_stability.py`); its result on a real cohort is **Open**.
+
+### Q38. If the assembler changes, does the best tool change?
+`python/assembler_sensitivity.py` takes the `scores.tsv` of two or more runs of the same cohort that differ only in the assembly (set
+`ASSEMBLY_SELECTION_MODE` or `ASSEMBLY_ALSO` and give each run its own results folder), re-ranks the tools on the isolates every run shares, and
+reports per task the leader, Kendall tau, whether the leader changed and a verdict (robust, partly assembler-dependent, assembler-dependent). Use
+`--html` for a standalone page. If the leader changes with the assembly, the ranking measures the assembler and tool together and must be reported
+that way. **Status: Verified** on constructed runs (`test/test_assembler_sensitivity.py`); **Open:** running the real cohort under two assemblers
+(it needs compute; see the resource estimate in the README).
+
+### Q39. How is the trustworthiness of each reference audited?
+`python/reference_evidence_audit.py` (stage 6, `RUN_REFERENCE_EVIDENCE_AUDIT`, report section *Reference evidence*) joins the truth provenance,
+repeat-content, depth-anomaly and ambiguity tables into one row per isolate: tier, independence, how many of the six evidence fields are recorded,
+flags (polished with the benchmark's own reads, short-read-first, no independent validation, repeat-rich plasmids, depth anomalies, ambiguous or
+marker-free plasmids), whether it meets the headline rule, and `strong`, `usable_with_caveats` or `weak` with every reason in words. A missing input
+table can only lower the status. The "headline reproduced on the strongest subset" test is the existing cohort variants in `rank_robustness`.
+**Status: Verified** (`test/test_reference_evidence_audit.py`). **Open:** evidence beyond NCBI metadata for most isolates.
+
+### Q40. How does PlasBench tell "installed" from "validated"?
+`validation_status` in `config/tool_capabilities.tsv` has four values: `real_binary_checked` (the real program ran in a test), `adapter_tested`
+(parser and adapter tested on fixtures), `untested`, `not_applicable` (baselines). A tool is never called validated because it ran. The review proposed
+a seven-step ladder (registered, installed, adapter tested, execution tested, output validated, benchmark validated, real-data validated). The first
+four map onto what exists; the last three need controlled datasets and independent real data and are **Open**, not claimed.
+
+### Q41. What was deliberately not changed?
+CPRR is not replaced: its thresholds are unvalidated, but nothing shows it fails to measure the intended outcome, and changing the endpoint now
+would break comparison with earlier results. PlasEval is not the universal scorer: it evaluates binning, and is used for that, validated against the
+original program (Q31). No composite score is the headline: classification, binning, reconstruction, structure and AMR placement measure different
+things, so an opaque total would hide trade-offs. The recommender is not tuned until it has been evaluated on independent studies. Tools are not
+added to enlarge the leaderboard.
+
+### Q42. The twelve hardest questions, answered without the dashboard
+1. **If the reference is wrong, is the correct tool penalised?** It can be. Every reference carries a tier, an independence class and an audit row (Q39); the headline uses only independent references, and the ranking is re-run without the weaker ones (`rank_robustness`). A wrong but independent reference is not detectable by PlasBench: **Open**.
+2. **How are poor reads, assembly errors and the algorithm separated?** Read QC (Q33) records input quality before assembly; assembly adequacy records whether the assembly contains the plasmid at all; the assembler-sensitivity script (Q38) shows whether the assembly drives the ranking. A tool is blamed only for what remains. The assembler experiment on a real cohort is **Open**.
+3. **95% of ten plasmids or 100% of eight?** They are different endpoints and PlasBench reports both: per-plasmid outcomes and CPRR count complete plasmids, base-level recovery counts bases. Which is "better" depends on the use; the benchmark does not merge them into one score.
+4. **Can F1 be high with no complete plasmid?** Yes, and the report shows it: CPRR and the per-plasmid outcome classes sit beside F1.
+5. **Can a tool gain by emitting many overlapping candidates?** Not unnoticed: combined coverage uses the union of aligned intervals, and redundancy, off-target and chimeric candidates are reported (Q34).
+6. **Is the winner just the tool whose database resembles the cohort?** Database release dates, overlap flags and recovery on plasmids absent from a tool's database are reported; for tools whose database is not installed the overlap screen cannot run: **Open** for those tools.
+7. **Is 99% identity correct if structure is wrong?** Structure is reported beside CPRR (gene order, feature preservation, split and merge events) but is not yet part of the CPRR verdict: **Documented**, not claimed as solved.
+8. **Is the ranking driven by one species or study?** Q37 answers this per cohort; a ranking dominated by one study is labelled fragile.
+9. **Is CPRR biologically meaningful?** Its thresholds are conventions with a published sweep, not derived and not expert-validated: **Needs validation**.
+10. **Can it recommend for an unseen organism?** The recommender abstains when evidence is insufficient and is validated by holding out studies, but on synthetic data so far: **Needs validation** on real independent studies.
+11. **What shows the scoring code is correct?** Constructed adversarial cases, and agreement with the original PlasEval program on 59 constructed cases and 210 of 211 real-bin pairs (Q31). That supports the binning dissimilarity, not every metric.
+12. **What is the most important discovery so far?** None yet, and PlasBench does not claim one: no real-data run of the full tool set exists. What exists is a framework whose scoring, input and reference controls are tested and whose claims carry evidence labels.
 
 ---
 
