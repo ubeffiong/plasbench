@@ -55,7 +55,7 @@ jobs:
       # A published GitHub Release (not just a pushed tag) is what Zenodo's
       # own GitHub integration archives -- see RELEASING.md. This step is what
       # actually makes that zero-code mirror fire for every tag.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           body_path: docs/RELEASE_TEMPLATE.md
