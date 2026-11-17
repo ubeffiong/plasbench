@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "cohort": "pub-mobsuite",
+  "generated": "2026-11-17",
+  "study": "mobsuite",
+  "label": "Robertson and Nash 2018 (MOB-suite benchmark)",
+  "citation": "Robertson and Nash 2018, Microbial Genomics, doi 10.1099/mgen.0.000206",
+  "note": "133 closed genomes. Their per-plasmid recall for MOB-suite is the one the plsMD paper reports for the 80 isolates it kept, so only those 80 have a published outcome table here.",
+  "published_outcomes": "plsmd2026",
+  "isolates": 95,
+  "candidates": 133,
+  "funnel": [
+    {
+      "stage": "Isolates in the paper",
+      "n": 133
+    },
+    {
+      "stage": "Found a complete assembly and a paired Illumina run",
+      "n": 112
+    },
+    {
+      "stage": "Truth confirmed against the paper (exact, superset, subset) or inferred (Teixeira)",
+      "n": 95
+    }
+  ],
+  "truth_match": [
+    {
+      "value": "exact",
+      "n": 93
+    },
+    {
+      "value": "superset",
+      "n": 1
+    },
+    {
+      "value": "subset",
+      "n": 1
+    }
+  ],
+  "left_out": [
+    {
+      "reason": "NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth",
+      "n": 17
+    },
+    {
+      "reason": "no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)",
+      "n": 16
+    },
+    {
+      "reason": "no complete assembly and no usable read pair at NCBI",
+      "n": 5
+    }
+  ],
+  "compare_command": "plasbench compare-published --results-dir <results> --samples cohorts/pub-mobsuite.tsv"
+}

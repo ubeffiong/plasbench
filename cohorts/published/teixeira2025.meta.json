@@ -1,0 +1,121 @@
+{
+  "study": "teixeira2025",
+  "title": "Circling in on plasmids: benchmarking plasmid detection and reconstruction tools for short-read data from diverse species",
+  "citation": "Teixeira et al. 2025, Briefings in Bioinformatics, doi 10.1093/bib/bbaf589",
+  "licence": "MIT (analysis repository data file); article open access",
+  "cohorts": [
+    "pub-teixeira2025"
+  ],
+  "what_it_is": "The published contig-level calls of 13 tools on 250 isolates (12,795 short-read contigs) beside the hybrid-assembly ground truth. Per-isolate precision, recall and F1 are computed by PlasBench from those published calls (plasmid is positive; chromosome, unknown, unclassified and repeat calls count as not plasmid), by contig count and weighted by contig length.",
+  "source": {
+    "url": "https://raw.githubusercontent.com/broadinstitute/plasmid-detection-benchmark/main/data/predictions.xlsx",
+    "file": "predictions.xlsx",
+    "sha256": "db558a6775f473662369fb1c358f28530f85883ea3767beb807d031d2646e091",
+    "retrieved": "2026-11-17"
+  },
+  "tool_map": {
+    "MOB-recon": "mob_recon",
+    "PLASMe": "plasme",
+    "PlaScope": "plascope",
+    "Plasmer": "plasmer",
+    "Platon": "platon",
+    "RFPlasmid": "rfplasmid",
+    "geNomad": "genomad",
+    "gplas2": "gplas2_mob",
+    "plASgraph2": "plasgraph2",
+    "PlasBin-Flow": "plasbin_flow",
+    "HyAsP": null,
+    "PlasmidEC": null,
+    "PlasmidFinder": null
+  },
+  "tool_map_notes": {
+    "HyAsP": "No PlasBench adapter; published only.",
+    "PlasmidEC": "No PlasBench adapter; published only.",
+    "PlasmidFinder": "A replicon marker, not a classifier; PlasBench scores a replicon baseline instead."
+  },
+  "metrics": [
+    {
+      "published_metric": "contig_precision_count",
+      "label": "Contig precision (by contig count)",
+      "plasbench_metric": "contig_precision_count",
+      "plasbench_source": "scores.tsv, column contig_precision_count",
+      "level": "per_isolate",
+      "comparability": "similar",
+      "tolerance": 0.05,
+      "note": "Both score contigs of the short-read assembly against a hybrid truth. PlasBench drops contigs under CONTIG_MIN_LENGTH and labels ambiguous and chimeric contigs unscorable; the published table keeps every contig."
+    },
+    {
+      "published_metric": "contig_recall_count",
+      "label": "Contig recall (by contig count)",
+      "plasbench_metric": "contig_recall_count",
+      "plasbench_source": "scores.tsv, column contig_recall_count",
+      "level": "per_isolate",
+      "comparability": "similar",
+      "tolerance": 0.05,
+      "note": "As above."
+    },
+    {
+      "published_metric": "contig_f1_count",
+      "label": "Contig F1 (by contig count)",
+      "plasbench_metric": "contig_f1_count",
+      "plasbench_source": "scores.tsv, column contig_f1_count",
+      "level": "per_isolate",
+      "comparability": "similar",
+      "tolerance": 0.05,
+      "note": "As above."
+    },
+    {
+      "published_metric": "contig_precision_bp",
+      "label": "Contig precision (length-weighted)",
+      "plasbench_metric": "contig_precision_bp",
+      "plasbench_source": "scores.tsv, column contig_precision_bp",
+      "level": "per_isolate",
+      "comparability": "similar",
+      "tolerance": 0.05,
+      "note": "As above."
+    },
+    {
+      "published_metric": "contig_recall_bp",
+      "label": "Contig recall (length-weighted)",
+      "plasbench_metric": "contig_recall_bp",
+      "plasbench_source": "scores.tsv, column contig_recall_bp",
+      "level": "per_isolate",
+      "comparability": "similar",
+      "tolerance": 0.05,
+      "note": "As above."
+    },
+    {
+      "published_metric": "contig_f1_bp",
+      "label": "Contig F1 (length-weighted)",
+      "plasbench_metric": "contig_f1_bp",
+      "plasbench_source": "scores.tsv, column contig_f1_bp",
+      "level": "per_isolate",
+      "comparability": "similar",
+      "tolerance": 0.05,
+      "note": "As above."
+    }
+  ],
+  "caveats": [
+    "The published truth is a hybrid assembly built on the same Illumina reads used as benchmark input; 45 of 250 hybrids are not complete (see teixeira2025_repo_ground_truth_summary.tsv).",
+    "The published contigs come from the authors' own assembly of each isolate; a PlasBench run assembles the reads again, so contig sets differ and per-isolate numbers are compared as means, not contig by contig.",
+    "PlasBench's tool versions and databases differ from the paper's; a gap can be a version effect.",
+    "Most of the 250 isolates have no deposited complete assembly: running them in PlasBench needs a hybrid truth rebuilt from the deposited reads (python/build_hybrid_truth.py).",
+    "The precision, recall and F1 here are computed from the published calls under the definition above; they are not the figures printed in the paper."
+  ],
+  "rows": 19500,
+  "published_tools": [
+    "HyAsP",
+    "MOB-recon",
+    "PLASMe",
+    "PlaScope",
+    "PlasBin-Flow",
+    "Plasmer",
+    "PlasmidEC",
+    "PlasmidFinder",
+    "Platon",
+    "RFPlasmid",
+    "geNomad",
+    "gplas2",
+    "plASgraph2"
+  ]
+}

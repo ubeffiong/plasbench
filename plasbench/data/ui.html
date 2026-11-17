@@ -2854,6 +2854,7 @@ async function cohortInfo(name) {
    <div class="bd stack" style="gap:14px">
     ${desc ? `<div class="desc md">${desc}</div>` : ""}
     ${stats}
+    ${publicationCard(d)}
     <div class="cohbars">${bars}</div>
     ${L.present ? `<p class="mut small" style="margin:0">From the sheet and its verification lock (<code>${esc(L.path)}</code>): country, host, isolation source, collection date, how the reference was sequenced and assembled, and the Illumina run's size come from NCBI as recorded when the cohort was locked. The download estimate uses the same factors as <code>plasbench run</code>'s pre-download check.</p>` : ""}
     <div>
@@ -2890,6 +2891,19 @@ function failTable(rows) {
   const max = Math.max(...rows.map(r => r.n));
   return `<table class="data"><thead><tr><th>Reason</th><th class="num">Genomes</th></tr></thead><tbody>${rows.map(r =>
     `<tr><td>${esc(r.reason)}</td><td class="num">${fmtN(r.n)}<span class="shr" style="width:${Math.max(2, Math.round(80 * r.n / max))}px"></span></td></tr>`).join("")}</tbody></table>`;
+}
+function publicationCard(d) {
+  const p = d.publication; if (!p) return "";
+  const rows = (arr, key, val) => (arr || []).map(x => `<tr><td>${esc(x[key])}</td><td class="num">${fmtN(x[val])}</td></tr>`).join("");
+  const studies = p.studies ? `<table class="data"><thead><tr><th>Study</th><th class="num">Isolates</th></tr></thead><tbody>${rows(p.studies, "label", "isolates")}</tbody></table>` : "";
+  const funnel = p.funnel ? `<table class="data"><thead><tr><th>From the paper to this cohort</th><th class="num">Isolates</th></tr></thead><tbody>${rows(p.funnel, "stage", "n")}</tbody></table>` : "";
+  const left = (p.left_out || []).length ? `<details><summary class="small">Why ${fmtN((p.left_out || []).reduce((a, x) => a + x.n, 0))} published isolates are not in it</summary><table class="data"><tbody>${rows(p.left_out, "reason", "n")}</tbody></table></details>` : "";
+  const has = (p.published_tables || []).length;
+  return `<div class="note" style="display:block"><b>Published benchmark cohort.</b> ${esc(p.citation || p.label || "")}${p.note ? `<div class="small mut" style="margin-top:4px">${esc(p.note)}</div>` : ""}
+    <div class="cohbars" style="margin-top:8px">${studies}${funnel}${p.truth_match ? `<table class="data"><thead><tr><th>Truth plasmids vs the paper's</th><th class="num">Isolates</th></tr></thead><tbody>${rows(p.truth_match, "value", "n")}</tbody></table>` : ""}</div>${left}
+    <p class="small" style="margin:8px 0 0">${has ? "The paper's own outcomes ship with PlasBench, so after a run you can put your results beside them:" : "No published outcome table ships for this cohort yet; the isolates can still be run."}
+     ${has ? `<br><code>${esc((p.compare_command || "").replace("<results>", "results"))}</code> <button class="btn ghost sm" onclick="navigator.clipboard.writeText(${JSON.stringify((p.compare_command || "").replace("<results>", "results"))});toast('Command copied')">Copy</button>` : ""}</p>
+    ${has ? `<p class="small mut" style="margin:4px 0 0">Stage 6 does this automatically (setting RUN_PUBLISHED_COMPARISON) and the report gets a "Comparison with published outcomes" section. It is a comparison for your judgement, not a ranking: assemblies, tool versions, databases and metric definitions differ from the paper's.</p>` : ""}</div>`;
 }
 async function selectionReport(name) {
   let d = S.cohInfo && S.cohInfo.name === name ? S.cohInfo : null;

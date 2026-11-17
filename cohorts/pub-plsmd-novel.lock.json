@@ -1,0 +1,2323 @@
+{
+  "schema_version": "1.1",
+  "sample_sheet": "pub-plsmd-novel.tsv",
+  "sample_sheet_sha256": "6eb2f5e86f4037cc61478c9d4bd9d9473168489b1230f6fb546d299f04545054",
+  "evidence": [
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252970_001",
+      "assembly": {
+        "accession": "GCF_964198965.1",
+        "biosample": "SAMEA115720004",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252970",
+        "biosample": "SAMEA115720004",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720004",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "284288015",
+        "spots": "957915",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252971_002",
+      "assembly": {
+        "accession": "GCF_964199135.1",
+        "biosample": "SAMEA115720005",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252971",
+        "biosample": "SAMEA115720005",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720005",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "264028960",
+        "spots": "891216",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252974_003",
+      "assembly": {
+        "accession": "GCF_964199015.1",
+        "biosample": "SAMEA115720008",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252974",
+        "biosample": "SAMEA115720008",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720008",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "285849840",
+        "spots": "965235",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252975_004",
+      "assembly": {
+        "accession": "GCF_964198845.1",
+        "biosample": "SAMEA115720009",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252975",
+        "biosample": "SAMEA115720009",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720009",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "251127839",
+        "spots": "844523",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252976_005",
+      "assembly": {
+        "accession": "GCF_964199025.1",
+        "biosample": "SAMEA115720010",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252976",
+        "biosample": "SAMEA115720010",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720010",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "262905648",
+        "spots": "885195",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252977_006",
+      "assembly": {
+        "accession": "GCF_964198835.1",
+        "biosample": "SAMEA115720011",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252977",
+        "biosample": "SAMEA115720011",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720011",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "287338593",
+        "spots": "970287",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252979_007",
+      "assembly": {
+        "accession": "GCF_964198875.1",
+        "biosample": "SAMEA115720013",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252979",
+        "biosample": "SAMEA115720013",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720013",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "470191840",
+        "spots": "1606436",
+        "avg_length": "292"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252980_008",
+      "assembly": {
+        "accession": "GCF_964198855.1",
+        "biosample": "SAMEA115720014",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252980",
+        "biosample": "SAMEA115720014",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720014",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "233216717",
+        "spots": "785838",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252981_009",
+      "assembly": {
+        "accession": "GCF_964198805.1",
+        "biosample": "SAMEA115720015",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252981",
+        "biosample": "SAMEA115720015",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720015",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "313647758",
+        "spots": "1059676",
+        "avg_length": "295"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252982_010",
+      "assembly": {
+        "accession": "GCF_964198865.1",
+        "biosample": "SAMEA115720016",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252982",
+        "biosample": "SAMEA115720016",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720016",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "291004798",
+        "spots": "978046",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252983_011",
+      "assembly": {
+        "accession": "GCF_964198935.1",
+        "biosample": "SAMEA115720017",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252983",
+        "biosample": "SAMEA115720017",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720017",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "308376941",
+        "spots": "1038198",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252984_012",
+      "assembly": {
+        "accession": "GCF_964198685.1",
+        "biosample": "SAMEA115720018",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252984",
+        "biosample": "SAMEA115720018",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720018",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "280597437",
+        "spots": "948479",
+        "avg_length": "295"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252985_013",
+      "assembly": {
+        "accession": "GCF_964198895.1",
+        "biosample": "SAMEA115720019",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252985",
+        "biosample": "SAMEA115720019",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720019",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "313991917",
+        "spots": "1055253",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252987_014",
+      "assembly": {
+        "accession": "GCF_964198815.1",
+        "biosample": "SAMEA115720021",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252987",
+        "biosample": "SAMEA115720021",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720021",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "378122417",
+        "spots": "1275518",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252989_015",
+      "assembly": {
+        "accession": "GCF_964199065.1",
+        "biosample": "SAMEA115720023",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252989",
+        "biosample": "SAMEA115720023",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720023",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "386027518",
+        "spots": "1298349",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252990_016",
+      "assembly": {
+        "accession": "GCF_964198675.1",
+        "biosample": "SAMEA115720024",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252990",
+        "biosample": "SAMEA115720024",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720024",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "375827143",
+        "spots": "1266627",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252991_017",
+      "assembly": {
+        "accession": "GCF_964198825.1",
+        "biosample": "SAMEA115720025",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252991",
+        "biosample": "SAMEA115720025",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720025",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "212350048",
+        "spots": "717019",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252992_018",
+      "assembly": {
+        "accession": "GCF_964198945.1",
+        "biosample": "SAMEA115720026",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252992",
+        "biosample": "SAMEA115720026",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720026",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "325399167",
+        "spots": "1099440",
+        "avg_length": "295"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252993_019",
+      "assembly": {
+        "accession": "GCF_964198975.1",
+        "biosample": "SAMEA115720027",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252993",
+        "biosample": "SAMEA115720027",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720027",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "344090469",
+        "spots": "1157758",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252994_020",
+      "assembly": {
+        "accession": "GCF_964198625.1",
+        "biosample": "SAMEA115720028",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252994",
+        "biosample": "SAMEA115720028",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720028",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "469320456",
+        "spots": "1579194",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252995_021",
+      "assembly": {
+        "accession": "GCF_964198725.1",
+        "biosample": "SAMEA115720029",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252995",
+        "biosample": "SAMEA115720029",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720029",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "432123929",
+        "spots": "1455040",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252996_022",
+      "assembly": {
+        "accession": "GCF_964199125.1",
+        "biosample": "SAMEA115720030",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252996",
+        "biosample": "SAMEA115720030",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720030",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "373481953",
+        "spots": "1253014",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252997_023",
+      "assembly": {
+        "accession": "GCF_964198915.1",
+        "biosample": "SAMEA115720031",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252997",
+        "biosample": "SAMEA115720031",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720031",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "408042405",
+        "spots": "1379736",
+        "avg_length": "295"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252998_024",
+      "assembly": {
+        "accession": "GCF_964199115.1",
+        "biosample": "SAMEA115720032",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252998",
+        "biosample": "SAMEA115720032",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720032",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "471417344",
+        "spots": "1587074",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13252999_025",
+      "assembly": {
+        "accession": "GCF_964198775.1",
+        "biosample": "SAMEA115720033",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13252999",
+        "biosample": "SAMEA115720033",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720033",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "569690979",
+        "spots": "1921321",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253000_026",
+      "assembly": {
+        "accession": "GCF_964198785.1",
+        "biosample": "SAMEA115720034",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253000",
+        "biosample": "SAMEA115720034",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720034",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "535581724",
+        "spots": "1807054",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253001_027",
+      "assembly": {
+        "accession": "GCF_964198795.1",
+        "biosample": "SAMEA115720035",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253001",
+        "biosample": "SAMEA115720035",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720035",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "292406971",
+        "spots": "982214",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253002_028",
+      "assembly": {
+        "accession": "GCF_964198925.1",
+        "biosample": "SAMEA115720036",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253002",
+        "biosample": "SAMEA115720036",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720036",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "323761487",
+        "spots": "1095982",
+        "avg_length": "295"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253003_029",
+      "assembly": {
+        "accession": "GCF_964198745.1",
+        "biosample": "SAMEA115720037",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253003",
+        "biosample": "SAMEA115720037",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720037",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "324932994",
+        "spots": "1094310",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253005_030",
+      "assembly": {
+        "accession": "GCF_964198705.1",
+        "biosample": "SAMEA115720039",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253005",
+        "biosample": "SAMEA115720039",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720039",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "315242256",
+        "spots": "1056877",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253007_031",
+      "assembly": {
+        "accession": "GCF_964198955.1",
+        "biosample": "SAMEA115720041",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253007",
+        "biosample": "SAMEA115720041",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720041",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "325359776",
+        "spots": "1104594",
+        "avg_length": "294"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253008_032",
+      "assembly": {
+        "accession": "GCF_964199005.1",
+        "biosample": "SAMEA115720042",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253008",
+        "biosample": "SAMEA115720042",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720042",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "341035925",
+        "spots": "1142437",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253009_033",
+      "assembly": {
+        "accession": "GCF_964199105.1",
+        "biosample": "SAMEA115720043",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253009",
+        "biosample": "SAMEA115720043",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720043",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "411455881",
+        "spots": "1379162",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253010_034",
+      "assembly": {
+        "accession": "GCF_964199095.1",
+        "biosample": "SAMEA115720044",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253010",
+        "biosample": "SAMEA115720044",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720044",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "371294768",
+        "spots": "1243334",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253011_035",
+      "assembly": {
+        "accession": "GCF_964198655.1",
+        "biosample": "SAMEA115720045",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253011",
+        "biosample": "SAMEA115720045",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720045",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "299299094",
+        "spots": "1002539",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253014_036",
+      "assembly": {
+        "accession": "GCF_964198765.1",
+        "biosample": "SAMEA115720048",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253014",
+        "biosample": "SAMEA115720048",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720048",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "270286691",
+        "spots": "909435",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_err13253015_037",
+      "assembly": {
+        "accession": "GCF_964199145.1",
+        "biosample": "SAMEA115720049",
+        "bioprojects": [
+          "PRJEB76496"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "ONT GridION,Illumina MiSeq",
+        "assembly_method": "unicycler v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Croatia",
+        "isolation_source": "clinical material",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13253015",
+        "biosample": "SAMEA115720049",
+        "bioproject": "PRJEB76496",
+        "sample_name": "SAMEA115720049",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "222710678",
+        "spots": "750672",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_err15075951_038",
+      "assembly": {
+        "accession": "GCF_965318675.1",
+        "biosample": "SAMEA117852468",
+        "bioprojects": [
+          "PRJEB86005"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NovaSeq 6000, MinION",
+        "assembly_method": "Autocycler v0.2.1, Polypolish v0.6.0, Hybracter v0.11.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "restricted access",
+        "isolation_source": "restricted access",
+        "host": "",
+        "collection_date": "restricted access",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR15075951",
+        "biosample": "SAMEA117852468",
+        "bioproject": "PRJEB86005",
+        "sample_name": "SAMEA117852468",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1225626633",
+        "spots": "4077403",
+        "avg_length": "300"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samea117852469",
+      "assembly": {
+        "accession": "GCF_965318305.1",
+        "biosample": "SAMEA117852469",
+        "bioprojects": [
+          "PRJEB86005"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NovaSeq 6000, MinION",
+        "assembly_method": "Autocycler v0.2.1, Polypolish v0.6.0, Hybracter v0.11.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "restricted access",
+        "isolation_source": "restricted access",
+        "host": "",
+        "collection_date": "restricted access",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR15075953",
+        "biosample": "SAMEA117852469",
+        "bioproject": "PRJEB86005",
+        "sample_name": "SAMEA117852469",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1102341968",
+        "spots": "3666894",
+        "avg_length": "300"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "staphylococcus_aureus_samea117852471",
+      "assembly": {
+        "accession": "GCF_965319415.1",
+        "biosample": "SAMEA117852471",
+        "bioprojects": [
+          "PRJEB86005"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NovaSeq 6000, MinION",
+        "assembly_method": "Autocycler v0.2.1, Polypolish v0.6.0, Hybracter v0.11.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "restricted access",
+        "isolation_source": "restricted access",
+        "host": "",
+        "collection_date": "restricted access",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR15076233",
+        "biosample": "SAMEA117852471",
+        "bioproject": "PRJEB86005",
+        "sample_name": "SAMEA117852471",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1317650406",
+        "spots": "4393022",
+        "avg_length": "299"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "staphylococcus_aureus_samea117852470",
+      "assembly": {
+        "accession": "GCF_965327205.1",
+        "biosample": "SAMEA117852470",
+        "bioprojects": [
+          "PRJEB86005"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina NovaSeq 6000, MinION",
+        "assembly_method": "Autocycler v0.2.1, Polypolish v0.6.0, Hybracter v0.11.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "restricted access",
+        "isolation_source": "restricted access",
+        "host": "",
+        "collection_date": "restricted access",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR15085410",
+        "biosample": "SAMEA117852470",
+        "bioproject": "PRJEB86005",
+        "sample_name": "SAMEA117852470",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "928305385",
+        "spots": "3080638",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn13334506",
+      "assembly": {
+        "accession": "GCF_031198825.1",
+        "biosample": "SAMN13334506",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA417863"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Oxford Nanopore; Illumina MiSeq",
+        "assembly_method": "Unicycler v. 0.4.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada",
+        "isolation_source": "food",
+        "host": "",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR10859048",
+        "biosample": "SAMN13334506",
+        "bioproject": "PRJNA417863",
+        "sample_name": "CFIAFB20140150",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "417306775",
+        "spots": "829517",
+        "avg_length": "503"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn13334284",
+      "assembly": {
+        "accession": "GCF_050217165.1",
+        "biosample": "SAMN13334284",
+        "bioprojects": [
+          "PRJNA417863"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. v0.4.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada",
+        "isolation_source": "food",
+        "host": "",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR10859129",
+        "biosample": "SAMN13334284",
+        "bioproject": "PRJNA417863",
+        "sample_name": "CFIAFB20130200",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "665197798",
+        "spots": "1714343",
+        "avg_length": "388"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn17766475",
+      "assembly": {
+        "accession": "GCF_022789685.2",
+        "biosample": "SAMN17766475",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543833",
+        "biosample": "SAMN17766475",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2019-1497",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "357499574",
+        "spots": "762022",
+        "avg_length": "469"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn17766508",
+      "assembly": {
+        "accession": "GCF_022789105.2",
+        "biosample": "SAMN17766508",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543847",
+        "biosample": "SAMN17766508",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2020-440",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "707489602",
+        "spots": "1617434",
+        "avg_length": "437"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn17766507",
+      "assembly": {
+        "accession": "GCF_022789185.2",
+        "biosample": "SAMN17766507",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543848",
+        "biosample": "SAMN17766507",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2020-428",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "567427057",
+        "spots": "1294340",
+        "avg_length": "438"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn17766502",
+      "assembly": {
+        "accession": "GCF_022789205.2",
+        "biosample": "SAMN17766502",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543853",
+        "biosample": "SAMN17766502",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2020-314",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "255484887",
+        "spots": "466677",
+        "avg_length": "547"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn17766468",
+      "assembly": {
+        "accession": "GCF_022789805.2",
+        "biosample": "SAMN17766468",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543867",
+        "biosample": "SAMN17766468",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2019-1417-2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "518670513",
+        "spots": "1140179",
+        "avg_length": "454"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn17766464",
+      "assembly": {
+        "accession": "GCF_022789905.2",
+        "biosample": "SAMN17766464",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543871",
+        "biosample": "SAMN17766464",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2019-604",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "350203920",
+        "spots": "722853",
+        "avg_length": "484"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn17766463",
+      "assembly": {
+        "accession": "GCF_022789885.2",
+        "biosample": "SAMN17766463",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543872",
+        "biosample": "SAMN17766463",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2019-400-2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "236232872",
+        "spots": "493997",
+        "avg_length": "478"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn13382564",
+      "assembly": {
+        "accession": "GCF_022790445.2",
+        "biosample": "SAMN13382564",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2016",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543874",
+        "biosample": "SAMN13382564",
+        "bioproject": "PRJNA591480",
+        "sample_name": "2016-563",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "466437084",
+        "spots": "1163407",
+        "avg_length": "400"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn13382597",
+      "assembly": {
+        "accession": "GCF_022789975.2",
+        "biosample": "SAMN13382597",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2016",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543877",
+        "biosample": "SAMN13382597",
+        "bioproject": "PRJNA591480",
+        "sample_name": "2016-1397",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "333499573",
+        "spots": "728921",
+        "avg_length": "457"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn13382572",
+      "assembly": {
+        "accession": "GCF_022790305.2",
+        "biosample": "SAMN13382572",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2016",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543904",
+        "biosample": "SAMN13382572",
+        "bioproject": "PRJNA591480",
+        "sample_name": "2016-733",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "421075845",
+        "spots": "938259",
+        "avg_length": "448"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676138",
+      "assembly": {
+        "accession": "GCF_041861165.1",
+        "biosample": "SAMN32676138",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048573",
+        "biosample": "SAMN32676138",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-4249-1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "444343207",
+        "spots": "908442",
+        "avg_length": "489"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676124",
+      "assembly": {
+        "accession": "GCF_041861175.1",
+        "biosample": "SAMN32676124",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048589",
+        "biosample": "SAMN32676124",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-3775-3",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "437463664",
+        "spots": "806864",
+        "avg_length": "542"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676123",
+      "assembly": {
+        "accession": "GCF_041861185.1",
+        "biosample": "SAMN32676123",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048590",
+        "biosample": "SAMN32676123",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-3721-3",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "337438187",
+        "spots": "692205",
+        "avg_length": "487"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676082",
+      "assembly": {
+        "accession": "GCF_041861285.1",
+        "biosample": "SAMN32676082",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048635",
+        "biosample": "SAMN32676082",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-2661",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "498200613",
+        "spots": "969557",
+        "avg_length": "513"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676066",
+      "assembly": {
+        "accession": "GCF_041861325.1",
+        "biosample": "SAMN32676066",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048652",
+        "biosample": "SAMN32676066",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-2318-1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "355363008",
+        "spots": "624982",
+        "avg_length": "568"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676061",
+      "assembly": {
+        "accession": "GCF_041861345.1",
+        "biosample": "SAMN32676061",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048658",
+        "biosample": "SAMN32676061",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-2067-1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "281841398",
+        "spots": "500042",
+        "avg_length": "563"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676060",
+      "assembly": {
+        "accession": "GCF_041861355.1",
+        "biosample": "SAMN32676060",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048659",
+        "biosample": "SAMN32676060",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-202-1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "341140328",
+        "spots": "614270",
+        "avg_length": "555"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn32676150",
+      "assembly": {
+        "accession": "GCF_041861155.1",
+        "biosample": "SAMN32676150",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048673",
+        "biosample": "SAMN32676150",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-468-1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "652863233",
+        "spots": "1367984",
+        "avg_length": "477"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn46912175",
+      "assembly": {
+        "accession": "GCF_048296815.1",
+        "biosample": "SAMN46912175",
+        "bioprojects": [
+          "PRJNA1225944"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiniSeq, Oxford Nanopore",
+        "assembly_method": "Unicycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Switzerland: Kanton Zurich",
+        "isolation_source": "Food: retail chicken meat",
+        "host": "",
+        "collection_date": "2024-06-25",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR32410804",
+        "biosample": "SAMN46912175",
+        "bioproject": "PRJNA1225944",
+        "sample_name": "Salmonella enterica N24-1393-GF161",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "175025145",
+        "spots": "588059",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn46912174",
+      "assembly": {
+        "accession": "GCF_048296785.1",
+        "biosample": "SAMN46912174",
+        "bioprojects": [
+          "PRJNA1225944"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiniSeq, Oxford Nanopore",
+        "assembly_method": "Unicycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Switzerland: Kanton Zurich",
+        "isolation_source": "Food: retail chicken meat",
+        "host": "",
+        "collection_date": "2024-06-25",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR32410805",
+        "biosample": "SAMN46912174",
+        "bioproject": "PRJNA1225944",
+        "sample_name": "Salmonella enterica N24-1392-GF152",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "181642290",
+        "spots": "610287",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn46912173",
+      "assembly": {
+        "accession": "GCF_048296805.1",
+        "biosample": "SAMN46912173",
+        "bioprojects": [
+          "PRJNA1225944"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiniSeq, Oxford Nanopore",
+        "assembly_method": "Unicycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Switzerland: Kanton Zurich",
+        "isolation_source": "Food: retail chicken meat",
+        "host": "",
+        "collection_date": "2024-05-14",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR32410808",
+        "biosample": "SAMN46912173",
+        "bioproject": "PRJNA1225944",
+        "sample_name": "Salmonella enterica N24-1044-GF8",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "216965942",
+        "spots": "730102",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn46912172",
+      "assembly": {
+        "accession": "GCF_048296825.1",
+        "biosample": "SAMN46912172",
+        "bioprojects": [
+          "PRJNA1225944"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiniSeq, Oxford Nanopore",
+        "assembly_method": "Unicycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Switzerland: Kanton Zurich",
+        "isolation_source": "Food: retail chicken meat",
+        "host": "",
+        "collection_date": "2024-05-14",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR32410809",
+        "biosample": "SAMN46912172",
+        "bioproject": "PRJNA1225944",
+        "sample_name": "Salmonella enterica N24-1008-GF4",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "223530835",
+        "spots": "750740",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn10501887",
+      "assembly": {
+        "accession": "GCF_004768625.1",
+        "biosample": "SAMN10501887",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA417863"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 4.5",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada",
+        "isolation_source": "food",
+        "host": "",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8264777",
+        "biosample": "SAMN10501887",
+        "bioproject": "PRJNA417863",
+        "sample_name": "CFIAFB20170120",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "385536956",
+        "spots": "929319",
+        "avg_length": "414"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn10501886",
+      "assembly": {
+        "accession": "GCF_004798765.1",
+        "biosample": "SAMN10501886",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA417863"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 4.5",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada",
+        "isolation_source": "food",
+        "host": "",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8264778",
+        "biosample": "SAMN10501886",
+        "bioproject": "PRJNA417863",
+        "sample_name": "CFIAFB20170119",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "839597373",
+        "spots": "1820598",
+        "avg_length": "461"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn10501888",
+      "assembly": {
+        "accession": "GCF_004768665.1",
+        "biosample": "SAMN10501888",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA417863"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 4.5",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada",
+        "isolation_source": "food",
+        "host": "",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8264780",
+        "biosample": "SAMN10501888",
+        "bioproject": "PRJNA417863",
+        "sample_name": "CFIAFB20170121",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "566454330",
+        "spots": "1061117",
+        "avg_length": "533"
+      },
+      "errors": []
+    }
+  ]
+}
