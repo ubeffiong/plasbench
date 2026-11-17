@@ -337,7 +337,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 @media (max-width:640px){#chead{overflow-x:auto;scrollbar-width:thin}#chead .grow{flex:0 0 4px}}
 #cstate{font-size:11.5px;padding:0 6px;line-height:18px;border-radius:2px;border:1px solid var(--term-line);color:#aab3bd}
 #cstate:empty{display:none}
-#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled{color:#e3c27a;border-color:#6b5520}
+#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.completed_with_warnings{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
 /* console colour code, all three tabs: errors red, warnings yellow */
 .c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b;font-weight:600}
@@ -427,7 +427,7 @@ body.gd-open #gdrawer{transform:none}
 .tree li.study>.tn{font-weight:600;padding-top:5px;padding-bottom:5px;border-top:1px solid var(--line-2)}
 .tree li:not(.open)>ul{display:none}
 .sdot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--faint)}
-.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled{background:var(--warn)}
+.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled,.sdot.stalled,.sdot.completed_with_warnings{background:var(--warn)}
 /* git history colour code: you are here / pushed / not yet pushed / merge */
 .hdot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;background:var(--faint)}
 .hdot.head{background:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}.hdot.pushed{background:var(--ok)}.hdot.local{background:var(--warn)}
@@ -1256,7 +1256,7 @@ function stageLine(s) {
 function sessCard(s) {
   const pr = s.progress || {}, open = S.sessOpen.has(s.id);
   const dur = fmtDur((s.ended || Date.now() / 1000) - s.started);
-  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : "Running", completed: "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
+  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? "Stalled: no output for a while" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
   const pct = s.group === "completed" ? 100 : pr.percent;
   const bar = s.group === "ongoing" && pct == null ? `<div class="sbar ind"><i></i></div>` : `<div class="sbar"><i style="width:${pct == null ? (s.group === "attention" ? 8 : 0) : pct}%"></i></div>`;
   const run = s.run_index != null ? (S.runs || [])[s.run_index] : null;
@@ -1367,14 +1367,14 @@ async function refreshJobs() {
   $("#s_jobs").textContent = running.length ? `${running.length} running` : (S.jobs.length ? `${S.jobs.length} in history` : "Nothing running");
   $("#k_jobs").textContent = running.length;
   const sel = $("#cjob"), cur = S.consJob;
-  sel.innerHTML = S.jobs.length ? S.jobs.slice(0, 40).map(j => `<option value="${j.id}">${esc(stateWord(j.state))} · ${esc(j.label).slice(0, 80)}</option>`).join("") : `<option value="">No jobs yet</option>`;
+  sel.innerHTML = S.jobs.length ? S.jobs.slice(0, 40).map(j => `<option value="${j.id}">${esc(stateWord(j.display_state || j.state))} · ${esc(j.label).slice(0, 80)}</option>`).join("") : `<option value="">No jobs yet</option>`;
   if (cur) sel.value = cur;
   if (!$("#v_jobs").hidden) renderJobs();
   if (typeof renderPanelJobs === "function" && GD.open && PT.active === "jobs") renderPanelJobs();
   const nrun = S.jobs.filter(j => j.state === "running" || j.state === "cancelling").length;
   if ($("#pjbadge")) { $("#pjbadge").hidden = !nrun; $("#pjbadge").textContent = nrun; }
 }
-const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted"})[s] || s;
+const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"Stalled (no output; may still be working)", completed_with_warnings:"Completed with warnings"})[s] || s;
 function showConsole(id, expand) {
   if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
   $("#cjob").value = S.consJob || "";
@@ -1415,7 +1415,7 @@ async function pollConsole(force) {
     const waiting = running && /(\[[yY]\/[nN]\]|\[[yY]es\/[nN]o\]|\?|:)\s*$/.test(lastLine) && lastLine.trim().length > 3;
     if (waiting && !$("#cin").classList.contains("waiting")) { setConsole(true); setCTab("out"); toast("A command is waiting for your answer in the console", ""); $("#cintx").focus(); }
     $("#cin").classList.toggle("waiting", waiting);
-    const st = $("#cstate"); st.className = j.state; st.textContent = stateWord(j.state) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
+    const st = $("#cstate"); st.className = j.display_state || j.state; st.textContent = stateWord(j.display_state || j.state) + (j.exit != null && j.state !== "done" ? ` (exit ${j.exit})` : "");
     $("#ccancel").hidden = j.state !== "running";
     if (S.follow) $("#clog").scrollTop = $("#clog").scrollHeight;
     const wasRunning = S._lastState === "running"; S._lastState = j.state;
@@ -3629,7 +3629,7 @@ async function renderDoc(t) {
 function renderPanelJobs() {
   const jobs = (S.jobs || []).slice(0, 40);
   $("#pj_list").innerHTML = jobs.map(j => `<li data-pjob="${esc(j.id)}" title="${esc(j.command)}"><span class="sdot ${esc(j.state)}"></span>
-    <span class="t"><b>${esc(j.label)}</b><span>${esc(stateWord(j.state))} · ${esc(fmtTime(j.started))}${j.ended || j.state === "running" ? " · " + esc(fmtDur((j.ended || Date.now() / 1000) - j.started)) : ""}</span></span>
+    <span class="t"><b>${esc(j.label)}</b><span>${esc(stateWord(j.display_state || j.state))} · ${esc(fmtTime(j.started))}${j.ended || j.state === "running" ? " · " + esc(fmtDur((j.ended || Date.now() / 1000) - j.started)) : ""}</span></span>
     ${j.state === "running" ? `<button class="gd-ib" data-pjcancel="${esc(j.id)}" title="Cancel">${icon("stop")}</button>` : ""}</li>`).join("")
     || `<li class="mut" style="cursor:default">Nothing started from this window yet.</li>`;
 }
@@ -3752,7 +3752,7 @@ $("#runadd").onclick = () => pickPath(true, async p => { try { await api("runs/a
    =================================================================================================== */
 function renderJobs() {
   const st = s => `<span class="status ${s === "done" ? "ok" : s === "running" || s === "cancelling" ? "run" : s === "failed" || s === "interrupted" ? "bad" : "idle"}">${icon(s === "done" ? "check" : s === "running" ? "play" : s === "cancelled" ? "stop" : "x")}</span>`;
-  $("#jobtb").innerHTML = S.jobs.map(j => `<tr><td><div class="row">${st(j.state)}<span>${stateWord(j.state)}${j.exit != null && j.state !== "done" ? ` <span class="mut small">exit ${j.exit}</span>` : ""}</span></div></td>
+  $("#jobtb").innerHTML = S.jobs.map(j => `<tr><td><div class="row">${st(j.state)}<span>${stateWord(j.display_state || j.state)}${j.exit != null && j.state !== "done" ? ` <span class="mut small">exit ${j.exit}</span>` : ""}</span></div></td>
     <td><b>${esc(j.label)}</b><div class="mono small mut" style="word-break:break-all">${esc(j.command)}</div></td><td class="small">${fmtTime(j.started)}</td>
     <td class="small">${fmtDur((j.ended || Date.now() / 1000) - j.started)}</td>
     <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="showConsole(${jsq(j.id)}, true)">Log</button>

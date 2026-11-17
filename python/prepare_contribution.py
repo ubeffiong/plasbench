@@ -24,6 +24,7 @@ from pathlib import Path
 
 from build_accession_ledger import build_ledger, write_ledger
 from validate_cohort import LOCK_SCHEMA_VERSION, read_ledger, read_rows, schema_errors, verify_row
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 
 # Hygiene for public-accession metadata, not a real secret-detection tool:
@@ -111,7 +112,7 @@ def existing_header(path):
 
 
 def git(args, root, check=True):
-    return subprocess.run(["git", *args], cwd=root, check=check, capture_output=True, text=True)
+    return subprocess.run(["git", *args], cwd=root, check=check, capture_output=True, text=True, timeout=subprocess_timeout())
 
 
 def main():

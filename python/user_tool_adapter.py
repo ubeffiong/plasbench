@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from plasbench_common import iter_fasta  # noqa: E402
+from plasbench_common import iter_fasta, subprocess_timeout  # noqa: E402
 import user_tools  # noqa: E402
 
 DELIMITERS = {"tab": "\t", "\\t": "\t", "comma": ",", ",": ",", "semicolon": ";", ";": ";", "space": None,
@@ -235,7 +235,7 @@ def from_fasta_dir(path, mapping, prov):
 def run_adapter(tool, output, contigs, out_fasta):
     script = tool.resolve(tool.get("output", "adapter"))
     launcher = ["bash"] if script.endswith(".sh") else [sys.executable] if script.endswith(".py") else []
-    result = subprocess.run(launcher + [script, output, contigs, out_fasta])
+    result = subprocess.run(launcher + [script, output, contigs, out_fasta], timeout=subprocess_timeout())
     if result.returncode != 0:
         raise OutputError(f"the tool's adapter {script} exited {result.returncode}")
     if not Path(out_fasta).is_file():

@@ -37,6 +37,13 @@ fi
 
 # 4. no plasmid_files directory: empty and valid
 mkdir -p "$TMP/d"
+# a directory with no result file at all is a failed run (AU-008) ...
+if bash "$ROOT/adapters/adapt_plsmd.sh" "$TMP/d" /dev/null "$TMP/d0.plasmid.fasta" 2> "$TMP/d.err"; then
+    echo "FAIL: plsmd with no output must fail" >&2; exit 1
+fi
+grep -q "no output from plsmd" "$TMP/d.err"
+# ... a report with no plasmid_files is a tool that ran and reconstructed nothing
+printf 'plasmid\tinc\n' > "$TMP/d/s1_report.tsv"
 bash "$ROOT/adapters/adapt_plsmd.sh" "$TMP/d" /dev/null "$TMP/d.plasmid.fasta"
 [[ ! -s "$TMP/d.plasmid.fasta" ]]
 [[ "$(cat "$TMP/d.bins.tsv")" == $'bin_id\tsequence_id' ]]

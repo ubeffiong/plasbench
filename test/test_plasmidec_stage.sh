@@ -59,7 +59,7 @@ fi
 echo "an organism PlasmidEC has no model for is skipped with a recorded reason -> PASS"
 
 printf 'sample_id\tassembly_accession\tsra_run\torganism\ns1\tGCF_1\tSRR1\tEscherichia coli\n' > "$TMP/sheet.tsv"
-run_stage env RUN_PLASMIDEC=1 PLASMIDEC_FAKE_CRASH=1 || { echo "FAIL: stage must not abort when the tool produces nothing" >&2; exit 1; }
+run_stage env RUN_PLASMIDEC=1 PLASMIDEC_FAKE_CRASH=1 ALLOW_ALL_TOOLS_FAILED=1 || { echo "FAIL: stage must not abort when the tool produces nothing" >&2; exit 1; }
 if [[ "$(status_field 3)" != "failed" || -e "$TMP/results/s1/pred_plasmidec.plasmid.fasta" ]]; then
     echo "FAIL: a run with no ensemble_output.csv must be failed, not completed" >&2; cat "$TMP/results/tool_status.tsv" >&2; exit 1
 fi

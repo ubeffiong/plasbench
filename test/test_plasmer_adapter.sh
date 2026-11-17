@@ -62,6 +62,13 @@ echo "scores.tsv carries every RF-scored contig's real plasmid probability, look
 # No predProb.tsv/predPlasmids.fa at all is a valid "predicted none", not a
 # hard adapter failure.
 rm -rf "$TMP/out2"; mkdir -p "$TMP/out2/results"
+if bash "$ROOT/adapters/adapt_plasmer.sh" "$TMP/out2" "$base_asm" "$TMP/pred_none.plasmid.fasta" 2> "$TMP/none.err"; then
+    echo "FAIL: plasmer with no output files must fail (AU-008), not report an empty prediction" >&2; exit 1
+fi
+grep -q "no output from plasmer" "$TMP/none.err" || { echo "FAIL: the failure must say 'no output from plasmer'" >&2; exit 1; }
+echo "no output from plasmer at all is a failed run, with the reason -> PASS"
+# The tool ran and found nothing: its (empty) result file exists, so this is a completed empty prediction.
+: > "$TMP/out2/results/s.plasmer.predPlasmids.fa"
 bash "$ROOT/adapters/adapt_plasmer.sh" "$TMP/out2" "$base_asm" "$TMP/pred2.plasmid.fasta"
 [[ ! -s "$TMP/pred2.plasmid.fasta" ]] || { echo "FAIL: expected an empty prediction when no predPlasmids.fa exists" >&2; exit 1; }
 [[ "$(tail -n +2 "$TMP/pred2.scores.tsv" | wc -l)" -eq 0 ]] || { echo "FAIL: expected no scores when no predProb.tsv exists" >&2; exit 1; }

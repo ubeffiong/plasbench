@@ -13,6 +13,9 @@ OUT_DIR="$1"
 # shellcheck disable=SC2034  # BASE_ASM: positional adapter contract, unused here
 BASE_ASM="$2"
 OUT_FASTA="$3"
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/_require_output.sh"
+require_tool_output mob_recon "$OUT_DIR" 'contig_report.txt' 'mobtyper_results.txt' 'plasmid_*.fasta' 'chromosome.fasta' || exit 3
 : > "$OUT_FASTA"   # start empty (an empty file is a valid "predicted nothing")
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 

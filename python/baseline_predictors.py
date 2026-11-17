@@ -52,7 +52,7 @@ COV = re.compile(r"(?:_cov_|\bdepth=)([0-9.]+)", re.IGNORECASE)
 NOT_APPLICABLE = 3
 
 
-from plasbench_common import iter_fasta  # noqa: E402
+from plasbench_common import iter_fasta, subprocess_timeout  # noqa: E402
 
 
 def read_fasta(path):
@@ -100,7 +100,7 @@ def coverage_baseline(args):
 def reference_baseline(args):
     records = read_fasta(args.contigs)
     result = subprocess.run(["minimap2", "-c", "--secondary=no", "-x", "asm5", "-t", str(args.threads),
-                             args.reference, args.contigs], text=True, capture_output=True)
+                             args.reference, args.contigs], text=True, capture_output=True, timeout=subprocess_timeout())
     if result.returncode != 0:
         sys.exit(f"ERROR: minimap2 failed: {result.stderr.strip()[:300]}")
     covered = {}

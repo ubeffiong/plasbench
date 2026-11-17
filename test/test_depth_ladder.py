@@ -88,7 +88,7 @@ def check_local_truth_inputs():
         ladder.shutil.which = lambda name: "/stub/" + name
         ladder.subprocess.Popen = lambda cmd, stdout=None: types.SimpleNamespace(
             stdout=types.SimpleNamespace(close=lambda: None), wait=lambda: 0)
-        ladder.subprocess.run = lambda cmd, stdin=None, stdout=None, check=False: (
+        ladder.subprocess.run = lambda cmd, stdin=None, stdout=None, check=False, timeout=None: (
             stdout.write(gzip.compress(b"@r\nACGT\n+\n!!!!\n")), types.SimpleNamespace(returncode=0))[1]
         out = os.path.join(tmp, "out")
         argv = sys.argv

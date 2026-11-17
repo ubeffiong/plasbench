@@ -76,7 +76,9 @@ else
 fi
 
 TMP_SHEET="$(mktemp "${TMP_DIR:-/tmp}/plasbench_operational_XXXXXX.tsv")"
-trap 'rm -f "$TMP_SHEET"' EXIT
+remove_tmp_sheet() { rm -f "$TMP_SHEET"; }
+stage_timing_begin 8
+on_exit_add remove_tmp_sheet
 printf 'sample_id\tassembly_accession\tsra_run\n%s\tNA\t%s\n' "$SAMPLE" "$SRA" > "$TMP_SHEET"
 
 log "=== Operational reconstruction: $SAMPLE (tool: $TOOL, source: $TOOL_SOURCE) ==="
@@ -99,7 +101,16 @@ fi
 log "--- stage 4: reconstruct with $TOOL only ---"
 SAMPLE_SHEET="$TMP_SHEET" ONLY_TOOL="$TOOL" ANALYSIS_TRACK="$TRACK" bash "$HERE/04_run_tools.sh"
 
+# A prediction counts only when THIS run's stage 4 recorded the tool as completed (or reused after its fingerprint matched) and left its .complete marker:
+# an uninstalled tool is "skipped" and a failed one "failed", and a pred_<tool>.plasmid.fasta from an earlier run must not pass for either (AU-030).
 PRED="$RESULTS_DIR/$SAMPLE/pred_${TOOL}.plasmid.fasta"
+TOOL_STATE="$(awk -F'\t' -v s="$SAMPLE" -v t="$TOOL" '$1 == s && $2 == t { st = $3 "|" $5 } END { print st }' "$RESULTS_DIR/tool_status.tsv" 2>/dev/null || true)"
+tool_state_now="${TOOL_STATE%%|*}"; tool_state_reason="${TOOL_STATE#*|}"
+case "${tool_state_now:-none}" in
+    completed|reused) ;;
+    *) die "$TOOL did not run for $SAMPLE in this run (status: ${tool_state_now:-none}${tool_state_reason:+, $tool_state_reason}); a prediction left by an earlier run is not used. See $LOG_DIR/${SAMPLE}.${TOOL}.log" ;;
+esac
+[[ -f "$RESULTS_DIR/$SAMPLE/.${TOOL}.complete" ]] || die "$TOOL has no completion marker for $SAMPLE in this run; an earlier prediction is not used"
 [[ -s "$PRED" ]] || die "$TOOL did not produce a prediction for $SAMPLE; see $LOG_DIR/${SAMPLE}.${TOOL}.log"
 
 # Optional operational-mode novel-vs-known plasmid classification (see

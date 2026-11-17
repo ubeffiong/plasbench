@@ -46,6 +46,12 @@ echo "scores.tsv carries every contig's real 'votes plasmid' score, joined by co
 
 # No prediction.csv at all is a valid "predicted none", not a hard adapter failure.
 rm -rf "$TMP/out2"; mkdir -p "$TMP/out2"
+if bash "$ROOT/adapters/adapt_rfplasmid.sh" "$TMP/out2" "$base_asm" "$TMP/pred_none.plasmid.fasta" 2> "$TMP/none.err"; then
+    echo "FAIL: rfplasmid with no output files must fail (AU-008), not report an empty prediction" >&2; exit 1
+fi
+grep -q "no output from rfplasmid" "$TMP/none.err" || { echo "FAIL: the failure must say 'no output from rfplasmid'" >&2; exit 1; }
+echo "no output from rfplasmid at all is a failed run, with the reason -> PASS"
+printf 'contigID\tprediction\n' > "$TMP/out2/prediction.csv"   # ran, found nothing
 bash "$ROOT/adapters/adapt_rfplasmid.sh" "$TMP/out2" "$base_asm" "$TMP/pred2.plasmid.fasta"
 [[ ! -s "$TMP/pred2.plasmid.fasta" ]] || { echo "FAIL: expected an empty prediction when no prediction.csv exists" >&2; exit 1; }
 echo "no prediction.csv is scored as 'no plasmids', not a failure -> PASS"

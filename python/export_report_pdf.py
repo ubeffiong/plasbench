@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path, PureWindowsPath
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 PATH_NAMES = ["msedge", "microsoft-edge", "microsoft-edge-stable", "google-chrome", "google-chrome-stable", "chrome", "chromium", "chromium-browser"]
 
@@ -80,7 +81,7 @@ def browser_path(path, browser):
     if not windows_browser_from_wsl(browser):
         return str(path)
     return subprocess.run(["wslpath", "-w", str(path)], check=True, stdout=subprocess.PIPE,
-                          text=True).stdout.strip()
+                          text=True, timeout=subprocess_timeout()).stdout.strip()
 
 
 def browser_url(report, browser):

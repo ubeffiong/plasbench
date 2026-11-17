@@ -5,6 +5,7 @@ a separate script for single responsibility -- see adapters/SCORES.md)."""
 
 import argparse
 import csv
+import os
 from pathlib import Path
 
 # Calibration (score_plasmids.py calibration()): only for tools exposing a
@@ -33,10 +34,13 @@ def main():
         summary = summaries.get((row["sample"], row["tool"]), {})
         for field in FIELDS:
             row[field] = summary.get(field, "")
-    with open(args.scores, "w", newline="") as handle:
+    # Written beside the table and renamed over it, so a kill mid-write leaves the previous file intact (AU-049).
+    tmp_path = str(args.scores) + ".tmp"
+    with open(tmp_path, "w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
         writer.writeheader()
         writer.writerows(rows)
+    os.replace(tmp_path, args.scores)
 
 
 if __name__ == "__main__":
