@@ -464,8 +464,12 @@ one giant bin, or leaves plasmid sequence completely unassigned, is not
 automatically penalised by that alone. `score_bins.py` additionally computes
 **Normalized Mutual Information (NMI)** and **Variation of Information (VI)** over
 a deliberately wider, bp-weighted contingency table: every predicted bin as a row,
-every true plasmid as a column, plus two virtual categories — an
-`"__unassigned__"` row for true-plasmid bp no bin covers at all, and a
+every true plasmid as a column, plus two virtual categories — one
+**singleton cluster per unassigned true-plasmid base** (sequence no bin covers was
+placed with nothing; an earlier version pooled all such bases into one
+`"__unassigned__"` row, so a single wholly missed plasmid matched that row one to one and
+scored a perfect NMI, VI and ARI, corrected on 17 November 2026 and checked against a per-base
+brute force in `test_bin_clustering_missed.py`) — and a
 `"CHROMOSOME"` column for chromosome bp a bin wrongly claims. Chromosome bp no bin
 ever claims (the correct, desired outcome for most of a bacterial genome) is
 deliberately excluded, so the metric is not swamped by an enormous, uninteresting
@@ -1053,7 +1057,7 @@ binning recall and F1 against that reachable length, so a tool is not penalised 
 contains.
 
 **ARI.** A base-pair-weighted Adjusted Rand Index over the same contingency table as NMI: bins plus
-unassigned plasmid bases as rows, truth plasmids plus wrongly claimed chromosome as columns, and each
+unassigned plasmid bases (each a singleton cluster) as rows, truth plasmids plus wrongly claimed chromosome as columns, and each
 base as one item. It is descriptive and never ranks tools.
 
 **Micro versus macro.** Ranking scores and `mean_*` columns are macro averages: per isolate, then
