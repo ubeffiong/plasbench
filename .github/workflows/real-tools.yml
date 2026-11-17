@@ -74,10 +74,10 @@ jobs:
         shell: micromamba-shell {0}
         run: |
           # plasmidSPAdes finds plasmids by their copy number relative to the chromosome, so a lone plasmid gives it nothing to compare
-          # (it assembles fine and calls nothing plasmid). Simulate a 200 kb random background at about 10x beside the plasmid at about 150x.
-          python -c "import random; r = random.Random(11); print('>background'); print(''.join(r.choice('ACGT') for _ in range(200000)))" > work/background.fasta
-          wgsim -N 2200 -1 150 -2 150 -e 0.001 -r 0 work/fixture.fasta work/p1.fq work/p2.fq
-          wgsim -N 6700 -1 150 -2 150 -e 0.001 -r 0 work/background.fasta work/b1.fq work/b2.fq
+          # (it assembles fine and calls nothing plasmid). Simulate a 100 kb random background at about 30x beside the plasmid at about 300x (ordinary short-read depths; at 8x the pairs did not anchor and nothing was called).
+          python -c "import random; r = random.Random(11); print('>background'); print(''.join(r.choice('ACGT') for _ in range(100000)))" > work/background.fasta
+          wgsim -N 4400 -1 150 -2 150 -e 0.001 -r 0 work/fixture.fasta work/p1.fq work/p2.fq
+          wgsim -N 10000 -1 150 -2 150 -e 0.001 -r 0 work/background.fasta work/b1.fq work/b2.fq
           cat work/p1.fq work/b1.fq > work/r1.fq
           cat work/p2.fq work/b2.fq > work/r2.fq
       - name: Give the simulated reads varied qualities
