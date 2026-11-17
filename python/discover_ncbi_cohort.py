@@ -67,6 +67,10 @@ def main():
                         help="Require a country/place term in deposited BioSample geo_loc_name; repeat as needed.")
     parser.add_argument("--max-assemblies", type=int, default=30,
                         help="Maximum complete assemblies inspected per organism (default: 30).")
+    parser.add_argument("--negative-controls", action="store_true",
+                        help="Look for plasmid-free isolates instead: complete genomes whose deposited record declares NO plasmid, paired with an Illumina run as usual. "
+                             "They test what a tool does when there is nothing to find (isolate specificity, chromosome false positives). A record that declares no "
+                             "plasmid is a candidate only: the truth-label evidence stage still checks the replicons, and a curator confirms the isolate is plasmid-free.")
     parser.add_argument("--email", default=os.environ.get("NCBI_EMAIL"))
     parser.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
     args = parser.parse_args()
@@ -103,8 +107,8 @@ def main():
                                      "reason": "BioSample geo_loc_name does not confirm requested country/place"}); continue
                 if assembly["assembly_status"].lower() != "complete genome":
                     rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""), "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""), "reason": "assembly is not Complete Genome"}); continue
-                if not assembly["has_plasmid"]:
-                    rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""), "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""), "reason": "assembly does not declare plasmid replicons"}); continue
+                if bool(assembly["has_plasmid"]) == bool(args.negative_controls):
+                    rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""), "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""), "reason": ("assembly declares plasmid replicons, so it is not a negative control" if args.negative_controls else "assembly does not declare plasmid replicons")}); continue
                 if not assembly["derived_truth_technology"]:
                     rejected.append({"assembly_accession": accession, "biosample": assembly.get("biosample", ""), "organism_query": organism, "country_query": ", ".join(args.country), "country_evidence": origin_evidence, "sequencing_tech": assembly.get("sequencing_tech", ""),
                                      "reason": "Datasets v2 has no explicit long-read sequencing evidence"}); continue
@@ -133,7 +137,8 @@ def main():
                         # rows are tier B until a curator supplies a real study.
                         "truth_technology": assembly["derived_truth_technology"], "truth_quality_tier": "B",
                         "biosample": assembly["biosample"], "bioproject": selected["BioProject"], "sample_origin": origin_evidence,
-                        "read_depth_x": "", "assembly_plasmid_count": "", "source_study": "NCBI_discovery_pending_publication_review",
+                        "read_depth_x": "", "assembly_plasmid_count": "0" if args.negative_controls else "",
+                        "source_study": "NCBI_discovery_negative_control_pending_review" if args.negative_controls else "NCBI_discovery_pending_publication_review",
                         "alternate_paired_runs": alternates,
                         "candidate_extra_long_read_runs": extra_long_read_runs,
                     })

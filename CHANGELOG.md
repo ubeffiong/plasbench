@@ -12,6 +12,12 @@ history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
 ## [Unreleased]
+### Added -- the verification items that were left open
+- **Independent-truth runs:** `plasbench run --independent-truth-only` runs only the isolates whose truth is independent of the benchmark's reads (1,099 of the 7,227 in `public-v4`); with `--max-isolates N` the N is a balanced selection of those. The cohort file and its lock are unchanged.
+- **Negative controls:** `plasbench discover-cohort --negative-controls` (and `discover_ncbi_cohort.py --negative-controls`) looks for complete genomes whose record declares no plasmid, paired with an Illumina run, as candidates for plasmid-free isolates. None has been added to a cohort yet: the live discovery and a curator's check are still to do.
+- **Intervals:** `resampling.stratified_bootstrap_t_ci` gives the studentised cluster bootstrap a species-stratified form (it used to fall back to `cluster_t` whenever the ranking was species-balanced), and the full simulation now measures it. The default method is unchanged (see `docs/STATS_VALIDATION.md`).
+- **Curation grade:** the report's cohort filter is now labelled *Curation grade* (with an explanation), and the README says what `truth_quality_tier` means and what it does and does not do.
+
 ### Added -- fixes from the independent verification
 - **The real-data run is in the repository**: `benchmark.report_cohort1` is renamed `results_real_cohort1` (10 isolates, PlasBench 0.2.3, three real tools) with a README saying what it supports and what it does not. The verification document had wrongly said no real-data result existed.
 - **Binning: unaligned sequence is now counted beside the headline.** `score_bins.py --pred-fasta` writes `bin_unaligned_bp`, `bin_unaligned_fraction`, `lw_bin_precision_strict` and `lw_bin_f1_strict`; the leaderboard gains `mean_lw_bin_f1_strict` and `mean_bin_unaligned_fraction`. A bin padded with contigs that align nowhere scored a perfect headline; it now shows a low strict score. The headline definition is unchanged.

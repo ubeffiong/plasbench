@@ -34,5 +34,27 @@ Because cluster t cannot cover when one study dominates, `resampling.interval()`
 - The procedures stay **provisional** (`simulate_validation.overall_status()`, per number of studies).
 - This is statistical calibration under simulated structures; validation on a real multi-study cohort is still outstanding.
 
+## Is another interval method better? (the 17 November re-run)
+
+The verification (`docs/INDEPENDENT_VERIFICATION.md`) found nominal 95% intervals covering 81-94% in a harsher, skewed toy simulation, and asked whether swapping the method fixes it. The full simulation above was re-run with the studentised cluster bootstrap given a real species-stratified form (until then the stratified rows reused the cluster-t numbers). Every other column of the 86 rows reproduced exactly, so the run is reproducible; only the `bootstrap_t_coverage` and `bootstrap_t_width` of the stratified rows changed.
+
+Coverage of a nominal 95% (1,000 replicates, Monte Carlo error about 0.007 near 0.95 and 0.011 near 0.9):
+
+| Design | percentile | cluster_t (default) | bootstrap_t |
+|---|---:|---:|---:|
+| balanced, 12 studies | 0.898 | 0.940 | 0.940 |
+| balanced, 30 studies | 0.938 | 0.955 | 0.954 |
+| unbalanced, 12 studies, 10% missing | 0.880 | 0.921 | **0.936** |
+| unbalanced, 20 studies, 20% missing | 0.919 | 0.943 | 0.947 |
+| one dominant species of 3, 12 studies | 0.741 | 0.882 | **0.942** |
+| one dominant study, 12 studies | 0.897 | 0.723 | 0.824 |
+| two heavy studies (80% of isolates), 12 studies | 0.884 | 0.785 | 0.846 |
+| 10% resource failures, 12 studies | 0.904 | 0.955 | 0.928 |
+| a study fails entirely (10% of studies), 12 | 0.888 | 0.981 | 0.910 |
+| stratified, 2 x 4 studies | 0.850 | 0.964 | 0.960 |
+| stratified, 2 x 12 studies, unbalanced | 0.925 | 0.936 | 0.939 |
+
+**Result.** No method is better everywhere. The studentised bootstrap is better with unbalanced designs and a dominant species (0.936 and 0.942 against 0.921 and 0.882) and about equal in balanced ones, but it is worse when runs fail (0.928 against 0.955) or a whole study fails (0.886-0.910 against 0.98). With a dominant study or two heavy studies every studentised interval is far below nominal and the existing rule (percentile, 0.87-0.91) is still the least bad. The shortfall is therefore a property of the design, not of the method chosen, and swapping the default would trade one weak scenario for another. The default stays `cluster_t` (a pre-registered `fixed` parameter), the percentile rule for a dominant study stays, `PLASBENCH_CI_METHOD=bootstrap_t` is available (now with strata), and the report keeps saying that intervals from unbalanced or dominated cohorts are optimistic.
+
 ## Limits of this study
 Monte Carlo error is about 0.007 for a rate near 0.05 and 0.011 near 0.9 with 1,000 replicates; the Holm comparisons are independent (real tool pairs share tools, which makes Holm more conservative); species effects were equal across species; the simulated structures are not the shipped cohorts, so a conclusion about a particular cohort needs a run with its own number of studies and structure.

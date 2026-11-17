@@ -500,6 +500,50 @@ def bootstrap_t_ci(values, groups=None, iterations=1000, level=0.95):
     return mean - high_q * se, mean - low_q * se
 
 
+def stratified_bootstrap_t_ci(values, groups, strata, iterations=1000, level=0.95):
+    """Studentized cluster bootstrap interval for the macro mean (the mean of per-stratum means); (None, None) when a stratum has fewer than two clusters.
+
+    Clusters are resampled within each stratum, the macro mean and its CR1 standard error are recomputed on every draw, and the interval is built from the
+    distribution of (draw mean - mean) / draw standard error, as bootstrap_t_ci does for one stratum. Until this existed, bootstrap_t fell back to cluster_t
+    whenever the ranking was species-balanced, which is the headline's usual form.
+    """
+    if _has_nan(values) or not _finite(values):
+        return None, None
+    by_stratum = defaultdict(lambda: ([], []))
+    for value, group, stratum in zip(values, groups if groups is not None else list(range(len(values))), strata):
+        by_stratum[stratum][0].append(value)
+        by_stratum[stratum][1].append(group)
+    sets = [resampling_units(*by_stratum[s]) for s in sorted(by_stratum)]
+    if not sets or any(len(units) < 2 for units in sets) or sum(len(units) for units in sets) < MIN_CLUSTERS_CI:
+        return None, None
+
+    def macro(unit_sets):
+        means, variance = [], 0.0
+        for units in unit_sets:
+            mean, se, _ = _cr1(units)
+            means.append(mean)
+            variance += se * se
+        s = len(means)
+        return sum(means) / s, math.sqrt(variance) / s
+
+    mean, se = macro(sets)
+    if se == 0:
+        return mean, mean
+    rng = random.Random(20261117)
+    stats = []
+    for _ in range(iterations):
+        m, s = macro([rng.choices(units, k=len(units)) for units in sets])
+        if s > 0:
+            stats.append((m - mean) / s)
+    if len(stats) < iterations // 2:
+        return None, None
+    stats.sort()
+    alpha = (1.0 - level) / 2.0
+    low_q = stats[int(alpha * len(stats))]
+    high_q = stats[int((1.0 - alpha) * len(stats)) - 1]
+    return mean - high_q * se, mean - low_q * se
+
+
 def dominant_share(values, groups=None):
     """The largest share of the observations held by one independent cluster (0 with no cluster labels). One study that holds most of the isolates is what the
     full simulation found the cluster-t interval cannot handle (python/simulate_validation.py: 64-79% coverage of a nominal 95%)."""
@@ -524,12 +568,14 @@ def interval_method_used(values, groups=None, strata=None, method=None):
 def interval(values, groups=None, strata=None, method=None, iterations=1000):
     """The leaderboard's interval for the (macro) mean, by INTERVAL_METHOD unless method is given (or a dominant study triggers the percentile fallback: interval_method_used).
 
-    bootstrap_t has no stratified form here: with strata it falls back to cluster_t (both are studentized)."""
+    bootstrap_t has a stratified form (stratified_bootstrap_t_ci)."""
     method = interval_method_used(values, groups, strata, method)
     if method == "percentile":
         return stratified_bootstrap(values, groups, strata, iterations=iterations)
-    if method == "bootstrap_t" and strata is None:
-        return bootstrap_t_ci(values, groups, iterations=iterations)
+    if method == "bootstrap_t":
+        if strata is None:
+            return bootstrap_t_ci(values, groups, iterations=iterations)
+        return stratified_bootstrap_t_ci(values, groups, strata, iterations=iterations)
     return cluster_t_ci(values, groups, strata)
 
 

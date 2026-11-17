@@ -195,3 +195,12 @@ All from the repository root of a worktree at `17c9936`; scratch scripts were ke
 - **Cohort column `truth_quality_tier`.** A required schema field with a real function (it gates Tier 1). Renaming it means migrating every cohort file and lock; left as a documented name problem.
 - **Unaligned predicted bases never false positives (base-level).** The base-level scorer is unchanged; the new columns cover the binning layer only.
 - **Confidence intervals under-cover.** Disclosed in `STATS_VALIDATION.md`; no method change.
+
+## 13. The items left open in section 12, and what was done
+
+| Item | What was done | Result |
+|---|---|---|
+| Truth independence (15% of public-v4) | `plasbench run --independent-truth-only` runs only the isolates whose truth is independent of the benchmark's reads (`sheet_limit.independent_truth_only`, using `truth_provenance.independence()`); combine with `--max-isolates` | 1,099 of 7,227 isolates; the independence of the data itself is unchanged. `test/test_independent_truth_only.py` |
+| No plasmid-free isolates | `discover_ncbi_cohort.py --negative-controls` and `plasbench discover-cohort --negative-controls` look for complete genomes whose record declares no plasmid, paired with an Illumina run | **Not run live: no plasmid-free isolate has been added to any cohort.** The contributed pool holds only plasmid-bearing assemblies, so these must come from a new search and a curator's check. `test/test_discover_negative_controls.py` (faked NCBI responses) |
+| `truth_quality_tier` | The report's filter is labelled *Curation grade* with an explanation; the README defines the column | The name in the cohort files and the Tier 1 gate on grade `A` are unchanged (renaming means migrating every cohort and lock; loosening the gate would redefine Tier 1) |
+| Intervals under-cover | `resampling.stratified_bootstrap_t_ci` added; the full simulation re-run (reproduced every other column exactly) | No method is better everywhere (`docs/STATS_VALIDATION.md`, last section). The default stays `cluster_t`. Switching it is a decision for the project owner because the parameter is pre-registered as fixed. `test/test_stratified_bootstrap_t.py` |
