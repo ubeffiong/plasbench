@@ -4,7 +4,7 @@
 # across containers) rather than baked in at build time. Baking a live,
 # unpinned, unchecksummed network fetch into the image would make builds
 # non-reproducible and fail the whole build on any network hiccup.
-FROM mambaorg/micromamba@sha256:e3797091302382ea841498bc93a7b0a50f7c1448333d5e946d2d1608d0c5f43d
+FROM mambaorg/micromamba@sha256:e1476182cd40eb1f7c0cfae4adec9bfd78f3d7f05c61368306abfdc8939c1198
 
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
@@ -18,7 +18,9 @@ LABEL org.opencontainers.image.title="PlasBench" \
 COPY --chown=$MAMBA_USER:$MAMBA_USER env/environment.lock.yml /tmp/environment.lock.yml
 # environment.lock.yml is Conda's @EXPLICIT format. Micromamba interprets
 # --file as YAML, so supply the lock's exact package URLs as specifications.
-RUN micromamba create -y -n plasbench $(awk '!/^(@|#|$)/ {print}' /tmp/environment.lock.yml) \
+# The channels are named because newer micromamba images (e147618 and later) resolve each URL as a package spec against the default channel only, so the lock's
+# bioconda packages "do not exist"; with both channels named the exact builds are found, as before.
+RUN micromamba create -y -n plasbench -c conda-forge -c bioconda $(awk '!/^(@|#|$)/ {print}' /tmp/environment.lock.yml) \
     && micromamba clean --all --yes
 
 # MOB-suite pins pandas<=1.5.3 and numpy<1.23.5, which cannot co-exist with the
