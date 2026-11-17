@@ -78,9 +78,12 @@ candidate's NCBI and read-QC outcome. The window's Cohorts page shows both as th
 * **Size and mix:** 7,227 isolates, 943 species, 1,818 BioProjects. It is not a balanced sample: *E. coli* has 1,360 isolates and 520
   species have one. Use `--max-isolates N` (balanced by default) or the `organism`, `selection_arm`, `panel_subset` and
   `truth_assembly_strategy` columns.
-* **Truth:** 3,552 long-read-first rows (2,453 hybrid, 1,099 long-read-only), 2,522 short-read-first and 1,153 unclassified. Only the
-  long-read-first rows are headline-eligible; four species have 20 or more such studies (*E. coli* 111, *K. pneumoniae* 58,
-  *S. aureus* 35, *S. enterica* 34).
+* **Truth:** 3,616 long-read-first rows (2,486 hybrid, 1,130 long-read-only), 2,738 short-read-first and 873 unclassified (labels recomputed on
+  17 November 2026 after `classify_method` was corrected; `python/relabel_cohort_provenance.py --check` keeps the sheet in step with it). Under the
+  default `HEADLINE_INDEPENDENCE=independent` only the 1,130 long-read-only rows with no polishing reads are headline-eligible (the 2,486 long-read-first
+  hybrids are polished with Illumina reads of the same BioSample and count as `partially_independent`); two species have 20 or more such independent
+  studies (*E. coli* 42, *K. pneumoniae* 30). Counting every long-read-first row, four species reach 20 (*E. coli* 115, *K. pneumoniae* 58,
+  *S. aureus* 35, *S. enterica* 34), which is what `HEADLINE_INDEPENDENCE=independent,partially_independent` would admit.
 * **Arms:** 1,539 `recent` (public on or after 2025-01-01 on the earlier of assembly and first read) and 5,688 `older`, for the
   leakage comparison. `panel_subset=core` marks the 98 isolates of the first, balanced selection (20 each of *E. coli*, *K. pneumoniae*,
   *S. enterica*, *S. aureus*, 18 *E. hormaechei*).

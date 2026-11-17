@@ -1,7 +1,7 @@
 {
   "schema_version": "1.1",
   "sample_sheet": "negative-controls-v1.tsv",
-  "sample_sheet_sha256": "c5eb49c5460511d28618e27b03b5cfaf7c1b836af82dff466bddb8397c9413d2",
+  "sample_sheet_sha256": "067317a1770d0a8bbcec09143a3a4a0dae66229a04537e6bccd0d1f407707bc1",
   "evidence": [
     {
       "sample_id": "negctl_acinetobacter_baumannii_gcf_004101705_1",

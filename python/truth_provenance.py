@@ -84,12 +84,23 @@ POLISH = ("none", "independent", "same_as_benchmark", "unknown")
 # assembly records (e.g. an E. coli Trycycler + Medaka + Polypolish assembly).
 LONG_READ_ASSEMBLERS = re.compile(
     r"\b(flye|canu|raven|tryc(?:yc|y)ler|autocycler|dragonflye|hybracter|miniasm|necat|nextdenovo|"
-    r"wtdbg2?|hifiasm|smartdenovo|hgap|falcon|ra)\b", re.IGNORECASE)
+    r"wtdbg2?|hifiasm|smartdenovo|hgap\d*|falcon|ra)\b", re.IGNORECASE)
 CONSENSUS_LONG_READ = re.compile(r"\b(tryc(?:yc|y)ler|autocycler|hybracter)\b", re.IGNORECASE)
-SHORT_READ_FIRST = re.compile(r"\b(unicycler|masurca|spades)\b", re.IGNORECASE)
-ILLUMINA = re.compile(r"\b(illumina|miseq|hiseq|nextseq|novaseq|iseq|bgiseq|dnbseq|mgiseq)\b", re.IGNORECASE)
-LONG_READ_TECH = re.compile(r"\b(nanopore|ont|minion|gridion|promethion|pacbio|sequel|rs ii|hifi)\b",
+SHORT_READ_FIRST = re.compile(r"\b(unicycler[a-z]?|unic(?:yc|lyc|ly)ler|masurca|spades)\b", re.IGNORECASE)
+ILLUMINA = re.compile(r"\b(illumina|mi\s?seq|hi\s?seq|next\s?seq|nova\s?seq|mini\s?seq|i\s?seq\d*|bgiseq|dnbseq|mgiseq)\b", re.IGNORECASE)
+# Programs that polish with SHORT reads. Their presence in the assembly method is Illumina evidence even when the technology field names no Illumina run (an audit
+# found Polypolish- and Pilon-polished assemblies labelled long_read_only, hence "independent"). Racon is left out: it polishes with long reads as often as short.
+ILLUMINA_POLISHERS = re.compile(r"\b(polypolish|pilon|pypolca|polca|nextpolish|hapo-?g|fmlrc)\b", re.IGNORECASE)
+LONG_READ_TECH = re.compile(r"\b(nanopore|ont|minion|gridion|promethion|pacbio|smrt|sequel|revio|rs ii|hifi)\b",
                             re.IGNORECASE)
+
+
+def _tokens(text):
+    """NCBI free text with its separators made visible to the word patterns: OXFORD_NANOPORE, PACBIO_SMRT and run-together names such as IlluminaMiSeq or
+    PacBioSequel become separate words (the old patterns treated an underscore as part of a word and missed them)."""
+    text = text or ""
+    # the original text is kept beside the split one, so names that only match unsplit (MinION, PromethION, PacBio) still do
+    return text.replace("_", " ") + " ; " + re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text).replace("_", " ")
 
 
 def read_rows(path):
@@ -125,10 +136,14 @@ def classify_method(method, tech):
     """Return (strategy, polish, reason) from NCBI's free-text assembly fields."""
     if not method and not tech:
         return "unknown", "unknown", "no assembly method or sequencing technology recorded"
-    has_illumina = bool(ILLUMINA.search(tech) or ILLUMINA.search(method))
+    method, tech = _tokens(method), _tokens(tech)
+    has_illumina = bool(ILLUMINA.search(tech) or ILLUMINA.search(method) or ILLUMINA_POLISHERS.search(method))
     long_assembler = bool(LONG_READ_ASSEMBLERS.search(method))
     consensus = bool(CONSENSUS_LONG_READ.search(method))
-    short_first = bool(SHORT_READ_FIRST.search(method))
+    # "Unicycler_polish" is a short-read POLISHING step run on a long-read assembly, not Unicycler assembling: it is Illumina evidence, not a short-read-first assembler
+    unicycler_polish = bool(re.search(r"unicycler[ _-]?polish", method, re.IGNORECASE))
+    has_illumina = has_illumina or unicycler_polish
+    short_first = bool(SHORT_READ_FIRST.search(re.sub(r"unicycler[ _-]?polish", " ", method, flags=re.IGNORECASE)))
     if consensus or (long_assembler and not short_first):
         strategy = "long_read_first_hybrid" if has_illumina else "long_read_only"
     elif short_first and not long_assembler:

@@ -149,10 +149,11 @@ filters and the NCBI verification is in `public-v4`.** That is 7,227 isolates of
 large panel, not a designed sample: species and studies are unequal (*E. coli* 1,360 isolates, 520 species have one), so
 choose what to run with the columns and with `plasbench run --max-isolates N`, which takes a balanced N (see the README).
 
-* **Truth strategy** (`truth_assembly_strategy`): 3,552 long-read-first (2,453 hybrid, 1,099 long-read-only), 2,522
-  short-read-first, 1,153 unclassified. Only long-read-first rows belong in the headline; the others are tier 3 and are
-  described, not ranked. Four species reach the headline's 20 long-read-first studies: *E. coli* (111), *K. pneumoniae*
-  (58), *S. aureus* (35), *S. enterica* (34).
+* **Truth strategy** (`truth_assembly_strategy`): 3,616 long-read-first (2,486 hybrid, 1,130 long-read-only), 2,738
+  short-read-first, 873 unclassified (recomputed 17 November 2026; see `python/relabel_cohort_provenance.py`). Only long-read-first rows can be
+  in the headline; the others are tier 3 and are described, not ranked. With the default `HEADLINE_INDEPENDENCE=independent` only the 1,130
+  long-read-only rows qualify, and two species reach 20 independent studies: *E. coli* (42) and *K. pneumoniae* (30). If partially independent
+  (Illumina-polished) long-read-first rows are admitted, four reach 20: *E. coli* (115), *K. pneumoniae* (58), *S. aureus* (35), *S. enterica* (34).
 * **Leakage arms** (`selection_arm`): 1,539 `recent` (public on or after 2025-01-01, earlier of assembly and first read)
   and 5,688 `older`. `panel_subset` is `core` for the 98 isolates of the first, balanced selection (20 each of *E. coli*,
   *K. pneumoniae*, *S. enterica*, *S. aureus* and 18 *E. hormaechei*) and `extended` for the rest.
