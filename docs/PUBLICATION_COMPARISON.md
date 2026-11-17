@@ -56,7 +56,7 @@ shows how each publication cohort was built, the funnel, why isolates are missin
 | Study | Published metric | PlasBench metric | Tools with a counterpart |
 |---|---|---|---|
 | plsMD 2026 (both sets) | per-plasmid recall, copied from the paper's supplement | `completeness` per truth plasmid (`<sample>/<tool>.per_plasmid.tsv`), matched by accession | plsMD ↔ `plsmd`, MOB-suite ↔ `mob_recon`, gplas ↔ `gplas2_mob` (gplas2 is gplas's successor: similar, not identical) |
-| Teixeira 2025 | per-isolate contig precision, recall and F1, by contig count and by contig length, **computed by PlasBench from the paper's published calls** and truth (not the paper's printed figures) | `contig_*_count` and `contig_*_bp` in `scores.tsv` | MOB-recon, PLASMe, PlaScope, Plasmer, Platon, RFPlasmid, geNomad, gplas2, plASgraph2, PlasBin-Flow. HyAsP, PlasmidEC and PlasmidFinder have no PlasBench adapter: shown as published only |
+| Teixeira 2025 | per-isolate contig precision, recall and F1, by contig count and by contig length, **computed by PlasBench from the paper's published calls** and truth (not the paper's printed figures) | `contig_*_count` and `contig_*_bp` in `scores.tsv` | MOB-recon, PLASMe, PlaScope, Plasmer, Platon, RFPlasmid, geNomad, gplas2, plASgraph2, PlasBin-Flow, PlasmidEC. HyAsP and PlasmidFinder have no PlasBench counterpart: shown as published only |
 | PlasEval 2024 | dissimilarity of the original program | see [`PLASEVAL_REPLICATION.md`](PLASEVAL_REPLICATION.md) (`plasbench analysis plaseval-replication`, and the comparison gate) | MOB-recon, HyAsP, gplas2, PlasBin-Flow |
 | MOB-suite 2018 | none shipped per isolate: its recall for the 63 shared isolates is in the plsMD paper's table | as for plsMD | `mob_recon` |
 

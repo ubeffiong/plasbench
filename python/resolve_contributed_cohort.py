@@ -132,23 +132,8 @@ def check_run(run_id, row, assembly, thresholds, genome_size, api_key, email):
     return info, worst, "; ".join(notes)
 
 
-def single_replicon(accession, api_key=None):
-    """(genome size in bases, number of sequences) of an assembly from the NCBI Datasets report; (None, None) when it cannot be read."""
-    try:
-        request = vc.Request("https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/" + accession + "/dataset_report",
-                             headers={"User-Agent": "PlasBench/0.4 cohort resolver", "Accept": "application/json"})
-        reports = vc.fetch(request, 60, 4, "NCBI Datasets report request", parse=lambda payload: json.loads(payload.decode("utf-8", "replace"))).get("reports", [])
-        stats = reports[0].get("assembly_stats", {})
-        return int(stats.get("total_sequence_length") or 0) or None, int(stats.get("number_of_component_sequences") or 0) or None
-    except Exception:
-        return None, None
-
-
-MIN_CHROMOSOME_BP = 1_500_000   # a single sequence shorter than this is not a bacterial chromosome (a plasmid recorded alone would be)
-
-
-def resolve(row, thresholds, api_key, email, pause, max_depth=300.0, negative_controls=False):
-    """(sheet_row or None, precheck_row). With negative_controls the assembly must be a plasmid-free, single-sequence chromosome instead of a plasmid-bearing one."""
+def resolve(row, thresholds, api_key, email, pause, max_depth=300.0):
+    """(sheet_row or None, precheck_row)."""
     out = {"sample_id": row["sample_id"], "assembly_accession": row["assembly_accession"], "organism": row["organism"],
            "selection_arm": row.get("selection_arm", ""), "status": "", "reasons": "", "sra_run": "", "bioproject": "",
            "est_depth_x": "", "est_read_pairs": "", "est_mean_read_length": ""}
@@ -164,18 +149,7 @@ def resolve(row, thresholds, api_key, email, pause, max_depth=300.0, negative_co
     problems = []
     if assembly["assembly_status"].lower() != "complete genome" or assembly["datasets_assembly_level"].lower() != "complete genome":
         problems.append("assembly is not a Complete Genome")
-    if negative_controls:
-        size, sequences = single_replicon(row["assembly_accession"], api_key)
-        time.sleep(pause)
-        if assembly["has_plasmid"]:
-            problems.append("assembly declares plasmid replicons, so it is not a negative control")
-        if sequences != 1:
-            problems.append(f"assembly has {sequences if sequences else 'an unknown number of'} sequences, not exactly one chromosome")
-        elif size is None or size < MIN_CHROMOSOME_BP:
-            problems.append(f"its single sequence is {size} bases, too short to be a bacterial chromosome")
-        if size and not row.get("genome_size"):
-            row = dict(row, genome_size=str(size))
-    elif not assembly["has_plasmid"]:
+    if not assembly["has_plasmid"]:
         problems.append("assembly does not declare plasmid replicons")
     if not assembly["derived_truth_technology"]:
         problems.append("sequencing evidence has no explicit long-read platform")
@@ -275,7 +249,6 @@ def main():
                     help="runs deeper than this are used only when no shallower run passes, and are noted (default 300)")
     ap.add_argument("--allow-shared-bioproject", action="store_true",
                     help="keep several isolates per BioProject (the analysis clusters on cluster_key / BioProject)")
-    ap.add_argument("--negative-controls", action="store_true", help="the candidates are plasmid-free isolates (from discover-cohort --negative-controls): require a plasmid-free, single-sequence chromosome of bacterial size instead of plasmids")
     ap.add_argument("--workers", type=int, default=4, help="parallel NCBI lookups (default 4, about 8 requests/second with a key)")
     ap.add_argument("--cache", help="JSON file of earlier per-candidate results; resolved candidates are not re-queried")
     ap.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
@@ -308,7 +281,7 @@ def main():
         key = row["assembly_accession"] + "|" + row.get("selection_arm", "")
         if key in cache:
             return index, row, cache[key]["sheet"], cache[key]["precheck"], True
-        sheet, out = resolve(row, thresholds, args.api_key, args.email, pause, args.preferred_max_depth, args.negative_controls)
+        sheet, out = resolve(row, thresholds, args.api_key, args.email, pause, args.preferred_max_depth)
         return index, row, sheet, out, False
 
     results = {}

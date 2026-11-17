@@ -28,7 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = Path(__file__).with_name("expected.tsv")
-SUMMARY_FIELDS = ["tool", "version", "database", "tool_exit", "adapter_exit", "seconds", "plasmid_share", "expected_min_share", "problems", "status"]
+SUMMARY_FIELDS = ["tool", "version", "database", "tool_exit", "adapter_exit", "seconds", "plasmid_share", "expected_min_share", "problems", "status", "plasmid_recovered", "expected_min_recovered"]
 SUBSET_OF_INPUT = {"mob_recon", "platon"}   # their predictions are contigs of the input assembly; a re-assembler's are not
 NEEDS_DATABASE = {"platon": "PLATON_DB"}
 
@@ -104,6 +104,47 @@ def plasmid_share(predicted, input_fasta):
     return called / total if total else None
 
 
+def read_fasta_sequence(path):
+    """The sequences of a FASTA, upper case, one string per record."""
+    out, parts = [], []
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith(">"):
+                if parts:
+                    out.append("".join(parts))
+                parts = []
+            else:
+                parts.append(line.strip().upper())
+    if parts:
+        out.append("".join(parts))
+    return out
+
+
+def plasmid_recovered(predicted, input_fasta, k=31):
+    """Fraction of the input plasmid's k-mers (either strand) found in the predicted FASTA: how much of the plasmid the tool actually returned.
+    plasmid_share only compares sizes, so a tool that calls 50 kb of the wrong sequence scores 7 on a 7 kb plasmid; this does not."""
+    if not Path(predicted).is_file():
+        return 0.0
+    comp = str.maketrans("ACGT", "TGCA")
+    have = set()
+    for seq in read_fasta_sequence(predicted):
+        for i in range(len(seq) - k + 1):
+            kmer = seq[i:i + k]
+            have.add(kmer)
+            have.add(kmer.translate(comp)[::-1])
+    wanted = [seq[i:i + k] for seq in read_fasta_sequence(input_fasta) for i in range(len(seq) - k + 1)]
+    return sum(1 for kmer in wanted if kmer in have) / len(wanted) if wanted else None
+
+
+def expected_recovered(tool, path=EXPECTED):
+    """The least fraction of the plasmid the tool must return (optional column min_recovered; 0 = not yet set)."""
+    with open(path, newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader((line for line in handle if line.strip() and not line.startswith("#")), delimiter="\t"):
+            if row["tool"] == tool:
+                return float(row.get("min_recovered") or 0)
+    return 0.0
+
+
 def expected_floor(tool, path=EXPECTED):
     with open(path, newline="", encoding="utf-8") as handle:
         for row in csv.DictReader((line for line in handle if line.strip() and not line.startswith("#")), delimiter="\t"):
@@ -112,7 +153,7 @@ def expected_floor(tool, path=EXPECTED):
     return 0.0
 
 
-def judge(problems, tool_exit, adapter_exit, share, floor):
+def judge(problems, tool_exit, adapter_exit, share, floor, recovered=None, min_recovered=0.0):
     """('pass'|'fail', reasons) from the run: structural problems and exit codes fail; a share under the floor fails; a tool that calls NOTHING as plasmid on an input that is a plasmid fails even where the floor is 0 (a floor of 0 means the value is not yet set, not that zero is acceptable)."""
     reasons = list(problems)
     if tool_exit != 0:
@@ -123,6 +164,10 @@ def judge(problems, tool_exit, adapter_exit, share, floor):
         reasons.append("the tool called nothing as plasmid on an input that is a plasmid")
     elif share is not None and share + 1e-12 < floor:
         reasons.append(f"plasmid share {share:.3f} is under the expected {floor:.3f}")
+    if recovered is not None and recovered <= 0.0 and (share is None or share > 0.0):
+        reasons.append("none of the input plasmid's sequence is in what the tool called plasmid")
+    elif recovered is not None and recovered + 1e-12 < min_recovered:
+        reasons.append(f"only {recovered:.3f} of the plasmid was recovered; expected at least {min_recovered:.3f}")
     return ("fail" if reasons else "pass"), reasons
 
 
@@ -188,10 +233,12 @@ def main():
         input_ids = [name for name, _length in fasta_records(args.assembly)]
         problems = validate_output(args.tool, pred, bins, input_ids) if tool_exit == 0 and adapter_exit == 0 else []
         share, floor = plasmid_share(pred, args.assembly), expected_floor(args.tool)
-        status, reasons = judge(problems, tool_exit, adapter_exit, share, floor)
+        recovered, min_recovered = plasmid_recovered(pred, args.assembly), expected_recovered(args.tool)
+        status, reasons = judge(problems, tool_exit, adapter_exit, share, floor, recovered, min_recovered)
         if tool_exit != 0:
             reasons.append("log tail: " + " | ".join(log.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-3:]))
-        row.update(plasmid_share="" if share is None else f"{share:.4f}", expected_min_share=f"{floor:.4f}", problems="; ".join(reasons), status=status)
+        row.update(plasmid_share="" if share is None else f"{share:.4f}", expected_min_share=f"{floor:.4f}", problems="; ".join(reasons), status=status,
+                   plasmid_recovered="" if recovered is None else f"{recovered:.4f}", expected_min_recovered=f"{min_recovered:.4f}")
     with open(args.summary, "a+", newline="", encoding="utf-8") as handle:
         handle.seek(0)
         fresh = not handle.read(1)
@@ -199,7 +246,7 @@ def main():
         if fresh:
             writer.writeheader()
         writer.writerow(row)
-    print(f"[{args.tool}] {row['status']}: {row['problems'] or 'no problems'} (plasmid share {row['plasmid_share'] or 'n/a'})")
+    print(f"[{args.tool}] {row['status']}: {row['problems'] or 'no problems'} (plasmid share {row['plasmid_share'] or 'n/a'}, recovered {row['plasmid_recovered'] or 'n/a'})")
     sys.exit(0 if row["status"] == "pass" else 1)
 
 

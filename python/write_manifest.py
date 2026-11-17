@@ -17,7 +17,7 @@ from pathlib import Path
 TOOLS = ("datasets", "prefetch", "fasterq-dump", "fastp", "spades.py", "unicycler",
          "mob_recon", "platon", "plasmidspades.py", "gplas", "minimap2", "python3",
          "plassembler", "plsMD", "flye", "hybracter", "trycycler", "genomad", "PLASMe.py",
-         "plASgraph2_classify.py", "rfplasmid", "plasmidhunter", "Plasmer", "plaScope.sh")
+         "plASgraph2_classify.py", "rfplasmid", "plasmidhunter", "Plasmer", "plaScope.sh", "plasmidEC.sh")
 
 
 from plasbench_common import sha256  # noqa: E402,F401

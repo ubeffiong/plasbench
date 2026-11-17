@@ -8,13 +8,13 @@ evidence rules applied to them — every row in both files passes the same
 |---|---:|---|---|
 | [`public-v1.tsv`](public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
-| [`negative-controls-v1.tsv`](negative-controls-v1.tsv) | 18 | all B | **plasmid-free isolates** (negative controls): complete genomes of one chromosome each, no plasmid, with paired Illumina reads. Measures what a tool does when there is nothing to find (isolate specificity, chromosome false positives). Not a ranking panel on its own: run it beside `public-v4` |
 | [`public-v4.tsv`](public-v4.tsv) | 7,227 | all B | the large validation panel: every genome of the contributed pool that verified at NCBI (943 species, 1,818 BioProjects), with recent and older leakage arms and a balanced order; run a slice with `plasbench run --max-isolates N`; see below |
 | [`pub-plsmd-novel.tsv`](pub-plsmd-novel.tsv) | 68 | all B | the plsMD paper's novel set (Lotfi et al. 2026): every isolate, truth plasmids exactly the paper's; published recall ships |
 | [`pub-plsmd-filtered.tsv`](pub-plsmd-filtered.tsv) | 63 | all B | the plsMD paper's filtered benchmark (80 isolates in the paper), also in the MOB-suite benchmark; published recall ships |
 | [`pub-mobsuite.tsv`](pub-mobsuite.tsv) | 95 | all B | the MOB-suite benchmark (Robertson and Nash 2018; 133 genomes in the paper) |
 | [`pub-teixeira2025.tsv`](pub-teixeira2025.tsv) | 5 | all B | the 5 of Teixeira et al. 2025's 250 isolates that resolve to a deposited complete assembly (the rest need a rebuilt truth); the paper's calls ship for all 250 |
 | [`publication-v1.tsv`](publication-v1.tsv) | 168 | all B | the four publication cohorts together, each isolate once (`published_studies` lists its papers); never pool the studies into one leaderboard |
+| [`negative-controls-v1.tsv`](negative-controls-v1.tsv) | 136 | all B | plasmid-free negative controls: RefSeq complete genomes with a single replicon, long-read truth and a paired Illumina run (12 species, 88 BioProjects); for false-positive plasmid calling; see below |
 | [`plaseval-ecoli53.tsv`](plaseval-ecoli53.tsv) | 53 | all B | replicating the PlasEval paper's binning comparison and its comparison gate; not a headline panel (truth is a Unicycler hybrid on the same reads; one species). See [`docs/PLASEVAL_REPLICATION.md`](../docs/PLASEVAL_REPLICATION.md) |
 
 `public-v1` is frozen. Do not add rows to it: published results reference it by
@@ -93,28 +93,24 @@ candidate's NCBI and read-QC outcome. The window's Cohorts page shows both as th
 * **Not done:** no tool has been run on this panel; `truth_polish_reads` and the truth strategy are NCBI-derived, not curator-checked;
   reference tiers are not yet computed.
 
-## negative-controls-v1 — plasmid-free isolates
-
-Every other panel here is made of plasmid-bearing genomes, so none could measure a false positive on an isolate with no plasmid. `negative-controls-v1` has 18 isolates (*S. aureus* 12, *E. coli* 4, *K. pneumoniae* 2), one per BioProject.
-
-How it was made (all against live NCBI on 17 November 2026, with no e-mail or key sent):
-1. `plasbench discover-cohort --negative-controls --refseq --hybrid-sequencing --organism <species> --max-assemblies 2000` lists the complete RefSeq genomes whose record names Illumina and a
-   long-read platform. A bulk filter keeps only those that are a **single sequence** (a plasmid-bearing genome has at least two): 22 of 1,500 *E. coli*, 10 of 1,483 *K. pneumoniae*, 57 of the *S. aureus* candidates.
-   Each survivor is then checked for a paired Illumina run with the same BioSample and BioProject. Result: 6, 2 and 24 candidates.
-2. `resolve_contributed_cohort.py --negative-controls` re-checks each candidate: Complete Genome, **no plasmid replicon declared**, exactly one sequence of at least 1.5 Mb (a lone plasmid
-   record would be shorter), the run's BioSample, platform, layout and BioProject, and the pre-download read-QC grades (all 32 passed). It keeps one isolate per BioProject: 18 rows.
-3. `validate-cohort --online --write-lock` verified all 18 at NCBI (`negative-controls-v1.lock.json`). A row that declares `assembly_plasmid_count` 0 is checked the other way round from a normal row:
-   the assembly must declare no plasmid.
-
-What it does not establish: a record that declares no plasmid is a candidate, not proof; the truth-label evidence stage (stage 2) still scans each chromosome for replicon markers, and a curator should confirm the isolates before a published claim. Three species only, and *S. aureus* is two thirds of it. To
-extend it, repeat step 1 for more species (Acinetobacter, Salmonella, Enterococcus and others were not searched: the live search is slow at about a minute per candidate with no API key) and run steps 2 and 3 on the combined candidates.
-
 ## Publication cohorts (compare with a paper)
 
 `pub-*.tsv` and `publication-v1.tsv` are the isolates of published benchmarks, built by `plasbench build-publication-cohorts` from the candidate ledgers in
 `candidates/`, `public-v4` and NCBI resolution, and verified online (locked). Each row records `truth_match` (whether the assembly's plasmids are the plasmids the paper
 used), `paper_run_used` and `published_studies`. The papers' own outcomes are in `published/`. Every one of the 531 candidates is accounted for in
 `candidates/publication_cohort_audit.tsv`. See [`../docs/PUBLICATION_COMPARISON.md`](../docs/PUBLICATION_COMPARISON.md).
+
+## negative-controls-v1 — plasmid-free controls
+
+Every genome of the other cohorts carries at least one plasmid, so a tool's false positives (calling plasmid on an isolate that has none) could not be measured on real data. These 136
+isolates are RefSeq Complete Genomes whose deposited assembly has exactly one replicon, with a recorded long-read platform and a paired Illumina run on the assembly's BioProject at 30x to 400x
+(`plasbench analysis discover-plasmid-free`; every row verified with `validate-cohort --online`, locked, and checked to declare **no** plasmid replicon). At most 15 per species and 3 per BioProject.
+Species: *A. baumannii*, *E. coli*, *K. pneumoniae*, *P. aeruginosa*, *S. enterica*, *S. aureus* (15 each), *E. faecalis* (13), *S. marcescens* (13), *E. hormaechei* (7), *C. freundii* (6),
+*K. oxytoca* (5), *E. faecium* (2). `candidates/negative_controls_audit.tsv` lists every candidate and why it was not taken.
+
+**What it does not prove:** a single-replicon complete assembly shows the submitter deposited no plasmid, not that the strain has none (a plasmid can be lost or never assembled). Each row's
+`plasmid_free_evidence` says so; read a tool's false positives on these as "plasmid calls with no plasmid in the reference". Tier B, no tool has been run on it. This cohort is built by `discover_plasmid_free.py` (single-replicon assemblies, deterministic, verified and locked); `plasbench discover-cohort --negative-controls` is the other route: it finds candidates whose record declares no plasmid for a curator to review, for organisms or places you choose. Run it with the other cohorts or
+alone: its isolates score through the zero-plasmid path (`zero_plasmid_specificity`, `isolate_specificity`, chromosomal false-positive bases).
 
 ## Verification
 

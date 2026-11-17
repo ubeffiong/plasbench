@@ -13,7 +13,7 @@ ADAPTER_OF = {
     "mob_recon": "adapt_mob_recon.sh", "flye_mob_recon": "adapt_mob_recon.sh", "trycycler_mob_recon": "adapt_mob_recon.sh", "platon": "adapt_platon.sh",
     "plasmidspades": "adapt_plasmidspades.sh", "gplas2_mob": "adapt_gplas.sh", "gplas2_external": "adapt_gplas.sh", "plassembler": "adapt_plassembler.sh",
     "hybracter_long": "adapt_hybracter.sh", "hybracter_hybrid": "adapt_hybracter.sh", "genomad": "adapt_genomad.sh", "plasme": "adapt_plasme.sh",
-    "rfplasmid": "adapt_rfplasmid.sh", "plasmidhunter": "adapt_plasmidhunter.sh", "plasmer": "adapt_plasmer.sh", "plascope": "adapt_plascope.sh",
+    "rfplasmid": "adapt_rfplasmid.sh", "plasmidhunter": "adapt_plasmidhunter.sh", "plasmer": "adapt_plasmer.sh", "plascope": "adapt_plascope.sh", "plasmidec": "adapt_plasmidec.sh",
     "plasgraph2": "adapt_plasgraph2.sh", "plsmd": "adapt_plsmd.sh", "plasbin_flow": "adapt_plasbin_flow.sh",
 }
 # Tools allowed to sit at the `untested` tier. Adding a tool here is a decision, made in a reviewed change, to ship an adapter without a test; remove the

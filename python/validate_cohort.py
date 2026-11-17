@@ -341,11 +341,11 @@ def verify_row(row, email=None, api_key=None):
     errors = []
     if assembly["assembly_status"].lower() != "complete genome": errors.append("assembly is not Complete Genome")
     if assembly["datasets_assembly_level"].lower() != "complete genome": errors.append("Datasets v2 assembly level is not Complete Genome")
-    # A row that declares assembly_plasmid_count 0 is a negative control (a plasmid-free isolate): the assembly must then declare NO plasmid, which is checked
-    # here exactly as a normal row's plasmids are, so the declared count and the evidence cannot disagree.
-    negative_control = (row.get("assembly_plasmid_count") or "").strip() == "0"
-    if negative_control and assembly["has_plasmid"]: errors.append("row declares assembly_plasmid_count 0 but the assembly metadata declares plasmid replicons")
-    if not negative_control and not assembly["has_plasmid"]: errors.append("assembly metadata does not declare plasmid replicons")
+    if (row.get("control_type") or "").strip() == "plasmid_free":
+        # A negative control must be the opposite of every other row: the assembly declares NO plasmid replicon and the row says zero plasmids.
+        if assembly["has_plasmid"]: errors.append("plasmid-free control, but the assembly metadata declares plasmid replicons")
+        if (row.get("assembly_plasmid_count") or "").strip() not in ("0", ""): errors.append("plasmid-free control must have assembly_plasmid_count 0")
+    elif not assembly["has_plasmid"]: errors.append("assembly metadata does not declare plasmid replicons")
     if not assembly["derived_truth_technology"]:
         errors.append("Datasets v2 sequencing_tech has no explicit long-read platform")
     elif row["truth_technology"] != assembly["derived_truth_technology"]:

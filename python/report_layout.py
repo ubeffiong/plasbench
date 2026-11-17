@@ -53,7 +53,7 @@ VIEWS = [
      'plasmid-maps evidence-explorer amr-placement contig-layer'),
     ('diagnostics', 'Detailed results', 'Detailed results', 'pulse',
      'The full score tables and the diagnostics behind the headline: additional ranking metrics, sensitivity and power, scores by tool and sample, recovery by stratum and replicon, bins, accuracy, features and runtime.', True,
-     'more-metrics ranking-sensitivity statistics rank-robustness stratified scenarios replicon-recovery graded-tiers accuracy-dimension feature-preservation bin-diagnostics bin-quality learn-agreement learn-multiplicity learn-stability learn-amrregions learn-synteny learn-copynumber learn-plsmd learn-published performance baselines-calibration scores'),
+     'more-metrics ranking-sensitivity statistics rank-robustness stratified scenarios replicon-recovery graded-tiers accuracy-dimension feature-preservation bin-diagnostics bin-quality learn-agreement learn-multiplicity learn-stability learn-amrregions learn-synteny learn-copynumber learn-plsmd learn-published learn-drivers learn-novelty performance baselines-calibration scores'),
     ('quality', 'Data and reference quality', 'Data and reference quality', 'shield',
      'The reference standard the scores rest on (design, tiers, labels, repeats) and checks on the assemblies, the cohort and the runs. Each card carries a status; open it for the detail.', True,
      'headline-design assembly-quality cohort-qc quast-diagnostics database-membership health isolate-difficulty orthogonal-evidence excluded-replicons label-schemes truth-label-audit learn-truthqc learn-readqc learn-assembly learn-refaudit metadata-completeness samples tools'),

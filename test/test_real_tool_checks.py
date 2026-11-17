@@ -74,6 +74,29 @@ def main():
     check("a tool exit fails", crt.judge([], 1, -1, None, 0.0)[0] == "fail")
     check("the shipped floors are all present and numeric", all(crt.expected_floor(t) >= 0 for t in ("mob_recon", "platon", "plasmidspades")))
 
+    print("recovery of the plasmid (a size comparison cannot see a tool that returns the wrong sequence)")
+    import random
+    import tempfile as _tempfile
+    rng = random.Random(1)
+    plasmid, other = ("".join(rng.choice("ACGT") for _ in range(n)) for n in (2000, 5000))
+    reverse = plasmid[::-1].translate(str.maketrans("ACGT", "TGCA"))
+    with _tempfile.TemporaryDirectory() as tmp:
+        t = Path(tmp)
+        (t / "in.fa").write_text(">p\n" + plasmid + "\n")
+        (t / "whole.fa").write_text(">a\n" + other + "\n>b\n" + plasmid + "\n")
+        (t / "half.fa").write_text(">a\n" + plasmid[:1000] + "\n")
+        (t / "reverse.fa").write_text(">a\n" + reverse + "\n")
+        (t / "wrong.fa").write_text(">a\n" + other + "\n")
+        check("the whole plasmid inside larger output is fully recovered", crt.plasmid_recovered(t / "whole.fa", t / "in.fa") == 1.0)
+        check("half the plasmid is about half recovered", abs(crt.plasmid_recovered(t / "half.fa", t / "in.fa") - 0.5) < 0.02)
+        check("the reverse strand counts", crt.plasmid_recovered(t / "reverse.fa", t / "in.fa") == 1.0)
+        check("wrong sequence, even if large, recovers nothing", crt.plasmid_recovered(t / "wrong.fa", t / "in.fa") == 0.0)
+        check("a missing predicted FASTA recovers nothing", crt.plasmid_recovered(t / "none.fa", t / "in.fa") == 0.0)
+    check("a large share with nothing recovered fails", crt.judge([], 0, 0, 7.0, 0.0, 0.0, 0.0)[0] == "fail")
+    check("a recovery under an enforced floor fails", crt.judge([], 0, 0, 1.0, 0.0, 0.5, 0.9)[0] == "fail")
+    check("a recovery at the floor passes", crt.judge([], 0, 0, 1.0, 0.0, 0.95, 0.9)[0] == "pass")
+    check("the shipped recovery floors are all present and numeric", all(crt.expected_recovered(t) >= 0 for t in ("mob_recon", "platon", "plasmidspades")))
+
     print("the real adapters on stand-in output")
     if not bash_works():
         print("  SKIP: no working bash for the adapters (set PLASBENCH_BASH)")
