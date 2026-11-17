@@ -30,7 +30,9 @@ acquire_run_lock "stage 4 (run tools)"
 stage_timing_begin 4
 [[ -f "$SAMPLE_SHEET" ]] || die "stage 4: the sample sheet $SAMPLE_SHEET does not exist"
 [[ -n "$(read_samples "$SAMPLE_SHEET")" ]] || die "stage 4: the sample sheet $SAMPLE_SHEET lists no samples, so there is nothing to run (fill in the cohort, or run stages 1-3 first)"
-[[ -x /usr/bin/time ]] || warn "/usr/bin/time is not installed: peak memory and CPU time cannot be measured; peak_rss_kb stays blank and tool_run_resources.tsv says so for each run"
+# GNU time for peak memory; PLASBENCH_TIME_BIN overrides the path (the tests point it at nothing to prove the blank-memory note, AU-033)
+TIME_BIN="${PLASBENCH_TIME_BIN:-/usr/bin/time}"; export TIME_BIN
+[[ -x "$TIME_BIN" ]] || warn "$TIME_BIN is not installed: peak memory and CPU time cannot be measured; peak_rss_kb stays blank and tool_run_resources.tsv says so for each run"
 reset_shard_dir "run_tools"
 STATUS_SHARDS="$(shard_dir "run_tools")"
 reset_shard_dir "run_tools_outcomes"
@@ -78,6 +80,18 @@ record_status() {
         fi
         [[ "$attempts" -gt 1 ]] && reason="${reason:+$reason; }attempts=$attempts"
     fi
+    # AU-035: a malformed prediction FASTA is caught here, at stage 4, not when stage 5 tries to score it. The run is recorded as failed (tool class)
+    # and its completion marker is removed, so stage 5 ignores it and a rerun redoes the tool.
+    if [[ "$status" == "completed" && -n "$4" && -s "$4" ]]; then
+        local malformed
+        if ! malformed="$(python3 "$HERE/../python/check_prediction_fasta.py" "$4" 2>&1)"; then
+            status="failed"; failure_class="tool"; exit_code=""
+            reason="malformed prediction FASTA: ${malformed:-unreadable} (stage-4 check; see $4)"
+            rm -f "$(dirname "$4")/.${tool}.complete"
+            set -- "$1" "$2" "$3" "" "$5" "${6:-}" "${7:-}"
+            warn "$tool: prediction for $sample is not valid FASTA ($malformed); marked failed"
+        fi
+    fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$status" "$4" "$reason" "${6:-}" "$rss" \
         > "$STATUS_SHARDS/${sample}.${tool}.tsv"
     # Side table with explicit columns (tool_status.tsv keeps its fixed schema
@@ -93,7 +107,7 @@ record_status() {
         threads="${!tvar:-${THREADS:-}}"
         [[ -s "$LOG_DIR/${sample}.${tool}.attempt_times" ]] && attempt_seconds="$(paste -sd, "$LOG_DIR/${sample}.${tool}.attempt_times")"
         if [[ -z "$rss" ]]; then
-            if [[ ! -x /usr/bin/time ]]; then rss_note="/usr/bin/time not installed"
+            if [[ ! -x "$TIME_BIN" ]]; then rss_note="/usr/bin/time not installed"
             else rss_note="not measured (timed out, killed, or the tool does not run under the profiler)"; fi
         fi
         printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$sample" "$tool" "$threads" "$attempt_seconds" "$rss" "$rss_note" \
@@ -171,7 +185,7 @@ profile_rss() { [[ -s "$1" ]] && awk '$1 ~ /^[0-9]+$/ && NF == 3 { if ($1 + 0 > 
 profile_exec() {
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
     local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file" "$LOG_DIR/${SAMPLE}.${TOOL}.attempts"
-    if [[ -x /usr/bin/time ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget /usr/bin/time -a -f '%M %U %S' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget "$@" || rc=$?; fi
+    if [[ -x "$TIME_BIN" ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget "$TIME_BIN" -a -f '%M %U %S' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }
@@ -179,7 +193,7 @@ profile_exec_in_dir() {
     local run_dir="$1"; shift
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
     local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file" "$LOG_DIR/${SAMPLE}.${TOOL}.attempts"
-    if [[ -x /usr/bin/time ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && /usr/bin/time -a -f "%M %U %S" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
+    if [[ -x "$TIME_BIN" ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && "$TIME_BIN" -a -f "%M %U %S" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }
@@ -327,9 +341,11 @@ run_adapter() {
 run_mob_recon() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_MOB_RECON mob_recon && have mob_recon; then
-        local TOOL="mob_recon" OUT="$RDIR/mob_recon" PRED="$RDIR/pred_mob_recon.plasmid.fasta" DONE="$RDIR/.mob_recon.complete"
+        local TOOL="mob_recon" OUT="$RDIR/mob_recon" PRED="$RDIR/pred_mob_recon.plasmid.fasta" DONE="$RDIR/.mob_recon.complete" mob_db=""
         if is_complete "$DONE" "$PRED"; then
             log "  mob_recon: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif mob_db="$(mobsuite_db_dir 2>/dev/null)"; [[ -n "$mob_db" ]] && ! mobsuite_db_complete "$mob_db" && db_preflight_fail "$SAMPLE" "$TOOL" "$mob_db/ncbi_plasmid_full_seqs.fas (incomplete MOB-suite database; run: bash env/download_mobsuite_db.sh)"; then
+            :
         else
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  mob_recon ($SAMPLE) ..."
@@ -454,6 +470,8 @@ run_plsmd() {
         elif [[ -z "${PLSMD_DB:-}" ]]; then
             warn "plsmd needs PLSMD_DB (the PLSDB BLAST index prefix); skipped for $SAMPLE"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "PLSMD_DB not set"
+        elif ! compgen -G "${PLSMD_DB}.*" > /dev/null 2>&1 && db_preflight_fail "$SAMPLE" "$TOOL" "${PLSMD_DB}.nhr (BLAST index files not found)"; then
+            :
         elif [[ "${ASSEMBLER:-spades}" != "unicycler" ]]; then
             warn "plsmd needs a Unicycler assembly (ASSEMBLER=unicycler); skipped for $SAMPLE"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "assembly is not from Unicycler (set ASSEMBLER=unicycler)"
@@ -741,6 +759,8 @@ run_plascope() {
         elif [[ -z "$db" ]]; then
             warn "  $TOOL has no database for organism '${organism:-not_recorded}'; skipped for $SAMPLE"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "no PlaScope database for organism ${organism:-not_recorded}"
+        elif ! compgen -G "${db}*" > /dev/null 2>&1 && db_preflight_fail "$SAMPLE" "$TOOL" "$db"; then
+            :
         else
             # plaScope.sh errors out if <out>/<sample>_PlaScope/{PlaScope_predictions,
             # Centrifuge_results} already exist -- OUT must not exist yet; it
