@@ -30,7 +30,7 @@ import math
 import os
 from collections import defaultdict
 from plasbench_common import (  # noqa: E402
-    merge_intervals, interval_overlap_bp as overlap, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership,
+    merge_intervals, interval_overlap_bp as overlap, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership, iter_fasta,
     read_truth_split,
 )
 from matching import max_weight_matching  # noqa: E402
@@ -301,6 +301,20 @@ CPRR_FIELDS = ["true_plasmid", "length", "matched_bin", "coverage", "bin_share",
                "correct_without_identity", "correct"]
 
 
+def unaligned_in_bins(pred_fasta, membership, query_aligned):
+    """Bases of every binned contig that align to no truth sequence, or None when the predicted sequences were not given.
+
+    The bin scores above count only aligned bases, so sequence that cannot align (contamination, a plasmid the truth lacks, assembly junk)
+    costs a bin nothing. This is the amount that went uncounted; python/score_bins.py reports it beside the headline, never inside it.
+    """
+    if not pred_fasta or not os.path.exists(pred_fasta):
+        return None
+    total = 0
+    for name, _, sequence in iter_fasta(pred_fasta, set(membership)):
+        total += max(0, len(sequence) - merge(query_aligned.get(name, [])))
+    return total
+
+
 def length_weighted_binning(overlaps, plasmids, total_mapped, all_bins):
     """Length-weighted binning precision/recall/F1 from an ungated Hungarian match."""
     matched = maximum_weight(dict(overlaps), sorted(all_bins), sorted(plasmids))
@@ -387,6 +401,9 @@ def main():
                         help="Minimum PAF mapping quality retained for bin scoring (default: 0).")
     parser.add_argument("--min-alignment-query-coverage", type=float, default=0.0,
                         help="Minimum fraction of a predicted record covered by an individual PAF alignment (default: 0).")
+    parser.add_argument("--pred-fasta", help="The predicted sequences. With it, the bases of a bin's contigs that align to no truth "
+                        "sequence are counted (bin_unaligned_bp) and a stricter length-weighted precision that charges them is written "
+                        "(lw_bin_precision_strict). Without it those columns are blank, never 0.")
     args = parser.parse_args()
     if not 0 < args.threshold <= 1 or not 0 < args.min_bin_purity <= 1:
         raise SystemExit("ERROR: matching thresholds must be in (0, 1].")
@@ -398,6 +415,7 @@ def main():
     membership = read_bins(args.bins)
     plasmid_intervals, chromosome_intervals = defaultdict(list), defaultdict(list)
     identity_counts = defaultdict(lambda: [0, 0])  # (bin, plasmid) -> [matches, block length]
+    query_aligned = defaultdict(list)  # predicted record -> retained query intervals on a truth sequence
     # Applies the same alignment-quality gate as score_plasmids.py (base-level
     # scoring), so a short, low-identity, or low-MAPQ placement that the base
     # score discards cannot still count toward bin completeness/purity.
@@ -419,6 +437,8 @@ def main():
             if target in plasmids:
                 identity_counts[(bin_id, target)][0] += matches
                 identity_counts[(bin_id, target)][1] += block_length
+            if target in plasmids or target in chromosomes:
+                query_aligned[fields[0]].append((max(0, min(qstart, qend)), min(qlen, max(qstart, qend))))
             if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
             elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
     overlaps = {key: merge(value) for key, value in plasmid_intervals.items()}
@@ -456,6 +476,12 @@ def main():
     # plasmid), matching this file's existing availability-aware convention.
     nmi, vi = clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins)
     lw = length_weighted_binning(overlaps, plasmids, total_mapped, all_bins)
+    unaligned_bp, strict = unaligned_in_bins(args.pred_fasta, membership, query_aligned), {"precision": None, "f1": None}
+    if unaligned_bp is not None:
+        correct_bp = sum(bp for _, _, bp in lw["matched"])
+        strict["precision"] = safe_div(correct_bp, sum(total_mapped.values()) + unaligned_bp)
+        p_s, r_s = strict["precision"], lw["recall"]
+        strict["f1"] = 2 * p_s * r_s / (p_s + r_s) if p_s + r_s else 0.0
     ari = adjusted_rand(overlaps, plasmids, chromosome_bp)
     # Assembly-aware recall: the denominator is the plasmid length the assembly
     # actually covers, so a tool is not blamed for bases no contig contains.
@@ -494,7 +520,8 @@ def main():
         writer.writerow(["bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events", "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction", "nmi", "variation_of_information",
                          "lw_bin_precision", "lw_bin_recall", "lw_bin_f1",
                          "cprr_plasmids", "cprr_correct", "cprr_correct_without_identity",
-                         "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware"]
+                         "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware",
+                         "bin_unaligned_bp", "bin_unaligned_fraction", "lw_bin_precision_strict", "lw_bin_f1_strict"]
                         + [f"outcome_{name}" for name in OUTCOMES]
                         + ["cprr_sweep_correct", "cprr_sweep_correct_without_identity"])
         writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else "",
@@ -502,7 +529,11 @@ def main():
                          cprr_total, cprr_correct, cprr_correct_no_identity,
                          f"{ari:.4f}" if ari is not None else "",
                          f"{lw_recall_assembly:.4f}" if lw_recall_assembly is not None else "",
-                         f"{lw_f1_assembly:.4f}" if lw_f1_assembly is not None else ""]
+                         f"{lw_f1_assembly:.4f}" if lw_f1_assembly is not None else "",
+                         unaligned_bp if unaligned_bp is not None else "",
+                         f"{safe_div(unaligned_bp, total_bp + unaligned_bp):.4f}" if unaligned_bp is not None else "",
+                         f"{strict['precision']:.4f}" if strict["precision"] is not None else "",
+                         f"{strict['f1']:.4f}" if strict["f1"] is not None else ""]
                         + [outcome_counts[name] for name in OUTCOMES]
                         # Comma-separated counts, one per CPRR_SWEEP_THRESHOLDS value (0.80..0.99).
                         + [",".join(map(str, sweep_with)), ",".join(map(str, sweep_without))])

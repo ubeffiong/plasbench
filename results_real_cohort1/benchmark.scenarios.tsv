@@ -1,0 +1,11 @@
+sample	scenario	tags	n_plasmids	largest_plasmid_bp	smallest_plasmid_bp	read_depth_x	is_density_per_10kb	annotated
+arbank_0346	complex	large_plasmid,annotated	2	101116	66038	125.0000	0.0000	true
+arbank_0349	complex	large_plasmid,annotated	1	278067	278067	108.0000	0.0000	true
+tahini_salmonella	annotated	cryptic_small,annotated	1	3967	3967	50.0000	0.0000	true
+upec_ecpf14	annotated	annotated	1	7154	7154	83.0000	0.0000	true
+upec_ecpf15	complex	large_plasmid,annotated	2	135461	6431	68.0000	0.0000	true
+upec_ecpf16	complex	large_plasmid,annotated	2	123935	5658	218.0000	0.0000	true
+upec_ecpf18	complex	multi_plasmid,large_plasmid,cryptic_small,annotated	4	128954	1506	315.0000	0.0000	true
+upec_ecpf40	complex	multi_plasmid,cryptic_small,annotated	4	89178	2113	65.0000	0.0000	true
+upec_ecpf5	complex	large_plasmid,cryptic_small,annotated	2	131660	1546	75.0000	0.0000	true
+upec_ecpf7	complex	multi_plasmid,large_plasmid,cryptic_small,annotated	3	129632	1551	75.0000	0.0000	true

@@ -1,0 +1,11 @@
+sample	status	contigs	reason	runtime_seconds
+upec_ecpf5	completed	/home/ueffiong/.local/share/plasbench/data/upec_ecpf5/contigs.fasta		346
+upec_ecpf7	completed	/home/ueffiong/.local/share/plasbench/data/upec_ecpf7/contigs.fasta		334
+upec_ecpf14	completed	/home/ueffiong/.local/share/plasbench/data/upec_ecpf14/contigs.fasta		367
+upec_ecpf15	completed	/home/ueffiong/.local/share/plasbench/data/upec_ecpf15/contigs.fasta		298
+upec_ecpf16	completed	/home/ueffiong/.local/share/plasbench/data/upec_ecpf16/contigs.fasta		1255
+upec_ecpf18	completed	/home/ueffiong/.local/share/plasbench/data/upec_ecpf18/contigs.fasta		1908
+upec_ecpf40	completed	/home/ueffiong/.local/share/plasbench/data/upec_ecpf40/contigs.fasta		292
+arbank_0346	completed	/home/ueffiong/.local/share/plasbench/data/arbank_0346/contigs.fasta		941
+arbank_0349	completed	/home/ueffiong/.local/share/plasbench/data/arbank_0349/contigs.fasta		1064
+tahini_salmonella	completed	/home/ueffiong/.local/share/plasbench/data/tahini_salmonella/contigs.fasta		305

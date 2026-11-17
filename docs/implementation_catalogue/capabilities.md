@@ -230,6 +230,16 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
   Resource *estimates* for a full run are in the README; a measured pilot on the target hardware is open.
 - **Tests.** `test_performance_summary.py`, `test_thread_budget.sh`, `test_parallel_execution.sh`, `test_assemble_crash_safe.sh`.
 
+### 3.21a Guards on the run tables and on synthetic data
+
+- **What.** Before anything is ranked, `run_consistency.py` checks that the score, status and failure tables describe the same runs: duplicate runs, a completed run with no score and
+  no recorded failure, a score for a sample the status table does not list for a tool it does list (errors that stop aggregation unless `ALLOW_INCONSISTENT_RUNS=1`, when the report
+  carries a banner), and a sample missing from the sheet or a tool the status table does not cover (warnings). A malformed or truncated score table stops with the file, line and
+  value. `data_nature.py` refuses a run that mixes synthetic (`sample_origin = synthetic`) and real samples, and puts a "Demonstration data" banner on an all-synthetic report.
+  `score_bins.py --pred-fasta` also counts the bases of a bin's contigs that align nowhere (`bin_unaligned_bp`, `lw_bin_f1_strict`) beside the headline.
+- **Where.** `python/run_consistency.py`, `data_nature.py`, `score_bins.py`, `aggregate_results.py`, `build_html_report.py`; `docs/INDEPENDENT_VERIFICATION.md` section 12.
+  **Tests.** `test_run_consistency.py`, `test_bin_unaligned.py`.
+
 ### 3.22 Review, evidence and documentation
 
 - **What.** The independent review (`INDEPENDENT_REVIEW.md`, every claim tied to a file and line, with a checking test), the external review log (R1 to R9: who reviewed, what

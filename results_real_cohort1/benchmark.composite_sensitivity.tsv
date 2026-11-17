@@ -1,0 +1,19 @@
+analysis_track	tool	variant	rank	mean_rank	best_rank	worst_rank	share_first
+short_read	mob_recon	baseline	1				
+short_read	mob_recon	without_completeness	1				
+short_read	mob_recon	without_structure	1				
+short_read	mob_recon	without_biology	1				
+short_read	mob_recon	without_performance	1				
+short_read	mob_recon	random_weights_500		1	1	1	1.0000
+short_read	plasmidspades	baseline	3				
+short_read	plasmidspades	without_completeness	3				
+short_read	plasmidspades	without_structure	3				
+short_read	plasmidspades	without_biology	3				
+short_read	plasmidspades	without_performance	3				
+short_read	plasmidspades	random_weights_500		3	3	3	0.0000
+short_read	platon	baseline	2				
+short_read	platon	without_completeness	2				
+short_read	platon	without_structure	2				
+short_read	platon	without_biology	2				
+short_read	platon	without_performance	2				
+short_read	platon	random_weights_500		2	2	2	0.0000

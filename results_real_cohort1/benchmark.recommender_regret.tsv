@@ -1,0 +1,10 @@
+profile	sample	held_out_study	organism	recommended_tool	recommended_score	predicted_score	best_tool	best_score	regret	near_optimal	single_best_tool	single_best_score	single_best_regret	floor_flag	basis
+f1	arbank_0346	AR_Bank_0346_2021	Escherichia coli	platon	0.8611	0.8951	platon	0.8611	0.0000	yes	platon	0.8611	0.0000	no	organism=Escherichia coli
+f1	arbank_0349	AR_Bank_0349_2019	Escherichia coli	platon	0.9151	0.8883	mob_recon	0.9414	0.0263	yes	platon	0.9151	0.0263	no	organism=Escherichia coli
+f1	tahini_salmonella	Tahini_Salmonella_2022	Salmonella enterica subsp. enterica serovar Tennessee	platon	1.0000	0.8913	mob_recon	1.0000	0.0000	yes	platon	1.0000	0.0000	no	single_best
+f2	arbank_0346	AR_Bank_0346_2021	Escherichia coli	mob_recon	0.8573	0.8721	platon	0.8668	0.0095	yes	mob_recon	0.8573	0.0095	no	organism=Escherichia coli
+f2	arbank_0349	AR_Bank_0349_2019	Escherichia coli	mob_recon	0.9094	0.8656	mob_recon	0.9094	0.0000	yes	mob_recon	0.9094	0.0000	no	organism=Escherichia coli
+f2	tahini_salmonella	Tahini_Salmonella_2022	Salmonella enterica subsp. enterica serovar Tennessee	mob_recon	1.0000	0.8704	mob_recon	1.0000	0.0000	yes	mob_recon	1.0000	0.0000	no	single_best
+f0_5	arbank_0346	AR_Bank_0346_2021	Escherichia coli	platon	0.8554	0.9478	platon	0.8554	0.0000	yes	platon	0.8554	0.0000	no	organism=Escherichia coli
+f0_5	arbank_0349	AR_Bank_0349_2019	Escherichia coli	platon	0.9642	0.9342	mob_recon	0.9757	0.0115	yes	platon	0.9642	0.0115	no	organism=Escherichia coli
+f0_5	tahini_salmonella	Tahini_Salmonella_2022	Salmonella enterica subsp. enterica serovar Tennessee	platon	1.0000	0.9375	mob_recon	1.0000	0.0000	yes	platon	1.0000	0.0000	no	single_best

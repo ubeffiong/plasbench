@@ -1,0 +1,11 @@
+sample	tool	analysis_track	n_truth_plasmids	n_bins	n_high	n_medium	n_low	n_spurious	plasmids_with_high_bin	plasmids_with_medium_or_better_bin	high_quality_yield	medium_or_better_yield	homogeneity	completeness	v_measure
+arbank_0346	mob_recon	short_read	2	3	0	2	0	1	0	2	0.000000	1.000000	0.889559	0.720612	0.796222
+arbank_0349	mob_recon	short_read	1	3	0	1	0	2	0	1	0.000000	1.000000	1.000000	0.000000	0.000000
+tahini_salmonella	mob_recon	short_read	1	1	1	0	0	0	1	1	1.000000	1.000000	1.000000	1.000000	1.000000
+upec_ecpf14	mob_recon	short_read	1	2	1	0	0	1	1	1	1.000000	1.000000	1.000000	1.000000	1.000000
+upec_ecpf15	mob_recon	short_read	2	2	2	0	0	0	2	2	1.000000	1.000000	0.975020	0.396844	0.564096
+upec_ecpf16	mob_recon	short_read	2	4	0	0	3	1	0	0	0.000000	0.000000	0.567113	0.309480	0.400437
+upec_ecpf18	mob_recon	short_read	4	4	1	3	0	0	1	4	0.250000	1.000000	0.906093	0.722218	0.803774
+upec_ecpf40	mob_recon	short_read	4	4	2	0	2	0	2	2	0.500000	0.500000	0.570876	0.563804	0.567318
+upec_ecpf5	mob_recon	short_read	2	4	1	0	3	0	1	1	0.500000	0.500000	0.350694	0.137168	0.197203
+upec_ecpf7	mob_recon	short_read	3	3	2	1	0	0	2	3	0.666667	1.000000	0.570545	0.307440	0.399570

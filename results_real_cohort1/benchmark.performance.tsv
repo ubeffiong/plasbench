@@ -1,0 +1,6 @@
+tool	n_runs	n_completed	n_failed	n_resource_failures	n_skipped	success_rate	median_runtime_seconds	p90_runtime_seconds	median_peak_memory_gb	threads	recovered_plasmids	thread_seconds_per_recovered_plasmid	cpu_utilisation	n_cpu_runs	runtime_scaling_exponent	memory_scaling_exponent	n_scaling_points
+baseline_coverage	10	10	0	0	0	1.000000	0.000000	0.100000		4	10.000000	0.400000					
+baseline_reference	10	0	0	0	10					4							
+mob_recon	10	10	0	0	0	1.000000	54.000000	64.100000	1.938650	4	11.000000	185.090909	0.780869	10			
+plasmidspades	10	10	0	0	0	1.000000	398.000000	1386.500000	2.216278	4	13.000000	2346.461538	0.969767	10			
+platon	10	10	0	0	0	1.000000	59.000000	63.000000	3.847458	4	12.000000	189.666667	0.751446	10			

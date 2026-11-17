@@ -1,0 +1,5 @@
+analysis_track	task	tool	species	n_samples	n_clusters	metric	mean_metric	in_headline
+short_read	reconstruction	mob_recon	Escherichia coli	1	1	lw_bin_f1	0.8381	no
+short_read	classification	baseline_coverage	Escherichia coli	1	1	f1	0.0000	no
+short_read	classification	plasmidspades	Escherichia coli	1	1	f1	0.8331	no
+short_read	classification	platon	Escherichia coli	1	1	f1	0.8611	no

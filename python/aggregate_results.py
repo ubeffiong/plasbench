@@ -35,6 +35,8 @@ from collections import defaultdict
 from pathlib import Path
 
 import headline_design as hd
+import run_consistency
+import data_nature
 # Resampling primitives (resampling.py); re-exported because validate_recommendations.py
 # and the tests import bootstrap_ci / paired_permutation_pvalue from this module.
 from resampling import (  # noqa: E402,F401
@@ -153,11 +155,21 @@ def parse_sweep(text):
 
 
 def read_scores(path):
+    """Score rows; a malformed value stops the run with the file, the line and the value instead of a traceback."""
+    try:
+        return _read_scores(path)
+    except (ValueError, IndexError, KeyError) as exc:
+        raise SystemExit(f"ERROR: {path} line {getattr(_read_scores, 'line', '?')} is malformed ({type(exc).__name__}: {exc}). "
+                         "A score table needs every column of its header and numbers (or blanks) in the numeric columns. "
+                         "The previous report, if any, was left in place and is NOT from this run.")
+
+
+def _read_scores(path):
     rows = []
     with open(path) as fh:
         header = fh.readline().rstrip("\n").split("\t")
         idx = {name: i for i, name in enumerate(header)}
-        for line in fh:
+        for _read_scores.line, line in enumerate(fh, start=2):
             if not line.strip():
                 continue
             f = line.rstrip("\n").split("\t")
@@ -214,6 +226,9 @@ def read_scores(path):
                 "contig_mcc_bp": float(f[idx["contig_mcc_bp"]]) if "contig_mcc_bp" in idx and f[idx["contig_mcc_bp"]] else None,
                 "bin_ari": float(f[idx["bin_ari"]]) if "bin_ari" in idx and f[idx["bin_ari"]] else None,
                 "lw_bin_f1_assembly_aware": float(f[idx["lw_bin_f1_assembly_aware"]]) if "lw_bin_f1_assembly_aware" in idx and f[idx["lw_bin_f1_assembly_aware"]] else None,
+                # Bases of a bin's contigs that align to nothing, and the length-weighted F1 that charges them (blank without the predicted sequences).
+                "bin_unaligned_fraction": float(f[idx["bin_unaligned_fraction"]]) if "bin_unaligned_fraction" in idx and f[idx["bin_unaligned_fraction"]] else None,
+                "lw_bin_f1_strict": float(f[idx["lw_bin_f1_strict"]]) if "lw_bin_f1_strict" in idx and f[idx["lw_bin_f1_strict"]] else None,
                 "TP_bp": int(f[idx["TP_bp"]]) if "TP_bp" in idx and f[idx["TP_bp"]] else None,
                 "FP_bp": int(f[idx["FP_bp"]]) if "FP_bp" in idx and f[idx["FP_bp"]] else None,
                 "FN_bp": int(f[idx["FN_bp"]]) if "FN_bp" in idx and f[idx["FN_bp"]] else None,
@@ -641,7 +656,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
         row["is_baseline"] = "yes" if (design.is_baseline(row["tool"]) if design else row["tool"].startswith("baseline_")) else "no"
         tool_rows = [r for r in rows if r["tool"] == row["tool"]]
         for key in ("contig_f1_count", "contig_mcc_count", "contig_f1_bp", "contig_mcc_bp",
-                    "bin_ari", "lw_bin_f1_assembly_aware", "mcc", "f2", "f0_5", "abstention_rate",
+                    "bin_ari", "lw_bin_f1_assembly_aware", "lw_bin_f1_strict", "bin_unaligned_fraction", "mcc", "f2", "f0_5", "abstention_rate",
                     "contig_bin_f1_bp"):
             values = [r[key] for r in tool_rows if r.get(key) is not None]
             row[f"mean_{key}"] = statistics.mean(values) if values else None
@@ -965,7 +980,7 @@ def write_tsv(summary, path):
             "n_failed_resource", "n_unknown_overlap",
             "micro_precision", "micro_recall", "micro_f1",
             "mean_contig_f1_count", "mean_contig_mcc_count", "mean_contig_f1_bp", "mean_contig_mcc_bp",
-            "mean_bin_ari", "mean_lw_bin_f1_assembly_aware",
+            "mean_bin_ari", "mean_lw_bin_f1_assembly_aware", "mean_lw_bin_f1_strict", "mean_bin_unaligned_fraction",
             "n_plasmids_in_tool_database", "mean_recovery_in_tool_database", "mean_recovery_not_in_tool_database",
             "mean_mcc", "mean_f2", "mean_f0_5", "mean_abstention_rate",
             "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
@@ -1034,6 +1049,7 @@ def write_tsv(summary, path):
                 fmt4(s.get("mean_contig_f1_count")), fmt4(s.get("mean_contig_mcc_count")),
                 fmt4(s.get("mean_contig_f1_bp")), fmt4(s.get("mean_contig_mcc_bp")),
                 fmt4(s.get("mean_bin_ari")), fmt4(s.get("mean_lw_bin_f1_assembly_aware")),
+                fmt4(s.get("mean_lw_bin_f1_strict")), fmt4(s.get("mean_bin_unaligned_fraction")),
                 s.get("n_plasmids_in_tool_database", ""), fmt4(s.get("mean_recovery_in_tool_database")),
                 fmt4(s.get("mean_recovery_not_in_tool_database")),
                 fmt4(s.get("mean_mcc")), fmt4(s.get("mean_f2")), fmt4(s.get("mean_f0_5")),
@@ -1352,11 +1368,25 @@ def main():
                          "score-zero (default): scored 0 for that tool, like any failure. exclude: the "
                          "sample drops out of every tool's ranking, so a small machine cannot penalise a tool. "
                          "Either way the count is reported as n_failed_resource.")
+    ap.add_argument("--allow-inconsistent-runs", action="store_true", default=os.environ.get("ALLOW_INCONSISTENT_RUNS", "0") == "1",
+                    help="rank even when the score, status and failure tables disagree (see run_consistency.py). Default off. ALLOW_INCONSISTENT_RUNS=1 sets it.")
     args = ap.parse_args()
 
     rows = read_scores(args.scores)
     if not rows:
         raise SystemExit("No score rows found in " + args.scores)
+    findings = run_consistency.check(args.scores, args.tool_status, str(Path(args.scores).with_name("score_failures.tsv")), args.sample_sheet)
+    run_consistency.write(args.out_prefix + ".input_consistency.tsv", findings)
+    errors = [f for f in findings if f["severity"] == "error"]
+    if findings and not errors:
+        print("[aggregate] note: " + run_consistency.summary(findings))
+    if errors:
+        message = ("the run tables disagree, so a ranking from them could be built on missing, stale or duplicated runs:" + chr(10)
+                   + run_consistency.summary(errors))
+        if not args.allow_inconsistent_runs:
+            raise SystemExit("ERROR: " + message + chr(10) + "Fix or remove the stale rows, or set ALLOW_INCONSISTENT_RUNS=1 to rank anyway (the report then carries a warning banner).")
+        print("[aggregate] WARNING: " + message)
+    data_nature.refuse_mixed({r["sample"] for r in rows}, data_nature.read_sheet(args.sample_sheet), os.environ.get("ALLOW_SYNTHETIC_WITH_REAL", "0") == "1")
 
     # A headline leaderboard treats samples as independent. Depth-ladder points
     # share a genome, so ranking them would narrow the bootstrap CI and inflate

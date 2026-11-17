@@ -1,0 +1,12 @@
+sample	tool	analysis_track	true_plasmid	bin_id	pcn_pred	pcn_truth	log2_ratio	status
+tahini_salmonella	mob_recon	short_read	NZ_CP091879.1	plasmid_AB039	7.6869			no_truth_depth
+upec_ecpf14	mob_recon	short_read	NZ_CP054231.1	plasmid_AA153	2.5575			no_truth_depth
+upec_ecpf15	mob_recon	short_read	NZ_CP054228.1	plasmid_AA179	1.3142			no_truth_depth
+upec_ecpf15	mob_recon	short_read	NZ_CP054229.1	plasmid_AD479	4.2153			no_truth_depth
+upec_ecpf18	mob_recon	short_read	NZ_CP054221.1	plasmid_AA474	2.0327			no_truth_depth
+upec_ecpf40	mob_recon	short_read	NZ_CP054216.1	plasmid_AA474	2.8085			no_truth_depth
+upec_ecpf40	mob_recon	short_read	NZ_CP054217.1	plasmid_AA977	5.8213			no_truth_depth
+upec_ecpf40	mob_recon	short_read	NZ_CP054218.1	plasmid_AC748	10.9865			no_truth_depth
+upec_ecpf5	mob_recon	short_read	NZ_CP054238.1	plasmid_AB685	7.8188			no_truth_depth
+upec_ecpf7	mob_recon	short_read	NZ_CP054234.1	plasmid_AA579	4.7508			no_truth_depth
+upec_ecpf7	mob_recon	short_read	NZ_CP054235.1	plasmid_AB685	13.6332			no_truth_depth

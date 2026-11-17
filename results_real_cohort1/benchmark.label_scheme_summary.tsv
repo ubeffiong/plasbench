@@ -1,0 +1,4 @@
+scheme	role	samples	replicons	plasmids	plasmid_bp	excluded_replicons	plasmids_differing_from_primary	scored_file
+ncbi	primary	10	32	22	1403770	0	0	truth.tsv
+nonchromosomal	sensitivity	10	32	22	1403770	0	0	truth.nonchromosomal.tsv
+evidence	sensitivity	10	32	22	1403770	0	0	truth.scored.tsv
