@@ -417,6 +417,32 @@ wait_online() {
     log "  internet is back: download resumed"
 }
 
+# verify_or_record_download FILE URL LABEL [EXPECTED_SHA256] [PROVENANCE_FILE]
+# Supply-chain check for a downloaded database or archive. Where a SHA-256 is configured, a mismatch fails (returns 1; the caller deletes the file).
+# Where none is configured, the observed checksum is printed with an explicit notice and appended as one JSON line to PROVENANCE_FILE
+# (default: download_provenance.jsonl next to FILE), so the run can be traced to the exact bytes that were installed. Never fails on a missing pin.
+verify_or_record_download() {
+    local file="$1" url="$2" label="$3" want="${4:-}" prov="${5:-$(dirname "$1")/download_provenance.jsonl}" got verified=false
+    if have sha256sum; then got="$(sha256sum "$file" | awk '{print $1}')"
+    elif have shasum; then got="$(shasum -a 256 "$file" | awk '{print $1}')"
+    else got="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$file" 2>/dev/null || true)"; fi
+    [[ -n "$got" ]] || { warn "$label: no SHA-256 tool found; the download could not be checksummed"; return 0; }
+    if [[ -n "$want" ]]; then
+        if [[ "$got" != "$(printf '%s' "$want" | tr 'A-F' 'a-f')" ]]; then
+            warn "$label: SHA-256 $got does not match the pinned $want"
+            return 1
+        fi
+        verified=true
+        log "$label: SHA-256 verified ($got)"
+    else
+        warn "NOTICE: no SHA-256 is pinned for the $label download, so it could not be verified. Observed SHA-256: $got (recorded in $prov). Pin it to make a later install fail on a changed file."
+    fi
+    mkdir -p "$(dirname "$prov")" 2>/dev/null || true
+    printf '{"label": "%s", "url": "%s", "file": "%s", "downloaded_utc": "%s", "sha256": "%s", "sha256_verified": %s}\n' \
+        "$label" "$url" "$(basename "$file")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$got" "$verified" >> "$prov" 2>/dev/null || true
+    return 0
+}
+
 # resumable_download URL DEST [EXPECTED_BYTES]
 # Downloads to DEST.part and keeps every byte already received: a dropped
 # connection, a closed laptop or a later re-run continues where it stopped

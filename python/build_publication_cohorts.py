@@ -105,9 +105,12 @@ class Entrez:
 
     def _get(self, tool, **params):
         params.update({"retmode": "json", "tool": "plasbench", "email": self.email})
-        if self.key:
+        endpoint = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/{tool}.fcgi"
+        if self.key:   # the key goes in the POST body, never in the URL (proxy logs, tracebacks)
             params["api_key"] = self.key
-        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/{tool}.fcgi?" + urllib.parse.urlencode(params)
+            url = urllib.request.Request(endpoint, data=urllib.parse.urlencode(params).encode("ascii"))
+        else:
+            url = endpoint + "?" + urllib.parse.urlencode(params)
         for attempt in range(5):
             wait = (0.12 if self.key else 0.36) - (time.time() - self.last)
             if wait > 0:

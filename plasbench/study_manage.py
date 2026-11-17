@@ -28,7 +28,8 @@ BUNDLE_MANIFEST = "plasbench_study_bundle.json"
 BUNDLE_SCHEMA = 1
 MAX_TAGS = 12
 MAX_TAG_LEN = 32
-MAX_UNPACKED = 8 * 2**30            # a bundle that unpacks to more than this is refused
+MAX_UNPACKED = 4 * 2**30            # a bundle that unpacks to more than this is refused (and never more than the free disk space, see import_bundle)
+RATIO_FLOOR = 2**20                  # the compression-ratio check applies to every bundle that unpacks to more than this
 MAX_RATIO = 200                      # compressed-to-unpacked ratio above this looks like a zip bomb
 SCAN_CAP = 200_000
 # a bundle without results keeps the record and the study-level tables and reports; per-sample folders and heavy data stay out
@@ -299,9 +300,16 @@ def import_bundle(root, bundle_path, new_name=None) -> Path:
         members = [i for i in z.infolist() if i.filename != BUNDLE_MANIFEST and not i.is_dir()]
         total = sum(i.file_size for i in members)
         packed = sum(i.compress_size for i in members) or 1
-        if total > MAX_UNPACKED or (total > 50 * 2**20 and total / packed > MAX_RATIO):
+        try:
+            free = shutil.disk_usage(ws if ws.exists() else ws.parent).free
+        except OSError:
+            free = MAX_UNPACKED
+        if total > min(MAX_UNPACKED, max(free // 2, 0)) or (total > RATIO_FLOOR and total / packed > MAX_RATIO):
             raise ValueError("this bundle unpacks to an unreasonable size and was refused")
         listed = {f["path"]: f for f in manifest.get("files", [])}
+        for info in members:   # a member the manifest does not list has no checksum to verify: it could be anything (a script in a report)
+            if info.filename.startswith("study/") and info.filename[len("study/"):] not in listed:
+                raise ValueError(f"{info.filename} is in the bundle but not listed in its manifest: the bundle was refused")
         staging = ws / f".import-{name}-{os.getpid()}"
         shutil.rmtree(staging, ignore_errors=True)
         try:
@@ -316,7 +324,7 @@ def import_bundle(root, bundle_path, new_name=None) -> Path:
                 with z.open(info) as src, open(dest, "wb") as out:
                     shutil.copyfileobj(src, out)
                 expected = listed.get(rel)
-                if expected and _sha256(dest) != expected.get("sha256"):
+                if not expected or _sha256(dest) != expected.get("sha256"):
                     raise ValueError(f"{rel} does not match its checksum in the manifest: the bundle is damaged")
             if not (staging / "study.json").is_file():
                 raise ValueError("the bundle has no study.json")

@@ -35,7 +35,3 @@ def explain(code) -> str:
         except ValueError:
             return f"stopped by signal {code - 128}"
     return f"failed with exit code {code}"
-
-
-def is_signal(code) -> bool:
-    return code is not None and (int(code) < 0 or int(code) > 128)

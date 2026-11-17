@@ -633,7 +633,7 @@ body.gd-open #gdrawer{transform:none}
       <div class="row"><input type="password" id="ncbi_key" placeholder="36-character key" autocomplete="off"><button class="btn sec sm" id="ncbi_show" type="button">Show</button></div>
      </div><div class="ft"><button class="btn" id="ncbi_save"><svg class="ico sm"><use href="#i-save"/></svg>Save</button></div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-box"/></svg><h3>Install a tool profile</h3></div><div class="bd">
-      <p class="mut small" style="margin-top:0">Profiles group related tools. <b>core</b> is needed for everything; the rest add assemblers, reconstruction tools and optional analyses.</p>
+      <p class="mut small" style="margin-top:0">Profiles group related tools. <b>core</b> is needed for everything; the rest add assemblers, binning-reconstruction tools and optional analyses.</p>
       <div class="row"><select id="profile"></select><button class="btn" id="profgo">Install</button></div>
       <div class="row wrap" style="margin-top:12px"><button class="btn sec sm" data-run='["install-tools","plan"]' data-label="Show the install plan">Show install plan</button>
        <button class="btn sec sm" data-run='["install-tools","list"]' data-label="List install profiles">List profiles</button>
@@ -656,6 +656,11 @@ body.gd-open #gdrawer{transform:none}
     <p>Every tool PlasBench can benchmark, built-in and your own. The switch, and the <b>on</b> / <b>off</b> beside it, set whether a tool runs by default: <b>on</b> means it runs unless you turn it off for a run, <b>off</b> means it is skipped unless you turn it on (saved for this computer). The New benchmark page can still change it for one run.</p></div>
     <div class="row"><button class="btn sec" id="toolsref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button><button class="btn" data-go="addtool"><svg class="ico sm"><use href="#i-plus"/></svg>Add your own tool</button></div></div>
    <div class="stats" id="toolkpis" style="margin-bottom:12px"></div>
+   <div class="note info small" id="taskhelp" style="margin-bottom:12px"><svg class="ico"><use href="#i-info"/></svg><div><b>Three kinds of task, each ranked on its own.</b>
+    <b>Classification</b>: the tool labels every contig plasmid or chromosome (ranked by base-level F1).
+    <b>Binning reconstruction</b>: the tool groups contigs into separate plasmids (ranked by length-weighted binning F1).
+    <b>Sequence reassembly</b>: the tool produces the plasmid sequences themselves (ranked by CPRR, the share of true plasmids recovered correctly).
+    Tools are never ranked against tools of another task or another input track.</div></div>
    <div class="card">
     <div class="toolbar"><input type="search" id="toolq" placeholder="Filter tools…" aria-label="Filter tools">
      <div class="chips" id="toolchips"></div></div>
@@ -926,7 +931,7 @@ body.gd-open #gdrawer{transform:none}
 
   <h4 id="uh_steps">The five sections of the form, top to bottom</h4>
   <dl class="hsteps">
-   <dt>1 · What it is</dt><dd><b>Name</b>: lower-case letters, digits and <code>_</code>; it cannot be a built-in tool's name. It becomes the tool's id everywhere (<code>my_mob_recon</code>). <b>Task</b>: <i>reconstruction</i> if it groups contigs into separate plasmids, which gives bin-level metrics; <i>classification</i> if it only says plasmid or chromosome per contig. <b>Analysis track</b>: <i>short_read</i> for tools working from Illumina assemblies. Tools are ranked only against tools on the same track. <b>Version command</b>: its first line of output is recorded as the version in the report.</dd>
+   <dt>1 · What it is</dt><dd><b>Name</b>: lower-case letters, digits and <code>_</code>; it cannot be a built-in tool's name. It becomes the tool's id everywhere (<code>my_mob_recon</code>). <b>Task</b>: <i>binning reconstruction</i> if it groups contigs into separate plasmids, which gives bin-level metrics; <i>classification</i> if it only says plasmid or chromosome per contig. <b>Analysis track</b>: <i>short_read</i> for tools working from Illumina assemblies. Tools are ranked only against tools on the same track. <b>Version command</b>: its first line of output is recorded as the version in the report.</dd>
    <dt>2 · How to install it</dt><dd><b>conda</b>: list the packages with versions; channels default to conda-forge and bioconda. <b>pip</b>: a Python package. <b>script</b>: your own <code>install.sh</code> placed next to the manifest. <b>none</b>: already on your PATH, or you only import results. <b>Verify command</b> is run after installing and by <code>plasbench check</code>; anything that exits 0 when the tool works, such as <code>--help</code>.</dd>
    <dt>3 · Reference database</dt><dd>Say <b>yes</b> if the tool compares contigs to a plasmid database (PLSDB, MOB-suite's, ...). PlasBench then checks whether the test genomes are inside that database, which would inflate the score. <b>Database path</b> is what <code>{db}</code> means in the command.</dd>
    <dt>4 · How to run it</dt><dd>Write the command for one sample using <a href="#uh_ph">placeholders</a> instead of file names. Click a placeholder chip to insert it. Tick the inputs it <b>requires</b>: a sample missing one, for example without long reads, is skipped with that reason rather than failing. Every value is safely quoted for you, so spaces in paths are fine. A long command may continue on indented lines.</dd>
@@ -959,7 +964,7 @@ body.gd-open #gdrawer{transform:none}
   <p>and it writes <code>out/chromosome.fasta</code>, <code>out/contig_report.txt</code> and <b>one <code>out/plasmid_&lt;cluster&gt;.fasta</code> per plasmid it reconstructed</b>. One FASTA per plasmid is exactly the <b>fasta_dir</b> format. So, section by section:</p>
   <table class="htab"><tr><th>Section</th><th>Field</th><th>Value</th><th>Why</th></tr>
    <tr><td rowspan="4">1 What it is</td><td>Name</td><td><code>my_mob_recon</code></td><td><code>mob_recon</code> is taken by the built-in</td></tr>
-   <tr><td>Task</td><td>reconstruction</td><td>it groups contigs into plasmids</td></tr>
+   <tr><td>Task</td><td>binning reconstruction</td><td>it groups contigs into plasmids</td></tr>
    <tr><td>Analysis track</td><td>short_read</td><td>it works on Illumina assemblies</td></tr>
    <tr><td>Version command</td><td><code>mob_recon --version</code></td><td>recorded in the report</td></tr>
    <tr><td rowspan="3">2 Install</td><td>Method</td><td>conda</td><td>it is a bioconda package</td></tr>
@@ -1153,6 +1158,12 @@ function toast(msg, kind="") {
   t.innerHTML = icon(kind === "bad" ? "alert" : kind === "ok" ? "check" : "info") + `<span>${esc(msg)}</span>`;
   $("#toasts").append(t); setTimeout(() => t.remove(), kind === "bad" ? 7000 : 4000);
 }
+// Copy to the clipboard and say so only once the write has happened; a refused write (no permission, not a secure context) is shown, not hidden.
+async function copyText(text, done) {
+  try { await navigator.clipboard.writeText(text); toast(done || "Copied", "ok"); return true; }
+  catch (e) { toast("Could not copy: " + ((e && e.message) || "the browser refused clipboard access") + ". Select the text and press Ctrl+C instead.", "bad"); return false; }
+}
+window.copyText = copyText;
 const fmtTime = s => s ? new Date(s * 1000).toLocaleString([], {dateStyle:"medium", timeStyle:"short"}) : "";
 const fmtDur = s => { if (s == null) return ""; s = Math.round(s); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s/60)}m ${s%60}s` : `${Math.floor(s/3600)}h ${Math.floor(s%3600/60)}m`; };
 const quote = a => /^[\w@%+=:,./-]+$/.test(a) ? a : "'" + a.replace(/'/g, "'\\''") + "'";
@@ -1295,7 +1306,7 @@ document.addEventListener("click", async e => {
       case "folder": await api("reveal", {path: s.results}); break;
       case "remove": await api(`jobs/${id}/delete`, {}); refreshJobs(); refreshSessions(); break;
       case "details": S.sessOpen.has(id) ? S.sessOpen.delete(id) : S.sessOpen.add(id); renderSessions(); break;
-      case "copy": navigator.clipboard.writeText(s.command); toast("Command copied"); break;
+      case "copy": await copyText(s.command, "Command copied"); break;
     }
   } catch (err) { toast(err.message, "bad"); }
 });
@@ -1409,7 +1420,7 @@ async function pollConsole(force) {
     if (S.follow) $("#clog").scrollTop = $("#clog").scrollHeight;
     const wasRunning = S._lastState === "running"; S._lastState = j.state;
     if (wasRunning && j.state !== "running") { toast(`${j.label}: ${stateWord(j.state).toLowerCase()}`, j.state === "done" ? "ok" : "bad"); refreshJobs(); afterJob(j); }
-  } catch {} finally { polling = false; }
+  } catch (e) { const st = $("#cstate"); if (st) { st.className = "failed"; st.textContent = "cannot reach PlasBench, retrying"; } } finally { polling = false; }
 }
 function afterJob(j) {
   const n = j.argv[0];
@@ -1430,7 +1441,7 @@ $("#cin").onsubmit = e => { e.preventDefault(); sendAnswer($("#cintx").value); }
 $("#cin").addEventListener("click", e => { const b = e.target.closest("[data-ans]"); if (b) sendAnswer(b.dataset.ans); });
 $("#cinsec").onchange = e => { $("#cintx").type = e.target.checked ? "password" : "text"; };
 $("#ccancel").onclick = async () => { try { await api(`jobs/${S.consJob}/cancel`, {}); toast("Cancelling…"); } catch (e) { toast(e.message, "bad"); } };
-$("#ccopy").onclick = () => { navigator.clipboard.writeText(({term: $("#tlog"), sess: $("#slog")}[S.ctab] || $("#clog")).innerText); toast("Copied"); };
+$("#ccopy").onclick = () => copyText(({term: $("#tlog"), sess: $("#slog")}[S.ctab] || $("#clog")).innerText, "Copied");
 $("#cfollow").onclick = e => { S.follow = !S.follow; e.currentTarget.setAttribute("aria-pressed", S.follow); e.currentTarget.style.opacity = S.follow ? 1 : .55; };
 // The console is a fixed footer, open from the start at a quarter of the window (never under 160 px); it remembers
 // its height and whether you closed it.
@@ -1484,7 +1495,7 @@ async function pollSession(force) {
     b.innerHTML = j.events.length ? j.events.map(e => `<span class="s-t">${esc(e.t.slice(11))}</span>  <span class="${sessClass(e)}">${esc(e.text)}</span>`).join("\n")
       : `<span class="s-sys">Nothing has happened in this session yet. Commands you start from the pages and type in the Terminal appear here, with how they ended. Save as script turns them into a bash script that repeats them.</span>`;
     if (atEnd || force) b.scrollTop = b.scrollHeight;
-  } catch {}
+  } catch (e) { const b = $("#slog"); if (b) b.innerHTML = `<span class="s-sys">The session log could not be loaded (${esc(e.message)}).</span>`; }
 }
 $("#ssel").onchange = e => { SL.shown = e.target.value; SL.count = -1; pollSession(true); };
 setInterval(() => { if (S.ctab === "sess" && !document.hidden) pollSession(); }, 2000);
@@ -1720,15 +1731,18 @@ $("#ncbi_save").onclick = async () => {
    TOOLS
    =================================================================================================== */
 const TF = {q:"", chip:"all"};
+// The three evaluation tasks, always under these names (README: "classification, binning reconstruction, sequence reassembly").
+const TASK_LABEL = {binning_reconstruction: "Binning reconstruction", sequence_reassembly: "Sequence reassembly", classification: "Classification"};
+const taskLabel = t => TASK_LABEL[t] || String(t || "").replace(/_/g, " ");
 async function loadTools(force) {
   try {
     const tools = await getTools(force);
     const real = tools.filter(t => t.source !== "demo");
     const kp = [["Registered tools", real.length, "built-in and your own"], ["Installed here", real.filter(t => t.installed).length, "found on this computer"],
-                ["Binning tools", real.filter(t => t.task === "binning_reconstruction").length, `${real.filter(t => t.task === "sequence_reassembly").length} reassembly · ${real.filter(t => t.task === "classification").length} classification`],
+                ["Binning reconstruction tools", real.filter(t => t.task === "binning_reconstruction").length, `${real.filter(t => t.task === "sequence_reassembly").length} sequence reassembly · ${real.filter(t => t.task === "classification").length} classification`],
                 ["Your own tools", real.filter(t => t.source === "user").length, "added with a manifest"]];
     $("#toolkpis").innerHTML = kp.map(([l, v, d]) => `<div><label>${l}</label><b>${v}</b><span>${d}</span></div>`).join("");
-    const chips = [["all","All"],["binning_reconstruction","Binning"],["sequence_reassembly","Reassembly"],["classification","Classification"],["short_read","Short-read"],["long_read","Long-read"],["hybrid","Hybrid"],["installed","Installed"],["missing","Not installed"],["user","Your tools"],["demo","Demo"]];
+    const chips = [["all","All"],["binning_reconstruction","Binning reconstruction"],["sequence_reassembly","Sequence reassembly"],["classification","Classification"],["short_read","Short-read"],["long_read","Long-read"],["hybrid","Hybrid"],["installed","Installed"],["missing","Not installed"],["user","Your tools"],["demo","Demo"]];
     $("#toolchips").innerHTML = chips.map(([k, l]) => `<button class="chip ${TF.chip === k ? "on" : ""}" data-chip="${k}">${l}</button>`).join("");
     renderToolTable();
     $("#s_tools").textContent = `${real.filter(t => t.installed).length} of ${real.length} installed`;
@@ -1742,7 +1756,7 @@ function renderToolTable() {
   $("#tooltb").innerHTML = rows.map(t => `<tr>
     <td><b>${esc(t.display)}</b> ${t.source === "user" ? `<span class="tag user">your tool</span>` : t.source === "demo" ? `<span class="tag">demo</span>` : ""}<div class="mut small">${esc(t.tool)} · ${esc(t.method_class || "")}</div>
       ${t.description ? `<div class="mut small" style="max-width:420px">${esc(t.description.slice(0, 160))}</div>` : ""}</td>
-    <td><span class="tag ${t.task !== "classification" ? "rec" : "cls"}">${esc((t.task || "").replace(/_/g, " "))}</span><div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div></td>
+    <td><span class="tag ${t.task !== "classification" ? "rec" : "cls"}">${esc(taskLabel(t.task))}</span><div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div></td>
     <td>${t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
     <td class="small" style="max-width:260px">${esc(t.database || "–")}${t.database_release ? `<div class="mut">released ${esc(t.database_release)}</div>` : ""}</td>
     <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}: ${t.enabled ? "on, so it runs unless you turn it off for a run" : "off, so it is skipped unless you turn it on for a run"}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label> <b class="small ${t.enabled ? "ok-t" : "mut"}" data-flagtxt="${esc(t.run_flag)}">${t.enabled ? "on" : "off"}</b>` :
@@ -1767,7 +1781,7 @@ $("#toolsref").onclick = () => loadTools(true);
 const UT_FIELDS = {
   tool: [["name","Name","text","Lower-case letters, digits and _; becomes the tool's id in every table.",true],
          ["display_name","Display name","text","What the report calls it."],
-         ["task","Task","select:binning_reconstruction|sequence_reassembly|classification","binning_reconstruction groups existing contigs into plasmids (ranked by binning F1); sequence_reassembly produces plasmid sequences (ranked by CPRR); classification labels contigs (ranked by base F1).",true],
+         ["task","Task","select:binning_reconstruction|sequence_reassembly|classification","Binning reconstruction groups existing contigs into plasmids (ranked by length-weighted binning F1); sequence reassembly produces plasmid sequences (ranked by CPRR); classification labels each contig plasmid or chromosome (ranked by base-level F1).",true],
          ["analysis_track","Analysis track","select:short_read|long_read|hybrid","Tools are ranked only within their track.",true],
          ["description","Description","text","One line, shown in the tool catalogue."],
          ["citation","Citation","text","Shown with the results."],
@@ -1873,7 +1887,7 @@ async function utValidate() {
     const r = await api("usertools/validate", {text: $("#ut_text").value});
     if (r.ok) {
       const row = r.row;
-      box.innerHTML = `<div class="note ok">${icon("check", "ico")}<div><b>Valid manifest</b><div class="small">${esc(row.tool)} · ${esc(row.binning_capable === "yes" ? "reconstruction" : "classification")} · ${esc(row.analysis_track.replace("_", " "))}</div></div></div>` +
+      box.innerHTML = `<div class="note ok">${icon("check", "ico")}<div><b>Valid manifest</b><div class="small">${esc(row.tool)} · ${esc(row.binning_capable === "yes" ? "binning reconstruction" : "classification")} · ${esc(row.analysis_track.replace("_", " "))}</div></div></div>` +
         (r.warnings.length ? `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>${r.warnings.map(esc).join("<br>")}</div></div>` : "") +
         `<div class="small mut" style="margin-top:10px"><b>Install plan</b></div><div class="cmdline" style="margin-top:4px"><code>${esc(r.plan.filter(s => s[0] !== "ENV").map(s => s[0] === "VERIFY" ? "verify: " + s[1] : s.join(" ").replace("{CONDA}", "conda")).join("\n") || "nothing to install")}</code></div>
         <div class="small mut" style="margin-top:10px">Then: <code>plasbench run … --tool ${esc(row.tool)}</code></div>`;
@@ -1944,8 +1958,8 @@ const PAGE_HELP = {
 "title": "Tools",
 "what": "Every tool PlasBench can benchmark, built-in and your own, with what it does and whether it is ready.",
 "steps": [
-"Use the chips at the top to filter: All, Reconstruction, Classification, Short-read, Long-read, Hybrid, Installed, Not installed, Your tools.",
-"Read a row: the <b>task</b> (reconstruction groups contigs into plasmids; classification labels contigs), the <b>track</b> (short-read, long-read, hybrid), the input it needs, whether it is installed, and the reference database it searches.",
+"Use the chips at the top to filter: All, Binning reconstruction, Sequence reassembly, Classification, Short-read, Long-read, Hybrid, Installed, Not installed, Your tools.",
+"Read a row: the <b>task</b> (binning reconstruction groups contigs into plasmids; sequence reassembly produces plasmid sequences; classification labels contigs), the <b>track</b> (short-read, long-read, hybrid), the input it needs, whether it is installed, and the reference database it searches.",
 "A missing tool has an <b>Install</b> button in its row.",
 "The switch sets whether the tool runs <b>by default</b>, saved for this computer. <b>on</b> beside it: the tool runs unless you turn it off for a run. <b>off</b>: it is skipped unless you turn it on for a run. In New benchmark, the first choice reads <b>default · on</b> or <b>default · off</b> so you can see what \"default\" means for each tool; picking on or off there changes only that run."
 ],
@@ -2210,7 +2224,7 @@ $("#uh_load").onclick = () => {
   $("#ut_text").value = UT_EXAMPLE; utChanged(true); scrollTo({top: 0, behavior: "smooth"});
   toast("Example loaded: check the form, then Save & install", "ok");
 };
-$("#ut_copy").onclick = () => { navigator.clipboard.writeText($("#ut_text").value); toast("Manifest copied"); };
+$("#ut_copy").onclick = () => copyText($("#ut_text").value, "Manifest copied");
 $("#ut_dl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([$("#ut_text").value], {type:"text/plain"}));
   a.download = "plasbench-tool.ini"; a.click(); };
 async function utSave(install) {
@@ -2485,10 +2499,11 @@ function openCommand(name) {
       <button class="btn sec" id="cmdcopy">${icon("copy")}Copy</button><button class="btn" id="cmdrun">${icon("play")}Run</button></div>
     <div id="cmderr" style="padding:0 18px 14px"></div></div>`;
   const update = async () => { const argv = cmdArgv(); $("#cmdprev").textContent = cmdText(argv);
-    const v = await api("validate", {argv}); $("#cmderr").innerHTML = v.ok ? "" : `<div class="note bad">${icon("x", "ico")}<div>${esc(v.message)}</div></div>`; $("#cmdrun").disabled = !v.ok; };
+    let v; try { v = await api("validate", {argv}); } catch (e) { v = {ok: false, message: "Could not check this command line (" + e.message + "). Run is disabled until PlasBench answers."}; }
+    $("#cmderr").innerHTML = v.ok ? "" : `<div class="note bad">${icon("x", "ico")}<div>${esc(v.message)}</div></div>`; $("#cmdrun").disabled = !v.ok; };
   bindForm($("#cmdform"), S.cmd.values, update);
   if ($("#cmdsub")) $("#cmdsub").onchange = e => { S.cmd.sub = e.target.value; S.cmd.values = {}; openCommand(name); };
-  $("#cmdcopy").onclick = () => { navigator.clipboard.writeText($("#cmdprev").textContent); toast("Command copied"); };
+  $("#cmdcopy").onclick = () => copyText($("#cmdprev").textContent, "Command copied");
   $("#cmdrun").onclick = () => confirmRun(cmdArgv(), `plasbench ${name}${S.cmd.sub ? " " + S.cmd.sub : ""}`);
   $("#cmdhelp").onclick = () => showHelpDialog(c, sc);
   update();
@@ -2633,8 +2648,8 @@ function bindWizard() {
   const form = $("#wbody"); if (!form._bound) { bindForm(form, V, () => {}); form._bound = true; }
   if (W.step === WSTEPS.length - 1) {
     const argv = wizArgv();
-    api("validate", {argv}).then(v => { $("#wverr").innerHTML = v.ok ? `<div class="note ok">${icon("check", "ico")}<div>The command line is valid.</div></div>` : `<div class="note bad">${icon("x", "ico")}<div>${esc(v.message)}</div></div>`; $("#wstart").disabled = !v.ok; });
-    $("#wcopy").onclick = () => { navigator.clipboard.writeText(cmdText(argv)); toast("Command copied"); };
+    api("validate", {argv}).catch(e => ({ok: false, message: "Could not check this command line (" + e.message + "). Start is disabled until PlasBench answers."})).then(v => { $("#wverr").innerHTML = v.ok ? `<div class="note ok">${icon("check", "ico")}<div>The command line is valid.</div></div>` : `<div class="note bad">${icon("x", "ico")}<div>${esc(v.message)}</div></div>`; $("#wstart").disabled = !v.ok; });
+    $("#wcopy").onclick = () => copyText(cmdText(argv), "Command copied");
     if ($("#wscript")) $("#wscript").onclick = () => { const p = prompt("Save the run as a bash script (relative to the PlasBench folder):", "run_benchmark.sh"); if (p) confirmRun([...argv, "--write-script", p], "Write the run as a script"); };
     $("#wstart").onclick = async () => { const j = await startJob(argv, W.source === "demo" ? "Offline demo" : `Benchmark: ${wizSummary()[0][1]}`); if (j) toast("Started. Follow it in the console; results appear on Runs & reports.", "ok"); };
   }
@@ -2803,7 +2818,7 @@ async function loadIsolates() {
     <div class="ft" style="justify-content:space-between"><div class="cmdline grow"><span class="p">$</span><code id="isoprev"></code></div><button class="btn" id="isorun">${icon("plus")}Add isolate</button></div>`;
   const upd = () => $("#isoprev").textContent = cmdText(buildArgv(c, ISO, ["init-local"]));
   bindForm($("#isoform"), ISO, upd); upd();
-  $("#isorun").onclick = async () => { const argv = buildArgv(c, ISO, ["init-local"]); const v = await api("validate", {argv});
+  $("#isorun").onclick = async () => { const argv = buildArgv(c, ISO, ["init-local"]); let v; try { v = await api("validate", {argv}); } catch (e) { return toast("Could not check the command: " + e.message, "bad"); }
     if (!v.ok) return toast(v.message, "bad"); confirmRun(argv, `Add isolate ${ISO.sample || ""}`); };
 }
 async function loadCohorts() {
@@ -2887,7 +2902,7 @@ async function cohortInfo(name) {
   };
   $("#coh_q").oninput = draw; $("#coh_all").onchange = draw; draw();
   $("#coh_copy").onclick = () => { const cols = $("#coh_all").checked ? d.columns : COH_MAIN.filter(c => d.columns.includes(c));
-    navigator.clipboard.writeText([cols.join("\t"), ...d.rows.map(r => cols.map(c => r[c] ?? "").join("\t"))].join("\n")); toast("Copied as TSV"); };
+    return copyText([cols.join("\t"), ...d.rows.map(r => cols.map(c => r[c] ?? "").join("\t"))].join("\n"), "Copied as TSV"); };
   box.scrollIntoView({behavior: "smooth", block: "start"});
 }
 /* selection report pop-up: where a cohort's genomes came from, the criteria, the funnel, why others failed, the sequence information */
@@ -2914,7 +2929,7 @@ function publicationCard(d) {
   return `<div class="note" style="display:block"><b>Published benchmark cohort.</b> ${esc(p.citation || p.label || "")}${p.note ? `<div class="small mut" style="margin-top:4px">${esc(p.note)}</div>` : ""}
     <div class="cohbars" style="margin-top:8px">${studies}${funnel}${p.truth_match ? `<table class="data"><thead><tr><th>Truth plasmids vs the paper's</th><th class="num">Isolates</th></tr></thead><tbody>${rows(p.truth_match, "value", "n")}</tbody></table>` : ""}</div>${left}
     <p class="small" style="margin:8px 0 0">${has ? "The paper's own outcomes ship with PlasBench, so after a run you can put your results beside them:" : "No published outcome table ships for this cohort yet; the isolates can still be run."}
-     ${has ? `<br><code>${esc((p.compare_command || "").replace("<results>", "results"))}</code> <button class="btn ghost sm" onclick="navigator.clipboard.writeText(${jsq((p.compare_command || "").replace("<results>", "results"))});toast('Command copied')">Copy</button>` : ""}</p>
+     ${has ? `<br><code>${esc((p.compare_command || "").replace("<results>", "results"))}</code> <button class="btn ghost sm" onclick="copyText(${jsq((p.compare_command || "").replace("<results>", "results"))}, 'Command copied')">Copy</button>` : ""}</p>
     ${has ? `<p class="small mut" style="margin:4px 0 0">Stage 6 does this automatically (setting RUN_PUBLISHED_COMPARISON) and the report gets a "Comparison with published outcomes" section. It is a comparison for your judgement, not a ranking: assemblies, tool versions, databases and metric definitions differ from the paper's.</p>` : ""}</div>`;
 }
 async function selectionReport(name) {
@@ -2984,7 +2999,7 @@ async function selectionReport(name) {
     $("#sr_sp", dlg).innerHTML = spTable(rows); $("#sr_n", dlg).textContent = `${rows.length} of ${speciesRows.length} species with at least one candidate`;
   };
   $("#sr_q", dlg).oninput = draw; draw();
-  $("#sr_copy", dlg).onclick = () => { navigator.clipboard.writeText(r.criteria.map((c, i) => `${i + 1}. ${c.rule}`).join("\n")); toast("Criteria copied"); };
+  $("#sr_copy", dlg).onclick = () => copyText(r.criteria.map((c, i) => `${i + 1}. ${c.rule}`).join("\n"), "Criteria copied");
 }
 /* WORKSPACE ------------------------------------------------------------------------------------------ */
 const fmtGB = b => b == null ? "unknown" : `${(b / 2 ** 30).toLocaleString(undefined, {maximumFractionDigits: 0})} GB`;
@@ -3187,9 +3202,10 @@ async function loadGit() {
       <div class="card"><div class="hd"><h3>Branches</h3></div><div id="g_br" class="tasks"></div>
        <div class="bd"><div class="row"><input type="text" id="g_newbr" placeholder="new-branch-name"><button class="btn sec" id="g_mkbr">Create and switch</button></div></div></div>
       <div class="card"><div class="hd"><h3>Remote</h3></div><div class="bd">
-       <div class="row"><input type="text" id="g_url" value="${esc(remote ? remote.url : "")}" placeholder="https://github.com/your-org/your-repo.git"><button class="btn sec" id="g_seturl">Save</button></div>
+       <div class="row"><input type="text" id="g_url" value="${esc(remote ? remote.url : "")}" placeholder="https://github.com/your-org/your-repo.git"><button class="btn sec" id="g_seturl">Save</button>${remote ? `<button class="btn ghost" id="g_rmremote" title="Disconnect this repository from ${esc(remote.name || "origin")}; nothing is deleted on the server or on disk">Remove</button>` : ""}</div>
        <p class="mut small" style="margin:6px 0 0">Never put a password or token in the address; sign in with Git's credential manager or the GitHub CLI.</p>
-       ${st.gh ? `<div class="row" style="margin-top:8px">${st.gh_logged_in ? `<span class="small ok-t">${icon("check")} signed in to GitHub</span>` : `<button class="btn sec sm" id="g_ghlogin">Sign in to GitHub</button>`}</div>` : ""}</div></div>
+       ${st.gh ? `<div class="row" style="margin-top:8px">${st.gh_logged_in ? `<span class="small ok-t">${icon("check")} signed in to GitHub</span>` : `<button class="btn sec sm" id="g_ghlogin">Sign in to GitHub</button>`}${st.gh_logged_in ? `<button class="btn ghost sm" id="g_ghsetup" title="Runs gh auth setup-git: lets git use your GitHub sign-in when pushing over https">Let git use this sign-in</button>` : ""}</div>
+       ${st.gh && st.gh_logged_in && !remote ? `<div class="row" style="margin-top:8px"><input type="text" id="g_ghname" placeholder="new-repository-name"><select id="g_ghvis" aria-label="Visibility"><option value="private">private</option><option value="public">public</option></select><button class="btn sec sm" id="g_ghcreate" title="Creates the repository on GitHub and connects this one to it as origin">Create on GitHub</button></div>` : ""}` : ""}</div></div>
       <div class="card" id="g_ignore"><div class="hd"><h3>Ignored files</h3><span class="sub"><code>.gitignore</code></span></div><div class="bd">
        <details id="gi_managed"><summary class="small" style="cursor:pointer"><b>PlasBench's rules</b> <span class="mut">(read-only; kept up to date by PlasBench)</span></summary>
         <pre class="cmdline small" id="gi_block" style="display:block;max-height:220px;white-space:pre;margin-top:6px"></pre></details>
@@ -3275,6 +3291,9 @@ function bindGit(st) {
   $("#gi_test").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); giTest(); } };
   $("#g_saveid").onclick = () => gitOp({op: "identity", name: $("#g_name").value.trim(), email: $("#g_mail").value.trim(), scope: $("#g_scope").value}, "Identity saved");
   if ($("#g_ghlogin")) $("#g_ghlogin").onclick = () => gitOp({op: "gh_login"});
+  if ($("#g_ghsetup")) $("#g_ghsetup").onclick = () => gitOp({op: "gh_setup_git"});
+  if ($("#g_ghcreate")) $("#g_ghcreate").onclick = () => { const n = $("#g_ghname").value.trim(); if (!n) return toast("Type a name for the new repository", "bad"); gitOp({op: "gh_create", name: n, visibility: $("#g_ghvis").value}); };
+  if ($("#g_rmremote")) $("#g_rmremote").onclick = () => { const r = (st.remotes || [])[0]; if (r && confirm(`Disconnect this repository from ${r.name || "origin"} (${r.url})? Nothing is deleted on the server or on disk.`)) gitOp({op: "remote_remove", name: r.name || "origin"}, "Remote removed"); };
 }
 $("#g_repo").onchange = async e => { G.repo = e.target.value; G.sel.clear(); GD.files = null; await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); refreshGit(); };
 /* ---- source control drawer: changes, files, branches, git actions and remote actions, from any page ---- */
@@ -3385,7 +3404,7 @@ async function gdShowDiff(path, staged, quiet) {
 async function gdBranches() {
   try { const r = await api(`git/branches?${gq()}`);
     $("#gd_brl").innerHTML = r.branches.map(b => `<li ${b.current ? "" : `data-gdb="${esc(b.name)}"`} title="${b.current ? "current branch" : "switch to " + esc(b.name)}"><span class="st">${b.current ? "●" : ""}</span><span class="nm mono" style="direction:ltr">${esc(b.name)}</span>${b.upstream ? `<span class="mut small">${esc(b.upstream)}</span>` : ""}${b.current ? "" : `<span class="act"><button data-gdb="${esc(b.name)}">Switch</button></span>`}</li>`).join("") || `<li class="mut">No branches yet.</li>`;
-  } catch {}
+  } catch (e) { $("#gd_brl").innerHTML = `<li class="mut">Could not load branches: ${esc(e.message)}</li>`; }
 }
 async function gdFiles(filterOnly) {
   try {
@@ -3401,7 +3420,7 @@ async function gdFiles(filterOnly) {
 async function gdHistory() {
   try { const r = await api(`git/log?${gq()}&n=25`);
     $("#gd_hl").innerHTML = r.log.map(c => `<li data-gdrev="${esc(c.hash)}" title="${esc(commitTip(c))}"><span class="hdot ${commitKind(c)}"></span><span class="h">${esc(c.short)}</span><span class="nm" style="direction:ltr">${esc(c.subject)}</span></li>`).join("") || `<li class="mut">No commits yet.</li>`;
-  } catch {}
+  } catch (e) { $("#gd_hl").innerHTML = `<li class="mut">Could not load the history: ${esc(e.message)}</li>`; }
 }
 $("#gd_body").addEventListener("click", async e => {
   const s = e.target.closest("[data-gds]"); if (s) { e.stopPropagation(); return gitOp({op: "stage", paths: [s.dataset.gds]}, "Staged"); }
@@ -3589,7 +3608,7 @@ async function renderDoc(t) {
     const word = {merge: "merge commit", local: "not yet pushed", pushed: "pushed"}[kind];
     const chunks = c.patch.split(/\n(?=diff --git )/).filter(x => x.trim());
     box.innerHTML = `<div class="docbar"><h2>${esc(c.subject)}</h2><span class="tag"><span class="hdot ${kind}"></span>&nbsp;${word}</span>
-        <button class="btn ghost sm" onclick="navigator.clipboard.writeText(${jsq(c.hash)});toast('Commit id copied')">${icon("copy")}${esc(c.short)}</button>
+        <button class="btn ghost sm" onclick="copyText(${jsq(c.hash)}, 'Commit id copied')">${icon("copy")}${esc(c.short)}</button>
         <button class="btn ghost sm" onclick="mtClose(${jsq(t.id)})">${icon("x")}Close</button></div>
       <div class="card"><div class="bd"><dl class="facts">
         <dt>Author</dt><dd>${esc(c.author)} &lt;${esc(c.email)}&gt;</dd><dt>Date</dt><dd>${esc(new Date(c.date).toLocaleString())} (${esc(c.when)})</dd>
@@ -3706,7 +3725,9 @@ function runRow(r, i) {
     <div class="row wrap" style="justify-content:flex-end;align-content:flex-start">${r.report ? `<a class="btn sec" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">${icon("chart")}Open report</a>` : ""}
       ${r.pdf ? `<a class="btn sec" href="/view/${idx}/benchmark.report.pdf" target="_blank">PDF</a>` : `<button class="btn sec" data-run="${dattr(["report-pdf", "--results-dir", r.path])}" data-label="Export ${esc(r.name)} to PDF">${icon("down")}Export PDF</button>`}
       <button class="btn ghost" data-run="${dattr(["report", "--results-dir", r.path, "--no-report-prompt"])}" data-label="Rebuild the report of ${esc(r.name)}">${icon("refresh")}Rebuild</button>
-      <button class="btn ghost icon" title="Show the folder" onclick="reveal(${jsq(r.path)})">${icon("folder")}</button></div></div>`;
+      <button class="btn ghost icon" title="Show the folder" onclick="reveal(${jsq(r.path)})">${icon("folder")}</button>
+      ${r.leaderboard ? `<a class="btn ghost" href="/view/${idx}/benchmark.leaderboard.tsv" download="${esc(r.name)}.leaderboard.tsv" title="Download the leaderboard of this run as a TSV table">${icon("down")}Leaderboard</a>` : ""}
+      ${r.registered ? `<button class="btn ghost" title="Remove this folder from the list (the files stay on disk)" onclick="forgetRun(${jsq(r.path)})">Forget</button>` : ""}</div></div>`;
 }
 function runBrief(r) {
   const idx = S.runs.indexOf(r), lead = r.leaders.map(l => `${esc(l.display || l.tool)} <span class="mut">(${esc(l.task || "leader")})</span>`).join(", ");
@@ -3721,6 +3742,8 @@ async function loadRuns(force) {
     $("#runlist").innerHTML = runs.length ? runs.map(runRow).join("") : `<div class="bd"><div class="note info">${icon("info", "ico")}<div>No results yet. <a href="#" data-act="demo">Run the demo</a> to see a report in about a minute.</div></div></div>`;
   } catch (e) { toast(e.message, "bad"); }
 }
+window.forgetRun = async p => { if (!confirm("Remove this results folder from the Runs list? The files stay on disk, and you can add the folder again.")) return;
+  try { await api("runs/forget", {path: p}); S.runs = null; await loadRuns(true); toast("Removed from the list", "ok"); } catch (e) { toast(e.message, "bad"); } };
 $("#runref").onclick = () => loadRuns(true);
 $("#runadd").onclick = () => pickPath(true, async p => { try { await api("runs/add", {path: p}); S.runs = null; loadRuns(); toast("Added", "ok"); } catch (e) { toast(e.message, "bad"); } }, "Choose a results folder");
 

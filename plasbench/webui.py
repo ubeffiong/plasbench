@@ -55,6 +55,9 @@ SERVABLE = {".html": "text/html; charset=utf-8", ".pdf": "application/pdf", ".ts
             ".fasta": "text/plain; charset=utf-8", ".fa": "text/plain; charset=utf-8", ".gz": "application/gzip",
             ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".zip": "application/zip"}
 MAX_LOG_CHUNK = 256 * 1024
+REPORT_CSP = ("default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; "
+              "font-src data:; form-action 'none'; frame-ancestors 'self'; "
+              "sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox")
 
 
 # --------------------------------------------------------------------------------------------- project facts
@@ -167,6 +170,10 @@ class Project:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as _fh:
             _fh.write("\n".join(kept) + "\n")
+        try:
+            os.chmod(path, 0o600)     # holds the NCBI key: owner only (a no-op on Windows, where the profile folder's ACL applies)
+        except OSError:
+            pass
         return self.local_env()
 
     # -- your own isolates: sheet template, folder scan, staging, quick check (python/intake.py) -------------------------
@@ -439,6 +446,7 @@ class Project:
         candidates.update(Path(e) for e in extra)
         from . import studies
         candidates.update(Path(st["results"]) for st in studies.list_studies(self.root))
+        registered = {str(Path(e).resolve()) for e in extra}   # folders added by hand: these (and only these) can be forgotten
         rows = []
         for folder in sorted(candidates):
             if not folder.is_dir():
@@ -473,7 +481,7 @@ class Project:
                          "pdf": (folder / "benchmark.report.pdf").is_file(),
                          "summary_pdf": (folder / "benchmark.report.summary.pdf").is_file(),
                          "modified": stamp, "tools": len(tools - {None}), "samples": samples, "failed": failed,
-                         "leaders": leaders})
+                         "leaders": leaders, "leaderboard": leaderboard.is_file(), "registered": str(folder.resolve()) in registered})
         rows.sort(key=lambda r: -r["modified"])
         return rows
 
@@ -1065,6 +1073,10 @@ def make_handler(project: Project, jobs: Jobs):
                 self.send_header("Content-Security-Policy",
                                  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
                                  "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+            elif (extra or {}).get("report") and (ctype.startswith("text/html") or ctype.startswith("image/svg")):
+                # run-file HTML/SVG is data from disk (a study bundle or a results folder can come from someone else): it keeps its inline script and style
+                # (filters, 3D) but runs in an opaque origin (sandbox without allow-same-origin) with connect-src 'none', so it cannot call this window's API
+                self.send_header("Content-Security-Policy", REPORT_CSP)
             if (extra or {}).get("page_seen") is not None:
                 self.send_header("X-PlasBench-Page-Seen", extra["page_seen"])
             if (extra or {}).get("disposition"):
@@ -1512,7 +1524,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"runs": project.runs(state["runs"])})
             if route == "runs/forget":
                 state = load_state()
-                state["runs"] = [r for r in state.get("runs", []) if r != data.get("path")]
+                gone = str(Path(str(data.get("path", ""))).resolve())
+                state["runs"] = [r for r in state.get("runs", []) if r != data.get("path") and str(Path(r).resolve()) != gone]
                 save_state(state)
                 return self.jsend(200, {"ok": True})
             if route == "usertools/validate":

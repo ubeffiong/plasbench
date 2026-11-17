@@ -22,6 +22,7 @@ from pathlib import Path
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 SUBDIRS = ("results", "logs", "tmp")
+WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
 
 
 def _local_env(root: Path) -> dict:
@@ -50,6 +51,9 @@ def valid_name(name: str) -> str:
     if not NAME_RE.match(name):
         raise ValueError(f"study name {name!r}: use letters, digits, '.', '_' or '-', starting with a letter or digit "
                          "(at most 80 characters)")
+    if name.endswith((".", " ")) or name.split(".")[0].upper() in WINDOWS_RESERVED:
+        raise ValueError(f"study name {name!r} is not allowed: Windows reserves names such as CON, PRN, AUX, NUL, COM1-9 and LPT1-9 "
+                         "(with or without an extension), and a name cannot end with a dot or a space")
     return name
 
 

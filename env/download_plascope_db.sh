@@ -37,15 +37,10 @@ fetch_one() {
     if [[ -n "$url" ]]; then
         echo "[plascope_db] downloading $label from provided ${url_var} ..."
         (cd "$dest_parent" && wget -O "$archive_name" "$url")
-        if [[ -n "$sha" ]]; then
-            echo "[plascope_db] verifying checksum ..."
-            (cd "$dest_parent" && echo "${sha}  $archive_name" | sha256sum -c -) || {
-                rm -f "$dest_parent/$archive_name"
-                die "downloaded $archive_name did not match ${sha_var}; refusing to use it"
-            }
-        else
-            warn "${sha_var} not set; skipping checksum verification of the downloaded database"
-        fi
+        verify_or_record_download "$dest_parent/$archive_name" "$url" "PlaScope $label database" "$sha" "$dest_parent/download_provenance.jsonl" || {
+            rm -f "$dest_parent/$archive_name"
+            die "downloaded $archive_name did not match ${sha_var}; refusing to use it"
+        }
         (cd "$dest_parent" && tar -xzf "$archive_name" && rm -f "$archive_name")
         echo "[plascope_db] done. $label DB should be at $prefix"
     fi
