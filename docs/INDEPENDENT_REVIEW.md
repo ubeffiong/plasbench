@@ -416,18 +416,18 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 
 | ID | Claim | Evidence | Symbol |
 |---|---|---|---|
-| E1 | TP is reference plasmid bases covered by the prediction | `python/score_plasmids.py:293` | `tp = 0` |
-| E2 | FN is plasmid bases minus TP | `python/score_plasmids.py:303` | `fn = total_plasmid - tp` |
-| E3 | Unmapped predicted bases are counted separately and are not FP | `python/score_plasmids.py:219` | `unmapped_pred_bp += max` |
-| E4 | Scorer CLI default minimum alignment length is 1 | `python/score_plasmids.py:633` | `--min-alignment-length` |
-| E5 | Scorer CLI default minimum identity is 0 | `python/score_plasmids.py:635` | `--min-alignment-identity` |
-| E6 | Scorer CLI default minimum MAPQ is 0 | `python/score_plasmids.py:637` | `--min-alignment-mapq` |
-| E7 | Scorer CLI default query coverage is 0 | `python/score_plasmids.py:639` | `--min-alignment-query-coverage` |
+| E1 | TP is reference plasmid bases covered by the prediction | `python/score_plasmids.py:268` | `tp = 0` |
+| E2 | FN is plasmid bases minus TP | `python/score_plasmids.py:278` | `fn = total_plasmid - tp` |
+| E3 | Unmapped predicted bases are counted separately and are not FP | `python/score_plasmids.py:194` | `unmapped_pred_bp += max` |
+| E4 | Scorer CLI default minimum alignment length is 1 | `python/score_plasmids.py:608` | `--min-alignment-length` |
+| E5 | Scorer CLI default minimum identity is 0 | `python/score_plasmids.py:610` | `--min-alignment-identity` |
+| E6 | Scorer CLI default minimum MAPQ is 0 | `python/score_plasmids.py:612` | `--min-alignment-mapq` |
+| E7 | Scorer CLI default query coverage is 0 | `python/score_plasmids.py:614` | `--min-alignment-query-coverage` |
 | E8 | Pipeline default minimum alignment length is 200 | `config/config.sh:540` | `MIN_ALIGNMENT_LENGTH` |
 | E9 | Pipeline default identity is 0.90 | `config/config.sh:541` | `MIN_ALIGNMENT_IDENTITY` |
 | E10 | Pipeline default MAPQ is 20 | `config/config.sh:542` | `MIN_ALIGNMENT_MAPQ` |
 | E11 | Pipeline default query coverage is 0.20 | `config/config.sh:543` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
-| E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:786` | `0.99995` |
+| E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:761` | `0.99995` |
 | E13 | Bin purity gate default 0.9 | `python/score_bins.py:369` | `--min-bin-purity` |
 | E14 | Split threshold default 0.1 | `python/score_bins.py:370` | `--split-threshold` |
 | E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:302` | `def length_weighted_binning` |

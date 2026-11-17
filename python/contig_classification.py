@@ -79,7 +79,7 @@ SCORE_FIELDS = ["contig_min_length", "contigs_evaluable", "contigs_short", "cont
                 "contig_bin_precision_bp", "contig_bin_recall_bp", "contig_bin_f1_bp"]
 
 
-from plasbench_common import read_truth_table  # noqa: E402
+from plasbench_common import read_truth_table, read_fasta_length_map, iter_paf, paf_identity  # noqa: E402
 
 
 def read_truth(path):
@@ -88,16 +88,8 @@ def read_truth(path):
 
 
 def read_fasta_lengths(path):
-    lengths, name = {}, None
-    with open(path, encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if line.startswith(">"):
-                name = line[1:].split()[0]
-                lengths[name] = 0
-            elif name is not None:
-                lengths[name] += len(line)
-    return lengths
+    """id -> length; a duplicate id or an empty header is an error (shared validated reader)."""
+    return read_fasta_length_map(path)
 
 
 def merged_length(intervals):
@@ -115,22 +107,21 @@ def cmd_label(args):
     plasmid_bp = defaultdict(lambda: defaultdict(int))          # contig -> plasmid -> aligned bp
     plasmid_query = defaultdict(list)                           # (contig, plasmid) -> query intervals
     target_intervals = defaultdict(list)                        # (contig, plasmid) -> target intervals
-    with open(args.paf, encoding="utf-8") as handle:
-        for line in handle:
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12 or f[0] not in lengths or f[5] not in truth:
-                continue
-            matches, block = int(f[9]), int(f[10])
-            if not block or matches / block < args.min_identity:
-                continue
-            kind = truth[f[5]][0]
-            q = (min(int(f[2]), int(f[3])), max(int(f[2]), int(f[3])))
-            t = (min(int(f[7]), int(f[8])), max(int(f[7]), int(f[8])))
-            query_intervals[f[0]][kind].append(q)
-            if kind == "PLASMID":
-                plasmid_bp[f[0]][f[5]] += q[1] - q[0]
-                target_intervals[(f[0], f[5])].append(t)
-                plasmid_query[(f[0], f[5])].append(q)
+    # Shared reader: a malformed row is dropped, counted and warned about once (AU-021).
+    for row in iter_paf(args.paf, label="labelling PAF"):
+        contig, target = row["qname"], row["tname"]
+        if contig not in lengths or target not in truth:
+            continue
+        if not row["block_length"] or paf_identity(row["matches"], row["block_length"]) < args.min_identity:
+            continue
+        kind = truth[target][0]
+        q = (min(row["qstart"], row["qend"]), max(row["qstart"], row["qend"]))
+        t = (min(row["tstart"], row["tend"]), max(row["tstart"], row["tend"]))
+        query_intervals[contig][kind].append(q)
+        if kind == "PLASMID":
+            plasmid_bp[contig][target] += q[1] - q[0]
+            target_intervals[(contig, target)].append(t)
+            plasmid_query[(contig, target)].append(q)
     rows, covered = [], defaultdict(list)
     for contig, length in lengths.items():
         p_frac = merged_length(query_intervals[contig]["PLASMID"]) / length if length else 0.0

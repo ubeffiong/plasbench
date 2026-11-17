@@ -50,26 +50,15 @@ import sys
 REVIEW = "REVIEW"
 
 
-from plasbench_common import open_maybe_gz  # noqa: E402,F401
+from plasbench_common import open_maybe_gz, read_fasta_records  # noqa: E402,F401
 
 
 def read_fasta_lengths(path):
-    """Return list of (seq_id, length) preserving order. seq_id = first token."""
-    ids = []
-    seq_id = None
-    length = 0
-    with open_maybe_gz(path) as fh:
-        for line in fh:
-            if line.startswith(">"):
-                if seq_id is not None:
-                    ids.append((seq_id, length))
-                seq_id = line[1:].strip().split()[0]
-                length = 0
-            else:
-                length += len(line.strip())
-        if seq_id is not None:
-            ids.append((seq_id, length))
-    return ids
+    """Return list of (seq_id, length) preserving order. seq_id = first token.
+
+    Uses the shared validated reader: a duplicate id or a bare '>' is an error.
+    """
+    return read_fasta_records(path)
 
 
 def strip_version(accession):

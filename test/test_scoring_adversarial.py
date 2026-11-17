@@ -11,6 +11,13 @@ Reference (truth):
 These tests pin down what the scorer DOES today, including the documented
 optimism of precision (bases with no retained alignment are never false
 positives), so a later change to that behaviour is a visible, deliberate one.
+
+Pinned values that are KNOWN OPTIMISM are asserted through optimism(), which labels
+them and requires the corrected expectation next to them (audit AU-045): either the
+scorer's own corrected column (strict_precision, already fixed) or, where the scorer
+has no corrected column yet, the value it should report, derived from the same row
+and marked "not yet fixed". A future fix to the optimistic value therefore has to
+change a line that says so, instead of looking like a regression.
 """
 
 import os
@@ -66,6 +73,15 @@ def main():
         ok &= bool(condition)
         print(f"  {'PASS' if condition else 'FAIL'}: {label}")
 
+    pinned_optimism = []
+
+    def optimism(label, pinned, corrected_label, corrected, fixed):
+        """A pinned value that over-states performance. `corrected` is the honest value;
+        fixed=True means the scorer already reports it (a column), False means it does not."""
+        pinned_optimism.append((label, fixed))
+        check(f"[known optimism, pinned] {label}", pinned)
+        check(f"[corrected expectation, {'fixed in scorer' if fixed else 'NOT YET FIXED: derived, not a scorer column'}] {corrected_label}", corrected)
+
     # 1. Chimeric contig: first 2000 bp is plasmidA, last 500 bp is chromosome.
     #    Both pieces are primary placements and both must be counted.
     row, _ = score(tmp, "chimeric", {"chim": 2500},
@@ -89,8 +105,8 @@ def main():
     print("repeat shared with chromosome, MAPQ filter 20 (pipeline default)")
     check("FP == 0 (filtered repeat is not a false positive)", int(row["FP_bp"]) == 0)
     check("unmapped_pred_bp == 800 (it is reported here instead)", int(row["unmapped_pred_bp"]) == 800)
-    check("precision == 1.0 (optimistic by design)", approx(float(row["precision"]), 1.0))
-    check("strict_precision == 2000/2800", approx(float(row["strict_precision"]), 2000 / 2800))
+    optimism("precision == 1.0 although 800 predicted bp are a repeat placed on the chromosome", approx(float(row["precision"]), 1.0),
+             "strict_precision == 2000/2800 (unmapped predicted bases count against precision)", approx(float(row["strict_precision"]), 2000 / 2800), True)
     row, _ = score(tmp, "repeat_unfiltered", {"good": 2000, "rep": 800}, repeat_paf,
                    "--min-alignment-mapq", "0")
     print("same repeat with MAPQ filter 0")
@@ -104,8 +120,11 @@ def main():
                    + paf("dimer", 4000, 2000, 4000, "plasmidA", 2000, 0, 2000))
     print("multimer (two tandem copies of plasmidA)")
     check("TP == 2000 (no double credit)", int(row["TP_bp"]) == 2000)
-    check("FP == 0 (no penalty either)", int(row["FP_bp"]) == 0)
     check("redundant_pred_bp == 2000 (the only trace)", int(row["redundant_pred_bp"]) == 2000)
+    honest = (int(row["TP_bp"])) / (int(row["TP_bp"]) + int(row["FP_bp"]) + int(row["redundant_pred_bp"]))
+    optimism("FP == 0 and precision == 1.0 although half of the 4000 predicted bp repeat the same plasmid", int(row["FP_bp"]) == 0 and approx(float(row["precision"]), 1.0),
+             "redundancy-charged precision TP/(TP+FP+redundant) == 0.5 (strict_precision is 1.0 here, so it does not catch this)",
+             approx(honest, 0.5) and approx(float(row["strict_precision"]), 1.0), False)
 
     # 4. Truncated plasmids: plasmidA 85% covered, plasmidB 100% covered.
     row, _ = score(tmp, "truncated", {"a": 1700, "b": 1000},
@@ -133,6 +152,10 @@ def main():
     check("TP == 2000", int(row["TP_bp"]) == 2000)
 
     print()
+    print(f"  {len(pinned_optimism)} pinned values are known optimism; "
+          f"{sum(1 for _, fixed in pinned_optimism if fixed)} have a corrected column in the scorer, "
+          f"{sum(1 for _, fixed in pinned_optimism if not fixed)} do not yet (listed above as NOT YET FIXED)")
+    check("the known-optimism pins are still all labelled", len(pinned_optimism) == 2)
     if not ok:
         print("SCORING ADVERSARIAL TESTS FAILED")
         sys.exit(1)

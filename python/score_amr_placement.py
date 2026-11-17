@@ -76,6 +76,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import score_bins  # noqa: E402
+from plasbench_common import read_tsv  # noqa: E402
 import score_plasmids as sp  # noqa: E402
 import tool_capabilities as tc  # noqa: E402
 
@@ -86,13 +87,6 @@ SUMMARY_FIELDS = ["tool", "gene_class", "n_gene_copies", "n_recovered", "n_corre
                   "n_shared_contig", "n_unassigned_contig", "correct_plasmid_rate", "replicon_type_correct_rate",
                   "n_samples", "n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate", "draft_truth_copies", "evaluation_task", "attribution_mode"]
 DEFAULT_CLASSES = Path(__file__).resolve().parents[1] / "config" / "amr_gene_classes.tsv"
-
-
-def read_tsv(path):
-    if not path or not os.path.isfile(path) or not os.path.getsize(path):
-        return []
-    with open(path, newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle, delimiter="\t"))
 
 
 FLANK_BP = int(os.environ.get("AMR_FLANK_BP", 1000))
