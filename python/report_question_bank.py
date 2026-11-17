@@ -24,6 +24,7 @@ from collections import defaultdict
 from pathlib import Path
 from plasbench_common import number  # noqa: E402
 import report_aliases  # noqa: E402
+import report_common  # noqa: E402
 import metric_registry  # noqa: E402
 
 SECTIONS = (("metric-framework", "Metrics"),
@@ -256,8 +257,8 @@ def ladder_html():
             + (f"<p><strong>Gaps, stated plainly:</strong></p><ul>{gap_items}</ul>" if gap_items else ""))
 
 
-def metric_framework_section(leaderboard, data_dir):
-    """The headline metric set, per tool, with how contigs were labelled."""
+def metric_framework_section(leaderboard, data_dir, scores=None):
+    """The headline metric set, per tool, with how contigs were labelled; `scores` (scores.tsv rows) adds the share of contigs left out of the contig-level F1."""
     rows = [r for r in leaderboard if r.get("tool")]
 
     def cell(row, key):
@@ -270,7 +271,8 @@ def metric_framework_section(leaderboard, data_dir):
         f"<td>{cell(r, 'mean_contig_f1_count')}</td><td>{cell(r, 'mean_contig_f1_bp')}</td>"
         f"<td>{cell(r, 'mean_contig_mcc_count')}</td><td>{cell(r, 'mean_contig_mcc_bp')}</td>"
         f"<td>{cell(r, 'mean_lw_bin_f1')}</td><td>{cell(r, 'mean_lw_bin_f1_assembly_aware')}</td>"
-        f"<td>{cell(r, 'mean_bin_ari')}</td><td>{cell(r, 'cprr')}</td></tr>" for r in rows)
+        f"<td>{cell(r, 'mean_bin_ari')}</td><td>{cell(r, 'cprr')}</td>"
+        f"<td>{esc(report_common.contig_exclusion_text(scores, r['tool']))}</td></tr>" for r in rows)
     label_counts = defaultdict(int)
     if data_dir and Path(data_dir).is_dir():
         for path in Path(data_dir).glob("*/contig_labels.tsv"):
@@ -299,8 +301,9 @@ def metric_framework_section(leaderboard, data_dir):
         "<div class='panel'><table class='sortable'><thead><tr><th>Track / task</th><th>Tool</th>"
         "<th>Base F1 (macro)</th><th>Base F1 (micro)</th><th>Contig F1 (count)</th><th>Contig F1 (length)</th>"
         "<th>MCC (count)</th><th>MCC (length)</th><th>Binning F1 (length)</th><th>Binning F1 (assembly-aware)</th>"
-        "<th>ARI</th><th>CPRR</th></tr></thead><tbody>"
-        + (body or "<tr><td colspan='12'>No scored tools.</td></tr>") + "</tbody></table></div></details></section>")
+        "<th>ARI</th><th>CPRR</th><th>Contigs excluded from contig F1</th></tr></thead><tbody>"
+        + (body or "<tr><td colspan='13'>No scored tools.</td></tr>") + "</tbody></table></div>"
+        f"<p class='muted'><strong>Contig F1 is not comparable with base F1.</strong> {esc(report_common.CONTIG_NOT_COMPARABLE)}</p></details></section>")
 
 
 TIER_WORDS = {"real_binary_checked": "real binary checked", "adapter_tested": "adapter tested", "untested": "untested", "not_applicable": "not a third-party tool"}
@@ -381,7 +384,7 @@ def database_membership_section(leaderboard, out_dir):
 
 def inject(page, out_dir, leaderboard, data_dir=None):
     """Insert the question-bank sections before Recommendations, and their nav links."""
-    sections = (metric_framework_section(leaderboard, data_dir) + database_membership_section(leaderboard, out_dir)
+    sections = (metric_framework_section(leaderboard, data_dir, report_common.read_tsv(str(Path(out_dir) / "scores.tsv"))) + database_membership_section(leaderboard, out_dir)
                 + baselines_section(out_dir, leaderboard) + interpretation_section() + metadata_section(out_dir)
                 + excluded_replicons_section(data_dir))
     anchor = "<section id='recommendations'>"

@@ -34,6 +34,8 @@ from pathlib import Path
 
 import report_3d
 import report_aliases
+import report_common
+from resampling import MIN_CLUSTERS_CI
 
 SECTIONS = (("prereg", "Pre-registration"), ("scoring-additions", "MCC &amp; F-beta"),
             ("plasmid-outcomes", "Plasmid outcomes"), ("label-schemes", "Label schemes"),
@@ -215,10 +217,13 @@ def contig_layer_section(leaderboard, scores, crosscheck=()):
         body += (f"<p class='muted'>Excluded contig length summed over scored runs: shared (AMBIGUOUS) {shared:,} bp, "
                  f"unassigned (UNPLACED) {unassigned:,} bp.</p>")
         tables = table(["Track / task", "Tool", "Base F1 (reference layer)", "Contig F1 (length)", "Contig MCC (length)",
-                        "Contig binning F1 (length)"],
+                        "Contig binning F1 (length)", "Contigs excluded from contig F1"],
                        [(f"{r.get('analysis_track')} / {r.get('task')}", r["tool"], r.get("mean_f1"),
-                         r.get("mean_contig_f1_bp"), r.get("mean_contig_mcc_bp"), r.get("mean_contig_bin_f1_bp"))
+                         r.get("mean_contig_f1_bp"), r.get("mean_contig_mcc_bp"), r.get("mean_contig_bin_f1_bp"),
+                         report_common.contig_exclusion_text(scores, r["tool"]))
                         for r in have])
+        body += (f"<p class='muted'><strong>Not comparable with base-level F1.</strong> {esc(report_common.CONTIG_NOT_COMPARABLE)} "
+                 "The last column is the share of the contigs scored for the tool that were left out for those reasons.</p>")
     if not drawn:
         body += f"<h3>Independent second scorer</h3><p>{esc(status)}: {esc(basis)}.</p>"
     if crosscheck:
@@ -387,15 +392,31 @@ def amr_section(rows, data_dir=None):
                    report_3d.host("rings", "v3-data-amr", payload, scene, -18, 26) + collapsible(tables))
 
 
+def independent_units(leaderboard):
+    """The number of independent units (studies or clusters) behind the headline ranking: the largest n_ranking_clusters of the leaderboard, the number the
+    leaderboard's '< N independent units' interval note is about. None when the leaderboard does not record it."""
+    counts = []
+    for r in leaderboard or []:
+        try:
+            counts.append(int(float(r.get("n_ranking_clusters") or r.get("n_independent_clusters") or 0)))
+        except (TypeError, ValueError):
+            pass
+    return max(counts) if counts and max(counts) else None
+
+
 def validity_section(leaderboard, provenance, evaluation, crosscheck=()):
     tiers = Counter(r.get("reference_tier", "") for r in provenance)
     studies = max((int(r.get("n_folds") or 0) for r in evaluation), default=0)
     validated = tiers.get("1", 0) + tiers.get("2", 0)
-    if validated and studies >= 3:
-        level, why = "validated", f"{validated} long-read-first isolate(s) across {studies} held-out studies"
+    # One derivation: the independent units behind the ranking and the minimum an interval needs (resampling.MIN_CLUSTERS_CI) are the same figures the leaderboard
+    # prints ("< N independent units"); without a recorded count the held-out folds stand in for it.
+    units = independent_units(leaderboard)
+    units = studies if units is None else units
+    if validated and units >= MIN_CLUSTERS_CI:
+        level, why = "validated", f"{validated} long-read-first isolate(s) across {units} independent units (an interval needs at least {MIN_CLUSTERS_CI})"
     elif validated:
-        level, why = "partially validated", (f"{validated} long-read-first isolate(s), but only {studies} held-out "
-                                             "stud(ies) for the recommender")
+        level, why = "partially validated", (f"{validated} long-read-first isolate(s), but only {units} independent unit(s): "
+                                             f"fewer than the {MIN_CLUSTERS_CI} an interval needs, so the leaderboard shows '< {MIN_CLUSTERS_CI} independent units'")
     else:
         level, why = "extrapolated", "no long-read-first (tier 1-2) truth in this run"
     body = table(["Claim", "Status", "Basis"], [

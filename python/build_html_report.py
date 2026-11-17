@@ -16,6 +16,8 @@ from pathlib import Path
 from urllib.parse import quote
 from plasbench_common import display_tool_name  # noqa: E402
 import data_nature  # noqa: E402
+import run_consistency  # noqa: E402
+from resampling import MIN_CLUSTERS_CI  # noqa: E402
 
 
 def info_script():
@@ -70,6 +72,77 @@ def lazy_frame_note(what):
 def read_tsv(path):
     with open(path, newline="") as fh:
         return list(csv.DictReader(fh, delimiter="\t"))
+
+
+HOME_PATH = re.compile(r"(?:/home/|/Users/|[A-Za-z]:\\Users\\)[^/\\\s'\"<>:]+")
+
+
+def redact_paths(text):
+    """A home folder in text shown in the report (/home/<user>/..., /Users/<user>/..., or a Windows Users folder) becomes ~, so a shared report does not carry a user name."""
+    return HOME_PATH.sub("~", str(text))
+
+
+# What the report cannot be built without, per input table. A damaged table gives one clear message instead of a KeyError or ValueError traceback.
+REQUIRED_INPUT_COLUMNS = {
+    "scores": ("sample", "tool", "f1", "true_plasmid_bp"),
+    "tool status": ("sample", "tool", "status"),
+    "leaderboard": ("tool", "mean_precision", "mean_recall", "mean_f1"),
+}
+NUMERIC_INPUT_COLUMNS = {
+    "scores": ("f1", "precision", "recall", "true_plasmid_bp", "plasmid_recall", "bin_f1"),
+    "leaderboard": ("mean_precision", "mean_recall", "mean_f1", "ranking_score", "n_samples", "n_completed", "n_failed", "n_skipped"),
+}
+
+
+def validate_inputs(tables, paths, allow_mismatch=False):
+    """Stop with one clear message when an input table is damaged or does not belong with the others.
+
+    tables: {"scores": rows, "tool status": rows, "leaderboard": rows}; paths: the same keys to file names (for the message).
+    Checks: every required column is present; the numeric columns hold finite numbers or blanks; and, when aggregation recorded a fingerprint of the score table it ranked
+    (benchmark.input_fingerprint.json), that the scores given here are those scores, not the file of another run. allow_mismatch skips only the last check."""
+    problems = []
+    for name, rows in tables.items():
+        if not rows:
+            continue                      # an empty table has no header to check; the report says "no scores" where it matters
+        header = set(rows[0])
+        missing = [c for c in REQUIRED_INPUT_COLUMNS.get(name, ()) if c not in header]
+        if missing:
+            problems.append(f"{paths.get(name)}: the {name} table has no column {', '.join(repr(c) for c in missing)} (columns found: {', '.join(sorted(header)[:10])}...)")
+            continue
+        for column in NUMERIC_INPUT_COLUMNS.get(name, ()):
+            if column not in header:
+                continue
+            for line, row in enumerate(rows, start=2):
+                value = row.get(column)
+                if value in (None, ""):
+                    continue
+                try:
+                    finite = float(value) == float(value) and abs(float(value)) != float("inf")
+                except ValueError:
+                    finite = False
+                if not finite:
+                    problems.append(f"{paths.get(name)} line {line}: column '{column}' holds {value!r}, which is not a finite number or blank")
+                    break
+    if problems:
+        raise SystemExit("ERROR: the report cannot be built from these inputs:\n  " + "\n  ".join(problems)
+                         + "\nThe previous report, if any, was left in place and is NOT from these inputs.")
+    leaderboard_tools = {row["tool"] for row in tables["leaderboard"]}
+    known_tools = {row["tool"] for row in tables["scores"]} | {row["tool"] for row in tables.get("tool status", [])}
+    stray = sorted(leaderboard_tools - known_tools)
+    if stray and not allow_mismatch:
+        raise SystemExit(f"ERROR: the leaderboard {paths.get('leaderboard')} ranks tool(s) {', '.join(stray)} that appear in neither {paths.get('scores')} nor the status table: "
+                         "the leaderboard and the scores are not from the same run. Re-run aggregation, or pass --allow-input-mismatch to build anyway.")
+    fingerprint_path = paths.get("fingerprint")
+    if fingerprint_path and Path(fingerprint_path).is_file() and not allow_mismatch:
+        try:
+            recorded = json.loads(Path(fingerprint_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            recorded = {}
+        actual = run_consistency.fingerprint(paths["scores"])
+        if recorded and (recorded.get("scores_rows") != actual["scores_rows"] or recorded.get("scores_sha256") != actual["scores_sha256"]):
+            raise SystemExit(f"ERROR: {paths['scores']} has {actual['scores_rows']} row(s) but the leaderboard was ranked from a score table with {recorded.get('scores_rows')} row(s) "
+                             f"(or different values: {Path(fingerprint_path).name}). The leaderboard and the scores are not from the same run, so the report would show numbers "
+                             "that disagree with each other. Re-run aggregation on this scores.tsv, or pass --allow-input-mismatch to build anyway.")
 
 
 ANALYSIS_TRACKS = ("short_read", "long_read", "hybrid")
@@ -271,7 +344,8 @@ GLOSSARY = {
     },
     "Chromosomal contamination": {
         "what": "Chromosome-reference bases covered by a predicted-plasmid "
-                "alignment, as a fraction of all truth-mapped bases.",
+                "alignment (FP bp), as a fraction of all truth-reference bases the "
+                "predictions cover (TP bp + FP bp); the report card averages it over isolates.",
         "why": "The most consequential error for AMR work: a resistance gene "
                "called plasmid-borne when it is chromosomal changes the "
                "conclusion about transmissibility.",
@@ -293,10 +367,11 @@ GLOSSARY = {
         "why": "Only available when curated AMR truth was supplied; otherwise it "
                "reads as unavailable rather than zero.",
     },
-    "Circular truth recovery": {
-        "what": "Fraction of circular reference plasmids recovered above the threshold.",
-        "why": "It does not establish that the predicted sequence is closed. "
-               "Nothing in this report does.",
+    "Coverage of circular truth plasmids": {
+        "what": "Fraction of the reference plasmids whose truth is circular that the predicted sequence covers above the threshold "
+                "(the scores column circular_plasmid_recall).",
+        "why": "It measures how much of a circular plasmid was covered, not whether the prediction is circular or closed. "
+               "Nothing in this report tests circularity.",
     },
     "Collinear fraction": {
         "what": "Aligned bases that keep reference order and orientation, over "
@@ -411,7 +486,8 @@ GLOSSARY = {
     "Complete + circular recall": {
         "what": "Fraction of a tool's CIRCULAR true plasmids that are essentially "
                 "fully covered by its own predicted sequence -- the strictest "
-                "per-plasmid completeness band this report computes.",
+                "per-plasmid completeness band this report computes. It is coverage "
+                "of circular truth plasmids; it does not test that the prediction is circular.",
         "why": "Only defined for isolates whose circular truth is actually known "
                "(score_plasmids.py's --circular-plasmids); shown as 'not assessed', "
                "never a fabricated 0, when that evidence is unavailable. Distinct "
@@ -548,12 +624,16 @@ def report_cards(leaderboard, scores):
     otherwise have to weigh by hand, and every component is shown beside it so
     the compression can be undone.
     """
+    # Chromosomal contamination = FP bp / (TP bp + FP bp) per isolate: the share of the truth-reference bases a tool's predictions cover that are chromosome
+    # (the definition the glossary gives). An isolate whose predictions cover no truth base has no contamination to state and is left out, not counted as 0.
     contamination = defaultdict(list)
     for row in scores:
-        true_bp = optional_number(row.get("true_plasmid_bp")) or 0
-        false_bp = optional_number(row.get("FP_bp")) or 0
-        total = true_bp + false_bp
-        if total:
+        true_covered = optional_number(row.get("TP_bp"))
+        false_bp = optional_number(row.get("FP_bp"))
+        if true_covered is None or false_bp is None:
+            continue
+        total = true_covered + false_bp
+        if total > 0:
             contamination[row["tool"]].append(false_bp / total)
 
     cards = []
@@ -561,12 +641,16 @@ def report_cards(leaderboard, scores):
         tool = row["tool"]
         scored = number(row.get("n_samples")) or 0
         completed = number(row.get("n_completed")) or 0
+        # Runs completed = completed / (completed + failed + skipped): numerator and denominator both come from the status table, so they describe the same runs.
+        # (The old completed / scored divided a status-table count by the number of scored isolates, which on a headline ranking of one isolate read 1000%.)
+        # A tool with no run in the status table at all has completion 0 when it was scored (a leaderboard from before the counts existed), else it is not measured.
+        attempted = completed + (number(row.get("n_failed")) or 0) + (number(row.get("n_skipped")) or 0)
         dirt = contamination.get(tool, [])
         parts = {
             "mean_f1": optional_number(row.get("mean_f1")),
             "mean_plasmid_recall": optional_number(row.get("mean_plasmid_recall")),
             "contamination": (sum(dirt) / len(dirt)) if dirt else None,
-            "completion": (completed / scored) if scored else None,
+            "completion": min(1.0, completed / attempted) if attempted else (0.0 if scored else None),
         }
         # A component that was never measured is dropped and the remaining
         # weights are renormalised, rather than counted as a zero.
@@ -601,14 +685,37 @@ def consistency_banner(results_dir):
         rows = read_tsv(path) if path.is_file() else []
     except (OSError, ValueError):
         rows = []
-    rows = [r for r in rows if r.get("severity", "error") == "error"]
+    rows = run_consistency.banner_findings(rows)
     if not rows:
         return ""
     kinds = Counter(r.get("kind", "") for r in rows)
     detail = "; ".join(f"{n} {k.replace('_', ' ')}" for k, n in sorted(kinds.items()))
+    errors = [r for r in rows if r.get("severity", "error") == "error"]
+    if not errors:
+        return ("<div class='insight caution input-inconsistent' id='consistency-banner'><p><strong>Some values are missing from the score table.</strong> " + esc(detail)
+                + ". A run with a blank ranking metric is left out of that tool's mean, so the mean covers fewer runs than the tool was scored on. "
+                + "The affected runs are listed in benchmark.input_consistency.tsv.</p></div>")
     return ("<div class='insight caution input-inconsistent' id='consistency-banner'><p><strong>The run tables disagree.</strong> " + esc(detail)
-            + ". This ranking was built anyway (ALLOW_INCONSISTENT_RUNS=1), so it may rest on missing, stale or duplicated runs: do not quote it. "
+            + ". This ranking was built anyway (ALLOW_INCONSISTENT_RUNS=1), so it may rest on missing, stale, duplicated or contradictory runs: do not quote it. "
             + "The affected runs are listed in benchmark.input_consistency.tsv.</p></div>")
+
+
+def shared_set_banner(rows):
+    """A banner above the ranking for every (track, task) whose shared sample set is empty or small (aggregate_results.py sets ranking_warning); empty when none is."""
+    seen, items = set(), []
+    for row in rows:
+        warning = row.get("ranking_warning") or ""
+        key = (row.get("analysis_track"), row.get("task"))
+        if warning and key not in seen:
+            seen.add(key)
+            where = " / ".join(part for part in key if part)
+            items.append(f"<li><strong>{esc(where) or 'This ranking'}:</strong> {esc(warning)}. Tools that shrink the shared set: {esc(row.get('shared_set_shrunk_by') or 'none identified')}.</li>")
+    if not items:
+        return ""
+    return ("<div class='insight caution shared-set-warning' id='shared-set-banner'><p><strong>The ranking rests on a small or empty shared sample set.</strong> "
+            "Every tool is ranked on the samples all ranked tools were scored on; when one tool is missing from many samples that set shrinks, or disappears and each tool "
+            "is then ranked on its own samples. Read these ranks as provisional. Each tool's own-sample mean stays in the table (mean F1 on all scored samples).</p>"
+            f"<ul>{''.join(items)}</ul></div>")
 
 
 def primary_banner(leaderboard):
@@ -657,6 +764,12 @@ def guided_findings(leaderboard, cards, scores, status_counts):
                      "treat the rank as provisional, not a settled result.",
         }.get(sig_raw, " Too few samples are shared with the runner-up for a paired "
                        "significance test yet, so this lead is not statistically assessed.")
+        if best.get("ranking_warning"):
+            findings.append({
+                "tone": "caution", "label": "Small or empty shared sample set",
+                "text": esc(best["ranking_warning"]) + ". Tools that shrink the shared set: " + esc(best.get("shared_set_shrunk_by") or "none identified") + ".",
+                "target": "#leaderboard", "action": "See the ranking",
+            })
         status, population = primary_state(leaderboard)
         if status != "available":
             findings.append({
@@ -751,7 +864,7 @@ def grade_rows_html(cards):
         for c in cards)
 
 
-def summary_section(leaderboard, cards, findings, scores, status_counts, metadata, scope=""):
+def summary_section(leaderboard, cards, findings, scores, status_counts, metadata, scope="", all_leaderboards=None):
     """The headline numbers, the grades, and what to look at first."""
     if not leaderboard:
         return ""
@@ -761,15 +874,19 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
     best = leaderboard[0]
 
     stats = [
-        ("Methods compared", str(len(leaderboard)), "Tools with at least one scored run."),
+        ("Methods compared", str(len({r["tool"] for r in all_leaderboards}) if all_leaderboards else len(leaderboard)),
+         "Distinct tools with at least one scored run, counted across every track and task "
+         + (f"({len(leaderboard)} in the task the leading method belongs to)." if all_leaderboards else "of this leaderboard.")),
         ("Isolates", str(samples), "Samples with a truth set and at least one scored method."),
         ("Truth plasmids", str(int(plasmids)), "Reference plasmids the methods were measured against."),
         # `scope` names the analysis track when several were scored (" · Short-read track"): the leader belongs to one track, never to a pooled ranking
-        (("Leading method" if primary_state(leaderboard)[0] == "available" else "Leading method (provisional)"), esc(best["tool"]),
-         (f"Highest {headline_label(best)} ({headline_value(best) or 0:.3f}){scope} · method ranking only."
+        (("Leading method" if primary_state(leaderboard)[0] == "available" else "Leading method (provisional)"),
+         esc(best["tool"]) + ("<small>only tool in its task: nothing to compare it with</small>" if len(leaderboard) == 1 else ""),
+         (("Only tool of its task, so it leads by default, not by comparison. " if len(leaderboard) == 1 else "") + f"Highest {headline_label(best)} ({headline_value(best) or 0:.3f}){scope} · method ranking only."
           if primary_state(leaderboard)[0] == "available" else
           f"Provisional: highest {headline_label(best)} ({headline_value(best) or 0:.3f}){scope}. Primary analysis unavailable (no qualifying reference); not the headline result.")),
-        ("Runs not completed", str(status_counts.get("failed", 0) + status_counts.get("skipped", 0)),
+        ("Runs not completed", str(status_counts.get("failed", 0) + status_counts.get("skipped", 0))
+         + f"<small>{status_counts.get('failed', 0)} failed &middot; {status_counts.get('skipped', 0)} skipped</small>",
          "Failed runs on plasmid-bearing isolates count as zero for that tool; skipped runs are left out."),
     ]
     stat_html = "".join(
@@ -796,7 +913,9 @@ def summary_section(leaderboard, cards, findings, scores, status_counts, metadat
         "composite of Base F1 (40%), plasmid recall (25%), freedom from chromosomal "
         "contamination (20%) and completed runs (15%); A &ge;0.90, B &ge;0.80, C &ge;0.65, "
         "D &ge;0.45. A component that was not measured is dropped and the rest reweighted, "
-        "never counted as zero. The components are shown so the grade can be taken apart.</p>"
+        "never counted as zero. Chromosomal contamination is FP bp / (TP bp + FP bp): the share of the truth-reference bases a method's predictions cover that are chromosome, "
+        "averaged over isolates. Runs completed is completed / (completed + failed + skipped) from the status table, at most 100%. "
+        "The components are shown so the grade can be taken apart.</p>"
         "<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Grade</th>"
         "<th>Base F1</th><th>Plasmid recall</th><th>Chromosomal contamination</th>"
         f"<th>Runs completed</th></tr></thead><tbody data-iso-slot='summary-card'>{grade_html}</tbody></table></div>"
@@ -854,8 +973,17 @@ def agreement_pointer_script():
     return report_asset("agreement_pointer_script.html")
 
 
-def read_tool_versions(path):
+def clean_version(value):
+    """A version string as shown: the first non-empty line, a home folder redacted, at most 120 characters (a tool that prints a warning for --version is clipped)."""
+    lines = [line.strip() for line in str(value).splitlines() if line.strip()]
+    text = redact_paths(lines[0] if lines else "unreported")
+    return text if len(text) <= 120 else text[:117] + "..."
+
+
+def read_tool_versions(path, ran=None):
     """Map report tool labels to versions recorded at the time of the run.
+
+    ran: when given, the tool labels that actually ran in this run; every other label is left out (a manifest lists every tool found on the machine).
 
     Two sources, in order. The executable map covers the adapters that ship
     here, whose report label differs from the command they invoke. A run may
@@ -886,7 +1014,52 @@ def read_tool_versions(path):
     declared = manifest.get("method_versions", {}) or {}
     if isinstance(declared, dict):
         versions.update({str(label): str(value) for label, value in declared.items() if value})
-    return versions
+    return {label: clean_version(value) for label, value in versions.items() if ran is None or label in ran}
+
+
+KEY_SETTINGS = ("ANALYSIS_TRACK", "ASSEMBLER", "CONTIG_MIN_LENGTH", "MIN_ALIGNMENT_IDENTITY", "MIN_ALIGNMENT_LENGTH", "MIN_ALIGNMENT_MAPQ", "MIN_ALIGNMENT_QUERY_COVERAGE",
+                "PLASMID_RECOVERY_THRESHOLD", "CPRR_MIN_COVERAGE", "CPRR_MIN_IDENTITY", "HEADLINE_MAX_REFERENCE_TIER", "MIN_SPECIES_CLUSTERS", "RESOURCE_FAILURES")
+
+
+def run_manifest_html(manifest_path, tool_versions):
+    """The Run metadata items taken from run_manifest.json: PlasBench version, container, databases (path, files, checksum), versions of the tools that ran, key settings and the
+    manifest's own warnings. Home folders are redacted. Without a manifest one item says so."""
+    try:
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise ValueError("not an object")
+    except (OSError, ValueError, TypeError):
+        return "<div><small>Run manifest</small>not recorded (no run_manifest.json was given or it could not be read)</div>"
+    items = []
+
+    def item(label, value):
+        items.append(f"<div><small>{esc(label)}</small>{esc(redact_paths(value))}</div>")
+    version = manifest.get("tool_version")
+    item("PlasBench version", f"{manifest.get('tool') or 'PlasBench'} {version}" if version else "not recorded")
+    container = manifest.get("container") if isinstance(manifest.get("container"), dict) else {}
+    item("Container", " ".join(str(v) for v in (container.get("image"), container.get("image_digest")) if v) or "no container image recorded (run on the host)")
+    databases = manifest.get("databases") if isinstance(manifest.get("databases"), dict) else {}
+    parts = []
+    for name, info in sorted(databases.items()):
+        info = info if isinstance(info, dict) else {}
+        if info.get("available"):
+            detail = [f"{info['file_count']} file(s)" if info.get("file_count") else "", f"sha256 {str(info['identity_sha256'])[:12]}" if info.get("identity_sha256") else "",
+                      f"version {info['version']}" if info.get("version") else "", f"at {info['path']}" if info.get("path") else ""]
+            parts.append(f"{name}: installed ({', '.join(d for d in detail if d)})")
+        else:
+            parts.append(f"{name}: not installed" + (f" (looked in {info['path']})" if info.get("path") else ""))
+    if parts:
+        item("Databases", "; ".join(parts))
+    if tool_versions:
+        item("Tool versions (tools that ran)", "; ".join(f"{label}: {value}" for label, value in sorted(tool_versions.items())))
+    settings = manifest.get("settings") if isinstance(manifest.get("settings"), dict) else {}
+    shown = [f"{key}={settings[key]}" for key in KEY_SETTINGS if key in settings]
+    if shown:
+        item("Key settings", "; ".join(shown) + f" ({len(settings)} settings are recorded in run_manifest.json)")
+    warnings = manifest.get("warnings") if isinstance(manifest.get("warnings"), list) else []
+    if warnings:
+        item("Manifest warnings", "; ".join(str(w) for w in warnings[:5]) + (f" (and {len(warnings) - 5} more)" if len(warnings) > 5 else ""))
+    return "".join(items)
 
 
 def optional_analysis_html(manifest_path, results_dir, report_path):
@@ -1388,7 +1561,29 @@ EFFECT_STATUS_TEXT = {
 }
 
 
-def headline_design_section(out_dir):
+def tier1_unreachable_note(provenance, curation_grades=None):
+    """A banner when Tier 1 cannot be reached by any sample because no row has curation grade A (the sample sheet's truth_quality_tier).
+
+    Tier 1 needs grade A (a reviewed publication or collection names the study) as well as long-read-first truth and evidence-checked labels, so a cohort whose
+    every row is grade B (complete, not curator-approved) can never have a Tier 1 reference, whatever its assemblies are; the report must not describe Tier 1 as attainable
+    for it. curation_grades: the grades in the sample sheet; when not given, the grades named in the provenance reasons are used. Empty when Tier 1 is reachable or recorded."""
+    if not provenance or any(r.get("reference_tier") == "1" for r in provenance):
+        return ""
+    grades = {str(g).strip().upper() for g in (curation_grades or []) if str(g).strip()}
+    if not grades:
+        for r in provenance:
+            match = re.search(r"truth_quality_tier ([A-Za-z])", r.get("tier_reason") or "")
+            if match:
+                grades.add(match.group(1).upper())
+    if not grades or "A" in grades:
+        return ""
+    return ("<div class='insight caution tier1-unreachable' id='tier1-banner'><p><strong>No sample in this run can reach Tier 1.</strong> Tier 1 requires curation grade A "
+            f"(the sample sheet's truth_quality_tier), and every curation grade recorded for this cohort is {esc(', '.join(sorted(grades)))}. The best a reference can be is Tier 2, so the "
+            "Tier 1 description below is what a reviewed cohort could reach, not something this cohort can. Have the rows reviewed and set truth_quality_tier to A (with "
+            "evidence-checked labels and polishing independent of the benchmark reads) to make Tier 1 attainable.</p></div>")
+
+
+def headline_design_section(out_dir, curation_grades=None):
     """Reference standard, provenance tiers and species balance behind the headline."""
     design = read_tsv(out_dir / "benchmark.headline_design.tsv") if (out_dir / "benchmark.headline_design.tsv").is_file() else []
     provenance = read_tsv(out_dir / "benchmark.truth_provenance.tsv") if (out_dir / "benchmark.truth_provenance.tsv").is_file() else []
@@ -1456,6 +1651,7 @@ def headline_design_section(out_dir):
                            "No tool was scored on both headline-tier and tier-3 truth in this run.")
     return (
         "<section id='headline-design'><h2>Headline design and reference standard</h2>"
+        + tier1_unreachable_note(provenance, curation_grades) +
         "<p class='lead'>Which samples and species the headline ranking rests on. Two separate questions are asked of each reference. "
         "<strong>Reference quality</strong> (validated, partially validated, provisional) is the tier. <strong>Evaluation independence</strong> asks whether the reference is independent of the evidence the "
         "benchmarked tools use: <em>independent</em> (long-read-first, polished with no reads or reads independent of the benchmark), <em>partially independent</em> (long-read-first structure, polished "
@@ -2282,6 +2478,8 @@ def main():
     ap.add_argument("--leave-taxon-out", help="benchmark.leave_taxon_out.tsv (leave_taxon_out.py)")
     ap.add_argument("--amr-placement", help="benchmark.amr_placement.tsv (score_amr_placement.py collect)")
     ap.add_argument("--contig-crosscheck", help="benchmark.contig_crosscheck.tsv (contig_crosscheck.py compare)")
+    ap.add_argument("--allow-input-mismatch", action="store_true", default=os.environ.get("ALLOW_INPUT_MISMATCH", "0") == "1",
+                    help="build even when the leaderboard was not ranked from the scores given (a different tool set or score table). Default off. ALLOW_INPUT_MISMATCH=1 sets it.")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -2291,6 +2489,10 @@ def main():
     scores = read_tsv(args.scores)
     status = read_tsv(args.tool_status) if Path(args.tool_status).is_file() else []
     leaderboard = read_tsv(args.leaderboard)
+    validate_inputs({"scores": scores, "tool status": status, "leaderboard": leaderboard},
+                    {"scores": args.scores, "tool status": args.tool_status, "leaderboard": args.leaderboard,
+                     "fingerprint": re.sub(r"\.leaderboard\.tsv$", ".input_fingerprint.json", args.leaderboard)},
+                    allow_mismatch=args.allow_input_mismatch)
     # Rank WITHIN each analysis track, never across them. The pooled file is
     # kept only as a fallback for a results directory written before per-track
     # leaderboards existed.
@@ -2331,7 +2533,9 @@ def main():
     sheet_rows = data_nature.read_sheet(args.sample_sheet)
     data_nature.refuse_mixed(set(samples), sheet_rows, os.environ.get("ALLOW_SYNTHETIC_WITH_REAL", "0") == "1")
     demo_banner = data_nature.BANNER if data_nature.all_synthetic(set(samples), sheet_rows) else ""
+    tool_versions = read_tool_versions(args.manifest, ran=set(tools))   # only the tools that ran: a manifest lists every tool found on the machine
     versions = sorted(set(tool_versions.values()))
+    manifest_html = run_manifest_html(args.manifest, tool_versions)
     track_counts = Counter(row.get("analysis_track") or "short_read" for row in scores)
     tracks = sorted(track_counts)
     if not track_leaderboards:
@@ -2388,7 +2592,7 @@ def main():
                 score=esc(f"{headline_value(row):.4f}" if headline_value(row) is not None else "-"),
                 f1_width=max(0, min(100, round((headline_value(row) or 0) * 100))),
                 band=score_band(headline_value(row) or 0),
-                ci=esc(f"{row['ranking_ci_low']}–{row['ranking_ci_high']}" if row.get("ranking_ci_low") else "< 5 independent units"),
+                ci=esc(f"{row['ranking_ci_low']}–{row['ranking_ci_high']}" if row.get("ranking_ci_low") else f"< {MIN_CLUSTERS_CI} independent units"),
                 cprr=esc((f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
                           + (f"; per isolate {number(row['cprr_isolate_mean']):.1%}"
                              if row.get("cprr_isolate_mean") else "")
@@ -2458,7 +2662,8 @@ def main():
         leaderboard_panels = leaderboard_table(
             track_leaderboards.get(ordered_tracks[0], leaderboard) if ordered_tracks else leaderboard)
 
-    leaderboard_panels = consistency_banner(results_dir) + primary_banner(headline_leaderboard) + leaderboard_panels
+    leaderboard_panels = (consistency_banner(results_dir) + primary_banner(headline_leaderboard)
+                          + shared_set_banner([row for rows in track_leaderboards.values() for row in rows]) + leaderboard_panels)
     import report_wiring
     robustness_html = robustness_section(track_leaderboards, ordered_tracks or list(track_leaderboards),
                                          report_wiring.overlap_statuses(str(results_dir)))
@@ -2846,7 +3051,7 @@ def main():
     ) or f"<div class='panel'><table class='sortable'>{comparison_head}<tbody><tr><td colspan='13'>No paired score rows are available.</td></tr></tbody></table></div>"
     score_failure_html = "".join(
         "<li><strong>{sample} / {tool}</strong> at {stage}: {reason}</li>".format(
-            sample=esc(row["sample"]), tool=esc(row["tool"]), stage=esc(row["stage"]), reason=esc(row["reason"])
+            sample=esc(row["sample"]), tool=esc(row["tool"]), stage=esc(row["stage"]), reason=esc(redact_paths(row["reason"]))
         ) for row in score_failures
     ) or "<li>No score-stage failures were recorded.</li>"
 
@@ -2855,7 +3060,7 @@ def main():
         "<td>{runtime}</td><td>{memory}</td><td>{reason}</td></tr>".format(
             sample=esc(row["sample"]), tool=esc(row["tool"]), state=esc(row["status"]),
             runtime=esc(row.get("runtime_seconds") or "-"), memory=esc(row.get("peak_rss_kb") or "-"),
-            reason=esc(row.get("reason") or "-"),
+            reason=esc(redact_paths(row.get("reason") or "-")),
         ) for row in status
     ) or "<tr><td colspan='4'>Stage 4 status was not available.</td></tr>"
 
@@ -2953,7 +3158,8 @@ def main():
     optional_not_run_html = (f"<div><small>Optional analyses not run</small>{esc('; '.join(optional_not_run))}. Their absence is not a failed benchmark.</div>"
                              if optional_not_run else "")
     findings = guided_findings(headline_leaderboard, cards, scores, status_counts)
-    summary_html = summary_section(headline_leaderboard, cards, findings, scores, status_counts, metadata, scope=best_scope)
+    summary_html = summary_section(headline_leaderboard, cards, findings, scores, status_counts, metadata, scope=best_scope,
+                                   all_leaderboards=[row for rows in track_leaderboards.values() for row in rows])
     insight_html = "".join(f"<li>{esc(note)}</li>" for note in insight_notes)
     chart_html = performance_chart(headline_leaderboard)
     glossary_cards = glossary_section()
@@ -2998,18 +3204,18 @@ def main():
 <main><nav class='nav' aria-label='Report sections'><a href='#summary'>Summary</a><a href='#metadata'>Run metadata</a><a href='#chart'>Metric chart</a><a href='#leaderboard'>Method ranking</a><a href='#recommendations'>Recommendations</a><a href='#validation'>Study validation</a><a href='#extended'>Extended analyses</a><a href='#selected'>Selected reconstructions</a><a href='#scores'>All scores</a><a href='#statistics'>Statistics</a><a href='#bin-diagnostics'>Bin diagnostics</a><a href='#zero-plasmid'>Zero-plasmid isolates</a><a href='#graded-tiers'>Graded plasmid recovery</a><a href='#isolate-difficulty'>Isolate difficulty</a><a href='#cohort-qc'>Cohort QC flags</a><a href='#replicon-recovery'>Recovery by replicon</a><a href='#quast-diagnostics'>QUAST diagnostics</a><a href='#rank-robustness'>Ranking robustness</a><a href='#truth-label-audit'>Truth-label audit</a><a href='#stratified'>Performance by stratum</a><a href='#orthogonal-evidence'>Orthogonal evidence</a>{dimension_nav_html}<a href='#health'>Run health</a><a href='#tools'>Tool drill-down</a><a href='#samples'>Sample drill-down</a><a href='#keys'>Keys and legend</a><a href='#files'>File explorer</a><a href='#method'>Method</a></nav>
 <div class='metrics'><div class='metric'><small>Samples observed</small><strong>{len(samples)}</strong></div><div class='metric'><small>Tools observed</small><strong>{len(tools)}</strong></div><div class='metric'><small>Benchmark winner: {best_metric}</small><strong>{best_f1}</strong><small>{best_value}{best_scope} · method ranking only</small></div><div class='metric'><small>Execution issues</small><strong>{status_counts['failed'] + status_counts['skipped']}</strong><small>{status_counts['failed']} failed · {status_counts['skipped']} skipped</small></div></div>
 {summary_html}
-<section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div>{optional_not_run_html}</div></section>
+<section id='metadata'><h2>Run and output metadata</h2><div class='metadata'><div><small>Run folder</small>{esc(run_folder)}</div><div><small>Input cohort / sheet</small>{esc(cohort_label)}</div><div><small>Report generated</small>{esc(generated)}</div><div><small>Score observations</small>{len(scores)} sample-tool row(s)</div><div><small>Tracked artifacts</small>{artifact_count} file(s) · {esc(size_text(artifact_bytes))}</div><div><small>Execution states</small>{status_counts['completed']} completed · {status_counts['reused']} reused · {status_counts['failed']} failed · {status_counts['skipped']} skipped</div><div><small>Scoring inputs</small>scores.tsv, tool_status.tsv, benchmark.leaderboard.tsv</div><div><small>Reference scope</small>Complete assembly reference bases; plasmid is the positive class</div>{manifest_html}{optional_not_run_html}</div></section>
 <section id='chart'><h2>Performance profile</h2><p class='lead'>Mean precision, recall, and F1 by tool. Green is precision, amber is recall, and dark green is F1; bar length spans 0 to 1.</p><div class='chart-card'>{chart_html}</div></section>
 <section id='leaderboard'><h2>Benchmark method ranking</h2><p class='lead'>This compares methods across this benchmark cohort. It is not, by itself, a claim that the top method has produced a biologically confirmed plasmid for every sample. Plasmid recall gives equal weight to each truth plasmid, limiting domination by a large replicon. Perfect reference recovery requires F1 and plasmid recall of 1 with no ambiguous, unmapped, or off-truth predicted bases. Strict reconstruction additionally requires perfect available bin diagnostics; neither label proves nucleotide identity or circular closure. Mean bin F1 is shown only for declared binning methods; “not applicable” is not a zero. Mean PR-AUC is shown only for tools exposing a per-record probability (ML classifiers); it never replaces mean F1 in the ranking. Select a column heading to sort.</p>{leaderboard_panels}</section>
 <section id='recommendations'><h2>Operational method recommendations</h2><p class='lead'>These are coverage-gated, multi-objective method recommendations, not proof that any individual predicted sequence is correct. Accuracy is primary; failure rate, structural diagnostics, runtime, and memory are included as lower-weighted practical considerations. Each scored isolate also has a reusable <code>selected_candidate/</code> folder containing the chosen already-generated FASTA and a JSON explanation.</p>{recommendation_task_note}{recommendation_why}{recommendation_evidence}<div class='panel'><table class='sortable'><thead><tr><th>Scope</th><th>Group</th><th>Primary method</th><th>State</th><th>Scored</th><th>Coverage</th><th>Mean F1</th><th>Mean plasmid recall</th><th>Median runtime s</th><th>Median peak RSS KiB</th><th>Decision note</th><th>Decision score</th></tr></thead><tbody>{recommendation_rows}</tbody></table></div></section>
 <section id='validation'><h2>Leave-one-study-out validation</h2><p class='lead'>For each source study, the method is selected using all other studies and then evaluated only on the held-out study. A withheld result means the cohort does not yet have enough independent study evidence; it is not a failed method.</p><div class='panel'><table class='sortable'><thead><tr><th>Held-out study</th><th>Held-out samples</th><th>Training-selected method</th><th>Training samples</th><th>Held-out mean F1</th><th>Status</th><th>Interpretation</th></tr></thead><tbody>{validation_rows}</tbody></table></div></section>
 {extended_section}
 <section id='selected'><h2>Selected reconstructions</h2><p class='lead'>Each card translates its <code>selection_report.json</code> into a research-facing decision. Downloading the selected FASTA does not rerun any reconstruction; it retrieves the original output retained from the completed tool run.</p>{''.join(selection_cards) or "<p class='muted'>No sample-level selection reports were produced.</p>"}</section>
-<section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. Circular-truth recovery is not evidence that a predicted sequence is closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{tool_options}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Curation grade <select id='tier-filter' title='The cohort column truth_quality_tier: how far a curator has reviewed the row (A = a reviewed publication or collection names the study, B = complete but not curator-approved, C = not verified). It is not the reference tier used by the headline.'><option value=''>All grades</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Circular truth recovery</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
+<section id='scores'><h2>All sample-tool scores</h2><p class='lead'>Filter by performance, tool provenance, or cohort metadata; export the exact visible subset. Unambiguous, ambiguous, and unmapped predicted bases are separate categories. AMR and circular-truth recovery are unavailable (-) unless curated truth annotations were supplied. The circular-truth column is coverage of the plasmids whose truth is circular (circular_plasmid_recall); it does not test that a predicted sequence is circular or closed.</p><div class='controls'><label>Sample <select id='sample-filter'><option value=''>All samples</option>{''.join(f"<option>{esc(s)}</option>" for s in samples)}</select></label><label>Tool <select id='tool-filter'><option value=''>All tools</option>{tool_options}</select></label><label>Tool version <select id='version-filter'><option value=''>All versions</option><option>not recorded</option>{''.join(f"<option>{esc(v)}</option>" for v in versions)}</select></label><label>Organism <select id='organism-filter'><option value=''>All organisms</option>{''.join(f"<option>{esc(v)}</option>" for v in organisms)}</select></label><label>Origin <select id='origin-filter'><option value=''>All origins</option>{''.join(f"<option>{esc(v)}</option>" for v in origins)}</select></label><label>Truth technology <select id='tech-filter'><option value=''>All technologies</option>{''.join(f"<option>{esc(v)}</option>" for v in technologies)}</select></label><label>Curation grade <select id='tier-filter' title='The cohort column truth_quality_tier: how far a curator has reviewed the row (A = a reviewed publication or collection names the study, B = complete but not curator-approved, C = not verified). It is not the reference tier used by the headline.'><option value=''>All grades</option>{''.join(f"<option>{esc(v)}</option>" for v in tiers)}</select></label><label>Plasmid size <select id='size-filter'><option value=''>All sizes</option><option value='small'>Small (&lt;10 kb)</option><option value='medium'>Medium (10–100 kb)</option><option value='large'>Large (≥100 kb)</option></select></label><label>Depth ≥ <input id='depth-min' type='number' min='0' step='any' placeholder='any'></label><label>Depth ≤ <input id='depth-max' type='number' min='0' step='any' placeholder='any'></label><label>F1 band <select id='band-filter'><option value=''>All bands</option><option value='high'>High (≥0.90)</option><option value='medium'>Medium (0.70–0.89)</option><option value='low'>Low (&lt;0.70)</option></select></label><button id='export-scores' type='button'>Download filtered CSV</button><span id='score-count' class='count'></span></div><div class='panel'><table id='score-table' class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Tool version</th><th>Origin</th><th>Read depth ×</th><th>True plasmid bp</th><th>TP bp</th><th>FP bp</th><th>FN bp</th><th>Unambiguous predicted bp</th><th>Ambiguous predicted bp</th><th>Unmapped predicted bp</th><th>Precision</th><th>Recall</th><th>AMR recovery</th><th>Coverage of circular truth plasmids</th><th>F1</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 <section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least six independent units (five for an interval). Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p>{comparison_tables}<p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
 <section id='zero-plasmid'><h2>Zero-plasmid isolates (negative control)</h2><p class='lead'>Precision, recall, and F1 are correctly undefined on an isolate with no true plasmid at all -- there is nothing to recover, and a tool predicting nothing has made a correct abstention, not scored a zero. These isolates are still valuable: they are the only ones that directly measure false-positive behavior. Isolate specificity is 1 minus the fraction of that isolate's chromosome a tool wrongly called plasmid; chromosome FP bp is the same false call in raw bases, summed across every plasmid-free isolate a tool was scored on. A specificity below 1.0 means real chromosomal sequence was misclassified as plasmid on a sample where NO plasmid exists to justify it.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Plasmid-free isolates scored</th><th>Mean isolate specificity</th><th>Total chromosome FP bp</th></tr></thead><tbody>{zero_plasmid_html}</tbody></table></div></section>
-<section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered AND circular, the strictest per-plasmid claim this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>
+<section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered, among plasmids whose truth is circular (coverage of a circular plasmid, not a test that the prediction is circular), the strictest per-plasmid completeness band this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>
 <section id='isolate-difficulty'><h2>Isolate difficulty</h2><p class='lead'>Truth-derived signals for how intrinsically hard THIS isolate is to correctly separate into plasmid vs. chromosome, independent of any tool's own performance on it -- never a tool-performance measure, and never wired into the recommendation model (see docs/METHODS.md). Off by default (RUN_DIFFICULTY_FEATURES); each field is independently optional and shown as "not available" rather than a guessed value when its own prerequisite (an assembly graph, short reads, or the external tool) was missing.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>GFA dead-end count</th><th>Plasmid/chromosome depth ratio</th><th>Plasmid/chromosome Mash distance</th></tr></thead><tbody>{difficulty_html}</tbody></table></div>
 <h3>Dataset characteristics</h3><p class='lead'>Every isolate in one table, composed from the measurements the pipeline already makes (assembly statistics, read depth and quality, repeat content of the truth, the signals above). Each column says whether it is <strong>knowable without a reference</strong> (an isolate's own reads, assembly and organism: the only kind a live recommendation may use) or <strong>needs the reference</strong> (shown to explain results, never a model input). A value that was not measured says so; it is never a zero.</p><div class='panel'>{dataset_features_html}</div></section>
 <section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
@@ -3036,9 +3242,10 @@ const statusFilter=document.getElementById('status-filter');function filterStatu
 document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEventListener('click',()=>{{const table=head.closest('table'),body=table.tBodies[0],rows=Array.from(body.rows),ascending=head.dataset.order!=='asc';rows.sort((a,b)=>{{const av=a.cells[index]?.innerText.trim()||'',bv=b.cells[index]?.innerText.trim()||'',an=Number(av.replace(/[^0-9.-]/g,'')),bn=Number(bv.replace(/[^0-9.-]/g,''));const result=Number.isNaN(an)||Number.isNaN(bn)?av.localeCompare(bv):an-bn;return ascending?result:-result;}});rows.forEach(row=>body.appendChild(row));table.querySelectorAll('th').forEach(h=>delete h.dataset.order);head.dataset.order=ascending?'asc':'desc';}}));
 </script>
 </body></html>"""
-    page = page.replace("<a href='#scores'>", "<a href='#enterprise'>Interactive dashboard</a><a href='#scores'>")
+    if enterprise_html:        # the link only when the section exists (it is embedded with --embed-dashboard), never a dangling #enterprise
+        page = page.replace("<a href='#scores'>", "<a href='#enterprise'>Interactive dashboard</a><a href='#scores'>")
     page = page.replace("<section id='scores'>", enterprise_html + "<section id='scores'>")
-    design_html = headline_design_section(results_dir)
+    design_html = headline_design_section(results_dir, tiers)
     page = page.replace("<section id='recommendations'>",
                         robustness_html + design_html + "<section id='recommendations'>", 1)
     page = page.replace("<a href='#recommendations'>Recommendations</a>",
@@ -3110,6 +3317,8 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     import report_names   # tool ids -> display names in the page text, so print, PDF and no-JavaScript readers see them too
     page = report_names.humanise(page, {tool: display_tool_name(tool) for tool in tools})
     page = page.replace("</body>", humanise_tool_labels_script(tools) + "</body>")
+    if not demo_banner:     # the demo-data sentences of the figure modules are true only for a synthetic run
+        page = data_nature.strip_demo_boilerplate(page)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
     print(f"Wrote HTML report: {out}")
