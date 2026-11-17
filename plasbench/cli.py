@@ -213,6 +213,7 @@ ANALYSES = {
     "rank-sensitivity": ("rank_sensitivity.py", "How much the ranking depends on scoring choices"),
     "bin-agreement": ("bin_agreement.py", "PlasEval-style best-match scores and split/join dissimilarity between bin sets"),
     "plaseval-replication": ("plaseval_replication.py", "Score the PlasEval paper's published bins (53 E. coli isolates) with PlasBench and draw the error profile; optionally compare with the original program"),
+    "build-published-outcomes": ("build_published_outcomes.py", "Rebuild the published-outcome tables (cohorts/published/) from the plsMD and Teixeira supplementary workbooks"),
     "assembly-adequacy": ("assembly_adequacy.py", "Whether each short-read assembly contains the plasmids it is judged against"),
     "copy-number": ("copy_number.py", "Tool versus truth plasmid copy number per matched bin"),
     "repeat-content": ("repeat_content.py", "K-mer repeat content of the truth replicons"),
@@ -488,6 +489,16 @@ def build_parser():
     report_parser.add_argument("--importer-command", default="")
     report_parser.add_argument("--resolver-command", default="")
     report_parser.add_argument("--validate-command", default="")
+    compare_parser = sub.add_parser("compare-published", help="Put PlasBench's results on a publication's isolates beside the publication's own outcomes (tables, JSON and an optional page).")
+    compare_parser.add_argument("--results-dir", type=Path, required=True, help="The finished run's results directory.")
+    compare_parser.add_argument("--samples", type=Path, required=True, help="The cohort sheet that was run (matched to the publication by BioSample).")
+    compare_parser.add_argument("--scores", type=Path, help="Defaults to <results-dir>/scores.tsv.")
+    compare_parser.add_argument("--out-prefix", type=Path, help="Defaults to <results-dir>/benchmark.published_comparison.")
+    compare_parser.add_argument("--html", type=Path, help="Also write a stand-alone page.")
+    pubcohort_parser = sub.add_parser("build-publication-cohorts", help="Build the publication cohorts (pub-*.tsv and publication-v1.tsv) from the candidate ledgers, public-v4 and NCBI resolution.")
+    pubcohort_parser.add_argument("--resolved", type=Path, action="append", default=[], metavar="STUDY=resolved.tsv", help="Resolver output per study, for example mobsuite=work/mobsuite/resolved.tsv (repeatable).")
+    pubcohort_parser.add_argument("--out-dir", type=Path, default=Path("cohorts"))
+    pubcohort_parser.add_argument("--audit", type=Path, help="Write the per-candidate outcome table here.")
     resolve_parser = sub.add_parser("resolve-contributed-cohort", help="Verify importer candidates at NCBI, run the pre-download read-QC check, and choose the final per-species rows.")
     resolve_parser.add_argument("--candidates", type=Path, action="append", required=True, help="Importer candidates.tsv; repeat for the recent and older arms.")
     resolve_parser.add_argument("--out-dir", type=Path, required=True)
@@ -975,6 +986,19 @@ def main(argv=None):
             command.append("--allow-short-read-first")
         if args.arm:
             command.extend(["--arm", args.arm])
+        code = run(command, root)
+    elif args.command == "compare-published":
+        command = [sys.executable, "python/compare_published.py", "--results-dir", str(args.results_dir), "--samples", str(args.samples)]
+        for flag, value in (("--scores", args.scores), ("--out-prefix", args.out_prefix), ("--html", args.html)):
+            if value:
+                command.extend([flag, str(value)])
+        code = run(command, root)
+    elif args.command == "build-publication-cohorts":
+        command = [sys.executable, "python/build_publication_cohorts.py", "--out-dir", str(args.out_dir)]
+        for item in args.resolved:
+            command.extend(["--resolved", str(item)])
+        if args.audit:
+            command.extend(["--audit", str(args.audit)])
         code = run(command, root)
     elif args.command == "selection-report":
         command = [sys.executable, "python/build_selection_report.py", "--name", args.name, "--sheet", str(args.sheet),

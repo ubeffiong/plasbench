@@ -1,0 +1,44 @@
+{
+  "study": "plsmd2026",
+  "title": "plsMD: a plasmid reconstruction tool from short-read assemblies",
+  "citation": "Lotfi et al. 2026, BMC Bioinformatics, doi 10.1186/s12859-026-06585-y",
+  "licence": "CC BY 4.0 (article and supplement)",
+  "cohorts": [
+    "pub-plsmd-filtered",
+    "pub-plsmd-novel"
+  ],
+  "what_it_is": "The paper's own per-plasmid recall for plsMD, MOB-suite and gplas on its 80-isolate filtered benchmark (244 plasmids) and its 68-isolate novel set (269 plasmids). Values are copied from Additional file 2 and divided by 100.",
+  "source": {
+    "url": "https://static-content.springer.com/esm/art%3A10.1186%2Fs12859-026-06585-y/MediaObjects/12859_2026_6585_MOESM2_ESM.xlsx",
+    "file": "12859_2026_6585_MOESM2_ESM.xlsx",
+    "sha256": "43a1dced9163be9297a0f49c51ee328d5c9fc9b8f9217c7273f5ac35ada251a9",
+    "retrieved": "2026-11-17"
+  },
+  "tool_map": {
+    "plsMD": "plsmd",
+    "MOB-suite": "mob_recon",
+    "gplas": "gplas2_mob"
+  },
+  "tool_map_notes": {
+    "gplas": "The paper ran gplas; PlasBench's tool is gplas2 (its successor), so this pair is similar, not identical."
+  },
+  "metrics": [
+    {
+      "published_metric": "plasmid_recall",
+      "label": "Per-plasmid recall",
+      "plasbench_metric": "completeness",
+      "plasbench_source": "{sample}/{tool}.per_plasmid.tsv, column completeness (matched on the truth plasmid accession)",
+      "level": "per_plasmid",
+      "comparability": "similar",
+      "tolerance": 0.05,
+      "note": "plsMD's recall is the share of a reference plasmid's bases found in the reconstructed plasmid; PlasBench's completeness is the share of the truth plasmid's bases covered by aligned predicted sequence (MAPQ and identity filters apply). The same idea, not the same code."
+    }
+  ],
+  "caveats": [
+    "plsMD's own tool column is the tool's published run on the paper's assemblies; a PlasBench run of plsmd uses your assembly, assembler and PLSDB release.",
+    "The filtered set was chosen by the authors for samples whose Unicycler assembly is explained by the closed genome, which favours every tool.",
+    "plsMD queries PLSDB, which probably contains the truth plasmids of the filtered set; the novel set is the paper's claim of absence from PLSDB 2024_05_31_v2, not verified here.",
+    "Truth plasmids are the paper's GenBank accessions; PlasBench's truth for the same isolate comes from the resolved assembly and is matched by accession, so a plasmid absent from it is reported as unmatched, not as zero."
+  ],
+  "rows": 1539
+}

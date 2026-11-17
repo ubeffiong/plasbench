@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "cohort": "publication-v1",
+  "generated": "2026-11-17",
+  "label": "Mixed publication cohort",
+  "isolates": 168,
+  "studies": [
+    {
+      "study": "mobsuite",
+      "label": "Robertson and Nash 2018 (MOB-suite benchmark)",
+      "isolates": 95
+    },
+    {
+      "study": "plsmd_filtered",
+      "label": "Lotfi et al. 2026, plsMD filtered benchmark (Dataset A)",
+      "isolates": 63
+    },
+    {
+      "study": "plsmd_novel",
+      "label": "Lotfi et al. 2026, plsMD novel set (Dataset B)",
+      "isolates": 68
+    },
+    {
+      "study": "teixeira",
+      "label": "Teixeira et al. 2025 (Circling in on plasmids)",
+      "isolates": 5
+    }
+  ],
+  "truth_match": [
+    {
+      "value": "exact",
+      "n": 161
+    },
+    {
+      "value": "inferred",
+      "n": 5
+    },
+    {
+      "value": "superset",
+      "n": 1
+    },
+    {
+      "value": "subset",
+      "n": 1
+    }
+  ],
+  "compare_command": "plasbench compare-published --results-dir <results> --samples cohorts/publication-v1.tsv"
+}

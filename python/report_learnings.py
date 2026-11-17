@@ -8,6 +8,7 @@ Sections (always present; a missing table says "Not run" and why, never silence)
   learn-copynumber  tool versus truth plasmid copy number per matched bin
   learn-truthqc     repeat content and read-depth anomalies of the truth
   learn-plsmd       what a database-dependent tool such as plsMD can and cannot show (leakage)
+  learn-published   PlasBench's results beside the outcomes a publication reported for the same isolates
 
 Called once from build_html_report.py: `inject(page, results_dir, scores_path)`. Standard library only.
 """
@@ -18,7 +19,7 @@ from collections import defaultdict
 
 SECTIONS = [("learn-agreement", "Bin agreement"), ("learn-adequacy", "Assembly adequacy"),
             ("learn-copynumber", "Copy number"), ("learn-truthqc", "Truth repeats and depth"),
-            ("learn-plsmd", "Database-dependent tools")]
+            ("learn-plsmd", "Database-dependent tools"), ("learn-published", "Published outcomes")]
 
 
 from plasbench_common import number  # noqa: E402,F401
@@ -244,6 +245,27 @@ def plsmd_section(scores):
                    "membership matters most.", body)
 
 
+def published_section(report, summary_rows):
+    """PlasBench against the publication's own outcomes (python/compare_published.py). Descriptive; never ranks."""
+    lead = ("When the cohort holds isolates of a published benchmark, this puts PlasBench's result beside the paper's for the same isolates "
+            "and tools. <strong>A comparison for your own judgement: not a gate and not a ranking.</strong>")
+    if not report:
+        return section("learn-published", "Comparison with published outcomes", lead,
+                       note("Not run: no comparison with a publication was written (benchmark.published_comparison.json). It is written when "
+                            "the cohort holds isolates of a published benchmark (pub-*.tsv or publication-v1.tsv) and RUN_PUBLISHED_COMPARISON "
+                            "is not off; or run: plasbench compare-published --results-dir <results> --samples <cohort.tsv>."))
+    import compare_published as cp
+    for study in report.get("studies", []):
+        study["summary"] = []
+        for row in summary_rows or []:
+            if row.get("study") == study["study"]:
+                study["summary"].append({k: (cp.fnum(v) if k in ("published_mean", "plasbench_mean", "mean_difference", "mean_abs_difference", "correlation", "share_within_tolerance", "tolerance") else v)
+                                         for k, v in row.items()})
+                for key in ("n_pairs", "n_published_only"):
+                    study["summary"][-1][key] = int(float(row.get(key) or 0))
+    return section("learn-published", "Comparison with published outcomes", lead, cp.html_body(report))
+
+
 def inject(page, results_dir, scores_path):
     scores = read_tsv(scores_path) or []
     r = lambda name: read_tsv(os.path.join(results_dir, "benchmark." + name + ".tsv"))  # noqa: E731
@@ -253,9 +275,18 @@ def inject(page, results_dir, scores_path):
         import json
         with open(gate_json, encoding="utf-8") as handle:
             gate = (json.load(handle), r("plaseval_gate") or [])
+    published_json = os.path.join(results_dir, "benchmark.published_comparison.json")
+    published = None
+    if os.path.isfile(published_json):
+        import json
+        with open(published_json, encoding="utf-8") as handle:
+            published = json.load(handle)
+        if published.get("status") == "NO_DATA":
+            published = None
     sections = (agreement_section(scores, r("tool_agreement"), gate) + adequacy_section(r("assembly_adequacy"))
                 + copynumber_section(r("copy_number")) + truthqc_section(r("repeat_content"), r("truth_depth_anomalies"))
-                + plsmd_section(scores))
+                + plsmd_section(scores)
+                + published_section(published, r("published_comparison")))
     anchor = "<section id='recommendations'>"
     if anchor in page:
         page = page.replace(anchor, sections + anchor, 1)

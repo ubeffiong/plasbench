@@ -110,8 +110,9 @@ The review proposed seven evaluation domains and four phases and asked for the p
 and structure dimensions already exist (FAQ Q43). Added: the AMR regions view, the synteny ribbons and an AMR information funnel (all interactive, descriptive), and the
 cohorts of plsMD (filtered and novel) and the MOB-suite benchmark as candidates, with their supplement tables, ENA run metadata and the caveats found when adopting them (for
 example 23 of the 68 plsMD novel runs were public before the stated sequencing date, so "novel" is the paper's claim). Not adopted: phylogeny, clustering and relatedness,
-pangenome, host-range and transmission analyses, which are outside the benchmark by an earlier decision. Open: resolving the candidates to assemblies and reads, and a
-performance-drivers regression.
+pangenome, host-range and transmission analyses, which are outside the benchmark by an earlier decision. Done afterwards (2026-11-17): the candidates were resolved at NCBI and built into runnable, verified publication cohorts with the papers' own outcomes and a
+`compare-published` comparison (`docs/PUBLICATION_COMPARISON.md`); Teixeira's 245 isolates without a deposited assembly still need a rebuilt truth. Open: a
+performance-drivers regression, a novelty check against PLSDB, plasmid-free controls, PlasmidEC, and running tools on these cohorts.
 
 ## Validation evidence
 
@@ -130,7 +131,7 @@ performance-drivers regression.
 
 ## Not yet done
 
-- **Resolving the publication candidate cohorts** to assemblies, reads and verified truth, and **looking at the new views on a real cohort**.
+- **Running tools on the publication cohorts** and reading the comparison with the papers; **rebuilding Teixeira's hybrid truth** for the 245 isolates with no deposited assembly; **looking at the new views on a real cohort**.
 - A **real multi-assembler comparison** with `assembler_sensitivity.py`, and a **real-cohort ranking-stability** result.
 - A **real-data run** of the benchmark on `public-v3`, published with intervals and the manifest. Nothing about ranking or generalisation is demonstrated until then.
 - An **independent third-party re-run** of a benchmark, and an **external validation cohort**.

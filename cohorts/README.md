@@ -9,6 +9,11 @@ evidence rules applied to them — every row in both files passes the same
 | [`public-v1.tsv`](public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
 | [`public-v4.tsv`](public-v4.tsv) | 7,227 | all B | the large validation panel: every genome of the contributed pool that verified at NCBI (943 species, 1,818 BioProjects), with recent and older leakage arms and a balanced order; run a slice with `plasbench run --max-isolates N`; see below |
+| [`pub-plsmd-novel.tsv`](pub-plsmd-novel.tsv) | 68 | all B | the plsMD paper's novel set (Lotfi et al. 2026): every isolate, truth plasmids exactly the paper's; published recall ships |
+| [`pub-plsmd-filtered.tsv`](pub-plsmd-filtered.tsv) | 63 | all B | the plsMD paper's filtered benchmark (80 isolates in the paper), also in the MOB-suite benchmark; published recall ships |
+| [`pub-mobsuite.tsv`](pub-mobsuite.tsv) | 95 | all B | the MOB-suite benchmark (Robertson and Nash 2018; 133 genomes in the paper) |
+| [`pub-teixeira2025.tsv`](pub-teixeira2025.tsv) | 5 | all B | the 5 of Teixeira et al. 2025's 250 isolates that resolve to a deposited complete assembly (the rest need a rebuilt truth); the paper's calls ship for all 250 |
+| [`publication-v1.tsv`](publication-v1.tsv) | 168 | all B | the four publication cohorts together, each isolate once (`published_studies` lists its papers); never pool the studies into one leaderboard |
 | [`plaseval-ecoli53.tsv`](plaseval-ecoli53.tsv) | 53 | all B | replicating the PlasEval paper's binning comparison and its comparison gate; not a headline panel (truth is a Unicycler hybrid on the same reads; one species). See [`docs/PLASEVAL_REPLICATION.md`](../docs/PLASEVAL_REPLICATION.md) |
 
 `public-v1` is frozen. Do not add rows to it: published results reference it by
@@ -86,6 +91,13 @@ candidate's NCBI and read-QC outcome. The window's Cohorts page shows both as th
   to add them.
 * **Not done:** no tool has been run on this panel; `truth_polish_reads` and the truth strategy are NCBI-derived, not curator-checked;
   reference tiers are not yet computed.
+
+## Publication cohorts (compare with a paper)
+
+`pub-*.tsv` and `publication-v1.tsv` are the isolates of published benchmarks, built by `plasbench build-publication-cohorts` from the candidate ledgers in
+`candidates/`, `public-v4` and NCBI resolution, and verified online (locked). Each row records `truth_match` (whether the assembly's plasmids are the plasmids the paper
+used), `paper_run_used` and `published_studies`. The papers' own outcomes are in `published/`. Every one of the 531 candidates is accounted for in
+`candidates/publication_cohort_audit.tsv`. See [`../docs/PUBLICATION_COMPARISON.md`](../docs/PUBLICATION_COMPARISON.md).
 
 ## Verification
 
