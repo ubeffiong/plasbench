@@ -457,8 +457,9 @@ def main():
         for bin_id in sorted(all_bins - used_bins): writer.writerow([bin_id, "", 0, "", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "unmatched_bin"])
         for plasmid in sorted(set(plasmids) - used_plasmids): writer.writerow(["", plasmid, 0, "", "", "", "", "", "missed_plasmid"])
     if plasmids:
-        precision = len(matched) / len(all_bins) if all_bins else 0.0; recall = len(matched) / len(plasmids)
-        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        # Nothing binned: precision is undefined (blank), as score_plasmids.py leaves it when nothing was predicted; recall is 0 and so is F1 (audit AU-048).
+        precision = len(matched) / len(all_bins) if all_bins else None; recall = len(matched) / len(plasmids)
+        f1 = (2 * precision * recall / (precision + recall) if precision + recall else 0.0) if precision is not None else 0.0
     else:  # no true plasmid: same undefined-not-zero rule as the length-weighted metrics above
         precision, recall, f1 = (0.0 if all_bins else None), None, None
     total_bp, chromosome_total = sum(total_mapped.values()), sum(chromosome_bp.values())
