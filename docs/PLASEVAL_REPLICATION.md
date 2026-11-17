@@ -11,7 +11,7 @@ question unavoidable: **does the reimplementation give the original program's nu
 |---|---|---|
 | The cohort | `cohorts/plaseval-ecoli53.tsv` | The paper's 53 *E. coli* isolates (Saskatchewan broiler farms), with BioSample, short-read and long-read SRA runs and GenBank assembly from the paper's `Ecoli_samples.csv`. Reference tier 3: the truth is a Unicycler hybrid built on the same Illumina reads, so this is a replication panel, not a headline panel. Schema-validated only; the online NCBI check has not been run (the sheet header gives the command). |
 | The paper's bins | `cohorts/plaseval_ecoli53/bins/` | The ground truth and the bins of MOB-recon, HyAsP, gplas2 and PlasBin-flow for each isolate, unchanged from the paper's Zenodo record (CC BY 4.0, [10.5281/zenodo.10785150](https://doi.org/10.5281/zenodo.10785150)). |
-| The replication | `plasbench plaseval-replication` | Scores those published bins with PlasBench (no tool is re-run), draws the error profile, and, when the original program is found, runs it on the same pairs. |
+| The replication | `plasbench analysis plaseval-replication` | Scores those published bins with PlasBench (no tool is re-run), draws the error profile, and, when the original program is found, runs it on the same pairs. |
 | The gate | `python/plaseval_gate.py`, stage 6 | The same comparison inside any run: it runs the original on the bins stage 5 exported and writes `benchmark.plaseval_gate.tsv` and `.json`, shown in the report's Bin agreement section. |
 
 ## What has been measured so far
@@ -55,7 +55,7 @@ git clone https://github.com/acme92/PlasEval.git && git -C PlasEval checkout 823
 pip install "networkx<3.4" "pandas<4" "bidict<1" "psutil<7"      # into the plasbench environment
 
 # 2. the paper's real bins: PlasBench against the original, all 212 pairs
-plasbench plaseval-replication --out-dir results_plaseval --original-timeout 600 --workers 4
+plasbench analysis plaseval-replication --out-dir results_plaseval --original-timeout 600 --workers 4
 #    -> results_plaseval/plaseval_replication.html and plaseval_replication.scores.tsv
 
 # 3. the gate inside a real benchmark of the cohort (needs the reads; hours and tens of GB)
