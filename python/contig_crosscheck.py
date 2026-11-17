@@ -166,8 +166,7 @@ def read_labels(path):
 def fasta_ids(path):
     if not path.is_file() or not path.stat().st_size:
         return set()
-    with open(path, encoding="utf-8") as handle:
-        return {line[1:].split()[0] for line in handle if line.startswith(">")}
+    return {name for name, _, _ in iter_fasta(path) if name}  # shared reader (AU-021)
 
 
 def length_weighted(labels, called):

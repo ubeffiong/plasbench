@@ -44,7 +44,7 @@ FIELDS = ("sample", "tool", "analysis_track", "n_truth_plasmids", "n_bins", "n_h
           "medium_or_better_yield", "homogeneity", "completeness", "v_measure")
 
 
-from plasbench_common import read_truth_split, read_bin_membership  # noqa: E402
+from plasbench_common import read_truth_split, read_bin_membership, iter_paf, paf_identity  # noqa: E402
 
 
 # Shared validated readers. Before, this script filed every non-PLASMID row as
@@ -72,25 +72,20 @@ def read_alignments(paf, membership, plasmids, chromosomes, min_length, min_iden
     """bin -> target -> [(tstart, tend)] and bin -> mapped query bases (any truth target)."""
     ref = defaultdict(lambda: defaultdict(list))
     query = defaultdict(list)
-    with open(paf, encoding="utf-8") as handle:
-        for line in handle:
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12 or "tp:A:S" in f[12:] or f[0] not in membership:
-                continue
-            try:
-                qlen, qs, qe, tname = int(f[1]), int(f[2]), int(f[3]), f[5]
-                ts, te, matches, block, mapq = int(f[7]), int(f[8]), int(f[9]), int(f[10]), int(f[11])
-            except ValueError:
-                continue
-            if block < min_length or mapq < min_mapq or (matches / block if block else 0) < min_identity:
-                continue
-            if (abs(qe - qs) / qlen if qlen else 0) < min_qcov:
-                continue
-            if tname not in plasmids and tname not in chromosomes:
-                continue
-            bin_id = membership[f[0]]
-            ref[bin_id][tname].append((min(ts, te), max(ts, te)))
-            query[(bin_id, f[0])].append((min(qs, qe), max(qs, qe)))
+    for row in iter_paf(paf, label="bin-quality PAF"):
+        if "tp:A:S" in row["tags"] or row["qname"] not in membership:
+            continue
+        qlen, qs, qe, tname = row["qlen"], row["qstart"], row["qend"], row["tname"]
+        ts, te, matches, block, mapq = row["tstart"], row["tend"], row["matches"], row["block_length"], row["mapq"]
+        if block < min_length or mapq < min_mapq or paf_identity(matches, block) < min_identity:
+            continue
+        if (abs(qe - qs) / qlen if qlen else 0) < min_qcov:
+            continue
+        if tname not in plasmids and tname not in chromosomes:
+            continue
+        bin_id = membership[row["qname"]]
+        ref[bin_id][tname].append((min(ts, te), max(ts, te)))
+        query[(bin_id, row["qname"])].append((min(qs, qe), max(qs, qe)))
     mapped = defaultdict(int)
     for (bin_id, _), intervals in query.items():
         mapped[bin_id] += union_bp(intervals)

@@ -42,7 +42,7 @@ from plasbench_common import merge_intervals as merge  # noqa: E402
 SEPARATOR = "__plasbench_window__"
 
 
-from plasbench_common import iter_fasta, open_maybe_gz  # noqa: E402
+from plasbench_common import iter_fasta, open_maybe_gz, iter_paf, paf_identity  # noqa: E402
 
 
 def open_text(path):
@@ -110,31 +110,31 @@ def parse_window_name(name):
 def cmd_intervals(args):
     truth = read_truth(args.truth)
     scorable = {seq_id: [] for seq_id, (mol, _) in truth.items() if mol == "PLASMID"}
-    with open(args.paf) as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12:
-                sys.exit(f"ERROR: PAF line {line_number} has fewer than 12 columns")
-            origin = parse_window_name(f[0])
-            if origin is None:
-                continue
-            seq_id, w_start, w_end = origin
-            qlen, qstart, qend = int(f[1]), int(f[2]), int(f[3])
-            target, tstart, tend = f[5], int(f[7]), int(f[8])
-            matches, block, mapq = int(f[9]), int(f[10]), int(f[11])
-            identity = matches / block if block else 0.0
-            qcov = abs(qend - qstart) / qlen if qlen else 0.0
-            if (block < args.min_alignment_length or identity < args.min_alignment_identity
-                    or mapq < args.min_alignment_mapq or qcov < args.min_alignment_query_coverage):
-                continue
-            if target != seq_id or seq_id not in scorable:
-                continue
-            # Must land on its own origin, not a same-sequence copy elsewhere.
-            if min(tend, w_end) - max(tstart, w_start) <= 0:
-                continue
-            scorable[seq_id].append((max(tstart, w_start), min(tend, w_end)))
+    # Strict on purpose: a damaged PAF here would silently shrink the scorable truth, so a
+    # short or non-integer row stops the run (shared reader, strict=True).
+    try:
+        rows = list(iter_paf(args.paf, strict=True))
+    except ValueError as exc:
+        sys.exit(f"ERROR: {exc}")
+    for row in rows:
+        origin = parse_window_name(row["qname"])
+        if origin is None:
+            continue
+        seq_id, w_start, w_end = origin
+        qlen, qstart, qend = row["qlen"], row["qstart"], row["qend"]
+        target, tstart, tend = row["tname"], row["tstart"], row["tend"]
+        matches, block, mapq = row["matches"], row["block_length"], row["mapq"]
+        identity = paf_identity(matches, block)
+        qcov = abs(qend - qstart) / qlen if qlen else 0.0
+        if (block < args.min_alignment_length or identity < args.min_alignment_identity
+                or mapq < args.min_alignment_mapq or qcov < args.min_alignment_query_coverage):
+            continue
+        if target != seq_id or seq_id not in scorable:
+            continue
+        # Must land on its own origin, not a same-sequence copy elsewhere.
+        if min(tend, w_end) - max(tstart, w_start) <= 0:
+            continue
+        scorable[seq_id].append((max(tstart, w_start), min(tend, w_end)))
     total_plasmid = sum(length for mol, length in truth.values() if mol == "PLASMID")
     total_scorable = 0
     with open(args.out, "w") as out:
