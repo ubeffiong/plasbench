@@ -155,7 +155,21 @@ def info(root, name: str) -> dict:
                 s[key] = _counts(rows, key)
     out["summary"] = s
     out["selection"] = selection_report(path.with_name(f"{name}.selection.json"))
+    out["publication"] = publication_info(path.with_name(f"{name}.publication.json"), path.parent / "published")
     return out
+
+
+def publication_info(path: Path, published_dir: Path):
+    """How a publication cohort was built (python/build_publication_cohorts.py), and whether the paper's outcomes ship with it."""
+    try:
+        info = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(info, dict) or not info.get("schema_version"):
+        return None
+    keys = [info["published_outcomes"]] if info.get("published_outcomes") else ["plsmd2026", "teixeira2025"]
+    info["published_tables"] = [k for k in keys if (published_dir / f"{k}.published.tsv").is_file()]
+    return info
 
 
 def selection_report(path: Path):

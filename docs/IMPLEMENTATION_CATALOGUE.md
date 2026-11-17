@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 176 analysis modules, 27 registered tools and baselines (19 real tools), 202 registered
-outputs, 49 run switches, 329 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 179 analysis modules, 27 registered tools and baselines (19 real tools), 205 registered
+outputs, 50 run switches, 331 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -362,7 +362,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 6. Every module
 
-176 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+179 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -461,6 +461,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 |---|---|
 | `aggregate_results.py` | combine per-sample score rows into a per-tool |
 | `clonal_groups.py` | group near-identical (clonal) isolates. |
+| `compare_published.py` | Compare a PlasBench run with the outcomes a publication reported for the same isolates. |
 | `compare_runs.py` | Reproducibility: do repeated runs of the same benchmark give the same answer? |
 | `compare_scoring_methods.py` | One-off BLASTN-vs-minimap2 scoring cross-check (Phase E, Part 15 of the |
 | `composite_score.py` | Optional, descriptive five-dimension view of each tool, with gates and weight sensitivity. |
@@ -578,6 +579,8 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 |---|---|
 | `audit_three_class_scoring.py` | One-off three-class scoring audit (Phase E, Part 14 of the sibling-repo |
 | `build_publication_cohort_candidates.py` | Build CANDIDATE ledgers for three published plasmid-reconstruction cohorts. |
+| `build_publication_cohorts.py` | Build the publication cohorts: the isolates a published benchmark used, as runnable PlasBench cohorts. |
+| `build_published_outcomes.py` | Turn the supplementary data of published plasmid benchmarks into long-format "published outcome" tables. |
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
@@ -588,7 +591,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 7. Every output file and where the report shows it
 
-202 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+205 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -633,6 +636,9 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `benchmark.plaseval_gate.json` | plaseval_gate.py | learn-agreement | shown | PlasEval gate verdict: PASS, FAIL, PARTIAL, NOT_RUN or NO_DATA, with the tolerance, the original's commit and the counts. |
 | `benchmark.plaseval_gate.tsv` | plaseval_gate.py | learn-agreement | shown | Comparison with the original PlasEval program: Per isolate and tool: PlasBench's dissimilarity and best-match F1 against the original program's. |
 | `benchmark.power.tsv` | power_analysis.py | power | shown | Statistical power: Table. |
+| `benchmark.published_comparison.json` | compare_published.py | learn-published | shown | Published-comparison verdict: Per study and metric: the status, tool-order agreement, tools with no counterpart and the caveats. |
+| `benchmark.published_comparison.tsv` | compare_published.py | learn-published | shown | Comparison with published outcomes: Per tool, metric and stratum: matched pairs, published mean, PlasBench mean, difference, correlation, agreement. |
+| `benchmark.published_comparison_pairs.tsv` | compare_published.py | learn-published | partly | Every matched published pair: Each isolate or plasmid with the published value and PlasBench's; summarised in the comparison table. |
 | `benchmark.rank_robustness.tsv` | rank_sensitivity.py | rank-robustness | shown | Rank robustness: Table. |
 | `benchmark.ranking_stability.tsv` | ranking_stability.py | learn-stability | shown | Ranking stability: Per task: does the leader or the order change when one study or species is removed, or every study weighs the same. |
 | `benchmark.recommendation_model.card.md` | fit_recommendation_model.py | recommendations | partly | Recommendation model card: Quoted in the recommendations. |
@@ -850,6 +856,7 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 | `RUN_PLASBIN_FLOW` | `0` | see the comment block above it in config/config.sh |
 | `RUN_STATS_VALIDATION` | `0` | see the comment block above it in config/config.sh |
 | `RUN_RANK_SENSITIVITY` | `1` | see the comment block above it in config/config.sh |
+| `RUN_PUBLISHED_COMPARISON` | `auto` | see the comment block above it in config/config.sh |
 
 ## 9. History: every merged change
 

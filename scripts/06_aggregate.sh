@@ -318,6 +318,12 @@ if [[ "${RUN_PLASEVAL_GATE:-auto}" != "off" && "${RUN_BIN_AGREEMENT:-1}" == "1" 
     fi
 fi
 
+# Published-outcome comparison: when the sample sheet holds isolates of a published benchmark (cohorts/published/), PlasBench's results are
+# put beside the paper's own (matched by BioSample, studies kept apart). Descriptive: it never stops a run and never changes a score.
+if [[ "${RUN_PUBLISHED_COMPARISON:-auto}" != "off" ]]; then
+    python3 "$HERE/../python/compare_published.py" --results-dir "$RESULTS_DIR" --samples "$SAMPLE_SHEET" --scores "$SCORES"         --out-prefix "$RESULTS_DIR/benchmark.published_comparison" --html "$RESULTS_DIR/benchmark.published_comparison.html" > /dev/null         || warn "published-outcome comparison failed; the other results are unaffected"
+fi
+
 if [[ "${COHORT_QC_FLAGS_ENABLED:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/flag_cohort_outliers.py" \
         --stats-dir "$DATA_DIR" --samples "$SAMPLE_SHEET" \

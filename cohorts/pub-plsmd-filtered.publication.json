@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "cohort": "pub-plsmd-filtered",
+  "generated": "2026-11-17",
+  "study": "plsmd_filtered",
+  "label": "Lotfi et al. 2026, plsMD filtered benchmark (Dataset A)",
+  "citation": "Lotfi et al. 2026, BMC Bioinformatics, doi 10.1186/s12859-026-06585-y",
+  "note": "80 isolates, 244 plasmids; also in the MOB-suite benchmark. Not novel by design.",
+  "published_outcomes": "plsmd2026",
+  "isolates": 63,
+  "candidates": 80,
+  "funnel": [
+    {
+      "stage": "Isolates in the paper",
+      "n": 80
+    },
+    {
+      "stage": "Found a complete assembly and a paired Illumina run",
+      "n": 71
+    },
+    {
+      "stage": "Truth confirmed against the paper (exact, superset, subset) or inferred (Teixeira)",
+      "n": 63
+    }
+  ],
+  "truth_match": [
+    {
+      "value": "exact",
+      "n": 62
+    },
+    {
+      "value": "subset",
+      "n": 1
+    }
+  ],
+  "left_out": [
+    {
+      "reason": "no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)",
+      "n": 9
+    },
+    {
+      "reason": "NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth",
+      "n": 8
+    }
+  ],
+  "compare_command": "plasbench compare-published --results-dir <results> --samples cohorts/pub-plsmd-filtered.tsv"
+}
