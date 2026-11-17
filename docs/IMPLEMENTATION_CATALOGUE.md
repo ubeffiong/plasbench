@@ -8,7 +8,7 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 176 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
+**Size at the time of writing:** 176 analysis modules, 27 registered tools and baselines (19 real tools), 202 registered
 outputs, 49 run switches, 326 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
@@ -588,7 +588,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 7. Every output file and where the report shows it
 
-201 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+202 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -617,6 +617,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `benchmark.dataset_features.tsv` | characterise_dataset.py | isolate-difficulty | shown | Dataset characteristics: One row per isolate; every column marked as knowable without a reference or not (Isolate difficulty tab). |
 | `benchmark.feature_preservation.tsv` | feature_preservation.py | feature-preservation | shown | Feature preservation: Table. |
 | `benchmark.headline_design.tsv` | headline_design.py | headline-design | shown | Headline design (units of analysis): Table. |
+| `benchmark.input_consistency.tsv` | run_consistency.py | leaderboard | partly | Run tables that disagree: Empty when the tables agree; otherwise a banner above the ranking and this list. |
 | `benchmark.label_scheme_summary.tsv` | label_schemes.py | label-schemes | shown | Labelling scheme summary: Table. |
 | `benchmark.label_schemes.tsv` | label_schemes.py | label-schemes | shown | Labelling schemes, merged: Table. |
 | `benchmark.leaderboard.md` | aggregate_results.py | files | shown | Leaderboard as Markdown: Linked from the Run files panel. |
