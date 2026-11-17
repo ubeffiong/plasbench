@@ -12,6 +12,10 @@ history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
 ## [Unreleased]
+### Changed -- production readiness
+- Fixed the scheduled **Real tools** workflow, whose Platon and plasmidSPAdes jobs failed on the fixture, not on the tools: Platon cannot train its gene finder on a 4 kb plasmid (`ORF prediction failed!`), so the check passes `--meta`; wgsim writes one constant quality character, from which SPAdes cannot infer the PHRED offset (`Failed to determine offset!`), so the workflow gives the simulated reads varied qualities. The production commands in `scripts/04_run_tools.sh` are unchanged. Whether the two now pass is confirmed by a manual run of the workflow (see the pull request).
+- CI now runs the whole test suite on Python 3.9, 3.11 and 3.13 (`requires-python` is `>=3.9`; only 3.11 was tested).
+- Added `SECURITY.md` (private reporting, supported versions, what is in scope) and `.github/dependabot.yml` (weekly GitHub Actions and monthly Docker base-image updates, each as a CI-tested pull request).
 ### Added -- independent verification of the earlier audits
 - `docs/INDEPENDENT_VERIFICATION.md` challenges the first audit, the second-review response and the performance audit on `main` at `17c9936`, classifying each finding and recording what was run versus read. New findings: bins padded with sequence that aligns nowhere keep a perfect binning score (verified with seven constructed cases); the report accepts missing, stale or duplicate runs without an error; the weekly real-tool check has a pass floor of 0; one test is registered nowhere. Intervals under-cover a nominal 95% (81-94% in simulation). Verdict: ready for a pilot and external review, not yet citable as evidence that one tool beats another.
 - Fixed: the documented command `plasbench plaseval-replication` does not exist; it is `plasbench analysis plaseval-replication` (README-level docs, FAQ, replication guide).

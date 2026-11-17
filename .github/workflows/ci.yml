@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       # shellcheck from the runner's package manager: ludeeus/action-shellcheck's
       # release download returns a non-archive on the current runner image, so
       # the job failed before any check ran.

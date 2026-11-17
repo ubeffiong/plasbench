@@ -4012,7 +4012,7 @@ command the manifest contains, as you, so read a manifest you receive before add
 
 Contributions are welcome — bug reports, cohort additions, new tool adapters,
 documentation fixes. This section says how, and what happens to your
-contribution once you send it.
+contribution once you send it. **Security problems** are reported privately, not as an issue: see [SECURITY.md](SECURITY.md). CI runs the test suite on Python 3.9, 3.11 and 3.13 (the supported range is 3.9 and later).
 
 **Maintainer:** [@ubeffiong](https://github.com/ubeffiong). All pull requests are
 reviewed and merged by the maintainer; `main` is protected and cannot be pushed
