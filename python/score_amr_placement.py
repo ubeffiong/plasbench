@@ -178,6 +178,8 @@ def cmd_score(args):
         if target not in plasmids:
             continue
         for query, start, end in intervals:
+            if membership and query not in membership:
+                continue   # a record in no bin is unassigned, not a one-contig bin of its own (audit AU-004)
             overlaps[(membership.get(query, query), target)] += max(0, end - start)
     # bin_matching: a binner with bins, matched one-to-one. contig_attribution: a classifier or reassembler (or a binner that wrote no bins): each record is attributed to the truth sequence
     # (plasmid or chromosome) it aligns to most, many records may share one plasmid, and a record that is mostly chromosome is wrong for a plasmid gene.
@@ -207,10 +209,13 @@ def cmd_score(args):
                   "truth_evidence_tier": (row.get("evidence_tier") or "").strip(), "evaluation_task": task, "attribution": attribution, "attribution_mode": mode}
         if best and best_bp / length >= args.min_gene_coverage:
             # contig_attribution: the record is attributed on its own; there is no bin, so no co-localisation claim
-            bin_id = membership.get(best, best) if mode == "bin_matching" else ""
-            target = matched.get(bin_id if mode == "bin_matching" else best, "")
+            unbinned = mode == "bin_matching" and best not in membership
+            bin_id = membership.get(best, "") if mode == "bin_matching" else ""
+            target = "" if unbinned else matched.get(bin_id if mode == "bin_matching" else best, "")
             label = labels.get(best, "")
-            if label == "AMBIGUOUS":
+            if unbinned:
+                placement = "unassigned_contig"   # the binner left this record out of every bin: the gene was not placed (audit AU-004)
+            elif label == "AMBIGUOUS":
                 placement = "shared_contig"
             elif label == "UNPLACED":
                 placement = "unassigned_contig"
