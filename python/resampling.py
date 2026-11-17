@@ -567,18 +567,28 @@ def interval_method_used(values, groups=None, strata=None, method=None):
     return base
 
 
-def interval(values, groups=None, strata=None, method=None, iterations=1000):
+def clamp_interval(low, high, bounds):
+    """Clip an interval to the range the statistic can take (audit AU-052). Clipping to the metric's own range cannot lose coverage: no value outside it exists.
+    (None, None) and an absent `bounds` pass through; an interval entirely outside the range collapses to the nearest bound."""
+    if bounds is None or low is None or high is None:
+        return low, high
+    lo, hi = bounds
+    return min(max(low, lo), hi), min(max(high, lo), hi)
+
+
+def interval(values, groups=None, strata=None, method=None, iterations=1000, bounds=None):
     """The leaderboard's interval for the (macro) mean, by INTERVAL_METHOD unless method is given (or a dominant study triggers the percentile fallback: interval_method_used).
 
-    bootstrap_t has a stratified form (stratified_bootstrap_t_ci)."""
+    bootstrap_t has a stratified form (stratified_bootstrap_t_ci). `bounds` (low, high) clips the interval to the statistic's range, e.g. (0, 1) for a proportion: the cluster-t
+    interval is symmetric and can leave it (0.498 to 1.102 for a proportion)."""
     method = interval_method_used(values, groups, strata, method)
     if method == "percentile":
-        return stratified_bootstrap(values, groups, strata, iterations=iterations)
+        return clamp_interval(*stratified_bootstrap(values, groups, strata, iterations=iterations), bounds)
     if method == "bootstrap_t":
         if strata is None:
-            return bootstrap_t_ci(values, groups, iterations=iterations)
-        return stratified_bootstrap_t_ci(values, groups, strata, iterations=iterations)
-    return cluster_t_ci(values, groups, strata)
+            return clamp_interval(*bootstrap_t_ci(values, groups, iterations=iterations), bounds)
+        return clamp_interval(*stratified_bootstrap_t_ci(values, groups, strata, iterations=iterations), bounds)
+    return clamp_interval(*cluster_t_ci(values, groups, strata), bounds)
 
 
 INTERVAL_METHOD = __import__("os").environ.get("PLASBENCH_CI_METHOD", "cluster_t")

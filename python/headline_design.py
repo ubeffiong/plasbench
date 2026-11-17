@@ -307,7 +307,7 @@ def pair_statistics(diffs, groups, strata):
     worker processes; every resampling call seeds its own RNG, so the result
     does not depend on which process runs it or in what order.
     """
-    low, high = resampling_interval(diffs, groups, strata)   # INTERVAL_METHOD (PLASBENCH_CI_METHOD), or the percentile bootstrap when one study dominates
+    low, high = resampling_interval(diffs, groups, strata, bounds=(-1.0, 1.0))   # a difference of two [0, 1] scores; INTERVAL_METHOD (PLASBENCH_CI_METHOD), or the percentile bootstrap when one study dominates
     return low, high, stratified_permutation(diffs, groups, strata), interval_method_used(diffs, groups, strata)
 
 
@@ -420,7 +420,7 @@ def ranking_fields(tool, by_tool, shared, design, metric):
         basis = "pooled (no species with enough independent clusters)" if design and design.species else "pooled"
     values = [values_by_sample[s] for s in samples]
     groups = [design.cluster(s) if design else f"sample:{s}" for s in samples]
-    low, high = resampling_interval(values, groups, strata)
+    low, high = resampling_interval(values, groups, strata, bounds=(0.0, 1.0))   # the ranking metrics are proportions
     return {"ranking_metric": metric, "ranking_score": macro_mean(values, strata),
             "ranking_ci_low": low, "ranking_ci_high": high, "ranking_species_basis": basis,
             "ci_method": interval_method_used(values, groups, strata), "max_cluster_share": dominant_share(values, groups),

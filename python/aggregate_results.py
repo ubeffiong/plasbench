@@ -573,7 +573,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
             ranking_samples = [r["sample"] for r in rows if r["tool"] == tool and r["f1"] is not None]
             ranking_f1 = list(d["f1"])
         groups = cluster_labels(ranking_samples, clusters)
-        f1_ci_low, f1_ci_high = resampling_interval(ranking_f1, groups)
+        f1_ci_low, f1_ci_high = resampling_interval(ranking_f1, groups, bounds=(0.0, 1.0))
         summary.append({
             "tool": tool,
             "n_samples": d["n"],

@@ -55,5 +55,5 @@ The audit (`audit-2026-11-17/AUDIT_REPORT.md`, `ISSUE_REGISTER.tsv`) raised 53 f
 | AU-049 | Low | FIXED | scores.tsv is truncated in place then appended: a kill mid-merge leaves a partial file.... |
 | AU-050 | Low | NOT FIXED | CI permissions and action pinning need workflow scope on the token |
 | AU-051 | Medium | NOT FIXED | disclosed in METHODS; a with/without-exclusion report not built |
-| AU-052 | Low | NOT FIXED | cluster-t interval not clamped: changes the interval method; the pre-registered default was decided separately |
+| AU-052 | Low | FIXED | intervals for proportions are clipped to [0, 1] (paired differences to [-1, 1]) via `resampling.clamp_interval`; the method itself and its coverage under-run are unchanged and documented in `docs/STATS_VALIDATION.md` |
 | AU-053 | Low | PARTIAL | README states which code built the cohort-1 results; not rebuilt because the sample sheet is not in the folder |
