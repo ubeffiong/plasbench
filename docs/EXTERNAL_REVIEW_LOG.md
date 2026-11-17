@@ -111,8 +111,9 @@ and structure dimensions already exist (FAQ Q43). Added: the AMR regions view, t
 cohorts of plsMD (filtered and novel) and the MOB-suite benchmark as candidates, with their supplement tables, ENA run metadata and the caveats found when adopting them (for
 example 23 of the 68 plsMD novel runs were public before the stated sequencing date, so "novel" is the paper's claim). Not adopted: phylogeny, clustering and relatedness,
 pangenome, host-range and transmission analyses, which are outside the benchmark by an earlier decision. Done afterwards (2026-11-17): the candidates were resolved at NCBI and built into runnable, verified publication cohorts with the papers' own outcomes and a
-`compare-published` comparison (`docs/PUBLICATION_COMPARISON.md`); Teixeira's 245 isolates without a deposited assembly still need a rebuilt truth. Open: a
-performance-drivers regression, a novelty check against PLSDB, plasmid-free controls, PlasmidEC, and running tools on these cohorts.
+`compare-published` comparison (`docs/PUBLICATION_COMPARISON.md`); Teixeira's 245 isolates without a deposited assembly still need a rebuilt truth. The remaining gaps were then closed in code (2026-11-17): PlasmidEC is a registered tool (stand-in tested), PLSDB novelty and a
+multivariable performance-drivers regression are stage-6 analyses with report sections, and `negative-controls-v1` provides 136 verified plasmid-free controls. Still open:
+running any tool on these cohorts (nothing here has been run on real tool output), a real PLSDB download for the novelty analysis, and rebuilding Teixeira's hybrid truth.
 
 ## Validation evidence
 

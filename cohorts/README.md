@@ -14,6 +14,7 @@ evidence rules applied to them — every row in both files passes the same
 | [`pub-mobsuite.tsv`](pub-mobsuite.tsv) | 95 | all B | the MOB-suite benchmark (Robertson and Nash 2018; 133 genomes in the paper) |
 | [`pub-teixeira2025.tsv`](pub-teixeira2025.tsv) | 5 | all B | the 5 of Teixeira et al. 2025's 250 isolates that resolve to a deposited complete assembly (the rest need a rebuilt truth); the paper's calls ship for all 250 |
 | [`publication-v1.tsv`](publication-v1.tsv) | 168 | all B | the four publication cohorts together, each isolate once (`published_studies` lists its papers); never pool the studies into one leaderboard |
+| [`negative-controls-v1.tsv`](negative-controls-v1.tsv) | 136 | all B | plasmid-free negative controls: RefSeq complete genomes with a single replicon, long-read truth and a paired Illumina run (12 species, 88 BioProjects); for false-positive plasmid calling; see below |
 | [`plaseval-ecoli53.tsv`](plaseval-ecoli53.tsv) | 53 | all B | replicating the PlasEval paper's binning comparison and its comparison gate; not a headline panel (truth is a Unicycler hybrid on the same reads; one species). See [`docs/PLASEVAL_REPLICATION.md`](../docs/PLASEVAL_REPLICATION.md) |
 
 `public-v1` is frozen. Do not add rows to it: published results reference it by
@@ -98,6 +99,18 @@ candidate's NCBI and read-QC outcome. The window's Cohorts page shows both as th
 `candidates/`, `public-v4` and NCBI resolution, and verified online (locked). Each row records `truth_match` (whether the assembly's plasmids are the plasmids the paper
 used), `paper_run_used` and `published_studies`. The papers' own outcomes are in `published/`. Every one of the 531 candidates is accounted for in
 `candidates/publication_cohort_audit.tsv`. See [`../docs/PUBLICATION_COMPARISON.md`](../docs/PUBLICATION_COMPARISON.md).
+
+## negative-controls-v1 — plasmid-free controls
+
+Every genome of the other cohorts carries at least one plasmid, so a tool's false positives (calling plasmid on an isolate that has none) could not be measured on real data. These 136
+isolates are RefSeq Complete Genomes whose deposited assembly has exactly one replicon, with a recorded long-read platform and a paired Illumina run on the assembly's BioProject at 30x to 400x
+(`plasbench analysis discover-plasmid-free`; every row verified with `validate-cohort --online`, locked, and checked to declare **no** plasmid replicon). At most 15 per species and 3 per BioProject.
+Species: *A. baumannii*, *E. coli*, *K. pneumoniae*, *P. aeruginosa*, *S. enterica*, *S. aureus* (15 each), *E. faecalis* (13), *S. marcescens* (13), *E. hormaechei* (7), *C. freundii* (6),
+*K. oxytoca* (5), *E. faecium* (2). `candidates/negative_controls_audit.tsv` lists every candidate and why it was not taken.
+
+**What it does not prove:** a single-replicon complete assembly shows the submitter deposited no plasmid, not that the strain has none (a plasmid can be lost or never assembled). Each row's
+`plasmid_free_evidence` says so; read a tool's false positives on these as "plasmid calls with no plasmid in the reference". Tier B, no tool has been run on it. Run it with the other cohorts or
+alone: its isolates score through the zero-plasmid path (`zero_plasmid_specificity`, `isolate_specificity`, chromosomal false-positive bases).
 
 ## Verification
 

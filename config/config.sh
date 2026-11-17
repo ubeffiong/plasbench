@@ -860,3 +860,12 @@ export PLASMIDEC_CLASSIFIERS="${PLASMIDEC_CLASSIFIERS:-}"       # empty: its def
 # resistance genes, species, read depth and the recent/older arm, with study-clustered intervals (benchmark.performance_drivers.*; the report's
 # "Performance drivers" section). A tool with too few plasmids or studies is reported as not estimable. Descriptive: never changes a score or ranking.
 export RUN_PERFORMANCE_DRIVERS="${RUN_PERFORMANCE_DRIVERS:-1}"
+# PLSDB novelty (python/plsdb_novelty.py): each truth plasmid is aligned to PLSDB and called known (a record covers at least NOVELTY_KNOWN_COVERAGE of it at
+# NOVELTY_KNOWN_IDENTITY), related (a record covers at least NOVELTY_RELATED_COVERAGE) or novel; recovery is then split by class (benchmark.plsdb_novelty*;
+# the report's "Novelty" section) and the class is a driver in the performance-drivers model. RUN_PLSDB_NOVELTY is auto (run when PLSDB_FASTA exists) or off.
+# PLSDB_FASTA is the sequences FASTA written by env/download_plsdb.sh. Novelty is relative to that PLSDB release. Descriptive: never changes a score or ranking.
+export RUN_PLSDB_NOVELTY="${RUN_PLSDB_NOVELTY:-auto}"
+export PLSDB_FASTA="${PLSDB_FASTA:-$(plasbench_db_path plsdb)/sequences.fasta}"
+export NOVELTY_KNOWN_COVERAGE="${NOVELTY_KNOWN_COVERAGE:-0.80}"
+export NOVELTY_KNOWN_IDENTITY="${NOVELTY_KNOWN_IDENTITY:-0.95}"
+export NOVELTY_RELATED_COVERAGE="${NOVELTY_RELATED_COVERAGE:-0.30}"

@@ -1,0 +1,4724 @@
+{
+  "schema_version": "1.1",
+  "sample_sheet": "negative-controls-v1.tsv",
+  "sample_sheet_sha256": "c5eb49c5460511d28618e27b03b5cfaf7c1b836af82dff466bddb8397c9413d2",
+  "evidence": [
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_004101705_1",
+      "assembly": {
+        "accession": "GCF_004101705.1",
+        "biosample": "SAMN07258689",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA390934"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 0.4.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Canada",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR5739086",
+        "biosample": "SAMN07258689",
+        "bioproject": "PRJNA390934",
+        "sample_name": "11A14CRGN003",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "385902413",
+        "spots": "642749",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_004101725_1",
+      "assembly": {
+        "accession": "GCF_004101725.1",
+        "biosample": "SAMN07258647",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA390934"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 0.4.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Canada",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2012",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR5739041",
+        "biosample": "SAMN07258647",
+        "bioproject": "PRJNA390934",
+        "sample_name": "11A1213CRGN055",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "509435518",
+        "spots": "848533",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_008244905_1",
+      "assembly": {
+        "accession": "GCF_008244905.1",
+        "biosample": "SAMN07258673",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA390934"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq, Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR5739106",
+        "biosample": "SAMN07258673",
+        "bioproject": "PRJNA390934",
+        "sample_name": "11A1314CRGN089",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "444955851",
+        "spots": "741080",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_018831465_1",
+      "assembly": {
+        "accession": "GCF_018831465.1",
+        "biosample": "SAMN14149266",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA607827"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MiniION; Illumina MiSeq",
+        "assembly_method": "Hybrid assembly v. 1.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Lebanon",
+        "isolation_source": "Animal (cat)",
+        "host": "",
+        "collection_date": "2015",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR15275367",
+        "biosample": "SAMN14149266",
+        "bioproject": "PRJNA607827",
+        "sample_name": "AbAx270-wgs",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "784768744",
+        "spots": "2598572",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_019903195_1",
+      "assembly": {
+        "accession": "GCF_019903195.1",
+        "biosample": "SAMN15646562",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA607827"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. v1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA",
+        "isolation_source": "field soil",
+        "host": "",
+        "collection_date": "not applicable",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12328723",
+        "biosample": "SAMN15646562",
+        "bioproject": "PRJNA607827",
+        "sample_name": "10_3",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "483292010",
+        "spots": "1152688",
+        "avg_length": "419"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_021019495_3",
+      "assembly": {
+        "accession": "GCF_021019495.3",
+        "biosample": "SAMN21245945",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA761133"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Trycycler v. 0.5.5",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Afghanistan",
+        "isolation_source": "wound",
+        "host": "Homo sapiens",
+        "collection_date": "2018",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR15734207",
+        "biosample": "SAMN21245945",
+        "bioproject": "PRJNA761133",
+        "sample_name": "Acinetobacter baumannii MRSN576822",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "251206350",
+        "spots": "423290",
+        "avg_length": "593"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_023221535_1",
+      "assembly": {
+        "accession": "GCF_023221535.1",
+        "biosample": "SAMN27770840",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA812061"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; PacBio RS",
+        "assembly_method": "Unicycler v. 0.4.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Australia: Brisbane",
+        "isolation_source": "clinical",
+        "host": "Homo sapiens",
+        "collection_date": "1999",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18918021",
+        "biosample": "SAMN27770840",
+        "bioproject": "PRJNA812061",
+        "sample_name": "Acinetobacter baumannii F46 (RBH46)",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "358265400",
+        "spots": "1791327",
+        "avg_length": "200"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_032822615_1",
+      "assembly": {
+        "accession": "GCF_032822615.1",
+        "biosample": "SAMN33787963",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA949389"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq; Oxford Nanopore GridION",
+        "assembly_method": "Trycycler v. 0.5.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Australia: South Australia",
+        "isolation_source": "lake",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23998933",
+        "biosample": "SAMN33787963",
+        "bioproject": "PRJNA949389",
+        "sample_name": "SAAb472",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "381554803",
+        "spots": "1269353",
+        "avg_length": "300"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_041154775_1",
+      "assembly": {
+        "accession": "GCF_041154775.1",
+        "biosample": "SAMD00778454",
+        "bioprojects": [
+          "PRJDB18098"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illuminia MiSeq; Oxford nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Nepal:Kathmandu",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR553529",
+        "biosample": "SAMD00778454",
+        "bioproject": "PRJDB18098",
+        "sample_name": "SAMD00778454",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "268570323",
+        "spots": "526793",
+        "avg_length": "509"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_041154785_1",
+      "assembly": {
+        "accession": "GCF_041154785.1",
+        "biosample": "SAMD00778455",
+        "bioprojects": [
+          "PRJDB18098"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illuminia MiSeq; Oxford nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Nepal:Kathmandu",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR553530",
+        "biosample": "SAMD00778455",
+        "bioproject": "PRJDB18098",
+        "sample_name": "SAMD00778455",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "199224347",
+        "spots": "367099",
+        "avg_length": "542"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_041154825_1",
+      "assembly": {
+        "accession": "GCF_041154825.1",
+        "biosample": "SAMD00778471",
+        "bioprojects": [
+          "PRJDB18098"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illuminia MiSeq; Oxford nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Nepal:Kathmandu",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR553546",
+        "biosample": "SAMD00778471",
+        "bioproject": "PRJDB18098",
+        "sample_name": "SAMD00778471",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "328307163",
+        "spots": "597852",
+        "avg_length": "549"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_052186105_1",
+      "assembly": {
+        "accession": "GCF_052186105.1",
+        "biosample": "SAMN48287745",
+        "bioprojects": [
+          "PRJNA1257383"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina; Oxford Nanopore",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Germany",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR33405397",
+        "biosample": "SAMN48287745",
+        "bioproject": "PRJNA1257383",
+        "sample_name": "Strain Ab398",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "523450747",
+        "spots": "1764614",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_062075452_1",
+      "assembly": {
+        "accession": "GCF_062075452.1",
+        "biosample": "SAMN60587237",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA835507"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore; Illumina MiSeq",
+        "assembly_method": "Hybracter v. 0.11.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom:Nottingham",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "1993",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR38978468",
+        "biosample": "SAMN60587237",
+        "bioproject": "PRJNA835507",
+        "sample_name": "KT-A6",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "141181800",
+        "spots": "235303",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_062075454_1",
+      "assembly": {
+        "accession": "GCF_062075454.1",
+        "biosample": "SAMN60587233",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA835507"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore; Illumina MiSeq",
+        "assembly_method": "Hybracter v. 0.11.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom:Nottingham",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "1985",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR38978459",
+        "biosample": "SAMN60587233",
+        "bioproject": "PRJNA835507",
+        "sample_name": "KT-A120",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "120444600",
+        "spots": "200741",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_acinetobacter_baumannii_gcf_062075456_1",
+      "assembly": {
+        "accession": "GCF_062075456.1",
+        "biosample": "SAMN60587227",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA835507"
+        ],
+        "organism": "Acinetobacter baumannii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore; Illumina MiSeq",
+        "assembly_method": "Hybracter v. 0.11.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom:Nottingham",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "1985",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR38978474",
+        "biosample": "SAMN60587227",
+        "bioproject": "PRJNA835507",
+        "sample_name": "KT-A24",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "415200200",
+        "spots": "2076001",
+        "avg_length": "200"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_citrobacter_freundii_gcf_011064845_1",
+      "assembly": {
+        "accession": "GCF_011064845.1",
+        "biosample": "SAMN14128751",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA607328"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. v0.4.8-beta",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "",
+        "collection_date": "2018",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR11179868",
+        "biosample": "SAMN14128751",
+        "bioproject": "PRJNA607328",
+        "sample_name": "Citrobacter freundii BDGP7",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "521920057",
+        "spots": "869718",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_citrobacter_freundii_gcf_013731955_1",
+      "assembly": {
+        "accession": "GCF_013731955.1",
+        "biosample": "SAMN15148707",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA605147"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Hybrid: Illumina and OXFORD_NANOPORE",
+        "assembly_method": "Unicycler v. v0.4.7",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "Freshwater sample from downstream of wastewater treatment plant",
+        "host": "",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR11948867",
+        "biosample": "SAMN15148707",
+        "bioproject": "PRJNA605147",
+        "sample_name": "WTP5|T3-00830",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "669709699",
+        "spots": "2218627",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_citrobacter_freundii_gcf_029718045_1",
+      "assembly": {
+        "accession": "GCF_029718045.1",
+        "biosample": "SAMN15488480",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA605147"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina/Nanopore",
+        "assembly_method": "Unicycler v. v0.4.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "Pooled sediment sample collected from floor of pig farm",
+        "host": "",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12184050",
+        "biosample": "SAMN15488480",
+        "bioproject": "PRJNA605147",
+        "sample_name": "RH02|T1-E1C01",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "839625999",
+        "spots": "2781828",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_citrobacter_freundii_gcf_029719765_1",
+      "assembly": {
+        "accession": "GCF_029719765.1",
+        "biosample": "SAMN15488679",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA605147"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina/Nanopore",
+        "assembly_method": "Unicycler v. v0.4.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "Pooled soil sample collected from floor of poultry farm",
+        "host": "",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12184003",
+        "biosample": "SAMN15488679",
+        "bioproject": "PRJNA605147",
+        "sample_name": "RH18|T1-SOC05",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "834884063",
+        "spots": "2765860",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_citrobacter_freundii_gcf_033399635_1",
+      "assembly": {
+        "accession": "GCF_033399635.1",
+        "biosample": "SAMN37709340",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA607328"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq, Oxford Nanopore MiniION",
+        "assembly_method": "Flye/Pilon v. 2.9-b1774",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR26305306",
+        "biosample": "SAMN37709340",
+        "bioproject": "PRJNA607328",
+        "sample_name": "Citrobacter freundii FELIX_MS690",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "748914301",
+        "spots": "1405017",
+        "avg_length": "533"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_citrobacter_freundii_gcf_034377565_1",
+      "assembly": {
+        "accession": "GCF_034377565.1",
+        "biosample": "SAMN37931207",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA607328"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq, Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. v0.4.9b",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR26473414",
+        "biosample": "SAMN37931207",
+        "bioproject": "PRJNA607328",
+        "sample_name": "Citrobacter freundii FELIX_MS432",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "899685921",
+        "spots": "1598459",
+        "avg_length": "562"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterobacter_hormaechei_gcf_008123985_1",
+      "assembly": {
+        "accession": "GCF_008123985.1",
+        "biosample": "SAMN12603275",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA560883"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq and Nanopore",
+        "assembly_method": "Unicycler v. 0.4.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "mouse gut",
+        "host": "",
+        "collection_date": "2018-05-18",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR10013878",
+        "biosample": "SAMN12603275",
+        "bioproject": "PRJNA560883",
+        "sample_name": "PG20180056",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "300629955",
+        "spots": "701519",
+        "avg_length": "428"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterobacter_hormaechei_gcf_008124025_1",
+      "assembly": {
+        "accession": "GCF_008124025.1",
+        "biosample": "SAMN12603274",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA560883"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq and Nanopore",
+        "assembly_method": "Unicycler v. 0.4.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "mouse gut",
+        "host": "",
+        "collection_date": "2018-05-18",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR10013877",
+        "biosample": "SAMN12603274",
+        "bioproject": "PRJNA560883",
+        "sample_name": "PG20180049",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "295276258",
+        "spots": "695853",
+        "avg_length": "424"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterobacter_hormaechei_gcf_008693905_1",
+      "assembly": {
+        "accession": "GCF_008693905.1",
+        "biosample": "SAMN11056357",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA231221"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Pacbio; Illumina",
+        "assembly_method": "canu v. 1.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: KY",
+        "isolation_source": "clinical isolate",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8984857",
+        "biosample": "SAMN11056357",
+        "bioproject": "PRJNA231221",
+        "sample_name": "FDAARGOS_642",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1727378694",
+        "spots": "5719797",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterobacter_hormaechei_gcf_025244885_1",
+      "assembly": {
+        "accession": "GCF_025244885.1",
+        "biosample": "SAMN30697279",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA877370"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.8-beta",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Hong Kong: Telegraph Bay",
+        "isolation_source": "Stormwater drain",
+        "host": "",
+        "collection_date": "2021-04-23",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR25627275",
+        "biosample": "SAMN30697279",
+        "bioproject": "PRJNA877370",
+        "sample_name": "Joanne_E_hormaechei_WLB1A",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "251151919",
+        "spots": "709600",
+        "avg_length": "353"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterobacter_hormaechei_gcf_027920365_1",
+      "assembly": {
+        "accession": "GCF_027920365.1",
+        "biosample": "SAMN32541572",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA917514"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NovaSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.8-beta",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Hong Kong: Aberdeen typhoon shelter",
+        "isolation_source": "marine sediment",
+        "host": "",
+        "collection_date": "2021-07",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR25592469",
+        "biosample": "SAMN32541572",
+        "bioproject": "PRJNA917514",
+        "sample_name": "Winston_E_hormaechei_WYTS.MG41",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1293141689",
+        "spots": "2632502",
+        "avg_length": "491"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterobacter_hormaechei_gcf_043970015_1",
+      "assembly": {
+        "accession": "GCF_043970015.1",
+        "biosample": "SAMN39551840",
+        "bioprojects": [
+          "PRJNA1067818"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore GridION and Illumina NovaSeq",
+        "assembly_method": "Unicycler v. 0.4.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Taiwan",
+        "isolation_source": "bile",
+        "host": "Homo sapiens",
+        "collection_date": "2022-08-24",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR38980039",
+        "biosample": "SAMN39551840",
+        "bioproject": "PRJNA1067818",
+        "sample_name": "ecc23",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1636914600",
+        "spots": "5456382",
+        "avg_length": "300"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterobacter_hormaechei_gcf_043973385_1",
+      "assembly": {
+        "accession": "GCF_043973385.1",
+        "biosample": "SAMN39551824",
+        "bioprojects": [
+          "PRJNA1067818"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore GridION and Illumina NovaSeq",
+        "assembly_method": "Unicycler v. 0.4.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Taiwan",
+        "isolation_source": "blood",
+        "host": "Homo sapiens",
+        "collection_date": "2022-07-14",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR38979998",
+        "biosample": "SAMN39551824",
+        "bioproject": "PRJNA1067818",
+        "sample_name": "ecc7",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1514404800",
+        "spots": "5048016",
+        "avg_length": "300"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_005484525_1",
+      "assembly": {
+        "accession": "GCF_005484525.1",
+        "biosample": "SAMN11388367",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA388547"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Singapore",
+        "isolation_source": "air",
+        "host": "",
+        "collection_date": "2015-05-14",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12123476",
+        "biosample": "SAMN11388367",
+        "bioproject": "PRJNA388547",
+        "sample_name": "Enterococcus faecalis str. SGAir0397",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "773472564",
+        "spots": "1540782",
+        "avg_length": "502"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_013344645_1",
+      "assembly": {
+        "accession": "GCF_013344645.1",
+        "biosample": "SAMN13182396",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA587161"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina HiSeq; Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. v.0.4.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA:International Space Station, US Lab",
+        "isolation_source": "Surface",
+        "host": "not applicable",
+        "collection_date": "2011-04-15",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR10386875",
+        "biosample": "SAMN13182396",
+        "bioproject": "PRJNA587161",
+        "sample_name": "ISS_2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "666044000",
+        "spots": "1332088",
+        "avg_length": "500"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_023299785_1",
+      "assembly": {
+        "accession": "GCF_023299785.1",
+        "biosample": "SAMN28025460",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA833940"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq, Oxford Nanopore",
+        "assembly_method": "Unicycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "not applicable",
+        "isolation_source": "pet food (BARF)",
+        "host": "",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR19612313",
+        "biosample": "SAMN28025460",
+        "bioproject": "PRJNA833940",
+        "sample_name": "Enterococcus faecalis AT43a",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "324965567",
+        "spots": "1097445",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_023375505_1",
+      "assembly": {
+        "accession": "GCF_023375505.1",
+        "biosample": "SAMN23424735",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA783264"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq, Oxford Nanopore MinIon",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "not applicable",
+        "isolation_source": "fecal sample",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR17662742",
+        "biosample": "SAMN23424735",
+        "bioproject": "PRJNA783264",
+        "sample_name": "Enterococcus faecalis 249",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "311400849",
+        "spots": "1056178",
+        "avg_length": "294"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_030020195_1",
+      "assembly": {
+        "accession": "GCF_030020195.1",
+        "biosample": "SAMN33741215",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA944190"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Dallas, Texas",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2018-06",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR24894193",
+        "biosample": "SAMN33741215",
+        "bioproject": "PRJNA944190",
+        "sample_name": "EfsPF13",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "967001394",
+        "spots": "3621267",
+        "avg_length": "267"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_030020215_1",
+      "assembly": {
+        "accession": "GCF_030020215.1",
+        "biosample": "SAMN33741214",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA944190"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Dallas, Texas",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2018-04",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR24894194",
+        "biosample": "SAMN33741214",
+        "bioproject": "PRJNA944190",
+        "sample_name": "EfsPF5",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "450113478",
+        "spots": "1506539",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_030020645_1",
+      "assembly": {
+        "accession": "GCF_030020645.1",
+        "biosample": "SAMN33741197",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA944190"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq, ONT MinION",
+        "assembly_method": "Unicycler v. v.0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Dallas, Texas",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2018-07",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR24894177",
+        "biosample": "SAMN33741197",
+        "bioproject": "PRJNA944190",
+        "sample_name": "EfsC20",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "980997114",
+        "spots": "3300548",
+        "avg_length": "297"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_032681005_1",
+      "assembly": {
+        "accession": "GCF_032681005.1",
+        "biosample": "SAMN37639065",
+        "bioprojects": [
+          "PRJNA1023047",
+          "PRJNA224116"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore GridION",
+        "assembly_method": "De novo assembly using Unicycler v. 5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "South Korea:Gyeonggi-do, Anseong-si",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2022-11-28",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR26748297",
+        "biosample": "SAMN37639065",
+        "bioproject": "PRJNA1023047",
+        "sample_name": "Complete genome sequences of an Enterococcus faecalis strain 3222 isolated from human patients in South Korea",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "709571812",
+        "spots": "1188921",
+        "avg_length": "596"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_033813895_1",
+      "assembly": {
+        "accession": "GCF_033813895.1",
+        "biosample": "SAMN38203340",
+        "bioprojects": [
+          "PRJNA1039159",
+          "PRJNA224116"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore GridION",
+        "assembly_method": "De novo assembly using Unicycler v. 5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "South Korea:Gyeonggi-do, Anseong-si",
+        "isolation_source": "Pig rectum feces",
+        "host": "",
+        "collection_date": "2021-07-05",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR27204062",
+        "biosample": "SAMN38203340",
+        "bioproject": "PRJNA1039159",
+        "sample_name": "Complete genome sequences of an Enterococcus faecalis strain 90-2 isolated from pig in South Korea",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "640847953",
+        "spots": "1073474",
+        "avg_length": "596"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_036352195_1",
+      "assembly": {
+        "accession": "GCF_036352195.1",
+        "biosample": "SAMN39634309",
+        "bioprojects": [
+          "PRJNA1069998",
+          "PRJNA224116"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore GridION",
+        "assembly_method": "unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Mayo Clinic, Rochester, Minnesota",
+        "isolation_source": "sonicate fluid from explanted prosthetic implant; 83 yr old male patient with knee implant",
+        "host": "Homo sapiens",
+        "collection_date": "2005/2009",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR27764008",
+        "biosample": "SAMN39634309",
+        "bioproject": "PRJNA1069998",
+        "sample_name": "IDRL-7639",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1036640258",
+        "spots": "2313303",
+        "avg_length": "448"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_050426525_1",
+      "assembly": {
+        "accession": "GCF_050426525.1",
+        "biosample": "SAMN48387113",
+        "bioprojects": [
+          "PRJNA1260167"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "hybracter v. 0.7.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Australia: Adelaide",
+        "isolation_source": "wastewater",
+        "host": "",
+        "collection_date": "2022-09-10",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR33468766",
+        "biosample": "SAMN48387113",
+        "bioproject": "PRJNA1260167",
+        "sample_name": "Efa-W6",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "647792053",
+        "spots": "2198548",
+        "avg_length": "294"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_050427045_1",
+      "assembly": {
+        "accession": "GCF_050427045.1",
+        "biosample": "SAMN48387111",
+        "bioprojects": [
+          "PRJNA1260167"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "hybracter v. 0.7.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Australia: Adelaide",
+        "isolation_source": "wastewater",
+        "host": "",
+        "collection_date": "2022-09-10",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR33468769",
+        "biosample": "SAMN48387111",
+        "bioproject": "PRJNA1260167",
+        "sample_name": "Efa-W4",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "504005157",
+        "spots": "1698988",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecalis_gcf_050427495_1",
+      "assembly": {
+        "accession": "GCF_050427495.1",
+        "biosample": "SAMN48387110",
+        "bioprojects": [
+          "PRJNA1260167"
+        ],
+        "organism": "Enterococcus faecalis",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "hybracter v. 0.7.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Australia: Adelaide",
+        "isolation_source": "wastewater",
+        "host": "",
+        "collection_date": "2022-09-10",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR33468770",
+        "biosample": "SAMN48387110",
+        "bioproject": "PRJNA1260167",
+        "sample_name": "Efa-W3",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "510354005",
+        "spots": "1722451",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecium_gcf_900638765_1",
+      "assembly": {
+        "accession": "GCF_900638765.1",
+        "biosample": "SAMEA4884567",
+        "bioprojects": [
+          "PRJEB28495",
+          "PRJNA224116"
+        ],
+        "organism": "Enterococcus faecium",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq 2x150, Oxford Nanopore Technologies",
+        "assembly_method": "Unicycler(v0.4.1)",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR2779495",
+        "biosample": "SAMEA4884567",
+        "bioproject": "PRJEB28495",
+        "sample_name": "SAMEA4884567",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "175131987",
+        "spots": "581621",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_enterococcus_faecium_gcf_900639705_1",
+      "assembly": {
+        "accession": "GCF_900639705.1",
+        "biosample": "SAMEA4885972",
+        "bioprojects": [
+          "PRJEB28495",
+          "PRJNA224116"
+        ],
+        "organism": "Enterococcus faecium",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq 2x150, Oxford Nanopore Technologies",
+        "assembly_method": "Unicycler(v0.4.1)",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR2778832",
+        "biosample": "SAMEA4885972",
+        "bioproject": "PRJEB28495",
+        "sample_name": "SAMEA4885972",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "724449819",
+        "spots": "2406091",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_004804205_1",
+      "assembly": {
+        "accession": "GCF_004804205.1",
+        "biosample": "SAMN11266257",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA315192"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 0.4.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "not applicable",
+        "isolation_source": "feces",
+        "host": "Homo sapiens",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8792696",
+        "biosample": "SAMN11266257",
+        "bioproject": "PRJNA315192",
+        "sample_name": "382634",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "477085116",
+        "spots": "2412748",
+        "avg_length": "197"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_005037805_1",
+      "assembly": {
+        "accession": "GCF_005037805.1",
+        "biosample": "SAMN08768106",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA287560"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq;Oxford Nanopore MinION",
+        "assembly_method": "Unicycler;Canu v. 0.4.4.0;1.7",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada:Saskatchewan",
+        "isolation_source": "Clinical: Human (Homo sapiens)",
+        "host": "Homo sapiens",
+        "collection_date": "2000",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR7896256",
+        "biosample": "SAMN08768106",
+        "bioproject": "PRJNA287560",
+        "sample_name": "FWSEC0005",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "596266710",
+        "spots": "1351792",
+        "avg_length": "441"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_009432795_1",
+      "assembly": {
+        "accession": "GCF_009432795.1",
+        "biosample": "SAMN11633023",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA530317"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII, Illumina MiSeq",
+        "assembly_method": "HGAP, Pilon v. v3.0, v1.18",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA",
+        "isolation_source": "missing",
+        "host": "",
+        "collection_date": "2008",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR9994127",
+        "biosample": "SAMN11633023",
+        "bioproject": "PRJNA530317",
+        "sample_name": "M7638",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "484910265",
+        "spots": "1083886",
+        "avg_length": "447"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_011331215_2",
+      "assembly": {
+        "accession": "GCF_011331215.2",
+        "biosample": "SAMN13948677",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA603908"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore GridION",
+        "assembly_method": "Flye v. v2.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Houston",
+        "isolation_source": "blood",
+        "host": "Homo sapiens",
+        "collection_date": "2015-01/2016-07",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR11148648",
+        "biosample": "SAMN13948677",
+        "bioproject": "PRJNA603908",
+        "sample_name": "MB1860",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1897597839",
+        "spots": "12581492",
+        "avg_length": "150"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_014157395_1",
+      "assembly": {
+        "accession": "GCF_014157395.1",
+        "biosample": "SAMD00194359",
+        "bioprojects": [
+          "PRJDB6962",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Sequel; NextSeq 500",
+        "assembly_method": "flye v2.5; minimap v0.2-r124; racon v1.1.0; circlator v1.5.3; Pilon v1.18; SPAdes v3.11.1; A5-miseq v20140604",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan:Tokyo",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2018-02-13",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR199195",
+        "biosample": "SAMD00194359",
+        "bioproject": "PRJDB6962",
+        "sample_name": "SAMD00194359",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "253881409",
+        "spots": "889587",
+        "avg_length": "285"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_014338505_1",
+      "assembly": {
+        "accession": "GCF_014338505.1",
+        "biosample": "SAMN15889825",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA658821"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina and Nanopore",
+        "assembly_method": "Unicycler v. 0.4.9b",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "not collected",
+        "isolation_source": "not applicable",
+        "host": "not applicable",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12506198",
+        "biosample": "SAMN15889825",
+        "bioproject": "PRJNA658821",
+        "sample_name": "MFDpir",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "730479476",
+        "spots": "2736618",
+        "avg_length": "266"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_022811545_1",
+      "assembly": {
+        "accession": "GCF_022811545.1",
+        "biosample": "SAMN13193118",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA587532"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Trycycler v. v0.5.1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "New Zealand:Palmerston North",
+        "isolation_source": "the tolC deletion strain of the Keio collection",
+        "host": "",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR10394591",
+        "biosample": "SAMN13193118",
+        "bioproject": "PRJNA587532",
+        "sample_name": "JW5503",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "453433022",
+        "spots": "753211",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_031852295_1",
+      "assembly": {
+        "accession": "GCF_031852295.1",
+        "biosample": "SAMN35621341",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA980147"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 0.4.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Netherlands",
+        "isolation_source": "not collected",
+        "host": "Homo sapiens",
+        "collection_date": "2021-08-02",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR24827104",
+        "biosample": "SAMN35621341",
+        "bioproject": "PRJNA980147",
+        "sample_name": "RIVM_C040753",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "849565564",
+        "spots": "2911624",
+        "avg_length": "291"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_051562005_1",
+      "assembly": {
+        "accession": "GCF_051562005.1",
+        "biosample": "SAMN49815510",
+        "bioprojects": [
+          "PRJNA1287288"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "flye v. 2.9;medaka v. 1.7;polypolish v. 0.5.0;masurca v. 4.0.9 v. flye v. 2.9;medaka v. 1.7;polypolish v. 0.5.0;masurca v. 4.0.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Australia:Melbourne",
+        "isolation_source": "blood",
+        "host": "Homo sapiens",
+        "collection_date": "2019-05-21",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR34410510",
+        "biosample": "SAMN49815510",
+        "bioproject": "PRJNA1287288",
+        "sample_name": "AH19E045",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "543492790",
+        "spots": "1799645",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_052907945_1",
+      "assembly": {
+        "accession": "GCF_052907945.1",
+        "biosample": "SAMN51205866",
+        "bioprojects": [
+          "PRJNA1321367",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina Hiseq400 and Oxford Nanopore",
+        "assembly_method": "Unicycler v. v0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Mali",
+        "isolation_source": "stool",
+        "host": "Homo sapiens",
+        "collection_date": "2008",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR35329210",
+        "biosample": "SAMN51205866",
+        "bioproject": "PRJNA1321367",
+        "sample_name": "200088",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1045548838",
+        "spots": "3524483",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_054048005_1",
+      "assembly": {
+        "accession": "GCF_054048005.1",
+        "biosample": "SAMN50685443",
+        "bioprojects": [
+          "PRJNA1308153",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "Flye v. 2.9.3-b1797",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: Houston",
+        "isolation_source": "blood",
+        "host": "Homo sapiens",
+        "collection_date": "2022-05-22",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR40502616",
+        "biosample": "SAMN50685443",
+        "bioproject": "PRJNA1308153",
+        "sample_name": "MB14152",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "513949625",
+        "spots": "947240",
+        "avg_length": "542"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_055661425_1",
+      "assembly": {
+        "accession": "GCF_055661425.1",
+        "biosample": "SAMD01706130",
+        "bioprojects": [
+          "PRJDB37405"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "MinION",
+        "assembly_method": "hybracter v. 0.11.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "clinical",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR794466",
+        "biosample": "SAMD01706130",
+        "bioproject": "PRJDB37405",
+        "sample_name": "SAMD01706130",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "425463338",
+        "spots": "1408819",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_055661455_1",
+      "assembly": {
+        "accession": "GCF_055661455.1",
+        "biosample": "SAMD01706127",
+        "bioprojects": [
+          "PRJDB37405"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "MinION",
+        "assembly_method": "hybracter v. 0.11.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "clinical",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR794460",
+        "biosample": "SAMD01706127",
+        "bioproject": "PRJDB37405",
+        "sample_name": "SAMD01706127",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "809912358",
+        "spots": "2681829",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_964341145_1",
+      "assembly": {
+        "accession": "GCF_964341145.1",
+        "biosample": "SAMEA116133961",
+        "bioprojects": [
+          "PRJEB80458"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore",
+        "assembly_method": "Pilon v. 1.24",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "Rectal swab",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR13801973",
+        "biosample": "SAMEA116133961",
+        "bioproject": "PRJEB80458",
+        "sample_name": "SAMEA116133961",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1236798480",
+        "spots": "6344674",
+        "avg_length": "194"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_escherichia_coli_gcf_988242765_1",
+      "assembly": {
+        "accession": "GCF_988242765.1",
+        "biosample": "SAMEA118770092",
+        "bioprojects": [
+          "PRJEB93885"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PromethION",
+        "assembly_method": "Autocycler",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "blood culture",
+        "host": "Homo sapiens",
+        "collection_date": "2024-01-13",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR15422893",
+        "biosample": "SAMEA118770092",
+        "bioproject": "PRJEB93885",
+        "sample_name": "SAMEA118770092",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1656553800",
+        "spots": "5521846",
+        "avg_length": "300"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_oxytoca_gcf_017968865_1",
+      "assembly": {
+        "accession": "GCF_017968865.1",
+        "biosample": "SAMN18675296",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA683049"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Dallas, Texas",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2018-05",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR14250193",
+        "biosample": "SAMN18675296",
+        "bioproject": "PRJNA683049",
+        "sample_name": "KoPF10",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2307537750",
+        "spots": "7718075",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_oxytoca_gcf_027627785_1",
+      "assembly": {
+        "accession": "GCF_027627785.1",
+        "biosample": "SAMN28911479",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA847041"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION; Illumina MiSeq",
+        "assembly_method": "Flye v. 2.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "stool",
+        "host": "Homo sapiens",
+        "collection_date": "2004-03-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR21540817",
+        "biosample": "SAMN28911479",
+        "bioproject": "PRJNA847041",
+        "sample_name": "MUG_Kleb_oxy_AHC-6_hybrid",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1598080627",
+        "spots": "3399558",
+        "avg_length": "470"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_oxytoca_gcf_062019476_1",
+      "assembly": {
+        "accession": "GCF_062019476.1",
+        "biosample": "SAMN41608012",
+        "bioprojects": [
+          "PRJNA1118413"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION and Illumina NovaSeq X Plus",
+        "assembly_method": "Flye v. 2.9.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Los Angeles",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR29479709",
+        "biosample": "SAMN41608012",
+        "bioproject": "PRJNA1118413",
+        "sample_name": "S7",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1632423917",
+        "spots": "5607996",
+        "avg_length": "291"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_oxytoca_gcf_062019513_1",
+      "assembly": {
+        "accession": "GCF_062019513.1",
+        "biosample": "SAMN41608011",
+        "bioprojects": [
+          "PRJNA1118413"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION and Illumina NovaSeq X Plus",
+        "assembly_method": "Flye v. 2.9.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Los Angeles",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR29479710",
+        "biosample": "SAMN41608011",
+        "bioproject": "PRJNA1118413",
+        "sample_name": "S6",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1486273236",
+        "spots": "5095407",
+        "avg_length": "291"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_oxytoca_gcf_062019526_1",
+      "assembly": {
+        "accession": "GCF_062019526.1",
+        "biosample": "SAMN41608010",
+        "bioprojects": [
+          "PRJNA1118413"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION and Illumina NovaSeq X Plus",
+        "assembly_method": "Flye v. 2.9.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Los Angeles",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR29479711",
+        "biosample": "SAMN41608010",
+        "bioproject": "PRJNA1118413",
+        "sample_name": "S5",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1711644107",
+        "spots": "5888655",
+        "avg_length": "290"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_019927855_2",
+      "assembly": {
+        "accession": "GCF_019927855.2",
+        "biosample": "SAMN18874752",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA717739"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "Autocycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: District of Columbia",
+        "isolation_source": "blood",
+        "host": "Homo sapiens",
+        "collection_date": "2018-04-26",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR26412245",
+        "biosample": "SAMN18874752",
+        "bioproject": "PRJNA717739",
+        "sample_name": "MRSN572640",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "624924570",
+        "spots": "2075801",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_019928065_2",
+      "assembly": {
+        "accession": "GCF_019928065.2",
+        "biosample": "SAMN18874740",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA717739"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "Autocycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Jordan",
+        "isolation_source": "not collected",
+        "host": "Homo sapiens",
+        "collection_date": "2014-02-24",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR26412288",
+        "biosample": "SAMN18874740",
+        "bioproject": "PRJNA717739",
+        "sample_name": "MRSN513382",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "586196427",
+        "spots": "1947112",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_019928385_2",
+      "assembly": {
+        "accession": "GCF_019928385.2",
+        "biosample": "SAMN18874721",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA717739"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore PromethION",
+        "assembly_method": "Autocycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: California",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2014-12-09",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR26412255",
+        "biosample": "SAMN18874721",
+        "bioproject": "PRJNA717739",
+        "sample_name": "MRSN28893",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "421484481",
+        "spots": "1400031",
+        "avg_length": "301"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_020525505_1",
+      "assembly": {
+        "accession": "GCF_020525505.1",
+        "biosample": "SAMN22024792",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA768294"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Minion (Oxford Nanopore) and NextSeq 500/550 (Illumina)",
+        "assembly_method": "Trycycler; Medaka; Pilon v. 0.3.3; 1.3.3; 1.23",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Netherlands",
+        "isolation_source": "feces",
+        "host": "Homo sapiens",
+        "collection_date": "2002",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR16202847",
+        "biosample": "SAMN22024792",
+        "bioproject": "PRJNA768294",
+        "sample_name": "Klebsiella pneumoniae SB1139",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "978515700",
+        "spots": "3334515",
+        "avg_length": "293"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_020525945_1",
+      "assembly": {
+        "accession": "GCF_020525945.1",
+        "biosample": "SAMN22024797",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA768294"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Minion (Oxford Nanopore) and NextSeq 500/550 (Illumina)",
+        "assembly_method": "Trycycler; Medaka; Pilon v. 0.3.3; 1.3.3; 1.23",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Netherlands",
+        "isolation_source": "",
+        "host": "Water",
+        "collection_date": "2000",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR16202842",
+        "biosample": "SAMN22024797",
+        "bioproject": "PRJNA768294",
+        "sample_name": "Klebsiella pneumoniae SB615",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1256587968",
+        "spots": "4375575",
+        "avg_length": "287"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_022789345_2",
+      "assembly": {
+        "accession": "GCF_022789345.2",
+        "biosample": "SAMN17766494",
+        "bioprojects": [
+          "PRJNA591480"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "marine environment",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18543812",
+        "biosample": "SAMN17766494",
+        "bioproject": "PRJNA591480",
+        "sample_name": "KGMAR-2019-2186",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "549847447",
+        "spots": "1006669",
+        "avg_length": "546"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_036884245_1",
+      "assembly": {
+        "accession": "GCF_036884245.1",
+        "biosample": "SAMN39976604",
+        "bioprojects": [
+          "PRJNA1077593"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "not collected",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2001-06",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR27998988",
+        "biosample": "SAMN39976604",
+        "bioproject": "PRJNA1077593",
+        "sample_name": "Strain_11978",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "690541836",
+        "spots": "2479201",
+        "avg_length": "278"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_041861055_1",
+      "assembly": {
+        "accession": "GCF_041861055.1",
+        "biosample": "SAMN28626263",
+        "bioprojects": [
+          "PRJNA835677"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "Sus scrofa domesticus",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR19372461",
+        "biosample": "SAMN28626263",
+        "bioproject": "PRJNA835677",
+        "sample_name": "2019-01-2201",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "240851155",
+        "spots": "562665",
+        "avg_length": "428"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_041861215_1",
+      "assembly": {
+        "accession": "GCF_041861215.1",
+        "biosample": "SAMN32676116",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048597",
+        "biosample": "SAMN32676116",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-3513-1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "377157007",
+        "spots": "742573",
+        "avg_length": "507"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_041861235_1",
+      "assembly": {
+        "accession": "GCF_041861235.1",
+        "biosample": "SAMN32676100",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048615",
+        "biosample": "SAMN32676100",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-3043-2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "486233753",
+        "spots": "1055369",
+        "avg_length": "460"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_041861255_1",
+      "assembly": {
+        "accession": "GCF_041861255.1",
+        "biosample": "SAMN32676088",
+        "bioprojects": [
+          "PRJNA922900"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Flye v. v2.9-b1768; Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Norway",
+        "isolation_source": "Caecal",
+        "host": "",
+        "collection_date": "2020",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23048628",
+        "biosample": "SAMN32676088",
+        "bioproject": "PRJNA922900",
+        "sample_name": "KGVET-2020-01-2846-1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "700309676",
+        "spots": "1396528",
+        "avg_length": "501"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_046272125_1",
+      "assembly": {
+        "accession": "GCF_046272125.1",
+        "biosample": "SAMN41071133",
+        "bioprojects": [
+          "PRJNA1101017"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "garam masala hot spice mixture",
+        "host": "",
+        "collection_date": "2017-11",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR9042857",
+        "biosample": "SAMN41071133",
+        "bioproject": "PRJNA1101017",
+        "sample_name": "CFSAN137062",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "341908919",
+        "spots": "719250",
+        "avg_length": "475"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_060388695_1",
+      "assembly": {
+        "accession": "GCF_060388695.1",
+        "biosample": "SAMN49942155",
+        "bioprojects": [
+          "PRJNA1290837",
+          "PRJNA224116"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NovaSeq; Oxford Nanopore",
+        "assembly_method": "unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "sputum",
+        "host": "Homo sapiens",
+        "collection_date": "2018-10-23",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR34518214",
+        "biosample": "SAMN49942155",
+        "bioproject": "PRJNA1290837",
+        "sample_name": "KP39",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1152342608",
+        "spots": "3815704",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_986741565_1",
+      "assembly": {
+        "accession": "GCF_986741565.1",
+        "biosample": "SAMEA123066261",
+        "bioprojects": [
+          "PRJEB120950"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "OXFORD_NANOPORE;ILLUMINA",
+        "assembly_method": "Unicycler",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "spontaneous rifampicin-resistant mutant of Klebsiella pneumoniae ATCC 43816 (selected after passage through mice)",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR17564368",
+        "biosample": "SAMEA123066261",
+        "bioproject": "PRJEB120950",
+        "sample_name": "SAMEA123066261",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "969228164",
+        "spots": "3782631",
+        "avg_length": "256"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_klebsiella_pneumoniae_gcf_987475225_1",
+      "assembly": {
+        "accession": "GCF_987475225.1",
+        "biosample": "SAMEA123169331",
+        "bioprojects": [
+          "PRJEB121539"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "OXFORD_NANOPORE;ILLUMINA",
+        "assembly_method": "Unicycler",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "spontaneous rifampicin-resistant mutant of Klebsiella pneumoniae ATCC 43816 (selected after passage through mice)",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR17700797",
+        "biosample": "SAMEA123169331",
+        "bioproject": "PRJEB121539",
+        "sample_name": "KP1544 (ICC8001 -36G>T)",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1910834060",
+        "spots": "6879908",
+        "avg_length": "277"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_002968955_1",
+      "assembly": {
+        "accession": "GCF_002968955.1",
+        "biosample": "SAMN07291500",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA316321"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Pacbio; Illumina",
+        "assembly_method": "SMRT v. 2.3.0; HGAP v. 3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR32629554",
+        "biosample": "SAMN07291500",
+        "bioproject": "PRJNA316321",
+        "sample_name": "AR_0357",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "347384547",
+        "spots": "735553",
+        "avg_length": "472"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_014467035_1",
+      "assembly": {
+        "accession": "GCF_014467035.1",
+        "biosample": "SAMN15860813",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA658200"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII; Illumina NextSeq",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA",
+        "isolation_source": "Draining sinus tract from infected LVAD patient",
+        "host": "Homo sapiens",
+        "collection_date": "2019-06-24",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12480598",
+        "biosample": "SAMN15860813",
+        "bioproject": "PRJNA658200",
+        "sample_name": "NRD619.1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "639704241",
+        "spots": "2307630",
+        "avg_length": "277"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_022569855_1",
+      "assembly": {
+        "accession": "GCF_022569855.1",
+        "biosample": "SAMN26226229",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA810040"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio Sequel+Illumina MiSeq",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Colombia",
+        "isolation_source": "Soi",
+        "host": "",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18299193",
+        "biosample": "SAMN26226229",
+        "bioproject": "PRJNA810040",
+        "sample_name": "H20",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "760880442",
+        "spots": "1263921",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_022569915_1",
+      "assembly": {
+        "accession": "GCF_022569915.1",
+        "biosample": "SAMN26226225",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA810040"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio Sequel+Illumina MiSeq",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Japan",
+        "isolation_source": "Pacific Ocean",
+        "host": "",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18299197",
+        "biosample": "SAMN26226225",
+        "bioproject": "PRJNA810040",
+        "sample_name": "H16",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "725121040",
+        "spots": "1204520",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_022569975_1",
+      "assembly": {
+        "accession": "GCF_022569975.1",
+        "biosample": "SAMN26226220",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA810040"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio Sequel+Illumina MiSeq",
+        "assembly_method": "Unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "Keratitis",
+        "host": "",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18299168",
+        "biosample": "SAMN26226220",
+        "bioproject": "PRJNA810040",
+        "sample_name": "H10",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "503052270",
+        "spots": "835635",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_026727695_1",
+      "assembly": {
+        "accession": "GCF_026727695.1",
+        "biosample": "SAMN28336043",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA838002"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore GridION; Illumina MiSeq",
+        "assembly_method": "flye v. 2.9; Newbler v. 2.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Germany: Bielefeld",
+        "isolation_source": "plastic surface of detergent compartment of a washing machine",
+        "host": "",
+        "collection_date": "2019-10-22",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR22318776",
+        "biosample": "SAMN28336043",
+        "bioproject": "PRJNA838002",
+        "sample_name": "Pseudomonas aeruginosa B2.1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "200157674",
+        "spots": "333143",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_036835625_1",
+      "assembly": {
+        "accession": "GCF_036835625.1",
+        "biosample": "SAMN36987766",
+        "bioprojects": [
+          "PRJNA826241"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION; Illumina HiSeq",
+        "assembly_method": "unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "China:Hangzhou",
+        "isolation_source": "rectal swab",
+        "host": "Homo sapiens",
+        "collection_date": "2019-08-13",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR31098984",
+        "biosample": "SAMN36987766",
+        "bioproject": "PRJNA826241",
+        "sample_name": "IPA34",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1666601010",
+        "spots": "5678598",
+        "avg_length": "293"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_037287425_1",
+      "assembly": {
+        "accession": "GCF_037287425.1",
+        "biosample": "SAMN40123758",
+        "bioprojects": [
+          "PRJNA1007270"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq and Oxford Nanopore GridION X5",
+        "assembly_method": "Flye v. v2.8.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Durham",
+        "isolation_source": "bloodstream",
+        "host": "Homo sapiens",
+        "collection_date": "not collected",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR39132960",
+        "biosample": "SAMN40123758",
+        "bioproject": "PRJNA1007270",
+        "sample_name": "GN04821",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "970215767",
+        "spots": "3332440",
+        "avg_length": "291"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_037287465_1",
+      "assembly": {
+        "accession": "GCF_037287465.1",
+        "biosample": "SAMN40123747",
+        "bioprojects": [
+          "PRJNA1007270"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq and Oxford Nanopore GridION X5",
+        "assembly_method": "Flye v. v2.8.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Durham",
+        "isolation_source": "bloodstream",
+        "host": "Homo sapiens",
+        "collection_date": "not collected",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR39132972",
+        "biosample": "SAMN40123747",
+        "bioproject": "PRJNA1007270",
+        "sample_name": "GN06816",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1305650618",
+        "spots": "4493840",
+        "avg_length": "290"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_049532575_1",
+      "assembly": {
+        "accession": "GCF_049532575.1",
+        "biosample": "SAMN31936896",
+        "bioprojects": [
+          "PRJNA906522"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq + Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. Galaxy Version 0.5.0+galaxy1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Switzerland",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR22997612",
+        "biosample": "SAMN31936896",
+        "bioproject": "PRJNA906522",
+        "sample_name": "Paer05",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "598645393",
+        "spots": "2057154",
+        "avg_length": "291"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_049532595_1",
+      "assembly": {
+        "accession": "GCF_049532595.1",
+        "biosample": "SAMN31936898",
+        "bioprojects": [
+          "PRJNA906522"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq + Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. Galaxy Version 0.5.0+galaxy1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Switzerland",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23021870",
+        "biosample": "SAMN31936898",
+        "bioproject": "PRJNA906522",
+        "sample_name": "Paer09",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "208958101",
+        "spots": "1105818",
+        "avg_length": "188"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_049564875_1",
+      "assembly": {
+        "accession": "GCF_049564875.1",
+        "biosample": "SAMN31936911",
+        "bioprojects": [
+          "PRJNA906522"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq + Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. Galaxy Version 0.5.0+galaxy1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Germany",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23021864",
+        "biosample": "SAMN31936911",
+        "bioproject": "PRJNA906522",
+        "sample_name": "Paer33",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "237353037",
+        "spots": "1256183",
+        "avg_length": "188"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_059421375_1",
+      "assembly": {
+        "accession": "GCF_059421375.1",
+        "biosample": "SAMN57557773",
+        "bioprojects": [
+          "PRJNA1428285",
+          "PRJNA224116"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina iSeq; Oxford Nanopore GridION",
+        "assembly_method": "Flye v. 2.9.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Utah",
+        "isolation_source": "wastewater",
+        "host": "",
+        "collection_date": "2026-02-24",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR38324879",
+        "biosample": "SAMN57557773",
+        "bioproject": "PRJNA1428285",
+        "sample_name": "Sink Drain 2140659",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "400750875",
+        "spots": "1430386",
+        "avg_length": "280"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_062019365_1",
+      "assembly": {
+        "accession": "GCF_062019365.1",
+        "biosample": "SAMN38917255",
+        "bioprojects": [
+          "PRJNA1054342"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio Sequel",
+        "assembly_method": "HGAP v. SMRT Link V11",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Austria: Steyr",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2022-09-26",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR27279249",
+        "biosample": "SAMN38917255",
+        "bioproject": "PRJNA1054342",
+        "sample_name": "pt15",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "793554873",
+        "spots": "2763903",
+        "avg_length": "287"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_pseudomonas_aeruginosa_gcf_062019379_1",
+      "assembly": {
+        "accession": "GCF_062019379.1",
+        "biosample": "SAMN38917254",
+        "bioprojects": [
+          "PRJNA1054342"
+        ],
+        "organism": "Pseudomonas aeruginosa",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio Sequel",
+        "assembly_method": "HGAP v. SMRT Link V11",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Austria: Steyr",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2022-09-26",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR27279250",
+        "biosample": "SAMN38917254",
+        "bioproject": "PRJNA1054342",
+        "sample_name": "pt14-2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "382552742",
+        "spots": "1308880",
+        "avg_length": "292"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_000188955_2",
+      "assembly": {
+        "accession": "GCF_000188955.2",
+        "biosample": "SAMN00710608",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA50023"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RS",
+        "assembly_method": "SMRT Analysis v. 1.3.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "environmental swab",
+        "host": "",
+        "collection_date": "2010-02-01",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2544675",
+        "biosample": "SAMN00710608",
+        "bioproject": "PRJNA50023",
+        "sample_name": "507440-20",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "488095681",
+        "spots": "1108092",
+        "avg_length": "440"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_002266325_2",
+      "assembly": {
+        "accession": "GCF_002266325.2",
+        "biosample": "SAMN07163933",
+        "bioprojects": [
+          "PRJNA186035",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Nigeria",
+        "isolation_source": "cattle stool",
+        "host": "Bos taurus",
+        "collection_date": "2012",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR5627247",
+        "biosample": "SAMN07163933",
+        "bioproject": "PRJNA186035",
+        "sample_name": "CFSAN059881",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "340130593",
+        "spots": "1320872",
+        "avg_length": "257"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_003200975_3",
+      "assembly": {
+        "accession": "GCF_003200975.3",
+        "biosample": "SAMN03463864",
+        "bioprojects": [
+          "PRJNA186035",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "Microbial Genome Analysis v. SMRTLink v11",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:VA",
+        "isolation_source": "creek sediment",
+        "host": "",
+        "collection_date": "2011-09-15",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR7216513",
+        "biosample": "SAMN03463864",
+        "bioproject": "PRJNA186035",
+        "sample_name": "CFSAN003353",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "560949081",
+        "spots": "1268122",
+        "avg_length": "442"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_004354225_1",
+      "assembly": {
+        "accession": "GCF_004354225.1",
+        "biosample": "SAMN04192176",
+        "bioprojects": [
+          "PRJNA186035",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq, nanopore grridION",
+        "assembly_method": "SPAdes, CANU v. SPAdes v3.1.1, CANU v1.7",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA",
+        "isolation_source": "cucumber",
+        "host": "missing",
+        "collection_date": "2015-09-02",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2671205",
+        "biosample": "SAMN04192176",
+        "bioproject": "PRJNA186035",
+        "sample_name": "CFSAN038692",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1053558071",
+        "spots": "2757095",
+        "avg_length": "382"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_006874805_1",
+      "assembly": {
+        "accession": "GCF_006874805.1",
+        "biosample": "SAMN04088947",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA242847"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII; Illumina MiSeq",
+        "assembly_method": "Canu v. 1.4.1; Pilon v. 1.18; Pilon v. 1.23",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA:WA",
+        "isolation_source": "Animal-Swine-Roaster Swine",
+        "host": "",
+        "collection_date": "2015",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2421550",
+        "biosample": "SAMN04088947",
+        "bioproject": "PRJNA242847",
+        "sample_name": "FSIS1503788",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "551404795",
+        "spots": "1189492",
+        "avg_length": "463"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_014805785_2",
+      "assembly": {
+        "accession": "GCF_014805785.2",
+        "biosample": "SAMN15944967",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA478278"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Taiwan",
+        "isolation_source": "liver",
+        "host": "Chicken",
+        "collection_date": "2015",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12549527",
+        "biosample": "SAMN15944967",
+        "bioproject": "PRJNA478278",
+        "sample_name": "R16.0556",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "740617305",
+        "spots": "1349656",
+        "avg_length": "548"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_019670145_1",
+      "assembly": {
+        "accession": "GCF_019670145.1",
+        "biosample": "SAMD00097512",
+        "bioprojects": [
+          "PRJDB6430",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Sequel; NextSeq500",
+        "assembly_method": "Canu v. 1.4; minimap v. 0.2-r124; racon v. 1.1.0; circlator v. 1.5.3; Pilon v. 1.18; SPAdes v. 3.11.1; A5-miseq v. 20140604",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2007",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR107061",
+        "biosample": "SAMD00097512",
+        "bioproject": "PRJDB6430",
+        "sample_name": "SAMD00097512",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "278159957",
+        "spots": "998392",
+        "avg_length": "278"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_022655665_1",
+      "assembly": {
+        "accession": "GCF_022655665.1",
+        "biosample": "SAMN26664046",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA804648"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. v0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Australia: Tasmania",
+        "isolation_source": "feces",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18329060",
+        "biosample": "SAMN26664046",
+        "bioproject": "PRJNA804648",
+        "sample_name": "P287611",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "506551270",
+        "spots": "1912886",
+        "avg_length": "264"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_022655685_1",
+      "assembly": {
+        "accession": "GCF_022655685.1",
+        "biosample": "SAMN26664047",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA804648"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. v0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Australia: Tasmania",
+        "isolation_source": "feces",
+        "host": "Homo sapiens",
+        "collection_date": "2021",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR18329058",
+        "biosample": "SAMN26664047",
+        "bioproject": "PRJNA804648",
+        "sample_name": "P289597",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "542505974",
+        "spots": "2028193",
+        "avg_length": "267"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_028747905_1",
+      "assembly": {
+        "accession": "GCF_028747905.1",
+        "biosample": "SAMN32935253",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA910287"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq; Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler v. 0.4.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "China: Hong Kong",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR23648691",
+        "biosample": "SAMN32935253",
+        "bioproject": "PRJNA910287",
+        "sample_name": "Salmonella enterica serovar Typhi S1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "281103823",
+        "spots": "983741",
+        "avg_length": "285"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_038020165_1",
+      "assembly": {
+        "accession": "GCF_038020165.1",
+        "biosample": "SAMN40557410",
+        "bioprojects": [
+          "PRJNA1090139"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore, Illumina Nextseq",
+        "assembly_method": "Flye v. 2.9.1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA",
+        "isolation_source": "bovine",
+        "host": "not applicable",
+        "collection_date": "1990",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR28604151",
+        "biosample": "SAMN40557410",
+        "bioproject": "PRJNA1090139",
+        "sample_name": "CVMAU-2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "231198720",
+        "spots": "727040",
+        "avg_length": "318"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_054880995_1",
+      "assembly": {
+        "accession": "GCF_054880995.1",
+        "biosample": "SAMN50110822",
+        "bioprojects": [
+          "PRJNA1294593",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION; Illumina NextSeq",
+        "assembly_method": "unicycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Italy",
+        "isolation_source": "ENVIRONMENT",
+        "host": "",
+        "collection_date": "2015",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR34654955",
+        "biosample": "SAMN50110822",
+        "bioproject": "PRJNA1294593",
+        "sample_name": "22-SA00429-0",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "328043090",
+        "spots": "1116845",
+        "avg_length": "293"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_059100285_1",
+      "assembly": {
+        "accession": "GCF_059100285.1",
+        "biosample": "SAMN51024899",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA937468"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore",
+        "assembly_method": "Flye v. 2.9.5-b1801",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Germany",
+        "isolation_source": "Pork",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR35250053",
+        "biosample": "SAMN51024899",
+        "bioproject": "PRJNA937468",
+        "sample_name": "19-SA03017-0",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "346413485",
+        "spots": "1194343",
+        "avg_length": "290"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_059100505_1",
+      "assembly": {
+        "accession": "GCF_059100505.1",
+        "biosample": "SAMN51024785",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA937468"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore",
+        "assembly_method": "Flye v. 2.9.5-b1801",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Germany",
+        "isolation_source": "Pork, organs",
+        "host": "",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR35249886",
+        "biosample": "SAMN51024785",
+        "bioproject": "PRJNA937468",
+        "sample_name": "19-SA00767-0",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "296079005",
+        "spots": "1021862",
+        "avg_length": "289"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_salmonella_enterica_gcf_940599845_1",
+      "assembly": {
+        "accession": "GCF_940599845.1",
+        "biosample": "SAMEA14291302",
+        "bioprojects": [
+          "PRJEB52538",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "MinION,Illumina",
+        "assembly_method": "Flye,Racon,Medaka,Minimap2,Pilon",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "ERR9668960",
+        "biosample": "SAMEA14291302",
+        "bioproject": "PRJEB52538",
+        "sample_name": "SAMEA14291302",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "301370553",
+        "spots": "1009131",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_002996885_1",
+      "assembly": {
+        "accession": "GCF_002996885.1",
+        "biosample": "SAMN04014932",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292904"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3242023",
+        "biosample": "SAMN04014932",
+        "bioproject": "PRJNA292904",
+        "sample_name": "FDA-CDC-AR_0091",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "526350602",
+        "spots": "1117259",
+        "avg_length": "471"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_002997125_1",
+      "assembly": {
+        "accession": "GCF_002997125.1",
+        "biosample": "SAMN04014940",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292904"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3290654",
+        "biosample": "SAMN04014940",
+        "bioproject": "PRJNA292904",
+        "sample_name": "FDA-CDC-AR_0099",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "545297687",
+        "spots": "1168501",
+        "avg_length": "466"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_003071565_1",
+      "assembly": {
+        "accession": "GCF_003071565.1",
+        "biosample": "SAMN04014965",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292902"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112286",
+        "biosample": "SAMN04014965",
+        "bioproject": "PRJNA292902",
+        "sample_name": "FDA-CDC-AR_0124",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "532540276",
+        "spots": "2636338",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_003071585_1",
+      "assembly": {
+        "accession": "GCF_003071585.1",
+        "biosample": "SAMN04014971",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292902"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112288",
+        "biosample": "SAMN04014971",
+        "bioproject": "PRJNA292902",
+        "sample_name": "FDA-CDC-AR_0130",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "384447208",
+        "spots": "1903204",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_003186475_1",
+      "assembly": {
+        "accession": "GCF_003186475.1",
+        "biosample": "SAMN06311524",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA278886"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. v.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Boston",
+        "isolation_source": "wound",
+        "host": "Homo sapiens",
+        "collection_date": "2016",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR5237395",
+        "biosample": "SAMN06311524",
+        "bioproject": "PRJNA278886",
+        "sample_name": "0000-0063-2274",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "349440765",
+        "spots": "727856",
+        "avg_length": "480"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_003204405_1",
+      "assembly": {
+        "accession": "GCF_003204405.1",
+        "biosample": "SAMN04014963",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292902"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112284",
+        "biosample": "SAMN04014963",
+        "bioproject": "PRJNA292902",
+        "sample_name": "FDA-CDC-AR_0122",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "494310766",
+        "spots": "2447083",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_009936295_1",
+      "assembly": {
+        "accession": "GCF_009936295.1",
+        "biosample": "SAMD00191436",
+        "bioprojects": [
+          "PRJDB8907",
+          "PRJNA224116"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Miseq; MinION",
+        "assembly_method": "Unicycler v. 0.4.7",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan:Akita, Yurihonjo, Akita Prefectural University",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2019-03-27",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR196107",
+        "biosample": "SAMD00191436",
+        "bioproject": "PRJDB8907",
+        "sample_name": "SAMD00191436",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1082838940",
+        "spots": "3549713",
+        "avg_length": "305"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_013377375_1",
+      "assembly": {
+        "accession": "GCF_013377375.1",
+        "biosample": "SAMN11633367",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA542556"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SOAPdenovo v. 2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "China:Sichuan",
+        "isolation_source": "rhizosphere soil in ginger field",
+        "host": "",
+        "collection_date": "2015-09-01",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR9072110",
+        "biosample": "SAMN11633367",
+        "bioproject": "PRJNA542556",
+        "sample_name": "Serratia marcescens 1912768R",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1473292202",
+        "spots": "4878451",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_022439505_1",
+      "assembly": {
+        "accession": "GCF_022439505.1",
+        "biosample": "SAMN23485796",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA784350"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina HiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Australia: U-Vet Werribee Animal Hospital",
+        "isolation_source": "Urine collected via cystocentesis",
+        "host": "Felis catus",
+        "collection_date": "2012-01-16",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR17060594",
+        "biosample": "SAMN23485796",
+        "bioproject": "PRJNA784350",
+        "sample_name": "Serratia marcescens CM2012_028",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "256515600",
+        "spots": "427526",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_022439565_1",
+      "assembly": {
+        "accession": "GCF_022439565.1",
+        "biosample": "SAMN23485811",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA784350"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina HiSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.9",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Australia: U-Vet Werribee Animal Hospital",
+        "isolation_source": "Guttural pouch biopsy",
+        "host": "Equus ferus caballus",
+        "collection_date": "2019-03-11",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR17060582",
+        "biosample": "SAMN23485811",
+        "bioproject": "PRJNA784350",
+        "sample_name": "Serratia marcescens CM2019_254",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "255435000",
+        "spots": "425725",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_029025665_1",
+      "assembly": {
+        "accession": "GCF_029025665.1",
+        "biosample": "SAMN33434791",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA938405"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NovaSeq; Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.4.8-beta",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Hong Kong: Kam Shan",
+        "isolation_source": "soil",
+        "host": "",
+        "collection_date": "2022-05-24",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR25511191",
+        "biosample": "SAMN33434791",
+        "bioproject": "PRJNA938405",
+        "sample_name": "Serratia_marcescens_RX11",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "969366228",
+        "spots": "2021635",
+        "avg_length": "479"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_037287525_1",
+      "assembly": {
+        "accession": "GCF_037287525.1",
+        "biosample": "SAMN40123782",
+        "bioprojects": [
+          "PRJNA1007270"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq and Oxford Nanopore GridION X5",
+        "assembly_method": "Flye v. v2.8.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Durham",
+        "isolation_source": "bloodstream",
+        "host": "Homo sapiens",
+        "collection_date": "not collected",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR39132934",
+        "biosample": "SAMN40123782",
+        "bioproject": "PRJNA1007270",
+        "sample_name": "GN02966",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "986904311",
+        "spots": "3382353",
+        "avg_length": "291"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_serratia_marcescens_gcf_037287555_1",
+      "assembly": {
+        "accession": "GCF_037287555.1",
+        "biosample": "SAMN40123781",
+        "bioprojects": [
+          "PRJNA1007270"
+        ],
+        "organism": "Serratia marcescens",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq and Oxford Nanopore GridION X5",
+        "assembly_method": "Flye v. v2.8.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Durham",
+        "isolation_source": "bloodstream",
+        "host": "Homo sapiens",
+        "collection_date": "not collected",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR39132935",
+        "biosample": "SAMN40123781",
+        "bioproject": "PRJNA1007270",
+        "sample_name": "GN02903",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "977888094",
+        "spots": "3380237",
+        "avg_length": "289"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_009912095_1",
+      "assembly": {
+        "accession": "GCF_009912095.1",
+        "biosample": "SAMN11175628",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA528186"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq / Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler Hybrid Assembly v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8776853",
+        "biosample": "SAMN11175628",
+        "bioproject": "PRJNA528186",
+        "sample_name": "Barcoding_48_sample_31",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "121752504",
+        "spots": "268363",
+        "avg_length": "453"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_009912115_1",
+      "assembly": {
+        "accession": "GCF_009912115.1",
+        "biosample": "SAMN11175616",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA528186"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq / Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler Hybrid Assembly v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8776835",
+        "biosample": "SAMN11175616",
+        "bioproject": "PRJNA528186",
+        "sample_name": "Barcoding_48_sample_19",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "104903642",
+        "spots": "227729",
+        "avg_length": "460"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_009912335_1",
+      "assembly": {
+        "accession": "GCF_009912335.1",
+        "biosample": "SAMN11175631",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA528186"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq / Oxford Nanopore MiniION",
+        "assembly_method": "Unicycler Hybrid Assembly v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR8776850",
+        "biosample": "SAMN11175631",
+        "bioproject": "PRJNA528186",
+        "sample_name": "Barcoding_48_sample_34",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "133516707",
+        "spots": "282900",
+        "avg_length": "471"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_022405875_1",
+      "assembly": {
+        "accession": "GCF_022405875.1",
+        "biosample": "SAMN15567968",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA626345"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore",
+        "assembly_method": "Uniclycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12343893",
+        "biosample": "SAMN15567968",
+        "bioproject": "PRJNA626345",
+        "sample_name": "NAS_NP_181",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "204189220",
+        "spots": "444365",
+        "avg_length": "459"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_022405915_1",
+      "assembly": {
+        "accession": "GCF_022405915.1",
+        "biosample": "SAMN15567951",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA626345"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore",
+        "assembly_method": "Uniclycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12343911",
+        "biosample": "SAMN15567951",
+        "bioproject": "PRJNA626345",
+        "sample_name": "NAS_AN_239",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "156250939",
+        "spots": "324904",
+        "avg_length": "480"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_022406435_1",
+      "assembly": {
+        "accession": "GCF_022406435.1",
+        "biosample": "SAMN15567910",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA626345"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore",
+        "assembly_method": "Uniclycler v. 0.4.8",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR12343924",
+        "biosample": "SAMN15567910",
+        "bioproject": "PRJNA626345",
+        "sample_name": "NAS_AN_016",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "235071446",
+        "spots": "489812",
+        "avg_length": "479"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_022870625_1",
+      "assembly": {
+        "accession": "GCF_022870625.1",
+        "biosample": "SAMN16710839",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA675653"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore GridION",
+        "assembly_method": "Unicycler v. 0.4.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: Houston",
+        "isolation_source": "blood",
+        "host": "Homo sapiens",
+        "collection_date": "2017",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR19433006",
+        "biosample": "SAMN16710839",
+        "bioproject": "PRJNA675653",
+        "sample_name": "TCH32767",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "176394728",
+        "spots": "318501",
+        "avg_length": "553"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_041902405_1",
+      "assembly": {
+        "accession": "GCF_041902405.1",
+        "biosample": "SAMN43318620",
+        "bioprojects": [
+          "PRJNA1151632"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NovaSeq and Nanopore MinION",
+        "assembly_method": "Unicycler v. 0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Algeria: El-Harrach",
+        "isolation_source": "Cattle nasal swabs",
+        "host": "Cattle",
+        "collection_date": "2022",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR30352265",
+        "biosample": "SAMN43318620",
+        "bioproject": "PRJNA1151632",
+        "sample_name": "CBC235",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "640283186",
+        "spots": "2120143",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_042078115_1",
+      "assembly": {
+        "accession": "GCF_042078115.1",
+        "biosample": "SAMN39326608",
+        "bioprojects": [
+          "PRJNA1063000"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina; Oxford Nanopore",
+        "assembly_method": "Unicycler v. 5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "South Korea: Gimje",
+        "isolation_source": "milk",
+        "host": "bovine",
+        "collection_date": "2019-04-15",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR27483100",
+        "biosample": "SAMN39326608",
+        "bioproject": "PRJNA1063000",
+        "sample_name": "Staphylococcus aureus M19060305",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1112442132",
+        "spots": "1862896",
+        "avg_length": "597"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_045346865_1",
+      "assembly": {
+        "accession": "GCF_045346865.1",
+        "biosample": "SAMN40554536",
+        "bioprojects": [
+          "PRJNA1090044"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "Flye v. 2.9.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2021-04-19",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR28396804",
+        "biosample": "SAMN40554536",
+        "bioproject": "PRJNA1090044",
+        "sample_name": "Staphylococcus aureus TUM20929",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "241382276",
+        "spots": "602775",
+        "avg_length": "400"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_045346955_1",
+      "assembly": {
+        "accession": "GCF_045346955.1",
+        "biosample": "SAMN40554537",
+        "bioprojects": [
+          "PRJNA1090044"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Oxford Nanopore MinION",
+        "assembly_method": "Flye v. 2.9.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2020-12-16",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR28396803",
+        "biosample": "SAMN40554537",
+        "bioproject": "PRJNA1090044",
+        "sample_name": "Staphylococcus aureus TUM20963",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "225534731",
+        "spots": "582587",
+        "avg_length": "387"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_046741905_1",
+      "assembly": {
+        "accession": "GCF_046741905.1",
+        "biosample": "SAMN34066421",
+        "bioprojects": [
+          "PRJNA952137"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiniSeq + Oxford Nanopore MinION",
+        "assembly_method": "Unicycler v. Galaxy Version 0.5.0+galaxy1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Germany",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2019",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR24061457",
+        "biosample": "SAMN34066421",
+        "bioproject": "PRJNA952137",
+        "sample_name": "GE-MSSA40",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "246742574",
+        "spots": "830872",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_051549755_1",
+      "assembly": {
+        "accession": "GCF_051549755.1",
+        "biosample": "SAMN46784592",
+        "bioprojects": [
+          "PRJNA1222585"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina NextSeq; Oxford Nanopore",
+        "assembly_method": "Unicycler v. v0.5.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR32860427",
+        "biosample": "SAMN46784592",
+        "bioproject": "PRJNA1222585",
+        "sample_name": "AH6350",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "742751174",
+        "spots": "2504174",
+        "avg_length": "296"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_062009805_1",
+      "assembly": {
+        "accession": "GCF_062009805.1",
+        "biosample": "SAMN63220370",
+        "bioprojects": [
+          "PRJNA1531035",
+          "PRJNA224116"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore",
+        "assembly_method": "other (Unicycler) v. Unicycler version 0.4.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom: Glasgow",
+        "isolation_source": "bone",
+        "host": "Homo sapiens",
+        "collection_date": "2025-06-05",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR40722874",
+        "biosample": "SAMN63220370",
+        "bioproject": "PRJNA1531035",
+        "sample_name": "310902E_Saureus14",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "129284578",
+        "spots": "257539",
+        "avg_length": "502"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "negctl_staphylococcus_aureus_gcf_062009818_1",
+      "assembly": {
+        "accession": "GCF_062009818.1",
+        "biosample": "SAMN63220360",
+        "bioprojects": [
+          "PRJNA1531035",
+          "PRJNA224116"
+        ],
+        "organism": "Staphylococcus aureus",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": false,
+        "sequencing_tech": "Illumina MiSeq; Oxford Nanopore",
+        "assembly_method": "other (Unicycler) v. Unicycler version 0.4.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "United Kingdom: Glasgow",
+        "isolation_source": "bone",
+        "host": "Homo sapiens",
+        "collection_date": "2025-06-05",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR40722866",
+        "biosample": "SAMN63220360",
+        "bioproject": "PRJNA1531035",
+        "sample_name": "308883E_Saureus4",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "261530956",
+        "spots": "520978",
+        "avg_length": "502"
+      },
+      "errors": []
+    }
+  ]
+}

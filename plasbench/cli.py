@@ -215,6 +215,8 @@ ANALYSES = {
     "plaseval-replication": ("plaseval_replication.py", "Score the PlasEval paper's published bins (53 E. coli isolates) with PlasBench and draw the error profile; optionally compare with the original program"),
     "build-published-outcomes": ("build_published_outcomes.py", "Rebuild the published-outcome tables (cohorts/published/) from the plsMD and Teixeira supplementary workbooks"),
     "performance-drivers": ("performance_drivers.py", "A multivariable, study-clustered regression of per-plasmid recovery on size, repeats, replicon family, resistance genes, species, depth and arm"),
+    "plsdb-novelty": ("plsdb_novelty.py", "Classify each truth plasmid as known, related or novel against PLSDB and compare recovery across the classes"),
+    "discover-plasmid-free": ("discover_plasmid_free.py", "Find plasmid-free negative controls (single-replicon complete genomes with long-read truth and a paired Illumina run) at NCBI"),
     "assembly-adequacy": ("assembly_adequacy.py", "Whether each short-read assembly contains the plasmids it is judged against"),
     "copy-number": ("copy_number.py", "Tool versus truth plasmid copy number per matched bin"),
     "repeat-content": ("repeat_content.py", "K-mer repeat content of the truth replicons"),

@@ -9,6 +9,7 @@ Sections (always present; a missing table says "Not run" and why, never silence)
   learn-truthqc     repeat content and read-depth anomalies of the truth
   learn-plsmd       what a database-dependent tool such as plsMD can and cannot show (leakage)
   learn-published   PlasBench's results beside the outcomes a publication reported for the same isolates
+  learn-novelty     recovery of PLSDB-known, related and novel truth plasmids
   learn-drivers     what drives per-plasmid recovery: a multivariable, study-clustered regression per tool
 
 Called once from build_html_report.py: `inject(page, results_dir, scores_path)`. Standard library only.
@@ -20,7 +21,7 @@ from collections import defaultdict
 
 SECTIONS = [("learn-agreement", "Bin agreement"), ("learn-adequacy", "Assembly adequacy"),
             ("learn-copynumber", "Copy number"), ("learn-truthqc", "Truth repeats and depth"),
-            ("learn-plsmd", "Database-dependent tools"), ("learn-published", "Published outcomes"), ("learn-drivers", "Performance drivers")]
+            ("learn-plsmd", "Database-dependent tools"), ("learn-published", "Published outcomes"), ("learn-drivers", "Performance drivers"), ("learn-novelty", "Novelty")]
 
 
 from plasbench_common import number  # noqa: E402,F401
@@ -267,6 +268,34 @@ def published_section(report, summary_rows):
     return section("learn-published", "Comparison with published outcomes", lead, cp.html_body(report))
 
 
+def novelty_section(summary, recovery):
+    """Recovery split by how much of each truth plasmid PLSDB already holds (python/plsdb_novelty.py). Descriptive; never ranks."""
+    lead = ("A tool that looks plasmids up in a database recovers a <em>known</em> plasmid far more easily than a new one. Each truth plasmid is classed by how much of it "
+            "PLSDB already holds, and recovery is compared across the classes. <strong>Novel means no substantial relative in the PLSDB release used, not unknown to science; "
+            "descriptive, it never changes a score or ranking.</strong>")
+    if not summary:
+        return section("learn-novelty", "Novelty against PLSDB", lead,
+                       note("Not run: benchmark.plsdb_novelty.json was not produced. It needs a PLSDB FASTA (env/download_plsdb.sh, setting PLSDB_FASTA) and RUN_PLSDB_NOVELTY not off."))
+    counts = summary.get("classes", {})
+    th = summary.get("thresholds", {})
+    prov = summary.get("plsdb_provenance")
+    release = (prov.get("utc_date") or prov.get("date") or "") if isinstance(prov, dict) else ""
+    body = (f"<p class='muted'>{summary.get('truth_plasmids', 0)} truth plasmids: {counts.get('known', 0)} known (a PLSDB record covers at least {th.get('known_coverage')} of it at "
+            f"{th.get('known_identity')} identity), {counts.get('related', 0)} related (coverage at least {th.get('related_coverage')}), {counts.get('novel', 0)} novel. "
+            f"PLSDB file {esc(summary.get('plsdb_file', ''))}{(', downloaded ' + esc(release)) if release else ', release not recorded'}.</p>")
+    rows = []
+    for r in recovery or []:
+        gap = r.get("gap_to_known")
+        ci = f"{fmt(number_or_none(r.get('gap_ci_low')), 3)} to {fmt(number_or_none(r.get('gap_ci_high')), 3)}" if r.get("gap_ci_low") not in (None, "") else "-"
+        rows.append([r["tool"], r["analysis_track"], r["novelty"], r["n_plasmids"], r["n_studies"], fmt(number_or_none(r["mean_completeness"]), 3),
+                     fmt(number_or_none(r["recovered_fraction"]), 3), fmt(number_or_none(gap), 3) if gap not in (None, "") else "-", ci, r.get("status", "")])
+    body += panel(["Tool", "Track", "PLSDB novelty", "Plasmids", "Studies", "Mean completeness", "Recovered share", "Gap to known", "Gap 95% interval", "Status"], rows,
+                  "No per-plasmid results to split by novelty.")
+    for cv in summary.get("caveats", []):
+        body += f"<p class='muted'>{esc(cv)}</p>"
+    return section("learn-novelty", "Novelty against PLSDB", lead, body)
+
+
 def drivers_section(summary, rows):
     """Per tool: the drivers of per-plasmid recovery from one multivariable model (python/performance_drivers.py). Descriptive; never ranks."""
     lead = ("Which plasmid and isolate characteristics go with worse recovery, <strong>holding the others fixed</strong>: size, repeats, replicon family, "
@@ -343,11 +372,18 @@ def inject(page, results_dir, scores_path):
         import json
         with open(drivers_json, encoding="utf-8") as handle:
             drivers = json.load(handle)
+    novelty_json = os.path.join(results_dir, "benchmark.plsdb_novelty.json")
+    novelty = None
+    if os.path.isfile(novelty_json):
+        import json
+        with open(novelty_json, encoding="utf-8") as handle:
+            novelty = json.load(handle)
     sections = (agreement_section(scores, r("tool_agreement"), gate) + adequacy_section(r("assembly_adequacy"))
                 + copynumber_section(r("copy_number")) + truthqc_section(r("repeat_content"), r("truth_depth_anomalies"))
                 + plsmd_section(scores)
                 + published_section(published, r("published_comparison"))
-                + drivers_section(drivers, r("performance_drivers")))
+                + drivers_section(drivers, r("performance_drivers"))
+                + novelty_section(novelty, read_tsv(os.path.join(results_dir, "benchmark.plsdb_novelty_recovery.tsv"))))
     anchor = "<section id='recommendations'>"
     if anchor in page:
         page = page.replace(anchor, sections + anchor, 1)

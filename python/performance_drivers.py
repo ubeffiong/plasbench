@@ -18,6 +18,7 @@ Inputs
   results/<sample>/<tool>.per_plasmid.tsv     completeness and length per truth plasmid (score_plasmids.py)
   results/benchmark.repeat_content.tsv        internal_repeat_fraction, chromosome_shared_fraction (optional)
   data/<sample>/truth_features.tsv            replicon labels (annotate_reference.py), truth_amr.tsv for resistance genes (optional)
+  results/benchmark.plsdb_novelty.tsv         PLSDB novelty class per truth plasmid (plsdb_novelty.py; optional)
   the sample sheet                            organism, cluster_key / bioproject, read_depth_x, selection_arm (optional)
 Output
   <prefix>.tsv   one row per tool, track and term
@@ -257,12 +258,13 @@ def species_of(organism):
     return " ".join(parts[:2]) if parts else ""
 
 
-def collect(results_dir, data_dir, samples, repeat_rows):
+def collect(results_dir, data_dir, samples, repeat_rows, novelty_rows=None):
     """One record per (track, tool, scored truth plasmid) with every driver value that could be determined."""
     repeats = {}
     for row in repeat_rows or []:
         if row.get("molecule_type") == "PLASMID":
             repeats[(row["sample"], row["sequence_id"])] = (fnum(row.get("internal_repeat_fraction")), fnum(row.get("chromosome_shared_fraction")))
+    novelty = {(r["sample"], r["sequence_id"]): r["novelty"] for r in novelty_rows or [] if r.get("novelty")}
     per_sample_count = defaultdict(set)
     records = []
     label_cache, amr_cache = {}, {}
@@ -296,7 +298,7 @@ def collect(results_dir, data_dir, samples, repeat_rows):
                 "replicon": None if labels is None else replicon_family(labels.get(seq, {}).get("replicon", set())),
                 "amr": amr_value, "species": species_of(meta.get("organism")) or None,
                 "log_depth": math.log10(depth) if depth and depth > 0 else None,
-                "arm": meta.get("selection_arm") or None,
+                "arm": meta.get("selection_arm") or None, "novelty": novelty.get((sample, seq)),
                 "cluster": meta.get("cluster_key") or meta.get("bioproject") or sample})
     for rec in records:
         rec["n_in_isolate"] = float(len(per_sample_count[(rec["tool"], rec["sample"])]))
@@ -371,6 +373,7 @@ def build_design(recs, notes):
             categorical("species", lambda r: (r["species"] if r["species"] in top else ("other" if r["species"] else None)), top, "other", "species {}")
     else:
         notes["left_out"].append({"driver": "species", "reason": f"no species with {MIN_SPECIES_PLASMIDS} or more plasmids"})
+    categorical("plsdb_novelty", lambda r: r["novelty"], ["related", "novel"], "known", "PLSDB {}")
     categorical("arm", lambda r: r["arm"], ["recent"], "older", "public {} (vs older)")
     return terms
 
@@ -479,9 +482,9 @@ def fit_tool(track, tool, recs, args):
     return result
 
 
-def run(results_dir, data_dir, sample_sheet, repeat_path, out_prefix, args):
+def run(results_dir, data_dir, sample_sheet, repeat_path, out_prefix, args, novelty_path=None):
     samples = load_samples(sample_sheet)
-    records = collect(results_dir, data_dir, samples, read_tsv(repeat_path))
+    records = collect(results_dir, data_dir, samples, read_tsv(repeat_path), read_tsv(novelty_path))
     groups = defaultdict(list)
     for rec in records:
         groups[(rec["track"], rec["tool"])].append(rec)
@@ -512,6 +515,7 @@ def main():
     ap.add_argument("--data-dir", required=True)
     ap.add_argument("--sample-sheet", required=True)
     ap.add_argument("--repeat-content", help="default: <results-dir>/benchmark.repeat_content.tsv")
+    ap.add_argument("--novelty", help="default: <results-dir>/benchmark.plsdb_novelty.tsv (optional; adds PLSDB novelty as a driver)")
     ap.add_argument("--out-prefix", help="default: <results-dir>/benchmark.performance_drivers")
     ap.add_argument("--min-plasmids", type=int, default=30)
     ap.add_argument("--min-clusters", type=int, default=5)
@@ -519,7 +523,8 @@ def main():
     ap.add_argument("--seed", type=int, default=20261117)
     args = ap.parse_args()
     prefix = args.out_prefix or os.path.join(args.results_dir, "benchmark.performance_drivers")
-    results = run(args.results_dir, args.data_dir, args.sample_sheet, args.repeat_content or os.path.join(args.results_dir, "benchmark.repeat_content.tsv"), prefix, args)
+    results = run(args.results_dir, args.data_dir, args.sample_sheet, args.repeat_content or os.path.join(args.results_dir, "benchmark.repeat_content.tsv"), prefix, args,
+                  args.novelty or os.path.join(args.results_dir, "benchmark.plsdb_novelty.tsv"))
     est = [r for r in results if r["status"] == "estimated"]
     print(f"performance drivers: {len(est)} of {len(results)} tool/track models estimated; wrote {prefix}.tsv and {prefix}.json")
     for r in results:
