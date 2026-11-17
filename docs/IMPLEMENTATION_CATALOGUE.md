@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 184 analysis modules, 28 registered tools and baselines (20 real tools), 210 registered
-outputs, 53 run switches, 357 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 186 analysis modules, 28 registered tools and baselines (20 real tools), 211 registered
+outputs, 53 run switches, 369 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -371,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-184 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+186 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -416,6 +416,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `summarize_depth_ladder.py` | Summarize PlasBench score rows from a deterministic depth-ladder experiment. |
 | `summarize_read_quality_ladder.py` | Summarize PlasBench score rows from a deterministic read-quality-ladder |
 | `truth_depth_anomalies.py` | Advisory truth QC: coverage-anomaly regions from benchmark-read depth. |
+| `truth_exclusion_sensitivity.py` | the headline with and without the evidence-based truth exclusion (audit AU-051). |
 | `truth_marker_overlap.py` | which tools share a database with the evidence that labelled the truth? |
 | `truth_provenance.py` | how was each truth assembly built, and how far can it |
 | `validate_cohort.py` | Validate a PlasBench cohort locally and against linked NCBI metadata. |
@@ -592,6 +593,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `build_publication_cohorts.py` | Build the publication cohorts: the isolates a published benchmark used, as runnable PlasBench cohorts. |
 | `build_published_outcomes.py` | Turn the supplementary data of published plasmid benchmarks into long-format "published outcome" tables. |
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
+| `check_prediction_fasta.py` | Stage-4 well-formedness check of a tool's prediction FASTA (audit AU-035). |
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
@@ -605,7 +607,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 7. Every output file and where the report shows it
 
-210 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+211 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -690,6 +692,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `benchmark.study_sensitivity.tsv` | ranking_stability.py | learn-stability | shown | Leave-one-study-out rankings: Table. |
 | `benchmark.tool_agreement.tsv` | bin_agreement.py | learn-agreement | shown | Tool-versus-tool dissimilarity: Matrix. |
 | `benchmark.truth_depth_anomalies.tsv` | truth_depth_anomalies.py | learn-truthqc | shown | Depth anomalies of the truth: Table. |
+| `benchmark.truth_exclusion_sensitivity.tsv` | truth_exclusion_sensitivity.py | truth-label-audit | shown | Headline with and without the truth exclusion: Table. |
 | `benchmark.truth_label_audit.tsv` | audit_truth_labels.py | truth-label-audit | shown | Truth-label audit: Table. |
 | `benchmark.truth_marker_overlap.tsv` | truth_marker_overlap.py | truth-label-audit | shown | Truth-marker databases shared with tools: Table. |
 | `benchmark.truth_provenance.tsv` | truth_provenance.py | headline-design | shown | Truth provenance: Tier shown with the design. |
