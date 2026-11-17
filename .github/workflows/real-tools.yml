@@ -31,7 +31,7 @@ jobs:
       ACCESSION: ${{ github.event.inputs.accession || (matrix.tool == 'plasmidspades' && 'NZ_CP054231.1' || 'J01749.1') }}
     steps:
       - uses: actions/checkout@v4
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: mamba-org/setup-micromamba@v3
         with:
           environment-name: real
           create-args: >-
