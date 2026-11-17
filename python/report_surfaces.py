@@ -264,6 +264,7 @@ def _file_entries():
         S("score_failures.tsv", ag, "Runs that could not be scored", "05_score.sh", "outcome-states", "shown", "Listed with the reason.", expected=False),
         S("tool_status.tsv", ag, "How each run ended", "04_run_tools.sh", "outcome-states", "shown", "Every run's status and reason.", expected=True),
         S("tool_outcomes.tsv", ag, "Outcome of each tool run", "aggregate_results.py", "outcome-states", "partly", "Folded into outcome states."),
+        S("benchmark.input_consistency.tsv", ag, "Run tables that disagree", "run_consistency.py", "leaderboard", "partly", "Empty when the tables agree; otherwise a banner above the ranking and this list.", expected=True),
         S("assembly_status.tsv", ag, "How each assembly ended", "03_assemble.sh", "health", "partly", "Failures are counted in the health summary."),
         S("download_status.tsv", ag, "How each download ended", "01_download.sh", "health", "partly", "Failures are counted in the health summary."),
         S("quast_diagnostics.tsv", ag, "QUAST diagnostics, merged", "run_quast_diagnostics.py", "quast-diagnostics", "shown", "Table."),
