@@ -31,6 +31,9 @@ STEM="${OUT_FASTA%.plasmid.fasta}"
 BINS="${STEM}.bins.tsv"
 REPORT_OUT="${STEM}.plsmd_report.tsv"
 
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/_require_output.sh"
+require_tool_output plsmd "$OUT_DIR" 'plasmid_files/*' '*_report.tsv' || exit 3
 : > "$OUT_FASTA"
 printf 'bin_id\tsequence_id\n' > "$BINS"
 

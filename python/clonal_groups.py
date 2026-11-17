@@ -30,7 +30,7 @@ import subprocess
 import sys
 import tempfile
 
-from plasbench_common import MASH_SKETCH_SIZE, UnionFind, mash_dist_limit  # noqa: E402
+from plasbench_common import MASH_SKETCH_SIZE, UnionFind, mash_dist_limit, subprocess_timeout  # noqa: E402
 
 
 def read_rows(path):
@@ -47,12 +47,12 @@ def mash_pairs(references, max_distance, threads):
         sketch = os.path.join(tmp, "isolates")
         paths = [references[sample] for sample in sorted(references)]
         build = subprocess.run(["mash", "sketch", "-p", str(threads), "-s", str(MASH_SKETCH_SIZE), "-o", sketch] + paths,
-                               text=True, capture_output=True)
+                               text=True, capture_output=True, timeout=subprocess_timeout())
         if build.returncode != 0:
             return None
         dist = subprocess.run(["mash", "dist", "-p", str(threads), "-d", repr(mash_dist_limit(max_distance)),
                                sketch + ".msh", sketch + ".msh"],
-                              text=True, capture_output=True)
+                              text=True, capture_output=True, timeout=subprocess_timeout())
         if dist.returncode != 0:
             return None
     by_path = {path: sample for sample, path in references.items()}

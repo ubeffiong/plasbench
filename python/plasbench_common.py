@@ -18,6 +18,22 @@ import shutil
 import sys
 
 
+def subprocess_timeout(default=21600):
+    """Seconds a helper subprocess (minimap2, mash, seqtk, a git call ...) may run before it is stopped, so a hung helper cannot hang a stage forever (AU-044).
+
+    The default is generous (6 hours). PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS overrides it; 0 or "off" removes the limit. subprocess raises TimeoutExpired, which names the command."""
+    value = os.environ.get("PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS", "").strip().lower()
+    if not value:
+        return default
+    if value in ("0", "off", "none"):
+        return None
+    try:
+        seconds = float(value)
+    except ValueError:
+        return default
+    return seconds if seconds > 0 else None
+
+
 def number(value):
     """float(value), or None when it is missing or not numeric."""
     try:

@@ -31,6 +31,9 @@
 # Usage: adapt_rfplasmid.sh <rfplasmid_out_dir> <base_assembly_fasta> <out_fasta>
 set -euo pipefail
 OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/_require_output.sh"
+require_tool_output rfplasmid "$OUT_DIR" 'prediction.csv' || exit 3
 : > "$OUT_FASTA"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 CANDIDATES="${OUT_FASTA%.plasmid.fasta}.candidates.fasta"; : > "$CANDIDATES"

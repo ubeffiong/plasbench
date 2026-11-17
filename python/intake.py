@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from read_pairing import find_pairs, isolate_name  # noqa: E402
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 FASTA_NAME = re.compile(r"\.(fa|fna|fasta|fas|fsa)(\.gz)?$", re.IGNORECASE)
@@ -878,7 +879,7 @@ def check_sample(row: dict, data_dir: Path, sheet: Path, deep: bool = True, root
         if truth.is_file() and not f["error"]:
             script = Path(__file__).resolve().parent / "validate_truth_table.py"
             done = subprocess.run([sys.executable, str(script), "--truth", str(truth), "--reference", str(reference), "--sample", sample],
-                                  capture_output=True, text=True)
+                                  capture_output=True, text=True, timeout=subprocess_timeout())
             if done.returncode == 0:
                 rows = [l.split("\t") for l in truth.read_text(encoding="utf-8").splitlines()[1:] if l.strip() and not l.startswith("#")]
                 plasmids = sum(1 for r in rows if len(r) > 1 and r[1].strip().upper() == "PLASMID")

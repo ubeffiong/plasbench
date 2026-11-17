@@ -12,6 +12,10 @@ and keeps three small files beside the log so ANY server, including a new one st
     JOB_ID.pid     {"runner": pid, "child": pid, "started": t}      written once the command has started
     JOB_ID.alive   touched every few seconds                      a fresh file means the run is still going (a stale one cannot be confused with a reused pid)
     JOB_ID.exit    {"code": n, "ended": t}                       written, atomically, when the command ends however it ends (not when the runner itself is killed)
+    JOB_ID.activity                                              touched when the command prints something other than a "still working" notice: how long ago says whether it is stalled
+
+The command runs in its own process group (its own session on POSIX), recorded as "pgid" in JOB_ID.pid. Cancelling the run, and the runner receiving SIGTERM, stop the whole group;
+a server that starts later and finds the runner gone (it was killed with SIGKILL, which nothing can catch) stops the orphaned group and refuses to start or resume the run while any member is alive.
 
 Answers typed in the window are appended to JOB_ID.in as JSON lines {"text": ..., "shown": ...}; the runner forwards each complete line's text to the command's standard input and
 records `[you] <shown>` in the log (shown is masked for a secret), so a command that asks a question keeps working after the window reconnects.
@@ -21,6 +25,7 @@ position on Windows, so one would overwrite the other.) Standard library only.
 """
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -29,11 +34,21 @@ import time
 HEARTBEAT_SECONDS = 4
 STALE_SECONDS = 20          # a heartbeat older than this means the runner is gone
 POLL_SECONDS = 0.25
+STALL_SECONDS_DEFAULT = 600  # no output for this long: the run is shown as stalled (PLASBENCH_STALL_SECONDS overrides; 0 turns it off)
+KILL_GRACE_SECONDS = 8       # between SIGTERM and SIGKILL when stopping a group
+
+
+def stall_seconds():
+    """The no-output window after which a running job is called stalled (environment PLASBENCH_STALL_SECONDS, default 10 minutes, 0 = never)."""
+    try:
+        return max(0.0, float(os.environ.get("PLASBENCH_STALL_SECONDS", STALL_SECONDS_DEFAULT)))
+    except ValueError:
+        return float(STALL_SECONDS_DEFAULT)
 
 
 def paths(job_dir, job_id):
     base = os.path.join(job_dir, job_id)
-    return {"log": base + ".log", "pid": base + ".pid", "alive": base + ".alive", "exit": base + ".exit", "input": base + ".in"}
+    return {"log": base + ".log", "pid": base + ".pid", "alive": base + ".alive", "exit": base + ".exit", "input": base + ".in", "activity": base + ".activity"}
 
 
 def _write_json(path, payload):
@@ -71,6 +86,139 @@ def is_alive(job_dir, job_id, now=None):
     return age < STALE_SECONDS
 
 
+def pid_alive(pid):
+    """True while a process with this id exists (a zombie that nobody reaped counts as gone on POSIX)."""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)   # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return bool(ok) and code.value == 259   # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    try:   # a zombie is dead for our purposes
+        with open(f"/proc/{pid}/stat", "rb") as handle:
+            return handle.read().rsplit(b")", 1)[1].split()[0] != b"Z"
+    except (OSError, IndexError):
+        return True
+
+
+def group_alive(pgid):
+    """True while any process of this process group is alive (POSIX; on Windows the leader's own pid is the only member that can be checked)."""
+    try:
+        pgid = int(pgid)
+    except (TypeError, ValueError):
+        return False
+    if pgid <= 0:
+        return False
+    if os.name == "nt":
+        return pid_alive(pgid)
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return any(_group_member_alive(pid, pgid) for pid in _pids())
+
+
+def _pids():
+    try:
+        return [int(n) for n in os.listdir("/proc") if n.isdigit()]
+    except OSError:
+        return []
+
+
+def _group_member_alive(pid, pgid):
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as handle:
+            fields = handle.read().rsplit(b")", 1)[1].split()
+        return int(fields[2]) == pgid and fields[0] != b"Z"
+    except (OSError, IndexError, ValueError):
+        return False
+
+
+def kill_group(pgid, grace=KILL_GRACE_SECONDS):
+    """Stop every member of the process group: SIGTERM, then SIGKILL after `grace` seconds. Returns True when none is left. On Windows the tree is stopped with taskkill."""
+    try:
+        pgid = int(pgid)
+    except (TypeError, ValueError):
+        return True
+    if pgid <= 0:
+        return True
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(pgid)], capture_output=True)
+        return not pid_alive(pgid)
+    for sig, wait in ((signal.SIGTERM, grace), (signal.SIGKILL, 3)):
+        try:
+            os.killpg(pgid, sig)
+        except (ProcessLookupError, PermissionError):
+            break
+        end = time.time() + wait
+        while time.time() < end and group_alive(pgid):
+            time.sleep(0.1)
+        if not group_alive(pgid):
+            return True
+    return not group_alive(pgid)
+
+
+def run_state(job_dir, job_id):
+    """What is left of a run: whether its runner and any member of its process group are alive (read from JOB_ID.pid)."""
+    info = read_json(paths(job_dir, job_id)["pid"]) or {}
+    runner_alive = pid_alive(info.get("runner")) if info.get("runner") else False
+    return {"runner": info.get("runner"), "pgid": info.get("pgid"), "runner_alive": runner_alive,
+            "group_alive": group_alive(info.get("pgid")) if info.get("pgid") else False}
+
+
+def idle_seconds(job_dir, job_id, now=None):
+    """Seconds since the command last printed anything (not counting 'still working' notices), or None when unknown."""
+    p = paths(job_dir, job_id)
+    for key in ("activity", "log"):
+        try:
+            return max(0.0, (now or time.time()) - os.path.getmtime(p[key]))
+        except OSError:
+            continue
+    return None
+
+
+def is_stalled(job_dir, job_id, now=None, window=None):
+    """True when the run is going (a fresh heartbeat, no exit) but has printed nothing for the stall window: a hung or frozen tool still has a live runner."""
+    window = stall_seconds() if window is None else window
+    if window <= 0 or not is_alive(job_dir, job_id, now):
+        return False
+    idle = idle_seconds(job_dir, job_id, now)
+    return idle is not None and idle > window
+
+
+def lock_holder(results_dir):
+    """The live holder of RESULTS_DIR/.run.lock as {"pid", "pgid", "started", "what"}, or None when there is no lock or nothing of it is alive."""
+    if not results_dir or os.name == "nt":   # on Windows the pipeline runs in WSL or Git Bash: its pids are not Windows pids, so they cannot be checked from here
+        return None
+    try:
+        with open(os.path.join(results_dir, ".run.lock"), encoding="utf-8") as handle:
+            lock = dict(line.rstrip("\n").split("=", 1) for line in handle if "=" in line)
+    except OSError:
+        return None
+    pid = lock.get("pid", "")
+    pgid = lock.get("pgid", "")
+    if pid_alive(pid) or (pgid and group_alive(pgid)):
+        return lock
+    return None
+
+
 def run(job_dir, job_id, cwd, command):
     p = paths(job_dir, job_id)
     _touch(p["alive"])
@@ -83,6 +231,9 @@ def run(job_dir, job_id, cwd, command):
             log.write(data)
             log.flush()
     kwargs = {}
+    if os.name != "nt":
+        kwargs["start_new_session"] = True   # the command leads its own process group, so one killpg stops it and everything it started
+        kwargs["env"] = dict(os.environ, PLASBENCH_JOB_GROUP="1")   # tells the stage scripts their process group is this job's (scripts/lib.sh acquire_run_lock)
     if os.name == "nt":
         # a hidden console that the command and everything it starts share: a console program started from a detached process would otherwise open a window of its own
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x08000000   # CREATE_NO_WINDOW
@@ -93,8 +244,19 @@ def run(job_dir, job_id, cwd, command):
         log.close()
         _write_json(p["exit"], {"code": 127, "ended": time.time()})
         return 127
-    _write_json(p["pid"], {"runner": os.getpid(), "child": proc.pid, "started": time.time()})
+    _write_json(p["pid"], {"runner": os.getpid(), "child": proc.pid, "pgid": proc.pid, "started": time.time()})
+    _touch(p["activity"])
     done = threading.Event()
+
+    def stop_group(signum=None, frame=None):
+        """SIGTERM/SIGINT/SIGHUP to the runner stops the command's whole group, then the run ends normally (its exit file says it was signalled)."""
+        threading.Thread(target=kill_group, args=(proc.pid,), daemon=True).start()
+    if os.name != "nt" and threading.current_thread() is threading.main_thread():
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            try:
+                signal.signal(sig, stop_group)
+            except (ValueError, OSError):
+                pass
 
     def copy_output():
         while True:
@@ -102,6 +264,9 @@ def run(job_dir, job_id, cwd, command):
             if not chunk:
                 break
             write_log(chunk)
+            # A "still working" notice from run_with_heartbeat comes from the shell, not the tool: it must not make a silent tool look alive.
+            if any(line.strip() and b"still working:" not in line for line in chunk.splitlines()):
+                _touch(p["activity"])
 
     reader = threading.Thread(target=copy_output, daemon=True)
     reader.start()

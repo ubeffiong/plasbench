@@ -45,6 +45,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 import freeze_prereg  # noqa: E402
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 PREREG = "config/prereg.tsv"
 PLAIN = "config/prereg_plain.tsv"
@@ -260,7 +261,7 @@ def freeze_prereg_equal(planned, actual):
 
 def lock(root=ROOT):
     done = subprocess.run([sys.executable, str(HERE / "freeze_prereg.py"), "--prereg", str(Path(root) / PREREG), "--lock", str(Path(root) / LOCK), "--write", "--strict"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, timeout=subprocess_timeout())
     if done.returncode != 0:
         raise ValueError((done.stderr or done.stdout).strip().replace("ERROR: ", ""))
     return status(root)

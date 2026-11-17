@@ -34,6 +34,7 @@ import subprocess
 import sys
 from collections import defaultdict
 from statistics import median
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 FIELDS = ["sample", "tool", "analysis_track", "true_plasmid", "bin_id", "pcn_pred", "pcn_truth", "log2_ratio", "status"]
 SPADES = re.compile(r"length_(\d+)_cov_([0-9.eE+-]+)")
@@ -269,7 +270,7 @@ def main(argv=None):
         a = ap.parse_args(argv[1:])
         here = os.path.dirname(os.path.abspath(__file__))
         return subprocess.call([sys.executable, os.path.join(here, "merge_tables.py"), "--results-dir", a.results_dir,
-                                "--suffix", ".copy_number.tsv", "--out", a.out])
+                                "--suffix", ".copy_number.tsv", "--out", a.out], timeout=subprocess_timeout())
     if argv and argv[0] == "summary":
         ap = argparse.ArgumentParser(prog="copy_number.py summary")
         ap.add_argument("--table", required=True)

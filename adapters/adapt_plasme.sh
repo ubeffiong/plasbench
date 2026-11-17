@@ -27,6 +27,9 @@
 # both it and its "<name>_report.csv" sibling reliably.
 set -euo pipefail
 OUT_DIR="$1"; BASE_ASM="$2"; OUT_FASTA="$3"
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/_require_output.sh"
+require_tool_output plasme "$OUT_DIR" 'plasme_output.fasta' 'plasme_output.fasta_report.csv' || exit 3
 : > "$OUT_FASTA"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 CANDIDATES="${OUT_FASTA%.plasmid.fasta}.candidates.fasta"; : > "$CANDIDATES"

@@ -63,8 +63,10 @@ valid_sample_id() {
 
 # True when a tool left something in its output directory. A tool that ran, even one that found no plasmid, writes at least a log or a
 # table there; a directory that is missing or empty means it crashed or wrote somewhere else, which must not be read as "no plasmids".
+# A log alone does not count (AU-008): only files that are not *.log, *.err, *.stderr, *.stdout, *.out or the run.log/command files are real output; each adapter
+# additionally checks for its own tool's result files (adapters/_require_output.sh).
 tool_output_present() {
-    [[ -d "$1" ]] && [[ -n "$(find "$1" -type f -print -quit 2>/dev/null)" ]]
+    [[ -d "$1" ]] && [[ -n "$(find "$1" -type f ! -iname '*.log' ! -iname '*.err' ! -iname '*.stderr' ! -iname '*.stdout' ! -iname '*.out' ! -name 'command*' -print -quit 2>/dev/null)" ]]
 }
 
 # --- crash-aware sample jobs ---------------------------------------------
@@ -146,14 +148,145 @@ warn_resource_oversubscription() {
 # stage has finished, in the caller-supplied deterministic order -- so the
 # merged file's row order matches today's sequential output exactly, whatever
 # order the parallel jobs actually completed in.
+# Every process gets its own temporary area (TMP_DIR/.run.XXXXXX, made on first use), so two runs that share TMP_DIR (two terminals, the window
+# beside a terminal, two non-study runs) can no longer wipe each other's shards (audit AU-001). It is removed when the process ends; a run killed with
+# SIGKILL leaves it behind and the next run reports and keeps it (recover_stale_run_dirs).
 shard_dir() {
     local stage_name="$1"
-    printf '%s/.shards.%s' "${TMP_DIR:-/tmp}" "$stage_name"
+    printf '%s/.shards.%s' "${RUN_TMP_DIR:-${TMP_DIR:-/tmp}}" "$stage_name"
 }
 
 reset_shard_dir() {
+    init_run_tmp
     local dir; dir="$(shard_dir "$1")"
     rm -rf "$dir"; mkdir -p "$dir"
+}
+
+# --- exit hooks, unique temp area, run lock, stage timing -------------------------------------------------------------
+_PLASBENCH_MAIN_PID="$BASHPID"
+_PLASBENCH_EXIT_HOOKS=()
+_PLASBENCH_EXIT_RC=0
+# on_exit_add FUNCTION: run FUNCTION (no arguments) when this script ends, however it ends (a subshell never runs them).
+_plasbench_run_exit_hooks() {
+    _PLASBENCH_EXIT_RC=$?
+    [[ "$BASHPID" == "$_PLASBENCH_MAIN_PID" ]] || return 0
+    trap - EXIT
+    local hook
+    for hook in "${_PLASBENCH_EXIT_HOOKS[@]}"; do "$hook" || true; done
+    return 0
+}
+on_exit_add() {
+    _PLASBENCH_EXIT_HOOKS+=("$1")
+    trap '_plasbench_run_exit_hooks' EXIT
+}
+
+init_run_tmp() {
+    [[ -n "${RUN_TMP_DIR:-}" && -d "${RUN_TMP_DIR:-}" && "${_RUN_TMP_OWNER:-}" == "$BASHPID" ]] && return 0
+    mkdir -p "${TMP_DIR:-/tmp}"
+    recover_stale_run_dirs
+    RUN_TMP_DIR="$(mktemp -d "${TMP_DIR:-/tmp}/.run.XXXXXX")"
+    _RUN_TMP_OWNER="$BASHPID"
+    printf '%s\n' "$$" > "$RUN_TMP_DIR/owner"
+    on_exit_add cleanup_run_tmp
+}
+
+cleanup_run_tmp() {
+    [[ "${_RUN_TMP_OWNER:-}" == "$BASHPID" && -n "${RUN_TMP_DIR:-}" ]] && rm -rf "$RUN_TMP_DIR"
+    return 0
+}
+
+# A run that was killed (SIGKILL, power loss) cannot clean up. Its temp area is moved to LOG_DIR/recovered_shards/ and reported, never silently
+# deleted: finished tools are reused through their .complete markers on the next run, and the shard rows show what the killed run had recorded.
+recover_stale_run_dirs() {
+    local d owner n dest
+    for d in "${TMP_DIR:-/tmp}"/.run.*; do
+        [[ -d "$d" ]] || continue
+        owner="$(cat "$d/owner" 2>/dev/null || true)"
+        if [[ "$owner" =~ ^[0-9]+$ ]] && kill -0 "$owner" 2>/dev/null; then continue; fi
+        n="$(find "$d" -name '*.tsv' 2>/dev/null | wc -l | tr -d ' ')"
+        dest="${LOG_DIR:-${TMP_DIR:-/tmp}}/recovered_shards"
+        mkdir -p "$dest" 2>/dev/null || true
+        if mv "$d" "$dest/$(basename "$d")" 2>/dev/null; then
+            warn "found the temporary results of a run that was killed (pid ${owner:-unknown}; ${n} unmerged status row file(s)); kept in $dest/$(basename "$d"). Tools it finished are reused through their .complete markers."
+        fi
+    done
+    return 0
+}
+
+_pid_alive() { [[ "${1:-}" =~ ^[0-9]+$ ]] && kill -0 "$1" 2>/dev/null; }
+# True when a process other than $2 (not a zombie) still belongs to process group $1.
+_pgroup_alive() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] || return 1
+    ps -eo pgid=,pid=,stat= 2>/dev/null | awk -v g="$1" -v me="${2:-0}" '$1 == g && $2 != me && $3 !~ /^Z/ { found = 1 } END { exit !found }'
+}
+
+# acquire_run_lock WHAT: one run at a time per results folder. The lock file RESULTS_DIR/.run.lock holds the pid, the start time and the process group
+# (when this run leads one: setsid, or the window's job runner). It refuses, with a message, while the pid or any member of the recorded group is alive,
+# and removes a stale lock (audit AU-001/AU-009). run_all.sh holds the lock for its stages and exports PLASBENCH_LOCK_PID, so they do not refuse themselves.
+acquire_run_lock() {
+    local what="$1" lock="${RESULTS_DIR:?}/.run.lock" holder_pid holder_pgid holder_start holder_what my_pgid
+    mkdir -p "$RESULTS_DIR"
+    if [[ -n "${PLASBENCH_LOCK_PID:-}" && -f "$lock" ]] && grep -qx "pid=$PLASBENCH_LOCK_PID" "$lock" && _pid_alive "$PLASBENCH_LOCK_PID"; then
+        return 0
+    fi
+    if [[ -s "$lock" ]]; then
+        holder_pid="$(sed -n 's/^pid=//p' "$lock" | head -1)"
+        holder_pgid="$(sed -n 's/^pgid=//p' "$lock" | head -1)"
+        holder_start="$(sed -n 's/^started=//p' "$lock" | head -1)"
+        holder_what="$(sed -n 's/^what=//p' "$lock" | head -1)"
+        if [[ "$holder_pid" != "$$" ]] && _pid_alive "$holder_pid"; then
+            die "another PlasBench run is already using $RESULTS_DIR (pid $holder_pid, ${holder_what:-unknown stage}, started ${holder_start:-unknown}). Wait for it, stop it, or give this run its own results folder (--results-dir or --study)."
+        fi
+        if _pgroup_alive "$holder_pgid" "$$"; then
+            die "a previous run in $RESULTS_DIR (pid ${holder_pid:-?}) is gone, but processes of its process group $holder_pgid are still running (a killed run leaves its tools behind). Stop them first (kill -- -$holder_pgid), then start again."
+        fi
+        warn "removing a stale run lock in $RESULTS_DIR (pid ${holder_pid:-unknown}, ${holder_what:-unknown stage}, started ${holder_start:-unknown}): that run is no longer alive."
+        rm -f "$lock"
+    fi
+    my_pgid="$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ' || true)"
+    [[ "$my_pgid" == "$$" || ( -n "$my_pgid" && "${PLASBENCH_JOB_GROUP:-}" == "1" ) ]] || my_pgid=""
+    if ! ( set -o noclobber; printf 'pid=%s\npgid=%s\nstarted=%s\nwhat=%s\n' "$$" "$my_pgid" "$(date '+%Y-%m-%d %H:%M:%S')" "$what" > "$lock" ) 2>/dev/null; then
+        die "another PlasBench run took the lock on $RESULTS_DIR at the same moment ($(sed -n 's/^pid=//p' "$lock" 2>/dev/null | head -1)); start again when it has finished."
+    fi
+    _RUN_LOCK_OWNER="$BASHPID"
+    export PLASBENCH_LOCK_PID="$$"
+    on_exit_add release_run_lock
+}
+
+release_run_lock() {
+    [[ "${_RUN_LOCK_OWNER:-}" == "$BASHPID" ]] && rm -f "${RESULTS_DIR:-/nonexistent}/.run.lock"
+    return 0
+}
+
+# stage_timing_begin STAGE: record how long this stage script ran into RESULTS_DIR/stage_timing.tsv when it ends (one row per stage, the latest run
+# replaces the earlier one), including a stage that failed (audit AU-033).
+stage_timing_begin() {
+    _STAGE_TIMING_ID="$1"; _STAGE_TIMING_START="$(date +%s)"
+    on_exit_add record_stage_timing
+}
+
+record_stage_timing() {
+    [[ -n "${_STAGE_TIMING_ID:-}" && -d "${RESULTS_DIR:-/nonexistent}" ]] || return 0
+    local file="$RESULTS_DIR/stage_timing.tsv" tmp end
+    tmp="$file.$$.tmp"; end="$(date +%s)"
+    {
+        printf 'stage\tstarted\tended\telapsed_seconds\texit_code\n'
+        if [[ -f "$file" ]]; then awk -F'\t' -v s="$_STAGE_TIMING_ID" 'NR > 1 && $1 != s' "$file"; fi
+        printf '%s\t%s\t%s\t%s\t%s\n' "$_STAGE_TIMING_ID" "$_STAGE_TIMING_START" "$end" "$(( end - _STAGE_TIMING_START ))" "$_PLASBENCH_EXIT_RC"
+    } > "$tmp" 2>/dev/null && mv -f "$tmp" "$file" 2>/dev/null
+    return 0
+}
+
+# check_free_disk DIR [MIN_GB]: warn (never stop) when the folder's drive has less than MIN_GB free (default MIN_FREE_DISK_GB, 20; 0 turns it off).
+check_free_disk() {
+    local dir="$1" min_gb="${2:-${MIN_FREE_DISK_GB:-20}}" kb
+    [[ "$min_gb" =~ ^[0-9]+$ && "$min_gb" -gt 0 ]] || return 0
+    kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }')"
+    [[ "$kb" =~ ^[0-9]+$ ]] || return 0
+    if (( kb / 1048576 < min_gb )); then
+        warn "only about $(( kb / 1048576 )) GB is free where $dir is (below the ${min_gb} GB threshold, MIN_FREE_DISK_GB): downloads and assemblies may fill the disk."
+    fi
+    return 0
 }
 
 # merge_shards STAGE_NAME OUT_FILE HEADER SHARD_FILE...
@@ -520,6 +653,7 @@ explain_exit() {
         0) echo "finished" ;;
         1) echo "a command reported an error" ;;
         2) echo "a command was given a wrong option or a missing file" ;;
+        4) echo "every tool run of stage 4 failed (nothing was produced to score)" ;;
         124) echo "a time limit was reached" ;;
         126) echo "a program could not be run (permissions)" ;;
         127) echo "a program was not found (not installed, or not on PATH)" ;;

@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 
 FIELDS = ("sequence_id", "start", "end", "strand", "feature_id", "gene", "product",
@@ -128,7 +129,7 @@ def run_engine(engine, fasta, workdir, threads, database=None):
     else:
         command = [executable, "--outdir", str(out), "--prefix", "plasbench", "--cpus", str(threads), "--force", str(fasta)]
         expected = out / "plasbench.gff"
-    result = subprocess.run(command, text=True, capture_output=True)
+    result = subprocess.run(command, text=True, capture_output=True, timeout=subprocess_timeout())
     if result.returncode != 0 or not expected.is_file():
         message = (result.stderr or result.stdout or "annotation output was not produced").strip().splitlines()[0]
         return None, {"status": "failed", "reason": message, "version": version(executable)}

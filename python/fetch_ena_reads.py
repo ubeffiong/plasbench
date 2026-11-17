@@ -31,6 +31,7 @@ import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 CONNECTIONS = max(1, int(os.environ.get("ENA_DOWNLOAD_CONNECTIONS", "4") or 4))
 SEGMENT_MIN_BYTES = int(os.environ.get("ENA_SEGMENT_MIN_BYTES", str(16 << 20)) or (16 << 20))
@@ -92,7 +93,7 @@ def aria2_download(url, tmp, connections=CONNECTIONS):
     command = ["aria2c", f"--max-connection-per-server={connections}", f"--split={connections}",
                "--min-split-size=1M", "--allow-overwrite=true", "--auto-file-renaming=false",
                "--quiet=true", "--dir", os.path.dirname(os.path.abspath(tmp)), "--out", os.path.basename(tmp), url]
-    return subprocess.run(command, check=False).returncode == 0
+    return subprocess.run(command, check=False, timeout=subprocess_timeout()).returncode == 0
 
 
 def parallel_attempt(url, tmp, total, timeout):

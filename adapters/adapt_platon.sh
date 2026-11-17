@@ -10,6 +10,9 @@ OUT_DIR="$1"
 # shellcheck disable=SC2034  # BASE_ASM: positional adapter contract, unused here
 BASE_ASM="$2"
 OUT_FASTA="$3"
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/_require_output.sh"
+require_tool_output platon "$OUT_DIR" '*.tsv' '*.json' '*.plasmid.fasta' '*.chromosome.fasta' || exit 3
 : > "$OUT_FASTA"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 shopt -s nullglob

@@ -60,12 +60,16 @@ def read_cpu(logs_dir, sample, tool):
         lines = open(path, encoding="utf-8").read().strip().splitlines()
     except OSError:
         return None
-    parts = lines[-1].split() if lines else []      # /usr/bin/time's own line is the last one
-    if len(parts) >= 3:
-        user, system = number(parts[1]), number(parts[2])
-        if user is not None and system is not None:
-            return user + system
-    return None
+    # One three-number line per attempt (a retried run appends): the runtime in tool_status.tsv covers every attempt, so the CPU seconds must too.
+    total, seen = 0.0, False
+    for line in lines:
+        parts = line.split()
+        if len(parts) == 3 and number(parts[0]) is not None:
+            user, system = number(parts[1]), number(parts[2])
+            if user is not None and system is not None:
+                total += user + system
+                seen = True
+    return total if seen else None
 
 
 def reference_length(data_dir, sample):
@@ -91,7 +95,16 @@ def slope(points):
     return sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / denom
 
 
-def summarise(status_rows, score_rows, threads, logs_dir, data_dir, min_points):
+def read_resources(tool_status_path):
+    """(sample, tool) -> row of tool_run_resources.tsv (stage 4: each run's own thread count, attempt seconds, peak memory), {} when absent."""
+    path = os.path.join(os.path.dirname(os.path.abspath(tool_status_path)), "tool_run_resources.tsv") if tool_status_path else ""
+    return {(r.get("sample"), r.get("tool")): r for r in read_tsv(path)}
+
+
+def summarise(status_rows, score_rows, threads, logs_dir, data_dir, min_points, resources=None):
+    """`threads` is only the fallback for a run that recorded none: when stage 4 recorded the threads a run was given (tool_run_resources.tsv), every
+    thread-second and CPU-utilisation figure uses that run's own count, so tools given different thread counts are not distorted (AU-032)."""
+    resources = resources or {}
     recovered = defaultdict(float)
     for row in score_rows:
         value = number(row.get("recovered_plasmid_count"))
@@ -110,9 +123,15 @@ def summarise(status_rows, score_rows, threads, logs_dir, data_dir, min_points):
         runtimes = [v for r in done if (v := number(r.get("runtime_seconds"))) is not None]
         memory = [v for r in done if (v := number(r.get("peak_rss_kb"))) is not None]
         attempts = len(done) + len(failed)
+
+        def threads_of(r, tool=tool):
+            value = number((resources.get((r["sample"], tool)) or {}).get("threads"))
+            return int(value) if value and value > 0 else threads
+        used = sorted({threads_of(r) for r in done + failed}) or [threads]
         row = {"tool": tool, "n_runs": len(rows), "n_completed": len(done), "n_failed": len(failed),
                "n_resource_failures": len(resource), "n_skipped": len(skipped),
-               "success_rate": len(done) / attempts if attempts else None, "threads": threads}
+               "success_rate": len(done) / attempts if attempts else None,
+               "threads": str(used[0]) if len(used) == 1 else f"{used[0]}-{used[-1]}"}
         if runtimes:
             row["median_runtime_seconds"] = statistics.median(runtimes)
             row["p90_runtime_seconds"] = percentile(runtimes, 0.9)
@@ -121,13 +140,14 @@ def summarise(status_rows, score_rows, threads, logs_dir, data_dir, min_points):
         if tool in recovered:
             row["recovered_plasmids"] = recovered[tool]
             if runtimes and recovered[tool] > 0:
-                row["thread_seconds_per_recovered_plasmid"] = sum(runtimes) * threads / recovered[tool]
-        cpu_pairs = [(c, r_time) for r in done
+                thread_seconds = sum(v * threads_of(r) for r in done if (v := number(r.get("runtime_seconds"))) is not None)
+                row["thread_seconds_per_recovered_plasmid"] = thread_seconds / recovered[tool]
+        cpu_pairs = [(c, r_time * threads_of(r)) for r in done
                      if (c := read_cpu(logs_dir, r["sample"], tool)) is not None
                      and (r_time := number(r.get("runtime_seconds")))]
         if cpu_pairs:
             row["n_cpu_runs"] = len(cpu_pairs)
-            row["cpu_utilisation"] = sum(c for c, _ in cpu_pairs) / (sum(t for _, t in cpu_pairs) * threads)
+            row["cpu_utilisation"] = sum(c for c, _ in cpu_pairs) / sum(t for _, t in cpu_pairs)
         for field, source in (("runtime_scaling_exponent", "runtime_seconds"), ("memory_scaling_exponent", "peak_rss_kb")):
             points = []
             for r in done:
@@ -158,12 +178,14 @@ def main():
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     rows = summarise(read_tsv(args.tool_status), read_tsv(args.scores), max(args.threads, 1), args.logs_dir,
-                     args.data_dir, args.min_scaling_points)
-    with open(args.out, "w", newline="", encoding="utf-8") as handle:
+                     args.data_dir, args.min_scaling_points, read_resources(args.tool_status))
+    tmp_out = args.out + ".tmp"   # renamed over the table when complete (AU-049)
+    with open(tmp_out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow({k: fmt(row.get(k)) for k in FIELDS})
+    os.replace(tmp_out, args.out)
     sys.stderr.write(f"[performance_summary] {len(rows)} tool(s) -> {args.out}\n")
     return 0
 

@@ -7,7 +7,17 @@ source "$HERE/lib.sh"
 need python3
 
 SCORES="$RESULTS_DIR/scores.tsv"
-[[ -s "$SCORES" ]] || die "no scores found at $SCORES; run 05_score.sh first"
+mkdir -p "$RESULTS_DIR"
+stage_timing_begin 6
+if [[ ! -s "$SCORES" ]]; then
+    # Name the stage that is actually missing: a run in which no tool produced a prediction has nothing for stage 5 to score (AU-035).
+    if [[ ! -s "$RESULTS_DIR/tool_status.tsv" ]]; then
+        die "no scores found at $SCORES and no tool status at $RESULTS_DIR/tool_status.tsv: stage 4 (run tools) has not run for this results folder; run 04_run_tools.sh, then 05_score.sh"
+    elif ! awk -F'\t' 'NR > 1 && ($3 == "completed" || $3 == "reused") { f = 1 } END { exit !f }' "$RESULTS_DIR/tool_status.tsv"; then
+        die "no scores found at $SCORES because no tool run completed in stage 4 (see $RESULTS_DIR/tool_status.tsv and the tool logs in ${LOG_DIR:-logs}); there is nothing for stage 5 to score"
+    fi
+    die "no scores found at $SCORES although tools completed in stage 4; stage 5 (score) did not produce them: run 05_score.sh (see $RESULTS_DIR/score_failures.tsv)"
+fi
 # Optional structural evidence is accepted only after record, provenance, and
 # closure-support validation. Invalid evidence remains on disk for audit but is
 # excluded from selection reports.

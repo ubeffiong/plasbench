@@ -119,6 +119,7 @@ def main():
                 check(f"{tool}: the adapter runs and its output passes every check", done.returncode == 0 and crt.validate_output(tool, pred, bins, ids) == [], done.stderr[-300:])
             empty = t / "empty"
             empty.mkdir()
+            (empty / "contig_report.txt").write_text("contig_id\tmolecule_type\n")   # the tool ran and found no plasmid; a folder with no result file is a failed run (AU-008)
             pred = t / "pred_mob_recon.plasmid.fasta"
             done = subprocess.run([BASH, str(ROOT / "adapters" / "adapt_mob_recon.sh"), str(empty), str(asm), str(pred)], capture_output=True, text=True)
             check("an output directory with no plasmids is a valid empty prediction, not a failure", done.returncode == 0 and pred.read_text() == "" and "predicted no plasmids" in done.stderr)

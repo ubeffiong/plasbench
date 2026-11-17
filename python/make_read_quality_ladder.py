@@ -15,7 +15,7 @@ import gzip
 import shutil
 import subprocess
 from pathlib import Path
-from plasbench_common import link_or_copy  # noqa: E402
+from plasbench_common import link_or_copy, subprocess_timeout  # noqa: E402
 
 
 def rows(path):
@@ -105,7 +105,7 @@ def main():
                     [args.filtlong, "--min_length", str(min_length), "--min_mean_q", str(min_mean_q), str(long_reads)],
                     stdout=subprocess.PIPE,
                 )
-                gzip_result = subprocess.run(["gzip", "-c"], stdin=filtlong.stdout, stdout=handle, check=False)
+                gzip_result = subprocess.run(["gzip", "-c"], stdin=filtlong.stdout, stdout=handle, check=False, timeout=subprocess_timeout())
                 filtlong.stdout.close()
                 filtlong_result = filtlong.wait()
             if filtlong_result or gzip_result.returncode:

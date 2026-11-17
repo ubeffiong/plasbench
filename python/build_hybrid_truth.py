@@ -51,6 +51,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 CIRCULAR = re.compile(r"\bcircular=true\b", re.IGNORECASE)
 
@@ -160,7 +161,7 @@ def main():
         out_dir = Path(tmp) / "unicycler"
         command = [unicycler_path, "-1", args.r1, "-2", args.r2, "-l", args.long_reads,
                    "-o", str(out_dir), "-t", str(args.threads)]
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=subprocess_timeout())
         if result.returncode != 0:
             sys.stderr.write(f"[build_hybrid_truth] unicycler failed (exit {result.returncode}):\n{result.stderr[-4000:]}\n")
             sys.exit(1)

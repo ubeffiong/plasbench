@@ -20,6 +20,18 @@ source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
 need minimap2
 need python3
+mkdir -p "$RESULTS_DIR" "$LOG_DIR"
+acquire_run_lock "stage 5 (score)"
+stage_timing_begin 5
+[[ -f "$SAMPLE_SHEET" ]] || die "stage 5: the sample sheet $SAMPLE_SHEET does not exist"
+[[ -n "$(read_samples "$SAMPLE_SHEET")" ]] || die "stage 5: the sample sheet $SAMPLE_SHEET lists no samples, so there is nothing to score (fill in the cohort, or run stages 1-4 first)"
+
+# The reason a failed scoring call goes into score_failures.tsv: the last line it wrote (the exception message), then where the whole log is.
+failure_reason() {
+    local log="$1" last
+    last="$(grep -v '^[[:space:]]*$' "$log" 2>/dev/null | tail -n 1 | tr '\t\r' '  ' | cut -c1-300 || true)"
+    printf '%s (log: %s)' "${last:-no message was written}" "$log"
+}
 # Per sample*tool job, minimap2 (at $THREADS) and, when enabled, the QUAST
 # diagnostics step (at QUAST_DIAGNOSTICS_THREADS) run sequentially -- so the
 # job's PEAK thread demand is the max of the two, not their sum. Defaults to
@@ -326,7 +338,7 @@ score_sample() {
             --sample "$SAMPLE" --tool "$tool" --out "$SCORE_SHARD" \
             2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
             warn "scoring failed for $SAMPLE/$tool; excluded from aggregation"
-            printf '%s\t%s\tscore\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$FAILURE_SHARD"
+            printf '%s\t%s\tscore\t%s\n' "$SAMPLE" "$tool" "$(failure_reason "$LOG_DIR/${SAMPLE}.${tool}.score.log")" >> "$FAILURE_SHARD"
             continue
         fi
         rm -f "$RDIR/${tool}.contig_classification.tsv"
@@ -385,7 +397,7 @@ score_sample() {
                 --cprr-min-identity "$CPRR_MIN_IDENTITY" \
                 --summary "$RDIR/${tool}.bin_summary.tsv" 2>> "$LOG_DIR/${SAMPLE}.${tool}.score.log"; then
                 warn "bin scoring failed for $SAMPLE/$tool; retaining base-level score"
-                printf '%s\t%s\tbin_score\t%s\n' "$SAMPLE" "$tool" "see $LOG_DIR/${SAMPLE}.${tool}.score.log" >> "$FAILURE_SHARD"
+                printf '%s\t%s\tbin_score\t%s\n' "$SAMPLE" "$tool" "$(failure_reason "$LOG_DIR/${SAMPLE}.${tool}.score.log")" >> "$FAILURE_SHARD"
             fi
         elif [[ -s "$BINS" ]]; then
             # Contig-level classifiers may emit one record per contig, but that
@@ -500,26 +512,30 @@ wait
 # Merge per-sample score shards. Each carries its own header (written by the
 # first score_plasmids.py call for that sample), so the header is taken from
 # the first non-empty shard only; every other shard contributes data rows.
-: > "$SCORES"
+# The table is built beside scores.tsv and renamed over it, so a kill mid-merge leaves the previous file intact (AU-049).
+SCORES_NEW="$SCORES.new"
+: > "$SCORES_NEW"
 header_written=0
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     shard="$SCORE_SHARDS/${SAMPLE}.tsv"
     if [[ -s "$shard" ]]; then
         if [[ "$header_written" -eq 0 ]]; then
-            cat "$shard" >> "$SCORES"; header_written=1
+            cat "$shard" >> "$SCORES_NEW"; header_written=1
         else
-            tail -n +2 "$shard" >> "$SCORES"
+            tail -n +2 "$shard" >> "$SCORES_NEW"
         fi
     fi
 done < <(read_samples "$SAMPLE_SHEET")
+mv -f "$SCORES_NEW" "$SCORES"
 
 failure_shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     failure_shards+=("$FAILURE_SHARDS/${SAMPLE}.tsv")
 done < <(read_samples "$SAMPLE_SHEET")
-merge_shards "$SCORE_FAILURES" "$(printf 'sample\ttool\tstage\treason')" "${failure_shards[@]}"
+merge_shards "$SCORE_FAILURES.tmp" "$(printf 'sample\ttool\tstage\treason')" "${failure_shards[@]}"
+mv -f "$SCORE_FAILURES.tmp" "$SCORE_FAILURES"
 rm -rf "$SCORE_SHARDS" "$FAILURE_SHARDS"
 
 [[ -s "$SCORES" ]] && python3 "$HERE/../python/merge_bin_metrics.py" --scores "$SCORES" --results-dir "$RESULTS_DIR"

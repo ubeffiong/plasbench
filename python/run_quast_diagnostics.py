@@ -55,6 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from compute_difficulty_features import read_truth, split_reference_by_label  # noqa: E402
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 
 def split_individual_plasmids(fasta_path, labels, out_dir):
@@ -104,7 +105,7 @@ def run_quast(quast_path, query, reference, out_dir, threads, min_contig):
     command = [quast_path, str(query), "-r", str(reference), "-o", str(out_dir),
                "--min-contig", str(min_contig), "--fast", "--no-icarus", "--silent",
                "-t", str(threads)]
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=subprocess_timeout())
     report = Path(out_dir) / "report.tsv"
     if result.returncode != 0 or not report.is_file():
         sys.stderr.write(f"[run_quast_diagnostics] QUAST failed for {query} vs {reference} "

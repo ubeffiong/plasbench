@@ -25,7 +25,9 @@ source "$HERE/lib.sh"
 warn_resource_oversubscription "stage 1 (download)" "$MAX_PARALLEL_SAMPLES" "$THREADS"
 
 STATUS="$RESULTS_DIR/download_status.tsv"
-mkdir -p "$RESULTS_DIR" "$LOG_DIR"
+mkdir -p "$RESULTS_DIR" "$LOG_DIR" "$DATA_DIR"
+stage_timing_begin 1
+check_free_disk "$DATA_DIR"
 reset_shard_dir "download"
 STATUS_SHARDS="$(shard_dir "download")"
 

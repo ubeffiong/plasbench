@@ -13,6 +13,7 @@ new -- pass through this join completely unchanged.
 
 import argparse
 import csv
+import os
 from pathlib import Path
 
 FIELDS = [
@@ -108,10 +109,13 @@ def main():
         for field in FIELDS:
             row[field] = summary.get(field, "")
         row["perfect_reference_recovery"], row["strict_reference_reconstruction"] = perfect_metrics(row)
-    with open(args.scores, "w", newline="") as handle:
+    # Written beside the table and renamed over it, so a kill mid-write leaves the previous file intact (AU-049).
+    tmp_path = str(args.scores) + ".tmp"
+    with open(tmp_path, "w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
         writer.writeheader()
         writer.writerows(rows)
+    os.replace(tmp_path, args.scores)
 
 
 if __name__ == "__main__":

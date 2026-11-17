@@ -41,6 +41,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 TAB, NL = chr(9), chr(10)
 FIELDS = ["sample", "assembler", "path", "eligible", "reasons", "n_contigs", "total_length", "n50", "l50", "largest_contig",
@@ -95,7 +96,7 @@ def mapped_read_fraction(assembly, r1, r2, sample_reads=100000, threads=2):
                         break
                     dst.write(line)
             outs.append(out)
-        done = subprocess.run(["minimap2", "-x", "sr", "-t", str(threads), assembly, outs[0], outs[1]], capture_output=True, text=True)
+        done = subprocess.run(["minimap2", "-x", "sr", "-t", str(threads), assembly, outs[0], outs[1]], capture_output=True, text=True, timeout=subprocess_timeout())
         if done.returncode:
             return None
         mapped = set()
