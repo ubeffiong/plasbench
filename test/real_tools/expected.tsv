@@ -3,7 +3,11 @@
 # no real run had been reviewed when this file was written, so a floor would be a guess. After the first scheduled run, read its summary artifact
 # and set the floor from the observed value (a little below it), in a reviewed commit. A tool that rewrites contig names or breaks its output
 # format fails regardless of the floor.
-tool	min_plasmid_share	note
-mob_recon	0	set from the first reviewed scheduled run
-platon	0	set from the first reviewed scheduled run
-plasmidspades	0	set from the first reviewed scheduled run
+# min_recovered: the least fraction of the plasmid's own 31-mers that must be in what the tool called plasmid (0 = not set). Share compares sizes only; this says whether the
+# plasmid itself came back. Set from the real-tool run of 2026-11-17 (a little below what each tool showed): mob_recon and platon return contigs of the input, so 1.0;
+# plasmidSPAdes, on 600,000 pairs of the real reads SRR11905452, recovered only 0.099 of the 7,154 bp plasmid NZ_CP054231.1 while calling 50 kb (share 7.0): a finding about
+# the tool on this fixture, recorded as a regression guard, not as a standard of good performance.
+tool	min_plasmid_share	min_recovered	note
+mob_recon	0	0.9	observed share 1.00, recovered 1.00 (2026-11-17)
+platon	0	0.9	observed share 1.00, recovered 1.00 (2026-11-17)
+plasmidspades	0	0.05	observed share 7.01, recovered 0.099 (2026-11-17); real reads of E. coli EcPF14
