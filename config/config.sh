@@ -113,6 +113,13 @@ export MISSED_RECALL="${MISSED_RECALL:-0.50}"
 # zero, and large isolates or many tools make runs of many hours normal). Set one only to stop a truly stuck run, and make it generous (172800 = two days);
 # a run that exceeds it fails with exit 124 (resource failure).
 export TOOL_RETRIES="${TOOL_RETRIES:-1}"
+# Opt-in preset (AU-010): PLASBENCH_TOOL_TIMEOUT_PRESET=generous sets TOOL_TIMEOUT_SECONDS=172800 (two days per tool per isolate) when it is not set explicitly. It is
+# off by default because any limit can turn a slow but correct run into a zero score; an explicit TOOL_TIMEOUT_SECONDS always wins; an unknown preset name is an error.
+case "${PLASBENCH_TOOL_TIMEOUT_PRESET:-}" in
+    "") ;;
+    generous) : "${TOOL_TIMEOUT_SECONDS:=172800}" ;;
+    *) echo "ERROR: PLASBENCH_TOOL_TIMEOUT_PRESET='${PLASBENCH_TOOL_TIMEOUT_PRESET}' is not a preset (known: generous = 172800 s)" >&2; return 1 2>/dev/null || exit 1 ;;
+esac
 export TOOL_TIMEOUT_SECONDS="${TOOL_TIMEOUT_SECONDS:-}"
 # Recommender evaluation (python/evaluate_recommender.py, stage 6).
 export RUN_RECOMMENDER_EVAL="${RUN_RECOMMENDER_EVAL:-1}"

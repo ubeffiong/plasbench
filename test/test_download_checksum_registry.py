@@ -7,7 +7,7 @@
     recorded as verified, an explicit pin overrides the registry, a custom URL gets no registry pin;
   - PLASBENCH_REQUIRE_CHECKSUMS=1 refuses a download that has no pin at all;
   - the Dockerfile verifies the gplas2 archive when GPLAS2_SHA256 is given.
-No value in the shipped registry is pinned: none could be verified offline from the repository, and the registry says so (status=unpinned).
+Only the gplas2 archive is pinned (fetched and hashed on 2026-11-17); every other row says status=unpinned because its file was over ~300 MB and was not fetched.
 Needs bash (skipped when none is usable).
 """
 import csv

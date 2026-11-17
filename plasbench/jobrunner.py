@@ -214,9 +214,22 @@ def lock_holder(results_dir):
         return None
     pid = lock.get("pid", "")
     pgid = lock.get("pgid", "")
-    if pid_alive(pid) or (pgid and group_alive(pgid)):
+    if pid_alive(pid) and not heartbeat_stale(results_dir):
+        return lock
+    if pgid and group_alive(pgid):
         return lock
     return None
+
+
+def heartbeat_stale(results_dir, now=None):
+    """True when RESULTS_DIR/.run.lock.heartbeat exists and is older than PLASBENCH_LOCK_STALE_SECONDS (default 60): scripts/lib.sh treats such a lock as stale even
+    while its pid is alive (a reused pid). A lock with no heartbeat file (an older version) is never called stale here."""
+    try:
+        limit = float(os.environ.get("PLASBENCH_LOCK_STALE_SECONDS", "") or 60)
+        age = (time.time() if now is None else now) - os.path.getmtime(os.path.join(results_dir, ".run.lock.heartbeat"))
+    except (OSError, ValueError):
+        return False
+    return age > limit
 
 
 def run(job_dir, job_id, cwd, command):
