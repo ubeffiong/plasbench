@@ -443,6 +443,8 @@ def build_parser():
     discover_parser.add_argument("--country", action="append", default=[],
                                  help="Require deposited BioSample geo_loc_name to contain this country/place; repeat as needed.")
     discover_parser.add_argument("--max-assemblies", type=int, default=30)
+    discover_parser.add_argument("--negative-controls", action="store_true",
+                                 help="Look for plasmid-free isolates (complete genomes whose record declares no plasmid, with a paired Illumina run) to use as negative controls.")
     discover_parser.add_argument("--email")
     discover_parser.add_argument("--api-key")
     provenance_parser = sub.add_parser(
@@ -689,6 +691,10 @@ def build_parser():
                                  "a balanced selection, spread across species, studies and recent / older genomes, so a small run is a "
                                  "fair miniature of the cohort; --isolate-order file takes the first N rows instead. The sheet itself is "
                                  "not changed: a copy with those rows is written next to the results and used for this run.")
+        inputs.add_argument("--independent-truth-only", action="store_true",
+                            help="Run only the isolates whose truth is independent of the benchmark's reads (long-read-only or long-read-first, polished with no reads "
+                                 "or independent reads). With public-v4 that is about 15% of the cohort. Combine with --max-isolates for a balanced N of them. "
+                                 "The cohort file is not changed; a copy is written next to the results.")
         inputs.add_argument("--isolate-order", choices=("balanced", "file"), default="balanced",
                             help="With --max-isolates: balanced (default) spreads the N isolates across species, studies and "
                                  "recent / older genomes; file takes the first N rows exactly as they appear in the sheet.")
@@ -947,6 +953,8 @@ def main(argv=None):
             command.extend(["--organism", organism])
         for country in args.country:
             command.extend(["--country", country])
+        if args.negative_controls:
+            command.append("--negative-controls")
         if args.email:
             command.extend(["--email", args.email])
         if args.api_key:
@@ -1229,6 +1237,15 @@ def main(argv=None):
                 args.log_dir = folder / "logs"
             study_tmp = (folder / "tmp").resolve().as_posix()
             print(f"[plasbench] Study folder: {folder}")
+        if getattr(args, "independent_truth_only", False):
+            from . import sheet_limit
+            source_sheet = args.samples or Path(os.environ.get("SAMPLE_SHEET") or root / "config" / "accessions.tsv")
+            try:
+                only = sheet_limit.independent_truth_only(source_sheet, args.results_dir or Path(os.environ.get("RESULTS_DIR") or root / "results"))
+            except ValueError as exc:
+                parser.error(str(exc))
+            args.samples = only.path
+            print(f"[plasbench] --independent-truth-only: running {only.kept} of {only.total} isolates of {Path(source_sheet).name} (copy: {only.path})")
         if getattr(args, "max_isolates", None) is not None:
             from . import sheet_limit
             source_sheet = args.samples or Path(os.environ.get("SAMPLE_SHEET") or root / "config" / "accessions.tsv")

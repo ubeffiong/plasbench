@@ -14,6 +14,9 @@ an isolate that has none; `zero_plasmid_specificity`, `isolate_specificity`) cou
 It writes a cohort sheet (`--out`, valid input to `validate-cohort --online --write-lock`) with `assembly_plasmid_count` 0 and `control_type` plasmid_free,
 and an audit of every candidate and why it was not taken (`--audit`).
 
+The other route, `plasbench discover-cohort --negative-controls`, finds plasmid-free candidates for chosen organisms or places and leaves them for a curator to review;
+this script builds the ready, verified cohort `negative-controls-v1`.
+
 What this does NOT prove: a single-replicon complete assembly says the submitter deposited no plasmid, not that the strain has none (a plasmid can be lost
 or never assembled, especially without long reads). Every row therefore carries `plasmid_free_evidence` stating exactly that, and the stage-2 depth and
 truth checks can still flag a hidden replicon. Treat the controls as "no plasmid in the reference", and read a tool's false positives on them with that in mind.

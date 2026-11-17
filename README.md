@@ -2515,7 +2515,7 @@ machine-enforced by `plasbench validate-cohort --online`
 | `assembly_accession` | matches `^GC[AF]_\d+\.\d+$` |
 | `sra_run` | matches `^(SRR|ERR|DRR)\d+$` |
 | `truth_technology` | one of `long_read`, `hybrid` |
-| `truth_quality_tier` | one of `A`, `B`, `C` |
+| `truth_quality_tier` | one of `A`, `B`, `C`: the **curation grade** of the row, not a measure of how good the reference is. `A` = every evidence check passed and a reviewed publication or collection names the study; `B` = checks passed but no curator has approved it (every automatically contributed row, such as all of `public-v4`); `C` = not verified online. The reference tier that decides the headline (1-3) is derived separately from how the assembly was built and polished (`benchmark.truth_provenance.tsv`); the grade only matters to it in that a reference cannot be Tier 1 without grade `A`. The report calls this column *Curation grade*. |
 | `read_depth_x` | numeric and greater than zero when supplied |
 
 #### Evidence checks (online, against NCBI)

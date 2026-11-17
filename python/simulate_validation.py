@@ -296,7 +296,7 @@ def run_stratified(name, clusters, per_cluster, tau, sigma, missing, effect, rep
     rng = random.Random(seed)
     rejected = test_n = 0
     sizes, methods = [], set()
-    per_method = {m: [0, 0, 0.0] for m in ("percentile", "cluster_t", LEADERBOARD)}
+    per_method = {m: [0, 0, 0.0] for m in ("percentile", "cluster_t", "bootstrap_t", LEADERBOARD)}
     for _ in range(replicates):
         values, groups, strata = [], [], []
         for stratum, shift in (("A", -0.1), ("B", 0.1)):
@@ -318,7 +318,6 @@ def run_stratified(name, clusters, per_cluster, tau, sigma, missing, effect, rep
             test_n += 1
             rejected += p <= ALPHA
             methods.add(resampling.permutation_method(len(set(groups))))
-    per_method["bootstrap_t"] = list(per_method["cluster_t"])   # bootstrap_t has no stratified form (resampling.interval falls back to cluster_t)
     return _plain_row(mode, name, "stratified", 2 * clusters, sizes, tau, sigma, missing, effect, replicates, per_method, rejected, test_n, methods, "stratified species")
 
 

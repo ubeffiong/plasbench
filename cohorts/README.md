@@ -109,7 +109,7 @@ Species: *A. baumannii*, *E. coli*, *K. pneumoniae*, *P. aeruginosa*, *S. enteri
 *K. oxytoca* (5), *E. faecium* (2). `candidates/negative_controls_audit.tsv` lists every candidate and why it was not taken.
 
 **What it does not prove:** a single-replicon complete assembly shows the submitter deposited no plasmid, not that the strain has none (a plasmid can be lost or never assembled). Each row's
-`plasmid_free_evidence` says so; read a tool's false positives on these as "plasmid calls with no plasmid in the reference". Tier B, no tool has been run on it. Run it with the other cohorts or
+`plasmid_free_evidence` says so; read a tool's false positives on these as "plasmid calls with no plasmid in the reference". Tier B, no tool has been run on it. This cohort is built by `discover_plasmid_free.py` (single-replicon assemblies, deterministic, verified and locked); `plasbench discover-cohort --negative-controls` is the other route: it finds candidates whose record declares no plasmid for a curator to review, for organisms or places you choose. Run it with the other cohorts or
 alone: its isolates score through the zero-plasmid path (`zero_plasmid_specificity`, `isolate_specificity`, chromosomal false-positive bases).
 
 ## Verification
