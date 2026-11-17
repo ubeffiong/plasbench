@@ -107,5 +107,6 @@ def independent_truth_only(source, dest_dir) -> Limited:
     dest_dir.mkdir(parents=True, exist_ok=True)
     out = dest_dir / f"{source.stem}.independent{source.suffix or '.tsv'}"
     note = f"# PlasBench --independent-truth-only: {len(kept)} of {len(data)} isolates of {source.name} whose truth is independent of the benchmark's reads.\n"
-    out.write_text(note + (header if header.endswith("\n") else header + "\n") + "".join(kept), encoding="utf-8", newline="")
+    with open(out, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write(note + (header if header.endswith("\n") else header + "\n") + "".join(kept))
     return Limited(out, len(data), len(kept))
