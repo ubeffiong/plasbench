@@ -179,6 +179,12 @@ plasbench selection-report --name public-v4 --sheet cohorts/public-v4.tsv --impo
   --resolver-dir curation/v4/resolved --out cohorts/public-v4.selection.json
 ```
 
+## Publication cohorts
+
+The isolates of the published benchmarks (plsMD 2026, MOB-suite 2018, Teixeira 2025) are runnable cohorts, with the papers' own outcomes shipped beside them, so a run can be
+compared with the paper. They are built from the candidate ledgers, `public-v4` and NCBI resolution, and each row's assembly is checked against the plasmids the paper used as
+truth. How they were built, which isolates are missing and why, and how to compare are in [`PUBLICATION_COMPARISON.md`](PUBLICATION_COMPARISON.md).
+
 ## Candidate Review And Balance
 
 Keep raw discoveries as candidates. To detect study dependence and create a
@@ -206,6 +212,11 @@ apply identical evidence rules and differ only in curation grade. Read
 | [`public-v2.tsv`](../cohorts/public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
 | [`public-v3.tsv`](../cohorts/public-v3.tsv) | 98 | 10 A + 88 B | the species-balanced headline design; recorded truth provenance |
 | [`public-v4.tsv`](../cohorts/public-v4.tsv) | 7,227 | all B | the large validation panel: every verified genome of the contributed pool, 943 species, recent and older arms; run a balanced slice with `--max-isolates`; see [`cohorts/README.md`](../cohorts/README.md) |
+| [`pub-plsmd-novel.tsv`](../cohorts/pub-plsmd-novel.tsv) | 68 | all B | the plsMD paper's novel set; compare with the paper (`plasbench compare-published`) |
+| [`pub-plsmd-filtered.tsv`](../cohorts/pub-plsmd-filtered.tsv) | 63 | all B | the plsMD paper's filtered benchmark; compare with the paper |
+| [`pub-mobsuite.tsv`](../cohorts/pub-mobsuite.tsv) | 95 | all B | the MOB-suite benchmark |
+| [`pub-teixeira2025.tsv`](../cohorts/pub-teixeira2025.tsv) | 5 | all B | the 5 of Teixeira's 250 isolates with a deposited complete assembly |
+| [`publication-v1.tsv`](../cohorts/publication-v1.tsv) | 168 | all B | the publication cohorts together, each isolate once; see [`PUBLICATION_COMPARISON.md`](PUBLICATION_COMPARISON.md) |
 
 These are versioned **input cohort manifests**, not a substitute for released
 performance evidence. A public performance claim requires a reproducible run,

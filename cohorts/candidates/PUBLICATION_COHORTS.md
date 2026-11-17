@@ -7,6 +7,11 @@ into a `public-vN` cohort without resolve, curate and `validate-cohort --online`
 (see `docs/COHORTS.md`, `docs/FINDING_DATA.md`). No sequencing data, FASTA or archive was
 downloaded; only small supplementary tables and ENA metadata were fetched.
 
+> **Update 2026-11-17: these candidates have since been resolved and built into runnable cohorts** (`cohorts/pub-*.tsv`, `cohorts/publication-v1.tsv`), verified
+> online and locked, with the papers' own outcomes in `cohorts/published/`. See [`docs/PUBLICATION_COMPARISON.md`](../../docs/PUBLICATION_COMPARISON.md). What happened to every
+> candidate is in `publication_cohort_audit.tsv`; Teixeira's 245 isolates without a deposited assembly are in `teixeira2025_self_build_candidates.tsv`. The ledgers below are unchanged.
+> The commands under "Next commands" are what `plasbench build-publication-cohorts` automates; the text above that describes the ledgers as unresolved is the state on 2026-11-16.
+
 ## Counts (checked by `test/test_publication_cohort_candidates.py`)
 
 | file | isolates | plasmids |

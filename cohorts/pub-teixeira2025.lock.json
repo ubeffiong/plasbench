@@ -1,0 +1,182 @@
+{
+  "schema_version": "1.1",
+  "sample_sheet": "pub-teixeira2025.tsv",
+  "sample_sheet_sha256": "c8e53458d828af651c27687b3fad4859edc8bad2dd4c71c71684fccb479ff9fe",
+  "evidence": [
+    {
+      "sample_id": "citrobacter_portucalensis_bidmc108_004",
+      "assembly": {
+        "accession": "GCF_001037585.2",
+        "biosample": "SAMN03280170",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA271899"
+        ],
+        "organism": "Citrobacter sp. BIDMC108",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina; Oxford Nanopore",
+        "assembly_method": "Unicycler v. v0.4.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2127634",
+        "biosample": "SAMN03280170",
+        "bioproject": "PRJNA271899",
+        "sample_name": "BIDMC108",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "559360220",
+        "spots": "2769113",
+        "avg_length": "201"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "citrobacter_freundii_mgh279_061",
+      "assembly": {
+        "accession": "GCF_014337275.1",
+        "biosample": "SAMN08148341",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA271899"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina; Oxford Nanopore",
+        "assembly_method": "Unicycler v. v0.4.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: MA, Boston",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR30873065",
+        "biosample": "SAMN08148341",
+        "bioproject": "PRJNA271899",
+        "sample_name": "Citrobacter freundii MGH279",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "834597946",
+        "spots": "4131673",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "citrobacter_freundii_mgh281_062",
+      "assembly": {
+        "accession": "GCF_014337335.1",
+        "biosample": "SAMN08148335",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA271899"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina; Oxford Nanopore",
+        "assembly_method": "Unicycler v. v0.4.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: MA, Boston",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR13261841",
+        "biosample": "SAMN08148335",
+        "bioproject": "PRJNA271899",
+        "sample_name": "Citrobacter freundii MGH281",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1196024022",
+        "spots": "5920911",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "citrobacter_freundii_mgh281c_063",
+      "assembly": {
+        "accession": "GCF_014337315.1",
+        "biosample": "SAMN08148334",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA271899"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina; Oxford Nanopore",
+        "assembly_method": "Unicycler v. v0.4.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: MA, Boston",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR13261840",
+        "biosample": "SAMN08148334",
+        "bioproject": "PRJNA271899",
+        "sample_name": "Citrobacter freundii MGH281C",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1361227096",
+        "spots": "6738748",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "citrobacter_freundii_mgh283_064",
+      "assembly": {
+        "accession": "GCF_014337295.1",
+        "biosample": "SAMN08148336",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA271899"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina; Oxford Nanopore",
+        "assembly_method": "Unicycler v. v0.4.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA: MA, Boston",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR13261839",
+        "biosample": "SAMN08148336",
+        "bioproject": "PRJNA271899",
+        "sample_name": "Citrobacter freundii MGH283",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1382510220",
+        "spots": "6844110",
+        "avg_length": "202"
+      },
+      "errors": []
+    }
+  ]
+}

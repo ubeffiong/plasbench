@@ -730,6 +730,13 @@ HELP = {
         "Few excluded is good.",
         "Shows the truth that could not be settled.",
         "Appears only when something was excluded."),
+    "learn-published": H(
+        "Your results beside what a publication reported for the same isolates.",
+        "The publication's own per-isolate or per-plasmid outcomes, matched to this run by BioSample.",
+        "For each tool the paper also ran: the published mean, PlasBench's mean, their difference, correlation and the share within tolerance, with the tools' order compared.",
+        "Small differences mean PlasBench reproduces the paper's picture; a large gap can come from the assembly, tool or database version or the metric definition.",
+        "Lets you justify a PlasBench result against published work.",
+        "Not a gate or a ranking. Studies are never pooled, and a published value PlasBench could not match is counted as published only, not as zero."),
     "learn-copynumber": H(
         "Estimated copy number of each plasmid.",
         "Assembly read-depth headers and matched bins.",

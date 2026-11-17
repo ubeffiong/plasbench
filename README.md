@@ -2089,6 +2089,12 @@ reference, and writes `results/benchmark.report.html` — open that file in a br
 below for how to read it). Re-running the same command later reuses everything already
 completed (see [step 10](#step-10--run-your-first-benchmark)) instead of starting over.
 
+**Compare with a published benchmark.** `cohorts/pub-plsmd-novel.tsv`, `pub-plsmd-filtered.tsv`, `pub-mobsuite.tsv`, `pub-teixeira2025.tsv` and the mixed `publication-v1.tsv`
+(168 isolates) hold the isolates of published benchmarks, verified at NCBI, with the papers' own outcomes shipped in `cohorts/published/`. After a run,
+`plasbench compare-published --results-dir results --samples cohorts/pub-plsmd-novel.tsv` puts PlasBench's per-plasmid recall or contig results beside the paper's, tool by tool,
+and says whether the tool order agrees; stage 6 does it automatically and the report gets a "Comparison with published outcomes" section. It is a comparison for your
+own justification, not a gate: [`docs/PUBLICATION_COMPARISON.md`](docs/PUBLICATION_COMPARISON.md) says what is compared, how to read a gap and what is not covered.
+
 **Run only part of a cohort.** A large cohort (for example `public-v4`) is more than most computers should
 download in one go. `--max-isolates N` runs only N isolates of the cohort or sample sheet; N is whatever you
 choose (40 below is only an example):
@@ -2412,6 +2418,8 @@ ones you'll actually reach for most often; every command has more than shown her
 | `import-contributed-cohort` | Select a seeded, one-per-read-BioProject candidate cohort from the contributed RefSeq/SRA pool (unverified until `validate-cohort --online`). | *`--out-dir`*, `--released-after`, `--released-before`, `--date-basis`, `--species`, `--max-clusters-per-species`, `--seed` |
 | `resolve-contributed-cohort` | Verify importer candidates at NCBI (needs `NCBI_API_KEY`), choose the real BioProject and best SRA run, run the pre-download read-QC check, and pick the final per-species rows. | *`--candidates`* (repeatable), *`--out-dir`*, `--target-per-species`, `--min-recent`, `--cache` |
 | `selection-report` | Write `cohorts/<name>.selection.json`: where a cohort's genomes came from, the criteria, how many were available and passed each stage, why others failed, and the sequence information of the selected genomes (the window's Cohorts page opens it as a pop-up). | *`--name`*, *`--sheet`*, *`--importer-dir`*, *`--resolver-dir`*, *`--out`* |
+| `build-publication-cohorts` | Build the publication cohorts (`pub-*.tsv`, `publication-v1.tsv`) from the candidate ledgers, `public-v4` and NCBI resolution, checking that each assembly's plasmids are the paper's truth plasmids. | *`--resolved`*, *`--online`*, *`--audit`* |
+| `compare-published` | Put the results of a run on a publication's isolates beside the publication's own outcomes (matched by BioSample, studies apart): tables, JSON and an optional page. | *`--results-dir`*, *`--samples`*, *`--html`* |
 | `build-ledger` | Regenerate the cross-cohort BioSample dedup ledger from every `cohorts/*.lock.json`. | `--cohorts-dir`, `--out` |
 | `prepare-contribution` | Validate a new isolate and stage it on a local git branch, ready for a PR. | *`--cohort`*, *`--new-rows`*, *`--scores`*, `--tool-status` |
 | `select-candidates` | Recompute recommendations from an existing `scores.tsv` (what stage 6 calls internally). | `--scores`, `--samples`, `--results-dir`, `--min-samples`, `--min-coverage` |
@@ -2507,7 +2515,7 @@ machine-enforced by `plasbench validate-cohort --online`
 | `assembly_accession` | matches `^GC[AF]_\d+\.\d+$` |
 | `sra_run` | matches `^(SRR|ERR|DRR)\d+$` |
 | `truth_technology` | one of `long_read`, `hybrid` |
-| `truth_quality_tier` | one of `A`, `B`, `C` |
+| `truth_quality_tier` | one of `A`, `B`, `C`: the **curation grade** of the row, not a measure of how good the reference is. `A` = every evidence check passed and a reviewed publication or collection names the study; `B` = checks passed but no curator has approved it (every automatically contributed row, such as all of `public-v4`); `C` = not verified online. The reference tier that decides the headline (1-3) is derived separately from how the assembly was built and polished (`benchmark.truth_provenance.tsv`); the grade only matters to it in that a reference cannot be Tier 1 without grade `A`. The report calls this column *Curation grade*. |
 | `read_depth_x` | numeric and greater than zero when supplied |
 
 #### Evidence checks (online, against NCBI)

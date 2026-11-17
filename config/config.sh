@@ -842,3 +842,7 @@ export LEAKAGE_CUTOFF_DATE="${LEAKAGE_CUTOFF_DATE:-}"
 # first paired read run's year, read as 1 January), assembly, or read. Sheets without first_read_year behave as assembly.
 # The screen only flags; EXCLUDE_DATABASE_OVERLAP=1 (above) is what drops the flagged rows before ranking.
 export LEAKAGE_DATE_BASIS="${LEAKAGE_DATE_BASIS:-earliest_public}"
+# RUN_PUBLISHED_COMPARISON: auto (default) or off. When the cohort holds isolates of a published benchmark (the pub-* cohorts and
+# publication-v1; tables in cohorts/published/), stage 6 writes benchmark.published_comparison.* putting PlasBench's results beside the
+# paper's own, matched by BioSample. Descriptive: it never changes a score or a ranking, and a failure only warns.
+export RUN_PUBLISHED_COMPARISON="${RUN_PUBLISHED_COMPARISON:-auto}"

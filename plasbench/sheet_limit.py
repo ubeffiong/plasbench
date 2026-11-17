@@ -67,3 +67,46 @@ def limit_sheet(source, limit: int, dest_dir, order: str = "balanced") -> Limite
     with open(out, "w", encoding="utf-8", newline="") as _fh:
         _fh.write(note + "".join(body))
     return Limited(out, total, limit)
+
+
+def independent_truth_only(source, dest_dir) -> Limited:
+    """A copy of the sheet with only the isolates whose truth is independent of the benchmark's reads (`plasbench run --independent-truth-only`).
+
+    Independent means what truth_provenance.independence() says: a long-read-only or long-read-first assembly whose polishing reads are `none` or `independent`.
+    Needs the sheet's truth_assembly_strategy and truth_polish_reads columns (public-v4 has them). The cohort file is not changed, so its lock still matches;
+    the copy is written next to the results. A sheet with none of these isolates is an error, not an empty run.
+    """
+    source = Path(source)
+    try:
+        lines = source.read_text(encoding="utf-8").splitlines(keepends=True)
+    except OSError as exc:
+        raise ValueError(f"cannot read the sample sheet {source}: {exc}") from exc
+    header, data = None, []
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if header is None:
+            header = line
+        else:
+            data.append(line)
+    if header is None:
+        raise ValueError(f"the sample sheet {source} has no header row")
+    columns = next(csv.reader([header.rstrip("\r\n")], delimiter="\t"))
+    if "truth_assembly_strategy" not in columns or "truth_polish_reads" not in columns:
+        raise ValueError(f"{source.name} has no truth_assembly_strategy and truth_polish_reads columns, so independent truth cannot be selected; "
+                         "run `plasbench collect-truth-provenance` or use a cohort that records them (public-v4 does)")
+    from truth_provenance import independence
+    kept = []
+    for row in data:
+        record = dict(zip(columns, next(csv.reader([row.rstrip("\r\n")], delimiter="\t"))))
+        if independence((record.get("truth_assembly_strategy") or "").strip(), (record.get("truth_polish_reads") or "").strip())[0] == "independent":
+            kept.append(row if row.endswith("\n") else row + "\n")
+    if not kept:
+        raise ValueError(f"{source.name} has no isolate whose truth is independent of the benchmark's reads")
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    out = dest_dir / f"{source.stem}.independent{source.suffix or '.tsv'}"
+    note = f"# PlasBench --independent-truth-only: {len(kept)} of {len(data)} isolates of {source.name} whose truth is independent of the benchmark's reads.\n"
+    with open(out, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write(note + (header if header.endswith("\n") else header + "\n") + "".join(kept))
+    return Limited(out, len(data), len(kept))

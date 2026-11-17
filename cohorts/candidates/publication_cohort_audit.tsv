@@ -1,0 +1,532 @@
+study	paper_sample	biosample	organism	source	assembly_accession	outcome	reason	error
+mobsuite	DRR000944	SAMD00002684	Salmonella enterica	resolved at NCBI	GCF_000828595.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	DRR065946	SAMD00056130	Escherichia coli	public-v4	GCF_002357915.1	included	truth exact	
+mobsuite	DRR065947	SAMD00056131	Escherichia coli	public-v4	GCF_002357895.1	included	truth exact	
+mobsuite	DRR065948	SAMD00056132	Escherichia coli	public-v4	GCF_002357875.1	included	truth superset	
+mobsuite	SRR1029665	SAMN01832085	Salmonella enterica			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	SRR498276	SAMN01823701	Salmonella enterica			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	SRR1284629	SAMN02713684	Citrobacter freundii	resolved at NCBI	GCF_000648515.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1427234	SAMN01057614	Klebsiella pneumoniae	resolved at NCBI	GCF_000281435.2	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1427243	SAMN02713685	Klebsiella pneumoniae	resolved at NCBI	GCF_000695935.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1501122	SAMN02786843	Klebsiella oxytoca	resolved at NCBI	GCF_000714655.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1501128	SAMN02786855	Klebsiella pneumoniae	resolved at NCBI	GCF_000714675.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1515967	SAMN02713682	Enterobacter cloacae	resolved at NCBI	GCF_000724505.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1510963	SAMN02786856	Klebsiella pneumoniae	resolved at NCBI	GCF_000717515.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1576778	SAMN02713683	Enterobacter cloacae	resolved at NCBI	GCF_000750225.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1576808	SAMN02713646	Enterobacter cloacae	resolved at NCBI	GCF_000750275.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1558174	SAMN02904571	Providencia stuartii	resolved at NCBI	GCF_000754345.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1508819	SAMN02885365	Klebsiella pneumoniae	resolved at NCBI	GCF_000764615.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR3492219	SAMN02949643	Escherichia coli	resolved at NCBI	GCF_000829985.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR1955549	SAMN03371464	Salmonella enterica	public-v4	GCF_001629755.1	included	truth exact	
+mobsuite	SRR2544673	SAMN01041085	Salmonella enterica	public-v4	GCF_000335875.2	included	truth exact	
+mobsuite	SRR2965815	SAMN03733748	Enterobacter cloacae	public-v4	GCF_001022015.1	included	truth exact	
+mobsuite	SRR2965748	SAMN03733745	Klebsiella aerogenes	public-v4	GCF_001021995.1	included	truth exact	
+mobsuite	SRR1582895	SAMN03024610	Klebsiella pneumoniae	public-v4	GCF_001022035.1	included	truth exact	
+mobsuite	SRR2965820	SAMN03733769	Enterobacter cloacae	public-v4	GCF_001022075.1	included	truth exact	
+mobsuite	SRR2965612	SAMN03733827	Enterobacter cloacae	public-v4	GCF_001022055.1	included	truth exact	
+mobsuite	SRR2965752	SAMN03733641	Enterobacter asburiae	public-v4	GCF_001022095.1	included	truth exact	
+mobsuite	SRR2965639	SAMN03733663	Klebsiella oxytoca	public-v4	GCF_001022295.1	included	truth exact	
+mobsuite	SRR2965721	SAMN03733692	Kluyvera intermedia	public-v4	GCF_001022135.1	included	truth exact	
+mobsuite	SRR2965690	SAMN03733741	Citrobacter freundii	public-v4	GCF_001022155.1	included	truth exact	
+mobsuite	SRR2965660	SAMN03733750	Klebsiella oxytoca	public-v4	GCF_001022115.1	included	truth exact	
+mobsuite	SRR1582875	SAMN03024590	Klebsiella pneumoniae	public-v4	GCF_001022175.1	included	truth exact	
+mobsuite	SRR2965655	SAMN03733738	Klebsiella oxytoca	resolved at NCBI	GCF_001022195.1	included	truth exact	
+mobsuite	SRR1582868	SAMN03024583	Klebsiella pneumoniae	public-v4	GCF_001022235.1	included	truth exact	
+mobsuite	SRR2965616	SAMN03733830	Enterobacter cloacae	public-v4	GCF_001022255.1	included	truth exact	
+mobsuite	SRR2965739	SAMN03733754	Citrobacter freundii	public-v4	GCF_001022275.1	included	truth exact	
+mobsuite	SRR2965806	SAMN03733727	Enterobacter hormaechei	public-v4	GCF_001874505.1	included	truth subset	
+mobsuite	SRR2120261	SAMN03339922	Enterococcus faecium	public-v4	GCF_001587115.1	included	truth exact	
+mobsuite	SRR2598330	SAMN04156749	Salmonella enterica	public-v4	GCF_001441205.1	included	truth exact	
+mobsuite	SRR2896022	SAMN04156727	Salmonella enterica	public-v4	GCF_001441225.1	included	truth exact	
+mobsuite	SRR2898679	SAMN04156715	Salmonella enterica	public-v4	GCF_001441245.1	included	truth exact	
+mobsuite	SRR1570041	SAMN02991226	Escherichia coli	resolved at NCBI	GCF_001420955.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR2965672	SAMN03733725	Klebsiella pneumoniae	public-v4	GCF_001456135.1	included	truth exact	
+mobsuite	SRR2970646	SAMN04159541	Escherichia coli	public-v4	GCF_001469815.1	included	truth exact	
+mobsuite	SRR3105312	SAMN04418075	Enterococcus faecium	resolved at NCBI	GCF_001518735.1	included	truth exact	
+mobsuite	SRR2814419	SAMN03996249	Salmonella enterica	public-v4	GCF_001558355.2	included	truth exact	
+mobsuite	SRR2822449	SAMN03996308	Enterococcus gallinarum			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	SRR3222155	SAMN03701676	Klebsiella pneumoniae	resolved at NCBI	GCF_001675125.1	included	truth exact	
+mobsuite	SRR3221963	SAMN03455931	Escherichia coli	public-v4	GCF_001675145.1	included	truth exact	
+mobsuite	SRR2820617	SAMN03996283	Klebsiella aerogenes	public-v4	GCF_001593585.2	included	truth exact	
+mobsuite	SRR3228444	SAMN03455970	Klebsiella pneumoniae	public-v4	GCF_001648215.1	included	truth exact	
+mobsuite	SRR3217430	SAMN03455930	Klebsiella pneumoniae	public-v4	GCF_001663295.1	included	truth exact	
+mobsuite	SRR3465535	SAMN03455926	Aeromonas veronii	public-v4	GCF_001634325.1	included	truth exact	
+mobsuite	SRR3173804	SAMN02568587	Salmonella enterica	public-v4	GCF_001612515.1	included	truth exact	
+mobsuite	SRR3465557	SAMN03455975	Klebsiella pneumoniae	public-v4	GCF_001663435.1	included	truth exact	
+mobsuite	SRR3465532	SAMN03455977	Klebsiella pneumoniae	public-v4	GCF_001936035.1	included	truth exact	
+mobsuite	SRR3465539	SAMN03455974	Escherichia coli	public-v4	GCF_001663475.1	included	truth exact	
+mobsuite	SRR2914453	SAMN04191551	Escherichia coli			left out	no complete assembly and no usable read pair at NCBI	
+mobsuite	SRR2939562	SAMN04285042	Salmonella enterica	public-v4	GCF_001931555.1	included	truth exact	
+mobsuite	SRR3129297	SAMN04364590	Salmonella enterica			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	SRR2407791	SAMN03988471	Salmonella enterica	public-v4	GCF_001931595.1	included	truth exact	
+mobsuite	SRR3028742	SAMN04334633	Salmonella enterica	resolved at NCBI	GCF_001689935.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR3028738	SAMN04334629	Salmonella enterica	resolved at NCBI	GCF_001690005.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR3028781	SAMN04334672	Salmonella enterica	public-v4	GCF_001690035.1	included	truth exact	
+mobsuite	SRR3707412	SAMN05263553	Salmonella enterica	public-v4	GCF_001690055.1	included	truth exact	
+mobsuite	SRR3703080	SAMN05263538	Salmonella enterica	public-v4	GCF_001690075.1	included	truth exact	
+mobsuite	SRR3707447	SAMN05263513	Salmonella enterica	public-v4	GCF_001690115.1	included	truth exact	
+mobsuite	SRR3707411	SAMN05263546	Salmonella enterica	resolved at NCBI	GCF_001690135.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+mobsuite	SRR3707415	SAMN05263504	Salmonella enterica	public-v4	GCF_001690095.1	included	truth exact	
+mobsuite	SRR3709723	SAMN05277889	Salmonella enterica	public-v4	GCF_001692555.1	included	truth exact	
+mobsuite	SRR3709728	SAMN05277890	Salmonella enterica	public-v4	GCF_001692495.1	included	truth exact	
+mobsuite	SRR3682071	SAMN05263514	Salmonella enterica	public-v4	GCF_001692595.1	included	truth exact	
+mobsuite	SRR3685561	SAMN05263515	Salmonella enterica	public-v4	GCF_001692575.1	included	truth exact	
+mobsuite	SRR3703041	SAMN05263516	Salmonella enterica	resolved at NCBI	GCF_001692515.1	included	truth exact	
+mobsuite	SRR3703074	SAMN05263517	Salmonella enterica	public-v4	GCF_001692615.1	included	truth exact	
+mobsuite	SRR3028751	SAMN04334642	Salmonella enterica	public-v4	GCF_001692535.1	included	truth exact	
+mobsuite	SRR3028762	SAMN04334653	Salmonella enterica	public-v4	GCF_001692655.1	included	truth exact	
+mobsuite	SRR3028749	SAMN04334640	Salmonella enterica	public-v4	GCF_001692635.1	included	truth exact	
+mobsuite	SRR3191403	SAMN04510563	Escherichia coli			left out	no complete assembly and no usable read pair at NCBI	
+mobsuite	SRR3219268	SAMN04448219	Klebsiella pneumoniae	public-v4	GCF_001704235.1	included	truth exact	
+mobsuite	SRR3221674	SAMN04448229	Klebsiella pneumoniae	public-v4	GCF_001709275.1	included	truth exact	
+mobsuite	SRR3222213	SAMN04448241	Klebsiella pneumoniae	public-v4	GCF_001709295.1	included	truth exact	
+mobsuite	SRR3195851	SAMN04447635	Escherichia coli	public-v4	GCF_001753445.1	included	truth exact	
+mobsuite	SRR3195839	SAMN04447629	Escherichia coli	public-v4	GCF_001753465.1	included	truth exact	
+mobsuite	SRR3195852	SAMN04447630	Escherichia coli	public-v4	GCF_001753505.1	included	truth exact	
+mobsuite	SRR3195765	SAMN04447623	Escherichia coli	public-v4	GCF_001753545.1	included	truth exact	
+mobsuite	SRR3195841	SAMN04447636	Escherichia coli	public-v4	GCF_001753565.1	included	truth exact	
+mobsuite	SRR3195840	SAMN04447624	Escherichia coli	public-v4	GCF_001753485.1	included	truth exact	
+mobsuite	SRR3195836	SAMN04447632	Escherichia coli	public-v4	GCF_001753525.1	included	truth exact	
+mobsuite	SRR1395326	SAMN02800603	Salmonella enterica	public-v4	GCF_002196535.1	included	truth exact	
+mobsuite	SRR3066286	SAMN03733631	Klebsiella oxytoca	public-v4	GCF_001870185.1	included	truth exact	
+mobsuite	SRR5713998	SAMN03024573	Klebsiella pneumoniae	public-v4	GCF_001870165.1	included	truth exact	
+mobsuite	SRR2965682	SAMN03733765	Klebsiella pneumoniae	resolved at NCBI	GCF_001902535.1	included	truth exact	
+mobsuite	SRR2965692	SAMN03733793	Klebsiella pneumoniae	public-v4	GCF_001902255.1	included	truth exact	
+mobsuite	SRR2965667	SAMN03733848	Klebsiella oxytoca	resolved at NCBI	GCF_001970835.1	included	truth exact	
+mobsuite	SRR1582861	SAMN03024576	Klebsiella pneumoniae	public-v4	GCF_001908515.1	included	truth exact	
+mobsuite	SRR1582870	SAMN03024585	Klebsiella pneumoniae	resolved at NCBI	GCF_001908715.1	included	truth exact	
+mobsuite	SRR3999062	SAMN05511184	Escherichia coli	resolved at NCBI	GCF_002011965.1	included	truth exact	
+mobsuite	SRR3999063	SAMN05511183	Escherichia coli	resolved at NCBI	GCF_002011985.1	included	truth exact	
+mobsuite	SRR3999067	SAMN05511179	Escherichia coli	resolved at NCBI	GCF_002012005.1	included	truth exact	
+mobsuite	SRR3999064	SAMN05511182	Escherichia coli	resolved at NCBI	GCF_002012105.1	included	truth exact	
+mobsuite	SRR3999061	SAMN05511185	Escherichia coli	resolved at NCBI	GCF_002012165.1	included	truth exact	
+mobsuite	SRR2075005	SAMN03702837	Salmonella enterica	public-v4	GCF_002128385.1	included	truth exact	
+mobsuite	SRR2074998	SAMN03702839	Salmonella enterica	public-v4	GCF_002128365.1	included	truth exact	
+mobsuite	SRR3931165	SAMN05414625	Escherichia coli	public-v4	GCF_002105735.1	included	truth exact	
+mobsuite	SRR2724081	SAMN04158282	Klebsiella pneumoniae			left out	no complete assembly and no usable read pair at NCBI	
+mobsuite	SRR1714120	SAMN03256350	Escherichia coli	public-v4	GCF_002249955.1	included	truth exact	
+mobsuite	SRR2244244	SAMN04011426	Klebsiella pneumoniae	resolved at NCBI	GCF_001316565.3	included	truth exact	
+mobsuite	SRR2544681	SAMN02147037	Escherichia coli	public-v4	GCF_000464955.2	included	truth exact	
+mobsuite	SRR2244257	SAMN04011439	Klebsiella pneumoniae			left out	no complete assembly and no usable read pair at NCBI	
+mobsuite	SRR3290448	SAMN04578538	Escherichia coli	public-v4	GCF_002741175.1	included	truth exact	
+mobsuite	SRR3341739	SAMN04621488	Escherichia coli	public-v4	GCF_002741335.1	included	truth exact	
+mobsuite	SRR3360246	SAMN04625459	Escherichia coli	public-v4	GCF_002741555.1	included	truth exact	
+mobsuite	SRR3793744	SAMN05368232	Escherichia coli			left out	no complete assembly and no usable read pair at NCBI	
+mobsuite	ERR1008775	SAMEA3357193	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1008714	SAMEA3357223	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023631	SAMEA3357328	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023628	SAMEA3357325	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023685	SAMEA3357405	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023674	SAMEA3357381	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023801	SAMEA3357080	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023800	SAMEA3357077	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023775	SAMEA3357010	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1023792	SAMEA3357043	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1008737	SAMEA3357272	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	ERR1008735	SAMEA3357268	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+mobsuite	SRR3112258	SAMN04014847	Escherichia coli	public-v4	GCF_002787215.1	included	truth exact	
+mobsuite	SRR3112262	SAMN04014852	Escherichia coli	public-v4	GCF_002788295.1	included	truth exact	
+mobsuite	SRR3112265	SAMN04014855	Escherichia coli	public-v4	GCF_002787315.1	included	truth exact	
+mobsuite	SRR3112266	SAMN04014856	Escherichia coli	public-v4	GCF_002788115.1	included	truth exact	
+mobsuite	SRR3112272	SAMN04014863	Citrobacter freundii	public-v4	GCF_002796505.1	included	truth exact	
+mobsuite	SRR3112260	SAMN04014850	Klebsiella aerogenes	public-v4	GCF_002796525.1	included	truth exact	
+mobsuite	SRR3112268	SAMN04014858	Escherichia coli	public-v4	GCF_002796585.1	included	truth exact	
+mobsuite	SRR3112270	SAMN04014860	Escherichia coli	public-v4	GCF_002796445.1	included	truth exact	
+plsmd_filtered	SRR2965690	SAMN03733741	Citrobacter freundii	public-v4	GCF_001022155.1	included	truth exact	
+plsmd_filtered	SRR2965739	SAMN03733754	Citrobacter freundii	public-v4	GCF_001022275.1	included	truth exact	
+plsmd_filtered	SRR3112272	SAMN04014863	Citrobacter freundii	public-v4	GCF_002796505.1	included	truth exact	
+plsmd_filtered	SRR2965752	SAMN03733641	Enterobacter asburiae	public-v4	GCF_001022095.1	included	truth exact	
+plsmd_filtered	SRR1515967	SAMN02713682	Enterobacter cloacae	resolved at NCBI	GCF_000724505.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR2965815	SAMN03733748	Enterobacter cloacae	public-v4	GCF_001022015.1	included	truth exact	
+plsmd_filtered	SRR2965820	SAMN03733769	Enterobacter cloacae	public-v4	GCF_001022075.1	included	truth exact	
+plsmd_filtered	SRR2965612	SAMN03733827	Enterobacter cloacae	public-v4	GCF_001022055.1	included	truth exact	
+plsmd_filtered	SRR2965616	SAMN03733830	Enterobacter cloacae	public-v4	GCF_001022255.1	included	truth exact	
+plsmd_filtered	SRR2965806	SAMN03733727	Enterobacter hormaechei	public-v4	GCF_001874505.1	included	truth subset	
+plsmd_filtered	DRR065947	SAMD00056131	Escherichia coli	public-v4	GCF_002357895.1	included	truth exact	
+plsmd_filtered	SRR3492219	SAMN02949643	Escherichia coli	resolved at NCBI	GCF_000829985.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR3221963	SAMN03455931	Escherichia coli	public-v4	GCF_001675145.1	included	truth exact	
+plsmd_filtered	SRR3465539	SAMN03455974	Escherichia coli	public-v4	GCF_001663475.1	included	truth exact	
+plsmd_filtered	SRR3195851	SAMN04447635	Escherichia coli	public-v4	GCF_001753445.1	included	truth exact	
+plsmd_filtered	SRR3195852	SAMN04447630	Escherichia coli	public-v4	GCF_001753505.1	included	truth exact	
+plsmd_filtered	SRR3195765	SAMN04447623	Escherichia coli	public-v4	GCF_001753545.1	included	truth exact	
+plsmd_filtered	SRR3195841	SAMN04447636	Escherichia coli	public-v4	GCF_001753565.1	included	truth exact	
+plsmd_filtered	SRR3195840	SAMN04447624	Escherichia coli	public-v4	GCF_001753485.1	included	truth exact	
+plsmd_filtered	SRR3195836	SAMN04447632	Escherichia coli	public-v4	GCF_001753525.1	included	truth exact	
+plsmd_filtered	SRR3999063	SAMN05511183	Escherichia coli	resolved at NCBI	GCF_002011985.1	included	truth exact	
+plsmd_filtered	SRR3999067	SAMN05511179	Escherichia coli	resolved at NCBI	GCF_002012005.1	included	truth exact	
+plsmd_filtered	SRR3999061	SAMN05511185	Escherichia coli	resolved at NCBI	GCF_002012165.1	included	truth exact	
+plsmd_filtered	SRR3931165	SAMN05414625	Escherichia coli	public-v4	GCF_002105735.1	included	truth exact	
+plsmd_filtered	SRR2544681	SAMN02147037	Escherichia coli	public-v4	GCF_000464955.2	included	truth exact	
+plsmd_filtered	SRR3112258	SAMN04014847	Escherichia coli	public-v4	GCF_002787215.1	included	truth exact	
+plsmd_filtered	SRR3112262	SAMN04014852	Escherichia coli	public-v4	GCF_002788295.1	included	truth exact	
+plsmd_filtered	SRR3112266	SAMN04014856	Escherichia coli	public-v4	GCF_002788115.1	included	truth exact	
+plsmd_filtered	SRR3112270	SAMN04014860	Escherichia coli	public-v4	GCF_002796445.1	included	truth exact	
+plsmd_filtered	SRR2965748	SAMN03733745	Klebsiella aerogenes	public-v4	GCF_001021995.1	included	truth exact	
+plsmd_filtered	SRR2965639	SAMN03733663	Klebsiella oxytoca	public-v4	GCF_001022295.1	included	truth exact	
+plsmd_filtered	SRR2965660	SAMN03733750	Klebsiella oxytoca	public-v4	GCF_001022115.1	included	truth exact	
+plsmd_filtered	SRR2965655	SAMN03733738	Klebsiella oxytoca	resolved at NCBI	GCF_001022195.1	included	truth exact	
+plsmd_filtered	SRR3066286	SAMN03733631	Klebsiella oxytoca	public-v4	GCF_001870185.1	included	truth exact	
+plsmd_filtered	SRR2965667	SAMN03733848	Klebsiella oxytoca	resolved at NCBI	GCF_001970835.1	included	truth exact	
+plsmd_filtered	SRR1427234	SAMN01057614	Klebsiella pneumoniae	resolved at NCBI	GCF_000281435.2	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR1510963	SAMN02786856	Klebsiella pneumoniae	resolved at NCBI	GCF_000717515.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR1582895	SAMN03024610	Klebsiella pneumoniae	public-v4	GCF_001022035.1	included	truth exact	
+plsmd_filtered	SRR1582875	SAMN03024590	Klebsiella pneumoniae	public-v4	GCF_001022175.1	included	truth exact	
+plsmd_filtered	SRR1582868	SAMN03024583	Klebsiella pneumoniae	public-v4	GCF_001022235.1	included	truth exact	
+plsmd_filtered	SRR2965672	SAMN03733725	Klebsiella pneumoniae	public-v4	GCF_001456135.1	included	truth exact	
+plsmd_filtered	SRR3222155	SAMN03701676	Klebsiella pneumoniae	resolved at NCBI	GCF_001675125.1	included	truth exact	
+plsmd_filtered	SRR3465532	SAMN03455977	Klebsiella pneumoniae	public-v4	GCF_001936035.1	included	truth exact	
+plsmd_filtered	SRR3222213	SAMN04448241	Klebsiella pneumoniae	public-v4	GCF_001709295.1	included	truth exact	
+plsmd_filtered	SRR5713998	SAMN03024573	Klebsiella pneumoniae	public-v4	GCF_001870165.1	included	truth exact	
+plsmd_filtered	SRR2965682	SAMN03733765	Klebsiella pneumoniae	resolved at NCBI	GCF_001902535.1	included	truth exact	
+plsmd_filtered	SRR2965692	SAMN03733793	Klebsiella pneumoniae	public-v4	GCF_001902255.1	included	truth exact	
+plsmd_filtered	SRR1582861	SAMN03024576	Klebsiella pneumoniae	public-v4	GCF_001908515.1	included	truth exact	
+plsmd_filtered	ERR1008775	SAMEA3357193	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	ERR1023685	SAMEA3357405	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	ERR1023801	SAMEA3357080	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	ERR1023800	SAMEA3357077	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	ERR1023775	SAMEA3357010	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	ERR1023792	SAMEA3357043	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	ERR1008737	SAMEA3357272	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	SRR2965721	SAMN03733692	Kluyvera intermedia	public-v4	GCF_001022135.1	included	truth exact	
+plsmd_filtered	SRR1558174	SAMN02904571	Providencia stuartii	resolved at NCBI	GCF_000754345.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR498276	SAMN01823701	Salmonella enterica			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	SRR2598330	SAMN04156749	Salmonella enterica	public-v4	GCF_001441205.1	included	truth exact	
+plsmd_filtered	SRR2896022	SAMN04156727	Salmonella enterica	public-v4	GCF_001441225.1	included	truth exact	
+plsmd_filtered	SRR2898679	SAMN04156715	Salmonella enterica	public-v4	GCF_001441245.1	included	truth exact	
+plsmd_filtered	SRR3173804	SAMN02568587	Salmonella enterica	public-v4	GCF_001612515.1	included	truth exact	
+plsmd_filtered	SRR2939562	SAMN04285042	Salmonella enterica	public-v4	GCF_001931555.1	included	truth exact	
+plsmd_filtered	SRR3129297	SAMN04364590	Salmonella enterica			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+plsmd_filtered	SRR2407791	SAMN03988471	Salmonella enterica	public-v4	GCF_001931595.1	included	truth exact	
+plsmd_filtered	SRR3028742	SAMN04334633	Salmonella enterica	resolved at NCBI	GCF_001689935.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR3028738	SAMN04334629	Salmonella enterica	resolved at NCBI	GCF_001690005.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR3028781	SAMN04334672	Salmonella enterica	public-v4	GCF_001690035.1	included	truth exact	
+plsmd_filtered	SRR3703080	SAMN05263538	Salmonella enterica	public-v4	GCF_001690075.1	included	truth exact	
+plsmd_filtered	SRR3707411	SAMN05263546	Salmonella enterica	resolved at NCBI	GCF_001690135.1	left out	NCBI records no long-read sequencing platform for the assembly, so it cannot serve as long-read truth	
+plsmd_filtered	SRR3707415	SAMN05263504	Salmonella enterica	public-v4	GCF_001690095.1	included	truth exact	
+plsmd_filtered	SRR3709723	SAMN05277889	Salmonella enterica	public-v4	GCF_001692555.1	included	truth exact	
+plsmd_filtered	SRR3709728	SAMN05277890	Salmonella enterica	public-v4	GCF_001692495.1	included	truth exact	
+plsmd_filtered	SRR3682071	SAMN05263514	Salmonella enterica	public-v4	GCF_001692595.1	included	truth exact	
+plsmd_filtered	SRR3685561	SAMN05263515	Salmonella enterica	public-v4	GCF_001692575.1	included	truth exact	
+plsmd_filtered	SRR3703041	SAMN05263516	Salmonella enterica	resolved at NCBI	GCF_001692515.1	included	truth exact	
+plsmd_filtered	SRR3028751	SAMN04334642	Salmonella enterica	public-v4	GCF_001692535.1	included	truth exact	
+plsmd_filtered	SRR3028762	SAMN04334653	Salmonella enterica	public-v4	GCF_001692655.1	included	truth exact	
+plsmd_filtered	SRR3028749	SAMN04334640	Salmonella enterica	public-v4	GCF_001692635.1	included	truth exact	
+plsmd_filtered	SRR2074998	SAMN03702839	Salmonella enterica	public-v4	GCF_002128365.1	included	truth exact	
+plsmd_novel	ERR13252970	SAMEA115720004	Klebsiella pneumoniae	resolved at NCBI	GCF_964198965.1	included	truth exact	
+plsmd_novel	ERR13252971	SAMEA115720005	Klebsiella pneumoniae	resolved at NCBI	GCF_964199135.1	included	truth exact	
+plsmd_novel	ERR13252974	SAMEA115720008	Klebsiella pneumoniae	resolved at NCBI	GCF_964199015.1	included	truth exact	
+plsmd_novel	ERR13252975	SAMEA115720009	Klebsiella pneumoniae	resolved at NCBI	GCF_964198845.1	included	truth exact	
+plsmd_novel	ERR13252976	SAMEA115720010	Klebsiella pneumoniae	resolved at NCBI	GCF_964199025.1	included	truth exact	
+plsmd_novel	ERR13252977	SAMEA115720011	Klebsiella pneumoniae	resolved at NCBI	GCF_964198835.1	included	truth exact	
+plsmd_novel	ERR13252979	SAMEA115720013	Klebsiella pneumoniae	resolved at NCBI	GCF_964198875.1	included	truth exact	
+plsmd_novel	ERR13252980	SAMEA115720014	Klebsiella pneumoniae	resolved at NCBI	GCF_964198855.1	included	truth exact	
+plsmd_novel	ERR13252981	SAMEA115720015	Klebsiella pneumoniae	resolved at NCBI	GCF_964198805.1	included	truth exact	
+plsmd_novel	ERR13252982	SAMEA115720016	Klebsiella pneumoniae	resolved at NCBI	GCF_964198865.1	included	truth exact	
+plsmd_novel	ERR13252983	SAMEA115720017	Klebsiella pneumoniae	resolved at NCBI	GCF_964198935.1	included	truth exact	
+plsmd_novel	ERR13252984	SAMEA115720018	Klebsiella pneumoniae	resolved at NCBI	GCF_964198685.1	included	truth exact	
+plsmd_novel	ERR13252985	SAMEA115720019	Klebsiella pneumoniae	resolved at NCBI	GCF_964198895.1	included	truth exact	
+plsmd_novel	ERR13252987	SAMEA115720021	Klebsiella pneumoniae	resolved at NCBI	GCF_964198815.1	included	truth exact	
+plsmd_novel	ERR13252989	SAMEA115720023	Klebsiella pneumoniae	resolved at NCBI	GCF_964199065.1	included	truth exact	
+plsmd_novel	ERR13252990	SAMEA115720024	Klebsiella pneumoniae	resolved at NCBI	GCF_964198675.1	included	truth exact	
+plsmd_novel	ERR13252991	SAMEA115720025	Klebsiella pneumoniae	resolved at NCBI	GCF_964198825.1	included	truth exact	
+plsmd_novel	ERR13252992	SAMEA115720026	Klebsiella pneumoniae	resolved at NCBI	GCF_964198945.1	included	truth exact	
+plsmd_novel	ERR13252993	SAMEA115720027	Klebsiella pneumoniae	resolved at NCBI	GCF_964198975.1	included	truth exact	
+plsmd_novel	ERR13252994	SAMEA115720028	Klebsiella pneumoniae	resolved at NCBI	GCF_964198625.1	included	truth exact	
+plsmd_novel	ERR13252995	SAMEA115720029	Klebsiella pneumoniae	resolved at NCBI	GCF_964198725.1	included	truth exact	
+plsmd_novel	ERR13252996	SAMEA115720030	Klebsiella pneumoniae	resolved at NCBI	GCF_964199125.1	included	truth exact	
+plsmd_novel	ERR13252997	SAMEA115720031	Klebsiella pneumoniae	resolved at NCBI	GCF_964198915.1	included	truth exact	
+plsmd_novel	ERR13252998	SAMEA115720032	Klebsiella pneumoniae	resolved at NCBI	GCF_964199115.1	included	truth exact	
+plsmd_novel	ERR13252999	SAMEA115720033	Klebsiella pneumoniae	resolved at NCBI	GCF_964198775.1	included	truth exact	
+plsmd_novel	ERR13253000	SAMEA115720034	Klebsiella pneumoniae	resolved at NCBI	GCF_964198785.1	included	truth exact	
+plsmd_novel	ERR13253001	SAMEA115720035	Klebsiella pneumoniae	resolved at NCBI	GCF_964198795.1	included	truth exact	
+plsmd_novel	ERR13253002	SAMEA115720036	Klebsiella pneumoniae	resolved at NCBI	GCF_964198925.1	included	truth exact	
+plsmd_novel	ERR13253003	SAMEA115720037	Klebsiella pneumoniae	resolved at NCBI	GCF_964198745.1	included	truth exact	
+plsmd_novel	ERR13253005	SAMEA115720039	Klebsiella pneumoniae	resolved at NCBI	GCF_964198705.1	included	truth exact	
+plsmd_novel	ERR13253007	SAMEA115720041	Klebsiella pneumoniae	resolved at NCBI	GCF_964198955.1	included	truth exact	
+plsmd_novel	ERR13253008	SAMEA115720042	Klebsiella pneumoniae	resolved at NCBI	GCF_964199005.1	included	truth exact	
+plsmd_novel	ERR13253009	SAMEA115720043	Klebsiella pneumoniae	resolved at NCBI	GCF_964199105.1	included	truth exact	
+plsmd_novel	ERR13253010	SAMEA115720044	Klebsiella pneumoniae	resolved at NCBI	GCF_964199095.1	included	truth exact	
+plsmd_novel	ERR13253011	SAMEA115720045	Klebsiella pneumoniae	resolved at NCBI	GCF_964198655.1	included	truth exact	
+plsmd_novel	ERR13253014	SAMEA115720048	Klebsiella pneumoniae	resolved at NCBI	GCF_964198765.1	included	truth exact	
+plsmd_novel	ERR13253015	SAMEA115720049	Klebsiella pneumoniae	resolved at NCBI	GCF_964199145.1	included	truth exact	
+plsmd_novel	ERR15075951	SAMEA117852468	Salmonella enterica	resolved at NCBI	GCF_965318675.1	included	truth exact	
+plsmd_novel	ERR15075953	SAMEA117852469	Salmonella enterica	public-v4	GCF_965318305.1	included	truth exact	
+plsmd_novel	ERR15076233	SAMEA117852471	Staphylococcus aureus	public-v4	GCF_965319415.1	included	truth exact	
+plsmd_novel	ERR15085410	SAMEA117852470	Staphylococcus aureus	public-v4	GCF_965327205.1	included	truth exact	
+plsmd_novel	SRR10859048	SAMN13334506	Salmonella enterica	public-v4	GCF_031198825.1	included	truth exact	
+plsmd_novel	SRR10859129	SAMN13334284	Salmonella enterica	public-v4	GCF_050217165.1	included	truth exact	
+plsmd_novel	SRR18543833	SAMN17766475	Klebsiella pneumoniae	public-v4	GCF_022789685.2	included	truth exact	
+plsmd_novel	SRR18543847	SAMN17766508	Klebsiella pneumoniae	public-v4	GCF_022789105.2	included	truth exact	
+plsmd_novel	SRR18543848	SAMN17766507	Klebsiella pneumoniae	public-v4	GCF_022789185.2	included	truth exact	
+plsmd_novel	SRR18543853	SAMN17766502	Klebsiella pneumoniae	public-v4	GCF_022789205.2	included	truth exact	
+plsmd_novel	SRR18543867	SAMN17766468	Klebsiella pneumoniae	public-v4	GCF_022789805.2	included	truth exact	
+plsmd_novel	SRR18543871	SAMN17766464	Klebsiella pneumoniae	public-v4	GCF_022789905.2	included	truth exact	
+plsmd_novel	SRR18543872	SAMN17766463	Klebsiella pneumoniae	public-v4	GCF_022789885.2	included	truth exact	
+plsmd_novel	SRR18543874	SAMN13382564	Klebsiella pneumoniae	public-v4	GCF_022790445.2	included	truth exact	
+plsmd_novel	SRR18543877	SAMN13382597	Klebsiella pneumoniae	public-v4	GCF_022789975.2	included	truth exact	
+plsmd_novel	SRR18543904	SAMN13382572	Klebsiella pneumoniae	public-v4	GCF_022790305.2	included	truth exact	
+plsmd_novel	SRR23048573	SAMN32676138	Klebsiella pneumoniae	public-v4	GCF_041861165.1	included	truth exact	
+plsmd_novel	SRR23048589	SAMN32676124	Klebsiella pneumoniae	public-v4	GCF_041861175.1	included	truth exact	
+plsmd_novel	SRR23048590	SAMN32676123	Klebsiella pneumoniae	public-v4	GCF_041861185.1	included	truth exact	
+plsmd_novel	SRR23048635	SAMN32676082	Klebsiella pneumoniae	public-v4	GCF_041861285.1	included	truth exact	
+plsmd_novel	SRR23048652	SAMN32676066	Klebsiella pneumoniae	public-v4	GCF_041861325.1	included	truth exact	
+plsmd_novel	SRR23048658	SAMN32676061	Klebsiella pneumoniae	public-v4	GCF_041861345.1	included	truth exact	
+plsmd_novel	SRR23048659	SAMN32676060	Klebsiella pneumoniae	public-v4	GCF_041861355.1	included	truth exact	
+plsmd_novel	SRR23048673	SAMN32676150	Klebsiella pneumoniae	public-v4	GCF_041861155.1	included	truth exact	
+plsmd_novel	SRR32410804	SAMN46912175	Salmonella enterica	public-v4	GCF_048296815.1	included	truth exact	
+plsmd_novel	SRR32410805	SAMN46912174	Salmonella enterica	public-v4	GCF_048296785.1	included	truth exact	
+plsmd_novel	SRR32410808	SAMN46912173	Salmonella enterica	public-v4	GCF_048296805.1	included	truth exact	
+plsmd_novel	SRR32410809	SAMN46912172	Salmonella enterica	public-v4	GCF_048296825.1	included	truth exact	
+plsmd_novel	SRR8264777	SAMN10501887	Salmonella enterica	public-v4	GCF_004768625.1	included	truth exact	
+plsmd_novel	SRR8264778	SAMN10501886	Salmonella enterica	public-v4	GCF_004798765.1	included	truth exact	
+plsmd_novel	SRR8264780	SAMN10501888	Salmonella enterica	public-v4	GCF_004768665.1	included	truth exact	
+teixeira	BIDMC100	SAMN03280191	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC106	SAMN03280214	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC107	SAMN03280169	Citrobacter freundii complex (species A)			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC108	SAMN03280170	Citrobacter portucalensis	resolved at NCBI	GCF_001037585.2	included	truth inferred	
+teixeira	BIDMC110	SAMN03280193	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC113	SAMN03280217	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC19A	SAMN02138646	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC82	SAMN02581401	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC87	SAMN03280187	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC89	SAMN03280415	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC94	SAMN03280189	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BIDMC98	SAMN03280208	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH27	SAMN02138592	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH31	SAMN02138596	Enterobacter asburiae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH37	SAMN02138600	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH49	SAMN03280195	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH50	SAMN03280196	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH56	SAMN03280432	Serratia marcescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH57	SAMN03280199	Serratia marcescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH69	SAMN04521876	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH73	SAMN08148225	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH77	SAMN08148229	Serratia marcescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	BWH78	SAMN08148230	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH1	SAMN02138541	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH101	SAMN03280398	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH103	SAMN03280163	Citrobacter freundii complex (species A)			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH105	SAMN03280165	Citrobacter portucalensis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH109	SAMN03280167	Citrobacter freundii complex (species A)			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH113	SAMN03280402	Klebsiella quasipneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH119	SAMN03280183	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH121	SAMN03280205	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH123	SAMN03280408	Klebsiella quasipneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH129	SAMN04521880	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH132	SAMN04521883	Enterobacter roggenkampii			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH14	SAMN02138554	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH143	SAMN04521892	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH147	SAMN04521896	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH149	SAMN04521898	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH15	SAMN02138555	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH151	SAMN04521900	Citrobacter amalonaticus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH153	SAMN04521902	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH159	SAMN04521908	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH161	SAMN04521910	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH177	SAMN04521926	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH183	SAMN04521932	Pluralibacter gergoviae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH189	SAMN08148243	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH193	SAMN08148289	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH197	SAMN08148235	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH211	SAMN08148251	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH214	SAMN08148253	Citrobacter freundii complex (species A)			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH217	SAMN08148295	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH219	SAMN08148256	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH225	SAMN08148259	Serratia marcescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH230	SAMN08148241	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH233	SAMN08148266	Klebsiella aerogenes			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH239	SAMN08148269	Enterobacter roggenkampii			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH240	SAMN08148270	Enterobacter kobei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH243	SAMN08148273	Enterobacter asburiae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH245	SAMN08148275	Serratia marcescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH247	SAMN08148277	Klebsiella aerogenes			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH279	SAMN08148341	Citrobacter freundii	resolved at NCBI	GCF_014337275.1	included	truth inferred	
+teixeira	MGH281	SAMN08148335	Citrobacter freundii	resolved at NCBI	GCF_014337335.1	included	truth inferred	
+teixeira	MGH281c	SAMN08148334	Citrobacter freundii	resolved at NCBI	GCF_014337315.1	included	truth inferred	
+teixeira	MGH283	SAMN08148336	Citrobacter freundii	resolved at NCBI	GCF_014337295.1	included	truth inferred	
+teixeira	MGH3	SAMN02138543	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH37	SAMN02138577	Enterobacter kobei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH39	SAMN02138579	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH43	SAMN02138583	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH6	SAMN02138546	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH7	SAMN02138547	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH83	SAMN03280386	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH89	SAMN03280388	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH97	SAMN03280396	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	MGH99	SAMN03280161	Citrobacter freundii complex (species A)			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI101	SAMN04521851	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI105	SAMN04521855	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI107	SAMN04521857	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI117	SAMN04521867	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI121	SAMN04521871	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI123	SAMN08148172	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI141	SAMN08148189	Citrobacter freundii complex (species A)			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI147	SAMN08148195	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI148	SAMN08148196	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI151	SAMN08148199	Citrobacter freundii complex (species A)			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI161	SAMN08148208	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI179	SAMN08148302	Klebsiella aerogenes			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI187	SAMN08148306	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI191	SAMN08148308	Escherichia coli			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI193	SAMN08148309	Enterobacter asburiae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI75	SAMN03280422	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI85	SAMN03280175	Enterobacter hormaechei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI89	SAMN03280171	Klebsiella aerogenes			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	UCI93	SAMN03280428	Klebsiella pneumoniae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0755b	SAMN16255385	Enterococcus canintestini			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ015	SAMN16255605	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ040	SAMN16255583	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ046	SAMN16255413	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ049	SAMN16255565	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ051	SAMN16255426	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ083	SAMN16255478	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ136	SAMN16255516	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ173	SAMN16255428	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0755f	SAMN16255393	Enterococcus flavescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0765a	SAMN16255556	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1083b	SAMN16255389	Enterococcus flavescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1096b	SAMN16255437	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1297f	SAMN16255419	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2564	SAMN16255392	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ149	SAMN16255414	Enterococcus casseliflavus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2726	SAMN16255373	Enterococcus devriesei			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ008	SAMN16255549	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ029	SAMN16255569	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ081	SAMN16255544	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ088	SAMN16255637	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ107	SAMN16255455	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ112	SAMN16255540	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ129	SAMN16255510	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ134	SAMN16255618	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ151	SAMN16255663	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ180	SAMN16255678	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ183	SAMN16255610	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0188	SAMN16255586	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0198e	SAMN16255653	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0206e	SAMN16255418	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0238e	SAMN16255382	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0682	SAMN16255616	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0719d	SAMN16255381	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0839b	SAMN16255596	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0841a	SAMN16255673	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1315a	SAMN16255423	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1318a	SAMN16255701	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1325a	SAMN16255629	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1337a	SAMN16255669	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1347a	SAMN16255666	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1368f	SAMN16255627	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1375a	SAMN16255483	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1406a	SAMN16255717	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1409a	SAMN16255671	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1444a	SAMN16255407	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1537a	SAMN16255461	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1614a	SAMN16255545	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2372	SAMN16255660	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2385	SAMN16255724	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2386	SAMN16255555	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2416	SAMN16255441	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2419	SAMN16255417	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2454a	SAMN16255642	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2455a	SAMN16255450	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2461a	SAMN16255449	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2463a	SAMN16255675	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2468a	SAMN16255451	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2553	SAMN16255472	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2561	SAMN16255485	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2573	SAMN16255481	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2583	SAMN16255728	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2608	SAMN16255489	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2611	SAMN16255480	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2612	SAMN16255654	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2636	SAMN16255631	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2646	SAMN16255638	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2648	SAMN16255460	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2653	SAMN16255606	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2660	SAMN16255665	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2662	SAMN16255484	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2664	SAMN16255444	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2674	SAMN16255714	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2676	SAMN16255604	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2680	SAMN16255684	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2685	SAMN16255487	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2687	SAMN16255415	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2694	SAMN16255590	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2700	SAMN16255603	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2705	SAMN16255719	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2708	SAMN16255492	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2709	SAMN16255698	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2712	SAMN16255704	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2718	SAMN16255726	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2720	SAMN16255488	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2723	SAMN16255552	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2730	SAMN16255664	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2732	SAMN16255479	Enterococcus faecalis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ146	SAMN16255531	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0007	SAMN16255609	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0436a	SAMN16255635	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0673	SAMN16255647	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0837a	SAMN16255539	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0872a	SAMN16255585	Enterococcus lactis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0901a	SAMN16255690	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1248a	SAMN16255564	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2377	SAMN16255582	Enterococcus lactis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2383	SAMN16255589	Enterococcus lactis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2391	SAMN16255578	Enterococcus lactis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2446a	SAMN16255538	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2651	SAMN16255579	Enterococcus lactis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2675	SAMN16255580	Enterococcus lactis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2696	SAMN16255708	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2719	SAMN16255723	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2733	SAMN16255722	Enterococcus faecium			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ063	SAMN16255581	Enterococcus flavescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0970a	SAMN16255534	Enterococcus flavescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2449a	SAMN16255396	Enterococcus flavescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2469a	SAMN16255395	Enterococcus flavescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2472a	SAMN16255394	Enterococcus flavescens			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ034	SAMN16255561	Enterococcus gallinarum			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2724	SAMN16255465	Enterococcus gallinarum			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ048	SAMN16255386	Enterococcus gilvus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ077	SAMN16255648	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ078	SAMN16255438	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ082	SAMN16255628	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ085	SAMN16255624	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1371a	SAMN16255598	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1421a	SAMN16255541	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1682a	SAMN16255443	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1726a	SAMN16255447	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2549	SAMN16255431	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2585	SAMN16255601	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2672	SAMN16255442	Enterococcus hirae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1283b	SAMN16255473	Enterococcus lactis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2359	SAMN16255712	Enterococcus mangumiae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2371	SAMN16255644	Enterococcus mangumiae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2381	SAMN16255696	Enterococcus mangumiae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2417	SAMN16255711	Enterococcus mangumiae			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ045	SAMN16255535	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ062	SAMN16255420	Enterococcus mundtii			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ080	SAMN16255521	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ084	SAMN16255399	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ093	SAMN16255587	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ095b	SAMN16255519	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ147	SAMN16255497	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ153	SAMN16255514	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ156	SAMN16255515	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ161	SAMN16255499	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ162	SAMN16255501	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ171	SAMN16255469	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ172	SAMN16255467	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0806c	SAMN16255597	Enterococcus mundtii			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV0996a	SAMN16255518	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1286c	SAMN16255528	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1288f	SAMN16255551	Enterococcus mundtii			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV1368e	SAMN16255527	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2389	SAMN16255433	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2316	SAMN16255558	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	DIV2357	SAMN16255536	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2587	SAMN16255458	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2731	SAMN16255503	Enterococcus pernyi			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2734	SAMN16255436	Enterococcus mundtii			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2558	SAMN16255370	Enterococcus raffinosus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	AZ109	SAMN16255362	Enterococcus angrensis			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2686	SAMN16255364	Enterococcus sp.			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	
+teixeira	GCID-2628	SAMN16255548	Enterococcus thailandicus			left out	no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)	

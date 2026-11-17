@@ -1,0 +1,3332 @@
+{
+  "schema_version": "1.1",
+  "sample_sheet": "pub-mobsuite.tsv",
+  "sample_sheet_sha256": "d504bee60607200d4c66dc920247633fc634ef9dd1a863741d02c08aad60c310",
+  "evidence": [
+    {
+      "sample_id": "escherichia_coli_samd00056130",
+      "assembly": {
+        "accession": "GCF_002357915.1",
+        "biosample": "SAMD00056130",
+        "bioprojects": [
+          "PRJDB5007",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "MiSeq; PacBio RSII",
+        "assembly_method": "HGAP Assembly v. 3.0; Celera Assembler v. 8.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "",
+        "host": "Sus scrofa",
+        "collection_date": "2008",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR065946",
+        "biosample": "SAMD00056130",
+        "bioproject": "PRJDB5007",
+        "sample_name": "SAMD00056130",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "784705724",
+        "spots": "1460122",
+        "avg_length": "537"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samd00056131",
+      "assembly": {
+        "accession": "GCF_002357895.1",
+        "biosample": "SAMD00056131",
+        "bioprojects": [
+          "PRJDB5007",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "MiSeq; PacBio RSII",
+        "assembly_method": "HGAP Assembly v. 3.0; Celera Assembler v. 8.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "",
+        "host": "Bos taurus",
+        "collection_date": "2012",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR065947",
+        "biosample": "SAMD00056131",
+        "bioproject": "PRJDB5007",
+        "sample_name": "SAMD00056131",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "698712600",
+        "spots": "1164521",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samd00056132",
+      "assembly": {
+        "accession": "GCF_002357875.1",
+        "biosample": "SAMD00056132",
+        "bioprojects": [
+          "PRJDB5007",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "MiSeq; PacBio RSII",
+        "assembly_method": "HGAP Assembly v. 3.0; Celera Assembler v. 8.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Japan",
+        "isolation_source": "",
+        "host": "Bos taurus",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "DRR065948",
+        "biosample": "SAMD00056132",
+        "bioproject": "PRJDB5007",
+        "sample_name": "SAMD00056132",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "826278600",
+        "spots": "1377131",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn03371464",
+      "assembly": {
+        "accession": "GCF_001629755.1",
+        "biosample": "SAMN03371464",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA276399"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII; Illumina MiSeq",
+        "assembly_method": "HGAP3; BWA-SW 0.7.10-r789; Samtools 0.1.19-96b5f2294a; VarScan v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Germany: Erlangen",
+        "isolation_source": "human sample",
+        "host": "Homo sapiens",
+        "collection_date": "2010-07-06",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1955549",
+        "biosample": "SAMN03371464",
+        "bioproject": "PRJNA276399",
+        "sample_name": "11-01853",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "243685463",
+        "spots": "520069",
+        "avg_length": "468"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn01041085",
+      "assembly": {
+        "accession": "GCF_000335875.2",
+        "biosample": "SAMN01041085",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA41929"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RS",
+        "assembly_method": "SMRT Portal HGAP v. 2.1.1",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Mexico",
+        "isolation_source": "poultry",
+        "host": "",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2544673",
+        "biosample": "SAMN01041085",
+        "bioproject": "PRJNA41929",
+        "sample_name": "18569",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "615243401",
+        "spots": "1473164",
+        "avg_length": "417"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterobacter_hormaechei_samn03733748",
+      "assembly": {
+        "accession": "GCF_001022015.1",
+        "biosample": "SAMN03733748",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Urine/Genitourinary",
+        "host": "Homo sapiens",
+        "collection_date": "2011-01",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965815",
+        "biosample": "SAMN03733748",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Enterobacter cloacae KPC-producing clinical isolate CAV1311",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "527865800",
+        "spots": "1747900",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_aerogenes_samn03733745",
+      "assembly": {
+        "accession": "GCF_001021995.1",
+        "biosample": "SAMN03733745",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella aerogenes",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2010-11",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965748",
+        "biosample": "SAMN03733745",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Enterobacter aerogenes KPC-producing clinical isolate CAV1320",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "357561658",
+        "spots": "1183979",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03024610",
+      "assembly": {
+        "accession": "GCF_001022035.1",
+        "biosample": "SAMN03024610",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "sputum",
+        "host": "Homo sapiens",
+        "collection_date": "2011-03",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1582895",
+        "biosample": "SAMN03024610",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1392",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "561059828",
+        "spots": "1857814",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterobacter_hormaechei_samn03733769",
+      "assembly": {
+        "accession": "GCF_001022075.1",
+        "biosample": "SAMN03733769",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "respiratory",
+        "host": "Homo sapiens",
+        "collection_date": "2011-06",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965820",
+        "biosample": "SAMN03733769",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Enterobacter cloacae KPC-producing clinical isolate CAV1411",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "443790510",
+        "spots": "1469505",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterobacter_hormaechei_samn03733827",
+      "assembly": {
+        "accession": "GCF_001022055.1",
+        "biosample": "SAMN03733827",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2012-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965612",
+        "biosample": "SAMN03733827",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Enterobacter cloacae KPC-producing clinical isolate CAV1668",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "512700568",
+        "spots": "1697684",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterobacter_asburiae_samn03733641",
+      "assembly": {
+        "accession": "GCF_001022095.1",
+        "biosample": "SAMN03733641",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Enterobacter asburiae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "2008-03",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965752",
+        "biosample": "SAMN03733641",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Enterobacter asburiae KPC-producing clinical isolate CAV1043",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "334354770",
+        "spots": "1107135",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_oxytoca_samn03733663",
+      "assembly": {
+        "accession": "GCF_001022295.1",
+        "biosample": "SAMN03733663",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2009-04",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965639",
+        "biosample": "SAMN03733663",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella oxytoca KPC-producing clinical isolate CAV1099",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "510855952",
+        "spots": "1691576",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "phytobacter_ursingii_samn03733692",
+      "assembly": {
+        "accession": "GCF_001022135.1",
+        "biosample": "SAMN03733692",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Phytobacter ursingii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2009-09",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965721",
+        "biosample": "SAMN03733692",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Kluyvera intermedia KPC-producing clinical isolate CAV1151",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "379914490",
+        "spots": "1257995",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "citrobacter_freundii_samn03733741",
+      "assembly": {
+        "accession": "GCF_001022155.1",
+        "biosample": "SAMN03733741",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Urine/Genitourinary",
+        "host": "Homo sapiens",
+        "collection_date": "2010-11",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965690",
+        "biosample": "SAMN03733741",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Citrobacter freundii KPC-producing clinical isolate CAV1321",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "382812482",
+        "spots": "1267591",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_oxytoca_samn03733750",
+      "assembly": {
+        "accession": "GCF_001022115.1",
+        "biosample": "SAMN03733750",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Urine/Genitourinary",
+        "host": "Homo sapiens",
+        "collection_date": "2010-12",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965660",
+        "biosample": "SAMN03733750",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella oxytoca KPC-producing clinical isolate CAV1335",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "236183630",
+        "spots": "782065",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03024590",
+      "assembly": {
+        "accession": "GCF_001022175.1",
+        "biosample": "SAMN03024590",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2010-12",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1582875",
+        "biosample": "SAMN03024590",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1344",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "203410892",
+        "spots": "673546",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_oxytoca_srr2965655_032",
+      "assembly": {
+        "accession": "GCF_001022195.1",
+        "biosample": "SAMN03733738",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2010-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965655",
+        "biosample": "SAMN03733738",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella oxytoca KPC-producing clinical isolate CAV1374",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "531347860",
+        "spots": "1759430",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03024583",
+      "assembly": {
+        "accession": "GCF_001022235.1",
+        "biosample": "SAMN03024583",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2012-04",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1582868",
+        "biosample": "SAMN03024583",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1596",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "587911856",
+        "spots": "1946728",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterobacter_hormaechei_samn03733830",
+      "assembly": {
+        "accession": "GCF_001022255.1",
+        "biosample": "SAMN03733830",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2012-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965616",
+        "biosample": "SAMN03733830",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Enterobacter cloacae KPC-producing clinical isolate CAV1669",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "486084100",
+        "spots": "1609550",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "citrobacter_freundii_samn03733754",
+      "assembly": {
+        "accession": "GCF_001022275.1",
+        "biosample": "SAMN03733754",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "respiratory",
+        "host": "Homo sapiens",
+        "collection_date": "2012-10",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965739",
+        "biosample": "SAMN03733754",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Citrobacter freundii KPC-producing clinical isolate CAV1741",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "387210508",
+        "spots": "1282154",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterobacter_hormaechei_samn03733727",
+      "assembly": {
+        "accession": "GCF_001874505.1",
+        "biosample": "SAMN03733727",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Enterobacter hormaechei",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP3 v. 2.2.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2010-05",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965806",
+        "biosample": "SAMN03733727",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Enterobacter cloacae KPC-producing clinical isolate CAV1176",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "370998846",
+        "spots": "1228473",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterococcus_faecium_samn03339922",
+      "assembly": {
+        "accession": "GCF_001587115.1",
+        "biosample": "SAMN03339922",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA275194"
+        ],
+        "organism": "Enterococcus faecium",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; PacBio SMRT",
+        "assembly_method": "genious v. 7.1.4",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Germany",
+        "isolation_source": "",
+        "host": "Homo sapiens",
+        "collection_date": "2010",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2120261",
+        "biosample": "SAMN03339922",
+        "bioproject": "PRJNA275194",
+        "sample_name": "UW8175",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "345854323",
+        "spots": "912304",
+        "avg_length": "379"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04156749",
+      "assembly": {
+        "accession": "GCF_001441205.1",
+        "biosample": "SAMN04156749",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Quebec",
+        "isolation_source": "chicken meat",
+        "host": "",
+        "collection_date": "2010",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2598330",
+        "biosample": "SAMN04156749",
+        "bioproject": "PRJNA298211",
+        "sample_name": "SA02DT10168701",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "382058383",
+        "spots": "768000",
+        "avg_length": "497"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04156727",
+      "assembly": {
+        "accession": "GCF_001441225.1",
+        "biosample": "SAMN04156727",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Quebec",
+        "isolation_source": "human stool",
+        "host": "Homo sapiens",
+        "collection_date": "2012",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2896022",
+        "biosample": "SAMN04156727",
+        "bioproject": "PRJNA298211",
+        "sample_name": "12-4374",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "653201292",
+        "spots": "1311206",
+        "avg_length": "498"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04156715",
+      "assembly": {
+        "accession": "GCF_001441245.1",
+        "biosample": "SAMN04156715",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Quebec",
+        "isolation_source": "turkey meat",
+        "host": "",
+        "collection_date": "2012-01",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2898679",
+        "biosample": "SAMN04156715",
+        "bioproject": "PRJNA298211",
+        "sample_name": "N13-01290",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "721415033",
+        "spots": "1448133",
+        "avg_length": "498"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03733725",
+      "assembly": {
+        "accession": "GCF_001456135.1",
+        "biosample": "SAMN03733725",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 2.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "respiratory",
+        "host": "Homo sapiens",
+        "collection_date": "2010-05",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965672",
+        "biosample": "SAMN03733725",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1193",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "388904124",
+        "spots": "1287762",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04159541",
+      "assembly": {
+        "accession": "GCF_001469815.1",
+        "biosample": "SAMN04159541",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA297860"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 27-Jun-2014",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "United Kingdom",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2005-01-01",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2970646",
+        "biosample": "SAMN04159541",
+        "bioproject": "PRJNA297860",
+        "sample_name": "Escherichia coli isolate uk_P46212",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "319075000",
+        "spots": "1595375",
+        "avg_length": "200"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "enterococcus_faecium_srr3105312_044",
+      "assembly": {
+        "accession": "GCF_001518735.1",
+        "biosample": "SAMN04418075",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA308959"
+        ],
+        "organism": "Enterococcus faecium",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "PacBio SMRT Analysis v. 2.3, HGAP 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "feces",
+        "host": "Homo sapiens",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3105312",
+        "biosample": "SAMN04418075",
+        "bioproject": "PRJNA308959",
+        "sample_name": "Enterococcus faecium 6E6 WT",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "116380656",
+        "spots": "461828",
+        "avg_length": "252"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn03996249",
+      "assembly": {
+        "accession": "GCF_001558355.2",
+        "biosample": "SAMN03996249",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA231221"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina",
+        "assembly_method": "HGAP3 v. Nov 2014",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA",
+        "isolation_source": "missing",
+        "host": "",
+        "collection_date": "1948",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2814419",
+        "biosample": "SAMN03996249",
+        "bioproject": "PRJNA231221",
+        "sample_name": "FDAARGOS_94",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "521975272",
+        "spots": "2584036",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_srr3222155_047",
+      "assembly": {
+        "accession": "GCF_001675125.1",
+        "biosample": "SAMN03701676",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA284365"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SMRT Portal v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3222155",
+        "biosample": "SAMN03701676",
+        "bioproject": "PRJNA284365",
+        "sample_name": "KPNIH36",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "421572500",
+        "spots": "843145",
+        "avg_length": "500"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn03455931",
+      "assembly": {
+        "accession": "GCF_001675145.1",
+        "biosample": "SAMN03455931",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA279612"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SMRT Portal v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3221963",
+        "biosample": "SAMN03455931",
+        "bioproject": "PRJNA279612",
+        "sample_name": "ECONIH2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2400000000",
+        "spots": "4000000",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_aerogenes_samn03996283",
+      "assembly": {
+        "accession": "GCF_001593585.2",
+        "biosample": "SAMN03996283",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA231221"
+        ],
+        "organism": "Klebsiella aerogenes",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina",
+        "assembly_method": "Celera v. 8.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "USA:DC",
+        "isolation_source": "rectal swab",
+        "host": "Homo sapiens",
+        "collection_date": "2014-02-25",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2820617",
+        "biosample": "SAMN03996283",
+        "bioproject": "PRJNA231221",
+        "sample_name": "FDAARGOS_139",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "636795102",
+        "spots": "3152451",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03455970",
+      "assembly": {
+        "accession": "GCF_001648215.1",
+        "biosample": "SAMN03455970",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA279650"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SMRT Portal v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3228444",
+        "biosample": "SAMN03455970",
+        "bioproject": "PRJNA279650",
+        "sample_name": "AATZP",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2400000000",
+        "spots": "4000000",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03455930",
+      "assembly": {
+        "accession": "GCF_001663295.1",
+        "biosample": "SAMN03455930",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA279611"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3217430",
+        "biosample": "SAMN03455930",
+        "bioproject": "PRJNA279611",
+        "sample_name": "KPNIH39",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2400000000",
+        "spots": "4000000",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "aeromonas_veronii_samn03455926",
+      "assembly": {
+        "accession": "GCF_001634325.1",
+        "biosample": "SAMN03455926",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA279607"
+        ],
+        "organism": "Aeromonas veronii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SMRT Portal v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3465535",
+        "biosample": "SAMN03455926",
+        "bioproject": "PRJNA279607",
+        "sample_name": "AVNIH1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1392800400",
+        "spots": "2321334",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn02568587",
+      "assembly": {
+        "accession": "GCF_001612515.1",
+        "biosample": "SAMN02568587",
+        "bioprojects": [
+          "PRJNA161807",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RS",
+        "assembly_method": "SMRT Portal HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:VA",
+        "isolation_source": "tuna",
+        "host": "",
+        "collection_date": "2005-02-10",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3173804",
+        "biosample": "SAMN02568587",
+        "bioproject": "PRJNA161807",
+        "sample_name": "CFSAN001415",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "526272803",
+        "spots": "1121370",
+        "avg_length": "469"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03455975",
+      "assembly": {
+        "accession": "GCF_001663435.1",
+        "biosample": "SAMN03455975",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA279655"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SMRT Portal v. 2.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3465557",
+        "biosample": "SAMN03455975",
+        "bioproject": "PRJNA279655",
+        "sample_name": "Kpn223",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2400000000",
+        "spots": "4000000",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03455977",
+      "assembly": {
+        "accession": "GCF_001936035.1",
+        "biosample": "SAMN03455977",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA279657"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SMRT Portal v. 2.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3465532",
+        "biosample": "SAMN03455977",
+        "bioproject": "PRJNA279657",
+        "sample_name": "ATCC 35657",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2400000000",
+        "spots": "4000000",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn03455974",
+      "assembly": {
+        "accession": "GCF_001663475.1",
+        "biosample": "SAMN03455974",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA279654"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "SMRT Portal v. 2.2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "",
+        "host": "",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3465539",
+        "biosample": "SAMN03455974",
+        "bioproject": "PRJNA279654",
+        "sample_name": "Eco889",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2400000000",
+        "spots": "4000000",
+        "avg_length": "600"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04285042",
+      "assembly": {
+        "accession": "GCF_001931555.1",
+        "biosample": "SAMN04285042",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292666"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:NC",
+        "isolation_source": "missing",
+        "host": "Gallus gallus",
+        "collection_date": "2015",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2939562",
+        "biosample": "SAMN04285042",
+        "bioproject": "PRJNA292666",
+        "sample_name": "FSIS1502169",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "271499668",
+        "spots": "1011106",
+        "avg_length": "268"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn03988471",
+      "assembly": {
+        "accession": "GCF_001931595.1",
+        "biosample": "SAMN03988471",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292661"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:TN",
+        "isolation_source": "chicken breast",
+        "host": "",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2407791",
+        "biosample": "SAMN03988471",
+        "bioproject": "PRJNA292661",
+        "sample_name": "CVM N55391-R",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "412591748",
+        "spots": "755939",
+        "avg_length": "545"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04334672",
+      "assembly": {
+        "accession": "GCF_001690035.1",
+        "biosample": "SAMN04334672",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA305824"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina HiSeq",
+        "assembly_method": "MIRA v. 4.9.5_2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Quebec",
+        "isolation_source": "food",
+        "host": "",
+        "collection_date": "2014-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3028781",
+        "biosample": "SAMN04334672",
+        "bioproject": "PRJNA305824",
+        "sample_name": "SH14-028",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "412173268",
+        "spots": "792726",
+        "avg_length": "519"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05263553",
+      "assembly": {
+        "accession": "GCF_001690055.1",
+        "biosample": "SAMN05263553",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina MiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Ontario",
+        "isolation_source": "Bovine Organ",
+        "host": "Bos taurus",
+        "collection_date": "2011",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3707412",
+        "biosample": "SAMN05263553",
+        "bioproject": "PRJNA298211",
+        "sample_name": "11-004736-1-7",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "534330866",
+        "spots": "1068275",
+        "avg_length": "500"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05263538",
+      "assembly": {
+        "accession": "GCF_001690075.1",
+        "biosample": "SAMN05263538",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina HiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Ontario",
+        "isolation_source": "Chicken Meat",
+        "host": "",
+        "collection_date": "2011",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3703080",
+        "biosample": "SAMN05263538",
+        "bioproject": "PRJNA298211",
+        "sample_name": "CE-R2-11-0435",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2036294128",
+        "spots": "10080664",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05263513",
+      "assembly": {
+        "accession": "GCF_001690115.1",
+        "biosample": "SAMN05263513",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina MiSeq",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: British Columbia",
+        "isolation_source": "Chicken Meat",
+        "host": "",
+        "collection_date": "2009",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3707447",
+        "biosample": "SAMN05263513",
+        "bioproject": "PRJNA298211",
+        "sample_name": "SA02DT09004001",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "623553004",
+        "spots": "1252486",
+        "avg_length": "497"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05263504",
+      "assembly": {
+        "accession": "GCF_001690095.1",
+        "biosample": "SAMN05263504",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina MiSeq",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada",
+        "isolation_source": "Chicken Cecal Content",
+        "host": "",
+        "collection_date": "2009",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3707415",
+        "biosample": "SAMN05263504",
+        "bioproject": "PRJNA298211",
+        "sample_name": "SA01AB09084001",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "626944818",
+        "spots": "1258998",
+        "avg_length": "497"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05277889",
+      "assembly": {
+        "accession": "GCF_001692555.1",
+        "biosample": "SAMN05277889",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina MiSeq",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: British Columbia",
+        "isolation_source": "food",
+        "host": "",
+        "collection_date": "2003",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3709723",
+        "biosample": "SAMN05277889",
+        "bioproject": "PRJNA298211",
+        "sample_name": "A3ES40",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "292028803",
+        "spots": "553772",
+        "avg_length": "527"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05277890",
+      "assembly": {
+        "accession": "GCF_001692495.1",
+        "biosample": "SAMN05277890",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina MiSeq",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: British Columbia",
+        "isolation_source": "human",
+        "host": "Homo sapiens",
+        "collection_date": "2003",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3709728",
+        "biosample": "SAMN05277890",
+        "bioproject": "PRJNA298211",
+        "sample_name": "A3EZ223",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "393174350",
+        "spots": "731870",
+        "avg_length": "537"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05263514",
+      "assembly": {
+        "accession": "GCF_001692595.1",
+        "biosample": "SAMN05263514",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina HiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Ontario",
+        "isolation_source": "Chicken feces",
+        "host": "",
+        "collection_date": "2013-09-09",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3682071",
+        "biosample": "SAMN05263514",
+        "bioproject": "PRJNA298211",
+        "sample_name": "AMR588-04-00318",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1869090446",
+        "spots": "9252923",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05263515",
+      "assembly": {
+        "accession": "GCF_001692575.1",
+        "biosample": "SAMN05263515",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina HiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Ontario",
+        "isolation_source": "Chicken feces",
+        "host": "",
+        "collection_date": "2013-09-09",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3685561",
+        "biosample": "SAMN05263515",
+        "bioproject": "PRJNA298211",
+        "sample_name": "AMR588-04-00320",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2389317206",
+        "spots": "11828303",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_srr3703041_073",
+      "assembly": {
+        "accession": "GCF_001692515.1",
+        "biosample": "SAMN05263516",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina HiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Ontario",
+        "isolation_source": "Chicken feces",
+        "host": "",
+        "collection_date": "2013-10-18",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3703041",
+        "biosample": "SAMN05263516",
+        "bioproject": "PRJNA298211",
+        "sample_name": "AMR588-04-00435",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1910823242",
+        "spots": "9459521",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn05263517",
+      "assembly": {
+        "accession": "GCF_001692615.1",
+        "biosample": "SAMN05263517",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA298211"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio; Illumina HiSeq",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Ontario",
+        "isolation_source": "Chicken feces",
+        "host": "",
+        "collection_date": "2013-10-18",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3703074",
+        "biosample": "SAMN05263517",
+        "bioproject": "PRJNA298211",
+        "sample_name": "AMR588-04-00437",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "2235206962",
+        "spots": "11065381",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04334642",
+      "assembly": {
+        "accession": "GCF_001692535.1",
+        "biosample": "SAMN04334642",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA305824"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina HiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.5_2",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Quebec",
+        "isolation_source": "human",
+        "host": "Homo sapiens",
+        "collection_date": "2013-11",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3028751",
+        "biosample": "SAMN04334642",
+        "bioproject": "PRJNA305824",
+        "sample_name": "SH13-006",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "437339768",
+        "spots": "1000856",
+        "avg_length": "436"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04334653",
+      "assembly": {
+        "accession": "GCF_001692655.1",
+        "biosample": "SAMN04334653",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA305824"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina HiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Quebec",
+        "isolation_source": "human",
+        "host": "Homo sapiens",
+        "collection_date": "2014-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3028762",
+        "biosample": "SAMN04334653",
+        "bioproject": "PRJNA305824",
+        "sample_name": "SH14-009",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "474102466",
+        "spots": "868350",
+        "avg_length": "545"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn04334640",
+      "assembly": {
+        "accession": "GCF_001692635.1",
+        "biosample": "SAMN04334640",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA305824"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "Illumina HiSeq; PacBio",
+        "assembly_method": "MIRA v. 4.9.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "hybrid",
+        "geo_loc_name": "Canada: Quebec",
+        "isolation_source": "human",
+        "host": "Homo sapiens",
+        "collection_date": "2013-11",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3028749",
+        "biosample": "SAMN04334640",
+        "bioproject": "PRJNA305824",
+        "sample_name": "SH13-004",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "299844002",
+        "spots": "685962",
+        "avg_length": "437"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn04448219",
+      "assembly": {
+        "accession": "GCF_001704235.1",
+        "biosample": "SAMN04448219",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA296771"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: California",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2010-06-14",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3219268",
+        "biosample": "SAMN04448219",
+        "bioproject": "PRJNA296771",
+        "sample_name": "DHQP1002001",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "650075500",
+        "spots": "1300151",
+        "avg_length": "500"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn04448229",
+      "assembly": {
+        "accession": "GCF_001709275.1",
+        "biosample": "SAMN04448229",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA296771"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: Pennsylvania",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2013-03-14",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3221674",
+        "biosample": "SAMN04448229",
+        "bioproject": "PRJNA296771",
+        "sample_name": "DHQP1300920",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "219704883",
+        "spots": "465333",
+        "avg_length": "472"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn04448241",
+      "assembly": {
+        "accession": "GCF_001709295.1",
+        "biosample": "SAMN04448241",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA296771"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: Minnesota",
+        "isolation_source": "tracheal aspirate",
+        "host": "Homo sapiens",
+        "collection_date": "2014-03-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3222213",
+        "biosample": "SAMN04448241",
+        "bioproject": "PRJNA296771",
+        "sample_name": "DHQP1400954",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "890217774",
+        "spots": "1880719",
+        "avg_length": "473"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04447635",
+      "assembly": {
+        "accession": "GCF_001753445.1",
+        "biosample": "SAMN04447635",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA291880"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "RS_HGAP_Assembly v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Kansas",
+        "isolation_source": "Cattle Hide",
+        "host": "",
+        "collection_date": "2003-06",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3195851",
+        "biosample": "SAMN04447635",
+        "bioproject": "PRJNA291880",
+        "sample_name": "1130-Regions",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "248114300",
+        "spots": "412150",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04447629",
+      "assembly": {
+        "accession": "GCF_001753465.1",
+        "biosample": "SAMN04447629",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA291880"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "RS_HGAP_Assembly v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Nebraska",
+        "isolation_source": "Cattle Hide",
+        "host": "",
+        "collection_date": "2003-06",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3195839",
+        "biosample": "SAMN04447629",
+        "bioproject": "PRJNA291880",
+        "sample_name": "2149-Regions",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "221191656",
+        "spots": "367428",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04447630",
+      "assembly": {
+        "accession": "GCF_001753505.1",
+        "biosample": "SAMN04447630",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA291880"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "RS_HGAP_Assembly v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Nebraska",
+        "isolation_source": "Cattle Hide",
+        "host": "",
+        "collection_date": "2003-06",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3195852",
+        "biosample": "SAMN04447630",
+        "bioproject": "PRJNA291880",
+        "sample_name": "2159-Regions",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "307144614",
+        "spots": "510207",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04447623",
+      "assembly": {
+        "accession": "GCF_001753545.1",
+        "biosample": "SAMN04447623",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA291880"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "RS_HGAP_Assembly v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Kansas",
+        "isolation_source": "Cattle Hide",
+        "host": "",
+        "collection_date": "2003-07",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3195765",
+        "biosample": "SAMN04447623",
+        "bioproject": "PRJNA291880",
+        "sample_name": "3384-Regions",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "551254410",
+        "spots": "915705",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04447636",
+      "assembly": {
+        "accession": "GCF_001753565.1",
+        "biosample": "SAMN04447636",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA291880"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "RS_HGAP_Assembly v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Idaho",
+        "isolation_source": "Cattle Hide",
+        "host": "",
+        "collection_date": "2003-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3195841",
+        "biosample": "SAMN04447636",
+        "bioproject": "PRJNA291880",
+        "sample_name": "4276-Regions",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "503647648",
+        "spots": "836624",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04447624",
+      "assembly": {
+        "accession": "GCF_001753485.1",
+        "biosample": "SAMN04447624",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA291880"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "RS_HGAP_Assembly v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Canada: Alberta",
+        "isolation_source": "Cattle Hide",
+        "host": "",
+        "collection_date": "2003-09",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3195840",
+        "biosample": "SAMN04447624",
+        "bioproject": "PRJNA291880",
+        "sample_name": "8368-Regions",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "457545284",
+        "spots": "760042",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04447632",
+      "assembly": {
+        "accession": "GCF_001753525.1",
+        "biosample": "SAMN04447632",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA291880"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "RS_HGAP_Assembly v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Texas",
+        "isolation_source": "Cattle Hide",
+        "host": "",
+        "collection_date": "2003-10",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3195836",
+        "biosample": "SAMN04447632",
+        "bioproject": "PRJNA291880",
+        "sample_name": "9234-Regions",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "517042148",
+        "spots": "858874",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn02800603",
+      "assembly": {
+        "accession": "GCF_002196535.1",
+        "biosample": "SAMN02800603",
+        "bioprojects": [
+          "PRJNA186035",
+          "PRJNA224116"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "mango",
+        "host": "",
+        "collection_date": "2014-05-12",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1395326",
+        "biosample": "SAMN02800603",
+        "bioproject": "PRJNA186035",
+        "sample_name": "CFSAN017963",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "507320495",
+        "spots": "1113299",
+        "avg_length": "455"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_oxytoca_samn03733631",
+      "assembly": {
+        "accession": "GCF_001870185.1",
+        "biosample": "SAMN03733631",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "blood",
+        "host": "Homo sapiens",
+        "collection_date": "2007-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3066286",
+        "biosample": "SAMN03733631",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella oxytoca KPC-producing clinical isolate CAV1015",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "547497310",
+        "spots": "1812905",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03024573",
+      "assembly": {
+        "accession": "GCF_001870165.1",
+        "biosample": "SAMN03024573",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Abdominal Abscess",
+        "host": "Homo sapiens",
+        "collection_date": "2007-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1582858",
+        "biosample": "SAMN03024573",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1016",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "528612042",
+        "spots": "1750371",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_srr2965682_092",
+      "assembly": {
+        "accession": "GCF_001902535.1",
+        "biosample": "SAMN03733765",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Urine/Genitourinary",
+        "host": "Homo sapiens",
+        "collection_date": "2011-05",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965682",
+        "biosample": "SAMN03733765",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1417",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "535499152",
+        "spots": "1773176",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03733793",
+      "assembly": {
+        "accession": "GCF_001902255.1",
+        "biosample": "SAMN03733793",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2011-10",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965692",
+        "biosample": "SAMN03733793",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1453",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "705186610",
+        "spots": "2335055",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_oxytoca_srr2965667_094",
+      "assembly": {
+        "accession": "GCF_001970835.1",
+        "biosample": "SAMN03733848",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella oxytoca",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "Perirectal",
+        "host": "Homo sapiens",
+        "collection_date": "2012-12",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2965667",
+        "biosample": "SAMN03733848",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella oxytoca KPC-producing clinical isolate CAV1752",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "700047778",
+        "spots": "2318039",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_samn03024576",
+      "assembly": {
+        "accession": "GCF_001908515.1",
+        "biosample": "SAMN03024576",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2008-04",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1582861",
+        "biosample": "SAMN03024576",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1042",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "332749640",
+        "spots": "1101820",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_srr1582870_096",
+      "assembly": {
+        "accession": "GCF_001908715.1",
+        "biosample": "SAMN03024585",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA246471"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:Virginia",
+        "isolation_source": "urine",
+        "host": "Homo sapiens",
+        "collection_date": "2010-08",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1582870",
+        "biosample": "SAMN03024585",
+        "bioproject": "PRJNA246471",
+        "sample_name": "Klebsiella pneumoniae KPC-producing clinical isolate CAV1217",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "303164210",
+        "spots": "1003855",
+        "avg_length": "302"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_srr3999062_097",
+      "assembly": {
+        "accession": "GCF_002011965.1",
+        "biosample": "SAMN05511184",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA316786"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: Pittsburgh",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2010",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3999062",
+        "biosample": "SAMN05511184",
+        "bioproject": "PRJNA316786",
+        "sample_name": "MMMOSAM:1bcb310e-6fce-465f-a67a-0b06bf5e5d61",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1508902164",
+        "spots": "2506482",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_srr3999063_098",
+      "assembly": {
+        "accession": "GCF_002011985.1",
+        "biosample": "SAMN05511183",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA316786"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: Caguas",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2011",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3999063",
+        "biosample": "SAMN05511183",
+        "bioproject": "PRJNA316786",
+        "sample_name": "MMMOSAM:1e515830-d6cd-43d5-8c8b-635752587f5f",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1333577490",
+        "spots": "2215245",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_srr3999067_099",
+      "assembly": {
+        "accession": "GCF_002012005.1",
+        "biosample": "SAMN05511179",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA316786"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Brazil: Rio de Janeiro",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2011",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3999067",
+        "biosample": "SAMN05511179",
+        "bioproject": "PRJNA316786",
+        "sample_name": "MMMOSAM:3e2b11b5-ec80-472c-82c8-43e6833a5a3f",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1109856230",
+        "spots": "1843615",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_srr3999064_100",
+      "assembly": {
+        "accession": "GCF_002012105.1",
+        "biosample": "SAMN05511182",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA316786"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "Israel: Kfar Sava",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2012",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3999064",
+        "biosample": "SAMN05511182",
+        "bioproject": "PRJNA316786",
+        "sample_name": "MMMOSAM:2dcca2ee-442c-4576-8364-b995704f85d4",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1026615282",
+        "spots": "1705341",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_srr3999061_101",
+      "assembly": {
+        "accession": "GCF_002012165.1",
+        "biosample": "SAMN05511185",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA316786"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. unspecified",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA: Boston",
+        "isolation_source": "not applicable",
+        "host": "Homo sapiens",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3999061",
+        "biosample": "SAMN05511185",
+        "bioproject": "PRJNA316786",
+        "sample_name": "MMMOSAM:1838a6c5-fe2e-45ff-a900-66dce1f4e54c",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "1244792724",
+        "spots": "2067762",
+        "avg_length": "602"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn03702837",
+      "assembly": {
+        "accession": "GCF_002128385.1",
+        "biosample": "SAMN03702837",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA242847"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. v.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:PA",
+        "isolation_source": "product egg raw white",
+        "host": "",
+        "collection_date": "2013",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2075005",
+        "biosample": "SAMN03702837",
+        "bioproject": "PRJNA242847",
+        "sample_name": "CFSAN033541",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "173572781",
+        "spots": "581230",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "salmonella_enterica_samn03702839",
+      "assembly": {
+        "accession": "GCF_002128365.1",
+        "biosample": "SAMN03702839",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA242847"
+        ],
+        "organism": "Salmonella enterica",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. v.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA:OH",
+        "isolation_source": "egg raw whole",
+        "host": "",
+        "collection_date": "2012",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2074998",
+        "biosample": "SAMN03702839",
+        "bioproject": "PRJNA242847",
+        "sample_name": "CFSAN033543",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "393248699",
+        "spots": "1316870",
+        "avg_length": "298"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn05414625",
+      "assembly": {
+        "accession": "GCF_002105735.1",
+        "biosample": "SAMN05414625",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA312475"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. v.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "blue cheese in wax",
+        "host": "",
+        "collection_date": "2014",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3931165",
+        "biosample": "SAMN05414625",
+        "bioproject": "PRJNA312475",
+        "sample_name": "CFSAN051542",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "473974259",
+        "spots": "1249243",
+        "avg_length": "379"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn03256350",
+      "assembly": {
+        "accession": "GCF_002249955.1",
+        "biosample": "SAMN03256350",
+        "bioprojects": [
+          "PRJNA218110",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR1714120",
+        "biosample": "SAMN03256350",
+        "bioproject": "PRJNA218110",
+        "sample_name": "CDC#03-98",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "391018044",
+        "spots": "827128",
+        "avg_length": "472"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_pneumoniae_srr2244244_107",
+      "assembly": {
+        "accession": "GCF_001316565.3",
+        "biosample": "SAMN04011426",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA287968"
+        ],
+        "organism": "Klebsiella pneumoniae",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. V3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "South Africa: Durban",
+        "isolation_source": "missing",
+        "host": "Homo sapiens",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2244244",
+        "biosample": "SAMN04011426",
+        "bioproject": "PRJNA287968",
+        "sample_name": "UNN46_S10",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "890900539",
+        "spots": "1652526",
+        "avg_length": "539"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn02147037",
+      "assembly": {
+        "accession": "GCF_000464955.2",
+        "biosample": "SAMN02147037",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA230969"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. v.3.0",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "stool",
+        "host": "Homo sapiens",
+        "collection_date": "1994",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR2544681",
+        "biosample": "SAMN02147037",
+        "bioproject": "PRJNA230969",
+        "sample_name": "CFSAN002236",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "421776445",
+        "spots": "878184",
+        "avg_length": "480"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04578538",
+      "assembly": {
+        "accession": "GCF_002741175.1",
+        "biosample": "SAMN04578538",
+        "bioprojects": [
+          "PRJNA218110",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "2014-07",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3290448",
+        "biosample": "SAMN04578538",
+        "bioproject": "PRJNA218110",
+        "sample_name": "2014EL-1343-2",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "706762788",
+        "spots": "1407894",
+        "avg_length": "502"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04621488",
+      "assembly": {
+        "accession": "GCF_002741335.1",
+        "biosample": "SAMN04621488",
+        "bioprojects": [
+          "PRJNA218110",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3341739",
+        "biosample": "SAMN04621488",
+        "bioproject": "PRJNA218110",
+        "sample_name": "F5656C1",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "687179266",
+        "spots": "1368883",
+        "avg_length": "502"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04625459",
+      "assembly": {
+        "accession": "GCF_002741555.1",
+        "biosample": "SAMN04625459",
+        "bioprojects": [
+          "PRJNA218110",
+          "PRJNA224116"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio",
+        "assembly_method": "HGAP v. 3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "USA",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3360246",
+        "biosample": "SAMN04625459",
+        "bioproject": "PRJNA218110",
+        "sample_name": "F9792",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "977026034",
+        "spots": "1946267",
+        "avg_length": "502"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04014847",
+      "assembly": {
+        "accession": "GCF_002787215.1",
+        "biosample": "SAMN04014847",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "canu v. 1.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112258",
+        "biosample": "SAMN04014847",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0006",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "780022798",
+        "spots": "3861499",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04014852",
+      "assembly": {
+        "accession": "GCF_002788295.1",
+        "biosample": "SAMN04014852",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "canu v. 1.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112262",
+        "biosample": "SAMN04014852",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0011",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "536861056",
+        "spots": "2657728",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04014855",
+      "assembly": {
+        "accession": "GCF_002787315.1",
+        "biosample": "SAMN04014855",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112265",
+        "biosample": "SAMN04014855",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0014",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "633191624",
+        "spots": "3134612",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04014856",
+      "assembly": {
+        "accession": "GCF_002788115.1",
+        "biosample": "SAMN04014856",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112266",
+        "biosample": "SAMN04014856",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0015",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "485632240",
+        "spots": "2404120",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "citrobacter_freundii_samn04014863",
+      "assembly": {
+        "accession": "GCF_002796505.1",
+        "biosample": "SAMN04014863",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Citrobacter freundii",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112272",
+        "biosample": "SAMN04014863",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0022",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "502687100",
+        "spots": "2488550",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "klebsiella_aerogenes_samn04014850",
+      "assembly": {
+        "accession": "GCF_002796525.1",
+        "biosample": "SAMN04014850",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Klebsiella aerogenes",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "canu v. 1.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112260",
+        "biosample": "SAMN04014850",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0009",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "582927358",
+        "spots": "2885779",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04014858",
+      "assembly": {
+        "accession": "GCF_002796585.1",
+        "biosample": "SAMN04014858",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "HGAP v. 2.3",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112268",
+        "biosample": "SAMN04014858",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0017",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "471484766",
+        "spots": "2334083",
+        "avg_length": "202"
+      },
+      "errors": []
+    },
+    {
+      "sample_id": "escherichia_coli_samn04014860",
+      "assembly": {
+        "accession": "GCF_002796445.1",
+        "biosample": "SAMN04014860",
+        "bioprojects": [
+          "PRJNA224116",
+          "PRJNA292901"
+        ],
+        "organism": "Escherichia coli",
+        "assembly_status": "Complete Genome",
+        "has_plasmid": true,
+        "sequencing_tech": "PacBio RSII",
+        "assembly_method": "canu v. 1.6",
+        "datasets_assembly_level": "Complete Genome",
+        "derived_truth_technology": "long_read",
+        "geo_loc_name": "missing",
+        "isolation_source": "missing",
+        "host": "missing",
+        "collection_date": "missing",
+        "derived_truth_quality_tier": "B"
+      },
+      "run": {
+        "run": "SRR3112270",
+        "biosample": "SAMN04014860",
+        "bioproject": "PRJNA292901",
+        "sample_name": "FDA-CDC-AR_0019",
+        "platform": "ILLUMINA",
+        "layout": "PAIRED",
+        "bases": "542969536",
+        "spots": "2687968",
+        "avg_length": "202"
+      },
+      "errors": []
+    }
+  ]
+}

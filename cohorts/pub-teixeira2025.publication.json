@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "cohort": "pub-teixeira2025",
+  "generated": "2026-11-17",
+  "study": "teixeira",
+  "label": "Teixeira et al. 2025 (Circling in on plasmids)",
+  "citation": "Teixeira et al. 2025, Briefings in Bioinformatics, doi 10.1093/bib/bbaf589",
+  "note": "250 isolates, 31 species. Most have no deposited complete assembly; only those that resolve to one are runnable without rebuilding the hybrid truth.",
+  "published_outcomes": "teixeira2025",
+  "isolates": 5,
+  "candidates": 250,
+  "funnel": [
+    {
+      "stage": "Isolates in the paper",
+      "n": 250
+    },
+    {
+      "stage": "Found a complete assembly and a paired Illumina run",
+      "n": 5
+    },
+    {
+      "stage": "Truth confirmed against the paper (exact, superset, subset) or inferred (Teixeira)",
+      "n": 5
+    }
+  ],
+  "truth_match": [
+    {
+      "value": "inferred",
+      "n": 5
+    }
+  ],
+  "left_out": [
+    {
+      "reason": "no deposited complete assembly (long and short reads exist: the truth must be rebuilt, python/build_hybrid_truth.py)",
+      "n": 245
+    }
+  ],
+  "compare_command": "plasbench compare-published --results-dir <results> --samples cohorts/pub-teixeira2025.tsv"
+}

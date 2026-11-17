@@ -172,8 +172,9 @@ def run_metadata(run, email=None, api_key=None):
     runinfo = fetch(Request("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + urlencode(params),
                             headers={"User-Agent": "PlasBench/0.1 cohort validator"}),
                     30, 4, "NCBI run-info request", parse=lambda payload: payload.decode("utf-8"))
-    rows = list(csv.DictReader(runinfo.splitlines()))
-    if len(rows) != 1 or rows[0].get("Run") != run:
+    # An SRA experiment can hold several runs, in which case run-info lists one row per run: take the requested run's row.
+    rows = [r for r in csv.DictReader(runinfo.splitlines()) if r.get("Run") == run]
+    if len(rows) != 1:
         raise ValueError(f"could not retrieve run-info row for {run}")
     row = rows[0]
     return {"run": run, "biosample": row.get("BioSample", ""), "bioproject": row.get("BioProject", ""),
