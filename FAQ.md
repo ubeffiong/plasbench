@@ -381,7 +381,7 @@ can identify a person; use de-identified metadata. Files committed before the up
 dissimilarity are reimplemented from the paper (the PlasEval repository has no licence, so none of its code is used or shipped). Three pieces
 test them against the original: the 59-case cross-check (Q2); the **`plaseval-ecoli53` cohort**, the paper's 53 *E. coli* isolates with their
 accessions and the paper's published ground truth and tool bins (`cohorts/plaseval_ecoli53/bins`, CC BY 4.0), scored by
-`plasbench plaseval-replication`; and the **comparison gate** (`python/plaseval_gate.py`, `RUN_PLASEVAL_GATE`), which in stage 6 runs the original
+`plasbench analysis plaseval-replication`; and the **comparison gate** (`python/plaseval_gate.py`, `RUN_PLASEVAL_GATE`), which in stage 6 runs the original
 on every pair of exported bins and compares dissimilarity and best-match precision, recall and F1. The verdict (PASS, FAIL, PARTIAL, NOT_RUN or
 NO_DATA) is written to `benchmark.plaseval_gate.json` and shown in the report. With `RUN_PLASEVAL_GATE=auto` (the default) it compares when the
 original is found and otherwise records NOT_RUN; with `on`, a missing original or a disagreement stops the run. It never changes a score.
