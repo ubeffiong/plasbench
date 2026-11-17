@@ -103,7 +103,13 @@ def main():
     wait(lambda: "x" in first.get(lost["id"])["log"])
     # The machine went away: the runner is killed outright (SIGKILL cannot be caught), so no exit is recorded. _kill() is a cancel (it stops the command's group too and the
     # runner records the stop), which is not this situation.
-    runner = int((jobrunner.read_json(first._paths(lost["id"])["pid"]) or {}).get("runner") or first.jobs[lost["id"]].get("pid") or 0)
+    runner = 0
+    for _ in range(100):   # the runner's pid file can lag the log; never signal pid 0 or 1 (os.kill(0, ...) would hit this whole process group)
+        runner = int((jobrunner.read_json(first._paths(lost["id"])["pid"]) or {}).get("runner") or first.jobs[lost["id"]].get("pid") or 0)
+        if runner > 1:
+            break
+        time.sleep(0.1)
+    assert runner > 1, "no runner pid recorded for the lost run"
     if os.name == "nt":
         first._kill(lost["id"], first.jobs[lost["id"]])
     else:
