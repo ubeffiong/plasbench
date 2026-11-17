@@ -30,7 +30,7 @@ import math
 import os
 from collections import defaultdict
 from plasbench_common import (  # noqa: E402
-    merge_intervals, interval_overlap_bp as overlap, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership, iter_fasta,
+    merge_intervals, interval_overlap_bp as overlap, iter_paf, paf_identity, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership, iter_fasta,
     read_truth_split,
 )
 from matching import max_weight_matching  # noqa: E402
@@ -408,28 +408,26 @@ def main():
     # Applies the same alignment-quality gate as score_plasmids.py (base-level
     # scoring), so a short, low-identity, or low-MAPQ placement that the base
     # score discards cannot still count toward bin completeness/purity.
-    with open(args.paf, encoding="utf-8") as handle:
-        for raw in handle:
-            fields = raw.rstrip("\n").split("\t")
-            if len(fields) < 12 or fields[0] not in membership: continue
-            try:
-                qlen, qstart, qend = int(fields[1]), int(fields[2]), int(fields[3])
-                start, stop = int(fields[7]), int(fields[8])
-                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
-            except ValueError: continue
-            identity = matches / block_length if block_length else 0.0
-            query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
-            if (block_length < args.min_alignment_length or identity < args.min_alignment_identity
-                    or mapq < args.min_alignment_mapq or query_coverage < args.min_alignment_query_coverage):
-                continue
-            target, bin_id = fields[5], membership[fields[0]]
-            if target in plasmids:
-                identity_counts[(bin_id, target)][0] += matches
-                identity_counts[(bin_id, target)][1] += block_length
-            if target in plasmids or target in chromosomes:
-                query_aligned[fields[0]].append((max(0, min(qstart, qend)), min(qlen, max(qstart, qend))))
-            if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
-            elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
+    # Shared reader: a malformed row is dropped, counted and warned about once (AU-021).
+    for paf_row in iter_paf(args.paf, label="bin PAF"):
+        if paf_row["qname"] not in membership: continue
+        qname, target = paf_row["qname"], paf_row["tname"]
+        qlen, qstart, qend = paf_row["qlen"], paf_row["qstart"], paf_row["qend"]
+        start, stop = paf_row["tstart"], paf_row["tend"]
+        matches, block_length, mapq = paf_row["matches"], paf_row["block_length"], paf_row["mapq"]
+        identity = paf_identity(matches, block_length)
+        query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
+        if (block_length < args.min_alignment_length or identity < args.min_alignment_identity
+                or mapq < args.min_alignment_mapq or query_coverage < args.min_alignment_query_coverage):
+            continue
+        bin_id = membership[qname]
+        if target in plasmids:
+            identity_counts[(bin_id, target)][0] += matches
+            identity_counts[(bin_id, target)][1] += block_length
+        if target in plasmids or target in chromosomes:
+            query_aligned[qname].append((max(0, min(qstart, qend)), min(qlen, max(qstart, qend))))
+        if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
+        elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
     overlaps = {key: merge(value) for key, value in plasmid_intervals.items()}
     plasmid_bp = defaultdict(int)
     for (bin_id, _), bp in overlaps.items(): plasmid_bp[bin_id] += bp

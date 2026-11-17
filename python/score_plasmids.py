@@ -54,37 +54,12 @@ from plasbench_common import interval_overlap_bp as overlap_bp, merge_intervals 
 
 
 from plasbench_common import read_truth_table as read_truth  # noqa: E402,F401  (moved to the shared module)
+from plasbench_common import read_fasta_length_map, paf_identity  # noqa: E402
 
 
 def read_fasta_lengths(path):
-    """Return FASTA record id -> length, rejecting ambiguous duplicate ids."""
-    lengths = {}
-    name = None
-    length = 0
-    with open(path) as fh:
-        for raw in fh:
-            line = raw.strip()
-            if not line:
-                continue
-            if line.startswith(">"):
-                if name is not None:
-                    if name in lengths:
-                        raise ValueError(f"duplicate FASTA record id: {name}")
-                    lengths[name] = length
-                fields = line[1:].split()
-                if not fields:
-                    raise ValueError("FASTA header without a record id")
-                name = fields[0]
-                length = 0
-            elif name is None:
-                raise ValueError("FASTA sequence encountered before a header")
-            else:
-                length += len(line)
-    if name is not None:
-        if name in lengths:
-            raise ValueError(f"duplicate FASTA record id: {name}")
-        lengths[name] = length
-    return lengths
+    """Return FASTA record id -> length, rejecting ambiguous duplicate ids and empty headers."""
+    return read_fasta_length_map(path)
 
 
 def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.0, min_mapq=0,
@@ -170,7 +145,7 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
                     f"({pred_lengths[qname]})"
                 )
             counters["alignment_total"] += 1
-            identity = matches / block_length if block_length else 0.0
+            identity = paf_identity(matches, block_length)
             query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
             if (block_length < min_length or identity < min_identity or mapq < min_mapq
                     or query_coverage < min_query_coverage):

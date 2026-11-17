@@ -195,6 +195,9 @@ python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" -
 # Scoring specification layers, same scripts as stage 6.
 python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark.label_schemes.tsv" \
     --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"
+# The headline with and without the evidence-based truth exclusion. The demo has no evidence-labelled truth, so this writes nothing and the report says "Not run".
+python3 "$PY/truth_exclusion_sensitivity.py" --rank-robustness "$DEMO/benchmark.rank_robustness.tsv" --truth-marker-overlap "$DEMO/benchmark.truth_marker_overlap.tsv" \
+    --label-schemes "$DEMO/benchmark.label_schemes.tsv" --out "$DEMO/benchmark.truth_exclusion_sensitivity.tsv" 2>/dev/null || true
 python3 "$PY/score_amr_placement.py" collect --results-dir "$DEMO" --truth-provenance "$DEMO/benchmark.truth_provenance.tsv" --out "$DEMO/benchmark.amr_placement.tsv"
 python3 "$PY/evaluate_recommender.py" --scores "$SCORES" --samples "$SAMPLES" --tool-status "$STATUS" \
     --dataset-features "$DEMO/benchmark.dataset_features.tsv" --out-prefix "$DEMO/benchmark" --min-train-samples 1
@@ -225,6 +228,7 @@ python3 "$PY/build_html_report.py" \
     --recovery-by-replicon "$DEMO/benchmark.recovery_by_replicon.tsv" \
     --truth-label-audit "$DEMO/benchmark.truth_label_audit.tsv" \
     --truth-marker-overlap "$DEMO/benchmark.truth_marker_overlap.tsv" \
+    --truth-exclusion-sensitivity "$DEMO/benchmark.truth_exclusion_sensitivity.tsv" \
     --dataset-features "$DEMO/benchmark.dataset_features.tsv" \
     --dimensions-prefix "$DEMO/benchmark" \
     --comparisons "$DEMO/benchmark.paired_comparisons.tsv" \

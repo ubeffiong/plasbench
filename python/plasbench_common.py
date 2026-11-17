@@ -268,6 +268,129 @@ def iter_fasta(path, wanted=None):
         yield name, header, "".join(chunks)
 
 
+def read_fasta_records(path, duplicates="error", empty_header="error"):
+    """The one validated FASTA length reader: ordered list of (record id, length); gzip-aware.
+
+    Policy, applied the same way for every caller (audit AU-021):
+      duplicates   "error" (default) raises ValueError on a repeated id; "last" keeps the
+                   later length at the first position. A repeated id is never resolved
+                   silently by default, because the same file would then score differently
+                   by script.
+      empty_header "error" (default) raises ValueError on a bare '>'; "skip" drops that
+                   record and its sequence.
+    Sequence lines before the first header are an error. Blank lines are ignored.
+    """
+    if duplicates not in ("error", "last") or empty_header not in ("error", "skip"):
+        raise ValueError("duplicates must be 'error' or 'last'; empty_header 'error' or 'skip'")
+    order, lengths = [], {}
+    name, total, skipping = None, 0, False
+
+    def close():
+        if name is None or skipping:
+            return
+        if name in lengths and duplicates == "error":
+            raise ValueError(f"duplicate FASTA record id: {name}")
+        if name not in lengths:
+            order.append(name)
+        lengths[name] = total
+
+    with open_maybe_gz(path, "rt") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                close()
+                fields = line[1:].split()
+                total = 0
+                if fields:
+                    name, skipping = fields[0], False
+                elif empty_header == "skip":
+                    name, skipping = "", True
+                else:
+                    raise ValueError("FASTA header without a record id")
+            elif name is None:
+                raise ValueError("FASTA sequence encountered before a header")
+            else:
+                total += len(line)
+    close()
+    return [(key, lengths[key]) for key in order]
+
+
+def read_fasta_length_map(path, duplicates="error", empty_header="error"):
+    """read_fasta_records as a dict, id -> length."""
+    return dict(read_fasta_records(path, duplicates, empty_header))
+
+
+PAF_FIELDS = ("qname", "qlen", "qstart", "qend", "strand", "tname", "tlen", "tstart", "tend",
+              "matches", "block_length", "mapq")
+
+
+def paf_identity(matches, block_length):
+    """Residue identity of one PAF row. A zero-length block has no identity: 0.0 everywhere
+    (it fails every identity floor), never 1.0 and never an exception."""
+    return matches / block_length if block_length else 0.0
+
+
+def iter_paf(path, strict=False, stats=None, label="PAF"):
+    """Yield one dict per PAF row (the 12 mandatory columns as PAF_FIELDS, integers parsed,
+    plus "tags": the optional columns, and "line": the 1-based line number).
+
+    strict=True raises ValueError on a row with fewer than 12 columns or a non-integer
+    numeric column (the point-estimate scorer's rule). strict=False drops such a row,
+    counts it in stats["dropped"] (when a dict is given) and writes ONE warning with the
+    total to stderr when the file ends, so a damaged PAF is visible instead of silently
+    scoring as if the rows never existed.
+    """
+    dropped = 0
+    first_bad = None
+    with open(path, encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            fields = line.rstrip("\n").rstrip("\r").split("\t")
+            problem = None
+            if len(fields) < 12:
+                problem = f"{label} line {line_number} has {len(fields)} columns; expected at least 12"
+            else:
+                try:
+                    row = {"qname": fields[0], "qlen": int(fields[1]), "qstart": int(fields[2]),
+                           "qend": int(fields[3]), "strand": fields[4], "tname": fields[5],
+                           "tlen": int(fields[6]), "tstart": int(fields[7]), "tend": int(fields[8]),
+                           "matches": int(fields[9]), "block_length": int(fields[10]),
+                           "mapq": int(fields[11]), "tags": fields[12:], "line": line_number}
+                except ValueError:
+                    problem = f"{label} line {line_number} has invalid integer coordinates"
+            if problem:
+                if strict:
+                    raise ValueError(problem)
+                dropped += 1
+                first_bad = first_bad or problem
+                continue
+            yield row
+    if stats is not None:
+        stats["dropped"] = stats.get("dropped", 0) + dropped
+    if dropped:
+        print(f"WARNING: {dropped} malformed {label} row(s) dropped from {path} (first: {first_bad})",
+              file=sys.stderr)
+
+
+def read_table(path, required=(), allow_missing=False):
+    """Rows of a TSV as dicts, validated: every name in required must be a header column.
+
+    Raises ValueError for a missing column (naming it) and FileNotFoundError for a missing
+    file unless allow_missing, which returns [] (read_tsv's lenient behaviour).
+    """
+    if allow_missing and (not path or not os.path.isfile(path)):
+        return []
+    with open(path, newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        missing = [c for c in required if c not in (reader.fieldnames or [])]
+        if missing:
+            raise ValueError(f"{path}: missing required column(s): {', '.join(missing)}")
+        return list(reader)
+
+
 def read_truth_table(path):
     """The scorer's validated truth reader: (sequence_id -> (molecule_type, length),
     total plasmid bp, total chromosome bp).

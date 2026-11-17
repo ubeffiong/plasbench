@@ -12,6 +12,12 @@ history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
 ## [Unreleased]
+### Added -- audit follow-up (AU-021, AU-022, AU-045, AU-051)
+- **Shared readers (AU-021).** `plasbench_common.read_fasta_records`, `iter_paf`, `read_table` and `paf_identity` are the one validated reader set: a duplicate FASTA id or an empty header is an error, a malformed PAF row is dropped, counted and warned about once, a zero-length block has identity 0.0 everywhere (`build_enterprise_view` used 1.0). `score_plasmids`, `contig_classification`, `make_truth`, `score_bins`, `score_amr_placement` and `build_enterprise_view` use them; scores on valid input are unchanged (`test/test_shared_readers.py`). Other readers in the repository are not yet moved.
+- **Guard tests (AU-022).** `test/test_guard_mutants.py` covers the synthetic/real refusal, the commit secret scan and the TP clamp; each was checked by hand mutation.
+- **Test honesty (AU-045).** The evidence-ledger test checks the enclosing definition and asserts the cited behaviour for 21 rows; `test_scoring_adversarial.py` labels known-optimism pins and asserts the corrected expectation beside them. Ledger line numbers for E1-E7 and E12 corrected.
+- **With and without the truth exclusion (AU-051).** `python/truth_exclusion_sensitivity.py` writes `benchmark.truth_exclusion_sensitivity.tsv` (stage 6, report Truth labels tab, `plasbench truth-exclusion-sensitivity`): base-level F1 under the NCBI labels and the evidence labels, rank and top-tool change, and the change for tools that share a database with the truth markers.
+
 ### Fixed -- the 17 November 2026 independent audit (53 findings; see `audit-2026-11-17/` register)
 - **Scores.** NMI, VI and ARI now penalise a plasmid no bin covers (unassigned bases are singleton clusters; AU-003). An AMR gene on a record in no bin is `unassigned_contig`, not `correct_plasmid` (AU-004). Contig F1 shows its excluded share and is marked not comparable with base F1 (AU-020). A sample with no provenance record is no longer assumed identity-valid (AU-029).
 - **Truth provenance.** `classify_method` reads `OXFORD_NANOPORE`, `IlluminaMiSeq`, misspelt Unicycler, HGAP and the Illumina polishers (Polypolish, Pilon, ...); public-v4 and the negative controls are relabelled with `python/relabel_cohort_provenance.py` and their lock hashes updated (AU-005, AU-006, AU-014). `validate-cohort` warns where `truth_technology` and the assembly-method strategy contradict (AU-027).

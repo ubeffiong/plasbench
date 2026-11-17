@@ -569,6 +569,8 @@ result is `not_evaluated`. The audit never edits `truth.tsv` and never changes a
 
 `python/truth_marker_overlap.py` writes `benchmark.truth_marker_overlap.tsv`: for every tool that uses a reference database and every marker caller behind the truth labels (`config/truth_marker_databases.tsv`), whether the database is the same (`yes`), possibly overlapping in content (`possible`), not shared (`no`) or unknown. MOB-suite tools share the MOB-typing database with the truth evidence. It is a name-level screen, not a sequence-level proof (that is the database-leakage analysis).
 
+`python/truth_exclusion_sensitivity.py` writes `benchmark.truth_exclusion_sensitivity.tsv` (stage 6, after rank sensitivity; also shown in the report's Truth labels tab): the mean base-level F1 of every tool under the NCBI labels (no exclusion, the pre-registered primary) and under the evidence labels (marker-free plasmids and other ambiguous replicons excluded), the rank change, whether the top tool changes, and the mean change for tools that share a database with the truth markers against those that do not. This answers whether the replicon-database exclusion favours replicon-based tools by construction. It covers base-level F1 only; the reconstruction headlines are not re-scored under another truth. Advisory: it never changes a score or a rank.
+
 ```bash
 python3 python/stratify_recovery.py --results-dir results --data-dir data \
     --out results/benchmark.recovery_by_replicon.tsv

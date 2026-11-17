@@ -114,7 +114,7 @@ def main():
     print("the report and the wiring")
     import build_html_report as report  # noqa: E402
     source = (ROOT / "python" / "build_html_report.py").read_text(encoding="utf-8")
-    check("the audit table has a Flags column and the overlap table sits in the Truth labels tab", "<th>Finding</th><th>Flags</th>" in source and "{marker_overlap_html}</section>" in source
+    check("the audit table has a Flags column and the overlap table sits in the Truth labels tab", "<th>Finding</th><th>Flags</th>" in source and "{marker_overlap_html}{exclusion_html}</section>" in source
           and "Marker databases shared with benchmarked tools" in source and "Not run: no marker-overlap table" in source)
     check("the report takes --truth-marker-overlap", "--truth-marker-overlap" in source and "Chromid candidate" in report.GLOSSARY)
     stage = (ROOT / "scripts" / "06_aggregate.sh").read_text(encoding="utf-8")
