@@ -36,6 +36,10 @@ history is lost, only the numbering is cleaner. See
 - Fixed: the documented command `plasbench plaseval-replication` does not exist; it is `plasbench analysis plaseval-replication` (README-level docs, FAQ, replication guide).
 
 
+### Changed -- the real-tool check uses real reads for plasmidSPAdes and measures recovery
+- plasmidSPAdes is now checked on **real reads** of a known isolate (SRR11905452, *E. coli* EcPF14, first 600,000 pairs; the plasmid is NZ_CP054231.1, 7,154 bp; `cohorts/public-v1.tsv` `upec_ecpf14`), because it picks plasmids by copy number against a chromosome and called nothing on synthetic or lone-plasmid reads. MOB-suite and Platon keep the pBR322 fixture.
+- New measure **`plasmid_recovered`**: the fraction of the plasmid's 31-mers (either strand) found in what the tool called plasmid. The existing share compares sizes only. It exposed that plasmidSPAdes, which called 50 kb (share 7.0), returned **0.099** of the real plasmid; MOB-suite and Platon return 1.0. A tool recovering none of the plasmid fails; `expected.tsv` has a `min_recovered` column (mob_recon 0.9, platon 0.9, plasmidspades 0.05, set from the 2026-11-17 run as a regression guard, not as a standard of performance).
+- The summary table gains `plasmid_recovered` and `expected_min_recovered` (appended).
 ### Added -- the verification items that were left open
 - **Independent-truth runs:** `plasbench run --independent-truth-only` runs only the isolates whose truth is independent of the benchmark's reads (1,099 of the 7,227 in `public-v4`); with `--max-isolates N` the N is a balanced selection of those. The cohort file and its lock are unchanged.
 - **Negative controls:** `plasbench discover-cohort --negative-controls` (and `discover_ncbi_cohort.py --negative-controls`) looks for complete genomes whose record declares no plasmid, paired with an Illumina run, as candidates for plasmid-free isolates. None has been added to a cohort yet: the live discovery and a curator's check are still to do.
