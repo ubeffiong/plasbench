@@ -388,6 +388,8 @@ correctly abstained. Precision *is* still a real, defined number whenever someth
 *was* predicted on such an isolate (TP is always 0 there, so precision is exactly
 0.0 — a genuine, meaningful "of what you predicted, none was correct").
 
+The same rule applies to the binning metrics from `score_bins.py` (`bin_precision`, `bin_recall`, `bin_f1`, `lw_bin_precision`, `lw_bin_recall`, `lw_bin_f1` and the strict variants): on an isolate with no true plasmid they are empty, precision is 0.0 when something was binned, and the isolate does not enter the mean.
+
 The converse case is **not** undefined. On an isolate that *has* true plasmid, a
 tool that predicts nothing (empty output, or every alignment filtered out) has
 recall 0 and therefore **F1 = 0**, even though its precision stays empty. Earlier

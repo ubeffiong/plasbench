@@ -92,7 +92,9 @@ SETTING_VARIANTS = (
     ("min_length=100", {"min_length": 100}),
     ("min_length=500", {"min_length": 500}),
 )
-METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge50", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "lw_bin_f1", "contig_f1_bp", "contig_bin_f1_bp")
+METRIC_VARIANTS = ("strict_f1", "plasmid_recall", "plasmid_recall_ge50", "plasmid_recall_ge90", "mcc", "f2", "f0_5", "lw_bin_f1", "lw_bin_f1_strict", "contig_f1_bp", "contig_bin_f1_bp")
+# lw_bin_f1_strict also charges sequence a tool put in a bin that aligns nowhere. The headline lw_bin_f1 does not, so a tool can pad its bins and keep first place;
+# the metric:lw_bin_f1_strict row shows whether the ranking survives that (it is a sensitivity row, never the pre-registered endpoint).
 CPRR_THRESHOLDS = ("0.80", "0.90", "0.95", "0.99")
 
 

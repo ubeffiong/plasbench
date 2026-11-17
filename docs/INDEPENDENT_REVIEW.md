@@ -428,11 +428,11 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E10 | Pipeline default MAPQ is 20 | `config/config.sh:543` | `MIN_ALIGNMENT_MAPQ` |
 | E11 | Pipeline default query coverage is 0.20 | `config/config.sh:544` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
 | E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:786` | `0.99995` |
-| E13 | Bin purity gate default 0.9 | `python/score_bins.py:380` | `--min-bin-purity` |
-| E14 | Split threshold default 0.1 | `python/score_bins.py:381` | `--split-threshold` |
-| E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:318` | `def length_weighted_binning` |
+| E13 | Bin purity gate default 0.9 | `python/score_bins.py:390` | `--min-bin-purity` |
+| E14 | Split threshold default 0.1 | `python/score_bins.py:391` | `--split-threshold` |
+| E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:323` | `def length_weighted_binning` |
 | E16 | Ungated one-to-one Hungarian match | `python/score_bins.py:53` | `def maximum_weight` |
-| E17 | CPRR is computed after the match | `python/score_bins.py:330` | `def correct_reconstruction` |
+| E17 | CPRR is computed after the match | `python/score_bins.py:340` | `def correct_reconstruction` |
 | E18 | CPRR minimum coverage 0.95 | `config/config.sh:64` | `CPRR_MIN_COVERAGE` |
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
 | E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:175` | `or len(units) < MIN_CLUSTERS_CI or _has_nan(values)` |
@@ -445,11 +445,11 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:101` | `PRIMARY_UNAVAILABLE = "unavailable"` |
 | E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:110` | `min_species_clusters=20` |
 | E29 | Ranking set is shared across all tools in the group | `python/headline_design.py:331` | `def shared_values` |
-| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:268` | `def build_variants` |
+| E30 | Robustness variants are built from base F1 | `python/rank_sensitivity.py:270` | `def build_variants` |
 | E31 | Power analysis uses a normal approximation | `python/power_analysis.py:69` | `NormalDist().inv_cdf` |
 | E32 | Plasmid replicons under the long-read depth floor become ambiguous (default 5x) | `python/label_truth_evidence.py:154` | `--min-long-read-depth` |
 | E33 | Tier is decided from strategy, polish and cohort tier | `python/truth_provenance.py:319` | `reference_tier, tier_reason = tier(` |
-| E34 | Circularity guard for long-read tools | `scripts/lib.sh:230` | `truth_independent_of_long_reads` |
+| E34 | Circularity guard for long-read tools | `scripts/lib.sh:263` | `truth_independent_of_long_reads` |
 | E35 | Date-based overlap screen | `python/flag_database_overlap.py:101` | `possible_overlap` |
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:242` | `lambda was selected on the same LOSO folds` |
