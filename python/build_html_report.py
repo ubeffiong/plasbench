@@ -601,6 +601,7 @@ def consistency_banner(results_dir):
         rows = read_tsv(path) if path.is_file() else []
     except (OSError, ValueError):
         rows = []
+    rows = [r for r in rows if r.get("severity", "error") == "error"]
     if not rows:
         return ""
     kinds = Counter(r.get("kind", "") for r in rows)

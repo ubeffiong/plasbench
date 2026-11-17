@@ -97,6 +97,12 @@ with tempfile.TemporaryDirectory() as d:
     r = aggregate(d)
     check("the stale rows stop the aggregation", r.returncode != 0 and "duplicate_run" in r.stderr, r.stderr[-300:])
 
+    # a sample missing from the sheet is a warning only (the sheet in use is often not the run's own)
+    build(d)
+    write(os.path.join(d, "samples.tsv"), ["sample_id", "organism", "sample_origin", "source_study"], [["s1", "Escherichia coli", "clinical", "study0"]])
+    r = aggregate(d)
+    check("samples missing from the sheet warn but do not stop the aggregation", r.returncode == 0 and "unknown_sample" in open(os.path.join(d, "benchmark.input_consistency.tsv")).read(), r.stderr[-300:])
+
     # malformed numbers
     build(d)
     text = open(os.path.join(d, "scores.tsv")).read().replace(TAB + "0.8" + TAB + "1.0" + TAB + "1" + NL, TAB + "NaNx" + TAB + "1.0" + TAB + "1" + NL, 1)

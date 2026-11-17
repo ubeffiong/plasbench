@@ -1377,9 +1377,12 @@ def main():
         raise SystemExit("No score rows found in " + args.scores)
     findings = run_consistency.check(args.scores, args.tool_status, str(Path(args.scores).with_name("score_failures.tsv")), args.sample_sheet)
     run_consistency.write(args.out_prefix + ".input_consistency.tsv", findings)
-    if findings:
+    errors = [f for f in findings if f["severity"] == "error"]
+    if findings and not errors:
+        print("[aggregate] note: " + run_consistency.summary(findings))
+    if errors:
         message = ("the run tables disagree, so a ranking from them could be built on missing, stale or duplicated runs:" + chr(10)
-                   + run_consistency.summary(findings))
+                   + run_consistency.summary(errors))
         if not args.allow_inconsistent_runs:
             raise SystemExit("ERROR: " + message + chr(10) + "Fix or remove the stale rows, or set ALLOW_INCONSISTENT_RUNS=1 to rank anyway (the report then carries a warning banner).")
         print("[aggregate] WARNING: " + message)

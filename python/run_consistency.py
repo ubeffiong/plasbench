@@ -7,9 +7,9 @@ same runs, and reports every disagreement, because each one changes a ranking wi
   duplicate_run            the same sample and tool scored twice (an old run left in the folder); the averages mix both
   completed_without_score  a run finished, but it has no score row and no recorded scoring failure; the tool is then ranked on fewer samples
   score_without_status     a score row for a run the status table does not know (a stale or foreign row)
-  unknown_sample           a score row for a sample that is not in the sample sheet
+  unknown_sample           a score row for a sample that is not in the sample sheet (a WARNING: the sheet in use is often a different file from the run's own)
 
-All four are errors: aggregation stops unless ALLOW_INCONSISTENT_RUNS=1 (--allow-inconsistent-runs), in which case the findings are written to
+The first three are errors: aggregation stops unless ALLOW_INCONSISTENT_RUNS=1 (--allow-inconsistent-runs), in which case the findings are written to
 benchmark.input_consistency.tsv and the report puts a banner above the leaderboard. A run that failed, timed out or was skipped is not a finding: those
 are scored zero or left out by the ranking rules and shown in Run health.
 """
@@ -20,6 +20,7 @@ from collections import Counter
 
 SHOULD_HAVE_SCORE = {"completed", "reused"}
 FIELDS = ["kind", "severity", "sample", "tool", "detail"]
+WARNING_KINDS = {"unknown_sample"}
 
 
 def _rows(path):
@@ -56,7 +57,7 @@ def check(scores_path, status_path=None, failures_path=None, sample_sheet=None):
         if known:
             for sample in sorted({s for s, _ in scored} - known):
                 found.append(("unknown_sample", sample, "", "not in the sample sheet"))
-    return [dict(zip(FIELDS, (kind, "error", sample, tool, detail))) for kind, sample, tool, detail in found]
+    return [dict(zip(FIELDS, (kind, "warning" if kind in WARNING_KINDS else "error", sample, tool, detail))) for kind, sample, tool, detail in found]
 
 
 def write(path, findings):
@@ -86,7 +87,7 @@ def main(argv=None):
     if args.out:
         write(args.out, findings)
     print(summary(findings) if findings else "run tables agree")
-    return 1 if findings else 0
+    return 1 if any(f["severity"] == "error" for f in findings) else 0
 
 
 if __name__ == "__main__":
