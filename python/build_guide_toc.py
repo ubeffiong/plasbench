@@ -122,7 +122,8 @@ def main():
         return 1 if stale else 0
     for path, new in ((guide_path, new_guide), (readme_path, new_readme)):
         if path in stale:
-            path.write_text(new, encoding="utf-8", newline="\n")
+            with open(path, "w", encoding="utf-8", newline="\n") as _fh:
+                _fh.write(new)
             print(f"{path}: contents list updated")
     if not stale:
         print("guide and README contents lists already current")

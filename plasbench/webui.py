@@ -165,7 +165,8 @@ class Project:
             if key not in done and value is not None:
                 kept.append(f"export {key}={shlex.quote(str(value))}")
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(kept) + "\n", encoding="utf-8", newline="\n")
+        with open(path, "w", encoding="utf-8", newline="\n") as _fh:
+            _fh.write("\n".join(kept) + "\n")
         return self.local_env()
 
     # -- your own isolates: sheet template, folder scan, staging, quick check (python/intake.py) -------------------------
@@ -1613,7 +1614,8 @@ def make_handler(project: Project, jobs: Jobs):
             if target.exists() and not overwrite:
                 return {"ok": False, "exists": True, "problems": [f"{target} already exists"], "path": str(target)}
             folder.mkdir(parents=True, exist_ok=True)
-            target.write_text(text.replace("\r\n", "\n"), encoding="utf-8", newline="\n")
+            with open(target, "w", encoding="utf-8", newline="\n") as _fh:
+                _fh.write(text.replace("\r\n", "\n"))
             return {"ok": True, "path": str(target), "folder": str(folder)}
 
     return Handler

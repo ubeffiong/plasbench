@@ -72,7 +72,22 @@ jobs:
       - name: Simulate reads for plasmidSPAdes
         if: matrix.tool == 'plasmidspades'
         shell: micromamba-shell {0}
-        run: wgsim -N 5000 -1 150 -2 150 -e 0.001 -r 0 work/fixture.fasta work/r1.fq work/r2.fq
+        run: |
+          # plasmidSPAdes finds plasmids by their copy number relative to the chromosome, so a lone plasmid gives it nothing to compare
+          # (it assembles fine and calls nothing plasmid). Simulate a 100 kb random background at about 30x beside the plasmid at about 300x (ordinary short-read depths; at 8x the pairs did not anchor and nothing was called).
+          python -c "import random; r = random.Random(11); print('>background'); print(''.join(r.choice('ACGT') for _ in range(100000)))" > work/background.fasta
+          wgsim -N 4400 -1 150 -2 150 -e 0.001 -r 0 work/fixture.fasta work/p1.fq work/p2.fq
+          wgsim -N 10000 -1 150 -2 150 -e 0.001 -r 0 work/background.fasta work/b1.fq work/b2.fq
+          cat work/p1.fq work/b1.fq > work/r1.fq
+          cat work/p2.fq work/b2.fq > work/r2.fq
+      - name: Give the simulated reads varied qualities
+        if: matrix.tool == 'plasmidspades'
+        run: |
+          # wgsim writes one constant quality character, from which SPAdes' BayesHammer cannot infer the PHRED offset ("Failed to determine offset!").
+          # Real reads vary, so vary these (Phred+33, 20-40); the bases are untouched.
+          for f in work/r1.fq work/r2.fq; do
+            awk 'BEGIN{srand(7)} NR%4==0{q=""; for(i=1;i<=length($0);i++) q=q sprintf("%c",53+int(rand()*20)); print q; next} {print}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          done
       - name: Run the real tool and check its output
         shell: micromamba-shell {0}
         run: |

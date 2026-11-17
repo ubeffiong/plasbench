@@ -64,7 +64,8 @@ def limit_sheet(source, limit: int, dest_dir, order: str = "balanced") -> Limite
     what = ("a balanced selection (spread across species, studies and recent / older)" if balanced else "the first rows, in file order")
     note = f"# PlasBench --max-isolates {limit}: {limit} of {total} isolates of {source.name}, {what}.\n"
     body = [header if header.endswith("\n") else header + "\n"] + [row if row.endswith("\n") else row + "\n" for row in chosen]
-    out.write_text(note + "".join(body), encoding="utf-8", newline="")
+    with open(out, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write(note + "".join(body))
     return Limited(out, total, limit)
 
 

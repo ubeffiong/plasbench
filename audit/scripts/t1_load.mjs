@@ -1,0 +1,15 @@
+import { launch } from "./cdp.mjs";
+import fs from "node:fs";
+const SP = process.argv[2];
+const url = JSON.parse(fs.readFileSync(`${SP}/ui/uihome/server.json`, "utf8")).url;
+const b = await launch({ profile: `${SP}/ui/chrome1` });
+await b.send("Page.navigate", { url });
+await b.sleep(4000);
+console.log("title:", await b.evalJS("document.title"));
+console.log("url now (token stripped?):", await b.evalJS("location.href"));
+await b.shot(`${SP}/ui/shots/home.png`);
+const nav = await b.evalJS(`[...document.querySelectorAll('nav a, nav button, [data-page], .rail a, .rail button')].map(e=>({t:(e.innerText||e.title||'').trim().slice(0,30),p:e.dataset.page||e.getAttribute('href')||e.id}))`);
+console.log("nav:", JSON.stringify(nav));
+console.log("ids count:", await b.evalJS("document.querySelectorAll('[id]').length"), " buttons:", await b.evalJS("document.querySelectorAll('button').length"), " tabindex:", await b.evalJS("document.querySelectorAll('[tabindex]').length"));
+console.log("console errors:", JSON.stringify(b.consoleErrors(), null, 1));
+await b.close();
