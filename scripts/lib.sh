@@ -581,8 +581,19 @@ wait_online() {
     log "  internet is back: download resumed"
 }
 
+# download_pin LABEL URL: print the SHA-256 that config/download_checksums.tsv (override: PLASBENCH_DOWNLOAD_CHECKSUMS) pins for LABEL, or nothing.
+# A registry row applies to its own URL only (a custom URL gets no pin); a row with an empty url applies to any URL. Rows with status other than
+# "pinned", or a sha256 that is not 64 hex characters, give no pin (AU-026).
+download_pin() {
+    local label="$1" url="${2:-}" registry="${PLASBENCH_DOWNLOAD_CHECKSUMS:-${PROJECT_ROOT:-.}/config/download_checksums.tsv}"
+    [[ -f "$registry" ]] || return 0
+    awk -F'\t' -v label="$label" -v url="$url" '
+        NR > 1 && $1 == label && $5 == "pinned" && length($3) == 64 && $3 ~ /^[0-9A-Fa-f]+$/ && ($2 == "" || $2 == url) { print tolower($3); exit }' "$registry"
+}
+
 # verify_or_record_download FILE URL LABEL [EXPECTED_SHA256] [PROVENANCE_FILE]
 # Supply-chain check for a downloaded database or archive. Where a SHA-256 is configured, a mismatch fails (returns 1; the caller deletes the file).
+# EXPECTED_SHA256 defaults to the pin in config/download_checksums.tsv (see download_pin); PLASBENCH_REQUIRE_CHECKSUMS=1 refuses a download with no pin.
 # Where none is configured, the observed checksum is printed with an explicit notice and appended as one JSON line to PROVENANCE_FILE
 # (default: download_provenance.jsonl next to FILE), so the run can be traced to the exact bytes that were installed. Never fails on a missing pin.
 verify_or_record_download() {
@@ -591,6 +602,11 @@ verify_or_record_download() {
     elif have shasum; then got="$(shasum -a 256 "$file" | awk '{print $1}')"
     else got="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$file" 2>/dev/null || true)"; fi
     [[ -n "$got" ]] || { warn "$label: no SHA-256 tool found; the download could not be checksummed"; return 0; }
+    [[ -n "$want" ]] || want="$(download_pin "$label" "$url")"
+    if [[ -z "$want" && "${PLASBENCH_REQUIRE_CHECKSUMS:-0}" == "1" ]]; then
+        warn "$label: no SHA-256 is pinned (environment variable or config/download_checksums.tsv) and PLASBENCH_REQUIRE_CHECKSUMS=1; refusing it. Observed SHA-256: $got"
+        return 1
+    fi
     if [[ -n "$want" ]]; then
         if [[ "$got" != "$(printf '%s' "$want" | tr 'A-F' 'a-f')" ]]; then
             warn "$label: SHA-256 $got does not match the pinned $want"
