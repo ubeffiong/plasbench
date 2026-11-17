@@ -4,7 +4,7 @@
 # across containers) rather than baked in at build time. Baking a live,
 # unpinned, unchecksummed network fetch into the image would make builds
 # non-reproducible and fail the whole build on any network hiccup.
-FROM mambaorg/micromamba@sha256:e3797091302382ea841498bc93a7b0a50f7c1448333d5e946d2d1608d0c5f43d
+FROM mambaorg/micromamba@sha256:e1476182cd40eb1f7c0cfae4adec9bfd78f3d7f05c61368306abfdc8939c1198
 
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
