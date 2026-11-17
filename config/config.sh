@@ -138,7 +138,6 @@ export DIMER_MIN_HALF_COVERAGE="${DIMER_MIN_HALF_COVERAGE:-0.90}"
 # provenance) is a sensitivity analysis. The headline averages per-species
 # means over species with at least MIN_SPECIES_CLUSTERS independent
 # (non-clonal) clusters; smaller species are described only.
-export HEADLINE_MAX_REFERENCE_TIER="${HEADLINE_MAX_REFERENCE_TIER:-2}"
 export MIN_SPECIES_CLUSTERS="${MIN_SPECIES_CLUSTERS:-20}"
 # Clonal clusters (python/clonal_groups.py): isolates whose chromosomes are
 # within this Mash distance are treated as one clonal unit.
@@ -805,7 +804,7 @@ export STATS_VALIDATION_MODE="${STATS_VALIDATION_MODE:-smoke}"
 export CHROMID_MIN_BP="${CHROMID_MIN_BP:-350000}"
 # A PLASMID of at least this many bases is flagged large_plasmid by the truth audit (advisory; it never excludes a sample).
 export LARGE_PLASMID_BP="${LARGE_PLASMID_BP:-500000}"
-# Bases either side of an AMR gene copy whose coverage by the same predicted record is its flank context (python/score_amr_placement.py). Descriptive, never ranks a tool; pre-registration row amr_flank_bp (proposed).
+# Bases either side of an AMR gene copy whose coverage by the same predicted record is its flank context (python/score_amr_placement.py). Descriptive, never ranks a tool; pre-registration row amr_flank_bp.
 export AMR_FLANK_BP="${AMR_FLANK_BP:-1000}"
 # Highest reference tier the primary analysis accepts (1 = long-read-first and independently validated, 2 = long-read-first, 3 = anything else). Pre-registration row headline_max_reference_tier.
 export HEADLINE_MAX_REFERENCE_TIER="${HEADLINE_MAX_REFERENCE_TIER:-2}"
@@ -820,17 +819,17 @@ export PLASBENCH_CI_METHOD="${PLASBENCH_CI_METHOD:-cluster_t}"
 # cluster_t in every simulated stratified design and 6 points better with a dominant species), cluster_t or percentile. Pre-registration row interval_method_stratified.
 export PLASBENCH_CI_METHOD_STRATIFIED="${PLASBENCH_CI_METHOD_STRATIFIED:-bootstrap_t}"
 # Independent clusters (BioProjects or clonal groups) the references in those tiers must come from for the primary analysis to be available. Below it the ranking is shown as provisional:
-# a headline from fewer clusters has no interval and no test. Default 5 is the interval minimum (MIN_CLUSTERS_CI). Pre-registration row headline_min_clusters (proposed).
+# a headline from fewer clusters has no interval and no test. Default 5 is the interval minimum (MIN_CLUSTERS_CI). Pre-registration row headline_min_clusters.
 export HEADLINE_MIN_CLUSTERS="${HEADLINE_MIN_CLUSTERS:-5}"
 # 1 (default) runs the ranking-robustness sweeps (python/rank_sensitivity.py) in stage 6; 0 skips them.
 export RUN_RANK_SENSITIVITY="${RUN_RANK_SENSITIVITY:-1}"
 # Evaluation independence the primary analysis accepts (comma-separated from independent, partially_independent, dependent, unknown), in ADDITION to reference tier <= HEADLINE_MAX_REFERENCE_TIER.
-# Default "independent": long-read-first truth polished with no reads or reads independent of the benchmark. Sensitivity analyses add partially independent, then every reference. Pre-registration row headline_independence (proposed).
+# Default "independent": long-read-first truth polished with no reads or reads independent of the benchmark. Sensitivity analyses add partially independent, then every reference. Pre-registration row headline_independence.
 export HEADLINE_INDEPENDENCE="${HEADLINE_INDEPENDENCE:-independent}"
 # Processes the statistics simulation (python/simulate_validation.py) uses in stage 6 (1 = one process). It never changes a number; the full mode takes minutes with 8 or more.
 export STATS_VALIDATION_WORKERS="${STATS_VALIDATION_WORKERS:-1}"
 # A study that holds more than this share of the isolates makes the default interval fall back to the percentile cluster bootstrap (the full simulation found cluster-t covers only 64-79% then).
-# PLASBENCH_DOMINANT_FALLBACK=0 turns the fallback off. Pre-registration row dominant_study_share (proposed).
+# PLASBENCH_DOMINANT_FALLBACK=0 turns the fallback off. Pre-registration row dominant_study_share.
 export PLASBENCH_DOMINANT_SHARE="${PLASBENCH_DOMINANT_SHARE:-0.30}"
 export PLASBENCH_DOMINANT_FALLBACK="${PLASBENCH_DOMINANT_FALLBACK:-1}"
 
