@@ -182,7 +182,8 @@ if [[ "${RUN_PLASMIDHUNTER:-0}" -eq 1 ]]; then
 fi
 if [[ "${RUN_PLASMIDEC:-0}" -eq 1 ]]; then
     # PlasmidEC installs its own conda environments and databases on first use, so only the launcher is checked here.
-    check_tool "${PLASMIDEC_CMD%% *}" ""
+    plasmidec_bin="${PLASMIDEC_CMD%% *}"
+    check_tool "$plasmidec_bin" ""
 fi
 if [[ "${RUN_PLASMER:-0}" -eq 1 ]]; then
     check_tool Plasmer plasmer
