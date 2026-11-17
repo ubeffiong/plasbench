@@ -68,6 +68,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plasbench_common import subprocess_timeout  # noqa: E402
+
 
 def read_truth(path):
     """sequence_id -> (molecule_type, length)."""
@@ -111,7 +114,7 @@ def run_genomad(genomad_path, fasta, out_dir, genomad_db_parent, threads):
     caller could get subtly wrong."""
     genomad_db = Path(genomad_db_parent) / "genomad_db"
     command = [genomad_path, "end-to-end", "--threads", str(threads), str(fasta), str(out_dir), str(genomad_db)]
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=subprocess_timeout())
     if result.returncode != 0:
         sys.stderr.write(f"[audit_three_class_scoring] genomad failed (exit {result.returncode}):\n{result.stderr[-2000:]}\n")
         return None

@@ -693,9 +693,23 @@ class Jobs:
         state = job.get("state", "")
         if state == "running" and jobrunner.is_stalled(str(self.dir), job["id"]):
             return "stalled"
+        if state == "running" and self._is_retrying(job["id"]):
+            return "retrying"
         if state == "done" and job.get("warnings"):
             return "completed_with_warnings"
         return state
+
+    RETRY_LINE = re.compile(r"failed \(exit \d+\); retry (\d+) of (\d+)")
+
+    def _is_retrying(self, job_id: str) -> bool:
+        """True when the last line the run printed is stage 4's "<sample> / <tool> failed (exit N); retry K of M" notice: a tool failed and is being run again (AU-010).
+        Derived from the output, like `stalled`, so it ends as soon as the run prints anything else. `queued` (waiting for a free slot) is not shown: the window runs one benchmark at a time."""
+        try:
+            tail = _tail_bytes(self._paths(job_id)["log"], 2000).decode("utf-8", "replace")
+        except OSError:
+            return False
+        lines = [line for line in tail.splitlines() if line.strip()]
+        return bool(lines) and self.RETRY_LINE.search(lines[-1]) is not None
 
     def _reap_orphans(self, job_id: str):
         """The runner is gone (killed with SIGKILL, which nothing can catch) but the command it started may still be going, with nothing watching it. Stop the whole process group

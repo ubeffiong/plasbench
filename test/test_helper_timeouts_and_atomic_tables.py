@@ -75,7 +75,8 @@ os.environ.pop("PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS", None)
 # static scan: the helper scripts that were fixed carry a timeout on every run/call/check_* call
 FIXED = ["annotate_proteins", "assembly_selection", "baseline_predictors", "build_hybrid_truth", "clonal_groups", "copy_number", "database_containment",
          "detect_dimers", "fetch_ena_reads", "intake", "prepare_contribution", "qc_pilot", "run_quast_diagnostics", "simulate_reads",
-         "user_tool_adapter", "export_report_pdf", "prereg_admin", "make_depth_ladder", "make_read_quality_ladder", "compute_difficulty_features"]
+         "user_tool_adapter", "export_report_pdf", "prereg_admin", "make_depth_ladder", "make_read_quality_ladder", "compute_difficulty_features",
+         "audit_three_class_scoring", "compare_scoring_methods", "build_implementation_catalogue"]
 missing = []
 for name in FIXED:
     tree = ast.parse(open(os.path.join(PY, name + ".py"), encoding="utf-8").read())

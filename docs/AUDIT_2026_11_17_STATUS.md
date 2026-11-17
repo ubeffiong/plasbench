@@ -1,6 +1,6 @@
 # Status of the 17 November 2026 audit findings
 
-The audit (`audit-2026-11-17/AUDIT_REPORT.md`, `ISSUE_REGISTER.tsv`) raised 53 findings. Status after the fixes in this change: **34 fixed, 11 partial, 8 not fixed.** A finding is `FIXED` only when a test fails on the old code and passes on the new; the web window and CSP changes were checked by headers, static HTML and reasoning, not in a browser.
+The audit (`audit-2026-11-17/AUDIT_REPORT.md`, `ISSUE_REGISTER.tsv`) raised 53 findings. Status after the fixes in this change: **39 fixed, 6 partial, 8 not fixed.** A finding is `FIXED` only when a test fails on the old code and passes on the new; the web window and CSP changes were checked by headers, static HTML and reasoning, not in a browser.
 
 | ID | Severity | Status | Note |
 |---|---|---|---|
@@ -12,8 +12,8 @@ The audit (`audit-2026-11-17/AUDIT_REPORT.md`, `ISSUE_REGISTER.tsv`) raised 53 f
 | AU-006 | High | FIXED | Nine of the 1,099 'independent' (long-read-only, polish none) isolates are not independent: six name an Illumi... |
 | AU-007 | High | FIXED | 'Runs completed' is completed/scored with no clamp: the shipped real-cohort report shows 1000% (10/1), which l... |
 | AU-008 | High | FIXED | 12 of 16 adapters exit 0 with an empty prediction when the tool's output is missing; the guard accepts any fil... |
-| AU-009 | High | PARTIAL | process-group cancel and orphan recovery added; SIGKILL cannot be trapped, pid reuse can cause a false refusal, WSL pids differ from Windows pids |
-| AU-010 | High | PARTIAL | `stalled` and `completed_with_warnings` shown; no default tool timeout (the confirmed default is no limit, and a limit would change scores) |
+| AU-009 | High | PARTIAL | process-group cancel, orphan recovery and a mkdir guard around the stale-lock check/remove/create (`test_run_lock_race.sh`: 8 simultaneous starters over one stale lock, exactly one wins). Residual: SIGKILL cannot be trapped and leaves the lock until the next start; the lock is pid based, so pid reuse can cause a false refusal and WSL pids differ from Windows pids; a guard left by a killed starter is reclaimed when its pid is dead (a small window of its own); a live guard owner is waited for ~10 s, then the start is refused |
+| AU-010 | High | PARTIAL | `stalled`, `completed_with_warnings` and now `retrying` (derived from the run's last output line, `test_job_retrying_state.py`) shown. Not done: `queued` (the window runs one benchmark at a time, so there is nothing to queue behind); stall detection from CPU time; a default tool timeout (the confirmed default is no limit, and a limit would change scores) |
 | AU-011 | High | FIXED | Stage 4 exits 0 when every tool failed; the run continues to the report, and the job shows done at 100%.... |
 | AU-012 | High | FIXED | A tool marked failed that still has score rows is not flagged; a blank metric is silently dropped (a tool's me... |
 | AU-013 | High | FIXED | The shared-sample restriction is a cliff: a tool silently absent from samples shrinks everyone's ranking set (... |
@@ -29,25 +29,25 @@ The audit (`audit-2026-11-17/AUDIT_REPORT.md`, `ISSUE_REGISTER.tsv`) raised 53 f
 | AU-023 | Medium | FIXED | runner counts skipped checks; `REQUIRE_NO_SKIPS=1` fails on any (CI workflow not edited: needs workflow scope) |
 | AU-024 | Medium | FIXED | Commands typed into the terminal are stored verbatim in sessions.jsonl and terminal_history.jsonl (including e... |
 | AU-025 | Medium | FIXED | The commit scanner misses password: in .yml, ZENODO_TOKEN= in .cfg and NCBI_API_KEY= in a file named config.lo... |
-| AU-026 | Medium | PARTIAL | download checksums verified or recorded for Platon, PlaScope and MOB-suite; release, Dockerfile and gplas2 pinning not done |
+| AU-026 | Medium | PARTIAL | `config/download_checksums.tsv` registry read by `verify_or_record_download` and `env/download_plsdb.sh`; `PLASBENCH_REQUIRE_CHECKSUMS=1` refuses an unpinned download; the Dockerfile verifies the gplas2 archive when `GPLAS2_SHA256` is given; Platon, PlaScope and MOB-suite checksums verified or recorded (`test_download_checksum_registry.py`). Not done: no value in the registry is pinned, because none could be verified offline from the repository (every row says `unpinned`); the registry is not yet enforced by default; release checksums still come from the same host; the container image digest is already pinned |
 | AU-027 | Medium | FIXED | truth_technology and truth_assembly_strategy disagree on 101 rows (66 long_read vs long_read_first_hybrid, 32... |
 | AU-028 | Medium | FIXED | All 7,227 rows are curation grade B, so Tier 1 and grade A are unreachable; the tier-1 population is empty and... |
 | AU-029 | Low | FIXED | identity_valid returns True when a sample has no provenance record, applying identity criteria with unknown po... |
 | AU-030 | Medium | FIXED | Stage 8 checks only that pred_<tool>.plasmid.fasta is non-empty; an uninstalled tool is 'skipped' and an older... |
 | AU-031 | Medium | FIXED | Retries re-run the same command into the same output directory without cleanup (tools that refuse an existing... |
 | AU-032 | Medium | FIXED | Uses one global THREADS for every tool, so thread-seconds and CPU utilisation are wrong when per-tool threads... |
-| AU-033 | Medium | PARTIAL | stage timing and per-attempt resources recorded; blank-memory note untested |
+| AU-033 | Medium | FIXED | stage timing and per-attempt resources recorded; the blank-memory note is tested with `PLASBENCH_TIME_BIN` pointing at nothing (`test_stage4_preflight_and_fasta.sh`); free disk is checked with a warning, not a hard stop |
 | AU-034 | Low | NOT FIXED | needs a measured pilot, not code |
-| AU-035 | Low | PARTIAL | failure reasons, database pre-flight for three tools and empty-cohort checks; malformed-FASTA check and other tools' pre-flight not done |
+| AU-035 | Low | FIXED | failure reasons, empty-cohort checks, a stage-4 malformed-prediction-FASTA check (`python/check_prediction_fasta.py`; the run is failed at stage 4 and loses its completion marker) and database pre-flight for Platon, geNomad, PLASMe, PlaScope, plsMD and MOB-suite (not launched, recorded as an infrastructure failure with the path). Plasmer keeps its earlier `skipped` row for a missing database (already pre-flighted); Plassembler and Hybracter are pre-flighted in stage 7, not stage 4 |
 | AU-036 | Low | FIXED | The compression-ratio check runs only above 50 MB and the cap is 8 GiB, so a low-ratio bomb below 8 GiB is acc... |
 | AU-037 | Low | FIXED | Windows reserved names (CON) and a trailing dot (foo. aliases foo) are accepted as study names.... |
 | AU-038 | Low | FIXED | config/local.env (holding the NCBI key) is written with the default umask; some scripts send the NCBI key in U... |
-| AU-039 | Low | PARTIAL | Forget, remote Remove, Create on GitHub, git sign-in wired; `git/show` deliberately unwired |
+| AU-039 | Low | FIXED | Forget, remote Remove, Create on GitHub, git sign-in wired; `git/show` is now the Copy patch button of the commit page (`test_window_git_show_and_rank_help.py` also checks that no served git GET route lacks a control) |
 | AU-040 | Low | FIXED | Two validate calls have no catch (Start/Run keep their previous state on a network error); ~30 empty catch blo... |
-| AU-041 | Medium | PARTIAL | one task vocabulary, task explanation and leaderboard download; rank help and exit-0 wording not done |
+| AU-041 | Medium | FIXED | one task vocabulary, task explanation, leaderboard download, a "How to read a rank" note and leader tooltips on the Runs page, and an exit-0 run with failed tool runs is worded "Completed with warnings" (toast and state chip) with an explanation of what the report covers. Checked by static HTML tests and a script syntax check, not in a browser |
 | AU-042 | Low | FIXED | Stale counts: '23 tools and three baselines' (20 real tools + 3 baselines + 5 demo stand-ins), 58 CLI subcomma... |
 | AU-043 | Low | FIXED | seven dead functions removed; `GPLAS_THREADS` kept (documented as having no effect on gplas) |
-| AU-044 | Low | PARTIAL | 21 subprocess sites bounded; five Popen pipelines and three analysis scripts left |
+| AU-044 | Low | FIXED | every `subprocess.run/call/check_*` in `python/` carries the helper timeout (an AST scan over the covered scripts, now including the three analysis scripts), and the five Popen pipelines (make_depth_ladder, make_read_quality_ladder, measure_depth, simulate_reads, compute_difficulty_features) kill the producer on timeout (`test_popen_pipeline_timeouts.py`). The interactive launcher calls in `plasbench/` (cli, tools, terminal, install_git, taskkill, wslpath) are deliberately unbounded: a user waits on them |
 | AU-045 | Medium | PARTIAL | `classify_method` is now tested on real cohort tokens against an independent oracle and the cohort count is derived; the ledger and adversarial tests still pin line positions and known optimism |
 | AU-046 | Medium | NOT FIXED | needs real binaries and a scheduled job; not possible here |
 | AU-047 | Low | NOT FIXED | two definitions of gene recovery kept: choosing one changes scientific numbers and needs a decision |

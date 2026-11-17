@@ -337,7 +337,7 @@ dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:fl
 @media (max-width:640px){#chead{overflow-x:auto;scrollbar-width:thin}#chead .grow{flex:0 0 4px}}
 #cstate{font-size:11.5px;padding:0 6px;line-height:18px;border-radius:2px;border:1px solid var(--term-line);color:#aab3bd}
 #cstate:empty{display:none}
-#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.completed_with_warnings{color:#e3c27a;border-color:#6b5520}
+#cstate.running{color:#8cc3ff;border-color:#2e5f94}#cstate.done{color:#7fcf98;border-color:#2c6b40}#cstate.failed,#cstate.interrupted{color:#f1938a;border-color:#7a2f29}#cstate.cancelled,#cstate.stalled,#cstate.retrying,#cstate.completed_with_warnings{color:#e3c27a;border-color:#6b5520}
 #clog{flex:1;overflow:auto;margin:0;padding:6px 12px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
 /* console colour code, all three tabs: errors red, warnings yellow */
 .c-err,#clog .c-err,#tlog .t-err,#slog .s-bad{color:#ff6b6b;font-weight:600}
@@ -427,7 +427,7 @@ body.gd-open #gdrawer{transform:none}
 .tree li.study>.tn{font-weight:600;padding-top:5px;padding-bottom:5px;border-top:1px solid var(--line-2)}
 .tree li:not(.open)>ul{display:none}
 .sdot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--faint)}
-.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled,.sdot.stalled,.sdot.completed_with_warnings{background:var(--warn)}
+.sdot.running,.sdot.cancelling{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}.sdot.done{background:var(--ok)}.sdot.failed,.sdot.interrupted{background:var(--bad)}.sdot.cancelled,.sdot.stalled,.sdot.retrying,.sdot.completed_with_warnings{background:var(--warn)}
 /* git history colour code: you are here / pushed / not yet pushed / merge */
 .hdot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;background:var(--faint)}
 .hdot.head{background:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}.hdot.pushed{background:var(--ok)}.hdot.local{background:var(--warn)}
@@ -1258,7 +1258,7 @@ function stageLine(s) {
 function sessCard(s) {
   const pr = s.progress || {}, open = S.sessOpen.has(s.id);
   const dur = fmtDur((s.ended || Date.now() / 1000) - s.started);
-  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? "Stalled: no output for a while" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
+  const chip = {ongoing: s.state === "cancelling" ? "Cancelling" : s.display_state === "stalled" ? "Stalled: no output for a while" : s.display_state === "retrying" ? "Retrying a failed tool" : "Running", completed: s.display_state === "completed_with_warnings" ? "Completed with warnings" : "Completed"}[s.group] || ({failed: "Failed", interrupted: "Interrupted", cancelled: "Cancelled"}[s.state] || s.state);
   const pct = s.group === "completed" ? 100 : pr.percent;
   const bar = s.group === "ongoing" && pct == null ? `<div class="sbar ind"><i></i></div>` : `<div class="sbar"><i style="width:${pct == null ? (s.group === "attention" ? 8 : 0) : pct}%"></i></div>`;
   const run = s.run_index != null ? (S.runs || [])[s.run_index] : null;
@@ -1377,7 +1377,7 @@ async function refreshJobs() {
   if ($("#pjbadge")) { $("#pjbadge").hidden = !nrun; $("#pjbadge").textContent = nrun; }
 }
 const WARN_EXPLAIN = "The run finished (the process exited normally, exit 0) but at least one tool run failed. Scores and the report cover only the tools that worked; the failed ones and their reasons are listed in tool_status.tsv and the console output.";
-const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"Stalled (no output; may still be working)", completed_with_warnings:"Completed with warnings"})[s] || s;
+const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"Stalled (no output; may still be working)", retrying:"Retrying a failed tool", completed_with_warnings:"Completed with warnings"})[s] || s;
 function showConsole(id, expand) {
   if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
   $("#cjob").value = S.consJob || "";
