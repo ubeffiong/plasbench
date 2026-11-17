@@ -95,7 +95,7 @@ jobs:
             echo "### ${{ matrix.tool }}" >> "$GITHUB_STEP_SUMMARY"
             column -t -s$'\t' "work/summary.${{ matrix.tool }}.tsv" >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: real-tool-${{ matrix.tool }}
