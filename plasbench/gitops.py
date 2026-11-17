@@ -3,9 +3,10 @@
 Ported from GenoSuv's gitops.py (same design, same author), with PlasBench's data rules:
   * git is always called with an argument LIST (never through a shell), `GIT_TERMINAL_PROMPT=0` (no hidden prompt that
     hangs) and config hardening so a repository's own .git/config cannot make reading it run a program;
-  * what is tracked is your RUNS, not the program, one repository per STUDY: each study folder is its own repository,
-    whose managed "runs" .gitignore keeps the study's record, tables, reports, figures and logs and leaves raw
-    sequence data, tmp and credentials out. The PlasBench program folder is offered only when it already is a developer checkout (its
+  * what is tracked is your RUNS, not the program, in ONE repository in the WORKING DIRECTORY (the workspace that holds every study):
+    `git init` lives there, and its managed "runs" .gitignore keeps each study's record, tables, reports, figures and logs and leaves raw
+    sequence data, tmp and credentials out. A study that already has a repository of its own keeps it (it is left out of the working-directory
+    one). The PlasBench program folder is offered only when it already is a developer checkout (its
     own block keeps studies, results, downloads and credentials out of the program's history);
   * every commit is scanned first: reads/alignments/run folders, secrets (config/local.env holds the NCBI API key) and
     files over GitHub's 100 MB limit block it (data and secrets can be overridden only by typing a sentence; size not);
@@ -59,8 +60,8 @@ PROGRAM_HEAVY = ("reads", "alignments", "variants", "tracks", "indexes", "archiv
 # A study repository keeps study-level tables and reports only. Per-sample sub-folders (predictions, alignments,
 # truth, reads) and sample-data folders can carry sample identity or clinical detail, and so can files named for
 # patients, clinical data or line lists: they stay out, whatever their format.
-SAMPLE_DATA_IGNORE = ["results/*/", "data/", "reads/", "assembly/", "predictions*/", "metadata/", "clinical/",
-                      "patient*/", "**/*patient*", "**/*clinical*", "**/*linelist*"]
+SAMPLE_DATA_IGNORE = ["**/results/*/", "**/data/", "**/reads/", "**/assembly/", "**/predictions*/", "**/metadata/", "**/clinical/",
+                      "**/patient*/", "**/*patient*", "**/*clinical*", "**/*linelist*"]
 SAMPLE_DATA_PATTERNS = [
     (re.compile(r"(^|/)results/[^/]+/"), "per-sample output folder (sequence and sample-level files)"),
     (re.compile(r"(^|/)(data|reads|assembly|metadata|clinical|predictions[^/]*)/"), "sample data folder"),
@@ -99,7 +100,7 @@ SAFE_IGNORE = ("# --- PlasBench safety block (managed: keeps run outputs, large 
                "# --- end PlasBench safety block ---\n")
 
 RUNS_IGNORE = ("# --- PlasBench runs block (managed) ---\n"
-               "# This repository tracks a benchmark RUN (one study): its record (study.json), sample sheets, settings,\n"
+               "# This repository tracks benchmark RUNS (the studies of the working directory): each study's record (study.json), sample sheets, settings,\n"
                "# result tables (.tsv/.csv/.json), reports (.html/.pdf), figures and logs. Heavy data stays out: reads,\n"
                "# alignments (BAM/SAM/CRAM), variants, assemblies and sequences, indexes and databases, archives. They are\n"
                "# large, and a rerun re-creates them. Credentials never go in. PlasBench updates this block when its list\n"
@@ -545,6 +546,21 @@ def untrack(repo, paths: list) -> dict:
     return {"untracked": rel}
 
 
+def exclude_nested_repos(repo) -> list:
+    """Studies that already have a repository of their own are left out of this one (a local .git/info/exclude entry, not a tracked file)."""
+    repo = Path(repo)
+    nested = sorted(p.name for p in repo.iterdir() if p.is_dir() and not p.name.startswith(".") and (p / ".git").exists())
+    if nested:
+        info = repo / ".git" / "info"
+        info.mkdir(parents=True, exist_ok=True)
+        exclude = info / "exclude"
+        have = exclude.read_text(encoding="utf-8").splitlines() if exclude.exists() else []
+        add = [f"/{n}/" for n in nested if f"/{n}/" not in have]
+        if add:
+            exclude.write_text("\n".join(have + ["# studies with a repository of their own (PlasBench)"] + add) + "\n", encoding="utf-8")
+    return nested
+
+
 def init(repo, branch: str = "main", first_commit: bool = False, message: str = "Initial commit", kind: str = "runs") -> dict:
     repo = valid_repo(str(repo))
     branch = valid_branch(branch)
@@ -553,6 +569,9 @@ def init(repo, branch: str = "main", first_commit: bool = False, message: str = 
     run(repo, "init", "-b", branch)
     changed = ensure_gitignore(repo, kind)
     res = {"initialised": True, "gitignore_updated": changed}
+    nested = exclude_nested_repos(repo) if kind == "runs" else []
+    if nested:
+        res["left_out"] = nested
     if first_commit:
         run(repo, "add", "-A")
         res.update(commit(repo, message))

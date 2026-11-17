@@ -129,9 +129,9 @@ def main():
     check("/api/git/files lists a checkout's tracked files", code == 200 and ("plasbench/webui.py" in body.get("files", [])
           or not (ROOT / ".git").exists()), body if code != 200 else body["total"])
     code, body = get("/api/git/status")
-    check("version control defaults to a study (or the workspace when there is none), never the program", code == 200
-          and all(c["kind"] in ("study", "program") for c in body["choices"])
-          and Path(body["repo"]).resolve() != ROOT.resolve(), body.get("repo"))
+    check("version control defaults to the working directory (where git init lives), never the program", code == 200
+          and body["choices"][0]["kind"] == "workspace" and all(c["kind"] in ("workspace", "study", "program") for c in body["choices"])
+          and Path(body["repo"]).resolve() != ROOT.resolve() and body["is_workspace"], body.get("repo"))
     code, _ = get("/api/cohorts/info?name=nope")
     check("/api/cohorts/info: unknown cohort is a 404", code == 404)
     server.shutdown()

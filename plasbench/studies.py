@@ -98,7 +98,7 @@ def create(root, name: str, note: str = "") -> Path:
     for sub in SUBDIRS:
         (folder / sub).mkdir(parents=True, exist_ok=True)
     now = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    record = {"name": folder.name, "created": now, "updated": now, "note": note, "runs": []}
+    record = {"schema_version": 1, "name": folder.name, "created": now, "updated": now, "note": note, "tags": [], "runs": []}
     (folder / "study.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return folder
 
@@ -122,8 +122,10 @@ def list_studies(root) -> list:
         out.append({"name": folder.name, "path": str(folder), "results": str(results), "modified": stamp,
                     "cohort": record.get("cohort"), "sample_sheet": record.get("sample_sheet"),
                     "runs": len(record.get("runs", [])), "report": (results / "benchmark.report.html").is_file(),
-                    "created": record.get("created"), "note": record.get("note", ""),
-                    "migrated_from": record.get("migrated_from"), "tracked": (folder / ".git").exists(),
+                    "created": record.get("created"), "note": record.get("note", ""), "tags": record.get("tags", []),
+                    "cloned_from": record.get("cloned_from"), "imported_from": record.get("imported_from"),
+                    "migrated_from": record.get("migrated_from"), "tracked": (folder / ".git").exists() or (base / ".git").exists(),
+                    "tracked_in": "own" if (folder / ".git").exists() else ("workspace" if (base / ".git").exists() else None),
                     "last_command": (record.get("runs") or [{}])[-1].get("command")})
     out.sort(key=lambda s: -s["modified"])
     return out

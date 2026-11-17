@@ -24,6 +24,7 @@ ONE_OFF = {
     "build_guide_toc",             # regenerates the table of contents of docs/SCIENTIFIC_GUIDE.md; test_guide_docs.py runs it
     "build_publication_cohort_candidates",  # rebuilds the publication candidate cohorts from their supplements; test_publication_cohort_candidates.py runs it
     "build_implementation_catalogue",  # regenerates docs/IMPLEMENTATION_CATALOGUE.md; test_implementation_catalogue.py runs it
+    "qc_pilot",                    # a maintainer tool that measures a short real-read pilot to freeze the QC thresholds; test_threshold_freeze.py runs it with the ENA stubbed
     "refresh_sample_report",       # called at the end of test/run_demo.sh (the demo is not a pipeline stage); test_refresh_sample_report.py covers it
 }
 

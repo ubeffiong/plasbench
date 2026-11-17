@@ -6,8 +6,13 @@ tool is ranked or recommended for them (panel edge case D13).
 A tool recommendation assumes one bacterial isolate. Two cheap signals catch the
 commonest violations without a database:
 
-  assembly_size  total assembly length > --max-size-mb (8.5 Mb): larger than
-                 almost any single bacterial genome plus plasmids.
+  assembly_size  total assembly length > --max-size-mb (8.5 Mb): larger than the
+                 genome plus plasmids of the clinical species PlasBench targets
+                 (none of 3,428 public-v4 genomes of 11 such species is over it, the
+                 largest being 7.30 Mb). Large-genome taxa are different: 361 of 3,799
+                 genomes of other taxa, mostly Streptomyces, exceed it, so for those
+                 set ASSEMBLY_QC_MAX_SIZE_MB higher; the flag is advice, not proof.
+                 (Frozen, with the evidence, in docs/THRESHOLD_FREEZE.md.)
   gc_spread      the GC content of long contigs (>= --min-contig-length, 10 kb)
                  spreads more than --max-gc-spread (0.12, as a fraction) between
                  the length-weighted 10th and 90th percentiles: two organisms.

@@ -136,19 +136,30 @@ def main():
     if not gitops.find_git():
         print("  skip  git is not installed")
     else:
-        repo = new_ws / "notes"
-        repo.mkdir()
+        repo = new_ws                                   # git init lives in the working directory
+        study = new_ws / "cohort1"
+        code, r = call("/api/git", {"op": "init", "repo": str(study)})
+        check("no repository is started inside a study: it is covered by the working-directory one", code == 400 and "working directory" in r.get("error", ""), r)
         code, r = call("/api/git", {"op": "init", "repo": str(repo)})
-        check("a repository is initialised inside the workspace, with the runs block (tracks runs, not raw data)",
+        check("a repository is initialised in the working directory, with the runs block (tracks runs, not raw data)",
               code == 200 and "PlasBench runs block" in (repo / ".gitignore").read_text(encoding="utf-8"), r)
+        ignore = (repo / ".gitignore").read_text(encoding="utf-8")
+        check("its ignore rules reach into every study (sample data and tmp at any depth)", "**/results/*/" in ignore and "**/reads/" in ignore and "**/tmp/" in ignore, ignore[:400])
+
+        def ignored(rel):
+            return subprocess.run(["git", "-C", str(repo), "check-ignore", "-q", rel], capture_output=True).returncode == 0
+        check("in a study: per-sample sequence, tmp and reads stay out; the study record and study-level tables are tracked",
+              ignored("cohort1/results/S1/pred.fasta") and ignored("cohort1/tmp/x") and ignored("cohort1/reads/a.fastq.gz")
+              and not ignored("cohort1/study.json") and not ignored("cohort1/results/benchmark.leaderboard.tsv"))
         code, r = call("/api/git", {"op": "init", "repo": str(ROOT / "plasbench")})
         check("no repository is started in the PlasBench program folder", code == 400 and "runs" in r.get("error", ""), r)
-        code, r = call("/api/git", {"op": "init", "repo": str(new_ws)})
-        check("no repository is started at the workspace level (one per study)", code == 400 and "per study" in r.get("error", ""), r)
         code, st = call(f"/api/git/status?repo={urllib.request.quote(str(repo))}")
         mine = [c for c in st.get("choices", []) if c.get("path") == str(repo)]
-        check("each study is offered as its own repository, marked tracked", code == 200 and mine and mine[0]["kind"] == "study"
-              and mine[0]["tracked"], st.get("choices"))
+        check("the working directory is the first choice, marked tracked", code == 200 and mine and mine[0]["kind"] == "workspace"
+              and mine[0]["tracked"] and st["choices"][0]["path"] == str(repo), st.get("choices"))
+        code, info = call("/api/workspace")
+        check("a study is shown as tracked, in the working-directory repository", code == 200 and info["studies"]
+              and all(s["tracked"] and s["tracked_in"] == "workspace" for s in info["studies"]), info["studies"])
         outside = tmp / "elsewhere"
         outside.mkdir()
         check("a folder outside the PlasBench folder and the workspace is refused",
@@ -156,6 +167,9 @@ def main():
         check("identity is saved", call("/api/git", {"op": "identity", "repo": str(repo), "name": "Test User",
                                                       "email": "test@example.org"})[0] == 200)
         (repo / "notes.md").write_text("# study notes\n", encoding="utf-8")
+        (study / "results" / "S1").mkdir(parents=True, exist_ok=True)
+        (study / "results" / "S1" / "pred.fasta").write_text(">x\nACGT\n", encoding="utf-8")
+        (study / "results" / "benchmark.leaderboard.tsv").write_text("tool\tf1\n", encoding="utf-8")
         (repo / "config").mkdir()
         (repo / "config" / "local.env").write_text("export NCBI_API_KEY=0123456789abcdef0123456789abcdef01\n", encoding="utf-8")
         subprocess.run(["git", "-C", str(repo), "add", "-f", "config/local.env"], capture_output=True)
