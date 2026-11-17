@@ -816,6 +816,9 @@ export HEADLINE_REFERENCE_INDEPENDENCE="${HEADLINE_REFERENCE_INDEPENDENCE:-indep
 # Interval method of the leaderboard and the paired comparisons (python/resampling.py): cluster_t (default; chosen by simulate_validation.py), bootstrap_t or percentile.
 # Pre-registration row interval_method.
 export PLASBENCH_CI_METHOD="${PLASBENCH_CI_METHOD:-cluster_t}"
+# Interval method for a species-balanced (stratified) mean, the headline's usual form: bootstrap_t (default; the studentised cluster bootstrap is at least as good as
+# cluster_t in every simulated stratified design and 6 points better with a dominant species), cluster_t or percentile. Pre-registration row interval_method_stratified.
+export PLASBENCH_CI_METHOD_STRATIFIED="${PLASBENCH_CI_METHOD_STRATIFIED:-bootstrap_t}"
 # Independent clusters (BioProjects or clonal groups) the references in those tiers must come from for the primary analysis to be available. Below it the ranking is shown as provisional:
 # a headline from fewer clusters has no interval and no test. Default 5 is the interval minimum (MIN_CLUSTERS_CI). Pre-registration row headline_min_clusters (proposed).
 export HEADLINE_MIN_CLUSTERS="${HEADLINE_MIN_CLUSTERS:-5}"

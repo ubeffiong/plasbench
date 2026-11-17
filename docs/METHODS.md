@@ -790,7 +790,8 @@ An interval is emitted for each mean F1 and ranking score by `PLASBENCH_CI_METHO
 (default `cluster_t`: a CR1 cluster-robust standard error with a t critical value on
 G−1 degrees of freedom, chosen because it held near-nominal coverage in
 `simulate_validation.py` where the percentile cluster bootstrap under-covered; the
-percentile and studentized bootstrap remain selectable), and
+percentile and studentized bootstrap remain selectable; for a species-balanced, stratified mean `PLASBENCH_CI_METHOD_STRATIFIED`, default the studentized cluster
+bootstrap, which the simulation found at least as good in every stratified design and about 6 points better with one dominant species), and
 `benchmark.paired_comparisons.tsv` reports paired per-sample F1 differences, their
 interval, the effect status against `SMALLEST_DIFFERENCE` (equivalent, practically
 different, different but of unclear size, inconclusive, not assessable), whether the pair

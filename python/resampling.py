@@ -556,13 +556,15 @@ def dominant_share(values, groups=None):
 
 
 def interval_method_used(values, groups=None, strata=None, method=None):
-    """The method interval() will use. An explicit `method` is honoured. With none given the leaderboard's INTERVAL_METHOD applies, EXCEPT that a study holding more than
+    """The method interval() will use. An explicit `method` is honoured. With none given the leaderboard's INTERVAL_METHOD applies (STRATIFIED_INTERVAL_METHOD when the
+    interval is for a species-balanced, stratified mean), EXCEPT that a study holding more than
     DOMINANT_STUDY_SHARE of the observations switches a studentised interval to the percentile cluster bootstrap, which the simulation found the least bad there."""
     if method:
         return method
-    if DOMINANT_FALLBACK and INTERVAL_METHOD != "percentile" and dominant_share(values, groups) > DOMINANT_STUDY_SHARE:
+    base = STRATIFIED_INTERVAL_METHOD if strata is not None else INTERVAL_METHOD
+    if DOMINANT_FALLBACK and base != "percentile" and dominant_share(values, groups) > DOMINANT_STUDY_SHARE:
         return "percentile"
-    return INTERVAL_METHOD
+    return base
 
 
 def interval(values, groups=None, strata=None, method=None, iterations=1000):
@@ -580,10 +582,16 @@ def interval(values, groups=None, strata=None, method=None, iterations=1000):
 
 
 INTERVAL_METHOD = __import__("os").environ.get("PLASBENCH_CI_METHOD", "cluster_t")
+# The interval for a species-balanced (stratified) macro mean, which is the headline's usual form (pre-registration row interval_method_stratified). The full simulation
+# (docs/STATS_VALIDATION.md) found the studentised cluster bootstrap at least as good as cluster t in every stratified design (0.94-0.96 against 0.88-0.96) and 6 points
+# better with one dominant species (0.94 against 0.88), where cluster t fails; the unstratified comparison favours cluster t when runs fail, so that default is unchanged.
+STRATIFIED_INTERVAL_METHOD = __import__("os").environ.get("PLASBENCH_CI_METHOD_STRATIFIED", "bootstrap_t")
 # A study that holds more than this share of the observations makes the default interval fall back to the percentile bootstrap (PLASBENCH_DOMINANT_SHARE, pre-registration row
 # dominant_study_share; PLASBENCH_DOMINANT_FALLBACK=0 turns the fallback off). 0.30 is above what unbalanced designs of 1-6 isolates per study reach and far below the 40-60% of
 # the structures the simulation showed cluster-t cannot cover.
 DOMINANT_STUDY_SHARE = float(__import__("os").environ.get("PLASBENCH_DOMINANT_SHARE", "0.30"))
 DOMINANT_FALLBACK = __import__("os").environ.get("PLASBENCH_DOMINANT_FALLBACK", "1") != "0"
+if STRATIFIED_INTERVAL_METHOD not in INTERVAL_METHODS:
+    raise SystemExit(f"PLASBENCH_CI_METHOD_STRATIFIED must be one of {INTERVAL_METHODS}, got {STRATIFIED_INTERVAL_METHOD!r}")
 if INTERVAL_METHOD not in INTERVAL_METHODS:
     raise SystemExit(f"PLASBENCH_CI_METHOD must be one of {INTERVAL_METHODS}, got {INTERVAL_METHOD!r}")

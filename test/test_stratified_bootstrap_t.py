@@ -41,6 +41,14 @@ check("a NaN gives no interval", rs.stratified_bootstrap_t_ci([float("nan")] + v
 check("interval(method='bootstrap_t') with strata uses it instead of falling back to cluster_t", rs.interval(v, g, s, method="bootstrap_t", iterations=500) == (lo, hi))
 check("it differs from the cluster-t interval (a real second method)", rs.interval(v, g, s, method="cluster_t") != (lo, hi))
 
+# the pre-registered decision (interval_method_stratified): the default interval for a stratified mean is the studentised bootstrap, the unstratified one is cluster t
+check("a stratified interval uses bootstrap_t by default", rs.interval_method_used(v, g, s) == "bootstrap_t", rs.interval_method_used(v, g, s))
+check("an unstratified interval keeps cluster_t", rs.interval_method_used(v, g, None) == "cluster_t", rs.interval_method_used(v, g, None))
+check("the default stratified interval is the stratified studentised bootstrap", rs.interval(v, g, s, iterations=500) == (lo, hi))
+dominant_groups = ["big"] * (len(v) * 6 // 10) + [f"o{i}" for i in range(len(v) - len(v) * 6 // 10)]
+check("one dominant study still switches either kind to the percentile bootstrap", rs.interval_method_used(v, dominant_groups, s) == "percentile" and rs.interval_method_used(v, dominant_groups, None) == "percentile")
+check("an explicit method is still honoured with strata", rs.interval_method_used(v, g, s, method="cluster_t") == "cluster_t")
+
 # a small coverage check on data with a known macro mean (0.5): smoke only, wide tolerance
 hits = total = 0
 for _ in range(120):
