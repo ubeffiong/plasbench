@@ -27,6 +27,7 @@ fi
 STATUS="$RESULTS_DIR/tool_status.tsv"
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 acquire_run_lock "stage 4 (run tools)"
+tool_timeout_notice
 stage_timing_begin 4
 [[ -f "$SAMPLE_SHEET" ]] || die "stage 4: the sample sheet $SAMPLE_SHEET does not exist"
 [[ -n "$(read_samples "$SAMPLE_SHEET")" ]] || die "stage 4: the sample sheet $SAMPLE_SHEET lists no samples, so there is nothing to run (fill in the cohort, or run stages 1-3 first)"

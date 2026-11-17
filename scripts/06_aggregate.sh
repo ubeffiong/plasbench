@@ -180,6 +180,7 @@ job_truth_exclusion_sensitivity() {
     python3 "$HERE/../python/truth_exclusion_sensitivity.py" --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
         --truth-marker-overlap "$RESULTS_DIR/benchmark.truth_marker_overlap.tsv" --label-schemes "$RESULTS_DIR/benchmark.label_schemes.tsv" \
         --label-scheme "${TRUTH_LABEL_SCHEME:-ncbi}" --out "$RESULTS_DIR/benchmark.truth_exclusion_sensitivity.tsv" \
+        --rescore-reconstruction "$RESULTS_DIR" --data-dir "$DATA_DIR" \
         || warn "truth-exclusion sensitivity was not written (needs rank_robustness with a scheme:evidence variant); scores are unaffected"
 }
 

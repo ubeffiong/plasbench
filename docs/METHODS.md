@@ -1127,7 +1127,7 @@ Cohen's kappa and both scorers' length-weighted F1 and MCC; "agree" when both di
 **Outcome states** (`04_run_tools.sh`, `aggregate_results.py`). completed, reused, failed (tool),
 failed (resource: exit 124/137), infrastructure failure (exit 125/126/127, or a full disk in the log:
 never scored), not applicable (skipped). `TOOL_RETRIES` automatic retries (not for 124/137);
-`TOOL_TIMEOUT_SECONDS` the same budget for all tools. `tool_outcomes.tsv` carries `exit_code`,
+`TOOL_TIMEOUT_SECONDS` the same budget for all tools (blank by default, with a notice at the start of stage 4; the opt-in `PLASBENCH_TOOL_TIMEOUT_PRESET=generous` sets 172800 s). `tool_outcomes.tsv` carries `exit_code`,
 `failure_class` and `attempts`; `tool_status.tsv` keeps its fixed schema.
 
 **Paired tests.** Beside the sign-flip permutation test: the Wilcoxon signed-rank p-value (zeros

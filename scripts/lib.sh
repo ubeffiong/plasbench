@@ -228,6 +228,34 @@ _pgroup_alive() {
 # (AU-009). Residual limits: a guard left by a killed starter is reclaimed when its pid is dead (that reclaim is itself a small window); a guard
 # whose owner is alive is waited for up to ~10 s and then refused; the lock is still pid based, so pid reuse can refuse a start that was safe and
 # the pids of a WSL run are not visible to a Windows check (and the reverse); SIGKILL of the lock holder leaves the lock until the next start.
+# Heartbeat (AU-009 follow-up): the holder also touches RESULTS_DIR/.run.lock.heartbeat every PLASBENCH_LOCK_HEARTBEAT_SECONDS (default 5) from a small background
+# loop (its own session where setsid exists, so a killed run's group does not count it as a survivor; it ends when the holder's pid is gone or the file is
+# removed). A lock whose heartbeat file is older than PLASBENCH_LOCK_STALE_SECONDS (default 60) is stale EVEN WHEN ITS PID IS ALIVE: a pid that was reused by an
+# unrelated process after a SIGKILL or a reboot no longer blocks the next start, and neither does a holder that has been stopped for longer than the threshold.
+# Residual limits: a lock without a heartbeat file (written by an older version) is still judged by its pid alone; a holder that is merely suspended (SIGSTOP, a
+# laptop sleep, a machine too loaded to schedule the loop for the whole threshold) is declared stale and can be taken over while it still runs, which the
+# process-group check below only prevents for a holder that leads a group; a heartbeat younger than the threshold after a SIGKILL still refuses for up to that
+# long when the pid has been reused; the file clock is the local one, so a results folder on a network share with a skewed clock can misjudge; the WSL/Windows pid
+# difference above still applies.
+_lock_file_age() {   # seconds since the file was last modified; empty when it does not exist
+    local m
+    [[ -e "$1" ]] || return 0
+    m="$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true)"
+    [[ "$m" =~ ^[0-9]+$ ]] && echo $(( $(date +%s) - m ))
+    return 0
+}
+_lock_heartbeat_start() {
+    local hb="$1.heartbeat" interval="${PLASBENCH_LOCK_HEARTBEAT_SECONDS:-5}"
+    [[ "$interval" =~ ^[0-9]+([.][0-9]+)?$ ]] || interval=5
+    : > "$hb" 2>/dev/null || return 0
+    local loop='owner="$1"; hb="$2"; every="$3"; while kill -0 "$owner" 2>/dev/null && [[ -f "$hb" ]]; do sleep "$every"; [[ -f "$hb" ]] && touch "$hb" 2>/dev/null; done'
+    if command -v setsid >/dev/null 2>&1; then
+        setsid bash -c "$loop" _ "$$" "$hb" "$interval" >/dev/null 2>&1 < /dev/null &
+    else
+        bash -c "$loop" _ "$$" "$hb" "$interval" >/dev/null 2>&1 < /dev/null &
+    fi
+    disown 2>/dev/null || true
+}
 _lock_guard_enter() {
     local guard="$1.guard" tries=0 owner
     until mkdir "$guard" 2>/dev/null; do
@@ -249,7 +277,7 @@ _lock_guard_leave() {
 }
 
 acquire_run_lock() {
-    local what="$1" lock="${RESULTS_DIR:?}/.run.lock" holder_pid holder_pgid holder_start holder_what my_pgid
+    local what="$1" lock="${RESULTS_DIR:?}/.run.lock" holder_pid holder_pgid holder_start holder_what my_pgid hb_age stale_after
     mkdir -p "$RESULTS_DIR"
     if [[ -n "${PLASBENCH_LOCK_PID:-}" && -f "$lock" ]] && grep -qx "pid=$PLASBENCH_LOCK_PID" "$lock" && _pid_alive "$PLASBENCH_LOCK_PID"; then
         return 0
@@ -261,7 +289,12 @@ acquire_run_lock() {
         holder_pgid="$(sed -n 's/^pgid=//p' "$lock" | head -1)"
         holder_start="$(sed -n 's/^started=//p' "$lock" | head -1)"
         holder_what="$(sed -n 's/^what=//p' "$lock" | head -1)"
-        if [[ "$holder_pid" != "$$" ]] && _pid_alive "$holder_pid"; then
+        hb_age="$(_lock_file_age "$lock.heartbeat")"
+        stale_after="${PLASBENCH_LOCK_STALE_SECONDS:-60}"
+        [[ "$stale_after" =~ ^[0-9]+$ ]] || stale_after=60
+        if [[ "$holder_pid" != "$$" ]] && _pid_alive "$holder_pid" && [[ -n "$hb_age" ]] && (( hb_age > stale_after )); then
+            warn "the run lock in $RESULTS_DIR names pid $holder_pid, which is alive, but its heartbeat is ${hb_age} s old (limit ${stale_after} s): treating the lock as stale (the pid was probably reused by another program, or that run has been stopped)."
+        elif [[ "$holder_pid" != "$$" ]] && _pid_alive "$holder_pid"; then
             _lock_guard_leave
             die "another PlasBench run is already using $RESULTS_DIR (pid $holder_pid, ${holder_what:-unknown stage}, started ${holder_start:-unknown}). Wait for it, stop it, or give this run its own results folder (--results-dir or --study)."
         fi
@@ -270,7 +303,7 @@ acquire_run_lock() {
             die "a previous run in $RESULTS_DIR (pid ${holder_pid:-?}) is gone, but processes of its process group $holder_pgid are still running (a killed run leaves its tools behind). Stop them first (kill -- -$holder_pgid), then start again."
         fi
         warn "removing a stale run lock in $RESULTS_DIR (pid ${holder_pid:-unknown}, ${holder_what:-unknown stage}, started ${holder_start:-unknown}): that run is no longer alive."
-        rm -f "$lock"
+        rm -f "$lock" "$lock.heartbeat"
     fi
     my_pgid="$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ' || true)"
     [[ "$my_pgid" == "$$" || ( -n "$my_pgid" && "${PLASBENCH_JOB_GROUP:-}" == "1" ) ]] || my_pgid=""
@@ -278,6 +311,7 @@ acquire_run_lock() {
         _lock_guard_leave
         die "another PlasBench run took the lock on $RESULTS_DIR at the same moment ($(sed -n 's/^pid=//p' "$lock" 2>/dev/null | head -1)); start again when it has finished."
     fi
+    _lock_heartbeat_start "$lock"
     _lock_guard_leave
     _RUN_LOCK_OWNER="$BASHPID"
     export PLASBENCH_LOCK_PID="$$"
@@ -285,8 +319,15 @@ acquire_run_lock() {
 }
 
 release_run_lock() {
-    [[ "${_RUN_LOCK_OWNER:-}" == "$BASHPID" ]] && rm -f "${RESULTS_DIR:-/nonexistent}/.run.lock"
+    [[ "${_RUN_LOCK_OWNER:-}" == "$BASHPID" ]] && rm -f "${RESULTS_DIR:-/nonexistent}/.run.lock" "${RESULTS_DIR:-/nonexistent}/.run.lock.heartbeat"
     return 0
+}
+
+# tool_timeout_notice: said once at the start of stage 4. No tool time limit is the confirmed default (a limit can score a slow tool zero), so a wedged tool can hold
+# a run for ever; this tells the user, and names the opt-in (AU-010). Silent when a limit is set.
+tool_timeout_notice() {
+    [[ -n "${TOOL_TIMEOUT_SECONDS:-}" ]] && return 0
+    log "NOTE: no tool time limit is set (TOOL_TIMEOUT_SECONDS is blank), so a tool that hangs will hold this run until you stop it. This is the default because a limit can score a slow but correct tool as failed. To guard against a stuck run set PLASBENCH_TOOL_TIMEOUT_PRESET=generous (two days per tool per isolate) or TOOL_TIMEOUT_SECONDS=<seconds>."
 }
 
 # stage_timing_begin STAGE: record how long this stage script ran into RESULTS_DIR/stage_timing.tsv when it ends (one row per stage, the latest run
