@@ -12,13 +12,13 @@ Every row below says how it was checked. Three levels are used:
 - **Read:** I read the code or data but did not execute it.
 - **Delegated:** a subagent ran the experiment and reported; I did not repeat it.
 
-**Not done:** the full test suite (about 16 minutes in CI), the demo before/after byte comparison, a run on real reads, any real plasmid tool, install in a clean environment, the browser behaviour of the report. A finding marked "Requires additional evidence" was not examined or could not be settled with what I ran.
+**Not done:** the demo before/after byte comparison, a new run on real reads, any real plasmid tool run by me, install in a clean environment, the browser behaviour of the report. A finding marked "Requires additional evidence" was not examined or could not be settled with what I ran.
 
 ## 1. Verdict
 
 **PlasBench is ready for a pilot and for external methodological review. It is not ready to be cited as evidence that one plasmid tool is better than another**, for three reasons that are independent of the quality of the code:
 
-1. No real-data benchmark result exists in the repository, so every number in every report is from synthetic or constructed data.
+1. The only real-data run in the repository (`results_real_cohort1`, 10 isolates, PlasBench 0.2.3, three real tools) has a headline that rests on one Tier-2 isolate, so it shows the pipeline works on real reads but cannot rank tools. The first version of this document said no real-data result existed; that was wrong, see the correction below.
 2. The metrics have verified blind spots that can rank a tool above where it belongs (section 4).
 3. Only 15% of the 7,227 public-v4 isolates have truth that is independent of the benchmark's own reads (section 5).
 
@@ -28,9 +28,9 @@ The framework is honest about most of its weaknesses and several of the first au
 
 | # | Claim in the first audit | Class | How | Evidence |
 |---|---|---|---|---|
-| 1 | No real-data result exists. | **Confirmed** | Read | No results directory contains real-cohort output; `results_demo` and `results_audit` are synthetic (the second states so in its README, the HTML report does not, see N6). |
+| 1 | No real-data result exists. | **True when the audit was written (8 November); not true now** | Read, Ran | `results_real_cohort1` (renamed from `benchmark.report_cohort1`) is a real run produced on 14 November with PlasBench 0.2.3: 10 public isolates, `mob_recon`, `platon`, `plasmidspades` and a baseline, all 40 runs completed. Its run tables are consistent (checked with the new `run_consistency.py`). Limits: 1 of the 10 references is Tier 2 and 9 are Tier 3, so the headline basis is one isolate and the interval is "< 5 independent units". My first version of this row said "Confirmed" because I looked for a results folder by its usual name and missed this one. |
 | 2 | Truth independence is poor (0 of 98 Tier 1). | **Confirmed, and larger now** | Ran | public-v4: only 1,099 of 7,227 rows (15%) are `long_read_only` with polish `none`. 4,975 (69%) are `same_as_benchmark`; 1,153 (16%) are `unknown`. |
-| 3 | Cohort column `truth_quality_tier` is misleading. | **Confirmed** | Ran | In public-v4 all 7,227 rows are `B`, including 2,522 short-read-first rows. The column carries no information. |
+| 3 | Cohort column `truth_quality_tier` is misleading. | **Partially confirmed** | Ran, Read | It is a curation grade (`A` = a reviewed publication or collection names the study; `B` = complete but not curator-approved; `python/validate_cohort.py:121`), not a measure of how good the truth is. All 7,227 public-v4 rows are `B` because none was curator-reviewed, including 2,522 short-read-first rows. The name invites the misreading. It also caps the provenance tier: `python/truth_provenance.py:243-250` gives Tier 1 only to grade `A`, so no public-v4 isolate can be Tier 1. That does not change the headline, which already takes Tiers 1 and 2. My first version said the column "carries no information"; it carries this cap. |
 | 4 | No plasmid-free isolates. | **Confirmed** | Ran | public-v4: 0 rows with a plasmid count of 0. |
 | 5 | A minimum of 5 clusters makes p < 0.05 unreachable. | **Confirmed at the time, now fixed** | Read, Ran | `python/resampling.py:47-48`: `MIN_CLUSTERS_TEST = 6`. Simulated type-I error under a true null: 0.027 (6 clusters), 0.047 (8), 0.053 (12), 0.050 (20). Calibrated. |
 | 6 | The statistics were never checked by simulation. | **Incorrect now** | Read, Ran | `python/simulate_validation.py` and [STATS_VALIDATION.md](STATS_VALIDATION.md) exist. The audit's underlying worry is still right (item 7). |
@@ -48,15 +48,15 @@ The framework is honest about most of its weaknesses and several of the first au
 
 | ID | Finding | Severity | How |
 |---|---|---|---|
-| N1 | **A bin can be padded with sequence that aligns nowhere at no cost.** | High | Ran |
-| N2 | **The report accepts inconsistent inputs silently** (missing runs, stale rows, duplicate rows, re-ranking on a shared subset). | High | Delegated |
+| N1 | **A bin can be padded with sequence that aligns nowhere at no cost.** **Fixed in this change** (strict columns, section 12). | High | Ran |
+| N2 | **The report accepts inconsistent inputs silently** (missing runs, stale rows, duplicate rows). **Fixed in this change** (section 12); re-ranking on the shared subset is by design and still shown only as "on N shared". | High | Delegated |
 | N3 | Public-v4 cluster key is the BioProject; clonal relatedness across BioProjects is not handled. | Medium | Read (cohort), unverified effect |
-| N4 | The weekly real-tool check cannot fail on bad output: `min_plasmid_share` is 0 for all three tools (`test/real_tools/expected.tsv`). | Medium | Read |
-| N5 | A test exists that nothing runs: `test/test_reference_groups.py` is in neither `test/run_tests.sh` nor any workflow. It passes when run by hand. | Low | Ran |
-| N6 | The HTML report never says the data is synthetic or demo. The warning is only in `results_audit/README.md`. | Medium | Delegated |
-| N7 | A documented command fails: `plasbench plaseval-replication` (`FAQ.md:384`, `docs/PLASEVAL_REPLICATION.md:14,58`) exits 2. The working form is `plasbench analysis plaseval-replication`. **Fixed in this change.** | Medium | Ran |
-| N8 | The Galaxy wrapper pins `TOOL_VERSION` 0.2.4 (`galaxy/macros.xml:5`); the package is 0.4.1 and the 0.2.x tags were removed. Whether conda can resolve it was not checked. | Medium | Read |
-| N9 | `test/run_demo.sh` ends several analyses with `|| true` (lines 99, 105, 107, 189-194, 249), so a broken optional analysis leaves the demo green. | Low–Medium | Read (delegated survey) |
+| N4 | The weekly real-tool check cannot fail on bad output: `min_plasmid_share` is 0 for all three tools (`test/real_tools/expected.tsv`). **Partly fixed**: a share of zero now fails; a real floor still needs a reviewed first run. | Medium | Read |
+| N5 | A test exists that nothing runs: `test/test_reference_groups.py` is in neither `test/run_tests.sh` nor any workflow. It passes when run by hand. **Fixed in this change** (registered). | Low | Ran |
+| N6 | The HTML report never says the data is synthetic or demo, and nothing stopped synthetic and real samples sharing a report. **Fixed in this change** (section 12). | Medium | Delegated |
+| N7 | A documented command fails: `plasbench plaseval-replication` (`FAQ.md:384`, `docs/PLASEVAL_REPLICATION.md:14,58`) exits 2. The working form is `plasbench analysis plaseval-replication`. **Fixed in #101.** | Medium | Ran |
+| N8 | The Galaxy wrapper pins `TOOL_VERSION` 0.2.4 (`galaxy/macros.xml:5`); the package is 0.4.1 and the 0.2.x tags were removed. Whether conda can resolve it was not checked. **Pin synced and drift test added in this change; conda resolution still unchecked.** | Medium | Read |
+| N9 | `test/run_demo.sh` ends several analyses with `|| true` (lines 99, 105, 107, 189-194, 249), so a broken optional analysis leaves the demo green. **Six of them fixed in this change.** | Low–Medium | Read (delegated survey) |
 | N10 | 69 non-`RUN_` configuration keys are documented nowhere; `GPLAS_THREADS` is dead; `ASSEMBLER_SENSITIVITY_NAME` is read but undeclared. | Low | Delegated |
 | N11 | A cohort's "older" arm is 5,688 of 7,227 isolates (79%). Older isolates are more likely to be in a tool's own database, so the leakage exposure of public-v4 is probably higher than public-v3's. The size of the effect was not measured. | Medium | Read (cohort), effect unverified |
 
@@ -151,7 +151,7 @@ From a delegated read of `test/`, the workflows and `run_tests.sh`; items marked
 
 | Rank | Issue | Why it ranks here |
 |---|---|---|
-| 1 | No real-data run of the pipeline with at least a few real tools. | Everything else is unvalidated without it. |
+| 1 | A real-data run large enough to rank: `results_real_cohort1` has 10 isolates and one Tier-2 reference. The public-v4 independent subset (1,099 isolates, 211 clusters) is the obvious next run. | Without it no tool ranking can be quoted. |
 | 2 | N1: unaligned bases in a bin are free. | A verified way to keep a perfect binning score; fixable in one script. |
 | 3 | N2: inconsistent or stale inputs produce a normal-looking report. | A silent wrong ranking from an incomplete run. |
 | 4 | Independence of truth: 15% of public-v4 is independent; the sensitivity analysis must be shown beside every headline. | Limits what the headline can claim. |
@@ -174,3 +174,24 @@ All from the repository root of a worktree at `17c9936`; scratch scripts were ke
 - Tests: `test_reference_groups`, `test_matching`, `test_resampling_equivalence`, `test_scoring_adversarial`, `test_wilcoxon`, `test_bin_matching`.
 - Command check: the `plasbench` entry point with `plaseval-replication` (exit 2) and `analysis plaseval-replication`.
 - Delegated: report failure-state experiments (N2, N6), the test-suite survey (section 6) and the interface survey (sections 9, N8, N10).
+
+## 12. What changed in response (this PR)
+
+| Finding | Change | Where | Test |
+|---|---|---|---|
+| Real-data result was missed | Folder renamed `benchmark.report_cohort1` to `results_real_cohort1`, a README states what it is and is not, corrections above | `results_real_cohort1/README.md` | – |
+| N1 unaligned bases in a bin | `score_bins.py` takes `--pred-fasta` and writes `bin_unaligned_bp`, `bin_unaligned_fraction`, `lw_bin_precision_strict`, `lw_bin_f1_strict`; stage 5 passes the predicted sequences; the columns reach `scores.tsv` and the leaderboard as `mean_lw_bin_f1_strict` and `mean_bin_unaligned_fraction`. The headline is unchanged on purpose: the strict value sits beside it | `python/score_bins.py`, `merge_bin_metrics.py`, `aggregate_results.py`, `scripts/05_score.sh` | `test/test_bin_unaligned.py` |
+| N2 inconsistent inputs | `python/run_consistency.py` finds duplicate runs, completed runs with no score and no recorded failure, scores with no status and samples outside the sheet. Aggregation stops with a message unless `ALLOW_INCONSISTENT_RUNS=1`; then the report carries a banner. A malformed or truncated score table now stops with the file, line and value instead of a traceback | `python/run_consistency.py`, `aggregate_results.py`, `build_html_report.py` | `test/test_run_consistency.py` |
+| N6 synthetic data | `python/data_nature.py`: a run mixing synthetic (`sample_origin = synthetic`) and real samples is refused by aggregation and by the report builder (`ALLOW_SYNTHETIC_WITH_REAL=1` overrides, for engine tests only); an all-synthetic report carries a "Demonstration data" banner | `python/data_nature.py`, `aggregate_results.py`, `build_html_report.py` | `test/test_run_consistency.py` |
+| N4 real-tool floor | A share of zero fails | `test/real_tools/check_real_tool.py` | `test/test_real_tool_checks.py` |
+| N5 unregistered test | `test_reference_groups.py` registered | `test/run_tests.sh` | – |
+| N9 `\|\| true` | Removed from the six optional demo analyses (lines 189-194) | `test/run_demo.sh` | demo end to end |
+| N8 Galaxy pin | `TOOL_VERSION` 0.2.4 to 0.4.1; a drift test compares it with `pyproject.toml` | `galaxy/macros.xml` | `test/test_doc_versions.py` |
+
+**Not changed, and why**
+
+- **Truth independence (15% independent).** A property of the public data, not of the code. The report already shows the independent-truth sensitivity; the way to improve it is to run the 1,099 `long_read_only` isolates. No subset cohort file was created in this change.
+- **No plasmid-free isolates.** Also a property of the cohort. The scorer already supports plasmid-free isolates (`isolate_specificity`, `n_zero_plasmid_isolates`); none is in public-v4.
+- **Cohort column `truth_quality_tier`.** A required schema field with a real function (it gates Tier 1). Renaming it means migrating every cohort file and lock; left as a documented name problem.
+- **Unaligned predicted bases never false positives (base-level).** The base-level scorer is unchanged; the new columns cover the binning layer only.
+- **Confidence intervals under-cover.** Disclosed in `STATS_VALIDATION.md`; no method change.

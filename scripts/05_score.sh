@@ -370,7 +370,7 @@ score_sample() {
         fi
         local BINS="$RDIR/pred_${tool}.bins.tsv"
         if [[ -s "$BINS" ]] && binning_capable "$tool"; then
-            if ! python3 "$HERE/../python/score_bins.py" --truth "$SCORE_TRUTH" --paf "$PAF" --bins "$BINS" "${AMBIGUITY_ARGS[@]}" "${ASM_COV_ARGS[@]}" \
+            if ! python3 "$HERE/../python/score_bins.py" --truth "$SCORE_TRUTH" --paf "$PAF" --bins "$BINS" --pred-fasta "$PRED" "${AMBIGUITY_ARGS[@]}" "${ASM_COV_ARGS[@]}" \
                 --threshold "$PLASMID_RECOVERY_THRESHOLD" --out "$RDIR/${tool}.bin_matches.tsv" \
                 --min-alignment-length "$MIN_ALIGNMENT_LENGTH" \
                 --min-alignment-identity "$MIN_ALIGNMENT_IDENTITY" \

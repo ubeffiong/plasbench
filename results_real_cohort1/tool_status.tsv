@@ -1,0 +1,51 @@
+sample	tool	status	prediction_fasta	reason	runtime_seconds	peak_rss_kb
+upec_ecpf5	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_mob_recon.plasmid.fasta		56	2361248
+upec_ecpf5	platon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_platon.plasmid.fasta		63	4225660
+upec_ecpf5	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_plasmidspades.plasmid.fasta		385	2321928
+upec_ecpf5	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+upec_ecpf5	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+upec_ecpf7	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_mob_recon.plasmid.fasta		56	2224996
+upec_ecpf7	platon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_platon.plasmid.fasta		57	4118960
+upec_ecpf7	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_plasmidspades.plasmid.fasta		367	2319776
+upec_ecpf7	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+upec_ecpf7	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+upec_ecpf14	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_mob_recon.plasmid.fasta		36	947228
+upec_ecpf14	platon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_platon.plasmid.fasta		62	3949744
+upec_ecpf14	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_plasmidspades.plasmid.fasta		411	2323428
+upec_ecpf14	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+upec_ecpf14	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+upec_ecpf15	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_mob_recon.plasmid.fasta		36	961956
+upec_ecpf15	platon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_platon.plasmid.fasta		46	3897816
+upec_ecpf15	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_plasmidspades.plasmid.fasta		335	2322660
+upec_ecpf15	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+upec_ecpf15	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+upec_ecpf16	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_mob_recon.plasmid.fasta		64	2951628
+upec_ecpf16	platon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_platon.plasmid.fasta		58	3624776
+upec_ecpf16	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_plasmidspades.plasmid.fasta		1316	2576584
+upec_ecpf16	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+upec_ecpf16	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+upec_ecpf18	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_mob_recon.plasmid.fasta		52	1840648
+upec_ecpf18	platon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_platon.plasmid.fasta		55	4312452
+upec_ecpf18	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_plasmidspades.plasmid.fasta		2021	3206924
+upec_ecpf18	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+upec_ecpf18	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+upec_ecpf40	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_mob_recon.plasmid.fasta		51	1827668
+upec_ecpf40	platon	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_platon.plasmid.fasta		60	4284836
+upec_ecpf40	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_plasmidspades.plasmid.fasta		343	2324444
+upec_ecpf40	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_baseline_coverage.plasmid.fasta	trivial baseline	1	
+upec_ecpf40	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+arbank_0346	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_mob_recon.plasmid.fasta		65	2874940
+arbank_0346	platon	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_platon.plasmid.fasta		62	3713784
+arbank_0346	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_plasmidspades.plasmid.fasta		987	2333000
+arbank_0346	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+arbank_0346	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+arbank_0349	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_mob_recon.plasmid.fasta		61	2405700
+arbank_0349	platon	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_platon.plasmid.fasta		63	4376460
+arbank_0349	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_plasmidspades.plasmid.fasta		1109	3772668
+arbank_0349	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+arbank_0349	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		
+tahini_salmonella	mob_recon	completed	/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_mob_recon.plasmid.fasta		32	587156
+tahini_salmonella	platon	completed	/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_platon.plasmid.fasta		43	3665552
+tahini_salmonella	plasmidspades	completed	/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_plasmidspades.plasmid.fasta		352	2302536
+tahini_salmonella	baseline_coverage	completed	/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_baseline_coverage.plasmid.fasta	trivial baseline	0	
+tahini_salmonella	baseline_reference	skipped		plasmid reference set not built (build_plasmid_reference_set.py)		

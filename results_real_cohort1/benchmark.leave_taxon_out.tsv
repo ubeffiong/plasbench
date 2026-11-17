@@ -1,0 +1,4 @@
+level	held_out_group	n_isolates	n_training_isolates	mean_regret	single_best_mean_regret	near_optimal_rate	gap_closed	status	note
+genus	Escherichia	9	1					not_assessed	no tool met --min-train-samples on the remaining taxa
+genus	Salmonella	1	9	0.0000	0.0000	1.0000		assessed	
+phylum		10						not_assessed	no phylum recorded for any isolate

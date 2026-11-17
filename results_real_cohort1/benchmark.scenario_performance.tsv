@@ -1,0 +1,9 @@
+analysis_track	scenario	tool	n_samples	mean_f1	mean_precision	mean_recall	mean_plasmid_recall	underpowered
+short_read	annotated	baseline_coverage	2	0.4648	0.3069	1.0000	1.0000	true
+short_read	annotated	mob_recon	2	1.0000	1.0000	1.0000	1.0000	true
+short_read	annotated	plasmidspades	2	0.7674	0.6825	1.0000	1.0000	true
+short_read	annotated	platon	2	1.0000	1.0000	1.0000	1.0000	true
+short_read	complex	baseline_coverage	8	0.3915	0.5824	0.3525	0.3333	false
+short_read	complex	mob_recon	8	0.8604	0.8745	0.8510	0.3958	false
+short_read	complex	plasmidspades	8	0.5902	0.6226	0.5739	0.4479	false
+short_read	complex	platon	8	0.8777	0.9704	0.8079	0.4583	false

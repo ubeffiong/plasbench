@@ -12,6 +12,13 @@ history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
 ## [Unreleased]
+### Added -- fixes from the independent verification
+- **The real-data run is in the repository**: `benchmark.report_cohort1` is renamed `results_real_cohort1` (10 isolates, PlasBench 0.2.3, three real tools) with a README saying what it supports and what it does not. The verification document had wrongly said no real-data result existed.
+- **Binning: unaligned sequence is now counted beside the headline.** `score_bins.py --pred-fasta` writes `bin_unaligned_bp`, `bin_unaligned_fraction`, `lw_bin_precision_strict` and `lw_bin_f1_strict`; the leaderboard gains `mean_lw_bin_f1_strict` and `mean_bin_unaligned_fraction`. A bin padded with contigs that align nowhere scored a perfect headline; it now shows a low strict score. The headline definition is unchanged.
+- **The run tables are checked before ranking** (`python/run_consistency.py`): duplicate runs, completed runs with no score and no recorded failure, scores with no status, samples outside the sheet. Aggregation stops with a message unless `ALLOW_INCONSISTENT_RUNS=1`, and then the report carries a banner. A malformed or truncated `scores.tsv` stops with the file, line and value instead of a traceback.
+- **Synthetic data stays out of real reports** (`python/data_nature.py`): a run that mixes `sample_origin = synthetic` samples with real ones is refused by aggregation and by the report builder; an all-synthetic report carries a "Demonstration data" banner.
+- The weekly real-tool check now fails a tool that calls nothing as plasmid; `test_reference_groups.py` is registered; six optional demo analyses no longer end in `|| true`; the Galaxy wrapper pin follows `pyproject.toml` with a drift test.
+
 ### Added -- independent verification of the earlier audits
 - `docs/INDEPENDENT_VERIFICATION.md` challenges the first audit, the second-review response and the performance audit on `main` at `17c9936`, classifying each finding and recording what was run versus read. New findings: bins padded with sequence that aligns nowhere keep a perfect binning score (verified with seven constructed cases); the report accepts missing, stale or duplicate runs without an error; the weekly real-tool check has a pass floor of 0; one test is registered nowhere. Intervals under-cover a nominal 95% (81-94% in simulation). Verdict: ready for a pilot and external review, not yet citable as evidence that one tool beats another.
 - Fixed: the documented command `plasbench plaseval-replication` does not exist; it is `plasbench analysis plaseval-replication` (README-level docs, FAQ, replication guide).

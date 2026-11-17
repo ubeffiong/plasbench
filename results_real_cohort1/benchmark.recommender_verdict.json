@@ -1,0 +1,11 @@
+{
+  "verdict": "benchmark_only",
+  "note": "oracle gap 0.0088 < 0.02: per-isolate recommendation cannot add value over the single best tool; report the leaderboard",
+  "oracle_gap": "0.0088",
+  "gap_closed": "0.0000",
+  "oracle_gap_floor": 0.02,
+  "near_optimal_margin": 0.05,
+  "min_expected_score": 0.4,
+  "n_isolates": 3,
+  "n_folds": 3
+}

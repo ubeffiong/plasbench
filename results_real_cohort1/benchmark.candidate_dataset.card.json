@@ -1,0 +1,8 @@
+{
+  "candidate_rows": 40,
+  "features": "/home/ueffiong/plasbench-0.2.3/results/benchmark.candidate_features.tsv",
+  "intended_use": "Research and validation of future per-candidate selection models; not a clinical model or a replacement for PlasBench selection safeguards.",
+  "labels": "/home/ueffiong/plasbench-0.2.3/results/benchmark.candidate_labels.tsv",
+  "schema_version": "1.0",
+  "truth_label_policy": "Only tool_output rows carry aggregate score labels; bin rows remain unlabelled until validated bin-specific truth is available."
+}

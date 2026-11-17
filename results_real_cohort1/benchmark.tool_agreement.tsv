@@ -1,0 +1,7 @@
+tool_a	tool_b	n_samples	mean_dissimilarity
+baseline_coverage	mob_recon	10	0.716094
+baseline_coverage	platon	10	0.668725
+baseline_coverage	truth	10	0.751267
+mob_recon	platon	10	0.363552
+mob_recon	truth	10	0.156746
+platon	truth	10	0.305500

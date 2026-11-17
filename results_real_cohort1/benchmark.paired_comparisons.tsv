@@ -1,0 +1,4 @@
+tool_a	tool_b	paired_samples	mean_f1_difference	difference_ci_low	difference_ci_high	permutation_p_value	permutation_p_value_holm	wins_a	ties	wins_b	analysis_track	paired_clusters	task	metric	wilcoxon_p_value	wilcoxon_p_value_holm	equivalent	smallest_difference
+baseline_coverage	plasmidspades	1	-0.8331					0	0	1	short_read	1	classification	f1	1.000000	1.000000	no	0.05
+baseline_coverage	platon	1	-0.8611					0	0	1	short_read	1	classification	f1	1.000000	1.000000	no	0.05
+plasmidspades	platon	1	-0.0280					0	0	1	short_read	1	classification	f1	1.000000	1.000000	yes	0.05

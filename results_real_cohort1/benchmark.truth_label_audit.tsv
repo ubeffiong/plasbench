@@ -1,0 +1,33 @@
+sample	sequence_id	molecule_type	length	replicon_labels	mob_labels	finding
+arbank_0346	NZ_CP066366.1	CHROMOSOME	4718281	IncQ1		chromosome_with_plasmid_markers
+arbank_0346	NZ_CP066367.1	PLASMID	101116	IncFIA,IncFII(pHN7A8)_1_pHN7A8	MOBF	consistent
+arbank_0346	NZ_CP066368.1	PLASMID	66038	IncI2	MOBP	consistent
+arbank_0349	NZ_CP041996.1	CHROMOSOME	4995442			consistent
+arbank_0349	NZ_CP041997.1	PLASMID	278067	IncFIB,IncFIB(AP001918)_1,IncFIC,IncFIC(FII)_1,IncN,IncN_1,rep_cluster_1088,rep_cluster_2244	MOBF	consistent
+tahini_salmonella	NZ_CP091878.1	CHROMOSOME	4825110			consistent
+tahini_salmonella	NZ_CP091879.1	PLASMID	3967	Col(pHAD28)_1,rep_cluster_2335		consistent
+upec_ecpf14	NZ_CP054230.1	CHROMOSOME	5129852		MOBP	chromosome_with_plasmid_markers
+upec_ecpf14	NZ_CP054231.1	PLASMID	7154	ColRNAI_1,rep_cluster_2370	MOBP	consistent
+upec_ecpf15	NZ_CP054227.1	CHROMOSOME	4796742			consistent
+upec_ecpf15	NZ_CP054228.1	PLASMID	135461	IncFIA,IncFIB,IncFIB(AP001918)_1,IncFIC	MOBF	consistent
+upec_ecpf15	NZ_CP054229.1	PLASMID	6431	Col(pHAD28)_1,rep_cluster_2335		consistent
+upec_ecpf16	NZ_CP054224.1	CHROMOSOME	4721932	pENTAS02_1,rep_cluster_2132	MOBP	chromosome_with_plasmid_markers
+upec_ecpf16	NZ_CP054225.1	PLASMID	123935	IncFIA,IncFIA(HI1)_1_HI1,IncFIB,IncFIB(K)_1_Kpn3	MOBP	consistent
+upec_ecpf16	NZ_CP054226.1	PLASMID	5658	Col(pHAD28)_1,rep_cluster_2373		consistent
+upec_ecpf18	NZ_CP054219.1	CHROMOSOME	5010549			consistent
+upec_ecpf18	NZ_CP054220.1	PLASMID	128954	Col156_1,IncFIA,IncFIA_1,IncFIB,IncFIB(AP001918)_1,IncFII,IncFII(pRSB107)_1_pRSB107,rep_cluster_2131	MOBF,MOBP	consistent
+upec_ecpf18	NZ_CP054221.1	PLASMID	86740	IncI1/B/O,IncI1_1_Alpha	MOBP	consistent
+upec_ecpf18	NZ_CP054222.1	PLASMID	5167	Col156,Col156_1	MOBQ	consistent
+upec_ecpf18	NZ_CP054223.1	PLASMID	1506	Col(MG828),Col(MG828)_1		consistent
+upec_ecpf40	NZ_CP054214.1	CHROMOSOME	5025664			consistent
+upec_ecpf40	NZ_CP054215.1	PLASMID	89178	IncFIA_1,IncFIB,IncFIB(AP001918)_1,IncFII,IncQ1		consistent
+upec_ecpf40	NZ_CP054216.1	PLASMID	88657	IncI1/B/O,IncI_Gamma_1	MOBP	consistent
+upec_ecpf40	NZ_CP054217.1	PLASMID	5167	Col156,Col156_1	MOBQ	consistent
+upec_ecpf40	NZ_CP054218.1	PLASMID	2113	Col(BS512),Col(BS512)_1		consistent
+upec_ecpf5	NZ_CP054236.1	CHROMOSOME	5147412		MOBP	chromosome_with_plasmid_markers
+upec_ecpf5	NZ_CP054237.1	PLASMID	131660	IncFIA,IncFIA_1,IncFIB,IncFIB(AP001918)_1,IncFII,IncFII(pRSB107)_1_pRSB107,IncQ1	MOBF,MOBP	consistent
+upec_ecpf5	NZ_CP054238.1	PLASMID	1546	Col(MG828),Col(MG828)_1		consistent
+upec_ecpf7	NZ_CP054232.1	CHROMOSOME	4996527		MOBP	chromosome_with_plasmid_markers
+upec_ecpf7	NZ_CP054233.1	PLASMID	129632	Col156_1,IncFIA,IncFIB,IncFIB(AP001918)_1,IncFIC,IncFII(29)_1_pUTI89,rep_cluster_2131	MOBF,MOBP	consistent
+upec_ecpf7	NZ_CP054234.1	PLASMID	4072	ColpEC648,rep_cluster_1778	MOBQ	consistent
+upec_ecpf7	NZ_CP054235.1	PLASMID	1551	Col(MG828),Col(MG828)_1		consistent

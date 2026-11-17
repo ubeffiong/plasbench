@@ -1,0 +1,4 @@
+profile	metric	n_isolates	n_folds	n_tools	mean_regret	p95_regret	near_optimal_rate	top1_rate	mean_kendall_tau	single_best_mean_regret	oracle_mean_score	single_best_mean_score	recommender_mean_score	oracle_gap	gap_closed	floor_flagged	floor_true_best_below_floor	verdict	note
+f1	f1	3	3	4	0.0088	0.0237	1.0000	0.6667	0.5556	0.0088	0.9342	0.9254	0.9254	0.0088	0.0000	0		benchmark_only	oracle gap 0.0088 < 0.02: per-isolate recommendation cannot add value over the single best tool; report the leaderboard
+f2	f2	3	3	4	0.0032	0.0086	1.0000	0.6667	0.6667	0.0032	0.9254	0.9222	0.9222	0.0032	0.0000	0		benchmark_only	oracle gap 0.0032 < 0.02: per-isolate recommendation cannot add value over the single best tool; report the leaderboard
+f0_5	f0_5	3	3	4	0.0038	0.0104	1.0000	0.6667	0.4444	0.0038	0.9437	0.9399	0.9399	0.0038	0.0000	0		benchmark_only	oracle gap 0.0038 < 0.02: per-isolate recommendation cannot add value over the single best tool; report the leaderboard

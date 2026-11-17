@@ -1,0 +1,41 @@
+sample	tool	candidate_id	label_scope	f1	precision	recall	plasmid_recall	bin_f1
+upec_ecpf5	baseline_coverage	tool_output	tool_output	0.0487	0.1690	0.0284	0.5000	
+upec_ecpf5	mob_recon	tool_output	tool_output	0.8562	0.8212	0.8945	0.5000	0.3333
+upec_ecpf5	plasmidspades	tool_output	tool_output	0.0212	0.1193	0.0116	0.5000	
+upec_ecpf5	platon	tool_output	tool_output	0.8783	1.0000	0.7830	0.5000	
+upec_ecpf7	baseline_coverage	tool_output	tool_output	0.8495	0.9674	0.7572	0.6667	
+upec_ecpf7	mob_recon	tool_output	tool_output	0.8809	0.9548	0.8177	0.6667	0.6667
+upec_ecpf7	plasmidspades	tool_output	tool_output	0.9065	0.9132	0.8999	0.3333	
+upec_ecpf7	platon	tool_output	tool_output	0.8783	0.9115	0.8475	0.6667	
+upec_ecpf14	baseline_coverage	tool_output	tool_output	0.5508	0.3801	1.0000	1.0000	
+upec_ecpf14	mob_recon	tool_output	tool_output	1.0000	1.0000	1.0000	1.0000	0.6667
+upec_ecpf14	plasmidspades	tool_output	tool_output	0.5348	0.3650	1.0000	1.0000	
+upec_ecpf14	platon	tool_output	tool_output	1.0000	1.0000	1.0000	1.0000	
+upec_ecpf15	baseline_coverage	tool_output	tool_output	0.0821	0.5270	0.0445	0.5000	
+upec_ecpf15	mob_recon	tool_output	tool_output	0.9591	1.0000	0.9215	1.0000	1.0000
+upec_ecpf15	plasmidspades	tool_output	tool_output	0.9061	1.0000	0.8284	0.5000	
+upec_ecpf15	platon	tool_output	tool_output	0.9591	1.0000	0.9215	1.0000	
+upec_ecpf16	baseline_coverage	tool_output	tool_output	0.2333	0.6675	0.1414	0.0000	
+upec_ecpf16	mob_recon	tool_output	tool_output	0.5383	0.4932	0.5924	0.0000	0.0000
+upec_ecpf16	plasmidspades	tool_output	tool_output	0.1749	0.2279	0.1419	0.5000	
+upec_ecpf16	platon	tool_output	tool_output	0.7701	1.0000	0.6261	0.5000	
+upec_ecpf18	baseline_coverage	tool_output	tool_output	0.9363	0.9778	0.8983	0.2500	
+upec_ecpf18	mob_recon	tool_output	tool_output	0.9611	1.0000	0.9252	0.2500	0.2500
+upec_ecpf18	plasmidspades	tool_output	tool_output	0.9373	0.9771	0.9006	0.7500	
+upec_ecpf18	platon	tool_output	tool_output	0.8873	1.0000	0.7975	0.2500	
+upec_ecpf40	baseline_coverage	tool_output	tool_output	0.9633	0.9869	0.9408	0.7500	
+upec_ecpf40	mob_recon	tool_output	tool_output	0.9078	0.9187	0.8972	0.7500	0.7500
+upec_ecpf40	plasmidspades	tool_output	tool_output	0.9424	0.9269	0.9584	1.0000	
+upec_ecpf40	platon	tool_output	tool_output	0.8722	1.0000	0.7733	0.7500	
+arbank_0346	baseline_coverage	tool_output	tool_output	0.0000	0.0000	0.0000	0.0000	
+arbank_0346	mob_recon	tool_output	tool_output	0.8381	0.8080	0.8706	0.0000	0.0000
+arbank_0346	plasmidspades	tool_output	tool_output	0.8331	0.8164	0.8506	0.0000	
+arbank_0346	platon	tool_output	tool_output	0.8611	0.8517	0.8706	0.0000	
+arbank_0349	baseline_coverage	tool_output	tool_output	0.0185	0.3638	0.0095	0.0000	
+arbank_0349	mob_recon	tool_output	tool_output	0.9414	1.0000	0.8893	0.0000	0.0000
+arbank_0349	plasmidspades	tool_output	tool_output	0.0000	0.0000	0.0000	0.0000	
+arbank_0349	platon	tool_output	tool_output	0.9151	1.0000	0.8435	0.0000	
+tahini_salmonella	baseline_coverage	tool_output	tool_output	0.3788	0.2336	1.0000	1.0000	
+tahini_salmonella	mob_recon	tool_output	tool_output	1.0000	1.0000	1.0000	1.0000	1.0000
+tahini_salmonella	plasmidspades	tool_output	tool_output	1.0000	1.0000	1.0000	1.0000	
+tahini_salmonella	platon	tool_output	tool_output	1.0000	1.0000	1.0000	1.0000	

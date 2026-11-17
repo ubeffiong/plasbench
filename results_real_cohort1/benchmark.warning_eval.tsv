@@ -1,0 +1,8 @@
+warning	n_evaluated	n_fired	n_failed	n_fired_and_failed	firing_rate	ppv	sensitivity	n_could_not_be_applied	status	note
+assembly_qc:assembly_size	3	0	0	0	0.0000			0	assessed	
+assembly_qc:gc_spread	3	0	0	0	0.0000			0	assessed	
+cohort_outlier:assembly_size_bp	3	0	0	0	0.0000			0	assessed	
+cohort_outlier:contig_count	3	0	0	0	0.0000			0	assessed	
+cohort_outlier:gc_percent	3	1	0	0	0.3333	0.0000		0	assessed	
+cohort_outlier:n50	3	0	0	0	0.0000			0	assessed	
+cohort_outlier:plasmid_count	3	0	0	0	0.0000			0	assessed	

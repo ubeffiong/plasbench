@@ -63,7 +63,8 @@ SCORE_COLUMN_GROUPS = {
         "bin_precision", "bin_recall", "bin_f1", "matched_bins", "unmatched_bins", "missed_plasmids", "split_events", "merge_events",
         "contaminated_bins", "chromosome_aligned_bp", "repeat_ambiguity_bp", "bin_total_mapped_bp", "contamination_fraction",
         "nmi", "variation_of_information", "perfect_reference_recovery", "strict_reference_reconstruction",
-        "lw_bin_precision", "lw_bin_recall", "lw_bin_f1", "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware"],
+        "lw_bin_precision", "lw_bin_recall", "lw_bin_f1", "bin_ari", "lw_bin_recall_assembly_aware", "lw_bin_f1_assembly_aware",
+        "bin_unaligned_bp", "bin_unaligned_fraction", "lw_bin_precision_strict", "lw_bin_f1_strict"],
     "Contig layer": [
         "contig_min_length", "contigs_evaluable", "contigs_short", "contigs_ambiguous", "contigs_unplaced", "contigs_chimeric",
         "contigs_chimeric_bp", "contig_tp", "contig_fp", "contig_fn", "contig_tn", "contig_precision_count", "contig_recall_count",
@@ -103,7 +104,7 @@ LEADERBOARD_COLUMN_GROUPS = {
         "cprr_correct", "cprr_plasmids", "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates", "cprr_isolate_mean", "cprr_isolates", "cprr_auc", "total_outcome_perfect", "total_outcome_fragmented", "total_outcome_merged",
         "total_outcome_fragmented_and_merged", "total_outcome_partial", "total_outcome_missed"],
     "Bins": ["n_bin_scored", "mean_bin_f1", "mean_nmi", "mean_variation_of_information", "mean_lw_bin_f1", "mean_bin_ari",
-             "mean_lw_bin_f1_assembly_aware"],
+             "mean_lw_bin_f1_assembly_aware", "mean_lw_bin_f1_strict", "mean_bin_unaligned_fraction"],
     "Contig layer": ["mean_contig_f1_count", "mean_contig_mcc_count", "mean_contig_f1_bp", "mean_contig_mcc_bp", "mean_contig_bin_f1_bp"],
     "Calibration": ["n_pr_scored", "mean_pr_auc", "mean_brier_score", "mean_expected_calibration_error", "n_calibrated"],
     "Database leakage": [
