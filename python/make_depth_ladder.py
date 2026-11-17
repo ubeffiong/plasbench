@@ -6,7 +6,7 @@ import csv
 import shutil
 import subprocess
 from pathlib import Path
-from plasbench_common import link_or_copy, subprocess_timeout  # noqa: E402
+from plasbench_common import link_or_copy, subprocess_timeout, watchdog  # noqa: E402
 
 
 def rows(path):
@@ -88,9 +88,17 @@ def main():
                         [args.seqtk, "sample", "-s", str(args.seed), str(source_reads), f"{fraction:.12g}"],
                         stdout=subprocess.PIPE,
                     )
-                    gzip_result = subprocess.run(["gzip", "-c"], stdin=seqtk.stdout, stdout=handle, check=False, timeout=subprocess_timeout())
-                    seqtk.stdout.close()
-                    seqtk_result = seqtk.wait()
+                    with watchdog(seqtk) as guard:
+                        try:
+                            gzip_result = subprocess.run(["gzip", "-c"], stdin=seqtk.stdout, stdout=handle, check=False, timeout=subprocess_timeout())
+                        except subprocess.TimeoutExpired:
+                            seqtk.kill()
+                            raise SystemExit(f"ERROR: subsampling timed out for {sample} mate {mate} at {label} (PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS)")
+                        seqtk.stdout.close()
+                        seqtk_result = seqtk.wait()
+                    if guard.fired:
+                        target_reads.unlink(missing_ok=True)
+                        raise SystemExit(f"ERROR: seqtk timed out for {sample} mate {mate} at {label} (PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS)")
                 if seqtk_result or gzip_result.returncode:
                     target_reads.unlink(missing_ok=True)
                     raise SystemExit(f"ERROR: subsampling failed for {sample} mate {mate} at {label}")

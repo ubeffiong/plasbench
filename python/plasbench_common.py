@@ -34,6 +34,40 @@ def subprocess_timeout(default=21600):
     return seconds if seconds > 0 else None
 
 
+class watchdog:
+    """Context manager: kill a Popen process if the with-block runs longer than `seconds` (default subprocess_timeout()), AU-044.
+
+    Popen pipelines (seqtk | gzip, minimap2 | samtools, a streamed decompressor) cannot use subprocess.run(timeout=); this bounds the
+    wait on the producer. `.fired` is True when the process was killed, so the caller can report a timeout instead of a vague failure."""
+
+    def __init__(self, proc, seconds=-1):
+        import threading
+        self.proc = proc
+        self.seconds = subprocess_timeout() if seconds == -1 else seconds
+        self.fired = False
+        self._timer = None
+        self._threading = threading
+
+    def _kill(self):
+        self.fired = True
+        try:
+            self.proc.kill()
+        except OSError:
+            pass
+
+    def __enter__(self):
+        if self.seconds:
+            self._timer = self._threading.Timer(self.seconds, self._kill)
+            self._timer.daemon = True
+            self._timer.start()
+        return self
+
+    def __exit__(self, *exc):
+        if self._timer:
+            self._timer.cancel()
+        return False
+
+
 def number(value):
     """float(value), or None when it is missing or not numeric."""
     try:

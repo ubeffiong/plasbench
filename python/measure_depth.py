@@ -14,6 +14,8 @@ import shutil
 import subprocess
 from concurrent.futures import ProcessPoolExecutor
 
+from plasbench_common import watchdog
+
 
 def reference_bp(path):
     with open(path, newline="", encoding="utf-8") as handle:
@@ -30,11 +32,15 @@ def fastq_bp(path):
     decompressor = (shutil.which("pigz") or shutil.which("gzip")) if path.endswith(".gz") else None
     if decompressor:
         proc = subprocess.Popen([decompressor, "-dc", path], stdout=subprocess.PIPE, bufsize=1 << 20)
-        try:
-            total = _sequence_bases(proc.stdout)
-        finally:
-            proc.stdout.close()
-        if proc.wait() != 0:
+        with watchdog(proc) as guard:
+            try:
+                total = _sequence_bases(proc.stdout)
+            finally:
+                proc.stdout.close()
+            code = proc.wait()
+        if guard.fired:
+            raise SystemExit(f"ERROR: decompressing {path} timed out ({decompressor}; PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS)")
+        if code != 0:
             raise SystemExit(f"ERROR: could not decompress {path} ({decompressor} exited {proc.returncode})")
         return total
     opener = gzip.open if path.endswith(".gz") else open
