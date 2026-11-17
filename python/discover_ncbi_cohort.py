@@ -8,6 +8,7 @@ assembly and paired Illumina run have the exact same BioSample and BioProject.
 
 import argparse
 import csv
+import json
 import os
 import re
 import time
@@ -58,6 +59,29 @@ def long_read_runs_for_biosample(biosample, email, api_key):
     )
 
 
+def single_sequence_uids(uids, email, api_key, batch=100):
+    """The assembly UIDs among `uids` whose assembly is ONE sequence, found in bulk before any per-assembly lookup.
+
+    A complete genome with a plasmid has at least two sequences, so for a negative-control search a single component sequence is the cheap first filter
+    (one request per 100 assemblies instead of an assembly report each). It keeps a candidate, it never accepts one: the per-assembly checks still run on every
+    survivor. Organisms with two chromosomes (Vibrio) would be missed, which only costs candidates.
+    """
+    kept = []
+    for start in range(0, len(uids), batch):
+        chunk = uids[start:start + batch]
+        summary = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi", {"db": "assembly", "id": ",".join(chunk)}, email, api_key)["result"]
+        by_accession = {summary[uid]["assemblyaccession"]: uid for uid in chunk if uid in summary}
+        request = Request("https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/" + ",".join(by_accession) + "/dataset_report",
+                          headers={"User-Agent": "PlasBench/0.4 cohort discovery", "Accept": "application/json"})
+        reports = fetch(request, 60, 4, "NCBI Datasets report request", parse=lambda payload: json.loads(payload.decode("utf-8", "replace"))).get("reports", [])
+        for report in reports:
+            stats = report.get("assembly_stats", {})
+            if int(stats.get("number_of_component_sequences", 0) or 0) == 1 and report.get("accession") in by_accession:
+                kept.append(by_accession[report["accession"]])
+        time.sleep(request_interval(api_key))
+    return kept
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--organism", action="append", required=True,
@@ -71,6 +95,10 @@ def main():
                         help="Look for plasmid-free isolates instead: complete genomes whose deposited record declares NO plasmid, paired with an Illumina run as usual. "
                              "They test what a tool does when there is nothing to find (isolate specificity, chromosome false positives). A record that declares no "
                              "plasmid is a candidate only: the truth-label evidence stage still checks the replicons, and a curator confirms the isolate is plasmid-free.")
+    parser.add_argument("--refseq", action="store_true", help="Only the latest RefSeq assemblies (curated, one per genome).")
+    parser.add_argument("--hybrid-sequencing", action="store_true",
+                        help="Only assemblies whose record names Illumina AND a long-read platform (Oxford Nanopore or PacBio). Most candidates without both are "
+                             "rejected later for lack of paired reads, so this saves the lookups.")
     parser.add_argument("--email", default=os.environ.get("NCBI_EMAIL"))
     parser.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"))
     args = parser.parse_args()
@@ -79,12 +107,20 @@ def main():
     accepted, rejected, seen = [], [], set()
     for organism in args.organism:
         query = f'"{organism}"[Organism] AND "complete genome"[Assembly Level]'
+        if args.refseq:
+            query += ' AND "latest refseq"[filter]'
+        if args.hybrid_sequencing:
+            query += ' AND Illumina[All Fields] AND ("Oxford Nanopore"[All Fields] OR PacBio[All Fields])'
         if args.country:
             query += " AND (" + " OR ".join(f'\"{country}\"[All Fields]' for country in args.country) + ")"
         result = ncbi_json("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi", {
             "db": "assembly", "term": query, "retmax": args.max_assemblies, "sort": "date",
         }, args.email, args.api_key)
         identifiers = result["esearchresult"].get("idlist", [])
+        if args.negative_controls and identifiers:
+            before = len(identifiers)
+            identifiers = single_sequence_uids(identifiers, args.email, args.api_key)
+            print(f"[discovery] {organism}: {len(identifiers)} of {before} candidate(s) are a single sequence (no plasmid is possible in the others)", flush=True)
         print(f"[discovery] {organism}: inspecting {len(identifiers)} complete-assembly candidate(s)", flush=True)
         for position, uid in enumerate(identifiers, 1):
             try:

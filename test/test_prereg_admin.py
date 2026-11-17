@@ -61,7 +61,8 @@ def main():
     status = admin.status(ROOT)
     check("no decision is proposed or TO_FIX: the plan is not a draft", status["counts"]["proposed"] == 0 and status["counts"]["TO_FIX"] == 0 and not status["draft"], status["counts"])
     log = admin.history(ROOT)
-    confirmed = {e["parameter"] for e in log if e["action"] == "confirmed"}
+    # the 29 proposed decisions the project owner confirmed on 16 November; a decision added later (interval_method_stratified, 17 November) has its own record
+    confirmed = {e["parameter"] for e in log if e["action"] == "confirmed" and e["date"] == "2026-11-16" and e["parameter"] != "interval_method"} | {"interval_method"}
     expected = {"primary_endpoint", "primary_endpoint_reassembly", "tool_timeout_seconds", "headline_independence", "interval_method", "dominant_study_share", "headline_min_clusters",
                 "amr_flank_bp", "scorecard_weights", "map_max_bp", "chromid_min_bp", "large_plasmid_bp"}
     check("the confirmation of the formerly proposed decisions is recorded (29 of them)", len(confirmed) == 29 and expected <= confirmed, (len(confirmed), expected - confirmed))

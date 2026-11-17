@@ -2,6 +2,7 @@
 """discover_ncbi_cohort.py --negative-controls: plasmid-free complete genomes become candidates, and plasmid-bearing ones are rejected (and the reverse without the flag)."""
 
 import csv
+import json
 import os
 import sys
 import tempfile
@@ -28,8 +29,18 @@ ASSEMBLIES = {
 def fake_ncbi_json(url, params, email, api_key):
     if "esearch" in url:
         return {"esearchresult": {"idlist": ["1", "2"]}}
-    uid = params["id"]
-    return {"result": {uid: {"assemblyaccession": f"GCF_00000000{uid}.1"}}}
+    return {"result": {uid: {"assemblyaccession": f"GCF_00000000{uid}.1"} for uid in params["id"].split(",")}}
+
+
+DATASETS_CALLS = []
+
+
+def fake_fetch(request, timeout, retries, label, parse):
+    # the bulk Datasets report: assembly 1 is a single sequence, assembly 2 has a plasmid (3 sequences)
+    DATASETS_CALLS.append(request.full_url)
+    sizes = {"GCF_000000001.1": 1, "GCF_000000002.1": 3}
+    wanted = request.full_url.split("/accession/")[1].split("/")[0].split(",")
+    return parse(json.dumps({"reports": [{"accession": a, "assembly_stats": {"number_of_component_sequences": sizes[a]}} for a in wanted]}).encode())
 
 
 def fake_metadata(accession, email, api_key):
@@ -44,15 +55,15 @@ def fake_runinfo(biosample, email, api_key, platform_term="ILLUMINA[Platform]"):
 
 def run(extra):
     with tempfile.TemporaryDirectory() as d:
-        saved = (dnc.ncbi_json, dnc.assembly_metadata, dnc.runinfo_for_biosample, dnc.long_read_runs_for_biosample, dnc.time.sleep, sys.argv)
-        dnc.ncbi_json, dnc.assembly_metadata, dnc.runinfo_for_biosample = fake_ncbi_json, fake_metadata, fake_runinfo
+        saved = (dnc.ncbi_json, dnc.assembly_metadata, dnc.runinfo_for_biosample, dnc.long_read_runs_for_biosample, dnc.time.sleep, sys.argv, dnc.fetch)
+        dnc.ncbi_json, dnc.assembly_metadata, dnc.runinfo_for_biosample, dnc.fetch = fake_ncbi_json, fake_metadata, fake_runinfo, fake_fetch
         dnc.long_read_runs_for_biosample = lambda *a, **k: []
         dnc.time.sleep = lambda s: None
         sys.argv = ["discover_ncbi_cohort.py", "--organism", "Escherichia coli", "--out-dir", d, *extra]
         try:
             dnc.main()
         finally:
-            dnc.ncbi_json, dnc.assembly_metadata, dnc.runinfo_for_biosample, dnc.long_read_runs_for_biosample, dnc.time.sleep, sys.argv = saved
+            dnc.ncbi_json, dnc.assembly_metadata, dnc.runinfo_for_biosample, dnc.long_read_runs_for_biosample, dnc.time.sleep, sys.argv, dnc.fetch = saved
         read = lambda name: list(csv.DictReader(open(os.path.join(d, name), encoding="utf-8"), delimiter=chr(9)))  # noqa: E731
         return read("accepted.tsv"), read("rejected.tsv")
 
@@ -62,7 +73,9 @@ check("without the flag the plasmid-bearing assembly is accepted and the plasmid
       and [r["reason"] for r in rejected] == ["assembly does not declare plasmid replicons"], (accepted, rejected))
 accepted, rejected = run(["--negative-controls"])
 check("with --negative-controls the plasmid-free assembly is the candidate", [r["biosample"] for r in accepted] == ["SAMN1"], accepted)
-check("the plasmid-bearing assembly is rejected as not a negative control", [r["reason"] for r in rejected] == ["assembly declares plasmid replicons, so it is not a negative control"], rejected)
+check("the plasmid-bearing assembly never reaches the per-assembly lookups: the bulk single-sequence filter removed it", rejected == [] and len(DATASETS_CALLS) == 1, (rejected, DATASETS_CALLS))
+check("the bulk filter asked the Datasets report for both candidates in one request", "GCF_000000001.1,GCF_000000002.1" in DATASETS_CALLS[0], DATASETS_CALLS)
+check("without --negative-controls the bulk filter is not used", len(DATASETS_CALLS) == 1)
 check("the candidate records zero plasmids and says it still needs review", accepted[0]["assembly_plasmid_count"] == "0" and "negative_control_pending_review" in accepted[0]["source_study"], accepted[0])
 
 print("ALL DISCOVER NEGATIVE CONTROL TESTS PASSED" if ok else "DISCOVER NEGATIVE CONTROL TESTS FAILED")

@@ -12,7 +12,7 @@ under **Scoring decisions**, and in the file `config/prereg.tsv`. Every report a
 
 ## What has been decided
 
-**On 16 November 2026 the project owner confirmed all 29 decisions that had been proposed.** Nothing was left open. Together with the decisions settled earlier, all 69 decisions are
+**On 16 November 2026 the project owner confirmed all 29 decisions that had been proposed.** Nothing was left open. Together with the decisions settled earlier, and one added on 17 November 2026 (`interval_method_stratified`, decided by Claude as an expert on the full interval simulation, with the project owner's delegation), all 70 decisions are
 now confirmed (one of them, the scorecard bands for variant concordance and structural variants, is marked *unavailable by design*: there is no independent set of true variants to compare
 with, so PlasBench shows those two measures as unavailable instead of inventing a threshold).
 
@@ -100,6 +100,7 @@ Each row says what the decision means, the value that was decided, and whether y
 | **When tests are exact and when they are simulated** (`exact_permutation_max_units`) | Up to this many independent studies the test counts every possible outcome exactly; above it, it samples outcomes at random. | `12` | no (written into the program) |
 | **Difference too small to matter** (`smallest_difference`) | Two tools whose scores differ by less than this are reported as practically equivalent. | `0.05` | yes, in the window or with `plasbench analysis prereg set` |
 | **The test used to compare two tools** (`paired_test`) | Two tools are compared with a permutation test on whole studies, with a second test beside it, and p-values are adjusted for the number of comparisons (Holm). | `sign-flip permutation (primary) and Wilcoxon signed-rank` | no (written into the program) |
+| **How confidence intervals are calculated when species are balanced** (`interval_method_stratified`) | When the ranking averages per-species means (the usual headline), the interval uses a studentised cluster bootstrap: whole studies are resampled within each species and each draw is scaled by its own standard error. Without species balancing the cluster-robust t interval of the previous decision is still used. | `bootstrap_t` | yes, in the window or with `plasbench analysis prereg set` |
 | **How confidence intervals are calculated** (`interval_method`) | The default is a cluster-robust t interval, which treats each independent study as one unit. Two other methods stay available and are measured beside it. | `cluster_t` | yes, in the window or with `plasbench analysis prereg set` |
 | **When one study is too large for the default interval** (`dominant_study_share`) | If one study holds more than this share of the isolates, intervals switch to the percentile method, which the simulation found less bad in that situation. | `0.30` | yes, in the window or with `plasbench analysis prereg set` |
 
