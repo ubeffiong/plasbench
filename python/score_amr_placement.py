@@ -197,8 +197,11 @@ def cmd_score(args):
         sid, start, end = row["sequence_id"], int(row["start"]), int(row["end"])
         length = max(1, end - start)
         best, best_bp = "", 0
+        per_query = defaultdict(list)
         for query, qs, qe in covered_by_query.get(sid, []):
-            bp = max(0, min(end, qe) - max(start, qs))
+            per_query[query].append((qs, qe))
+        for query, spans in per_query.items():   # a record's own alignments to the gene are united, so one record covering it in two blocks is one record
+            bp = covered_bp(spans, start, end)
             if bp > best_bp:
                 best, best_bp = query, bp
         record = {"sample": args.sample, "tool": args.tool, "copy_id": row.get("copy_id", ""),
@@ -207,10 +210,14 @@ def cmd_score(args):
                   "matched_plasmid": "", "placement": "not_recovered", "replicon_type_correct": "", "flank_covered": "",
                   "plasmid_cprr_correct": cprr.get(sid, ""), "plasmid_cprr_correct_no_identity": cprr_no_identity.get(sid, ""),
                   "truth_evidence_tier": (row.get("evidence_tier") or "").strip(), "evaluation_task": task, "attribution": attribution, "attribution_mode": mode}
-        if best and best_bp / length >= args.min_gene_coverage:
+        # Recovery is the union of every record's alignment, exactly as score_plasmids.py counts amr_gene_recall (audit AU-047): a gene split 0-48 + 52-100 is recovered
+        # in both. A gene no single record covers is recovered but cannot be placed on one record or bin, so it is reported as unassigned_contig.
+        union_bp = covered_bp([(qs, qe) for _q, qs, qe in covered_by_query.get(sid, [])], start, end)
+        if best and union_bp / length >= args.min_gene_coverage:
+            split = best_bp / length < args.min_gene_coverage
             # contig_attribution: the record is attributed on its own; there is no bin, so no co-localisation claim
-            unbinned = mode == "bin_matching" and best not in membership
-            bin_id = membership.get(best, "") if mode == "bin_matching" else ""
+            unbinned = (mode == "bin_matching" and best not in membership) or split
+            bin_id = membership.get(best, "") if mode == "bin_matching" and not split else ""
             target = "" if unbinned else matched.get(bin_id if mode == "bin_matching" else best, "")
             label = labels.get(best, "")
             if unbinned:
