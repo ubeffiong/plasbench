@@ -448,6 +448,8 @@ python3 "$HERE/../python/write_manifest.py" \
 # The interactive cohort dashboard repeats the heatmap and metric tables and adds about 1 MB: embedded only when REPORT_EMBED_DASHBOARD=1.
 REPORT_FLAGS=()
 if [ "${REPORT_EMBED_DASHBOARD:-0}" = "1" ]; then REPORT_FLAGS+=(--embed-dashboard); fi
+# Build the report even when the leaderboard was ranked from a different score table or tool set (audit AU-012); the mismatch is still printed.
+if [ "${ALLOW_INPUT_MISMATCH:-0}" = "1" ]; then REPORT_FLAGS+=(--allow-input-mismatch); fi
 
 python3 "$HERE/../python/build_html_report.py" \
     ${REPORT_FLAGS[@]+"${REPORT_FLAGS[@]}"} \
