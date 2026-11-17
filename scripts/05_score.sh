@@ -488,10 +488,12 @@ score_sample() {
     rm -f "$REF_MMI"
 }
 
+reset_shard_dir "score_crashed"
+CRASHED_DIR="$(shard_dir "score_crashed")"
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     job_slot_wait "$MAX_PARALLEL_SAMPLES"
-    score_sample "$SAMPLE" "$ASM" "$SRA" &
+    start_sample_job "$CRASHED_DIR" "$SAMPLE" score_sample "$SAMPLE" "$ASM" "$SRA"
 done < <(read_samples "$SAMPLE_SHEET")
 wait
 
@@ -545,5 +547,8 @@ if [[ "${RUN_QUAST_DIAGNOSTICS:-0}" -eq 1 ]]; then
     done
     shopt -u nullglob
 fi
+
+# After everything the other samples produced is merged: a sample whose scoring job crashed has no scores, and that is reported, not hidden.
+report_crashed_sample_jobs "Stage 5 (score)" "$CRASHED_DIR"
 
 log "Stage 5 (score) complete. Combined scores: $SCORES"

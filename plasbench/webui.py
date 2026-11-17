@@ -507,6 +507,7 @@ SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
 KEEP_JOBS = 500
 STARTUP_GRACE = 60   # seconds a freshly started runner may take to write its first heartbeat
+INTERRUPTED_WATCH_SECONDS = 6 * 3600   # how long an "interrupted" run is still watched for its heartbeat to come back (a laptop that slept) before the watcher gives up
 SERVER_STARTED = time.time()
 
 
@@ -623,20 +624,38 @@ class Jobs:
         while True:
             time.sleep(1.0)
             job = self.jobs.get(job_id)
-            if not job or job["state"] not in ("running", "cancelling"):
+            if not job or job["state"] not in ("running", "cancelling", "interrupted"):
                 break
             exit_info = jobrunner.read_json(self._paths(job_id)["exit"])
             if exit_info is not None:
                 self._finish(job_id, exit_info.get("code"), exit_info.get("ended"))
                 break
-            if not self._alive(job):
+            alive = self._alive(job)
+            if job["state"] == "interrupted":
+                # A stale heartbeat does not prove the runner is gone: when the computer sleeps or hibernates, the runner and this server stop together and
+                # the heartbeat file looks old on waking, before the runner has written its next one. If it comes back, the run is plainly still going; calling
+                # it interrupted and offering Resume would start a second pipeline in the same results folder. Keep watching for a while before giving up.
+                if alive:
+                    with self.lock:
+                        job.update(state="running", ended=None, exit=None)
+                        self._save()
+                    self._append_log(job_id, "\n[PlasBench] The run is still going (the computer was probably asleep or busy). It was only paused, so there is nothing to resume.\n")
+                    session_log().event("job_resumed_by_heartbeat", job=job_id, label=job["label"])
+                elif time.time() - (job.get("ended") or time.time()) > INTERRUPTED_WATCH_SECONDS:
+                    break
+                else:
+                    time.sleep(1.0)
+                continue
+            if not alive:
                 with self.lock:
                     job.update(state="cancelled" if job["state"] == "cancelling" else "interrupted", ended=self._last_sign_of_life(job_id), exit=None)
                     self._save()
                 self._append_log(job_id, "\n[PlasBench] " + ("The run was cancelled." if job["state"] == "cancelled" else
                                  "The run stopped without recording how it ended. Use Resume: finished work is kept and reused.") + "\n")
                 session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=None, seconds=round(job["ended"] - job["started"], 1))
-                break
+                if job["state"] == "cancelled":
+                    break
+                # interrupted: keep watching (see above)
         self.watchers.discard(job_id)
 
     def _finish(self, job_id: str, code, ended, save: bool = True):
@@ -776,6 +795,8 @@ class Jobs:
             raise KeyError(job_id)
         if job["state"] not in RESUMABLE_STATES or job.get("kind") != "plasbench" or not job.get("argv"):
             raise ValueError("only a failed, interrupted or cancelled plasbench run can be resumed")
+        if jobrunner.is_alive(str(self.dir), job_id):
+            raise ValueError("this run is still going (its runner is alive), so it cannot be resumed; wait for it to finish or cancel it first")
         if any(j["state"] in ("running", "cancelling") and j.get("argv") == job["argv"] for j in self.jobs.values()):
             raise ValueError("the same command is already running")
         command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(job["argv"])

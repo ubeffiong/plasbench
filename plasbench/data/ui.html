@@ -1034,6 +1034,12 @@ const S = {info:null, schema:null, env:null, tools:null, user:null, settings:nul
            cmd:{name:null, sub:null, values:{}}, wiz:{step:0, values:{}, source:"demo"}, consJob:null, consOffset:0, follow:true};
 const $ = (s, el=document) => el.querySelector(s), $$ = (s, el=document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+/* A value for use as an argument inside an inline handler: onclick="fn(${jsq(x)})".
+   esc() alone is NOT enough there: the browser decodes &#39; back to ' before the script is parsed, so a name containing '); breaks out of the string.
+   JSON.stringify makes a valid string literal (quotes, backslashes and newlines escaped); esc() then protects the attribute. */
+const jsq = s => esc(JSON.stringify(String(s ?? "")));
+/* The same for a JSON value in a data-* attribute (read back with JSON.parse(el.dataset.x)): always double-quoted and escaped. */
+const dattr = v => esc(JSON.stringify(v));
 const icon = (n, cls="ico sm") => `<svg class="${cls}"><use href="#i-${n}"/></svg>`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const newReqId = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Array.from({length: 24}, () => Math.floor(Math.random() * 36).toString(36)).join(""));
@@ -1670,7 +1676,7 @@ function renderEnv(env) {
     if (!c.ok && c.fix) {
       if (c.fix === "install-conda") fix = `<button class="btn sec sm" data-run='["install-conda","--yes"]' data-label="Install conda">Install</button>`;
       else if (c.fix === "install-git") fix = `<button class="btn sec sm" data-run='["install-git"]' data-label="Install Git${S.info?.os === "nt" || /Windows/.test(c.label) ? " for Windows (Git Bash)" : ""}">Install</button>`;
-      else if (c.fix.startsWith("install-tools ")) fix = `<button class="btn sec sm" data-run='${JSON.stringify(["install-tools", c.fix.split(" ")[1], "--yes"])}' data-label="Install ${esc(c.fix.split(" ")[1])} tools">Install</button>`;
+      else if (c.fix.startsWith("install-tools ")) fix = `<button class="btn sec sm" data-run="${dattr(["install-tools", c.fix.split(" ")[1], "--yes"])}" data-label="Install ${esc(c.fix.split(" ")[1])} tools">Install</button>`;
       else if (c.fix === "check") fix = `<button class="btn sec sm" data-run='["check","--yes"]' data-label="Download tool databases">Download</button>`;
       else if (c.fix.startsWith("settings:")) fix = `<button class="btn sec sm" onclick="document.getElementById('${c.fix.endsWith("KEY") ? "ncbi_key" : "ncbi_email"}').focus()">Enter</button>`;
       else fix = `<span class="mut small" style="max-width:260px">${esc(c.fix)}</span>`;
@@ -1735,8 +1741,8 @@ function renderToolTable() {
     <td class="small" style="max-width:260px">${esc(t.database || "–")}${t.database_release ? `<div class="mut">released ${esc(t.database_release)}</div>` : ""}</td>
     <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}: ${t.enabled ? "on, so it runs unless you turn it off for a run" : "off, so it is skipped unless you turn it on for a run"}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label> <b class="small ${t.enabled ? "ok-t" : "mut"}" data-flagtxt="${esc(t.run_flag)}">${t.enabled ? "on" : "off"}</b>` :
          t.source === "user" ? `<span class="mut small">--tool ${esc(t.tool)}</span>` : `<span class="mut small">–</span>`}</td>
-    <td style="text-align:right;white-space:nowrap">${t.source === "user" ? `<button class="btn ghost sm" onclick="editUserTool('${esc(t.tool)}')">${icon("edit")}Edit</button>` : ""}
-      ${t.profile && t.installed === false ? `<button class="btn sec sm" data-run='${JSON.stringify(["install-tools", t.profile, "--yes"])}' data-label="Install ${esc(t.display)}">Install</button>` : ""}</td></tr>`).join("")
+    <td style="text-align:right;white-space:nowrap">${t.source === "user" ? `<button class="btn ghost sm" onclick="editUserTool(${jsq(t.tool)})">${icon("edit")}Edit</button>` : ""}
+      ${t.profile && t.installed === false ? `<button class="btn sec sm" data-run="${dattr(["install-tools", t.profile, "--yes"])}" data-label="Install ${esc(t.display)}">Install</button>` : ""}</td></tr>`).join("")
     || `<tr><td colspan="6" class="mut">No tool matches.</td></tr>`;
 }
 $("#toolq").oninput = e => { TF.q = e.target.value; renderToolTable(); };
@@ -2797,10 +2803,10 @@ async function loadIsolates() {
 async function loadCohorts() {
   const cs = await getCohorts();
   $("#s_cohorts").textContent = `${cs.filter(c => !c.metagenomic).length} isolate · ${cs.filter(c => c.metagenomic).length} metagenomic`;
-  $("#cohtb").innerHTML = cs.map(c => `<tr data-coh="${esc(c.name)}"${S.coh === c.name ? ' class="sel"' : ""}><td><a href="javascript:void 0" onclick="cohortInfo('${esc(c.name)}')"><b>${esc(c.name)}</b></a><div class="mut small">${esc(c.path)}</div></td><td>${c.rows}</td>
+  $("#cohtb").innerHTML = cs.map(c => `<tr data-coh="${esc(c.name)}"${S.coh === c.name ? ' class="sel"' : ""}><td><a href="javascript:void 0" onclick="cohortInfo(${jsq(c.name)})"><b>${esc(c.name)}</b></a><div class="mut small">${esc(c.path)}</div></td><td>${c.rows}</td>
     <td>${c.locked ? `<span class="tag ok">${icon("check")}locked</span>` : `<span class="tag">unlocked</span>`}</td><td>${c.metagenomic ? "metagenomic" : "isolate"}</td>
-    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="cohortInfo('${esc(c.name)}')">${icon("info")}Details</button> ${c.selection ? `<button class="btn sec sm" onclick="selectionReport('${esc(c.name)}')">Selection report</button> ` : ""}${c.metagenomic ? "" : `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", c.path])}' data-label="Validate ${esc(c.name)}">Validate</button>
-      <button class="btn sec sm" onclick="benchCohort('${esc(c.name)}')">${icon("play")}Benchmark</button>`}</td></tr>`).join("");
+    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="cohortInfo(${jsq(c.name)})">${icon("info")}Details</button> ${c.selection ? `<button class="btn sec sm" onclick="selectionReport(${jsq(c.name)})">Selection report</button> ` : ""}${c.metagenomic ? "" : `<button class="btn sec sm" data-run="${dattr(["validate-cohort", "--samples", c.path])}" data-label="Validate ${esc(c.name)}">Validate</button>
+      <button class="btn sec sm" onclick="benchCohort(${jsq(c.name)})">${icon("play")}Benchmark</button>`}</td></tr>`).join("");
 }
 /* cohort details: what is in it, from the sheet, its lock and cohorts/README.md (nothing is downloaded) */
 const NCBI = [[/^GC[AF]_\d+\.\d+$/, "https://www.ncbi.nlm.nih.gov/datasets/genome/"], [/^[SED]RR\d+$/, "https://www.ncbi.nlm.nih.gov/sra/"],
@@ -2847,9 +2853,9 @@ async function cohortInfo(name) {
         .map(k => hbars(COH_LABEL[k] || k.replace(/_/g, " "), s[k])).join("");
   const desc = (d.readme ? md(d.readme.replace(/^##[^\n]*\n/, "")) : "") + (d.comments.length ? `<p class="mut small">${d.comments.map(esc).join(" ")}</p>` : "");
   box.innerHTML = `<div class="hd"><svg class="ico"><use href="#i-users"/></svg><h3>${esc(d.name)}</h3><span class="tag">${kindWord}</span> ${lockTag}<span class="grow"></span>
-     ${d.selection ? `<button class="btn sec sm" onclick="selectionReport('${esc(d.name)}')">${icon("info")}Selection report</button>` : ""}
-     ${d.kind === "isolate" ? `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", d.path])}' data-label="Validate ${esc(d.name)}">Validate</button>
-     <button class="btn sm" onclick="benchCohort('${esc(d.name)}')">${icon("play")}Benchmark</button>` : ""}
+     ${d.selection ? `<button class="btn sec sm" onclick="selectionReport(${jsq(d.name)})">${icon("info")}Selection report</button>` : ""}
+     ${d.kind === "isolate" ? `<button class="btn sec sm" data-run="${dattr(["validate-cohort", "--samples", d.path])}" data-label="Validate ${esc(d.name)}">Validate</button>
+     <button class="btn sm" onclick="benchCohort(${jsq(d.name)})">${icon("play")}Benchmark</button>` : ""}
      <button class="btn ghost icon sm" onclick="$('#cohdetail').hidden=true;S.coh='';$$('#cohtb tr').forEach(t=>t.classList.remove('sel'))" aria-label="Close details">${icon("x")}</button></div>
    <div class="bd stack" style="gap:14px">
     ${desc ? `<div class="desc md">${desc}</div>` : ""}
@@ -2902,7 +2908,7 @@ function publicationCard(d) {
   return `<div class="note" style="display:block"><b>Published benchmark cohort.</b> ${esc(p.citation || p.label || "")}${p.note ? `<div class="small mut" style="margin-top:4px">${esc(p.note)}</div>` : ""}
     <div class="cohbars" style="margin-top:8px">${studies}${funnel}${p.truth_match ? `<table class="data"><thead><tr><th>Truth plasmids vs the paper's</th><th class="num">Isolates</th></tr></thead><tbody>${rows(p.truth_match, "value", "n")}</tbody></table>` : ""}</div>${left}
     <p class="small" style="margin:8px 0 0">${has ? "The paper's own outcomes ship with PlasBench, so after a run you can put your results beside them:" : "No published outcome table ships for this cohort yet; the isolates can still be run."}
-     ${has ? `<br><code>${esc((p.compare_command || "").replace("<results>", "results"))}</code> <button class="btn ghost sm" onclick="navigator.clipboard.writeText(${JSON.stringify((p.compare_command || "").replace("<results>", "results"))});toast('Command copied')">Copy</button>` : ""}</p>
+     ${has ? `<br><code>${esc((p.compare_command || "").replace("<results>", "results"))}</code> <button class="btn ghost sm" onclick="navigator.clipboard.writeText(${jsq((p.compare_command || "").replace("<results>", "results"))});toast('Command copied')">Copy</button>` : ""}</p>
     ${has ? `<p class="small mut" style="margin:4px 0 0">Stage 6 does this automatically (setting RUN_PUBLISHED_COMPARISON) and the report gets a "Comparison with published outcomes" section. It is a comparison for your judgement, not a ranking: assemblies, tool versions, databases and metric definitions differ from the paper's.</p>` : ""}</div>`;
 }
 async function selectionReport(name) {
@@ -2998,9 +3004,9 @@ async function loadWorkspace(force) {
       return `<tr><td><b class="mono">${esc(st.name)}</b>${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}</td>
         <td class="small">${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "–"))}</td><td>${st.runs}</td><td class="small">${fmtTime(st.modified)}</td>
         <td style="text-align:right;white-space:nowrap">${st.report && idx >= 0 ? `<a class="btn sec sm" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">Report</a>` : ""}
-          <button class="btn ghost sm" onclick="benchStudy('${esc(st.name)}')">Run in this study</button>
-          <button class="btn ghost icon sm" title="${st.tracked ? "Tracked with Git: open its version control" : "Track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}" onclick="gitStudy('${esc(st.path.replace(/\\/g, "\\\\"))}')">${icon("git")}</button>
-          <button class="btn ghost icon sm" title="Open the study folder" onclick="reveal('${esc(st.path.replace(/\\/g, "\\\\"))}')">${icon("folder")}</button></td></tr>`; }).join("")
+          <button class="btn ghost sm" onclick="benchStudy(${jsq(st.name)})">Run in this study</button>
+          <button class="btn ghost icon sm" title="${st.tracked ? "Tracked with Git: open its version control" : "Track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}" onclick="gitStudy(${jsq(st.path)})">${icon("git")}</button>
+          <button class="btn ghost icon sm" title="Open the study folder" onclick="reveal(${jsq(st.path)})">${icon("folder")}</button></td></tr>`; }).join("")
       || `<tr><td colspan="5" class="mut">No studies yet. Start one from <a href="#wizard">New benchmark</a>, or create one on the right.</td></tr>`;
     $("#ws_recent").innerHTML = w.recent.length ? `<div class="small mut" style="margin-top:12px">Recent workspaces</div>` + w.recent.map(r =>
       `<button class="task" style="padding:6px 0" data-wsr="${esc(r)}"><svg class="ico"><use href="#i-folder"/></svg><span class="tx"><b class="mono" style="font-size:12.5px">${esc(r)}</b></span></button>`).join("") : "";
@@ -3499,7 +3505,7 @@ async function renderDoc(t) {
       const where = f ? (t.staged ? "staged for the next commit" : f.untracked ? "new file, not tracked yet" : "changed, not staged") : "no longer changed (committed or reverted)";
       box.innerHTML = `<div class="docbar"><h2 class="mono">${esc(t.path)}</h2><span class="tag ${t.staged ? "ok" : "warn"}">${esc(where)}</span>
         ${f && !t.staged ? `<button class="btn sec sm" id="dv_stage">${icon("plus")}Stage</button>` : ""}${f && t.staged ? `<button class="btn sec sm" id="dv_unstage">Unstage</button>` : ""}
-        <button class="btn ghost sm" id="dv_ref">${icon("refresh")}Refresh</button><button class="btn ghost sm" onclick="mtClose('${esc(t.id).replace(/'/g, "\\'")}')">${icon("x")}Close</button></div>
+        <button class="btn ghost sm" id="dv_ref">${icon("refresh")}Refresh</button><button class="btn ghost sm" onclick="mtClose(${jsq(t.id)})">${icon("x")}Close</button></div>
         <div class="mut small" style="margin:-4px 0 8px">${esc(t.repo)}</div>${renderDiff(d.diff)}`;
       if ($("#dv_stage")) $("#dv_stage").onclick = async () => { await gitOp({op: "stage", paths: [t.path], repo: t.repo}, "Staged"); mtClose(t.id); openDoc({kind: "diff", path: t.path, staged: true, repo: t.repo}); };
       if ($("#dv_unstage")) $("#dv_unstage").onclick = async () => { await gitOp({op: "unstage", paths: [t.path], repo: t.repo}, "Unstaged"); mtClose(t.id); openDoc({kind: "diff", path: t.path, staged: false, repo: t.repo}); };
@@ -3512,8 +3518,8 @@ async function renderDoc(t) {
     const word = {merge: "merge commit", local: "not yet pushed", pushed: "pushed"}[kind];
     const chunks = c.patch.split(/\n(?=diff --git )/).filter(x => x.trim());
     box.innerHTML = `<div class="docbar"><h2>${esc(c.subject)}</h2><span class="tag"><span class="hdot ${kind}"></span>&nbsp;${word}</span>
-        <button class="btn ghost sm" onclick="navigator.clipboard.writeText('${esc(c.hash)}');toast('Commit id copied')">${icon("copy")}${esc(c.short)}</button>
-        <button class="btn ghost sm" onclick="mtClose('${esc(t.id).replace(/'/g, "\\'")}')">${icon("x")}Close</button></div>
+        <button class="btn ghost sm" onclick="navigator.clipboard.writeText(${jsq(c.hash)});toast('Commit id copied')">${icon("copy")}${esc(c.short)}</button>
+        <button class="btn ghost sm" onclick="mtClose(${jsq(t.id)})">${icon("x")}Close</button></div>
       <div class="card"><div class="bd"><dl class="facts">
         <dt>Author</dt><dd>${esc(c.author)} &lt;${esc(c.email)}&gt;</dd><dt>Date</dt><dd>${esc(new Date(c.date).toLocaleString())} (${esc(c.when)})</dd>
         <dt>Commit</dt><dd class="mono">${esc(c.hash)}</dd>
@@ -3627,9 +3633,9 @@ function runRow(r, i) {
     <div class="meta"><span>${icon("folder")} ${esc(r.path)}</span><span>${fmtTime(r.modified)}</span><span>${r.samples} isolates</span><span>${r.tools} tools</span></div>
     <div class="leaders">${r.leaders.map(l => `<div class="leader"><span class="mut">${esc([l.task, l.track.replace("_", " ")].filter(Boolean).join(" · ") || "leader")}</span><b>${esc(l.display || l.tool)}</b><span class="mut">${l.lw ? "lw-F1 " + (+l.lw).toFixed(3) : "F1 " + (+l.f1 || 0).toFixed(3)}</span></div>`).join("")}</div></div>
     <div class="row wrap" style="justify-content:flex-end;align-content:flex-start">${r.report ? `<a class="btn sec" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">${icon("chart")}Open report</a>` : ""}
-      ${r.pdf ? `<a class="btn sec" href="/view/${idx}/benchmark.report.pdf" target="_blank">PDF</a>` : `<button class="btn sec" data-run='${JSON.stringify(["report-pdf", "--results-dir", r.path])}' data-label="Export ${esc(r.name)} to PDF">${icon("down")}Export PDF</button>`}
-      <button class="btn ghost" data-run='${JSON.stringify(["report", "--results-dir", r.path, "--no-report-prompt"])}' data-label="Rebuild the report of ${esc(r.name)}">${icon("refresh")}Rebuild</button>
-      <button class="btn ghost icon" title="Show the folder" onclick="reveal('${esc(r.path.replace(/\\/g, "\\\\"))}')">${icon("folder")}</button></div></div>`;
+      ${r.pdf ? `<a class="btn sec" href="/view/${idx}/benchmark.report.pdf" target="_blank">PDF</a>` : `<button class="btn sec" data-run="${dattr(["report-pdf", "--results-dir", r.path])}" data-label="Export ${esc(r.name)} to PDF">${icon("down")}Export PDF</button>`}
+      <button class="btn ghost" data-run="${dattr(["report", "--results-dir", r.path, "--no-report-prompt"])}" data-label="Rebuild the report of ${esc(r.name)}">${icon("refresh")}Rebuild</button>
+      <button class="btn ghost icon" title="Show the folder" onclick="reveal(${jsq(r.path)})">${icon("folder")}</button></div></div>`;
 }
 function runBrief(r) {
   const idx = S.runs.indexOf(r), lead = r.leaders.map(l => `${esc(l.display || l.tool)} <span class="mut">(${esc(l.task || "leader")})</span>`).join(", ");
@@ -3655,8 +3661,8 @@ function renderJobs() {
   $("#jobtb").innerHTML = S.jobs.map(j => `<tr><td><div class="row">${st(j.state)}<span>${stateWord(j.state)}${j.exit != null && j.state !== "done" ? ` <span class="mut small">exit ${j.exit}</span>` : ""}</span></div></td>
     <td><b>${esc(j.label)}</b><div class="mono small mut" style="word-break:break-all">${esc(j.command)}</div></td><td class="small">${fmtTime(j.started)}</td>
     <td class="small">${fmtDur((j.ended || Date.now() / 1000) - j.started)}</td>
-    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="showConsole('${j.id}', true)">Log</button>
-     ${j.state === "running" ? `<button class="btn danger sm" onclick="cancelJob('${j.id}')">Cancel</button>` : `${j.kind === "git" || !j.argv.length ? "" : `<button class="btn ghost sm" data-run='${esc(JSON.stringify(j.argv))}' data-label="${esc(j.label)}">Run again</button>`}<button class="btn ghost icon sm" title="Remove" onclick="delJob('${j.id}')">${icon("trash")}</button>`}</td></tr>`).join("")
+    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="showConsole(${jsq(j.id)}, true)">Log</button>
+     ${j.state === "running" ? `<button class="btn danger sm" onclick="cancelJob(${jsq(j.id)})">Cancel</button>` : `${j.kind === "git" || !j.argv.length ? "" : `<button class="btn ghost sm" data-run="${dattr(j.argv)}" data-label="${esc(j.label)}">Run again</button>`}<button class="btn ghost icon sm" title="Remove" onclick="delJob(${jsq(j.id)})">${icon("trash")}</button>`}</td></tr>`).join("")
     || `<tr><td colspan="5" class="mut">No jobs yet. Everything you start from this window appears here.</td></tr>`;
 }
 window.showConsole = showConsole;

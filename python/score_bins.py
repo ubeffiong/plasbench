@@ -93,6 +93,11 @@ def safe_div(a, b):
     return a / b if b else 0.0
 
 
+def blank_none(value):
+    """4-decimal text, or "" for an undefined value (never "0.0000" for something that is undefined)."""
+    return "" if value is None else f"{value:.4f}"
+
+
 def bp_entropy(weights_by_label):
     """Shannon entropy (natural log) of a discrete bp-weighted distribution."""
     total = sum(weights_by_label.values())
@@ -321,6 +326,11 @@ def length_weighted_binning(overlaps, plasmids, total_mapped, all_bins):
     correct_bp = sum(bp for _, _, bp in matched)
     truth_bp = sum(plasmids.values())
     mapped_bp = sum(total_mapped.values())
+    if not truth_bp:
+        # No true plasmid on this isolate (docs/METHODS.md, "Zero-true-plasmid isolates"): recall and F1 are 0/0, so they are undefined (None -> "").
+        # A 0.0 would score a tool that correctly predicted nothing like one that failed. Precision is a real 0.0 when something was mapped
+        # into a bin (nothing in it can be correct) and undefined when nothing was.
+        return {"matched": matched, "precision": 0.0 if mapped_bp else None, "recall": None, "f1": None}
     precision = safe_div(correct_bp, mapped_bp)
     recall = safe_div(correct_bp, truth_bp)
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
@@ -467,8 +477,11 @@ def main():
             writer.writerow([bin_id, plasmid, bp, f"{safe_div(bp, plasmids[plasmid]):.4f}", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "matched"])
         for bin_id in sorted(all_bins - used_bins): writer.writerow([bin_id, "", 0, "", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "unmatched_bin"])
         for plasmid in sorted(set(plasmids) - used_plasmids): writer.writerow(["", plasmid, 0, "", "", "", "", "", "missed_plasmid"])
-    precision = len(matched) / len(all_bins) if all_bins else 0.0; recall = len(matched) / len(plasmids) if plasmids else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    if plasmids:
+        precision = len(matched) / len(all_bins) if all_bins else 0.0; recall = len(matched) / len(plasmids)
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    else:  # no true plasmid: same undefined-not-zero rule as the length-weighted metrics above
+        precision, recall, f1 = (0.0 if all_bins else None), None, None
     total_bp, chromosome_total = sum(total_mapped.values()), sum(chromosome_bp.values())
     # Supplementary to bin_f1/split_events/merge_events/contamination_fraction
     # above -- never a replacement for them. "" (not 0) when the contingency
@@ -479,9 +492,11 @@ def main():
     unaligned_bp, strict = unaligned_in_bins(args.pred_fasta, membership, query_aligned), {"precision": None, "f1": None}
     if unaligned_bp is not None:
         correct_bp = sum(bp for _, _, bp in lw["matched"])
-        strict["precision"] = safe_div(correct_bp, sum(total_mapped.values()) + unaligned_bp)
+        strict_denominator = sum(total_mapped.values()) + unaligned_bp
+        strict["precision"] = safe_div(correct_bp, strict_denominator) if strict_denominator or lw["recall"] is not None else None
         p_s, r_s = strict["precision"], lw["recall"]
-        strict["f1"] = 2 * p_s * r_s / (p_s + r_s) if p_s + r_s else 0.0
+        if p_s is not None and r_s is not None:  # undefined when there is no true plasmid (r_s is None) or nothing was binned on such an isolate
+            strict["f1"] = 2 * p_s * r_s / (p_s + r_s) if p_s + r_s else 0.0
     ari = adjusted_rand(overlaps, plasmids, chromosome_bp)
     # Assembly-aware recall: the denominator is the plasmid length the assembly
     # actually covers, so a tool is not blamed for bases no contig contains.
@@ -491,7 +506,7 @@ def main():
         reachable = sum(assembly_covered.values())
         correct_bp = sum(bp for _, _, bp in lw["matched"])
         lw_recall_assembly = min(1.0, safe_div(correct_bp, reachable)) if reachable else None
-        if lw_recall_assembly is not None:
+        if lw_recall_assembly is not None and lw["precision"] is not None:
             p = lw["precision"]
             lw_f1_assembly = 2 * p * lw_recall_assembly / (p + lw_recall_assembly) if p + lw_recall_assembly else 0.0
     cprr_rows = correct_reconstruction(lw["matched"], overlaps, plasmids, total_mapped, identity_counts,
@@ -524,8 +539,8 @@ def main():
                          "bin_unaligned_bp", "bin_unaligned_fraction", "lw_bin_precision_strict", "lw_bin_f1_strict"]
                         + [f"outcome_{name}" for name in OUTCOMES]
                         + ["cprr_sweep_correct", "cprr_sweep_correct_without_identity"])
-        writer.writerow([f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else "",
-                         f"{lw['precision']:.4f}", f"{lw['recall']:.4f}", f"{lw['f1']:.4f}",
+        writer.writerow([blank_none(precision), blank_none(recall), blank_none(f1), len(matched), len(all_bins - used_bins), len(set(plasmids) - used_plasmids), splits, merges, sum(chromosome_bp.get(bin_id, 0) > 0 for bin_id in all_bins), chromosome_total, sum(ambiguity_bp.values()), total_bp, f"{chromosome_total / total_bp if total_bp else 0.0:.4f}", f"{nmi:.4f}" if nmi is not None else "", f"{vi:.4f}" if vi is not None else "",
+                         blank_none(lw["precision"]), blank_none(lw["recall"]), blank_none(lw["f1"]),
                          cprr_total, cprr_correct, cprr_correct_no_identity,
                          f"{ari:.4f}" if ari is not None else "",
                          f"{lw_recall_assembly:.4f}" if lw_recall_assembly is not None else "",
@@ -537,8 +552,9 @@ def main():
                         + [outcome_counts[name] for name in OUTCOMES]
                         # Comma-separated counts, one per CPRR_SWEEP_THRESHOLDS value (0.80..0.99).
                         + [",".join(map(str, sweep_with)), ",".join(map(str, sweep_without))])
-    print(f"bin precision={precision:.4f} bin recall={recall:.4f} bin f1={f1:.4f} matches={len(matched)} "
-          f"lw_bin_f1={lw['f1']:.4f} cprr={cprr_correct}/{cprr_total}")
+    shown = lambda value: blank_none(value) or "undefined"
+    print(f"bin precision={shown(precision)} bin recall={shown(recall)} bin f1={shown(f1)} matches={len(matched)} "
+          f"lw_bin_f1={shown(lw['f1'])} cprr={cprr_correct}/{cprr_total}")
 
 
 if __name__ == "__main__": main()
