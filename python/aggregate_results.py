@@ -1080,11 +1080,6 @@ def write_tsv(summary, path):
             fh.write("\t".join(str(x) for x in values) + "\n")
 
 
-def format_rate(rate, assessed):
-    """Display an availability-aware rate without turning missing evidence into zero."""
-    return f"{rate:.1%} (n={assessed})" if rate is not None else "not assessed"
-
-
 def write_md(summary, path, notes=()):
     # Deliberately narrower than write_tsv(): the compact, at-a-glance ranking
     # view. Every other column lives in the TSV and the HTML report.

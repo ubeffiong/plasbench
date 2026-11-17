@@ -25,22 +25,6 @@ def resolve(section_id):
     return section_id
 
 
-def container_of(section_id):
-    """The top-level container section that holds ``section_id`` (itself when it is top level)."""
-    entry = LEGACY_IDS.get(section_id)
-    return entry[0] if entry else section_id
-
-
-def tab_of(section_id):
-    """The tab label of a merged section, or '' for a section that is top level."""
-    entry = LEGACY_IDS.get(section_id)
-    return entry[1] if entry else ""
-
-
-def is_legacy(section_id):
-    return section_id in LEGACY_IDS
-
-
 def where(section_id, title=None):
     """Where a merged section is shown, e.g. 'Ranking confidence, tab Paired tests' (``title`` names the container)."""
     entry = LEGACY_IDS.get(section_id)

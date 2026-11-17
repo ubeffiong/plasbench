@@ -82,10 +82,6 @@ def wsl_distros() -> list:
     return out
 
 
-def wsl_available() -> bool:
-    return bool(wsl_distros())
-
-
 def git_for_windows_bash():
     """Git Bash's bash.exe from Git for Windows (never C:\\Windows\\System32\\bash.exe, the WSL launcher)."""
     if not IS_WIN:

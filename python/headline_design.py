@@ -263,7 +263,8 @@ class Design:
 
     def identity_valid(self, sample):
         record = self.provenance.get(sample)
-        return record is None or record.get("base_level_metrics_valid") == "yes"
+        # No provenance record means the polish is unknown, and unknown is never assumed independent: identity criteria are not applied (audit AU-029)
+        return record is not None and record.get("base_level_metrics_valid") == "yes"
 
     def ambiguous_plasmids(self, sample):
         record = self.provenance.get(sample) or {}

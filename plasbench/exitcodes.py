@@ -37,5 +37,3 @@ def explain(code) -> str:
     return f"failed with exit code {code}"
 
 
-def is_signal(code) -> bool:
-    return code is not None and (int(code) < 0 or int(code) > 128)
