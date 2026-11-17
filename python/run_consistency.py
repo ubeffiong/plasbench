@@ -6,7 +6,8 @@ same runs, and reports every disagreement, because each one changes a ranking wi
 
   duplicate_run            the same sample and tool scored twice (an old run left in the folder); the averages mix both
   completed_without_score  a run finished, but it has no score row and no recorded scoring failure; the tool is then ranked on fewer samples
-  score_without_status     a score row for a run the status table does not know (a stale or foreign row)
+  score_without_status     a score row for a sample the status table does not list for a tool it does list (a stale or foreign row)
+  tool_without_status      a tool with scores but no status rows at all (the status table does not cover it): a WARNING
   unknown_sample           a score row for a sample that is not in the sample sheet (a WARNING: the sheet in use is often a different file from the run's own)
 
 The first three are errors: aggregation stops unless ALLOW_INCONSISTENT_RUNS=1 (--allow-inconsistent-runs), in which case the findings are written to
@@ -20,7 +21,7 @@ from collections import Counter
 
 SHOULD_HAVE_SCORE = {"completed", "reused"}
 FIELDS = ["kind", "severity", "sample", "tool", "detail"]
-WARNING_KINDS = {"unknown_sample"}
+WARNING_KINDS = {"unknown_sample", "tool_without_status"}
 
 
 def _rows(path):
@@ -49,8 +50,12 @@ def check(scores_path, status_path=None, failures_path=None, sample_sheet=None):
             key = (r.get("sample", ""), r.get("tool", ""))
             if r.get("status") in SHOULD_HAVE_SCORE and key not in scored and key not in recorded:
                 found.append(("completed_without_score", key[0], key[1], f"status '{r.get('status')}' but no score row and no scoring failure recorded"))
+        status_tools = {t for _, t in status_keys}
         for sample, tool in sorted(scored - status_keys):
-            found.append(("score_without_status", sample, tool, "a score row for a run the status table does not list"))
+            if tool in status_tools:
+                found.append(("score_without_status", sample, tool, "a score row for a run the status table does not list, though it lists this tool"))
+        for tool in sorted({t for _, t in scored} - status_tools):
+            found.append(("tool_without_status", "", tool, "scores exist but the status table has no row for this tool"))
     if sheet:
         known = {r.get("sample_id") or r.get("sample") for r in sheet}
         known.discard(None)
