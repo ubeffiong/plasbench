@@ -428,19 +428,19 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E10 | Pipeline default MAPQ is 20 | `config/config.sh:543` | `MIN_ALIGNMENT_MAPQ` |
 | E11 | Pipeline default query coverage is 0.20 | `config/config.sh:544` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
 | E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:786` | `0.99995` |
-| E13 | Bin purity gate default 0.9 | `python/score_bins.py:366` | `--min-bin-purity` |
-| E14 | Split threshold default 0.1 | `python/score_bins.py:367` | `--split-threshold` |
-| E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:304` | `def length_weighted_binning` |
+| E13 | Bin purity gate default 0.9 | `python/score_bins.py:380` | `--min-bin-purity` |
+| E14 | Split threshold default 0.1 | `python/score_bins.py:381` | `--split-threshold` |
+| E15 | Length-weighted binning precision uses bases that aligned | `python/score_bins.py:318` | `def length_weighted_binning` |
 | E16 | Ungated one-to-one Hungarian match | `python/score_bins.py:53` | `def maximum_weight` |
-| E17 | CPRR is computed after the match | `python/score_bins.py:316` | `def correct_reconstruction` |
+| E17 | CPRR is computed after the match | `python/score_bins.py:330` | `def correct_reconstruction` |
 | E18 | CPRR minimum coverage 0.95 | `config/config.sh:64` | `CPRR_MIN_COVERAGE` |
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
 | E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:175` | `or len(units) < MIN_CLUSTERS_CI or _has_nan(values)` |
 | E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:259` | `or len(units) < MIN_CLUSTERS_TEST or _has_nan(differences)` |
-| E22 | Holm adjustment across pairs | `python/aggregate_results.py:712` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:889` | `def attach_significance` |
+| E22 | Holm adjustment across pairs | `python/aggregate_results.py:727` | `def holm_adjust` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:904` | `def attach_significance` |
 | E24 | Percentile cluster bootstrap | `python/resampling.py:166` | `def bootstrap_ci` |
-| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:84` | `def sample_clusters` |
+| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:86` | `def sample_clusters` |
 | E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:151` | `UnionFind()` |
 | E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:101` | `PRIMARY_UNAVAILABLE = "unavailable"` |
 | E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:110` | `min_species_clusters=20` |

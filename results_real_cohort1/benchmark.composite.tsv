@@ -1,0 +1,5 @@
+analysis_track	tool	accuracy	completeness	structure	biology	performance	composite	rank	status	gates_failed	dimensions_used	dimensions_dropped
+short_read	baseline_coverage		47.4340	9.8901	37.1681	100.0000	39.3351		gated	completeness	completeness,structure,biology,performance	accuracy
+short_read	mob_recon		69.8755	39.0827	69.9115	100.0000	63.1893	1	ranked		completeness,structure,biology,performance	accuracy
+short_read	plasmidspades		60.8735	14.2857	46.0177	84.5731	44.4373	3	ranked		completeness,structure,biology,performance	accuracy
+short_read	platon		70.6485	17.5824	62.8319	94.3978	53.4141	2	ranked		completeness,structure,biology,performance	accuracy

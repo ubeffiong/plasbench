@@ -4,7 +4,7 @@
 
 > **Benchmarking plasmid reconstruction and classification tools against complete reference assemblies.**
 
-> **[Open the sample HTML report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html)** (opens in your browser, nothing to install; Ctrl-click, Cmd-click or middle-click to open it in a new tab). It is the report PlasBench writes, built from the offline demo; the data are synthetic, so its numbers are not real results. To open it from a clone instead: [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html).
+> **[Open the sample HTML report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html)** (opens in your browser, nothing to install; Ctrl-click, Cmd-click or middle-click to open it in a new tab). It is the report PlasBench writes, built from the offline demo; the data are synthetic (the report opens with a "Demonstration data" banner), so its numbers are not real results. To open it from a clone instead: [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html).
 
 **Docs:** **[Run it: step-by-step lab guide](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** · [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
 
@@ -145,7 +145,7 @@ for the incremental precision-recall sweep.
 
 ## What the HTML report adds
 
-**See it first:** [open the sample report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html) (or open [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html) in a browser after cloning). It is built from the synthetic offline demo, so its numbers are not real results; see [docs/sample_report/](docs/sample_report/README.md).
+**See it first:** [open the sample report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html) (or open [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html) in a browser after cloning). It is built from the synthetic offline demo and says so in a banner at the top, so its numbers are not real results; see [docs/sample_report/](docs/sample_report/README.md).
 
 The report is one self-contained file that opens on an **Overview** and shows **one view at a time**, chosen from a fixed left rail (Overview,
 Recommendation, Figures, Plasmid maps, Detailed results, Data quality, Methods and limits, Scorecard (exploratory), Appendix) beside a slim top bar with a

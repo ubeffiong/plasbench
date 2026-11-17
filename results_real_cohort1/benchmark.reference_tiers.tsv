@@ -1,0 +1,9 @@
+analysis_track	task	tool	reference_tier	n_samples	metric	mean_metric	cprr	cprr_plasmids
+short_read	reconstruction	mob_recon	2	1	lw_bin_f1	0.8381	0.0000	2
+short_read	reconstruction	mob_recon	3	9	lw_bin_f1	0.8223	0.4500	20
+short_read	classification	baseline_coverage	2	1	f1	0.0000		0
+short_read	classification	baseline_coverage	3	9	f1	0.4513		0
+short_read	classification	plasmidspades	2	1	f1	0.8331		0
+short_read	classification	plasmidspades	3	9	f1	0.6026		0
+short_read	classification	platon	2	1	f1	0.8611		0
+short_read	classification	platon	3	9	f1	0.9067		0

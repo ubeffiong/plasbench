@@ -1,0 +1,3 @@
+analysis_track	task	ranking_metric	reference_basis	species_basis	min_species_clusters
+short_read	reconstruction	lw_bin_f1	reference tiers 1-2	pooled (no species with enough independent clusters)	20
+short_read	classification	f1	reference tiers 1-2	pooled (no species with enough independent clusters)	20

@@ -186,12 +186,12 @@ python3 "$PY/composite_score.py" --scores "$SCORES" --accuracy "$DIM.accuracy.ts
 python3 "$PY/validate_recommendations.py" --scores "$SCORES" --samples "$SAMPLES" \
     --out "$DEMO/benchmark.recommendation_validation.tsv" --min-train-samples 1
 # Evaluation additions learned from PlasEval, plsMD and GAEMR, same scripts as stage 6 (each says "Not run" without its input).
-python3 "$PY/repeat_content.py" summary --data-dir "$DEMO" --out "$DEMO/benchmark.repeat_content.tsv" || true
-python3 "$PY/characterise_dataset.py" --data-dir "$DEMO" --sample-sheet "$SAMPLES" --out "$DEMO/benchmark.dataset_features.tsv" || true
-python3 "$PY/database_provenance.py" collect --tool-status "$STATUS" --out "$DEMO/benchmark.database_provenance.tsv" || true
-python3 "$PY/assembly_adequacy.py" merge --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_adequacy.tsv" || true
-python3 "$PY/copy_number.py" merge --results-dir "$DEMO" --out "$DEMO/benchmark.copy_number.tsv" || true
-python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" --out "$DEMO/benchmark.tool_agreement.tsv" || true
+python3 "$PY/repeat_content.py" summary --data-dir "$DEMO" --out "$DEMO/benchmark.repeat_content.tsv"
+python3 "$PY/characterise_dataset.py" --data-dir "$DEMO" --sample-sheet "$SAMPLES" --out "$DEMO/benchmark.dataset_features.tsv"
+python3 "$PY/database_provenance.py" collect --tool-status "$STATUS" --out "$DEMO/benchmark.database_provenance.tsv"
+python3 "$PY/assembly_adequacy.py" merge --data-dir "$DEMO" --out "$DEMO/benchmark.assembly_adequacy.tsv"
+python3 "$PY/copy_number.py" merge --results-dir "$DEMO" --out "$DEMO/benchmark.copy_number.tsv"
+python3 "$PY/bin_agreement.py" matrix --results-dir "$DEMO" --data-dir "$DEMO" --out "$DEMO/benchmark.tool_agreement.tsv"
 # Scoring specification layers, same scripts as stage 6.
 python3 "$PY/label_schemes.py" collect --data-dir "$DEMO" --out "$DEMO/benchmark.label_schemes.tsv" \
     --summary-out "$DEMO/benchmark.label_scheme_summary.tsv"

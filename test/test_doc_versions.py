@@ -27,6 +27,8 @@ def main():
     check("CITATION.cff", citation == version, citation)
     guide = re.search(r"describes PlasBench at version ([0-9][0-9.]*[0-9])", (ROOT / "docs" / "SCIENTIFIC_GUIDE.md").read_text(encoding="utf-8"))
     check("the Scientific Guide names the same version", guide is not None and guide.group(1) == version, guide.group(1) if guide else "no version sentence")
+    galaxy = re.search(r'name="@TOOL_VERSION@">([^<]+)<', (ROOT / "galaxy" / "macros.xml").read_text(encoding="utf-8"))
+    check("the Galaxy wrapper pins the same version (it pinned 0.2.4 while the package was 0.4.1)", galaxy is not None and galaxy.group(1) == version, galaxy.group(1) if galaxy else "no TOOL_VERSION token")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     check("the changelog has an entry for it", f"## [{version}]" in changelog)
     print("ALL DOC VERSION TESTS PASSED" if not FAILED else f"DOC VERSION TESTS FAILED: {FAILED}")

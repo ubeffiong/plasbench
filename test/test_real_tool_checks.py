@@ -68,7 +68,8 @@ def main():
 
     print("the verdict")
     check("clean run passes", crt.judge([], 0, 0, 0.5, 0.0)[0] == "pass")
-    check("a share of 0 against a floor of 0 passes (recorded, not enforced)", crt.judge([], 0, 0, 0.0, 0.0)[0] == "pass")
+    check("a share of 0 fails even against a floor of 0: calling nothing as plasmid on a plasmid is a failure", crt.judge([], 0, 0, 0.0, 0.0)[0] == "fail")
+    check("a small positive share passes while the floor is unset (0)", crt.judge([], 0, 0, 0.02, 0.0)[0] == "pass")
     check("a share under an enforced floor fails", crt.judge([], 0, 0, 0.1, 0.5)[0] == "fail")
     check("a tool exit fails", crt.judge([], 1, -1, None, 0.0)[0] == "fail")
     check("the shipped floors are all present and numeric", all(crt.expected_floor(t) >= 0 for t in ("mob_recon", "platon", "plasmidspades")))

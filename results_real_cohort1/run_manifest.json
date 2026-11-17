@@ -1,0 +1,1324 @@
+{
+  "container": {
+    "image": null,
+    "image_digest": null
+  },
+  "databases": {
+    "genomad": {
+      "available": false,
+      "path": "/home/ueffiong/.plasbench/databases/genomad"
+    },
+    "plasme": {
+      "available": false,
+      "path": "/home/ueffiong/.plasbench/databases/plasme"
+    },
+    "platon": {
+      "available": true,
+      "file_count": 31,
+      "identity_sha256": "3d0463bddb1fe021188c8ba9e4056db52cce48c944d6089ab3300a9cdaa6b2b0",
+      "path": "/home/ueffiong/.plasbench/databases/platon/db"
+    }
+  },
+  "execution_profiles": [
+    {
+      "peak_rss_kb": "2361248",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "56",
+      "sample": "upec_ecpf5",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "4225660",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "63",
+      "sample": "upec_ecpf5",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2321928",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "385",
+      "sample": "upec_ecpf5",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf5/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "upec_ecpf5",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "upec_ecpf5",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "2224996",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "56",
+      "sample": "upec_ecpf7",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "4118960",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "57",
+      "sample": "upec_ecpf7",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2319776",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "367",
+      "sample": "upec_ecpf7",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf7/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "upec_ecpf7",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "upec_ecpf7",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "947228",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "36",
+      "sample": "upec_ecpf14",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "3949744",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "62",
+      "sample": "upec_ecpf14",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2323428",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "411",
+      "sample": "upec_ecpf14",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf14/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "upec_ecpf14",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "upec_ecpf14",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "961956",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "36",
+      "sample": "upec_ecpf15",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "3897816",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "46",
+      "sample": "upec_ecpf15",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2322660",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "335",
+      "sample": "upec_ecpf15",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf15/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "upec_ecpf15",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "upec_ecpf15",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "2951628",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "64",
+      "sample": "upec_ecpf16",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "3624776",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "58",
+      "sample": "upec_ecpf16",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2576584",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "1316",
+      "sample": "upec_ecpf16",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf16/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "upec_ecpf16",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "upec_ecpf16",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "1840648",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "52",
+      "sample": "upec_ecpf18",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "4312452",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "55",
+      "sample": "upec_ecpf18",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "3206924",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "2021",
+      "sample": "upec_ecpf18",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf18/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "upec_ecpf18",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "upec_ecpf18",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "1827668",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "51",
+      "sample": "upec_ecpf40",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "4284836",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "60",
+      "sample": "upec_ecpf40",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2324444",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "343",
+      "sample": "upec_ecpf40",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/upec_ecpf40/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "1",
+      "sample": "upec_ecpf40",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "upec_ecpf40",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "2874940",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "65",
+      "sample": "arbank_0346",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "3713784",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "62",
+      "sample": "arbank_0346",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2333000",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "987",
+      "sample": "arbank_0346",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0346/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "arbank_0346",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "arbank_0346",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "2405700",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "61",
+      "sample": "arbank_0349",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "4376460",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "63",
+      "sample": "arbank_0349",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "3772668",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "1109",
+      "sample": "arbank_0349",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/arbank_0349/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "arbank_0349",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "arbank_0349",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    },
+    {
+      "peak_rss_kb": "587156",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_mob_recon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "32",
+      "sample": "tahini_salmonella",
+      "status": "completed",
+      "tool": "mob_recon"
+    },
+    {
+      "peak_rss_kb": "3665552",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_platon.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "43",
+      "sample": "tahini_salmonella",
+      "status": "completed",
+      "tool": "platon"
+    },
+    {
+      "peak_rss_kb": "2302536",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_plasmidspades.plasmid.fasta",
+      "reason": "",
+      "runtime_seconds": "352",
+      "sample": "tahini_salmonella",
+      "status": "completed",
+      "tool": "plasmidspades"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "/home/ueffiong/plasbench-0.2.3/results/tahini_salmonella/pred_baseline_coverage.plasmid.fasta",
+      "reason": "trivial baseline",
+      "runtime_seconds": "0",
+      "sample": "tahini_salmonella",
+      "status": "completed",
+      "tool": "baseline_coverage"
+    },
+    {
+      "peak_rss_kb": "",
+      "prediction_fasta": "",
+      "reason": "plasmid reference set not built (build_plasmid_reference_set.py)",
+      "runtime_seconds": "",
+      "sample": "tahini_salmonella",
+      "status": "skipped",
+      "tool": "baseline_reference"
+    }
+  ],
+  "generated_at": "2026-11-14T06:32:30.638697+00:00",
+  "input_checksums": {
+    "sample_sheet": {
+      "bytes": 1607,
+      "sha256": "f131acb5f55949f820c5fbd72fe5f7f6d6e738fd675e426ed80a4c554ec80c9f"
+    },
+    "truth_tables": {
+      "arbank_0346": {
+        "bytes": 123,
+        "sha256": "a68373206d182a475ec253047c40686ab2e8cac6fafb198b6860e59e532d269c"
+      },
+      "arbank_0349": {
+        "bytes": 95,
+        "sha256": "d4d101aada0fa627a63c51a650eede7912ea8d2530291c867f676db95ae1860d"
+      },
+      "tahini_salmonella": {
+        "bytes": 93,
+        "sha256": "8d8bf967308cf2bc3cdf5e40280114b1e686bbb76224fe797a41132ce1f0b6ef"
+      },
+      "upec_ecpf14": {
+        "bytes": 93,
+        "sha256": "b1985a7708097e2ec1b739259a742922a7ada2a1caa871ddd6f4025bd96b9fb2"
+      },
+      "upec_ecpf15": {
+        "bytes": 122,
+        "sha256": "dae273f43c390ec844d83961d12610291be594efddedbd151c5b4465392eb031"
+      },
+      "upec_ecpf16": {
+        "bytes": 122,
+        "sha256": "d83f0a6b6a3c7d0d12a7f97b15da9312b3a2b5ca1ad15398d5d36c9c14cbe363"
+      },
+      "upec_ecpf18": {
+        "bytes": 177,
+        "sha256": "73f8fa5441d4de03fffc390d60c93b3947f3c6d6e4856418c79d735c36b85ea7"
+      },
+      "upec_ecpf40": {
+        "bytes": 176,
+        "sha256": "723b326098044114b2f8b468ee1455a531ef43fa963599e8353e35271f1d70f6"
+      },
+      "upec_ecpf5": {
+        "bytes": 122,
+        "sha256": "f96df9190b2a8f635162ef1849838c44b22455af7f660771d4863f71f25404c7"
+      },
+      "upec_ecpf7": {
+        "bytes": 149,
+        "sha256": "f1c9f06fc4ddcee7a28d44f76d387006db2a3b5f2f4a14b4967ab6fd7177e157"
+      }
+    }
+  },
+  "models": {
+    "plasgraph2": {
+      "available": false,
+      "path": null
+    },
+    "plasme": {
+      "available": false,
+      "path": null
+    },
+    "recommendation": {
+      "available": false
+    }
+  },
+  "outputs": {
+    "benchmark.accuracy.tsv": {
+      "bytes": 4488,
+      "sha256": "06a521f8c117a004162954b798efd1ad0a09ee1c39fb6f343d32b1b795efbf03"
+    },
+    "benchmark.amr_placement.tsv": {
+      "bytes": 170,
+      "sha256": "ed5f10915aeaec36633bb0f808f824509932b42cc51cd52f1134c4d4832230ac"
+    },
+    "benchmark.assembly_adequacy.tsv": {
+      "bytes": 1326,
+      "sha256": "773b103a5c0294ba7729a13add564192c2858c8ed51c421250250be51dad3ab9"
+    },
+    "benchmark.assembly_qc.tsv": {
+      "bytes": 628,
+      "sha256": "e4b637c440f580e5e73485c0ca61d3f766b9c120583abf08cd30bd4749fa0767"
+    },
+    "benchmark.bin_quality.tsv": {
+      "bytes": 1163,
+      "sha256": "09dfb9418ab8c4356dc64effde5a8087d73498a403088f5e1e9c6f3884590967"
+    },
+    "benchmark.candidate_dataset.card.json": {
+      "bytes": 544,
+      "sha256": "c2e72de156c8f5185936fda12f5a01d6cfadac41fee475556d12cbdfc0c62a5c"
+    },
+    "benchmark.candidate_features.tsv": {
+      "bytes": 7109,
+      "sha256": "c7bd8382e9f88b51bb55428b0a5921a7d1fca76f901a8891a4f8d2d48c911041"
+    },
+    "benchmark.candidate_labels.tsv": {
+      "bytes": 3286,
+      "sha256": "0c66b4e03a6c878023628993470fc883d907a665565854b809d379b077ef6d9a"
+    },
+    "benchmark.clonal_groups.tsv": {
+      "bytes": 455,
+      "sha256": "b1dec22d7c938ee39c60276266d17246987ccc72238d606d35696537fcb4c528"
+    },
+    "benchmark.cohort_qc_flags.tsv": {
+      "bytes": 3526,
+      "sha256": "9b6db5068bcd5465f4c03eb1c4406975493701a0684aee74ffca7f1fb06b4357"
+    },
+    "benchmark.composite.tsv": {
+      "bytes": 658,
+      "sha256": "ca7a8361b39ebe10e84ad9e1cffb41375434b47acc8e36c844e97769b9e36edf"
+    },
+    "benchmark.composite_sensitivity.tsv": {
+      "bytes": 901,
+      "sha256": "2ccf891dbcb76ee7b915df805f9f4f1b245fafc0ce701c5776b9e4ae0e83ad28"
+    },
+    "benchmark.contig_crosscheck.tsv": {
+      "bytes": 3337,
+      "sha256": "09f6e2cdf6a7ffada4507b61d2003873b85c33fe1de56148d37a2b6f1b67b9e0"
+    },
+    "benchmark.copy_number.tsv": {
+      "bytes": 1024,
+      "sha256": "a6b5886e3cb02f41044b0da9cd4482a25862321391b467f76fbf6689446f1c90"
+    },
+    "benchmark.cprr_threshold_sweep.tsv": {
+      "bytes": 1260,
+      "sha256": "506c256013e2d67d30c19ff0b26339c0a9db4fc9f729520877cb5a99f140d785"
+    },
+    "benchmark.database_containment.tsv": {
+      "bytes": 3189,
+      "sha256": "4a098a1b3c87ccfa8e525e680e4323ec6da77942e2f9b38321493df4e9f8f25e"
+    },
+    "benchmark.database_overlap.tsv": {
+      "bytes": 4782,
+      "sha256": "8d8ca645a5e9a27b70c3c37d64e33a8aabcc2fed8e12546bd1a4dddf91a2e452"
+    },
+    "benchmark.feature_preservation.tsv": {
+      "bytes": 9712,
+      "sha256": "f917d0f66e5e5ea6681753cd502014f348af78205a4b4940ddb14414684c13b9"
+    },
+    "benchmark.headline_design.tsv": {
+      "bytes": 303,
+      "sha256": "59dcae554d7457b24698affb5befef31744ca772bc11dd33e84c023950454b00"
+    },
+    "benchmark.label_scheme_summary.tsv": {
+      "bytes": 289,
+      "sha256": "6ffbc22d61de9a40e4236e468bd5e0c773238d6b1fe85c899d7a1db9d244b005"
+    },
+    "benchmark.label_schemes.tsv": {
+      "bytes": 6449,
+      "sha256": "39b71a29ea7b1bce827c731f3f96e9ab5e9f557370edd7436b6209cc556f5855"
+    },
+    "benchmark.leaderboard.md": {
+      "bytes": 2661,
+      "sha256": "9dd607013fb44731bf147f98fb95e5d3b9668f6bc512a7bc7f8533df23bd9184"
+    },
+    "benchmark.leaderboard.tsv": {
+      "bytes": 3421,
+      "sha256": "f5bf87c6b03e010beda195b53b97421573b4ff6b105d8211f3ff89f1d0dfae51"
+    },
+    "benchmark.leave_taxon_out.tsv": {
+      "bytes": 339,
+      "sha256": "8cd4d6a48b01e620009f0d7c9299164c683c04ac1cd1075ecfaf0ccbe1c67604"
+    },
+    "benchmark.metadata_completeness.tsv": {
+      "bytes": 2799,
+      "sha256": "cd4eca618f5847c903c9bbc0bfac9e2433428df6e00673d53229839feb1375c6"
+    },
+    "benchmark.missing_regions.tsv": {
+      "bytes": 5359,
+      "sha256": "dbee7e8311cf64ed5ee3c445a0026733bdaa665288452f02f70342d80058c0b7"
+    },
+    "benchmark.ngoc.tsv": {
+      "bytes": 2136,
+      "sha256": "8fe9389f04f26d8fab067632de9d030c756408942c75325be0aafcb28d7e4677"
+    },
+    "benchmark.outcome_states.tsv": {
+      "bytes": 331,
+      "sha256": "77847c0c418ba19ec3dbe38b3a3142321563797fe4d5e258c661f7acc53d29f7"
+    },
+    "benchmark.paired_comparisons.tsv": {
+      "bytes": 572,
+      "sha256": "67bd339e42520aab95ce06a8d03d4d7f5fdfcf6c3ff3bd3617bf6f7117d26fe9"
+    },
+    "benchmark.performance.tsv": {
+      "bytes": 725,
+      "sha256": "6a2fed3ecdb1c1c89782caeb49361e161d6978fac09b9f9899ab7f0b5f2ead19"
+    },
+    "benchmark.power.tsv": {
+      "bytes": 564,
+      "sha256": "77d45dd70ef117ee67aa98225dec23afe893972856b328d9e48b659c996bd8c4"
+    },
+    "benchmark.rank_robustness.tsv": {
+      "bytes": 5256,
+      "sha256": "4748386467b887794d72e34800f25b1d65b4194b946d48aec22905aa78b7c802"
+    },
+    "benchmark.recommendation_validation.tsv": {
+      "bytes": 8878,
+      "sha256": "3ab821e05c2c8bce0fec98666fc6440313e187ad3ef2e88ecde8db2dd921249a"
+    },
+    "benchmark.recommendations.tsv": {
+      "bytes": 4041,
+      "sha256": "b4f85695333c91dc1f2a0f5b9048ae2696d5eb3b836c6c278527f731d9c4c6bc"
+    },
+    "benchmark.recommender_eval.tsv": {
+      "bytes": 960,
+      "sha256": "275d7b7b8773b3869e1ff3615b934e34dce705b94e2cdfe2e82c5e95d074110b"
+    },
+    "benchmark.recommender_regret.tsv": {
+      "bytes": 1660,
+      "sha256": "4d4d6a43f19825ea22948c8422ed01eef6bedc6012cb36f9e7c9eb3421e2fa44"
+    },
+    "benchmark.recommender_verdict.json": {
+      "bytes": 342,
+      "sha256": "b91e49ad420da438f634f3ca4251eb1d29c1c9eb33d0bde64746bb5405afa85d"
+    },
+    "benchmark.recovery_by_replicon.tsv": {
+      "bytes": 16256,
+      "sha256": "2c66263600d9ef24a19ef151b4accfc304604396d83f840ba769d60ce933762e"
+    },
+    "benchmark.reference_tiers.tsv": {
+      "bytes": 557,
+      "sha256": "50f69642c07e09fde077f07aeeea1f036b0dd88a17ebf77f3cf9e9ff14bbef52"
+    },
+    "benchmark.repeat_content.tsv": {
+      "bytes": 2598,
+      "sha256": "62ef13e9e84663ec4aa2c8f5913b32b4d5db39791a5f16df0b31735cbc68ba51"
+    },
+    "benchmark.scenario_performance.tsv": {
+      "bytes": 649,
+      "sha256": "7f4f46885d5c53dc4339a6ed6285a9d63eab0fa6065d904adcf3788297c5f277"
+    },
+    "benchmark.scenarios.tsv": {
+      "bytes": 974,
+      "sha256": "4675def79b05c83937c16765ea7f7ead2284614d59a60bc9dcd18613cd618945"
+    },
+    "benchmark.short_read.leaderboard.md": {
+      "bytes": 2661,
+      "sha256": "9dd607013fb44731bf147f98fb95e5d3b9668f6bc512a7bc7f8533df23bd9184"
+    },
+    "benchmark.short_read.leaderboard.tsv": {
+      "bytes": 3421,
+      "sha256": "f5bf87c6b03e010beda195b53b97421573b4ff6b105d8211f3ff89f1d0dfae51"
+    },
+    "benchmark.species.tsv": {
+      "bytes": 381,
+      "sha256": "697cf1a2ad1bcba17db7f8a5c6f52127b23ecffe78da59880e34f6529fe14da0"
+    },
+    "benchmark.stratified.tsv": {
+      "bytes": 3528,
+      "sha256": "791998af0d71f21dfca648ec157b8d6cafc98b61c5d19b68d0796c4b5667b492"
+    },
+    "benchmark.tool_agreement.tsv": {
+      "bytes": 238,
+      "sha256": "e4fb26fe28bf8af3ee388a0526a5d3ae59b9a1164ddbf093107123e6f8730fb7"
+    },
+    "benchmark.truth_label_audit.tsv": {
+      "bytes": 2914,
+      "sha256": "f1bd397ae6c8b9ac47e74e2d4ec2e68bdfb2ab72ea408626412c2306e013e51d"
+    },
+    "benchmark.truth_provenance.tsv": {
+      "bytes": 2794,
+      "sha256": "7787c714877f51eefe746750124d2016311f5b62170db2caf5ee096e9ef998b2"
+    },
+    "benchmark.warning_eval.tsv": {
+      "bytes": 510,
+      "sha256": "0d08874ef67acb83c7b81fe4498727ea0813b2c889937a4883fdb08fa50aff58"
+    },
+    "benchmark.warnings.tsv": {
+      "bytes": 3153,
+      "sha256": "ce547099d81ef9afe442311f0c42fb47da7b3463b3916b2c63b32cc4e17ba3f0"
+    }
+  },
+  "platform": {
+    "python": "3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13) [GCC 12.3.0]",
+    "system": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39"
+  },
+  "preregistration": {
+    "PREREG_SHA256": "87cdb75486866794d16e07aa2ec9dd765f528cf029b80f7765e8e160bd1ead45",
+    "env_mismatches": [],
+    "error": "",
+    "frozen_at": "",
+    "locked": false,
+    "matches": false,
+    "parameters": 54,
+    "prereg_file": "/home/ueffiong/plasbench-0.2.3/config/prereg.tsv",
+    "sha256": "87cdb75486866794d16e07aa2ec9dd765f528cf029b80f7765e8e160bd1ead45",
+    "to_fix": [
+      "tool_timeout_seconds",
+      "integrated_element_min_depth",
+      "unverified_candidate_requires_circular_path",
+      "scorecard_weights",
+      "scorecard_overall_bands",
+      "scorecard_bands_A2",
+      "scorecard_bands_A3",
+      "scorecard_bands_A4_C2",
+      "scorecard_bands_B1",
+      "scorecard_bands_B2_B3",
+      "scorecard_bands_C1",
+      "scorecard_bands_C3",
+      "scorecard_bands_C4",
+      "scorecard_bands_D1",
+      "scorecard_bands_D2_D3",
+      "scorecard_bands_E1",
+      "scorecard_bands_E2",
+      "scorecard_bands_E3",
+      "scorecard_min_samples",
+      "map_max_bp"
+    ]
+  },
+  "project_root": "/home/ueffiong/plasbench-0.2.3",
+  "samples": [
+    {
+      "assembly_accession": "GCF_013372425.1",
+      "assembly_plasmid_count": "2",
+      "bioproject": "PRJNA636382",
+      "biosample": "SAMN15075992",
+      "organism": "Escherichia coli",
+      "read_depth_x": "75",
+      "sample_id": "upec_ecpf5",
+      "sample_origin": "clinical_urine",
+      "source_study": "Snyder_2020_recurrent_UTI",
+      "sra_run": "SRR11905454",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_013372405.1",
+      "assembly_plasmid_count": "3",
+      "bioproject": "PRJNA636382",
+      "biosample": "SAMN15075993",
+      "organism": "Escherichia coli",
+      "read_depth_x": "75",
+      "sample_id": "upec_ecpf7",
+      "sample_origin": "clinical_urine",
+      "source_study": "Snyder_2020_recurrent_UTI",
+      "sra_run": "SRR11905453",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_013372385.1",
+      "assembly_plasmid_count": "1",
+      "bioproject": "PRJNA636382",
+      "biosample": "SAMN15075994",
+      "organism": "Escherichia coli",
+      "read_depth_x": "83",
+      "sample_id": "upec_ecpf14",
+      "sample_origin": "clinical_urine",
+      "source_study": "Snyder_2020_recurrent_UTI",
+      "sra_run": "SRR11905452",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_013372365.1",
+      "assembly_plasmid_count": "2",
+      "bioproject": "PRJNA636382",
+      "biosample": "SAMN15075995",
+      "organism": "Escherichia coli",
+      "read_depth_x": "68",
+      "sample_id": "upec_ecpf15",
+      "sample_origin": "clinical_urine",
+      "source_study": "Snyder_2020_recurrent_UTI",
+      "sra_run": "SRR11905451",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_013372345.1",
+      "assembly_plasmid_count": "2",
+      "bioproject": "PRJNA636382",
+      "biosample": "SAMN15075996",
+      "organism": "Escherichia coli",
+      "read_depth_x": "218",
+      "sample_id": "upec_ecpf16",
+      "sample_origin": "clinical_urine",
+      "source_study": "Snyder_2020_recurrent_UTI",
+      "sra_run": "SRR11905450",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_013372325.1",
+      "assembly_plasmid_count": "4",
+      "bioproject": "PRJNA636382",
+      "biosample": "SAMN15075997",
+      "organism": "Escherichia coli",
+      "read_depth_x": "315",
+      "sample_id": "upec_ecpf18",
+      "sample_origin": "clinical_urine",
+      "source_study": "Snyder_2020_recurrent_UTI",
+      "sra_run": "SRR11905449",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_013372305.1",
+      "assembly_plasmid_count": "4",
+      "bioproject": "PRJNA636382",
+      "biosample": "SAMN15075998",
+      "organism": "Escherichia coli",
+      "read_depth_x": "65",
+      "sample_id": "upec_ecpf40",
+      "sample_origin": "clinical_urine",
+      "source_study": "Snyder_2020_recurrent_UTI",
+      "sra_run": "SRR11905448",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_017579865.1",
+      "assembly_plasmid_count": "2",
+      "bioproject": "PRJNA554345",
+      "biosample": "SAMN12263369",
+      "organism": "Escherichia coli",
+      "read_depth_x": "125",
+      "sample_id": "arbank_0346",
+      "sample_origin": "clinical_antimicrobial_resistance_bank",
+      "source_study": "AR_Bank_0346_2021",
+      "sra_run": "SRR13296941",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_008152105.1",
+      "assembly_plasmid_count": "1",
+      "bioproject": "PRJNA554502",
+      "biosample": "SAMN12272266",
+      "organism": "Escherichia coli",
+      "read_depth_x": "108",
+      "sample_id": "arbank_0349",
+      "sample_origin": "clinical_antimicrobial_resistance_bank",
+      "source_study": "AR_Bank_0349_2019",
+      "sra_run": "SRR10076548",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    },
+    {
+      "assembly_accession": "GCF_022162985.1",
+      "assembly_plasmid_count": "1",
+      "bioproject": "PRJNA802760",
+      "biosample": "SAMN25597006",
+      "organism": "Salmonella enterica subsp. enterica serovar Tennessee",
+      "read_depth_x": "50",
+      "sample_id": "tahini_salmonella",
+      "sample_origin": "food_tahini",
+      "source_study": "Tahini_Salmonella_2022",
+      "sra_run": "SRR17858528",
+      "truth_quality_tier": "A",
+      "truth_technology": "hybrid"
+    }
+  ],
+  "schema_version": "1.0",
+  "selected_candidates": {
+    "arbank_0346": {
+      "files": [
+        "arbank_0346.candidate.bin_matches.tsv",
+        "arbank_0346.candidate.bin_summary.tsv",
+        "arbank_0346.candidate.bins.tsv",
+        "arbank_0346.candidate.plasmid.fasta",
+        "arbank_0346.candidate.pred_vs_ref.all.paf",
+        "arbank_0346.candidate.pred_vs_ref.paf",
+        "arbank_0346.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6605,
+        "sha256": "07b53fe9310ab6e8bde06242bbc36bb3ba514f07a1b07c2d0b482679e218aba0"
+      }
+    },
+    "arbank_0349": {
+      "files": [
+        "arbank_0349.candidate.bin_matches.tsv",
+        "arbank_0349.candidate.bin_summary.tsv",
+        "arbank_0349.candidate.bins.tsv",
+        "arbank_0349.candidate.plasmid.fasta",
+        "arbank_0349.candidate.pred_vs_ref.all.paf",
+        "arbank_0349.candidate.pred_vs_ref.paf",
+        "arbank_0349.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6474,
+        "sha256": "da171d47046fe65c3527e11cb8312790155f9c1cce435bd395d173fe558ddcef"
+      }
+    },
+    "tahini_salmonella": {
+      "files": [
+        "tahini_salmonella.candidate.bin_matches.tsv",
+        "tahini_salmonella.candidate.bin_summary.tsv",
+        "tahini_salmonella.candidate.bins.tsv",
+        "tahini_salmonella.candidate.plasmid.fasta",
+        "tahini_salmonella.candidate.pred_vs_ref.all.paf",
+        "tahini_salmonella.candidate.pred_vs_ref.paf",
+        "tahini_salmonella.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6392,
+        "sha256": "15eb1b0caf81e7f86407ba3a466165bc1241b9819e621b2709923fa4c88e8ee5"
+      }
+    },
+    "upec_ecpf14": {
+      "files": [
+        "upec_ecpf14.candidate.bin_matches.tsv",
+        "upec_ecpf14.candidate.bin_summary.tsv",
+        "upec_ecpf14.candidate.bins.tsv",
+        "upec_ecpf14.candidate.plasmid.fasta",
+        "upec_ecpf14.candidate.pred_vs_ref.all.paf",
+        "upec_ecpf14.candidate.pred_vs_ref.paf",
+        "upec_ecpf14.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6378,
+        "sha256": "ce93cbc84b33df31ff4a84f3da95a2875317b06fa8928579aaa3739b5b69e275"
+      }
+    },
+    "upec_ecpf15": {
+      "files": [
+        "upec_ecpf15.candidate.bin_matches.tsv",
+        "upec_ecpf15.candidate.bin_summary.tsv",
+        "upec_ecpf15.candidate.bins.tsv",
+        "upec_ecpf15.candidate.plasmid.fasta",
+        "upec_ecpf15.candidate.pred_vs_ref.all.paf",
+        "upec_ecpf15.candidate.pred_vs_ref.paf",
+        "upec_ecpf15.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6401,
+        "sha256": "e2354bdc572214939689d4862dfcdd6df1eccde349f5ffdd1e480af7f2be688b"
+      }
+    },
+    "upec_ecpf16": {
+      "files": [
+        "upec_ecpf16.candidate.bin_matches.tsv",
+        "upec_ecpf16.candidate.bin_summary.tsv",
+        "upec_ecpf16.candidate.bins.tsv",
+        "upec_ecpf16.candidate.plasmid.fasta",
+        "upec_ecpf16.candidate.pred_vs_ref.all.paf",
+        "upec_ecpf16.candidate.pred_vs_ref.paf",
+        "upec_ecpf16.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6541,
+        "sha256": "9113df73a2956cf4de8e85ed3d4f8d64f2e01e4f78703dc862e1c4cce71b3101"
+      }
+    },
+    "upec_ecpf18": {
+      "files": [
+        "upec_ecpf18.candidate.bin_matches.tsv",
+        "upec_ecpf18.candidate.bin_summary.tsv",
+        "upec_ecpf18.candidate.bins.tsv",
+        "upec_ecpf18.candidate.plasmid.fasta",
+        "upec_ecpf18.candidate.pred_vs_ref.all.paf",
+        "upec_ecpf18.candidate.pred_vs_ref.paf",
+        "upec_ecpf18.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6446,
+        "sha256": "d82b36ea51432018c614ad47d7425709c76341754ba1de2c4a3e2f1c675b3b0b"
+      }
+    },
+    "upec_ecpf40": {
+      "files": [
+        "upec_ecpf40.candidate.bin_matches.tsv",
+        "upec_ecpf40.candidate.bin_summary.tsv",
+        "upec_ecpf40.candidate.bins.tsv",
+        "upec_ecpf40.candidate.plasmid.fasta",
+        "upec_ecpf40.candidate.pred_vs_ref.all.paf",
+        "upec_ecpf40.candidate.pred_vs_ref.paf",
+        "upec_ecpf40.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6541,
+        "sha256": "b55f19591a25508e50b604ed3400ab39f597b33e4536d5c66c289820d59d9c8e"
+      }
+    },
+    "upec_ecpf5": {
+      "files": [
+        "upec_ecpf5.candidate.bin_matches.tsv",
+        "upec_ecpf5.candidate.bin_summary.tsv",
+        "upec_ecpf5.candidate.bins.tsv",
+        "upec_ecpf5.candidate.plasmid.fasta",
+        "upec_ecpf5.candidate.pred_vs_ref.all.paf",
+        "upec_ecpf5.candidate.pred_vs_ref.paf",
+        "upec_ecpf5.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6563,
+        "sha256": "0b912aea352c3406acc44184a22985372ce528e928785d64cf1d1d8f151e5145"
+      }
+    },
+    "upec_ecpf7": {
+      "files": [
+        "upec_ecpf7.candidate.bin_matches.tsv",
+        "upec_ecpf7.candidate.bin_summary.tsv",
+        "upec_ecpf7.candidate.bins.tsv",
+        "upec_ecpf7.candidate.plasmid.fasta",
+        "upec_ecpf7.candidate.pred_vs_ref.all.paf",
+        "upec_ecpf7.candidate.pred_vs_ref.paf",
+        "upec_ecpf7.selection_report.json"
+      ],
+      "selection_report": {
+        "bytes": 6575,
+        "sha256": "3636d61129a34671a9d6b299ab59c428f78da45b0d0f69b4c97e725ca5e190fa"
+      }
+    }
+  },
+  "settings": {
+    "AMR_GENE_RECOVERY_THRESHOLD": "0.90",
+    "ANALYSIS_TRACK": "short_read",
+    "ANALYSIS_TRACK_FILTER": "",
+    "ANNOTATION_REPLICON_DB": "plasmidfinder",
+    "ASSEMBLER": "spades",
+    "ASSEMBLY_QC_MAX_GC_SPREAD": "0.12",
+    "ASSEMBLY_QC_MAX_SIZE_MB": "8.5",
+    "BASELINE_COVERAGE_RATIO": "1.5",
+    "BASELINE_MIN_CONTIG_LENGTH": "1000",
+    "BASELINE_REFERENCE_MIN_QUERY_COVERAGE": "0.8",
+    "CLONAL_MASH_DISTANCE": "0.0005",
+    "COHORT_QC_FLAGS_ENABLED": "1",
+    "COHORT_QC_MIN_COHORT_SIZE": "8",
+    "COHORT_QC_ZSCORE_THRESHOLD": "3.5",
+    "COLLAPSE_DIMERS": "1",
+    "CONTIG_CROSSCHECK_SCALED": "10",
+    "CONTIG_MIN_COVERAGE": "0.80",
+    "CONTIG_MIN_IDENTITY": "0.95",
+    "CONTIG_MIN_LENGTH": "1000",
+    "CPRR_MIN_COVERAGE": "0.95",
+    "CPRR_MIN_IDENTITY": "0.99",
+    "CPRR_MIN_SHARE": "0.95",
+    "DATABASE_CONTAINMENT_MIN_COVERAGE": "0.95",
+    "DATABASE_CONTAINMENT_MIN_IDENTITY": "0.99",
+    "DECISION_PROFILE": "accuracy_first",
+    "DEPTH_ANOMALY_Z": "3",
+    "DEPTH_WINDOW_BP": "1000",
+    "DIMER_MIN_HALF_COVERAGE": "0.90",
+    "DIMER_MIN_IDENTITY": "0.95",
+    "DISSIMILARITY_ALPHA": "0.5",
+    "EXCLUDE_DATABASE_OVERLAP": "0",
+    "FLYE_MOB_RECON_ALLOW_CIRCULAR_TRUTH": "0",
+    "FLYE_READ_TYPE": "nano-hq",
+    "FRAGMENT_SHARE": "0.20",
+    "GENOMAD_DB": "/home/ueffiong/.plasbench/databases/genomad",
+    "HEADLINE_MAX_REFERENCE_TIER": "2",
+    "HYBRACTER_CHROMOSOME_LENGTH": "1000000",
+    "HYBRACTER_HYBRID_ALLOW_CIRCULAR_TRUTH": "0",
+    "HYBRACTER_LONG_ALLOW_CIRCULAR_TRUTH": "0",
+    "ISFINDER_FASTA": "",
+    "LONG_READS_FILE": "long_reads.fastq.gz",
+    "MEMORY_GB": "7",
+    "MINIMAP2_PRESET": "asm5",
+    "MIN_ALIGNMENT_IDENTITY": "0.90",
+    "MIN_ALIGNMENT_LENGTH": "200",
+    "MIN_ALIGNMENT_MAPQ": "20",
+    "MIN_ALIGNMENT_QUERY_COVERAGE": "0.20",
+    "MIN_ASSEMBLY_ADEQUACY": "0.90",
+    "MIN_READ_LEN": "50",
+    "MIN_SPECIES_CLUSTERS": "20",
+    "MISSED_RECALL": "0.50",
+    "NEAR_OPTIMAL_MARGIN": "0.05",
+    "ORACLE_GAP_FLOOR": "0.02",
+    "PERFECT_THRESHOLD": "0.95",
+    "PLASBIN_FLOW_OUTPUTS_DIR": "",
+    "PLASGRAPH2_CPU_ONLY": "1",
+    "PLASGRAPH2_MODEL_DIR": "",
+    "PLASGRAPH2_VERSION": "",
+    "PLASME_CHECKOUT_DIR": "",
+    "PLASME_DB": "/home/ueffiong/.plasbench/databases/plasme",
+    "PLASME_PROBABILITY": "0.5",
+    "PLASME_VERSION": "",
+    "PLASMID_RECOVERY_THRESHOLD": "0.90",
+    "PLASMID_REFERENCE_FASTA": "/home/ueffiong/.plasbench/databases/plasmid_reference/reference.fasta",
+    "PLASMID_REFERENCE_SKETCH": "/home/ueffiong/.plasbench/databases/plasmid_reference/reference.msh",
+    "PLASSEMBLER_ALLOW_CIRCULAR_TRUTH": "0",
+    "PLASSEMBLER_CHROMOSOME_LENGTH": "1000000",
+    "PLASSEMBLER_DB": "/home/ueffiong/.plasbench/databases/plassembler",
+    "PLATON_DB": "/home/ueffiong/.plasbench/databases/platon/db",
+    "PLSMD_DB": "",
+    "PRESERVE_DOWNLOADS": "1",
+    "READ_SOURCE": "auto",
+    "RECOMMENDATION_FAILURE_REGRET": "0.10",
+    "RECOMMENDATION_MIN_COVERAGE": "0.80",
+    "RECOMMENDATION_MIN_EXPECTED_SCORE": "0.40",
+    "RECOMMENDATION_MIN_SAMPLES": "5",
+    "RECOMMENDATION_MODEL_MIN_IMPROVEMENT": "0.05",
+    "RECOMMENDATION_MODEL_MIN_SAMPLES": "20",
+    "RECOMMENDATION_MODEL_MIN_STUDIES": "3",
+    "RECOMMENDATION_MODEL_NESTED_MIN_SAMPLES": "60",
+    "RECOMMENDATION_MODEL_NESTED_MIN_STUDIES": "5",
+    "REPEAT_KMER": "29",
+    "REPLICON_ABRICATE_DBS": "plasmidfinder",
+    "REPORT_MAPPING_AMBIGUITY": "1",
+    "REQUIRE_PREREG": "0",
+    "RUN_AMR_PLACEMENT": "1",
+    "RUN_ASSEMBLY_ADEQUACY": "1",
+    "RUN_ASSEMBLY_QC_GATE": "1",
+    "RUN_BASELINE_COVERAGE": "1",
+    "RUN_BASELINE_REFERENCE": "1",
+    "RUN_BASELINE_REPLICON": "0",
+    "RUN_BIN_AGREEMENT": "1",
+    "RUN_CONTIG_CLASSIFICATION": "1",
+    "RUN_CONTIG_CROSSCHECK": "1",
+    "RUN_COPY_NUMBER": "1",
+    "RUN_DATABASE_CONTAINMENT": "1",
+    "RUN_DIMER_DETECTION": "1",
+    "RUN_FLYE_MOB_RECON": "0",
+    "RUN_GENOMAD": "0",
+    "RUN_GPLAS2_EXTERNAL": "0",
+    "RUN_GPLAS2_MOB": "0",
+    "RUN_HYBRACTER_HYBRID": "0",
+    "RUN_HYBRACTER_LONG": "0",
+    "RUN_MOB_RECON": "1",
+    "RUN_PLASBIN_FLOW": "0",
+    "RUN_PLASGRAPH2": "0",
+    "RUN_PLASME": "0",
+    "RUN_PLASMIDSPADES": "1",
+    "RUN_PLASSEMBLER": "0",
+    "RUN_PLATON": "1",
+    "RUN_PLSMD": "0",
+    "RUN_RECOMMENDATION_MODEL": "0",
+    "RUN_RECOMMENDER_EVAL": "1",
+    "RUN_REPEAT_CONTENT": "1",
+    "RUN_SCORABLE_TRUTH": "1",
+    "RUN_TRUTH_DEPTH_ANOMALIES": "0",
+    "RUN_TRUTH_LABEL_EVIDENCE": "1",
+    "RUN_TRYCYCLER_MOB_RECON": "0",
+    "SCORABLE_STEP_BP": "250",
+    "SCORABLE_WINDOW_BP": "1000",
+    "SMALLEST_DIFFERENCE": "0.05",
+    "THREADS": "4",
+    "TOOL_DATABASE_FASTAS": "",
+    "TOOL_RETRIES": "1",
+    "TOOL_TIMEOUT_SECONDS": "",
+    "TRUTH_LABEL_SCHEME": "ncbi",
+    "TRUTH_LONG_READ_PRESET": "map-ont",
+    "TRUTH_MIN_LONG_READ_DEPTH": "5",
+    "TRYCYCLER_ASSEMBLY_COUNT": "4",
+    "TRYCYCLER_MEDAKA_POLISH": "0",
+    "TRYCYCLER_MOB_RECON_ALLOW_CIRCULAR_TRUTH": "0",
+    "TRYCYCLER_READ_TYPE": "nano-hq"
+  },
+  "tool": "PlasBench",
+  "tool_version": "0.2.3",
+  "tools": {
+    "PLASMe.py": {
+      "available": false
+    },
+    "Plasmer": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/Plasmer",
+      "version": "Plasmer v0.1 20220816"
+    },
+    "datasets": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/datasets",
+      "version": "datasets version: 18.41.1"
+    },
+    "fasterq-dump": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/fasterq-dump",
+      "version": "/home/ueffiong/miniforge3/envs/plasbench/bin/fasterq-dump : 2.9.6"
+    },
+    "fastp": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/fastp",
+      "version": "fastp 1.4.0"
+    },
+    "flye": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/flye",
+      "version": "2.9.5-b1801"
+    },
+    "genomad": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/genomad",
+      "version": "geNomad, version 1.13.0"
+    },
+    "gplas": {
+      "available": false
+    },
+    "hybracter": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/hybracter",
+      "version": "\b"
+    },
+    "minimap2": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/minimap2",
+      "version": "2.28-r1209"
+    },
+    "mob_recon": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/mob_recon",
+      "version": "mob_recon 3.1.9"
+    },
+    "plASgraph2_classify.py": {
+      "available": false
+    },
+    "plaScope.sh": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/plaScope.sh",
+      "version": "1.3.1"
+    },
+    "plasmidhunter": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/plasmidhunter",
+      "version": "/home/ueffiong/miniforge3/envs/plasbench-plasmidhunter/lib/python3.10/site-packages/PlasmidHunter/PlasmidHunter.py:3: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81."
+    },
+    "plasmidspades.py": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/plasmidspades.py",
+      "version": "SPAdes genome assembler v4.0.0 [plasmidSPAdes mode]"
+    },
+    "plassembler": {
+      "available": false
+    },
+    "platon": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/platon",
+      "version": "platon 1.7"
+    },
+    "plsMD": {
+      "available": false
+    },
+    "prefetch": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/prefetch",
+      "version": "/home/ueffiong/miniforge3/envs/plasbench/bin/prefetch : 2.9.6"
+    },
+    "python3": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/python3",
+      "version": "Python 3.12.3"
+    },
+    "rfplasmid": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/rfplasmid",
+      "version": "RFPlasmid version 0.0.18"
+    },
+    "spades.py": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/spades.py",
+      "version": "SPAdes genome assembler v4.0.0"
+    },
+    "trycycler": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/trycycler",
+      "version": "Trycycler v0.5.6"
+    },
+    "unicycler": {
+      "available": true,
+      "path": "/home/ueffiong/miniforge3/envs/plasbench/bin/unicycler",
+      "version": "Unicycler v0.5.1"
+    }
+  },
+  "warnings": []
+}

@@ -1,0 +1,6 @@
+analysis_track	tool	n_runs	completed	reused	failed_tool	failed_resource	infrastructure_failure	not_applicable	retried
+short_read	baseline_coverage	10	10	0	0	0	0	0	0
+short_read	baseline_reference	10	0	0	0	0	0	10	0
+short_read	mob_recon	10	10	0	0	0	0	0	0
+short_read	plasmidspades	10	10	0	0	0	0	0	0
+short_read	platon	10	10	0	0	0	0	0	0

@@ -1,0 +1,4 @@
+analysis_track	task	metric	tool_a	tool_b	paired_samples	clusters	mean_difference	sd_cluster_differences	alpha	power	min_detectable_difference	target_difference	clusters_needed_for_target	observed_vs_mdd	status
+short_read	classification	f1	baseline_coverage	plasmidspades	10	4	-0.386064		0.050000	0.800000		0.050000			too_few_clusters
+short_read	classification	f1	baseline_coverage	platon	10	4	-0.686914		0.050000	0.800000		0.050000			too_few_clusters
+short_read	classification	f1	plasmidspades	platon	10	4	-0.300850		0.050000	0.800000		0.050000			too_few_clusters

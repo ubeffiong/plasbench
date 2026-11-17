@@ -1,0 +1,173 @@
+analysis_track	tool	feature_type	label	n_plasmids	n_samples	mean_completeness	recovered_fraction	underpowered	median_completeness	q1_completeness	q3_completeness	n_cprr_assessed	cprr
+short_read	baseline_coverage	amr	arg_carrying	7	6	0.3596	0.0000	false	0.0176	0.0047	0.7987	0	
+short_read	baseline_coverage	amr	no_arg_detected	15	8	0.7859	0.6667	false	0.9817	0.8757	1.0000	0	
+short_read	baseline_coverage	mob	MOBF	6	6	0.2707	0.0000	false	0.0135	0.0024	0.5644	0	
+short_read	baseline_coverage	mob	MOBP	8	7	0.5898	0.3750	false	0.7987	0.1152	0.9745	0	
+short_read	baseline_coverage	mob	MOBQ	3	3	0.9559	0.6667	true	1.0000	0.9338	1.0000	0	
+short_read	baseline_coverage	mob	untyped	8	7	0.8388	0.6250	false	0.9669	0.8904	1.0000	0	
+short_read	baseline_coverage	replicon	Col(BS512)	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	baseline_coverage	replicon	Col(BS512)_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	baseline_coverage	replicon	Col(MG828)	3	3	0.9453	0.6667	true	0.9521	0.9180	0.9760	0	
+short_read	baseline_coverage	replicon	Col(MG828)_1	3	3	0.9453	0.6667	true	0.9521	0.9180	0.9760	0	
+short_read	baseline_coverage	replicon	Col(pHAD28)_1	3	3	0.6606	0.6667	true	0.9817	0.4909	0.9909	0	
+short_read	baseline_coverage	replicon	Col156	2	2	0.9338	0.5000	true	0.9338	0.9007	0.9669	0	
+short_read	baseline_coverage	replicon	Col156_1	4	3	0.8662	0.2500	true	0.8591	0.8246	0.9007	0	
+short_read	baseline_coverage	replicon	ColRNAI_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	baseline_coverage	replicon	ColpEC648	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	baseline_coverage	replicon	IncFIA	6	6	0.2938	0.0000	false	0.0827	0.0044	0.5970	0	
+short_read	baseline_coverage	replicon	IncFIA(HI1)_1_HI1	1	1	0.1478	0.0000	true	0.1478	0.1478	0.1478	0	
+short_read	baseline_coverage	replicon	IncFIA_1	3	3	0.5869	0.0000	true	0.8506	0.4341	0.8716	0	
+short_read	baseline_coverage	replicon	IncFIB	7	7	0.3807	0.0000	false	0.1478	0.0135	0.7987	0	
+short_read	baseline_coverage	replicon	IncFIB(AP001918)_1	6	6	0.4195	0.0000	false	0.3822	0.0115	0.8246	0	
+short_read	baseline_coverage	replicon	IncFIB(K)_1_Kpn3	1	1	0.1478	0.0000	true	0.1478	0.1478	0.1478	0	
+short_read	baseline_coverage	replicon	IncFIC	3	3	0.2521	0.0000	true	0.0095	0.0047	0.3781	0	
+short_read	baseline_coverage	replicon	IncFIC(FII)_1	1	1	0.0095	0.0000	true	0.0095	0.0095	0.0095	0	
+short_read	baseline_coverage	replicon	IncFII	3	3	0.5869	0.0000	true	0.8506	0.4341	0.8716	0	
+short_read	baseline_coverage	replicon	IncFII(29)_1_pUTI89	1	1	0.7467	0.0000	true	0.7467	0.7467	0.7467	0	
+short_read	baseline_coverage	replicon	IncFII(pHN7A8)_1_pHN7A8	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	baseline_coverage	replicon	IncFII(pRSB107)_1_pRSB107	2	2	0.4341	0.0000	true	0.4341	0.2259	0.6423	0	
+short_read	baseline_coverage	replicon	IncI1/B/O	2	2	0.9778	1.0000	true	0.9778	0.9745	0.9811	0	
+short_read	baseline_coverage	replicon	IncI1_1_Alpha	1	1	0.9712	1.0000	true	0.9712	0.9712	0.9712	0	
+short_read	baseline_coverage	replicon	IncI2	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	baseline_coverage	replicon	IncI_Gamma_1	1	1	0.9844	1.0000	true	0.9844	0.9844	0.9844	0	
+short_read	baseline_coverage	replicon	IncN	1	1	0.0095	0.0000	true	0.0095	0.0095	0.0095	0	
+short_read	baseline_coverage	replicon	IncN_1	1	1	0.0095	0.0000	true	0.0095	0.0095	0.0095	0	
+short_read	baseline_coverage	replicon	IncQ1	2	2	0.4551	0.0000	true	0.4551	0.2364	0.6738	0	
+short_read	baseline_coverage	replicon	rep_cluster_1088	1	1	0.0095	0.0000	true	0.0095	0.0095	0.0095	0	
+short_read	baseline_coverage	replicon	rep_cluster_1778	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	baseline_coverage	replicon	rep_cluster_2131	2	2	0.7987	0.0000	true	0.7987	0.7727	0.8246	0	
+short_read	baseline_coverage	replicon	rep_cluster_2244	1	1	0.0095	0.0000	true	0.0095	0.0095	0.0095	0	
+short_read	baseline_coverage	replicon	rep_cluster_2335	2	2	0.9909	1.0000	true	0.9909	0.9863	0.9954	0	
+short_read	baseline_coverage	replicon	rep_cluster_2370	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	baseline_coverage	replicon	rep_cluster_2373	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	baseline_coverage	size_band	<10kb	11	8	0.8805	0.7273	false	1.0000	0.9180	1.0000	0	
+short_read	baseline_coverage	size_band	>50kb	11	8	0.4200	0.1818	false	0.1478	0.0047	0.8716	0	
+short_read	mob_recon	amr	arg_carrying	7	6	0.8612	0.0000	false	0.8801	0.8330	0.8916	7	0.0000
+short_read	mob_recon	amr	no_arg_detected	15	8	0.8786	0.7333	false	0.9817	0.9012	1.0000	15	0.6000
+short_read	mob_recon	mob	MOBF	6	6	0.8815	0.1667	false	0.8916	0.8824	0.8963	6	0.0000
+short_read	mob_recon	mob	MOBP	8	7	0.8790	0.3750	false	0.8955	0.8446	0.9745	8	0.2500
+short_read	mob_recon	mob	MOBQ	3	3	0.9559	0.6667	true	1.0000	0.9338	1.0000	3	0.6667
+short_read	mob_recon	mob	untyped	8	7	0.8275	0.6250	false	0.9669	0.8634	1.0000	8	0.6250
+short_read	mob_recon	replicon	Col(BS512)	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	1	1.0000
+short_read	mob_recon	replicon	Col(BS512)_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	1	1.0000
+short_read	mob_recon	replicon	Col(MG828)	3	3	0.9453	0.6667	true	0.9521	0.9180	0.9760	3	0.6667
+short_read	mob_recon	replicon	Col(MG828)_1	3	3	0.9453	0.6667	true	0.9521	0.9180	0.9760	3	0.6667
+short_read	mob_recon	replicon	Col(pHAD28)_1	3	3	0.6606	0.6667	true	0.9817	0.4909	0.9909	3	0.6667
+short_read	mob_recon	replicon	Col156	2	2	0.9338	0.5000	true	0.9338	0.9007	0.9669	2	0.5000
+short_read	mob_recon	replicon	Col156_1	4	3	0.8936	0.2500	true	0.8823	0.8532	0.9228	4	0.2500
+short_read	mob_recon	replicon	ColRNAI_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	1	1.0000
+short_read	mob_recon	replicon	ColpEC648	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	1	1.0000
+short_read	mob_recon	replicon	IncFIA	6	6	0.8365	0.1667	false	0.8870	0.8274	0.8963	6	0.0000
+short_read	mob_recon	replicon	IncFIA(HI1)_1_HI1	1	1	0.6195	0.0000	true	0.6195	0.6195	0.6195	1	0.0000
+short_read	mob_recon	replicon	IncFIA_1	3	3	0.8643	0.0000	true	0.8938	0.8479	0.8955	3	0.0000
+short_read	mob_recon	replicon	IncFIB	7	7	0.8329	0.1429	false	0.8893	0.8059	0.8955	7	0.0000
+short_read	mob_recon	replicon	IncFIB(AP001918)_1	6	6	0.8685	0.1667	false	0.8916	0.8297	0.8963	6	0.0000
+short_read	mob_recon	replicon	IncFIB(K)_1_Kpn3	1	1	0.6195	0.0000	true	0.6195	0.6195	0.6195	1	0.0000
+short_read	mob_recon	replicon	IncFIC	3	3	0.8726	0.3333	true	0.8893	0.8496	0.9040	3	0.0000
+short_read	mob_recon	replicon	IncFIC(FII)_1	1	1	0.8893	0.0000	true	0.8893	0.8893	0.8893	1	0.0000
+short_read	mob_recon	replicon	IncFII	3	3	0.8643	0.0000	true	0.8938	0.8479	0.8955	3	0.0000
+short_read	mob_recon	replicon	IncFII(29)_1_pUTI89	1	1	0.8098	0.0000	true	0.8098	0.8098	0.8098	1	0.0000
+short_read	mob_recon	replicon	IncFII(pHN7A8)_1_pHN7A8	1	1	0.8801	0.0000	true	0.8801	0.8801	0.8801	1	0.0000
+short_read	mob_recon	replicon	IncFII(pRSB107)_1_pRSB107	2	2	0.8955	0.0000	true	0.8955	0.8946	0.8963	2	0.0000
+short_read	mob_recon	replicon	IncI1/B/O	2	2	0.9778	1.0000	true	0.9778	0.9745	0.9811	2	0.5000
+short_read	mob_recon	replicon	IncI1_1_Alpha	1	1	0.9712	1.0000	true	0.9712	0.9712	0.9712	1	1.0000
+short_read	mob_recon	replicon	IncI2	1	1	0.8562	0.0000	true	0.8562	0.8562	0.8562	1	0.0000
+short_read	mob_recon	replicon	IncI_Gamma_1	1	1	0.9844	1.0000	true	0.9844	0.9844	0.9844	1	0.0000
+short_read	mob_recon	replicon	IncN	1	1	0.8893	0.0000	true	0.8893	0.8893	0.8893	1	0.0000
+short_read	mob_recon	replicon	IncN_1	1	1	0.8893	0.0000	true	0.8893	0.8893	0.8893	1	0.0000
+short_read	mob_recon	replicon	IncQ1	2	2	0.8479	0.0000	true	0.8479	0.8250	0.8709	2	0.0000
+short_read	mob_recon	replicon	rep_cluster_1088	1	1	0.8893	0.0000	true	0.8893	0.8893	0.8893	1	0.0000
+short_read	mob_recon	replicon	rep_cluster_1778	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	1	1.0000
+short_read	mob_recon	replicon	rep_cluster_2131	2	2	0.8535	0.0000	true	0.8535	0.8316	0.8753	2	0.0000
+short_read	mob_recon	replicon	rep_cluster_2244	1	1	0.8893	0.0000	true	0.8893	0.8893	0.8893	1	0.0000
+short_read	mob_recon	replicon	rep_cluster_2335	2	2	0.9909	1.0000	true	0.9909	0.9863	0.9954	2	1.0000
+short_read	mob_recon	replicon	rep_cluster_2370	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	1	1.0000
+short_read	mob_recon	replicon	rep_cluster_2373	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	1	0.0000
+short_read	mob_recon	size_band	<10kb	11	8	0.8805	0.7273	false	1.0000	0.9180	1.0000	11	0.7273
+short_read	mob_recon	size_band	>50kb	11	8	0.8656	0.2727	false	0.8893	0.8330	0.9079	11	0.0909
+short_read	plasmidspades	amr	arg_carrying	7	6	0.6229	0.1429	false	0.8469	0.4204	0.8779	0	
+short_read	plasmidspades	amr	no_arg_detected	15	8	0.9181	0.8000	false	1.0000	0.9893	1.0000	0	
+short_read	plasmidspades	mob	MOBF	6	6	0.5679	0.0000	false	0.8305	0.2051	0.8454	0	
+short_read	plasmidspades	mob	MOBP	8	7	0.7097	0.3750	false	0.8779	0.6562	0.9856	0	
+short_read	plasmidspades	mob	MOBQ	3	3	0.9565	0.6667	true	1.0000	0.9348	1.0000	0	
+short_read	plasmidspades	mob	untyped	8	7	0.9896	1.0000	false	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	Col(BS512)	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	Col(BS512)_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	Col(MG828)	3	3	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	Col(MG828)_1	3	3	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	Col(pHAD28)_1	3	3	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	Col156	2	2	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	Col156_1	4	3	0.9351	0.5000	true	0.9498	0.8849	1.0000	0	
+short_read	plasmidspades	replicon	ColRNAI_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	ColpEC648	1	1	0.8696	0.0000	true	0.8696	0.8696	0.8696	0	
+short_read	plasmidspades	replicon	IncFIA	6	6	0.5850	0.0000	false	0.8305	0.2821	0.8454	0	
+short_read	plasmidspades	replicon	IncFIA(HI1)_1_HI1	1	1	0.1027	0.0000	true	0.1027	0.1027	0.1027	0	
+short_read	plasmidspades	replicon	IncFIA_1	3	3	0.5859	0.3333	true	0.8407	0.4204	0.8788	0	
+short_read	plasmidspades	replicon	IncFIB	7	7	0.5115	0.1429	false	0.8203	0.0513	0.8701	0	
+short_read	plasmidspades	replicon	IncFIB(AP001918)_1	6	6	0.5796	0.1667	false	0.8305	0.2051	0.8849	0	
+short_read	plasmidspades	replicon	IncFIB(K)_1_Kpn3	1	1	0.1027	0.0000	true	0.1027	0.1027	0.1027	0	
+short_read	plasmidspades	replicon	IncFIC	3	3	0.5733	0.0000	true	0.8203	0.4102	0.8599	0	
+short_read	plasmidspades	replicon	IncFIC(FII)_1	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	plasmidspades	replicon	IncFII	3	3	0.5859	0.3333	true	0.8407	0.4204	0.8788	0	
+short_read	plasmidspades	replicon	IncFII(29)_1_pUTI89	1	1	0.8996	0.0000	true	0.8996	0.8996	0.8996	0	
+short_read	plasmidspades	replicon	IncFII(pHN7A8)_1_pHN7A8	1	1	0.8469	0.0000	true	0.8469	0.8469	0.8469	0	
+short_read	plasmidspades	replicon	IncFII(pRSB107)_1_pRSB107	2	2	0.4204	0.0000	true	0.4204	0.2102	0.6305	0	
+short_read	plasmidspades	replicon	IncI1/B/O	2	2	0.9893	1.0000	true	0.9893	0.9856	0.9931	0	
+short_read	plasmidspades	replicon	IncI1_1_Alpha	1	1	0.9819	1.0000	true	0.9819	0.9819	0.9819	0	
+short_read	plasmidspades	replicon	IncI2	1	1	0.8562	0.0000	true	0.8562	0.8562	0.8562	0	
+short_read	plasmidspades	replicon	IncI_Gamma_1	1	1	0.9968	1.0000	true	0.9968	0.9968	0.9968	0	
+short_read	plasmidspades	replicon	IncN	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	plasmidspades	replicon	IncN_1	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	plasmidspades	replicon	IncQ1	2	2	0.4585	0.5000	true	0.4585	0.2292	0.6877	0	
+short_read	plasmidspades	replicon	rep_cluster_1088	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	plasmidspades	replicon	rep_cluster_1778	1	1	0.8696	0.0000	true	0.8696	0.8696	0.8696	0	
+short_read	plasmidspades	replicon	rep_cluster_2131	2	2	0.8701	0.0000	true	0.8701	0.8554	0.8849	0	
+short_read	plasmidspades	replicon	rep_cluster_2244	1	1	0.0000	0.0000	true	0.0000	0.0000	0.0000	0	
+short_read	plasmidspades	replicon	rep_cluster_2335	2	2	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	rep_cluster_2370	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	replicon	rep_cluster_2373	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	size_band	<10kb	11	8	0.9881	0.9091	false	1.0000	1.0000	1.0000	0	
+short_read	plasmidspades	size_band	>50kb	11	8	0.6602	0.2727	false	0.8469	0.4615	0.9083	0	
+short_read	platon	amr	arg_carrying	7	6	0.7748	0.0000	false	0.8409	0.7289	0.8498	0	
+short_read	platon	amr	no_arg_detected	15	8	0.9446	0.8000	false	0.9844	0.9353	1.0000	0	
+short_read	platon	mob	MOBF	6	6	0.8235	0.1667	false	0.8422	0.7960	0.8710	0	
+short_read	platon	mob	MOBP	8	7	0.8399	0.3750	false	0.8485	0.7550	0.9745	0	
+short_read	platon	mob	MOBQ	3	3	0.9559	0.6667	true	1.0000	0.9338	1.0000	0	
+short_read	platon	mob	untyped	8	7	0.9203	0.7500	false	0.9909	0.9350	1.0000	0	
+short_read	platon	replicon	Col(BS512)	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	platon	replicon	Col(BS512)_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	platon	replicon	Col(MG828)	3	3	0.9453	0.6667	true	0.9521	0.9180	0.9760	0	
+short_read	platon	replicon	Col(MG828)_1	3	3	0.9453	0.6667	true	0.9521	0.9180	0.9760	0	
+short_read	platon	replicon	Col(pHAD28)_1	3	3	0.9939	1.0000	true	1.0000	0.9909	1.0000	0	
+short_read	platon	replicon	Col156	2	2	0.9338	0.5000	true	0.9338	0.9007	0.9669	0	
+short_read	platon	replicon	Col156_1	4	3	0.8463	0.2500	true	0.8542	0.7999	0.9007	0	
+short_read	platon	replicon	ColRNAI_1	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	platon	replicon	ColpEC648	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	platon	replicon	IncFIA	6	6	0.7844	0.1667	false	0.8110	0.7028	0.8703	0	
+short_read	platon	replicon	IncFIA(HI1)_1_HI1	1	1	0.6090	0.0000	true	0.6090	0.6090	0.6090	0	
+short_read	platon	replicon	IncFIA_1	3	3	0.6676	0.0000	true	0.6768	0.6109	0.7289	0	
+short_read	platon	replicon	IncFIB	7	7	0.7450	0.1429	false	0.7810	0.6429	0.8422	0	
+short_read	platon	replicon	IncFIB(AP001918)_1	6	6	0.7676	0.1667	false	0.8110	0.7028	0.8428	0	
+short_read	platon	replicon	IncFIB(K)_1_Kpn3	1	1	0.6090	0.0000	true	0.6090	0.6090	0.6090	0	
+short_read	platon	replicon	IncFIC	3	3	0.8677	0.3333	true	0.8435	0.8422	0.8810	0	
+short_read	platon	replicon	IncFIC(FII)_1	1	1	0.8435	0.0000	true	0.8435	0.8435	0.8435	0	
+short_read	platon	replicon	IncFII	3	3	0.6676	0.0000	true	0.6768	0.6109	0.7289	0	
+short_read	platon	replicon	IncFII(29)_1_pUTI89	1	1	0.8409	0.0000	true	0.8409	0.8409	0.8409	0	
+short_read	platon	replicon	IncFII(pHN7A8)_1_pHN7A8	1	1	0.8801	0.0000	true	0.8801	0.8801	0.8801	0	
+short_read	platon	replicon	IncFII(pRSB107)_1_pRSB107	2	2	0.7289	0.0000	true	0.7289	0.7028	0.7550	0	
+short_read	platon	replicon	IncI1/B/O	2	2	0.9778	1.0000	true	0.9778	0.9745	0.9811	0	
+short_read	platon	replicon	IncI1_1_Alpha	1	1	0.9712	1.0000	true	0.9712	0.9712	0.9712	0	
+short_read	platon	replicon	IncI2	1	1	0.8562	0.0000	true	0.8562	0.8562	0.8562	0	
+short_read	platon	replicon	IncI_Gamma_1	1	1	0.9844	1.0000	true	0.9844	0.9844	0.9844	0	
+short_read	platon	replicon	IncN	1	1	0.8435	0.0000	true	0.8435	0.8435	0.8435	0	
+short_read	platon	replicon	IncN_1	1	1	0.8435	0.0000	true	0.8435	0.8435	0.8435	0	
+short_read	platon	replicon	IncQ1	2	2	0.6630	0.0000	true	0.6630	0.6040	0.7220	0	
+short_read	platon	replicon	rep_cluster_1088	1	1	0.8435	0.0000	true	0.8435	0.8435	0.8435	0	
+short_read	platon	replicon	rep_cluster_1778	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	platon	replicon	rep_cluster_2131	2	2	0.7589	0.0000	true	0.7589	0.7178	0.7999	0	
+short_read	platon	replicon	rep_cluster_2244	1	1	0.8435	0.0000	true	0.8435	0.8435	0.8435	0	
+short_read	platon	replicon	rep_cluster_2335	2	2	0.9909	1.0000	true	0.9909	0.9863	0.9954	0	
+short_read	platon	replicon	rep_cluster_2370	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	platon	replicon	rep_cluster_2373	1	1	1.0000	1.0000	true	1.0000	1.0000	1.0000	0	
+short_read	platon	size_band	<10kb	11	8	0.9714	0.8182	false	1.0000	0.9669	1.0000	0	
+short_read	platon	size_band	>50kb	11	8	0.8097	0.2727	false	0.8435	0.7289	0.8993	0	

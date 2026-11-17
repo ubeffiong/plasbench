@@ -10,7 +10,7 @@ runs the real binary exactly as stage 4 does, passes its output through the real
                 INPUT (a tool that rewrites contig names breaks scoring silently). A re-assembler (plasmidSPAdes) writes contigs of its own, so this does not apply
   bins          every adapter writes a bins table with the header `bin_id<TAB>sequence_id`, no sequence in two rows, no empty bin
   database      a tool that needs a database reports a clear problem when it is missing, before it runs (never an obscure crash)
-  known output  the share of the input called plasmid is compared with test/real_tools/expected.tsv; a floor of 0 means "recorded, not yet enforced"
+  known output  the share of the input called plasmid is compared with test/real_tools/expected.tsv; a floor of 0 means "not yet set": any share above zero passes, a share of zero fails
 
 The input is a plasmid (the fixture is fetched by the workflow), so a tool that calls none of it plasmid is reported, and judged only against the floor in
 expected.tsv. The floors start at 0 because no real run had been reviewed when this was written: set each from the first reviewed scheduled run.
@@ -113,13 +113,15 @@ def expected_floor(tool, path=EXPECTED):
 
 
 def judge(problems, tool_exit, adapter_exit, share, floor):
-    """('pass'|'fail', reasons) from the run: structural problems and exit codes fail; a share under the floor fails; a share of 0 with a floor of 0 passes as 'not enforced'."""
+    """('pass'|'fail', reasons) from the run: structural problems and exit codes fail; a share under the floor fails; a tool that calls NOTHING as plasmid on an input that is a plasmid fails even where the floor is 0 (a floor of 0 means the value is not yet set, not that zero is acceptable)."""
     reasons = list(problems)
     if tool_exit != 0:
         reasons.append(f"the tool exited {tool_exit}")
     if adapter_exit != 0:
         reasons.append(f"the adapter exited {adapter_exit}")
-    if share is not None and share + 1e-12 < floor:
+    if share is not None and share <= 0.0:
+        reasons.append("the tool called nothing as plasmid on an input that is a plasmid")
+    elif share is not None and share + 1e-12 < floor:
         reasons.append(f"plasmid share {share:.3f} is under the expected {floor:.3f}")
     return ("fail" if reasons else "pass"), reasons
 

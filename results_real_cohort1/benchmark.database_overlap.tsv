@@ -1,0 +1,41 @@
+sample	tool	truth_release_date	database_release_date	overlap_status	reason
+arbank_0346	baseline_coverage	2021-03-24		no_reference_database	tool uses no reference plasmid database or trained model
+arbank_0346	mob_recon	2021-03-24	2020-05-04	after_database	truth assembly was released after the tool's database
+arbank_0346	plasmidspades	2021-03-24		no_reference_database	tool uses no reference plasmid database or trained model
+arbank_0346	platon	2021-03-24	2020-10-05	after_database	truth assembly was released after the tool's database
+arbank_0349	baseline_coverage	2019-08-30		no_reference_database	tool uses no reference plasmid database or trained model
+arbank_0349	mob_recon	2019-08-30	2020-05-04	possible_overlap	truth assembly was public before the tool's database release
+arbank_0349	plasmidspades	2019-08-30		no_reference_database	tool uses no reference plasmid database or trained model
+arbank_0349	platon	2019-08-30	2020-10-05	possible_overlap	truth assembly was public before the tool's database release
+tahini_salmonella	baseline_coverage	2022-02-10		no_reference_database	tool uses no reference plasmid database or trained model
+tahini_salmonella	mob_recon	2022-02-10	2020-05-04	after_database	truth assembly was released after the tool's database
+tahini_salmonella	plasmidspades	2022-02-10		no_reference_database	tool uses no reference plasmid database or trained model
+tahini_salmonella	platon	2022-02-10	2020-10-05	after_database	truth assembly was released after the tool's database
+upec_ecpf14	baseline_coverage	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf14	mob_recon	2020-06-24	2020-05-04	after_database	truth assembly was released after the tool's database
+upec_ecpf14	plasmidspades	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf14	platon	2020-06-24	2020-10-05	possible_overlap	truth assembly was public before the tool's database release
+upec_ecpf15	baseline_coverage	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf15	mob_recon	2020-06-24	2020-05-04	after_database	truth assembly was released after the tool's database
+upec_ecpf15	plasmidspades	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf15	platon	2020-06-24	2020-10-05	possible_overlap	truth assembly was public before the tool's database release
+upec_ecpf16	baseline_coverage	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf16	mob_recon	2020-06-24	2020-05-04	after_database	truth assembly was released after the tool's database
+upec_ecpf16	plasmidspades	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf16	platon	2020-06-24	2020-10-05	possible_overlap	truth assembly was public before the tool's database release
+upec_ecpf18	baseline_coverage	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf18	mob_recon	2020-06-24	2020-05-04	after_database	truth assembly was released after the tool's database
+upec_ecpf18	plasmidspades	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf18	platon	2020-06-24	2020-10-05	possible_overlap	truth assembly was public before the tool's database release
+upec_ecpf40	baseline_coverage	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf40	mob_recon	2020-06-24	2020-05-04	after_database	truth assembly was released after the tool's database
+upec_ecpf40	plasmidspades	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf40	platon	2020-06-24	2020-10-05	possible_overlap	truth assembly was public before the tool's database release
+upec_ecpf5	baseline_coverage	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf5	mob_recon	2020-06-24	2020-05-04	after_database	truth assembly was released after the tool's database
+upec_ecpf5	plasmidspades	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf5	platon	2020-06-24	2020-10-05	possible_overlap	truth assembly was public before the tool's database release
+upec_ecpf7	baseline_coverage	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf7	mob_recon	2020-06-24	2020-05-04	after_database	truth assembly was released after the tool's database
+upec_ecpf7	plasmidspades	2020-06-24		no_reference_database	tool uses no reference plasmid database or trained model
+upec_ecpf7	platon	2020-06-24	2020-10-05	possible_overlap	truth assembly was public before the tool's database release

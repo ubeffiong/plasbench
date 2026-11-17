@@ -1,0 +1,11 @@
+sample	clonal_group	method
+upec_ecpf5	mash:upec_ecpf5	mash<=0.0005
+upec_ecpf7	mash:upec_ecpf7	mash<=0.0005
+upec_ecpf14	mash:upec_ecpf14	mash<=0.0005
+upec_ecpf15	mash:upec_ecpf15	mash<=0.0005
+upec_ecpf16	mash:upec_ecpf16	mash<=0.0005
+upec_ecpf18	mash:upec_ecpf18	mash<=0.0005
+upec_ecpf40	mash:upec_ecpf40	mash<=0.0005
+arbank_0346	mash:arbank_0346	mash<=0.0005
+arbank_0349	mash:arbank_0349	mash<=0.0005
+tahini_salmonella	mash:tahini_salmonella	mash<=0.0005
