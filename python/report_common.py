@@ -38,6 +38,36 @@ def read_tsv(path):
         return list(csv.DictReader((line for line in handle if line.strip() and not line.startswith("#")), delimiter="\t"))
 
 
+CONTIG_NOT_COMPARABLE = ("Contig-level F1 counts the assembly's contigs (or their bases) that could be labelled plasmid or chromosome, and leaves out contigs that are ambiguous, "
+                         "chimeric, unplaced or too short; base-level F1 counts reference bases. The two are not comparable: do not read a contig F1 against a base F1.")
+
+
+def contig_exclusion(scores, tool=None):
+    """(excluded contigs, all contigs, share) over the score rows (those of `tool` when given), or None when the contig columns are absent.
+
+    Excluded = ambiguous + unplaced + chimeric + too short; evaluable contigs are the ones the contig-level F1 is computed on."""
+    evaluable = excluded = 0
+    seen = False
+    for row in scores or []:
+        if tool is not None and row.get("tool") != tool:
+            continue
+        n = number(row.get("contigs_evaluable"))
+        if n is None:
+            continue
+        seen = True
+        evaluable += n
+        excluded += sum(number(row.get(key)) or 0 for key in ("contigs_ambiguous", "contigs_unplaced", "contigs_chimeric", "contigs_short"))
+    if not seen or evaluable + excluded <= 0:
+        return None
+    return int(excluded), int(evaluable + excluded), excluded / (evaluable + excluded)
+
+
+def contig_exclusion_text(scores, tool=None):
+    """The excluded share as shown next to a contig-level F1: '12% (3 of 25 contigs)', or 'not recorded'."""
+    found = contig_exclusion(scores, tool)
+    return "not recorded" if found is None else f"{found[2]:.0%} ({found[0]:,} of {found[1]:,} contigs)"
+
+
 def read_json(path):
     if not path or not os.path.isfile(path):
         return None

@@ -283,6 +283,9 @@ def _cross_links(page):
         start = page.find(f"<section id='{sid}'")
         if start < 0:
             continue
+        if sid == "plasmid-maps" and "<section id='enterprise'" not in page:     # the dashboard is embedded only with --embed-dashboard: never link to an anchor that is not there
+            note = ("<p class='rpt-xlink'>Open the <a href='#pb-explorer-view'>reconstruction evidence explorer</a> for one truth plasmid at a time "
+                    "(the interactive cohort dashboard is not embedded in this report).</p>")
         end = page.find("</section>", start) if sid != "enterprise" else -1
         probe = page[start:start + 3000] if sid == "enterprise" else page[start:end]
         if "rpt-xlink" in probe:

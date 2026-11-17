@@ -20,6 +20,28 @@ BANNER = ("<div class='insight caution demo-banner' id='demo-banner' role='note'
           "a tool comparison or evidence about any tool. Run PlasBench on a real cohort to obtain one.</p></div>")
 
 
+# Sentences the figure and section modules write for the bundled demo ("the demo data are synthetic and flat"). They are true only for a synthetic run; on a real run they
+# are wrong, so strip_demo_boilerplate() removes them from the finished page unless every sample is synthetic. Each entry is (sentence, replacement).
+DEMO_SENTENCES = (
+    (", and the demo data are synthetic and flat:", ":"),
+    (" The bundled demo data are synthetic and flat: counts from them demonstrate the engine, not a biological result.", ""),
+    ("The bundled demo data are synthetic and flat: counts from them demonstrate the engine, not a biological result.", ""),
+    (" The bundled demo data are synthetic and flat; its counts demonstrate the engine, not a biological result.", ""),
+    (" The demo data are synthetic and flat: they demonstrate the engine, not a biological result.", ""),
+    (" The demo data are synthetic and nearly flat, so many points coincide.", ""),
+    (" Demo data are synthetic and flat; do not read them as a result.", ""),
+    ("Demo data are synthetic and flat; do not read them as a result.", ""),
+    ("Demo data are synthetic and flat.", ""),
+)
+
+
+def strip_demo_boilerplate(page):
+    """The page without the demo-data sentences (see DEMO_SENTENCES); the caller applies it only to a run that is not all synthetic."""
+    for sentence, replacement in DEMO_SENTENCES:
+        page = page.replace(sentence, replacement)
+    return page
+
+
 def read_sheet(path):
     """sample id -> row for a sample sheet or cohort file (comment lines starting with # are skipped); {} when absent or unreadable."""
     if not path:

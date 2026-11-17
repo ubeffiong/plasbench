@@ -11,6 +11,10 @@ This folder is the output of a real run, not the bundled demo. It was renamed fr
 | Not run | geNomad, PLASMe, plasgraph2, plsMD and the long-read tools (switched off in the settings recorded in the manifest) |
 | Open first | `benchmark.report.html`; the tables are the `benchmark.*.tsv` files, the per-run scores are `scores.tsv` |
 
+## Which code built it
+
+Everything here, including `benchmark.report.html` and `benchmark.leaderboard.*`, was built with **PlasBench 0.2.3** and **ranks on 1 isolate** (the one Tier 2 reference; the headline ranking is therefore not a result, see below). It was **not rebuilt with later code**: the report needs the sample sheet and the per-sample data folder of the original run, which are not part of this folder, so a rebuild from these files alone would not be the same report. Consequences of the version: its leaderboard lacks the shared-sample warning columns, the run-table consistency table and the input fingerprint added later, and its report card and summary tiles are those of 0.2.3 (the 1000% "runs completed" and "Methods compared 1" it shows were corrected in later versions). To get a current report, rerun stage 6 on this folder's `scores.tsv` and `tool_status.tsv` with the sample sheet and data folder of the run.
+
 ## What it supports, and what it does not
 
 - **Supports:** that the pipeline runs end to end on real reads and real references, and a descriptive look at three real tools on ten isolates.
