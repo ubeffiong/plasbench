@@ -22,6 +22,7 @@ ONE_OFF = {
     "audit_three_class_scoring",   # imported by compare_scoring_methods; METHODS.md documents it
     "parse_teixeira2025_supplement",  # one-time cohort migration, docs/FINDING_DATA.md
     "build_guide_toc",             # regenerates the table of contents of docs/SCIENTIFIC_GUIDE.md; test_guide_docs.py runs it
+    "build_publication_cohort_candidates",  # rebuilds the publication candidate cohorts from their supplements; test_publication_cohort_candidates.py runs it
     "build_implementation_catalogue",  # regenerates docs/IMPLEMENTATION_CATALOGUE.md; test_implementation_catalogue.py runs it
     "refresh_sample_report",       # called at the end of test/run_demo.sh (the demo is not a pipeline stage); test_refresh_sample_report.py covers it
 }

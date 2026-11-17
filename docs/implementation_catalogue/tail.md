@@ -28,6 +28,7 @@ Stated plainly so no one has to find it by looking. Full detail and a status for
 - **A real multi-assembler comparison and a real-cohort ranking-stability result**; the modules exist and are tested on constructed cohorts.
 - **A measured resource pilot** on the target hardware; the resource figures in the README are estimates.
 - **A comparison with the figures printed in the PlasEval paper**, and the one isolate-tool pair the original program could not finish.
+- **Resolving the publication candidate cohorts** (assembly accessions, truth independence, read pairing) and a **performance-drivers analysis** (a regression of per-plasmid recovery on plasmid size, repeat content, assembly fragmentation and database membership, as in the Teixeira analysis repository); both are specified, not built.
 - **Out of scope by design:** plasmid clustering, communities, database search, relatedness, backbone/accessory analysis, phylogeny, and any diagnostic or epidemiological inference.
 
 ## 12. Keeping this document true

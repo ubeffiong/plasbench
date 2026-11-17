@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 170 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
-outputs, 49 run switches, 319 test files and 89 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 174 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
+outputs, 49 run switches, 324 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -207,8 +207,9 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
   `score_amr_placement.py` scores each gene copy at its position: not recovered, shared contig, unassigned contig, on the wrong plasmid or correctly placed, by output type.
   `feature_preservation.py` reports full-length versus partial recovery of replicon, mobility, IS and AMR features and gene-order conservation. SV-PRR reports CPRR counting
   structural discordance, beside CPRR, as an unvalidated descriptive measure.
-- **Where.** `python/score_amr_placement.py`, `feature_preservation.py`, `call_structural_variants.py`, `annotate_reference.py`, `stratify_recovery.py` (recovery by replicon,
-  MOB, size and AMR carriage). **Tests.** `test_amr_truth.py`, `test_derive_amr_truth.py`, `test_feature_preservation.py`, `test_stratify_recovery.py`.
+- **AMR regions view (new).** `report_amr_regions.py` draws every resistance region of the truth (genes coloured by class, with insertion sequences, integrase or integron, replicon, mobility, transfer and metal-resistance context around them) with one lane per tool showing, gene by gene, correct plasmid, wrong plasmid, shared or unassigned contig, or not recovered, plus whether the flank is covered, and a verdict per region (intact, partial, lost; "attributed" for tools that do not bin). A funnel table shows where resistance information is lost: recovered, on the correct plasmid, flank covered, region intact. Interactive: choose a region, show or hide tools and gene classes, zoom, hover or focus to highlight a gene across every lane, click to pin its details. It re-draws what `score_amr_placement.py` already scored and changes no score.
+- **Where.** `python/score_amr_placement.py`, `report_amr_regions.py`, `feature_preservation.py`, `call_structural_variants.py`, `annotate_reference.py`, `stratify_recovery.py` (recovery by replicon,
+  MOB, size and AMR carriage). **Tests.** `test_amr_truth.py`, `test_derive_amr_truth.py`, `test_feature_preservation.py`, `test_stratify_recovery.py`, `test_report_amr_regions.py`.
 - **Limits.** Mobile-element context and gene-neighbourhood preservation go only as far as the element and order checks; per-plasmid consistency of replicon, MOB and AMR is not cross-checked.
 
 ### 3.12 The recommender and the operational path
@@ -242,7 +243,8 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
   locking cohorts, a cross-cohort accession ledger, and a path for contributing a new isolate on a local git branch.
 - **Where.** `cohorts/`, `python/discover_ncbi_cohort.py`, `curate_cohort.py`, `validate_cohort.py`, `build_accession_ledger.py`, `import_contributed_cohort.py`, `prepare_contribution.py`.
   **Tests.** `test_cohort_validation.py`, `test_accession_ledger.py`, `test_import_contributed_cohort.py`.
-- **Limits.** Cohorts are small and taxonomically narrow, mostly Gram-negative, with no plasmid-free isolates in the released cohort.
+- **Candidate cohorts from publications (new).** The cohorts of three publications are adopted as *candidates*, not released benchmarks: plsMD filtered (80 isolates, 244 plasmids), plsMD novel (68 isolates, 269 plasmids, reported absent from PLSDB) and the MOB-suite benchmark (133 closed genomes, 377 plasmids), with the raw supplement tables, ENA run metadata, and a per-isolate ground-truth summary from the Teixeira repository. Every unresolved field is blank, never guessed: assembly accessions are not resolved, truth independence is unverified, and the caveats found while adopting them are written down (the plsMD filtered set is a subset of the MOB-suite set; 23 of 68 novel runs were public before the stated sequencing date; the novel runs fall in only 6 BioProjects, so they need dependence-aware holdouts). Files: `cohorts/candidates/PUBLICATION_COHORTS.md`, `python/build_publication_cohort_candidates.py`. **Tests.** `test_publication_cohort_candidates.py`.
+- **Limits.** Cohorts are small and taxonomically narrow, mostly Gram-negative, with no plasmid-free isolates in the released cohort. The adopted candidates have no resolved assemblies yet.
 
 ### 3.16 Bring your own tool
 
@@ -255,11 +257,11 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 - **What.** One self-contained page with a left rail of views, the headline and recommendation first, then analytics in story order. It includes: the leaderboard and scorecard,
   radar fingerprints, precision-recall, a heat table of every metric, CPRR distributions and a forest plot, circular plasmid maps and an interactive map viewer, 3D views, the
   plasmid matrix with per-isolate FASTA download, the binning error profile (PlasEval cohort), the MultiQC-style QC table, the QUAST-style assembly heat table and the Alvis-style
-  candidate tracks (new), ranking stability and reference evidence (new), and a "?" help dialog on every section. Nothing is hidden: a section with nothing to show says "Not run" and
+  candidate tracks (new), ranking stability and reference evidence (new), the interactive AMR regions view and synteny ribbons (new: how each tool's records sit on a truth plasmid in order and orientation, with forward and reverse blocks, identity shading, filters and a details panel), and a "?" help dialog on every section. Nothing is hidden: a section with nothing to show says "Not run" and
   why, and every output file is registered with the section that shows it (section 7). Export to PDF with headless Edge or Chrome; a sample report built from offline demo data is
   linked from the README.
 - **Where.** `python/build_html_report.py` and the `report_*` modules (section 6), `report_surfaces.py` (the registry), `docs/images/`. PRs #24-#38, #70, #94, #97.
-  **Tests.** `test_report_javascript.py`, `test_visual_report.py`, `test_report_surfaces.py`, `test_report_reviewers.py`, `test_stage_dimensions.sh`.
+  **Tests.** `test_report_javascript.py`, `test_visual_report.py`, `test_report_surfaces.py`, `test_report_reviewers.py`, `test_report_amr_regions.py`, `test_report_synteny.py`, `test_stage_dimensions.sh`.
 
 ### 3.18 The PlasBench window
 
@@ -350,7 +352,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 6. Every module
 
-170 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+174 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -517,6 +519,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `refresh_sample_report.py` | every generated demo report replaces the sample report in the repository. |
 | `report_3d.py` | the server side of the three interactive 3D views in the report. |
 | `report_aliases.py` | Legacy report section ids and where they live now. |
+| `report_amr_regions.py` | resistance-region comparison: does each tool keep the AMR genes AND the mobile context around them, on the right plasmid? |
 | `report_collapse.py` | fold the tables that a figure now draws into closed <details>, in one place. |
 | `report_common.py` | shared building blocks for the report modules added in the HTML overhaul. |
 | `report_condense.py` | shorten the report page from the inside: sub-tabs, windowed long tables, consistent table typography. |
@@ -548,6 +551,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `report_scoring_spec.py` | HTML report sections for the scoring specification and |
 | `report_surfaces.py` | the registry of every pipeline output and its place in the report. |
 | `report_svg.py` | small, dependency-free SVG toolkit for the PlasBench report. |
+| `report_synteny.py` | synteny ribbons: how each tool's records sit on a truth plasmid, in order and orientation. |
 | `report_wiring.py` | wires pipeline outputs that the report did not show into HTML, and used to group the navigation (now python/report_layout.py). |
 | `report_workflow.py` | the PlasBench workflow figure, drawn once as docs/images/workflow.svg for the README. |
 
@@ -563,7 +567,9 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | Module | What it does |
 |---|---|
 | `audit_three_class_scoring.py` | One-off three-class scoring audit (Phase E, Part 14 of the sibling-repo |
+| `build_publication_cohort_candidates.py` | Build CANDIDATE ledgers for three published plasmid-reconstruction cohorts. |
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
+| `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
 
@@ -738,7 +744,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `{sample}/truth_repeat_regions.tsv` | repeat_content.py | plasmid-maps | shown | Repeat regions of the truth: Drawn as the repeat track of the circular plasmid maps. |
 | `{sample}/truth_scorable.provenance.json` | scorable_truth.py | None | partly | Scorable-truth provenance: Provenance. It is listed in the Artifact explorer only. |
 | `{sample}/truth_scorable.tsv` | scorable_truth.py | learn-adequacy | partly | Which truth bases the assembly can reach: Gives the recall ceiling; the table is not listed. |
-| `{sample}/visualization/alignment_blocks.json` | build_visualization_data.py | samples | shown | Alignment blocks for the sequence view: Drawn. |
+| `{sample}/visualization/alignment_blocks.json` | build_visualization_data.py | samples | shown | Alignment blocks for the sequence view: Drawn; the Synteny ribbons section joins each truth plasmid to each tool's records in order and orientation. |
 | `{sample}/visualization/structural_calls.json` | call_structural_variants.py | samples | shown | Structural calls for the sequence view: Drawn. |
 | `{sample}/visualization/structural_metrics.tsv` | build_visualization_data.py | samples | partly | Structural metrics for the sequence view: Drawn as marks, not listed. |
 | `{sample}/{sample2}.mob_classifier.provenance.json` | mob_to_gplas_classifier.py | None | partly | MOB classifier provenance: Provenance. It is listed in the Artifact explorer only. |
@@ -750,7 +756,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `{sample}/pred_{tool}.scores.tsv` | 04_run_tools.sh | baselines-calibration | partly | Per-record probability: Gives PR-AUC and calibration. |
 | `{sample}/pred_{tool}.structural_evidence.validation.json` | validate_structural_evidence.py | orthogonal-evidence | partly | Validation of the supplied structural evidence: Summarised. |
 | `{sample}/{tool}.accuracy.tsv` | alignment_accuracy.py | accuracy-dimension | partly | Nucleotide accuracy: Merged into benchmark.accuracy. |
-| `{sample}/{tool}.amr_placement.tsv` | score_amr_placement.py | amr-placement | shown | AMR gene placement: Every gene copy is a marker on that tool's ring in the 3D ring tower, with a detail panel and CSV export. |
+| `{sample}/{tool}.amr_placement.tsv` | score_amr_placement.py | amr-placement | shown | AMR gene placement: Every gene copy is a marker on that tool's ring in the 3D ring tower, with a detail panel and CSV export; the AMR regions section draws each resistance region with its mobile context and one lane per tool. |
 | `{sample}/{tool}.bestmatch.tsv` | bin_agreement.py | learn-agreement | partly | Best-match precision and recall: Merged into scores and summarised. |
 | `{sample}/{tool}.bin_matches.tsv` | score_bins.py | bin-diagnostics | shown | Bin to plasmid matches: Drawn as the bin flow. |
 | `{sample}/{tool}.bin_quality.tsv` | bin_quality.py | bin-quality | partly | Bin quality tier: Merged into benchmark.bin_quality. |
@@ -834,7 +840,7 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 
 ## 9. History: every merged change
 
-89 merged pull requests, in order. Each is a reviewed, tested change; the title says what it did.
+91 merged pull requests, in order. Each is a reviewed, tested change; the title says what it did.
 
 | PR | Merged | What it did |
 |---|---|---|
@@ -927,6 +933,8 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 | #94 | 2026-11-16 | feat: short-read QC gate, assembly selection policy, candidate multiplicity analysis and an external review log |
 | #95 | 2026-11-16 | Contributed RefSeq/SRA candidate pool and a seeded, cluster-aware cohort importer |
 | #96 | 2026-11-16 | Configurable leakage screen (cutoff policy, fixed date, date basis), settable in plasbench ui |
+| #97 | 2026-11-16 | feat: ranking stability, assembler sensitivity, reference evidence audit, 215-question assessment and the implementation catalogue |
+| #99 | 2026-11-16 | Your own isolates: template, folder scan, quick test, and a plain way out of every error |
 
 ## 10. Tests and how to run them
 
@@ -957,6 +965,7 @@ Stated plainly so no one has to find it by looking. Full detail and a status for
 - **A real multi-assembler comparison and a real-cohort ranking-stability result**; the modules exist and are tested on constructed cohorts.
 - **A measured resource pilot** on the target hardware; the resource figures in the README are estimates.
 - **A comparison with the figures printed in the PlasEval paper**, and the one isolate-tool pair the original program could not finish.
+- **Resolving the publication candidate cohorts** (assembly accessions, truth independence, read pairing) and a **performance-drivers analysis** (a regression of per-plasmid recovery on plasmid size, repeat content, assembly fragmentation and database membership, as in the Teixeira analysis repository); both are specified, not built.
 - **Out of scope by design:** plasmid clustering, communities, database search, relatedness, backbone/accessory analysis, phylogeny, and any diagnostic or epidemiological inference.
 
 ## 12. Keeping this document true

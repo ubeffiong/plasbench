@@ -995,7 +995,7 @@ there, what is still missing, and the Docker command when Docker is available.
 | **Settings** | Every setting PlasBench reads, its default and its explanation, searchable. Your changes are saved to `config/local.env` on this computer, and clearing one returns to the default. |
 | **Workspace & studies** | Every benchmark is a study with its own folder (results, report, logs and a record of how it was run). Choose and check the workspace that holds them (free space, drive type, cloud-sync warnings), see every study, open its report or folder, start a new one. |
 | **New benchmark** | A five-step wizard: the isolates (demo, a bundled cohort, your own sheet, or the metagenomic track), the tools (built-in on/off and your own), resources, outputs and stages, then a review of the exact command before it starts. |
-| **Your own isolates** | Add an isolate from its FASTQ files and complete reference (`plasbench init-local`), with file pickers. |
+| **Your own isolates** | Point PlasBench at the folder(s) where your reads and reference genomes are. **1 Get a sheet**: download a template (your own isolates, a public NCBI cohort, a truth table) with the rules written in it. **2 Find my files**: it finds every isolate, shows its reads, the reference it was matched to and how sure that is, its labels and a guessed organism; you fix a name, tick what you want and **Place the selected isolates** (originals never changed). **3 Quick test**: opens every file the way a run will and passes, warns or fails each thing, including whether the reads come from the reference's isolate; each failure says what to do and links to the [guide](docs/INPUT_GUIDE.md), and **Fix what can be fixed** repairs what has one right answer. **Label sequences** is the one decision left to you: which reference sequences are plasmids. Then **Benchmark this sheet**. Adding a single isolate by hand (`plasbench init-local`) is still there. |
 | **Cohorts** | The bundled study sets. **Details** shows what each holds: description, isolates and species, plasmids in the truth, read depth, BioProjects and the download size. Breakdowns cover organism, truth tier, how the truth was assembled, origin and country. A searchable table lists every sample, with NCBI links, host, isolation source, collection date and how its reference was sequenced (from the cohort's lock). Validate a cohort, or benchmark it in one click. |
 | **Runs & reports** | **Run sessions**: every benchmark you started, grouped as ongoing (with stage, isolate and percentage progress), needing attention (failed, interrupted or cancelled: one click to **Resume**, finished work is kept) and completed (open the report, run again). Runs are detached from the window, so closing it, losing the connection or quitting with *Quit and keep running* does not stop them, and a new window finds them again. Below, every results folder with the leader of each task: open the report, export a PDF, or rebuild the report. |
 | **Jobs** | Everything started from the window, with its exact command line, how it ended, its full log, and **Run again**. |
@@ -2397,6 +2397,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `install-conda` | Detect (or install) a conda-family manager. | `--yes`, `--prefix` |
 | `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `all`, ...). | *`profile`* (positional) |
 | `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
+| `intake` | Your own isolates in bulk: `template` (a sheet to fill in), `scan FOLDER...` (find isolates, change nothing), `stage FOLDER...` (place them, write the sheet), `check [--fix]` (the quick test). Guide: [docs/INPUT_GUIDE.md](docs/INPUT_GUIDE.md). | *`template\|scan\|stage\|check`*, `--data-dir`, `--samples`, `--fix` |
 | `validate-cohort` | Check a cohort sheet's schema, or verify it against NCBI online. | *`--samples`*, `--online`, `--write-lock`, `--verify-lock`, `--ledger` |
 | `validate-orthogonal-evidence` | Validate optional independent laboratory/technology evidence without changing computational scores. | *`--evidence`*, `--out` |
 | `derive-amr-truth` | Draft AMR truth from reference annotation; never writes `truth_amr.tsv`. | *`--features`*, *`--truth`*, *`--out`* |
@@ -3176,6 +3177,30 @@ there.
 Everything so far downloads isolates from NCBI. This section is for benchmarking
 **your own sequencing data**. Every command is complete; copy it as written.
 
+### 5.0a The quickest route: point PlasBench at your folders
+
+You do not have to know the file layout in advance. Say where your reads and reference genomes are; PlasBench finds each isolate, places the files, and tests that it can read and use them **before** a run spends hours. The full guide, with one section per message you may see, is [docs/INPUT_GUIDE.md](docs/INPUT_GUIDE.md). In the window: **plasbench ui**, then **Your own isolates**.
+
+```bash
+# 1. (optional) a sheet to fill in by hand, with the rules written at the top: local | cohort | truth
+plasbench intake template local --out config/local.tsv
+
+# 2. find isolates in your folder(s): reads, references, labels. Changes nothing.
+plasbench intake scan /path/to/your/folder
+
+# 3. place them where a run expects them and write the sample sheet
+plasbench intake stage /path/to/your/folder
+
+# 4. the quick test: opens every file the way a run will; add --fix to repair what can be repaired
+plasbench intake check --fix
+```
+
+What it does for you: pairs read files by name (`_1/_2`, `_R1/_R2`, Illumina `_S1_L001_R1_001`, several lanes joined into one isolate); matches each reference FASTA to its isolate by name or folder and **says how sure it is**, refusing to guess when two isolates could own one file; reads the organism from the FASTA header (as a guess to confirm); compresses uncompressed reads; drafts the truth table from the FASTA headers.
+
+What it will not do: decide which sequences are plasmids. That is the ground truth every score is judged against, so anything a header does not state is left as `REVIEW` for you (the window has a **Label sequences** table for it), and a run will not start while any `REVIEW` remains. It never changes your original files.
+
+The quick test checks that the reads open and are paired, the reference is a complete DNA genome with unique names, the truth table matches the reference, and, because no file name can show this, **that the reads actually come from the reference's isolate** (21-letter words from a sample of the reads are looked up in the reference: 80% or more is a pass, 30-80% a warning, less a failure). Every failure names the file, says what to do in plain steps and links to its section of the guide; `--fix` repairs what has one right answer (a `.gz` that is plain text, differently named read files, a missing or untidy truth table, the template's example row).
+
 ### 5.0 Prepare inputs before running: choose one route
 
 Do not start with `plasbench run` until you know which input route describes
@@ -3755,14 +3780,16 @@ conclusions from two or three samples.
 
 ### 5.9 Operational mode: reconstruct without scoring
 
-To recover plasmids from a new isolate with no ground truth, leave
-`assembly_accession` empty. The pipeline skips the reference and truth entirely
+To recover plasmids from a new isolate with no ground truth, set
+`assembly_accession` to `NA` (an empty field also works). The pipeline skips the reference and truth entirely
 and you supply only the two FASTQ files:
 
 ```
 sample_id	assembly_accession	sra_run
-new_isolate		newreads
+new_isolate	NA	newreads
 ```
+
+`plasbench intake stage` writes such a row for you when it finds reads with no reference.
 
 Better still, use the dedicated command, which runs only the method your own
 benchmark selected rather than every tool:

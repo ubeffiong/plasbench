@@ -87,3 +87,5 @@
 94	2026-11-16	feat: short-read QC gate, assembly selection policy, candidate multiplicity analysis and an external review log
 95	2026-11-16	Contributed RefSeq/SRA candidate pool and a seeded, cluster-aware cohort importer
 96	2026-11-16	Configurable leakage screen (cutoff policy, fixed date, date basis), settable in plasbench ui
+97	2026-11-16	feat: ranking stability, assembler sensitivity, reference evidence audit, 215-question assessment and the implementation catalogue
+99	2026-11-16	Your own isolates: template, folder scan, quick test, and a plain way out of every error

@@ -756,10 +756,37 @@ body.gd-open #gdrawer{transform:none}
   <!-- ISOLATES ------------------------------------------------------------------------------------ -->
   <section class="view" id="v_isolates" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Benchmark</div><h1>Your own isolates</h1>
-    <p>Add an isolate you sequenced: its paired short reads and a complete reference assembly (the truth). PlasBench copies or links the files into place, drafts the truth table, and adds a row to your sample sheet. Then benchmark the sheet from <a href="#wizard">New benchmark</a>.</p></div></div>
-   <div class="split"><div class="card" id="isoform"></div>
-    <div class="stack"><div class="note info"><svg class="ico"><use href="#i-info"/></svg><div><b>What you need per isolate</b><ul><li>Paired Illumina reads (<code>_1</code> and <code>_2</code> FASTQ, gzipped is fine)</li><li>A complete reference: chromosome and plasmids as separate records, ideally long-read first</li><li>Optionally, an NCBI sequence report to label replicons</li></ul></div></div>
-     <div class="note warn"><svg class="ico"><use href="#i-alert"/></svg><div>Check the drafted <code>truth.tsv</code> before scoring: every PLASMID / CHROMOSOME label is what the tools are judged against.</div></div></div></div>
+    <p>Tell PlasBench which folder(s) hold your reads and reference genomes. It finds each isolate, places the files where the run expects them, and tests that it can read and use them, before any run spends hours. Not sure what you need? <a href="#help/docs/INPUT_GUIDE.md">Read the guide</a>.</p></div></div>
+   <div class="stack">
+    <div class="card" id="in_get">
+     <div class="hd"><h3>1. Get a sheet to fill in <span class="mut small">(optional)</span></h3></div>
+     <div class="bd" style="padding:12px 14px">
+      <p class="mut" style="margin-top:0">You do not have to write a sheet: step 2 writes it for you from your folders. If you prefer to fill one in yourself, download a template. Each has the rules written at the top, and a worked example.</p>
+      <div class="row wrap" id="in_tpl"></div>
+      <div class="note info" style="margin-top:10px"><svg class="ico"><use href="#i-info"/></svg><div><b>What you need for each isolate:</b> its paired Illumina reads (two files); for a <em>scored</em> benchmark also the <em>complete</em> genome of the <em>same</em> isolate (chromosome and each plasmid as separate sequences). With reads only, PlasBench reconstructs the plasmids but cannot score them.</div></div>
+     </div></div>
+    <div class="card" id="in_find">
+     <div class="hd"><h3>2. Find my files</h3><span class="sub">plasbench intake scan / stage</span></div>
+     <div class="bd" style="padding:12px 14px">
+      <p class="mut" style="margin-top:0">Add the folder(s) where your files are. Sub-folders are searched. Nothing is changed until you press <b>Place the selected isolates</b>.</p>
+      <div class="row wrap"><button class="btn sec" id="in_addf"><svg class="ico sm"><use href="#i-folder"/></svg>Add a folder…</button>
+       <input type="text" id="in_fpath" placeholder="or paste a folder path" aria-label="Folder path" style="flex:1;min-width:220px"><button class="btn sec" id="in_fadd">Add</button></div>
+      <div id="in_folders" class="row wrap" style="margin:10px 0"></div>
+      <div class="row wrap"><button class="btn" id="in_scan" disabled><svg class="ico sm"><use href="#i-play"/></svg>Find my files</button><span class="mut small" id="in_scan_msg"></span></div>
+      <div id="in_found" style="margin-top:12px"></div>
+     </div></div>
+    <div class="card" id="in_test">
+     <div class="hd"><h3>3. Quick test: can PlasBench see and use them?</h3><span class="sub">plasbench intake check</span></div>
+     <div class="bd" style="padding:12px 14px">
+      <p class="mut" style="margin-top:0">Opens each file the way a run will: are the reads real FASTQ and paired, is the reference a complete genome, do the labels match it, and do the reads actually come from that reference's isolate. Takes seconds per isolate and changes nothing unless you press Fix.</p>
+      <div class="field"><label>Sample sheet</label><div class="ctl"><input type="text" id="in_sheet" aria-label="Sample sheet path"><button class="btn sec sm" id="in_sheet_b">Browse</button></div></div>
+      <div class="field"><label>Data folder</label><div class="ctl"><input type="text" id="in_data" aria-label="Data folder"></div><div class="help">Where each isolate's own folder lives. The default is PlasBench's data folder.</div></div>
+      <div class="row wrap" style="margin-top:8px"><label class="row small"><input type="checkbox" id="in_deep" checked> Also compare the reads with the reference (a few seconds each)</label></div>
+      <div class="row wrap" style="margin:10px 0"><button class="btn" id="in_run"><svg class="ico sm"><use href="#i-check"/></svg>Run the quick test</button><button class="btn sec" id="in_fix" hidden><svg class="ico sm"><use href="#i-refresh"/></svg>Fix what can be fixed</button><span class="mut small" id="in_run_msg"></span></div>
+      <div id="in_result"></div>
+     </div></div>
+    <div class="card" id="isoform"></div>
+   </div>
   </section>
 
   <!-- COHORTS ------------------------------------------------------------------------------------- -->
@@ -863,6 +890,9 @@ body.gd-open #gdrawer{transform:none}
  </form>
 </div>
 
+<dialog id="lbldlg" class="wide" aria-labelledby="lb_t"><div class="hd"><svg class="ico"><use href="#i-edit"/></svg><h3 id="lb_t">Label sequences</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
+ <div class="bd"><p class="mut" style="margin-top:0">For each sequence of the reference, say whether it is a <b>plasmid</b> or the <b>chromosome</b>. Every tool is scored against these labels, so PlasBench never fills them in for you. "Header says" is what the FASTA header states; where it says nothing, the choice is yours. Do not decide by size alone.</p><div id="lb_body"></div></div>
+ <div class="ft"><span class="mut small grow" id="lb_msg"></span><button class="btn sec" data-close>Cancel</button><button class="btn" id="lb_save">Save labels</button></div></dialog>
 <dialog id="fsdlg"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="fs_title">Choose</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd"><div class="row" style="margin-bottom:8px"><button class="btn sec sm" id="fs_up">Up</button><input type="text" id="fs_path" aria-label="Path"><button class="btn sec sm" id="fs_go">Go</button></div>
   <div class="fs-list" id="fs_list"></div></div>
@@ -1988,21 +2018,24 @@ const PAGE_HELP = {
 },
 "isolates": {
 "title": "Your own isolates",
-"what": "Adds an isolate you sequenced, so it can be benchmarked like the public ones.",
+"what": "Finds your sequencing files in the folder(s) you name, places them where a run expects them, and tests that PlasBench can read and use them, before any run spends hours.",
 "steps": [
-"Give it a sample id (letters, digits, _ and -).",
-"Choose its paired Illumina reads (<code>_1</code> and <code>_2</code> FASTQ, gzipped is fine).",
-"Choose its complete reference assembly: chromosome and plasmids as separate records, ideally long-read first. This is the truth the tools are judged against.",
-"Optionally add the NCBI sequence report, to label which records are plasmids.",
-"Press <b>Add</b>. PlasBench copies or links the files, drafts <code>truth.tsv</code>, and adds a row to your sample sheet.",
-"<b>Check the drafted truth.tsv</b>: every PLASMID or CHROMOSOME label is what the tools will be scored against. Then benchmark the sheet from <a href=\"#wizard\">New benchmark</a>."
+"<b>1 Get a sheet</b> (optional): download a template with the rules written in it. You can skip this; step 2 writes the sheet for you.",
+"<b>2 Find my files</b>: add the folder(s) where your reads and reference genomes are, then press <b>Find my files</b>. Each isolate shows its reads, the reference it was matched to (and how sure that is), its labels and a guessed organism. Fix any name, tick the isolates you want, and press <b>Place the selected isolates</b>. Your originals are never changed.",
+"<b>3 Quick test</b>: opens every file the way a run will. Red items say exactly what to do and link to the guide. <b>Fix what can be fixed</b> repairs what has one right answer (compression, file names, a missing or untidy truth table).",
+"<b>Label sequences</b>: the one decision PlasBench will not make for you is which reference sequences are plasmids. Choose for each; every tool is scored against your choice.",
+"When everything is green, press <b>Benchmark this sheet</b>."
 ],
 "tips": [
-"A reference assembled from the same short reads you benchmark is circular truth. Prefer long-read or hybrid references made independently.",
-"Mix your isolates with a public cohort by adding both sheets in New benchmark."
+"Name a reference after its isolate (<code>KP01.fna</code> for <code>KP01</code>) or keep it in the isolate's own folder, so it is matched with certainty.",
+"A reference must be the <em>complete</em> genome of the <em>same</em> isolate. The quick test compares your reads with it and warns when they do not match.",
+"With reads only (no reference) an isolate is reconstructed, not scored."
 ],
 "cli": [
-"plasbench init-local --sample S1 --reads-1 R1.fq.gz --reads-2 R2.fq.gz --reference ref.fasta"
+"plasbench intake template local --out config/local.tsv",
+"plasbench intake scan /path/to/folder",
+"plasbench intake stage /path/to/folder",
+"plasbench intake check --fix"
 ]
 },
 "cohorts": {
@@ -2607,9 +2640,154 @@ $("#wnext").onclick = () => {
    ISOLATES, COHORTS
    =================================================================================================== */
 const ISO = {};
+
+/* Your own isolates: template, find, place, quick test, label ---------------------------------------------------------------- */
+const IN = {folders: [], found: null, labelSample: ""};
+const IN_TAG = {ready: ["ok", "ready"], attention: ["warn", "check"], blocked: ["bad", "blocked"]};
+const inLvl = l => l === "error" ? ["bad", "fix this"] : l === "warn" ? ["warn", "check"] : ["", "note"];
+const guideLink = `<a href="#help/docs/INPUT_GUIDE.md">guide</a>`;
+const fixText = t => esc(t || "").replace(/\n/g, "<br>");
+async function inInit() {
+  const d = await api("intake/defaults");
+  if (!$("#in_sheet").value) $("#in_sheet").value = d.samples;
+  if (!$("#in_data").value) $("#in_data").value = d.data_dir;
+  $("#in_tpl").innerHTML = d.templates.map(t => `<button class="btn sec" data-tpl="${esc(t.kind)}" title="Download ${esc(t.file)}">${icon("down")}${esc(t.label)}</button>`).join("");
+}
+$("#in_tpl").onclick = async e => {
+  const b = e.target.closest("[data-tpl]"); if (!b) return;
+  try { const r = await api(`intake/template?kind=${encodeURIComponent(b.dataset.tpl)}`);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([r.text], {type: "text/tab-separated-values"})); a.download = r.file; a.click();
+    toast(`${r.file} downloaded: fill it in, keeping the header line and the TAB between columns`, "ok"); } catch (e2) { toast(e2.message, "bad"); }
+};
+function inFolders() {
+  $("#in_folders").innerHTML = IN.folders.map((f, i) => `<span class="tag">${icon("folder")}${esc(f)}<button class="btn ghost icon sm" data-inrm="${i}" aria-label="Remove folder" style="padding:0 2px">${icon("x")}</button></span>`).join("")
+    || `<span class="mut small">No folder yet.</span>`;
+  $("#in_scan").disabled = !IN.folders.length;
+}
+function inAddFolder(p) { p = (p || "").trim(); if (p && !IN.folders.includes(p)) IN.folders.push(p); IN.found = null; $("#in_found").innerHTML = ""; inFolders(); }
+$("#in_addf").onclick = () => pickPath(true, inAddFolder, "Choose a folder with your reads and reference genomes");
+$("#in_fadd").onclick = () => { inAddFolder($("#in_fpath").value); $("#in_fpath").value = ""; };
+$("#in_fpath").onkeydown = e => { if (e.key === "Enter") $("#in_fadd").click(); };
+$("#in_folders").onclick = e => { const b = e.target.closest("[data-inrm]"); if (b) { IN.folders.splice(+b.dataset.inrm, 1); inFolders(); } };
+$("#in_sheet_b").onclick = () => pickPath(false, p => { $("#in_sheet").value = p; }, "Choose a sample sheet");
+$("#in_scan").onclick = async () => {
+  $("#in_scan_msg").textContent = "Looking…"; $("#in_scan").disabled = true;
+  try { IN.found = await api("intake/scan", {paths: IN.folders}); inFound(); $("#in_scan_msg").textContent = ""; }
+  catch (e) { $("#in_scan_msg").textContent = ""; toast(e.message, "bad"); }
+  $("#in_scan").disabled = !IN.folders.length;
+};
+function inIssues(issues) {
+  return issues.map(x => { const [c, t] = inLvl(x.level);
+    return `<div style="margin:4px 0"><span class="tag ${c}">${t}</span> ${esc(x.text)}${x.level !== "info" && x.fix ? `<div class="mut small" style="margin:3px 0 0 6px;border-left:2px solid var(--line);padding-left:8px"><b>What to do:</b> ${fixText(x.fix)}<br>${x.auto ? `<span class="tag ok">Fix can repair this after placing</span> ` : ""}${guideLink}</div>` : ""}</div>`; }).join("");
+}
+function inFound() {
+  const f = IN.found, box = $("#in_found");
+  const sm = f.summary, left = f.leftovers;
+  const rows = f.isolates.map((i, n) => { const [c, t] = IN_TAG[i.status];
+    const ref = i.reference;
+    return `<tr data-in="${esc(i.id)}"><td><input type="checkbox" data-incheck ${i.status === "blocked" ? "" : "checked"} aria-label="Include ${esc(i.id)}"></td>
+      <td><input type="text" data-inid value="${esc(i.id)}" style="width:150px" aria-label="Sample name"><div class="mut small">${i.lanes} lane${i.lanes === 1 ? "" : "s"}</div></td>
+      <td class="small"><div><b>Reads</b> ${esc(i.r1[0].split(/[\\/]/).pop())} + ${esc(i.r2[0].split(/[\\/]/).pop())}</div>
+        <div><b>Reference</b> ${ref ? `${esc(ref.path.split(/[\\/]/).pop())} · ${ref.records} sequence${ref.records === 1 ? "" : "s"} · ${ref.total_bp.toLocaleString()} bp <span class="mut">(${esc(i.reference_how)})</span>` : `<span class="mut">none: reads only, will not be scored</span>`}</div>
+        ${i.truth.kind ? `<div><b>Labels</b> ${esc(i.truth.kind.replace("_", " "))}: ${esc(i.truth.path.split(/[\\/]/).pop())}</div>` : ""}</td>
+      <td><input type="text" data-inorg value="${esc(i.organism_guess)}" placeholder="organism" style="width:150px" aria-label="Organism">${i.organism_guess ? `<div class="mut small">guessed from the FASTA header: confirm</div>` : ""}</td>
+      <td><span class="tag ${c}">${t}</span></td></tr>
+      ${i.issues.length ? `<tr><td></td><td colspan="4" class="small">${inIssues(i.issues)}</td></tr>` : ""}`; }).join("");
+  const other = [];
+  if (left.fasta_unmatched.length) other.push(`<b>FASTA files not matched to an isolate:</b> ${left.fasta_unmatched.map(x => esc(x.split(/[\\/]/).pop())).join(", ")}`);
+  if (left.long_read_files.length) other.push(`<b>Long-read files (not placed here):</b> ${left.long_read_files.map(x => esc(x.split(/[\\/]/).pop())).join(", ")}`);
+  if (left.unpaired_fastq.length) other.push(`<b>FASTQ files with no mate (ignored):</b> ${left.unpaired_fastq.map(x => esc(x.split(/[\\/]/).pop())).join(", ")}`);
+  box.innerHTML = `${f.notes.map(n => `<div class="note warn" style="margin-bottom:6px"><svg class="ico"><use href="#i-alert"/></svg><div>${esc(n)} ${guideLink}</div></div>`).join("")}
+    ${f.isolates.length ? `<div class="mut small" style="margin-bottom:6px">${sm.isolates} isolate${sm.isolates === 1 ? "" : "s"} found: ${sm.ready} ready, ${sm.attention} to check, ${sm.blocked} blocked. ${sm.scored} will be scored.</div>
+      <div style="overflow:auto"><table class="data"><thead><tr><th></th><th>Isolate</th><th>What was found</th><th>Organism</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${other.length ? `<div class="mut small" style="margin-top:8px">${other.join("<br>")}</div>` : ""}
+      <div class="row wrap" style="margin-top:10px"><button class="btn" id="in_stage">${icon("plus")}Place the selected isolates</button>
+       <label class="row small">How: <select id="in_link"><option value="copy">copy the files</option><option value="hardlink">hard-link (no extra disk space)</option><option value="symlink">symbolic link</option></select></label>
+       <span class="mut small" id="in_stage_msg">Your original files are never changed.</span></div>` : ""}`;
+  if ($("#in_stage")) $("#in_stage").onclick = inStage;
+}
+async function inStage() {
+  const only = [], rename = {}, organism = {};
+  $$("#in_found tr[data-in]").forEach(tr => {
+    if (!tr.querySelector("[data-incheck]").checked) return;
+    const old = tr.dataset.in, id = tr.querySelector("[data-inid]").value.trim() || old;
+    only.push(old); if (id !== old) rename[old] = id;
+    const org = tr.querySelector("[data-inorg]").value.trim(); if (org) organism[old] = org;
+  });
+  if (!only.length) return toast("Tick at least one isolate", "bad");
+  $("#in_stage").disabled = true; $("#in_stage_msg").textContent = "Placing…";
+  try {
+    const r = await api("intake/stage", {paths: IN.folders, only, rename, organism, link: $("#in_link").value, data_dir: $("#in_data").value.trim(), samples: $("#in_sheet").value.trim()});
+    const bad = r.results.filter(x => !x.ok);
+    $("#in_stage_msg").innerHTML = `<span class="${r.staged.length ? "ok-t" : "bad-t"}">${r.staged.length} placed</span>${bad.length ? `, <span class="bad-t">${bad.length} skipped</span>` : ""}`;
+    $("#in_found").insertAdjacentHTML("beforeend", `<div style="margin-top:8px">${r.results.map(x => `<div class="small">${x.ok ? icon("check") : icon("x")} <b>${esc(x.id)}</b> ${x.ok ? "placed" : "skipped"}${x.messages.length && !x.ok ? `: ${esc(x.messages.join(" "))}` : ""}</div>`).join("")}</div>`);
+    if (r.staged.length) { $("#in_sheet").value = r.samples; toast(`${r.staged.length} isolate${r.staged.length === 1 ? "" : "s"} placed. Running the quick test…`, "ok"); await inRun(false); $("#in_test").scrollIntoView({behavior: "smooth"}); }
+  } catch (e) { toast(e.message, "bad"); $("#in_stage_msg").textContent = ""; }
+  $("#in_stage").disabled = false;
+}
+const inSt = {pass: ["ok", "check"], warn: ["warn", "alert"], fail: ["bad", "x"], info: ["", "info"]};
+function inRender(results, repaired) {
+  const ok = results.every(r => r.ok), fixable = results.some(r => r.checks.some(c => c.status !== "pass" && c.status !== "info" && c.auto));
+  $("#in_fix").hidden = !fixable;
+  const html = results.map(r => `<div class="card" style="margin:8px 0"><div class="hd"><h3>${esc(r.sample_id)} <span class="mut small">${esc(r.mode)}</span></h3><span class="tag ${r.ok ? "ok" : "bad"}">${r.ok ? "usable" : "not usable yet"}</span>
+      ${r.checks.some(c => c.code === "truth-review" || c.code === "truth-mismatch") ? `<button class="btn sec sm" data-inlabel="${esc(r.sample_id)}" style="margin-left:8px">${icon("edit")}Label sequences</button>` : ""}</div>
+      <div class="bd" style="padding:8px 14px">${r.checks.map(c => { const [t, ic] = inSt[c.status] || ["", "info"];
+        return `<div style="margin:5px 0"><span class="tag ${t}">${icon(ic)}${c.status}</span> <b>${esc(c.name)}</b>${c.detail ? ` <span class="mut">${esc(c.detail)}</span>` : ""}
+          ${c.status === "fail" || c.status === "warn" ? `<div class="small" style="margin:3px 0 0 6px;border-left:2px solid ${c.status === "fail" ? "var(--bad)" : "var(--warn)"};padding-left:8px"><b>What to do:</b> ${fixText(c.fix)}<br>${c.auto ? `<span class="tag ok">Fix can repair this</span> ` : ""}${guideLink}</div>` : ""}</div>`; }).join("")}</div></div>`).join("");
+  const done = (repaired || []).length ? `<div class="note ok" style="margin-bottom:8px"><svg class="ico"><use href="#i-check"/></svg><div><b>Repaired:</b><ul style="margin:4px 0 0">${repaired.map(x => `<li>${esc(x.sample_id)}: ${esc(x.what)}</li>`).join("")}</ul></div></div>` : "";
+  const next = ok ? `<div class="note ok" style="margin:8px 0"><svg class="ico"><use href="#i-check"/></svg><div><b>Everything can be read and used.</b> Start the benchmark with this sheet.</div></div><button class="btn" id="in_go">${icon("play")}Benchmark this sheet</button>`
+    : `<div class="note warn" style="margin:8px 0"><svg class="ico"><use href="#i-alert"/></svg><div>Not ready yet: follow the <b>What to do</b> under each red item${fixable ? ", or press <b>Fix what can be fixed</b>" : ""}, then run the test again. Nothing has been run.</div></div>`;
+  $("#in_result").innerHTML = done + html + next;
+  if ($("#in_go")) $("#in_go").onclick = () => { S.wiz = {step: 0, source: "sheet", values: {...(S.wiz?.values || {}), samples: $("#in_sheet").value.trim()}}; go("wizard"); };
+}
+async function inRun(fix) {
+  const sheet = $("#in_sheet").value.trim(), data_dir = $("#in_data").value.trim(), deep = $("#in_deep").checked;
+  if (!sheet) return toast("Give the sample sheet", "bad");
+  $("#in_run").disabled = $("#in_fix").disabled = true; $("#in_run_msg").textContent = "Reading the sheet…";
+  try {
+    const sh = await api("intake/sheet", {samples: sheet, data_dir});
+    if (!sh.exists) { $("#in_result").innerHTML = `<div class="note bad"><svg class="ico"><use href="#i-x"/></svg><div>There is no sample sheet at <code>${esc(sh.samples)}</code>. Place isolates in step 2 (it writes the sheet), or download the template in step 1, fill it in and choose it here. ${guideLink}</div></div>`; return; }
+    if (!sh.rows.length) { $("#in_result").innerHTML = `<div class="note bad"><svg class="ico"><use href="#i-x"/></svg><div>The sheet has no isolate rows. Add your isolates (step 2), or delete the template's EXAMPLE_ row and add yours. ${guideLink}</div></div>`; return; }
+    const results = [], repaired = []; let k = 0;
+    for (const row of sh.rows) {
+      k++; $("#in_run_msg").textContent = `Testing ${row.sample_id} (${k} of ${sh.rows.length})…`;
+      const r = await api("intake/check", {samples: sheet, data_dir, sample: row.sample_id, deep, fix: !!fix});
+      if (r.error && !r.samples.length) { results.push({sample_id: row.sample_id, mode: "", ok: false, checks: [{status: "fail", name: "Sample sheet", detail: r.error, fix: (r.error_info && r.error_info.fix) || "", auto: false}]}); continue; }
+      results.push(...r.samples); repaired.push(...(r.repaired || []));
+    }
+    inRender(results, repaired); $("#in_run_msg").textContent = "";
+  } catch (e) { toast(e.message, "bad"); $("#in_run_msg").textContent = ""; }
+  $("#in_run").disabled = $("#in_fix").disabled = false;
+}
+$("#in_run").onclick = () => inRun(false);
+$("#in_fix").onclick = () => inRun(true);
+$("#in_result").onclick = e => { const b = e.target.closest("[data-inlabel]"); if (b) inLabels(b.dataset.inlabel); };
+async function inLabels(sample) {
+  IN.labelSample = sample; $("#lb_t").textContent = `Label sequences: ${sample}`; $("#lb_msg").textContent = "";
+  try {
+    const r = await api("intake/labels", {sample, data_dir: $("#in_data").value.trim()});
+    if (r.has_report) { toast("This isolate takes its labels from an NCBI sequence report; there is nothing to label by hand", ""); return; }
+    $("#lb_body").innerHTML = `<table class="data"><thead><tr><th>Sequence</th><th>Length</th><th>FASTA header</th><th>Header says</th><th>It is a</th></tr></thead><tbody>${r.rows.map(x => {
+      const cur = ["PLASMID", "CHROMOSOME"].includes(x.label) ? x.label : "";
+      return `<tr data-lbid="${esc(x.sequence_id)}"><td class="mono">${esc(x.sequence_id)}</td><td>${x.length.toLocaleString()} bp</td><td class="small">${esc(x.header)}</td>
+        <td>${x.header_says ? `<span class="tag">${esc(x.header_says)}</span>` : `<span class="mut small">nothing</span>`}</td>
+        <td><select data-lbsel aria-label="Type of ${esc(x.sequence_id)}"><option value="">choose…</option><option value="PLASMID"${cur === "PLASMID" ? " selected" : ""}>PLASMID</option><option value="CHROMOSOME"${cur === "CHROMOSOME" ? " selected" : ""}>CHROMOSOME</option></select></td></tr>`; }).join("")}</tbody></table>`;
+    $("#lbldlg").showModal();
+  } catch (e) { toast(e.message, "bad"); }
+}
+$("#lb_save").onclick = async () => {
+  const labels = {}; $$("#lb_body tr[data-lbid]").forEach(tr => { labels[tr.dataset.lbid] = tr.querySelector("[data-lbsel]").value; });
+  try {
+    const r = await api("intake/labels/save", {sample: IN.labelSample, data_dir: $("#in_data").value.trim(), labels});
+    if (!r.ok) { $("#lb_msg").innerHTML = `<span class="bad-t">${r.problems.map(esc).join("<br>")}</span>`; return; }
+    $("#lbldlg").close(); toast("Labels saved", "ok"); inRun(false);
+  } catch (e) { toast(e.message, "bad"); }
+};
+
 async function loadIsolates() {
+  inFolders(); inInit().catch(e => toast(e.message, "bad"));
   await getSchema(); const c = command("init-local");
-  $("#isoform").innerHTML = `<div class="hd"><h3>Add an isolate</h3><span class="sub">plasbench init-local</span></div>${groupedFields(c.args, ISO, "iso", true)}
+  $("#isoform").innerHTML = `<div class="hd"><h3>Or add one isolate by hand</h3><span class="sub">plasbench init-local</span></div>${groupedFields(c.args, ISO, "iso", true)}
     <div class="ft" style="justify-content:space-between"><div class="cmdline grow"><span class="p">$</span><code id="isoprev"></code></div><button class="btn" id="isorun">${icon("plus")}Add isolate</button></div>`;
   const upd = () => $("#isoprev").textContent = cmdText(buildArgv(c, ISO, ["init-local"]));
   bindForm($("#isoform"), ISO, upd); upd();
