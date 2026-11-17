@@ -95,7 +95,8 @@ def main():
     print("confirming")
     tmp = fresh_root()
     rewritten = (tmp / "config" / "prereg.tsv").read_text(encoding="utf-8").replace("\r\n", "\n").replace("dominant_study_share\t0.30\tPLASBENCH_DOMINANT_SHARE\t8\tno\tfixed", "dominant_study_share\t0.30\tPLASBENCH_DOMINANT_SHARE\t8\tno\tproposed")
-    (tmp / "config" / "prereg.tsv").write_text(rewritten, encoding="utf-8", newline="\n")
+    with open(tmp / "config" / "prereg.tsv", "w", encoding="utf-8", newline="\n") as _fh:
+        _fh.write(rewritten)
     (tmp / "config" / "prereg_decisions.tsv").write_text("\t".join(admin.DECISION_FIELDS) + "\n", encoding="utf-8")
     check("a proposed decision is seen as proposed", admin.status(tmp)["counts"]["proposed"] == 1 and admin.status(tmp)["draft"])
     check("confirming needs a reason and a name", refuses(lambda: admin.confirm(tmp, ["dominant_study_share"], "", "me"), "why") and refuses(lambda: admin.confirm(tmp, ["dominant_study_share"], "fine by me", ""), "who"))

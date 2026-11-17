@@ -33,7 +33,8 @@ SHEET = ("# a cohort header comment\n"
 with tempfile.TemporaryDirectory() as tmp:
     tmp = Path(tmp)
     sheet = tmp / "cohort.tsv"
-    sheet.write_text(SHEET, encoding="utf-8", newline="")
+    with open(sheet, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write(SHEET)
     before = sheet.read_bytes()
 
     print("the first N rows, in file order")
@@ -63,7 +64,8 @@ with tempfile.TemporaryDirectory() as tmp:
             check(label, True)
 
     print("the command line")
-    sheet.write_text(SHEET, encoding="utf-8", newline="")
+    with open(sheet, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write(SHEET)
     script = tmp / "run.sh"
     env = dict(os.environ, PLASBENCH_WORKSPACE=str(tmp / "ws"))
     done = subprocess.run([sys.executable, "-m", "plasbench", "run", "--samples", str(sheet), "--max-isolates", "2",
@@ -93,7 +95,8 @@ def organism_sheet(path):
             n += 1
             lines.append(f"s{n}\tGCF_{n}.1\tSRR{n}\t{species}\t{'recent' if i % 3 == 0 else 'older'}\tPRJ{species[:2]}{i // 2}\t"
                          f"{'long_read_first_hybrid' if i % 5 else 'short_read_first_hybrid'}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="")
+    with open(path, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write("\n".join(lines) + "\n")
 
 
 with tempfile.TemporaryDirectory() as tmp2:
