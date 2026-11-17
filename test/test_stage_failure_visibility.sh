@@ -30,8 +30,8 @@ make_project() {   # make_project DIR : samples s1 and s2, contigs and trimmed r
 stage4() {   # stage4 DIR [env assignments...] : run stage 4 for mob_recon only, print its exit code
     local T="$1"; shift
     ( export DATA_DIR="$T/data" RESULTS_DIR="$T/results" LOG_DIR="$T/logs" SAMPLE_SHEET="$T/config/accessions.tsv" REQUIRE_CURATED_METADATA=0 ONLY_TOOL=mob_recon
-      for kv in "$@"; do export "$kv"; done
-      PATH="$T/bin:$PATH" timeout 120 bash "$ROOT/scripts/04_run_tools.sh" > "$T/stage.log" 2>&1; echo $? )
+      # env sets any extra NAME=value arguments for the stage only (no dynamic export, which shellcheck cannot follow)
+      PATH="$T/bin:$PATH" env "$@" timeout 120 bash "$ROOT/scripts/04_run_tools.sh" > "$T/stage.log" 2>&1; echo $? )
 }
 status_of() { awk -F'\t' -v s="$2" -v t="$3" '$1==s && $2==t {print $3}' "$1/results/tool_status.tsv" 2>/dev/null || true; }
 
