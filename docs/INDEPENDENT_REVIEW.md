@@ -454,7 +454,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E36 | Mash screen is marked experimental and unvalidated | `python/classify_operational_plasmid.py:4` | `EXPERIMENTAL AND UNVALIDATED` |
 | E37 | The recommender's ridge penalty is chosen on the folds it reports | `python/fit_recommendation_model.py:242` | `lambda was selected on the same LOSO folds` |
 | E38 | The bootstrap test re-implements the algorithm | `test/test_robustness_diagnostics.py:48` | `def reference_bootstrap` |
-| E39 | CI installs minimap2 so the aligner test runs for real | `.github/workflows/ci.yml:28` | `apt-get install -y -qq minimap2` |
+| E39 | CI installs minimap2 so the aligner test runs for real | `.github/workflows/ci.yml:34` | `apt-get install -y -qq minimap2` |
 | E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:16` | `base_level_metrics_valid` |
 | E41 | Tool database dates (first row) | `config/tool_database_releases.tsv:2` | `mob_recon` |
 | E42 | Exclusion of possible overlaps is off by default | `config/config.sh:549` | `EXCLUDE_DATABASE_OVERLAP` |

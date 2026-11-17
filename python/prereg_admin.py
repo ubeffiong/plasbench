@@ -170,7 +170,8 @@ def _write_local_env(root, key, value):
     if not done:
         out.append(f"export {key}={shlex.quote(value)}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
+    with open(path, "w", encoding="utf-8", newline="\n") as _fh:
+        _fh.write("\n".join(out) + "\n")
 
 
 def _update_default(root, key, value):
@@ -179,7 +180,8 @@ def _update_default(root, key, value):
     new, n = re.subn(rf'(export\s+{re.escape(key)}="\$\{{{re.escape(key)}:-)([^}}]*)(\}}")', lambda m: m.group(1) + value + m.group(3), text)
     if not n:
         raise ValueError(f"could not find the default of {key} in config/config.sh")
-    path.write_text(new, encoding="utf-8", newline="")
+    with open(path, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write(new)
     return n
 
 
@@ -200,7 +202,8 @@ def _rewrite_prereg(root, changes):
             cells += [""] * (index + 1 - len(cells))
             cells[index] = value
         lines[number] = "\t".join(cells)
-    path.write_text(newline.join(lines), encoding="utf-8", newline="")
+    with open(path, "w", encoding="utf-8", newline="") as _fh:
+        _fh.write(newline.join(lines))
 
 
 def set_value(root, parameter, value, reason, by, update_default=False, today=None):

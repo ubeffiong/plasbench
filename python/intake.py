@@ -736,7 +736,8 @@ def repair_sample(row: dict, data_dir: Path, sheet: Path) -> list:
         lines = sheet.read_text(encoding="utf-8").splitlines()
         kept = [l for l in lines if not l.split("\t")[0].startswith("EXAMPLE_")]
         if len(kept) != len(lines):
-            sheet.write_text("\n".join(kept) + "\n", encoding="utf-8", newline="\n")
+            with open(sheet, "w", encoding="utf-8", newline="\n") as _fh:
+                _fh.write("\n".join(kept) + "\n")
             done.append("removed the template's EXAMPLE_ row from the sheet")
     return done
 
@@ -1023,7 +1024,8 @@ def main(argv=None) -> int:
         if args.out:
             out = Path(args.out)
             out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(text, encoding="utf-8", newline="\n")
+            with open(out, "w", encoding="utf-8", newline="\n") as _fh:
+                _fh.write(text)
             print(f"wrote {out}\nFill it in, keeping the header line and the TAB between columns. Guide: docs/INPUT_GUIDE.md")
         else:
             sys.stdout.write(text)

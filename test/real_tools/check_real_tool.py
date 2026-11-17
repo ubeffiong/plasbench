@@ -142,7 +142,9 @@ def run_tool(tool, assembly, workdir, reads=None, threads=2):
         return (["mob_recon", "--infile", str(assembly), "--outdir", str(out), "--num_threads", str(threads), "--force"], ["mob_recon", "--version"],
                 "adapt_mob_recon.sh", out, pred, Path(str(pred).replace(".plasmid.fasta", ".bins.tsv")))
     if tool == "platon":
-        return (["platon", "--db", os.environ.get("PLATON_DB", ""), "--threads", str(threads), "--output", str(out), "--prefix", "fixture", str(assembly)],
+        # --meta: the fixture is a ~4 kb plasmid, too short for Platon's single-genome gene-finder training (it fails with "ORF prediction failed!").
+        # Real assemblies are megabases and run without it in scripts/04_run_tools.sh.
+        return (["platon", "--db", os.environ.get("PLATON_DB", ""), "--threads", str(threads), "--output", str(out), "--prefix", "fixture", "--meta", str(assembly)],
                 ["platon", "--version"], "adapt_platon.sh", out, pred, Path(str(pred).replace(".plasmid.fasta", ".bins.tsv")))
     if tool == "plasmidspades":
         if not reads:
