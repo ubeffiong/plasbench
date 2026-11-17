@@ -55,7 +55,7 @@ jobs:
         run: mob_init
       - name: Platon database (cached)
         if: matrix.tool == 'platon'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: platon_db
           key: platon-db-zenodo-4066768
