@@ -143,18 +143,40 @@ The importer only selects. `plasbench resolve-contributed-cohort` then checks ev
 This check cannot see base quality, adapters or pair integrity. Stage 3's `short_read_qc.py` does, on the downloaded
 reads, and can still exclude a sample. Then `plasbench validate-cohort --online --write-lock` verifies the final sheet.
 
-The design (decided 2026-11-16 on the project owner's instruction to take the decision; it is a cohort-selection choice, not a scoring decision, so it is not in `config/prereg.tsv`): 20 clusters for each of
-*E. coli*, *K. pneumoniae*, *S. enterica*, *S. aureus* and *E. hormaechei* (the species with at least 20 long-read-first
-clusters in the pool); at least 10 per species public on or after 2025-01-01 on the `earliest_public` basis and the
-rest older, so the leakage comparison has both arms in every species; one isolate per BioProject; long-read-first
-truth only; seed 20260916. A species that cannot reach 20 is reported short, never padded.
+The design (decided 2026-11-16 on the project owner's instruction to add everything that is available; it is a cohort-selection
+choice, not a scoring decision, so it is not in `config/prereg.tsv`): **every genome in the pool that passes the offline
+filters and the NCBI verification is in `public-v4`.** That is 7,227 isolates of 943 species from 1,818 BioProjects. It is a
+large panel, not a designed sample: species and studies are unequal (*E. coli* 1,360 isolates, 520 species have one), so
+choose what to run with the columns and with `plasbench run --max-isolates N`, which takes a balanced N (see the README).
+
+* **Truth strategy** (`truth_assembly_strategy`): 3,552 long-read-first (2,453 hybrid, 1,099 long-read-only), 2,522
+  short-read-first, 1,153 unclassified. Only long-read-first rows belong in the headline; the others are tier 3 and are
+  described, not ranked. Four species reach the headline's 20 long-read-first studies: *E. coli* (111), *K. pneumoniae*
+  (58), *S. aureus* (35), *S. enterica* (34).
+* **Leakage arms** (`selection_arm`): 1,539 `recent` (public on or after 2025-01-01, earlier of assembly and first read)
+  and 5,688 `older`. `panel_subset` is `core` for the 98 isolates of the first, balanced selection (20 each of *E. coli*,
+  *K. pneumoniae*, *S. enterica*, *S. aureus* and 18 *E. hormaechei*) and `extended` for the rest.
+* **Read QC:** the pre-download check passed 7,081 rows and flagged 146 (`qc_precheck=warn`). Estimated depth is 10.7x to
+  18,224x (median 139x), and 1,661 rows are above 300x. Reads for the whole panel would be about 5 TB to download
+  (plus 87 GB of references); the first 100 rows in balanced order are about 84 GB. Run a slice with `--max-isolates`.
+* **Not judged:** 42 candidates failed their NCBI lookup on temporary errors (503, timeouts) and are listed under
+  "NCBI lookup failed" in the selection report; re-running `resolve-contributed-cohort` adds them.
+* **Not done:** no tool has been run on this panel, the post-download QC (stage 3) has not run on its reads, and truth
+  strategy and polishing are NCBI-derived, not curator-checked.
+
+The sheet is written in balanced order (`balance_rank`: species take turns, recent and older alternate, long-read-first
+before the rest, one isolate per study before a second), so any first N rows are a fair miniature of the whole.
 
 The window's **Cohorts** page shows a **Selection report** pop-up for a cohort built this way: where the genomes came from, the criteria, how many were available and how many passed each stage, why the others failed (offline filters and NCBI / read-QC), a per-species table, and the sequence information of the selected genomes. It is read from `cohorts/<name>.selection.json`, written by `plasbench selection-report` from the importer's and resolver's output, so it states only what the selection run produced.
 
 ```bash
-plasbench import-contributed-cohort --arm recent --released-after 2025-01-01 --max-clusters-per-species 20   --species "Escherichia coli" --species "Klebsiella pneumoniae" --species "Salmonella enterica"   --species "Staphylococcus aureus" --species "Enterobacter hormaechei" --out-dir curation/v4/recent
-plasbench import-contributed-cohort --arm older --released-before 2024-12-31 --max-clusters-per-species 30   (same --species) --out-dir curation/v4/older
-plasbench resolve-contributed-cohort --candidates curation/v4/recent/candidates.tsv   --candidates curation/v4/older/candidates.tsv --out-dir curation/v4/resolved --cache curation/v4/resolve_cache.json
+plasbench import-contributed-cohort --allow-short-read-first --all-members --arm auto --date-basis earliest_public \
+  --out-dir curation/v4/full
+plasbench resolve-contributed-cohort --candidates curation/v4/full/candidates.tsv --out-dir curation/v4/resolved \
+  --cache curation/v4/resolve_cache.json --target-per-species 0 --allow-shared-bioproject --workers 12
+plasbench validate-cohort --samples curation/v4/resolved/resolved.tsv --online --workers 8 --write-lock curation/v4/resolved.lock.json
+plasbench selection-report --name public-v4 --sheet cohorts/public-v4.tsv --importer-dir curation/v4/full \
+  --resolver-dir curation/v4/resolved --out cohorts/public-v4.selection.json
 ```
 
 ## Candidate Review And Balance
@@ -183,7 +205,7 @@ apply identical evidence rules and differ only in curation grade. Read
 | [`public-v1.tsv`](../cohorts/public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](../cohorts/public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
 | [`public-v3.tsv`](../cohorts/public-v3.tsv) | 98 | 10 A + 88 B | the species-balanced headline design; recorded truth provenance |
-| [`public-v4.tsv`](../cohorts/public-v4.tsv) | 98 | all B | species-balanced, leakage-aware (recent and older arms); from the contributed pool, verified online; see [`cohorts/README.md`](../cohorts/README.md) |
+| [`public-v4.tsv`](../cohorts/public-v4.tsv) | 7,227 | all B | the large validation panel: every verified genome of the contributed pool, 943 species, recent and older arms; run a balanced slice with `--max-isolates`; see [`cohorts/README.md`](../cohorts/README.md) |
 
 These are versioned **input cohort manifests**, not a substitute for released
 performance evidence. A public performance claim requires a reproducible run,

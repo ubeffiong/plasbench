@@ -261,13 +261,18 @@ def main():
     ncbi_rows = [r for r in precheck if r["status"] in ("reject", "error")]
     ncbi_reasons = tally(categorise(r.get("reasons", ""), NCBI_REASONS) for r in ncbi_rows)
     status_counts = Counter(r["status"] for r in precheck)
+    core = sum(1 for r in sheet if r.get("panel_subset") == "core")
+    verified_now = status_counts.get("pass", 0) + status_counts.get("warn", 0)
+    selected_note = ("every verified row, then re-checked in full by validate-cohort --online" if not core else
+                     f"{len(sheet) - core} verified in this run + {core} carried over from the first selection (panel_subset=core, verified earlier), "
+                     "then all re-checked by validate-cohort --online")
     funnel = [
         {"stage": "In the contributed pool", "n": len(pool), "note": "RefSeq Complete Genomes with at least one linked SRA run"},
         {"stage": "Passed the offline filters", "n": len(candidates), "note": "BioSample new, long-read platform named, truth strategy allowed, plasmid table agrees"},
         {"stage": "Looked up at NCBI", "n": len(precheck), "note": "every candidate, assembly and SRA run-info"},
         {"stage": "Verified at NCBI", "n": status_counts.get("pass", 0) + status_counts.get("warn", 0),
          "note": f"{status_counts.get('pass', 0)} passed the read-QC pre-check, {status_counts.get('warn', 0)} flagged"},
-        {"stage": f"Selected into {args.name}", "n": len(sheet), "note": "all verified rows, then re-checked in full by validate-cohort --online"},
+        {"stage": f"Selected into {args.name}", "n": len(sheet), "note": selected_note},
     ]
 
     depth = [number(r.get("est_depth_x")) or number(r.get("read_depth_x")) for r in sheet]
