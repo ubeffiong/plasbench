@@ -2089,6 +2089,26 @@ reference, and writes `results/benchmark.report.html` — open that file in a br
 below for how to read it). Re-running the same command later reuses everything already
 completed (see [step 10](#step-10--run-your-first-benchmark)) instead of starting over.
 
+**Run only part of a cohort.** A large cohort (for example `public-v4`) is more than most computers should
+download in one go. `--max-isolates N` runs only N isolates of the cohort or sample sheet; N is whatever you
+choose (40 below is only an example):
+
+```bash
+plasbench run --cohort public-v4 --max-isolates 40
+```
+
+The N isolates are a **balanced selection**, so a small run is a fair miniature of the cohort rather than whatever
+species happens to be first in the file: species with at least 10 isolates take turns (largest first, then the small
+ones), within a species recent and older genomes alternate, long-read-first truths come before the others, and
+every study contributes one isolate before any study contributes a second. The order depends only on the rows'
+own values, so it is the same on every computer, and `public-v4` is written in this order. Use
+`--isolate-order file` to take the first N rows exactly as they appear instead.
+
+The cohort file is not changed (its lock still matches); a copy with the chosen rows, `<name>.balanced_40.tsv`, is
+written next to the results and used for the run. In the window, **New benchmark** has the same choice under *How
+many isolates*. If N is larger than the cohort, all of it runs. A sheet with no `organism` column has nothing to
+balance on and is read in file order.
+
 #### Metagenomic community workflow
 
 This is a **separate** workflow for mixed communities, including wastewater,
@@ -2390,6 +2410,8 @@ ones you'll actually reach for most often; every command has more than shown her
 | `curate-cohort` | Strictly screen candidates into `accepted.tsv`/`rejected.tsv` with reasons. | *`--candidates`*, *`--out-dir`*, `--ledger` |
 | `review-candidates` | Turn a large candidate set into a balanced, capped shortlist. | `--candidates`, `--max-per-bioproject`, `--max-per-organism` |
 | `import-contributed-cohort` | Select a seeded, one-per-read-BioProject candidate cohort from the contributed RefSeq/SRA pool (unverified until `validate-cohort --online`). | *`--out-dir`*, `--released-after`, `--released-before`, `--date-basis`, `--species`, `--max-clusters-per-species`, `--seed` |
+| `resolve-contributed-cohort` | Verify importer candidates at NCBI (needs `NCBI_API_KEY`), choose the real BioProject and best SRA run, run the pre-download read-QC check, and pick the final per-species rows. | *`--candidates`* (repeatable), *`--out-dir`*, `--target-per-species`, `--min-recent`, `--cache` |
+| `selection-report` | Write `cohorts/<name>.selection.json`: where a cohort's genomes came from, the criteria, how many were available and passed each stage, why others failed, and the sequence information of the selected genomes (the window's Cohorts page opens it as a pop-up). | *`--name`*, *`--sheet`*, *`--importer-dir`*, *`--resolver-dir`*, *`--out`* |
 | `build-ledger` | Regenerate the cross-cohort BioSample dedup ledger from every `cohorts/*.lock.json`. | `--cohorts-dir`, `--out` |
 | `prepare-contribution` | Validate a new isolate and stage it on a local git branch, ready for a PR. | *`--cohort`*, *`--new-rows`*, *`--scores`*, `--tool-status` |
 | `select-candidates` | Recompute recommendations from an existing `scores.tsv` (what stage 6 calls internally). | `--scores`, `--samples`, `--results-dir`, `--min-samples`, `--min-coverage` |

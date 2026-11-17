@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 172 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
-outputs, 49 run switches, 320 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 174 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
+outputs, 49 run switches, 324 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -352,7 +352,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 6. Every module
 
-172 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+174 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -568,8 +568,10 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 |---|---|
 | `audit_three_class_scoring.py` | One-off three-class scoring audit (Phase E, Part 14 of the sibling-repo |
 | `build_publication_cohort_candidates.py` | Build CANDIDATE ledgers for three published plasmid-reconstruction cohorts. |
+| `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
+| `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
 
 
 ## 7. Every output file and where the report shows it

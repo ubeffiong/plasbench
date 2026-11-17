@@ -10,6 +10,9 @@ For one cohort sample sheet (cohorts/<name>.tsv) this gathers:
   * whether the lock still matches the sheet (sha256), and the download estimate the lock allows. That estimate uses
     the same factors as python/estimate_download.py: 0.615 bytes per base of gzipped FASTQ, 12.1 MB of reference
     files per isolate.
+  * the selection report (cohorts/<name>.selection.json, written by python/build_selection_report.py) when the cohort
+    was built by a selection run: where the genomes came from, the criteria, how many were available and how many passed
+    each stage, why the others failed, and the sequence information of the selected genomes.
 Nothing is fetched from the network.
 """
 from __future__ import annotations
@@ -151,4 +154,14 @@ def info(root, name: str) -> dict:
             if key in columns:
                 s[key] = _counts(rows, key)
     out["summary"] = s
+    out["selection"] = selection_report(path.with_name(f"{name}.selection.json"))
     return out
+
+
+def selection_report(path: Path):
+    """The parsed selection report, or None when the cohort has none (or it cannot be read)."""
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return report if isinstance(report, dict) and report.get("schema_version") else None

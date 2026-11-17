@@ -178,7 +178,8 @@ def run_metadata(run, email=None, api_key=None):
     row = rows[0]
     return {"run": run, "biosample": row.get("BioSample", ""), "bioproject": row.get("BioProject", ""),
             "sample_name": row.get("SampleName", ""), "platform": row.get("Platform", ""),
-            "layout": row.get("LibraryLayout", ""), "bases": row.get("bases", "")}
+            "layout": row.get("LibraryLayout", ""), "bases": row.get("bases", ""),
+            "spots": row.get("spots", ""), "avg_length": row.get("avgLength", "")}
 
 
 def read_ledger(path):
@@ -467,6 +468,8 @@ def main():
     parser.add_argument("--email", help="contact email sent to NCBI E-utilities")
     parser.add_argument("--api-key", default=os.environ.get("NCBI_API_KEY"),
                         help="NCBI API key (default: NCBI_API_KEY); raises the request allowance.")
+    parser.add_argument("--workers", type=int, default=1, help="parallel NCBI verifications with --online (default 1; 4 is safe with an API key)")
+    parser.add_argument("--retries", type=int, default=3, help="attempts per row before a lookup failure is reported (default 3)")
     parser.add_argument("--write-lock", help="write retrieved verification evidence as JSON")
     parser.add_argument("--verify-lock", help="require a verification lock matching --samples")
     parser.add_argument("--ledger", help="cohorts/accepted_accessions.tsv (build_accession_ledger.py); "
@@ -489,13 +492,28 @@ def main():
         return
     evidence = []
     if args.online and not errors:
-        for row in rows:
-            try:
-                result = verify_row(row, args.email, args.api_key)
-                evidence.append(result)
-                errors.extend(f"{row['sample_id']}: {message}" for message in result["errors"])
-            except Exception as exc:
-                errors.append(f"{row['sample_id']}: NCBI verification failed: {exc}")
+        def verify_with_retry(row):
+            """A dropped connection must not fail a thousand-row sheet: retry a transient lookup failure a few times."""
+            last = None
+            for attempt in range(args.retries):
+                try:
+                    return row, verify_row(row, args.email, args.api_key), None
+                except Exception as exc:
+                    last = exc
+                    time.sleep(min(30, 3 * (attempt + 1)))
+            return row, None, last
+        if args.workers > 1:
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
+                outcomes = list(pool.map(verify_with_retry, rows))          # map keeps the sheet's row order
+        else:
+            outcomes = [verify_with_retry(row) for row in rows]
+        for row, result, failure in outcomes:
+            if failure is not None:
+                errors.append(f"{row['sample_id']}: NCBI verification failed: {failure}")
+                continue
+            evidence.append(result)
+            errors.extend(f"{row['sample_id']}: {message}" for message in result["errors"])
     if errors:
         raise SystemExit("COHORT VALIDATION FAILED\n" + "\n".join(errors))
     if args.write_lock:

@@ -22,7 +22,7 @@ CATEGORIES = [
     ("sweeps", "Depth and quality sweeps", "How far sequencing can be cut before recovery degrades.",
      ["depth-ladder", "depth-report", "read-quality-ladder", "read-quality-report"]),
     ("cohorts", "Cohorts and truth", "Find, curate and validate isolates and their reference truth.",
-     ["discover-cohort", "discover-design-cohort", "review-candidates", "import-contributed-cohort", "curate-cohort", "validate-cohort",
+     ["discover-cohort", "discover-design-cohort", "review-candidates", "import-contributed-cohort", "resolve-contributed-cohort", "selection-report", "curate-cohort", "validate-cohort",
       "build-ledger", "collect-truth-provenance", "derive-amr-truth", "promote-amr-truth", "audit-truth-labels", "prepare-contribution"]),
     ("results", "Results and analysis", "Reports, PDFs and standalone analyses of a completed run.",
      ["open-report", "report-pdf", "analysis", "candidate-dataset", "import-external-benchmark",

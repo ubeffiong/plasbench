@@ -478,6 +478,22 @@ def build_parser():
     import_parser.add_argument("--max-clusters-per-species", type=int, default=0)
     import_parser.add_argument("--min-clusters", type=int, default=20)
     import_parser.add_argument("--seed", type=int, default=20260916)
+    import_parser.add_argument("--arm", default="", help="Label for selection_arm (for example recent or older) so two runs can be combined by resolve-contributed-cohort.")
+    report_parser = sub.add_parser("selection-report", help="Write cohorts/<name>.selection.json: how a cohort was selected (shown as the Selection report pop-up in the window).")
+    report_parser.add_argument("--name", required=True)
+    report_parser.add_argument("--sheet", type=Path, required=True)
+    report_parser.add_argument("--importer-dir", type=Path, required=True)
+    report_parser.add_argument("--resolver-dir", type=Path, required=True)
+    report_parser.add_argument("--out", type=Path, required=True)
+    report_parser.add_argument("--importer-command", default="")
+    report_parser.add_argument("--resolver-command", default="")
+    report_parser.add_argument("--validate-command", default="")
+    resolve_parser = sub.add_parser("resolve-contributed-cohort", help="Verify importer candidates at NCBI, run the pre-download read-QC check, and choose the final per-species rows.")
+    resolve_parser.add_argument("--candidates", type=Path, action="append", required=True, help="Importer candidates.tsv; repeat for the recent and older arms.")
+    resolve_parser.add_argument("--out-dir", type=Path, required=True)
+    resolve_parser.add_argument("--target-per-species", type=int, default=20)
+    resolve_parser.add_argument("--min-recent", type=int, default=10)
+    resolve_parser.add_argument("--cache", type=Path, help="JSON cache of earlier per-candidate results.")
     conda_parser = sub.add_parser(
         "install-conda",
         help="Check for conda/mamba/micromamba; offer to install Miniforge if none is found.",
@@ -629,6 +645,7 @@ def build_parser():
         epilog="Examples:\n"
                "  plasbench run --cohort public-v1 --threads 8\n"
                "  plasbench run --samples my_samples.tsv --threads 8\n"
+               "  plasbench run --cohort public-v4 --max-isolates 40   (a balanced 40 of its isolates; any N)\n"
                "  plasbench run --cohort public-v1 --write-script run_public_v1.sh\n"
                "  plasbench run 3 4 5 6 --platon off --assembler unicycler\n"
                "  plasbench run --parallel-samples 3 --parallel-tools 2\n"
@@ -653,6 +670,14 @@ def build_parser():
         samples_or_cohort = inputs.add_mutually_exclusive_group()
         samples_or_cohort.add_argument("-s", "--samples", type=Path, help="Sample-sheet TSV; defaults to config/accessions.tsv.")
         samples_or_cohort.add_argument("-c", "--cohort", help="Isolate: shorthand for --samples cohorts/<NAME>.tsv (e.g. public-v1). Meta: --cohort bmock12 materializes the bundled physical truth control.")
+        inputs.add_argument("--max-isolates", type=int, metavar="N",
+                            help="Run only N isolates of the cohort or sample sheet (N is any number you choose). By default they are "
+                                 "a balanced selection, spread across species, studies and recent / older genomes, so a small run is a "
+                                 "fair miniature of the cohort; --isolate-order file takes the first N rows instead. The sheet itself is "
+                                 "not changed: a copy with those rows is written next to the results and used for this run.")
+        inputs.add_argument("--isolate-order", choices=("balanced", "file"), default="balanced",
+                            help="With --max-isolates: balanced (default) spreads the N isolates across species, studies and "
+                                 "recent / older genomes; file takes the first N rows exactly as they appear in the sheet.")
         inputs.add_argument("--write-script", type=Path,
                             help="Write the exact resolved commands to this file instead of running them, "
                                  "so you can review or edit them before running it yourself with bash.")
@@ -948,6 +973,23 @@ def main(argv=None):
                 command.extend([flag, value])
         if args.allow_short_read_first:
             command.append("--allow-short-read-first")
+        if args.arm:
+            command.extend(["--arm", args.arm])
+        code = run(command, root)
+    elif args.command == "selection-report":
+        command = [sys.executable, "python/build_selection_report.py", "--name", args.name, "--sheet", str(args.sheet),
+                   "--importer-dir", str(args.importer_dir), "--resolver-dir", str(args.resolver_dir), "--out", str(args.out)]
+        for flag, value in (("--importer-command", args.importer_command), ("--resolver-command", args.resolver_command), ("--validate-command", args.validate_command)):
+            if value:
+                command.extend([flag, value])
+        code = run(command, root)
+    elif args.command == "resolve-contributed-cohort":
+        command = [sys.executable, "python/resolve_contributed_cohort.py", "--out-dir", str(args.out_dir),
+                   "--target-per-species", str(args.target_per_species), "--min-recent", str(args.min_recent)]
+        for path in args.candidates:
+            command.extend(["--candidates", str(path)])
+        if args.cache:
+            command.extend(["--cache", str(args.cache)])
         code = run(command, root)
     elif args.command == "install-conda":
         command = [bash_command(), "env/bootstrap_conda.sh"]
@@ -1159,6 +1201,21 @@ def main(argv=None):
                 args.log_dir = folder / "logs"
             study_tmp = (folder / "tmp").resolve().as_posix()
             print(f"[plasbench] Study folder: {folder}")
+        if getattr(args, "max_isolates", None) is not None:
+            from . import sheet_limit
+            source_sheet = args.samples or Path(os.environ.get("SAMPLE_SHEET") or root / "config" / "accessions.tsv")
+            limit_dir = args.results_dir or Path(os.environ.get("RESULTS_DIR") or root / "results")
+            try:
+                limited = sheet_limit.limit_sheet(source_sheet, args.max_isolates, limit_dir, args.isolate_order)
+            except ValueError as exc:
+                parser.error(str(exc))
+            if limited.path:
+                args.samples = limited.path
+                how = "a balanced selection" if ".balanced_" in limited.path.name else "the first rows, in file order"
+                print(f"[plasbench] --max-isolates {args.max_isolates}: running {limited.kept} of {limited.total} "
+                      f"isolates of {Path(source_sheet).name}, {how} (copy: {limited.path})")
+            else:
+                print(f"[plasbench] --max-isolates {args.max_isolates}: {Path(source_sheet).name} has only {limited.total}; running all of them")
         env = {}
         path_options = {
             "samples": "SAMPLE_SHEET", "data_dir": "DATA_DIR", "results_dir": "RESULTS_DIR",

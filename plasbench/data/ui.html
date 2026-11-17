@@ -147,6 +147,16 @@ main{min-width:0;padding:18px 24px 36px;max-width:1440px;width:100%}
 .hb{display:grid;grid-template-columns:minmax(0,1fr) 90px 32px;gap:6px;align-items:center;font-size:12.5px;margin:2px 0}
 .hb span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hb i{display:block;height:8px;background:var(--primary);border-radius:1px;min-width:2px}
 .hb .n{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+/* selection report pop-up */
+dialog.selrep{width:min(1100px,97vw)}dialog.selrep .bd{max-height:78vh}
+.selrep h4{margin:18px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600}.selrep h4:first-child{margin-top:0}
+.selrep .fun{display:grid;grid-template-columns:200px minmax(0,1fr) 70px;gap:10px;align-items:center;margin:5px 0;font-size:13px}
+.selrep .fun .bar{height:16px;background:var(--surface-2);border-radius:3px;overflow:hidden}.selrep .fun .bar i{display:block;height:100%;background:var(--primary)}
+.selrep .fun .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}.selrep .fun small{grid-column:2 / 4;color:var(--mut);margin-top:-4px}
+.selrep ol.crit{margin:0;padding-left:20px}.selrep ol.crit li{margin:5px 0}.selrep .par{font-size:12px;color:var(--mut)}
+.selrep table.data td.num,.selrep table.data th.num{text-align:right;font-variant-numeric:tabular-nums}
+.selrep .shr{display:inline-block;height:6px;background:var(--bad,#c0392b);border-radius:1px;vertical-align:middle;margin-left:6px}
+.selrep .lim li{margin:4px 0}
 #cohdetail .desc{font-size:13px}#cohdetail .desc p{margin:4px 0}
 #coh_rows td,#coh_rows th{white-space:nowrap}#coh_rows td.wrap{white-space:normal;min-width:160px}
 tr.sel>td{background:var(--select)}
@@ -643,13 +653,13 @@ body.gd-open #gdrawer{transform:none}
   <!-- TOOLS --------------------------------------------------------------------------------------- -->
   <section class="view" id="v_tools" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Set up</div><h1>Tools</h1>
-    <p>Every tool PlasBench can benchmark, built-in and your own. The switch sets whether a tool runs by default (saved for this computer); the New benchmark page can still change it for one run.</p></div>
+    <p>Every tool PlasBench can benchmark, built-in and your own. The switch, and the <b>on</b> / <b>off</b> beside it, set whether a tool runs by default: <b>on</b> means it runs unless you turn it off for a run, <b>off</b> means it is skipped unless you turn it on (saved for this computer). The New benchmark page can still change it for one run.</p></div>
     <div class="row"><button class="btn sec" id="toolsref"><svg class="ico sm"><use href="#i-refresh"/></svg>Refresh</button><button class="btn" data-go="addtool"><svg class="ico sm"><use href="#i-plus"/></svg>Add your own tool</button></div></div>
    <div class="stats" id="toolkpis" style="margin-bottom:12px"></div>
    <div class="card">
     <div class="toolbar"><input type="search" id="toolq" placeholder="Filter tools…" aria-label="Filter tools">
      <div class="chips" id="toolchips"></div></div>
-    <div class="tablewrap"><table class="data"><thead><tr><th>Tool</th><th>Task and track</th><th>Installed</th><th>Reference database</th><th title="Saved for this computer">Default</th><th></th></tr></thead><tbody id="tooltb"></tbody></table></div>
+    <div class="tablewrap"><table class="data"><thead><tr><th>Tool</th><th>Task and track</th><th>Installed</th><th>Reference database</th><th title="Whether this tool runs when you do not choose tools yourself (its RUN_ setting). Saved for this computer.">Runs by default</th><th></th></tr></thead><tbody id="tooltb"></tbody></table></div>
    </div>
   </section>
 
@@ -1723,7 +1733,7 @@ function renderToolTable() {
     <td><span class="tag ${t.task !== "classification" ? "rec" : "cls"}">${esc((t.task || "").replace(/_/g, " "))}</span><div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div></td>
     <td>${t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
     <td class="small" style="max-width:260px">${esc(t.database || "–")}${t.database_release ? `<div class="mut">released ${esc(t.database_release)}</div>` : ""}</td>
-    <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label>` :
+    <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}: ${t.enabled ? "on, so it runs unless you turn it off for a run" : "off, so it is skipped unless you turn it on for a run"}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label> <b class="small ${t.enabled ? "ok-t" : "mut"}" data-flagtxt="${esc(t.run_flag)}">${t.enabled ? "on" : "off"}</b>` :
          t.source === "user" ? `<span class="mut small">--tool ${esc(t.tool)}</span>` : `<span class="mut small">–</span>`}</td>
     <td style="text-align:right;white-space:nowrap">${t.source === "user" ? `<button class="btn ghost sm" onclick="editUserTool('${esc(t.tool)}')">${icon("edit")}Edit</button>` : ""}
       ${t.profile && t.installed === false ? `<button class="btn sec sm" data-run='${JSON.stringify(["install-tools", t.profile, "--yes"])}' data-label="Install ${esc(t.display)}">Install</button>` : ""}</td></tr>`).join("")
@@ -1731,8 +1741,11 @@ function renderToolTable() {
 }
 $("#toolq").oninput = e => { TF.q = e.target.value; renderToolTable(); };
 $("#toolchips").onclick = e => { const b = e.target.closest("[data-chip]"); if (!b) return; TF.chip = b.dataset.chip; $$("#toolchips .chip").forEach(x => x.classList.toggle("on", x === b)); renderToolTable(); };
+const showFlag = (f, on) => { const t = $(`[data-flagtxt="${f}"]`); if (t) { t.textContent = on ? "on" : "off"; t.classList.toggle("ok-t", on); t.classList.toggle("mut", !on); }
+  const row = (S.tools || []).find(x => x.run_flag === f); if (row) row.enabled = on; };
 $("#tooltb").onchange = async e => { const f = e.target.dataset.flag; if (!f) return;
-  try { await api("settings", {changes: {[f]: e.target.checked ? "1" : "0"}}); toast(`${f}=${e.target.checked ? 1 : 0} saved for this computer`, "ok"); S.settings = null; }
+  try { await api("settings", {changes: {[f]: e.target.checked ? "1" : "0"}}); showFlag(f, e.target.checked);
+    toast(`${f}=${e.target.checked ? 1 : 0} saved for this computer: ${e.target.checked ? "runs by default" : "skipped by default"}`, "ok"); S.settings = null; }
   catch (err) { toast(err.message, "bad"); e.target.checked = !e.target.checked; } };
 $("#toolsref").onclick = () => loadTools(true);
 
@@ -1922,7 +1935,7 @@ const PAGE_HELP = {
 "Use the chips at the top to filter: All, Reconstruction, Classification, Short-read, Long-read, Hybrid, Installed, Not installed, Your tools.",
 "Read a row: the <b>task</b> (reconstruction groups contigs into plasmids; classification labels contigs), the <b>track</b> (short-read, long-read, hybrid), the input it needs, whether it is installed, and the reference database it searches.",
 "A missing tool has an <b>Install</b> button in its row.",
-"The switch sets whether the tool runs <b>by default</b>, saved for this computer. The New benchmark page can still change it for a single run."
+"The switch sets whether the tool runs <b>by default</b>, saved for this computer. <b>on</b> beside it: the tool runs unless you turn it off for a run. <b>off</b>: it is skipped unless you turn it on for a run. In New benchmark, the first choice reads <b>default · on</b> or <b>default · off</b> so you can see what \"default\" means for each tool; picking on or off there changes only that run."
 ],
 "tips": [
 "Tools are ranked only against tools on the same track.",
@@ -2031,6 +2044,7 @@ const PAGE_HELP = {
 "steps": [
 "Press <b>Details</b> on a cohort to see what is in it. You get its description, the number of isolates and species, plasmids in the truth, read depth, BioProjects, and the download size. Breakdowns show organism, truth tier, how the truth was assembled, origin and country, and a table lists every sample.",
 "Filter the sample table by organism, country, accession or study. Accessions link to their NCBI pages. <b>all columns</b> shows every field, including host, isolation source, collection date and how the reference was sequenced.",
+"<b>Selection report</b> (on cohorts that were selected from a candidate pool, such as public-v4) opens a pop-up: where the genomes came from, the selection criteria, how many were available and how many passed each stage, why the others failed, the species table, and the sequence information of the selected genomes.",
 "<b>Validate</b> checks the sheet: columns, accessions, duplicates, and the lock, if there is one.",
 "<b>Benchmark</b> opens New benchmark with this cohort chosen."
 ],
@@ -2042,6 +2056,7 @@ const PAGE_HELP = {
 ],
 "cli": [
 "plasbench validate-cohort --samples cohorts/public-v1.tsv",
+"plasbench selection-report --name public-v4 --sheet cohorts/public-v4.tsv --importer-dir work/full --resolver-dir work/v4full --out cohorts/public-v4.selection.json",
 "plasbench run --cohort public-v1"
 ]
 },
@@ -2347,6 +2362,11 @@ $("#set_save").onclick = async () => {
    Generic form (All commands, wizard steps, isolates)
    =================================================================================================== */
 function argLabel(a) { return a.positional ? a.dest.replace(/_/g, " ") : a.flags.find(f => f.startsWith("--"))?.slice(2).replace(/-/g, " ") || a.dest; }
+/* The "default" choice of a tool's on / default / off control means "whatever is saved for this computer": say which. */
+function defaultWord(dest) {
+  const t = (S.tools || []).find(x => x.tool === dest || x.tool === String(dest).replace(/-/g, "_"));
+  return t && t.run_flag ? `default · ${t.enabled ? "on" : "off"}` : "default";
+}
 function fieldHTML(a, values, prefix) {
   const id = `${prefix}_${a.dest}`, v = values[a.dest], flag = a.flags.find(f => f.startsWith("--")) || a.flags[0] || "";
   const changed = v !== undefined && v !== "" && v !== null && !(a.kind === "flag" && v === false);
@@ -2354,7 +2374,7 @@ function fieldHTML(a, values, prefix) {
   if (a.kind === "flag") ctl = `<label class="switch"><input type="checkbox" id="${id}" data-dest="${a.dest}" ${v ? "checked" : ""}><span></span></label><span class="mut small">${v ? "on" : "off"}</span>`;
   else if (a.kind === "choice") {
     if (a.choices.length === 2 && a.choices.includes("on") && a.choices.includes("off"))
-      ctl = `<div class="tri" role="group" aria-label="${esc(argLabel(a))}">${["", "on", "off"].map(o => `<button type="button" data-dest="${a.dest}" data-val="${o}" class="${(v || "") === o ? "on" : ""} ${o === "off" ? "off" : ""}">${o || "default"}</button>`).join("")}</div>`;
+      ctl = `<div class="tri" role="group" aria-label="${esc(argLabel(a))}">${["", "on", "off"].map(o => `<button type="button" data-dest="${a.dest}" data-val="${o}" class="${(v || "") === o ? "on" : ""} ${o === "off" ? "off" : ""}" ${o ? "" : `title="Use the setting saved for this computer"`}>${o || defaultWord(a.dest)}</button>`).join("")}</div>`;
     else ctl = `<select id="${id}" data-dest="${a.dest}"><option value="">${a.default != null ? `default (${esc(a.default)})` : "— not set —"}</option>${a.choices.map(c => `<option ${String(v) === String(c) ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
   }
   else if (a.kind === "int" || a.kind === "float") ctl = `<input type="number" id="${id}" data-dest="${a.dest}" value="${esc(v ?? "")}" placeholder="${a.default != null ? "default " + esc(a.default) : ""}" ${a.kind === "float" ? 'step="any"' : ""}>`;
@@ -2502,6 +2522,10 @@ function renderWizard() {
           <div class="field"><label>Local inputs only</label><div class="ctl"><label class="switch"><input type="checkbox" id="wlocal" ${V.local_inputs ? "checked" : ""}><span></span></label></div><div class="help">Your reads and references are already on disk; never download.</div></div>` :
         `<div class="field"><label>Community sheet</label><div class="ctl"><input type="text" id="wsheet" value="${esc(V.samples || "")}" placeholder="meta_samples.tsv"><button class="btn sec sm" data-browse="wsheet" data-dir="0">Browse</button></div></div>
          <div class="field"><label>Predictions folder</label><div class="ctl"><input type="text" id="wpred" value="${esc(V.predictions_dir || "")}" placeholder="predictions_meta"><button class="btn sec sm" data-browse="wpred" data-dir="1">Browse</button></div><div class="help">&lt;tool&gt;/&lt;community&gt;.bins.tsv normalized outputs.</div></div>`}</div></div>
+      ${W.source === "cohort" || W.source === "sheet" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>How many isolates</h3><span class="sub">optional</span></div><div class="bd">
+        <div class="field"><label for="w_max_isolates">Run only</label><div class="ctl"><input type="number" min="1" step="1" id="w_max_isolates" data-dest="max_isolates" value="${esc(V.max_isolates || "")}" placeholder="all" style="max-width:120px"><span class="mut small">isolates${W.source === "cohort" && cohorts.find(c => c.name === V.cohort) ? ` of ${cohorts.find(c => c.name === V.cohort).rows}` : ""}</span></div>
+        <div class="help">Any number you choose. The isolates are a balanced selection: spread across species and studies, and across recent and older genomes, so a small run is a fair miniature of the cohort. The cohort file is not changed. Leave empty to run all of them.</div></div>
+        <div class="field"><label>Which isolates</label><div class="ctl"><select id="w_isolate_order" data-dest="isolate_order"><option value="">balanced (recommended)</option><option value="file" ${V.isolate_order === "file" ? "selected" : ""}>the first rows in the sheet</option></select></div></div></div></div>` : ""}
       ${W.source !== "demo" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>Study folder</h3><span class="sub">everything this benchmark produces goes here</span></div><div class="bd">
         <div class="field"><label for="wstudy">Study name</label><div class="ctl"><input type="text" id="wstudy" value="${esc(V.study || "")}" placeholder="${esc(wizDefaultStudy())}"></div>
         <div class="help" id="wstudyhelp">${esc(studyWhere())}</div></div></div></div>` : ""}`;
@@ -2510,11 +2534,11 @@ function renderWizard() {
     else {
       const tools = byGroup("tools").filter(a => a.kind === "choice");
       const known = Object.fromEntries(S.tools.map(t => [t.tool, t]));
-      html = `<div class="card"><div class="hd"><h3>Built-in tools</h3><span class="sub">default = the setting saved for this computer (Tools page)</span>
+      html = `<div class="card"><div class="hd"><h3>Built-in tools</h3><span class="sub">default · on or default · off = the setting saved for this computer (Tools page); on / off override it for this run only</span>
           <button class="btn ghost sm" id="wallon">All on</button><button class="btn ghost sm" id="walldef">All default</button></div><div class="bd"><div class="toggles">${tools.map(a => {
           const id = a.dest, t = known[id] || known[id.replace(/-/g, "_")], def = t?.enabled;
           return `<div class="tog"><div class="tx"><b>${esc(t?.display || argLabel(a))}</b><span>${esc(t ? `${t.task} · ${(t.track || "").replace("_", " ")}` : a.help.slice(0, 60))}${t ? ` · default ${def ? "on" : "off"}` : ""}${t?.installed === false ? ` · <span class="bad-t">not installed</span>` : ""}</span></div>
-            <div class="tri">${["", "on", "off"].map(o => `<button type="button" data-wtool="${a.dest}" data-val="${o}" class="${(V[a.dest] || "") === o ? "on" : ""} ${o === "off" ? "off" : ""}">${o || "default"}</button>`).join("")}</div></div>`; }).join("")}</div></div></div>
+            <div class="tri">${["", "on", "off"].map(o => `<button type="button" data-wtool="${a.dest}" data-val="${o}" class="${(V[a.dest] || "") === o ? "on" : ""} ${o === "off" ? "off" : ""}" ${o ? "" : `title="Use the setting saved for this computer (Tools page)"`}>${o || defaultWord(a.dest)}</button>`).join("")}</div></div>`; }).join("")}</div></div></div>
         <div class="card" style="margin-top:16px"><div class="hd"><h3>Your own tools</h3><span class="sub">added with Add your own tool</span><button class="btn ghost sm" data-go="addtool">${icon("plus")}Add one</button></div><div class="bd">${
           S.user.tools.length ? `<div class="toggles">${S.user.tools.map(u => { const on = (V.user_tools || []).includes(u.name);
             return `<div class="tog"><div class="tx"><b>${esc(u.display)}</b><span>${esc(u.task)} · ${esc(u.track.replace("_", " "))} · ${esc(u.mode)}</span></div><label class="switch"><input type="checkbox" data-wuser="${esc(u.name)}" ${on ? "checked" : ""}><span></span></label></div>`; }).join("")}</div>`
@@ -2578,7 +2602,7 @@ function wizSummary() {
   const W = S.wiz, V = W.values;
   const src = {demo:"Offline demo", cohort:`Cohort ${V.cohort || "(choose)"}`, sheet:`Sheet ${V.samples || "(choose)"}`, meta:"Metagenomics track"}[W.source];
   const on = Object.entries(V).filter(([k, v]) => v === "on").map(([k]) => k), off = Object.entries(V).filter(([k, v]) => v === "off").map(([k]) => k);
-  return [["Isolates", src], ["Study folder", W.source === "demo" ? "results_demo (the demo's own folder)" : (S.ws?.path || "") + (S.info?.sep || "/") + (V.study || wizDefaultStudy())], ["Tools changed for this run", [...on.map(t => "+" + t), ...off.map(t => "−" + t), ...(V.user_tools || []).map(u => "+" + u + " (yours)")].join(", ") || "defaults"],
+  return [["Isolates", src + (V.max_isolates ? ` (${V.max_isolates} only, ${V.isolate_order === "file" ? "the first rows" : "balanced"})` : "")], ["Study folder", W.source === "demo" ? "results_demo (the demo's own folder)" : (S.ws?.path || "") + (S.info?.sep || "/") + (V.study || wizDefaultStudy())], ["Tools changed for this run", [...on.map(t => "+" + t), ...off.map(t => "−" + t), ...(V.user_tools || []).map(u => "+" + u + " (yours)")].join(", ") || "defaults"],
           ["Threads per tool", V.threads || "default"], ["Results folder", V.results_dir || "default (results/)"], ["Stages", (V.stages || []).join(" ") || "all"], ["Assembler", V.assembler || "default"]];
 }
 function bindWizard() {
@@ -2775,7 +2799,7 @@ async function loadCohorts() {
   $("#s_cohorts").textContent = `${cs.filter(c => !c.metagenomic).length} isolate · ${cs.filter(c => c.metagenomic).length} metagenomic`;
   $("#cohtb").innerHTML = cs.map(c => `<tr data-coh="${esc(c.name)}"${S.coh === c.name ? ' class="sel"' : ""}><td><a href="javascript:void 0" onclick="cohortInfo('${esc(c.name)}')"><b>${esc(c.name)}</b></a><div class="mut small">${esc(c.path)}</div></td><td>${c.rows}</td>
     <td>${c.locked ? `<span class="tag ok">${icon("check")}locked</span>` : `<span class="tag">unlocked</span>`}</td><td>${c.metagenomic ? "metagenomic" : "isolate"}</td>
-    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="cohortInfo('${esc(c.name)}')">${icon("info")}Details</button> ${c.metagenomic ? "" : `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", c.path])}' data-label="Validate ${esc(c.name)}">Validate</button>
+    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="cohortInfo('${esc(c.name)}')">${icon("info")}Details</button> ${c.selection ? `<button class="btn sec sm" onclick="selectionReport('${esc(c.name)}')">Selection report</button> ` : ""}${c.metagenomic ? "" : `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", c.path])}' data-label="Validate ${esc(c.name)}">Validate</button>
       <button class="btn sec sm" onclick="benchCohort('${esc(c.name)}')">${icon("play")}Benchmark</button>`}</td></tr>`).join("");
 }
 /* cohort details: what is in it, from the sheet, its lock and cohorts/README.md (nothing is downloaded) */
@@ -2823,6 +2847,7 @@ async function cohortInfo(name) {
         .map(k => hbars(COH_LABEL[k] || k.replace(/_/g, " "), s[k])).join("");
   const desc = (d.readme ? md(d.readme.replace(/^##[^\n]*\n/, "")) : "") + (d.comments.length ? `<p class="mut small">${d.comments.map(esc).join(" ")}</p>` : "");
   box.innerHTML = `<div class="hd"><svg class="ico"><use href="#i-users"/></svg><h3>${esc(d.name)}</h3><span class="tag">${kindWord}</span> ${lockTag}<span class="grow"></span>
+     ${d.selection ? `<button class="btn sec sm" onclick="selectionReport('${esc(d.name)}')">${icon("info")}Selection report</button>` : ""}
      ${d.kind === "isolate" ? `<button class="btn sec sm" data-run='${JSON.stringify(["validate-cohort", "--samples", d.path])}' data-label="Validate ${esc(d.name)}">Validate</button>
      <button class="btn sm" onclick="benchCohort('${esc(d.name)}')">${icon("play")}Benchmark</button>` : ""}
      <button class="btn ghost icon sm" onclick="$('#cohdetail').hidden=true;S.coh='';$$('#cohtb tr').forEach(t=>t.classList.remove('sel'))" aria-label="Close details">${icon("x")}</button></div>
@@ -2851,6 +2876,89 @@ async function cohortInfo(name) {
   $("#coh_copy").onclick = () => { const cols = $("#coh_all").checked ? d.columns : COH_MAIN.filter(c => d.columns.includes(c));
     navigator.clipboard.writeText([cols.join("\t"), ...d.rows.map(r => cols.map(c => r[c] ?? "").join("\t"))].join("\n")); toast("Copied as TSV"); };
   box.scrollIntoView({behavior: "smooth", block: "start"});
+}
+/* selection report pop-up: where a cohort's genomes came from, the criteria, the funnel, why others failed, the sequence information */
+const fmtN = n => n == null ? "–" : Number(n).toLocaleString(undefined, {maximumFractionDigits: 1});
+function quant(q, unit) { return q ? `${fmtN(q.median)}${unit || ""} median (${fmtN(q.min)}–${fmtN(q.max)}${unit || ""}; middle half ${fmtN(q.p25)}–${fmtN(q.p75)}${unit || ""})` : "not recorded"; }
+function paramText(p) {
+  const e = Object.entries(p || {}).filter(([, v]) => v !== "" && v !== false && v != null); if (!e.length) return "";
+  return e.map(([k, v]) => typeof v === "object" ? `${k.replace(/_/g, " ")}: ` + Object.entries(v).map(([a, b]) => `${a} ${typeof b === "object" ? JSON.stringify(b) : b}`).join(", ")
+    : `${k.replace(/_/g, " ")}: ${v === true ? "yes" : v}`).join(" · ");
+}
+function failTable(rows) {
+  if (!rows || !rows.length) return `<p class="mut small">None.</p>`;
+  const max = Math.max(...rows.map(r => r.n));
+  return `<table class="data"><thead><tr><th>Reason</th><th class="num">Genomes</th></tr></thead><tbody>${rows.map(r =>
+    `<tr><td>${esc(r.reason)}</td><td class="num">${fmtN(r.n)}<span class="shr" style="width:${Math.max(2, Math.round(80 * r.n / max))}px"></span></td></tr>`).join("")}</tbody></table>`;
+}
+async function selectionReport(name) {
+  let d = S.cohInfo && S.cohInfo.name === name ? S.cohInfo : null;
+  if (!d) { try { d = await api("cohorts/info?name=" + encodeURIComponent(name)); } catch (e) { return toast(e.message, "bad"); } }
+  const r = d.selection; if (!r) return toast("This cohort has no selection report.", "bad");
+  const f = r.funnel, top = f[0].n || 1, sel = r.selected, rd = sel.reads, dlg = document.createElement("dialog");
+  dlg.className = "wide selrep"; dlg.setAttribute("aria-labelledby", "sr_t");
+  const stat = (label, n, note) => `<div><label>${esc(label)}</label><b>${fmtN(n)}</b><span>${esc(note || "")}</span></div>`;
+  const funnel = f.map((x, i) => `<div class="fun"><span>${esc(x.stage)}</span><div class="bar"><i style="width:${Math.max(0.5, 100 * x.n / top)}%"></i></div><span class="n">${fmtN(x.n)}</span><small>${esc(x.note)}${i && f[i - 1].n ? ` · ${(100 * x.n / f[i - 1].n).toFixed(0)}% of the stage before` : ""}</small></div>`).join("");
+  const speciesRows = r.species.filter(x => x.selected || x.passed_filters);
+  const spTable = rows => `<table class="data"><thead><tr><th>Species</th><th class="num">In pool</th><th class="num">Passed filters</th><th class="num">Verified</th><th class="num">Selected</th><th class="num">Recent</th><th class="num">Older</th><th class="num">Long-read-first</th></tr></thead><tbody>${
+    rows.map(x => `<tr><td><i>${esc(x.species)}</i></td><td class="num">${fmtN(x.pool)}</td><td class="num">${fmtN(x.passed_filters)}</td><td class="num">${fmtN(x.verified)}</td><td class="num"><b>${fmtN(x.selected)}</b></td><td class="num">${fmtN(x.recent)}</td><td class="num">${fmtN(x.older)}</td><td class="num">${fmtN(x.long_read_first)}</td></tr>`).join("")}</tbody></table>`;
+  const files = (r.source.pool_files || []).map(x => `<li><code>${esc(x.file)}</code> · ${fmtN(x.bytes / 1e6)} MB · SHA-256 <code>${esc(x.sha256.slice(0, 16))}…</code></li>`).join("");
+  const cmds = Object.entries(r.source.commands || {}).filter(([, v]) => v).map(([k, v]) => `<li><b>${esc(k)}</b>: <code>${esc(v)}</code></li>`).join("");
+  const rejected = Object.entries(r.failures.ncbi_status || {}).filter(([k]) => k === "reject" || k === "error").reduce((a, [, v]) => a + v, 0);
+  dlg.innerHTML = `<div class="hd"><svg class="ico"><use href="#i-users"/></svg><h3 id="sr_t">Selection report: ${esc(name)}</h3><span class="mut small">written ${esc(r.generated)}</span>
+     <button class="btn ghost icon" data-close aria-label="Close">${icon("x", "ico")}</button></div>
+   <div class="bd selrep">
+    <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+      ${stat("Available", f[0].n, "genomes in the pool")}${stat("Passed filters", f[1].n, "offline rules")}${stat("Verified", f[3].n, "NCBI + read-QC pre-check")}
+      ${stat("Selected", sel.n, `${sel.species} species`)}${stat("Independent studies", sel.bioprojects, "BioProjects")}${stat("Plasmids", sel.plasmids_total, "in the selected genomes")}</div>
+
+    <h4>Where they came from</h4>
+    <p style="margin:0 0 6px">${esc(r.source.origin)}</p>
+    <ul style="margin:0;padding-left:20px">${files}</ul>
+    <p class="mut small" style="margin:6px 0 0">Source notes: <code>${esc(r.source.source_notes || "not recorded")}</code>. Each genome is an NCBI RefSeq assembly (the accession links in the cohort table open it), each read set an SRA run, and the sample is its BioSample.</p>
+
+    <h4>Selection criteria (applied in this order)</h4>
+    <ol class="crit">${r.criteria.map(c => `<li>${esc(c.rule)}${paramText(c.parameters) ? `<div class="par">${esc(paramText(c.parameters))}</div>` : ""}</li>`).join("")}</ol>
+    ${cmds ? `<details style="margin-top:8px"><summary class="small">Commands that produced it</summary><ul class="small">${cmds}</ul></details>` : ""}
+
+    <h4>From available to selected</h4>
+    ${funnel}
+
+    <h4>Why candidates were dropped</h4>
+    <div class="cohbars" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr))">
+      <div><h6>Offline filters (${fmtN(r.failures.offline.reduce((a, x) => a + x.n, 0))} genomes)</h6>${failTable(r.failures.offline)}</div>
+      <div><h6>NCBI verification and read-QC pre-check (${fmtN(rejected)} candidates)</h6>${failTable(r.failures.ncbi)}</div></div>
+
+    <h4>Species: available, passed, selected</h4>
+    <div class="row" style="margin-bottom:6px"><input type="search" id="sr_q" placeholder="Filter species…" aria-label="Filter species" style="max-width:280px"><span class="grow"></span><span class="mut small" id="sr_n"></span></div>
+    <div class="tablewrap" style="max-height:300px;border:1px solid var(--line)" id="sr_sp"></div>
+
+    <h4>Sequence information of the selected genomes</h4>
+    <div class="cohbars">
+      <div><h6>Illumina reads (benchmark input)</h6><p class="small" style="margin:0">${esc(rd.platform)}</p>
+        <p class="small" style="margin:6px 0 0">Depth: ${esc(quant(rd.depth_x, "×"))}</p>
+        <p class="small" style="margin:4px 0 0">Read pairs: ${esc(quant(rd.read_pairs))}</p>
+        <p class="small" style="margin:4px 0 0">Mean read length: ${esc(quant(rd.mean_read_length, " bp"))}</p>
+        <p class="small mut" style="margin:6px 0 0">From SRA run-info, not from the reads. ${fmtN(rd.alternate_runs)} genomes have more than one usable run.</p></div>
+      ${hbars("Estimated depth", rd.depth_bins)}${hbars("Pre-download QC grade", rd.qc_precheck)}
+      ${hbars("Reference sequenced with", sel.reference_sequencing)}${hbars("Reference assembler", sel.reference_assembler)}
+      ${hbars("Truth assembly strategy", sel.truth_assembly_strategy)}${hbars("Truth built from", sel.truth_technology)}${hbars("Polished with the benchmark reads?", sel.truth_polish_reads)}
+      ${hbars("Plasmids per genome", sel.plasmids_per_genome)}${hbars("Region", sel.region)}${hbars("Isolation source", sel.source_category)}
+      ${hbars("Public year", sel.released_year)}${hbars("Recent vs older", sel.arms)}${hbars("Panel subset", sel.subset)}</div>
+    <p class="small mut" style="margin:6px 0 0">Reference genome size: ${esc(quant(sel.genome_size_mb, " Mb"))}.</p>
+
+    <h4>What this selection does not establish</h4>
+    <ul class="lim small">${r.limits.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+   </div>
+   <div class="ft"><button class="btn sec" id="sr_copy">${icon("copy")}Copy criteria</button><button class="btn" data-close>Close</button></div>`;
+  document.body.append(dlg); dlg.showModal(); dlg.addEventListener("close", () => dlg.remove());
+  dlg.querySelectorAll("[data-close]").forEach(b => b.onclick = () => dlg.close());
+  const draw = () => {
+    const q = $("#sr_q", dlg).value.trim().toLowerCase(), rows = speciesRows.filter(x => !q || x.species.toLowerCase().includes(q));
+    $("#sr_sp", dlg).innerHTML = spTable(rows); $("#sr_n", dlg).textContent = `${rows.length} of ${speciesRows.length} species with at least one candidate`;
+  };
+  $("#sr_q", dlg).oninput = draw; draw();
+  $("#sr_copy", dlg).onclick = () => { navigator.clipboard.writeText(r.criteria.map((c, i) => `${i + 1}. ${c.rule}`).join("\n")); toast("Criteria copied"); };
 }
 /* WORKSPACE ------------------------------------------------------------------------------------------ */
 const fmtGB = b => b == null ? "unknown" : `${(b / 2 ** 30).toLocaleString(undefined, {maximumFractionDigits: 0})} GB`;

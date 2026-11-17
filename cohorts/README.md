@@ -8,6 +8,7 @@ evidence rules applied to them — every row in both files passes the same
 |---|---:|---|---|
 | [`public-v1.tsv`](public-v1.tsv) | 10 | all A | reproducible headline results and citation |
 | [`public-v2.tsv`](public-v2.tsv) | 32 | 10 A + 22 B | broader organism and geographic coverage |
+| [`public-v4.tsv`](public-v4.tsv) | 7,227 | all B | the large validation panel: every genome of the contributed pool that verified at NCBI (943 species, 1,818 BioProjects), with recent and older leakage arms and a balanced order; run a slice with `plasbench run --max-isolates N`; see below |
 | [`plaseval-ecoli53.tsv`](plaseval-ecoli53.tsv) | 53 | all B | replicating the PlasEval paper's binning comparison and its comparison gate; not a headline panel (truth is a Unicycler hybrid on the same reads; one species). See [`docs/PLASEVAL_REPLICATION.md`](../docs/PLASEVAL_REPLICATION.md) |
 
 `public-v1` is frozen. Do not add rows to it: published results reference it by
@@ -58,6 +59,33 @@ Known limitations, stated plainly:
 - **No `read_depth_x`** on the added rows. Stage 2 measures observed coverage
   into `observed_depth.tsv`; run it before any depth-ladder work.
 - **Geography is from deposited metadata**, not curator-verified provenance.
+
+## public-v4 — the large validation panel (contributed pool)
+
+Every genome of the contributed pool (`candidates/contributed-refseq-sra/`) that passed the offline filters and was verified at NCBI,
+selected with `plasbench import-contributed-cohort`, checked with `plasbench resolve-contributed-cohort` and locked by
+`validate-cohort --online` (`public-v4.lock.json`, all 7,227 rows passed). Every row is tier B (no source publication reviewed). It was
+decided on 2026-11-16 on the project owner's instruction to add everything that is available; it is a cohort choice, not a scoring decision.
+`public-v4.selection.json` records how it was selected and `candidates/contributed-refseq-sra/public-v4.precheck.tsv` records every
+candidate's NCBI and read-QC outcome. The window's Cohorts page shows both as the **Selection report** pop-up.
+
+* **Size and mix:** 7,227 isolates, 943 species, 1,818 BioProjects. It is not a balanced sample: *E. coli* has 1,360 isolates and 520
+  species have one. Use `--max-isolates N` (balanced by default) or the `organism`, `selection_arm`, `panel_subset` and
+  `truth_assembly_strategy` columns.
+* **Truth:** 3,552 long-read-first rows (2,453 hybrid, 1,099 long-read-only), 2,522 short-read-first and 1,153 unclassified. Only the
+  long-read-first rows are headline-eligible; four species have 20 or more such studies (*E. coli* 111, *K. pneumoniae* 58,
+  *S. aureus* 35, *S. enterica* 34).
+* **Arms:** 1,539 `recent` (public on or after 2025-01-01 on the earlier of assembly and first read) and 5,688 `older`, for the
+  leakage comparison. `panel_subset=core` marks the 98 isolates of the first, balanced selection (20 each of *E. coli*, *K. pneumoniae*,
+  *S. enterica*, *S. aureus*, 18 *E. hormaechei*).
+* **Order:** written in balanced order (`balance_rank`), so the first N rows are a fair miniature of the cohort.
+* **Read QC:** the pre-download check passed 7,081 rows and flagged 146 (depth under 30x). Estimated depth is 10.7x to 18,224x
+  (median 139x); 1,661 rows are above 300x. The reads for the whole panel are about 5 TB to download, the first 100 rows about 84 GB.
+  The post-download gate (stage 3 `short_read_qc.py`) has **not** been run and may still exclude samples.
+* **Not judged:** 42 candidates failed their NCBI lookup on temporary errors and were left out; re-run `resolve-contributed-cohort`
+  to add them.
+* **Not done:** no tool has been run on this panel; `truth_polish_reads` and the truth strategy are NCBI-derived, not curator-checked;
+  reference tiers are not yet computed.
 
 ## Verification
 

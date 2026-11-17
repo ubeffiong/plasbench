@@ -13,6 +13,15 @@ history is lost, only the numbering is cleaner. See
 
 ## [Unreleased]
 
+### Added -- run only the first N isolates, and the cohort Selection report
+- `plasbench run --max-isolates N` (any N; *How many isolates* in New benchmark) runs a balanced N isolates of a cohort or sample sheet: species take turns, recent and older alternate, long-read-first truths first, one isolate per study before a second (`plasbench_common.balanced_order`); `--isolate-order file` takes the first N rows instead. The cohort file is untouched and a copy with the chosen rows is used (`plasbench/sheet_limit.py`). `public-v4` is written in this order (`balance_rank`).
+- The window's **Cohorts** page has a **Selection report** pop-up for a cohort built from the candidate pool: where the genomes came from, the criteria, available / passed / selected, why the others failed, a per-species table and the sequence information of the selected genomes. It reads `cohorts/<name>.selection.json`, written by `plasbench selection-report` (`python/build_selection_report.py`) from the importer's and resolver's output.
+
+### Added -- public-v4 and the read-QC pre-check (contributed pool, verified at NCBI)
+- `cohorts/public-v4.tsv` (+ lock, selection report, per-candidate audit): every genome of the contributed pool that verified at NCBI, 7,227 isolates of 943 species from 1,818 BioProjects, all tier B, all re-verified by `validate-cohort --online`. 1,539 recent (public from 2025-01-01) and 5,688 older; 3,552 long-read-first, 2,522 short-read-first, 1,153 unclassified truths; 98 are the first balanced selection (`panel_subset=core`). Written in balanced order, so `plasbench run --max-isolates N` runs a fair miniature. About 5 TB of reads for the whole panel; no tool has been run on it. The design is recorded in `docs/COHORTS.md` and `cohorts/README.md`. The accession ledger now covers it.
+- `plasbench resolve-contributed-cohort` (`python/resolve_contributed_cohort.py`): verifies candidates at NCBI, replaces the pool's umbrella BioProject with the real one, picks the best SRA run, and runs the pre-download read-QC check (depth, read pairs, read length from SRA run-info, graded against `config/short_read_qc_thresholds.tsv`). It cannot see base quality or pair integrity: stage 3's `short_read_qc.py` still decides on the downloaded reads.
+- `plasbench import-contributed-cohort --arm` labels a selection so two runs can be combined; `validate_cohort.run_metadata` also returns `spots` and `avg_length`.
+
 ### Added -- literature and public-data review: AMR regions, synteny ribbons, publication cohorts (16 November 2026)
 - `python/report_amr_regions.py`: interactive AMR regions view (truth resistance regions with mobile context, a lane per tool with per-gene placement and flank coverage, a verdict per region, a funnel of where resistance information is lost); report section *AMR regions*.
 - `python/report_synteny.py`: interactive synteny ribbons (order and orientation of each tool's records on a truth plasmid, identity shading, strand and identity filters, details panel); report section *Synteny ribbons*.
