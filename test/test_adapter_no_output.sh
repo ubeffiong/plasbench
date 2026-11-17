@@ -80,6 +80,7 @@ mkdir -p "$out/${sample}_PlaScope"; echo "started" > "$out/${sample}_PlaScope/ru
 EOS
 chmod +x "$TMP/bin/plaScope.sh"
 rc=0
+mkdir -p "$TMP/db"; : > "$TMP/db/chromosome_plasmid_db.stub"   # the stage-4 database pre-flight needs the database to exist
 PATH="$TMP/bin:$PATH" DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" TMP_DIR="$TMP/tmp" SAMPLE_SHEET="$TMP/sheet.tsv" REQUIRE_CURATED_METADATA=0 \
     ONLY_TOOL=plascope PLASCOPE_ECOLI_DB="$TMP/db/chromosome_plasmid_db" ALLOW_ALL_TOOLS_FAILED=1 TOOL_RETRIES=0 \
     bash "$ROOT/scripts/04_run_tools.sh" > "$TMP/stage.log" 2>&1 || rc=$?

@@ -17,6 +17,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 mkdir -p "$TMP/bin" "$TMP/data/s1" "$TMP/data/s2" "$TMP/results" "$TMP/logs"
+mkdir -p "$TMP/db/ecoli/chromosome_plasmid_db" "$TMP/db/klebsiella/Klebsiella_PlaScope"   # the stage-4 database pre-flight needs the databases to exist
 printf '>c1\nACGTACGT\n' > "$TMP/data/s1/contigs.fasta"
 printf '>c1\nACGTACGT\n' > "$TMP/data/s2/contigs.fasta"
 
