@@ -62,7 +62,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from plasbench_common import subprocess_timeout  # noqa: E402
+from plasbench_common import subprocess_timeout, watchdog  # noqa: E402
 
 
 def read_fasta_ids(path):
@@ -121,10 +121,17 @@ def simulate_long_reads(badread_path, reference, depth, error_model, qscore_mode
                "--error_model", error_model, "--qscore_model", qscore_model, "--seed", str(seed)]
     with open(out_long, "wb") as handle:
         badread = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        gzip_result = subprocess.run(["gzip", "-c"], stdin=badread.stdout, stdout=handle, check=False, timeout=subprocess_timeout())
-        badread.stdout.close()
-        _, badread_stderr = badread.communicate()
-        badread_result = badread.returncode
+        with watchdog(badread) as guard:
+            try:
+                gzip_result = subprocess.run(["gzip", "-c"], stdin=badread.stdout, stdout=handle, check=False, timeout=subprocess_timeout())
+            except subprocess.TimeoutExpired:
+                badread.kill()
+                gzip_result = subprocess.CompletedProcess(["gzip"], 1)
+            badread.stdout.close()
+            _, badread_stderr = badread.communicate()
+            badread_result = badread.returncode
+    if guard.fired:
+        sys.stderr.write("[simulate_reads] badread simulate timed out (PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS)\n")
     if badread_result or gzip_result.returncode:
         Path(out_long).unlink(missing_ok=True)
         sys.stderr.write(f"[simulate_reads] badread simulate failed (exit {badread_result}):\n{(badread_stderr or b'').decode(errors='replace')[-4000:]}\n")

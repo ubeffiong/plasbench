@@ -1,0 +1,7 @@
+label	url	sha256	bytes	status	note
+Platon database	https://zenodo.org/records/4066768/files/db.tar.gz		1690687855	unpinned	Zenodo record 4066768 db.tar.gz. The size is the one env/download_platon_db.sh already checks; the SHA-256 could not be verified offline from this repository. Fill it from the first verified download (see download_provenance.jsonl) and set status=pinned.
+PlaScope E. coli database				unpinned	Zenodo 10.5281/zenodo.1311641; the URL is supplied by the user (PLASCOPE_ECOLI_DB_URL), so no URL is registered. Fill url and sha256 after a verified download.
+PlaScope Klebsiella database				unpinned	Zenodo 10.5281/zenodo.1311647; as above for PLASCOPE_KLEBSIELLA_DB_URL.
+MOB-suite database	https://zenodo.org/records/10304948/files/data.tar.gz?download=1			unpinned	Default mirror used by env/download_mobsuite_db.sh when mob_init does not name one. SHA-256 not verifiable offline.
+PLSDB sequences				unpinned	PLSDB_URL has no trusted default, so no URL is registered; the pin applies to the decompressed sequences.fasta.
+gplas2 source tarball	https://gitlab.com/mmb-umcu/gplas2/-/archive/00cf37bec5e44b05ee30c8a4c99e987abbbb4c4f/gplas2-00cf37bec5e44b05ee30c8a4c99e987abbbb4c4f.tar.gz			unpinned	Pinned by commit in the Dockerfile; the archive hash is not verifiable offline. The Dockerfile verifies it when GPLAS2_SHA256 is given as a build argument.

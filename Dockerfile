@@ -56,10 +56,13 @@ USER $MAMBA_USER
 # its snakefiles is commented out, so it runs entirely inside this environment
 # and creates none at run time. The commit is pinned so the image is reproducible.
 ARG GPLAS2_COMMIT=00cf37bec5e44b05ee30c8a4c99e987abbbb4c4f
+# Optional: --build-arg GPLAS2_SHA256=<sha256 of the archive> makes the build fail on a different archive (config/download_checksums.tsv records that none is verified offline yet).
+ARG GPLAS2_SHA256=
 USER root
 RUN /opt/conda/envs/plasbench/bin/curl -sSL --retry 8 --retry-all-errors --retry-delay 5 \
       -o /tmp/gplas2.tar.gz \
       "https://gitlab.com/mmb-umcu/gplas2/-/archive/$GPLAS2_COMMIT/gplas2-$GPLAS2_COMMIT.tar.gz" \
+ && if [ -n "$GPLAS2_SHA256" ]; then echo "$GPLAS2_SHA256  /tmp/gplas2.tar.gz" | sha256sum -c -; fi \
  && mkdir -p /opt/gplas2 \
  && tar -xzf /tmp/gplas2.tar.gz -C /opt/gplas2 --strip-components=1 \
  && rm -f /tmp/gplas2.tar.gz \

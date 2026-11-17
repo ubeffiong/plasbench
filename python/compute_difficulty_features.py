@@ -62,7 +62,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from plasbench_common import MASH_SKETCH_SIZE  # noqa: E402
+from plasbench_common import MASH_SKETCH_SIZE, subprocess_timeout  # noqa: E402
 
 
 from plasbench_common import read_truth_table  # noqa: E402
@@ -134,13 +134,19 @@ def depth_ratio(fasta_path, truth_path, r1, r2, threads):
             # call (python/make_depth_ladder.py: seqtk | gzip).
             align = subprocess.Popen([minimap2, "-t", str(threads), "-ax", "sr", str(fasta_path), str(r1), str(r2)],
                                      stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            sort_result = subprocess.run([samtools, "sort", "-@", str(threads), "-o", str(bam), "-"],
-                                         stdin=align.stdout, capture_output=True, timeout=1800)
-            align.stdout.close()
-            align.wait(timeout=1800)
+            limit = subprocess_timeout()
+            try:
+                sort_result = subprocess.run([samtools, "sort", "-@", str(threads), "-o", str(bam), "-"],
+                                             stdin=align.stdout, capture_output=True, timeout=limit)
+                align.stdout.close()
+                align.wait(timeout=limit)
+            except subprocess.TimeoutExpired:
+                align.kill()
+                align.wait()
+                raise
             if align.returncode != 0 or sort_result.returncode != 0 or not bam.is_file():
                 return ""
-            subprocess.run([samtools, "index", str(bam)], capture_output=True, timeout=120)
+            subprocess.run([samtools, "index", str(bam)], capture_output=True, timeout=subprocess_timeout())
             coverage = subprocess.run([samtools, "coverage", str(bam)], capture_output=True, text=True, timeout=120)
             if coverage.returncode != 0:
                 return ""

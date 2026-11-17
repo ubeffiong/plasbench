@@ -223,21 +223,50 @@ _pgroup_alive() {
 # acquire_run_lock WHAT: one run at a time per results folder. The lock file RESULTS_DIR/.run.lock holds the pid, the start time and the process group
 # (when this run leads one: setsid, or the window's job runner). It refuses, with a message, while the pid or any member of the recorded group is alive,
 # and removes a stale lock (audit AU-001/AU-009). run_all.sh holds the lock for its stages and exports PLASBENCH_LOCK_PID, so they do not refuse themselves.
+# The check-then-remove-then-create sequence below runs inside a short mutex, the directory RESULTS_DIR/.run.lock.guard (mkdir is atomic): before it,
+# two starters that both saw the same stale lock could both delete it, and the second delete removed the first starter's fresh lock, so both ran
+# (AU-009). Residual limits: a guard left by a killed starter is reclaimed when its pid is dead (that reclaim is itself a small window); a guard
+# whose owner is alive is waited for up to ~10 s and then refused; the lock is still pid based, so pid reuse can refuse a start that was safe and
+# the pids of a WSL run are not visible to a Windows check (and the reverse); SIGKILL of the lock holder leaves the lock until the next start.
+_lock_guard_enter() {
+    local guard="$1.guard" tries=0 owner
+    until mkdir "$guard" 2>/dev/null; do
+        owner="$(cat "$guard/pid" 2>/dev/null || true)"
+        if [[ -n "$owner" ]] && ! _pid_alive "$owner"; then rm -rf "$guard"; continue; fi
+        tries=$(( tries + 1 ))
+        if (( tries > 100 )); then
+            die "the run lock of $RESULTS_DIR is being changed by another start (guard $guard, pid ${owner:-unknown}) and did not free within 10 seconds; try again."
+        fi
+        sleep 0.1
+    done
+    printf '%s\n' "$$" > "$guard/pid"
+}
+
+_lock_guard_leave() {
+    local guard="${RESULTS_DIR:-/nonexistent}/.run.lock.guard"
+    [[ "$(cat "$guard/pid" 2>/dev/null || true)" == "$$" ]] && rm -rf "$guard"
+    return 0
+}
+
 acquire_run_lock() {
     local what="$1" lock="${RESULTS_DIR:?}/.run.lock" holder_pid holder_pgid holder_start holder_what my_pgid
     mkdir -p "$RESULTS_DIR"
     if [[ -n "${PLASBENCH_LOCK_PID:-}" && -f "$lock" ]] && grep -qx "pid=$PLASBENCH_LOCK_PID" "$lock" && _pid_alive "$PLASBENCH_LOCK_PID"; then
         return 0
     fi
+    _lock_guard_enter "$lock"
+    on_exit_add _lock_guard_leave
     if [[ -s "$lock" ]]; then
         holder_pid="$(sed -n 's/^pid=//p' "$lock" | head -1)"
         holder_pgid="$(sed -n 's/^pgid=//p' "$lock" | head -1)"
         holder_start="$(sed -n 's/^started=//p' "$lock" | head -1)"
         holder_what="$(sed -n 's/^what=//p' "$lock" | head -1)"
         if [[ "$holder_pid" != "$$" ]] && _pid_alive "$holder_pid"; then
+            _lock_guard_leave
             die "another PlasBench run is already using $RESULTS_DIR (pid $holder_pid, ${holder_what:-unknown stage}, started ${holder_start:-unknown}). Wait for it, stop it, or give this run its own results folder (--results-dir or --study)."
         fi
         if _pgroup_alive "$holder_pgid" "$$"; then
+            _lock_guard_leave
             die "a previous run in $RESULTS_DIR (pid ${holder_pid:-?}) is gone, but processes of its process group $holder_pgid are still running (a killed run leaves its tools behind). Stop them first (kill -- -$holder_pgid), then start again."
         fi
         warn "removing a stale run lock in $RESULTS_DIR (pid ${holder_pid:-unknown}, ${holder_what:-unknown stage}, started ${holder_start:-unknown}): that run is no longer alive."
@@ -246,8 +275,10 @@ acquire_run_lock() {
     my_pgid="$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ' || true)"
     [[ "$my_pgid" == "$$" || ( -n "$my_pgid" && "${PLASBENCH_JOB_GROUP:-}" == "1" ) ]] || my_pgid=""
     if ! ( set -o noclobber; printf 'pid=%s\npgid=%s\nstarted=%s\nwhat=%s\n' "$$" "$my_pgid" "$(date '+%Y-%m-%d %H:%M:%S')" "$what" > "$lock" ) 2>/dev/null; then
+        _lock_guard_leave
         die "another PlasBench run took the lock on $RESULTS_DIR at the same moment ($(sed -n 's/^pid=//p' "$lock" 2>/dev/null | head -1)); start again when it has finished."
     fi
+    _lock_guard_leave
     _RUN_LOCK_OWNER="$BASHPID"
     export PLASBENCH_LOCK_PID="$$"
     on_exit_add release_run_lock
@@ -550,8 +581,19 @@ wait_online() {
     log "  internet is back: download resumed"
 }
 
+# download_pin LABEL URL: print the SHA-256 that config/download_checksums.tsv (override: PLASBENCH_DOWNLOAD_CHECKSUMS) pins for LABEL, or nothing.
+# A registry row applies to its own URL only (a custom URL gets no pin); a row with an empty url applies to any URL. Rows with status other than
+# "pinned", or a sha256 that is not 64 hex characters, give no pin (AU-026).
+download_pin() {
+    local label="$1" url="${2:-}" registry="${PLASBENCH_DOWNLOAD_CHECKSUMS:-${PROJECT_ROOT:-.}/config/download_checksums.tsv}"
+    [[ -f "$registry" ]] || return 0
+    awk -F'\t' -v label="$label" -v url="$url" '
+        NR > 1 && $1 == label && $5 == "pinned" && length($3) == 64 && $3 ~ /^[0-9A-Fa-f]+$/ && ($2 == "" || $2 == url) { print tolower($3); exit }' "$registry"
+}
+
 # verify_or_record_download FILE URL LABEL [EXPECTED_SHA256] [PROVENANCE_FILE]
 # Supply-chain check for a downloaded database or archive. Where a SHA-256 is configured, a mismatch fails (returns 1; the caller deletes the file).
+# EXPECTED_SHA256 defaults to the pin in config/download_checksums.tsv (see download_pin); PLASBENCH_REQUIRE_CHECKSUMS=1 refuses a download with no pin.
 # Where none is configured, the observed checksum is printed with an explicit notice and appended as one JSON line to PROVENANCE_FILE
 # (default: download_provenance.jsonl next to FILE), so the run can be traced to the exact bytes that were installed. Never fails on a missing pin.
 verify_or_record_download() {
@@ -560,6 +602,11 @@ verify_or_record_download() {
     elif have shasum; then got="$(shasum -a 256 "$file" | awk '{print $1}')"
     else got="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$file" 2>/dev/null || true)"; fi
     [[ -n "$got" ]] || { warn "$label: no SHA-256 tool found; the download could not be checksummed"; return 0; }
+    [[ -n "$want" ]] || want="$(download_pin "$label" "$url")"
+    if [[ -z "$want" && "${PLASBENCH_REQUIRE_CHECKSUMS:-0}" == "1" ]]; then
+        warn "$label: no SHA-256 is pinned (environment variable or config/download_checksums.tsv) and PLASBENCH_REQUIRE_CHECKSUMS=1; refusing it. Observed SHA-256: $got"
+        return 1
+    fi
     if [[ -n "$want" ]]; then
         if [[ "$got" != "$(printf '%s' "$want" | tr 'A-F' 'a-f')" ]]; then
             warn "$label: SHA-256 $got does not match the pinned $want"
