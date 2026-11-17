@@ -437,6 +437,22 @@ def provenance_errors(rows):
     return errors
 
 
+def technology_strategy_warnings(rows):
+    """truth_technology (from sequencing evidence) and truth_assembly_strategy (from the assembly method text) are two sources that can disagree (audit AU-027).
+    A warning, not an error: the sheet may be a shipped release; the rows are counted so the disagreement is visible rather than silent."""
+    contradictions = {}
+    for row in rows:
+        tech, strategy = (row.get("truth_technology") or "").strip(), (row.get("truth_assembly_strategy") or "").strip()
+        if tech == "long_read" and strategy in ("long_read_first_hybrid", "short_read_first_hybrid"):
+            key = f"truth_technology=long_read but the assembly method says {strategy} (short reads were used)"
+        elif tech == "hybrid" and strategy == "long_read_only":
+            key = "truth_technology=hybrid but the assembly method says long_read_only"
+        else:
+            continue
+        contradictions[key] = contradictions.get(key, 0) + 1
+    return [f"{n} row(s): {key}" for key, n in contradictions.items()]
+
+
 def composition_warnings(rows, max_species_share=0.30, min_species=5, min_species_isolates=20):
     """Advisory checks of species balance (docs/METHODS.md, "Species balance").
 
@@ -484,6 +500,8 @@ def main():
     rows, fields = read_rows(args.samples)
     errors = schema_errors(rows, fields, ledger=read_ledger(args.ledger))
     errors.extend(provenance_errors(rows))
+    for warning in technology_strategy_warnings(rows):
+        print(f"COHORT PROVENANCE WARNING: {warning}", file=sys.stderr)
     for warning in composition_warnings(rows):
         print(f"COHORT COMPOSITION WARNING: {warning}", file=sys.stderr)
     if args.verify_lock:
