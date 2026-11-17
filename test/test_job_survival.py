@@ -85,6 +85,7 @@ def main():
     fourth.answer(ask["id"], "yes")
     check("the answer reaches the command and is logged as [you]", wait(lambda: fourth.jobs[ask["id"]]["state"] == "done") and "got yes" in fourth.get(ask["id"])["log"]
           and "[you] yes" in fourth.get(ask["id"])["log"], fourth.get(ask["id"])["log"][-200:])
+    time.sleep(2)   # fourth saves the shared job index just after it sees its job finish; let that write land before first adds the next job, or it can overwrite it
     secret = launch(first, "answer = input('Key? ')\nprint('len', len(answer), flush=True)", label="secret")
     wait(lambda: "Key?" in first.get(secret["id"])["log"])
     server().answer(secret["id"], "hunter2", secret=True)
