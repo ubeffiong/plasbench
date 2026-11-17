@@ -9,6 +9,7 @@ Sections (always present; a missing table says "Not run" and why, never silence)
   learn-truthqc     repeat content and read-depth anomalies of the truth
   learn-plsmd       what a database-dependent tool such as plsMD can and cannot show (leakage)
   learn-published   PlasBench's results beside the outcomes a publication reported for the same isolates
+  learn-drivers     what drives per-plasmid recovery: a multivariable, study-clustered regression per tool
 
 Called once from build_html_report.py: `inject(page, results_dir, scores_path)`. Standard library only.
 """
@@ -19,7 +20,7 @@ from collections import defaultdict
 
 SECTIONS = [("learn-agreement", "Bin agreement"), ("learn-adequacy", "Assembly adequacy"),
             ("learn-copynumber", "Copy number"), ("learn-truthqc", "Truth repeats and depth"),
-            ("learn-plsmd", "Database-dependent tools"), ("learn-published", "Published outcomes")]
+            ("learn-plsmd", "Database-dependent tools"), ("learn-published", "Published outcomes"), ("learn-drivers", "Performance drivers")]
 
 
 from plasbench_common import number  # noqa: E402,F401
@@ -266,6 +267,59 @@ def published_section(report, summary_rows):
     return section("learn-published", "Comparison with published outcomes", lead, cp.html_body(report))
 
 
+def drivers_section(summary, rows):
+    """Per tool: the drivers of per-plasmid recovery from one multivariable model (python/performance_drivers.py). Descriptive; never ranks."""
+    lead = ("Which plasmid and isolate characteristics go with worse recovery, <strong>holding the others fixed</strong>: size, repeats, replicon family, "
+            "resistance genes, species, read depth and recent versus older data, in one model per tool with intervals that treat each study as one unit. "
+            "<strong>Associations, not causes; descriptive, it never changes a score or ranking.</strong>")
+    if not summary:
+        return section("learn-drivers", "Performance drivers", lead,
+                       note("Not run: benchmark.performance_drivers.json was not produced (RUN_PERFORMANCE_DRIVERS=0, or an older stage 6)."))
+    body = ""
+    tools = summary.get("tools", [])
+    estimated = [t for t in tools if t.get("status") == "estimated"]
+    if not estimated:
+        body += note("No tool had enough scored plasmids and studies for a model: " + "; ".join(f"{t['tool']}: {t.get('reason', '')}" for t in tools[:6]) + ".")
+    by_tool = defaultdict(list)
+    for r in rows or []:
+        by_tool[(r.get("analysis_track"), r.get("tool"))].append(r)
+    for t in tools:
+        key = (t.get("analysis_track"), t.get("tool"))
+        head = f"<h3>{esc(t['tool'])} <span class='muted'>({esc(t.get('analysis_track', ''))})</span></h3>"
+        if t.get("status") != "estimated":
+            body += head + f"<p class='muted'>Not estimable: {esc(t.get('reason', ''))}.</p>"
+            continue
+        size = t.get("size_effect")
+        said = ""
+        if size and size.get("ci_low") is not None:
+            direction = "lower" if size["estimate"] < 0 else "higher"
+            said = (f" Larger plasmids go with {direction} recovery by {abs(size['estimate']):.3f} per standard deviation of log size "
+                    f"(95% interval {size['ci_low']:.3f} to {size['ci_high']:.3f}; {esc(size['status'])}).")
+        body += head + (f"<p class='muted'>{t['n_plasmids']} plasmids from {t['n_clusters']} studies, R&sup2; {t['r2']:.2f}.{said}</p>" if t.get("r2") is not None
+                        else f"<p class='muted'>{t['n_plasmids']} plasmids from {t['n_clusters']} studies.{said}</p>")
+        trs = []
+        for r in sorted(by_tool.get(key, []), key=lambda r: -abs(float(r["estimate"] or 0))):
+            ref = f" (vs {r['reference']})" if r.get("reference") else ""
+            trs.append([r["term"] + ref, fmt(number_or_none(r["estimate"]), 3),
+                        f"{fmt(number_or_none(r['ci_low']), 3)} to {fmt(number_or_none(r['ci_high']), 3)}", r["status"], fmt(number_or_none(r["delta_r2_without"]), 3)])
+        body += panel(["Driver", "Effect on recovery", "95% interval", "Status", "Variance explained by this driver"], trs)
+        extra = [x["driver"] + ": " + x["reason"] for x in t.get("left_out", [])]
+        if extra:
+            body += f"<p class='muted'>Left out: {esc('; '.join(extra))}.</p>"
+        for w in t.get("warnings", []):
+            body += note(w)
+    body += note("Effects are per one standard deviation for numeric drivers and a difference from the stated reference for categories. 'Supported' means the estimate "
+                 "lies outside an interval widened for the number of terms in the model and its sign was stable across study resamples; 'unclear' is not 'no effect'.")
+    return section("learn-drivers", "Performance drivers", lead, body)
+
+
+def number_or_none(value):
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
 def inject(page, results_dir, scores_path):
     scores = read_tsv(scores_path) or []
     r = lambda name: read_tsv(os.path.join(results_dir, "benchmark." + name + ".tsv"))  # noqa: E731
@@ -283,10 +337,17 @@ def inject(page, results_dir, scores_path):
             published = json.load(handle)
         if published.get("status") == "NO_DATA":
             published = None
+    drivers_json = os.path.join(results_dir, "benchmark.performance_drivers.json")
+    drivers = None
+    if os.path.isfile(drivers_json):
+        import json
+        with open(drivers_json, encoding="utf-8") as handle:
+            drivers = json.load(handle)
     sections = (agreement_section(scores, r("tool_agreement"), gate) + adequacy_section(r("assembly_adequacy"))
                 + copynumber_section(r("copy_number")) + truthqc_section(r("repeat_content"), r("truth_depth_anomalies"))
                 + plsmd_section(scores)
-                + published_section(published, r("published_comparison")))
+                + published_section(published, r("published_comparison"))
+                + drivers_section(drivers, r("performance_drivers")))
     anchor = "<section id='recommendations'>"
     if anchor in page:
         page = page.replace(anchor, sections + anchor, 1)

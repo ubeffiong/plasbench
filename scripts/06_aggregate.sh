@@ -324,6 +324,14 @@ if [[ "${RUN_PUBLISHED_COMPARISON:-auto}" != "off" ]]; then
     python3 "$HERE/../python/compare_published.py" --results-dir "$RESULTS_DIR" --samples "$SAMPLE_SHEET" --scores "$SCORES"         --out-prefix "$RESULTS_DIR/benchmark.published_comparison" --html "$RESULTS_DIR/benchmark.published_comparison.html" > /dev/null         || warn "published-outcome comparison failed; the other results are unaffected"
 fi
 
+# What drives per-plasmid recovery? One multivariable, study-clustered regression per tool (python/performance_drivers.py): size, repeats, replicon
+# family, resistance genes, species, depth, arm. Descriptive: never changes a score or ranking, and a failure only warns.
+if [[ "${RUN_PERFORMANCE_DRIVERS:-1}" == "1" ]]; then
+    python3 "$HERE/../python/performance_drivers.py" --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" --sample-sheet "$SAMPLE_SHEET" \
+        --out-prefix "$RESULTS_DIR/benchmark.performance_drivers" > /dev/null \
+        || warn "performance-drivers regression failed; the other results are unaffected"
+fi
+
 if [[ "${COHORT_QC_FLAGS_ENABLED:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/flag_cohort_outliers.py" \
         --stats-dir "$DATA_DIR" --samples "$SAMPLE_SHEET" \

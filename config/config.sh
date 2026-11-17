@@ -846,3 +846,17 @@ export LEAKAGE_DATE_BASIS="${LEAKAGE_DATE_BASIS:-earliest_public}"
 # publication-v1; tables in cohorts/published/), stage 6 writes benchmark.published_comparison.* putting PlasBench's results beside the
 # paper's own, matched by BioSample. Descriptive: it never changes a score or a ranking, and a failure only warns.
 export RUN_PUBLISHED_COMPARISON="${RUN_PUBLISHED_COMPARISON:-auto}"
+# PlasmidEC (Paganini et al.; MIT; github.com/lisavader/plasmidEC, maintained at gitlab.com/mmb-umcu/plasmidec): an ensemble that calls a contig
+# plasmid by majority vote of RFPlasmid, PlaScope and Platon (add mlplasmids with PLASMIDEC_CLASSIFIERS). Off by default. It supports eight
+# species only (E. coli, K. pneumoniae, A. baumannii, S. enterica, P. aeruginosa, E. faecium, E. faecalis, S. aureus): any other organism is
+# skipped with a recorded reason, not failed. PLASMIDEC_CMD is how plasmidEC.sh is started (it installs its own conda environments and
+# databases on first use). Hard call only (no continuous score), so it is not PR-curve scored.
+export RUN_PLASMIDEC="${RUN_PLASMIDEC:-0}"
+export PLASMIDEC_CMD="${PLASMIDEC_CMD:-plasmidEC.sh}"
+export PLASMIDEC_THREADS="${PLASMIDEC_THREADS:-$THREADS}"
+export PLASMIDEC_MIN_LENGTH="${PLASMIDEC_MIN_LENGTH:-1000}"     # PlasmidEC's own -l default
+export PLASMIDEC_CLASSIFIERS="${PLASMIDEC_CLASSIFIERS:-}"       # empty: its default; or lowercase, comma separated (its -c)
+# RUN_PERFORMANCE_DRIVERS: 1 (default) or 0. Stage 6 fits, per tool, one model of per-plasmid recovery on plasmid size, repeat content, replicon family,
+# resistance genes, species, read depth and the recent/older arm, with study-clustered intervals (benchmark.performance_drivers.*; the report's
+# "Performance drivers" section). A tool with too few plasmids or studies is reported as not estimable. Descriptive: never changes a score or ranking.
+export RUN_PERFORMANCE_DRIVERS="${RUN_PERFORMANCE_DRIVERS:-1}"

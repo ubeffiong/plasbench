@@ -878,7 +878,7 @@ def read_tool_versions(path):
         "genomad": "genomad", "plasme": "PLASMe.py",
         "plasgraph2": "plASgraph2_classify.py",
         "rfplasmid": "rfplasmid", "plasmidhunter": "plasmidhunter", "plasmer": "Plasmer",
-        "plascope": "plaScope.sh",
+        "plascope": "plaScope.sh", "plasmidec": "plasmidEC.sh",
     }
     versions = {label: details.get("version", "unreported")
                 for label, name in executable.items()

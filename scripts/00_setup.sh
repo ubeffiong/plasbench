@@ -180,6 +180,10 @@ if [[ "${RUN_PLASMIDHUNTER:-0}" -eq 1 ]]; then
     # No separate database to verify -- PlasmidHunter's Naive Bayes model
     # ships inside its own PyPI package.
 fi
+if [[ "${RUN_PLASMIDEC:-0}" -eq 1 ]]; then
+    # PlasmidEC installs its own conda environments and databases on first use, so only the launcher is checked here.
+    check_tool "${PLASMIDEC_CMD%% *}" ""
+fi
 if [[ "${RUN_PLASMER:-0}" -eq 1 ]]; then
     check_tool Plasmer plasmer
     # Unlike Platon/MOB-suite/geNomad/PLASMe/PlaScope, Plasmer's database has

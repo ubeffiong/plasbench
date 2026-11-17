@@ -295,6 +295,7 @@ The registry is `config/tool_capabilities.tsv`. Only `mob_recon`, `platon` and `
 | genomad, plasme, rfplasmid, plasmidhunter, plasmer | ML classification | no | assembly | short_read | no |
 | plasgraph2 | ML classification | no | assembly graph | short_read | no |
 | plascope | classification | no | assembly | short_read | no |
+| plasmidec | classification | no | assembly | short_read | no |
 | flye_mob_recon, trycycler_mob_recon | binning | yes | long reads | long_read | yes |
 | hybracter_long | reassembly | yes | long reads | long_read | yes |
 | plassembler, hybracter_hybrid | reassembly | yes | hybrid reads | hybrid | yes |
@@ -765,7 +766,8 @@ All settings are environment variables read by `config/config.sh` (override them
 | `RUN_PLSMD`, `PLSMD_CMD`, `PLSMD_DB`, `PLSMD_THREADS` | 0, plsMD, empty, `THREADS` | plsMD: command (the Docker wrapper works), PLSDB BLAST index prefix, threads. Needs `ASSEMBLER=unicycler`. |
 | `RUN_PLASBIN_FLOW`, `PLASBIN_FLOW_OUTPUTS_DIR` | 0, empty | Adapt PlasBin-flow output files, one `<sample>.tsv` per sample, from the same assembly. |
 | `RUN_BASELINE_REPLICON`, `REPLICON_ABRICATE_DBS` | 0, plasmidfinder | Replicon-marker baseline and the Abricate databases it searches. |
-| `RUN_GPLAS2_MOB`, `RUN_GPLAS2_EXTERNAL`, `RUN_GENOMAD`, `RUN_PLASME`, `RUN_PLASGRAPH2`, `RUN_RFPLASMID`, `RUN_PLASMIDHUNTER`, `RUN_PLASMER`, `RUN_PLASCOPE` | 0 | Short-read tools, opt-in. |
+| `RUN_GPLAS2_MOB`, `RUN_GPLAS2_EXTERNAL`, `RUN_GENOMAD`, `RUN_PLASME`, `RUN_PLASGRAPH2`, `RUN_RFPLASMID`, `RUN_PLASMIDHUNTER`, `RUN_PLASMER`, `RUN_PLASCOPE`, `RUN_PLASMIDEC` | 0 | Short-read tools, opt-in. |
+| `PLASMIDEC_CMD`, `PLASMIDEC_THREADS`, `PLASMIDEC_MIN_LENGTH`, `PLASMIDEC_CLASSIFIERS` | plasmidEC.sh, `THREADS`, 1000, empty | PlasmidEC: how it is started, threads, the shortest contig it classifies, and (lowercase, comma separated) the classifiers to use instead of its default. Eight species only; others are skipped with a reason. |
 | `RUN_FLYE_MOB_RECON`, `RUN_PLASSEMBLER`, `RUN_HYBRACTER_LONG`, `RUN_HYBRACTER_HYBRID`, `RUN_TRYCYCLER_MOB_RECON` | 0 | Long-read and hybrid tools, opt-in, behind the circularity guard. |
 | `<TOOL>_ALLOW_CIRCULAR_TRUTH` | 0 | Override the circularity guard for one tool (recorded). |
 | `FORCE_RERUN_TOOLS` | 0 | Ignore completed-result markers. |
