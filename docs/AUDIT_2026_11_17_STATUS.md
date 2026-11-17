@@ -49,11 +49,11 @@ The audit (`audit-2026-11-17/AUDIT_REPORT.md`, `ISSUE_REGISTER.tsv`) raised 53 f
 | AU-043 | Low | FIXED | seven dead functions removed; `GPLAS_THREADS` kept (documented as having no effect on gplas) |
 | AU-044 | Low | PARTIAL | 21 subprocess sites bounded; five Popen pipelines and three analysis scripts left |
 | AU-045 | Medium | PARTIAL | `classify_method` is now tested on real cohort tokens against an independent oracle and the cohort count is derived; the ledger and adversarial tests still pin line positions and known optimism |
-| AU-046 | Medium | NOT FIXED | needs real binaries and a scheduled job; not possible here |
+| AU-046 | Medium | PARTIAL | the `test/real_tools/records/` directory the registry points to now exists and says plainly that no record is committed; running each real tool needs the binaries and a scheduled job, which cannot be done here |
 | AU-047 | Low | NOT FIXED | two definitions of gene recovery kept: choosing one changes scientific numbers and needs a decision |
 | AU-048 | Low | NOT FIXED | undefined-handling difference kept: aligning it changes published numbers and needs a decision |
 | AU-049 | Low | FIXED | scores.tsv is truncated in place then appended: a kill mid-merge leaves a partial file.... |
-| AU-050 | Low | NOT FIXED | CI permissions and action pinning need workflow scope on the token |
+| AU-050 | Low | PARTIAL | `docs/ci_hardening.patch` pins every action in `ci.yml` and `release.yml` to a commit SHA and gives `ci.yml` a read-only `permissions` block; it is a patch because a push that edits workflows needs a token with workflow scope. Apply with `git apply docs/ci_hardening.patch` |
 | AU-051 | Medium | NOT FIXED | disclosed in METHODS; a with/without-exclusion report not built |
 | AU-052 | Low | FIXED | intervals for proportions are clipped to [0, 1] (paired differences to [-1, 1]) via `resampling.clamp_interval`; the method itself and its coverage under-run are unchanged and documented in `docs/STATS_VALIDATION.md` |
 | AU-053 | Low | PARTIAL | README states which code built the cohort-1 results; not rebuilt because the sample sheet is not in the folder |
