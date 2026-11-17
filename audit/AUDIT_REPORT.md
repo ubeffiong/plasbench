@@ -22,7 +22,7 @@ The weaknesses that matter for a publication are:
 1. **The headline binning and reassembly endpoints can still be inflated.** Executed: a bin padded with 100 bp that aligns nowhere keeps `lw_bin_f1` = 1.0 and CPRR "correct". The strict columns drop (0.5 precision, 0.667 F1) but do not affect rank (MA-003). On the classification track, F1 stays 1.0 with 5,000 bp of junk (MA-004).
 2. **Zero-plasmid isolates score 0.0, not undefined, for binners** (MA-001, executed).
 3. **Failures and silent failures are not reliably distinguished from "nothing found"** (MA-005, 006, 007, 008; all executed on Linux). The stage reports completion when a sample's job died, records a tool that wrote nothing as `completed`, has no stall detection, and leaves the tool running after SIGINT.
-4. **The web UI has a script-injection path** from crafted folder or cohort names (MA-043, executed in Chrome), and the terminal route runs any command with the token (MA-046, executed). Together they are code execution as the user from a name in a shared folder. Apostrophes in names also break buttons without any attack.
+4. **Web UI security findings (details withheld).** Five findings about the local web window (MA-043, MA-045, MA-046, MA-047, MA-050) were removed from this report and the register; they are handled through the process in `SECURITY.md`. MA-043 is fixed in the follow-up fix PR. A related, non-security usability defect (names containing an apostrophe broke some buttons) is fixed by the same change.
 5. **Sleep or hibernate makes a live run show "interrupted", and Resume then starts a duplicate** (MA-039, executed).
 6. **The only real-data result in the repository predates the independence rule** and rests on 1 of 10 isolates (MA-019).
 7. **Defaults leave leakage and QC non-binding:** `EXCLUDE_DATABASE_OVERLAP=0` with 14 tools lacking release dates (MA-013), and QC mode `report` (MA-011). These are documented choices, but the manuscript run must set them deliberately.
@@ -32,7 +32,7 @@ The weaknesses that matter for a publication are:
 | Architecture | Coherent. Duplicated helpers remain (MA-017, plus the metric-helper duplication listed in the baseline). Report generator is still very large. |
 | Scientific validity | Strong design intent; endpoint loopholes above; several statistical consistency gaps (MA-025 to MA-028). |
 | Computational reliability | Weak on failure states, stall detection, cancel and re-run. |
-| Frontend (web UI) | Feature-rich and loopback-safe, with injection and state-handling defects. |
+| Frontend (web UI) | Feature-rich and loopback-only, with some security and state-handling findings (details withheld; see the register). |
 | Reporting | Good self-containment and no fabricated values found; denominator, missing-vs-zero and accessibility issues. |
 | Publication readiness | **Not ready.** See section 8. |
 
@@ -51,7 +51,7 @@ Carried from the baseline and partly re-confirmed: several matching rules and co
 
 ## 6. Integration map
 Static report path: `plasbench` CLI → `scripts/00..08` → `adapters/` → `python/` → TSVs → `build_html_report.py` + `report_*` → static HTML with lazy iframes.
-Web UI path: `ui.html` control → `fetch /api/<route>` with token → `webui.py` route → `Jobs`/`Terminal`/Git/intake services → detached `jobrunner` → `python -m plasbench` → bash stages → `.log/.pid/.alive/.exit` + `jobs.json` → polling (1 s console, 4 s job list) → UI. Agent-mapped: no UI call to a missing route, no control without a handler; unwired server routes: `runs/forget`, `git/show`, some git ops. I confirmed in Chrome that all 15 sidebar pages open with no console errors.
+Web UI path: `ui.html` control → `fetch /api/<route>` (authenticated) → `webui.py` route → `Jobs`/`Terminal`/Git/intake services → detached `jobrunner` → `python -m plasbench` → bash stages → `.log/.pid/.alive/.exit` + `jobs.json` → polling (1 s console, 4 s job list) → UI. Agent-mapped: no UI call to a missing route, no control without a handler; unwired server routes: `runs/forget`, `git/show`, some git ops. I confirmed in Chrome that all 15 sidebar pages open with no console errors.
 
 ## 7. Answers to the 15 final questions
 1. **Architecturally coherent?** Largely yes. The web UI, CLI and stages share a clean job model. Remaining issues are duplication and the monolithic report generator.
@@ -72,18 +72,34 @@ Web UI path: `ui.html` control → `fetch /api/<route>` with token → `webui.py
 
 ## 8. Remediation roadmap (nothing applied)
 **P0 (scientifically wrong or invalid results, or unsafe):**
-- MA-043: remove inline handlers and unescaped `data-run`; use event listeners and a JSON data island. Complexity S-M. Test: browser case with `a');window.__pwn=1;('` and `O'Neil`.
+- MA-043 (web UI): fixed in the follow-up fix PR. Details withheld.
 - MA-003/004: add an inflation-resistant co-primary or gate and a strict sensitivity row; unify the strict definitions. M. Test: the padded-bin fixture.
 - MA-001: blank metrics on zero-plasmid truth; add a false-positive-bp measure. S. Test: zero-plasmid fixture.
 - MA-005/006/008: per-PID waits, output-validating adapters, signal forwarding to process groups, status row for every unit. M. Test: the fake-binary cases in `TEST_LOG.md` as regression tests.
 - MA-039: re-adopt a job whose heartbeat resumes; refuse Resume while the original pid is alive. S. Test: suspend/resume case.
-**P1:** MA-044/045/046/047/048/049/050 (UI isolation, token handling, path validation, data-dir resolver, gitignore kind, hidden-answer storage); MA-007 stall detection; MA-009/010; MA-013/014/015; MA-019 regenerate the real report; MA-025 to 028; MA-031.
+**P1:** MA-044 to MA-050 (web window isolation and hardening, data-dir resolver, gitignore kind; the security-related ones are withheld, see `SECURITY.md`); MA-007 stall detection; MA-009/010; MA-013/014/015; MA-019 regenerate the real report; MA-025 to 028; MA-031.
 **P2:** MA-011/012 freeze QC thresholds and use enforce; MA-017/018/020/024/029/030/032 to 038; UI progress and states (MA-040/042).
 **P3:** MA-021/022/052/053 and documentation drift.
 **Quick wins (under a day):** MA-001, MA-016 (`is not None`), MA-018, MA-025, MA-028 clamp, MA-048, MA-049, the `.gitignore` kind, apostrophe fix.
 
 ## 9. Target architecture (incremental, preserving what works)
 Keep the three-task scoring design, preregistration lock, run-table checks and detached job runner. Add: (1) a per-run `run.json` and a `units.tsv` with explicit states `queued → running → validating → completed | failed | skipped | cancelled | stalled`, written by the stage scripts and read by the UI (replacing exit-code-only completion); (2) adapters that must produce a sentinel to count as completed; (3) a supervisor in `lib.sh` with per-PID waits, signal forwarding and stall detection from log/output activity; (4) enforce-mode QC and assembly selection for the primary analysis, with thresholds frozen in the preregistration lock; (5) one metrics module and one `number()`; (6) the UI served with no inline handlers, a stricter CSP, a sandboxed or separate-origin report viewer, and the token exchanged without appearing in `argv`; (7) tests: the fake-binary failure cases, a browser smoke test of the page and injection cases, a report DOM-ID and link test, and a runner that tallies failures.
+
+## 9a. Status after the P0 fix PR
+
+The register has a "Status after the P0 fix PR" column. In short:
+
+| Item | Status | Test |
+|---|---|---|
+| MA-001 zero-plasmid bin scores | Fixed: blank, as `docs/METHODS.md` says; isolates with plasmid unchanged | `test_zero_plasmid_bin_scoring.py` |
+| MA-003 padded bins | **Mitigated only.** `lw_bin_f1_strict` is now a rank-sensitivity row. The pre-registered headline (`lw_bin_f1`, CPRR) is unchanged, because gating it changes a frozen endpoint and needs the owner's decision | `test_rank_sensitivity.py` |
+| MA-005 crashed sample jobs (stages 4 and 5) | Fixed: stage keeps the other samples, then fails naming the crashed ones; `ALLOW_CRASHED_SAMPLE_JOBS=1` to continue | `test_stage_failure_visibility.sh` |
+| MA-006 tool exits 0 and writes nothing | Fixed for 8 tools that must create an output directory; the rest already validate | `test_stage_failure_visibility.sh` |
+| MA-008 Ctrl+C orphans | Fixed for the stage scripts (TERM, then KILL after 5 s); the window's own Cancel is unchanged | `test_stage_failure_visibility.sh` |
+| MA-039 sleep then duplicate Resume | Fixed | `test_job_sleep_resume.py` |
+| MA-043 inline-handler quoting in the window | Fixed (details withheld) | `test_webui_inline_handlers.py` |
+
+Each new test was also run against the unfixed code and fails there. Not changed: MA-007 (stall detection), MA-009/010, the leakage and shared-sample defaults, and everything not listed.
 
 ## 10. Open questions and disagreements
 - Whether the primary headline should gate on unaligned sequence is an authors' design decision; the audit shows what the current definition does not penalise.

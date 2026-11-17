@@ -259,6 +259,19 @@ tool_enabled() {
     fi
 }
 
+# run_adapter ADAPTER TOOL_OUTPUT_DIR ARGS... : run an adapter only when the tool actually wrote something into its output directory.
+# The adapters turn "no output found" into an empty prediction (the right answer for a tool that ran and found no plasmid), so a tool that
+# exited 0 after crashing silently, or wrote somewhere else, used to be recorded as "completed" with no plasmids. Exit 3 sends it to the
+# caller's failure branch (status "failed", the reason is in the tool's log) instead.
+run_adapter() {
+    local adapter="$1" out="$2"; shift 2
+    if ! tool_output_present "$out"; then
+        echo "[$adapter] the tool exited 0 but wrote nothing under $out; recording the run as FAILED, not as 'no plasmids found'" >&2
+        return 3
+    fi
+    bash "$ADAPT/$adapter" "$out" "$@"
+}
+
 # -------- one tool, one sample: each of these becomes an independent
 # background job when MAX_PARALLEL_TOOLS > 1, so every variable it uses is
 # either a parameter or something it sets itself -- nothing shared with a
@@ -275,7 +288,7 @@ run_mob_recon() {
             log "  mob_recon ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec mob_recon --infile "$CONTIGS" --outdir "$OUT" --num_threads "$MOB_RECON_THREADS" --force > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_mob_recon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_mob_recon.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "mob_recon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -453,7 +466,7 @@ run_platon() {
             log "  platon ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec platon --db "$PLATON_DB" --threads "$PLATON_THREADS" --output "$OUT" --prefix "$SAMPLE" "$CONTIGS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_platon.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_platon.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "platon failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -476,7 +489,7 @@ run_plasmidspades() {
             log "  plasmidSPAdes ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec plasmidspades.py -1 "$T1" -2 "$T2" -o "$OUT" --threads "$PLASMIDSPADES_THREADS" --memory "$PLASMIDSPADES_MEMORY_GB" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_plasmidspades.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasmidspades.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasmidSPAdes failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -528,7 +541,7 @@ run_genomad() {
             log "  genomad ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec genomad end-to-end --threads "$GENOMAD_THREADS" "$CONTIGS" "$OUT" "$GENOMAD_DB/genomad_db" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_genomad.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_genomad.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "genomad failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -552,7 +565,7 @@ run_plasme() {
             local START; START=$(profile_start)
             if profile_exec PLASMe.py "$CONTIGS" "$OUT/plasme_output.fasta" -d "$PLASME_DB" \
                     -p "$PLASME_PROBABILITY" -t "$PLASME_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_plasme.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasme.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasme failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -585,7 +598,7 @@ run_rfplasmid() {
             local jelly_flag=(); [[ "$RFPLASMID_JELLY" == "1" ]] && jelly_flag=(--jelly)
             if profile_exec rfplasmid --species "$RFPLASMID_SPECIES" --input "$STAGE" --out "$OUT" \
                     --threads "$RFPLASMID_THREADS" "${jelly_flag[@]}" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_rfplasmid.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_rfplasmid.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "rfplasmid failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -610,7 +623,7 @@ run_plasmidhunter() {
             log "  plasmidhunter ($SAMPLE) ..."
             local START; START=$(profile_start)
             if profile_exec plasmidhunter -i "$CONTIGS" -o "$OUT" -c "$PLASMIDHUNTER_THREADS" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_plasmidhunter.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasmidhunter.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasmidhunter failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -643,7 +656,7 @@ run_plasmer() {
             local START; START=$(profile_start)
             if profile_exec Plasmer -g "$CONTIGS" -p "$SAMPLE" -d "$PLASMER_DB" -t "$PLASMER_THREADS" \
                     -m "$PLASMER_MIN_LENGTH" -l "$PLASMER_LENGTH" -o "$OUT" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_plasmer.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plasmer.sh "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $PLASMER_DB" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "plasmer failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -942,10 +955,12 @@ if [[ "${RUN_PLASMER:-0}" -eq 1 ]]; then
     warn_resource_oversubscription "stage 4 (plasmer)" "$(( MAX_PARALLEL_SAMPLES * MAX_PARALLEL_TOOLS ))" "$PLASMER_THREADS" "$PLASMER_MEMORY_GB"
 fi
 
+reset_shard_dir "run_tools_crashed"
+CRASHED_DIR="$(shard_dir "run_tools_crashed")"
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
     job_slot_wait "$MAX_PARALLEL_SAMPLES"
-    process_sample "$SAMPLE" "$ASM" "$SRA" &
+    start_sample_job "$CRASHED_DIR" "$SAMPLE" process_sample "$SAMPLE" "$ASM" "$SRA"
 done < <(read_samples "$SAMPLE_SHEET")
 wait
 
@@ -962,5 +977,8 @@ merge_shards "$STATUS" "$(printf 'sample\ttool\tstatus\tprediction_fasta\treason
 outcome_shards=("${shards[@]/#$STATUS_SHARDS/$OUTCOME_SHARDS}")
 merge_shards "$OUTCOMES" "$(printf 'sample\ttool\tstatus\texit_code\tfailure_class\tattempts')" "${outcome_shards[@]}"
 rm -rf "$STATUS_SHARDS" "$OUTCOME_SHARDS"
+
+# After the merge, so the samples that did finish keep their rows: a sample whose job crashed has none, and that is reported, not hidden.
+report_crashed_sample_jobs "Stage 4 (run tools)" "$CRASHED_DIR"
 
 log "Stage 4 (run tools) complete."

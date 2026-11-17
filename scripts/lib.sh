@@ -61,6 +61,39 @@ valid_sample_id() {
     [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
 }
 
+# True when a tool left something in its output directory. A tool that ran, even one that found no plasmid, writes at least a log or a
+# table there; a directory that is missing or empty means it crashed or wrote somewhere else, which must not be read as "no plasmids".
+tool_output_present() {
+    [[ -d "$1" ]] && [[ -n "$(find "$1" -type f -print -quit 2>/dev/null)" ]]
+}
+
+# --- crash-aware sample jobs ---------------------------------------------
+# A stage runs one background job per sample. `wait` with no arguments returns 0 whatever those jobs did, and a job that dies under
+# `set -e` leaves no row behind, so a crashed sample used to vanish from the results while the stage reported success.
+# start_sample_job runs COMMAND in the background exactly as `COMMAND &` would (a subshell, still under set -e) and, if it exits non-zero
+# for any reason, leaves CRASH_DIR/SAMPLE holding the exit code. report_crashed_sample_jobs reads those once the stage has merged what the
+# other samples produced, so their results are kept, and then fails the stage (or only warns when ALLOW_CRASHED_SAMPLE_JOBS=1).
+start_sample_job() {
+    local crash_dir="$1" sample="$2"; shift 2
+    (
+        trap 'rc=$?; [[ $rc -eq 0 ]] || printf "%s\n" "$rc" > "$crash_dir/$sample" 2>/dev/null' EXIT
+        "$@"
+    ) &
+}
+
+report_crashed_sample_jobs() {
+    local stage="$1" crash_dir="$2" crashed=() f msg
+    for f in "$crash_dir"/*; do [[ -e "$f" ]] && crashed+=("$(basename "$f")"); done
+    rm -rf "$crash_dir"
+    (( ${#crashed[@]} )) || return 0
+    msg="$stage: the job for ${#crashed[@]} sample(s) crashed before it finished: ${crashed[*]}. Their results are MISSING, not zero (see ${LOG_DIR:-the log directory}/run_errors.log and the sample's log)."
+    if [[ "${ALLOW_CRASHED_SAMPLE_JOBS:-0}" == "1" ]]; then
+        warn "$msg Continuing because ALLOW_CRASHED_SAMPLE_JOBS=1."
+    else
+        die "$msg Fix the cause and re-run, or set ALLOW_CRASHED_SAMPLE_JOBS=1 to continue without them."
+    fi
+}
+
 # --- parallel job pool --------------------------------------------------
 # Block until fewer than MAX background jobs of this shell are running, then
 # return so the caller can start one more with `&`. MAX=1 (every stage's
@@ -517,10 +550,40 @@ _plasbench_on_err() {
     _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $(basename "$0") stopped: \`${cmd}\` failed, $(explain_exit "$code") (exit $code, ${src##*/} line $lineno)"
 }
 
+# Every process below $1, children first. Uses ps (procps); where ps cannot report parents (Git Bash), nothing is returned and the caller
+# falls back to this shell's own job list.
+_plasbench_descendants() {
+    local parent="$1" child
+    for child in $(ps -eo pid=,ppid= 2>/dev/null | awk -v p="$parent" '$2 == p { print $1 }'); do
+        _plasbench_descendants "$child"
+        printf '%s\n' "$child"
+    done
+}
+
+# Stop every process this script started (the tool, its wrapper, the profiler, a heartbeat) so Ctrl+C or a scheduler cancel does not leave a
+# tool running with nothing watching it. TERM first, then KILL for anything still alive after a few seconds.
+_plasbench_stop_children() {
+    local pids p waited=0 alive
+    pids="$(_plasbench_descendants "$$")"
+    [[ -n "$pids" ]] || pids="$(jobs -p 2>/dev/null)"
+    [[ -n "$pids" ]] || return 0
+    # shellcheck disable=SC2086
+    kill -TERM $pids 2>/dev/null || true
+    while (( waited < 5 )); do
+        alive=0
+        for p in $pids; do kill -0 "$p" 2>/dev/null && alive=1; done
+        (( alive )) || return 0
+        sleep 1; waited=$(( waited + 1 ))
+    done
+    # shellcheck disable=SC2086
+    kill -KILL $pids 2>/dev/null || true
+}
+
 _plasbench_on_signal() {
     local sig="$1" code="$2"
     trap - "$sig"
     _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $(basename "$0") $(explain_exit "$code")"
+    _plasbench_stop_children
     exit "$code"
 }
 

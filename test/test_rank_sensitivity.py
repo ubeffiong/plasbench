@@ -136,9 +136,10 @@ def main():
         scores = Path(tmp) / "scores.tsv"
         with open(scores, "w", newline="") as handle:
             w = csv.writer(handle, delimiter="\t", lineterminator="\n")
-            w.writerow(["sample", "tool", "analysis_track", "f1", "recall", "strict_precision", "plasmid_recall", "plasmid_recall_ge90", "plasmid_recall_ge50", "lw_bin_f1"])
-            w.writerow(["s1", "tool_short", "short_read", "0.2609", "0.15", "1.0", "0.0", "0.0", "0.0", "0.30"])
-            w.writerow(["s1", "tool_long", "short_read", "0.8571", "0.75", "1.0", "0.0", "0.0", "1.0", "0.20"])
+            w.writerow(["sample", "tool", "analysis_track", "f1", "recall", "strict_precision", "plasmid_recall", "plasmid_recall_ge90", "plasmid_recall_ge50", "lw_bin_f1", "lw_bin_f1_strict"])
+            # tool_short pads its bins with sequence that aligns nowhere: first on the headline lw_bin_f1 (0.30), second once that sequence is charged (strict 0.15).
+            w.writerow(["s1", "tool_short", "short_read", "0.2609", "0.15", "1.0", "0.0", "0.0", "0.0", "0.30", "0.15"])
+            w.writerow(["s1", "tool_long", "short_read", "0.8571", "0.75", "1.0", "0.0", "0.0", "1.0", "0.20", "0.20"])
         prefix = str(Path(tmp) / "out")
         sweep = Path(prefix + ".cprr_threshold_sweep.tsv")
         sweep_rows = [("0.80", "tool_x", 0.5), ("0.80", "tool_y", 0.4), ("0.95", "tool_x", 0.2), ("0.95", "tool_y", 0.3), ("0.99", "tool_x", 0.1), ("0.99", "tool_y", 0.2), ("0.90", "tool_x", 0.3), ("0.90", "tool_y", 0.35)]
@@ -156,6 +157,9 @@ def main():
               and by[("min_length=500", "tool_long")]["mean_value"] == by[("baseline", "tool_long")]["mean_value"])
         check("the headline short-read endpoint is an alternative ranking: tool_short first on lw_bin_f1, tool_long first on the baseline",
               by[("metric:lw_bin_f1", "tool_short")]["rank"] == "1" and by[("baseline", "tool_long")]["rank"] == "1" and by[("metric:lw_bin_f1", "tool_short")]["top_matches_baseline"] == "no")
+        check("padding shows up: tool_short is first on lw_bin_f1 but second on lw_bin_f1_strict, and the strict row says its top differs from the headline row",
+              by[("metric:lw_bin_f1", "tool_short")]["rank"] == "1" and by[("metric:lw_bin_f1_strict", "tool_short")]["rank"] == "2"
+              and by[("metric:lw_bin_f1_strict", "tool_long")]["rank"] == "1")
         check("the 50% recovery band is an alternative ranking", ("metric:plasmid_recall_ge50", "tool_long") in by and by[("metric:plasmid_recall_ge50", "tool_long")]["rank"] == "1")
         check("the baseline-family rows say they are compared with the baseline", all(r["compared_with"] == "baseline" for r in table if not r["variant"].startswith("cprr@")))
         cprr = [r for r in table if r["variant"].startswith("cprr@")]

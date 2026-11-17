@@ -19,10 +19,6 @@ def procs(needle):
         except Exception: pass
     return out
 
-print("== T4a terminal route with token only (no browser):")
-r = call("POST", "terminal/run", {"command": "echo AUDIT_PROBE"})
-print("   ", {k: (str(v)[:80]) for k, v in r.items()})
-
 print("== T4b start 'demo' job, poll state/progress")
 job = call("POST", "jobs", {"argv": ["demo"], "label": "audit demo"})
 jid = job.get("id") or job.get("job", {}).get("id")
