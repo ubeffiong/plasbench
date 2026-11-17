@@ -18,7 +18,9 @@ LABEL org.opencontainers.image.title="PlasBench" \
 COPY --chown=$MAMBA_USER:$MAMBA_USER env/environment.lock.yml /tmp/environment.lock.yml
 # environment.lock.yml is Conda's @EXPLICIT format. Micromamba interprets
 # --file as YAML, so supply the lock's exact package URLs as specifications.
-RUN micromamba create -y -n plasbench $(awk '!/^(@|#|$)/ {print}' /tmp/environment.lock.yml) \
+# The channels are named because newer micromamba images (e147618 and later) resolve each URL as a package spec against the default channel only, so the lock's
+# bioconda packages "do not exist"; with both channels named the exact builds are found, as before.
+RUN micromamba create -y -n plasbench -c conda-forge -c bioconda $(awk '!/^(@|#|$)/ {print}' /tmp/environment.lock.yml) \
     && micromamba clean --all --yes
 
 # MOB-suite pins pandas<=1.5.3 and numpy<1.23.5, which cannot co-exist with the
