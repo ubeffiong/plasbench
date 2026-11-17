@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 174 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
-outputs, 49 run switches, 324 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 176 analysis modules, 27 registered tools and baselines (19 real tools), 201 registered
+outputs, 49 run switches, 326 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -295,6 +295,16 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
   Resource *estimates* for a full run are in the README; a measured pilot on the target hardware is open.
 - **Tests.** `test_performance_summary.py`, `test_thread_budget.sh`, `test_parallel_execution.sh`, `test_assemble_crash_safe.sh`.
 
+### 3.21a Guards on the run tables and on synthetic data
+
+- **What.** Before anything is ranked, `run_consistency.py` checks that the score, status and failure tables describe the same runs: duplicate runs, a completed run with no score and
+  no recorded failure, a score for a sample the status table does not list for a tool it does list (errors that stop aggregation unless `ALLOW_INCONSISTENT_RUNS=1`, when the report
+  carries a banner), and a sample missing from the sheet or a tool the status table does not cover (warnings). A malformed or truncated score table stops with the file, line and
+  value. `data_nature.py` refuses a run that mixes synthetic (`sample_origin = synthetic`) and real samples, and puts a "Demonstration data" banner on an all-synthetic report.
+  `score_bins.py --pred-fasta` also counts the bases of a bin's contigs that align nowhere (`bin_unaligned_bp`, `lw_bin_f1_strict`) beside the headline.
+- **Where.** `python/run_consistency.py`, `data_nature.py`, `score_bins.py`, `aggregate_results.py`, `build_html_report.py`; `docs/INDEPENDENT_VERIFICATION.md` section 12.
+  **Tests.** `test_run_consistency.py`, `test_bin_unaligned.py`.
+
 ### 3.22 Review, evidence and documentation
 
 - **What.** The independent review (`INDEPENDENT_REVIEW.md`, every claim tied to a file and line, with a checking test), the external review log (R1 to R9: who reviewed, what
@@ -352,7 +362,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 6. Every module
 
-174 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+176 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -569,9 +579,11 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `audit_three_class_scoring.py` | One-off three-class scoring audit (Phase E, Part 14 of the sibling-repo |
 | `build_publication_cohort_candidates.py` | Build CANDIDATE ledgers for three published plasmid-reconstruction cohorts. |
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
+| `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
+| `run_consistency.py` | Do the run tables agree before anything is ranked? |
 
 
 ## 7. Every output file and where the report shows it
