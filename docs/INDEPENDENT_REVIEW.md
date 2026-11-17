@@ -423,10 +423,10 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E5 | Scorer CLI default minimum identity is 0 | `python/score_plasmids.py:635` | `--min-alignment-identity` |
 | E6 | Scorer CLI default minimum MAPQ is 0 | `python/score_plasmids.py:637` | `--min-alignment-mapq` |
 | E7 | Scorer CLI default query coverage is 0 | `python/score_plasmids.py:639` | `--min-alignment-query-coverage` |
-| E8 | Pipeline default minimum alignment length is 200 | `config/config.sh:541` | `MIN_ALIGNMENT_LENGTH` |
-| E9 | Pipeline default identity is 0.90 | `config/config.sh:542` | `MIN_ALIGNMENT_IDENTITY` |
-| E10 | Pipeline default MAPQ is 20 | `config/config.sh:543` | `MIN_ALIGNMENT_MAPQ` |
-| E11 | Pipeline default query coverage is 0.20 | `config/config.sh:544` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
+| E8 | Pipeline default minimum alignment length is 200 | `config/config.sh:540` | `MIN_ALIGNMENT_LENGTH` |
+| E9 | Pipeline default identity is 0.90 | `config/config.sh:541` | `MIN_ALIGNMENT_IDENTITY` |
+| E10 | Pipeline default MAPQ is 20 | `config/config.sh:542` | `MIN_ALIGNMENT_MAPQ` |
+| E11 | Pipeline default query coverage is 0.20 | `config/config.sh:543` | `MIN_ALIGNMENT_QUERY_COVERAGE` |
 | E12 | A fixed 0.99995 completeness band | `python/score_plasmids.py:786` | `0.99995` |
 | E13 | Bin purity gate default 0.9 | `python/score_bins.py:369` | `--min-bin-purity` |
 | E14 | Split threshold default 0.1 | `python/score_bins.py:370` | `--split-threshold` |
@@ -437,10 +437,10 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E19 | CPRR minimum identity 0.99 | `config/config.sh:66` | `CPRR_MIN_IDENTITY` |
 | E20 | Interval requires at least five clusters (named MIN_CLUSTERS_CI) | `python/resampling.py:175` | `or len(units) < MIN_CLUSTERS_CI or _has_nan(values)` |
 | E21 | Permutation test requires at least six clusters (FIXED in v0.4.0: was five, which cannot reach p < 0.05; named MIN_CLUSTERS_TEST, exact up to 12) | `python/resampling.py:259` | `or len(units) < MIN_CLUSTERS_TEST or _has_nan(differences)` |
-| E22 | Holm adjustment across pairs | `python/aggregate_results.py:727` | `def holm_adjust` |
-| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:904` | `def attach_significance` |
+| E22 | Holm adjustment across pairs | `python/aggregate_results.py:748` | `def holm_adjust` |
+| E23 | Significance attached to top versus runner-up | `python/aggregate_results.py:925` | `def attach_significance` |
 | E24 | Percentile cluster bootstrap | `python/resampling.py:166` | `def bootstrap_ci` |
-| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:86` | `def sample_clusters` |
+| E25 | Legacy clusters are BioProject or study only | `python/aggregate_results.py:87` | `def sample_clusters` |
 | E26 | Headline clusters merge clonal groups with union-find | `python/headline_design.py:151` | `UnionFind()` |
 | E27 | Headline fell back to all samples when no sample reached the tiers (FIXED in v0.4.0: the primary analysis is reported unavailable and the numbers are provisional) | `python/headline_design.py:101` | `PRIMARY_UNAVAILABLE = "unavailable"` |
 | E28 | Species need 20 clusters to enter the species-balanced mean | `python/headline_design.py:110` | `min_species_clusters=20` |
@@ -457,7 +457,7 @@ Each row names the claim, the file and line (`path:line`), and a short string th
 | E39 | CI installs minimap2 so the aligner test runs for real | `.github/workflows/ci.yml:34` | `apt-get install -y -qq minimap2` |
 | E40 | Base-level metrics valid only without same-read polishing | `python/truth_provenance.py:16` | `base_level_metrics_valid` |
 | E41 | Tool database dates (first row) | `config/tool_database_releases.tsv:2` | `mob_recon` |
-| E42 | Exclusion of possible overlaps is off by default | `config/config.sh:549` | `EXCLUDE_DATABASE_OVERLAP` |
+| E42 | Exclusion of possible overlaps is off by default | `config/config.sh:548` | `EXCLUDE_DATABASE_OVERLAP` |
 | E43 | barrnap is in the environment file | `env/environment.yml:25` | `barrnap` |
 | E44 | minimap2 is a hard requirement of scoring | `scripts/05_score.sh:21` | `need minimap2` |
 | E52 | Unresolvable truth sequences are labelled REVIEW | `python/make_truth.py:50` | `REVIEW = "REVIEW"` |
