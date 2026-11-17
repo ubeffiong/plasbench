@@ -35,5 +35,3 @@ def explain(code) -> str:
         except ValueError:
             return f"stopped by signal {code - 128}"
     return f"failed with exit code {code}"
-
-

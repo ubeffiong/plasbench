@@ -23,6 +23,30 @@ import time
 from pathlib import Path, PureWindowsPath
 
 SECRET_NAME = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|PASS\b", re.I)
+_VAL = r"""(?:"[^"]*"|'[^']*'|[^\s"';&|]+)"""
+_REDACTIONS = [
+    # NAME=value where NAME looks like a credential (export NCBI_API_KEY=..., ZENODO_TOKEN=..., --header style handled below)
+    (re.compile(r"(?i)\b([A-Za-z0-9_.-]*(?:api[_-]?key|token|secret|passw(?:or)?d|passwd|pwd|credential)[A-Za-z0-9_.-]*)(\s*[=:]\s*)" + _VAL), r"\1\2<hidden>"),
+    # --api-key VALUE / --token=VALUE / --password VALUE
+    (re.compile(r"(?i)(--?[A-Za-z0-9_-]*(?:api[_-]?key|token|secret|passw(?:or)?d|passwd|pwd)[A-Za-z0-9_-]*)([ =]+)" + _VAL), r"\1\2<hidden>"),
+    # Authorization / bearer headers
+    (re.compile(r"(?i)\b(authorization\s*:\s*(?:(?:bearer|basic|token)\s+)?)[^\s\"';]+"), r"\1<hidden>"),
+    (re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}"), r"\1<hidden>"),
+    # user:password@ in a URL
+    (re.compile(r"(?<=://)[^/@\s:]+:[^/@\s]+@"), "<hidden>@"),
+    # well-known token shapes anywhere
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,})"), "<hidden>"),
+]
+
+
+def redact_command(text: str) -> str:
+    """Hide keys, tokens and passwords in a typed command before it is written to a log, the terminal history or an exported script."""
+    out = text or ""
+    for rx, repl in _REDACTIONS:
+        out = rx.sub(repl, out)
+    return out
+
+
 MAX_READ = 5 * 2**20          # read at most the last 5 MB of the log
 
 
@@ -36,6 +60,8 @@ class SessionLog:
     def event(self, kind: str, **fields) -> dict:
         rec = {"t": time.strftime("%Y-%m-%d %H:%M:%S"), "session": self.session, "kind": kind}
         rec.update({k: v for k, v in fields.items() if v is not None})
+        if kind == "terminal" and isinstance(rec.get("command"), str):
+            rec["command"] = redact_command(rec["command"])
         try:
             with self.lock:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -131,7 +157,7 @@ class SessionLog:
                 lines.append(f"#   answered: {e.get('answer', '')}")
             elif kind == "terminal":
                 shell, code = e.get("shell", ""), e.get("exit", 0)
-                cmd = e.get("command", "")
+                cmd = redact_command(e.get("command", ""))      # also covers log lines written before commands were redacted
                 lines.append(f"# {when}  terminal ({e.get('shell_label', shell)})" + (f", exit {code}" if code else ""))
                 if shell == "powershell":
                     lines.append(_comment("PowerShell: " + cmd))

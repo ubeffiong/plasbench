@@ -39,13 +39,10 @@ cd "$DEST_PARENT"
 resumable_download "$URL" "$DEST_PARENT/db.tar.gz" "$SIZE" \
     || die "Platon database download did not finish (expected ${SIZE:-unknown} bytes); run 'bash env/download_platon_db.sh' again to continue it"
 [[ -n "$SIZE" ]] && echo "[platon_db] size verified ($SIZE bytes)"
-if [[ -n "${PLATON_DB_SHA256:-}" ]]; then
-    echo "[platon_db] verifying checksum ..."
-    echo "${PLATON_DB_SHA256}  db.tar.gz" | sha256sum -c - || {
-        rm -f db.tar.gz
-        die "downloaded db.tar.gz did not match PLATON_DB_SHA256; refusing to use it"
-    }
-fi
+verify_or_record_download "$DEST_PARENT/db.tar.gz" "$URL" "Platon database" "${PLATON_DB_SHA256:-}" "$DEST_PARENT/download_provenance.jsonl" || {
+    rm -f db.tar.gz
+    die "downloaded db.tar.gz did not match PLATON_DB_SHA256; refusing to use it"
+}
 
 echo "[platon_db] unpacking ..."
 tar -xzf db.tar.gz

@@ -118,6 +118,10 @@ if [[ -n "$MOB_PY" && -x "$MOB_PY" ]]; then
     log "Downloading the MOB-suite archive (resumable) to $ARCHIVE"
     resumable_download "$MIRROR" "$ARCHIVE" \
         || die "the MOB-suite download did not finish; run 'bash env/download_mobsuite_db.sh --yes' again to continue it"
+    verify_or_record_download "$ARCHIVE" "$MIRROR" "MOB-suite database" "${MOBSUITE_DB_SHA256:-}" "$STAGE/../download_provenance.jsonl" || {
+        rm -f "$ARCHIVE"
+        die "the MOB-suite archive did not match MOBSUITE_DB_SHA256; it was deleted and not used"
+    }
     log "Building the MOB-suite database from the downloaded archive (a status line appears every minute after 3 quiet minutes) ..."
     run_with_heartbeat "MOB-suite database index build" env PATH="$MOB_ROOT/bin:$PATH" PLASBENCH_MOB_ARCHIVE="$ARCHIVE" \
         "$MOB_PY" -c '
