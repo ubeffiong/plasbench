@@ -28,6 +28,7 @@ import argparse
 import csv
 import math
 import os
+import sys
 from collections import defaultdict
 from plasbench_common import (  # noqa: E402
     merge_intervals, interval_overlap_bp as overlap, iter_paf, paf_identity, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership, iter_fasta,
@@ -66,22 +67,19 @@ def bin_ambiguity(path, membership, plasmids, chromosomes, min_length=1, min_ide
     if not path:
         return {}
     by_query = defaultdict(lambda: defaultdict(list))
-    with open(path, encoding="utf-8") as handle:
-        for raw in handle:
-            fields = raw.rstrip("\n").split("\t")
-            if len(fields) < 12 or fields[0] not in membership: continue
-            try:
-                qlen = int(fields[1])
-                start, stop = sorted((int(fields[2]), int(fields[3])))
-                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
-            except ValueError: continue
-            identity = matches / block_length if block_length else 0.0
-            query_coverage = abs(stop - start) / qlen if qlen else 0.0
-            if (block_length < min_length or identity < min_identity or mapq < min_mapq
-                    or query_coverage < min_query_coverage): continue
-            target = fields[5]
-            if target in plasmids: by_query[fields[0]]["PLASMID"].append((start, stop))
-            elif target in chromosomes: by_query[fields[0]]["CHROMOSOME"].append((start, stop))
+    # Secondary rows are KEPT here on purpose: this PAF is the all-mapping one and the
+    # secondary placements are exactly what the ambiguity measure counts.
+    for row in iter_paf(path, label="ambiguity PAF"):
+        if row["qname"] not in membership: continue
+        qlen = row["qlen"]
+        start, stop = sorted((row["qstart"], row["qend"]))
+        identity = paf_identity(row["matches"], row["block_length"])
+        query_coverage = abs(stop - start) / qlen if qlen else 0.0
+        if (row["block_length"] < min_length or identity < min_identity or row["mapq"] < min_mapq
+                or query_coverage < min_query_coverage): continue
+        target = row["tname"]
+        if target in plasmids: by_query[row["qname"]]["PLASMID"].append((start, stop))
+        elif target in chromosomes: by_query[row["qname"]]["CHROMOSOME"].append((start, stop))
     by_bin = defaultdict(int)
     for query, types in by_query.items():
         if types["PLASMID"] and types["CHROMOSOME"]:
@@ -409,8 +407,14 @@ def main():
     # scoring), so a short, low-identity, or low-MAPQ placement that the base
     # score discards cannot still count toward bin completeness/purity.
     # Shared reader: a malformed row is dropped, counted and warned about once (AU-021).
+    secondary_ignored = 0
     for paf_row in iter_paf(args.paf, label="bin PAF"):
         if paf_row["qname"] not in membership: continue
+        # Primary-only, as score_plasmids.py: a user-supplied PAF may hold secondary rows
+        # (tp:A:S), which would let a repeat claim bases on several replicons (AU-048).
+        if "tp:A:S" in paf_row["tags"]:
+            secondary_ignored += 1
+            continue
         qname, target = paf_row["qname"], paf_row["tname"]
         qlen, qstart, qend = paf_row["qlen"], paf_row["qstart"], paf_row["qend"]
         start, stop = paf_row["tstart"], paf_row["tend"]
@@ -421,6 +425,12 @@ def main():
                 or mapq < args.min_alignment_mapq or query_coverage < args.min_alignment_query_coverage):
             continue
         bin_id = membership[qname]
+        # Same rule as score_plasmids.py: a target length that disagrees with the truth means
+        # the PAF was made against a different reference, so refuse rather than score it (AU-048).
+        truth_length = plasmids.get(target, chromosomes.get(target))
+        if truth_length is not None and paf_row["tlen"] != truth_length:
+            raise ValueError(f"PAF target length for '{target}' ({paf_row['tlen']}) disagrees with truth "
+                             f"({truth_length})")
         if target in plasmids:
             identity_counts[(bin_id, target)][0] += matches
             identity_counts[(bin_id, target)][1] += block_length
@@ -428,6 +438,9 @@ def main():
             query_aligned[qname].append((max(0, min(qstart, qend)), min(qlen, max(qstart, qend))))
         if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
         elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
+    if secondary_ignored:
+        sys.stderr.write(f"[score_bins] ignored {secondary_ignored} secondary alignment row(s) (tp:A:S) "
+                         f"in {args.paf}; scoring is primary-only.\n")
     overlaps = {key: merge(value) for key, value in plasmid_intervals.items()}
     plasmid_bp = defaultdict(int)
     for (bin_id, _), bp in overlaps.items(): plasmid_bp[bin_id] += bp

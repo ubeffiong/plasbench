@@ -26,7 +26,7 @@ import os
 import statistics
 import sys
 from collections import defaultdict
-from plasbench_common import number  # noqa: E402
+from plasbench_common import number, iter_fasta  # noqa: E402
 
 PAIR_FIELDS = ("analysis_track", "sample", "tool", "n_runs", "identical_scores", "f1_min", "f1_max", "f1_range",
                "f1_sd", "identical_predictions", "status")
@@ -49,17 +49,7 @@ def fasta_digest(run_dir, sample, tool):
     path = os.path.join(run_dir, sample, f"pred_{tool}.plasmid.fasta")
     if not os.path.isfile(path):
         return None
-    records, name, seq = [], None, []
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            if line.startswith(">"):
-                if name is not None:
-                    records.append((name, "".join(seq).upper()))
-                name, seq = line[1:].split()[0] if line[1:].split() else "", []
-            else:
-                seq.append(line.strip())
-    if name is not None:
-        records.append((name, "".join(seq).upper()))
+    records = [(name, sequence.upper()) for name, _, sequence in iter_fasta(path)]  # shared reader (AU-021)
     digest = hashlib.sha256()
     for record in sorted(records):
         digest.update(repr(record).encode())

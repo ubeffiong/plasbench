@@ -54,7 +54,7 @@ from plasbench_common import interval_overlap_bp as overlap_bp, merge_intervals 
 
 
 from plasbench_common import read_truth_table as read_truth  # noqa: E402,F401  (moved to the shared module)
-from plasbench_common import read_fasta_length_map, paf_identity  # noqa: E402
+from plasbench_common import read_fasta_length_map, paf_identity, iter_paf  # noqa: E402
 
 
 def read_fasta_lengths(path):
@@ -99,84 +99,65 @@ def parse_paf_intervals(path, truth, pred_lengths, min_length=1, min_identity=0.
     if os.path.getsize(path) == 0:
         return covered, sum(pred_lengths.values()), 0, 0, counters, covered_by_query
 
-    with open(path) as fh:
-        for line_number, line in enumerate(fh, start=1):
-            if not line.strip():
-                continue
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12:
+    # Shared strict reader (AU-021): a short or non-integer row raises ValueError, as before.
+    # The reader parses every row, so a secondary row (tp:A:S) with damaged numbers now
+    # raises too instead of being skipped unread; valid input is scored identically.
+    for row in iter_paf(path, strict=True):
+        # The scoring PAF is produced with --secondary=no, so it should hold no
+        # secondary rows. A user-supplied PAF might; counting them would let a
+        # repeat claim bases on several replicons, which the primary-only rule
+        # exists to prevent. Primary rows (tp:A:P) and inversions (tp:A:I) are
+        # kept: a chimeric query legitimately contributes every one of its pieces.
+        if "tp:A:S" in row["tags"]:
+            counters["secondary_alignment_ignored"] += 1
+            continue
+        qname, qlen, qstart, qend = row["qname"], row["qlen"], row["qstart"], row["qend"]
+        tname, tlen, tstart, tend = row["tname"], row["tlen"], row["tstart"], row["tend"]
+        matches, block_length, mapq = row["matches"], row["block_length"], row["mapq"]
+        if min_contig_length and qlen < min_contig_length:
+            # Predicted record below the minimum contig length: treated as not
+            # predicted (the caller drops it from pred_lengths too).
+            continue
+        if qname not in pred_lengths:
+            raise ValueError(f"PAF query '{qname}' is absent from --pred-fasta")
+        if qlen != pred_lengths[qname]:
+            raise ValueError(
+                f"PAF query length for '{qname}' ({qlen}) disagrees with FASTA "
+                f"({pred_lengths[qname]})"
+            )
+        counters["alignment_total"] += 1
+        identity = paf_identity(matches, block_length)
+        query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
+        if (block_length < min_length or identity < min_identity or mapq < min_mapq
+                or query_coverage < min_query_coverage):
+            counters["filtered_alignment_count"] += 1
+            continue
+        counters["alignment_retained"] += 1
+        # Only keep alignments to sequences we actually have truth for.
+        if tname in truth:
+            truth_length = truth[tname][1]
+            if tlen != truth_length:
                 raise ValueError(
-                    f"PAF line {line_number} has {len(f)} columns; expected at least 12"
+                    f"PAF target length for '{tname}' ({tlen}) disagrees with truth "
+                    f"({truth_length})"
                 )
-            # PAF mandatory columns (0-based indices):
-            # 0 qname 1 qlen 2 qstart 3 qend 4 strand
-            # 5 tname 6 tlen 7 tstart 8 tend 9 matches 10 blocklen 11 mapq
-            # The scoring PAF is produced with --secondary=no, so it should hold no
-            # secondary rows. A user-supplied PAF might; counting them would let a
-            # repeat claim bases on several replicons, which the primary-only rule
-            # exists to prevent. Primary rows (tp:A:P) and inversions (tp:A:I) are
-            # kept: a chimeric query legitimately contributes every one of its pieces.
-            if "tp:A:S" in f[12:]:
-                counters["secondary_alignment_ignored"] += 1
-                continue
-            qname = f[0]
-            try:
-                qlen = int(f[1])
-                qstart = int(f[2])
-                qend = int(f[3])
-                tname = f[5]
-                tlen = int(f[6])
-                tstart = int(f[7])
-                tend = int(f[8])
-                matches = int(f[9])
-                block_length = int(f[10])
-                mapq = int(f[11])
-            except ValueError as exc:
-                raise ValueError(f"PAF line {line_number} has invalid integer coordinates") from exc
-            if min_contig_length and qlen < min_contig_length:
-                # Predicted record below the minimum contig length: treated as not
-                # predicted (the caller drops it from pred_lengths too).
-                continue
-            if qname not in pred_lengths:
-                raise ValueError(f"PAF query '{qname}' is absent from --pred-fasta")
-            if qlen != pred_lengths[qname]:
-                raise ValueError(
-                    f"PAF query length for '{qname}' ({qlen}) disagrees with FASTA "
-                    f"({pred_lengths[qname]})"
-                )
-            counters["alignment_total"] += 1
-            identity = paf_identity(matches, block_length)
-            query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
-            if (block_length < min_length or identity < min_identity or mapq < min_mapq
-                    or query_coverage < min_query_coverage):
-                counters["filtered_alignment_count"] += 1
-                continue
-            counters["alignment_retained"] += 1
-            # Only keep alignments to sequences we actually have truth for.
-            if tname in truth:
-                truth_length = truth[tname][1]
-                if tlen != truth_length:
-                    raise ValueError(
-                        f"PAF target length for '{tname}' ({tlen}) disagrees with truth "
-                        f"({truth_length})"
-                    )
-                if tend < tstart:
-                    tstart, tend = tend, tstart
-                tstart = max(0, min(tstart, truth_length))
-                tend = max(0, min(tend, truth_length))
-                covered[tname].append((tstart, tend))
-                covered_by_query[tname].append((qname, tstart, tend))
-                if qend < qstart:
-                    qstart, qend = qend, qstart
-                qstart = max(0, min(qstart, qlen))
-                qend = max(0, min(qend, qlen))
-                query_covered[qname].append((qstart, qend))
-            else:
-                if qend < qstart:
-                    qstart, qend = qend, qstart
-                qstart = max(0, min(qstart, qlen))
-                qend = max(0, min(qend, qlen))
-                query_off_truth[qname].append((qstart, qend))
+            if tend < tstart:
+                tstart, tend = tend, tstart
+            tstart = max(0, min(tstart, truth_length))
+            tend = max(0, min(tend, truth_length))
+            covered[tname].append((tstart, tend))
+            covered_by_query[tname].append((qname, tstart, tend))
+            if qend < qstart:
+                qstart, qend = qend, qstart
+            qstart = max(0, min(qstart, qlen))
+            qend = max(0, min(qend, qlen))
+            query_covered[qname].append((qstart, qend))
+        else:
+            if qend < qstart:
+                qstart, qend = qend, qstart
+            qstart = max(0, min(qstart, qlen))
+            qend = max(0, min(qend, qlen))
+            query_off_truth[qname].append((qstart, qend))
 
     if counters["secondary_alignment_ignored"]:
         sys.stderr.write(
@@ -216,27 +197,18 @@ def ambiguous_query_bp(path, truth, pred_lengths, min_length, min_identity, min_
     if os.path.getsize(path) == 0:
         return 0
     by_query = defaultdict(lambda: defaultdict(list))
-    with open(path) as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 12:
-                raise ValueError(f"ambiguity PAF line {line_number} has fewer than 12 columns")
-            qname, target = fields[0], fields[5]
-            try:
-                qlen, qstart, qend = int(fields[1]), int(fields[2]), int(fields[3])
-                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
-            except ValueError as exc:
-                raise ValueError(f"ambiguity PAF line {line_number} has invalid coordinates") from exc
-            if qname not in pred_lengths or qlen != pred_lengths[qname] or target not in truth:
-                continue
-            query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
-            if (block_length < min_length or (matches / block_length if block_length else 0.0) < min_identity
-                    or mapq < min_mapq or query_coverage < min_query_coverage):
-                continue
-            qstart, qend = sorted((max(0, min(qstart, qlen)), max(0, min(qend, qlen))))
-            by_query[qname][truth[target][0]].append((qstart, qend))
+    for row in iter_paf(path, strict=True, label="ambiguity PAF"):
+        qname, target, qlen = row["qname"], row["tname"], row["qlen"]
+        qstart, qend = row["qstart"], row["qend"]
+        matches, block_length, mapq = row["matches"], row["block_length"], row["mapq"]
+        if qname not in pred_lengths or qlen != pred_lengths[qname] or target not in truth:
+            continue
+        query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
+        if (block_length < min_length or paf_identity(matches, block_length) < min_identity
+                or mapq < min_mapq or query_coverage < min_query_coverage):
+            continue
+        qstart, qend = sorted((max(0, min(qstart, qlen)), max(0, min(qend, qlen))))
+        by_query[qname][truth[target][0]].append((qstart, qend))
     return sum(
         overlap_bp(merge_intervals(types["PLASMID"])[0], merge_intervals(types["CHROMOSOME"])[0])
         for types in by_query.values() if types["PLASMID"] and types["CHROMOSOME"]

@@ -34,7 +34,7 @@ import subprocess
 import sys
 from collections import defaultdict
 from statistics import median
-from plasbench_common import subprocess_timeout  # noqa: E402
+from plasbench_common import subprocess_timeout, iter_paf  # noqa: E402
 
 FIELDS = ["sample", "tool", "analysis_track", "true_plasmid", "bin_id", "pcn_pred", "pcn_truth", "log2_ratio", "status"]
 SPADES = re.compile(r"length_(\d+)_cov_([0-9.eE+-]+)")
@@ -143,14 +143,12 @@ def matches_from_paf(path, bins, plasmids):
             member[s] = b
             member[normalise_id(s)] = b
     bp = defaultdict(int)
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12 or f[5] not in plasmids:
-                continue
-            b = member.get(f[0]) or member.get(normalise_id(f[0]))
-            if b:
-                bp[(b, f[5])] += abs(int(f[3]) - int(f[2]))
+    for row in iter_paf(path, label="copy-number PAF"):
+        if row["tname"] not in plasmids:
+            continue
+        b = member.get(row["qname"]) or member.get(normalise_id(row["qname"]))
+        if b:
+            bp[(b, row["tname"])] += abs(row["qend"] - row["qstart"])
     best = {}
     for (b, p), n in bp.items():
         if n > 0 and (b not in best or n > best[b][1] or (n == best[b][1] and p < best[b][0])):

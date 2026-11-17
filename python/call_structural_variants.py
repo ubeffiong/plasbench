@@ -53,6 +53,7 @@ Standard library only.
 
 import argparse
 import csv
+from plasbench_common import iter_paf  # noqa: E402
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -84,28 +85,23 @@ def truth_lengths(path):
 def read_paf(path, truth, thresholds):
     """Retain primary, confidently-mapped blocks against labelled references."""
     blocks = []
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 12 or fields[5] not in truth:
-                continue
-            try:
-                block = {
-                    "record_id": fields[0], "query_length": int(fields[1]),
-                    "query_start": int(fields[2]), "query_end": int(fields[3]),
-                    "strand": fields[4], "target": fields[5],
-                    "target_start": int(fields[7]), "target_end": int(fields[8]),
-                    "matches": int(fields[9]), "block_length": int(fields[10]),
-                    "mapq": int(fields[11]),
-                }
-            except ValueError:
-                continue
-            if block["block_length"] < thresholds["min_block_length"]:
-                continue
-            if block["mapq"] < thresholds["min_mapq"]:
-                continue
-            block["molecule_type"] = truth[block["target"]]["molecule_type"]
-            blocks.append(block)
+    for row in iter_paf(path, label="structural-variant PAF"):
+        if row["tname"] not in truth:
+            continue
+        block = {
+            "record_id": row["qname"], "query_length": row["qlen"],
+            "query_start": row["qstart"], "query_end": row["qend"],
+            "strand": row["strand"], "target": row["tname"],
+            "target_start": row["tstart"], "target_end": row["tend"],
+            "matches": row["matches"], "block_length": row["block_length"],
+            "mapq": row["mapq"],
+        }
+        if block["block_length"] < thresholds["min_block_length"]:
+            continue
+        if block["mapq"] < thresholds["min_mapq"]:
+            continue
+        block["molecule_type"] = truth[block["target"]]["molecule_type"]
+        blocks.append(block)
     return blocks
 
 
