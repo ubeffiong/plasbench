@@ -1,0 +1,61 @@
+sample	run	organism	status	note	pairs_in_prefix	median_read_length	mean_quality	q20_fraction	q30_fraction	gc_percent	n_fraction	adapter_fraction	duplication_fraction	pair_mismatch_fraction
+acinetobacter_baumannii_samn53393083	SRR36192521	Acinetobacter baumannii	measured		60000	151	35.7917	0.969051	0.943498	40.0515	1.33006e-05	0	0.01345	0
+acinetobacter_pittii_samn26198448	SRR18507778	Acinetobacter pittii	measured		60000	298	33.9677	0.928246	0.836596	39.2994	4.11228e-05	0	0.00213333	0
+acinetobacter_sp_samn10163184	SRR8179072	Acinetobacter sp. FDAARGOS_560	measured		60000	151	39.3356	0.981834	0.955486	38.7289	0.000206788	0.0147667	0.282617	0
+aeromonas_sp_samn52392035	SRR36137142		skipped	HTTPError: HTTP Error 403: Forbidden										
+agrobacterium_tumefaciens_samn16357217	SRR12827773		skipped	IncompleteRead: IncompleteRead(2183672 bytes read, 12496392 more expected)										
+bacillus_anthracis_samn22566405	SRR16572037	Bacillus anthracis	measured		60000	251	35.2379	0.912721	0.883138	35.0667	0	0.0163167	6.66667e-05	0
+bacillus_cereus_samn50033524	SRR34591634	Bacillus cereus	measured		60000	150	39.4938	0.991792	0.974518	35.2725	4.29823e-06	0	0.0426333	0
+bacillus_thuringiensis_samn40300947	SRR28262560	Bacillus thuringiensis	measured		60000	251	35.9806	0.973778	0.92627	36.1051	8.63319e-05	0	0.00116667	0
+bradyrhizobium_sp_samn53214506	SRR36097092	Bradyrhizobium sp. T-1	measured		60000	151	37.3957	0.962099	0.872774	63.7747	2.72075e-05	0.0484833	0.0279833	0
+campylobacter_coli_samea122715352	ERR17325308		skipped	HTTPError: HTTP Error 403: Forbidden										
+campylobacter_jejuni_samd00620736	DRR482492	Campylobacter jejuni	measured		60000	151	30	1	1	32.397	0	0.214833	0.119333	0
+citrobacter_freundii_samn53300907	SRR36093606	Citrobacter freundii	measured		60000	150	35.2993	0.961028	0.903752	52.0302	1.23889e-05	0.0245833	0.121517	0
+citrobacter_portucalensis_samea118770133	ERR15422820	Citrobacter portucalensis	measured		60000	150	36.5716	0.932177	0.836617	53.4528	4.3e-05	0.46935	0.00298333	0
+citrobacter_sp_samn04014998	SRR3112298		skipped	IncompleteRead: IncompleteRead(519672 bytes read, 14160392 more expected)										
+clostridium_botulinum_samn60897769	SRR39277795	Clostridium botulinum	measured		60000	301	34.8519	0.946165	0.874452	32.2992	0.00124166	0	0.00118333	0
+enterobacter_asburiae_samn51335570	SRR35395863	Enterobacter asburiae	measured		60000	151	33.8972	0.9511	0.904295	54.3665	0.000366609	0	0.00656667	0
+enterobacter_cloacae_samn51215377	SRR35295335	Enterobacter cloacae	measured		60000	151	33.6384	0.934019	0.896489	53.3102	2.92034e-05	0	0.0058	0
+enterobacter_hormaechei_samn51335550	SRR35395876	Enterobacter hormaechei	measured		60000	243	35.1375	0.9279	0.893264	54.4265	0	0	0.000566667	0
+enterobacter_kobei_samn51335571	SRR35395862	Enterobacter kobei	measured		60000	151	33.4662	0.936026	0.885038	54.2373	0.000352507	0	0.00443333	0
+enterobacter_roggenkampii_samn51335575	SRR35395858	Enterobacter roggenkampii	measured		60000	151	33.1286	0.929417	0.864055	55.5185	3.50861e-06	0	0.00353333	0
+enterococcus_faecalis_samn46230707	SRR31974501	Enterococcus faecalis	measured		60000	214	35.4728	0.924923	0.868692	37.6936	0.00023595	0	0.00435	0
+enterococcus_faecium_samn48144078	SRR36372736	Enterococcus faecium	measured		60000	151	37.466	0.976543	0.97163	37.581	0.000238445	0	0.00166667	0
+enterococcus_sp_samn16255563	SRR30299624	Enterococcus sp. MSG3310	measured		60000	151	35.1942	0.959862	0.896349	38.7589	1.19757e-05	0.00765	0.0394	0
+escherichia_coli_samn50713113	SRR35156819	Escherichia coli	measured		60000	151	38.751	0.984016	0.933924	50.8134	1.43488e-06	0.04345	0.0834333	0
+escherichia_fergusonii_samn16357201	SRR12825878	Escherichia fergusonii	measured		60000	151	32.8181	0.879032	0.717012	49.7197	1.84879e-05	0.00198333	0.0272167	0
+klebsiella_aerogenes_samn53177123	SRR36382651		skipped	not a plain two-file paired run at the ENA										
+klebsiella_grimontii_samn53300895	SRR36093633		skipped	HTTPError: HTTP Error 403: Forbidden										
+klebsiella_michiganensis_samn53177115	SRR36382660		skipped	not a plain two-file paired run at the ENA										
+klebsiella_oxytoca_samea118770132	ERR15422819		skipped	IncompleteRead: IncompleteRead(111672 bytes read, 14568392 more expected)										
+klebsiella_pneumoniae_samn53300893	SRR36093637	Klebsiella pneumoniae	measured		60000	150	35.215	0.958455	0.899725	57.3563	3.55556e-06	0.0537833	0.126917	0
+klebsiella_quasipneumoniae_samn53177102	SRR36382665		skipped	not a plain two-file paired run at the ENA										
+klebsiella_variicola_samn50713136	SRR35156788	Klebsiella variicola	measured		60000	151	38.6051	0.981588	0.926626	57.1526	4.96689e-07	0.0242667	0.0788333	0
+lacticaseibacillus_paracasei_samd01591446	DRR702374	Lacticaseibacillus paracasei	measured		60000	167	34.9239	0.945282	0.881103	46.1362	0.00190503	0	0.0133667	0
+lactiplantibacillus_plantarum_samn48667494	SRR33779932		skipped	error: Error -3 while decompressing data: incorrect header check										
+lactococcus_lactis_samn43929237	SRR34591821	Lactococcus lactis	measured		60000	159	32.4084	0.949687	0.889104	38.9443	2.04403e-06	0.0461	0.174333	0
+listeria_monocytogenes_samn54750457	SRR36896724	Listeria monocytogenes	measured		60000	151	37.3014	0.99247	0.979871	37.9856	0.000495716	0	0.00123333	0
+moraxella_bovis_samn21405638	SRR16089761		skipped	TimeoutError: The read operation timed out										
+neisseria_gonorrhoeae_samn04875542	SRR4123931	Neisseria gonorrhoeae	measured		60000	101	33.7882	0.937255	0.861373	49.9777	3.29208e-05	0.00015	0.0002	0
+pantoea_agglomerans_samn45893328	SRR31812282		skipped	HTTPError: HTTP Error 403: Forbidden										
+pasteurella_multocida_samn53536558	SRR36273494	Pasteurella multocida	measured		60000	151	35.2591	0.960543	0.900962	39.3555	7.83664e-06	0.000716667	0.0748833	0
+photobacterium_damselae_samn61297174	SRR40881678		skipped	IncompleteRead: IncompleteRead(335672 bytes read, 14344392 more expected)										
+pseudomonas_aeruginosa_samn53177101	SRR36382666		skipped	not a plain two-file paired run at the ENA										
+pseudomonas_sp_samn43145720	SRR32164072	Pseudomonas sp. Pseusp18	measured		60000	151	33.4446	0.936616	0.886155	59.3229	5.13245e-06	0.121317	0.00535	0
+pseudomonas_syringae_samn50736749	SRR36530844		skipped	HTTPError: HTTP Error 403: Forbidden										
+ralstonia_pseudosolanacearum_samd01229226	DRR667535	Ralstonia pseudosolanacearum	measured		60000	150	35.0906	0.956709	0.891393	66.4281	2.44444e-06	0.000783333	0.0926167	0
+rhizobium_leguminosarum_samn04457358	SRR3151553	Rhizobium leguminosarum	measured		60000	100	31.7895	0.890752	0.806888	60.3245	1.64167e-05	0.0105667	0.000433333	0
+salmonella_enterica_samn51024918	SRR35249808	Salmonella enterica subsp. enterica serovar Paratyphi B var. L(+) tartrate +	measured		60000	149	33.613	0.952981	0.888138	52.0097	0.000158796	0	0.00991667	0
+serratia_marcescens_samn52755113	SRR35798388		skipped	not a plain two-file paired run at the ENA										
+shigella_flexneri_samn48035617	SRR33210435	Shigella flexneri	measured		60000	151	35.6708	0.971333	0.92271	50.0938	4.06733e-05	0.01115	0.0762333	0
+shigella_sonnei_samn44789773	SRR31441128		skipped	not a plain two-file paired run at the ENA										
+staphylococcus_aureus_samea122657418	ERR18006682	Staphylococcus aureus	measured		60000	101	37.7937	0.977871	0.961177	34.6517	8.02101e-05	0	0.0008	0
+staphylococcus_capitis_samn28561908	SRR26146660	Staphylococcus capitis	measured		60000	151	30	1	1	41.7229	4.4702e-05	0.655433	0.0324167	0
+staphylococcus_epidermidis_samn52956272	SRR35902847	Staphylococcus epidermidis	measured		60000	151	39.0568	0.987299	0.950579	32.3643	4.42949e-07	0.04765	0.108633	0
+streptomyces_anulatus_samn30553307	SRR21428592		skipped	IncompleteRead: IncompleteRead(1183673 bytes read, 13496391 more expected)										
+streptomyces_sp_samn53096257	SRR36114699		skipped	IncompleteRead: IncompleteRead(111670 bytes read, 14568394 more expected)										
+xanthomonas_axonopodis_samn56511363	SRR37629062	Xanthomonas axonopodis pv. nakataecorchori	measured		60000	150	39.4235	0.993261	0.970337	64.4036	0.000114125	0.00716667	0.03385	0
+xanthomonas_citri_samn47254618	SRR32606334	Xanthomonas citri pv. fuscans	measured		60000	125	32.4813	0.889298	0.806911	63.7272	1.33333e-07	0.0347167	0.00045	0
+xylella_fastidiosa_samn53374526	SRR36215779		skipped	not a plain two-file paired run at the ENA										
+yersinia_pestis_samn47876430	SRR35131091	Yersinia pestis	measured		60000	175	33.4639	0.906251	0.818726	47.8066	0.00280671	0	0.00991667	0
+yersinia_pseudotuberculosis_samn10228561	SRR8283091	Yersinia pseudotuberculosis	measured		60000	151	36.1068	0.924873	0.841619	47.5256	2.49448e-05	0.00595	0.0290167	0

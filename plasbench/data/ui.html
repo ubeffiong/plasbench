@@ -736,6 +736,12 @@ body.gd-open #gdrawer{transform:none}
       <div class="field"><label for="st_name">Name</label><div class="ctl"><input type="text" id="st_name" placeholder="cohort1"></div><div class="help">Letters, digits, '.', '_' or '-'.</div></div>
       <div class="field"><label for="st_note">Note</label><div class="ctl"><input type="text" id="st_note" placeholder="What this study is for (optional)"></div></div>
      </div><div class="ft"><button class="btn" id="st_create"><svg class="ico sm"><use href="#i-plus"/></svg>Create study</button></div></div>
+     <div class="card"><div class="hd"><h3>Import a study</h3></div><div class="bd">
+      <p class="mut small" style="margin-top:0">Bring in a study bundle (a <code>.zip</code> made by <b>Manage &rarr; Export</b>) from another computer or an earlier time. It becomes a new study; nothing is overwritten.</p>
+      <div class="row"><input type="text" id="si_path" placeholder="D:\bundles\cohort1.zip" aria-label="Study bundle"><button class="btn sec sm" data-browse="si_path">Browse</button></div>
+      <div class="field" style="margin-top:8px"><label for="si_name">Name (optional)</label><div class="ctl"><input type="text" id="si_name" placeholder="the name inside the bundle"></div></div>
+     </div><div class="ft"><button class="btn" id="si_go"><svg class="ico sm"><use href="#i-plus"/></svg>Import study</button></div></div>
+     <div class="card" id="sa_card" hidden><div class="hd"><h3>Archived studies</h3><span class="sub" id="sa_n"></span></div><div class="bd" id="sa_list"></div></div>
     </div>
    </div>
   </section>
@@ -743,8 +749,8 @@ body.gd-open #gdrawer{transform:none}
   <!-- VERSION CONTROL ----------------------------------------------------------------------------- -->
   <section class="view" id="v_git" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Advanced</div><h1>Version control</h1>
-    <p>Git without the command line, for your <b>runs</b>: <b>each study is its own repository</b>, with the study's
-    record, sample sheets, settings, result tables, reports, figures and logs, its own history and its own remote. The PlasBench program itself is not tracked
+    <p>Git without the command line, for your <b>runs</b>: <b>one repository in the working directory</b>, holding every study's
+    record, sample sheets, settings, result tables, reports, figures and logs, with one history and one remote. The PlasBench program itself is not tracked
     here, because updates replace it. A managed <code>.gitignore</code> keeps raw sequence data (reads, assemblies,
     FASTA, alignments), tmp folders and credentials out. Every commit is checked for data, secrets and files too large
     for GitHub before it is made, and nothing is ever force-pushed.</p></div>
@@ -2102,9 +2108,9 @@ const PAGE_HELP = {
 },
 "git": {
 "title": "Version control",
-"what": "Git without the command line, for your <b>runs</b>. <b>Each study is its own repository</b>: its record (study.json), sample sheets, settings, result tables, reports, figures and logs, with its own history and its own remote. The PlasBench program itself is not tracked, because updates replace it.",
+"what": "Git without the command line, for your <b>runs</b>. <b>One repository, in the working directory</b>: every study's record (study.json), sample sheets, settings, result tables, reports, figures and logs, with one history and one remote. The PlasBench program itself is not tracked, because updates replace it.",
 "steps": [
-"Choose the study at the top (the list shows which are tracked). If it is not tracked yet, press <b>Initialise repository</b>; it writes the managed runs .gitignore first, keeping raw sequence data (reads, assemblies, FASTA, alignments), tmp folders and credentials out. The Git button on a study (Workspace &amp; studies, or the side panel's Studies tab) does the same.",
+"The first choice at the top is the <b>Working directory</b>, where <code>git init</code> lives. If it is not tracked yet, press <b>Initialise repository</b>; it writes the managed runs .gitignore first, keeping raw sequence data (reads, assemblies, FASTA, per-sample folders, alignments), tmp folders and credentials out. A study that already has a repository of its own is still listed, and is left out of the working-directory one. The Git button on a study (Workspace &amp; studies, or the side panel's Studies tab) opens this repository.",
 "The first time, enter your name and email under Identity and press Save. Commits need them.",
 "The changes list shows new and modified run files. Click one to see its diff. Press <b>Stage all</b>, or select files and press <b>Stage selected</b>.",
 "Write a short message (which runs, and why) and press <b>Commit</b>. The commit is checked first for raw data, secrets (such as the NCBI API key), patient identifiers and files too large for GitHub.",
@@ -2997,14 +3003,15 @@ async function loadWorkspace(force) {
       <div class="row wrap small mut" style="margin-top:6px;gap:16px">${w.available ? `<span class="ok-t">${icon("check")} available</span>` : `<span class="bad-t">${icon("x")} not available: connect the drive, or choose another folder</span>`}
        <span>${esc(w.kind_label)}</span><span>${fmtGB(w.free)} free</span></div>
       ${w.env_override ? `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>PLASBENCH_WORKSPACE is set in the environment, which wins over the choice saved here.</div></div>` : ""}`;
-    $("#ws_n").textContent = `${w.studies.length} in this workspace`;
+    $("#ws_n").textContent = `${w.studies.length} in this workspace`; loadArchived();
     $("#ws_tb").innerHTML = w.studies.map(st => {
       const run = (S.runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, ""));
       const idx = run ? S.runs.indexOf(run) : -1;
-      return `<tr><td><b class="mono">${esc(st.name)}</b>${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}</td>
+      return `<tr><td><b class="mono">${esc(st.name)}</b>${(st.tags || []).map(t => ` <span class="tag">${esc(t)}</span>`).join("")}${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}${st.cloned_from ? `<div class="mut small">copied from ${esc(st.cloned_from)}</div>` : ""}${st.imported_from ? `<div class="mut small">imported (was ${esc(st.imported_from)})</div>` : ""}</td>
         <td class="small">${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "–"))}</td><td>${st.runs}</td><td class="small">${fmtTime(st.modified)}</td>
         <td style="text-align:right;white-space:nowrap">${st.report && idx >= 0 ? `<a class="btn sec sm" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">Report</a>` : ""}
           <button class="btn ghost sm" onclick="benchStudy(${jsq(st.name)})">Run in this study</button>
+          <button class="btn ghost sm" onclick="manageStudy(${jsq(st.name)})" title="Notes and tags, rename, copy, export, archive, delete">Manage</button>
           <button class="btn ghost icon sm" title="${st.tracked ? "Tracked with Git: open its version control" : "Track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}" onclick="gitStudy(${jsq(st.path)})">${icon("git")}</button>
           <button class="btn ghost icon sm" title="Open the study folder" onclick="reveal(${jsq(st.path)})">${icon("folder")}</button></td></tr>`; }).join("")
       || `<tr><td colspan="5" class="mut">No studies yet. Start one from <a href="#wizard">New benchmark</a>, or create one on the right.</td></tr>`;
@@ -3034,6 +3041,71 @@ $("#ws_use").onclick = async () => {
 };
 $("#ws_recent").onclick = e => { const b = e.target.closest("[data-wsr]"); if (b) { $("#ws_path").value = b.dataset.wsr; $("#ws_check").click(); } };
 $("#ws_ref").onclick = async () => { await getRuns(true); loadWorkspace(true); };
+
+/* study management: notes and tags, rename, clone, export, archive, delete (with what it removes shown first), import, restore */
+const fmtGBytes = n => n < 1048576 ? (n / 1024).toFixed(0) + " KB" : n < 1073741824 ? (n / 1048576).toFixed(1) + " MB" : (n / 1073741824).toFixed(2) + " GB";
+window.manageStudy = async name => {
+  const st = (S.ws?.studies || []).find(s => s.name === name); if (!st) return;
+  const d = document.createElement("dialog"); d.className = "card"; d.style.cssText = "max-width:640px;width:94vw;padding:0;border:1px solid var(--line)";
+  d.innerHTML = `<div class="hd">${icon("folder", "ico")}<h3>Manage study <span class="mono">${esc(name)}</span></h3></div><div class="bd">
+    <div class="field"><label for="sm_note">Note</label><div class="ctl"><input type="text" id="sm_note" value="${esc(st.note || "")}" maxlength="2000"></div></div>
+    <div class="field"><label for="sm_tags">Tags</label><div class="ctl"><input type="text" id="sm_tags" value="${esc((st.tags || []).join(", "))}" placeholder="comma separated, e.g. real data, paper"></div>
+      <div class="help"><button class="btn sec sm" data-sm="meta" style="margin-top:6px">Save note and tags</button></div></div>
+    <hr style="border:0;border-top:1px solid var(--line-2);margin:12px 0">
+    <div class="field"><label for="sm_new">Rename or copy as</label><div class="ctl"><input type="text" id="sm_new" placeholder="new-name"></div>
+      <div class="help"><button class="btn sec sm" data-sm="rename">Rename</button> <button class="btn sec sm" data-sm="clone">Copy (same sample sheet, no results)</button>
+        <label class="small" style="margin-left:8px"><input type="checkbox" id="sm_cres"> copy results too</label></div></div>
+    <div class="field"><label>Export</label><div class="help" style="margin-top:0">A zip with the study's record, tables and reports (no per-sample data) to move it or keep it.
+      <button class="btn sec sm" data-sm="export">Export</button> <label class="small" style="margin-left:8px"><input type="checkbox" id="sm_xres"> include all results</label></div></div>
+    <hr style="border:0;border-top:1px solid var(--line-2);margin:12px 0">
+    <div class="field"><label>Archive</label><div class="help" style="margin-top:0">Moves the study out of the list into <code>.archive</code>. Nothing is deleted; restore it any time.
+      <button class="btn sec sm" data-sm="archive">Archive</button></div></div>
+    <div class="note bad" id="sm_del" style="display:block;margin-top:10px"><div><b>Delete for good</b> <span class="mut small" id="sm_facts">(counting what it holds…)</span><br>
+      <span class="small">It does not go to the recycle bin. Type the study's name to confirm.</span>
+      <div class="row" style="margin-top:6px"><input type="text" id="sm_confirm" placeholder="${esc(name)}" aria-label="Type the study name"><button class="btn sm" data-sm="delete" id="sm_delbtn" disabled style="background:var(--bad)">Delete</button></div></div></div>
+    <p id="sm_err" class="bad-t small" style="margin:8px 0 0" role="alert"></p></div>
+    <div class="ft"><button class="btn ghost" data-c>Close</button></div>`;
+  const close = () => { d.close(); d.remove(); };
+  d.onclick = async ev => {
+    if (ev.target.closest("[data-c]")) return close();
+    const b = ev.target.closest("[data-sm]"); if (!b) return;
+    const act = b.dataset.sm, err = $("#sm_err", d); err.textContent = "";
+    try {
+      if (act === "meta") { await api("studies/meta", {name, note: $("#sm_note", d).value, tags: $("#sm_tags", d).value.split(",")}); toast("Saved", "ok"); }
+      else if (act === "rename") { await api("studies/rename", {name, new_name: $("#sm_new", d).value.trim()}); toast("Renamed", "ok"); close(); }
+      else if (act === "clone") { await api("studies/clone", {name, new_name: $("#sm_new", d).value.trim(), with_results: $("#sm_cres", d).checked}); toast("Copied", "ok"); close(); }
+      else if (act === "export") { const r = await api("studies/export", {name, with_results: $("#sm_xres", d).checked}); toast(`Exported ${r.files} files (${fmtGBytes(r.bytes)})`, "ok"); reveal(r.path); }
+      else if (act === "archive") { await api("studies/archive", {name}); toast("Archived: restore it from Archived studies", "ok"); close(); }
+      else if (act === "delete") { const r = await api("studies/delete", {name, confirm: $("#sm_confirm", d).value}); toast(`Deleted ${name} (${r.files} files)`, "ok"); close(); }
+      S.runs = null; await getRuns(true).catch(() => {}); await loadWorkspace(true); if (window.loadPanelStudies) loadPanelStudies();
+    } catch (e) { err.textContent = e.message; }
+  };
+  d.oninput = ev => { if (ev.target.id === "sm_confirm") $("#sm_delbtn", d).disabled = ev.target.value.trim() !== name; };
+  d.oncancel = () => d.remove();
+  document.body.append(d); d.showModal();
+  try { const f = await api(`studies/facts?name=${encodeURIComponent(name)}`);
+    $("#sm_facts", d).textContent = `It holds ${f.files}${f.capped ? "+" : ""} file${f.files === 1 ? "" : "s"}, ${fmtGBytes(f.bytes)}, ${f.runs} run${f.runs === 1 ? "" : "s"}${f.report ? ", a report" : ""}${f.tracked ? ", its own git history" : ""}.`;
+  } catch (e) { $("#sm_facts", d).textContent = ""; }
+};
+async function loadArchived() {
+  try {
+    const a = (await api("studies/archived")).archived;
+    $("#sa_card").hidden = !a.length; $("#sa_n").textContent = a.length ? `${a.length}` : "";
+    $("#sa_list").innerHTML = a.map(x => `<div class="row" style="justify-content:space-between;gap:8px;padding:4px 0"><span><b class="mono">${esc(x.name)}</b> <span class="mut small">${esc(x.archived ? fmtTime(Date.parse(x.archived) / 1000) : "")}</span>${x.note ? `<div class="mut small">${esc(x.note)}</div>` : ""}</span>
+      <button class="btn sec sm" data-restore="${esc(x.archive)}">Restore</button></div>`).join("");
+  } catch (e) { /* no archive yet */ }
+}
+$("#sa_list").onclick = async e => {
+  const b = e.target.closest("[data-restore]"); if (!b) return;
+  try { const r = await api("studies/restore", {archive: b.dataset.restore}); toast(`Restored as ${r.path.split(/[\\/]/).pop()}`, "ok"); await loadWorkspace(true); }
+  catch (err) { toast(err.message, "bad"); }
+};
+$("#si_go").onclick = async () => {
+  const path = $("#si_path").value.trim(); if (!path) return toast("Enter or browse to a study bundle (.zip)", "bad");
+  try { const r = await api("studies/import", {path, new_name: $("#si_name").value.trim()}); toast(`Imported ${r.path.split(/[\\/]/).pop()}`, "ok"); $("#si_path").value = $("#si_name").value = ""; await loadWorkspace(true); }
+  catch (e) { toast(e.message, "bad"); }
+};
+
 $("#ws_reveal").onclick = () => S.ws && reveal(S.ws.path);
 $("#st_create").onclick = async () => {
   try { const r = await api("studies/create", {name: $("#st_name").value.trim(), note: $("#st_note").value.trim()});
@@ -3066,17 +3138,16 @@ async function loadGit() {
     if (!st.installed) {
       $("#g_stats").innerHTML = ""; $("#g_body").innerHTML = `<div class="note warn">${icon("alert", "ico")}<div>Git is not installed. Install it from <a href="https://git-scm.com/" target="_blank" rel="noopener">git-scm.com</a>, then reopen this page.</div></div>`; return;
     }
-    if (!st.is_repo && st.is_workspace) {
+    if (!st.is_repo && !st.is_workspace && !st.choices.some(c => c.kind === "program" && c.path === st.repo)) {
       $("#g_stats").innerHTML = "";
-      $("#g_body").innerHTML = `<div class="note info">${icon("info", "ico")}<div><b>Each study is its own repository.</b> ${st.choices.some(c => c.kind === "study")
-        ? "Choose a study above to track it." : `There are no studies yet. Start one from <a href="#wizard">New benchmark</a> or <a href="#workspace">Workspace &amp; studies</a>, then come back to track it.`}</div></div>`;
+      $("#g_body").innerHTML = `<div class="note info">${icon("info", "ico")}<div><b>Git lives in the working directory.</b> This study is covered by the working-directory repository: choose <b>Working directory: all studies</b> above${st.choices.some(c => c.kind === "workspace" && c.tracked) ? "" : " and initialise it there"}.</div></div>`;
       return;
     }
     if (!st.is_repo) {
       $("#g_stats").innerHTML = "";
-      $("#g_body").innerHTML = `<div class="split"><div class="card"><div class="hd"><h3>Track this study</h3></div><div class="bd">
-        <p style="margin-top:0">The study <b class="mono">${esc(st.repo.split(/[\\/]/).pop())}</b> is not a git repository yet. Each study is its own repository, with its own history and remote. Initialising adds the PlasBench <b>runs</b> <code>.gitignore</code> first:
-        each study's <code>study.json</code>, tables, reports, figures and logs are tracked; reads, assemblies, FASTA, alignments, tmp folders and credentials are not.</p>
+      $("#g_body").innerHTML = `<div class="split"><div class="card"><div class="hd"><h3>Track the working directory</h3></div><div class="bd">
+        <p style="margin-top:0">The working directory <b class="mono">${esc(st.repo)}</b> holds every study and is not a git repository yet. <b>Git lives here</b>: one repository, with one history and one remote for all your studies. Initialising adds the PlasBench <b>runs</b> <code>.gitignore</code> first:
+        each study's <code>study.json</code>, tables, reports, figures and logs are tracked; reads, assemblies, FASTA, per-sample folders, alignments, tmp folders and credentials are not. A study that already has a repository of its own keeps it and is left out of this one.</p>
         <div class="field"><label>Branch</label><div class="ctl"><input type="text" id="gi_branch" value="main"></div></div>
         <div class="field"><label>First commit</label><div class="ctl"><label class="switch"><input type="checkbox" id="gi_first"><span></span></label></div><div class="help">Commit what is here now (after the safety checks).</div></div></div>
         <div class="ft"><button class="btn" id="gi_go">Initialise repository</button></div></div>
@@ -3245,9 +3316,9 @@ async function loadDrawer(quiet) {
   $("#gd_repo").onchange = async e => { G.repo = e.target.value; GD.files = null; GD.diff = null; await api("git", {op: "repo_set", repo: G.repo}).catch(err => toast(err.message, "bad")); refreshGit(); };
   if (!st.installed) { $("#gd_body").innerHTML = `<div class="sec small" style="padding:10px">Git is not installed. Install it from <a href="https://git-scm.com/" target="_blank" rel="noopener">git-scm.com</a>.</div>`; return; }
   if (!st.is_repo) { $("#gd_body").innerHTML = `<div class="sec small" style="padding:10px">${st.is_workspace
-      ? (st.choices.some(c => c.kind === "study") ? "Each study is its own repository: choose a study above." : `No studies yet. Start one from <a href="#wizard">New benchmark</a>.`)
-      : `This study is not tracked yet. <button class="btn sm" id="gd_init" style="margin-top:6px">Track this study with Git</button>`}</div>`;
-    if ($("#gd_init")) $("#gd_init").onclick = () => gitOp({op: "init", branch: "main", first_commit: false}, "Study is now tracked");
+      ? `The working directory is not tracked yet. Git lives here, for all your studies. <button class="btn sm" id="gd_init" style="margin-top:6px">Track the working directory with Git</button>`
+      : `This folder is covered by the working-directory repository: choose <b>Working directory: all studies</b> above.`}</div>`;
+    if ($("#gd_init")) $("#gd_init").onclick = () => gitOp({op: "init", branch: "main", first_commit: false}, "The working directory is now tracked");
     return; }
   // keep sections' open/closed state and scroll position across refreshes
   const keepOpen = id => { const el = $("#" + id); return el ? el.open : (gdState(id) ?? ["gd_changes", "gd_commit"].includes(id)); };

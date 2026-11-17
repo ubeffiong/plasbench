@@ -1246,6 +1246,12 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "workspace/check":
                 from . import workspace
                 return self.jsend(200, workspace.check(q.get("path", "")))
+            if route == "studies/facts":           # what a delete or archive would involve, shown before the user confirms
+                from . import study_manage
+                return self.jsend(200, study_manage.facts(project.root, q.get("name", "")))
+            if route == "studies/archived":
+                from . import study_manage
+                return self.jsend(200, {"archived": study_manage.list_archived(project.root)})
             if route == "jobs":
                 return self.jsend(200, {"jobs": jobs.list()})
             if route == "run-sessions":
@@ -1463,6 +1469,39 @@ def make_handler(project: Project, jobs: Jobs):
                 folder = studies.create(project.root, data.get("name", ""), data.get("note", ""))
                 session_log().event("study_created", path=str(folder))
                 return self.jsend(200, {"path": str(folder)})
+            if route.startswith("studies/") and route[len("studies/"):] in ("meta", "rename", "clone", "archive", "restore", "delete", "export", "import"):
+                from . import study_manage as sm, studies, __version__
+                action, name = route[len("studies/"):], (data.get("name") or "").strip()
+
+                def busy():          # a run in progress that was started in this study
+                    if action in ("restore", "import", "export", "meta", "clone"):
+                        return False
+                    here = str(Path(studies.workspace(project.root)) / name).lower()
+                    for j in jobs.list():
+                        if j["state"] in ("running", "cancelling") and (here in (j.get("command") or "").lower() or f"--study {name}".lower() in (j.get("command") or "").lower()
+                                                                          or f"--study={name}".lower() in (j.get("command") or "").lower()):
+                            return True
+                    return False
+                if action == "meta":
+                    out = sm.update_meta(project.root, name, data.get("note"), data.get("tags"))
+                elif action == "rename":
+                    out = {"path": str(sm.rename(project.root, name, data.get("new_name", ""), busy()))}
+                elif action == "clone":
+                    out = {"path": str(sm.clone(project.root, name, data.get("new_name", ""), bool(data.get("with_results"))))}
+                elif action == "archive":
+                    out = {"path": str(sm.archive(project.root, name, busy()))}
+                elif action == "restore":
+                    out = {"path": str(sm.restore(project.root, data.get("archive", "")))}
+                elif action == "delete":
+                    out = sm.delete(project.root, name, data.get("confirm", ""), busy())
+                elif action == "export":
+                    stamp = time.strftime("%Y%m%d-%H%M%S")
+                    target = Path(studies.workspace(project.root)) / ".exports" / f"{studies.valid_name(name)}-{stamp}.zip"
+                    out = sm.export_bundle(project.root, name, target, bool(data.get("with_results")), __version__)
+                else:
+                    out = {"path": str(sm.import_bundle(project.root, Path(data.get("path", "")).expanduser(), (data.get("new_name") or "").strip() or None))}
+                session_log().event("study_" + action, study=name)
+                return self.jsend(200, out)
             if route == "runs/add":
                 folder = Path(data.get("path", "")).expanduser()
                 if not folder.is_dir():
@@ -1499,20 +1538,23 @@ def make_handler(project: Project, jobs: Jobs):
             return [project.root, studies.workspace(project.root)]
 
         def git_choices(self) -> dict:
-            """Version control tracks your runs, one repository per STUDY: each study folder in the workspace is offered,
-            newest first, marked tracked or not. The PlasBench program folder is listed only when it already is a git
-            checkout of its own (a developer's copy)."""
+            """Version control tracks your runs in ONE repository in the working directory (the workspace that holds every
+            study): that is the first choice, marked tracked or not. A study that already has a repository of its own is
+            still offered (marked); a study without one is covered by the working-directory repository. The PlasBench
+            program folder is listed only when it already is a git checkout of its own (a developer's copy)."""
             from . import studies
-            choices = [{"label": f"Study: {st['name']}" + ("" if (Path(st["path"]) / ".git").exists() else "  (not tracked yet)"),
-                        "path": st["path"], "kind": "study", "tracked": (Path(st["path"]) / ".git").exists()}
-                       for st in studies.list_studies(project.root)]
+            ws = studies.workspace(project.root)
+            choices = [{"label": "Working directory: all studies" + ("" if (ws / ".git").exists() else "  (not tracked yet)"),
+                        "path": str(ws), "kind": "workspace", "tracked": (ws / ".git").exists()}]
+            choices += [{"label": f"Study with its own repository: {st['name']}", "path": st["path"], "kind": "study", "tracked": True}
+                        for st in studies.list_studies(project.root) if (Path(st["path"]) / ".git").exists()]
             if (project.root / ".git").exists():
                 choices.append({"label": "PlasBench program (developer checkout)", "path": str(project.root), "kind": "program"})
             return {"choices": choices, "workspace": str(studies.workspace(project.root))}
 
         def git_repo(self, requested=None):
-            """The repository the Git page works on: the request's, else the saved one, else the most recent study (each
-            study is its own repository), else the workspace (which then shows "no studies yet").
+            """The repository the Git page works on: the request's, else the saved one, else the working directory (the
+            workspace that holds every study, where `git init` lives).
             Always inside the PlasBench folder or the workspace (gitops.valid_repo)."""
             from . import gitops
             from . import studies
@@ -1521,12 +1563,10 @@ def make_handler(project: Project, jobs: Jobs):
             saved = load_state().get("git_repo")
             if saved and not Path(saved).is_dir():
                 saved = None
-            recent = next(iter(studies.list_studies(project.root)), None)
-            chosen = requested or saved or (recent["path"] if recent else str(ws))
-            # a saved choice of the program folder that is not a checkout, or of the workspace itself, moves to a study
-            if not requested and (Path(chosen).resolve() == project.root.resolve() and not (project.root / ".git").exists()
-                                  or Path(chosen).resolve() == ws.resolve()) and recent:
-                chosen = recent["path"]
+            chosen = requested or saved or str(ws)
+            # a saved choice of the program folder that is not a checkout moves to the working directory
+            if not requested and Path(chosen).resolve() == project.root.resolve() and not (project.root / ".git").exists():
+                chosen = str(ws)
             try:
                 return gitops.valid_repo(chosen, self.git_roots())
             except ValueError:
@@ -1548,10 +1588,11 @@ def make_handler(project: Project, jobs: Jobs):
                 from . import studies
                 ws = Path(os.path.realpath(studies.workspace(project.root)))
                 here = Path(os.path.realpath(repo))
-                if here.parent != ws:
-                    raise ValueError("Version control is for your runs, one repository per study: start it in a study "
-                                     f"folder (a folder inside {ws}), not in the workspace itself or the PlasBench program "
-                                     "folder, which updates replace.")
+                if here != ws:
+                    where = ("a study is covered by the working-directory repository: start it in the working directory "
+                             f"({ws}) and every study is tracked there" if here.parent == ws else
+                             "the PlasBench program folder is replaced by updates and is not tracked here")
+                    raise ValueError("Version control is for your runs, in one repository in the working directory: " + where + ".")
                 return gitops.init(repo, body.get("branch") or "main", bool(body.get("first_commit")),
                                    body.get("message") or "Track PlasBench runs", kind="runs")
             if op == "identity":

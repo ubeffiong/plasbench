@@ -1,19 +1,22 @@
-# Short-read QC thresholds (python/short_read_qc.py). PROVISIONAL: conservative starting points, not universal cut-offs.
+# Short-read QC thresholds (python/short_read_qc.py). FROZEN on 17 November 2026 from real data; see docs/THRESHOLD_FREEZE.md for the evidence and the pilot table.
 #
-# Set them from pilot data on the intended sequencing platform and organisms, then mark every row `frozen` and record the
-# file's hash (it is written to every QC row as thresholds_sha) BEFORE the main benchmark is run. Do not tune them against
-# which tool wins. direction min: the metric must not fall below the limit; max: must not rise above it.
+# How they were set: the read-level measures (quality, Q30, read length, adapters, N, duplication, pair synchrony) were measured on the first read pairs of 40 real runs of
+# public-v4 (python/qc_pilot.py, docs/validation/short_read_qc_pilot.tsv, one isolate per species, chosen by position in the cohort's balanced order, never by any tool's
+# result); read pairs, depth and read length also against the ENA read counts of the 7,129 public-v4 runs that resolved (cohorts/candidates/contributed-refseq-sra/public-v4.precheck.tsv).
+# One value was changed by the pilot, before freezing: adapter_fraction has no reject limit (see its row). Do not change a frozen row after tools have been scored: a changed
+# file has a different hash (written to every QC row as thresholds_sha), so results made before and after a change are not comparable.
+# direction min: the metric must not fall below the limit; max: must not rise above it.
 # warn: the sample proceeds, flagged. reject: the sample is excluded from the primary benchmark when SHORT_READ_QC_MODE=enforce.
 # A blank reject means there is no rejection limit for that metric. Integrity failures (unreadable, truncated, empty, malformed
 # FASTQ, unequal read counts) always reject and are not listed here.
 metric	direction	warn	reject	status	rationale
-read_pairs	min	100000	10000	provisional	Fewer pairs cannot cover a bacterial genome at useful depth.
-estimated_depth_x	min	30	10	provisional	Uses the genome size given, or 5 Mb when not given (flagged genome_size_assumed). Plasmid recovery needs depth beyond the chromosome's.
-mean_quality	min	28	20	provisional	Mean Phred of the sampled bases.
-q30_fraction	min	0.75	0.50	provisional	Share of bases at Q30 or better.
-median_read_length	min	70	35	provisional	Median over the shorter mate; very short reads assemble poorly.
-adapter_fraction	max	0.10	0.50	provisional	Reads carrying an adapter: stage 3 trims them, so only a large share is a concern.
-duplication_fraction	max	0.50	0.90	provisional	Read with caution: very high depth also duplicates reads.
-n_fraction	max	0.01	0.10	provisional	Share of N bases.
-pair_mismatch_fraction	max	0	0.001	provisional	Read names that disagree between R1 and R2 at the same position: the files are out of sync.
-gc_deviation	max	0.10	0.20	provisional	Absolute GC difference from the expected organism GC; only evaluated when --expected-gc is given.
+read_pairs	min	100000	10000	frozen	Fewer pairs cannot cover a bacterial genome at useful depth. Of the 7,129 public-v4 runs that resolved, 4 (0.06%) are under the warn limit (median 2.0 million pairs); none of the 7,867 candidates fell under the reject limit.
+estimated_depth_x	min	30	10	frozen	Uses the genome size given, or 5 Mb when not given (flagged genome_size_assumed). Plasmid recovery needs depth beyond the chromosome's. Of the 7,129 resolved public-v4 runs, 136 (1.9%) are under the warn limit (median 139x); 9 of the 7,867 candidates (0.1%) fell under the reject limit.
+mean_quality	min	28	20	frozen	Mean Phred of the sampled bases. 40 real runs: minimum 30, median 35, so neither limit fired.
+q30_fraction	min	0.75	0.50	frozen	Share of bases at Q30 or better. 40 real runs: minimum 0.72, 5th percentile 0.81, median 0.89; the warn limit flagged 1 of 40 and the reject limit none.
+median_read_length	min	70	35	frozen	Median over the shorter mate; very short reads assemble poorly. 40 real runs: 100 to 301, median 151; of the 7,129 resolved public-v4 runs 7 (0.1%) are under the warn limit and none of the 7,867 candidates under the reject limit.
+adapter_fraction	max	0.10		frozen	Reads carrying an adapter: stage 3 trims them, so an adapter share is a signal, not a reason to discard. 40 real runs: median 0.1%, but 4 above 10% (12%, 21%, 47%, 66%), all with good quality (Q30 0.84 to 1.0), and the old reject limit of 0.50 would have excluded one of them for something trimming removes. The reject limit was therefore removed before freezing; the warn limit stays.
+duplication_fraction	max	0.50	0.90	frozen	Read with caution: very high depth also duplicates reads. 40 real runs: maximum 0.28, median 0.01; neither limit fired.
+n_fraction	max	0.01	0.10	frozen	Share of N bases. 40 real runs: maximum 0.0028; neither limit fired.
+pair_mismatch_fraction	max	0	0.001	frozen	Read names that disagree between R1 and R2 at the same position: the files are out of sync. An integrity check: 40 real runs had none, and any mismatch is a defect, so a warn limit of 0 is right.
+gc_deviation	max	0.10	0.20	frozen	Absolute GC difference from the expected organism GC. INERT by default: the pipeline passes no expected GC, so this row never fires. It is frozen as written and is NOT backed by the pilot (one isolate per species gives no within-species spread); supply --expected-gc only if you accept these limits unvalidated.

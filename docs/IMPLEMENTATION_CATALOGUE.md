@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 182 analysis modules, 28 registered tools and baselines (20 real tools), 210 registered
-outputs, 53 run switches, 340 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 183 analysis modules, 28 registered tools and baselines (20 real tools), 210 registered
+outputs, 53 run switches, 342 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -187,8 +187,12 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
   silently substituted. An assembly outside the eligible size range is marked ineligible and its samples are skipped with the reason. Outputs: `assembly_candidates.tsv`;
   report section *Assembly selection*.
 - **Assembly adequacy** (`assembly_adequacy.py`) separates "the assembly never contained the plasmid" from "the tool failed to find it".
-- **Tests.** `test_short_read_qc.py`, `test_short_read_qc_stage.sh`, `test_assembly_selection.py`, `test_assembly_selection_stage.sh`, `test_assembly_adequacy.py`.
-- **Limits.** The QC thresholds are provisional and not platform-specific; they are frozen before a main run and their file hash is stored in every row. Running every tool on
+- **Frozen thresholds** (`docs/THRESHOLD_FREEZE.md`). The ten short-read QC limits were frozen on 17 November 2026 from a real-read pilot (`qc_pilot.py`: the first read pairs of 40 real runs of
+  public-v4, `docs/validation/short_read_qc_pilot.tsv`) and the ENA read counts of 7,129 runs; the file hash `0727af448900` is stored in every QC row. One value changed before freezing
+  (`adapter_fraction` lost its reject limit: adapters are trimmed, and a good run had 66%). The assembly size limit (8.5 Mb) and GC spread limit (0.12) are frozen unchanged, with their evidence.
+  Not frozen, with the reason: `MIN_ASSEMBLY_ADEQUACY` and the candidate-multiplicity limits need a real multi-tool run; `gc_deviation` is inert by default and not backed by the pilot.
+- **Tests.** `test_short_read_qc.py`, `test_short_read_qc_stage.sh`, `test_assembly_selection.py`, `test_assembly_selection_stage.sh`, `test_assembly_adequacy.py`, `test_threshold_freeze.py`.
+- **Limits.** The QC thresholds are not platform-specific (the pilot is Illumina paired reads from public runs). Running every tool on
   every alternative assembly is a separate run per condition (3.5).
 
 ### 3.10 Candidate multiplicity: when a tool reports several sequences for one plasmid
@@ -268,8 +272,12 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 - **What.** `plasbench ui` opens a local window (own browser profile, session key) to configure and run a benchmark, see what is already installed (databases, data, study
   folders), follow and resume runs that survive disconnects, edit `.gitignore`, set the leakage cutoff, check for updates and upgrade in one click, and read cohort details and help.
   A desktop icon launches it. Runs are sessions that can be listed, followed, resumed and reopened.
-- **Where.** `plasbench/` (`webui.py`, `appwindow.py`, `desktop.py`, `jobrunner.py`, `runprogress.py`, `updatecheck.py`, `studies.py`, `workspace.py`); PRs #46, #47, #51, #72, #83, #86, #88, #89, #92, #96.
-  **Tests.** `test_webui.py`, `test_job_survival.py`, `test_update_check.py`, `test_desktop_window.py`, `test_workspace_studies.py`.
+- **Studies and the working directory.** Every benchmark is a study folder in the working directory (`studies.py`, `workspace.py`): a validated workspace picker with recent folders, a lazy folder tree in the
+  side panel, and `git init` in the **working directory** (one repository for all studies, with a managed ignore block that reaches into every study; a study with a repository of its own is left out).
+  `study_manage.py` adds notes and tags, rename, copy, archive and restore (nothing is deleted), delete with the files and bytes shown first and the study's name typed back, and zip bundles with a
+  manifest and checksums (import refuses path traversal, oversized bundles and damaged files). Design ideas follow GenoSuv's working folder; rename, copy, archive and bundles go beyond it.
+- **Where.** `plasbench/` (`webui.py`, `appwindow.py`, `desktop.py`, `jobrunner.py`, `runprogress.py`, `updatecheck.py`, `studies.py`, `study_manage.py`, `workspace.py`, `gitops.py`); PRs #46, #47, #51, #72, #83, #86, #88, #89, #92, #96.
+  **Tests.** `test_webui.py`, `test_job_survival.py`, `test_update_check.py`, `test_desktop_window.py`, `test_workspace_studies.py`, `test_study_manage.py`.
 
 ### 3.19 Installation, environments and databases
 
@@ -363,7 +371,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 6. Every module
 
-182 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+183 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -589,6 +597,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
 | `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
+| `qc_pilot.py` | A short-read QC pilot on real reads: the first part of each run's paired FASTQ files, measured with short_read_qc.py. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
 

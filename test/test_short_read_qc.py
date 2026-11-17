@@ -114,8 +114,8 @@ try:
           and "(reject)" in low["reasons"], low)
     a_warn = run(tmp, "a_warn", small, *pair(tmp, "a_warn", adapter=0.25))
     a_rej = run(tmp, "a_rej", small, *pair(tmp, "a_rej", adapter=0.80))
-    check("adapters in a quarter of reads: WARN; in most reads: REJECT", a_warn["qc_status"] == "WARN" and a_rej["qc_status"] == "REJECT"
-          and float(a_rej["adapter_fraction"]) > 0.5, (a_warn["reasons"], a_rej["reasons"]))
+    check("adapters in a quarter of reads: WARN; even in most reads: WARN, never REJECT (stage 3 trims them; the 17 November pilot found good runs with 47% and 66%)",
+          a_warn["qc_status"] == "WARN" and a_rej["qc_status"] == "WARN" and float(a_rej["adapter_fraction"]) > 0.5 and "(reject)" not in a_rej["reasons"], (a_warn["reasons"], a_rej["reasons"]))
     dup = run(tmp, "dup", small, *pair(tmp, "dup", same=True))
     check("every pair identical: duplication REJECT", dup["qc_status"] == "REJECT" and "duplication_fraction" in dup["reasons"], dup)
     nn = run(tmp, "nn", small, *pair(tmp, "nn", n_frac=0.2))
@@ -175,8 +175,9 @@ try:
     check("every threshold row names a metric the gate actually measures (a typo would silently never apply)",
           {t["metric"] for t in qc.read_thresholds(qc.DEFAULT_THRESHOLDS)[0]} <= measured,
           {t["metric"] for t in qc.read_thresholds(qc.DEFAULT_THRESHOLDS)[0]} - measured)
-    check("the shipped thresholds parse, are marked provisional and have a hash",
-          len(th) == 10 and policy == "provisional" and len(sha) == 12 and all(t["status"] == "provisional" for t in th))
+    check("the shipped thresholds parse, are frozen (every row) and have a hash",
+          len(th) == 10 and policy == "frozen" and len(sha) == 12 and all(t["status"] == "frozen" for t in th))
+    check("adapter_fraction has a warn limit and no reject limit", [(t["warn"], t["reject"]) for t in th if t["metric"] == "adapter_fraction"] == [("0.10", "")])
     check("shipped thresholds have a documented rationale per row",
           all(len(line.split(TAB)) == 6 and line.split(TAB)[5].strip() for line in open(qc.DEFAULT_THRESHOLDS, encoding="utf-8")
               if line.strip() and not line.startswith("#") and not line.startswith("metric")))
