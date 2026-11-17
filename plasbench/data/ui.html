@@ -816,6 +816,8 @@ body.gd-open #gdrawer{transform:none}
    <div class="card" id="sesscard" style="margin-bottom:14px"><div class="hd"><h3>Run sessions</h3><span class="mut small" id="sessnote"></span><div class="chips" id="sesstabs" role="tablist" aria-label="Run sessions"></div></div>
     <div class="bd" id="sesslist"><div class="mut">Looking for runs…</div></div></div>
    <h3 style="margin:14px 0 8px">Results folders</h3>
+   <div class="note info small" id="rankhelp" style="margin-bottom:12px"><svg class="ico"><use href="#i-info"/></svg><div><b>How to read a rank.</b>
+    A rank is a tool's position within one task and one input track (short-read, long-read or hybrid), ordered by that task's headline metric (F1 for classification, length-weighted binning F1 for binning, CPRR for reassembly). Rank 1 is the best score, but a tied or overlapping confidence interval means two tools cannot be told apart, and a tool is only ranked on the isolates it ran on. "Leading" names the rank-1 tool of each task; the full table is in the report and the Leaderboard download. A run that says "Completed with warnings" finished normally but had failed tool runs.</div></div>
    <div class="card" id="runlist"><div class="bd mut">Looking for results…</div></div>
   </section>
 
@@ -1374,6 +1376,7 @@ async function refreshJobs() {
   const nrun = S.jobs.filter(j => j.state === "running" || j.state === "cancelling").length;
   if ($("#pjbadge")) { $("#pjbadge").hidden = !nrun; $("#pjbadge").textContent = nrun; }
 }
+const WARN_EXPLAIN = "The run finished (the process exited normally, exit 0) but at least one tool run failed. Scores and the report cover only the tools that worked; the failed ones and their reasons are listed in tool_status.tsv and the console output.";
 const stateWord = s => ({running:"Running", cancelling:"Cancelling", done:"Done", failed:"Failed", cancelled:"Cancelled", interrupted:"Interrupted", stalled:"Stalled (no output; may still be working)", completed_with_warnings:"Completed with warnings"})[s] || s;
 function showConsole(id, expand) {
   if (id && id !== S.consJob) { S.consJob = id; S.consOffset = 0; S.tail = ""; $("#clog").innerHTML = ""; }
@@ -1419,7 +1422,13 @@ async function pollConsole(force) {
     $("#ccancel").hidden = j.state !== "running";
     if (S.follow) $("#clog").scrollTop = $("#clog").scrollHeight;
     const wasRunning = S._lastState === "running"; S._lastState = j.state;
-    if (wasRunning && j.state !== "running") { toast(`${j.label}: ${stateWord(j.state).toLowerCase()}`, j.state === "done" ? "ok" : "bad"); refreshJobs(); afterJob(j); }
+    const shown = j.display_state || j.state;
+    st.title = shown === "completed_with_warnings" ? WARN_EXPLAIN : "";
+    if (wasRunning && j.state !== "running") {
+      if (shown === "completed_with_warnings") toast(`${j.label}: finished, but some tool runs failed. ${WARN_EXPLAIN}`, "bad");
+      else toast(`${j.label}: ${stateWord(shown).toLowerCase()}`, j.state === "done" ? "ok" : "bad");
+      refreshJobs(); afterJob(j);
+    }
   } catch (e) { const st = $("#cstate"); if (st) { st.className = "failed"; st.textContent = "cannot reach PlasBench, retrying"; } } finally { polling = false; }
 }
 function afterJob(j) {
@@ -3609,6 +3618,7 @@ async function renderDoc(t) {
     const chunks = c.patch.split(/\n(?=diff --git )/).filter(x => x.trim());
     box.innerHTML = `<div class="docbar"><h2>${esc(c.subject)}</h2><span class="tag"><span class="hdot ${kind}"></span>&nbsp;${word}</span>
         <button class="btn ghost sm" onclick="copyText(${jsq(c.hash)}, 'Commit id copied')">${icon("copy")}${esc(c.short)}</button>
+        <button class="btn ghost sm" id="cm_patch" title="Copy the commit message, file list and full patch as plain text">${icon("copy")}Copy patch</button>
         <button class="btn ghost sm" onclick="mtClose(${jsq(t.id)})">${icon("x")}Close</button></div>
       <div class="card"><div class="bd"><dl class="facts">
         <dt>Author</dt><dd>${esc(c.author)} &lt;${esc(c.email)}&gt;</dd><dt>Date</dt><dd>${esc(new Date(c.date).toLocaleString())} (${esc(c.when)})</dd>
@@ -3620,6 +3630,7 @@ async function renderDoc(t) {
         <ul class="cfiles">${c.files.map((f, i) => `<li data-cfi="${i}" title="${esc(f.from ? f.from + " → " + f.path : f.path)}"><span class="st ${esc(f.status)}">${esc(f.status)}</span><span class="mono">${esc(f.path)}</span></li>`).join("")}</ul></div></div>
       <div class="cpatch">${chunks.map((ch, i) => { const m = ch.match(/^diff --git a\/(.*?) b\/(.*)$/m);
         return `<details open id="cfi_${i}"><summary>${esc(m ? m[2] : "patch")}</summary>${renderDiff(ch)}</details>`; }).join("")}</div>`;
+    $("#cm_patch").onclick = async () => { try { const r = await api(`git/show?${rq}&rev=${encodeURIComponent(t.rev)}`); await copyText(r.text, "Patch copied"); } catch (e) { toast("Could not read the patch: " + e.message, "bad"); } };
     box.querySelectorAll("[data-oprev]").forEach(a => a.onclick = () => openDoc({kind: "commit", rev: a.dataset.oprev, repo: t.repo}));
     box.querySelectorAll("[data-cfi]").forEach(li => li.onclick = () => { const d = $("#cfi_" + li.dataset.cfi); if (d) { d.open = true; d.scrollIntoView({behavior: "smooth", block: "start"}); } });
   } catch (e) { box.innerHTML = `<div class="note bad">${icon("x", "ico")}<div>${esc(e.message)}</div></div>`; }
@@ -3721,7 +3732,7 @@ function runRow(r, i) {
   const idx = S.runs.indexOf(r);
   return `<div class="run"><div><h4>${esc(r.name)} ${r.failed ? `<span class="tag bad">${r.failed} failed run${r.failed > 1 ? "s" : ""}</span>` : ""}</h4>
     <div class="meta"><span>${icon("folder")} ${esc(r.path)}</span><span>${fmtTime(r.modified)}</span><span>${r.samples} isolates</span><span>${r.tools} tools</span></div>
-    <div class="leaders">${r.leaders.map(l => `<div class="leader"><span class="mut">${esc([l.task, l.track.replace("_", " ")].filter(Boolean).join(" · ") || "leader")}</span><b>${esc(l.display || l.tool)}</b><span class="mut">${l.lw ? "lw-F1 " + (+l.lw).toFixed(3) : "F1 " + (+l.f1 || 0).toFixed(3)}</span></div>`).join("")}</div></div>
+    <div class="leaders">${r.leaders.map(l => `<div class="leader" title="Rank 1 for this task and track (see How to read a rank, above)"><span class="mut">${esc([l.task, l.track.replace("_", " ")].filter(Boolean).join(" · ") || "leader")}</span><b>${esc(l.display || l.tool)}</b><span class="mut">${l.lw ? "lw-F1 " + (+l.lw).toFixed(3) : "F1 " + (+l.f1 || 0).toFixed(3)}</span></div>`).join("")}</div></div>
     <div class="row wrap" style="justify-content:flex-end;align-content:flex-start">${r.report ? `<a class="btn sec" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">${icon("chart")}Open report</a>` : ""}
       ${r.pdf ? `<a class="btn sec" href="/view/${idx}/benchmark.report.pdf" target="_blank">PDF</a>` : `<button class="btn sec" data-run="${dattr(["report-pdf", "--results-dir", r.path])}" data-label="Export ${esc(r.name)} to PDF">${icon("down")}Export PDF</button>`}
       <button class="btn ghost" data-run="${dattr(["report", "--results-dir", r.path, "--no-report-prompt"])}" data-label="Rebuild the report of ${esc(r.name)}">${icon("refresh")}Rebuild</button>
