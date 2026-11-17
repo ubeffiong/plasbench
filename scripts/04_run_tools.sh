@@ -163,7 +163,7 @@ declare -A TOOL_EXECUTABLE=(
     [mob_recon]=mob_recon [gplas2_mob]=gplas [gplas2_external]=gplas [platon]=platon
     [plasmidspades]=plasmidspades.py [genomad]=genomad [plasme]=PLASMe.py [rfplasmid]=rfplasmid
     [plasmidhunter]=plasmidhunter [plasmer]=Plasmer [plascope]=plaScope.sh
-    [plasgraph2]=plASgraph2_classify.py
+    [plasgraph2]=plASgraph2_classify.py [plasmidec]=plasmidEC.sh
 )
 # Identity of a tool's executable without running it: resolved path, size and
 # modification time. Upgrading or reinstalling a tool rewrites its entry point (conda
@@ -708,6 +708,51 @@ run_plascope() {
     fi
 }
 
+run_plasmidec() {
+    local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
+    local CMD0="${PLASMIDEC_CMD%% *}"
+    if tool_enabled RUN_PLASMIDEC plasmidec && have "$CMD0"; then
+        local TOOL="plasmidec" OUT="$RDIR/plasmidec" PRED="$RDIR/pred_plasmidec.plasmid.fasta" DONE="$RDIR/.plasmidec.complete"
+        # PlasmidEC has pre-loaded models for eight species only; every other organism is a structural gap, recorded, not a failure.
+        local organism species=""; organism="$(sample_column "$SAMPLE_SHEET" "$SAMPLE" organism)"
+        case "$organism" in
+            "Escherichia coli"*) species="Escherichia coli" ;;
+            "Klebsiella pneumoniae"*) species="Klebsiella pneumoniae" ;;
+            "Acinetobacter baumannii"*) species="Acinetobacter baumannii" ;;
+            "Salmonella enterica"*) species="Salmonella enterica" ;;
+            "Pseudomonas aeruginosa"*) species="Pseudomonas aeruginosa" ;;
+            "Enterococcus faecium"*) species="Enterococcus faecium" ;;
+            "Enterococcus faecalis"*) species="Enterococcus faecalis" ;;
+            "Staphylococcus aureus"*) species="Staphylococcus aureus" ;;
+        esac
+        if is_complete "$DONE" "$PRED"; then
+            log "  plasmidec: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif [[ -z "$species" ]]; then
+            warn "  $TOOL has no model for organism '${organism:-not_recorded}'; skipped for $SAMPLE"
+            record_status "$SAMPLE" "$TOOL" "skipped" "" "no PlasmidEC model for organism ${organism:-not_recorded}"
+        else
+            rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$RDIR/plasmidec_in"
+            # plasmidEC.sh accepts only a *.fasta or *.gfa name and derives its sample name from it.
+            cp "$CONTIGS" "$RDIR/plasmidec_in/${SAMPLE}.fasta"
+            local -a EXTRA=()
+            [[ -n "$PLASMIDEC_CLASSIFIERS" ]] && EXTRA+=(-c "$PLASMIDEC_CLASSIFIERS")
+            log "  plasmidec ($SAMPLE, species=$species) ..."
+            local START; START=$(profile_start)
+            if profile_exec $PLASMIDEC_CMD -i "$RDIR/plasmidec_in/${SAMPLE}.fasta" -o "$OUT" -s "$species" -t "$PLASMIDEC_THREADS" \
+                    -l "$PLASMIDEC_MIN_LENGTH" "${EXTRA[@]}" -f > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
+                bash "$ADAPT/adapt_plasmidec.sh" "$OUT" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "species: $species" "$(profile_elapsed "$START")"
+            else
+                rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
+            fi
+            rm -rf "$RDIR/plasmidec_in"
+        fi
+    elif tool_enabled RUN_PLASMIDEC plasmidec; then
+        warn "plasmidec is enabled but $CMD0 is not installed; skipped for $SAMPLE"
+        record_status "$SAMPLE" "plasmidec" "skipped" "" "command unavailable"
+    fi
+}
+
 run_plasgraph2() {
     local SAMPLE="$1" SDIR="$2" RDIR="$3" CONTIGS="$4"
     if tool_enabled RUN_PLASGRAPH2 plasgraph2 && have plASgraph2_classify.py; then
@@ -880,6 +925,7 @@ process_sample() {
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmidhunter "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmer "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plascope "$SAMPLE" "$RDIR" "$CONTIGS" &
+    job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasmidec "$SAMPLE" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_plasgraph2 "$SAMPLE" "$SDIR" "$RDIR" "$CONTIGS" &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_coverage RUN_BASELINE_COVERAGE &
     job_slot_wait "$MAX_PARALLEL_TOOLS"; run_baseline "$SAMPLE" "$RDIR" "$CONTIGS" baseline_reference RUN_BASELINE_REFERENCE &
@@ -923,7 +969,7 @@ wait
 shards=()
 while IFS=$'\t' read -r SAMPLE ASM SRA; do
     [[ -z "${SAMPLE:-}" ]] && continue
-    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow "${USER_TOOL_LIST[@]}"; do
+    for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasmidec plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow "${USER_TOOL_LIST[@]}"; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")

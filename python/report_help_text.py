@@ -737,6 +737,20 @@ HELP = {
         "Small differences mean PlasBench reproduces the paper's picture; a large gap can come from the assembly, tool or database version or the metric definition.",
         "Lets you justify a PlasBench result against published work.",
         "Not a gate or a ranking. Studies are never pooled, and a published value PlasBench could not match is counted as published only, not as zero."),
+    "learn-novelty": H(
+        "Whether a tool recovers plasmids PLSDB has never seen as well as the ones it holds.",
+        "Each truth plasmid aligned to PLSDB, and the tool's per-plasmid recovery.",
+        "Truth plasmids are called known, related or novel by how much of them a single PLSDB record covers; the gap in mean recovery to the known class is shown with a study-clustered interval.",
+        "A large positive gap means the tool recognises plasmids more than it reconstructs them; no gap means its recovery does not depend on PLSDB membership.",
+        "Tells you whether a score on familiar plasmids will hold on new ones.",
+        "Novel is relative to the PLSDB release used. Needs a PLSDB FASTA; otherwise it says not run."),
+    "learn-drivers": H(
+        "Which plasmid and isolate characteristics go with worse recovery.",
+        "Every scored truth plasmid of a tool with its size, repeat content, replicon family, resistance genes, species, read depth and data age.",
+        "One regression per tool of recovery on all of them together; intervals treat each study as one unit; each driver's share of the explained variance is shown.",
+        "A negative effect means recovery is lower when that characteristic is higher, holding the others fixed. 'Supported' survives a correction for the number of terms.",
+        "Separates plasmid size from repeats, replicon family and species, which a one-factor breakdown mixes up.",
+        "Associations, not causes. Few studies give wide intervals; a tool with too few plasmids is not modelled."),
     "learn-copynumber": H(
         "Estimated copy number of each plasmid.",
         "Assembly read-depth headers and matched bins.",

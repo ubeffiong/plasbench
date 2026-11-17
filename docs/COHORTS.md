@@ -217,6 +217,7 @@ apply identical evidence rules and differ only in curation grade. Read
 | [`pub-mobsuite.tsv`](../cohorts/pub-mobsuite.tsv) | 95 | all B | the MOB-suite benchmark |
 | [`pub-teixeira2025.tsv`](../cohorts/pub-teixeira2025.tsv) | 5 | all B | the 5 of Teixeira's 250 isolates with a deposited complete assembly |
 | [`publication-v1.tsv`](../cohorts/publication-v1.tsv) | 168 | all B | the publication cohorts together, each isolate once; see [`PUBLICATION_COMPARISON.md`](PUBLICATION_COMPARISON.md) |
+| [`negative-controls-v1.tsv`](../cohorts/negative-controls-v1.tsv) | 136 | all B | plasmid-free negative controls (single-replicon complete genomes, long-read truth, paired Illumina run); see [`cohorts/README.md`](../cohorts/README.md) |
 
 These are versioned **input cohort manifests**, not a substitute for released
 performance evidence. A public performance claim requires a reproducible run,

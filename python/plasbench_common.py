@@ -148,7 +148,7 @@ TOOL_DISPLAY_NAMES = {
     "spades_like": "SPAdes-like", "gplas_like": "gplas-like",
     "weak_like": "Weak-like", "genomad": "geNomad", "plasme": "PLASMe",
     "plasgraph2": "plASgraph2", "rfplasmid": "RFPlasmid", "plascope": "PlaScope",
-    "plasmidhunter": "PlasmidHunter", "plasmer": "Plasmer",
+    "plasmidhunter": "PlasmidHunter", "plasmer": "Plasmer", "plasmidec": "PlasmidEC",
 }
 
 

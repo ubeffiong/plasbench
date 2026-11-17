@@ -324,6 +324,25 @@ if [[ "${RUN_PUBLISHED_COMPARISON:-auto}" != "off" ]]; then
     python3 "$HERE/../python/compare_published.py" --results-dir "$RESULTS_DIR" --samples "$SAMPLE_SHEET" --scores "$SCORES"         --out-prefix "$RESULTS_DIR/benchmark.published_comparison" --html "$RESULTS_DIR/benchmark.published_comparison.html" > /dev/null         || warn "published-outcome comparison failed; the other results are unaffected"
 fi
 
+# PLSDB novelty (python/plsdb_novelty.py): how much of each truth plasmid does PLSDB already hold, and does recovery depend on it? Runs when a PLSDB
+# FASTA is present (env/download_plsdb.sh; PLSDB_FASTA). Descriptive: never changes a score or ranking, and a failure only warns.
+if [[ "${RUN_PLSDB_NOVELTY:-auto}" != "off" && -s "${PLSDB_FASTA:-}" ]]; then
+    mapfile -t NOVELTY_SAMPLES < <(read_samples "$SAMPLE_SHEET" | cut -f1)
+    python3 "$HERE/../python/plsdb_novelty.py" --data-dir "$DATA_DIR" --results-dir "$RESULTS_DIR" --samples "${NOVELTY_SAMPLES[@]}" \
+        --plsdb "$PLSDB_FASTA" --sample-sheet "$SAMPLE_SHEET" --out-prefix "$RESULTS_DIR/benchmark.plsdb_novelty" \
+        --known-coverage "${NOVELTY_KNOWN_COVERAGE:-0.80}" --known-identity "${NOVELTY_KNOWN_IDENTITY:-0.95}" \
+        --related-coverage "${NOVELTY_RELATED_COVERAGE:-0.30}" --threads "$THREADS" > /dev/null \
+        || warn "PLSDB novelty analysis failed; the other results are unaffected"
+fi
+
+# What drives per-plasmid recovery? One multivariable, study-clustered regression per tool (python/performance_drivers.py): size, repeats, replicon
+# family, resistance genes, species, depth, arm. Descriptive: never changes a score or ranking, and a failure only warns.
+if [[ "${RUN_PERFORMANCE_DRIVERS:-1}" == "1" ]]; then
+    python3 "$HERE/../python/performance_drivers.py" --results-dir "$RESULTS_DIR" --data-dir "$DATA_DIR" --sample-sheet "$SAMPLE_SHEET" \
+        --out-prefix "$RESULTS_DIR/benchmark.performance_drivers" > /dev/null \
+        || warn "performance-drivers regression failed; the other results are unaffected"
+fi
+
 if [[ "${COHORT_QC_FLAGS_ENABLED:-1}" -eq 1 ]]; then
     python3 "$HERE/../python/flag_cohort_outliers.py" \
         --stats-dir "$DATA_DIR" --samples "$SAMPLE_SHEET" \

@@ -214,6 +214,9 @@ ANALYSES = {
     "bin-agreement": ("bin_agreement.py", "PlasEval-style best-match scores and split/join dissimilarity between bin sets"),
     "plaseval-replication": ("plaseval_replication.py", "Score the PlasEval paper's published bins (53 E. coli isolates) with PlasBench and draw the error profile; optionally compare with the original program"),
     "build-published-outcomes": ("build_published_outcomes.py", "Rebuild the published-outcome tables (cohorts/published/) from the plsMD and Teixeira supplementary workbooks"),
+    "performance-drivers": ("performance_drivers.py", "A multivariable, study-clustered regression of per-plasmid recovery on size, repeats, replicon family, resistance genes, species, depth and arm"),
+    "plsdb-novelty": ("plsdb_novelty.py", "Classify each truth plasmid as known, related or novel against PLSDB and compare recovery across the classes"),
+    "discover-plasmid-free": ("discover_plasmid_free.py", "Find plasmid-free negative controls (single-replicon complete genomes with long-read truth and a paired Illumina run) at NCBI"),
     "assembly-adequacy": ("assembly_adequacy.py", "Whether each short-read assembly contains the plasmids it is judged against"),
     "copy-number": ("copy_number.py", "Tool versus truth plasmid copy number per matched bin"),
     "repeat-content": ("repeat_content.py", "K-mer repeat content of the truth replicons"),
@@ -614,7 +617,7 @@ def build_parser():
     reconstruct_parser.add_argument("--sra", required=True, help="SRA run accession for this sample's Illumina reads.")
     reconstruct_parser.add_argument("--tool", choices=("mob_recon", "platon", "plasmidspades", "gplas2_mob", "gplas2_external",
                                                        "genomad", "plasme", "plasgraph2", "rfplasmid", "plasmidhunter",
-                                                       "plasmer", "plascope"),
+                                                       "plasmer", "plascope", "plasmidec"),
                                     help="Run exactly this tool, skipping the benchmark recommendation lookup.")
     reconstruct_parser.add_argument("--recommendation-model", type=Path,
                                     help="Optional fitted recommendation-model JSON (default: <results-dir>/benchmark.recommendation_model.json "
@@ -766,6 +769,7 @@ def build_parser():
             ("--plasmidhunter", "plasmidhunter", "Enable or disable optional PlasmidHunter gene-content Naive Bayes classification (assembly contigs)."),
             ("--plasmer", "plasmer", "Enable or disable optional Plasmer ensemble classification (assembly contigs; requires ~32GB RAM)."),
             ("--plascope", "plascope", "Enable or disable optional PlaScope Centrifuge classification (E. coli/Klebsiella only)."),
+            ("--plasmidec", "plasmidec", "Enable or disable optional PlasmidEC majority-vote ensemble classification (eight species only)."),
         ):
             tools.add_argument(option, dest=destination, choices=("on", "off"), help=label)
         tools.add_argument("--tool", dest="user_tools", action="append", metavar="NAME",
@@ -1310,7 +1314,8 @@ def main(argv=None):
                                    ("rfplasmid", "RUN_RFPLASMID"),
                                    ("plasmidhunter", "RUN_PLASMIDHUNTER"),
                                    ("plasmer", "RUN_PLASMER"),
-                                   ("plascope", "RUN_PLASCOPE")):
+                                   ("plascope", "RUN_PLASCOPE"),
+                                   ("plasmidec", "RUN_PLASMIDEC")):
             value = getattr(args, argument)
             if value:
                 env[variable] = "1" if value == "on" else "0"
