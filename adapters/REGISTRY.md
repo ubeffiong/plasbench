@@ -28,6 +28,7 @@ tool's own adapter script). See [docs/ADDING_TOOLS.md](../docs/ADDING_TOOLS.md).
 | PlasmidHunter | ml_classification | not applicable | short-read assembly | `adapt_plasmidhunter.sh` | optional |
 | Plasmer | ml_classification | not applicable | short-read assembly | `adapt_plasmer.sh` | optional |
 | PlaScope | classification | not applicable | short-read assembly (E. coli/Klebsiella only) | `adapt_plascope.sh` | optional |
+| PlasmidEC | classification | not applicable | short-read assembly (eight species only) | `adapt_plasmidec.sh` | optional |
 | PlasBin-flow | binning | applicable | assembly graph; PlasBench adapts the tool's own output | `adapt_plasbin_flow.sh` | optional |
 | plsMD | reassembly | applicable | short-read Unicycler assembly plus a PLSDB BLAST index | `adapt_plsmd.sh` | optional |
 
@@ -37,7 +38,7 @@ tool's own adapter script). See [docs/ADDING_TOOLS.md](../docs/ADDING_TOOLS.md).
 
 | `evaluation_task` | What the tool does | Primary endpoint |
 |---|---|---|
-| `classification` | labels sequence as plasmid-derived or not (Platon, geNomad, PLASMe, RFPlasmid, PlaScope, the baselines) | base-level F1 |
+| `classification` | labels sequence as plasmid-derived or not (Platon, geNomad, PLASMe, RFPlasmid, PlaScope, PlasmidEC, the baselines) | base-level F1 |
 | `binning_reconstruction` | groups the contigs of an existing assembly into plasmids (MOB-recon, gplas2, PlasBin-flow, Flye + MOB-recon) | length-weighted binning F1 |
 | `sequence_reassembly` | produces plasmid sequences of its own (plasmidSPAdes, Plassembler, Hybracter, plsmd) | isolate-level CPRR |
 
@@ -304,6 +305,30 @@ real 32GB system-RAM minimum for its kmer-db step (`PLASMER_MEMORY_GB` in
 `config/config.sh`).
 
     adapt_plasmer.sh <plasmer_out_dir> <base_assembly_fasta> <out_fasta>
+
+## adapt_plasmidec.sh
+
+`plasmidEC.sh -i <assembly.fasta> -o <out> -s "<species>" -t <threads> -l <min_length> [-c <classifiers>] -f` (Paganini et al., MIT; maintained at
+gitlab.com/mmb-umcu/plasmidec, an earlier copy at github.com/lisavader/plasmidEC) calls a contig plasmid by majority vote of RFPlasmid, PlaScope and Platon
+(`-m`: minority vote). It writes, in `<out>`: `ensemble_output.csv` (every classified contig: each classifier's call, `Plasmid_count` votes,
+`Combined_prediction`), `plasmid_contigs.fasta` (its own hard call, taken unchanged) and `all_predictions.csv`.
+
+`plasmid_contigs.fasta` may be absent or empty when no contig is called plasmid. That is "predicted none" **only when `ensemble_output.csv` exists**,
+because that file is written for every classified contig. A run without it did not finish: the adapter exits non-zero and `run_plasmidec()` records
+`failed`, so a crash never looks like "no plasmids found" (the silent-empty-prediction failure mode other adapters had).
+
+PlasmidEC has no continuous score (a vote count), so it is a hard classification (`method_class=classification`): no `candidates.fasta`/`scores.tsv`, and
+`bins.tsv` is header-only. Contigs shorter than `PLASMIDEC_MIN_LENGTH` (its `-l`, default 1000) are not classified by it.
+
+**Species gate:** PlasmidEC ships models for eight species only (*E. coli*, *K. pneumoniae*, *A. baumannii*, *S. enterica*, *P. aeruginosa*, *E. faecium*,
+*E. faecalis*, *S. aureus*). `run_plasmidec()` maps each sample's `organism` to `-s` and records any other organism as `skipped` with the reason, not as a
+failure. Like PlaScope's, this is a structural gap: read the shared-sample rule before ranking it against tools that run on every organism.
+
+Off by default (`RUN_PLASMIDEC=1`, `plasbench run --plasmidec on`). `PLASMIDEC_CMD` is how `plasmidEC.sh` is started (it builds its own conda environments and
+downloads the classifiers' databases on first use, about 20 minutes). Because it contains PlaScope and Platon, a PlasmidEC result is not independent of
+theirs when both are in a run: read them together.
+
+    adapt_plasmidec.sh <plasmidec_out_dir> <base_assembly_fasta> <out_fasta>
 
 ## adapt_plascope.sh
 

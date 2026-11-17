@@ -45,7 +45,7 @@ def main():
 
     print("the registry")
     caps = tc.read_capabilities(REGISTRY)
-    expected = {"classification": {"platon", "genomad", "plasme", "rfplasmid", "plasmidhunter", "plasmer", "plascope", "plasgraph2", "platon_like", "weak_like",
+    expected = {"classification": {"platon", "genomad", "plasme", "rfplasmid", "plasmidhunter", "plasmer", "plascope", "plasmidec", "plasgraph2", "platon_like", "weak_like",
                                    "baseline_coverage", "baseline_reference", "baseline_replicon"},
                 "binning_reconstruction": {"mob_recon", "gplas2_mob", "gplas2_external", "flye_mob_recon", "trycycler_mob_recon", "mob_like", "gplas_like", "plasbin_flow"},
                 "sequence_reassembly": {"plasmidspades", "plassembler", "hybracter_long", "hybracter_hybrid", "spades_like", "plsmd"}}

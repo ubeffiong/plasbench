@@ -210,8 +210,8 @@ TEIXEIRA_META = {
     "source": {"url": TEIXEIRA_URL, "file": "predictions.xlsx"},
     "tool_map": {"MOB-recon": "mob_recon", "PLASMe": "plasme", "PlaScope": "plascope", "Plasmer": "plasmer", "Platon": "platon",
                  "RFPlasmid": "rfplasmid", "geNomad": "genomad", "gplas2": "gplas2_mob", "plASgraph2": "plasgraph2", "PlasBin-Flow": "plasbin_flow",
-                 "HyAsP": None, "PlasmidEC": None, "PlasmidFinder": None},
-    "tool_map_notes": {"HyAsP": "No PlasBench adapter; published only.", "PlasmidEC": "No PlasBench adapter; published only.",
+                 "HyAsP": None, "PlasmidEC": "plasmidec", "PlasmidFinder": None},
+    "tool_map_notes": {"HyAsP": "No PlasBench adapter; published only.", "PlasmidEC": "PlasBench's plasmidec adapter wraps plasmidEC.sh; supports eight species only, so other isolates are skipped, not scored.",
                        "PlasmidFinder": "A replicon marker, not a classifier; PlasBench scores a replicon baseline instead."},
     "metrics": [
         {"published_metric": "contig_precision_count", "label": "Contig precision (by contig count)", "plasbench_metric": "contig_precision_count",

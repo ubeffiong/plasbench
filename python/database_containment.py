@@ -56,9 +56,9 @@ def merged_length(intervals):
     return total
 
 
-def containment(query_fasta, database_fasta, threads):
+def containment(query_fasta, database_fasta, threads, preset="asm5"):
     """query -> (best_record, coverage, identity) over alignments to each record."""
-    result = subprocess.run(["minimap2", "-c", "-x", "asm5", "-t", str(threads), database_fasta, query_fasta],
+    result = subprocess.run(["minimap2", "-c", "-x", preset, "-t", str(threads), database_fasta, query_fasta],
                             text=True, capture_output=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip()[:300])

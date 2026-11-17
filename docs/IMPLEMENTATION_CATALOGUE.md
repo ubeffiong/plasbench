@@ -8,8 +8,8 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 179 analysis modules, 27 registered tools and baselines (19 real tools), 205 registered
-outputs, 50 run switches, 331 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+**Size at the time of writing:** 182 analysis modules, 28 registered tools and baselines (20 real tools), 210 registered
+outputs, 53 run switches, 336 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
@@ -328,7 +328,7 @@ Take the dissimilarity between MOB-recon's bins and the truth for one isolate.
 
 ## 5. The tools
 
-The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools and 8 baselines and stand-ins used to calibrate the scores (a baseline is a trivial predictor every real tool should beat). Each tool is bound to one evaluation task, and that task, not its output format, decides which endpoint ranks it.
+The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools and 8 baselines and stand-ins used to calibrate the scores (a baseline is a trivial predictor every real tool should beat). Each tool is bound to one evaluation task, and that task, not its output format, decides which endpoint ranks it.
 
 | Tool | Method class | Track | Evaluation task | Validation status |
 |---|---|---|---|---|
@@ -351,6 +351,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `plasgraph2` | ml_classification | short_read | classification | adapter_tested |
 | `plsmd` | reassembly | short_read | sequence_reassembly | adapter_tested |
 | `plasbin_flow` | binning | short_read | binning_reconstruction | adapter_tested |
+| `plasmidec` | classification | short_read | classification | adapter_tested |
 | `mob_like` | binning | short_read | binning_reconstruction | not_applicable |
 | `platon_like` | classification | short_read | classification | not_applicable |
 | `spades_like` | reassembly | short_read | sequence_reassembly | not_applicable |
@@ -362,7 +363,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 6. Every module
 
-179 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
+182 modules in `python/`. Every one has a header that says what it is for; the one-line summary below is taken from it.
 
 ### Truth, references and cohorts
 
@@ -380,6 +381,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `detect_dimers.py` | find truth plasmids that are tandem multimers of themselves (dimers, trimers and higher, up to 6 copies) and, |
 | `discover_design_cohort.py` | find NCBI isolates that satisfy the headline |
 | `discover_ncbi_cohort.py` | Discover strict candidate pairs from NCBI for one or more organism names. |
+| `discover_plasmid_free.py` | Find plasmid-free negative controls: complete genomes with a single replicon, a long-read truth and a paired Illumina run. |
 | `estimate_download.py` | Estimate what stage 1 is about to download, before it downloads it. |
 | `fetch_ena_reads.py` | download a paired-end run's FASTQ from ENA, the European |
 | `import_contributed_cohort.py` | turn the contributed RefSeq/SRA candidate pool |
@@ -584,6 +586,8 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `build_selection_report.py` | write cohorts/<name>.selection.json: how a cohort was selected. |
 | `data_nature.py` | Is this run made of synthetic (demo) data, real data, or a mix? A mix is refused, and a synthetic run says so inside its report. |
 | `intake.py` | Bring your own isolates: get the sheet right, point at your folders, check that PlasBench can see and use what you have. |
+| `performance_drivers.py` | What drives per-plasmid reconstruction accuracy? A multivariable, study-clustered regression per tool. |
+| `plsdb_novelty.py` | How novel is each truth plasmid against PLSDB, and does recovery depend on it? |
 | `prereg_admin.py` | read, confirm and change PlasBench's pre-registered scoring decisions, and keep a record of who decided what and when. |
 | `resolve_contributed_cohort.py` | verify importer candidates against NCBI, run the |
 | `run_consistency.py` | Do the run tables agree before anything is ranked? |
@@ -591,7 +595,7 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 
 ## 7. Every output file and where the report shows it
 
-205 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+210 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -633,8 +637,13 @@ The registry (`config/tool_capabilities.tsv`) lists 27 entries: 19 real tools an
 | `benchmark.outcome_states.tsv` | aggregate_results.py | outcome-states | shown | Run outcome states: Table. |
 | `benchmark.paired_comparisons.tsv` | aggregate_results.py | statistics | shown | Paired tool comparisons: Table. |
 | `benchmark.performance.tsv` | performance_summary.py | performance | shown | Computational performance: Table. |
+| `benchmark.performance_drivers.json` | performance_drivers.py | learn-drivers | shown | Performance-drivers models: Per tool: plasmids, studies, R2, the size effect, drivers left out and warnings; or why it was not estimable. |
+| `benchmark.performance_drivers.tsv` | performance_drivers.py | learn-drivers | shown | Performance drivers: Per tool and term: effect on per-plasmid recovery, 95% interval, status and the variance the driver explains. |
 | `benchmark.plaseval_gate.json` | plaseval_gate.py | learn-agreement | shown | PlasEval gate verdict: PASS, FAIL, PARTIAL, NOT_RUN or NO_DATA, with the tolerance, the original's commit and the counts. |
 | `benchmark.plaseval_gate.tsv` | plaseval_gate.py | learn-agreement | shown | Comparison with the original PlasEval program: Per isolate and tool: PlasBench's dissimilarity and best-match F1 against the original program's. |
+| `benchmark.plsdb_novelty.json` | plsdb_novelty.py | learn-novelty | shown | PLSDB novelty summary: PLSDB file and provenance, thresholds, class counts and caveats. |
+| `benchmark.plsdb_novelty.tsv` | plsdb_novelty.py | learn-novelty | partly | PLSDB novelty per truth plasmid: Best PLSDB record, coverage, identity and class (known, related, novel) for each truth plasmid; summarised by tool in the novelty table. |
+| `benchmark.plsdb_novelty_recovery.tsv` | plsdb_novelty.py | learn-novelty | shown | Recovery by PLSDB novelty: Per tool and class: plasmids, studies, mean completeness, recovered share, and the gap to known with a study-clustered interval. |
 | `benchmark.power.tsv` | power_analysis.py | power | shown | Statistical power: Table. |
 | `benchmark.published_comparison.json` | compare_published.py | learn-published | shown | Published-comparison verdict: Per study and metric: the status, tool-order agreement, tools with no counterpart and the caveats. |
 | `benchmark.published_comparison.tsv` | compare_published.py | learn-published | shown | Comparison with published outcomes: Per tool, metric and stratum: matched pairs, published mean, PlasBench mean, difference, correlation, agreement. |
@@ -857,6 +866,9 @@ These `RUN_*` settings in `config/config.sh` turn an analysis on or off (1 = on)
 | `RUN_STATS_VALIDATION` | `0` | see the comment block above it in config/config.sh |
 | `RUN_RANK_SENSITIVITY` | `1` | see the comment block above it in config/config.sh |
 | `RUN_PUBLISHED_COMPARISON` | `auto` | see the comment block above it in config/config.sh |
+| `RUN_PLASMIDEC` | `0` | see the comment block above it in config/config.sh |
+| `RUN_PERFORMANCE_DRIVERS` | `1` | see the comment block above it in config/config.sh |
+| `RUN_PLSDB_NOVELTY` | `auto` | see the comment block above it in config/config.sh |
 
 ## 9. History: every merged change
 
