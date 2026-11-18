@@ -316,9 +316,9 @@ def build_parser():
                              help="Only the applications/Start menu entry, not an icon on the desktop.")
     demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     demo_parser.add_argument("--open-report", action="store_true",
-                             help="Open the completed demo report without prompting.")
+                             help="Open the completed demo report in your browser without asking.")
     demo_parser.add_argument("--no-report-prompt", action="store_true",
-                             help="Do not offer to open the completed demo report.")
+                             help="Do not ask whether to open the demo report when it finishes; just print its path.")
     open_report_parser = sub.add_parser("open-report", help="Open a completed HTML report in the default browser.")
     open_report_group = open_report_parser.add_mutually_exclusive_group(required=True)
     open_report_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
@@ -694,7 +694,7 @@ def build_parser():
                                  "not changed: a copy with those rows is written next to the results and used for this run.")
         inputs.add_argument("--independent-truth-only", action="store_true",
                             help="Run only the isolates whose truth is independent of the benchmark's reads (long-read-only or long-read-first, polished with no reads "
-                                 "or independent reads). With public-v4 that is about 15% of the cohort. Combine with --max-isolates for a balanced N of them. "
+                                 "or independent reads). With public-v4 that is about 15%% of the cohort. Combine with --max-isolates for a balanced N of them. "
                                  "The cohort file is not changed; a copy is written next to the results.")
         inputs.add_argument("--isolate-order", choices=("balanced", "file"), default="balanced",
                             help="With --max-isolates: balanced (default) spreads the N isolates across species, studies and "
@@ -711,9 +711,10 @@ def build_parser():
                                  "is not given; `report --study NAME` rebuilds that study's report. The workspace is "
                                  "PLASBENCH_WORKSPACE, default <PlasBench folder>/studies.")
         inputs.add_argument("--open-report", action="store_true",
-                            help="Open benchmark.report.html after a successful report-producing run; never prompts.")
+                            help="Open benchmark.report.html in your browser when the run finishes, without asking. Only for runs that write a report (not the metagenomics track).")
         inputs.add_argument("--no-report-prompt", action="store_true",
-                            help="Do not offer to open benchmark.report.html when an interactive run finishes.")
+                            help="Never stop at the end of the run to ask whether to open the report: it prints the report path and exits, so the run can go unattended. "
+                                 "It changes nothing about what is run or written (the window always sets it).")
         inputs.add_argument("--log-dir", type=Path, help="Directory for tool and mapping logs.")
         inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
         inputs.add_argument("--genomad-db", type=Path, help="Path to the installed geNomad database directory (containing genomad_db/).")

@@ -19,7 +19,8 @@ SCRIPT = ROOT / "python" / "estimate_download.py"
 def run(sheet, data_dir):
     result = subprocess.run([sys.executable, str(SCRIPT), "--samples", str(sheet),
                              "--data-dir", str(data_dir)],
-                            capture_output=True, text=True)
+                            capture_output=True, text=True,
+                            env={**__import__("os").environ, "ENA_SIZE_LOOKUP": "0"})   # these checks are about the lock-based estimate: stay offline
     assert result.returncode == 0, result.stderr
     return result.stdout
 
