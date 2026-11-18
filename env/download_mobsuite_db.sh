@@ -115,6 +115,9 @@ ARCHIVE="$STAGE/data.tar.gz"
 if [[ -n "$MOB_PY" && -x "$MOB_PY" ]]; then
     MIRROR="$("$MOB_PY" -c 'import json, os, mob_suite.mob_init as m; print(m.config["db_mirrors"][0])' 2>/dev/null || true)"
     MIRROR="${MIRROR:-https://zenodo.org/records/10304948/files/data.tar.gz?download=1}"
+    if url_needs_internet "$MIRROR"; then
+        require_internet --action "Downloading the MOB-suite database" --hint "Download data.tar.gz by hand on another computer, or set MIRROR to a file on disk." zenodo
+    fi
     log "Downloading the MOB-suite archive (resumable) to $ARCHIVE"
     resumable_download "$MIRROR" "$ARCHIVE" \
         || die "the MOB-suite download did not finish; run 'bash env/download_mobsuite_db.sh --yes' again to continue it"

@@ -18,6 +18,7 @@ from urllib.request import Request
 
 from curate_cohort import OUT_COLUMNS, safe_id, write_rows
 from validate_cohort import assembly_metadata, fetch, ncbi_json, request_interval
+from plasbench_common import net_require  # noqa: E402
 
 
 def runinfo_for_biosample(biosample, email, api_key, platform_term="ILLUMINA[Platform]"):
@@ -104,6 +105,7 @@ def main():
     args = parser.parse_args()
     if args.max_assemblies < 1:
         raise SystemExit("ERROR: --max-assemblies must be positive")
+    net_require(["ncbi", "ncbi_datasets"], action="Discovering cohort candidates at NCBI")
     accepted, rejected, seen = [], [], set()
     for organism in args.organism:
         query = f'"{organism}"[Organism] AND "complete genome"[Assembly Level]'

@@ -16,6 +16,8 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from plasbench_common import net_explain, net_require
+
 
 LOCK_SCHEMA_VERSION = "1.1"
 RETRYABLE_STATUS = (429, 500, 502, 503, 504)
@@ -515,6 +517,7 @@ def main():
         return
     evidence = []
     if args.online and not errors:
+        net_require(["ncbi", "ncbi_datasets"], action="Verifying the cohort at NCBI (--online)")
         def verify_with_retry(row):
             """A dropped connection must not fail a thousand-row sheet: retry a transient lookup failure a few times."""
             last = None
@@ -537,6 +540,10 @@ def main():
                 continue
             evidence.append(result)
             errors.extend(f"{row['sample_id']}: {message}" for message in result["errors"])
+    if errors and args.online and any("NCBI verification failed" in e for e in errors):
+        why = net_explain(ValueError(errors[0]), "ncbi", "NCBI verification", quiet_if_up=True)
+        if why:
+            errors.append(why)
     if errors:
         raise SystemExit("COHORT VALIDATION FAILED\n" + "\n".join(errors))
     if args.write_lock:

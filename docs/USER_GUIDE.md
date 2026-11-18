@@ -1125,6 +1125,18 @@ with the training-set mean. Only tools already eligible in
 `benchmark.recommendations.tsv`'s `overall` scope are ever considered --
 the model never live-recommends a tool nobody validated.
 
+## When You Are Offline
+
+PlasBench checks for the internet before anything that needs it, and says so in one plain sentence before it does any work (`plasbench net` shows the same check: which services answer, and advice).
+
+**Works offline:** scoring, aggregation and the HTML report (`plasbench report`, `report-pdf`), the demo, runs on files already on disk (`plasbench run ... --local-inputs`, or any run whose reference and reads are already downloaded: stage 1 asks for the internet only for what it has to fetch), `import-contributed-cohort`, `plasbench tools list/validate/new` and adding a tool from a folder, viewing studies in the window, and every tool that is already installed.
+
+**Needs the internet:** stage 1 downloads (NCBI Datasets, SRA, ENA), `install-tools`, `check --yes` when something is missing, database downloads (Zenodo, PLSDB, Figshare), `upgrade`, the update check, `validate-cohort --online`, `discover-*`, `resolve-contributed-cohort`, `curate-cohort`, `prepare-contribution`, adding a tool from a URL, and GitHub sign-in in the window.
+
+The message names the service and the reason: no network at all; DNS not working (in WSL run `wsl --shutdown` in PowerShell, check the VPN, or set a DNS server); one service down while the rest work; a sign-in page, proxy or certificate error in the way. A download that starts online and then loses the connection pauses and resumes by itself.
+
+Settings (environment variables, also in the window's Settings): `PLASBENCH_OFFLINE=1` refuses every online-only action at once, on purpose (for an offline session or a metered link); `PLASBENCH_ONLINE_TIMEOUT` is the seconds to wait for each service (default 5); `PLASBENCH_ASSUME_ONLINE=1` skips the check altogether (tests, or a network that only reaches a local mirror). The services and which commands use them are listed in `config/network_services.tsv`.
+
 ## Console Messages
 
 Console output is timestamped. It announces selected stages, each active stage,

@@ -53,6 +53,7 @@ if PREFIX_PATH="$(env_prefix)"; then
         echo "[setup_conda] reusing it unchanged (no channel refresh or package download)."
         exit 0
     fi
+    require_internet --action "Updating the PlasBench conda environment" --hint "Without internet the environment that exists keeps working: run with --reuse-existing to keep it unchanged." conda
     echo "[setup_conda] updating it in place (nothing is deleted) ..."
     run_with_heartbeat "Conda is solving/linking the PlasBench environment" \
         "$SOLVER" env update --prefix "$PREFIX_PATH" --file "$HERE/environment.yml" --prune=false 2>/dev/null \
@@ -64,6 +65,7 @@ if PREFIX_PATH="$(env_prefix)"; then
     echo "    conda env remove -n $ENV_NAME"
     echo "    bash env/setup_conda.sh"
 else
+    require_internet --action "Creating the PlasBench conda environment" --hint "Creating it downloads packages from conda-forge and bioconda." conda
     echo "[setup_conda] creating environment '$ENV_NAME' (this can take a few minutes)..."
     run_with_heartbeat "Conda is creating/linking the PlasBench environment" \
         "$SOLVER" env create -f "$HERE/environment.yml"

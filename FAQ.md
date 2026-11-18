@@ -621,6 +621,10 @@ the independent-truth subset of public-v4 is still to be done.
 **Answer.** In the study folder: `logs/run_<date>-<time>.log` is everything the run printed, including the heartbeats (`logs/run.latest.log` points at the newest; the newest 20 are kept, `LOG_RETENTION_RUNS`; `RUN_CONSOLE_LOG=0` turns it off); `logs/<sample>.<step>.log` is each tool's own output; `results/run_events.jsonl` has one JSON line per event (stage start and end, isolate steps, command start and end with exit code and seconds, heartbeats with CPU and memory, warnings), safe to read by machine; `results/stage_timing.tsv` has seconds per stage. Events carry names and numbers only, never environment variables or commands.
 **Status.** New after v0.5.0.
 
+### Q59. PlasBench says "needs the internet" but my browser works. What do I do?
+**Answer.** Run `plasbench net`: it tests each service separately. "DNS is not working" with a working connection is common in WSL2 or behind a VPN (`wsl --shutdown` in PowerShell, turn the VPN off or on, or set a DNS server); one service down while others work means that service (NCBI, ENA, GitHub, conda) is down or blocked, and the message names a way round it (for example `READ_SOURCE=ena`, or `--local-inputs` with files you place yourself); a sign-in or certificate message points at a captive portal or proxy. To work offline on purpose set `PLASBENCH_OFFLINE=1`; scoring, reports and runs on files already on disk keep working. See the User Guide, "When You Are Offline".
+**Status.** New after v0.5.0.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions

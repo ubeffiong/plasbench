@@ -24,7 +24,7 @@ from pathlib import Path
 
 from build_accession_ledger import build_ledger, write_ledger
 from validate_cohort import LOCK_SCHEMA_VERSION, read_ledger, read_rows, schema_errors, verify_row
-from plasbench_common import subprocess_timeout  # noqa: E402
+from plasbench_common import net_require, subprocess_timeout  # noqa: E402
 
 
 # Hygiene for public-accession metadata, not a real secret-detection tool:
@@ -190,6 +190,7 @@ def main():
 
     evidence = []
     if not errors:
+        net_require(["ncbi", "ncbi_datasets"], action="Preparing the contribution (verifies each pair at NCBI)")
         for row in new_rows:
             result = verify_row(row, args.email, args.api_key)
             evidence.append(result)

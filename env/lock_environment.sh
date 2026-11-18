@@ -12,6 +12,10 @@ case "$OUT_ABS" in
   *) echo "lock output must be inside the project root: $OUT_ABS" >&2; exit 2 ;;
 esac
 
+source "$HERE/../config/config.sh"
+source "$HERE/../scripts/lib.sh"
+require_internet --action "Resolving the environment lock" --hint "The lock is resolved in a Docker image with conda-forge packages." docker conda
+
 docker run --rm --user root -v "$ROOT:/workspace" -w /workspace "$IMAGE" \
   /bin/sh -c "micromamba create -q -y -n plasbench -f env/environment.yml && micromamba env export -n plasbench --explicit > '$CONTAINER_OUT'"
 grep -q '^@EXPLICIT$' "$OUT_ABS" || { rm -f "$OUT_ABS"; echo "lock generation failed" >&2; exit 1; }

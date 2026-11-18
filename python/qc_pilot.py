@@ -21,7 +21,7 @@ import subprocess
 import sys
 import urllib.request
 import zlib
-from plasbench_common import subprocess_timeout  # noqa: E402
+from plasbench_common import net_require, subprocess_timeout  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TAB, NL = chr(9), chr(10)
@@ -89,6 +89,7 @@ def main():
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--summary", required=True)
     args = ap.parse_args()
+    net_require(["ena"], action="The read-QC pilot (reads the start of each run from ENA)")
     os.makedirs(args.out_dir, exist_ok=True)
     rows = read_rows(args.cohort)[:args.n]
     results = []

@@ -31,7 +31,7 @@ import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from plasbench_common import subprocess_timeout  # noqa: E402
+from plasbench_common import net_explain, net_require, subprocess_timeout  # noqa: E402
 
 CONNECTIONS = max(1, int(os.environ.get("ENA_DOWNLOAD_CONNECTIONS", "4") or 4))
 SEGMENT_MIN_BYTES = int(os.environ.get("ENA_SEGMENT_MIN_BYTES", str(16 << 20)) or (16 << 20))
@@ -170,14 +170,17 @@ def main():
     args = ap.parse_args()
     if not args.size_only and not args.out_dir:
         ap.error("--out-dir is required unless --size-only is given")
+    if not os.environ.get("ENA_PORTAL_URL"):       # a mirror or a local test server is not "the internet"
+        net_require(["ena"], action=f"Looking up {args.run} at ENA" if args.size_only else f"Downloading {args.run} from ENA",
+                    code=3 if args.size_only else 1, probe=False)
     try:
         # A size lookup is only advice for the download stage, so it must not hold a run up: a short timeout (ENA_SIZE_TIMEOUT, seconds).
         report = file_report(args.run, timeout=max(1, int(os.environ.get("ENA_SIZE_TIMEOUT", "20") or 20))) if args.size_only else file_report(args.run)
     except (OSError, ValueError) as exc:
         if args.size_only:
-            sys.stderr.write(f"[fetch_ena_reads] size lookup failed for {args.run}: {exc}" + chr(10))
+            sys.stderr.write(f"[fetch_ena_reads] size lookup failed for {args.run}: {net_explain(exc, 'ena', 'The ENA size lookup')}" + chr(10))
             raise SystemExit(3)
-        raise SystemExit(f"ERROR: ENA lookup failed for {args.run}: {exc}")
+        raise SystemExit(f"ERROR: ENA lookup failed for {args.run}: {net_explain(exc, 'ena', 'The ENA lookup')}")
     if args.size_only:
         sizes = [x for x in (report.get("fastq_bytes") or "").split(";") if x.strip()]
         if not sizes or not all(x.strip().isdigit() for x in sizes):

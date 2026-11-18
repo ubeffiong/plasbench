@@ -192,6 +192,12 @@ export DOWNLOAD_CONFIRM="${DOWNLOAD_CONFIRM:-1}"
 # Before stage 1 downloads, PlasBench asks ENA for the exact compressed size of each run that the cohort's lock file has no base count for, so the estimate is real and
 # names the largest read set. 0 skips the lookup (it is also skipped when READ_SOURCE=sra, which never uses ENA).
 export ENA_SIZE_LOOKUP="${ENA_SIZE_LOOKUP:-1}"
+# Work offline on purpose. 1 switches every online-only action off at once (downloads, installs, upgrades, NCBI/ENA lookups, GitHub): each says plainly that it needs the
+# internet instead of trying. Scoring, reports and runs on files already on disk (--local-inputs) keep working. 0 (default) = use the internet when it is needed.
+export PLASBENCH_OFFLINE="${PLASBENCH_OFFLINE:-0}"
+# Seconds to wait for each service when PlasBench checks the connection before an online step (config/network_services.tsv lists the services; `plasbench net` shows them).
+# Raise it on a slow or satellite link. Default 5.
+export PLASBENCH_ONLINE_TIMEOUT="${PLASBENCH_ONLINE_TIMEOUT:-5}"
 # --- Run health and reliability ------------------------------------------------
 # Stage 4 exits with code 4 when every tool run failed, because there is nothing to score. 1 continues anyway with a warning (the report is then empty of results).
 export ALLOW_ALL_TOOLS_FAILED="${ALLOW_ALL_TOOLS_FAILED:-0}"

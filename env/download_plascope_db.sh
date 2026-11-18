@@ -35,6 +35,9 @@ fetch_one() {
 
     local url="${!url_var:-}" sha="${!sha_var:-}"
     if [[ -n "$url" ]]; then
+        if url_needs_internet "$url"; then
+            require_internet --action "Downloading the PlaScope $label database" --hint "Download the archive on a computer with internet and unpack it at $prefix." zenodo
+        fi
         echo "[plascope_db] downloading $label from provided ${url_var} ..."
         (cd "$dest_parent" && wget -O "$archive_name" "$url")
         verify_or_record_download "$dest_parent/$archive_name" "$url" "PlaScope $label database" "$sha" "$dest_parent/download_provenance.jsonl" || {

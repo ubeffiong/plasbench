@@ -50,6 +50,9 @@ def fetch(url: str, destination: Path, expected_md5: str, retries: int) -> None:
     if destination.is_file() and digest(destination) == expected_md5:
         print(f"[bmock12] reuse verified {destination.name}")
         return
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from plasbench_common import net_require
+    net_require(["figshare"], action=f"Downloading {destination.name}", hint="The verified files are kept once downloaded; re-run when online.")
     partial = destination.with_suffix(destination.suffix + ".part")
     partial.unlink(missing_ok=True)
     for attempt in range(1, retries + 1):

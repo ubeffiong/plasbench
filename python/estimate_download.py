@@ -118,6 +118,24 @@ def lookup_enabled() -> bool:
     return os.environ.get("ENA_SIZE_LOOKUP", "1") != "0" and os.environ.get("READ_SOURCE", "auto") != "sra"
 
 
+def ena_unreachable() -> str:
+    """'' when ENA can be asked for sizes; otherwise one plain sentence saying why not (offline, DNS broken, ENA down).
+
+    The size lookup is only advice, so being offline is a note in the estimate, never an error. A mirror set with ENA_PORTAL_URL is not probed."""
+    import os
+    if os.environ.get("ENA_PORTAL_URL"):
+        return ""
+    try:
+        from plasbench_common import netcheck_module
+        module = netcheck_module()
+        if module is None:
+            return ""
+        module.require("ena", action="The ENA size lookup")
+    except Exception as exc:  # noqa: BLE001 - NoInternet carries the sentence; anything else must not break the estimate
+        return str(exc) if exc.__class__.__name__ == "NoInternet" else ""
+    return ""
+
+
 def already_have(data_dir: Path, sample: str, sra: str):
     """(reference_present, reads_present) for one sample."""
     sdir = data_dir / sample
@@ -174,7 +192,8 @@ def main() -> int:
 
     # No base count for some samples (a sheet without a lock): ask ENA for each run's exact compressed size.
     exact, largest = 0, None
-    if unknown_runs and lookup_enabled():
+    offline_note = ena_unreachable() if unknown_runs and lookup_enabled() else ""
+    if unknown_runs and lookup_enabled() and not offline_note:
         found, unknown_after = ena_sizes(unknown_runs)
         exact = sum(found.values())
         if found:
@@ -197,6 +216,9 @@ def main() -> int:
     if largest:
         print(f"  LARGEST READ SET     : {largest[1]} ({largest[0]}) {human(largest[2])} compressed"
               + ("  <- very large: slow to download, ~3x on disk, heavy to assemble (MAX_RUN_DOWNLOAD_GB skips such isolates)" if largest[2] > 5e9 else ""))
+    if offline_note:
+        print("  NOTE: ENA read sizes were not looked up, so the total above leaves them out.")
+        print(f"        {offline_note}")
     if unknown:
         shown = ", ".join(unknown[:4]) + (" ..." if len(unknown) > 4 else "")
         print(f"  NOTE: no size for {len(unknown)} sample(s) ({shown});")

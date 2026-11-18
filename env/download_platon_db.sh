@@ -31,6 +31,9 @@ else
     SIZE=""
 fi
 
+if url_needs_internet "$URL"; then
+    require_internet --action "Downloading the Platon database" --hint "Download db.tar.gz by hand on another computer and unpack it at $PLATON_DB." zenodo
+fi
 echo "[platon_db] downloading Platon's database (~1.7 GB) into $DEST_PARENT"
 echo "[platon_db] from $URL"
 echo "[platon_db] it resumes: a dropped connection or a re-run continues where it stopped,"

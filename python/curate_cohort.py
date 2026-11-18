@@ -61,6 +61,8 @@ def main():
     required = {"assembly_accession", "sra_run"}
     if not candidates or any(not required.issubset(row) or not row["assembly_accession"] or not row["sra_run"] for row in candidates):
         raise SystemExit("ERROR: candidates must contain non-empty assembly_accession and sra_run columns")
+    from plasbench_common import net_require
+    net_require(["ncbi", "ncbi_datasets"], action="Curating the cohort (verifies each pair at NCBI)")
     accepted, rejected = [], []
     for index, candidate in enumerate(candidates, 1):
         accession, run_accession = candidate["assembly_accession"], candidate["sra_run"]

@@ -46,7 +46,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import validate_cohort as vc  # noqa: E402
-from plasbench_common import balanced_order  # noqa: E402
+from plasbench_common import balanced_order, net_require  # noqa: E402
 
 UMBRELLA_BIOPROJECT = "PRJNA224116"
 SHEET_EXTRA = ["balance_rank", "panel_subset", "selection_arm", "qc_precheck", "qc_precheck_notes", "est_depth_x", "est_read_pairs", "est_mean_read_length"]
@@ -265,6 +265,9 @@ def main():
         with open(args.cache, encoding="utf-8") as handle:
             cache = json.load(handle)
 
+    uncached = [c for c in candidates if (c["assembly_accession"] + "|" + c.get("selection_arm", "")) not in cache]
+    if uncached:    # everything answered from the cache file needs no internet
+        net_require(["ncbi", "ncbi_datasets"], action="Verifying the candidates at NCBI")
     sheet_rows, precheck = [], []
     lock = threading.Lock()
     done_count = [0]
