@@ -432,9 +432,9 @@ and flagged a mixed or oversized *assembly* afterwards (`assembly_qc_gate.py`, a
   reject limit in `config/short_read_qc_thresholds.tsv`;
 - `SHORT_READ_QC_MODE=report` (default) records the decision and flags the sample but excludes only an integrity failure; `enforce` also excludes a
   threshold REJECT (status `rejected`: not assembled, tools skipped as "short-read QC rejected", never scored as a tool failure); `off` skips it;
-- outputs: `results/short_read_qc.tsv`, `short_read_qc_status.tsv` and a MultiQC-style table in the report with a cohort PASS/WARN/REJECT summary.
-**Not done.** Taxonomic contamination screening (it needs a database; the table says `not_evaluated`), and an automatic with-and-without-warned-samples
-sensitivity analysis (the report gives the counts so it can be done).
+- outputs: `results/short_read_qc.tsv`, `short_read_qc_status.tsv` and, in the report, a MultiQC-style QC panel (`python/report_readqc_panel.py`): General statistics with inline bars and Copy table / Configure columns / Scatter plot / Violin plot / Export as CSV, distributions with the threshold lines, a side panel per sample (each metric as a gauge against its limit, why it passed, warned or was rejected, its assembly selection), the thresholds with their status and hash, and a "What the reviewer asked" box. A run without the table says *Not measured in this run* and gives the command; the offline demo shows clearly labelled SYNTHETIC QC (`python/make_demo_readqc.py`, refuses to run on real samples).
+**Not done.** Taxonomic contamination screening (it needs a database; the table says `not_evaluated`). The with-and-without-flagged-samples check is
+descriptive: the panel ranks the tools by mean F1 with and without the flagged samples when `scores.tsv` is beside the QC table, and says when it cannot.
 **Evidence.** `python/short_read_qc.py`; `test/test_short_read_qc.py` (good, warning-level and reject-level reads, every integrity failure, the
 shipped thresholds, and that every threshold row names a metric that is really measured); `test/test_short_read_qc_stage.sh` (stage 3 and stage 4
 in all three modes).
