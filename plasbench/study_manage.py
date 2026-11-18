@@ -58,12 +58,25 @@ def study_dir(root, name: str) -> Path:
     """The folder of an existing study, confined to the workspace (a name is a name, never a path)."""
     name = studies.valid_name(name)
     ws = Path(os.path.realpath(studies.workspace(root)))
+    if name in studies.registry(root):                      # a study kept outside the workspace
+        folder = studies.study_path(root, name)
+        if not (folder / "study.json").is_file():
+            raise ValueError(f"the study {name} is not available: {folder} cannot be reached (is the drive connected?). Connect it again, or use Remove from list")
+        return Path(os.path.realpath(folder))
     folder = Path(os.path.realpath(ws / name))
     if folder.parent != ws:
         raise ValueError("that is not a study of this workspace")
     if not (folder / "study.json").is_file():
         raise ValueError(f"there is no study named {name}")
     return folder
+
+
+def _guard_internal(root, name: str, action: str) -> None:
+    """Rename, copy and archive work on workspace studies; one kept outside the workspace is managed where it is."""
+    where = studies.registry(root).get(studies.valid_name(name))
+    if where:
+        raise ValueError(f"{name} lives outside the workspace ({where}), so it cannot be {action} from here. Move or copy the folder yourself, then use "
+                         "Remove from list and Add an existing study folder")
 
 
 def _guard_busy(busy, action: str) -> None:
@@ -95,8 +108,57 @@ def facts(root, name: str) -> dict:
         if capped:
             break
     record = _read_json(folder / "study.json")
+    inside = record.get("data_location") == "study" and (folder / "data").is_dir()
+    data = {"files": 0, "bytes": 0}
+    if inside:
+        data = _count_files(folder / "data")
     return {"name": folder.name, "path": str(folder), "files": files, "bytes": size, "capped": capped, "runs": len(record.get("runs", [])),
-            "report": (folder / "results" / "benchmark.report.html").is_file(), "tracked": (folder / ".git").exists()}
+            "report": (folder / "results" / "benchmark.report.html").is_file(), "tracked": (folder / ".git").exists(),
+            "external": name_is_external(root, folder.name), "data_location": record.get("data_location") or "shared", "data_dir": record.get("data_dir"),
+            "data_in_study": inside, "data_files": data["files"], "data_bytes": data["bytes"]}
+
+
+def name_is_external(root, name: str) -> bool:
+    return name in studies.registry(root)
+
+
+def _count_files(folder: Path) -> dict:
+    files = size = 0
+    for base, dirs, names in os.walk(folder):
+        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(base, d))]
+        for n in names:
+            files += 1
+            try:
+                size += os.path.getsize(os.path.join(base, n))
+            except OSError:
+                pass
+        if files > SCAN_CAP:
+            break
+    return {"files": files, "bytes": size}
+
+
+def delete_data(root, name: str, confirm_name: str, busy: bool = False) -> dict:
+    """Delete only the downloaded data kept INSIDE a study (<study>/data): results, report and record stay. Needs the study's name typed back.
+    Refused when the study's data is in the shared folder or another folder (nothing of the study's own to delete)."""
+    folder = study_dir(root, name)
+    if (confirm_name or "").strip() != folder.name:
+        raise ValueError("type the study's name exactly to confirm")
+    _guard_busy(busy, "delete its data")
+    record = _read_json(folder / "study.json")
+    data = folder / "data"
+    if record.get("data_location") != "study" or not data.is_dir() or os.path.islink(data):
+        raise ValueError("this study keeps no downloaded data inside its folder (it uses the shared folder or another folder), so there is nothing of its own to delete here")
+    removed = _count_files(data)
+    shutil.rmtree(data, onerror=_readonly_ok)
+    data.mkdir()                                  # the run keeps working: an empty <study>/data is where the next run puts its reads
+    record["updated"] = _now()
+    _write_json(folder / "study.json", record)
+    return {"name": folder.name, "path": str(data), "files": removed["files"], "bytes": removed["bytes"]}
+
+
+def remove_from_list(root, name: str) -> bool:
+    """Forget a study kept outside the workspace (its files stay). True when it was listed."""
+    return studies.unregister(root, studies.valid_name(name))
 
 
 # ---------------------------------------------------------------- metadata
@@ -125,6 +187,7 @@ def update_meta(root, name: str, note=None, tags=None) -> dict:
 
 # ---------------------------------------------------------------- rename, clone
 def rename(root, name: str, new_name: str, busy: bool = False) -> Path:
+    _guard_internal(root, name, "renamed")
     folder = study_dir(root, name)
     new_name = studies.valid_name(new_name)
     _guard_busy(busy, "rename it")
@@ -148,6 +211,7 @@ def rename(root, name: str, new_name: str, busy: bool = False) -> Path:
 
 def clone(root, name: str, new_name: str, with_results: bool = False) -> Path:
     """A new study with the same sample sheet, cohort, note and tags and an empty run history. Results are copied only when asked (they can be large)."""
+    _guard_internal(root, name, "copied")
     folder = study_dir(root, name)
     new_name = studies.valid_name(new_name)
     target = folder.parent / new_name
@@ -175,6 +239,7 @@ def archive_root(root) -> Path:
 
 def archive(root, name: str, busy: bool = False) -> Path:
     """Move a study to <workspace>/.archive/<name>-<timestamp>. Nothing is deleted; restore() brings it back."""
+    _guard_internal(root, name, "archived")
     folder = study_dir(root, name)
     _guard_busy(busy, "archive it")
     dest_root = archive_root(root)
@@ -234,6 +299,7 @@ def delete(root, name: str, confirm_name: str, busy: bool = False) -> dict:
     _guard_busy(busy, "delete it")
     removed = facts(root, folder.name)
     shutil.rmtree(folder, onerror=_readonly_ok)
+    studies.unregister(root, folder.name)
     return removed
 
 

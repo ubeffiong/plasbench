@@ -36,10 +36,11 @@ REFERENCE_BYTES = 12_100_000
 
 
 def human(num_bytes: float) -> str:
+    """Decimal units (1 GB = 1e9 bytes), the ones ENA, NCBI and drive makers use, and the ones the download log prints: one run is '9.5 GB' everywhere."""
     for unit in ("B", "KB", "MB", "GB", "TB"):
-        if abs(num_bytes) < 1024 or unit == "TB":
+        if abs(num_bytes) < 1000 or unit == "TB":
             return f"{num_bytes:.1f} {unit}" if unit != "B" else f"{num_bytes:.0f} B"
-        num_bytes /= 1024
+        num_bytes /= 1000
     return f"{num_bytes:.1f} TB"
 
 
@@ -73,6 +74,50 @@ def lock_bases(sheet: Path) -> dict:
     return {}
 
 
+def ena_sizes(runs: dict, report=None, workers: int = 8, deadline: float = 40.0):
+    """{sample: total FASTQ bytes} from ENA's file report for the runs the lock has no base count for, plus the samples ENA gave no size for.
+
+    A bare cohort sheet (a first-N copy, your own isolates) has no lock, so every read set used to print 'size unknown' and a single 9.5 GB run could hide in a
+    20-isolate 'quick' test. ENA reports each file's exact compressed size, so this asks it, a few runs at a time, within `deadline` seconds in all.
+    `report(run, timeout)` returns ENA's record for one run; it defaults to python/fetch_ena_reads.file_report.
+    """
+    import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    if report is None:
+        from fetch_ena_reads import file_report as report
+    found, missing = {}, []
+    start = time.time()
+
+    def one(sample, run):
+        record = report(run, timeout=15)
+        sizes = [x for x in (record.get("fastq_bytes") or "").split(";") if x.strip()]
+        if not sizes or not all(x.strip().isdigit() for x in sizes):
+            raise ValueError("no sizes")
+        return sample, sum(int(x) for x in sizes)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(one, s, r): s for s, r in runs.items()}
+        try:
+            for future in as_completed(futures, timeout=max(1.0, deadline)):
+                try:
+                    sample, total = future.result()
+                    found[sample] = total
+                except Exception:  # noqa: BLE001 - a lookup that fails only leaves that sample's size unknown
+                    missing.append(futures[future])
+        except Exception:  # noqa: BLE001 - the overall deadline: whatever has not answered is unknown
+            for future, sample in futures.items():
+                if not future.done():
+                    future.cancel()
+                    missing.append(sample)
+    return found, sorted(set(missing) | (set(runs) - set(found)))
+
+
+def lookup_enabled() -> bool:
+    """ENA lookups are skipped with ENA_SIZE_LOOKUP=0 and with READ_SOURCE=sra (which never uses ENA)."""
+    import os
+    return os.environ.get("ENA_SIZE_LOOKUP", "1") != "0" and os.environ.get("READ_SOURCE", "auto") != "sra"
+
+
 def already_have(data_dir: Path, sample: str, sra: str):
     """(reference_present, reads_present) for one sample."""
     sdir = data_dir / sample
@@ -87,6 +132,7 @@ def main() -> int:
     ap.add_argument("--samples", required=True)
     ap.add_argument("--data-dir", required=True)
     args = ap.parse_args()
+    sys.path.insert(0, str(Path(__file__).resolve().parent))   # fetch_ena_reads, for the size lookup
 
     sheet = Path(args.samples)
     data_dir = Path(args.data_dir)
@@ -99,6 +145,7 @@ def main() -> int:
     pending_refs = pending_reads = 0
     known_bases = 0
     unknown = []
+    unknown_runs = {}
     skipped = 0
 
     for row in rows:
@@ -119,27 +166,40 @@ def main() -> int:
                 known_bases += bases[sample]
             else:
                 unknown.append(sample)
+                unknown_runs[sample] = sra
 
     if pending_refs == 0 and pending_reads == 0:
         print(f"All {len(rows)} sample(s) are already downloaded; nothing to fetch.")
         return 0
 
+    # No base count for some samples (a sheet without a lock): ask ENA for each run's exact compressed size.
+    exact, largest = 0, None
+    if unknown_runs and lookup_enabled():
+        found, unknown_after = ena_sizes(unknown_runs)
+        exact = sum(found.values())
+        if found:
+            top = max(found, key=found.get)
+            largest = (top, unknown_runs[top], found[top])
+        unknown = unknown_after
     reference_bytes = pending_refs * REFERENCE_BYTES
-    reads_mid = known_bases * BYTES_PER_BASE
-    reads_low = known_bases * BYTES_PER_BASE_LOW
-    reads_high = known_bases * BYTES_PER_BASE_HIGH
+    reads_mid = known_bases * BYTES_PER_BASE + exact
+    reads_low = known_bases * BYTES_PER_BASE_LOW + exact
+    reads_high = known_bases * BYTES_PER_BASE_HIGH + exact
 
     print(f"About to download from NCBI:")
     print(f"  reference assemblies : {pending_refs:>4}  ~{human(reference_bytes)}")
-    if known_bases:
-        print(f"  Illumina read sets   : {pending_reads:>4}  ~{human(reads_mid)}"
-              f"  ({human(reads_low)} - {human(reads_high)})")
+    if known_bases or exact:
+        spread = f"  ({human(reads_low)} - {human(reads_high)})" if known_bases else "  (exact sizes from ENA)"
+        print(f"  Illumina read sets   : {pending_reads:>4}  ~{human(reads_mid)}{spread}")
         print(f"  ESTIMATED TOTAL      :       ~{human(reference_bytes + reads_mid)}")
     else:
         print(f"  Illumina read sets   : {pending_reads:>4}  size unknown")
+    if largest:
+        print(f"  LARGEST READ SET     : {largest[1]} ({largest[0]}) {human(largest[2])} compressed"
+              + ("  <- very large: slow to download, ~3x on disk, heavy to assemble (MAX_RUN_DOWNLOAD_GB skips such isolates)" if largest[2] > 5e9 else ""))
     if unknown:
         shown = ", ".join(unknown[:4]) + (" ..." if len(unknown) > 4 else "")
-        print(f"  NOTE: no base count for {len(unknown)} sample(s) ({shown});")
+        print(f"  NOTE: no size for {len(unknown)} sample(s) ({shown});")
         print(f"        their reads are NOT included in the total above.")
         print(f"        Run 'plasbench validate-cohort --samples {sheet} --online "
               f"--write-lock {sheet.with_suffix('.lock.json')}' for an exact figure.")

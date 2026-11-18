@@ -68,7 +68,16 @@ def _country(geo: str) -> str:
     return (geo or "").split(":")[0].strip()
 
 
+def is_ledger(columns) -> bool:
+    """The accession ledger (cohorts/accepted_accessions.tsv) lists accessions only, with none of the curated metadata a benchmark sheet needs, so a run on it
+    fails stage 0. One definition, shared with the command line's refusal (plasbench/sheetcheck.py)."""
+    from .sheetcheck import is_ledger as _is_ledger
+    return _is_ledger(columns)
+
+
 def kind_of(name: str, columns) -> str:
+    if is_ledger(columns):
+        return "ledger"
     if name.startswith("metagenomics") or "community_id" in columns:
         return "example" if ".example" in name else "metagenomic"
     return "isolate"

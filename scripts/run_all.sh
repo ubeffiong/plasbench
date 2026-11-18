@@ -37,8 +37,10 @@ declare -A SCRIPT=(
     [7]="07_long_read_reconstruct.sh"
 )
 
+start_console_log
 log "############ PlasBench ############"
 log "Running stages: ${STAGES[*]}"
+[[ -n "${_CONSOLE_LOG_FILE:-}" ]] && log "Console log of this run: $_CONSOLE_LOG_FILE (events: ${RESULTS_DIR:-results}/run_events.jsonl; 'plasbench status' shows what it is doing)"
 # A run that the terminal, WSL or the computer ended cannot report it at the time. This marker says what was
 # running; it is removed when the run finishes or reports its own error, so finding it means the last run was cut
 # off. The next run says so, and reuses the finished work.
@@ -52,6 +54,7 @@ if [[ -s "$RUN_MARK" ]]; then
     fi
 fi
 acquire_run_lock "run_all.sh stages ${STAGES[*]}"
+run_event run_start "stages=${STAGES[*]}" "log=${_CONSOLE_LOG_FILE:-}"
 rm -f "$RESULTS_DIR/.completed_with_warnings"
 if [[ -s "$RUN_MARK" ]]; then
     warn "the previous run stopped before it finished, without a chance to report why ($(head -1 "$RUN_MARK")): the terminal, WSL or the computer ended it, or it ran out of memory. Finished work is reused; see $LOG_DIR for its last messages."
@@ -75,6 +78,7 @@ for s in "${STAGES[@]}"; do
     fi
 done
 rm -f "$RUN_MARK"
+run_event run_end "status=finished"
 # A run that finished but in which some tool runs failed is "completed with warnings": exit 0 (the other tools' results are valid), but never a plain DONE.
 n_failed=0
 [[ -f "$RESULTS_DIR/tool_status.tsv" ]] && n_failed="$(awk -F'\t' 'NR > 1 && ($3 == "failed" || $3 == "infrastructure_failure") { n++ } END { print n + 0 }' "$RESULTS_DIR/tool_status.tsv")"

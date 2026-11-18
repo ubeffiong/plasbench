@@ -203,6 +203,51 @@ def is_stalled(job_dir, job_id, now=None, window=None):
     return idle is not None and idle > window
 
 
+ACTIVE_SECONDS = 180     # a file written this recently means the run is working
+ACTIVITY_MAX_ENTRIES = 2000
+ACTIVITY_MAX_SECONDS = 2.0
+
+
+def recent_activity(roots, now=None, max_entries=ACTIVITY_MAX_ENTRIES, max_seconds=ACTIVITY_MAX_SECONDS, limit=12, active_seconds=ACTIVE_SECONDS):
+    """The files modified most recently under `roots` (never following symlinks, at most `max_entries` entries or `max_seconds` seconds of walking).
+
+    Returns {"status": "active"|"quiet", "files": [{"root", "path", "size", "age_seconds"}], "walked", "truncated"}: active when anything changed in the last
+    `active_seconds`. Paths are relative to their root. A growing `.part` file shows a download that is still writing."""
+    now = time.time() if now is None else now
+    deadline = time.monotonic() + max_seconds
+    found, walked, truncated = [], 0, False
+    for root in roots:
+        if not root or not os.path.isdir(root) or os.path.islink(root):
+            continue
+        stack = [root]
+        while stack and not truncated:
+            current = stack.pop()
+            try:
+                with os.scandir(current) as it:
+                    entries = list(it)
+            except OSError:
+                continue
+            for entry in entries:
+                walked += 1
+                if walked > max_entries or time.monotonic() > deadline:
+                    truncated = True
+                    break
+                try:
+                    if entry.is_symlink():
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(entry.path)
+                    elif entry.is_file(follow_symlinks=False):
+                        st = entry.stat(follow_symlinks=False)
+                        found.append((st.st_mtime, st.st_size, root, os.path.relpath(entry.path, root)))
+                except OSError:
+                    continue
+    found.sort(key=lambda f: -f[0])
+    files = [{"root": r, "path": rel.replace(os.sep, "/"), "size": size, "age_seconds": max(0.0, round(now - mtime, 1))} for mtime, size, r, rel in found[:limit]]
+    active = bool(found) and now - found[0][0] <= active_seconds
+    return {"status": "active" if active else "quiet", "files": files, "walked": min(walked, max_entries), "truncated": truncated}
+
+
 def lock_holder(results_dir):
     """The live holder of RESULTS_DIR/.run.lock as {"pid", "pgid", "started", "what"}, or None when there is no lock or nothing of it is alive."""
     if not results_dir or os.name == "nt":   # on Windows the pipeline runs in WSL or Git Bash: its pids are not Windows pids, so they cannot be checked from here

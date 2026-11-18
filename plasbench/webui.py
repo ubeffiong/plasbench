@@ -13,6 +13,7 @@ real CLI parser; nothing is passed through a shell.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import platform
@@ -30,7 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
-from . import jobrunner, runprogress, ui_schema
+from . import cohort_info, fsutil, jobrunner, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -58,6 +59,72 @@ MAX_LOG_CHUNK = 256 * 1024
 REPORT_CSP = ("default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; "
               "font-src data:; form-action 'none'; frame-ancestors 'self'; "
               "sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox")
+
+
+RELIABILITY_GROUP = "Reliability and downloads"
+# Environment settings the window may pass with a job (Jobs.start): the Settings keys of config/config.sh plus the download and reliability
+# names the wizard's "Downloads and reliability" card sets. Anything else (LD_PRELOAD, PATH ...) is refused.
+EXTRA_ENV_KEYS = frozenset(["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "TOOL_TIMEOUT_SECONDS",
+                            "ALLOW_ALL_TOOLS_FAILED", "NETWORK_RETRIES", "ENA_DOWNLOAD_CONNECTIONS", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"])
+ENV_KEY = re.compile(r"[A-Z][A-Z0-9_]*")
+ENV_FORBIDDEN = frozenset(["PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "PROJECT_ROOT"])
+ENV_VALUE_MAX = 200
+
+
+# -- the Run status panel: python/run_status.py (written with the logging pipeline) summarises a results folder; the window only asks for it -----------
+STATUS_CACHE_SECONDS = 3.0
+_status_cache: dict = {}
+_status_lock = threading.Lock()
+
+
+def load_run_status(root):
+    """python/run_status.py imported by path, or None when this checkout does not have it."""
+    import importlib.util
+    path = Path(root) / "python" / "run_status.py"
+    if not path.is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("plasbench_run_status", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def run_status_json(root, results: Path, log_dir: Path, data_dir: Path, loader=None, now=time.monotonic) -> dict:
+    """run_status.summarize(results, log, data) as JSON-able data plus a `text` field (render(summary, diagnose=True)). Cached for 3 s per folder. Never raises:
+    a failure is {"state": "no-run", "error": reason}."""
+    key = str(results)
+    with _status_lock:
+        hit = _status_cache.get(key)
+        if hit and now() - hit[0] < STATUS_CACHE_SECONDS:
+            return hit[1]
+    try:
+        module = (loader or load_run_status)(root)
+        if module is None:
+            out = {"state": "no-run", "error": "this PlasBench has no python/run_status.py"}
+        else:
+            out = json.loads(json.dumps(module.summarize(results, log_dir, data_dir), default=str))
+            if not isinstance(out, dict):
+                out = {"state": "no-run", "error": "run_status returned something that is not a summary"}
+            else:
+                try:
+                    out["text"] = module.render(out, diagnose=True)
+                except Exception as exc:  # noqa: BLE001 - the summary is still useful without the text
+                    out["text"] = f"(the diagnosis text could not be made: {exc})"
+    except Exception as exc:  # noqa: BLE001
+        out = {"state": "no-run", "error": f"{type(exc).__name__}: {exc}"}
+    out.setdefault("state", "no-run")
+    out["results"], out["log_dir"] = key, str(log_dir)
+    with _status_lock:
+        _status_cache[key] = (now(), out)
+    return out
+
+
+def _sheet_header(path: Path) -> list:
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.strip() and not line.startswith("#"):
+                return line.rstrip("\r\n").split("\t")
+    return []
 
 
 # --------------------------------------------------------------------------------------------- project facts
@@ -123,8 +190,16 @@ class Project:
     def settings_resolved(self) -> list[dict]:
         """settings(), each location default also resolved to the path it means on this computer."""
         rows = self.settings()
+        carried, prev_group = "", None
         for row in rows:
             row.update(self.resolve_setting_default(row))
+            if row.get("group") != prev_group:
+                carried, prev_group = "", row.get("group")
+            row["tooltip"] = ui_help.setting_tooltip(row, carried)
+            if row.get("comment"):
+                carried = row["comment"]
+            if row["key"] in ui_help.RELIABILITY_KEYS:
+                row["group"] = RELIABILITY_GROUP
         return rows
 
     def local_env_path(self) -> Path:
@@ -493,7 +568,11 @@ class Project:
             except OSError:
                 n = 0
             name = path.stem
-            out.append({"name": name, "path": str(path), "rows": max(n, 0), "locked": (path.parent / f"{name}.lock.json").is_file(),
+            try:
+                header = _sheet_header(path)
+            except OSError:
+                header = []
+            out.append({"name": name, "path": str(path), "rows": max(n, 0), "ledger": cohort_info.is_ledger(header), "locked": (path.parent / f"{name}.lock.json").is_file(),
                         "metagenomic": name.startswith("metagenomics"),
                         "selection": (path.parent / f"{name}.selection.json").is_file(),
                         "publication": (path.parent / f"{name}.publication.json").is_file()})
@@ -513,7 +592,9 @@ class Project:
 # --------------------------------------------------------------------------------------------- jobs
 SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that make a benchmark run session (everything else stays on the Jobs page)
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
-KEEP_JOBS = 500
+KEEP_JOBS = 500                       # finished (`done`) jobs kept; a failed, interrupted or cancelled job is kept until deleted or past the retention
+JOB_RETENTION_DAYS_DEFAULT = 180
+LOCK_STALE_SECONDS = 15
 STARTUP_GRACE = 60   # seconds a freshly started runner may take to write its first heartbeat
 INTERRUPTED_WATCH_SECONDS = 6 * 3600   # how long an "interrupted" run is still watched for its heartbeat to come back (a laptop that slept) before the watcher gives up
 SERVER_STARTED = time.time()
@@ -530,13 +611,18 @@ class Jobs:
         self.dir = UI_HOME / "jobs"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.lock = threading.Lock()
+        self._save_lock = threading.RLock()
+        self._meta_sig: dict = {}
+        self._dir_stamp = None
         self.jobs: dict[str, dict] = {}
         self.watchers: set[str] = set()
         self.deleted: set[str] = set()
         self._progress_cache: dict = {}
+        tomb = self._tombstones()
         for job in self._read_index():
-            if isinstance(job, dict) and "id" in job:
+            if isinstance(job, dict) and "id" in job and job["id"] not in tomb:
                 self.jobs[job["id"]] = job
+        self._restore_from_meta(tomb)
         for job in list(self.jobs.values()):
             if job.get("state") == "interrupted" and jobrunner.is_alive(str(self.dir), job["id"]):
                 job.update(state="running", ended=None, exit=None)   # an earlier window called it lost before its runner had written a heartbeat; it is plainly going
@@ -557,29 +643,153 @@ class Jobs:
                 time.sleep(0.05)
         return []
 
-    def _save(self):
-        # Another window on the same folder (plasbench ui --new-instance) may have started jobs this one has not seen: keep them, so one window never erases another's runs.
-        try:
-            for job in self._read_index():
-                if job.get("id") not in self.jobs and job.get("id") not in self.deleted:
-                    self.jobs[job["id"]] = job
-                elif job.get("id") in self.jobs and job.get("state") in ("done", "failed", "cancelled") and self.jobs[job["id"]]["state"] in ("running", "cancelling"):
-                    self.jobs[job["id"]].update(job)   # another window already recorded how it ended
-        except (OSError, ValueError, KeyError):
-            pass
-        keep = sorted(self.jobs.values(), key=lambda j: j["started"])
-        running = [j for j in keep if j["state"] in ("running", "cancelling")]
-        recent = [j for j in keep if j["state"] not in ("running", "cancelling")][-KEEP_JOBS:] + running
-        tmp = self.dir / f"jobs.json.{os.getpid()}.{threading.get_ident()}.tmp"   # written whole, then renamed over the index: a reader sees the old file or the new one, never half
-        tmp.write_text(json.dumps(sorted(recent, key=lambda j: j["started"]), indent=1), encoding="utf-8")
-        for attempt in range(40):   # on Windows the rename fails with "Access denied" while another process has the index open to read it: wait a moment and try again
+    @contextlib.contextmanager
+    def _index_lock(self, timeout: float = 30.0):
+        """An exclusive lock around read-merge-write of the shared job list, shared by every thread and every window on this folder: a lock file created with O_EXCL (works on
+        Windows, POSIX and WSL). A lock older than LOCK_STALE_SECONDS belongs to a window that died; it is moved aside (an atomic rename, so only one waiter wins) and the wait goes on."""
+        path = self.dir / "jobs.lock"
+        deadline = time.time() + timeout
+        while True:
             try:
-                os.replace(tmp, self.dir / "jobs.json")
+                fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                break
+            except (FileExistsError, PermissionError):
+                try:
+                    age = time.time() - os.path.getmtime(path)
+                except OSError:
+                    continue                      # it was released between the two calls: try again at once
+                if age > LOCK_STALE_SECONDS:
+                    try:
+                        os.replace(path, f"{path}.stale.{os.getpid()}.{threading.get_ident()}")
+                        os.unlink(f"{path}.stale.{os.getpid()}.{threading.get_ident()}")
+                    except OSError:
+                        pass
+                    continue
+                if time.time() > deadline:
+                    raise ValueError("another PlasBench window is saving the job list: try again in a moment")
+                time.sleep(0.01)
+        try:
+            yield
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    def _tombstones(self) -> set:
+        """The ids of jobs the user deleted (in any window): they stay deleted."""
+        try:
+            return {line.strip() for line in (self.dir / "jobs.deleted").read_text(encoding="utf-8").splitlines() if line.strip()}
+        except OSError:
+            return set()
+
+    def _meta_path(self, job_id: str) -> Path:
+        return self.dir / f"{job_id}.meta.json"
+
+    def _write_meta(self, job: dict):
+        """<id>.meta.json beside the log: written at launch and whenever the job changes, so the list can be rebuilt from the folder."""
+        text = json.dumps(job, sort_keys=True, indent=1)
+        if self._meta_sig.get(job["id"]) == text:
+            return
+        tmp = self.dir / f"{job['id']}.meta.json.{os.getpid()}.{threading.get_ident()}.tmp"
+        tmp.write_text(text, encoding="utf-8")
+        for attempt in range(40):
+            try:
+                os.replace(tmp, self._meta_path(job["id"]))
                 break
             except PermissionError:
                 if attempt == 39:
                     raise
                 time.sleep(0.05)
+        self._meta_sig[job["id"]] = text
+
+    def _restore_from_meta(self, tomb: set) -> list:
+        """Jobs that have a meta file but are not in memory (the index was lost or is behind, or another window started them) come back, unless the user deleted them."""
+        restored = []
+        try:
+            names = [e.name for e in os.scandir(self.dir) if e.name.endswith(".meta.json")]
+        except OSError:
+            return restored
+        for name in names:
+            job_id = name[:-len(".meta.json")]
+            if job_id in self.jobs or job_id in tomb:
+                continue
+            try:
+                job = json.loads((self.dir / name).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(job, dict) and job.get("id") == job_id and "started" in job and "state" in job:
+                self.jobs[job_id] = job
+                restored.append(job)
+        return restored
+
+    @staticmethod
+    def retention_days() -> float:
+        """How long a finished job is kept (PLASBENCH_JOB_RETENTION_DAYS, default 180 days; 0 = for ever). A failed, interrupted or cancelled job is never dropped sooner."""
+        try:
+            return max(0.0, float(os.environ.get("PLASBENCH_JOB_RETENTION_DAYS", JOB_RETENTION_DAYS_DEFAULT)))
+        except ValueError:
+            return float(JOB_RETENTION_DAYS_DEFAULT)
+
+    def _prune(self) -> list:
+        """Drop jobs past the retention, and `done` jobs beyond the newest KEEP_JOBS. Returns the dropped jobs."""
+        now, days = time.time(), self.retention_days()
+        ordered = sorted((j for j in self.jobs.values() if j["state"] not in ("running", "cancelling")), key=lambda j: j["started"])
+        drop = [j for j in ordered if days > 0 and now - (j.get("ended") or j["started"]) > days * 86400]
+        rest_done = [j for j in ordered if j["state"] == "done" and j not in drop]
+        drop += rest_done[:-KEEP_JOBS] if len(rest_done) > KEEP_JOBS else []
+        for j in drop:
+            self.jobs.pop(j["id"], None)
+        return drop
+
+    def _register(self, job: dict):
+        """A newly launched job: its meta file first (so it can always be found again), then the shared list."""
+        self._write_meta(job)
+        with self.lock:
+            self.jobs[job["id"]] = job
+            self._save()
+
+    def _save(self):
+        # Another window on the same folder (plasbench ui --new-instance) may have started jobs this one has not seen: keep them, so one window never erases another's runs. The
+        # read-merge-write is one step under an exclusive lock (threads of this window and other windows alike); deletions are written down; every job also has a meta file.
+        with self._save_lock, self._index_lock():
+            tomb = self._tombstones()
+            for jid in tomb:
+                self.jobs.pop(jid, None)
+            try:
+                for job in self._read_index():
+                    jid = job.get("id")
+                    if jid in tomb:
+                        continue
+                    if jid not in self.jobs:
+                        self.jobs[jid] = job
+                    elif job.get("state") in ("done", "failed", "cancelled") and self.jobs[jid]["state"] in ("running", "cancelling"):
+                        self.jobs[jid].update(job)   # another window already recorded how it ended
+            except (OSError, ValueError, KeyError, AttributeError):
+                pass
+            self._restore_from_meta(tomb)
+            for job in list(self.jobs.values()):
+                self._write_meta(job)
+            for job in self._prune():
+                for path in list(self._paths(job["id"]).values()) + [self._meta_path(job["id"])]:
+                    try:
+                        os.unlink(path)
+                    except OSError:
+                        pass
+                self._meta_sig.pop(job["id"], None)
+            ordered = sorted(self.jobs.values(), key=lambda j: j["started"])
+            tmp = self.dir / f"jobs.json.{os.getpid()}.{threading.get_ident()}.tmp"   # written whole, then renamed over the index: a reader sees the old file or the new one, never half
+            tmp.write_text(json.dumps(ordered, indent=1), encoding="utf-8")
+            for attempt in range(40):   # on Windows the rename fails with "Access denied" while another process has the index open to read it: wait a moment and try again
+                try:
+                    os.replace(tmp, self.dir / "jobs.json")
+                    break
+                except PermissionError:
+                    if attempt == 39:
+                        raise
+                    time.sleep(0.05)
 
     def _paths(self, job_id: str) -> dict:
         return jobrunner.paths(str(self.dir), job_id)
@@ -589,7 +799,12 @@ class Jobs:
         if jobrunner.is_alive(str(self.dir), job["id"]):
             return True
         p = self._paths(job["id"])
-        return not os.path.exists(p["alive"]) and not os.path.exists(p["exit"]) and time.time() - job["started"] < STARTUP_GRACE
+        if os.path.exists(p["alive"]) or os.path.exists(p["exit"]) or time.time() - job["started"] >= STARTUP_GRACE:
+            return False
+        # No heartbeat yet, inside the grace period: a slow start is still a start, but a runner whose process is already gone is not "starting". Cancelling a run
+        # a moment after it began (before the runner wrote its pid file) used to leave it in `cancelling` for the whole grace period.
+        pid = job.get("pid")
+        return jobrunner.pid_alive(pid) if pid else True
 
     def _append_log(self, job_id: str, text: str):
         try:
@@ -749,12 +964,47 @@ class Jobs:
         ok, message = ui_schema.validate_argv(argv)
         if not ok:
             raise ValueError(message)
+        env = self.check_env(env)
         refusal = self._lock_refusal(argv)
         if refusal:
             raise ValueError(refusal)
         command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(argv)
         shown = "plasbench " + " ".join(shlex.quote(a) for a in argv)
         return self._launch(command, shown, label, env, list(argv), "plasbench", self.project.root)
+
+    def running_results(self) -> list:
+        """The results folders of runs that are going (running or cancelling)."""
+        return [j.get("results") for j in self.jobs.values() if j.get("state") in ("running", "cancelling") and j.get("results")]
+
+    def env_allowlist(self) -> set:
+        """The names a job may carry: every Settings key in config/config.sh plus the download and reliability names, minus a few that would redirect the program itself."""
+        try:
+            keys = {row["key"] for row in self.project.settings()}
+        except OSError:
+            keys = set()
+        return (keys | EXTRA_ENV_KEYS) - ENV_FORBIDDEN
+
+    def check_env(self, env) -> dict | None:
+        """Refuse an environment the window may not set: only UPPER_SNAKE names on the allowlist, values of plain text under 200 characters. Returns the cleaned dict."""
+        if env in (None, {}):
+            return None
+        if not isinstance(env, dict):
+            raise ValueError("env must be an object of setting names and values")
+        allowed, clean = self.env_allowlist(), {}
+        for key, value in env.items():
+            if not isinstance(key, str) or not ENV_KEY.fullmatch(key):
+                raise ValueError(f"not a setting name: {key!r} (use UPPER_SNAKE_CASE)")
+            if key not in allowed:
+                raise ValueError(f"{key} is not a setting the window may pass to a run")
+            if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+                raise ValueError(f"the value of {key} must be text or a number")
+            value = str(value)
+            if "\n" in value or "\r" in value or "\x00" in value:
+                raise ValueError(f"the value of {key} must be one line of plain text")
+            if len(value) >= ENV_VALUE_MAX:
+                raise ValueError(f"the value of {key} is too long (under {ENV_VALUE_MAX} characters)")
+            clean[key] = value
+        return clean or None
 
     def start_git(self, command: list, label: str, cwd) -> dict:
         """A git network operation built by plasbench.gitops.argv (never from the request): runs like any job."""
@@ -768,7 +1018,7 @@ class Jobs:
     def _launch(self, command, shown, label, env, argv, kind, cwd, resumes: str | None = None) -> dict:
         job_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
         p = self._paths(job_id)
-        child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
+        child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", PLASBENCH_STARTED_VIA="window")
         for key, value in (env or {}).items():
             if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
                 raise ValueError(f"not a setting name: {key}")
@@ -784,9 +1034,7 @@ class Jobs:
                "state": "running", "started": time.time(), "ended": None, "exit": None, "pid": runner.pid, "results": self._results_dir(argv)}
         if resumes:
             job["resumes"] = resumes
-        with self.lock:
-            self.jobs[job_id] = job
-            self._save()
+        self._register(job)
         threading.Thread(target=runner.wait, daemon=True).start()   # reap the runner; the outcome comes from its exit file
         self._watch(job_id)
         session_log().event("job_start", job=job_id, label=job["label"], command=shown, env=env or None, cwd=str(cwd), job_kind=kind)
@@ -909,7 +1157,36 @@ class Jobs:
         return dict(job, log=text, offset=min(size, max(0, offset) + MAX_LOG_CHUNK), size=size, display_state=self.display_state(job),
                     idle_seconds=jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None)
 
+    def activity(self, job_id: str) -> dict:
+        """Which files the run (or the tools it started) wrote most recently, so a quiet log can be told from a stuck run: the job's results folder and the shared data folder."""
+        job = self.jobs.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        roots = []
+        if job.get("results"):
+            roots.append(job["results"])
+        if job.get("kind") == "plasbench":
+            roots.append(str(self.project.path_setting("DATA_DIR", "data")))
+        out = jobrunner.recent_activity(roots)
+        out["state"] = job.get("state")
+        out["idle_seconds"] = jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None
+        return out
+
+    def _refresh_from_folder(self):
+        """A job another window started, or one the index lost, appears here too: when the job folder changed, jobs with a meta file come back (never a deleted one)."""
+        try:
+            stamp = os.stat(self.dir).st_mtime_ns
+        except OSError:
+            return
+        if stamp != self._dir_stamp:
+            self._dir_stamp = stamp
+            with self.lock:
+                for job in self._restore_from_meta(self._tombstones()):
+                    if job.get("state") in ("running", "cancelling") and job["id"] not in self.watchers:
+                        self._reconcile(job)
+
     def list(self) -> list[dict]:
+        self._refresh_from_folder()
         return [dict(j, display_state=self.display_state(j)) for j in sorted(self.jobs.values(), key=lambda j: -j["started"])]
 
     def progress(self, job_id: str) -> dict:
@@ -951,6 +1228,7 @@ class Jobs:
             except OSError:
                 activity = job["started"]
             out.append(dict(job, group=group, progress=progress, results=results, run_index=idx, last_activity=activity, display_state=self.display_state(job),
+                            idle_seconds=jobrunner.idle_seconds(str(self.dir), job["id"]) if state == "running" else None,
                             resumable=state in RESUMABLE_STATES and not any(j["state"] in ("running", "cancelling") and j.get("argv") == job["argv"] for j in self.jobs.values()),
                             reattached=bool(job.get("reattached"))))
         return out
@@ -962,8 +1240,11 @@ class Jobs:
                 raise ValueError("cancel the job before removing it")
             self.jobs.pop(job_id, None)
             self.deleted.add(job_id)
+            with self._save_lock, self._index_lock():
+                with open(self.dir / "jobs.deleted", "a", encoding="utf-8") as handle:   # written down: every window keeps it deleted
+                    handle.write(job_id + "\n")
             self._save()
-        for path in self._paths(job_id).values():
+        for path in list(self._paths(job_id).values()) + [self._meta_path(job_id)]:
             try:
                 os.unlink(path)
             except OSError:
@@ -995,7 +1276,7 @@ def save_state(state: dict):
 
 
 TEXT_PREVIEW = {".tsv": "table", ".csv": "table", ".txt": "text", ".log": "text", ".md": "text", ".json": "text",
-                ".yaml": "text", ".yml": "text", ".ini": "text", ".sh": "text", ".py": "text", ".gff": "text", ".gff3": "text"}
+                ".jsonl": "text", ".yaml": "text", ".yml": "text", ".ini": "text", ".sh": "text", ".py": "text", ".gff": "text", ".gff3": "text"}
 MAX_PREVIEW = 2 * 2**20
 
 
@@ -1018,15 +1299,28 @@ def read_study_file(root, raw: str) -> dict:
             "text": data.decode("utf-8", "replace")}
 
 
-def browse(path: str, files: bool) -> dict:
+def browse(path: str, files: bool, project=None) -> dict:
+    """The folder chooser's listing. An empty path is the root view: Quick places (Home, the workspace, the PlasBench folder, the shared data folder) and This PC (drive letters;
+    in WSL the Windows drives; on Linux /mnt, /media/$USER; on macOS /Volumes). A typed Windows or \\\\wsl.localhost path is converted to the Linux path in WSL."""
+    from . import chooser
+    wsl = chooser.in_wsl()
     if not path:
-        if os.name == "nt":
-            import string
-            drives = [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").exists()]
-            return {"path": "", "parent": None, "entries": [{"name": d, "path": d, "dir": True} for d in drives]}
-        path = str(Path.home())
+        places, pc = [], chooser.pc_places()
+        if project is not None:
+            from . import studies
+            from .cli import configured_data_dir
+            places = chooser.quick_places(project.root, studies.workspace(project.root), configured_data_dir(project.root))
+        else:
+            places = chooser.quick_places(Path.cwd(), Path.home())
+        help_text = ("A drive that is not listed is not mounted in Ubuntu. To mount a drive (E: as the example), run this in the Terminal tab; PlasBench never runs it for you: "
+                     + chooser.mount_command("E")) if wsl else ""
+        return {"path": "", "parent": None, "windows": "", "wsl": wsl, "places": places, "pc": pc, "help": help_text, "entries": places + pc}
+    path = chooser.to_linux(path)
     p = Path(path).expanduser()
     if not p.exists():
+        m = chooser.DRIVE_RE.match(str(path)) or (wsl and re.match(r"^/mnt/([A-Za-z])(/|$)", str(path)))
+        if wsl and m and re.match(r"^/mnt/([A-Za-z])(/|$)", str(p)):
+            raise FileNotFoundError(chooser.mount_help(re.match(r"^/mnt/([A-Za-z])", str(p)).group(1)))
         raise FileNotFoundError(f"{p} does not exist")
     if p.is_file():
         p = p.parent
@@ -1051,8 +1345,10 @@ def browse(path: str, files: bool) -> dict:
                 break
     except PermissionError:
         raise PermissionError(f"no permission to list {p}")
-    parent = str(p.parent) if p.parent != p else ("" if os.name == "nt" else None)
-    return {"path": str(p), "parent": parent, "entries": entries}
+    except OSError as exc:
+        raise PermissionError(f"cannot list {p}: {exc.strerror or exc}")
+    parent = str(p.parent) if p.parent != p else ""
+    return {"path": str(p), "parent": parent, "windows": chooser.to_windows(str(p)), "wsl": wsl, "entries": entries}
 
 
 class UIServer(ThreadingHTTPServer):
@@ -1218,6 +1514,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.send(404, b"not found", "text/plain; charset=utf-8")
             try:
                 return self.api_get(path[len("/api/"):], q)
+            except runfolders.RunFolderError as exc:
+                return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
                 return self.jsend(404, {"error": str(exc).strip("'")})
             except (PermissionError, ValueError, GitError) as exc:
@@ -1262,7 +1560,7 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "files/read":
                 return self.jsend(200, read_study_file(project.root, q.get("path", "")))
             if route == "browse":
-                return self.jsend(200, browse(q.get("path", ""), q.get("files") == "1"))
+                return self.jsend(200, browse(q.get("path", ""), q.get("files") == "1", project))
             if route == "docs":
                 return self.jsend(200, {"docs": project.docs()})
             if route == "doc":
@@ -1335,6 +1633,32 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "workspace/check":
                 from . import workspace
                 return self.jsend(200, workspace.check(q.get("path", "")))
+            if route == "fs/list":
+                from . import studies
+                return self.jsend(200, runfolders.list_dir(project.root, studies.workspace(project.root), q.get("path", ""), studies.external_folders(project.root)))
+            if route == "fs/properties":
+                from . import studies
+                return self.jsend(200, runfolders.properties(project.root, studies.workspace(project.root), q.get("path", ""), studies.external_folders(project.root)))
+            if route == "runs/facts":              # what deleting a run folder would remove, shown before the user confirms
+                from . import studies
+                ws = studies.workspace(project.root)
+                real = runfolders.check_deletable(project.root, ws, Path.home(), q.get("path", ""), state.get("runs", []), jobs.running_results(), studies.external_folders(project.root))
+                return self.jsend(200, runfolders.facts(ws, real))
+            if route == "runs/status":             # the Run status panel: same confinement as the other run routes (a study's results folder, or a listed run folder)
+                from . import studies
+                from .cli import configured_data_dir
+                ws = studies.workspace(project.root)
+                real = runfolders.check_deletable(project.root, ws, Path.home(), q.get("path", ""), state.get("runs", []), (), studies.external_folders(project.root))
+                study = real.parent if (real.parent / "study.json").is_file() else None
+                log_dir = (study / "logs") if study else real.parent / "logs"
+                data_dir = configured_data_dir(project.root)
+                if study:
+                    try:
+                        recorded = json.loads((study / "study.json").read_text(encoding="utf-8")).get("data_dir")
+                        data_dir = Path(recorded) if recorded else data_dir
+                    except (OSError, ValueError):
+                        pass
+                return self.jsend(200, run_status_json(project.root, real, log_dir, data_dir))
             if route == "studies/facts":           # what a delete or archive would involve, shown before the user confirms
                 from . import study_manage
                 return self.jsend(200, study_manage.facts(project.root, q.get("name", "")))
@@ -1346,7 +1670,16 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "run-sessions":
                 index = {r["path"]: i for i, r in enumerate(project.runs(state.get("runs", [])))}
                 index = {str(Path(k).resolve()): v for k, v in index.items()}
-                return self.jsend(200, {"sessions": jobs.sessions(index), "server_started": SERVER_STARTED})
+                from . import outside_runs, studies
+                try:
+                    outside = outside_runs.outside_runs(studies.list_studies(project.root), list(jobs.jobs.values()))
+                except Exception:  # noqa: BLE001 - a study folder that cannot be read must not hide the window's own runs
+                    outside = []
+                for entry in outside:
+                    entry["run_index"] = index.get(str(Path(entry["results"]).resolve()))
+                return self.jsend(200, {"sessions": jobs.sessions(index), "outside": outside, "server_started": SERVER_STARTED})
+            if route.startswith("jobs/") and route.endswith("/activity"):
+                return self.jsend(200, jobs.activity(route[len("jobs/"):-len("/activity")]))
             if route.startswith("jobs/"):
                 return self.jsend(200, jobs.get(route[len("jobs/"):], int(q.get("offset", 0))))
             if route == "usertools":
@@ -1427,6 +1760,8 @@ def make_handler(project: Project, jobs: Jobs):
             try:
                 data = self.body()
                 return self.api_post(route, data)
+            except runfolders.RunFolderError as exc:
+                return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
                 return self.jsend(404, {"error": str(exc).strip("'")})
             except (PermissionError, ValueError, GitError) as exc:
@@ -1555,17 +1890,30 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, out)
             if route == "studies/create":
                 from . import studies
-                folder = studies.create(project.root, data.get("name", ""), data.get("note", ""))
+                folder = studies.create(project.root, data.get("name", ""), data.get("note", ""), data.get("location") or None)
                 session_log().event("study_created", path=str(folder))
                 return self.jsend(200, {"path": str(folder)})
-            if route.startswith("studies/") and route[len("studies/"):] in ("meta", "rename", "clone", "archive", "restore", "delete", "export", "import"):
+            if route == "studies/add_existing":
+                from . import studies
+                folder = studies.add_existing(project.root, self.linux_path(data.get("path", "")))
+                session_log().event("study_added", path=str(folder))
+                return self.jsend(200, {"path": str(folder), "name": folder.name})
+            if route == "fs/mkdir":
+                from . import chooser
+                made = chooser.make_folder(self.linux_path(data.get("parent", "")), data.get("name", ""))
+                session_log().event("folder_created", path=made)
+                return self.jsend(200, {"path": made})
+            if route.startswith("studies/") and route[len("studies/"):] in ("meta", "rename", "clone", "archive", "restore", "delete", "export", "import", "delete_data", "unregister"):
                 from . import study_manage as sm, studies, __version__
                 action, name = route[len("studies/"):], (data.get("name") or "").strip()
 
                 def busy():          # a run in progress that was started in this study
                     if action in ("restore", "import", "export", "meta", "clone"):
                         return False
-                    here = str(Path(studies.workspace(project.root)) / name).lower()
+                    try:
+                        here = str(studies.study_path(project.root, name)).lower()
+                    except ValueError:
+                        return False
                     for j in jobs.list():
                         if j["state"] in ("running", "cancelling") and (here in (j.get("command") or "").lower() or f"--study {name}".lower() in (j.get("command") or "").lower()
                                                                           or f"--study={name}".lower() in (j.get("command") or "").lower()):
@@ -1583,6 +1931,10 @@ def make_handler(project: Project, jobs: Jobs):
                     out = {"path": str(sm.restore(project.root, data.get("archive", "")))}
                 elif action == "delete":
                     out = sm.delete(project.root, name, data.get("confirm", ""), busy())
+                elif action == "delete_data":
+                    out = sm.delete_data(project.root, name, data.get("confirm", ""), busy())
+                elif action == "unregister":
+                    out = {"removed": sm.remove_from_list(project.root, name)}
                 elif action == "export":
                     stamp = time.strftime("%Y%m%d-%H%M%S")
                     target = Path(studies.workspace(project.root)) / ".exports" / f"{studies.valid_name(name)}-{stamp}.zip"
@@ -1605,6 +1957,17 @@ def make_handler(project: Project, jobs: Jobs):
                 state["runs"] = [r for r in state.get("runs", []) if r != data.get("path") and str(Path(r).resolve()) != gone]
                 save_state(state)
                 return self.jsend(200, {"ok": True})
+            if route == "runs/delete":
+                from . import studies
+                ws = studies.workspace(project.root)
+                state = load_state()
+                ext = studies.external_folders(project.root)
+                real = runfolders.check_deletable(project.root, ws, Path.home(), data.get("path", ""), state.get("runs", []), jobs.running_results(), ext)
+                removed = runfolders.delete(project.root, ws, Path.home(), str(real), data.get("confirm", ""), state.get("runs", []), jobs.running_results(), ext)
+                state["runs"] = [r for r in state.get("runs", []) if str(Path(r).resolve()) != str(real) and r != data.get("path")]
+                save_state(state)
+                session_log().event("run_deleted", path=str(real), files=removed["files"], bytes=removed["bytes"])
+                return self.jsend(200, dict(removed, ok=True, freed_files=removed["files"], freed_bytes=removed["bytes"]))
             if route == "usertools/validate":
                 return self.jsend(200, self.validate_manifest(data.get("text", "")))
             if route == "usertools/save":
@@ -1612,20 +1975,18 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "reveal":
                 target = Path(data.get("path", ""))
                 if not target.exists():
-                    raise FileNotFoundError(str(target))
-                if os.name == "nt":
-                    subprocess.Popen(["explorer", "/select,", str(target)] if target.is_file() else ["explorer", str(target)])
-                elif sys.platform == "darwin":
-                    subprocess.Popen(["open", "-R", str(target)])
-                else:
-                    subprocess.Popen(["xdg-open", str(target if target.is_dir() else target.parent)])
-                return self.jsend(200, {"ok": True})
+                    raise FileNotFoundError(f"{target} does not exist")
+                return self.jsend(200, fsutil.reveal(target))
             raise FileNotFoundError(f"no such API: {route}")
 
         # ---------------------------------------------------------------- git (plasbench/gitops.py)
+        def linux_path(self, text):
+            from . import chooser
+            return chooser.to_linux(text)
+
         def git_roots(self):
             from . import studies
-            return [project.root, studies.workspace(project.root)]
+            return [project.root, studies.workspace(project.root)] + studies.external_folders(project.root)
 
         def git_choices(self) -> dict:
             """Version control tracks your runs in ONE repository in the working directory (the workspace that holds every

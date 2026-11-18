@@ -31,6 +31,8 @@ def normalise(raw: str) -> Path:
     s = (raw or "").strip().strip('"').strip("'").strip()
     if not s:
         raise ValueError("enter a folder path")
+    from . import chooser
+    s = chooser.to_linux(s)          # inside WSL: C:\\Users\\me, D:/x and \\\\wsl.localhost\\<distro>\\... become the Linux path PlasBench uses
     s = os.path.expandvars(os.path.expanduser(s))
     if "\x00" in s or any(c in s for c in '<>|*?"'):
         raise ValueError('the path contains characters that are not allowed (< > | * ? ")')
@@ -140,6 +142,11 @@ def check(raw: str) -> dict:
     if out["kind"] == "network":
         out["warnings"].append("network location: slower, and a dropped connection stops the run. Large files are better "
                                "on a local or external disk.")
+    from . import chooser
+    if chooser.in_wsl() and len(p.parts) > 2 and p.parts[1] == "mnt" and len(p.parts[2]) == 1:
+        out["warnings"].append("this is a Windows drive seen from Ubuntu (/mnt/" + p.parts[2] + "): it is slower than Ubuntu's own disk for many small files and for git, "
+                               "which a benchmark and a study repository use a lot. Use it for storage you must keep outside Ubuntu, not for heavy work if you can avoid it.")
+    out["windows"] = chooser.to_windows(str(p))
     if len(str(p)) > 150:
         out["warnings"].append("the path is long; Windows tools can fail on paths over 260 characters once study and "
                                "sample folder names are added")

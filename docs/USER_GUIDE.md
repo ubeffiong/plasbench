@@ -755,6 +755,68 @@ New files in a results folder: `.run.lock` and `.run.lock.heartbeat` (while a ru
 
 Exit codes of a stage: `0` success, `3` an adapter found no output from its tool, `4` every tool run failed. The window shows these as `failed`, `completed_with_warnings`, `stalled` and `retrying`.
 
+### Downloads: sizes, progress and the SRA Toolkit
+
+Stage 1 downloads each isolate's reference assembly and its paired reads.
+
+- **Before it starts**, PlasBench prints what it is about to fetch. For a sheet with no lock file it asks ENA for each run's exact compressed size, so the total is real and the **largest read set** is named; a set above `WARN_RUN_DOWNLOAD_GB` (default 5) is flagged as very large.
+- **While it runs**, the run log gets one progress line a minute per active download (`DOWNLOAD_PROGRESS_SECONDS`, 0 turns it off), for example `SRR123: mate 1 74.7%, mate 2 66.2% (7.1 of 9.5 GB)`. The reads come from the SRA Toolkit first and from ENA when that fails (`READ_SOURCE`). After `PREFETCH_FAIL_LIMIT` isolates in a row where the toolkit failed and ENA worked, the rest of the run goes to ENA first, and the log shows the toolkit's own last line as the reason.
+- **A limit.** `MAX_RUN_DOWNLOAD_GB` skips an isolate whose reads are larger; it is recorded as failed with the reason and retried when you raise the limit.
+- **A file that is not a cohort.** `plasbench run --cohort NAME` refuses a file that is certainly not a cohort (the accession ledger, or a table with no `sample_id` column), once and before a study folder is made. Whether a sheet has the curated columns is stage 0's check (REQUIRE_CURATED_METADATA, which `config/local.env` can switch off): it names the first three bad rows and counts the rest.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `READ_SOURCE` | `auto` | `auto`: SRA Toolkit, then ENA if it fails. `sra`: toolkit only. `ena`: ENA only, MD5-verified. |
+| `MAX_RUN_DOWNLOAD_GB` | blank | Skip an isolate whose reads exceed this many GB. Blank = no limit. |
+| `WARN_RUN_DOWNLOAD_GB` | `5` | Warn above this size (0 = never). |
+| `PREFETCH_FAIL_LIMIT` | `2` | Go to ENA first after this many toolkit failures in a row (0 = always try the toolkit first). |
+| `DOWNLOAD_PROGRESS_SECONDS` | `60` | How often a progress line is logged (0 = none). |
+| `ENA_DOWNLOAD_CONNECTIONS` | `4` | Parallel connections per ENA file. |
+| `DOWNLOAD_CONFIRM` | `1` | Show the estimate and ask before downloading (never asked without a terminal). |
+| `ENA_SIZE_LOOKUP` | `1` | `0` skips the ENA size lookup for the estimate. |
+| `ENA_PORTAL_URL` | ENA's file-report address | Point the lookup at a mirror. |
+
+**Run status in the window.** Every ongoing run on the Runs page, and the panel that appears under the console when a run has printed nothing for a while, has a Run status panel: a chip (Running / Finished / Stopped: cut off / Not running), what the run is doing now (stage, isolate, step and how long that command has run), CPU and memory of the run's processes, this computer's free memory, swap and disk, the progress counts, the newest log with its age and last line, and a "What this means" list of plain-words hints with the evidence behind each (shown as a warning only when they mention memory or disk). It refreshes every 5 seconds while it is on screen. Buttons: Refresh, Copy diagnosis (a text to paste into a message), Open the console log and Open run_events.jsonl. The "Downloads and reliability" card of New benchmark has a checkbox, on by default, to keep a console log of the run in the study (`logs/run_*.log`; `RUN_CONSOLE_LOG=0` when unchecked) and a field for how many are kept (`LOG_RETENTION_RUNS`, default 20).
+
+### Where your data and studies live
+
+Two different things are stored on disk, and each can be placed where you want.
+
+**Downloaded reads and assemblies (the "data").** By default every study uses ONE shared folder: `DATA_DIR` in `config/config.sh` (when PlasBench was installed with
+`install.sh` this is `~/.local/share/plasbench/data`, which under WSL is a Linux folder that Windows shows as `\\wsl.localhost\<distro>\home\<you>\.local\share\plasbench\data`).
+It is reused by every study, so nothing is downloaded twice, and it is kept when a study is deleted. For one run you can choose differently:
+
+| Choice | Command line | Window (New benchmark, step Options) | What it means |
+|---|---|---|---|
+| Shared folder | nothing (default) | Shared folder | Reused by every study; kept if a study is deleted. |
+| Inside the study | `--keep-data-in-study` | Inside this study folder | `<study>/data`; git-ignored; deleted together with the study. |
+| Another folder | `--data-dir PATH` | Another folder | Any folder on this computer or a connected drive. |
+
+The study remembers the choice (`data_location` and `data_dir` in its `study.json`), so Resume and later runs of the same study find the reads without repeating the flag; a flag
+given again overrides it. **Manage study → Delete downloaded data only** removes `<study>/data` and keeps the results.
+
+**The study folder itself (results, logs, the record).** It is `<workspace>/<name>` unless you say otherwise: `--study-location PARENT_DIR` creates `PARENT_DIR/<name>` (the folder
+must already exist), and the window's Study folder card and New study dialog have a Location choice. PlasBench remembers where an outside study is in a hidden list in the workspace,
+so `--study NAME`, the Workspace page and the folder tree find it. **Add an existing study folder** registers a folder that already holds a `study.json`. A study on a drive that is
+disconnected is listed as "not available" with Remove from list; nothing is created in its place. Rename, copy and archive are offered only for studies inside the workspace.
+
+**Windows drives from Ubuntu (WSL).** "Choose a folder" lists Quick places and This PC; under WSL This PC shows the Windows drives Ubuntu has mounted (`C: (Windows)` is `/mnt/c`).
+You can type a Windows path (`D:\data`, `\\wsl.localhost\Ubuntu\home\me`); it is converted and both forms are shown. A drive that is not listed is not mounted: run in the Terminal tab,
+for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e` (PlasBench never runs it for you).
+
+**Speed and sync folders.** A Windows drive seen from Ubuntu is slower than Ubuntu's own disk for many small files and for git; a cloud-sync folder (OneDrive, Dropbox) can lock
+or re-upload large files mid-run; an external or network drive stops the run if it disconnects (running again continues from the finished steps). The folder check shows these
+warnings, and the free space, under the path before you choose it.
+
+### Watching a run: status, diagnose and the logs
+
+A long run is quiet by nature, so PlasBench writes down what it is doing as it goes.
+
+- **`plasbench status`** says whether the run is running, finished or was cut off; the stage, isolate and step it is in and for how long; progress from the status tables; the CPU and memory of the run's processes; the machine's free memory, swap and disk; the newest log of that isolate; and hints that follow from those figures. `plasbench diagnose` adds the busiest processes. Both take `--study NAME` or `--results-dir DIR` (default: the most recently updated study), `--json` for scripts, and `--watch SECONDS` to repeat.
+- **Heartbeats.** Every long command prints `still working: <isolate> / <step> (N s elapsed; cpu=... rss=...; mem_avail=... swap_used=... disk_free=...; its log last changed N s ago: "<last line>")` after `HEARTBEAT_DELAY_SECONDS` (180) and then every `HEARTBEAT_INTERVAL_SECONDS` (60). That covers trimming, assembly and the stage-4 tools; downloads log their own progress line (see above). A warning is added when less than 300 MB of memory is available, or when the command has used almost no CPU and written nothing to its log for ten minutes.
+- **Files.** In the study: `logs/run_<date>-<time>.log` (everything the run printed; `logs/run.latest.log` points at the newest; the newest `LOG_RETENTION_RUNS` = 20 are kept; `RUN_CONSOLE_LOG=0` turns it off), `logs/<isolate>.<step>.log` (each tool's own output) and `results/run_events.jsonl` (one JSON line per stage start and end, isolate step, command start and end with exit code and seconds, heartbeat and warning; names and numbers only, never environment variables or commands). `results/stage_timing.tsv` has the seconds per stage.
+- **A run that was cut off** (the terminal, WSL or the computer ended it) shows as *stopped* with the hint that re-running resumes: finished isolates and tool results are reused.
+
 ## Workflow
 
 `plasbench run` runs stages 0-6. Select stages explicitly to resume or iterate:

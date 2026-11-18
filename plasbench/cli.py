@@ -1,6 +1,7 @@
 """Command-line entry point for the source checkout and container image."""
 
 import argparse
+import json
 import os
 import shlex
 import shutil
@@ -316,9 +317,9 @@ def build_parser():
                              help="Only the applications/Start menu entry, not an icon on the desktop.")
     demo_parser = sub.add_parser("demo", help="Run the offline synthetic scoring and report demo.")
     demo_parser.add_argument("--open-report", action="store_true",
-                             help="Open the completed demo report without prompting.")
+                             help="Open the completed demo report in your browser without asking.")
     demo_parser.add_argument("--no-report-prompt", action="store_true",
-                             help="Do not offer to open the completed demo report.")
+                             help="Do not ask whether to open the demo report when it finishes; just print its path.")
     open_report_parser = sub.add_parser("open-report", help="Open a completed HTML report in the default browser.")
     open_report_group = open_report_parser.add_mutually_exclusive_group(required=True)
     open_report_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
@@ -329,6 +330,15 @@ def build_parser():
     report_pdf_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
     report_pdf_group.add_argument("--results-dir", type=Path, help="Results directory containing benchmark.report.html.")
     report_pdf_parser.add_argument("--out", type=Path, help="PDF to write (default: next to the report, same name with .pdf).")
+    for status_name, status_help in (
+            ("status", "Show what a run is doing now: stage, isolate and step, for how long, CPU and memory, progress so far, and plain hints when it looks stuck."),
+            ("diagnose", "Like status, plus the busiest processes of the run: use it when a run seems stuck.")):
+        status_parser = sub.add_parser(status_name, help=status_help)
+        status_group = status_parser.add_mutually_exclusive_group()
+        status_group.add_argument("--study", help="The study whose run to inspect (default: the most recently updated study).")
+        status_group.add_argument("--results-dir", type=Path, help="A results folder to inspect (its run_events.jsonl and .run.lock are read).")
+        status_parser.add_argument("--json", action="store_true", help="Print the summary as JSON, for scripts and the window.")
+        status_parser.add_argument("--watch", type=int, metavar="SECONDS", help="Repeat every SECONDS until you press Ctrl+C.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
     upgrade_parser = sub.add_parser(
         "upgrade",
@@ -694,7 +704,7 @@ def build_parser():
                                  "not changed: a copy with those rows is written next to the results and used for this run.")
         inputs.add_argument("--independent-truth-only", action="store_true",
                             help="Run only the isolates whose truth is independent of the benchmark's reads (long-read-only or long-read-first, polished with no reads "
-                                 "or independent reads). With public-v4 that is about 15% of the cohort. Combine with --max-isolates for a balanced N of them. "
+                                 "or independent reads). With public-v4 that is about 15%% of the cohort. Combine with --max-isolates for a balanced N of them. "
                                  "The cohort file is not changed; a copy is written next to the results.")
         inputs.add_argument("--isolate-order", choices=("balanced", "file"), default="balanced",
                             help="With --max-isolates: balanced (default) spreads the N isolates across species, studies and "
@@ -702,7 +712,14 @@ def build_parser():
         inputs.add_argument("--write-script", type=Path,
                             help="Write the exact resolved commands to this file instead of running them, "
                                  "so you can review or edit them before running it yourself with bash.")
-        inputs.add_argument("-d", "--data-dir", type=Path, help="Directory for downloaded references, reads, and assemblies.")
+        inputs.add_argument("-d", "--data-dir", type=Path,
+                            help="Folder for downloaded references, reads and assemblies. By default every study uses ONE shared folder (DATA_DIR in config/config.sh, "
+                                 "~/.local/share/plasbench/data when installed by install.sh): it is reused by every study, so nothing is downloaded twice, and it is kept "
+                                 "when a study is deleted. Give a folder here to use another one for this run; the study remembers it for its later runs.")
+        inputs.add_argument("--keep-data-in-study", action="store_true",
+                            help="Keep this run's downloaded reads and assemblies inside the study folder, in <study>/data, instead of the shared folder. That folder is "
+                                 "git-ignored and is deleted together with the study. The study remembers the choice, so Resume and later runs find the reads. "
+                                 "Cannot be combined with --data-dir.")
         inputs.add_argument("-o", "--results-dir", type=Path,
                             help="Directory for predictions, scores, and reports (instead of a study folder).")
         inputs.add_argument("--study", metavar="NAME",
@@ -710,10 +727,15 @@ def build_parser():
                                  "study.json record). A run names its study after the cohort or sample sheet when this "
                                  "is not given; `report --study NAME` rebuilds that study's report. The workspace is "
                                  "PLASBENCH_WORKSPACE, default <PlasBench folder>/studies.")
+        inputs.add_argument("--study-location", type=Path, metavar="PARENT_DIR",
+                            help="Create the study folder as PARENT_DIR/NAME instead of in the workspace: on another drive, or anywhere you choose. PlasBench remembers where "
+                                 "it is (a hidden list in the workspace), so `--study NAME` finds it again. The folder must already exist; it is never created for you, "
+                                 "so a disconnected drive is not silently replaced by a folder on this computer's disk.")
         inputs.add_argument("--open-report", action="store_true",
-                            help="Open benchmark.report.html after a successful report-producing run; never prompts.")
+                            help="Open benchmark.report.html in your browser when the run finishes, without asking. Only for runs that write a report (not the metagenomics track).")
         inputs.add_argument("--no-report-prompt", action="store_true",
-                            help="Do not offer to open benchmark.report.html when an interactive run finishes.")
+                            help="Never stop at the end of the run to ask whether to open the report: it prints the report path and exits, so the run can go unattended. "
+                                 "It changes nothing about what is run or written (the window always sets it).")
         inputs.add_argument("--log-dir", type=Path, help="Directory for tool and mapping logs.")
         inputs.add_argument("--platon-db", type=Path, help="Path to the installed Platon database.")
         inputs.add_argument("--genomad-db", type=Path, help="Path to the installed geNomad database directory (containing genomad_db/).")
@@ -838,6 +860,33 @@ def main(argv=None):
         command = [sys.executable, str(root / "python" / "export_report_pdf.py"), "--report", str(report)]
         if args.out:
             command += ["--out", str(args.out)]
+        code = run(command, root)
+    elif args.command in ("status", "diagnose"):
+        from . import studies
+        if args.results_dir:
+            results_dir = Path(args.results_dir)
+        elif args.study:
+            try:
+                results_dir = studies.study_path(root, args.study) / "results"
+            except ValueError as exc:
+                parser.error(str(exc))
+        else:
+            listed = studies.list_studies(root)
+            results_dir = (Path(listed[0]["path"]) / "results") if listed else (root / "results")
+        command = [sys.executable, str(root / "python" / "run_status.py"), "--results-dir", str(results_dir)]
+        record = {}
+        try:
+            record = json.loads((results_dir.parent / "study.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        if record.get("data_dir"):
+            command += ["--data-dir", str(record["data_dir"])]
+        if args.command == "diagnose":
+            command.append("--diagnose")
+        if args.json:
+            command.append("--json")
+        if args.watch:
+            command += ["--watch", str(args.watch)]
         code = run(command, root)
     elif args.command == "test":
         code = run([bash_command(), "test/run_tests.sh"], root)
@@ -1188,13 +1237,15 @@ def main(argv=None):
             parser.error("plasbench run --mode meta requires --samples or --cohort bmock12")
         if args.study and args.results_dir:
             parser.error("give --study or --results-dir, not both")
+        if getattr(args, "study_location", None) and args.results_dir:
+            parser.error("--study-location needs a study folder: give it without --results-dir")
         if args.results_dir:
             meta_results = args.results_dir
         else:
             from . import studies
             try:
                 study_name = args.study or studies.default_name(args.cohort, args.samples, meta=True)
-                folder = studies.prepare(root, study_name, args.samples, args.cohort, argv or sys.argv[1:])
+                folder = studies.prepare(root, study_name, args.samples, args.cohort, argv or sys.argv[1:], location=getattr(args, "study_location", None))
             except ValueError as exc:
                 parser.error(str(exc))
             meta_results = folder / "results"
@@ -1210,16 +1261,34 @@ def main(argv=None):
             announce_report(meta_results / "metagenomics.report.html", args.open_report, not args.no_report_prompt)
     else:
         if args.cohort:
+            from . import sheetcheck
             cohort_path = root / "cohorts" / f"{args.cohort}.tsv"
+            # Only real benchmark sheets are offered: the accession ledger and the metagenomic tables sit in cohorts/ too.
+            available = sheetcheck.cohort_sheets(root / "cohorts") if (root / "cohorts").is_dir() else []
             if not cohort_path.is_file():
-                available = sorted(p.stem for p in (root / "cohorts").glob("*.tsv")) if (root / "cohorts").is_dir() else []
                 parser.error(
                     f"no such cohort '{args.cohort}' ({cohort_path} not found); "
                     f"available: {', '.join(available) if available else 'none'}"
                 )
+            # A file that is not a benchmark sheet (the accession ledger, for one) is refused here, once, before a study folder is made,
+            # instead of failing stage 0 with one error per row. Only what is certainly not a cohort is refused (the ledger, a table with no sample_id);
+            # whether a sheet has the curated columns stays stage 0's decision, because REQUIRE_CURATED_METADATA can be switched off in config/local.env.
+            problem = sheetcheck.refusal(cohort_path, available)
+            if problem:
+                parser.error(problem)
             args.samples = cohort_path
+        elif args.samples and Path(args.samples).is_file():
+            from . import sheetcheck
+            if sheetcheck.is_ledger(sheetcheck.header(args.samples)):
+                parser.error(sheetcheck.refusal(args.samples, sheetcheck.cohort_sheets(root / "cohorts") if (root / "cohorts").is_dir() else []))
         if args.study and args.results_dir:
             parser.error("give --study or --results-dir, not both")
+        if getattr(args, "keep_data_in_study", False) and args.data_dir:
+            parser.error("give --keep-data-in-study or --data-dir, not both")
+        if getattr(args, "keep_data_in_study", False) and args.results_dir:
+            parser.error("--keep-data-in-study needs a study folder: give it without --results-dir")
+        if getattr(args, "study_location", None) and args.results_dir:
+            parser.error("--study-location needs a study folder: give it without --results-dir")
         # Every run keeps what it produces in its own study folder (plasbench/studies.py); downloads stay shared.
         # `report` uses a study only when named, so `report --results-dir DIR` and the old layout keep working.
         study_tmp = None
@@ -1230,9 +1299,15 @@ def main(argv=None):
             try:
                 study_name = args.study or studies.default_name(args.cohort, args.samples)
                 folder = studies.prepare(root, study_name, args.samples if args.command == "run" else None,
-                                         args.cohort, argv or sys.argv[1:])
+                                         args.cohort, argv or sys.argv[1:], location=getattr(args, "study_location", None))
+                if args.command == "run":
+                    data_folder, data_note = studies.resolve_data(root, folder, getattr(args, "keep_data_in_study", False), args.data_dir, configured_data_dir(root))
+                    if data_folder is not None:
+                        args.data_dir = data_folder
             except ValueError as exc:
                 parser.error(str(exc))
+            if args.command == "run" and data_note:
+                print(f"[plasbench] {data_note}")
             args.results_dir = folder / "results"
             if not args.log_dir:
                 args.log_dir = folder / "logs"

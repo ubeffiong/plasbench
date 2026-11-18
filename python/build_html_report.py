@@ -1160,6 +1160,12 @@ def file_tree(root, report_path, excluded_paths=()):
             chunks.append(f"<li><details><summary>{esc(name)}/</summary>{render(child)}</details></li>")
         for name, path, size, modified in node["files"]:
             href = relative_link(path, report_path)
+            if href.startswith("../../") or href.startswith("file:"):
+                # The file lives well outside the report's folder (a logs folder elsewhere): a link that climbs out through several '../' or a file:// address would
+                # write the machine's own folder names into the page. List it by name, without a link.
+                chunks.append("<li class='file'><span>{}</span><span>{} · {} · not linked: it is outside this report's folder</span></li>".format(
+                    esc(name), size_text(size), esc(modified)))
+                continue
             chunks.append(
                 "<li class='file'><a href='{}' download>{}</a>"
                 "<span>{} · {}</span></li>".format(href, esc(name), size_text(size), esc(modified))

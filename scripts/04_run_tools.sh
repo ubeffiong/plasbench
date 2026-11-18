@@ -95,6 +95,7 @@ record_status() {
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$status" "$4" "$reason" "${6:-}" "$rss" \
         > "$STATUS_SHARDS/${sample}.${tool}.tsv"
+    run_event tool_end "sample=$sample" "tool=$tool" "status=$status" "reason=$reason"
     # Side table with explicit columns (tool_status.tsv keeps its fixed schema
     # for contribution files): sample, tool, status, exit_code, failure_class, attempts.
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$status" "$exit_code" "$failure_class" "$attempts" \

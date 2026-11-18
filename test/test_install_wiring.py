@@ -82,6 +82,7 @@ MANUAL = {
     "deadends": "no bioconda package; INSTALL.md documents the manual build",
     "blastn": "only the one-off compare_scoring_methods.py cross-check uses it, and it states its own requirement",
     "setsid": "util-linux; scripts/lib.sh uses it only for the run-lock heartbeat loop and checks for it first (falls back to a plain background loop)",
+    "ps": "procps, part of every Linux base system and macOS; scripts/lib.sh proc_stats and python/run_status.py use it for the CPU and memory figures of a running command, and report without those figures when it is missing",
     "timeout": "GNU coreutils; scripts/04_run_tools.sh uses it only when TOOL_TIMEOUT_SECONDS is set and checks for it first",
     "aria2c": "optional accelerator; fetch_ena_reads.py uses it only when it is on PATH (shutil.which) and otherwise "
               "downloads byte ranges itself, so nothing needs installing",

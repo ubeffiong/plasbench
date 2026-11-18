@@ -36,7 +36,8 @@ from plasbench_common import subprocess_timeout  # noqa: E402
 CONNECTIONS = max(1, int(os.environ.get("ENA_DOWNLOAD_CONNECTIONS", "4") or 4))
 SEGMENT_MIN_BYTES = int(os.environ.get("ENA_SEGMENT_MIN_BYTES", str(16 << 20)) or (16 << 20))
 
-PORTAL = "https://www.ebi.ac.uk/ena/portal/api/filereport"
+# ENA_PORTAL_URL points the file-report lookup at a mirror (or, in the tests, at a local fake server). The default is ENA itself.
+PORTAL = os.environ.get("ENA_PORTAL_URL") or "https://www.ebi.ac.uk/ena/portal/api/filereport"
 FIELDS = "run_accession,fastq_ftp,fastq_md5,fastq_bytes,library_layout"
 
 
@@ -162,12 +163,28 @@ def download(url, path, expected_md5, expected_bytes=None, retries=5, timeout=12
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True, help="SRR/ERR/DRR run accession")
-    ap.add_argument("--out-dir", required=True)
+    ap.add_argument("--out-dir", help="where to write the FASTQ files (required unless --size-only)")
+    ap.add_argument("--size-only", action="store_true",
+                    help="download nothing: print the run's total FASTQ bytes from ENA, then each file's bytes, tab-separated, on one line. "
+                         "Exit 3 when ENA cannot be reached or reports no sizes (the download stage then goes ahead without a size check).")
     args = ap.parse_args()
+    if not args.size_only and not args.out_dir:
+        ap.error("--out-dir is required unless --size-only is given")
     try:
-        report = file_report(args.run)
+        # A size lookup is only advice for the download stage, so it must not hold a run up: a short timeout (ENA_SIZE_TIMEOUT, seconds).
+        report = file_report(args.run, timeout=max(1, int(os.environ.get("ENA_SIZE_TIMEOUT", "20") or 20))) if args.size_only else file_report(args.run)
     except (OSError, ValueError) as exc:
+        if args.size_only:
+            sys.stderr.write(f"[fetch_ena_reads] size lookup failed for {args.run}: {exc}" + chr(10))
+            raise SystemExit(3)
         raise SystemExit(f"ERROR: ENA lookup failed for {args.run}: {exc}")
+    if args.size_only:
+        sizes = [x for x in (report.get("fastq_bytes") or "").split(";") if x.strip()]
+        if not sizes or not all(x.strip().isdigit() for x in sizes):
+            sys.stderr.write(f"[fetch_ena_reads] ENA reports no FASTQ sizes for {args.run}" + chr(10))
+            raise SystemExit(3)
+        print(chr(9).join([str(sum(int(x) for x in sizes))] + [x.strip() for x in sizes]))
+        return
     urls = [u for u in (report.get("fastq_ftp") or "").split(";") if u]
     md5s = (report.get("fastq_md5") or "").split(";")
     sizes = (report.get("fastq_bytes") or "").split(";")

@@ -170,6 +170,54 @@ export ANALYSIS_TRACK_FILTER="${ANALYSIS_TRACK_FILTER:-}"
 # retries each fetch this many times before recording the sample as failed.
 export NETWORK_RETRIES="${NETWORK_RETRIES:-3}"
 export NETWORK_RETRY_DELAY_SECONDS="${NETWORK_RETRY_DELAY_SECONDS:-15}"
+# Largest read download per isolate, in GB (the compressed FASTQ of its run, as ENA reports it). An isolate above it is skipped and recorded as failed with the
+# reason, the rest of the run goes on, and re-running stage 1 retries it once this is raised. Blank (default) = no limit. A 9.5 GB run of an 8.8 Mb genome is over
+# a thousand-fold coverage: slow to download and heavy to assemble. A limit of 5 to 10 keeps a quick test quick.
+export MAX_RUN_DOWNLOAD_GB="${MAX_RUN_DOWNLOAD_GB:-}"
+# Warn (never stop) when one isolate's reads are larger than this many GB (default 5; 0 = never warn). The warning says what a read set that size costs in time, disk
+# (about three times its size) and assembly memory.
+export WARN_RUN_DOWNLOAD_GB="${WARN_RUN_DOWNLOAD_GB:-5}"
+# With READ_SOURCE=auto: once the SRA Toolkit's prefetch has failed, and ENA has worked, for this many isolates in a row, stage 1 fetches from ENA first for the rest of
+# the run. That saves about a minute per isolate when the toolkit cannot connect. 0 = always try prefetch first. The count restarts each time stage 1 starts.
+export PREFETCH_FAIL_LIMIT="${PREFETCH_FAIL_LIMIT:-2}"
+# While reads download, the run log gets one progress line (percent of each mate, GB done) this often, in seconds, so a long download is not mistaken for a stall.
+# 0 = no progress lines.
+export DOWNLOAD_PROGRESS_SECONDS="${DOWNLOAD_PROGRESS_SECONDS:-60}"
+# Parallel connections per ENA file when reads come from ENA (python/fetch_ena_reads.py; aria2c does the transfer when it is installed). More can be faster on a
+# fast link; fewer is kinder to a slow or shared one. Default 4.
+export ENA_DOWNLOAD_CONNECTIONS="${ENA_DOWNLOAD_CONNECTIONS:-4}"
+# Show the estimated download size and ask before stage 1 fetches anything (1, the default). 0 skips the question. It is never asked when there is no terminal
+# (the window, CI, a container), so those runs proceed.
+export DOWNLOAD_CONFIRM="${DOWNLOAD_CONFIRM:-1}"
+# Before stage 1 downloads, PlasBench asks ENA for the exact compressed size of each run that the cohort's lock file has no base count for, so the estimate is real and
+# names the largest read set. 0 skips the lookup (it is also skipped when READ_SOURCE=sra, which never uses ENA).
+export ENA_SIZE_LOOKUP="${ENA_SIZE_LOOKUP:-1}"
+# --- Run health and reliability ------------------------------------------------
+# Stage 4 exits with code 4 when every tool run failed, because there is nothing to score. 1 continues anyway with a warning (the report is then empty of results).
+export ALLOW_ALL_TOOLS_FAILED="${ALLOW_ALL_TOOLS_FAILED:-0}"
+# Warn (never stop) before stage 1 when the drive holding the data folder has less than this many GB free. 0 turns the warning off.
+export MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-20}"
+# Time limit, in seconds, for every helper subprocess in python/ (subsampling, alignment helpers, analysis scripts). 0 or off removes the limit. Default 21600 (6 hours).
+export PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS="${PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS:-21600}"
+# A run holds RESULTS_DIR/.run.lock and touches .run.lock.heartbeat every this many seconds, so a second run on the same results folder is refused.
+export PLASBENCH_LOCK_HEARTBEAT_SECONDS="${PLASBENCH_LOCK_HEARTBEAT_SECONDS:-5}"
+# A lock whose heartbeat is older than this many seconds is taken over even if its process id is alive (a killed run, or a process id that was reused). Default 60.
+export PLASBENCH_LOCK_STALE_SECONDS="${PLASBENCH_LOCK_STALE_SECONDS:-60}"
+# 1 refuses a database download that has no pinned SHA-256 (an environment variable such as MOBSUITE_DB_SHA256, or a row in config/download_checksums.tsv). 0 (default)
+# downloads, prints the checksum it observed and records it in download_provenance.jsonl.
+export PLASBENCH_REQUIRE_CHECKSUMS="${PLASBENCH_REQUIRE_CHECKSUMS:-0}"
+# Aggregation stops when the run tables disagree (a missing column, a non-finite value, a status that contradicts a score). 1 ranks anyway; the report then carries a
+# warning not to quote it.
+export ALLOW_INCONSISTENT_RUNS="${ALLOW_INCONSISTENT_RUNS:-0}"
+# The report builder refuses a leaderboard that was not ranked from the scores it is given. 1 builds the report anyway (the mismatch is still printed).
+export ALLOW_INPUT_MISMATCH="${ALLOW_INPUT_MISMATCH:-0}"
+# The leaderboard flags a shared-sample set smaller than this fraction of the largest tool's samples (ranking_warning). The ranking itself is not changed. Default 0.5.
+export SHARED_MIN_FRACTION="${SHARED_MIN_FRACTION:-0.5}"
+# ...or smaller than this many samples. Default 5.
+export SHARED_MIN_SAMPLES="${SHARED_MIN_SAMPLES:-5}"
+# Stage 6 writes the headline with and without the replicon-database exclusion of marker-free plasmids (benchmark.truth_exclusion_sensitivity.tsv). 0 skips it.
+export RUN_TRUTH_EXCLUSION_SENSITIVITY="${RUN_TRUTH_EXCLUSION_SENSITIVITY:-1}"
+# --- Network resilience (continued) --------------------------------------------
 # Long commands continue normally, but after this many quiet seconds PlasBench
 # prints a live elapsed-time status line. This is especially useful while
 # Conda links MOB-suite or a tool writes its detailed output only to a log.

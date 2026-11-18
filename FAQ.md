@@ -570,6 +570,57 @@ and a coverage baseline. It is a descriptive evaluation, not a ranking, because 
 the independent-truth subset of public-v4 is still to be done.
 **Status.** Done for 10 isolates; open for the large panel.
 
+## M. Downloads, long runs and the window (found in field use, 18 November 2026)
+
+### Q47. `plasbench run --cohort accepted_accessions` stopped with a list of errors. Why?
+**Answer.** `accepted_accessions` is not a cohort. `cohorts/accepted_accessions.tsv` is the accession ledger: the BioSamples that earlier cohort releases already used, so that a new cohort does not repeat them. It has five columns (`biosample`, `sample_id`, `assembly_accession`, `sra_run`, `source_cohort`). A run needs `organism`, `truth_technology`, `truth_quality_tier`, `biosample` and `bioproject` for every isolate, which the ledger does not carry. Use a real cohort sheet such as `public-v4` (the ledger's `source_cohort` column shows which cohort each row came from). Now the command says this once and stops before it creates a study folder, the cohort picker and the "no such cohort" message list only files a run can use (not the ledger or the metagenomic tables), and stage 0 reports the first three bad rows and a count instead of one identical line per isolate.
+**Status.** Fixed after v0.5.0 (next release).
+
+### Q48. The log says "prefetch failed; reads fetched from ENA instead". Is that an error?
+**Answer.** No, it is a fallback that worked. `READ_SOURCE=auto` (the default) tries the SRA Toolkit's `prefetch` first and, when it fails, downloads the same run from ENA with MD5 checks. If it failed on every isolate, the toolkit on this computer cannot connect (a TLS, proxy or version problem), and each failed attempt costs about a minute. From the release after v0.5.0 the log shows the toolkit's own last line as the reason, and after `PREFETCH_FAIL_LIMIT` (default 2) isolates in a row where prefetch failed and ENA worked, stage 1 goes to ENA first for the rest of the run. `READ_SOURCE=ena` always does this; `READ_SOURCE=sra` never falls back; `PREFETCH_FAIL_LIMIT=0` always tries prefetch first.
+**Status.** Fixed after v0.5.0 (next release).
+
+### Q49. The run shows "stalled" while it downloads. Is it stuck? Does closing the window stop it?
+**Answer.** Usually it is not stuck. "Stalled" means no new output in the run log for 10 minutes (`PLASBENCH_STALL_SECONDS`); a download writes to its own log, so a long transfer used to leave the run log silent. From the release after v0.5.0 stage 1 logs a progress line every minute while reads download (`DOWNLOAD_PROGRESS_SECONDS`), for example `SRR123: mate 1 74.7%, mate 2 66.2% (7.1 of 9.5 GB)`. Closing the window does **not** stop a run: runs are detached from it, and you find them again under Runs and reports. To stop one, press Cancel, or quit and choose to stop runs. In a terminal, a download's progress is not the size of its `.part` file when aria2c does the transfer (it preallocates the full size); look at the modification time, or run `python python/download_progress.py --data-dir <the isolate's data folder> --run <SRR...>`.
+**Status.** Fixed after v0.5.0 (next release).
+
+### Q50. One isolate in my "quick" 20-isolate run has 9.5 GB of reads. Can I avoid that?
+**Answer.** Yes. Stage 1 now looks up each run's exact size at ENA before downloading, prints it, and warns above `WARN_RUN_DOWNLOAD_GB` (default 5): a read set that large is slow to download, needs about three times its size on disk, and is slow or memory-hungry to assemble (9.5 GB of reads for an 8.8 Mb genome is well over 1000-fold coverage). Set `MAX_RUN_DOWNLOAD_GB` (for example 5) to skip such isolates: they are recorded as failed with the reason, the rest of the run goes on, and re-running stage 1 retries them once you raise the limit. The summary printed before the download now also shows exact sizes and the largest read set even for a sheet with no lock file, where it used to say "size unknown".
+**Status.** Fixed after v0.5.0 (next release). There is still no cap on read depth during assembly.
+
+### Q51. What does `--no-report-prompt` mean?
+**Answer.** When a run finishes, PlasBench can stop and ask "open the report?". `--no-report-prompt` removes that question: it prints the report path and exits, so the run can go unattended. It changes nothing about what is run or written. `--open-report` does the opposite, opening the report in your browser at the end without asking. The window always sets `--no-report-prompt`.
+**Status.** Documented; the window has a checkbox for opening the report (see the User Guide).
+
+### Q52. Why are my downloaded reads in `~/.local/share/plasbench/data` (or `\\wsl.localhost\...`), and can I change that?
+**Answer.** That is the shared data folder (`DATA_DIR`, set by `install.sh`): every study reuses it, so the same reads are never downloaded twice, and it is kept when a study is deleted. Change it for one run with `--data-dir PATH` (the study remembers the folder for its later runs), or for everything with `DATA_DIR` on the Settings page. In the window, New benchmark → Options → "Where to keep downloaded reads and assemblies".
+**Status.** Documented in the User Guide ("Where your data and studies live").
+
+### Q53. Can I keep the data inside the study folder?
+**Answer.** Yes: `plasbench run ... --keep-data-in-study` (the window's second radio). The reads go to `<study>/data`, which the managed `.gitignore` excludes (checked with `git check-ignore`), and they are deleted with the study. The study remembers the choice, so Resume finds them. **Manage study → Delete downloaded data only** frees the space and keeps the results.
+**Status.** Done after v0.5.0 (next release).
+
+### Q54. Can a study live on another drive, or outside the workspace?
+**Answer.** Yes: `--study-location PARENT_DIR` (the folder must exist) or "Another folder" in the window's Study folder card or New study. PlasBench keeps a hidden list of where outside studies are, so they appear on the Workspace page and in `--study NAME`. If the drive is disconnected the study is shown as "not available" with Remove from list; nothing is created in its place. A Windows drive seen from WSL, or a cloud-sync folder, is slower or can lock files; the folder check warns.
+**Status.** Done after v0.5.0 (next release); rename, copy and archive are only for studies inside the workspace.
+
+### Q55. My drive is not listed in "Choose a folder". How do I select it?
+**Answer.** Under WSL, Ubuntu lists only the Windows drives it has mounted. In the Terminal tab run, for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e`, then press Refresh in the chooser; or type the Windows path (`E:\data`) in the path box, which is converted. PlasBench never runs the mount command itself.
+**Status.** Documented in the User Guide.
+
+### Q56. Why is my cancelled run not in the Jobs list, when I can see its folder in the studies tree?
+**Answer.** Two different reasons, both fixed. (1) A job started from the window is saved in a shared list; two windows (or a window and its background watcher) could overwrite each other's saves, and a deleted job could come back. The list is now saved under an exclusive lock, each job also keeps a small `<id>.meta.json` beside its log so the list can be rebuilt from the folder, deletions are written down, and a failed, interrupted or cancelled job is kept until you delete it or it is older than `PLASBENCH_JOB_RETENTION_DAYS` (default 180; 0 keeps them for ever). (2) A run you start in the Terminal tab or a shell is not a job of the window, so it never was in the Jobs list; the Runs page now shows the latest run of each study that was started outside the window, read-only and marked "started outside the window" (running, completed, or "interrupted or cancelled: it stopped without recording how it ended"), with Show in terminal and Open folder. The window cannot cancel such a run because it does not own the process.
+**Status.** Fixed after v0.5.0 (next release).
+
+### Q57. My run has been "stuck" for hours. How do I find out what it is doing?
+**Answer.** Run `plasbench status` (or `plasbench diagnose` for the busiest processes too; add `--watch 30` to repeat, or `--study NAME` to pick a study). It reads the run's event log, its lock, the status tables, the processes under it and the machine's memory and disk, and says in plain words: whether it is running, finished, or was cut off; the stage, isolate and step it is in and for how long; progress so far; CPU and memory; the newest log of that isolate and when it last changed; and hints that follow from those figures (for example "this isolate's reads are 9.4 GB compressed", "180 MB of memory is available", "3100 MB of swap is in use"). It never guesses: each hint shows the figure behind it.
+**What was wrong before.** The long steps of stage 3 (trimming with fastp, assembling with SPAdes or Unicycler) wrote only to their own logs, and the "still working" heartbeat existed only for the stage-4 tools, so a run could be silent in the run log for hours. Now every long command in stage 3 prints a heartbeat (elapsed time, CPU and memory of the command and what it started, memory, swap and disk of the machine, how long ago its own log last changed and that log's last line) and warns when memory is nearly gone or the command has used almost no CPU and written nothing for ten minutes.
+**Status.** Fixed after v0.5.0 (next release).
+
+### Q58. Where are the logs of a run?
+**Answer.** In the study folder: `logs/run_<date>-<time>.log` is everything the run printed, including the heartbeats (`logs/run.latest.log` points at the newest; the newest 20 are kept, `LOG_RETENTION_RUNS`; `RUN_CONSOLE_LOG=0` turns it off); `logs/<sample>.<step>.log` is each tool's own output; `results/run_events.jsonl` has one JSON line per event (stage start and end, isolate steps, command start and end with exit code and seconds, heartbeats with CPU and memory, warnings), safe to read by machine; `results/stage_timing.tsv` has seconds per stage. Events carry names and numbers only, never environment variables or commands.
+**Status.** New after v0.5.0.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions
