@@ -224,6 +224,37 @@ table.data tbody tr:hover td{background:var(--surface-2)}
 .field .help{grid-column:2;color:var(--mut);font-size:12px}
 .field.changed>label:after{content:"modified";font-size:11px;font-weight:400;color:var(--warn)}
 .field .reset{display:none}.field.changed .reset{display:inline-flex}
+/* ---------- Add your own tool: multi-select, source cards, output rows ---------- */
+.vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);border:0;white-space:nowrap}
+.ms{position:relative;width:100%;max-width:560px}
+.ms-btn{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:4px 8px;font:inherit;text-align:left;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:var(--radius);cursor:pointer}
+.ms-btn:hover{border-color:var(--faint)}.ms.open .ms-btn{border-color:var(--primary)}
+.ms-chips{display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0}
+.ms-chip{display:inline-flex;align-items:center;gap:5px;padding:0 8px;line-height:22px;border-radius:11px;background:var(--select);color:var(--primary-ink);border:1px solid var(--line);font-size:12.5px}
+.ms-pri{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--primary);color:#fff;border-radius:8px;padding:0 6px;line-height:16px}
+.ms-ph{color:var(--mut)}.ms-caret{flex:none}.ms.open .ms-caret{transform:rotate(180deg)}
+.ms-list{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 2px);margin:0;padding:4px;list-style:none;max-height:min(60vh,340px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg)}
+.ms-list:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.ms-list li{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:3px;cursor:pointer}
+.ms-list li:hover{background:var(--surface-2)}.ms-list li.act{background:var(--select)}
+.ms-cb{flex:none;width:16px;height:16px;margin-top:2px;border:1.5px solid var(--faint);border-radius:3px;background:var(--surface)}
+.ms-list li[aria-selected=true] .ms-cb{background:var(--primary);border-color:var(--primary)}
+.ms-list li[aria-selected=true] .ms-cb::after{content:"";display:block;width:4px;height:8px;margin:1px 0 0 4px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.ms-tx{display:flex;flex-direction:column;min-width:0;flex:1}.ms-ds{font-size:12px;color:var(--mut)}
+.ms-st{flex:none;font-size:11.5px;padding:0 6px;line-height:18px;border-radius:2px;border:1px solid var(--line);color:var(--fg-2);max-width:45%;overflow-wrap:anywhere}
+.ms-st.ok{border-color:transparent;color:var(--ok);background:var(--ok-soft)}.ms-st.warn{border-color:transparent;color:var(--warn);background:var(--warn-soft)}.ms-st.bad{border-color:transparent;color:var(--bad);background:var(--bad-soft)}
+.ms-na .ms-tx{opacity:.7}
+.ms-order{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px}.ms-order:empty{display:none}.ms-ordl{color:var(--mut)}
+.ms-ord{display:inline-flex;align-items:center;gap:2px;padding:1px 4px 1px 8px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2)}
+.ms-mv{font:inherit;font-size:10px;line-height:1;border:0;background:transparent;color:var(--primary);cursor:pointer;padding:4px 5px;border-radius:3px}.ms-mv:hover:not(:disabled){background:var(--primary-soft)}.ms-mv:disabled{opacity:.35;cursor:default}
+.srccards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.srccard{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);cursor:pointer;font-weight:400}
+.srccard:hover{border-color:var(--faint)}.srccard.on{border-color:var(--primary);background:var(--select)}.srccard:focus-within{outline:2px solid var(--focus);outline-offset:1px}
+.srccard input{margin-top:3px}.srccard span{display:flex;flex-direction:column}.srccard small{color:var(--mut);font-size:12px}
+fieldset.outrow{margin:8px 0;padding:4px 12px 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-2)}
+fieldset.outrow legend{padding:0 6px;font-weight:600;font-size:12.5px}
+.ut-serve{margin-top:6px;color:var(--fg-2)}
+@media (max-width:640px){.ms{max-width:none}.ms-list li{flex-wrap:wrap}.ms-st{max-width:none}.srccards{grid-template-columns:1fr}}
 dialog.pbdlg{width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 24px);display:flex;flex-direction:column;overflow:hidden}
 dialog.pbdlg[open]{display:flex}dialog.pbdlg .bd{overflow:auto;max-height:none;flex:1 1 auto}dialog.pbdlg .bd p{margin:0 0 10px}
 dialog.pbdlg.danger{border-top:3px solid var(--bad)}dialog.pbdlg.danger .hd .ico{color:var(--bad)}
@@ -969,7 +1000,7 @@ body.gd-open #gdrawer{transform:none}
 
 <dialog id="uthelp" class="wide" aria-labelledby="uh_t"><div class="hd"><svg class="ico"><use href="#i-help"/></svg><h3 id="uh_t">How "Add your own tool" works</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd help">
-  <nav class="htoc" aria-label="On this page"><a href="#uh_what">What it does</a><a href="#uh_before">Before you start</a><a href="#uh_steps">The five sections</a><a href="#uh_ph">Placeholders</a><a href="#uh_fmt">Output formats</a><a href="#uh_ex">Worked example: MOB-recon</a><a href="#uh_import">Results you already have</a><a href="#uh_fix">If the check complains</a></nav>
+  <nav class="htoc" aria-label="On this page"><a href="#uh_what">What it does</a><a href="#uh_before">Before you start</a><a href="#uh_steps">The five sections</a><a href="#uh_multi">Several tasks and outputs</a><a href="#uh_src">Where the tool comes from</a><a href="#uh_ph">Placeholders</a><a href="#uh_fmt">Output formats</a><a href="#uh_ex">Example: MOB-recon</a><a href="#uh_ex2">Example: binner and classifier</a><a href="#uh_ex3">Example: from a URL</a><a href="#uh_import">Results you already have</a><a href="#uh_fix">If the check complains</a></nav>
 
   <h4 id="uh_what">What it does</h4>
   <p>You describe your tool once: what it is, how to install it, the command that runs it, and where its answer is. PlasBench then treats it like a built-in tool:</p>
@@ -989,13 +1020,30 @@ body.gd-open #gdrawer{transform:none}
 
   <h4 id="uh_steps">The five sections of the form, top to bottom</h4>
   <dl class="hsteps">
-   <dt>1 · What it is</dt><dd><b>Name</b>: lower-case letters, digits and <code>_</code>; it cannot be a built-in tool's name. It becomes the tool's id everywhere (<code>my_mob_recon</code>). <b>Task</b>: <i>binning reconstruction</i> if it groups contigs into separate plasmids, which gives bin-level metrics; <i>classification</i> if it only says plasmid or chromosome per contig. <b>Analysis track</b>: <i>short_read</i> for tools working from Illumina assemblies. Tools are ranked only against tools on the same track. <b>Version command</b>: its first line of output is recorded as the version in the report.</dd>
-   <dt>2 · How to install it</dt><dd><b>conda</b>: list the packages with versions; channels default to conda-forge and bioconda. <b>pip</b>: a Python package. <b>script</b>: your own <code>install.sh</code> placed next to the manifest. <b>none</b>: already on your PATH, or you only import results. <b>Verify command</b> is run after installing and by <code>plasbench check</code>; anything that exits 0 when the tool works, such as <code>--help</code>.</dd>
+   <dt>1 · What it is</dt><dd><b>Name</b>: lower-case letters, digits and <code>_</code>; it cannot be a built-in tool's name. It becomes the tool's id everywhere (<code>my_mob_recon</code>). <b>Task</b>: choose one or more. <i>Binning reconstruction</i> groups contigs into separate plasmids, which gives bin-level metrics; <i>classification</i> says plasmid or chromosome per contig; <i>sequence reassembly</i> produces plasmid sequences. The first task is the <b>primary</b> one; the others are extra tasks the tool is also scored on, when its output allows (see <a href="#uh_multi">Several tasks and outputs</a>). <b>Analysis track</b>: <i>short_read</i> for tools working from Illumina assemblies. Tools are ranked only against tools on the same track. <b>Version command</b>: its first line of output is recorded as the version in the report.</dd>
+   <dt>2 · Where it comes from</dt><dd>Pick a <b>Source</b>: <b>already installed</b> (on your PATH), a <b>package manager</b> (conda: list the packages with versions; pip: a Python package), a <b>download from a URL</b>, <b>a file or folder on this computer</b>, or <b>your own install script</b> (a file beside the manifest). <a href="#uh_src">Details below.</a> <b>Verify command</b> is run after installing and by <code>plasbench check</code>.</dd>
    <dt>3 · Reference database</dt><dd>Say <b>yes</b> if the tool compares contigs to a plasmid database (PLSDB, MOB-suite's, ...). PlasBench then checks whether the test genomes are inside that database, which would inflate the score. <b>Database path</b> is what <code>{db}</code> means in the command.</dd>
    <dt>4 · How to run it</dt><dd>Write the command for one sample using <a href="#uh_ph">placeholders</a> instead of file names. Click a placeholder chip to insert it. Tick the inputs it <b>requires</b>: a sample missing one, for example without long reads, is skipped with that reason rather than failing. Every value is safely quoted for you, so spaces in paths are fine. A long command may continue on indented lines.</dd>
-   <dt>5 · How to read its output</dt><dd>Pick the <a href="#uh_fmt">format</a> that matches what the tool writes, then give the <b>output path</b> relative to <code>{outdir}</code>. For tables, say which column holds the contig and which holds the bin or label (by header name, or by number starting at 1).</dd></dl>
+   <dt>5 · How to read its output</dt><dd>Add one <b>output</b> row for each kind of file the tool writes. In each row pick the <a href="#uh_fmt">format</a> that matches what the tool writes, then give the <b>path</b> relative to <code>{outdir}</code>. Only the settings that format needs are shown: for tables, which column holds the contig and which holds the bin or label (by header name, or by number starting at 1). If you would rather not describe it, choose <b>Detect automatically</b> and list candidate file patterns.</dd></dl>
   <p>The <b>Check</b> box updates as you type and lists anything still to fix. When it says <b>Valid manifest</b>, press <b>Save &amp; install</b>. The tool is saved in <code>~/.plasbench/tools/&lt;name&gt;/</code> and installed, and the progress shows in the console.</p>
   <p><b>Then benchmark it</b>: on <b>New benchmark</b>, step <i>Tools</i>, tick it under <i>Your tools</i>. It also appears on the <b>Tools</b> page, where a switch sets whether it runs by default. From a terminal, the same is <code>plasbench run --cohort public-v1 --tool my_mob_recon</code>.</p>
+
+  <h4 id="uh_multi">One tool, several tasks and outputs</h4>
+  <p>Choose more than one <b>Task</b> when a tool can be judged on more than one. A binner, for example, can be scored as a binner and, by reading a contig that sits in a bin as a plasmid contig, as a classifier. Beside each task in the Task box, and in the <b>Check</b> box, PlasBench says how it gets that task's result from what you described:</p>
+  <table class="htab"><tr><th>Status</th><th>Meaning</th></tr>
+   <tr><td><b>native</b></td><td>the output you described already is that task's result</td></tr>
+   <tr><td><b>derived from &lt;output&gt;</b></td><td>the result is worked out from another output; the <i>How</i> column names the rule</td></tr>
+   <tr><td><b>not possible: &lt;reason&gt;</b></td><td>the output cannot give that task (for example plasmid labels cannot say which plasmid a contig belongs to). It is still selectable so you can read the reason; add an output that can, or remove the task.</td></tr></table>
+  <p>A tool may also write <b>more than one output</b>: add a row for each. In the manifest, one output is a plain <code>[output]</code> section; several become <code>format = contig_bins, plasmid_fasta</code> with a <code>[output.contig_bins]</code> and a <code>[output.plasmid_fasta]</code> section. If PlasBench is told <b>Detect automatically</b>, it is <code>format = auto</code> with <code>candidates = bins.tsv, *.labels.tsv</code>. A pattern that matches files of different shapes is reported as ambiguous, with the fix, instead of guessed. Each format can appear once.</p>
+  <h4 id="uh_src">Where the tool comes from</h4>
+  <table class="htab"><tr><th>Source</th><th>You give</th><th>Notes</th></tr>
+   <tr><td><b>Already installed</b></td><td>nothing</td><td>the tool is found on PATH; use a verify command to check</td></tr>
+   <tr><td><b>Package manager</b></td><td>conda packages or pip packages</td><td>PlasBench makes an environment for it</td></tr>
+   <tr><td><b>Download from a URL</b></td><td>an <code>https://</code> address; optionally a <b>SHA-256</b>, the <b>kind</b> (archive, git repository or single file), a <b>ref</b> for git, and a <b>build command</b></td><td>only https is accepted. With a SHA-256 a changed download is refused; without it the tool is shown as <i>not pinned</i>. Use <code>{src}</code> in the run command for the downloaded tool.</td></tr>
+   <tr><td><b>A file or folder on this computer</b></td><td>a path (<b>Choose file</b> or <b>Choose folder</b>, which lists every drive), <b>link</b> or <b>copy</b>, optionally a build command</td><td><b>copy</b> records a checksum and is reproducible; <b>link</b> follows the file as it changes. Use <code>{src}</code> in the run command.</td></tr>
+   <tr><td><b>My own install script</b></td><td>a script beside the manifest</td><td>run as <code>script &lt;environment name&gt;</code></td></tr></table>
+  <p><b>Trust:</b> PlasBench runs code you download or point to. Only use sources you trust; nothing is downloaded or run until you press <b>Save &amp; install</b>.</p>
+  <p><b>Upload or locate?</b> A small file (a script or an adapter, up to 5 MB) can be uploaded with <b>Upload from this computer</b>; it is stored in the tool's own folder under the tool's name. A large tool program is <b>located</b> on this computer or <b>downloaded</b>, never uploaded.</p>
 
   <h4 id="uh_ph">Placeholders: what PlasBench puts in the command for each sample</h4>
   <table class="htab"><tr><th>Write</th><th>It becomes</th></tr>
@@ -1005,7 +1053,8 @@ body.gd-open #gdrawer{transform:none}
    <tr><td><code>{long_reads}</code></td><td>the sample's long reads (FASTQ.gz), for long-read and hybrid tools</td></tr>
    <tr><td><code>{outdir}</code></td><td>an empty folder for this tool and this sample: write everything here</td></tr>
    <tr><td><code>{threads}</code> · <code>{sample}</code></td><td>the thread count for the tool · the sample's id</td></tr>
-   <tr><td><code>{db}</code> · <code>{tool_dir}</code></td><td>the database path from section 3 · the folder holding the manifest (for scripts you ship with it)</td></tr></table>
+   <tr><td><code>{db}</code> · <code>{tool_dir}</code></td><td>the database path from section 3 · the folder holding the manifest (for scripts you ship with it)</td></tr>
+   <tr><td><code>{src}</code></td><td>the tool itself, when it comes from a URL or from a file or folder on this computer</td></tr></table>
 
   <h4 id="uh_fmt">Output formats: pick the one that looks like your tool's answer</h4>
   <table class="htab"><tr><th>Format</th><th>The tool writes</th><th>You fill in</th></tr>
@@ -1069,6 +1118,66 @@ fasta_glob = plasmid_*.fasta
    <li>MOB-suite needs its database once: in the Terminal tab, run <code>conda run -n plasbench-my_mob_recon mob_init</code>. Skip this if the built-in MOB-recon is already set up.</li>
    <li><b>New benchmark</b> → <i>Tools</i> → tick <b>my_mob_recon</b> under <i>Your tools</i> → run. In the report it appears as "MOB-recon (my copy)", marked user-supplied, next to the built-in MOB-recon.</li></ol>
 
+  <h4 id="uh_ex2">Example: a binner that is also scored as a classifier</h4>
+  <p>A binner writes a table of contig and bin. That one output is a <b>native</b> result for binning reconstruction, and the same table <b>derives</b> classification: a contig in a bin is a plasmid contig. So the task list is <code>binning_reconstruction, classification</code> (binning is primary) with one <code>contig_bins</code> output.</p>
+  <pre class="hman">[tool]
+name = my_binner
+display_name = My binner (also scored as a classifier)
+task = binning_reconstruction, classification
+analysis_track = short_read
+description = A contig binner, scored as a binner and as a plasmid/chromosome classifier
+
+[install]
+method = conda
+packages = mybinner=1.0.0
+channels = conda-forge, bioconda
+verify_command = mybinner --help
+
+[run]
+mode = command
+command = mybinner --contigs {contigs} --out {outdir}/bins.tsv --threads {threads}
+requires = contigs
+
+[output]
+format = contig_bins
+path = bins.tsv
+delimiter = tab
+header = yes
+contig_column = contig
+bin_column = bin
+</pre>
+  <p><button class="btn sm" data-uhex="multi"><svg class="ico sm"><use href="#i-edit"/></svg>Load this example</button></p>
+
+  <h4 id="uh_ex3">Example: a tool downloaded from a URL</h4>
+  <p>The tool comes from a release archive. PlasBench downloads it when you press Save &amp; install, checks the SHA-256 if you give one, unpacks it, runs the build command, and the run command refers to it as <code>{src}</code>. Replace the address with the real one and paste its checksum.</p>
+  <pre class="hman">[tool]
+name = my_url_tool
+display_name = My tool (downloaded)
+task = classification
+analysis_track = short_read
+description = A classifier downloaded from a release page
+
+[install]
+method = url
+url = https://example.org/releases/mytool-1.2.0.tar.gz
+# sha256 = paste the SHA-256 of the file here (recommended): a changed download is then refused
+kind = archive
+build_command = make
+
+[run]
+mode = command
+command = {src}/mytool --contigs {contigs} --out {outdir}/labels.tsv --threads {threads}
+requires = contigs
+
+[output]
+format = contig_labels
+path = labels.tsv
+contig_column = contig
+label_column = label
+plasmid_values = plasmid
+</pre>
+  <p><button class="btn sm" data-uhex="url"><svg class="ico sm"><use href="#i-edit"/></svg>Load this example</button></p>
+
   <h4 id="uh_import">You already ran the tool: import its results instead</h4>
   <p>Set <b>How it runs</b> to <b>import</b>, set <b>Install method</b> to <b>none</b>, and give the <b>Outputs folder</b> and a <b>File name pattern</b> containing <code>{sample}</code>, such as <code>{sample}.tsv</code>, with one file per sample. Then fill in the output format as above. PlasBench runs nothing and scores what you give it. The files must come from the same assemblies PlasBench scores, so the contig ids match.</p>
 
@@ -1081,7 +1190,7 @@ fasta_glob = plasmid_*.fasta
    <tr><td>[section] unknown key '…'</td><td>a typo in the text box (the message lists the allowed keys); the form itself only writes known keys</td></tr></table>
   <p class="mut small">After a run, a sample whose output could not be read is listed as <i>skipped</i> with the reason. A tool error is listed as <i>failed</i>, and its log is in the study's <code>logs/</code> folder. Command-line equivalents: <code>plasbench tools new NAME</code>, <code>plasbench tools validate</code>, <code>plasbench install-tools NAME</code>. The full guide is <b>Guides → ADDING_TOOLS.md</b>.</p>
  </div>
- <div class="ft"><span class="mut small grow">The example fills the form; nothing is saved until you press Save.</span><button class="btn sec" data-close>Close</button><button class="btn" id="uh_load"><svg class="ico sm"><use href="#i-edit"/></svg>Load this example</button></div></dialog>
+ <div class="ft"><span class="mut small grow">An example fills the form; nothing is saved until you press Save.</span><button class="btn sec" data-close>Close</button><button class="btn" id="uh_load"><svg class="ico sm"><use href="#i-edit"/></svg>Load the MOB-recon example</button></div></dialog>
 
 <dialog id="pghelp" class="wide" aria-labelledby="ph_t"><div class="hd"><svg class="ico"><use href="#i-help"/></svg><h3 id="ph_t">Help</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd help" id="ph_b"></div><div class="ft"><button class="btn" data-close>Close</button></div></dialog>
@@ -1926,12 +2035,12 @@ async function loadTools(force) {
 function renderToolTable() {
   const q = TF.q.toLowerCase(), c = TF.chip;
   const rows = S.tools.filter(t => (c === "all" ? t.source !== "demo" : c === "installed" ? t.installed : c === "missing" ? t.installed === false :
-      c === "user" ? t.source === "user" : c === "demo" ? t.source === "demo" : (t.task === c || t.track === c) && t.source !== "demo")
+      c === "user" ? t.source === "user" : c === "demo" ? t.source === "demo" : (utToolTasks(t).includes(c) || t.track === c) && t.source !== "demo")
     && (!q || [t.tool, t.display, t.description, t.method_class].join(" ").toLowerCase().includes(q)));
   $("#tooltb").innerHTML = rows.map(t => `<tr>
     <td><b>${esc(t.display)}</b> ${t.source === "user" ? `<span class="tag user">your tool</span>` : t.source === "demo" ? `<span class="tag">demo</span>` : ""}<div class="mut small">${esc(t.tool)} · ${esc(t.method_class || "")}</div>
       ${t.description ? `<div class="mut small" style="max-width:420px">${esc(t.description.slice(0, 160))}</div>` : ""}</td>
-    <td><span class="tag ${t.task !== "classification" ? "rec" : "cls"}">${esc(taskLabel(t.task))}</span><div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div></td>
+    <td>${utToolTasks(t).map((x, i, all) => `<span class="tag ${x !== "classification" ? "rec" : "cls"}" ${all.length > 1 && i === 0 ? 'title="the primary task"' : ""}>${esc(taskLabel(x))}${all.length > 1 && i === 0 ? " · primary" : ""}</span>`).join(" ")}<div class="mut small" style="margin-top:3px">${esc((t.track || "").replace("_", " "))} · ${esc((t.input || "").replace(/_/g, " "))}</div>${t.source === "user" && t.install_source ? `<div class="mut small">${esc(utSourceLine(t))}</div>` : ""}</td>
     <td>${t.installed === true ? `<span class="tag ok">${icon("check")}installed</span>` : t.installed === false ? `<span class="tag bad">not found</span>` : `<span class="mut small">–</span>`}</td>
     <td class="small" style="max-width:260px">${esc(t.database || "–")}${t.database_release ? `<div class="mut">released ${esc(t.database_release)}</div>` : ""}</td>
     <td>${t.run_flag ? `<label class="switch" title="${esc(t.run_flag)}: ${t.enabled ? "on, so it runs unless you turn it off for a run" : "off, so it is skipped unless you turn it on for a run"}"><input type="checkbox" data-flag="${esc(t.run_flag)}" ${t.enabled ? "checked" : ""}><span></span></label> <b class="small ${t.enabled ? "ok-t" : "mut"}" data-flagtxt="${esc(t.run_flag)}">${t.enabled ? "on" : "off"}</b>` :
@@ -1953,22 +2062,36 @@ $("#toolsref").onclick = () => loadTools(true);
 /* ===================================================================================================
    ADD YOUR OWN TOOL (manifest builder)
    =================================================================================================== */
+/* ==UTPURE-BEGIN== (no DOM here: tested under node by test/test_ut_multi_task_ui.py) */
+const UT_TASKS = ["classification", "binning_reconstruction", "sequence_reassembly"];
+const UT_TASK_TEXT = {classification: "Classification", binning_reconstruction: "Binning reconstruction", sequence_reassembly: "Sequence reassembly"};
+const UT_FORMATS = ["contig_bins", "contig_labels", "plasmid_fasta", "fasta_dir", "adapter"];
+const UT_SOURCES = [["installed", "Already installed on this computer", "found on PATH"], ["package", "Package manager", "conda or pip"], ["url", "Download from a URL", "https only"],
+                    ["local", "A file or folder on this computer", "link or copy"], ["script", "My own install script", "saved beside the manifest"]];
+/* [key, label, kind, help, condition] ; the Source selector draws install.method itself, the Outputs rows draw [output] */
 const UT_FIELDS = {
   tool: [["name","Name","text","Lower-case letters, digits and _; becomes the tool's id in every table.",true],
          ["display_name","Display name","text","What the report calls it."],
-         ["task","Task","select:binning_reconstruction|sequence_reassembly|classification","Binning reconstruction groups existing contigs into plasmids (ranked by length-weighted binning F1); sequence reassembly produces plasmid sequences (ranked by CPRR); classification labels each contig plasmid or chromosome (ranked by base-level F1).",true],
+         ["task","Task","tasks","One or more. The first is the primary task. Each chosen task is scored; the status beside it says whether this tool's output serves it directly or by derivation.",true],
          ["analysis_track","Analysis track","select:short_read|long_read|hybrid","Tools are ranked only within their track.",true],
          ["description","Description","text","One line, shown in the tool catalogue."],
          ["citation","Citation","text","Shown with the results."],
          ["url","Web page","text",""],
          ["version_command","Version command","text","Its first output line is recorded as the tool's version, e.g. mytool --version."],
          ["requires_independent_long_read_truth","Needs truth independent of its long reads","select:auto|yes|no","auto = yes for long_read and hybrid tools."]],
-  install: [["method","Install method","select:conda|pip|script|none","conda/pip create an environment for the tool; script runs your install.sh; none = already on PATH or import mode.",true],
+  install: [["method","Install method","select:conda|pip|script|url|local|none","Chosen with the Source selector.",true],
          ["packages","Conda packages","text","Space or comma separated, e.g. mytool=1.4.2","conda"],
          ["channels","Channels","text","Default: conda-forge, bioconda","conda"],
          ["pip_packages","pip packages","text","e.g. mytool==0.9.1","conda|pip"],
          ["python","Python version","text","Default 3.10","pip"],
-         ["script","Install script","text","A file beside the manifest, run as script <environment name>","script"],
+         ["url","Download address","text","An https:// address. http, ftp and file addresses are refused.","url"],
+         ["sha256","SHA-256 checksum","text","Recommended: 64 hexadecimal characters. PlasBench refuses a download that does not match.","url"],
+         ["kind","What the address points to","select:|archive|git|file","Empty = decide from the address.","url"],
+         ["ref","Git tag, branch or commit","text","A tag or commit keeps the result reproducible.","url:git"],
+         ["path","File or folder on this computer","localpath","Use {src} in the run command to refer to it.","local"],
+         ["mode","How to use it","select:link|copy","link follows the file as it changes; copy records a checksum and is reproducible.","local"],
+         ["build_command","Build command (optional)","text","Run in the tool's folder after the download or copy, e.g. make.","url|local"],
+         ["script","Install script","upload","A file beside the manifest, run as script <environment name>. Small files (up to 5 MB) can be uploaded.","script"],
          ["env_name","Environment name","text","Default plasbench-<name>"],
          ["verify_command","Verify command","text","Run after installing and by plasbench check, e.g. mytool --help"]],
   database: [["uses_reference_database","Searches a plasmid database","select:no|yes","yes turns on the truth-leakage check."],
@@ -1982,97 +2105,403 @@ const UT_FIELDS = {
          ["timeout_seconds","Time limit (seconds)","number","Overrides TOOL_TIMEOUT_SECONDS","command"],
          ["env","Run from","select:auto|path","auto: the tool's own environment when it exists; path: whatever is on PATH","command"],
          ["dir","Outputs folder","path","One output per sample, made from the same assemblies PlasBench scores","import"],
-         ["pattern","File name pattern","text","Must contain {sample}, e.g. {sample}.tsv","import"]],
-  output: [["format","Output format","select:contig_bins|contig_labels|plasmid_fasta|fasta_dir|adapter","The shape of what the tool writes.",true],
-         ["path","Output path","text","Where the tool writes it, relative to {outdir}","!import"],
-         ["delimiter","Delimiter","select:tab|comma|semicolon|whitespace","","contig_bins|contig_labels"],
-         ["header","Header row","select:yes|no","","contig_bins|contig_labels"],
-         ["contig_column","Contig column","text","Name, or 1-based number","contig_bins|contig_labels"],
-         ["bin_column","Bin column","text","Name, or 1-based number","contig_bins"],
-         ["label_column","Label column","text","Plasmid/chromosome label","contig_labels"],
-         ["plasmid_values","Values meaning plasmid","text","e.g. plasmid, Plasmid, 1","contig_labels"],
-         ["score_column","Probability column","text","In [0, 1]; adds a precision-recall curve","contig_labels"],
-         ["threshold","Threshold","text","Without a label column, score ≥ threshold is plasmid (default 0.5)","contig_labels"],
-         ["fasta_glob","FASTA file patterns","text","Default *.fa, *.fasta, *.fna","fasta_dir"],
-         ["adapter","Adapter script","text","A script beside the manifest: adapter <output> <contigs> <pred fasta>","adapter"],
-         ["contig_id_from","Contig id","select:|first_token","first_token keeps the first word of the tool's contig ids","contig_bins|contig_labels"],
-         ["contig_id_strip_regex","Strip from contig ids","text","Regular expression removed from each id, e.g. _length_.*$","contig_bins|contig_labels"]]};
-const UT_TITLES = {tool:["What it is","name, task and track"], install:["How to install it","plasbench install-tools NAME"], database:["Reference database","for the leakage check"],
-                   run:["How to run it","mode, command and inputs"], output:["How to read its output","maps it onto PlasBench's predictions"]};
-let UT = {tool:{task:"binning_reconstruction", analysis_track:"short_read"}, install:{method:"conda", verify_command:""}, database:{uses_reference_database:"no"},
-          run:{mode:"command", requires:"contigs"}, output:{format:"contig_bins", header:"yes", delimiter:"tab"}}, utSync = false, utTimer = null;
-function utVisible(cond) {
-  if (!cond) return true;
-  const m = UT.install.method, mode = UT.run.mode, fmt = UT.output.format;
+         ["pattern","File name pattern","text","Must contain {sample}, e.g. {sample}.tsv","import"]]};
+/* the keys of one output row, by format: [key, label, kind, formats it applies to] */
+const UT_OUT_FIELDS = [
+  ["delimiter","Delimiter","select:tab|comma|semicolon|whitespace",["contig_bins","contig_labels"]],
+  ["header","Header row","select:yes|no",["contig_bins","contig_labels"]],
+  ["contig_column","Contig column","text",["contig_bins","contig_labels"]],
+  ["bin_column","Bin column","text",["contig_bins"]],
+  ["label_column","Label column","text",["contig_labels"]],
+  ["plasmid_values","Values meaning plasmid","text",["contig_labels"]],
+  ["score_column","Probability column","text",["contig_labels"]],
+  ["threshold","Threshold","text",["contig_labels"]],
+  ["fasta_glob","FASTA file patterns","text",["fasta_dir"]],
+  ["adapter","Adapter script","upload",["adapter"]],
+  ["contig_id_from","Contig id","select:|first_token",["contig_bins","contig_labels"]],
+  ["contig_id_strip_regex","Strip from contig ids","text",["contig_bins","contig_labels"]]];
+const UT_OUT_KNOWN = ["format", "path", ...UT_OUT_FIELDS.map(f => f[0])];
+const UT_NEW_ROW = {
+  contig_bins: {path: "bins.tsv", delimiter: "tab", header: "yes", contig_column: "contig", bin_column: "bin"},
+  contig_labels: {path: "labels.tsv", delimiter: "tab", header: "yes", contig_column: "contig", label_column: "label", plasmid_values: "plasmid"},
+  plasmid_fasta: {path: "plasmids.fasta"}, fasta_dir: {path: "plasmids", fasta_glob: "*.fasta"}, adapter: {path: "output"}};
+function utNewRow(format) { return Object.assign({format}, UT_NEW_ROW[format] || {}); }
+function utBlank() {
+  return {tool: {task: "binning_reconstruction", analysis_track: "short_read"}, install: {method: "conda"}, database: {uses_reference_database: "no"},
+          run: {mode: "command", requires: "contigs", command: "mytool --contigs {contigs} --out {outdir} --threads {threads}"},
+          out: {auto: false, candidates: "", rows: [utNewRow("contig_bins")]}, other: {}};
+}
+function utOutKeys(format) { return UT_OUT_FIELDS.filter(f => f[3].includes(format)); }
+function utVisible(cond, M) {
+  if (cond === true || !cond) return true;
+  const m = M.install.method, mode = M.run.mode;
   if (cond.startsWith("!")) return cond.slice(1) !== mode;
-  return cond.split("|").some(c => c === m || c === mode || c === fmt);
+  if (cond === "url:git") return m === "url" && (M.install.kind || "") === "git";
+  return cond.split("|").some(c => c === m || c === mode);
 }
-function utRender() {
-  const user = S.user;
-  $("#utsections").innerHTML = Object.keys(UT_FIELDS).map(sec => `<details class="fgroup" open><summary>${UT_TITLES[sec][0]} <span class="n">— ${UT_TITLES[sec][1]}</span></summary><div class="fb">` +
-    UT_FIELDS[sec].filter(f => utVisible(f[4] === true ? "" : f[4])).map(([k, label, kind, help, cond]) => {
-      const v = UT[sec][k] ?? "", id = `ut_${sec}_${k}`, req = cond === true;
-      let ctl;
-      if (kind.startsWith("select:")) ctl = `<select id="${id}" data-s="${sec}" data-k="${k}">${kind.slice(7).split("|").map(o => `<option value="${o}" ${o === v ? "selected" : ""}>${o || "(as written)"}</option>`).join("")}</select>`;
-      else if (kind === "textarea") ctl = `<textarea id="${id}" data-s="${sec}" data-k="${k}" rows="3" spellcheck="false">${esc(v)}</textarea>`;
-      else if (kind.startsWith("checks:")) { const set = new Set(String(v).split(/[,\s]+/).filter(Boolean));
-        ctl = `<div class="chips" id="${id}">${kind.slice(7).split("|").map(o => `<button type="button" class="chip ${set.has(o) ? "on" : ""}" data-s="${sec}" data-k="${k}" data-v="${o}">${o.replace("_", " ")}</button>`).join("")}</div>`; }
-      else if (kind === "path") ctl = `<input type="text" id="${id}" data-s="${sec}" data-k="${k}" value="${esc(v)}"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="1">Browse</button>`;
-      else ctl = `<input type="${kind === "number" ? "number" : "text"}" id="${id}" data-s="${sec}" data-k="${k}" value="${esc(v)}">`;
-      let extra = "";
-      if (sec === "run" && k === "command") extra = `<div class="chips" style="margin-top:6px">${Object.entries(user?.placeholders || {}).map(([p, d]) =>
-        `<button type="button" class="chip" title="${esc(d)}" data-ph="{${p}}">{${p}}</button>`).join("")}</div>`;
-      return `<div class="field"><label for="${id}">${esc(label)}${req ? `<span class="req">*</span>` : ""} <code>${k}</code></label><div><div class="ctl">${ctl}</div>${extra}</div>${help ? `<div class="help">${esc(help)}</div>` : ""}</div>`;
-    }).join("") + `</div></details>`).join("");
+/* tasks: a comma list, first = primary */
+function utTaskList(v) { const out = []; for (const t of String(v || "").split(",").map(s => s.trim()).filter(Boolean)) if (!out.includes(t)) out.push(t); return out; }
+function utToggleTask(list, t) { const l = list.slice(), i = l.indexOf(t); if (i < 0) l.push(t); else l.splice(i, 1); return l; }
+function utMoveTask(list, t, d) { const l = list.slice(), i = l.indexOf(t), j = i + d; if (i < 0 || j < 0 || j >= l.length) return l; [l[i], l[j]] = [l[j], l[i]]; return l; }
+/* what validate says about one task: native / derived from X / not possible: why */
+function utStatusText(e) {   /* the short word beside a task; the sentence (e.how) is in the Check table */
+  if (!e) return "";
+  return e.status === "not_possible" ? "not possible" : String(e.status || "");
 }
-function utToText() {
+function utStatusClass(s) { return s === "native" ? "ok" : s === "derived" ? "warn" : s === "not_possible" ? "bad" : ""; }
+/* type-ahead: the index of the next label starting with the typed text (a repeated single letter cycles) */
+function utTypeahead(labels, buf, cur) {
+  const b = String(buf || "").toLowerCase(), n = labels.length; if (!b || !n) return -1;
+  const off = b.length === 1 ? 1 : 0;
+  for (let i = 0; i < n; i++) { const idx = ((cur + off + i) % n + n) % n; if (String(labels[idx]).toLowerCase().startsWith(b)) return idx; }
+  return -1;
+}
+/* manifest text <-> form model */
+function utFmtKV(k, v) { v = String(v).trim(); return v.includes("\n") ? `${k} = ${v.split("\n").map(s => s.trim()).filter(Boolean).join("\n    ")}` : `${k} = ${v}`; }
+function utRowLines(r, M) {
+  const L = [], put = (k, v) => { if (String(v ?? "").trim() !== "") L.push(utFmtKV(k, v)); };
+  if (M.run.mode !== "import") put("path", r.path);
+  const keys = utOutKeys(r.format).map(f => f[0]);
+  for (const k of keys) put(k, r[k]);
+  for (const k of Object.keys(r)) if (!UT_OUT_KNOWN.includes(k)) put(k, r[k]);
+  return L;
+}
+function utOutputLines(M) {
+  const O = M.out, L = [];
+  if (O.auto) { L.push("", "[output]", "format = auto"); if (String(O.candidates || "").trim()) L.push(utFmtKV("candidates", O.candidates)); return L; }
+  const rows = (O.rows || []).filter(r => r.format);
+  if (!rows.length) return L;
+  if (rows.length === 1) { L.push("", "[output]", `format = ${rows[0].format}`, ...utRowLines(rows[0], M)); return L; }
+  L.push("", "[output]", `format = ${rows.map(r => r.format).join(", ")}`);
+  for (const r of rows) L.push("", `[output.${r.format}]`, ...utRowLines(r, M));
+  return L;
+}
+function utModelToText(M) {
   const lines = ["# PlasBench user tool manifest (written by plasbench ui). Reference: docs/ADDING_TOOLS.md"];
   for (const sec of Object.keys(UT_FIELDS)) {
-    const keys = UT_FIELDS[sec].filter(f => utVisible(f[4] === true ? "" : f[4])).map(f => f[0]);
-    const extra = Object.keys(UT[sec]).filter(k => !keys.includes(k) && UT[sec][k] && !UT_FIELDS[sec].some(f => f[0] === k));
-    const vals = [...keys, ...extra].filter(k => String(UT[sec][k] ?? "").trim() !== "");
-    if (!vals.length) continue;
-    lines.push("", `[${sec}]`);
-    for (const k of vals) { const v = String(UT[sec][k]).trim();
-      if (v.includes("\n")) lines.push(`${k} = ${v.split("\n").map(s => s.trim()).filter(Boolean).join("\n    ")}`); else lines.push(`${k} = ${v}`); }
+    const known = UT_FIELDS[sec].map(f => f[0]), vals = M[sec] || {};
+    const keys = UT_FIELDS[sec].filter(f => utVisible(f[4], M)).map(f => f[0]);
+    const extra = Object.keys(vals).filter(k => !known.includes(k));
+    const written = [...keys, ...extra].map(k => [k, sec === "tool" && k === "task" ? utTaskList(vals[k]).join(", ") : vals[k]]).filter(([, v]) => String(v ?? "").trim() !== "");
+    if (!written.length) continue;
+    lines.push("", `[${sec}]`, ...written.map(([k, v]) => utFmtKV(k, v)));
   }
+  lines.push(...utOutputLines(M));
+  for (const sec of Object.keys(M.other || {})) { const kv = Object.entries(M.other[sec]).filter(([, v]) => String(v ?? "").trim() !== ""); if (kv.length) lines.push("", `[${sec}]`, ...kv.map(([k, v]) => utFmtKV(k, v))); }
   return lines.join("\n") + "\n";
 }
-function utFromText(text) {
+function utParseIni(text) {
   const out = {}; let sec = null, key = null;
-  for (const raw of text.split(/\r?\n/)) {
+  for (const raw of String(text).split(/\r?\n/)) {
     const line = raw.replace(/\s+[#;].*$/, ""); if (/^\s*[#;]/.test(raw) || !line.trim()) { key = /^\s+\S/.test(raw) && key ? key : null; if (!line.trim()) continue; }
     const s = line.match(/^\s*\[([^\]]+)\]\s*$/); if (s) { sec = s[1].trim(); out[sec] = out[sec] || {}; key = null; continue; }
     if (/^\s+\S/.test(line) && sec && key) { out[sec][key] += "\n" + line.trim(); continue; }
     const kv = line.match(/^\s*([A-Za-z_][\w]*)\s*[=:]\s*(.*)$/); if (kv && sec) { key = kv[1].toLowerCase(); out[sec][key] = kv[2].trim(); }
   }
-  for (const s of Object.keys(UT_FIELDS)) out[s] = out[s] || {};
   return out;
+}
+function utTextToModel(text) {
+  const ini = utParseIni(text), M = {other: {}};
+  for (const s of Object.keys(UT_FIELDS)) M[s] = Object.assign({}, ini[s] || {});
+  const o = ini.output || {}, fmts = String(o.format || "").split(/[,\s]+/).filter(Boolean), used = new Set(["output"]);
+  const shared = Object.assign({}, o); delete shared.format; delete shared.candidates;
+  M.out = {auto: false, candidates: "", rows: []};
+  if (fmts.length === 1 && fmts[0] === "auto") { M.out.auto = true; M.out.candidates = o.candidates || ""; }
+  else if (fmts.length === 1) M.out.rows = [Object.assign({}, shared, {format: fmts[0]})];
+  else for (const f of fmts) { used.add("output." + f); M.out.rows.push(Object.assign({}, shared, ini["output." + f] || {}, {format: f})); }
+  for (const s of Object.keys(ini)) if (!(s in UT_FIELDS) && !used.has(s)) M.other[s] = ini[s];
+  return M;
+}
+/* live checks of the source (no server needed) */
+function utSourceOf(M) { const m = M.install.method; return !m || m === "none" ? "installed" : m === "conda" || m === "pip" ? "package" : m; }
+function utSourceMethod(id, M) { return id === "installed" ? "none" : id === "package" ? (["conda", "pip"].includes(M.install.method) ? M.install.method : "conda") : id; }
+function utSourceProblems(M) {
+  const errors = [], warnings = [], i = M.install, m = i.method;
+  if (m === "url") {
+    const u = String(i.url || "").trim();
+    if (!u) errors.push("Enter the https:// address to download the tool from.");
+    else if (!/^https:\/\/[^\s/]+/i.test(u)) errors.push("Only https:// addresses are accepted (not http://, ftp:// or file://). Use the https address, or download the file yourself and choose A file or folder on this computer.");
+    const h = String(i.sha256 || "").trim();
+    if (h && !/^[0-9a-fA-F]{64}$/.test(h)) errors.push("A SHA-256 checksum is exactly 64 hexadecimal characters (0-9, a-f).");
+    if (!h) warnings.push("Not pinned: without a SHA-256 checksum PlasBench cannot tell if the download changed since you looked at it. Recommended: add it.");
+    if (i.kind === "git" && !String(i.ref || "").trim()) warnings.push("No ref: the latest commit of the default branch is used, which changes over time. Give a tag or commit to make it reproducible.");
+  } else if (m === "local") {
+    if (!String(i.path || "").trim()) errors.push("Choose the file or folder on this computer.");
+    if (i.mode === "link") warnings.push("Linked: results change if the file changes. Use copy to record a checksum and keep a reproducible copy.");
+  } else if (m === "script" && !String(i.script || "").trim()) warnings.push("Name the install script, and upload it here or save it beside the manifest.");
+  return {errors, warnings};
+}
+function utSourceSummary(M) {
+  const i = M.install, src = utSourceOf(M), label = Object.fromEntries(UT_SOURCES.map(s => [s[0], s[1]]))[src], rows = [["Source", label + (src === "package" ? " (" + i.method + ")" : "")]];
+  if (i.method === "url") { rows.push(["Address", i.url || "(not set)"], ["SHA-256", i.sha256 || "not pinned"]); if (i.kind) rows.push(["Kind", i.kind]); if (i.ref) rows.push(["Ref", i.ref]); }
+  if (i.method === "local") rows.push(["Path", i.path || "(not set)"], ["Mode", i.mode || "link"]);
+  if (i.method === "script") rows.push(["Script", i.script || "(not set)"]);
+  if ((i.method === "url" || i.method === "local") && i.build_command) rows.push(["Build", i.build_command]);
+  return rows;
+}
+/* inline output problems, each with its fix */
+function utOutputProblems(M) {
+  const O = M.out, P = [];
+  if (O.auto) { if (!String(O.candidates || "").trim()) P.push("Detect automatically needs at least one file pattern. Add the names the tool writes, for example bins.tsv, *.labels.tsv."); return P; }
+  const rows = O.rows || [];
+  if (!rows.length) P.push("No output is described. Add an output row, or choose Detect automatically.");
+  const seen = {};
+  rows.forEach((r, n) => {
+    const w = `Output ${n + 1} (${r.format || "no format"})`;
+    if (!r.format) { P.push(`${w}: choose its format.`); return; }
+    if (seen[r.format]) P.push(`${w}: the format ${r.format} is already used by output ${seen[r.format]}. Each format can appear once: change this one or remove it.`); else seen[r.format] = n + 1;
+    if (M.run.mode !== "import" && !String(r.path || "").trim()) P.push(`${w}: say where the tool writes it, relative to {outdir}.`);
+    if (r.format === "contig_labels" && !String(r.label_column || "").trim() && !String(r.score_column || "").trim()) P.push(`${w}: give a label column or a probability column.`);
+    if (r.format === "contig_bins" && !String(r.bin_column || "").trim()) P.push(`${w}: give the bin column.`);
+    if (r.format === "adapter" && !String(r.adapter || "").trim()) P.push(`${w}: name the adapter script (upload it, or save it beside the manifest).`);
+  });
+  return P;
+}
+/* the Tools page and the wizard: where a user tool comes from */
+function utSourceLine(t) {
+  const s = t && t.install_source; if (!s) return "";
+  const word = {installed: "already installed", conda: "conda", pip: "pip", url: "URL", local: "local file", script: "install script"}[s] || s;
+  if (s === "url" || s === "local") return `source: ${word} · ${t.sha256 ? "sha256 " + String(t.sha256).slice(0, 12) + "…" : "not pinned"}`;
+  return `source: ${word}`;
+}
+function utToolTasks(t) { return t && t.tasks && t.tasks.length ? t.tasks : [t && t.task].filter(Boolean); }
+/* ==UTPURE-END== */
+const UT_TITLES = {tool:["What it is","name, tasks and track"], install:["Where it comes from and how to install it","plasbench install-tools NAME"], database:["Reference database","for the leakage check"],
+                   run:["How to run it","mode, command and inputs"], output:["How to read its output","one or more outputs, mapped onto PlasBench's predictions"]};
+let UT = utBlank(), utSync = false, utTimer = null, utLast = null;
+const utTip = key => tipBtn((S.schema?.usertool_help || {})[key], key.replace(/_/g, " "));
+const UT_TIP = {"tool.task": "task", "install.url": "src_url", "install.sha256": "src_sha256", "install.kind": "src_kind", "install.ref": "src_ref", "install.build_command": "src_build",
+  "install.path": "src_path", "install.mode": "src_mode", "install.script": "src_script"};
+const UT_OUT_TIP = {delimiter: "out_delimiter", header: "out_header", contig_column: "out_contig_column", bin_column: "out_bin_column", label_column: "out_label_column", plasmid_values: "out_plasmid_values",
+  score_column: "out_score_column", threshold: "out_threshold", fasta_glob: "out_fasta_glob", adapter: "out_adapter", contig_id_from: "out_contig_id_from", contig_id_strip_regex: "out_contig_id_strip"};
+const UT_EMPTY_LABEL = {"install.kind": "auto (decide from the address)", "contig_id_from": "as written"};
+
+/* ---- a reusable multi-select dropdown: msHTML(id, cfg) draws it, the handlers below (delegated) run it.
+   cfg = {labelId, placeholder, options: [{value, label, desc}], get() -> [values in order], set(values), status: {value: {status, how}}, primary: true}.
+   A button shows the chosen values as chips (the first one tagged primary); a popup listbox (aria-multiselectable) holds checkbox options.
+   Keys: Down/Up/Home/End move, Space or Enter toggle, Alt+Up/Down reorder, letters jump (type-ahead), Escape closes; a click outside closes. ---- */
+const MS = {};
+const msLabel = (cfg, v) => (cfg.options.find(o => o.value === v) || {label: v}).label;
+function msChipsHTML(cfg) {
+  const sel = cfg.get();
+  if (!sel.length) return `<span class="ms-ph">${esc(cfg.placeholder || "Choose…")}</span>`;
+  return sel.map((v, i) => `<span class="ms-chip">${esc(msLabel(cfg, v))}${cfg.primary && i === 0 ? `<span class="ms-pri">primary</span>` : ""}</span>`).join("");
+}
+function msOptionsHTML(id, cfg, act) {
+  const sel = cfg.get();
+  return cfg.options.map((o, i) => { const st = (cfg.status || {})[o.value], txt = utStatusText(st), cls = utStatusClass(st && st.status);
+    return `<li role="option" id="${id}_o_${i}" data-v="${esc(o.value)}" aria-selected="${sel.includes(o.value)}" class="${cls === "bad" ? "ms-na" : ""}${i === act ? " act" : ""}"><span class="ms-cb" aria-hidden="true"></span>` +
+      `<span class="ms-tx"><b>${esc(o.label)}</b><span class="ms-ds">${esc(o.desc || "")}</span></span>${txt ? `<span class="ms-st ${cls}">${esc(txt)}</span>` : ""}</li>`; }).join("");
+}
+function msOrderHTML(cfg) {
+  const sel = cfg.get(); if (!cfg.primary || sel.length < 2) return "";
+  return `<span class="ms-ordl">Order (the first is primary):</span>` + sel.map((v, i) => `<span class="ms-ord">${i + 1}. ${esc(msLabel(cfg, v))}` +
+    `<button type="button" class="ms-mv" data-mv="-1" data-v="${esc(v)}" ${i === 0 ? "disabled" : ""} aria-label="Move ${esc(msLabel(cfg, v))} earlier">&#9664;</button>` +
+    `<button type="button" class="ms-mv" data-mv="1" data-v="${esc(v)}" ${i === sel.length - 1 ? "disabled" : ""} aria-label="Move ${esc(msLabel(cfg, v))} later">&#9654;</button></span>`).join("");
+}
+function msHTML(id, cfg) {
+  MS[id] = cfg; cfg.active = 0;
+  return `<div class="ms" id="${id}" data-ms="${id}"><button type="button" class="ms-btn" id="${id}_btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}_list" aria-labelledby="${cfg.labelId} ${id}_btn">` +
+    `<span class="ms-chips" id="${id}_chips">${msChipsHTML(cfg)}</span><svg class="ico sm ms-caret" aria-hidden="true"><use href="#i-chev"/></svg></button>` +
+    `<ul class="ms-list" id="${id}_list" role="listbox" aria-multiselectable="true" aria-labelledby="${cfg.labelId}" tabindex="-1" hidden>${msOptionsHTML(id, cfg, -1)}</ul>` +
+    `<div class="ms-order" id="${id}_order">${msOrderHTML(cfg)}</div></div>`;
+}
+function msRefresh(id) {
+  const cfg = MS[id], root = document.getElementById(id); if (!cfg || !root) return;
+  const list = $(`#${id}_list`), open = !list.hidden;
+  $(`#${id}_chips`).innerHTML = msChipsHTML(cfg); $(`#${id}_order`).innerHTML = msOrderHTML(cfg);
+  list.innerHTML = msOptionsHTML(id, cfg, open ? cfg.active : -1);
+  if (open) list.setAttribute("aria-activedescendant", `${id}_o_${cfg.active}`);
+}
+function msSetStatus(id, map) { if (MS[id]) { MS[id].status = map; msRefresh(id); } }
+function msOpen(id) {
+  const cfg = MS[id], root = document.getElementById(id), list = $(`#${id}_list`); if (!cfg || !root || !list.hidden) return;
+  const first = cfg.options.findIndex(o => cfg.get().includes(o.value)); cfg.active = first < 0 ? 0 : first;
+  list.hidden = false; root.classList.add("open"); $(`#${id}_btn`).setAttribute("aria-expanded", "true"); msRefresh(id); list.focus();
+}
+function msClose(id, refocus) {
+  const root = document.getElementById(id), list = $(`#${id}_list`); if (!root || list.hidden) return;
+  list.hidden = true; root.classList.remove("open"); list.removeAttribute("aria-activedescendant"); $(`#${id}_btn`).setAttribute("aria-expanded", "false");
+  if (refocus) $(`#${id}_btn`).focus();
+}
+function msMoveActive(id, to) { const cfg = MS[id]; cfg.active = Math.max(0, Math.min(cfg.options.length - 1, to)); msRefresh(id); const li = $(`#${id}_o_${cfg.active}`); if (li && li.scrollIntoView) li.scrollIntoView({block: "nearest"}); }
+function msToggle(id, v) { const cfg = MS[id]; cfg.set(utToggleTask(cfg.get(), v)); msRefresh(id); }
+function msMove(id, v, d) { const cfg = MS[id]; cfg.set(utMoveTask(cfg.get(), v, d)); msRefresh(id); }
+let msBuf = "", msBufTimer = null;
+document.addEventListener("click", e => {
+  const root = e.target.closest && e.target.closest(".ms"); if (!root) return; const id = root.dataset.ms;
+  const mv = e.target.closest(".ms-mv"); if (mv) { msMove(id, mv.dataset.v, +mv.dataset.mv); const again = root.querySelector(`.ms-mv[data-v="${mv.dataset.v}"][data-mv="${mv.dataset.mv}"]`) || root.querySelector(".ms-mv:not([disabled])"); if (again) again.focus(); return; }
+  if (e.target.closest(".ms-btn")) { $(`#${id}_list`).hidden ? msOpen(id) : msClose(id, true); return; }
+  const li = e.target.closest("li[role=option]"); if (li) { const cfg = MS[id]; cfg.active = cfg.options.findIndex(o => o.value === li.dataset.v); msToggle(id, li.dataset.v); }
+});
+document.addEventListener("mousedown", e => { document.querySelectorAll(".ms.open").forEach(r => { if (!r.contains(e.target)) msClose(r.dataset.ms); }); });
+document.addEventListener("focusout", e => { const r = e.target.closest && e.target.closest(".ms.open"); if (r && e.relatedTarget && !r.contains(e.relatedTarget)) msClose(r.dataset.ms); });
+document.addEventListener("keydown", e => {
+  const root = e.target.closest && e.target.closest(".ms"); if (!root) return; const id = root.dataset.ms, cfg = MS[id]; if (!cfg) return;
+  if (e.target.classList.contains("ms-btn")) { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); msOpen(id); } return; }
+  if (e.target.id !== `${id}_list`) return;
+  const n = cfg.options.length, cur = cfg.options[cfg.active];
+  if (e.key === "ArrowDown") { e.preventDefault(); if (e.altKey && cur) msMove(id, cur.value, 1); else msMoveActive(id, cfg.active + 1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); if (e.altKey && cur) msMove(id, cur.value, -1); else msMoveActive(id, cfg.active - 1); }
+  else if (e.key === "Home") { e.preventDefault(); msMoveActive(id, 0); }
+  else if (e.key === "End") { e.preventDefault(); msMoveActive(id, n - 1); }
+  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); msClose(id, true); }
+  else if (e.key === "Enter" || (e.key === " " && !msBuf)) { e.preventDefault(); if (cur) msToggle(id, cur.value); }
+  else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    msBuf += e.key; clearTimeout(msBufTimer); msBufTimer = setTimeout(() => { msBuf = ""; }, 700);
+    const k = utTypeahead(cfg.options.map(o => o.label), msBuf, cfg.active); if (k >= 0) { e.preventDefault(); msMoveActive(id, k); }
+  }
+}, true);
+
+/* ---- the form ---- */
+function utTaskOptions() {
+  const help = S.user?.task_help || {};
+  const tasks = Array.isArray(S.user?.tasks) && S.user.tasks.length ? S.user.tasks : UT_TASKS;   /* the backend's list when the page has it */
+  return tasks.map(t => ({value: t, label: UT_TASK_TEXT[t] || t.replace(/_/g, " "), desc: help[t] || ""}));
+}
+function utStatusMap(r) { return Object.fromEntries(((r && r.tasks) || []).map(e => [e.task, e])); }
+function utTasksHTML(id) {
+  return msHTML(id, {labelId: "ut_task_lbl", placeholder: "Choose one or more tasks", primary: true, options: utTaskOptions(), status: utStatusMap(utLast),
+    get: () => utTaskList(UT.tool.task), set: list => { UT.tool.task = list.join(", "); utChanged(false); }});
+}
+function utOptions(kind, key, v) {
+  const empty = UT_EMPTY_LABEL[key] || "(as written)";
+  return kind.slice(7).split("|").map(o => `<option value="${esc(o)}" ${o === v ? "selected" : ""}>${o === "" ? esc(empty) : esc(o)}</option>`).join("");
+}
+function utSourceHTML() {
+  const cur = utSourceOf(UT), help = (S.user?.source_help || {})[UT.install.method || "none"] || "";
+  return `<div class="field"><label id="ut_src_lbl">Source ${utTip("source")}</label><div><div class="srccards" role="radiogroup" aria-labelledby="ut_src_lbl">` +
+    UT_SOURCES.map(([id, label, sub]) => `<label class="srccard ${id === cur ? "on" : ""}"><input type="radio" name="ut_src" value="${id}" ${id === cur ? "checked" : ""}><span><b>${esc(label)}</b><small>${esc(sub)}</small></span></label>`).join("") +
+    `</div>${help ? `<div class="help" style="margin-top:6px">${esc(help)}</div>` : ""}` +
+    `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>PlasBench will run code you download or point to. Only use sources you trust; nothing is downloaded or run until you press Save &amp; install.</div></div>` +
+    (cur === "package" ? `<div class="ctl" style="margin-top:8px"><label for="ut_install_method" class="small">Package manager</label><select id="ut_install_method" data-s="install" data-k="method"><option value="conda" ${UT.install.method === "conda" ? "selected" : ""}>conda</option><option value="pip" ${UT.install.method === "pip" ? "selected" : ""}>pip</option></select></div>` : "") +
+    `<div id="ut_src_msgs" aria-live="polite"></div></div></div>`;
+}
+function utFieldHTML(sec, f) {
+  const [k, label, kind, help, cond] = f, v = UT[sec][k] ?? "", id = `ut_${sec}_${k}`, req = cond === true, tip = UT_TIP[`${sec}.${k}`] ? utTip(UT_TIP[`${sec}.${k}`]) : "";
+  let ctl;
+  if (kind === "tasks") ctl = utTasksHTML(id);
+  else if (kind.startsWith("select:")) ctl = `<select id="${id}" data-s="${sec}" data-k="${k}">${utOptions(kind, `${sec}.${k}`, v)}</select>`;
+  else if (kind === "textarea") ctl = `<textarea id="${id}" data-s="${sec}" data-k="${k}" rows="3" spellcheck="false">${esc(v)}</textarea>`;
+  else if (kind.startsWith("checks:")) { const set = new Set(String(v).split(/[,\s]+/).filter(Boolean));
+    ctl = `<div class="chips" id="${id}">${kind.slice(7).split("|").map(o => `<button type="button" class="chip ${set.has(o) ? "on" : ""}" data-s="${sec}" data-k="${k}" data-v="${o}">${o.replace("_", " ")}</button>`).join("")}</div>`; }
+  else if (kind === "path") ctl = `<input type="text" id="${id}" data-s="${sec}" data-k="${k}" value="${esc(v)}"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="1">Browse</button>`;
+  else if (kind === "localpath") ctl = `<input type="text" id="${id}" data-s="${sec}" data-k="${k}" value="${esc(v)}" placeholder="C:\\tools\\mytool.exe or /home/me/mytool"><button type="button" class="btn sec sm" data-browse="${id}" data-dir="0">Choose file…</button><button type="button" class="btn sec sm" data-browse="${id}" data-dir="1">Choose folder…</button>`;
+  else if (kind === "upload") ctl = `<input type="text" id="${id}" data-s="${sec}" data-k="${k}" value="${esc(v)}">${utUploadBtn(id)}`;
+  else ctl = `<input type="${kind === "number" ? "number" : "text"}" id="${id}" data-s="${sec}" data-k="${k}" value="${esc(v)}">`;
+  let extra = "";
+  if (sec === "run" && k === "command") { const ph = Object.assign({}, S.user?.placeholders || {});
+    extra = `<div class="chips" style="margin-top:6px">${Object.entries(ph).map(([p, d]) => `<button type="button" class="chip" title="${esc(d)}" data-ph="{${p}}">{${p}}</button>`).join("")}</div>`; }
+  const lblFor = kind === "tasks" ? `ut_task_lbl` : "";
+  return `<div class="field"><label ${lblFor ? `id="${lblFor}" for="${id}_btn"` : `for="${id}"`}>${esc(label)}${req ? `<span class="req">*</span>` : ""} <code>${k}</code>${tip}</label><div><div class="ctl">${ctl}</div>${extra}</div>${help ? `<div class="help">${esc(help)}</div>` : ""}</div>`;
+}
+function utUploadBtn(id) {
+  return `<button type="button" class="btn sec sm" data-upload="${id}" title="Read a small file (up to 5 MB) in this browser and store it in the tool's own folder">Upload from this computer…</button>` +
+    `<input type="file" class="vh" id="${id}_file" data-upfor="${id}" tabindex="-1" aria-hidden="true">${utTip("upload")}`;
+}
+function utOutHTML() {
+  const O = UT.out, imp = UT.run.mode === "import"; O.rows = O.rows || []; const used = O.rows.map(r => r.format);
+  let h = `<div class="field"><label id="ut_out_lbl">Outputs ${utTip("outputs")}</label><div><div class="srccards" role="radiogroup" aria-labelledby="ut_out_lbl">` +
+    `<label class="srccard ${!O.auto ? "on" : ""}"><input type="radio" name="ut_outmode" value="rows" ${!O.auto ? "checked" : ""}><span><b>Specific outputs</b><small>one row per kind of output the tool writes</small></span></label>` +
+    `<label class="srccard ${O.auto ? "on" : ""}"><input type="radio" name="ut_outmode" value="auto" ${O.auto ? "checked" : ""}><span><b>Detect automatically</b><small>PlasBench recognises the shape from candidate file patterns</small></span></label></div>` +
+    `<div id="ut_out_errs" aria-live="polite"></div></div></div>`;
+  if (O.auto) return h + `<div class="field"><label for="ut_out_cands">Candidate file patterns ${utTip("out_candidates")}</label><div><div class="ctl"><input type="text" id="ut_out_cands" data-out="candidates" value="${esc(O.candidates || "")}" placeholder="bins.tsv, *.labels.tsv, plasmids/*.fasta"></div></div><div class="help">Globs relative to {outdir}, separated by commas. If files of different shapes match, PlasBench reports it as ambiguous instead of guessing.</div></div>`;
+  h += O.rows.map((r, i) => {
+    const fmtOpts = [...new Set([...UT_FORMATS, r.format])].filter(Boolean).map(f => `<option value="${esc(f)}" ${f === r.format ? "selected" : ""} ${used.includes(f) && f !== r.format ? "disabled" : ""}>${esc(f)}</option>`).join("");
+    const keys = utOutKeys(r.format).map(([k, label, kind]) => { const id = `ut_out_${i}_${k}`, v = r[k] ?? "", tip = UT_OUT_TIP[k] ? utTip(UT_OUT_TIP[k]) : "";
+      const ctl = kind.startsWith("select:") ? `<select id="${id}" data-row="${i}" data-k="${k}">${utOptions(kind, k, v)}</select>` : kind === "upload" ? `<input type="text" id="${id}" data-row="${i}" data-k="${k}" value="${esc(v)}">${utUploadBtn(id)}` : `<input type="text" id="${id}" data-row="${i}" data-k="${k}" value="${esc(v)}">`;
+      return `<div class="field"><label for="${id}">${esc(label)} <code>${k}</code>${tip}</label><div><div class="ctl">${ctl}</div></div></div>`; }).join("");
+    return `<fieldset class="outrow" data-i="${i}"><legend>Output ${i + 1}</legend>` +
+      `<div class="field"><label for="ut_out_${i}_format">Format <code>format</code>${utTip("out_format")}</label><div><div class="ctl"><select id="ut_out_${i}_format" data-row="${i}" data-k="format">${fmtOpts}</select>` +
+      `${O.rows.length > 1 ? `<button type="button" class="btn ghost sm" data-outdel="${i}" aria-label="Remove output ${i + 1}">${icon("x")}Remove</button>` : ""}</div><div class="help">${esc((S.user?.format_help || {})[r.format] || "")}</div></div></div>` +
+      (imp ? "" : `<div class="field"><label for="ut_out_${i}_path">Path <code>path</code>${utTip("out_path")}</label><div><div class="ctl"><input type="text" id="ut_out_${i}_path" data-row="${i}" data-k="path" value="${esc(r.path ?? "")}"></div></div><div class="help">Relative to {outdir}.</div></div>`) +
+      keys + `<div class="ut-serve small" data-serve="${esc(r.format)}"></div></fieldset>`; }).join("");
+  const free = UT_FORMATS.filter(f => !used.includes(f));
+  return h + `<div style="padding:8px 0"><button type="button" class="btn sec sm" id="ut_outadd" ${free.length ? "" : "disabled"}>${icon("plus")}Add another output</button> <span class="mut small">A tool can write more than one kind of output; each format can appear once.</span></div>`;
+}
+function utRender() {
+  const act = document.activeElement && document.activeElement.id;
+  $("#utsections").innerHTML = Object.keys(UT_FIELDS).map(sec => `<details class="fgroup" open><summary>${UT_TITLES[sec][0]} <span class="n">— ${UT_TITLES[sec][1]}</span></summary><div class="fb">` +
+    (sec === "install" ? utSourceHTML() : "") +
+    UT_FIELDS[sec].filter(f => utVisible(f[4], UT) && !(sec === "install" && f[0] === "method")).map(f => utFieldHTML(sec, f)).join("") + `</div></details>`).join("") +
+    `<details class="fgroup" open><summary>${UT_TITLES.output[0]} <span class="n">— ${UT_TITLES.output[1]}</span></summary><div class="fb">${utOutHTML()}</div></details>`;
+  if (act && document.getElementById(act)) document.getElementById(act).focus();
+  utInline();
+}
+/* inline messages that need no server: the source's errors and warnings, and the output problems with their fixes; the last check adds the server's */
+function utInline() {
+  const src = utSourceProblems(UT), box = $("#ut_src_msgs");
+  if (box) box.innerHTML = src.errors.map(e => `<div class="bad-t small" style="margin-top:6px">${icon("x")} ${esc(e)}</div>`).join("") + src.warnings.map(w => `<div class="warn-t small" style="margin-top:6px">${icon("alert")} ${esc(w)}</div>`).join("");
+  const eb = $("#ut_out_errs");
+  if (eb) { const mine = utOutputProblems(UT), theirs = ((utLast && utLast.problems) || []).filter(p => /output|candidate|ambigu|format/i.test(p) && !mine.some(m => m === p));
+    eb.innerHTML = [...mine, ...theirs].map(p => `<div class="bad-t small" style="margin-top:6px" role="alert">${icon("x")} ${esc(p)}</div>`).join(""); }
+  for (const el of $$("[data-serve]")) { const o = ((utLast && utLast.outputs) || []).find(x => x && x.format === el.dataset.serve);
+    if (!o) { el.innerHTML = ""; continue; }
+    const serves = o.serves || [];
+    el.innerHTML = `<b>Serves:</b> ${serves.length ? serves.map(t => `<span class="tag rec">${esc(taskLabel(t))}</span>`).join(" ") : `<span class="mut">no chosen task</span>`}`; }
 }
 function utChanged(fromText) {
   utSync = true;
-  if (fromText) { UT = utFromText($("#ut_text").value); utRender(); }
-  else { $("#ut_text").value = utToText(); }
+  if (fromText) { UT = utTextToModel($("#ut_text").value); utRender(); }
+  else { $("#ut_text").value = utModelToText(UT); utInline(); }
   utSync = false;
   clearTimeout(utTimer); utTimer = setTimeout(utValidate, 350);
+}
+function utCheckHTML(r, src) {
+  const problems = [...(r.problems || []), ...src.errors.filter(e => !(r.problems || []).includes(e))], warnings = [...(r.warnings || [])];
+  for (const w of src.warnings) if (!warnings.includes(w)) warnings.push(w);
+  const tasks = r.tasks || [], chosen = utTaskList(UT.tool.task);
+  const table = tasks.length ? `<table class="data small" style="margin-top:8px"><thead><tr><th>Task</th><th>Result</th><th>How</th></tr></thead><tbody>${tasks.map(t => `<tr><td>${esc(taskLabel(t.task))}${chosen[0] === t.task && chosen.length > 1 ? ` <span class="tag">primary</span>` : ""}</td><td><span class="tag ${utStatusClass(t.status)}">${esc(String(t.status || "").replace("_", " "))}</span></td><td>${esc(t.how || "")}</td></tr>`).join("")}</tbody></table>` : "";
+  const srcRows = r.source && Object.keys(r.source).length ? Object.entries(r.source).filter(([, v]) => v !== null && typeof v !== "object").map(([k, v]) => [k.replace(/_/g, " "), String(v)]) : utSourceSummary(UT);
+  const srcBlock = `<div class="small mut" style="margin-top:10px"><b>Source</b></div><dl class="facts small">${srcRows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+  const outs = (r.outputs || []).length ? `<div class="small mut" style="margin-top:10px"><b>Outputs</b></div><ul class="small" style="margin:4px 0 0 18px">${r.outputs.map(o => `<li><code>${esc(o.format || "")}</code>${o.path ? ` ${esc(o.path)}` : ""}${(o.serves || []).length ? ` serves ${o.serves.map(t => esc(taskLabel(t))).join(", ")}` : ""}${(o.candidates || []).length ? ` <span class="mut">(${o.candidates.map(esc).join(", ")})</span>` : ""}</li>`).join("")}</ul>` : "";
+  const warnBlock = warnings.length ? `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>${warnings.map(esc).join("<br>")}</div></div>` : "";
+  if (r.ok && !src.errors.length) {
+    const row = r.row, name = row ? row.tool : (UT.tool.name || ""), track = String((row && row.analysis_track) || UT.tool.analysis_track || "").replace("_", " ");
+    const tl = (tasks.length ? tasks.map(t => t.task) : chosen).map(taskLabel).join(" + ");
+    return `<div class="note ok">${icon("check", "ico")}<div><b>Valid manifest</b><div class="small">${esc(name)} · ${esc(tl)} · ${esc(track)}</div></div></div>` + table + srcBlock + outs + warnBlock +
+      (r.plan ? `<div class="small mut" style="margin-top:10px"><b>Install plan</b></div><div class="cmdline" style="margin-top:4px"><code>${esc(r.plan.filter(s => s[0] !== "ENV").map(s => s[0] === "VERIFY" ? "verify: " + s[1] : s.join(" ").replace("{CONDA}", "conda")).join("\n") || "nothing to install")}</code></div>` : "") +
+      `<div class="small mut" style="margin-top:10px">Then: <code>plasbench run … --tool ${esc(name)}</code></div>`;
+  }
+  return `<div class="note bad">${icon("x", "ico")}<div><b>${problems.length} thing${problems.length === 1 ? "" : "s"} to fix</b><ul>${problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div></div>` + table + srcBlock + warnBlock;
 }
 async function utValidate() {
   const box = $("#utcheck");
   try {
     const r = await api("usertools/validate", {text: $("#ut_text").value});
-    if (r.ok) {
-      const row = r.row;
-      box.innerHTML = `<div class="note ok">${icon("check", "ico")}<div><b>Valid manifest</b><div class="small">${esc(row.tool)} · ${esc(row.binning_capable === "yes" ? "binning reconstruction" : "classification")} · ${esc(row.analysis_track.replace("_", " "))}</div></div></div>` +
-        (r.warnings.length ? `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>${r.warnings.map(esc).join("<br>")}</div></div>` : "") +
-        `<div class="small mut" style="margin-top:10px"><b>Install plan</b></div><div class="cmdline" style="margin-top:4px"><code>${esc(r.plan.filter(s => s[0] !== "ENV").map(s => s[0] === "VERIFY" ? "verify: " + s[1] : s.join(" ").replace("{CONDA}", "conda")).join("\n") || "nothing to install")}</code></div>
-        <div class="small mut" style="margin-top:10px">Then: <code>plasbench run … --tool ${esc(row.tool)}</code></div>`;
-    } else box.innerHTML = `<div class="note bad">${icon("x", "ico")}<div><b>${r.problems.length} thing${r.problems.length > 1 ? "s" : ""} to fix</b><ul>${r.problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div></div>`;
+    utLast = r;
+    box.innerHTML = utCheckHTML(r, utSourceProblems(UT));
+    msSetStatus("ut_tool_task", utStatusMap(r)); utInline();
     return r;
   } catch (e) { box.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
 }
-$("#utsections").addEventListener("input", e => { const t = e.target; if (!t.dataset.s) return; UT[t.dataset.s][t.dataset.k] = t.value;
-  if (["method","mode","format"].includes(t.dataset.k)) utRender(); utChanged(false); });
-$("#utsections").addEventListener("change", e => { const t = e.target; if (t.tagName === "SELECT" && ["method","mode","format"].includes(t.dataset.k)) { utRender(); utChanged(false); } });
+/* ---- upload of a small file (a script or an adapter): read in the browser, stored in the tool's own folder ---- */
+async function utUpload(file, inputId) {
+  const max = S.user?.upload_max_bytes || 5 * 2 ** 20, name = String(UT.tool.name || "").trim();
+  if (!name) return showMessage({title: "Name the tool first", body: "An uploaded file is stored in the tool's own folder, which is named after the tool. Enter the Name in section 1, then upload again.", danger: true});
+  if (file.size > max) return showMessage({title: "That file is too large to upload", danger: true, body: `${file.name} is ${(file.size / 2 ** 20).toFixed(1)} MB; uploads are limited to ${Math.round(max / 2 ** 20)} MB and are meant for scripts and adapters.\n\nA large tool is located, not uploaded: choose Source: A file or folder on this computer, or download it from a URL.`});
+  let text; try { text = await file.text(); } catch (e) { return showMessage({title: "The file could not be read", body: e.message, danger: true}); }
+  if (text.includes("\u0000") || text.includes("\uFFFD")) return showMessage({title: "That does not look like a text file", danger: true, body: "Only text files (scripts and adapters) can be uploaded. Locate a program on this computer instead."});
+  try {
+    const r = await api("usertools/upload", {name, filename: file.name, text}), inp = document.getElementById(inputId);
+    if (inp) { inp.value = r.path; inp.dispatchEvent(new Event("input", {bubbles: true})); }
+    toast(`Uploaded ${r.path} to ${r.folder}`, "ok");
+  } catch (e) { showMessage({title: "Not uploaded", body: e.message, danger: true}); }
+}
+/* ---- events ---- */
+$("#utsections").addEventListener("input", e => { const t = e.target; if (t.tagName === "SELECT") return;
+  if (t.dataset.s) { UT[t.dataset.s][t.dataset.k] = t.value; utChanged(false); }
+  else if (t.dataset.row !== undefined) { UT.out.rows[+t.dataset.row][t.dataset.k] = t.value; utChanged(false); }
+  else if (t.dataset.out === "candidates") { UT.out.candidates = t.value; utChanged(false); } });
+$("#utsections").addEventListener("change", e => { const t = e.target;
+  if (t.name === "ut_src") { UT.install.method = utSourceMethod(t.value, UT); if (UT.install.method === "local" && !UT.install.mode) UT.install.mode = "link"; utRender(); utChanged(false); const r = document.querySelector('input[name="ut_src"]:checked'); if (r) r.focus(); return; }
+  if (t.name === "ut_outmode") { UT.out.auto = t.value === "auto"; if (!UT.out.auto && !UT.out.rows.length) UT.out.rows.push(utNewRow("contig_bins")); utRender(); utChanged(false); const r = document.querySelector('input[name="ut_outmode"]:checked'); if (r) r.focus(); return; }
+  if (t.dataset.upfor) { if (t.files && t.files[0]) utUpload(t.files[0], t.dataset.upfor); t.value = ""; return; }
+  if (t.tagName !== "SELECT") return;
+  if (t.dataset.row !== undefined) { const r = UT.out.rows[+t.dataset.row]; r[t.dataset.k] = t.value;
+    if (t.dataset.k === "format") for (const [k, v] of Object.entries(UT_NEW_ROW[t.value] || {})) if (!String(r[k] ?? "").trim()) r[k] = v;
+    utRender(); utChanged(false); return; }
+  if (t.dataset.s) { UT[t.dataset.s][t.dataset.k] = t.value; if ((t.dataset.s === "install" && ["method", "kind"].includes(t.dataset.k)) || (t.dataset.s === "run" && t.dataset.k === "mode")) utRender(); utChanged(false); } });
 $("#utsections").addEventListener("click", e => {
   const c = e.target.closest(".chip[data-v]");
   if (c) { const s = new Set(String(UT[c.dataset.s][c.dataset.k] || "").split(/[,\s]+/).filter(Boolean)); s.has(c.dataset.v) ? s.delete(c.dataset.v) : s.add(c.dataset.v);
@@ -2080,6 +2509,9 @@ $("#utsections").addEventListener("click", e => {
   const p = e.target.closest("[data-ph]");
   if (p) { const ta = $("#ut_run_command"); const at = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, at) + p.dataset.ph + ta.value.slice(ta.selectionEnd ?? at);
     ta.focus(); UT.run.command = ta.value; utChanged(false); }
+  const up = e.target.closest("[data-upload]"); if (up) { document.getElementById(up.dataset.upload + "_file").click(); return; }
+  if (e.target.closest("#ut_outadd")) { const f = UT_FORMATS.find(x => !UT.out.rows.some(r => r.format === x)); if (f) { UT.out.rows.push(utNewRow(f)); utRender(); utChanged(false); } return; }
+  const del = e.target.closest("[data-outdel]"); if (del) { UT.out.rows.splice(+del.dataset.outdel, 1); utRender(); utChanged(false); }
 });
 $("#ut_text").addEventListener("input", () => { if (!utSync) utChanged(true); });
 
@@ -2351,9 +2783,15 @@ const PAGE_HELP = {
 "title": "Add your own tool",
 "what": "Benchmark a tool PlasBench does not ship: describe it once, and it is installed, run, scored and reported like a built-in tool.",
 "steps": [
-"Press <b>How it works</b> for the full guide: the five sections of the form, the placeholders, the output formats, and a worked example (MOB-recon) you can load into the form."
+"Name the tool and choose its <b>task</b>. The Task box takes one or more: a binner can also be scored as a classifier. The first task is the primary one.",
+"Choose <b>where the tool comes from</b>: already installed, a package manager, a download from an https address, a file or folder on this computer, or your own install script. Nothing is downloaded or run until you press Save &amp; install.",
+"Describe its <b>outputs</b>: one row for each kind of file it writes, or let PlasBench detect the shape from file patterns. The Check box shows which output serves which task.",
+"Press <b>How it works</b> for the full guide, with three worked examples (MOB-recon, a binner that is also a classifier, and a tool downloaded from a URL) you can load into the form."
 ],
-"tips": [],
+"tips": [
+"Small files (a script or an adapter, up to 5 MB) can be uploaded from this computer. A large tool is located on this computer or downloaded, not uploaded.",
+"Give a download a SHA-256 checksum: PlasBench then refuses a file that changed."
+],
 "cli": [
 "plasbench tools new NAME",
 "plasbench tools validate",
@@ -2392,17 +2830,24 @@ $("#ut_help").onclick = openUtHelp;
 document.addEventListener("click", e => { if (e.target.closest("[data-uthelp]")) openUtHelp(); });
 $("#uthelp .bd").onclick = e => { const a = e.target.closest('a[href^="#uh_"]'); if (!a) return; e.preventDefault();
   $("#uthelp " + a.getAttribute("href")).scrollIntoView({behavior: "smooth", block: "start"}); };
-$("#uh_load").onclick = async () => {
-  const cur = (UT.tool && UT.tool.name) || "";
-  if (cur && cur !== "my_mob_recon" && !await askConfirm({title: "Replace the form with the example?", confirmLabel: "Replace", body: `"${cur}" in the form is replaced with the MOB-recon example. Nothing is saved until you press Save.`})) return;
-  $("#uthelp").close(); $("#ut_load").value = ""; $("#ut_where").textContent = "";
-  $("#ut_text").value = UT_EXAMPLE; utChanged(true); scrollTo({top: 0, behavior: "smooth"});
+const UT_EXAMPLE_MULTI = "[tool]\nname = my_binner\ndisplay_name = My binner (also scored as a classifier)\ntask = binning_reconstruction, classification\nanalysis_track = short_read\ndescription = A contig binner, scored as a binner and as a plasmid/chromosome classifier\n\n[install]\nmethod = conda\npackages = mybinner=1.0.0\nchannels = conda-forge, bioconda\nverify_command = mybinner --help\n\n[run]\nmode = command\ncommand = mybinner --contigs {contigs} --out {outdir}/bins.tsv --threads {threads}\nrequires = contigs\n\n[output]\nformat = contig_bins\npath = bins.tsv\ndelimiter = tab\nheader = yes\ncontig_column = contig\nbin_column = bin\n";
+const UT_EXAMPLE_URL = "[tool]\nname = my_url_tool\ndisplay_name = My tool (downloaded)\ntask = classification\nanalysis_track = short_read\ndescription = A classifier downloaded from a release page\n\n[install]\nmethod = url\nurl = https://example.org/releases/mytool-1.2.0.tar.gz\n# sha256 = paste the SHA-256 of the file here (recommended): a changed download is then refused\nkind = archive\nbuild_command = make\n\n[run]\nmode = command\ncommand = {src}/mytool --contigs {contigs} --out {outdir}/labels.tsv --threads {threads}\nrequires = contigs\n\n[output]\nformat = contig_labels\npath = labels.tsv\ncontig_column = contig\nlabel_column = label\nplasmid_values = plasmid\n";
+const UT_EXAMPLES = {mob: ["my_mob_recon", UT_EXAMPLE, "MOB-recon"], multi: ["my_binner", UT_EXAMPLE_MULTI, "binner and classifier"], url: ["my_url_tool", UT_EXAMPLE_URL, "URL-sourced tool"]};
+async function utLoadExample(key) {
+  const [ex, text, label] = UT_EXAMPLES[key], cur = (UT.tool && UT.tool.name) || "";
+  if (cur && !Object.values(UT_EXAMPLES).some(e => e[0] === cur) && !await askConfirm({title: "Replace the form with the example?", confirmLabel: "Replace", body: `"${cur}" in the form is replaced with the ${label} example. Nothing is saved until you press Save.`})) return;
+  $("#uthelp").close(); $("#ut_load").value = ""; $("#ut_where").textContent = ""; utLast = null;
+  $("#ut_text").value = text; utChanged(true); scrollTo({top: 0, behavior: "smooth"});
   toast("Example loaded: check the form, then Save & install", "ok");
-};
+}
+$("#uh_load").onclick = () => utLoadExample("mob");
+$("#uthelp .bd").addEventListener("click", e => { const b = e.target.closest("[data-uhex]"); if (b) utLoadExample(b.dataset.uhex); });
 $("#ut_copy").onclick = () => copyText($("#ut_text").value, "Manifest copied");
 $("#ut_dl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([$("#ut_text").value], {type:"text/plain"}));
   a.download = "plasbench-tool.ini"; a.click(); };
 async function utSave(install) {
+  const bad = utSourceProblems(UT).errors;
+  if (bad.length) { await showMessage({title: "Fix the source first", body: bad.join("\n\n"), danger: true}); return; }
   try {
     let r = await api("usertools/save", {text: $("#ut_text").value, overwrite: false});
     if (!r.ok && r.exists && await askConfirm({title: "Replace the saved tool?", danger: true, confirmLabel: "Replace it", body: `${r.path} already exists. Replacing it overwrites the saved manifest.`})) r = await api("usertools/save", {text: $("#ut_text").value, overwrite: true});
@@ -2418,14 +2863,13 @@ async function utLoadList() {
   $("#ut_load").innerHTML = `<option value="">New tool…</option>` + u.tools.map(t => `<option value="${esc(t.name)}">Edit: ${esc(t.display)} (${esc(t.name)})</option>`).join("");
   $("#s_addtool").textContent = u.tools.length ? `${u.tools.length} of your own` : "Manifest builder";
 }
-$("#ut_load").onchange = async e => { if (!e.target.value) { utReset(); return; }
+$("#ut_load").onchange = async e => { if (!e.target.value) { utReset(); return; } utLast = null;
   const r = await api(`usertools/get?name=${encodeURIComponent(e.target.value)}`); $("#ut_text").value = r.text; $("#ut_where").textContent = r.path; utChanged(true); };
-function utReset() { UT = {tool:{task:"binning_reconstruction", analysis_track:"short_read"}, install:{method:"conda"}, database:{uses_reference_database:"no"},
-  run:{mode:"command", requires:"contigs", command:"mytool --contigs {contigs} --out {outdir} --threads {threads}"}, output:{format:"contig_bins", path:"bins.tsv", header:"yes", delimiter:"tab", contig_column:"contig", bin_column:"bin"}};
+function utReset() { UT = utBlank(); utLast = null;
   $("#ut_where").textContent = "saved to ~/.plasbench/tools/<name>/"; utRender(); utChanged(false); }
 window.editUserTool = async name => { go("addtool"); setTimeout(async () => { $("#ut_load").value = name; $("#ut_load").dispatchEvent(new Event("change")); }, 200); };
 let utLoaded = false;
-async function loadAddTool() { try { await getUser(); if (!utLoaded) { utLoaded = true; utReset(); } await utLoadList(); } catch (e) { toast(e.message, "bad"); } }
+async function loadAddTool() { try { await Promise.all([getUser(), getSchema()]); if (!utLoaded) { utLoaded = true; utReset(); } await utLoadList(); } catch (e) { toast(e.message, "bad"); } }
 
 /* ===================================================================================================
    SETTINGS
@@ -2911,7 +3355,7 @@ function renderWizard() {
             <div class="tri">${["", "on", "off"].map(o => `<button type="button" data-wtool="${a.dest}" data-val="${o}" class="${(V[a.dest] || "") === o ? "on" : ""} ${o === "off" ? "off" : ""}" ${o ? "" : `title="Use the setting saved for this computer (Tools page)"`}>${o || defaultWord(a.dest)}</button>`).join("")}</div></div>`; }).join("")}</div></div></div>
         <div class="card" style="margin-top:16px"><div class="hd"><h3>Your own tools</h3><span class="sub">added with Add your own tool</span><button class="btn ghost sm" data-go="addtool">${icon("plus")}Add one</button></div><div class="bd">${
           S.user.tools.length ? `<div class="toggles">${S.user.tools.map(u => { const on = (V.user_tools || []).includes(u.name);
-            return `<div class="tog"><div class="tx"><b>${esc(u.display)}</b><span>${esc(u.task)} · ${esc(u.track.replace("_", " "))} · ${esc(u.mode)}</span></div><label class="switch"><input type="checkbox" data-wuser="${esc(u.name)}" ${on ? "checked" : ""}><span></span></label></div>`; }).join("")}</div>`
+            return `<div class="tog"><div class="tx"><b>${esc(u.display)}</b><span>${utToolTasks(u).map(x => `<span class="tag ${x !== "classification" ? "rec" : "cls"}">${esc(taskLabel(x))}</span>`).join(" ")} · ${esc(u.track.replace("_", " "))} · ${esc(u.mode)}${u.install_source ? ` · ${esc(utSourceLine(u))}` : ""}</span></div><label class="switch"><input type="checkbox" data-wuser="${esc(u.name)}" ${on ? "checked" : ""}><span></span></label></div>`; }).join("")}</div>`
           : `<p class="mut" style="margin:0">None yet. Any tool can be added without code changes: <a href="#addtool">Add your own tool</a>.</p>`}</div></div>
         <div class="card" style="margin-top:16px"><div class="bd">${fieldHTML(run.args.find(a => a.dest === "force_rerun_tools"), V, "w")}</div></div>`;
     }

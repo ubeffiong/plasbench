@@ -199,7 +199,7 @@ def main():
     check("each task has task, status in native|derived|not_possible, how, and its id",
           all({"task", "status", "how", "id"} <= set(t) and t["status"] in ("native", "derived", "not_possible") for t in r["tasks"])
           and [t["id"] for t in r["tasks"]] == ["mt", "mt__binning_reconstruction"], r["tasks"])
-    check("outputs lists each format with its path", r["outputs"] == [{"format": "contig_bins", "path": "bins.tsv"}, {"format": "contig_labels", "path": "labels.tsv"}], r["outputs"])
+    check("outputs lists each format with its path and the tasks it serves", r["outputs"] == [{"format": "contig_bins", "path": "bins.tsv", "serves": ["classification", "binning_reconstruction"]}, {"format": "contig_labels", "path": "labels.tsv", "serves": ["classification", "binning_reconstruction"]}], r["outputs"])
     check("source: method and a plain-sentence description", r["source"]["method"] == "none" and r["source"]["description"] == ut.SOURCE_HELP["none"])
     r = ut.validate_text("this is not = an ini file [")
     check("text that is not an INI file is a problem, not an exception", r["ok"] is False and r["problems"], r)

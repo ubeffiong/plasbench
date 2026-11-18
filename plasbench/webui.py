@@ -185,6 +185,47 @@ def _sheet_header(path: Path) -> list:
 
 
 # --------------------------------------------------------------------------------------------- project facts
+# -- Add your own tool: help text, a tool's summary, and the small-file upload ----------------------------------------------------------------------
+UPLOAD_MAX_BYTES = 5 * 1024 * 1024      # scripts and adapters only: a large tool binary is located on this computer or downloaded, never uploaded
+UPLOAD_BODY_MAX = 8 * 2**20             # the request may be a little larger than the file (JSON escaping), so the size message below is the one the user sees
+_TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
+_UPLOAD_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,99}$")
+
+
+def user_tool_summary(tool):
+    """{"tasks", "install_source", "install_mode", "sha256"} of one user tool for the tool lists: every task it declares, where it comes from
+    (installed, conda, pip, script, url, local), the url/local mode and the pinned checksum. Read from the manifest's own source_summary."""
+    src = tool.source_summary()
+    method = src.get("method") or "none"
+    return {"tasks": list(tool.tasks), "install_source": {"none": "installed"}.get(method, method), "install_mode": src.get("mode", ""),
+            "sha256": src.get("sha256", "") if method in ("url", "local") else ""}
+
+
+def store_tool_upload(name, filename, text, home=None):
+    """Write `text` as <home>/.plasbench/tools/<name>/<filename> and return {"ok", "path" (the relative path for the manifest), "folder", "bytes"}.
+    Refused (ValueError): a tool name that is not a manifest name, a file name that is a path (separator, drive colon, '..', leading dot) or the manifest itself,
+    text that is not text, or more than UPLOAD_MAX_BYTES. Line endings are stored as LF so a script runs under bash."""
+    if not isinstance(name, str) or not _TOOL_NAME.match(name):
+        raise ValueError("give the tool a name first (lower-case letters, digits and _, starting with a letter): the name is its folder")
+    if (not isinstance(filename, str) or not filename or any(c in filename for c in "/\\:\x00") or ".." in filename
+            or filename.startswith(".") or not _UPLOAD_NAME.match(filename)):
+        raise ValueError("the file name must be a plain name: no folders, no '..', no leading dot")
+    if filename.lower() == "plasbench-tool.ini":
+        raise ValueError("plasbench-tool.ini is the manifest; use Save for that")
+    if not isinstance(text, str) or "\x00" in text:
+        raise ValueError("only text files (scripts and adapters) can be uploaded; locate a binary on this computer instead")
+    raw = text.replace("\r\n", "\n").encode("utf-8")
+    if len(raw) > UPLOAD_MAX_BYTES:
+        raise ValueError(f"the file is {len(raw) / 2**20:.1f} MB; uploads are limited to {UPLOAD_MAX_BYTES // 2**20} MB. Locate a large file on this computer instead")
+    folder = (Path(home) if home else Path.home()) / ".plasbench" / "tools" / name
+    target = (folder / filename).resolve()
+    if folder.resolve() not in target.parents:
+        raise ValueError("the file name must be a plain name")
+    folder.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(raw)
+    return {"ok": True, "path": filename, "folder": str(folder), "bytes": len(raw)}
+
+
 class Project:
     def __init__(self, root: Path):
         self.root = Path(root).resolve()
@@ -398,6 +439,12 @@ class Project:
                 dbrel = {r["tool"]: r for r in csv.DictReader(handle, delimiter="\t") if r.get("tool")}
         defaults = {row["key"]: row for row in self.settings()}
         local = self.local_env()
+        mine = {}
+        try:   # your own tools: every task, where the tool comes from, and whether a download or copy is pinned by checksum
+            for n, t in self.user_tools().discover().items():
+                mine[n] = user_tool_summary(t)
+        except Exception:  # noqa: BLE001 - the Tools page still lists everything without it
+            mine = {}
         out = []
         for name, row in caps.items():
             inst = installers.get(name, {})
@@ -418,6 +465,8 @@ class Project:
                 "database": (dbrel.get(name) or {}).get("database", ""),
                 "database_release": (dbrel.get(name) or {}).get("database_release_date", ""),
             })
+            if name in mine:
+                out[-1].update(mine[name])
         return out
 
     def user_tools(self):
@@ -1550,9 +1599,9 @@ def make_handler(project: Project, jobs: Jobs):
             origin = self.headers.get("Origin")
             return origin is None or urlparse(origin).netloc == self.headers.get("Host", "")
 
-        def body(self) -> dict:
+        def body(self, limit=5 * 2**20) -> dict:
             length = int(self.headers.get("Content-Length") or 0)
-            if length > 5 * 2**20:
+            if length > limit:
                 raise ValueError("request too large")
             raw = self.rfile.read(length) if length else b"{}"
             return json.loads(raw.decode("utf-8") or "{}")
@@ -1770,12 +1819,12 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "usertools":
                 ut = project.user_tools()
                 tools = ut.discover()
-                return self.jsend(200, {"tools": [{"name": n, "display": t.display_name, "task": t.task, "track": t.track,
-                                                   "mode": t.get("run", "mode"), "format": t.get("output", "format"), "tasks": t.tasks,
-                                                   "formats_list": t.formats, "source": t.source_summary(),
-                                                   "install": t.get("install", "method", "none"), "path": str(t.path)}
+                return self.jsend(200, {"tools": [dict({"name": n, "display": t.display_name, "task": t.task, "track": t.track,
+                                                        "mode": t.get("run", "mode"), "format": t.get("output", "format"), "tasks": t.tasks,
+                                                        "formats_list": t.formats, "source": t.source_summary(),
+                                                        "install": t.get("install", "method", "none"), "path": str(t.path)}, **user_tool_summary(t))
                                                   for n, t in sorted(tools.items())],
-                                        "search_path": [str(p) for p in ut.search_path()],
+                                        "search_path": [str(p) for p in ut.search_path()], "upload_max_bytes": UPLOAD_MAX_BYTES,
                                         "placeholders": ut.PLACEHOLDERS, "formats": ut.FORMATS, "tasks": ut.TASKS,
                                         "tracks": ut.TRACKS, "install_methods": ut.INSTALL_METHODS, "task_help": ut.TASK_HELP,
                                         "format_help": ut.FORMAT_HELP, "source_help": ut.SOURCE_HELP, "schema": {k: sorted(v) for k, v in ut.SCHEMA.items()}})
@@ -1845,7 +1894,7 @@ def make_handler(project: Project, jobs: Jobs):
                         return self.send(code, body, ctype)
                     return self.jsend(504, {"error": "the first attempt of this request did not finish"})
             try:
-                data = self.body()
+                data = self.body(UPLOAD_BODY_MAX if route == "usertools/upload" else 5 * 2**20)
                 return self.api_post(route, data)
             except netgate.Offline as exc:
                 return self.jsend(503, exc.payload())
@@ -2099,6 +2148,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, self.validate_manifest(data.get("text", "")))
             if route == "usertools/save":
                 return self.jsend(200, self.save_manifest(data.get("text", ""), bool(data.get("overwrite"))))
+            if route == "usertools/upload":
+                return self.jsend(200, store_tool_upload(data.get("name"), data.get("filename"), data.get("text")))
             if route == "reveal":
                 target = Path(data.get("path", ""))
                 if not target.exists():

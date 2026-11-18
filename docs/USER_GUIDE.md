@@ -731,6 +731,8 @@ to the circularity guard: a sample is skipped unless its long reads are
 declared independent of its truth assembly, or the tool's own
 `*_ALLOW_CIRCULAR_TRUTH` override is set (see `docs/COHORTS.md`).
 
+**Your own tool in the window.** On *Add your own tool*, the **Task** box takes one or more tasks (the first is the primary; a binner can also be scored as a classifier, and the Check box says per task whether it is native, derived from another output, or not possible). **Source** says where the tool comes from: already installed, conda or pip, a download from an https address (give its SHA-256 so a changed file is refused), a file or folder on this computer (copy records a checksum; link follows the file), or your own install script. PlasBench runs code you download or point to, so only use sources you trust; nothing is downloaded or run until you press *Save & install*. Small scripts and adapters (up to 5 MB) can be uploaded from your computer; a large tool is located or downloaded, never uploaded. A tool may list several **outputs** (or *Detect automatically* with candidate file patterns). The Tools page and the benchmark wizard show one chip per task and where each of your tools comes from.
+
 ### Run reliability, timing and run-state settings (new in 0.5.0)
 
 All are optional; the defaults are safe. Set them in the environment or in `config/local.env`.

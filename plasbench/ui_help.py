@@ -276,3 +276,75 @@ def setting_tooltip(row, carried=""):
     out = tooltip(dict(entry, summary=summary), default=row.get("default"), setting=row["key"])
     out["flag"] = ""
     return out
+
+
+# ---- Add your own tool: what the page's new controls mean (the manifest keys are documented in docs/ADDING_TOOLS.md) ----------------------------------
+# The sentences are python/user_tools.py's own (TASK_HELP, FORMAT_HELP, SOURCE_HELP: the window sends those to the page); test_ui_help checks these copies are identical,
+# so the tooltips and the page cannot drift apart.
+TASK_HELP = {
+    "binning_reconstruction": "Groups assembly contigs into plasmids (bins); scored with bin-level metrics such as completeness, purity and CPRR.",
+    "sequence_reassembly": "Writes predicted plasmid sequence (a FASTA); scored on how well the sequence matches the true plasmids.",
+    "classification": "Labels each contig plasmid or chromosome, optionally with a probability; scored per base with F1 and PR-AUC.",
+}
+FORMAT_HELP = {
+    "contig_bins": "A table with one row per contig and the bin (plasmid) it belongs to; serves binning, and classification (a contig in any bin is plasmid).",
+    "contig_labels": "A table with one row per contig and a plasmid/chromosome label and/or a probability; serves classification, and binning only as one flagged bin per plasmid contig.",
+    "plasmid_fasta": "One FASTA of predicted plasmid sequence, each record its own plasmid; serves sequence reassembly only.",
+    "fasta_dir": "A folder with one FASTA file per predicted plasmid; serves sequence reassembly only.",
+    "adapter": "Your own script converts the tool's output into PlasBench's native files for the tasks named in adapter_tasks.",
+    "auto": "PlasBench looks at the files listed in candidates and recognises each by its content; an ambiguous or unrecognisable output is an error, never a guess.",
+}
+SOURCE_HELP = {
+    "conda": "Installs the named conda packages into the tool's own environment.",
+    "pip": "Installs the named pip packages into the tool's own environment.",
+    "script": "Runs an install script that ships beside the manifest.",
+    "url": "Downloads the tool from an https URL (archive, git repository or single file) into the manifest's src/ folder, checking its sha256 when you give one.",
+    "local": "Uses a tool already on this computer: a copy (recorded with a checksum, reproducible) or a link (used in place, can change under the benchmark).",
+    "none": "Nothing to install: the command is already on PATH.",
+}
+
+USERTOOL = {
+    "task": {"summary": "What the tool does. A tool may do more than one task; it is then scored on each, using the same output where PlasBench can derive one result from another. The first task chosen is the primary one.",
+             "choices": dict(TASK_HELP), "setting": "[tool] task", "default": "none",
+             "when": "Beside each task the page shows, from the Check panel, whether it is native (the output already is that result), derived from another output, or not possible (and why)."},
+    "task_primary": {"summary": "The first task in the list is the primary task: it names the tool's row in the tables and is the one the tool is ranked on first. Move a task left or right to change it.",
+                     "setting": "[tool] task (first item)"},
+    "source": {"summary": "Where the tool comes from. Nothing is downloaded or run until you press Save & install.",
+               "choices": {"Already installed": SOURCE_HELP["none"], "Package manager": "conda or pip: " + SOURCE_HELP["conda"],
+                           "Download from a URL": SOURCE_HELP["url"], "A file or folder on this computer": SOURCE_HELP["local"], "My own install script": SOURCE_HELP["script"]},
+               "setting": "[install] method", "default": "conda",
+               "when": "PlasBench will run code you download or point to. Only use sources you trust."},
+    "src_url": {"summary": "The https address to download the tool from. Only https is accepted; http and other schemes are refused.", "setting": "[install] url", "when": "Required for a download."},
+    "src_sha256": {"summary": "The expected SHA-256 checksum of the download (64 hexadecimal characters). When given, PlasBench refuses a download that does not match, so the tool cannot change under you.",
+                   "setting": "[install] sha256", "default": "not pinned", "when": "Recommended. Without it PlasBench cannot tell if the file changed since you checked it."},
+    "src_kind": {"summary": "What the URL points to.", "setting": "[install] kind", "default": "auto",
+                 "choices": {"auto": "Decide from the address and the file name.", "archive": "A .zip, .tar.gz or similar archive that is unpacked.", "git": "A git repository that is cloned (see ref).",
+                             "file": "A single file, kept as it is."}},
+    "src_ref": {"summary": "For a git repository: the tag, branch or commit to check out. A tag or commit keeps the result reproducible.", "setting": "[install] ref", "when": "Only for kind = git."},
+    "src_build": {"summary": "An optional command run after the download or copy to build the tool (for example make). It runs in the tool's folder.", "setting": "[install] build_command", "when": "Leave empty when the tool needs no build."},
+    "src_path": {"summary": "A file or folder already on this computer. Use {src} in the run command to refer to it. Choose... opens the folder browser, which lists every drive.", "setting": "[install] path"},
+    "src_mode": {"summary": "How PlasBench uses the local path.", "setting": "[install] mode", "default": "link",
+                 "choices": {"link": "Follow the file where it is. It always uses the current contents, but the result changes if the file changes.",
+                             "copy": "Copy it into the tool's folder and record a checksum. Reproducible: the copy does not change when the original does."}},
+    "src_script": {"summary": "Your own install script, saved beside the manifest and run as script <environment name>. Upload it here if it is small.", "setting": "[install] script"},
+    "upload": {"summary": "Upload a small file (a script or an adapter, up to 5 MB) from this computer. It is stored in the tool's own folder, under the tool's name, and the manifest then refers to it. Large tool programs are located on this computer or downloaded, not uploaded.",
+               "when": "Give the tool a name first: the name is its folder."},
+    "outputs": {"summary": "What the tool writes. A tool can write more than one kind of output: add one row per output. PlasBench reads each, and uses the one that fits each task you chose (for example contig bins can be turned into plasmid/chromosome labels).",
+                "setting": "[output] format and [output.<format>]", "when": "Detect automatically lists file patterns instead and PlasBench works out the shape."},
+    "out_format": {"summary": "The shape of this output.", "choices": dict(FORMAT_HELP), "setting": "[output] format"},
+    "out_path": {"summary": "Where the tool writes this output, relative to {outdir}.", "setting": "[output] path"},
+    "out_candidates": {"summary": "File name patterns (globs) to try under {outdir}, separated by commas, for example bins.tsv, *.labels.tsv. PlasBench reads whichever one exists and recognises its shape.", "setting": "[output] candidates",
+                       "when": "If two patterns match files of different shapes PlasBench says it is ambiguous instead of guessing."},
+    "out_delimiter": {"summary": "What separates the columns of the table.", "choices": {"tab": "Tab-separated.", "comma": "Comma-separated.", "semicolon": "Semicolon-separated.", "whitespace": "Any run of spaces."}, "setting": "delimiter", "default": "tab"},
+    "out_header": {"summary": "Whether the first row of the table holds column names.", "choices": {"yes": "Columns are given by name or number.", "no": "Columns must be given by number, starting at 1."}, "setting": "header", "default": "yes"},
+    "out_contig_column": {"summary": "The column holding the contig name: its header name, or its number starting at 1.", "setting": "contig_column"},
+    "out_bin_column": {"summary": "The column holding the bin (plasmid) each contig belongs to.", "setting": "bin_column"},
+    "out_label_column": {"summary": "The column holding the plasmid or chromosome label.", "setting": "label_column"},
+    "out_plasmid_values": {"summary": "The label values that mean plasmid, separated by commas, for example plasmid, Plasmid, 1. Any other value means chromosome.", "setting": "plasmid_values"},
+    "out_score_column": {"summary": "A column of probabilities between 0 and 1. It adds a precision-recall curve to the results.", "setting": "score_column"},
+    "out_threshold": {"summary": "Without a label column, a contig whose score is at least this value is a plasmid.", "setting": "threshold", "default": "0.5"},
+    "out_fasta_glob": {"summary": "Which files in the folder are plasmid FASTA files, for example plasmid_*.fasta.", "setting": "fasta_glob", "default": "*.fa, *.fasta, *.fna"},
+    "out_adapter": {"summary": "A script beside the manifest that is run as adapter <output> <contigs> <predictions fasta>.", "setting": "adapter"},
+    "out_contig_id_from": {"summary": "How to turn the tool's contig ids into PlasBench's.", "choices": {"": "Use them as written.", "first_token": "Keep the first word of each id."}, "setting": "contig_id_from"},
+    "out_contig_id_strip": {"summary": "A regular expression removed from each contig id, for example _length_.*$.", "setting": "contig_id_strip_regex"},
+}

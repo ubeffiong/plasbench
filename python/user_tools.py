@@ -164,6 +164,11 @@ def _task(value):
 
 
 # -- what each task needs, from what the tool writes -------------------------------------------------------------------
+# which tasks an output format can give a result for, native or derived (see derive_tasks); an adapter serves adapter_tasks, auto serves whatever the file turns out to be
+_SERVING = {"contig_bins": ("binning_reconstruction", "classification"), "contig_labels": ("classification", "binning_reconstruction"),
+            "plasmid_fasta": ("sequence_reassembly",), "fasta_dir": ("sequence_reassembly",)}
+
+
 def derive_tasks(tasks, formats, adapter_tasks=(), strict=True):
     """[{"task", "status": native|derived|not_possible, "how"}] for each task, given the declared output formats.
 
@@ -340,10 +345,22 @@ class Manifest:
             info["script"] = self.get("install", "script")
         return info
 
+    def serves(self, fmt):
+        """The declared tasks that output format `fmt` gives a result for (not_possible tasks are left out): what the window shows beside each output row."""
+        status = {e["task"]: e["status"] for e in self.derivation()}
+        out = []
+        for task in self.tasks:
+            if status.get(task, "not_possible") == "not_possible":
+                continue
+            if fmt == "auto" or task in _SERVING.get(fmt, ()) or (fmt == "adapter" and task in self.adapter_tasks)                     or (not self.strict and fmt in ("plasmid_fasta", "fasta_dir")):
+                out.append(task)
+        return out
+
     def output_summary(self):
+        """[{"format", "path" | "candidates", "serves": [task, ...]}] in the order declared."""
         if self.auto:
-            return [{"format": "auto", "candidates": _split_commas(self.get("output", "candidates"))}]
-        return [{"format": f, "path": self.output_get(f, "path")} for f in self.formats]
+            return [{"format": "auto", "candidates": _split_commas(self.get("output", "candidates")), "serves": self.serves("auto")}]
+        return [{"format": f, "path": self.output_get(f, "path"), "serves": self.serves(f)} for f in self.formats]
 
     # -- where the tool's source lives ---------------------------------------------------------------------------
     def src_path(self):

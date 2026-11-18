@@ -137,7 +137,8 @@ def schema():
     globals_ = [a for a in top["args"] if a["dest"] != "command"]
     return {"commands": commands, "categories": categories, "global_args": globals_, "aliases": ALIASES,
             "wizard_help": {k: ui_help.tooltip(v) for k, v in ui_help.WIZARD.items()},
-            "github_help": {k: ui_help.tooltip(v) for k, v in ui_help.GITHUB.items()}}
+            "github_help": {k: ui_help.tooltip(v) for k, v in ui_help.GITHUB.items()},
+            "usertool_help": {k: ui_help.tooltip(v) for k, v in ui_help.USERTOOL.items()}}
 
 
 def validate_argv(argv):
