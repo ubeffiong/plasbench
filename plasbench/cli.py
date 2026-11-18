@@ -1,6 +1,7 @@
 """Command-line entry point for the source checkout and container image."""
 
 import argparse
+import json
 import os
 import shlex
 import shutil
@@ -329,6 +330,15 @@ def build_parser():
     report_pdf_group.add_argument("--report", type=Path, help="Path to benchmark.report.html.")
     report_pdf_group.add_argument("--results-dir", type=Path, help="Results directory containing benchmark.report.html.")
     report_pdf_parser.add_argument("--out", type=Path, help="PDF to write (default: next to the report, same name with .pdf).")
+    for status_name, status_help in (
+            ("status", "Show what a run is doing now: stage, isolate and step, for how long, CPU and memory, progress so far, and plain hints when it looks stuck."),
+            ("diagnose", "Like status, plus the busiest processes of the run: use it when a run seems stuck.")):
+        status_parser = sub.add_parser(status_name, help=status_help)
+        status_group = status_parser.add_mutually_exclusive_group()
+        status_group.add_argument("--study", help="The study whose run to inspect (default: the most recently updated study).")
+        status_group.add_argument("--results-dir", type=Path, help="A results folder to inspect (its run_events.jsonl and .run.lock are read).")
+        status_parser.add_argument("--json", action="store_true", help="Print the summary as JSON, for scripts and the window.")
+        status_parser.add_argument("--watch", type=int, metavar="SECONDS", help="Repeat every SECONDS until you press Ctrl+C.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
     upgrade_parser = sub.add_parser(
         "upgrade",
@@ -850,6 +860,33 @@ def main(argv=None):
         command = [sys.executable, str(root / "python" / "export_report_pdf.py"), "--report", str(report)]
         if args.out:
             command += ["--out", str(args.out)]
+        code = run(command, root)
+    elif args.command in ("status", "diagnose"):
+        from . import studies
+        if args.results_dir:
+            results_dir = Path(args.results_dir)
+        elif args.study:
+            try:
+                results_dir = studies.study_path(root, args.study) / "results"
+            except ValueError as exc:
+                parser.error(str(exc))
+        else:
+            listed = studies.list_studies(root)
+            results_dir = (Path(listed[0]["path"]) / "results") if listed else (root / "results")
+        command = [sys.executable, str(root / "python" / "run_status.py"), "--results-dir", str(results_dir)]
+        record = {}
+        try:
+            record = json.loads((results_dir.parent / "study.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        if record.get("data_dir"):
+            command += ["--data-dir", str(record["data_dir"])]
+        if args.command == "diagnose":
+            command.append("--diagnose")
+        if args.json:
+            command.append("--json")
+        if args.watch:
+            command += ["--watch", str(args.watch)]
         code = run(command, root)
     elif args.command == "test":
         code = run([bash_command(), "test/run_tests.sh"], root)

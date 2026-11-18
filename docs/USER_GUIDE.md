@@ -806,6 +806,15 @@ for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e` (PlasBench 
 or re-upload large files mid-run; an external or network drive stops the run if it disconnects (running again continues from the finished steps). The folder check shows these
 warnings, and the free space, under the path before you choose it.
 
+### Watching a run: status, diagnose and the logs
+
+A long run is quiet by nature, so PlasBench writes down what it is doing as it goes.
+
+- **`plasbench status`** says whether the run is running, finished or was cut off; the stage, isolate and step it is in and for how long; progress from the status tables; the CPU and memory of the run's processes; the machine's free memory, swap and disk; the newest log of that isolate; and hints that follow from those figures. `plasbench diagnose` adds the busiest processes. Both take `--study NAME` or `--results-dir DIR` (default: the most recently updated study), `--json` for scripts, and `--watch SECONDS` to repeat.
+- **Heartbeats.** Every long command prints `still working: <isolate> / <step> (N s elapsed; cpu=... rss=...; mem_avail=... swap_used=... disk_free=...; its log last changed N s ago: "<last line>")` after `HEARTBEAT_DELAY_SECONDS` (180) and then every `HEARTBEAT_INTERVAL_SECONDS` (60). That covers trimming, assembly and the stage-4 tools; downloads log their own progress line (see above). A warning is added when less than 300 MB of memory is available, or when the command has used almost no CPU and written nothing to its log for ten minutes.
+- **Files.** In the study: `logs/run_<date>-<time>.log` (everything the run printed; `logs/run.latest.log` points at the newest; the newest `LOG_RETENTION_RUNS` = 20 are kept; `RUN_CONSOLE_LOG=0` turns it off), `logs/<isolate>.<step>.log` (each tool's own output) and `results/run_events.jsonl` (one JSON line per stage start and end, isolate step, command start and end with exit code and seconds, heartbeat and warning; names and numbers only, never environment variables or commands). `results/stage_timing.tsv` has the seconds per stage.
+- **A run that was cut off** (the terminal, WSL or the computer ended it) shows as *stopped* with the hint that re-running resumes: finished isolates and tool results are reused.
+
 ## Workflow
 
 `plasbench run` runs stages 0-6. Select stages explicitly to resume or iterate:

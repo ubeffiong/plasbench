@@ -34,6 +34,7 @@ STATUS_SHARDS="$(shard_dir "download")"
 # One shard file per sample, so concurrent jobs never contend for one file.
 record_download() {
     printf '%s\t%s\t%s\n' "$1" "$2" "$3" > "$STATUS_SHARDS/$1.tsv"
+    run_event download_end "sample=$1" "status=$2" "reason=$3"
 }
 
 # Show what this run is about to fetch, and get consent, before fetching it.
@@ -174,6 +175,7 @@ download_sample() {
     local SDIR="$DATA_DIR/$SAMPLE"
     mkdir -p "$SDIR"
     log "=== Sample $SAMPLE : assembly=$ASM  reads=$SRA ==="
+    run_event sample_start "sample=$SAMPLE" "step=download" "reads=$SRA"
     local REF="$SDIR/reference.fna"
     local REPORT="$SDIR/sequence_report.jsonl"
     local R1="$SDIR/${SRA}_1.fastq.gz"

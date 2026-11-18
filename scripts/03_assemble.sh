@@ -54,6 +54,7 @@ record_assembly_status() {
     local sample="$1"
     printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "${5:-}" \
         > "$STATUS_SHARDS/${sample}.tsv"
+    run_event assembly_end "sample=$1" "status=$2" "reason=${4:-}"
 }
 
 # Difficulty features (RUN_DIFFICULTY_FEATURES, off by default; see
@@ -92,13 +93,15 @@ run_alt_assembler() {   # run_alt_assembler NAME T1 T2 OUTDIR SAMPLE
     case "$name" in
         spades)
             need spades.py
-            spades.py -1 "$t1" -2 "$t2" -o "$out/work" --threads "$THREADS" --memory "$ASSEMBLY_MEMORY_GB" \
+            WATCH_LOG="$LOG_DIR/${sample}.alt.spades.log" run_with_heartbeat "$sample / alternative SPAdes assembly" \
+                spades.py -1 "$t1" -2 "$t2" -o "$out/work" --threads "$THREADS" --memory "$ASSEMBLY_MEMORY_GB" \
                 > "$LOG_DIR/${sample}.alt.spades.log" 2>&1 || return 1
             cp "$out/work/contigs.fasta" "$out/contigs.fasta"
             [[ -f "$out/work/assembly_graph_with_scaffolds.gfa" ]] && cp "$out/work/assembly_graph_with_scaffolds.gfa" "$out/assembly_graph.gfa" ;;
         unicycler)
             need unicycler
-            unicycler -1 "$t1" -2 "$t2" -o "$out/work" -t "$THREADS" > "$LOG_DIR/${sample}.alt.unicycler.log" 2>&1 || return 1
+            WATCH_LOG="$LOG_DIR/${sample}.alt.unicycler.log" run_with_heartbeat "$sample / alternative Unicycler assembly" \
+                unicycler -1 "$t1" -2 "$t2" -o "$out/work" -t "$THREADS" > "$LOG_DIR/${sample}.alt.unicycler.log" 2>&1 || return 1
             cp "$out/work/assembly.fasta" "$out/contigs.fasta"
             [[ -f "$out/work/assembly.gfa" ]] && cp "$out/work/assembly.gfa" "$out/assembly_graph.gfa" ;;
         *) warn "  ASSEMBLY_ALSO names an unknown assembler '$name' (use spades or unicycler); ignored"; return 1 ;;
@@ -224,7 +227,8 @@ assemble_sample() {
         [[ -s "$T1" || -s "$T2" ]] && log "  trimmed reads from an unfinished run found: trimming again"
         rm -f "$T1" "$T2" "$TRIM_DONE"
         log "  fastp trimming ($SAMPLE) ..."
-        if ! fastp -i "$R1" -I "$R2" -o "$P1" -O "$P2" \
+        run_event sample_start "sample=$SAMPLE" "step=fastp"
+        if ! WATCH_LOG="$LOG_DIR/${SAMPLE}.fastp.log" run_with_heartbeat "$SAMPLE / fastp trimming" fastp -i "$R1" -I "$R2" -o "$P1" -O "$P2" \
             --length_required "$MIN_READ_LEN" --thread "$THREADS" \
             --json "$SDIR/fastp.json" --html "$SDIR/fastp.html" $FASTP_EXTRA \
             > "$LOG_DIR/${SAMPLE}.fastp.log" 2>&1 \
@@ -264,7 +268,8 @@ assemble_sample() {
     if [[ "$ASSEMBLER" == "spades" ]]; then
         need spades.py
         log "  SPAdes assembling ($SAMPLE) ..."
-        if ! spades.py -1 "$T1" -2 "$T2" -o "$ASMDIR" \
+        run_event sample_start "sample=$SAMPLE" "step=spades"
+        if ! WATCH_LOG="$LOG_DIR/${SAMPLE}.spades.log" run_with_heartbeat "$SAMPLE / SPAdes assembly" spades.py -1 "$T1" -2 "$T2" -o "$ASMDIR" \
             --threads "$THREADS" --memory "$ASSEMBLY_MEMORY_GB" \
             > "$LOG_DIR/${SAMPLE}.spades.log" 2>&1; then
             warn "SPAdes failed for $SAMPLE; excluded from tool runs and scoring"
@@ -280,7 +285,8 @@ assemble_sample() {
     elif [[ "$ASSEMBLER" == "unicycler" ]]; then
         need unicycler
         log "  Unicycler assembling ($SAMPLE) ..."
-        if ! unicycler -1 "$T1" -2 "$T2" -o "$ASMDIR" -t "$THREADS" \
+        run_event sample_start "sample=$SAMPLE" "step=unicycler"
+        if ! WATCH_LOG="$LOG_DIR/${SAMPLE}.unicycler.log" run_with_heartbeat "$SAMPLE / Unicycler assembly" unicycler -1 "$T1" -2 "$T2" -o "$ASMDIR" -t "$THREADS" \
             > "$LOG_DIR/${SAMPLE}.unicycler.log" 2>&1; then
             warn "Unicycler failed for $SAMPLE; excluded from tool runs and scoring"
             record_assembly_status "$SAMPLE" "failed" "" \

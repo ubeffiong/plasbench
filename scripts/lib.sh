@@ -4,23 +4,112 @@
 # Pretty logging with timestamps.
 log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 
-# Run a potentially quiet command while keeping the user informed. Detailed
-# stdout/stderr may be redirected to a per-tool log by the caller; heartbeat
-# lines prefer /dev/tty so they still reach the interactive terminal.
+# ---- Live status and the run's event log -----------------------------------------------------------------------------------------
+# The console this stage was started with (the terminal, the window's job log, or run_all.sh's tee). Heartbeats are written here, never into a tool's own log
+# file: callers redirect the tool's output around a whole function (`profile_exec ... > tool.log 2>&1`), which used to swallow the "still working" lines.
+# (A named descriptor needs bash 4.1; older bash, such as macOS's 3.2, falls back to stderr itself.)
+_pb_set_console_fd() {
+    if [[ "${BASH_VERSINFO[0]:-0}" -gt 4 || ( "${BASH_VERSINFO[0]:-0}" -eq 4 && "${BASH_VERSINFO[1]:-0}" -ge 1 ) ]]; then
+        exec {PB_CONSOLE_FD}>&2
+    else
+        PB_CONSOLE_FD=2
+    fi
+}
+[[ -n "${PB_CONSOLE_FD:-}" ]] || _pb_set_console_fd
+
+# Run a potentially quiet command while keeping the user informed. Detailed stdout/stderr may be redirected to a per-tool log by the caller.
 heartbeat_log() {
     local message="$*"
-    if [[ -w /dev/tty ]]; then
+    if { : >&"$PB_CONSOLE_FD"; } 2>/dev/null; then
+        printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$message" >&"$PB_CONSOLE_FD"
+    elif [[ -w /dev/tty ]]; then
         printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$message" > /dev/tty
     else
         log "$message" >&2
     fi
 }
 
+# JSON-safe text: backslash and quote escaped, control characters turned into spaces.
+_json_escape() {
+    local s="${1//\\/\\\\}"
+    s="${s//\"/\\\"}"; s="${s//$'\n'/ }"; s="${s//$'\r'/ }"; s="${s//$'\t'/ }"
+    printf '%s' "$s"
+}
+
+# run_event EVENT [key=value ...]: append one JSON line to RESULTS_DIR/run_events.jsonl (RUN_EVENTS_FILE overrides). Every stage, every isolate step, every
+# long command and every heartbeat is recorded, so `plasbench status` and `plasbench diagnose` can say what a run is doing, and what it did, without reading
+# logs. One line per write (an append of a single short line is atomic), no secrets (callers pass names and numbers, never environment or commands).
+run_event() {
+    local event="$1"; shift
+    local file="${RUN_EVENTS_FILE:-${RESULTS_DIR:+$RESULTS_DIR/run_events.jsonl}}"
+    [[ -n "$file" ]] || return 0
+    local line kv
+    line="{\"ts\":\"$(date '+%Y-%m-%dT%H:%M:%S%z')\",\"epoch\":$(date +%s),\"pid\":$$,\"event\":\"$(_json_escape "$event")\""
+    [[ -n "${_STAGE_TIMING_ID:-}" ]] && line+=",\"stage\":\"$(_json_escape "$_STAGE_TIMING_ID")\""
+    for kv in "$@"; do
+        [[ "$kv" == *=* ]] || continue
+        line+=",\"$(_json_escape "${kv%%=*}")\":\"$(_json_escape "${kv#*=}")\""
+    done
+    printf '%s}\n' "$line" >> "$file" 2>/dev/null || true
+}
+
+# proc_stats PID: "cpu=NN% rss=NNNMB procs=N" for PID and everything it started (Linux and macOS ps). Empty when ps cannot say.
+proc_stats() {
+    ps -eo pid=,ppid=,pcpu=,rss= 2>/dev/null | awk -v root="$1" '
+        { ppid[$1] = $2; cpu[$1] = $3; rss[$1] = $4 }
+        END {
+            for (p in ppid) { q = p; d = 0
+                while ((q in ppid) && d < 64) { if (q == root) { n++; c += cpu[p]; r += rss[p]; break } q = ppid[q]; d++ } }
+            if (n > 0) printf "cpu=%.0f%% rss=%.0fMB procs=%d", c, r / 1024, n
+        }'
+}
+
+# sys_stats [DIR]: "mem_avail=NNNMB swap_used=NNNMB disk_free=NNGB" (Linux /proc/meminfo; the fields it cannot read are left out).
+sys_stats() {
+    local out="" avail swap free
+    if [[ -r /proc/meminfo ]]; then
+        avail="$(awk '/^MemAvailable:/ { printf "%d", $2 / 1024 }' /proc/meminfo 2>/dev/null)"
+        swap="$(awk '/^SwapTotal:/ { t = $2 } /^SwapFree:/ { f = $2 } END { printf "%d", (t - f) / 1024 }' /proc/meminfo 2>/dev/null)"
+        [[ -n "$avail" ]] && out+="mem_avail=${avail}MB"
+        [[ -n "$swap" ]] && out+="${out:+ }swap_used=${swap}MB"
+    fi
+    free="$(df -Pk "${1:-.}" 2>/dev/null | awk 'NR == 2 { printf "%.0f", $4 / 1048576 }')"
+    [[ -n "$free" ]] && out+="${out:+ }disk_free=${free}GB"
+    printf '%s' "$out"
+}
+
+# One heartbeat: elapsed time, CPU and memory of the command and what it started, memory/swap/disk of the machine, how long ago its log (WATCH_LOG, set by
+# the caller) last changed and that log's last line, plus a plain warning when memory is nearly gone or the command is idle. Also written to the event log.
+heartbeat_report() {
+    local pid="$1" description="$2" elapsed="$3" stats sysstats idle="" tail_line="" now mtime avail cpu
+    stats="$(proc_stats "$pid")"
+    sysstats="$(sys_stats "${RESULTS_DIR:-.}")"
+    if [[ -n "${WATCH_LOG:-}" && -f "$WATCH_LOG" ]]; then
+        now="$(date +%s)"
+        mtime="$(stat -c %Y "$WATCH_LOG" 2>/dev/null || stat -f %m "$WATCH_LOG" 2>/dev/null || true)"
+        [[ "$mtime" =~ ^[0-9]+$ ]] && idle=$(( now - mtime ))
+        tail_line="$(grep -v '^[[:space:]]*$' "$WATCH_LOG" 2>/dev/null | tail -n 1 | tr -d '\r' | cut -c1-110 || true)"
+    fi
+    heartbeat_log "still working: $description (${elapsed}s elapsed; ${stats:-no process figures}${sysstats:+; $sysstats}${idle:+; its log last changed ${idle}s ago}${tail_line:+: \"$tail_line\"})"
+    run_event heartbeat "what=$description" "elapsed=$elapsed" "stats=${stats}" "system=${sysstats}" "log_idle=${idle}"
+    avail="$(sed -n 's/.*mem_avail=\([0-9]*\)MB.*/\1/p' <<< "$sysstats")"
+    if [[ "$avail" =~ ^[0-9]+$ && "$avail" -lt 300 ]]; then
+        heartbeat_log "WARNING: only ${avail} MB of memory is available: $description may be killed (exit 137) or crawl in swap. Lower THREADS or ASSEMBLY_MEMORY_GB, or skip isolates with very large read sets (MAX_RUN_DOWNLOAD_GB)."
+        run_event warning "what=$description" "kind=low_memory" "mem_avail_mb=$avail"
+    fi
+    cpu="$(sed -n 's/.*cpu=\([0-9]*\)%.*/\1/p' <<< "$stats")"
+    if [[ "$cpu" =~ ^[0-9]+$ && "$cpu" -lt 5 && "$idle" =~ ^[0-9]+$ && "$idle" -gt 600 ]]; then
+        heartbeat_log "WARNING: $description has used almost no CPU and written nothing to its log for $(( idle / 60 )) minutes: it may be waiting on the network or a lock. 'plasbench diagnose' shows what it is waiting on."
+        run_event warning "what=$description" "kind=idle" "log_idle=$idle"
+    fi
+}
+
 run_with_heartbeat() {
     local description="$1"; shift
     local delay="${HEARTBEAT_DELAY_SECONDS:-180}" interval="${HEARTBEAT_INTERVAL_SECONDS:-60}"
-    local started elapsed=0 last_notice=0 pid
+    local started elapsed=0 last_notice=0 pid rc=0
     started="$(date +%s)"
+    run_event command_start "what=$description"
     "$@" & pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         # Poll cheaply so a fast command returns promptly; only print at the
@@ -28,11 +117,13 @@ run_with_heartbeat() {
         sleep 1
         elapsed=$(( $(date +%s) - started ))
         if [[ "$elapsed" -ge "$delay" && $(( elapsed - last_notice )) -ge "$interval" ]] && kill -0 "$pid" 2>/dev/null; then
-            heartbeat_log "still working: $description (${elapsed}s elapsed; detailed output may be in its log file)"
+            heartbeat_report "$pid" "$description" "$elapsed"
             last_notice="$elapsed"
         fi
     done
-    wait "$pid"
+    wait "$pid" || rc=$?
+    run_event command_end "what=$description" "seconds=$(( $(date +%s) - started ))" "exit=$rc"
+    return "$rc"
 }
 # Warnings print yellow and errors red, when they go to a terminal (never into a log file or the window, which
 # colours them itself). NO_COLOR (https://no-color.org) or PLASBENCH_COLOR=never turns colour off;
@@ -173,6 +264,32 @@ _plasbench_run_exit_hooks() {
     trap - EXIT
     local hook
     for hook in "${_PLASBENCH_EXIT_HOOKS[@]}"; do "$hook" || true; done
+    stop_console_log || true      # last, so the hooks' own messages are still captured
+    return 0
+}
+
+# start_console_log: keep this run's console output in the study as LOG_DIR/run_<date>-<time>.log (the newest LOG_RETENTION_RUNS, default 20, are kept; run.latest.log
+# points at the newest), in addition to showing it. Called once by run_all.sh. RUN_CONSOLE_LOG=0 turns it off. The tee is closed and waited for at exit, so the last
+# lines are never lost. Heartbeats follow the redirect (PB_CONSOLE_FD is re-pointed), so they land in the log too.
+start_console_log() {
+    [[ "${RUN_CONSOLE_LOG:-1}" == "1" && -n "${LOG_DIR:-}" && -z "${_CONSOLE_LOG_FILE:-}" ]] || return 0
+    mkdir -p "$LOG_DIR" 2>/dev/null || return 0
+    local file="$LOG_DIR/run_$(date +%Y%m%d-%H%M%S).log"
+    : > "$file" 2>/dev/null || return 0
+    ls -1t "$LOG_DIR"/run_*.log 2>/dev/null | tail -n +"$(( ${LOG_RETENTION_RUNS:-20} + 1 ))" | while read -r old; do rm -f "$old"; done
+    _CONSOLE_LOG_FILE="$file"
+    exec > >(tee -a "$file") 2>&1
+    _CONSOLE_TEE_PID=$!
+    _pb_set_console_fd
+    ln -sf "$(basename "$file")" "$LOG_DIR/run.latest.log" 2>/dev/null || cp -f "$file" "$LOG_DIR/run.latest.log" 2>/dev/null || true
+}
+stop_console_log() {
+    [[ -n "${_CONSOLE_TEE_PID:-}" ]] || return 0
+    local pid="$_CONSOLE_TEE_PID"; _CONSOLE_TEE_PID=""
+    # Every copy of the tee's pipe must be closed before it sees end-of-input: stdout, stderr and the heartbeat descriptor.
+    if [[ "${PB_CONSOLE_FD:-2}" -gt 2 ]]; then eval "exec ${PB_CONSOLE_FD}>&-"; PB_CONSOLE_FD=2; fi
+    exec >&- 2>&-
+    wait "$pid" 2>/dev/null || true
     return 0
 }
 on_exit_add() {
@@ -335,10 +452,12 @@ tool_timeout_notice() {
 stage_timing_begin() {
     _STAGE_TIMING_ID="$1"; _STAGE_TIMING_START="$(date +%s)"
     on_exit_add record_stage_timing
+    run_event stage_start "${SAMPLE_SHEET:+sheet=$(basename "$SAMPLE_SHEET")}" "$(sys_stats "${RESULTS_DIR:-.}" | sed 's/^/system=/')"
 }
 
 record_stage_timing() {
     [[ -n "${_STAGE_TIMING_ID:-}" && -d "${RESULTS_DIR:-/nonexistent}" ]] || return 0
+    run_event stage_end "seconds=$(( $(date +%s) - _STAGE_TIMING_START ))" "exit=${_PLASBENCH_EXIT_RC:-}"
     local file="$RESULTS_DIR/stage_timing.tsv" tmp end
     tmp="$file.$$.tmp"; end="$(date +%s)"
     {
