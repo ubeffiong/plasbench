@@ -7,8 +7,15 @@
         tmp/            scratch space
 
 The workspace is `PLASBENCH_WORKSPACE` (environment, or config/local.env, where the window's Workspace page saves it),
-else `<PlasBench folder>/studies`. Downloaded reads, references and tool databases are NOT per study: they stay in
-the shared data and database folders, so a second study of the same isolates downloads nothing again.
+else `<PlasBench folder>/studies`. Downloaded reads, references and tool databases are NOT per study by default: they stay in
+the shared data and database folders, so a second study of the same isolates downloads nothing again. A run can instead keep its
+downloads inside the study (`run --keep-data-in-study`, <study>/data, git-ignored, deleted with the study) or in another folder
+(`run --data-dir`); the choice is recorded in study.json (`data_location`: shared | study | custom, and `data_dir`) and reused by later
+runs of the same study.
+
+A study folder can also live OUTSIDE the workspace (`run --study-location PARENT_DIR`, "Add an existing study folder..."): its name and
+absolute path are kept in a hidden registry file in the workspace (.external_studies.json, never committed). Every part of PlasBench finds
+a study folder through `study_path(root, name)`, so workspace and external studies behave alike; names are unique across both.
 """
 from __future__ import annotations
 
@@ -46,6 +53,87 @@ def workspace(root) -> Path:
     return Path(configured).expanduser() if configured else Path(root) / "studies"
 
 
+REGISTRY = ".external_studies.json"
+
+
+def _same(a, b) -> bool:
+    return os.path.normcase(os.path.realpath(str(a))) == os.path.normcase(os.path.realpath(str(b)))
+
+
+def registry_path(root) -> Path:
+    return workspace(root) / REGISTRY
+
+
+def registry(root) -> dict:
+    """{study name: absolute folder} of the studies kept outside the workspace."""
+    try:
+        data = json.loads(registry_path(root).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    found = data.get("studies") if isinstance(data, dict) else None
+    return {str(k): str(v) for k, v in found.items()} if isinstance(found, dict) else {}
+
+
+def _save_registry(root, entries: dict) -> None:
+    path = registry_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps({"schema_version": 1, "studies": dict(sorted(entries.items()))}, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def register(root, name: str, folder) -> None:
+    name = valid_name(name)
+    entries = registry(root)
+    if name in entries and not _same(entries[name], folder):
+        raise ValueError(f"a study named {name} already exists at {entries[name]}")
+    if (workspace(root) / name / "study.json").is_file() and not _same(workspace(root) / name, folder):
+        raise ValueError(f"a study named {name} already exists in the workspace")
+    entries[name] = str(Path(folder).resolve())
+    _save_registry(root, entries)
+
+
+def unregister(root, name: str) -> bool:
+    entries = registry(root)
+    if entries.pop(name, None) is None:
+        return False
+    _save_registry(root, entries)
+    return True
+
+
+def study_path(root, name: str, location=None) -> Path:
+    """The folder of study `name`: the workspace's <workspace>/<name>, or the registered external folder, or (for a NEW study with `location`) <location>/<name>.
+    The one place a study folder is worked out. Raises ValueError for a bad name, a clash between workspace and external names, or a location that is not there."""
+    name = valid_name(name)
+    entries, ws = registry(root), workspace(root)
+    if location:
+        loc = Path(str(location)).expanduser()
+        if not loc.is_absolute():
+            raise ValueError("give the full path of the folder that will hold the study (for example D:\\Studies or /mnt/d/Studies)")
+        if _same(loc, ws):
+            location = None
+        else:
+            if not loc.is_dir():
+                raise ValueError(f"the study location {loc} does not exist: choose or create the folder first (a disconnected drive is never created for you)")
+            target = loc / name
+            if name in entries and not _same(entries[name], target):
+                raise ValueError(f"a study named {name} already exists at {entries[name]}")
+            if (ws / name / "study.json").is_file():
+                raise ValueError(f"a study named {name} already exists in the workspace")
+            return target
+    if name in entries:
+        return Path(entries[name])
+    return ws / name
+
+
+def is_external(root, folder) -> bool:
+    return not _same(Path(folder).parent, workspace(root))
+
+
+def external_folders(root) -> list:
+    return [Path(p) for p in registry(root).values()]
+
+
 def valid_name(name: str) -> str:
     name = (name or "").strip()
     if not NAME_RE.match(name):
@@ -71,11 +159,67 @@ def _sha256(path: Path):
         return None
 
 
-def prepare(root, name: str, samples=None, cohort=None, argv=None) -> Path:
+def _after_create(root, folder: Path) -> None:
+    """An external study is registered, and gets its own .gitignore (the workspace repository does not cover it): data, results of the samples and reads stay out of git."""
+    if not is_external(root, folder):
+        return
+    register(root, folder.name, folder)
+    try:
+        from . import gitops
+        gitops.ensure_gitignore(folder, "runs")
+    except Exception:  # noqa: BLE001 - a missing git helper must not stop a run
+        pass
+
+
+def data_record(folder) -> dict:
+    try:
+        rec = json.loads((Path(folder) / "study.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {"data_location": rec.get("data_location"), "data_dir": rec.get("data_dir")}
+
+
+def resolve_data(root, folder, keep_in_study: bool = False, data_dir=None, shared_dir=None) -> tuple:
+    """Decide where this run keeps downloaded reads and assemblies and record it in study.json. Returns (folder or None, message).
+
+    --keep-data-in-study -> <study>/data (created); --data-dir X -> X; neither -> what the study recorded earlier (so Resume and later stages find the reads), else None
+    (the shared folder from config.sh). An explicit choice overrides and updates the record."""
+    folder = Path(folder)
+    path = folder / "study.json"
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = {"name": folder.name, "runs": []}
+    chosen, message = None, ""
+    if keep_in_study:
+        chosen = folder / "data"
+        chosen.mkdir(parents=True, exist_ok=True)
+        record["data_location"], record["data_dir"] = "study", str(chosen)
+        message = f"Downloaded data stays inside the study: {chosen} (git-ignored, deleted with the study)"
+    elif data_dir:
+        chosen = Path(data_dir)
+        record["data_location"], record["data_dir"] = "custom", str(chosen)
+        message = f"Downloaded data goes to {chosen} (recorded for this study)"
+    elif record.get("data_location") in ("study", "custom") and record.get("data_dir"):
+        chosen = Path(record["data_dir"])
+        if record["data_location"] == "study":
+            chosen.mkdir(parents=True, exist_ok=True)
+        message = (f"Downloaded data folder: {chosen} (recorded for this study; give --data-dir or --keep-data-in-study to change it)")
+    else:
+        record["data_location"] = "shared"
+        if shared_dir:
+            record["data_dir"] = str(shared_dir)
+    if path.parent.is_dir():
+        path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return chosen, message
+
+
+def prepare(root, name: str, samples=None, cohort=None, argv=None, location=None) -> Path:
     """Create (or reuse) the study folder and record this run in its study.json. Returns the folder."""
-    folder = workspace(root) / valid_name(name)
+    folder = study_path(root, name, location)
     for sub in SUBDIRS:
         (folder / sub).mkdir(parents=True, exist_ok=True)
+    _after_create(root, folder)
     record_path = folder / "study.json"
     try:
         record = json.loads(record_path.read_text(encoding="utf-8"))
@@ -88,33 +232,73 @@ def prepare(root, name: str, samples=None, cohort=None, argv=None) -> Path:
         record["sample_sheet_sha256"] = _sha256(samples)
     if cohort:
         record["cohort"] = cohort
-    record.setdefault("runs", []).append({"started": now, "command": "plasbench " + " ".join(argv or [])})
+    record.setdefault("runs", []).append({"started": now, "command": "plasbench " + " ".join(argv or []), "via": os.environ.get("PLASBENCH_STARTED_VIA") or "terminal"})
     record["runs"] = record["runs"][-200:]
     record_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return folder
 
 
-def create(root, name: str, note: str = "") -> Path:
-    """An empty study (from the window's New study button): its folders and a study.json, no run yet."""
-    folder = workspace(root) / valid_name(name)
+def create(root, name: str, note: str = "", location=None) -> Path:
+    """An empty study (from the window's New study button): its folders and a study.json, no run yet. `location` puts it outside the workspace."""
+    folder = study_path(root, name, location)
     if (folder / "study.json").exists():
         raise ValueError(f"a study named {folder.name} already exists")
     for sub in SUBDIRS:
         (folder / sub).mkdir(parents=True, exist_ok=True)
+    _after_create(root, folder)
     now = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     record = {"schema_version": 1, "name": folder.name, "created": now, "updated": now, "note": note, "tags": [], "runs": []}
     (folder / "study.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return folder
 
 
+def add_existing(root, folder) -> Path:
+    """Register a folder that already holds a study.json (from "Add an existing study folder...")."""
+    folder = Path(str(folder)).expanduser()
+    if not folder.is_dir() or not (folder / "study.json").is_file():
+        raise ValueError(f"{folder} has no study.json: choose a study folder")
+    try:
+        name = valid_name(json.loads((folder / "study.json").read_text(encoding="utf-8")).get("name") or folder.name)
+    except (OSError, ValueError):
+        name = valid_name(folder.name)
+    if _same(folder.parent, workspace(root)):
+        raise ValueError(f"{folder} is already in the workspace")
+    if folder.name != name:
+        raise ValueError(f"the folder is named {folder.name} but its study is named {name}: rename the folder to {name} first")
+    register(root, name, folder)
+    return folder
+
+
+def _data_facts(folder: Path, record: dict) -> dict:
+    where = record.get("data_location") or "shared"
+    inside = where == "study" and (folder / "data").is_dir()
+    out = {"data_location": where, "data_dir": record.get("data_dir"), "data_in_study": inside, "data_bytes": None}
+    if inside:
+        try:
+            from . import runfolders
+            counted = runfolders._count(folder / "data", 5000, 0.4)
+            out["data_bytes"], out["data_capped"] = counted["bytes"], counted["capped"]
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
 def list_studies(root) -> list:
-    """Every study in the workspace, newest first, with what the window shows about it."""
+    """Every study in the workspace and every registered external one, newest first, with what the window shows about it. An external study whose folder is missing
+    (a disconnected drive) is listed with available False and the reason; it is never an exception."""
     base = workspace(root)
     out = []
-    if not base.is_dir():
-        return out
-    for folder in base.iterdir():
-        if not folder.is_dir() or folder.name.startswith("."):
+    todo = []
+    if base.is_dir():
+        todo += [(f, False) for f in base.iterdir() if f.is_dir() and not f.name.startswith(".")]
+    for name, where in registry(root).items():
+        todo.append((Path(where), True))
+    for folder, external in todo:
+        if external and not (folder / "study.json").is_file():
+            out.append({"name": folder.name, "path": str(folder), "results": str(folder / "results"), "modified": 0, "cohort": None, "sample_sheet": None, "runs": 0,
+                        "report": False, "created": None, "note": "", "tags": [], "cloned_from": None, "imported_from": None, "migrated_from": None, "tracked": False,
+                        "tracked_in": None, "last_command": None, "external": True, "available": False,
+                        "unavailable": f"not available: {folder} (is the drive connected?)", "data_location": None, "data_dir": None, "data_in_study": False, "data_bytes": None})
             continue
         try:
             record = json.loads((folder / "study.json").read_text(encoding="utf-8"))
@@ -128,8 +312,8 @@ def list_studies(root) -> list:
                     "runs": len(record.get("runs", [])), "report": (results / "benchmark.report.html").is_file(),
                     "created": record.get("created"), "note": record.get("note", ""), "tags": record.get("tags", []),
                     "cloned_from": record.get("cloned_from"), "imported_from": record.get("imported_from"),
-                    "migrated_from": record.get("migrated_from"), "tracked": (folder / ".git").exists() or (base / ".git").exists(),
-                    "tracked_in": "own" if (folder / ".git").exists() else ("workspace" if (base / ".git").exists() else None),
-                    "last_command": (record.get("runs") or [{}])[-1].get("command")})
+                    "migrated_from": record.get("migrated_from"), "tracked": (folder / ".git").exists() or ((base / ".git").exists() and not external),
+                    "tracked_in": "own" if (folder / ".git").exists() else ("workspace" if (base / ".git").exists() and not external else None),
+                    "last_command": (record.get("runs") or [{}])[-1].get("command"), "external": external, "available": True, **_data_facts(folder, record)})
     out.sort(key=lambda s: -s["modified"])
     return out

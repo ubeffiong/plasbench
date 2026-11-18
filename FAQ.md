@@ -592,6 +592,26 @@ the independent-truth subset of public-v4 is still to be done.
 **Answer.** When a run finishes, PlasBench can stop and ask "open the report?". `--no-report-prompt` removes that question: it prints the report path and exits, so the run can go unattended. It changes nothing about what is run or written. `--open-report` does the opposite, opening the report in your browser at the end without asking. The window always sets `--no-report-prompt`.
 **Status.** Documented; the window has a checkbox for opening the report (see the User Guide).
 
+### Q52. Why are my downloaded reads in `~/.local/share/plasbench/data` (or `\\wsl.localhost\...`), and can I change that?
+**Answer.** That is the shared data folder (`DATA_DIR`, set by `install.sh`): every study reuses it, so the same reads are never downloaded twice, and it is kept when a study is deleted. Change it for one run with `--data-dir PATH` (the study remembers the folder for its later runs), or for everything with `DATA_DIR` on the Settings page. In the window, New benchmark → Options → "Where to keep downloaded reads and assemblies".
+**Status.** Documented in the User Guide ("Where your data and studies live").
+
+### Q53. Can I keep the data inside the study folder?
+**Answer.** Yes: `plasbench run ... --keep-data-in-study` (the window's second radio). The reads go to `<study>/data`, which the managed `.gitignore` excludes (checked with `git check-ignore`), and they are deleted with the study. The study remembers the choice, so Resume finds them. **Manage study → Delete downloaded data only** frees the space and keeps the results.
+**Status.** Done after v0.5.0 (next release).
+
+### Q54. Can a study live on another drive, or outside the workspace?
+**Answer.** Yes: `--study-location PARENT_DIR` (the folder must exist) or "Another folder" in the window's Study folder card or New study. PlasBench keeps a hidden list of where outside studies are, so they appear on the Workspace page and in `--study NAME`. If the drive is disconnected the study is shown as "not available" with Remove from list; nothing is created in its place. A Windows drive seen from WSL, or a cloud-sync folder, is slower or can lock files; the folder check warns.
+**Status.** Done after v0.5.0 (next release); rename, copy and archive are only for studies inside the workspace.
+
+### Q55. My drive is not listed in "Choose a folder". How do I select it?
+**Answer.** Under WSL, Ubuntu lists only the Windows drives it has mounted. In the Terminal tab run, for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e`, then press Refresh in the chooser; or type the Windows path (`E:\data`) in the path box, which is converted. PlasBench never runs the mount command itself.
+**Status.** Documented in the User Guide.
+
+### Q56. Why is my cancelled run not in the Jobs list, when I can see its folder in the studies tree?
+**Answer.** Two different reasons, both fixed. (1) A job started from the window is saved in a shared list; two windows (or a window and its background watcher) could overwrite each other's saves, and a deleted job could come back. The list is now saved under an exclusive lock, each job also keeps a small `<id>.meta.json` beside its log so the list can be rebuilt from the folder, deletions are written down, and a failed, interrupted or cancelled job is kept until you delete it or it is older than `PLASBENCH_JOB_RETENTION_DAYS` (default 180; 0 keeps them for ever). (2) A run you start in the Terminal tab or a shell is not a job of the window, so it never was in the Jobs list; the Runs page now shows the latest run of each study that was started outside the window, read-only and marked "started outside the window" (running, completed, or "interrupted or cancelled: it stopped without recording how it ended"), with Show in terminal and Open folder. The window cannot cancel such a run because it does not own the process.
+**Status.** Fixed after v0.5.0 (next release).
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions
