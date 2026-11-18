@@ -799,7 +799,12 @@ class Jobs:
         if jobrunner.is_alive(str(self.dir), job["id"]):
             return True
         p = self._paths(job["id"])
-        return not os.path.exists(p["alive"]) and not os.path.exists(p["exit"]) and time.time() - job["started"] < STARTUP_GRACE
+        if os.path.exists(p["alive"]) or os.path.exists(p["exit"]) or time.time() - job["started"] >= STARTUP_GRACE:
+            return False
+        # No heartbeat yet, inside the grace period: a slow start is still a start, but a runner whose process is already gone is not "starting". Cancelling a run
+        # a moment after it began (before the runner wrote its pid file) used to leave it in `cancelling` for the whole grace period.
+        pid = job.get("pid")
+        return jobrunner.pid_alive(pid) if pid else True
 
     def _append_log(self, job_id: str, text: str):
         try:
