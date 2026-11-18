@@ -644,6 +644,10 @@ the independent-truth subset of public-v4 is still to be done.
 **Answer.** The top bar checks the internet and each service (GitHub, NCBI, SRA, ENA, PyPI, conda, Zenodo, PLSDB). A control that needs an unreachable service looks disabled with the reason and advice; it stays focusable, and clicking it checks again at that moment. Local work (scoring, reports, studies, settings, a run whose reads are already on disk) never needs the internet. `PLASBENCH_OFFLINE=1` forces offline mode on purpose.
 **Status.** Done after v0.5.0 (next release).
 
+### Q62. My reads and reference genomes are in one big folder. Do I have to name every file?
+**Answer.** No. Use **Your own isolates > Scan a folder** in the window, or `plasbench scan-isolates FOLDER` (add `--write-sheet config/local.tsv` to place what it finds). It looks through the sub-folders, pairs the reads by their names (`_R1/_R2`, `_1/_2`, lanes, SRA style), picks the complete reference for each isolate and tells you why, and ignores BAMs, logs, PDFs, spreadsheets and assembler output such as `contigs.fasta`. It changes nothing in your folder; whatever it is unsure of is shown as an issue with the alternatives, never chosen silently. **Limit.** It matches by folder and file names and the start of each file, so a reference sitting in the right folder but from another strain looks right; check every isolate marked "check" and run the quick test. See the guide section "Add isolates from a folder".
+**Status.** New after v0.5.0.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions

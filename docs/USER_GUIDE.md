@@ -757,6 +757,31 @@ New files in a results folder: `.run.lock` and `.run.lock.heartbeat` (while a ru
 
 Exit codes of a stage: `0` success, `3` an adapter found no output from its tool, `4` every tool run failed. The window shows these as `failed`, `completed_with_warnings`, `stalled` and `retrying`.
 
+### Add isolates from a folder
+
+See also `plasbench intake scan` / `intake stage` ([Input guide](INPUT_GUIDE.md)): the sheet-first route to the same placement, which stays available.
+
+If your reads and reference genomes are in one folder (with sub-folders, and other files mixed in), you do not have to name each file. In the window, **Your own isolates > Scan a folder**; on the command line:
+
+```
+plasbench scan-isolates /path/to/folder                 # look; changes nothing
+plasbench scan-isolates /path/to/folder --json          # the same, for scripts
+plasbench scan-isolates /path/to/folder --write-sheet config/local.tsv    # also place the complete isolates
+```
+
+The result is a table: for each isolate, the reads (1 and 2), the reference, a confidence (high, medium, low) and what needs attention. The exit code is 0 when every isolate is complete and 3 when some need attention. **Scanning never modifies the folder.** `--write-sheet` calls the same function as `plasbench init-local` for each isolate (so `--link copy|symlink|hardlink` behaves the same); isolates with an error are never placed, and isolates that only need review (for example lanes to be joined) are placed only with `--yes` or when you confirm in the window.
+
+What is recognised:
+
+- **Paired reads:** `_R1/_R2`, `_1/_2`, `.1/.2`, `-1/-2`, `_R1_001/_R2_001`, SRA style `SRR..._1.fastq.gz`; `.fastq` or `.fq`, any letter case. Illumina lanes (`S1_L001`, `S1_L002`) are one isolate, listed and flagged; they are joined by gzip concatenation (nothing is decompressed) only after you confirm. A missing mate is an error. Reads must be gzipped.
+- **Reference:** a plain FASTA of the complete genome. Chosen by how close it is to the isolate (same folder, the isolate's folder, the sample name in the file name) and by evidence in the file (an NCBI accession such as `NZ_`/`NC_`/`CP` in the header, the words complete genome, plasmid or chromosome, a few sequences, genome-sized length, a folder or file name such as reference, truth, complete, closed, hybrid). Each choice shows its reasons ("Why these files") and the runners-up as alternatives you can switch to.
+- **Never a reference:** `contigs.fasta`, `scaffolds.fasta`, assembly graphs, anything in a SPAdes, Unicycler, Flye, Shovill, SKESA, MEGAHIT or similar folder, FASTA with `NODE_` or `depth=` headers.
+- **Also used:** `sequence_report.jsonl` and a `truth.tsv` that sit with the isolate.
+- **Ignored and counted:** BAM/SAM, documents, spreadsheets, logs, hidden folders, `.git`, `__pycache__`, `node_modules`, `results`, `logs`, symbolic-link folders (loops are never followed), online-only cloud files (never opened), unreadable folders (a warning), and unpaired or long-read FASTQ (not used by `init-local`).
+- **Limits:** `--max-depth` (default 6 levels) and `--max-files` (default 200000).
+
+It never guesses silently: two equally good references, two read pairs with one name, a missing reference, a reference that looks like a draft or is under 20 kb, two samples sharing a reference, and ids that had to be changed (only letters, digits, `.`, `_`, `-` are allowed; ids that differ only in capital letters are made unique) are all shown as issues. The matching uses folder and file names and the first part of each file, so it can be wrong: a reference in the right folder but belonging to another strain looks right. Check every isolate marked "check", and run the quick test (`plasbench intake check`) before a long run.
+
 ### Downloads: sizes, progress and the SRA Toolkit
 
 Stage 1 downloads each isolate's reference assembly and its paired reads.

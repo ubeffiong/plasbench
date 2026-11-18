@@ -375,6 +375,21 @@ def build_parser():
                               help="How to place the input files (default: copy).")
     local_parser.add_argument("--force", action="store_true", help="Overwrite an existing truth.tsv.")
 
+    scan_parser = sub.add_parser(
+        "scan-isolates",
+        help="Point at ONE folder: find each isolate's paired reads and complete reference in it (changes nothing unless --write-sheet).",
+        description="Looks through FOLDER and its sub-folders for paired FASTQ reads, reference genomes, sequence reports and truth tables, and shows what it "
+                    "would use for each isolate, how sure it is and what needs your attention. Exit code 0: every isolate is complete; 3: some need attention. "
+                    "With --write-sheet the complete ones are placed exactly as init-local would. Guide: docs/USER_GUIDE.md, 'Add isolates from a folder'. See also `plasbench intake scan/stage`, the sheet-first route to the same placement (docs/INPUT_GUIDE.md).")
+    scan_parser.add_argument("folder", type=Path, help="The folder to look through (sub-folders are searched).")
+    scan_parser.add_argument("--json", action="store_true", help="Print the full result as JSON instead of a table.")
+    scan_parser.add_argument("--max-depth", type=int, default=6, help="How many folder levels down to look (default 6).")
+    scan_parser.add_argument("--max-files", type=int, default=200000, help="Stop after this many files (default 200000).")
+    scan_parser.add_argument("--write-sheet", metavar="SHEET", help="Also place the isolates and write/append this sample sheet (for example config/local.tsv), through the same code as init-local.")
+    scan_parser.add_argument("--data-dir", type=Path, help="Where sample directories live (default: the configured shared data directory).")
+    scan_parser.add_argument("--link", choices=("copy", "symlink", "hardlink"), default="copy", help="How to place the input files with --write-sheet (default: copy).")
+    scan_parser.add_argument("--yes", action="store_true", help="With --write-sheet, also place isolates that only need review (never ones with an error).")
+
     intake_parser = sub.add_parser(
         "intake",
         help="Your own isolates: write a sheet template, find isolates in a folder, place them, and quick-test that PlasBench can use them.",
@@ -878,6 +893,46 @@ def net_command(args):
     return 0 if answer["state"] in ("online", "assumed_online") else 3
 
 
+def scan_isolates_command(args, root):
+    """plasbench scan-isolates FOLDER: print what was found; with --write-sheet place the isolates in-process (same function as init-local)."""
+    from . import isolate_scan
+    res = isolate_scan.scan(args.folder, max_depth=args.max_depth, max_files=args.max_files)
+    samples = res["samples"]
+    need = [s for s in samples if s["status"] != "ready"]
+    if args.json:
+        print(isolate_scan.dump(res))
+    else:
+        short = lambda p: Path(p).name if p else "-"  # noqa: E731
+        print(f"{'sample':<22}{'reads 1':<28}{'reads 2':<28}{'reference':<26}{'confidence':<11}status / issues")
+        for s in samples:
+            issues = "; ".join(i["message"] for i in s["issues"] if i["level"] != "info")
+            print(f"{s['sample_id']:<22.21}{short(s['reads_1']):<28.27}{short(s['reads_2']):<28.27}{short(s['reference']):<26.25}{s['confidence']:<11}{s['status']}" + (f": {issues}" if issues else ""))
+        for u in res["unrecognised"]:
+            print(f"  ignored/unmatched: {u['count']} x {u['kind']}")
+        for key, n in sorted(res["skipped"].items()):
+            print(f"  skipped: {n} x {key.replace('_', ' ')}")
+        for w in res["warnings"]:
+            print(f"  warning: {w}")
+        print(f"{len(samples)} isolate(s): {len(samples) - len(need)} complete, {len(need)} need attention.")
+    code = 0 if samples and not need and not res["cancelled"] and not res["warnings"] else 3
+    if args.write_sheet:
+        sheet = Path(args.write_sheet)
+        sheet = sheet if sheet.is_absolute() else root / sheet
+        data_dir = args.data_dir or configured_data_dir(root)
+        review = [s for s in samples if s["status"] == "review"]
+        confirm = args.yes
+        if review and not confirm and sys.stdin.isatty() and not args.json:
+            confirm = input(f"{len(review)} isolate(s) only need review (see above). Place them anyway? [y/N] ").strip().lower() in ("y", "yes")
+        done = isolate_scan.stage(samples, data_dir, sheet, link=args.link, confirm=confirm, root=root)
+        out = sys.stderr if args.json else sys.stdout
+        for r in done["results"]:
+            print(f"{'placed ' if r['ok'] else 'skipped'} {r['sample_id']}" + ("" if r["ok"] else ": " + " ".join(r["messages"])), file=out)
+        print(f"{len(done['staged'])} placed in {data_dir}; sheet: {sheet}", file=out)
+        if len(done["staged"]) < len(samples):
+            code = 3
+    return code
+
+
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -921,6 +976,8 @@ def main(argv=None):
         from . import desktop
         return desktop.main(["--project-root", str(root)] + (["--remove"] if args.remove else [])
                             + (["--no-desktop"] if args.no_desktop else []))
+    if args.command == "scan-isolates":
+        raise SystemExit(scan_isolates_command(args, root))
     if args.command == "demo":
         code = run([bash_command(), "test/run_demo.sh"], root)
     elif args.command == "open-report":
