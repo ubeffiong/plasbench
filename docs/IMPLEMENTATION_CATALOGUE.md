@@ -9,7 +9,7 @@ a methods file, a changelog and the code. This catalogue is the index to all of 
 explains the method in depth.
 
 **Size at the time of writing:** 188 analysis modules, 28 registered tools and baselines (20 real tools), 212 registered
-outputs, 54 run switches, 394 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
+outputs, 54 run switches, 395 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
 ## 1. How to read this document
