@@ -547,6 +547,29 @@ A review of published plasmid benchmarks (PlasEval, Teixeira 2025, plsMD 2026, t
 
 ---
 
+## L. Upgrading to v0.5.0 (18 November 2026)
+
+### Q44. My scores changed after upgrading. Is something wrong?
+**Answer.** No: v0.5.0 corrects scoring that the independent audit of 17 November 2026 showed to be too generous or inconsistent. The list is in
+[docs/releases/v0.5.0.md](docs/releases/v0.5.0.md). The ones most likely to move a number: NMI, Variation of Information and ARI now penalise a
+plasmid that no bin covers (before, one wholly missed plasmid scored a perfect 1.0, 0.0, 1.0); an AMR gene on a record that is in no bin is
+`unassigned_contig` rather than `correct_plasmid`; a binner that bins nothing has blank precision; truth provenance now recognises the real NCBI
+wording, so more references are short-read-first and some formerly "independent" Illumina-polished ones are not. Re-score older results before
+putting them beside new ones.
+**Status.** Fixed in v0.5.0; tests fail on the old code and pass on the new.
+
+### Q45. What did the audit leave undone?
+**Answer.** [docs/AUDIT_2026_11_17_STATUS.md](docs/AUDIT_2026_11_17_STATUS.md) lists all 53 findings: 42 fixed, 10 partial, 1 not fixed. The gaps that matter
+to a user: only three tools have real-binary checks, the download-size and timing figures are estimates, only the gplas2 download checksum is pinned,
+there is no default tool time limit (a preset is opt-in), and the window was not tested in a real browser for this release.
+**Status.** Open, with each item and its reason in the status table.
+
+### Q46. Is there a real-data result I can look at?
+**Answer.** Yes, one small one: [`results_real_cohort1/`](results_real_cohort1/README.md), 10 public isolates scored for `mob_recon`, `platon` and `plasmidspades`
+and a coverage baseline. It is a descriptive evaluation, not a ranking, because only 1 of the 10 references reaches reference Tier 2. The larger run on
+the independent-truth subset of public-v4 is still to be done.
+**Status.** Done for 10 isolates; open for the large panel.
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions
@@ -790,7 +813,7 @@ specific institutional dataset **Open** by nature.
 
 ### Part XVI. Publication and funding (Q456-484)
 
-**30. Journal reviewer questions (Q456-470).** The most likely rejections: no real-data results yet; truth is an assembly;
+**30. Journal reviewer questions (Q456-470).** The most likely rejections: only a small real-data result (10 isolates, no ranking); truth is an assembly;
 cohort small and taxonomically narrow; no independent validation of intervals or against an independent scorer. These are the
 open items below. Code is accessible; reproducibility is addressed above. A resource or benchmark paper is the defensible fit.
 

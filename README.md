@@ -6,7 +6,7 @@
 
 > **[Open the sample HTML report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html)** (opens in your browser, nothing to install; Ctrl-click, Cmd-click or middle-click to open it in a new tab). It is the report PlasBench writes, built from the offline demo; the data are synthetic (the report opens with a "Demonstration data" banner), so its numbers are not real results. To open it from a clone instead: [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html).
 
-**Docs:** **[Run it: step-by-step lab guide](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** · [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md)
+**Docs:** **[Run it: step-by-step lab guide](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)** · [FAQ](FAQ.md) · [Evaluation framework](#evaluation-framework-outcomes-metrics-and-endpoints) · [Benchmark workflow](#benchmark-workflow) · [Scoring at a glance](#how-scoring-works-at-a-glance) · [Methods](docs/METHODS.md) · [Real-data evaluation](#a-real-data-evaluation-cohort-1) · [Release notes](docs/releases/v0.5.0.md) · [QA result](docs/QA_RESULT_2026_11_18.md) · [Audit status](docs/AUDIT_2026_11_17_STATUS.md)
 
 > **Want to run it?** The dry-lab route is written out command by command in
 > **[Section 3: from a new machine to your first leaderboard](#3-standard-lab-workflow-from-a-new-machine-to-your-first-leaderboard)**
@@ -147,6 +147,17 @@ for the incremental precision-recall sweep.
 
 **See it first:** [open the sample report](https://htmlpreview.github.io/?https://github.com/ubeffiong/plasbench/blob/main/docs/sample_report/benchmark.report.html) (or open [docs/sample_report/benchmark.report.html](docs/sample_report/benchmark.report.html) in a browser after cloning). It is built from the synthetic offline demo and says so in a banner at the top, so its numbers are not real results; see [docs/sample_report/](docs/sample_report/README.md).
 
+### A real-data evaluation: cohort 1
+
+[`results_real_cohort1/`](results_real_cohort1/README.md) is a **real PlasBench run on real data**, not the demo: **10 public isolates with downloaded reads and deposited reference assemblies** (seven urinary *E. coli*, two AR Bank isolates and one *Salmonella*), scored for **three real tools**, `mob_recon`, `platon` and `plasmidspades`, and the coverage baseline. All four completed on all ten isolates. Open [`results_real_cohort1/benchmark.report.html`](results_real_cohort1/benchmark.report.html) for the full report.
+
+| Reference tier | Isolates | What the run measured |
+|---|---|---|
+| Tier 3 (provisional: 8 short-read-first references, 1 unknown) | 9 | Length-weighted binning F1 0.82 for `mob_recon`, with 9 of 20 plasmids correctly reconstructed. Base-level F1 0.91 for `platon`, 0.60 for `plasmidspades`, 0.45 for the coverage baseline. |
+| Tier 2 (long-read-first, polished with the benchmark's own reads) | 1 | `mob_recon` binning F1 0.84 and 0 of 2 plasmids correctly reconstructed. |
+
+**How to read it.** It shows that the pipeline runs end to end on real reads and real references, and it gives a descriptive comparison of three real tools on ten real isolates. It is **not a ranking**: only 1 of the 10 references reaches Tier 2, so the headline ranking rests on one isolate. Nine of the ten references are Tier 3 because they were assembled short-read-first, which favours tools that use the same short reads. It was built with PlasBench 0.2.3 and predates the unaligned-sequence columns of the binning score and the run-table check; it has not been rebuilt with this release. The larger run on the independent-truth subset of public-v4 (7,227 verified isolates) is the evaluation that can support a ranking, and it is still to be done.
+
 The report is one self-contained file that opens on an **Overview** and shows **one view at a time**, chosen from a fixed left rail (Overview,
 Recommendation, Figures, Plasmid maps, Detailed results, Data quality, Methods and limits, Scorecard (exploratory), Appendix) beside a slim top bar with a
 jump-to-section search (on a phone the palette, collapse and print actions sit behind one menu button). The analyses are ordered for someone reading to decide
@@ -282,8 +293,10 @@ cannot match. This table states only what was verified in their repositories and
 
 **Where the others are better, or PlasBench is weaker**
 
-- **No benchmark result on real data ships with PlasBench.** The bundled leaderboards come from a synthetic demo. plsMD and PlasEval
-  report results on real data in their publications; PlasBench provides the instrument, and the run is still to be done.
+- **One small real-data evaluation ships, not a validated ranking.** `results_real_cohort1/` scores three real tools on 10 real isolates (see
+  [A real-data evaluation](#a-real-data-evaluation-cohort-1)), but only one of its references reaches reference Tier 2, so it supports no ranking.
+  The bundled sample report still comes from a synthetic demo. plsMD and PlasEval report results on real data in their publications; the
+  larger run on the independent-truth subset of public-v4 is still to be done.
 - **PlasEval is the peer-reviewed reference for bin dissimilarity.** PlasBench now computes the same dissimilarity itself, repeat-aware: a contig
   that sits in several bins is paired copy by copy (branch and bound, capped by `DISSIMILARITY_MAX_CALLS`). Run against the original program
   (`github.com/acme92/PlasEval`, commit 8238356) on Linux, it agreed on best-match precision, recall and F1 and on the dissimilarity in all 59

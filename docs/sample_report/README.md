@@ -10,7 +10,7 @@ and tab that explains the analysis in plain language.
 
 Two things differ from a real run:
 
-- The report links to files of its results folder (tables, maps, selected FASTA files). Those 549 files are not included here, so those links open only when the
+- The report links to files of its results folder (tables, maps, selected FASTA files). Those 631 files are not included here, so those links open only when the
   report sits beside its results folder, as it does after a run.
 - Large optional parts are included so every feature can be seen (the interactive cohort dashboard and the evidence explorer).
 

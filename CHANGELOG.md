@@ -12,6 +12,10 @@ history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-11-18
+Scores change in this release (NMI/VI/ARI, AMR placement and gene recovery, empty-bin precision, truth provenance labels, interval clipping): see [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md) before comparing with a v0.4.1 result. It fixes the 53 findings of the independent audit of 17 November 2026 (42 fixed, 10 partial, 1 not fixed; per finding in [docs/AUDIT_2026_11_17_STATUS.md](docs/AUDIT_2026_11_17_STATUS.md)), adds public-v4, frozen QC thresholds, the interval decision, study management in the working directory and the truth-exclusion sensitivity, and ships a real-data evaluation (`results_real_cohort1/`, 10 isolates, three real tools). The full-suite QA result is in [docs/QA_RESULT_2026_11_18.md](docs/QA_RESULT_2026_11_18.md).
+
 ### Added -- audit follow-up (AU-021, AU-022, AU-045, AU-051)
 - **Shared readers (AU-021).** `plasbench_common.read_fasta_records`, `iter_paf`, `read_table` and `paf_identity` are the one validated reader set: a duplicate FASTA id or an empty header is an error, a malformed PAF row is dropped, counted and warned about once, a zero-length block has identity 0.0 everywhere (`build_enterprise_view` used 1.0). `score_plasmids`, `contig_classification`, `make_truth`, `score_bins`, `score_amr_placement` and `build_enterprise_view` use them; scores on valid input are unchanged (`test/test_shared_readers.py`). Other readers in the repository are not yet moved.
 - **Guard tests (AU-022).** `test/test_guard_mutants.py` covers the synthetic/real refusal, the commit secret scan and the TP clamp; each was checked by hand mutation.
@@ -84,22 +88,6 @@ history is lost, only the numbering is cleaner. See
 - **Negative controls:** `plasbench discover-cohort --negative-controls` (and `discover_ncbi_cohort.py --negative-controls`) looks for complete genomes whose record declares no plasmid, paired with an Illumina run, as candidates for plasmid-free isolates. None has been added to a cohort yet: the live discovery and a curator's check are still to do.
 - **Intervals:** `resampling.stratified_bootstrap_t_ci` gives the studentised cluster bootstrap a species-stratified form (it used to fall back to `cluster_t` whenever the ranking was species-balanced), and the full simulation now measures it. The default method is unchanged (see `docs/STATS_VALIDATION.md`).
 - **Curation grade:** the report's cohort filter is now labelled *Curation grade* (with an explanation), and the README says what `truth_quality_tier` means and what it does and does not do.
-
-
-### Changed -- production readiness
-- Fixed the scheduled **Real tools** workflow, whose Platon and plasmidSPAdes jobs failed on the fixture, not on the tools: Platon cannot train its gene finder on a 4 kb plasmid (`ORF prediction failed!`), so the check passes `--meta`; wgsim writes one constant quality character, from which SPAdes cannot infer the PHRED offset (`Failed to determine offset!`), so the workflow gives the simulated reads varied qualities. The production commands in `scripts/04_run_tools.sh` are unchanged. Whether the two now pass is confirmed by a manual run of the workflow (see the pull request).
-- CI now runs the whole test suite on Python 3.9, 3.11 and 3.13 (`requires-python` is `>=3.9`; only 3.11 was tested). The first 3.9 run found a real bug: `Path.write_text(..., newline=)` exists only from Python 3.10, so saving settings or a tool from the window, writing a sample sheet, and the pre-registration editor all failed on 3.9; 13 calls now use `open(..., newline=)`. The test job is pinned to `ubuntu-24.04` because `ubuntu-latest` (26.04) has no Python 3.9 build.
-- Added `SECURITY.md` (private reporting, supported versions, what is in scope) and `.github/dependabot.yml` (weekly GitHub Actions and monthly Docker base-image updates, each as a CI-tested pull request).
-### Added -- fixes from the independent verification
-- **The real-data run is in the repository**: `benchmark.report_cohort1` is renamed `results_real_cohort1` (10 isolates, PlasBench 0.2.3, three real tools) with a README saying what it supports and what it does not. The verification document had wrongly said no real-data result existed.
-- **Binning: unaligned sequence is now counted beside the headline.** `score_bins.py --pred-fasta` writes `bin_unaligned_bp`, `bin_unaligned_fraction`, `lw_bin_precision_strict` and `lw_bin_f1_strict`; the leaderboard gains `mean_lw_bin_f1_strict` and `mean_bin_unaligned_fraction`. A bin padded with contigs that align nowhere scored a perfect headline; it now shows a low strict score. The headline definition is unchanged.
-- **The run tables are checked before ranking** (`python/run_consistency.py`): duplicate runs, completed runs with no score and no recorded failure, scores with no status (errors); samples outside the sheet (a warning). Aggregation stops with a message unless `ALLOW_INCONSISTENT_RUNS=1`, and then the report carries a banner. A malformed or truncated `scores.tsv` stops with the file, line and value instead of a traceback.
-- **Synthetic data stays out of real reports** (`python/data_nature.py`): a run that mixes `sample_origin = synthetic` samples with real ones is refused by aggregation and by the report builder; an all-synthetic report carries a "Demonstration data" banner.
-- The weekly real-tool check now fails a tool that calls nothing as plasmid; `test_reference_groups.py` is registered; six optional demo analyses no longer end in `|| true`; the Galaxy wrapper pin follows `pyproject.toml` with a drift test.
-
-### Added -- independent verification of the earlier audits
-- `docs/INDEPENDENT_VERIFICATION.md` challenges the first audit, the second-review response and the performance audit on `main` at `17c9936`, classifying each finding and recording what was run versus read. New findings: bins padded with sequence that aligns nowhere keep a perfect binning score (verified with seven constructed cases); the report accepts missing, stale or duplicate runs without an error; the weekly real-tool check has a pass floor of 0; one test is registered nowhere. Intervals under-cover a nominal 95% (81-94% in simulation). Verdict: ready for a pilot and external review, not yet citable as evidence that one tool beats another.
-- Fixed: the documented command `plasbench plaseval-replication` does not exist; it is `plasbench analysis plaseval-replication` (README-level docs, FAQ, replication guide).
 
 
 ### Added -- publication cohorts and comparison with a paper's outcomes

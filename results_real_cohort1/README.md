@@ -1,4 +1,4 @@
-# results_real_cohort1: a real-data PlasBench run (10 isolates)
+# results_real_cohort1: a real-tool evaluation on a real dataset (10 isolates)
 
 This folder is the output of a real run, not the bundled demo. It was renamed from `benchmark.report_cohort1`.
 
