@@ -69,10 +69,10 @@ def _country(geo: str) -> str:
 
 
 def is_ledger(columns) -> bool:
-    """The accession ledger (cohorts/accepted_accessions.tsv) lists accessions only: biosample/sample_id/assembly_accession/sra_run/source_cohort,
-    with none of the curated metadata (organism, truth technology ...) a benchmark sheet needs, so a run on it fails stage 0."""
-    cols = set(columns)
-    return {"biosample", "source_cohort"} <= cols and not cols & {"organism", "truth_technology", "community_id"}
+    """The accession ledger (cohorts/accepted_accessions.tsv) lists accessions only, with none of the curated metadata a benchmark sheet needs, so a run on it
+    fails stage 0. One definition, shared with the command line's refusal (plasbench/sheetcheck.py)."""
+    from .sheetcheck import is_ledger as _is_ledger
+    return _is_ledger(columns)
 
 
 def kind_of(name: str, columns) -> str:

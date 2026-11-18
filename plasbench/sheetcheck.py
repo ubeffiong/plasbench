@@ -32,7 +32,7 @@ def header(path) -> list[str]:
 def is_ledger(columns) -> bool:
     """The accession ledger: it carries source_cohort and none of the curated truth columns."""
     cols = set(columns)
-    return "source_cohort" in cols and "biosample" in cols and "organism" not in cols and "truth_technology" not in cols
+    return {"biosample", "source_cohort"} <= cols and not cols & {"organism", "truth_technology", "community_id"}
 
 
 def missing_curated(columns) -> list[str]:
