@@ -621,6 +621,14 @@ the independent-truth subset of public-v4 is still to be done.
 **Answer.** In the study folder: `logs/run_<date>-<time>.log` is everything the run printed, including the heartbeats (`logs/run.latest.log` points at the newest; the newest 20 are kept, `LOG_RETENTION_RUNS`; `RUN_CONSOLE_LOG=0` turns it off); `logs/<sample>.<step>.log` is each tool's own output; `results/run_events.jsonl` has one JSON line per event (stage start and end, isolate steps, command start and end with exit code and seconds, heartbeats with CPU and memory, warnings), safe to read by machine; `results/stage_timing.tsv` has seconds per stage. Events carry names and numbers only, never environment variables or commands.
 **Status.** New after v0.5.0.
 
+### Q57. Why does the window sign in with a pop-up and a code instead of taking me to GitHub?
+**Answer.** It uses GitHub's device flow through the GitHub CLI: the window shows a one-time code and opens github.com in a small pop-up it controls, so you never leave PlasBench; approving there signs you in and closes the pop-up. No app has to be registered and the page never sees a token. If your browser blocks the pop-up, the window shows the address with an Open button. Without the GitHub CLI, install it (the window shows the command) or sign in with a personal access token, which is passed over standard input only.
+**Status.** Done after v0.5.0 (next release); not exercised against a real account in the tests.
+
+### Q58. A button is greyed out with "Needs the internet". Why, and can I still work?
+**Answer.** The top bar checks the internet and each service (GitHub, NCBI, SRA, ENA, PyPI, conda, Zenodo, PLSDB). A control that needs an unreachable service looks disabled with the reason and advice; it stays focusable, and clicking it checks again at that moment. Local work (scoring, reports, studies, settings, a run whose reads are already on disk) never needs the internet. `PLASBENCH_OFFLINE=1` forces offline mode on purpose.
+**Status.** Done after v0.5.0 (next release).
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions
