@@ -864,7 +864,8 @@ body.gd-open #gdrawer{transform:none}
   <!-- JOBS ---------------------------------------------------------------------------------------- -->
   <section class="view" id="v_jobs" hidden>
    <div class="vhead"><div class="ttl"><div class="crumbs">Results</div><h1>Jobs</h1>
-    <p>Every command started from this window, with its exact command line, how it ended, and its full log. Jobs keep running if you switch pages; Quit asks before stopping one that is still running.</p></div></div>
+    <p>Every command started from this window, with its exact command line, how it ended, and its full log. Jobs keep running if you switch pages; Quit asks before stopping one that is still running.</p>
+    <p class="small mut" id="jobs_note">Everything you start from this window appears here; runs you start in the Terminal appear under Runs and reports, marked 'started outside the window'.</p></div></div>
    <div class="card"><div class="tablewrap"><table class="data"><thead><tr><th>State</th><th>Job</th><th>Started</th><th>Duration</th><th></th></tr></thead><tbody id="jobtb"></tbody></table></div></div>
   </section>
 
@@ -1286,7 +1287,7 @@ const seenAttn = () => { try { return new Set(JSON.parse(localStorage.getItem(at
 const markSeen = ids => { try { const s = seenAttn(); ids.forEach(i => s.add(i)); localStorage.setItem(attnKey, JSON.stringify([...s].slice(-300))); } catch {} };
 async function refreshSessions() {
   if (S.conn) return;
-  try { S.sessions = (await api("run-sessions")).sessions; } catch { return; }
+  try { const r = await api("run-sessions"); S.sessions = r.sessions; S.outside = r.outside || []; } catch { return; }
   renderSessions(); updateAttention();
 }
 const ago = t => { const d = Date.now() / 1000 - t; return d < 90 ? "just now" : d < 5400 ? `${Math.round(d / 60)} min ago` : d < 172800 ? `${Math.round(d / 3600)} h ago` : fmtTime(t); };
@@ -1331,14 +1332,23 @@ function sessCard(s) {
     ${s.group === "ongoing" && s.display_state === "stalled" ? `<div class="stallnote" role="status">${esc(STALL_TEXT(s.idle_seconds))}<div class="acts"><button class="btn sec sm" data-sa="activity">Check activity</button><button class="btn danger sm" data-sa="cancel">Cancel</button></div>${activityHTML(S.act[s.id])}<div class="small mut" style="margin-top:4px">Resume is offered under Needs attention after a cancel.</div></div>` : ""}
     <div class="acts">${acts.filter(Boolean).join("")}</div>${detail}</div>`;
 }
+/* Runs started outside the window (the Terminal tab, a shell): read-only, never cancellable from here. */
+const outsideHTML = () => !(S.outside || []).length ? "" : `<h4 style="margin:16px 0 6px;font-size:13px">Started outside the window <span class="mut small">(read-only: this window did not start them, so it cannot cancel them)</span></h4>` + S.outside.map(o => {
+  const chip = {running: "Running", completed: "Completed", stopped: "Stopped without a recorded end"}[o.state], run = o.run_index != null ? (S.runs || [])[o.run_index] : null;
+  return `<div class="sess ${o.group}" data-outside="${esc(o.study)}"><div class="sh"><div style="min-width:0"><h4>${esc(o.label)} <span class="badge ${o.group === "ongoing" ? "run" : o.group === "completed" ? "ok" : "bad"}">${esc(chip)}</span> <span class="tag">started outside the window</span></h4>
+    <div class="sm"><span>${esc(o.started ? ago(o.started) : "")}</span>${o.earlier_runs ? `<span>${o.earlier_runs} earlier run${o.earlier_runs === 1 ? "" : "s"} in this study</span>` : ""}</div></div></div>
+    <div class="small mono" style="word-break:break-all;margin:4px 0">${esc(o.command)}</div>${o.state === "stopped" ? `<div class="small bad-t">Interrupted or cancelled: it stopped without recording how it ended.</div>` : ""}
+    <div class="acts">${o.report && o.run_index != null ? `<a class="btn sm" href="/view/${o.run_index}/benchmark.report.html" title="Open the report in a tab">${icon("chart")}Open report</a>` : ""}<button class="btn sec sm" data-oa="terminal" title="Change the Terminal tab to this study's folder">Show in terminal</button><button class="btn ghost sm" data-oa="folder" title="Open the study folder in your file manager">Open folder</button></div></div>`; }).join("");
+document.addEventListener("click", e => { const b = e.target.closest("[data-oa]"); if (!b) return; const o = (S.outside || []).find(x => x.study === b.closest("[data-outside]").dataset.outside); if (!o) return;
+  b.dataset.oa === "terminal" ? wtTerminal(o.study_path) : reveal(o.study_path); });
 function renderSessions() {
   if (!$("#sesslist")) return;
   const by = g => S.sessions.filter(x => g === "all" || x.group === g), n = g => by(g).length;
   if (!S.sessTab) S.sessTab = n("ongoing") ? "ongoing" : n("attention") ? "attention" : "completed";
-  $("#sesstabs").innerHTML = SESS_TABS.map(([k, l]) => `<button class="chip ${S.sessTab === k ? "on" : ""}" role="tab" aria-selected="${S.sessTab === k}" data-st="${k}">${l} (${n(k)})</button>`).join("");
+  setIfChanged($("#sesstabs"), SESS_TABS.map(([k, l]) => `<button class="chip ${S.sessTab === k ? "on" : ""}" role="tab" aria-selected="${S.sessTab === k}" data-st="${k}">${l} (${n(k)})</button>`).join(""));
   $("#sessnote").textContent = n("ongoing") ? `${n("ongoing")} running now` : n("attention") ? `${n("attention")} need${n("attention") === 1 ? "s" : ""} attention` : "";
   const list = by(S.sessTab);
-  $("#sesslist").innerHTML = list.length ? list.map(sessCard).join("") : `<div class="mut">${S.sessTab === "ongoing" ? "Nothing is running. Start one from New benchmark or run the demo." : S.sessTab === "attention" ? "No failed or interrupted runs." : S.sessTab === "completed" ? "No completed runs yet." : "No runs started from this window yet."}</div>`;
+  setIfChanged($("#sesslist"), list.length ? list.map(sessCard).join("") + outsideHTML() : outsideHTML() || `<div class="mut">${S.sessTab === "ongoing" ? "Nothing is running. Start one from New benchmark or run the demo." : S.sessTab === "attention" ? "No failed or interrupted runs." : S.sessTab === "completed" ? "No completed runs yet." : "No runs started from this window yet."}</div>`);
   if ($("#v_runs") && !$("#v_runs").hidden) markSeen(S.sessions.filter(x => x.group === "attention").map(x => x.id));
 }
 document.addEventListener("click", async e => {
@@ -1417,8 +1427,9 @@ async function refreshJobs() {
   $("#s_jobs").textContent = running.length ? `${running.length} running` : (S.jobs.length ? `${S.jobs.length} in history` : "Nothing running");
   $("#k_jobs").textContent = running.length;
   const sel = $("#cjob"), cur = S.consJob;
-  sel.innerHTML = S.jobs.length ? S.jobs.slice(0, 40).map(j => `<option value="${j.id}">${esc(stateWord(j.display_state || j.state))} · ${esc(j.label).slice(0, 80)}</option>`).join("") : `<option value="">No jobs yet</option>`;
-  if (cur) sel.value = cur;
+  const selHTML = S.jobs.length ? S.jobs.slice(0, 40).map(j => `<option value="${j.id}">${esc(stateWord(j.display_state || j.state))} · ${esc(j.label).slice(0, 80)}</option>`).join("") : `<option value="">No jobs yet</option>`;
+  if (document.activeElement !== sel) { const keep = sel.value; if (sel._html !== selHTML) { sel._html = selHTML; sel.innerHTML = selHTML; } if (keep && cur !== keep) sel.value = keep; }
+  if (cur && document.activeElement !== sel) sel.value = cur;
   if (!$("#v_jobs").hidden) renderJobs();
   if (typeof renderPanelJobs === "function" && GD.open && PT.active === "jobs") renderPanelJobs();
   const nrun = S.jobs.filter(j => j.state === "running" || j.state === "cancelling").length;
@@ -2481,6 +2492,58 @@ function defaultWord(dest) {
   const t = (S.tools || []).find(x => x.tool === dest || x.tool === String(dest).replace(/-/g, "_"));
   return t && t.run_flag ? `default · ${t.enabled ? "on" : "off"}` : "default";
 }
+/* ==PURE-BEGIN== (no DOM here: test/test_ui_patch.py runs this block under node) */
+/* The change signature of a folder listing: names, kinds, mtimes, sizes and child counts. Equal signatures mean nothing visible changed. */
+function listSignature(entries) { return (entries || []).map(e => [e.name, e.kind, e.mtime, e.size, e.children].join("|")).join(";"); }
+/* What to do to a keyed list: oldSigs = [[key, sig], ...] in DOM order, items = [{key, sig}, ...] wanted. Returns the keys to remove, the keys to insert, the keys whose
+   content changed, and whether the kept rows changed relative order. Rows whose signature is unchanged are never touched. */
+function diffKeyed(oldSigs, items) {
+  const old = new Map(oldSigs), want = new Set(items.map(i => i.key));
+  const remove = oldSigs.map(o => o[0]).filter(k => !want.has(k)), insert = [], update = [];
+  for (const it of items) { if (!old.has(it.key)) insert.push(it.key); else if (old.get(it.key) !== it.sig) update.push(it.key); }
+  const keptOld = oldSigs.map(o => o[0]).filter(k => want.has(k)), keptNew = items.map(i => i.key).filter(k => old.has(k));
+  return {remove, insert, update, reorder: keptOld.join("\u0001") !== keptNew.join("\u0001")};
+}
+/* The signature of everything the tree shows: the listing of every expanded folder (and the top one). */
+function treeSignature(cache, paths) { return paths.map(p => p + "=" + (cache[p] ? listSignature(cache[p].entries) : "?")).join("\n"); }
+/* Is the window busy with the user: a dialog or menu is open, or the pointer / focus is inside a component that must not be redrawn? */
+function isBusy(state) { return !!(state.dialog || state.menu || state.pointer || state.focus); }
+/* ==PURE-END== */
+function uiBusy(sels) {
+  const inside = sels || [];
+  return isBusy({dialog: !!document.querySelector("dialog[open]"), menu: typeof CTX !== "undefined" && !!CTX,
+    pointer: inside.some(q => { const e = document.querySelector(q); return e && e.matches(":hover"); }), focus: inside.some(q => { const e = document.querySelector(q); return e && e.contains(document.activeElement); })});
+}
+/* Put html into a container ONLY when it differs from what is there (so a poll that finds nothing new changes nothing: no flicker, no lost selection), and when it does
+   differ keep the scroll position of the container and its scrolling parents and the focused control. */
+function setIfChanged(el, html) {
+  if (!el || el._html === html) return false;
+  el._html = html;
+  const scrolls = []; for (let n = el; n && n !== document.body; n = n.parentElement) if (n.scrollHeight > n.clientHeight) scrolls.push([n, n.scrollTop]);
+  const ae = document.activeElement, mine = ae && el.contains(ae) && ae !== el ? {id: ae.id, tag: ae.tagName, text: (ae.textContent || "").trim(), sa: ae.dataset ? ae.dataset.sa : ""} : null;
+  el.innerHTML = html;
+  scrolls.forEach(([n, t]) => { n.scrollTop = t; });
+  if (mine) { const hit = (mine.id && document.getElementById(mine.id)) || [...el.querySelectorAll(mine.tag.toLowerCase())].find(x => (x.textContent || "").trim() === mine.text && (!mine.sa || x.dataset.sa === mine.sa)); if (hit) hit.focus({preventScroll: true}); }
+  return true;
+}
+/* Keyed patch of a list: only added, removed and changed rows are touched; htmlOf(item) gives one row's markup (its root gets data-key / data-sig). Focus stays on its row. */
+function applyKeyed(ul, items, htmlOf) {
+  const had = ul.contains(document.activeElement) && document.activeElement !== ul ? document.activeElement.closest("[data-key]") : null, hadKey = had ? had.dataset.key : null;
+  [...ul.children].filter(c => c.dataset.key === undefined).forEach(c => c.remove());
+  const cur = [...ul.children], d = diffKeyed(cur.map(c => [c.dataset.key, c.dataset.sig]), items), byKey = new Map(cur.map(c => [c.dataset.key, c]));
+  const mk = it => { const t = document.createElement("template"); t.innerHTML = htmlOf(it).trim(); const n = t.content.firstElementChild; n.dataset.key = it.key; n.dataset.sig = it.sig; return n; };
+  d.remove.forEach(k => byKey.get(k).remove());
+  d.update.forEach(k => { const n = mk(items.find(i => i.key === k)); byKey.get(k).replaceWith(n); byKey.set(k, n); });
+  let prev = null;
+  for (const it of items) {
+    let n = byKey.get(it.key); if (!n) { n = mk(it); byKey.set(it.key, n); }
+    const should = prev ? prev.nextElementSibling : ul.firstElementChild;
+    if (n !== should) ul.insertBefore(n, should);
+    prev = n;
+  }
+  if (hadKey != null && !ul.contains(document.activeElement)) { const row = byKey.get(hadKey); if (row) row.focus({preventScroll: true}); }
+}
+
 /* ---- designed dialogs: ONE promise-based component replaces every browser alert / confirm / prompt ----
    modalDialog({title, body, bodyHTML, facts:[[label, value]], detail, input:{label, value, placeholder, validate}, typeToConfirm, buttons:[{id, label, danger, primary}],
    cancelId, defaultId, danger, copy}) resolves {id, value}. role=dialog (alertdialog when destructive), aria-modal, labelled and described, Tab stays inside, focus returns to the
@@ -3285,7 +3348,7 @@ async function loadWorkspace(force) {
        <span>${esc(w.kind_label)}</span><span>${fmtGB(w.free)} free</span></div>
       ${w.env_override ? `<div class="note warn" style="margin-top:8px">${icon("alert", "ico")}<div>PLASBENCH_WORKSPACE is set in the environment, which wins over the choice saved here.</div></div>` : ""}`;
     $("#ws_n").textContent = `${w.studies.length} in this workspace`; loadArchived();
-    $("#ws_tb").innerHTML = w.studies.map(st => {
+    setIfChanged($("#ws_tb"), w.studies.map(st => {
       const run = (S.runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, ""));
       const idx = run ? S.runs.indexOf(run) : -1;
       return `<tr data-spath="${esc(st.path)}" data-sname="${esc(st.name)}"><td><b class="mono">${esc(st.name)}</b>${(st.tags || []).map(t => ` <span class="tag">${esc(t)}</span>`).join("")}${st.external ? ` <span class="tag" title="${esc(st.path)}">outside the workspace</span>` : ""}${st.available === false ? `<div class="bad-t small">${esc(st.unavailable)}</div>` : `<div class="mut small" title="${esc(st.data_dir || "")}">data: ${st.data_location === "study" ? `inside the study${st.data_bytes != null ? ` (${fmtGBytes(st.data_bytes)}${st.data_capped ? "+" : ""})` : ""}` : st.data_location === "custom" ? esc(st.data_dir || "another folder") : "shared folder"}</div>`}${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}${st.cloned_from ? `<div class="mut small">copied from ${esc(st.cloned_from)}</div>` : ""}${st.imported_from ? `<div class="mut small">imported (was ${esc(st.imported_from)})</div>` : ""}</td>
@@ -3295,7 +3358,7 @@ async function loadWorkspace(force) {
           <button class="btn ghost sm" onclick="manageStudy(${jsq(st.name)})" title="Notes and tags, rename, copy, export, archive, delete">Manage</button>
           <button class="btn ghost icon sm" title="${st.tracked ? "Tracked with Git: open its version control" : "Track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}" onclick="gitStudy(${jsq(st.path)})">${icon("git")}</button>
           <button class="btn ghost icon sm" title="Open the study folder" onclick="reveal(${jsq(st.path)})">${icon("folder")}</button></td></tr>`; }).join("")
-      || `<tr><td colspan="5" class="mut">No studies yet. Start one from <a href="#wizard">New benchmark</a>, or create one on the right.</td></tr>`;
+      || `<tr><td colspan="5" class="mut">No studies yet. Start one from <a href="#wizard">New benchmark</a>, or create one on the right.</td></tr>`);
     $("#ws_recent").innerHTML = w.recent.length ? `<div class="small mut" style="margin-top:12px">Recent workspaces</div>` + w.recent.map(r =>
       `<button class="task" style="padding:6px 0" data-wsr="${esc(r)}"><svg class="ico"><use href="#i-folder"/></svg><span class="tx"><b class="mono" style="font-size:12.5px">${esc(r)}</b></span></button>`).join("") : "";
     wtInit(!!force);
@@ -3365,7 +3428,7 @@ async function wtList(path, force) {
 }
 async function wtInit(force) {
   if (!$("#wt_tree")) return;
-  $("#wt_tip").innerHTML = tipBtn({summary: "Browse the workspace folder by folder. Only the workspace is shown; nothing outside it can be opened here.", choices: [["Arrow keys", "move up and down; Right expands, Left collapses"], ["Enter", "open a file, or expand / collapse a folder"], ["Home / End", "first / last row"], ["*", "expand every folder at this level"], ["Delete", "ask to delete a run folder (studies: Manage)"], ["F5", "refresh"], ["Shift+F10 or Menu key", "the actions menu (also right-click)"]], default: "", when: "Delete is offered only for runs and, through Manage, for studies."}, "folder tree");
+  if (!$("#wt_tip").firstChild) $("#wt_tip").innerHTML = tipBtn({summary: "Browse the workspace folder by folder. Only the workspace is shown; nothing outside it can be opened here.", choices: [["Arrow keys", "move up and down; Right expands, Left collapses"], ["Enter", "open a file, or expand / collapse a folder"], ["Home / End", "first / last row"], ["*", "expand every folder at this level"], ["Delete", "ask to delete a run folder (studies: Manage)"], ["F5", "refresh"], ["Shift+F10 or Menu key", "the actions menu (also right-click)"]], default: "", when: "Delete is offered only for runs and, through Manage, for studies."}, "folder tree");
   if (force) WT.cache = {};
   try {
     const l = await wtList(WT.top || "", !!force); WT.top = l.path; WT.root = l.root; await wtRender();
@@ -3378,23 +3441,53 @@ async function wtRows() {
   };
   await walk(WT.top, 1); return rows;
 }
+const wtRowSig = (r) => [r.e.name, r.e.kind, r.e.size, r.e.mtime, r.e.children, r.level, r.e.study ? 1 : 0, r.e.results ? 1 : 0].join("|") + "|" + (WT.open.has(r.path) ? "o" : "c");
+function wtRowHTML(it) {
+  const r = it.row, e = r.e, dir = e.kind === "dir", open = dir && WT.open.has(r.path);
+  const meta = dir ? (e.children != null ? `${e.children} item${e.children === 1 ? "" : "s"}` : "") : e.size != null ? fmtSize(e.size) : e.kind === "link" ? "link (not followed)" : "";
+  const tag = e.study ? `<span class="tag ok">study</span>` : e.results ? `<span class="tag">results</span>` : "";
+  return `<li role="treeitem" aria-level="${r.level}" ${dir ? `aria-expanded="${open}"` : ""} aria-selected="false" tabindex="-1" data-path="${esc(r.path)}" style="padding-left:${8 + (r.level - 1) * 18}px" title="${esc(r.path)}">
+      <span class="wtc" ${dir ? `data-wtcaret="1" aria-hidden="true"` : ""}>${dir ? (open ? "▾" : "▸") : ""}</span>${icon(dir ? "folder" : "file")}<span class="wtn">${esc(e.name)}</span>${tag}<span class="wtm">${esc(meta)}</span></li>`;
+}
+/* The tree is rendered ONCE and then patched: rows are keyed by path, only added / removed / changed rows are touched, and expansion, selection, scroll and focus live in WT, so a refresh
+   never collapses it, scrolls it or moves the focus. Nothing in a poll handler assigns the tree container's innerHTML. */
 async function wtRender(focus) {
   const l = WT.cache[WT.top]; if (!l) return;
   WT.rows = await wtRows();
   if (!WT.sel || !WT.rows.some(r => r.path === WT.sel)) WT.sel = WT.rows[0]?.path || null;
   const rel = wtRel(l.path), parts = rel === "." ? [] : rel.split("/"); let acc = WT.root;
-  $("#wt_crumbs").innerHTML = `<button type="button" data-wtgo="${esc(WT.root)}" title="Back to the workspace folder">Workspace</button>` + parts.map((p, i) => { acc = wtJoin(acc, p);
-    return `<span class="sepc" aria-hidden="true">›</span>` + (i === parts.length - 1 ? `<span class="cur" aria-current="location">${esc(p)}</span>` : `<button type="button" data-wtgo="${esc(acc)}" title="Go to ${esc(p)}">${esc(p)}</button>`); }).join("");
-  $("#wt_path").value = l.path; $("#wt_up").disabled = !l.parent; $("#wt_home").disabled = l.is_root;
-  $("#wt_tree").innerHTML = WT.rows.length ? WT.rows.map((r, i) => { const e = r.e, dir = e.kind === "dir", open = dir && WT.open.has(r.path), sel = r.path === WT.sel;
-    const meta = dir ? (e.children != null ? `${e.children} item${e.children === 1 ? "" : "s"}` : "") : e.size != null ? fmtSize(e.size) : e.kind === "link" ? "link (not followed)" : "";
-    const tag = e.study ? `<span class="tag ok">study</span>` : e.results ? `<span class="tag">results</span>` : "";
-    return `<li role="treeitem" aria-level="${r.level}" ${dir ? `aria-expanded="${open}"` : ""} aria-selected="${sel}" tabindex="${sel ? 0 : -1}" data-i="${i}" data-path="${esc(r.path)}" style="padding-left:${8 + (r.level - 1) * 18}px" title="${esc(r.path)}">
-      <span class="wtc" ${dir ? `data-wtcaret="1" aria-hidden="true"` : ""}>${dir ? (open ? "▾" : "▸") : ""}</span>${icon(dir ? "folder" : "file")}<span class="wtn">${esc(e.name)}</span>${tag}<span class="wtm">${esc(meta)}</span></li>`; }).join("")
-    : `<li class="mut small" role="none" style="padding:8px">This folder is empty.</li>`;
-  $("#wt_status").textContent = `${WT.rows.length} row${WT.rows.length === 1 ? "" : "s"} shown${l.truncated ? ` (only the first ${l.entries.length} entries of ${l.name} are listed)` : ""}`;
-  if (focus) $("#wt_tree").querySelector('[aria-selected="true"]')?.focus();
+  setIfChanged($("#wt_crumbs"), `<button type="button" data-wtgo="${esc(WT.root)}" title="Back to the workspace folder">Workspace</button>` + parts.map((p, i) => { acc = wtJoin(acc, p);
+    return `<span class="sepc" aria-hidden="true">›</span>` + (i === parts.length - 1 ? `<span class="cur" aria-current="location">${esc(p)}</span>` : `<button type="button" data-wtgo="${esc(acc)}" title="Go to ${esc(p)}">${esc(p)}</button>`); }).join(""));
+  if (document.activeElement !== $("#wt_path")) $("#wt_path").value = l.path;
+  $("#wt_up").disabled = !l.parent; $("#wt_home").disabled = l.is_root;
+  const tree = $("#wt_tree"), items = WT.rows.map(r => ({key: r.path, sig: wtRowSig(r), row: r}));
+  const empty = tree.querySelector("li.wtempty");
+  if (!items.length) { if (!empty) { [...tree.children].forEach(c => c.remove()); tree.insertAdjacentHTML("beforeend", `<li class="mut small wtempty" role="none" style="padding:8px">This folder is empty.</li>`); } }
+  else { if (empty) empty.remove(); applyKeyed(tree, items, wtRowHTML); }
+  tree.querySelectorAll("li[data-path]").forEach((li, i) => {            // selection and the roving tabindex change attributes only
+    li.dataset.i = i; const sel = li.dataset.path === WT.sel;
+    if (li.getAttribute("aria-selected") !== String(sel)) li.setAttribute("aria-selected", String(sel));
+    li.tabIndex = sel ? 0 : -1;
+  });
+  setIfChanged($("#wt_status"), esc(`${WT.rows.length} row${WT.rows.length === 1 ? "" : "s"} shown${l.truncated ? ` (only the first ${l.entries.length} entries of ${l.name} are listed)` : ""}`));
+  if (focus) $("#wt_tree").querySelector('[aria-selected="true"]')?.focus({preventScroll: false});
 }
+/* A slow background check (every 25 s, and when the tab becomes visible again): compare a cheap signature of the expanded folders and patch only what changed. It does nothing while a
+   dialog or menu is open, while the pointer is over the tree, or while focus is inside the card. */
+async function wtBackground(force) {
+  const view = $("#v_workspace");
+  if (!view || view.hidden || document.hidden || !WT.top || WT.busy) return;
+  if (!force && uiBusy(["#wt_card"])) return;
+  WT.busy = true;
+  try {
+    const paths = [WT.top, ...[...WT.open].filter(p => WT.cache[p])].slice(0, 40), before = treeSignature(WT.cache, paths), fresh = {};
+    for (const p of paths) { try { const r = await api(`fs/list?path=${encodeURIComponent(p)}`); fresh[p] = r; } catch { /* a folder that vanished: the next full refresh drops it */ } }
+    const after = treeSignature(Object.assign({}, WT.cache, fresh), paths);
+    if (after !== before && (force || !uiBusy(["#wt_card"]))) { Object.assign(WT.cache, fresh); await wtRender(false); }
+  } finally { WT.busy = false; }
+}
+setInterval(() => wtBackground(false), 25000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) wtBackground(false); });
 async function wtGo(path) { try { const l = await wtList(path, true); WT.top = l.path; WT.root = l.root; WT.sel = null; await wtRender(); } catch (e) { showMessage({title: "Cannot show that folder", body: e.message, detail: path, danger: true}); } }
 async function wtToggle(path, want) {
   const open = want === undefined ? !WT.open.has(path) : want; open ? WT.open.add(path) : WT.open.delete(path);
@@ -3762,7 +3855,7 @@ function setDrawer(open, remember = true) {
   $("#gdbtn").setAttribute("aria-pressed", open ? "true" : "false");
   if (remember) try { localStorage.setItem("pb_gd_open", open ? "1" : "0"); } catch {}
   clearInterval(GD.timer);
-  if (open) { setPanelTab(PT.active); GD.timer = setInterval(() => { if (!document.hidden && GD.open && PT.active !== "jobs") panelLoad(true); }, 15000); }
+  if (open) { setPanelTab(PT.active); GD.timer = setInterval(() => { if (!document.hidden && GD.open && PT.active !== "jobs" && !uiBusy(["#ps_list", "#gd_body"])) panelLoad(true); }, 30000); }
 }
 async function loadDrawer(quiet) {
   let st;
@@ -4074,10 +4167,10 @@ async function renderDoc(t) {
 /* ---- side panel: Jobs ---- */
 function renderPanelJobs() {
   const jobs = (S.jobs || []).slice(0, 40);
-  $("#pj_list").innerHTML = jobs.map(j => `<li data-pjob="${esc(j.id)}" title="${esc(j.command)}"><span class="sdot ${esc(j.state)}"></span>
+  setIfChanged($("#pj_list"), jobs.map(j => `<li data-pjob="${esc(j.id)}" title="${esc(j.command)}"><span class="sdot ${esc(j.state)}"></span>
     <span class="t"><b>${esc(j.label)}</b><span>${esc(stateWord(j.display_state || j.state))} · ${esc(fmtTime(j.started))}${j.ended || j.state === "running" ? " · " + esc(fmtDur((j.ended || Date.now() / 1000) - j.started)) : ""}</span></span>
     ${j.state === "running" ? `<button class="gd-ib" data-pjcancel="${esc(j.id)}" title="Cancel">${icon("stop")}</button>` : ""}</li>`).join("")
-    || `<li class="mut" style="cursor:default">Nothing started from this window yet.</li>`;
+    || `<li class="mut" style="cursor:default">Nothing started from this window yet.</li>`);
 }
 $("#pj_list").onclick = async e => {
   const c = e.target.closest("[data-pjcancel]"); if (c) { e.stopPropagation(); try { await api(`jobs/${c.dataset.pjcancel}/cancel`, {}); toast("Cancelling…"); } catch (err) { toast(err.message, "bad"); } return; }
@@ -4104,27 +4197,45 @@ async function treeFill(li) {
   const ul = li.querySelector(":scope > ul");
   try {
     const r = await api(`browse?files=1&path=${encodeURIComponent(li.dataset.tpath)}`);
-    ul.innerHTML = r.entries.map(treeNode).join("") || `<li class="mut small" style="padding:2px 8px">(empty)</li>`;
+    // setIfChanged: an unchanged folder leaves its rows, their open sub-folders, the scroll position and the focus alone
+    setIfChanged(ul, r.entries.map(treeNode).join("") || `<li class="mut small" style="padding:2px 8px">(empty)</li>`);
     ul.querySelectorAll(":scope > li.open[data-tdir='1']").forEach(treeFill);
-  } catch (e) { ul.innerHTML = `<li class="mut small" style="padding:2px 8px">${esc(e.message)}</li>`; }
+  } catch (e) { setIfChanged(ul, `<li class="mut small" style="padding:2px 8px">${esc(e.message)}</li>`); }
 }
+function psHeader(st, idx) {
+  return `<div class="tn" title="${esc(st.path)}${st.last_command ? "\n" + esc(st.last_command) : ""}"><svg class="ico cv"><use href="#i-chev"/></svg>
+          <span class="sdot ${st.report ? "done" : ""}" style="margin-top:0"></span><span class="nm mono">${esc(st.name)}</span>
+          <span class="act">${st.report && idx >= 0 ? `<a class="gd-ib" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab">${icon("chart")}</a>` : ""}
+          <button class="gd-ib" data-psgit="${esc(st.path)}" title="${st.tracked ? "Tracked with Git: show its changes and history" : "Not tracked yet: track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}">${icon("git")}</button>
+          <button class="gd-ib" data-psdir="${esc(st.path)}" title="Open the study folder">${icon("ext")}</button></span></div>`;
+}
+/* The panel's study tree is patched, not rebuilt: a study row is touched only when its own header changed; its open folders, scroll and focus are never reset by the timer. */
 async function loadPanelStudies() {
   try {
     const [w, runs] = await Promise.all([getWorkspace(true), getRuns(true).catch(() => [])]);
     $("#ps_where").textContent = `Studies · ${w.studies.length}`; $("#ps_where").title = w.path;
-    $("#ps_list").innerHTML = w.studies.map(st => {
-      const run = (runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, ""));
-      const idx = run ? runs.indexOf(run) : -1, open = TREE_OPEN.has(st.path);
-      return `<li class="study ${open ? "open" : ""}" role="treeitem" aria-expanded="${open}" data-tpath="${esc(st.path)}" data-tdir="1">
-        <div class="tn" title="${esc(st.path)}${st.last_command ? "\n" + esc(st.last_command) : ""}"><svg class="ico cv"><use href="#i-chev"/></svg>
-          <span class="sdot ${st.report ? "done" : ""}" style="margin-top:0"></span><span class="nm mono">${esc(st.name)}</span>
-          <span class="act">${st.report && idx >= 0 ? `<a class="gd-ib" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab">${icon("chart")}</a>` : ""}
-          <button class="gd-ib" data-psgit="${esc(st.path)}" title="${st.tracked ? "Tracked with Git: show its changes and history" : "Not tracked yet: track this study with Git"}" style="${st.tracked ? "color:var(--ok)" : ""}">${icon("git")}</button>
-          <button class="gd-ib" data-psdir="${esc(st.path)}" title="Open the study folder">${icon("ext")}</button></span></div>
-        <ul>${open ? `<li class="mut small" style="padding:2px 8px">Loading…</li>` : ""}</ul></li>`; }).join("")
-      || `<li class="mut" style="padding:10px;cursor:default">No studies yet. Start one with New benchmark.</li>`;
-    $$("#ps_list > li.open").forEach(treeFill);
-  } catch (e) { $("#ps_list").innerHTML = `<li class="mut" style="padding:10px">${esc(e.message)}</li>`; }
+    const ul = $("#ps_list");
+    const items = w.studies.map(st => {
+      const run = (runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, "")), idx = run ? runs.indexOf(run) : -1;
+      return {key: st.path, sig: psHeader(st, idx), st};
+    });
+    if (!items.length) { setIfChanged(ul, `<li class="mut" style="padding:10px;cursor:default">No studies yet. Start one with New benchmark.</li>`); return; }
+    if (ul.querySelector("li:not([data-key])")) { ul.innerHTML = ""; ul._html = null; }
+    const before = new Set([...ul.children].map(c => c.dataset.key));
+    const cur = new Map([...ul.children].map(c => [c.dataset.key, c]));
+    const diff = diffKeyed([...ul.children].map(c => [c.dataset.key, c.dataset.sig]), items);
+    diff.update.forEach(k => { const li = cur.get(k), it = items.find(i => i.key === k); li.querySelector(":scope > .tn").outerHTML = it.sig; li.dataset.sig = it.sig; });   // the header only: the open folders below stay
+    diff.remove.forEach(k => cur.get(k).remove());
+    const fresh = items.filter(i => !before.has(i.key));
+    fresh.forEach(it => { const open = TREE_OPEN.has(it.st.path), t = document.createElement("template");
+      t.innerHTML = `<li class="study ${open ? "open" : ""}" role="treeitem" aria-expanded="${open}" data-tpath="${esc(it.st.path)}" data-tdir="1" data-key="${esc(it.key)}">${it.sig}<ul>${open ? `<li class="mut small" style="padding:2px 8px">Loading…</li>` : ""}</ul></li>`;
+      const n = t.content.firstElementChild; n.dataset.sig = it.sig; cur.set(it.key, n); });
+    let prev = null;
+    for (const it of items) { const n = cur.get(it.key), should = prev ? prev.nextElementSibling : ul.firstElementChild; if (n !== should) ul.insertBefore(n, should); prev = n; }
+    ul._html = null;
+    fresh.forEach(it => { const n = cur.get(it.key); if (n.classList.contains("open")) treeFill(n); });
+    if (!ul._filled) { ul._filled = true; $$("#ps_list > li.open").forEach(treeFill); }
+  } catch (e) { setIfChanged($("#ps_list"), `<li class="mut" style="padding:10px">${esc(e.message)}</li>`); }
 }
 $("#ps_list").onclick = async e => {
   const d = e.target.closest("[data-psdir]"); if (d) { e.stopPropagation(); return reveal(d.dataset.psdir); }
@@ -4192,7 +4303,7 @@ window.reveal = async p => {
 async function loadRuns(force) {
   try { const runs = await getRuns(true); refreshSessions();
     $("#s_runs").textContent = runs.length ? `${runs.length} found` : "None yet";
-    $("#runlist").innerHTML = runs.length ? runs.map(runRow).join("") : `<div class="bd"><div class="note info">${icon("info", "ico")}<div>No results yet. <a href="#" data-act="demo">Run the demo</a> to see a report in about a minute.</div></div></div>`;
+    setIfChanged($("#runlist"), runs.length ? runs.map(runRow).join("") : `<div class="bd"><div class="note info">${icon("info", "ico")}<div>No results yet. <a href="#" data-act="demo">Run the demo</a> to see a report in about a minute.</div></div></div>`);
   } catch (e) { toast(e.message, "bad"); }
 }
 window.forgetRun = async p => {
@@ -4224,12 +4335,12 @@ $("#runadd").onclick = () => pickPath(true, async p => { try { await api("runs/a
    =================================================================================================== */
 function renderJobs() {
   const st = s => `<span class="status ${s === "done" ? "ok" : s === "running" || s === "cancelling" ? "run" : s === "failed" || s === "interrupted" ? "bad" : "idle"}">${icon(s === "done" ? "check" : s === "running" ? "play" : s === "cancelled" ? "stop" : "x")}</span>`;
-  $("#jobtb").innerHTML = S.jobs.map(j => `<tr><td><div class="row">${st(j.state)}<span>${stateWord(j.display_state || j.state)}${j.exit != null && j.state !== "done" ? ` <span class="mut small">exit ${j.exit}</span>` : ""}</span></div></td>
+  setIfChanged($("#jobtb"), S.jobs.map(j => `<tr><td><div class="row">${st(j.state)}<span>${stateWord(j.display_state || j.state)}${j.exit != null && j.state !== "done" ? ` <span class="mut small">exit ${j.exit}</span>` : ""}</span></div></td>
     <td><b>${esc(j.label)}</b><div class="mono small mut" style="word-break:break-all">${esc(envPrefix(j.env) + j.command)}</div></td><td class="small">${fmtTime(j.started)}</td>
     <td class="small">${fmtDur((j.ended || Date.now() / 1000) - j.started)}</td>
     <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="showConsole(${jsq(j.id)}, true)">Log</button>
      ${j.state === "running" ? `<button class="btn danger sm" onclick="cancelJob(${jsq(j.id)})">Cancel</button>` : `${j.kind === "git" || !j.argv.length ? "" : `<button class="btn ghost sm" data-run="${dattr(j.argv)}" data-label="${esc(j.label)}">Run again</button>`}<button class="btn ghost icon sm" title="Remove" onclick="delJob(${jsq(j.id)})">${icon("trash")}</button>`}</td></tr>`).join("")
-    || `<tr><td colspan="5" class="mut">No jobs yet. Everything you start from this window appears here.</td></tr>`;
+    || `<tr><td colspan="5" class="mut">No jobs yet. Everything you start from this window appears here.</td></tr>`);
 }
 window.showConsole = showConsole;
 window.cancelJob = async id => { try { if (!await askCancelRun(id)) return; await api(`jobs/${id}/cancel`, {}); refreshJobs(); } catch (e) { toast(e.message, "bad"); } };

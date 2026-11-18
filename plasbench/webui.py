@@ -13,6 +13,7 @@ real CLI parser; nothing is passed through a shell.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import platform
@@ -543,7 +544,9 @@ class Project:
 # --------------------------------------------------------------------------------------------- jobs
 SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that make a benchmark run session (everything else stays on the Jobs page)
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
-KEEP_JOBS = 500
+KEEP_JOBS = 500                       # finished (`done`) jobs kept; a failed, interrupted or cancelled job is kept until deleted or past the retention
+JOB_RETENTION_DAYS_DEFAULT = 180
+LOCK_STALE_SECONDS = 15
 STARTUP_GRACE = 60   # seconds a freshly started runner may take to write its first heartbeat
 INTERRUPTED_WATCH_SECONDS = 6 * 3600   # how long an "interrupted" run is still watched for its heartbeat to come back (a laptop that slept) before the watcher gives up
 SERVER_STARTED = time.time()
@@ -560,13 +563,18 @@ class Jobs:
         self.dir = UI_HOME / "jobs"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.lock = threading.Lock()
+        self._save_lock = threading.RLock()
+        self._meta_sig: dict = {}
+        self._dir_stamp = None
         self.jobs: dict[str, dict] = {}
         self.watchers: set[str] = set()
         self.deleted: set[str] = set()
         self._progress_cache: dict = {}
+        tomb = self._tombstones()
         for job in self._read_index():
-            if isinstance(job, dict) and "id" in job:
+            if isinstance(job, dict) and "id" in job and job["id"] not in tomb:
                 self.jobs[job["id"]] = job
+        self._restore_from_meta(tomb)
         for job in list(self.jobs.values()):
             if job.get("state") == "interrupted" and jobrunner.is_alive(str(self.dir), job["id"]):
                 job.update(state="running", ended=None, exit=None)   # an earlier window called it lost before its runner had written a heartbeat; it is plainly going
@@ -587,29 +595,153 @@ class Jobs:
                 time.sleep(0.05)
         return []
 
-    def _save(self):
-        # Another window on the same folder (plasbench ui --new-instance) may have started jobs this one has not seen: keep them, so one window never erases another's runs.
-        try:
-            for job in self._read_index():
-                if job.get("id") not in self.jobs and job.get("id") not in self.deleted:
-                    self.jobs[job["id"]] = job
-                elif job.get("id") in self.jobs and job.get("state") in ("done", "failed", "cancelled") and self.jobs[job["id"]]["state"] in ("running", "cancelling"):
-                    self.jobs[job["id"]].update(job)   # another window already recorded how it ended
-        except (OSError, ValueError, KeyError):
-            pass
-        keep = sorted(self.jobs.values(), key=lambda j: j["started"])
-        running = [j for j in keep if j["state"] in ("running", "cancelling")]
-        recent = [j for j in keep if j["state"] not in ("running", "cancelling")][-KEEP_JOBS:] + running
-        tmp = self.dir / f"jobs.json.{os.getpid()}.{threading.get_ident()}.tmp"   # written whole, then renamed over the index: a reader sees the old file or the new one, never half
-        tmp.write_text(json.dumps(sorted(recent, key=lambda j: j["started"]), indent=1), encoding="utf-8")
-        for attempt in range(40):   # on Windows the rename fails with "Access denied" while another process has the index open to read it: wait a moment and try again
+    @contextlib.contextmanager
+    def _index_lock(self, timeout: float = 30.0):
+        """An exclusive lock around read-merge-write of the shared job list, shared by every thread and every window on this folder: a lock file created with O_EXCL (works on
+        Windows, POSIX and WSL). A lock older than LOCK_STALE_SECONDS belongs to a window that died; it is moved aside (an atomic rename, so only one waiter wins) and the wait goes on."""
+        path = self.dir / "jobs.lock"
+        deadline = time.time() + timeout
+        while True:
             try:
-                os.replace(tmp, self.dir / "jobs.json")
+                fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                break
+            except (FileExistsError, PermissionError):
+                try:
+                    age = time.time() - os.path.getmtime(path)
+                except OSError:
+                    continue                      # it was released between the two calls: try again at once
+                if age > LOCK_STALE_SECONDS:
+                    try:
+                        os.replace(path, f"{path}.stale.{os.getpid()}.{threading.get_ident()}")
+                        os.unlink(f"{path}.stale.{os.getpid()}.{threading.get_ident()}")
+                    except OSError:
+                        pass
+                    continue
+                if time.time() > deadline:
+                    raise ValueError("another PlasBench window is saving the job list: try again in a moment")
+                time.sleep(0.01)
+        try:
+            yield
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    def _tombstones(self) -> set:
+        """The ids of jobs the user deleted (in any window): they stay deleted."""
+        try:
+            return {line.strip() for line in (self.dir / "jobs.deleted").read_text(encoding="utf-8").splitlines() if line.strip()}
+        except OSError:
+            return set()
+
+    def _meta_path(self, job_id: str) -> Path:
+        return self.dir / f"{job_id}.meta.json"
+
+    def _write_meta(self, job: dict):
+        """<id>.meta.json beside the log: written at launch and whenever the job changes, so the list can be rebuilt from the folder."""
+        text = json.dumps(job, sort_keys=True, indent=1)
+        if self._meta_sig.get(job["id"]) == text:
+            return
+        tmp = self.dir / f"{job['id']}.meta.json.{os.getpid()}.{threading.get_ident()}.tmp"
+        tmp.write_text(text, encoding="utf-8")
+        for attempt in range(40):
+            try:
+                os.replace(tmp, self._meta_path(job["id"]))
                 break
             except PermissionError:
                 if attempt == 39:
                     raise
                 time.sleep(0.05)
+        self._meta_sig[job["id"]] = text
+
+    def _restore_from_meta(self, tomb: set) -> list:
+        """Jobs that have a meta file but are not in memory (the index was lost or is behind, or another window started them) come back, unless the user deleted them."""
+        restored = []
+        try:
+            names = [e.name for e in os.scandir(self.dir) if e.name.endswith(".meta.json")]
+        except OSError:
+            return restored
+        for name in names:
+            job_id = name[:-len(".meta.json")]
+            if job_id in self.jobs or job_id in tomb:
+                continue
+            try:
+                job = json.loads((self.dir / name).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(job, dict) and job.get("id") == job_id and "started" in job and "state" in job:
+                self.jobs[job_id] = job
+                restored.append(job)
+        return restored
+
+    @staticmethod
+    def retention_days() -> float:
+        """How long a finished job is kept (PLASBENCH_JOB_RETENTION_DAYS, default 180 days; 0 = for ever). A failed, interrupted or cancelled job is never dropped sooner."""
+        try:
+            return max(0.0, float(os.environ.get("PLASBENCH_JOB_RETENTION_DAYS", JOB_RETENTION_DAYS_DEFAULT)))
+        except ValueError:
+            return float(JOB_RETENTION_DAYS_DEFAULT)
+
+    def _prune(self) -> list:
+        """Drop jobs past the retention, and `done` jobs beyond the newest KEEP_JOBS. Returns the dropped jobs."""
+        now, days = time.time(), self.retention_days()
+        ordered = sorted((j for j in self.jobs.values() if j["state"] not in ("running", "cancelling")), key=lambda j: j["started"])
+        drop = [j for j in ordered if days > 0 and now - (j.get("ended") or j["started"]) > days * 86400]
+        rest_done = [j for j in ordered if j["state"] == "done" and j not in drop]
+        drop += rest_done[:-KEEP_JOBS] if len(rest_done) > KEEP_JOBS else []
+        for j in drop:
+            self.jobs.pop(j["id"], None)
+        return drop
+
+    def _register(self, job: dict):
+        """A newly launched job: its meta file first (so it can always be found again), then the shared list."""
+        self._write_meta(job)
+        with self.lock:
+            self.jobs[job["id"]] = job
+            self._save()
+
+    def _save(self):
+        # Another window on the same folder (plasbench ui --new-instance) may have started jobs this one has not seen: keep them, so one window never erases another's runs. The
+        # read-merge-write is one step under an exclusive lock (threads of this window and other windows alike); deletions are written down; every job also has a meta file.
+        with self._save_lock, self._index_lock():
+            tomb = self._tombstones()
+            for jid in tomb:
+                self.jobs.pop(jid, None)
+            try:
+                for job in self._read_index():
+                    jid = job.get("id")
+                    if jid in tomb:
+                        continue
+                    if jid not in self.jobs:
+                        self.jobs[jid] = job
+                    elif job.get("state") in ("done", "failed", "cancelled") and self.jobs[jid]["state"] in ("running", "cancelling"):
+                        self.jobs[jid].update(job)   # another window already recorded how it ended
+            except (OSError, ValueError, KeyError, AttributeError):
+                pass
+            self._restore_from_meta(tomb)
+            for job in list(self.jobs.values()):
+                self._write_meta(job)
+            for job in self._prune():
+                for path in list(self._paths(job["id"]).values()) + [self._meta_path(job["id"])]:
+                    try:
+                        os.unlink(path)
+                    except OSError:
+                        pass
+                self._meta_sig.pop(job["id"], None)
+            ordered = sorted(self.jobs.values(), key=lambda j: j["started"])
+            tmp = self.dir / f"jobs.json.{os.getpid()}.{threading.get_ident()}.tmp"   # written whole, then renamed over the index: a reader sees the old file or the new one, never half
+            tmp.write_text(json.dumps(ordered, indent=1), encoding="utf-8")
+            for attempt in range(40):   # on Windows the rename fails with "Access denied" while another process has the index open to read it: wait a moment and try again
+                try:
+                    os.replace(tmp, self.dir / "jobs.json")
+                    break
+                except PermissionError:
+                    if attempt == 39:
+                        raise
+                    time.sleep(0.05)
 
     def _paths(self, job_id: str) -> dict:
         return jobrunner.paths(str(self.dir), job_id)
@@ -833,7 +965,7 @@ class Jobs:
     def _launch(self, command, shown, label, env, argv, kind, cwd, resumes: str | None = None) -> dict:
         job_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
         p = self._paths(job_id)
-        child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
+        child_env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", PLASBENCH_STARTED_VIA="window")
         for key, value in (env or {}).items():
             if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
                 raise ValueError(f"not a setting name: {key}")
@@ -849,9 +981,7 @@ class Jobs:
                "state": "running", "started": time.time(), "ended": None, "exit": None, "pid": runner.pid, "results": self._results_dir(argv)}
         if resumes:
             job["resumes"] = resumes
-        with self.lock:
-            self.jobs[job_id] = job
-            self._save()
+        self._register(job)
         threading.Thread(target=runner.wait, daemon=True).start()   # reap the runner; the outcome comes from its exit file
         self._watch(job_id)
         session_log().event("job_start", job=job_id, label=job["label"], command=shown, env=env or None, cwd=str(cwd), job_kind=kind)
@@ -989,7 +1119,21 @@ class Jobs:
         out["idle_seconds"] = jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None
         return out
 
+    def _refresh_from_folder(self):
+        """A job another window started, or one the index lost, appears here too: when the job folder changed, jobs with a meta file come back (never a deleted one)."""
+        try:
+            stamp = os.stat(self.dir).st_mtime_ns
+        except OSError:
+            return
+        if stamp != self._dir_stamp:
+            self._dir_stamp = stamp
+            with self.lock:
+                for job in self._restore_from_meta(self._tombstones()):
+                    if job.get("state") in ("running", "cancelling") and job["id"] not in self.watchers:
+                        self._reconcile(job)
+
     def list(self) -> list[dict]:
+        self._refresh_from_folder()
         return [dict(j, display_state=self.display_state(j)) for j in sorted(self.jobs.values(), key=lambda j: -j["started"])]
 
     def progress(self, job_id: str) -> dict:
@@ -1043,8 +1187,11 @@ class Jobs:
                 raise ValueError("cancel the job before removing it")
             self.jobs.pop(job_id, None)
             self.deleted.add(job_id)
+            with self._save_lock, self._index_lock():
+                with open(self.dir / "jobs.deleted", "a", encoding="utf-8") as handle:   # written down: every window keeps it deleted
+                    handle.write(job_id + "\n")
             self._save()
-        for path in self._paths(job_id).values():
+        for path in list(self._paths(job_id).values()) + [self._meta_path(job_id)]:
             try:
                 os.unlink(path)
             except OSError:
@@ -1455,7 +1602,14 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "run-sessions":
                 index = {r["path"]: i for i, r in enumerate(project.runs(state.get("runs", [])))}
                 index = {str(Path(k).resolve()): v for k, v in index.items()}
-                return self.jsend(200, {"sessions": jobs.sessions(index), "server_started": SERVER_STARTED})
+                from . import outside_runs, studies
+                try:
+                    outside = outside_runs.outside_runs(studies.list_studies(project.root), list(jobs.jobs.values()))
+                except Exception:  # noqa: BLE001 - a study folder that cannot be read must not hide the window's own runs
+                    outside = []
+                for entry in outside:
+                    entry["run_index"] = index.get(str(Path(entry["results"]).resolve()))
+                return self.jsend(200, {"sessions": jobs.sessions(index), "outside": outside, "server_started": SERVER_STARTED})
             if route.startswith("jobs/") and route.endswith("/activity"):
                 return self.jsend(200, jobs.activity(route[len("jobs/"):-len("/activity")]))
             if route.startswith("jobs/"):

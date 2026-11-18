@@ -24,8 +24,8 @@ def has(*needles):
 
 
 def main():
-    check("tree: role=tree with a label and treeitems with level / expanded / selected", has('role="tree" id="wt_tree"', 'role="treeitem" aria-level=', 'aria-expanded="${open}"', 'aria-selected="${sel}"'))
-    check("tree: roving tabindex", 'tabindex="${sel ? 0 : -1}"' in HTML)
+    check("tree: role=tree with a label and treeitems with level / expanded / selected", has('role="tree" id="wt_tree"', 'role="treeitem" aria-level=', 'aria-expanded="${open}"', "aria-selected\", String(sel)))
+    check("tree: roving tabindex", 'li.tabIndex = sel ? 0 : -1' in HTML)
     check("tree: lazy, one folder per request", "api(`fs/list?path=${encodeURIComponent(path)}`)" in HTML and "WT.open.has(p)" in HTML)
     for key in ('"ArrowDown"', '"ArrowUp"', '"ArrowRight"', '"ArrowLeft"', '"Home"', '"End"', '"Enter"', '"*"', '"Delete"', '"F5"', '"ContextMenu"', 'e.key === "F10" && e.shiftKey'):
         check(f"tree key {key}", key in HTML.split("(function wtBind()")[1])

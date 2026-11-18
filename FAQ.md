@@ -608,6 +608,10 @@ the independent-truth subset of public-v4 is still to be done.
 **Answer.** Under WSL, Ubuntu lists only the Windows drives it has mounted. In the Terminal tab run, for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e`, then press Refresh in the chooser; or type the Windows path (`E:\data`) in the path box, which is converted. PlasBench never runs the mount command itself.
 **Status.** Documented in the User Guide.
 
+### Q56. Why is my cancelled run not in the Jobs list, when I can see its folder in the studies tree?
+**Answer.** Two different reasons, both fixed. (1) A job started from the window is saved in a shared list; two windows (or a window and its background watcher) could overwrite each other's saves, and a deleted job could come back. The list is now saved under an exclusive lock, each job also keeps a small `<id>.meta.json` beside its log so the list can be rebuilt from the folder, deletions are written down, and a failed, interrupted or cancelled job is kept until you delete it or it is older than `PLASBENCH_JOB_RETENTION_DAYS` (default 180; 0 keeps them for ever). (2) A run you start in the Terminal tab or a shell is not a job of the window, so it never was in the Jobs list; the Runs page now shows the latest run of each study that was started outside the window, read-only and marked "started outside the window" (running, completed, or "interrupted or cancelled: it stopped without recording how it ended"), with Show in terminal and Open folder. The window cannot cancel such a run because it does not own the process.
+**Status.** Fixed after v0.5.0 (next release).
+
 ## Part 2. The reviewer question bank, section by section
 
 A 500-question examination bank (31 sections, grouped into Parts I-XVII, plus five foundational questions
