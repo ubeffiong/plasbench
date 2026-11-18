@@ -8,7 +8,7 @@ funder, a collaborator or a new user who has not read the code and should not ha
 a methods file, a changelog and the code. This catalogue is the index to all of them. It does not replace them: each section links to the document that
 explains the method in depth.
 
-**Size at the time of writing:** 186 analysis modules, 28 registered tools and baselines (20 real tools), 211 registered
+**Size at the time of writing:** 186 analysis modules, 28 registered tools and baselines (20 real tools), 212 registered
 outputs, 53 run switches, 373 test files and 91 merged pull requests. Sections 5 to 9 are generated from the repository itself, and a
 test (`test/test_implementation_catalogue.py`) fails if a module, a tool or an output is missing from them, so they cannot silently go out of date.
 
@@ -607,7 +607,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 
 ## 7. Every output file and where the report shows it
 
-211 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
+212 registered pipeline outputs, each with the module that writes it and where the report shows it. `shown` means the report draws or tabulates it; `partly` means it is available as a download or is summarised.
 
 | Output | Written by | Report section | Shown | What it holds |
 |---|---|---|---|---|
@@ -637,6 +637,7 @@ The registry (`config/tool_capabilities.tsv`) lists 28 entries: 20 real tools an
 | `benchmark.feature_preservation.tsv` | feature_preservation.py | feature-preservation | shown | Feature preservation: Table. |
 | `benchmark.headline_design.tsv` | headline_design.py | headline-design | shown | Headline design (units of analysis): Table. |
 | `benchmark.input_consistency.tsv` | run_consistency.py | leaderboard | partly | Run tables that disagree: Empty when the tables agree; otherwise a banner above the ranking and this list. |
+| `benchmark.input_fingerprint.json` | aggregate_results.py | leaderboard | partly | Input fingerprint: Which score table and tool set the leaderboard was ranked from; the report refuses a leaderboard paired with different scores. |
 | `benchmark.label_scheme_summary.tsv` | label_schemes.py | label-schemes | shown | Labelling scheme summary: Table. |
 | `benchmark.label_schemes.tsv` | label_schemes.py | label-schemes | shown | Labelling schemes, merged: Table. |
 | `benchmark.leaderboard.md` | aggregate_results.py | files | shown | Leaderboard as Markdown: Linked from the Run files panel. |
