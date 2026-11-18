@@ -16,6 +16,9 @@ case "$PROFILE" in
     ;;
 esac
 
+# Everything below installs packages (conda channels, PyPI, GitHub): stop here, before touching the environment, when there is no internet.
+require_internet --action "Installing the '$PROFILE' tools" --hint "Tools that are already installed keep working offline. Install on a computer with internet, or use --local-inputs runs with the tools you have." conda pypi github
+
 # Resolve the environment to an absolute PREFIX and install with -p, never -n.
 #
 # `-n NAME` means "look under this solver's own root prefix", and the solvers

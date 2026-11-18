@@ -732,7 +732,7 @@ mobsuite_db_preserve() {
 net_online() {
     local host="$1"
     [[ "${PLASBENCH_ASSUME_ONLINE:-0}" == "1" ]] && return 0   # tests
-    timeout "${PLASBENCH_ONLINE_TIMEOUT:-6}" bash -c ">/dev/tcp/$host/443" 2>/dev/null
+    timeout "${PLASBENCH_ONLINE_TIMEOUT:-5}" bash -c ">/dev/tcp/$host/443" 2>/dev/null
 }
 
 # wait_online HOST: when the connection is down, pause (log once, poll every
@@ -748,6 +748,66 @@ wait_online() {
         sleep "$poll"; waited=$(( waited + poll ))
     done
     log "  internet is back: download resumed"
+}
+
+# url_needs_internet URL: 0 unless URL is a local file or points at this computer (a mirror on disk or a test server needs no internet).
+url_needs_internet() {
+    case "$1" in
+        file://*|/*|http://localhost*|http://127.*|https://localhost*|https://127.*|http://\[::1\]*) return 1 ;;
+    esac
+    return 0
+}
+
+# require_internet [--any] [--warn] [--action TEXT] [--hint TEXT] SERVICE...
+# Stop (die) before any work when an online-only step cannot reach SERVICE (names are in config/network_services.tsv: github, ncbi,
+# ncbi_datasets, sra, ena, pypi, conda, zenodo, plsdb, ...). One plain sentence says which service and why (no network at all, DNS
+# not working, one service down, a sign-in page in the way). --any accepts one reachable service out of several; --warn prints the
+# sentence and returns 1 instead of stopping. Honours PLASBENCH_ASSUME_ONLINE=1 (no probing: tests, air-gapped mirrors), PLASBENCH_OFFLINE=1
+# (refuse at once) and PLASBENCH_ONLINE_TIMEOUT. Call it only on the path that really fetches: an action that can be done from files
+# already on disk must not demand the internet. Uses plasbench/netcheck.py when python3 is present, else a TCP probe of the catalogue hosts.
+require_internet() {
+    local any=() warn_only=0 action="" hint="" services=() root msg="" rc=0 svc host bad=() ok=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --any) any=(--any) ;;
+            --warn) warn_only=1 ;;
+            --action) action="$2"; shift ;;
+            --hint) hint="$2"; shift ;;
+            *) services+=("$1") ;;
+        esac
+        shift
+    done
+    [[ "${PLASBENCH_ASSUME_ONLINE:-0}" == "1" ]] && return 0
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    if command -v python3 >/dev/null 2>&1 && [[ -f "$root/plasbench/netcheck.py" ]]; then
+        msg="$(python3 -I "$root/plasbench/netcheck.py" require "${any[@]}" --action "$action" --hint "$hint" "${services[@]}" 2>&1)" || rc=$?
+        [[ "$rc" -eq 0 ]] && return 0
+        if [[ "$rc" -eq 3 ]]; then
+            msg="${msg#ERROR: }"
+            if [[ "$warn_only" -eq 1 ]]; then warn "$msg"; return 1; fi
+            die "$msg"
+        fi
+        msg=""    # python itself failed: fall back to the plain probe below
+    fi
+    if [[ "${PLASBENCH_OFFLINE:-0}" == "1" ]]; then
+        msg="${action:-This action} needs the internet (PLASBENCH_OFFLINE=1 is set). Online-only actions are switched off on purpose; unset PLASBENCH_OFFLINE to go online again. ${hint}"
+    else
+        for svc in "${services[@]}"; do
+            host="$(awk -F'\t' -v s="$svc" 'NR > 1 && $1 == s { n = split($4, a, ","); print a[1]; exit }' "$root/config/network_services.tsv" 2>/dev/null || true)"
+            [[ -n "$host" ]] || continue
+            if net_online "$host"; then ok=$(( ok + 1 )); else bad+=("$host"); fi
+        done
+        if [[ ${#bad[@]} -gt 0 && ( ${#any[@]} -eq 0 || "$ok" -eq 0 ) ]]; then
+            if net_online 1.1.1.1 && ! getent hosts "${bad[0]}" >/dev/null 2>&1; then
+                msg="${action:-This action} needs the internet (${bad[0]} unreachable: DNS failure). DNS is not working; in WSL try wsl --shutdown in PowerShell, check the VPN, or set a DNS server. ${hint}"
+            else
+                msg="${action:-This action} needs the internet (${bad[*]} unreachable). Check the connection, VPN or proxy and try again. ${hint}"
+            fi
+        fi
+    fi
+    [[ -z "$msg" ]] && return 0
+    if [[ "$warn_only" -eq 1 ]]; then warn "$msg"; return 1; fi
+    die "$msg"
 }
 
 # download_pin LABEL URL: print the SHA-256 that config/download_checksums.tsv (override: PLASBENCH_DOWNLOAD_CHECKSUMS) pins for LABEL, or nothing.

@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -340,6 +341,11 @@ def build_parser():
         status_parser.add_argument("--json", action="store_true", help="Print the summary as JSON, for scripts and the window.")
         status_parser.add_argument("--watch", type=int, metavar="SECONDS", help="Repeat every SECONDS until you press Ctrl+C.")
     sub.add_parser("test", help="Run the complete offline regression suite.")
+    net_parser = sub.add_parser(
+        "net", help="Check which online services this computer can reach (NCBI, ENA, GitHub, conda, ...) and what to do when one is not.")
+    net_parser.add_argument("--service", action="append", default=[], metavar="NAME",
+                            help="Check only this service (repeatable; names are in config/network_services.tsv). Default: all.")
+    net_parser.add_argument("--json", action="store_true", help="Print the answer as JSON, for scripts and the window.")
     upgrade_parser = sub.add_parser(
         "upgrade",
         help="Download the latest release and reuse this install's shared reads and databases.",
@@ -811,6 +817,65 @@ def build_parser():
     return parser
 
 
+def network_commands(root):
+    """{(command, sub): {"flag": str, "services": set}} from the `used_by` column of config/network_services.tsv.
+
+    A used_by entry that starts with "plasbench " names a command: "plasbench upgrade", "plasbench tools add" (a sub-command),
+    "plasbench validate-cohort --online" (only with that flag). Entries that are file paths are for test/test_network_declared.py."""
+    from . import netcheck
+    table = {}
+    for row in netcheck.load_catalogue(Path(root) / "config" / netcheck.CATALOGUE_NAME):
+        for token in (row.get("used_by") or "").split(";"):
+            words = token.split()
+            if len(words) < 2 or words[0] != "plasbench":
+                continue
+            flag = next((w for w in words[2:] if w.startswith("-")), "")
+            sub_name = next((w for w in words[2:] if not w.startswith("-")), "")
+            entry = table.setdefault((words[1], sub_name), {"flag": flag, "services": set()})
+            entry["services"].add(row["service"])
+    return table
+
+
+def network_preflight(args, root):
+    """Refuse an online-only command before it does anything when the services it needs are unreachable. Returns the message, or None.
+
+    Only the cases that certainly go online are checked: an action that can be done from files on disk must not demand the internet
+    (`run` and `check` decide that themselves, in stage 1 and scripts/00_setup.sh)."""
+    command = args.command
+    table = network_commands(root)
+    sub_name = ""
+    if command == "tools":
+        sub_name = getattr(args, "tools_command", "") or ""
+        source = str(getattr(args, "path", "") or "").replace("\\", "/")
+        if sub_name == "add" and not re.match(r"^(https?|git|ssh):/|^git@", source):
+            return None                      # a folder or manifest on disk
+    elif command == "analysis":
+        sub_name = getattr(args, "name", "") or ""
+    elif command == "install-tools" and getattr(args, "profile", "") in ("list", "plan", "validate"):
+        return None                          # registry inspection only
+    entry = table.get((command, sub_name))
+    if entry is None:
+        return None
+    if entry["flag"] and not getattr(args, entry["flag"].lstrip("-").replace("-", "_"), False):
+        return None
+    from . import netcheck
+    try:
+        netcheck.require(sorted(entry["services"]), action=f"plasbench {command}" + (f" {sub_name}" if sub_name else ""))
+    except netcheck.NoInternet as exc:
+        return exc.message
+    return None
+
+
+def net_command(args):
+    from . import netcheck
+    answer = netcheck.check(args.service or None)
+    if args.json:
+        print(json.dumps(answer, indent=2))
+    else:
+        print(netcheck.status_table(answer))
+    return 0 if answer["state"] in ("online", "assumed_online") else 3
+
+
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -831,12 +896,18 @@ def main(argv=None):
     # Without this explicit check, invoking the CLI from a random directory
     # failed later with a shell "file not found" message. The report opener is
     # deliberately standalone; every other command needs the release tree.
+    if args.command == "net":
+        raise SystemExit(net_command(args))
     if args.command != "open-report" and not is_project_root(root):
         parser.error(
             f"{root} is not a PlasBench release/source directory (scripts/run_all.sh missing). "
             "Run 'cd \"$PB\"' using the installation directory from the README, "
             "or pass --project-root /path/to/plasbench before the command."
         )
+    problem = network_preflight(args, root)
+    if problem:
+        print(f"[plasbench] ERROR: {problem}", file=sys.stderr)
+        raise SystemExit(3)
     if args.command == "ui":
         from .webui import serve
         serve(root, port=args.port, open_browser=not args.no_browser, tab=args.tab, new_instance=args.new_instance)

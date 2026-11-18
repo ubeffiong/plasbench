@@ -39,6 +39,9 @@ fi
 
 TMP="$DEST.part"
 rm -f "$TMP"
+if url_needs_internet "$PLSDB_URL"; then
+    require_internet --action "Downloading PLSDB" --hint "Download the FASTA on a computer with internet and place it at $DEST." plsdb
+fi
 echo "[plsdb] downloading from $PLSDB_URL ..."
 if command -v wget >/dev/null 2>&1 && [[ "$PLSDB_URL" != file://* ]]; then
     wget -O "$TMP" "$PLSDB_URL"

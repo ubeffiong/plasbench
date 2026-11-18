@@ -64,7 +64,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plasbench_common import MASH_SKETCH_SIZE, UnionFind, mash_dist_limit  # noqa: E402
 from validate_cohort import fetch, request_interval  # noqa: E402
-from plasbench_common import fasta_lengths  # noqa: E402
+from plasbench_common import fasta_lengths, net_require  # noqa: E402
 
 EFETCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
@@ -163,6 +163,7 @@ def main():
     curated = read_curated_accessions(args.accessions)
     if not curated:
         sys.exit(f"ERROR: no rows in {args.accessions}")
+    net_require(["ncbi"], action="Building the plasmid reference set (fetches sequences from NCBI)")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

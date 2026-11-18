@@ -382,6 +382,15 @@ for profile in "${!NEEDED_PROFILES[@]}"; do echo "  - install-tools profile: $pr
 for note in "${UNFIXABLE[@]:-}"; do [[ -n "$note" ]] && echo "  (not automatic) $note"; done
 echo
 
+# Installing needs the internet; checking does not. Say so (naming what is unreachable) before asking, only when something must be fetched.
+NET_NEEDS=()
+[[ "$NEED_CONDA" -eq 1 ]] && NET_NEEDS+=(github)
+[[ ${#NEEDED_PROFILES[@]} -gt 0 ]] && NET_NEEDS+=(conda pypi github)
+[[ "$NEED_PLATON_DB" -eq 1 || "$NEED_MOBSUITE_DB" -eq 1 || "$NEED_BAKTA_DB" -eq 1 || "$NEED_PLASSEMBLER_DB" -eq 1 || "$NEED_GENOMAD_DB" -eq 1 || "$NEED_PLASME_DB" -eq 1 ]] && NET_NEEDS+=(zenodo)
+if [[ ${#NET_NEEDS[@]} -gt 0 ]]; then
+    require_internet --action "Installing the missing tools and databases" --hint "The check above worked offline. Connect and run 'plasbench check --yes' again, or install them on a computer with internet (see INSTALL.md)." "${NET_NEEDS[@]}"
+fi
+
 PROCEED=0
 if [[ "$ASSUME_YES" -eq 1 ]]; then
     PROCEED=1

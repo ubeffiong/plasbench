@@ -103,6 +103,9 @@ def main():
         lines = [line for line in handle if line.strip() and not line.startswith("#")]
     rows = list(csv.DictReader(lines, delimiter="\t"))
     fields = list(rows[0]) if rows else []
+    if rows:
+        from plasbench_common import net_require
+        net_require(["ncbi", "ncbi_datasets"], action="Collecting truth provenance from NCBI")
     delay = 0.12 if args.api_key else 0.4
     evidence = []
     for row in rows:

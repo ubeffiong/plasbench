@@ -60,6 +60,7 @@ if [[ "$ASSUME_YES" -ne 1 ]]; then
 fi
 
 mkdir -p "$OUTPUT_DIR"
+require_internet --action "Downloading the Bakta database" --hint "Download the database on a computer with internet and point BAKTA_DB at it." zenodo
 log "Running bakta_db download (this can take a while for a large database)..."
 bakta_db download --output "$OUTPUT_DIR" --type "$DB_TYPE" || die "bakta_db download failed"
 

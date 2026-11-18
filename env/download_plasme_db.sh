@@ -50,6 +50,7 @@ if [[ "$ASSUME_YES" -ne 1 ]]; then
 fi
 
 mkdir -p "$OUTPUT_DIR"
+require_internet --action "Downloading the PLASMe database" --hint "Download it on a computer with internet and point PLASME_DB at it." zenodo
 log "Running PLASMe_db.py (this can take a while for a ~12.4 GB database)..."
 # PLASMe_db.py's exact flag for a custom destination is not independently
 # confirmed (its README documents the script's existence and default

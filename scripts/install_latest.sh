@@ -94,6 +94,22 @@ if [[ -n "$LOCAL_ARCHIVE" ]]; then
         (cd "$download_dir" && sha256sum "$base" > "$base.sha256")
     fi
 else
+    # No internet? Say so before trying (this script is standalone: it may be the first file on a new computer, so it checks by itself).
+    if [[ "${PLASBENCH_ASSUME_ONLINE:-0}" != "1" ]]; then
+        if [[ "${PLASBENCH_OFFLINE:-0}" == "1" ]]; then
+            echo "ERROR: installing the latest release needs the internet (PLASBENCH_OFFLINE=1 is set). Unset it, or use --archive with a release file you downloaded." >&2
+            exit 3
+        fi
+        if ! timeout "${PLASBENCH_ONLINE_TIMEOUT:-5}" bash -c '>/dev/tcp/1.1.1.1/443' 2>/dev/null \
+                && ! timeout "${PLASBENCH_ONLINE_TIMEOUT:-5}" bash -c '>/dev/tcp/8.8.8.8/443' 2>/dev/null; then
+            echo "ERROR: installing the latest release needs the internet (no network: nothing answers from this computer). Connect and try again, or download the release archive on another computer and use --archive FILE." >&2
+            exit 3
+        fi
+        if ! getent hosts github.com >/dev/null 2>&1; then
+            network_help 6
+            exit 3
+        fi
+    fi
     say "checking the latest GitHub release..."
     api_status=0
     release_json="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest")" || api_status=$?

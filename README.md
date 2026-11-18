@@ -2416,6 +2416,7 @@ ones you'll actually reach for most often; every command has more than shown her
 | `test` | The full offline regression suite (what CI runs). | none |
 | `check` | Check configured tools/databases; offers to install what's missing. | `--yes` |
 | `install-conda` | Detect (or install) a conda-family manager. | `--yes`, `--prefix` |
+| `net` | Which online services this computer can reach (NCBI, ENA, GitHub, conda, ...), and what to do when one is not; exit 0 online, 3 otherwise. `PLASBENCH_OFFLINE=1` switches every online-only action off. | `--service`, `--json` |
 | `install-tools` | Install one dependency profile (`core`, `reconstruction`, `long-read`, `all`, ...). | *`profile`* (positional) |
 | `init-local` | Register one of your own isolates: stages its files and appends a sample-sheet row. | *`--sample`*, *`--reads-1`/`--reads-2`*, `--reference`, `--samples` |
 | `intake` | Your own isolates in bulk: `template` (a sheet to fill in), `scan FOLDER...` (find isolates, change nothing), `stage FOLDER...` (place them, write the sheet), `check [--fix]` (the quick test). Guide: [docs/INPUT_GUIDE.md](docs/INPUT_GUIDE.md). | *`template\|scan\|stage\|check`*, `--data-dir`, `--samples`, `--fix` |

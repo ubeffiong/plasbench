@@ -37,6 +37,7 @@ from collections import Counter, defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from validate_cohort import derive_truth_technology  # noqa: E402
+from plasbench_common import net_require  # noqa: E402
 from truth_provenance import classify_method  # noqa: E402
 
 TAB, NL = chr(9), chr(10)
@@ -222,6 +223,7 @@ def main():
     ap.add_argument("--max-pages", type=int, default=12, help="pages of 1000 assemblies per taxon")
     ap.add_argument("--taxon", action="append", metavar="NAME=TAXID", help="replace the default taxa (repeatable)")
     args = ap.parse_args()
+    net_require(["ncbi"], action="Finding plasmid-free controls at NCBI")
     taxa = TAXA
     if args.taxon:
         taxa = []
