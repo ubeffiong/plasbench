@@ -202,6 +202,26 @@ WIZARD = {
                                  "setting": "ENA_DOWNLOAD_CONNECTIONS", "when": "Leave empty for the default (4). Only affects ENA downloads."},
 }
 
+# The Version control page's GitHub controls and the Online / Offline indicator (shown as tooltips by the page).
+GITHUB = {
+    "signin": {"summary": "Sign in to GitHub in a pop-up window: PlasBench shows a one-time code, you approve it on GitHub, and git push and pull then use the sign-in. The page never sees a token.", "when": "Needs the GitHub CLI (gh); without it, use a personal access token."},
+    "token": {"summary": "Sign in with a personal access token instead of the pop-up: the token is sent once, over standard input, to the GitHub CLI and is never stored or shown.", "when": "Give the token the repo scope (and workflow if you push workflow files)."},
+    "signout": {"summary": "Sign out of GitHub on this computer (gh auth logout). Nothing on GitHub changes.", "when": "Use Switch account to sign in as someone else."},
+    "create_repo": {"summary": "Create the repository on GitHub (your account or an organisation, public or private), add it as origin and push the first branch.", "when": "Keep it private unless you are sure: run folders can hold sample data."},
+    "clone": {"summary": "List or search your GitHub repositories and clone one into a folder."},
+    "branches": {"summary": "Switch, push (setting the upstream) and delete branches. Delete only removes a fully merged local branch; deleting on GitHub removes the remote branch. Nothing is force-pushed."},
+    "new_pr": {"summary": "Ask GitHub to merge one branch into another: title, description, base, head, draft, reviewers, labels. The branch is pushed first if needed."},
+    "prs": {"summary": "Open, closed and merged pull requests: view (checks, reviews, mergeability, changed files, comments), check out, mark ready, close, reopen and merge."},
+    "merge": {"summary": "Merge a pull request. Choose merge, squash or rebase, whether to delete the branch, or to wait for checks and merge automatically (only if the repository allows it).",
+              "choices": {"merge": "A merge commit keeps every commit.", "squash": "One commit for the whole pull request.", "rebase": "Replays the commits on top of the base branch."},
+              "when": "With failing checks, conflicts or a requested change PlasBench names the risk and asks you to confirm."},
+    "checks": {"summary": "Checks (CI) of a pull request or branch, with the failing names and addresses; re-run only the failed ones."},
+    "issues": {"summary": "List, create, comment on and close issues."},
+    "releases": {"summary": "List releases, create a tag (and push it), create a release from a tag with notes."},
+    "net_indicator": {"summary": "Whether the internet and each service PlasBench needs are reachable. Controls that need an unreachable service are switched off with the reason; local work is never blocked. Click for details and to check again.",
+                      "choices": {"Online": "Everything checked is reachable.", "Limited": "Some services are unreachable.", "DNS problem": "Names cannot be looked up: the connection may be up but names fail.", "Offline": "No connection.", "Offline (forced)": "PLASBENCH_OFFLINE=1 is set."}},
+}
+
 # Settings page: per setting, what the section comment in config.sh does not already say.
 SETTINGS = {
     "READ_SOURCE": WIZARD["read_source"],

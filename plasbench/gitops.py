@@ -730,6 +730,23 @@ def create_branch(repo, name: str, switch: bool = True):
     run(repo, "switch", "-c", n) if switch else run(repo, "branch", n)
 
 
+def delete_branch(repo, name: str):
+    """Delete a LOCAL branch that is fully merged (git branch -d: never -D, so unmerged work is not thrown away) and is not the one checked out."""
+    n = valid_branch(name)
+    if info(repo).get("branch") == n:
+        raise ValueError("this is the branch you are on: switch to another branch first")
+    run(repo, "branch", "-d", n)
+
+
+def create_tag(repo, name: str, message: str = ""):
+    """An annotated tag on the current commit."""
+    n = (name or "").strip()
+    if not re.match(r"^[A-Za-z0-9._/-]{1,100}$", n) or n.startswith("-") or ".." in n:
+        raise ValueError("tag name: letters, numbers, . _ - and / only")
+    run(repo, "check-ref-format", f"refs/tags/{n}")
+    run(repo, "tag", "-a", n, "-m", (message or n)[:500])
+
+
 def checkout(repo, name: str):
     n = valid_branch(name)
     if any(f["staged"] or f["unstaged"] for f in info(repo)["files"] if not f["untracked"]):

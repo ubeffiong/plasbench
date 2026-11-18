@@ -244,6 +244,14 @@ dialog.pbdlg .ft{flex-wrap:wrap}
 #wt_tree li:last-child{border-bottom:0}#wt_tree li:hover{background:var(--surface-2)}#wt_tree li[aria-selected="true"]{background:var(--surface-3)}
 #wt_tree li:focus{outline:2px solid var(--primary);outline-offset:-2px}#wt_tree .wtc{width:14px;flex:none;color:var(--mut);cursor:pointer;text-align:center}
 #wt_tree .wtn{overflow:hidden;text-overflow:ellipsis;min-width:0}#wt_tree .wtm{margin-left:auto;color:var(--mut);font-size:11.5px;flex:none}
+.netind{display:inline-flex;align-items:center;gap:6px}.netind .nd{width:9px;height:9px;border-radius:50%;background:var(--ok)}.netind.warn .nd{background:var(--warn)}.netind.bad .nd{background:var(--bad)}
+[data-needs].needs-net-off{opacity:.55;cursor:not-allowed}[data-needs].needs-net-off:focus-visible{outline:2px solid var(--warn)}
+.ghcode{font:700 34px/1.2 var(--mono,monospace);letter-spacing:.12em;text-align:center;padding:12px 8px;margin:6px 0 10px;border:2px dashed var(--line);border-radius:8px;background:var(--surface-2);user-select:all}
+.ghwait{display:flex;gap:10px;align-items:center;color:var(--mut)}.ghspin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:rtspin .9s linear infinite}
+@media (prefers-reduced-motion:reduce){.ghspin{animation:none}}
+dialog.pbdlg .ghlist{width:100%;border-collapse:collapse;font-size:12.5px}dialog.pbdlg .ghlist td,dialog.pbdlg .ghlist th{padding:4px 6px;border-bottom:1px solid var(--line-2);text-align:left;vertical-align:top}
+dialog.pbdlg.wide{width:min(900px,96vw)}dialog.pbdlg .frow{margin:0 0 10px}dialog.pbdlg .frow label{display:block;font-weight:500;margin-bottom:3px}dialog.pbdlg .frow .help{font-size:12px;color:var(--mut)}
+dialog.pbdlg .frow input[type=text],dialog.pbdlg .frow input[type=password],dialog.pbdlg .frow select,dialog.pbdlg .frow textarea{width:100%}
 .tipi{flex:none;display:inline-grid;place-items:center;width:18px;height:18px;padding:0;margin:0;border:1px solid var(--line);border-radius:50%;background:var(--surface-2);color:var(--mut);font:italic 700 11px/1 Georgia,serif;cursor:help;align-self:center}
 .tipi:hover,.tipi:focus-visible,.tipi[aria-expanded="true"]{background:var(--primary);color:#fff;border-color:var(--primary)}
 #tipbox{position:fixed;z-index:400;max-width:min(380px,calc(100vw - 24px));box-sizing:border-box;padding:10px 12px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px #0003;font-size:12.5px;line-height:1.45;overflow:auto;max-height:70vh}
@@ -585,6 +593,7 @@ body.gd-open #gdrawer{transform:none}
  </div>
  <span class="pill" id="jobpill" hidden><span class="pulse"></span><span id="jobpilltx">1 job running</span></span>
  <button class="tbtn" id="gdbtn" aria-pressed="false" title="Side panel: Studies, Jobs and Git (Ctrl+Shift+G opens Git)"><svg class="ico sm"><use href="#i-sidebar"/></svg><span>Panel</span><span class="badge" id="gdbadge" hidden></span></button>
+ <button class="tbtn netind" id="netind" title="Checking the internet connection…" aria-label="Internet status: checking"><span class="nd" aria-hidden="true"></span><span class="nl">Checking…</span></button>
  <button class="tbtn" id="helpbtn" title="Help for this page (F1)" aria-label="Help for this page"><svg class="ico sm"><use href="#i-help"/></svg></button>
  <button class="tbtn" id="theme" title="Switch between light and dark"><svg class="ico sm"><use href="#i-moon"/></svg></button>
  <button class="tbtn" id="consbtn" title="Show or hide the console (job output and terminal)"><svg class="ico sm"><use href="#i-term"/></svg><span>Console</span></button>
@@ -675,7 +684,7 @@ body.gd-open #gdrawer{transform:none}
      </div></div>
      <div class="card"><div class="hd"><svg class="ico"><use href="#i-refresh"/></svg><h3>Maintenance</h3></div><div class="bd grid" style="gap:10px">
       <button class="action" data-run='["install-conda","--yes"]' data-label="Install conda (Miniforge)"><span class="aico"><svg class="ico"><use href="#i-down"/></svg></span><span><b>Install conda</b><span>Only if no conda, mamba or micromamba is present.</span></span></button>
-      <button class="action" id="updcheck"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b><span>Asks GitHub whether a newer release exists. Nothing is installed.</span></span></button>
+      <button class="action" id="updcheck" data-needs="github" title="Asks GitHub whether a newer release exists"><span class="aico"><svg class="ico"><use href="#i-search"/></svg></span><span><b>Check for updates</b><span>Asks GitHub whether a newer release exists. Nothing is installed.</span></span></button>
       <div id="updresult" class="small" aria-live="polite" style="display:none"></div>
       <button class="action" data-run='["upgrade","--yes"]' data-label="Upgrade PlasBench"><span class="aico"><svg class="ico"><use href="#i-refresh"/></svg></span><span><b>Upgrade PlasBench</b><span>Latest release; keeps your reads, databases and studies. Close and reopen PlasBench afterwards to use the new version.</span></span></button>
       <button class="action" data-run='["test"]' data-label="Run the offline test suite"><span class="aico"><svg class="ico"><use href="#i-check"/></svg></span><span><b>Run the test suite</b><span>Offline regression checks of this installation.</span></span></button>
@@ -1127,7 +1136,12 @@ async function api(path, body) {
     throw new Error("session ended");
   }
   let data; try { data = await r.json(); } catch { data = {error: `HTTP ${r.status}`}; }
-  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  if (!r.ok) {
+    const err = new Error(data.message || data.error || `HTTP ${r.status}`); err.data = data; err.status = r.status;
+    if (r.status === 503 && data.error === "offline") { S.offlineMsg = {msg: err.message, t: Date.now()}; netRefresh(true); showOfflineDialog({service: data.service, state: data.state, advice: data.advice, message: data.message}); }
+    else if (r.status === 401 && data.action === "signin") { S.offlineMsg = {msg: err.message, t: Date.now()}; askSignInDialog(err.message); }
+    throw err;
+  }
   return data;
 }
 /* ---- a lost connection is not the end ----
@@ -1204,6 +1218,7 @@ window.addEventListener("online", () => { if (S.conn) { S.conn.delay = 2000; con
 document.addEventListener("visibilitychange", () => { if (!document.hidden && S.conn) { S.conn.delay = 2000; connProbe(false); } });
 window.addEventListener("pageshow", () => { if (S.conn) connProbe(false); });
 function toast(msg, kind="") {
+  if (kind === "bad" && S.offlineMsg && msg === S.offlineMsg.msg && Date.now() - S.offlineMsg.t < 4000) return;   // already shown as a dialog
   const t = document.createElement("div"); t.className = "toast " + kind;
   t.innerHTML = icon(kind === "bad" ? "alert" : kind === "ok" ? "check" : "info") + `<span>${esc(msg)}</span>`;
   $("#toasts").append(t); setTimeout(() => t.remove(), kind === "bad" ? 7000 : 4000);
@@ -2619,7 +2634,7 @@ function modalDialog(o) {
     d.setAttribute("aria-labelledby", uid + "t"); d.setAttribute("aria-describedby", uid + "d");
     const paras = o.bodyHTML || (o.body ? String(o.body).split(/\n\n+/).map(p => `<p>${esc(p)}</p>`).join("") : "");
     const facts = (o.facts || []).filter(f => f[1] != null && f[1] !== "").map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
-    const inp = o.input ? `<label for="${uid}i" style="display:block;font-weight:500;margin-bottom:4px">${esc(o.input.label || "")}</label><input type="text" id="${uid}i" value="${esc(o.input.value || "")}" placeholder="${esc(o.input.placeholder || "")}" autocomplete="off" style="width:100%">` : "";
+    const inp = o.input ? `<label for="${uid}i" style="display:block;font-weight:500;margin-bottom:4px">${esc(o.input.label || "")}</label><input type="${o.input.type === "password" ? "password" : "text"}" id="${uid}i" value="${esc(o.input.value || "")}" placeholder="${esc(o.input.placeholder || "")}" autocomplete="off" style="width:100%">` : "";
     const typed = o.typeToConfirm ? `<label for="${uid}i" style="display:block;margin-bottom:4px">Type <b class="mono">${esc(o.typeToConfirm)}</b> to confirm</label><input type="text" id="${uid}i" autocomplete="off" spellcheck="false" style="width:100%">` : "";
     d.innerHTML = `<div class="hd">${icon(o.danger ? "alert" : "info", "ico")}<h3 id="${uid}t">${esc(o.title || "")}</h3></div>
       <div class="bd" id="${uid}d">${paras}${facts ? `<dl class="facts">${facts}</dl>` : ""}${o.detail ? `<pre class="detail">${esc(o.detail)}</pre>` : ""}${inp}${typed}<div class="dlgerr" id="${uid}e" role="alert"></div></div>
@@ -2641,6 +2656,8 @@ function modalDialog(o) {
       const b = e.target.closest("[data-dlg]"); if (b && !b.disabled) return finish(b.dataset.dlg);
       if (e.target.closest("[data-dlg-copy]")) copyText(o.copy === true ? [o.detail, o.body].filter(Boolean).join("\n") : o.copy, "Copied");
     });
+    if (o.onclick) d.addEventListener("click", e => o.onclick(e, d, finish));
+    if (o.wide) d.classList.add("wide");
     d.addEventListener("keydown", e => {
       if (e.key === "Tab") {                                                                // focus trap
         const f = [...d.querySelectorAll("button:not([disabled]), input, select, textarea, a[href]")]; if (!f.length) return;
@@ -2665,7 +2682,7 @@ async function askConfirm(o) {
 }
 /* askText -> the text, or null when cancelled. */
 async function askText(o) {
-  const r = await modalDialog({title: o.title, body: o.body, detail: o.detail, input: {label: o.label, value: o.value, placeholder: o.placeholder, validate: o.validate},
+  const r = await modalDialog({title: o.title, body: o.body, bodyHTML: o.bodyHTML, detail: o.detail, input: {label: o.label, value: o.value, placeholder: o.placeholder, validate: o.validate, type: o.type},
     buttons: [{id: "cancel", label: o.cancelLabel || "Cancel"}, {id: "ok", label: o.confirmLabel || "OK", primary: true}], cancelId: "cancel", defaultId: "ok"});
   return r.id === "ok" ? r.value : null;
 }
@@ -3734,6 +3751,352 @@ window.benchStudy = name => { S.wiz = {step: 0, source: S.wiz.source === "demo" 
 /* VERSION CONTROL ------------------------------------------------------------------------------------ */
 const G = {repo: "", sel: new Set(), diffPath: null};
 const gq = () => G.repo ? `repo=${encodeURIComponent(G.repo)}` : "";
+/* ===================================================================================================
+   INTERNET AWARENESS: one indicator, and every control that needs the internet is marked data-needs="<service>"
+   (services: internet dns github ncbi sra ena pypi conda zenodo plsdb). The server (plasbench/netgate.py) is the authority and answers 503 {error: "offline"} for a job that needs a
+   service that is unreachable; the page shows the state, disables-with-a-reason (the control stays focusable) and re-checks at the click.
+   =================================================================================================== */
+S.net = null;
+const NET_BAD = new Set(["offline", "dns_broken", "forced_offline"]);
+const NET_LABEL = {online: "Online", assumed_online: "Online", offline: "Offline", dns_broken: "DNS problem", limited: "Limited", forced_offline: "Offline (forced)"};
+const NET_HOST = {github: "github.com", ncbi: "ncbi.nlm.nih.gov", sra: "the SRA (ncbi.nlm.nih.gov)", ena: "ebi.ac.uk (ENA)", pypi: "pypi.org", conda: "conda.anaconda.org", zenodo: "zenodo.org", plsdb: "PLSDB", internet: "the internet", dns: "name lookup (DNS)"};
+function netProblem(svc) {
+  const n = S.net; if (!n) return null;
+  const sv = (n.services || {})[svc];
+  if (NET_BAD.has(n.state) || (sv && sv.ok === false)) return {service: svc, state: n.state, kind: sv ? sv.kind : "", error: sv ? sv.error : "", advice: n.advice || []};
+  return null;
+}
+const netWhy = p => `Needs the internet: ${NET_HOST[p.service] || p.service} is unreachable (${p.kind || p.error || NET_LABEL[p.state] || p.state}). ${(p.advice || [])[0] || ""}`.trim();
+function netIndicatorHTML() {
+  const n = S.net; if (!n) return {cls: "", label: "Checking…", title: "Checking the internet connection…"};
+  const bad = NET_BAD.has(n.state), warn = n.state === "limited" || Object.values(n.services || {}).some(v => v && v.ok === false);
+  const lines = Object.entries(n.services || {}).map(([k, v]) => `${k}: ${v.ok ? "reachable" : "unreachable" + (v.kind ? " (" + v.kind + ")" : "")}${v.ms != null && v.ok ? ` · ${v.ms} ms` : ""}`);
+  return {cls: bad ? "bad" : warn ? "warn" : "", label: NET_LABEL[n.state] || n.state, title: [`Internet: ${NET_LABEL[n.state] || n.state}.`, ...lines, ...(n.advice || []), "Click for details and to check again."].join("\n")};
+}
+function renderNetInd() {
+  const b = $("#netind"); if (!b) return; const v = netIndicatorHTML();
+  setIfChanged(b, `<span class="nd" aria-hidden="true"></span><span class="nl">${esc(v.label)}</span>`);
+  b.className = "tbtn netind " + v.cls; b.title = v.title; b.setAttribute("aria-label", `Internet status: ${v.label}. Click for details.`);
+}
+function applyNetGating() {
+  document.querySelectorAll("[data-needs]").forEach(el => {
+    const p = netProblem(el.dataset.needs), on = el.classList.contains("needs-net-off");
+    if (p) {
+      const why = netWhy(p);
+      if (!on) { el.dataset.title0 = el.getAttribute("title") || ""; el.classList.add("needs-net-off"); }
+      if (el.getAttribute("aria-description") !== why) { el.setAttribute("aria-description", why); el.title = why; }
+      el.setAttribute("aria-disabled", "true");
+    } else if (on) {
+      el.classList.remove("needs-net-off"); el.removeAttribute("aria-description"); el.removeAttribute("aria-disabled");
+      if (el.dataset.title0) el.title = el.dataset.title0; else el.removeAttribute("title");
+    }
+  });
+}
+async function netRefresh(force) {
+  try { S.net = await api("net/status" + (force ? "?t=" + Date.now() : "")); S.netCommands = {commands: S.net.commands || {}, sub: S.net.subcommands || {}}; } catch { return; }
+  renderNetInd(); applyNetGating();
+}
+function netNeedsFor(el) {
+  if (el.dataset.needs) return [el.dataset.needs];
+  if (!el.dataset.run || !S.netCommands) return [];
+  let argv; try { argv = JSON.parse(el.dataset.run); } catch { return []; }
+  const t = S.netCommands.commands[argv[0]];
+  if (t === undefined) return [];
+  return t === null ? ((S.netCommands.sub[argv[0]] || {})[argv[1]] || []) : t;
+}
+async function showOfflineDialog(p) {
+  const r = await modalDialog({title: "No internet connection", cancelId: "close", defaultId: "again", bodyHTML: `<p>${esc(p.message || netWhy(p))}</p>${(p.advice || []).length ? `<ul>${p.advice.map(a => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}<p class="small mut">Nothing was started. Local work (scoring, reports, studies, settings) does not need the internet.</p>`,
+    buttons: [{id: "close", label: "Close"}, {id: "again", label: "Check again", primary: true}]});
+  if (r.id === "again") { await netRefresh(true); const q = p.service && netProblem(p.service); toast(q ? "Still offline: " + (NET_LABEL[S.net.state] || S.net.state) : "The internet is reachable again", q ? "bad" : "ok"); }
+}
+async function showNetDialog() {
+  await netRefresh(true); const n = S.net || {};
+  const r = await modalDialog({title: `Internet: ${NET_LABEL[n.state] || "unknown"}`, cancelId: "close", defaultId: "again",
+    facts: Object.entries(n.services || {}).map(([k, v]) => [k, v.ok ? `reachable${v.ms != null ? " · " + v.ms + " ms" : ""}` : `unreachable${v.kind ? " (" + v.kind + ")" : ""}${v.error ? ": " + v.error : ""}`]),
+    bodyHTML: `<p>${n.forced_offline ? "PLASBENCH_OFFLINE=1 is set, so PlasBench is working offline on purpose." : "Services that need the internet are switched off while they are unreachable. Local work is never blocked."}</p>${(n.advice || []).length ? `<ul>${n.advice.map(a => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}`,
+    buttons: [{id: "close", label: "Close"}, {id: "again", label: "Check again", primary: true}]});
+  if (r.id === "again") showNetDialog();
+}
+$("#netind").onclick = showNetDialog;
+// a control that needs a service which is unreachable: re-check at the click, and only start if it is reachable now
+document.addEventListener("click", async e => {
+  const el = e.target.closest("[data-needs], [data-run]"); if (!el || el.dataset.netOk) return;
+  const svcs = netNeedsFor(el); if (!svcs.length || !svcs.some(netProblem)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  await netRefresh(true);
+  const q = svcs.map(netProblem).find(Boolean);
+  if (q) return showOfflineDialog(q);
+  el.dataset.netOk = "1"; el.click(); delete el.dataset.netOk;
+}, true);
+setInterval(() => { if (!document.hidden && !uiBusy([])) netRefresh(); }, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) netRefresh(); });
+addEventListener("online", () => netRefresh(true)); addEventListener("offline", () => netRefresh(true));
+{ let t = 0; new MutationObserver(() => { clearTimeout(t); t = setTimeout(applyNetGating, 80); }).observe(document.body, {childList: true, subtree: true}); }
+netRefresh();
+
+/* ===================================================================================================
+   GITHUB SIGN-IN, in a pop-up: GitHub's device flow through the GitHub CLI. The page never sees a token: the server shows a one-time code and an address; the address is opened in a pop-up
+   window of this page (window.open in the click handler itself, so pop-up blockers allow it); approving there signs PlasBench in.
+   =================================================================================================== */
+S.ghAccount = null;
+const GH_FEATURES = "popup=yes,width=560,height=760,left=" + Math.max(0, Math.round((screen.width - 560) / 2)) + ",top=" + Math.max(0, Math.round((screen.height - 760) / 3));
+async function ghAccountRefresh() { try { S.ghAccount = await api("github/account"); } catch { S.ghAccount = null; } return S.ghAccount; }
+/* MUST be called straight from a click handler: the pop-up is opened here, before anything is awaited. */
+function githubSignIn() {
+  const w = window.open("about:blank", "plasbench-github", GH_FEATURES);
+  try { if (w) w.document.write("<!doctype html><title>GitHub</title><body style=\"font:16px system-ui;padding:28px;color:#333\">Contacting GitHub…</body>"); } catch { /* cross-origin once navigated */ }
+  return ghSignInFlow(w);
+}
+async function ghSignInFlow(w) {
+  if (S.ghAccount && S.ghAccount.gh_installed === false) { try { w && w.close(); } catch {} return ghInstallHelp(); }
+  const d = document.createElement("dialog"), opener = document.activeElement;
+  d.className = "pbdlg"; d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true"); d.setAttribute("aria-labelledby", "ghs_t"); d.setAttribute("aria-describedby", "ghs_d");
+  d.innerHTML = `<div class="hd">${icon("git", "ico")}<h3 id="ghs_t">Sign in to GitHub</h3></div><div class="bd" id="ghs_d"></div><div class="ft"><button type="button" class="btn sec" data-gh="token">Use a token instead</button><button type="button" class="btn sec" data-gh="reopen" hidden>I closed it by mistake: open again</button><button type="button" class="btn sec" data-gh="again" hidden>Try again</button><button type="button" class="btn" data-gh="cancel">Cancel</button></div>`;
+  const body = $("#ghs_d", d), btn = k => d.querySelector(`[data-gh="${k}"]`);
+  let stopped = false, url = "", blocked = false, popup = w;
+  const closeAll = () => { stopped = true; try { popup && !popup.closed && popup.close(); } catch {} if (d.open) d.close(); d.remove(); try { opener && opener.focus && opener.focus(); } catch {} };
+  const say = (html, spin) => { body.innerHTML = `${html}${spin ? `<div class="ghwait" role="status"><span class="ghspin" aria-hidden="true"></span><span>Waiting for you to approve in the GitHub window…</span></div>` : ""}`; };
+  d.addEventListener("cancel", e => { e.preventDefault(); btn("cancel").click(); });
+  d.addEventListener("keydown", e => { if (e.key === "Tab") { const f = [...d.querySelectorAll("button:not([hidden]):not([disabled])")]; if (!f.length) return; const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } } });
+  d.addEventListener("click", async e => {
+    const b = e.target.closest("[data-gh]"); if (!b) { if (e.target.closest("[data-ghcopy]")) copyText(e.target.closest("[data-ghcopy]").dataset.ghcopy, "Code copied"); return; }
+    const k = b.dataset.gh;
+    if (k === "cancel") { try { await api("github/signin/cancel", {}); } catch {} closeAll(); }
+    else if (k === "token") { try { await api("github/signin/cancel", {}); } catch {} closeAll(); githubTokenDialog(); }
+    else if (k === "reopen") { popup = window.open(url, "plasbench-github", GH_FEATURES); blocked = !popup; btn("reopen").hidden = !blocked && true; if (blocked) say(blockedHTML(), true); }   // the click itself opens it
+    else if (k === "again") { closeAll(); githubSignIn(); }
+  });
+  document.body.append(d); d.showModal(); btn("cancel").focus();
+  say(`<p>Getting a one-time code from GitHub…</p>`, false);
+  const blockedHTML = () => `<p class="bad-t">Your browser blocked the pop-up window.</p><p>Open this address yourself (a normal tab is fine), then enter the code:</p><p class="mono" style="overflow-wrap:anywhere">${esc(url)}</p><p><button type="button" class="btn sec sm" data-gh="reopen">Open GitHub</button></p>`;
+  let start;
+  try { start = await api("github/signin/start", {}); }
+  catch (err) { closeAll(); if (err.offline || err.status === 503) return; if (/not installed/i.test(err.message)) { ghAccountRefresh(); return ghInstallHelp(); } return showMessage({title: "Could not start the sign-in", danger: true, body: err.message}); }
+  if (start.already_signed_in) { closeAll(); toast(`Already signed in${start.user ? " as " + start.user : ""}`, "ok"); await ghAccountRefresh(); refreshGit(); return; }
+  url = start.url;
+  try { if (popup && !popup.closed) popup.location.href = url; else blocked = true; } catch { blocked = true; }
+  const render = () => say(`<p>Enter this code on GitHub when it asks:</p><div class="ghcode" aria-label="One-time code ${esc(start.code.split("").join(" "))}">${esc(start.code)}</div><p><button type="button" class="btn sec sm" data-ghcopy="${esc(start.code)}">${icon("copy")}Copy code</button></p>${blocked ? blockedHTML() : ""}`, true);
+  render(); btn("reopen").hidden = true;
+  const fail = msg => { stopped = true; try { popup && !popup.closed && popup.close(); } catch {} say(`<p class="bad-t">${esc(msg)}</p>`, false); btn("again").hidden = false; btn("reopen").hidden = true; btn("token").hidden = false; btn("cancel").textContent = "Close"; };
+  while (!stopped) {
+    await sleep(2000); if (stopped) break;
+    let st; try { st = await api("github/signin/status"); } catch { continue; }
+    if (st.state === "signed_in") { closeAll(); await ghAccountRefresh(); toast(`Signed in as ${st.user || (S.ghAccount && S.ghAccount.user) || "GitHub"}`, "ok"); refreshGit(); return; }
+    if (st.state === "failed") return fail(st.message || "GitHub did not accept the sign-in.");
+    if (st.state === "expired") return fail("The one-time code expired (15 minutes). Try again.");
+    if (st.state === "cancelled") return closeAll();
+    const gone = !popup || popup.closed;
+    if (gone && !blocked) { btn("reopen").hidden = false; }
+  }
+}
+async function ghInstallHelp() {
+  const a = S.ghAccount || await ghAccountRefresh() || {}, cmds = a.install && a.install.length ? a.install : ["conda install -c conda-forge gh"];
+  const r = await modalDialog({title: "The GitHub CLI is not installed", cancelId: "close", copy: cmds[0],
+    bodyHTML: `<p>Signing in from the window uses GitHub's command-line tool, <b>gh</b>, which is not installed here. Install it with one of these (in the Terminal tab), then try again:</p><pre class="detail">${esc(cmds.join("\n"))}</pre><p>Or sign in without it, with a personal access token.</p>`,
+    buttons: [{id: "close", label: "Close"}, {id: "token", label: "Use a token", primary: true}]});
+  if (r.id === "token") githubTokenDialog();
+}
+/* The token fallback: sent to the server once, which pipes it to `gh auth login --with-token` over standard input; it is never on a command line, never logged, never sent back. */
+async function githubTokenDialog() {
+  const t = await askText({title: "Sign in with a personal access token", label: "Token", type: "password", confirmLabel: "Sign in", validate: v => /^[A-Za-z0-9_\-]{20,255}$/.test(v.trim()) ? "" : "A token is 20 or more letters, digits, - and _, with no spaces",
+    bodyHTML: `<p>Create a token on GitHub (Settings → Developer settings → Personal access tokens) with the <b>repo</b> scope, and <b>workflow</b> if you will push workflow files. Quick link text: <span class="mono">https://github.com/settings/tokens/new?scopes=repo,workflow&amp;description=PlasBench</span></p><p class="small mut">The token goes to the GitHub CLI over standard input and is not stored by PlasBench or shown again.</p>`});
+  if (t == null) return;
+  try { const r = await api("github/signin/token", {token: t.trim()}); await ghAccountRefresh(); toast(`Signed in${r.user ? " as " + r.user : ""}`, "ok"); refreshGit(); }
+  catch (e) { if (!e.offline && e.status !== 503) showMessage({title: "Not signed in", danger: true, body: e.message}); }
+}
+async function askSignInDialog(message) {
+  const r = await modalDialog({title: "Sign in to GitHub", body: message || "You are not signed in to GitHub.", buttons: [{id: "cancel", label: "Not now"}, {id: "go", label: "Sign in", primary: true}], cancelId: "cancel"});
+  if (r.id === "go") githubSignIn();   // the dialog's button click is the user gesture that lets the pop-up open
+}
+async function githubSignOut() {
+  if (!await askConfirm({title: "Sign out of GitHub?", danger: true, confirmLabel: "Sign out", cancelLabel: "Stay signed in", body: "PlasBench (and git, through the GitHub CLI) will no longer be able to push or pull private repositories until you sign in again. Nothing on GitHub changes."})) return;
+  try { await api("github/signout", {}); await ghAccountRefresh(); toast("Signed out of GitHub", "ok"); refreshGit(); } catch (e) { toast(e.message, "bad"); }
+}
+const ghAccountHTML = (a, idp) => !a ? `<button class="btn sec sm" id="${idp}login" data-needs="github">Sign in to GitHub</button>`
+  : a.signed_in ? `<div class="row small" style="gap:8px;align-items:center"><span class="ghav" aria-hidden="true" style="width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;display:inline-grid;place-items:center;font-weight:700">${esc((a.user || "?")[0].toUpperCase())}</span><span>Signed in to GitHub as <b>${esc(a.user || "")}</b>${a.git_helper_configured ? "" : ` <span class="mut">(git is not set up to use it yet)</span>`}</span><button class="btn ghost sm" id="${idp}out">Sign out</button><button class="btn ghost sm" id="${idp}switch" data-needs="github" title="Sign out, then sign in as another account">Switch account</button></div>`
+  : `<div class="row" style="gap:8px"><button class="btn sec sm" id="${idp}login" data-needs="github" title="Sign in with a GitHub pop-up window">Sign in to GitHub</button><button class="btn ghost sm" id="${idp}token" title="Sign in with a personal access token instead">Use a token</button></div>`;
+function ghBindAccount(idp) {
+  if ($("#" + idp + "login")) $("#" + idp + "login").onclick = () => githubSignIn();
+  if ($("#" + idp + "token")) $("#" + idp + "token").onclick = () => githubTokenDialog();
+  if ($("#" + idp + "out")) $("#" + idp + "out").onclick = () => githubSignOut();
+  if ($("#" + idp + "switch")) $("#" + idp + "switch").onclick = async () => { try { await api("github/signout", {}); } catch {} await ghAccountRefresh(); githubSignIn(); };
+}
+
+/* ===================================================================================================
+   GITHUB ACTIONS of the Version control page (plasbench/ghops.py): repositories, branches, pull requests, checks, issues, releases. Reads show a dialog; writes run as jobs in the console
+   (the command line is the first line of the log). Destructive ones (delete branch, close, merge) go through a confirm dialog that says exactly what will happen.
+   =================================================================================================== */
+const ghop = (op, args, extra) => api("github/op", {op, repo: G.repo, args: args || {}, ...(extra || {})});
+async function ghWrite(op, args, extra, okMsg) {
+  try { const r = await ghop(op, args, extra); if (r.job) { toast(`Started ${r.job.label}; follow it in the console`, "ok"); await refreshJobs(); showConsole(r.job.id, true); } else toast(okMsg || "Done", "ok"); refreshGit(); return r; }
+  catch (e) { if (e.status === 409 && e.data && e.data.needs_confirm) return ghRisk(op, args, e.data.risks); if (e.status !== 503 && !(e.data && e.data.action === "signin")) showMessage({title: "GitHub", danger: true, body: e.message, detail: e.data && e.data.detail}); }
+}
+async function ghRisk(op, args, risks) {
+  if (await askConfirm({title: "Merge anyway?", danger: true, confirmLabel: "Merge despite the risk", cancelLabel: "Do not merge", bodyHTML: `<p>Merging now would go wrong:</p><ul>${risks.map(r => `<li>${esc(r)}</li>`).join("")}</ul><p>If you merge anyway, that is on your head: it cannot be undone from here.</p>`}))
+    return ghWrite(op, args, {risk_confirmed: true});
+}
+/* a small form dialog: fields [{id, label, type: text|textarea|select|checkbox, value, options, placeholder, help, required}] -> {id: value} or null */
+function formDialog(o) {
+  return new Promise(resolve => {
+    const opener = document.activeElement, uid = "pbf" + (++DLG_N), d = document.createElement("dialog");
+    d.className = "pbdlg" + (o.danger ? " danger" : ""); d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true"); d.setAttribute("aria-labelledby", uid + "t");
+    const fld = f => { const id = `${uid}_${f.id}`, v = f.value ?? "";
+      const ctl = f.type === "textarea" ? `<textarea id="${id}" rows="${f.rows || 4}" placeholder="${esc(f.placeholder || "")}">${esc(v)}</textarea>` : f.type === "select" ? `<select id="${id}">${(f.options || []).map(([ov, ol]) => `<option value="${esc(ov)}" ${String(ov) === String(v) ? "selected" : ""}>${esc(ol)}</option>`).join("")}</select>`
+        : f.type === "checkbox" ? `<label class="switch"><input type="checkbox" id="${id}" ${v ? "checked" : ""}><span></span></label>` : `<input type="text" id="${id}" value="${esc(v)}" placeholder="${esc(f.placeholder || "")}" autocomplete="off">`;
+      return `<div class="frow"><label for="${id}">${esc(f.label)}${f.required ? ` <span class="req">*</span>` : ""}</label>${ctl}${f.help ? `<div class="help">${esc(f.help)}</div>` : ""}</div>`; };
+    d.innerHTML = `<div class="hd">${icon("git", "ico")}<h3 id="${uid}t">${esc(o.title)}</h3></div><div class="bd">${o.bodyHTML || (o.body ? `<p>${esc(o.body)}</p>` : "")}${(o.fields || []).map(fld).join("")}<div class="dlgerr" role="alert" id="${uid}e"></div></div>
+      <div class="ft"><button type="button" class="btn sec" data-f="cancel">${esc(o.cancelLabel || "Cancel")}</button><button type="button" class="btn ${o.danger ? "danger" : ""}" data-f="ok">${esc(o.confirmLabel || "OK")}</button></div>`;
+    const done = v => { d.close(); d.remove(); try { opener && opener.focus && opener.focus(); } catch {} resolve(v); };
+    const read = () => { const out = {}; for (const f of o.fields || []) { const el = d.querySelector(`#${uid}_${f.id}`); out[f.id] = f.type === "checkbox" ? el.checked : el.value; } return out; };
+    d.addEventListener("cancel", e => { e.preventDefault(); done(null); });
+    d.addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (!b) return; if (b.dataset.f === "cancel") return done(null);
+      const v = read(), miss = (o.fields || []).find(f => f.required && !String(v[f.id]).trim()); if (miss) { $(`#${uid}e`, d).textContent = `${miss.label} is required`; return; }
+      const bad = o.validate && o.validate(v); if (bad) { $(`#${uid}e`, d).textContent = bad; return; } done(v); });
+    d.addEventListener("keydown", e => { if (e.key === "Tab") { const f = [...d.querySelectorAll("button, input, select, textarea")], i = f.indexOf(document.activeElement); if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } } });
+    document.body.append(d); d.showModal(); (d.querySelector("input[type=text],textarea,select") || d.querySelector("[data-f=ok]")).focus();
+  });
+}
+const ghDate = t => t ? fmtTime(Date.parse(t) / 1000) : "";
+const ghBadge = (txt, kind) => `<span class="tag ${kind || ""}">${esc(txt)}</span>`;
+async function ghCreateRepo() {
+  let orgs = []; try { orgs = (await ghop("orgs")).result || []; } catch (e) { if (e.status === 503 || (e.data && e.data.action === "signin")) return; }
+  const st = (await api(`git/status?${gq()}`).catch(() => ({}))) || {}, acct = S.ghAccount || {};
+  const v = await formDialog({title: "Create a repository on GitHub", confirmLabel: "Create and push", body: `Creates the repository, adds it as the remote "origin" of ${G.repo || "this repository"} and pushes the first branch${st.branch ? " (" + st.branch + ")" : ""}.`,
+    fields: [{id: "name", label: "Name", required: true, placeholder: "my-plasbench-runs", help: "Letters, numbers, . _ -"}, {id: "owner", label: "Owner", type: "select", value: acct.user || "", options: [[acct.user || "", (acct.user || "my account") + " (me)"], ...orgs.map(o => [o.login, o.login + " (organisation)"])]},
+      {id: "visibility", label: "Visibility", type: "select", value: "private", options: [["private", "private: only you and people you add"], ["public", "public: everyone can see it"]], help: "Run folders can hold sample data: keep it private unless you are sure."},
+      {id: "description", label: "Description", placeholder: "optional"}]});
+  if (v) ghWrite("repo_create", {name: v.name.trim(), owner: v.owner, visibility: v.visibility, description: v.description, push: true});
+}
+async function ghCloneDialog() {
+  let repos = []; try { repos = (await ghop("repo_list")).result || []; } catch (e) { if (e.status === 503 || (e.data && e.data.action === "signin")) return; return showMessage({title: "GitHub", danger: true, body: e.message}); }
+  const rowsHTML = list => list.length ? `<table class="ghlist"><thead><tr><th>Repository</th><th></th></tr></thead><tbody>${list.map(r => `<tr><td><b>${esc(r.full_name)}</b> ${r.private ? ghBadge("private") : ""}<div class="mut">${esc(r.description)}</div></td><td><button class="btn sm" data-clone="${esc(r.url)}">Clone</button></td></tr>`).join("")}</tbody></table>` : `<p class="mut">Nothing found.</p>`;
+  let pick = null;
+  await modalDialog({title: "Clone from GitHub", wide: true, cancelId: "close", bodyHTML: `<div class="row" style="margin-bottom:8px"><input type="text" id="ghq" placeholder="Search all of GitHub, or leave empty to list your repositories" aria-label="Search repositories"><button type="button" class="btn sec sm" data-search>Search</button></div><div id="ghres">${rowsHTML(repos)}</div>`,
+    buttons: [{id: "close", label: "Close"}],
+    onclick: async (e, d, finish) => {
+      const c = e.target.closest("[data-clone]"); if (c) { pick = c.dataset.clone; return finish("close"); }
+      if (e.target.closest("[data-search]")) { const q = $("#ghq", d).value.trim(); try { const r = q ? (await ghop("repo_search", {query: q})).result : (await ghop("repo_list")).result; $("#ghres", d).innerHTML = rowsHTML(r); } catch (err) { $("#ghres", d).innerHTML = `<p class="bad-t">${esc(err.message)}</p>`; } } } });
+  if (!pick) return;
+  const dest = await askText({title: "Clone into which folder?", label: "Full path of the new folder", value: (S.ws && S.ws.path ? S.ws.path + (S.info?.sep || "/") : "") + pick.split("/").pop().replace(/\.git$/, ""), confirmLabel: "Clone", validate: v => v.trim() ? "" : "Enter a folder"});
+  if (dest) gitOp({op: "clone", url: pick, dest: dest.trim()});
+}
+async function ghBranches() {
+  let r; try { r = await api(`git/branches?${gq()}`); } catch (e) { return toast(e.message, "bad"); }
+  await modalDialog({title: "Branches", wide: true, cancelId: "close", bodyHTML: `<table class="ghlist"><thead><tr><th>Branch</th><th>Tracks</th><th></th></tr></thead><tbody>${r.branches.map(b => `<tr><td class="mono">${esc(b.name)}${b.current ? " " + ghBadge("current", "ok") : ""}</td><td class="mono small">${esc(b.upstream || "—")}${b.ahead || b.behind ? ` <span class="mut">(${b.ahead || 0} ahead, ${b.behind || 0} behind)</span>` : ""}</td>
+      <td style="white-space:nowrap"><button class="btn sec sm" data-b="switch" data-n="${esc(b.name)}" ${b.current ? "disabled" : ""}>Switch</button> <button class="btn sec sm" data-needs="github" data-b="push" data-n="${esc(b.name)}" title="Push and set the upstream">Push</button> <button class="btn ghost sm" data-b="del" data-n="${esc(b.name)}" ${b.current ? "disabled" : ""}>Delete…</button> <button class="btn ghost sm" data-needs="github" data-b="delremote" data-n="${esc(b.name)}">Delete on GitHub…</button></td></tr>`).join("")}</tbody></table>
+      <p class="small mut">Create a branch with the box on the Version control page. Delete only removes a branch that is fully merged; nothing is force-pushed.</p>`,
+    buttons: [{id: "close", label: "Close"}],
+    onclick: async (e, d, finish) => {
+      const b = e.target.closest("[data-b]"); if (!b || b.disabled) return; const n = b.dataset.n, k = b.dataset.b;
+      if (k === "switch") { finish("close"); return gitOp({op: "checkout", name: n}, "Switched branch"); }
+      if (k === "push") { finish("close"); return gitOp({op: "push", confirm: true}); }
+      if (k === "del") { if (await askConfirm({title: `Delete the local branch ${n}?`, danger: true, confirmLabel: "Delete branch", body: "Only the local branch is removed, and only if everything on it is merged. The branch on GitHub (if any) stays."})) { finish("close"); gitOp({op: "branch_delete", name: n}, "Branch deleted"); } }
+      if (k === "delremote") { if (await askConfirm({title: `Delete ${n} on GitHub?`, danger: true, confirmLabel: "Delete on GitHub", body: `This removes the branch ${n} from the remote repository (git push origin --delete ${n}). Your local branch stays. Open pull requests from it are closed by GitHub.`})) { finish("close"); ghWrite("branch_delete_remote", {name: n}); } } } });
+}
+async function ghNewPR() {
+  let br = []; try { br = (await api(`git/branches?${gq()}`)).branches; } catch {}
+  const st = await api(`git/status?${gq()}`).catch(() => ({})), cur = st.branch || (br.find(b => b.current) || {}).name || "";
+  const names = br.map(b => b.name);
+  const v = await formDialog({title: "New pull request", confirmLabel: "Create pull request", body: "A pull request asks GitHub to merge one branch into another. The branch must be on GitHub: it is pushed first if needed.",
+    fields: [{id: "title", label: "Title", required: true}, {id: "body", label: "Description", type: "textarea", placeholder: "What changed and why"},
+      {id: "head", label: "From branch (head)", type: "select", value: cur, options: (names.length ? names : [cur]).map(n => [n, n])}, {id: "base", label: "Into branch (base)", type: "select", value: names.includes("main") ? "main" : names.includes("master") ? "master" : (names.find(n => n !== cur) || cur), options: (names.length ? names : [cur]).map(n => [n, n])},
+      {id: "draft", label: "Open as a draft", type: "checkbox"}, {id: "reviewers", label: "Reviewers", placeholder: "optional: user names, comma separated"}, {id: "labels", label: "Labels", placeholder: "optional: comma separated"}],
+    validate: v => v.head === v.base ? "Choose two different branches" : ""});
+  if (!v) return;
+  if (st.ahead || !(br.find(b => b.name === v.head) || {}).upstream) { if (await askConfirm({title: "Push the branch first?", confirmLabel: `Push ${v.head}`, cancelLabel: "Not now", body: `${v.head} is not fully on GitHub yet. Push it, then create the pull request.`})) { const r = await gitOp({op: "push", confirm: true}); if (r && r.job) { toast("Pushing; create the pull request again when it has finished", ""); return; } } }
+  ghWrite("pr_create", {title: v.title, body: v.body, head: v.head, base: v.base, draft: v.draft, reviewers: v.reviewers, labels: v.labels});
+}
+async function ghPRList(state) {
+  state = state || "open"; let list;
+  try { list = (await ghop("pr_list", {state})).result; } catch (e) { return (e.status === 503 || (e.data && e.data.action === "signin")) ? null : showMessage({title: "GitHub", danger: true, body: e.message}); }
+  await modalDialog({title: "Pull requests", wide: true, cancelId: "close",
+    bodyHTML: `<div class="row" style="margin-bottom:8px">${["open", "closed", "merged", "all"].map(k => `<button type="button" class="chip ${k === state ? "on" : ""}" data-state="${k}">${k}</button>`).join("")}</div>
+      ${list.length ? `<table class="ghlist"><thead><tr><th>#</th><th>Title</th><th>Branches</th><th></th></tr></thead><tbody>${list.map(p => `<tr><td>${p.number}</td><td><b>${esc(p.title)}</b> ${p.draft ? ghBadge("draft") : ""} ${ghBadge(p.state, p.state === "merged" ? "ok" : p.state === "closed" ? "bad" : "")}<div class="mut">${esc(p.author)} · ${esc(ghDate(p.updated))}</div></td><td class="mono small">${esc(p.head)} → ${esc(p.base)}</td><td><button class="btn sec sm" data-pr="view" data-n="${p.number}">View</button></td></tr>`).join("")}</tbody></table>` : `<p class="mut">No ${state === "all" ? "" : state} pull requests.</p>`}`,
+    buttons: [{id: "new", label: "New pull request…", primary: true}, {id: "close", label: "Close"}],
+    onclick: (e, d, finish) => { const s = e.target.closest("[data-state]"); if (s) { finish("close"); return ghPRList(s.dataset.state); } const v = e.target.closest("[data-pr]"); if (v) ghPRView(+v.dataset.n); } }).then(r => { if (r.id === "new") ghNewPR(); });
+}
+async function ghPRView(n) {
+  let v; try { v = (await ghop("pr_view", {number: n})).result; } catch (e) { return showMessage({title: "GitHub", danger: true, body: e.message}); }
+  const c = v.checks || {}, checksTxt = c.state === "none" ? "no checks" : c.state === "failing" ? `failing: ${c.failing.join(", ")}` : c.state === "pending" ? `running: ${c.pending.join(", ")}` : "all passing";
+  const mergeTxt = v.state !== "open" ? v.state : v.conflicts ? "has conflicts" : v.mergeable === "MERGEABLE" ? "can be merged" : v.merge_state === "BLOCKED" ? "blocked by branch protection" : (v.mergeable || "unknown").toLowerCase();
+  const open = v.state === "open";
+  await modalDialog({title: `#${v.number} ${v.title}`, wide: true, cancelId: "close",
+    facts: [["From → into", `${v.head} → ${v.base}`], ["Author", v.author], ["State", v.state + (v.draft ? " (draft)" : "")], ["Checks", checksTxt], ["Reviews", (v.review || "none").replace(/_/g, " ")], ["Mergeable", mergeTxt], ["Changed files", `${v.files.length} file${v.files.length === 1 ? "" : "s"}, +${v.additions} −${v.deletions}`], ["Address", v.url]],
+    bodyHTML: `${v.body ? `<p style="white-space:pre-wrap">${esc(v.body)}</p>` : ""}${v.files.length ? `<details><summary>Changed files</summary><ul class="mono small">${v.files.slice(0, 80).map(f => `<li>${esc(f.path)} +${f.additions} −${f.deletions}</li>`).join("")}</ul></details>` : ""}
+      ${v.comments.length ? `<details open><summary>${v.comments.length} comment${v.comments.length === 1 ? "" : "s"}</summary>${v.comments.map(m => `<p class="small"><b>${esc(m.author)}</b> <span class="mut">${esc(ghDate(m.created))}</span><br>${esc(m.body)}</p>`).join("")}</details>` : `<p class="mut small">No comments yet.</p>`}`,
+    buttons: [{id: "close", label: "Close"}, {id: "checks", label: "Checks…"}, ...(open ? [{id: "checkout", label: "Check out"}, {id: "comment", label: "Comment…"}, ...(v.draft ? [{id: "ready", label: "Mark ready"}] : []), {id: "closepr", label: "Close PR…", danger: true}, {id: "merge", label: "Merge…", primary: true}] : v.state === "closed" ? [{id: "reopen", label: "Reopen"}] : [])] }).then(async r => {
+    const a = r.id;
+    if (a === "checks") ghChecks(n);
+    else if (a === "checkout") ghWrite("pr_checkout", {number: n});
+    else if (a === "ready") ghWrite("pr_ready", {number: n});
+    else if (a === "reopen") ghWrite("pr_reopen", {number: n});
+    else if (a === "comment") { const t = await askText({title: `Comment on #${n}`, label: "Comment", confirmLabel: "Post comment", validate: x => x.trim() ? "" : "Write something"}); if (t) ghWrite("pr_comment", {number: n, body: t}); }
+    else if (a === "closepr") { if (await askConfirm({title: `Close pull request #${n}?`, danger: true, confirmLabel: "Close pull request", cancelLabel: "Keep it open", body: `"${v.title}" will be closed without merging. You can reopen it later.`})) ghWrite("pr_close", {number: n}); }
+    else if (a === "merge") ghMerge(v);
+  });
+}
+async function ghMerge(v) {
+  const f = await formDialog({title: `Merge #${v.number}`, danger: true, confirmLabel: "Merge", cancelLabel: "Do not merge", body: `"${v.title}": ${v.head} will be merged into ${v.base}. This cannot be undone from here.`,
+    fields: [{id: "method", label: "How", type: "select", value: "merge", options: [["merge", "Merge commit: keep every commit"], ["squash", "Squash: one commit"], ["rebase", "Rebase: replay the commits on top"]]},
+      {id: "delete_branch", label: `Delete the branch ${v.head} after merging`, type: "checkbox"}, {id: "auto", label: "Wait for the checks, then merge automatically", type: "checkbox", help: "Only works when the repository allows auto-merge; otherwise GitHub says so."}]});
+  if (f) ghWrite("pr_merge", {number: v.number, method: f.method, delete_branch: f.delete_branch, auto: f.auto});
+}
+async function ghChecks(n) {
+  let r, runs = []; try { r = (await ghop("pr_checks", {number: n})).result; } catch (e) { return showMessage({title: "Checks", danger: true, body: e.message}); }
+  const failed = r.checks.filter(c => c.bucket === "fail");
+  const x = await modalDialog({title: `Checks of #${n}: ${r.state}`, wide: true, cancelId: "close", bodyHTML: r.checks.length ? `<table class="ghlist"><thead><tr><th>Check</th><th>Result</th><th>Address</th></tr></thead><tbody>${r.checks.map(c => `<tr><td>${esc(c.name)}<div class="mut">${esc(c.workflow || "")}</div></td><td>${ghBadge(c.bucket || c.state, c.bucket === "pass" ? "ok" : c.bucket === "fail" ? "bad" : "")}</td><td class="mono small" style="overflow-wrap:anywhere">${esc(c.link || "")}</td></tr>`).join("")}</tbody></table>` : `<p class="mut">This pull request has no checks.</p>`,
+    buttons: [{id: "close", label: "Close"}, ...(failed.length ? [{id: "rerun", label: "Re-run failed checks", primary: true}] : [])]});
+  if (x.id === "rerun") { try { const runs = (await ghop("run_list", {})).result.filter(q => q.conclusion === "failure"); if (!runs.length) return toast("No failed workflow run found", ""); ghWrite("run_rerun", {run_id: runs[0].id}); } catch (e) { toast(e.message, "bad"); } }
+}
+async function ghIssues(state) {
+  state = state || "open"; let list;
+  try { list = (await ghop("issue_list", {state})).result; } catch (e) { return (e.status === 503 || (e.data && e.data.action === "signin")) ? null : showMessage({title: "GitHub", danger: true, body: e.message}); }
+  await modalDialog({title: "Issues", wide: true, cancelId: "close", bodyHTML: `<div class="row" style="margin-bottom:8px">${["open", "closed", "all"].map(k => `<button type="button" class="chip ${k === state ? "on" : ""}" data-state="${k}">${k}</button>`).join("")}</div>
+    ${list.length ? `<table class="ghlist"><tbody>${list.map(i => `<tr><td>#${i.number}</td><td><b>${esc(i.title)}</b> ${ghBadge(i.state, i.state === "closed" ? "bad" : "")}<div class="mut">${esc(i.author)} · ${esc(ghDate(i.updated))}</div></td><td style="white-space:nowrap"><button class="btn sec sm" data-i="comment" data-n="${i.number}">Comment…</button> ${i.state === "open" ? `<button class="btn ghost sm" data-i="close" data-n="${i.number}">Close…</button>` : ""}</td></tr>`).join("")}</tbody></table>` : `<p class="mut">No issues.</p>`}`,
+    buttons: [{id: "new", label: "New issue…", primary: true}, {id: "close", label: "Close"}],
+    onclick: async (e, d, finish) => { const s = e.target.closest("[data-state]"); if (s) { finish("close"); return ghIssues(s.dataset.state); } const b = e.target.closest("[data-i]"); if (!b) return; const n = +b.dataset.n;
+      if (b.dataset.i === "comment") { const t = await askText({title: `Comment on issue #${n}`, label: "Comment", confirmLabel: "Post comment", validate: x => x.trim() ? "" : "Write something"}); if (t) { finish("close"); ghWrite("issue_comment", {number: n, body: t}); } }
+      else if (await askConfirm({title: `Close issue #${n}?`, danger: true, confirmLabel: "Close issue", cancelLabel: "Keep it open", body: "The issue is closed; it can be reopened on GitHub."})) { finish("close"); ghWrite("issue_close", {number: n}); } } }).then(async r => {
+    if (r.id !== "new") return; const v = await formDialog({title: "New issue", confirmLabel: "Create issue", fields: [{id: "title", label: "Title", required: true}, {id: "body", label: "Description", type: "textarea"}]}); if (v) ghWrite("issue_create", {title: v.title, body: v.body}); });
+}
+async function ghReleases() {
+  let list; try { list = (await ghop("release_list", {})).result; } catch (e) { return (e.status === 503 || (e.data && e.data.action === "signin")) ? null : showMessage({title: "GitHub", danger: true, body: e.message}); }
+  const r = await modalDialog({title: "Releases and tags", wide: true, cancelId: "close", bodyHTML: list.length ? `<table class="ghlist"><tbody>${list.map(x => `<tr><td class="mono">${esc(x.tag)}</td><td>${esc(x.name)} ${x.draft ? ghBadge("draft") : ""}${x.prerelease ? ghBadge("pre-release") : ""}</td><td class="mut">${esc(ghDate(x.published))}</td></tr>`).join("")}</tbody></table>` : `<p class="mut">No releases yet.</p>`,
+    buttons: [{id: "tag", label: "New tag…"}, {id: "release", label: "New release…", primary: true}, {id: "close", label: "Close"}]});
+  if (r.id === "tag") { const v = await formDialog({title: "Create a tag", confirmLabel: "Create tag", body: "Tags the commit you are on. Push it afterwards to publish it.", fields: [{id: "name", label: "Tag", required: true, placeholder: "v1.0.0"}, {id: "message", label: "Message", placeholder: "optional"}, {id: "push", label: "Push the tag to GitHub", type: "checkbox", value: true}]});
+    if (v) { try { await ghop("tag_create", {name: v.name.trim(), message: v.message}); toast("Tag created", "ok"); if (v.push) ghWrite("tag_push", {tag: v.name.trim()}); } catch (e) { showMessage({title: "Tag", danger: true, body: e.message}); } } }
+  else if (r.id === "release") { const v = await formDialog({title: "Create a release", confirmLabel: "Create release", body: "Creates a release from a tag that is already on GitHub (or creates the tag from the default branch).", fields: [{id: "tag", label: "Tag", required: true, placeholder: "v1.0.0"}, {id: "title", label: "Title", placeholder: "defaults to the tag"}, {id: "notes", label: "Release notes", type: "textarea"}, {id: "draft", label: "Draft", type: "checkbox"}, {id: "prerelease", label: "Pre-release", type: "checkbox"}]});
+    if (v) ghWrite("release_create", {tag: v.tag.trim(), title: v.title, notes: v.notes, draft: v.draft, prerelease: v.prerelease}); }
+}
+async function ghBranchChecks() {
+  const st = await api(`git/status?${gq()}`).catch(() => ({}));
+  let runs; try { runs = (await ghop("run_list", {branch: st.branch || ""})).result; } catch (e) { return (e.status === 503 || (e.data && e.data.action === "signin")) ? null : showMessage({title: "Checks", danger: true, body: e.message}); }
+  const failed = runs.filter(r => r.conclusion === "failure");
+  const x = await modalDialog({title: `Checks on ${st.branch || "this branch"}`, wide: true, cancelId: "close", bodyHTML: runs.length ? `<table class="ghlist"><tbody>${runs.map(r => `<tr><td>${esc(r.name)}<div class="mut">${esc(ghDate(r.created))} · ${esc(r.event || "")}</div></td><td>${ghBadge(r.conclusion || r.status, r.conclusion === "success" ? "ok" : r.conclusion === "failure" ? "bad" : "")}</td><td class="mono small" style="overflow-wrap:anywhere">${esc(r.url || "")}</td></tr>`).join("")}</tbody></table>` : `<p class="mut">No workflow runs on this branch.</p>`,
+    buttons: [{id: "close", label: "Close"}, ...(failed.length ? [{id: "rerun", label: "Re-run failed checks", primary: true}] : [])]});
+  if (x.id === "rerun") ghWrite("run_rerun", {run_id: failed[0].id});
+}
+function ghCardHTML(st) {
+  const remote = (st.remotes || [])[0];
+  return `<div class="card" id="g_github"><div class="hd"><h3>GitHub ${tipBtn((S.schema?.github_help || {}).signin, "GitHub sign-in")}</h3><span class="sub">repositories, pull requests, checks, issues, releases</span></div><div class="bd"><div id="g_ghacct">${ghAccountHTML(S.ghAccount, "g_gh")}</div>
+    <div class="row wrap" style="margin-top:10px;gap:6px">
+      ${remote ? "" : `<button class="btn sec sm" data-needs="github" id="gh_create" title="Create the repository on GitHub, add it as origin and push the first branch">Create repository on GitHub…</button>`}
+      <button class="btn sec sm" data-needs="github" id="gh_clone" title="List or search your repositories and clone one">Clone from GitHub…</button>
+      <button class="btn sec sm" id="gh_branches" title="Switch, push and delete branches">Branches…</button>
+      <button class="btn sec sm" data-needs="github" id="gh_newpr" ${remote ? "" : "disabled"} title="Ask GitHub to merge one branch into another">New pull request…</button>
+      <button class="btn sec sm" data-needs="github" id="gh_prs" ${remote ? "" : "disabled"} title="Open, closed and merged pull requests: view, check out, mark ready, close, reopen, merge">Pull requests…</button>
+      <button class="btn sec sm" data-needs="github" id="gh_checks" ${remote ? "" : "disabled"} title="Workflow runs (CI) on this branch, and re-run the failed ones">Checks…</button>
+      <button class="btn sec sm" data-needs="github" id="gh_issues" ${remote ? "" : "disabled"} title="List, create, comment on and close issues">Issues…</button>
+      <button class="btn sec sm" data-needs="github" id="gh_releases" ${remote ? "" : "disabled"} title="List releases, create a tag, create a release from a tag">Releases…</button></div>
+    <p class="mut small" style="margin:8px 0 0">Nothing is force-pushed. Deleting, closing and merging ask first, and say exactly what will happen.</p></div></div>`;
+}
+function ghBindCard() {
+  ghBindAccount("g_gh");
+  const on = (id, fn) => { if ($("#" + id)) $("#" + id).onclick = fn; };
+  on("gh_create", ghCreateRepo); on("gh_clone", ghCloneDialog); on("gh_branches", ghBranches); on("gh_newpr", ghNewPR); on("gh_prs", () => ghPRList("open")); on("gh_checks", ghBranchChecks); on("gh_issues", () => ghIssues("open")); on("gh_releases", ghReleases);
+}
+
 async function gitOp(body, okMsg) {
   try { const r = await api("git", {repo: G.repo, ...body});
     if (r.job) { toast(`Started ${r.job.label}; follow it in the console`, "ok"); await refreshJobs(); showConsole(r.job.id, true); }
@@ -3744,7 +4107,7 @@ async function gitOp(body, okMsg) {
 const STATUS_WORD = {M: "modified", A: "added", D: "deleted", R: "renamed", C: "copied", U: "conflict", "?": "new", T: "type changed"};
 async function loadGit() {
   try {
-    const st = await api(`git/status?${gq()}`); G.repo = st.repo || G.repo;
+    const st = await api(`git/status?${gq()}`); G.repo = st.repo || G.repo; await ghAccountRefresh();
     const sel = $("#g_repo");
     const opts = [...st.choices.map(c => [c.path, `${c.label}: ${c.path}`])];
     if (st.repo && !opts.some(o => o[0] === st.repo)) opts.push([st.repo, st.repo]);
@@ -3771,7 +4134,7 @@ async function loadGit() {
         <div class="card"><div class="hd"><h3>Or clone an existing repository</h3></div><div class="bd">
         <div class="field"><label>Address</label><div class="ctl"><input type="text" id="gc_url" placeholder="https://github.com/your-org/your-repo.git"></div></div>
         <div class="field"><label>Into folder</label><div class="ctl"><input type="text" id="gc_dest" placeholder="${esc(st.repo)}${S.info?.sep || "/"}my-repo"><button class="btn sec sm" data-browse="gc_dest" data-dir="1">Browse</button></div><div class="help">A new, empty folder inside the PlasBench folder or the workspace.</div></div></div>
-        <div class="ft"><button class="btn sec" id="gc_go">Clone</button></div></div></div>`;
+        <div class="ft"><button class="btn sec" data-needs="github" id="gc_go">Clone</button></div></div></div>`;
       $("#gi_go").onclick = () => gitOp({op: "init", branch: $("#gi_branch").value.trim(), first_commit: $("#gi_first").checked}, "Repository initialised");
       $("#gc_go").onclick = () => gitOp({op: "clone", url: $("#gc_url").value.trim(), dest: $("#gc_dest").value.trim()});
       return;
@@ -3800,14 +4163,15 @@ async function loadGit() {
      </div><div class="stack">
       <div class="card"><div class="hd"><h3>Sync with the remote</h3></div><div class="bd">
        ${remote ? `<div class="mono small" style="overflow-wrap:anywhere">${esc(remote.name)} → ${esc(remote.url)}</div>` : `<p class="mut small" style="margin:0">No remote yet: add the repository address below.</p>`}</div>
-       <div class="ft"><button class="btn sec" id="g_fetch" ${remote ? "" : "disabled"}>Fetch</button><button class="btn sec" id="g_pull" ${remote ? "" : "disabled"}>Pull</button><button class="btn" id="g_push" ${remote ? "" : "disabled"}>Push${st.ahead ? ` ${st.ahead}` : ""}</button></div></div>
+       <div class="ft"><button class="btn sec" data-needs="github" id="g_fetch" ${remote ? "" : "disabled"}>Fetch</button><button class="btn sec" data-needs="github" id="g_pull" ${remote ? "" : "disabled"}>Pull</button><button class="btn" data-needs="github" id="g_push" ${remote ? "" : "disabled"}>Push${st.ahead ? ` ${st.ahead}` : ""}</button></div></div>
       <div class="card"><div class="hd"><h3>Branches</h3></div><div id="g_br" class="tasks"></div>
        <div class="bd"><div class="row"><input type="text" id="g_newbr" placeholder="new-branch-name"><button class="btn sec" id="g_mkbr">Create and switch</button></div></div></div>
       <div class="card"><div class="hd"><h3>Remote</h3></div><div class="bd">
        <div class="row"><input type="text" id="g_url" value="${esc(remote ? remote.url : "")}" placeholder="https://github.com/your-org/your-repo.git"><button class="btn sec" id="g_seturl">Save</button>${remote ? `<button class="btn ghost" id="g_rmremote" title="Disconnect this repository from ${esc(remote.name || "origin")}; nothing is deleted on the server or on disk">Remove</button>` : ""}</div>
        <p class="mut small" style="margin:6px 0 0">Never put a password or token in the address; sign in with Git's credential manager or the GitHub CLI.</p>
-       ${st.gh ? `<div class="row" style="margin-top:8px">${st.gh_logged_in ? `<span class="small ok-t">${icon("check")} signed in to GitHub</span>` : `<button class="btn sec sm" id="g_ghlogin">Sign in to GitHub</button>`}${st.gh_logged_in ? `<button class="btn ghost sm" id="g_ghsetup" title="Runs gh auth setup-git: lets git use your GitHub sign-in when pushing over https">Let git use this sign-in</button>` : ""}</div>
-       ${st.gh && st.gh_logged_in && !remote ? `<div class="row" style="margin-top:8px"><input type="text" id="g_ghname" placeholder="new-repository-name"><select id="g_ghvis" aria-label="Visibility"><option value="private">private</option><option value="public">public</option></select><button class="btn sec sm" id="g_ghcreate" title="Creates the repository on GitHub and connects this one to it as origin">Create on GitHub</button></div>` : ""}` : ""}</div></div>
+       ${false ? `<div class="row" style="margin-top:8px">${st.gh_logged_in ? `<span class="small ok-t">${icon("check")} signed in to GitHub</span>` : `<button class="btn sec sm" id="g_ghlogin">Sign in to GitHub</button>`}${st.gh_logged_in ? `<button class="btn ghost sm" id="g_ghsetup" title="Runs gh auth setup-git: lets git use your GitHub sign-in when pushing over https">Let git use this sign-in</button>` : ""}</div>
+       ${st.gh && st.gh_logged_in && !remote ? `<div class="row" style="margin-top:8px"><input type="text" id="g_ghname" placeholder="new-repository-name"><select id="g_ghvis" aria-label="Visibility"><option value="private">private</option><option value="public">public</option></select><button class="btn sec sm" id="g_ghcreate" data-needs="github" title="Creates the repository on GitHub and connects this one to it as origin">Create on GitHub</button></div>` : ""}` : ""}</div></div>
+      ${ghCardHTML(st)}
       <div class="card" id="g_ignore"><div class="hd"><h3>Ignored files</h3><span class="sub"><code>.gitignore</code></span></div><div class="bd">
        <details id="gi_managed"><summary class="small" style="cursor:pointer"><b>PlasBench's rules</b> <span class="mut">(read-only; kept up to date by PlasBench)</span></summary>
         <pre class="cmdline small" id="gi_block" style="display:block;max-height:220px;white-space:pre;margin-top:6px"></pre></details>
@@ -3892,7 +4256,7 @@ function bindGit(st) {
   $("#gi_testgo").onclick = giTest;
   $("#gi_test").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); giTest(); } };
   $("#g_saveid").onclick = () => gitOp({op: "identity", name: $("#g_name").value.trim(), email: $("#g_mail").value.trim(), scope: $("#g_scope").value}, "Identity saved");
-  if ($("#g_ghlogin")) $("#g_ghlogin").onclick = () => gitOp({op: "gh_login"});
+  ghBindCard();
   if ($("#g_ghsetup")) $("#g_ghsetup").onclick = () => gitOp({op: "gh_setup_git"});
   if ($("#g_ghcreate")) $("#g_ghcreate").onclick = () => { const n = $("#g_ghname").value.trim(); if (!n) return toast("Type a name for the new repository", "bad"); gitOp({op: "gh_create", name: n, visibility: $("#g_ghvis").value}); };
   if ($("#g_rmremote")) $("#g_rmremote").onclick = async () => { const r = (st.remotes || [])[0]; if (r && await askConfirm({title: "Disconnect the remote?", danger: true, confirmLabel: "Disconnect", body: `Disconnect this repository from ${r.name || "origin"} (${r.url})? Nothing is deleted on the server or on disk.`})) gitOp({op: "remote_remove", name: r.name || "origin"}, "Remote removed"); };
@@ -3961,9 +4325,9 @@ async function loadDrawer(quiet) {
        <div class="mut small" style="margin-top:4px">Only staged files are committed. Each commit is checked first for reads, run outputs, secrets and files too large for GitHub.</div>`;
   const remote = (st.remotes || [])[0];
   const remoteBody = (remote ? `<div class="mono small" style="overflow-wrap:anywhere">${esc(remote.name)} → ${esc(remote.url)}</div>` : `<div class="mut small">No remote yet.</div>`)
-    + `<div class="gd-row"><button class="btn sec sm" id="gd_fetch" ${remote ? "" : "disabled"}>Fetch</button><button class="btn sec sm" id="gd_pull" ${remote ? "" : "disabled"}>Pull${st.behind ? " " + st.behind : ""}</button><button class="btn sm" id="gd_push" ${remote ? "" : "disabled"}>Push${st.ahead ? " " + st.ahead : ""}</button></div>
+    + `<div class="gd-row"><button class="btn sec sm" data-needs="github" id="gd_fetch" ${remote ? "" : "disabled"}>Fetch</button><button class="btn sec sm" data-needs="github" id="gd_pull" ${remote ? "" : "disabled"}>Pull${st.behind ? " " + st.behind : ""}</button><button class="btn sm" data-needs="github" id="gd_push" ${remote ? "" : "disabled"}>Push${st.ahead ? " " + st.ahead : ""}</button></div>
        <div class="gd-row"><input type="text" id="gd_url" value="${esc(remote ? remote.url : "")}" placeholder="https://github.com/your-org/your-repo.git" aria-label="Remote address" style="flex:1;min-width:0;font-size:12px;min-height:26px"><button class="btn sec sm" id="gd_seturl" style="flex:none">Save</button></div>
-       ${st.gh ? (st.gh_logged_in ? `<div class="small ok-t" style="margin-top:6px">${icon("check")} signed in to GitHub</div>` : `<div class="gd-row"><button class="btn sec sm" id="gd_gh">Sign in to GitHub</button></div>`) : ""}
+       ${st.gh ? (st.gh_logged_in ? `<div class="small ok-t" style="margin-top:6px">${icon("check")} signed in to GitHub</div>` : `<div class="gd-row"><button class="btn sec sm" id="gd_gh" data-needs="github">Sign in to GitHub</button></div>`) : ""}
        <div class="mut small" style="margin-top:4px">Fetch, pull and push run in the console. Never put a password or token in the address.</div>`;
   $("#gd_body").innerHTML =
     gdSec("gd_changes", "Changes", changed, changes, keepOpen("gd_changes")) +
@@ -3985,7 +4349,7 @@ async function loadDrawer(quiet) {
   q("#gd_pull", () => gitOp({op: "pull"}));
   q("#gd_push", async () => { if (await askConfirm({title: "Push to the remote?", confirmLabel: "Push", body: `Push ${st.ahead || "your"} commit(s) on '${st.branch}' to ${remote ? remote.url : "the remote"}?`})) gitOp({op: "push", confirm: true}); });
   q("#gd_seturl", () => gitOp({op: "remote_set", name: "origin", url: $("#gd_url").value.trim()}, "Remote saved"));
-  q("#gd_gh", () => gitOp({op: "gh_login"}));
+  q("#gd_gh", () => githubSignIn());
   q("#gd_mkbr", () => gitOp({op: "branch_create", name: $("#gd_newbr").value.trim(), switch: true}, "Branch created"));
   $("#gd_files_q").oninput = () => gdFiles(true);
   if ($("#gd_branches").open) gdBranches();

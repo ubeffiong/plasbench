@@ -31,7 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
-from . import cohort_info, fsutil, jobrunner, runfolders, runprogress, ui_help, ui_schema
+from . import cohort_info, fsutil, ghops, ghsignin, jobrunner, netgate, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -61,6 +61,63 @@ REPORT_CSP = ("default-src 'none'; img-src 'self' data:; style-src 'unsafe-inlin
               "sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox")
 
 
+_signin = [None]
+_signin_lock = threading.Lock()
+
+
+def github_cmd():
+    """The GitHub CLI as an argv prefix (replaceable in tests), or None when gh is not installed."""
+    from . import gitops
+    path = gitops.find_gh()
+    return [path] if path else None
+
+
+def signin() -> "ghsignin.SignIn":
+    """The one device-flow sign-in manager of this server (created when first used)."""
+    with _signin_lock:
+        if _signin[0] is None:
+            _signin[0] = ghsignin.SignIn(github_cmd() or ["gh"])
+        elif _signin[0].gh_cmd != (github_cmd() or ["gh"]):
+            _signin[0].gh_cmd = github_cmd() or ["gh"]
+        return _signin[0]
+
+
+def reads_present(argv, env) -> bool:
+    """Are the reads and a reference of every sample of this run's sheet already in the data folder? (Then `plasbench run` needs no download and may start offline.)"""
+    root = _PROJECT_ROOT[0]
+    if root is None:
+        return False
+    flag = lambda *names: next((argv[i + 1] for i, a in enumerate(argv[:-1]) if a in names), None)    # noqa: E731
+    sheet = flag("-s", "--samples")
+    cohort = flag("-c", "--cohort")
+    path = Path(sheet) if sheet else (root / "cohorts" / f"{cohort}.tsv" if cohort else Path(os.environ.get("SAMPLE_SHEET") or root / "config" / "accessions.tsv"))
+    if not path.is_absolute():
+        path = root / path
+    header, rows = None, []
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.startswith("#") or not line.strip():
+                continue
+            cells = line.rstrip("\r\n").split("\t")
+            if header is None:
+                header = cells
+            else:
+                rows.append(dict(zip(header, cells)))
+    if not rows or "sample_id" not in (header or []):
+        return False
+    from .cli import configured_data_dir
+    data_dir = Path(flag("-d", "--data-dir")) if flag("-d", "--data-dir") else configured_data_dir(root)
+    for row in rows:
+        folder = data_dir / row["sample_id"]
+        if not folder.is_dir():
+            return False
+        names = [p.name.lower() for p in folder.iterdir() if p.is_file() and p.stat().st_size > 0]
+        if sum(1 for n in names if ".fastq" in n or n.endswith((".fq", ".fq.gz"))) < 2 or not any(n.endswith((".fna", ".fna.gz", ".fa", ".fasta", ".fa.gz", ".fasta.gz")) for n in names):
+            return False
+    return True
+
+
+_PROJECT_ROOT = [None]
 RELIABILITY_GROUP = "Reliability and downloads"
 # Environment settings the window may pass with a job (Jobs.start): the Settings keys of config/config.sh plus the download and reliability
 # names the wizard's "Downloads and reliability" card sets. Anything else (LD_PRELOAD, PATH ...) is refused.
@@ -131,6 +188,7 @@ def _sheet_header(path: Path) -> list:
 class Project:
     def __init__(self, root: Path):
         self.root = Path(root).resolve()
+        _PROJECT_ROOT[0] = self.root
         self.python_dir = self.root / "python"
         if str(self.python_dir) not in sys.path:
             sys.path.insert(0, str(self.python_dir))
@@ -900,6 +958,14 @@ class Jobs:
             from .exitcodes import explain
             reason = "cancelled from the window" if state == "cancelled" else explain(code)
             self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
+            if job.get("kind") == "git" and state != "cancelled":      # a git / GitHub failure, in plain words (not signed in, no permission, conflicts ...)
+                try:
+                    from . import ghops
+                    said = ghops.translate_error(_tail_bytes(self._paths(job_id)["log"], 3000).decode("utf-8", "replace"))
+                    if said["action"]:
+                        self._append_log(job_id, f"[PlasBench] {said['message']}\n")
+                except Exception:  # noqa: BLE001
+                    pass
         session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code, seconds=round(job["ended"] - job["started"], 1))
 
     def display_state(self, job: dict) -> str:
@@ -1006,12 +1072,13 @@ class Jobs:
             clean[key] = value
         return clean or None
 
-    def start_git(self, command: list, label: str, cwd) -> dict:
-        """A git network operation built by plasbench.gitops.argv (never from the request): runs like any job."""
+    def start_git(self, command: list, label: str, cwd, program: str = "git") -> dict:
+        """A git (or, with program="gh", GitHub CLI) network operation built by plasbench.gitops.argv / plasbench.ghops (never from the request as text): runs like any job, with
+        its command line written first in the log (tokens removed)."""
         from . import gitops
         if any(j.get("kind") == "git" and j["state"] in ("running", "cancelling") for j in self.jobs.values()):
             raise ValueError("another git operation is still running: wait for it to finish")
-        shown = gitops.redact(" ".join(shlex.quote(str(a)) for a in ["git"] + list(command[1:])))
+        shown = gitops.redact(" ".join(shlex.quote(str(a)) for a in [program] + list(command[1:])))
         env = {"GIT_TERMINAL_PROMPT": "0"}
         return self._launch(list(command), shown, label, env, [], "git", cwd)
 
@@ -1514,6 +1581,12 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.send(404, b"not found", "text/plain; charset=utf-8")
             try:
                 return self.api_get(path[len("/api/"):], q)
+            except netgate.Offline as exc:
+                return self.jsend(503, exc.payload())
+            except ghops.RiskError as exc:
+                return self.jsend(409, {"error": str(exc), "risks": exc.risks, "needs_confirm": True})
+            except ghops.GhError as exc:
+                return self.jsend(401 if exc.action == "signin" else 400, {"error": str(exc), "action": exc.action, "detail": exc.detail})
             except runfolders.RunFolderError as exc:
                 return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
@@ -1533,7 +1606,19 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, ui_schema.schema())
             if route == "update-check":
                 from . import updatecheck
+                netgate.require("github", "check for updates")
                 return self.jsend(200, updatecheck.check(__version__, updatecheck.fetch_latest))
+            if route == "net/status":              # the Online / Offline indicator and the gating of every internet-dependent control
+                names = [n for n in (q.get("services") or "").split(",") if n in netgate.SERVICES] or None
+                out = netgate.status(names)
+                out["commands"] = {k: (v if v is not None else None) for k, v in netgate.NET_COMMANDS.items()}
+                out["subcommands"] = netgate.SUBCOMMAND_NET
+                out["forced_offline"] = netgate.forced_offline()
+                return self.jsend(200, out)
+            if route == "github/account":
+                return self.jsend(200, ghsignin.account(github_cmd()))
+            if route == "github/signin/status":
+                return self.jsend(200, signin().status())
             if route == "env":
                 return self.jsend(200, {"checks": project.env_checks()})
             if route == "tools":
@@ -1760,6 +1845,12 @@ def make_handler(project: Project, jobs: Jobs):
             try:
                 data = self.body()
                 return self.api_post(route, data)
+            except netgate.Offline as exc:
+                return self.jsend(503, exc.payload())
+            except ghops.RiskError as exc:
+                return self.jsend(409, {"error": str(exc), "risks": exc.risks, "needs_confirm": True})
+            except ghops.GhError as exc:
+                return self.jsend(401 if exc.action == "signin" else 400, {"error": str(exc), "action": exc.action, "detail": exc.detail})
             except runfolders.RunFolderError as exc:
                 return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
@@ -1774,7 +1865,41 @@ def make_handler(project: Project, jobs: Jobs):
                 argv = data.get("argv")
                 if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
                     raise ValueError("argv must be a non-empty list of strings")
+                netgate.require_job(argv, data.get("env") or {}, "start this command", reads_present=lambda: reads_present(argv, data.get("env") or {}))
                 return self.jsend(200, jobs.start(argv, data.get("label", ""), data.get("env") or None))
+            if route == "github/signin/start":
+                cmd = github_cmd()
+                if not cmd:
+                    raise ValueError("the GitHub CLI (gh) is not installed: " + " or ".join(ghsignin.install_commands()))
+                netgate.require("github", "sign in to GitHub")
+                try:
+                    out = signin().start()
+                except RuntimeError as exc:
+                    raise ValueError(str(exc))
+                session_log().event("github_signin_started", pid_id=out.get("pid_id"))        # the one-time code is not a secret to log, but nothing else is recorded either
+                return self.jsend(200, out)
+            if route == "github/op":
+                return self.jsend(200, self.github_op(data))
+            if route == "github/signin/cancel":
+                return self.jsend(200, signin().cancel())
+            if route == "github/signout":
+                cmd = github_cmd()
+                if not cmd:
+                    raise ValueError("the GitHub CLI (gh) is not installed")
+                out = ghsignin.sign_out(cmd)
+                session_log().event("github_signout", ok=out["ok"])
+                return self.jsend(200, out)
+            if route == "github/signin/token":
+                cmd = github_cmd()
+                if not cmd:
+                    raise ValueError("the GitHub CLI (gh) is not installed: " + " or ".join(ghsignin.install_commands()))
+                netgate.require("github", "check the token")
+                token = data.get("token")
+                if not isinstance(token, str):
+                    raise ValueError("send the token as text")
+                out = ghsignin.sign_in_with_token(cmd, token)
+                session_log().event("github_signin_token", user=out.get("user"))              # never the token
+                return self.jsend(200, out)
             if route.startswith("jobs/") and route.endswith("/input"):
                 text = data.get("text", "")
                 if not isinstance(text, str):
@@ -2025,6 +2150,44 @@ def make_handler(project: Project, jobs: Jobs):
                     raise
                 return gitops.valid_repo(str(ws), self.git_roots())
 
+        def github_op(self, body: dict) -> dict:
+            """Every GitHub action of the Version control page (plasbench/ghops.py): reads run now and return parsed data; writes run as jobs in the console; a merge that would go wrong
+            is refused (409 with the risks) until the user confirmed them in the dialog."""
+            from . import gitops
+            op = str(body.get("op") or "")
+            args = body.get("args") if isinstance(body.get("args"), dict) else {}
+            if op not in ghops.READ_OPS | ghops.WRITE_OPS | ghops.LOCAL_OPS:
+                raise ValueError("unknown GitHub action")
+            repo = None if op in ("orgs", "repo_list", "repo_search") else self.git_repo(body.get("repo"))
+            if op in ghops.LOCAL_OPS:
+                if op == "branch_delete":
+                    gitops.delete_branch(repo, args.get("name", ""))
+                else:
+                    gitops.create_tag(repo, args.get("name", ""), args.get("message", ""))
+                session_log().event("github_" + op, name=args.get("name"))
+                return {"ok": True}
+            cmd = github_cmd()
+            if not cmd:
+                raise ValueError("the GitHub CLI (gh) is not installed: " + " or ".join(ghsignin.install_commands()))
+            netgate.require("github", f"GitHub: {op}")
+            if op in ghops.READ_OPS:
+                if op == "branch_remote_list":
+                    raise ValueError("unknown GitHub action")
+                result, shown = ghops.run_read(op, cmd, repo, **args)
+                return {"op": op, "result": result, "command": shown}
+            if op == "pr_merge" and not body.get("risk_confirmed"):
+                view, _ = ghops.run_read("pr_view", cmd, repo, number=args.get("number"))
+                risks = ghops.merge_risks(view)
+                if risks:
+                    raise ghops.RiskError("Merging now would go wrong: " + "; ".join(risks) + ".", risks)
+            if op in ("branch_delete_remote", "tag_push"):
+                command, program = ghops.git_build(op, gitops.find_git() or "git", repo, **args), "git"
+            else:
+                command, program = ghops.build(op, cmd, repo, **args), "gh"
+            job = jobs.start_git(command, f"github {op.replace('_', ' ')}", repo, program=program)
+            session_log().event("github_" + op, job=job["id"])
+            return {"job": job, "command": ghops.shown(command)}
+
         def git_op(self, body: dict) -> dict:
             """Every git action. Quick ones run now; fetch/pull/push/clone/GitHub run as jobs in the console."""
             from . import gitops
@@ -2078,6 +2241,11 @@ def make_handler(project: Project, jobs: Jobs):
                     info = gitops.info(repo)
                     raise ValueError(f"confirm the push: {info.get('ahead', 0)} commit(s) on '{info.get('branch')}' will be "
                                      f"sent to " + (info["remotes"][0]["url"] if info.get("remotes") else "the remote"))
+                if op in ("clone", "gh_login", "gh_setup_git", "gh_create"):
+                    netgate.require(netgate.git_services(body.get("url") or "") if op == "clone" else ["github"], f"git {op}")
+                else:
+                    remotes = gitops.info(repo).get("remotes") or []
+                    netgate.require(netgate.git_services(remotes[0]["url"] if remotes else ""), f"git {op}")
                 dest = None
                 if op == "clone":
                     dest = gitops.valid_repo(str(Path(body.get("dest", "")).parent), self.git_roots()) / Path(body.get("dest", "")).name
