@@ -823,17 +823,7 @@ def network_commands(root):
     A used_by entry that starts with "plasbench " names a command: "plasbench upgrade", "plasbench tools add" (a sub-command),
     "plasbench validate-cohort --online" (only with that flag). Entries that are file paths are for test/test_network_declared.py."""
     from . import netcheck
-    table = {}
-    for row in netcheck.load_catalogue(Path(root) / "config" / netcheck.CATALOGUE_NAME):
-        for token in (row.get("used_by") or "").split(";"):
-            words = token.split()
-            if len(words) < 2 or words[0] != "plasbench":
-                continue
-            flag = next((w for w in words[2:] if w.startswith("-")), "")
-            sub_name = next((w for w in words[2:] if not w.startswith("-")), "")
-            entry = table.setdefault((words[1], sub_name), {"flag": flag, "services": set()})
-            entry["services"].add(row["service"])
-    return table
+    return netcheck.command_table(Path(root) / "config" / netcheck.CATALOGUE_NAME)
 
 
 def network_preflight(args, root):

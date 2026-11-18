@@ -47,12 +47,13 @@ ALLOWED = {
     "python/plaseval_gate.py": "an error message that tells the user to `git clone` PlasEval; no request",
     "python/prepare_contribution.py": "prints the `git push` command for the contributor to run; the NCBI check is guarded (net_require)",
     "python/write_manifest.py": "a list of tool names recorded in the manifest, and a comment about pip install; no request",
+    "plasbench/ghops.py": "builds and runs `gh` commands only for the window's routes, which call netgate.require('github') (netcheck) first; the injectable runner keeps its tests offline",
+    "plasbench/ghsignin.py": "starts `gh auth login` only from the window's sign-in route, which calls netgate.require('github') (netcheck) first; `git push` here is a docstring",
     "python/build_published_outcomes.py": "a message that tells the user to pip install openpyxl; no request",
 }
 
 
-# Declared files that may lack a guard marker yet, with the reason.
-GUARD_EXEMPT = {"plasbench/gitops.py": "the window's GitHub sign-in is wired to netcheck by the parallel window work (/api/net/status)"}
+GUARD_EXEMPT = {}      # every declared file carries a guard now (plasbench/gitops.py: require_network)
 
 
 def used_by_files():

@@ -776,6 +776,27 @@ SAFE_NET = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull,
             "-c", "protocol.ext.allow=never", "-c", "uploadpack.packObjectsHook="]
 
 
+NETWORK_OPS = ("fetch", "pull", "push", "clone", "gh_login", "gh_setup_git", "gh_create")
+
+
+def require_network(op: str, repo=None, url: str = "") -> None:
+    """Refuse a network operation before it starts when the connectivity layer (plasbench/netcheck.py, through the window's adapter netgate) says its service is unreachable.
+
+    clone needs the host of `url`; fetch, pull and push need the host of the first remote; the sign-in and repository-creation operations need GitHub. Raises netgate.Offline
+    (the window answers 503 with the service, state and advice); local operations never call this."""
+    if op not in NETWORK_OPS:
+        return
+    from . import netgate
+    if op in ("gh_login", "gh_setup_git", "gh_create"):
+        services = ["github"]
+    else:
+        if op != "clone":
+            remotes = info(repo).get("remotes") or []
+            url = remotes[0]["url"] if remotes else ""
+        services = netgate.git_services(url)
+    netgate.require(services, f"git {op}")
+
+
 def argv(op: str, repo, **kw) -> list[str]:
     git = find_git()
     if op in ("fetch", "pull", "push"):

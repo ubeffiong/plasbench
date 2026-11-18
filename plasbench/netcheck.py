@@ -81,6 +81,25 @@ def load_catalogue(path: Path | None = None) -> list[dict]:
     return [r for r in rows if r.get("service")] or [dict(row) for row in _FALLBACK]
 
 
+def command_table(path: Path | None = None) -> dict:
+    """{(command, sub): {"flag": str, "services": set}} from the `used_by` column of the catalogue.
+
+    A used_by entry that starts with "plasbench " names a command: "plasbench upgrade", "plasbench tools add" (a sub-command),
+    "plasbench validate-cohort --online" (only with that flag). Entries that are file paths are for test/test_network_declared.py.
+    The command-line pre-flight (plasbench/cli.py) and the window's gating (plasbench/netgate.py) both read this one table."""
+    table: dict = {}
+    for row in load_catalogue(path):
+        for token in (row.get("used_by") or "").split(";"):
+            words = token.split()
+            if len(words) < 2 or words[0] != "plasbench":
+                continue
+            flag = next((w for w in words[2:] if w.startswith("-")), "")
+            sub_name = next((w for w in words[2:] if not w.startswith("-")), "")
+            entry = table.setdefault((words[1], sub_name), {"flag": flag, "services": set()})
+            entry["services"].add(row["service"])
+    return table
+
+
 SERVICES: dict[str, dict] = {row["service"]: row for row in load_catalogue()}
 SERVICE_LABELS: dict[str, str] = {name: row.get("label") or name for name, row in SERVICES.items()}
 

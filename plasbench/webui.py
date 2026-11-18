@@ -2241,11 +2241,7 @@ def make_handler(project: Project, jobs: Jobs):
                     info = gitops.info(repo)
                     raise ValueError(f"confirm the push: {info.get('ahead', 0)} commit(s) on '{info.get('branch')}' will be "
                                      f"sent to " + (info["remotes"][0]["url"] if info.get("remotes") else "the remote"))
-                if op in ("clone", "gh_login", "gh_setup_git", "gh_create"):
-                    netgate.require(netgate.git_services(body.get("url") or "") if op == "clone" else ["github"], f"git {op}")
-                else:
-                    remotes = gitops.info(repo).get("remotes") or []
-                    netgate.require(netgate.git_services(remotes[0]["url"] if remotes else ""), f"git {op}")
+                gitops.require_network(op, repo, body.get("url") or "")
                 dest = None
                 if op == "clone":
                     dest = gitops.valid_repo(str(Path(body.get("dest", "")).parent), self.git_roots()) / Path(body.get("dest", "")).name

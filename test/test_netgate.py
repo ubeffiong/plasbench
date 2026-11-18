@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Internet-dependent services, globally (plasbench/netgate.py and the routes that start network work), with a STUBBED plasbench/netcheck.py (the real one is built separately).
+"""Internet-dependent services, globally (plasbench/netgate.py and the routes that start network work), over the real plasbench/netcheck.py (tests inject a backend or use its PLASBENCH_OFFLINE / PLASBENCH_ASSUME_ONLINE switches; nothing here reaches the network).
 
-  - every state of the contract (online, offline, dns_broken, limited, forced_offline, assumed_online) comes through /api/net/status in its shape; without netcheck the answer is
-    assumed_online and PLASBENCH_OFFLINE=1 is forced_offline; a failing check never raises;
+  - every state of the contract (online, offline, dns_broken, limited, forced_offline, assumed_online) comes through /api/net/status in its shape; with the real netcheck PLASBENCH_ASSUME_ONLINE=1 is
+    assumed_online and PLASBENCH_OFFLINE=1 is forced_offline; a failing check never raises; the services, states, default timeout and command table are netcheck's;
   - require / require_any / services_for_job: a download run needs NCBI and a read source (SRA or ENA); a fully local run (--local-inputs, a stage list without 1, the metagenomics track, reads already
     on disk) needs nothing and still starts offline; install, update and discovery commands name their services;
   - offline, POST /api/jobs for a network command, a git network operation, the update check and the sign-in answer 503 {error: offline, service, state, advice, message} and start nothing;
@@ -70,9 +70,11 @@ def main():
         out = netgate.status()
         check(f"{state}: the contract's shape", out["state"] == state and isinstance(out["services"], dict) and isinstance(out["advice"], list) and "checked" in out and "online" in out, out)
     netgate.set_backend(None)
-    check("without netcheck: assumed_online, nothing blocked", netgate.status()["state"] == "assumed_online" and netgate.require("github") is None)
+    os.environ["PLASBENCH_ASSUME_ONLINE"] = "1"
+    check("the real netcheck, assumed online: nothing blocked", netgate.status()["state"] == "assumed_online" and netgate.require("github") is None)
+    os.environ.pop("PLASBENCH_ASSUME_ONLINE")
     os.environ["PLASBENCH_OFFLINE"] = "1"
-    check("PLASBENCH_OFFLINE=1 without netcheck: forced_offline, and require refuses", netgate.status()["state"] == "forced_offline" and netgate.status()["online"] is False)
+    check("PLASBENCH_OFFLINE=1 with the real netcheck: forced_offline, and require refuses", netgate.status()["state"] == "forced_offline" and netgate.status()["online"] is False)
     try:
         netgate.require("ncbi", "download")
         forced = False
@@ -80,6 +82,20 @@ def main():
         forced = exc.state == "forced_offline" and exc.payload()["error"] == "offline"
     check("forced offline names the setting", forced)
     os.environ.pop("PLASBENCH_OFFLINE")
+    from plasbench import netcheck
+    check("the adapter's services are the catalogue's (config/network_services.tsv)", set(netgate.SERVICES) == {r["service"] for r in netcheck.load_catalogue(ROOT / "config" / "network_services.tsv")} and "ncbi" in netgate.SERVICES)
+    seen = []
+    class Probe:
+        @staticmethod
+        def check(services=None, timeout=None):
+            seen.append(timeout)
+            return {"online": True, "state": "online", "checked": 0, "services": {}, "advice": []}
+    netgate.set_backend(Probe)
+    netgate.status()
+    check("the default timeout is netcheck's (5 s), not the adapter's own", seen == [None] and netcheck.DEFAULT_TIMEOUT == 5.0, seen)
+    unknown = sorted({s for v in netgate.NET_COMMANDS.values() if v for s in v} | {s for d in netgate.SUBCOMMAND_NET.values() for v in d.values() for s in v} | {s for _, v in netgate.FLAG_NET.values() for s in v} - set(netcheck.SERVICES))
+    check("every service the command tables name is a catalogue service", not [s for s in unknown if s not in netcheck.SERVICES], unknown)
+    check("the command table is the one `plasbench <command>` uses", all(netgate.NET_COMMANDS.get(c) is not None or c in netgate.SUBCOMMAND_NET or (c, sub) in netgate.FLAG_NET for (c, sub) in netcheck.command_table()))
 
     class Broken:
         @staticmethod
@@ -101,7 +117,7 @@ def main():
         check(f"{label}: needs nothing", netgate.services_for_job(argv, env) == {"all": [], "any": []}, label)
     check("reads already on disk: needs nothing", netgate.services_for_job(run, reads_present=lambda: True) == {"all": [], "any": []})
     check("reads missing: a download", netgate.services_for_job(run, reads_present=lambda: False)["all"] == ["ncbi"])
-    check("install, update and discovery commands name their services", netgate.command_services(["install-tools", "all"]) == ["conda"] and netgate.command_services(["upgrade"]) == ["github"] and netgate.command_services(["discover-cohort"]) == ["ncbi"]
+    check("install, update and discovery commands name their services", netgate.command_services(["install-tools", "all"]) == ["conda", "github", "pypi"] and netgate.command_services(["upgrade"]) == ["github"] and netgate.command_services(["discover-cohort"]) == ["ncbi", "ncbi_datasets"]
           and netgate.command_services(["tools", "install", "x"]) == ["conda"] and netgate.command_services(["tools", "list"]) == [] and netgate.command_services(["check"]) == [])
     check("git: github.com remotes need github, others need the internet", netgate.git_services("https://github.com/o/r.git") == ["github"] and netgate.git_services("git@github.com:o/r.git") == ["github"] and netgate.git_services("https://gitlab.example.org/o/r") == ["internet"])
     netgate.set_backend(backend("online", down=("sra",)))

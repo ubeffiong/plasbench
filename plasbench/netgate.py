@@ -1,9 +1,10 @@
 """The window's view of the internet: one place that asks the connectivity layer (plasbench/netcheck.py) and decides what needs it.
 
-netcheck is built separately. This module codes against its contract and works without it:
-    netcheck.check(services=None, timeout=3.0) -> {"online", "state": online|offline|dns_broken|limited|forced_offline|assumed_online, "checked", "services": {name: {ok, ms, error, kind}}, "advice": [str]}
+This module is the window's adapter over plasbench/netcheck.py, the one connectivity layer (also behind `plasbench net` and the command pre-flights):
+    netcheck.check(services=None, timeout=None -> netcheck.DEFAULT_TIMEOUT, 5 s) -> {"online", "state": online|offline|dns_broken|limited|forced_offline|assumed_online, "checked", "services": {name: {ok, ms, error, kind}}, "advice": [str]}
     netcheck.require(service_or_list, action="") raises netcheck.NoInternet(service, state, advice, message)
-When netcheck is not there, the answer is "assumed_online" (nothing is blocked), except PLASBENCH_OFFLINE=1, which is forced offline. `Offline` is what the window's routes raise:
+State names and service names are netcheck's (the services are the rows of config/network_services.tsv); PLASBENCH_OFFLINE=1 is forced offline and PLASBENCH_ASSUME_ONLINE=1 skips the probes, both decided
+by netcheck. A check that itself breaks answers "assumed_online" so that it never blocks local work. `Offline` is what the window's routes raise:
 the server answers 503 {"error": "offline", "service", "state", "advice", "message"} instead of starting a job that cannot work, and never hangs.
 
 `services_for_job` says which services a command needs: a fully local run (--local-inputs, the metagenomics track, or reads already on disk) needs none. Offline must never block local
@@ -12,19 +13,35 @@ things: scoring, reports, studies, the folder tree, settings, documents. Standar
 from __future__ import annotations
 
 import os
+import re
 import time
 
-SERVICES = ("internet", "dns", "github", "ncbi", "sra", "ena", "pypi", "conda", "zenodo", "plsdb")
+from . import netcheck
+
+SERVICES = tuple(netcheck.SERVICES)         # the rows of config/network_services.tsv
 BAD_STATES = ("offline", "dns_broken", "forced_offline")
 
-# Commands that start network work, and the services each needs (checked before the job starts). `None` means a sub-command table (see SUBCOMMAND_NET).
-NET_COMMANDS = {
-    "install-tools": ["conda"], "install-conda": ["conda"], "upgrade": ["github"],
-    "discover-cohort": ["ncbi"], "discover-design-cohort": ["ncbi"], "validate-cohort": ["ncbi"], "resolve-contributed-cohort": ["ncbi"],
-    "build-publication-cohorts": ["ncbi"], "collect-truth-provenance": ["ncbi"], "reconstruct": ["ncbi", "sra"],
-    "update-check": ["github"], "tools": None,
-}
-SUBCOMMAND_NET = {"tools": {"add": ["conda"], "install": ["conda"], "new": []}}
+# Commands that start network work, and the services each needs (checked before the job starts): the `plasbench ...` rows of the catalogue's used_by column, the same table
+# the command line's own pre-flight uses (netcheck.command_table), plus the few window-only commands below. `None` means a sub-command table (see SUBCOMMAND_NET); a row that
+# applies only with a flag (validate-cohort --online) is in FLAG_NET and is checked when that flag is in the command line.
+_EXTRA_COMMANDS = {"install-conda": ["conda"], "reconstruct": ["ncbi", "sra"], "update-check": ["github"]}
+
+
+def _tables():
+    commands, subs, flagged = {k: list(v) for k, v in _EXTRA_COMMANDS.items()}, {}, {}
+    for (command, sub), entry in sorted(netcheck.command_table().items()):
+        services = sorted(entry["services"])
+        if entry["flag"]:
+            flagged[(command, sub)] = (entry["flag"], services)
+        elif sub:
+            commands[command] = None
+            subs.setdefault(command, {})[sub] = services
+        else:
+            commands[command] = services
+    return commands, subs, flagged
+
+
+NET_COMMANDS, SUBCOMMAND_NET, FLAG_NET = _tables()
 GIT_NET_OPS = {"fetch", "pull", "push", "clone", "gh_login", "gh_setup_git", "gh_create"}
 
 
@@ -40,14 +57,6 @@ class Offline(Exception):
         return {"error": "offline", "service": self.service, "state": self.state, "advice": self.advice, "message": self.message}
 
 
-def _netcheck():
-    try:
-        from . import netcheck
-        return netcheck
-    except Exception:  # noqa: BLE001 - the connectivity layer may not be merged yet
-        return None
-
-
 _backend_override = None
 
 
@@ -58,28 +67,26 @@ def set_backend(module) -> None:
 
 
 def backend():
-    return _backend_override if _backend_override is not None else _netcheck()
+    return _backend_override if _backend_override is not None else netcheck
 
 
 def forced_offline() -> bool:
-    return os.environ.get("PLASBENCH_OFFLINE", "") not in ("", "0", "false", "False")
+    return netcheck.forced_offline()
 
 
-def _fallback(services=None) -> dict:
-    if forced_offline():
-        return {"online": False, "state": "forced_offline", "checked": time.time(), "services": {}, "advice": ["PLASBENCH_OFFLINE=1 is set: unset it to use the internet."]}
+def _unknown() -> dict:
+    """What a check that itself broke answers: nothing is known to be down, so local work is never blocked."""
     return {"online": True, "state": "assumed_online", "checked": time.time(), "services": {}, "advice": []}
 
 
-def status(services=None, timeout: float = 3.0) -> dict:
+def status(services=None, timeout=None) -> dict:
     """netcheck.check(...) in the contract's shape; never raises."""
-    mod = backend()
     try:
-        out = mod.check(services, timeout) if mod is not None and hasattr(mod, "check") else _fallback(services)
+        out = backend().check(services, timeout)
     except Exception:  # noqa: BLE001
-        out = _fallback(services)
+        out = _unknown()
     if not isinstance(out, dict):
-        out = _fallback(services)
+        out = _unknown()
     out.setdefault("online", out.get("state") not in BAD_STATES)
     out.setdefault("state", "assumed_online")
     out.setdefault("services", {})
@@ -93,17 +100,12 @@ def require(services, action: str = "") -> None:
     names = [services] if isinstance(services, str) else list(services or [])
     if not names:
         return
-    mod = backend()
-    if mod is not None and hasattr(mod, "require"):
-        try:
-            mod.require(names if len(names) > 1 else names[0], action)
-            return
-        except Exception as exc:  # noqa: BLE001
-            if exc.__class__.__name__ == "NoInternet" or hasattr(exc, "service"):
-                raise Offline(getattr(exc, "service", names[0]), getattr(exc, "state", "offline"), getattr(exc, "advice", []), getattr(exc, "message", "") or str(exc))
-            return                      # a failing check must not block local work
-    if forced_offline():
-        raise Offline(names[0], "forced_offline", ["PLASBENCH_OFFLINE=1 is set: unset it to use the internet."], f"Needs the internet: {names[0]} is not used because PLASBENCH_OFFLINE=1 is set.")
+    try:
+        backend().require(names if len(names) > 1 else names[0], action)
+    except Exception as exc:  # noqa: BLE001
+        if exc.__class__.__name__ == "NoInternet" or hasattr(exc, "service"):
+            raise Offline(getattr(exc, "service", names[0]), getattr(exc, "state", "offline"), getattr(exc, "advice", []), getattr(exc, "message", "") or str(exc))
+        # any other failure: a failing check must not block local work
 
 
 def require_any(services, action: str = "") -> None:
@@ -125,13 +127,19 @@ def git_services(remote_url: str = "") -> list:
 
 
 def command_services(argv) -> list:
-    """The services a `plasbench ...` command line needs, from NET_COMMANDS (empty for local commands)."""
+    """The services a `plasbench ...` command line needs (empty for local commands). `tools add` needs the internet only for a URL; `--online` commands only with that flag."""
     if not argv:
         return []
-    table = NET_COMMANDS.get(argv[0], [])
+    command, rest = argv[0], list(argv[1:])
+    sub = rest[0] if rest and (command, rest[0]) in {(c, s_) for c, d in SUBCOMMAND_NET.items() for s_ in d} | set(FLAG_NET) else ""
+    if (command, sub) in FLAG_NET:
+        flag, services = FLAG_NET[(command, sub)]
+        return list(services) if flag in rest else []
+    table = NET_COMMANDS.get(command, [])
     if table is None:
-        sub = argv[1] if len(argv) > 1 else ""
-        return list(SUBCOMMAND_NET.get(argv[0], {}).get(sub, []))
+        if command == "tools" and sub == "add" and not re.match(r"^(https?|git|ssh):/|^git@", (rest[1] if len(rest) > 1 else "").replace("\\", "/")):
+            return []                   # a folder or manifest on disk
+        return list(SUBCOMMAND_NET.get(command, {}).get(sub, []))
     return list(table)
 
 
