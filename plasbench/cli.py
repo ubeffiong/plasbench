@@ -1271,8 +1271,9 @@ def main(argv=None):
                     f"available: {', '.join(available) if available else 'none'}"
                 )
             # A file that is not a benchmark sheet (the accession ledger, for one) is refused here, once, before a study folder is made,
-            # instead of failing stage 0 with one error per row. REQUIRE_CURATED_METADATA=0 keeps the old behaviour.
-            problem = sheetcheck.refusal(cohort_path, available) if os.environ.get("REQUIRE_CURATED_METADATA", "1") != "0" else ""
+            # instead of failing stage 0 with one error per row. Only what is certainly not a cohort is refused (the ledger, a table with no sample_id);
+            # whether a sheet has the curated columns stays stage 0's decision, because REQUIRE_CURATED_METADATA can be switched off in config/local.env.
+            problem = sheetcheck.refusal(cohort_path, available)
             if problem:
                 parser.error(problem)
             args.samples = cohort_path

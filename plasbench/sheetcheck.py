@@ -40,38 +40,42 @@ def missing_curated(columns) -> list[str]:
     return [c for c in CURATED_COLUMNS if c not in cols]
 
 
+def looks_like_sample_sheet(columns) -> bool:
+    """A file a run could use: it has a sample_id column and is neither the accession ledger nor a metagenomic table. Whether it ALSO has the curated columns is stage 0's
+    business (REQUIRE_CURATED_METADATA can be switched off in config/local.env, which the command line does not read), so a minimal sheet is never refused here."""
+    cols = set(columns)
+    return "sample_id" in cols and not is_ledger(cols) and "community_id" not in cols
+
+
 def is_benchmark_sheet(path) -> bool:
-    """True when the file has every column a curated run needs (so it can appear in a cohort picker)."""
+    """True when the file has every column a curated run needs."""
     columns = header(path)
     return bool(columns) and not missing_curated(columns)
 
 
 def refusal(path, available=None) -> str:
-    """'' when the sheet has the curated columns; otherwise one message saying what the file is and what to use instead."""
+    """'' unless the file certainly cannot be a cohort: the accession ledger, or a table with no sample_id column. A sheet that merely lacks curated columns is left to stage 0."""
     path = Path(path)
     columns = header(path)
     if not columns:
         return f"{path} is empty or not readable as a tab-separated sheet"
-    missing = missing_curated(columns)
-    if not missing:
-        return ""
-    use = ""
-    if available:
-        use = f" Use one of the cohort sheets instead, for example: {', '.join(available[:6])}."
+    use = f" Use one of the cohort sheets instead, for example: {', '.join(available[:6])}." if available else ""
     if is_ledger(columns):
         return (f"'{path.stem}' is the accession ledger, not a cohort: it lists the BioSamples that earlier cohort releases already used, "
                 f"so that a new cohort does not repeat them (columns: {', '.join(columns)}). A benchmark needs {', '.join(CURATED_COLUMNS)} for every isolate."
                 f"{use} Its source_cohort column says which cohort each row came from.")
-    return (f"'{path.stem}' is not a benchmark sheet: it has no {', '.join(missing)} column{'s' if len(missing) > 1 else ''} "
-            f"(a run needs {', '.join(CURATED_COLUMNS)} for every isolate; see docs/INPUT_GUIDE.md).{use}")
+    if "sample_id" not in columns:
+        return (f"'{path.stem}' is not a sample sheet: it has no sample_id column (its columns: {', '.join(columns)}). "
+                f"A run needs sample_id, assembly_accession and sra_run for every isolate (see docs/INPUT_GUIDE.md).{use}")
+    return ""
 
 
 def cohort_sheets(cohorts_dir) -> list[str]:
-    """The names in cohorts/ that are benchmark sheets: *.tsv with the curated columns, not the ledger, not metagenomic or auxiliary tables."""
+    """The names in cohorts/ that a run can use: *.tsv with a sample_id column, not the ledger, not a metagenomic or auxiliary table."""
     out = []
     for path in sorted(Path(cohorts_dir).glob("*.tsv")):
-        if path.stem.startswith("metagenomics-") or is_ledger(header(path)):
+        if path.stem.startswith("metagenomics"):
             continue
-        if is_benchmark_sheet(path):
+        if looks_like_sample_sheet(header(path)):
             out.append(path.stem)
     return out

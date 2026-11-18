@@ -762,7 +762,7 @@ Stage 1 downloads each isolate's reference assembly and its paired reads.
 - **Before it starts**, PlasBench prints what it is about to fetch. For a sheet with no lock file it asks ENA for each run's exact compressed size, so the total is real and the **largest read set** is named; a set above `WARN_RUN_DOWNLOAD_GB` (default 5) is flagged as very large.
 - **While it runs**, the run log gets one progress line a minute per active download (`DOWNLOAD_PROGRESS_SECONDS`, 0 turns it off), for example `SRR123: mate 1 74.7%, mate 2 66.2% (7.1 of 9.5 GB)`. The reads come from the SRA Toolkit first and from ENA when that fails (`READ_SOURCE`). After `PREFETCH_FAIL_LIMIT` isolates in a row where the toolkit failed and ENA worked, the rest of the run goes to ENA first, and the log shows the toolkit's own last line as the reason.
 - **A limit.** `MAX_RUN_DOWNLOAD_GB` skips an isolate whose reads are larger; it is recorded as failed with the reason and retried when you raise the limit.
-- **A file that is not a cohort.** `plasbench run --cohort NAME` refuses a sheet that lacks the columns a run needs (the accession ledger, for example), once and before a study folder is made.
+- **A file that is not a cohort.** `plasbench run --cohort NAME` refuses a file that is certainly not a cohort (the accession ledger, or a table with no `sample_id` column), once and before a study folder is made. Whether a sheet has the curated columns is stage 0's check (REQUIRE_CURATED_METADATA, which `config/local.env` can switch off): it names the first three bad rows and counts the rest.
 
 | Setting | Default | What it does |
 |---|---|---|

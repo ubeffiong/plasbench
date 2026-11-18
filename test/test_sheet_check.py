@@ -34,7 +34,8 @@ with tempfile.TemporaryDirectory() as tmp:
     (cohorts / "accepted_accessions.tsv").write_text(LEDGER)
     (cohorts / "public-v4.tsv").write_text("# a comment line first\n" + CURATED)
     (cohorts / "metagenomics-real-v1.tsv").write_text("sample_id\tcommunity\nm1\tmock\n")
-    (cohorts / "odd.tsv").write_text("sample_id\tnotes\nx\ty\n")
+    (cohorts / "odd.tsv").write_text("name\tnotes\nx\ty\n")                                   # no sample_id column: not a sample sheet at all
+    (cohorts / "minimal.tsv").write_text("sample_id\tassembly_accession\ns1\tGCF_1.1\n")        # valid when REQUIRE_CURATED_METADATA=0 (config/local.env): never refused here
 
     # --- the helper -----------------------------------------------------------------------------------------------------------------------
     check("the ledger is recognised", sheetcheck.is_ledger(sheetcheck.header(cohorts / "accepted_accessions.tsv")))
@@ -42,13 +43,15 @@ with tempfile.TemporaryDirectory() as tmp:
           and sheetcheck.is_benchmark_sheet(cohorts / "public-v4.tsv"))
     check("a leading # comment line is skipped when reading the header", sheetcheck.header(cohorts / "public-v4.tsv")[0] == "sample_id")
     listed = sheetcheck.cohort_sheets(cohorts)
-    check("only real benchmark sheets are listed (no ledger, no metagenomic table, no odd file)", listed == ["public-v4"], listed)
+    check("sample sheets are listed, including a minimal one; not the ledger, a metagenomic table or a file with no sample_id", listed == ["minimal", "public-v4"], listed)
     message = sheetcheck.refusal(cohorts / "accepted_accessions.tsv", listed)
     check("the refusal says it is the ledger, names the columns a run needs and points to a real cohort",
           "accession ledger" in message and "organism" in message and "bioproject" in message and "public-v4" in message, message)
-    check("a sheet with the wrong columns gets a different, plain message", "not a benchmark sheet" in sheetcheck.refusal(cohorts / "odd.tsv", listed)
+    check("a sheet with the wrong columns gets a different, plain message", "not a sample sheet" in sheetcheck.refusal(cohorts / "odd.tsv", listed)
           and "accession ledger" not in sheetcheck.refusal(cohorts / "odd.tsv", listed))
     check("a good sheet gets no refusal", sheetcheck.refusal(cohorts / "public-v4.tsv", listed) == "")
+    check("a minimal sheet (no curated columns) is NOT refused: stage 0 decides, because the curation rule can be switched off in config/local.env",
+          sheetcheck.refusal(cohorts / "minimal.tsv", listed) == "" and not sheetcheck.is_benchmark_sheet(cohorts / "minimal.tsv"))
     check("an unreadable file is reported, not a crash", "not readable" in sheetcheck.refusal(cohorts / "missing.tsv"))
 
     # --- the command: refused once, before a study folder is made ---------------------------------------------------------------------------
@@ -68,7 +71,7 @@ with tempfile.TemporaryDirectory() as tmp:
     unknown = subprocess.run([sys.executable, "-m", "plasbench", "--project-root", str(project), "run", "--cohort", "nope"],
                              capture_output=True, text=True, cwd=str(ROOT), env=env, timeout=120)
     message_line = next((l for l in unknown.stderr.splitlines() if "no such cohort" in l), "")   # the usage banner also names commands
-    check("an unknown cohort lists only the real benchmark sheets", message_line.endswith("available: public-v4") and "accepted_accessions" not in message_line
+    check("an unknown cohort lists only the real benchmark sheets", message_line.endswith("available: minimal, public-v4") and "accepted_accessions" not in message_line
           and "metagenomics" not in message_line, message_line)
     ledger_samples = subprocess.run([sys.executable, "-m", "plasbench", "--project-root", str(project), "run", "--samples", str(cohorts / "accepted_accessions.tsv")],
                                     capture_output=True, text=True, cwd=str(ROOT), env=env, timeout=120)
