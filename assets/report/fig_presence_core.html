@@ -1,0 +1,158 @@
+<script>
+/* PlasBench presence/absence matrix: pure functions, vanilla JS, no libraries. The clustering is done in python/report_fig_presence.py and shipped in the
+   payload (order, tree); this file reorders by annotation, draws, and computes prevalence and per-tool recovery, mirroring the Python helpers. */
+(function (root) {
+'use strict';
+var Z = 1.959963984540054, NOT_REC = 'not recorded';
+var DW = 70, TW = 9, TG = 6, FW = 8, BGAP = 14, BARH = 46, LABH = 78;
+var OUT_NAME = {r: 'recovered', p: 'partly recovered', m: 'missed', '-': 'no value for this tool'};
+var TRACK_COLOURS = ['#0072B2', '#D55E00', '#009E73', '#E69F00', '#CC79A7', '#56B4E9', '#882255', '#117733', '#999933', '#44AA99'];
+
+var ESCMAP = {'&': '&amp;', '<': '&lt;', '>': '&gt;'}; ESCMAP[String.fromCharCode(34)] = '&quot;'; ESCMAP[String.fromCharCode(39)] = '&#39;';
+function esc(s) { return String(s).split('').map(function (c) { return ESCMAP[c] || c; }).join(''); }
+function wilson(c, n) {
+  if (!n) { return null; }
+  var p = c / n, d = 1 + Z * Z / n, centre = (p + Z * Z / (2 * n)) / d, half = Z * Math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / d;
+  return [Math.max(0, centre - half), Math.min(1, centre + half)];
+}
+function rowHeight(n) { return Math.max(3, Math.min(12, Math.floor(560 / Math.max(1, n)))); }
+/* row order: 'cluster' is the shipped order; a track key sorts by the value of that track (stable, ties keep the clustered order) */
+function rowOrder(data, key) {
+  if (!key || key === 'cluster') { return data.order.slice(); }
+  var t = null; data.tracks.forEach(function (x) { if (x.k === key) { t = x; } });
+  if (!t) { return data.order.slice(); }
+  var rank = {}; data.order.forEach(function (r, i) { rank[r] = i; });
+  return data.order.slice().sort(function (a, b) { return (t.r[a] - t.r[b]) || (rank[a] - rank[b]); });
+}
+function shownBlocks(data, amr) {
+  var drop = amr === 'amr_gene' ? 'amr_class' : 'amr_gene';
+  return data.blocks.map(function (b, i) { return {b: b, i: i}; }).filter(function (x) { return x.b.k !== drop; });
+}
+function isNa(block, row) { return block._na ? block._na[row] === 1 : block.na.indexOf(row) >= 0; }
+function prepare(data) {
+  data.blocks.forEach(function (b) { b._na = {}; b.na.forEach(function (r) { b._na[r] = 1; }); b._set = b.f.map(function (f) { var s = {}; f[1].forEach(function (r) { s[r] = 1; }); return s; }); });
+  return data;
+}
+function annotated(data, block) { return data.rows.length - block.na.length; }
+/* carriers among the plasmids annotated for the block, the annotated n, and the share (null when none is annotated) */
+function prevalence(data, block, fi) {
+  var n = annotated(data, block), c = 0;
+  block.f[fi][1].forEach(function (r) { if (!isNa(block, r)) { c++; } });
+  return {c: c, n: n, share: n ? c / n : null};
+}
+function outcomeOf(data, tool, row) { return tool === null || tool === undefined || tool === '' || !data.out[String(tool)] ? null : data.out[String(tool)].charAt(row); }
+/* per-tool recovery of the plasmids carrying a feature: recovered / with a value, Wilson; and the same for the non-carriers */
+function toolRecovery(data, block, fi) {
+  var carriers = {}; block.f[fi][1].forEach(function (r) { if (!isNa(block, r)) { carriers[r] = 1; } });
+  return data.tools.map(function (t, ti) {
+    var s = data.out[String(ti)], a = [0, 0, 0], b = [0, 0, 0];
+    for (var r = 0; r < data.rows.length; r++) {
+      var o = s.charAt(r); if (o === '-') { continue; }
+      if (isNa(block, r)) { continue; }
+      var x = carriers[r] ? a : b; x[1]++; if (o === 'r') { x[0]++; } else if (o === 'p') { x[2]++; }
+    }
+    return {tool: t, ti: ti, withFeature: {c: a[0], n: a[1], partly: a[2], rate: a[1] ? a[0] / a[1] : null, ci: wilson(a[0], a[1])},
+            without: {c: b[0], n: b[1], partly: b[2], rate: b[1] ? b[0] / b[1] : null, ci: wilson(b[0], b[1])}};
+  });
+}
+/* prevalence of a feature by the values of one annotation track: [{label, c, n}] over the annotated plasmids */
+function prevalenceBy(data, block, fi, trackKey) {
+  var t = null; data.tracks.forEach(function (x) { if (x.k === trackKey) { t = x; } });
+  if (!t) { return []; }
+  var carriers = {}; block.f[fi][1].forEach(function (r) { carriers[r] = 1; });
+  var out = t.vals.map(function (v) { return {label: v, c: 0, n: 0}; });
+  for (var r = 0; r < data.rows.length; r++) { if (isNa(block, r)) { continue; } var g = out[t.r[r]]; g.n++; if (carriers[r]) { g.c++; } }
+  return out.filter(function (g) { return g.n > 0; });
+}
+function rowFeatures(data, row) {
+  return data.blocks.map(function (b) {
+    if (isNa(b, row)) { return {block: b, na: true, names: []}; }
+    var names = []; b.f.forEach(function (f, i) { if (b._set[i][row]) { names.push(f[0]); } });
+    return {block: b, na: false, names: names};
+  });
+}
+function geometry(data, amr) {
+  var n = data.rows.length, rh = rowHeight(n), blocks = shownBlocks(data, amr), top = 20 + BARH + LABH, xT = DW + 6, xM = xT + data.tracks.length * (TW + 1) + TG;
+  var x = xM, pos = blocks.map(function (x0) { var o = {x: x, w: x0.b.f.length * FW, i: x0.i}; x += o.w + BGAP; return o; });
+  return {n: n, rh: rh, blocks: blocks, top: top, xT: xT, xM: xM, pos: pos, width: x + 20, height: top + n * rh + 40};
+}
+function svg(data, opts) {
+  opts = opts || {};
+  var amr = opts.amr || data.defaultAmr, G = geometry(data, amr), order = rowOrder(data, opts.order), rank = {}; order.forEach(function (r, i) { rank[r] = i; });
+  var tool = opts.tool === '' || opts.tool === undefined ? null : opts.tool, rh = G.rh, top = G.top, o = [];
+  o.push('<svg class="fp-svg" viewBox="0 0 ' + G.width + ' ' + G.height + '" role="group" aria-label="Presence and absence matrix, ' + G.n + ' plasmids" font-family="Arial,Helvetica,sans-serif">');
+  o.push('<defs><pattern id="fp-hatch-l" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="#e0e0e0"/><line x1="0" y1="0" x2="0" y2="4" stroke="#777" stroke-width="1.2"/></pattern>' +
+    '<pattern id="fp-part-l" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="3" fill="#cfe3f3"/><line x1="0" y1="0" x2="0" y2="3" stroke="#0072B2" stroke-width="1.5"/></pattern></defs>');
+  if (data.clustered && data.tree.length && (!opts.order || opts.order === 'cluster')) {
+    var hmax = 0; data.tree.forEach(function (m) { if (m[2] > hmax) { hmax = m[2]; } }); hmax = hmax || 1;
+    var node = {}, d = [];
+    for (var i = 0; i < G.n; i++) { node[i] = [top + rank[i] * rh + rh / 2, 0]; }
+    data.tree.forEach(function (m, k) {
+      var a = node[m[0]], b = node[m[1]], x = DW - (m[2] / hmax) * (DW - 4), xa = DW - (a[1] / hmax) * (DW - 4), xb = DW - (b[1] / hmax) * (DW - 4);
+      d.push('M' + xa.toFixed(1) + ' ' + a[0].toFixed(1) + 'H' + x.toFixed(1) + 'V' + b[0].toFixed(1) + 'H' + xb.toFixed(1));
+      node[G.n + k] = [(a[0] + b[0]) / 2, m[2]];
+    });
+    o.push('<path class="fp-dend" d="' + d.join('') + '" fill="none" stroke-width=".7"/>');
+  }
+  data.tracks.forEach(function (t, ti) {
+    var x = G.xT + ti * (TW + 1);
+    o.push('<text class="fp-t" transform="translate(' + (x + TW / 2) + ',' + (top - 4) + ') rotate(-60)" font-size="8">' + esc(t.l) + '</text>');
+    for (var r = 0; r < G.n; r++) {
+      var v = t.r[r], c = t.vals[v] === NOT_REC ? '#bbbbbb' : TRACK_COLOURS[v % TRACK_COLOURS.length];
+      o.push('<rect x="' + x + '" y="' + (top + rank[r] * rh) + '" width="' + TW + '" height="' + rh + '" fill="' + c + '"><title>' + esc(t.l + ': ' + t.vals[v]) + '</title></rect>');
+    }
+  });
+  G.pos.forEach(function (p, pi) {
+    var b = data.blocks[p.i], ann = annotated(data, b);
+    o.push('<text class="fp-t" x="' + (p.x + p.w / 2) + '" y="11" font-size="10" font-weight="bold" text-anchor="middle">' + esc(b.l) + '</text>');
+    b.na.forEach(function (r) { o.push('<rect x="' + p.x + '" y="' + (top + rank[r] * rh) + '" width="' + p.w + '" height="' + rh + '" fill="url(#fp-hatch-l)"/>'); });
+    b.f.forEach(function (f, fi) {
+      var fx = p.x + fi * FW, pv = prevalence(data, b, fi);
+      if (pv.share !== null) { o.push('<rect class="fp-bar" x="' + (fx + 1) + '" y="' + (20 + BARH - pv.share * BARH).toFixed(1) + '" width="' + (FW - 2) + '" height="' + (pv.share * BARH).toFixed(1) + '" fill="#0072B2"><title>' + esc(f[0] + ': ' + pv.c + ' of ' + pv.n + ' annotated plasmids (' + Math.round(pv.share * 100) + '%)') + '</title></rect>'); }
+      o.push('<g class="fp-col" role="button" tabindex="-1" data-b="' + p.i + '" data-f="' + fi + '" aria-label="' + esc('Feature ' + f[0] + ', ' + b.l + ', ' + pv.c + ' of ' + pv.n + ' annotated plasmids carry it') + '">' +
+        '<rect x="' + fx + '" y="20" width="' + FW + '" height="' + (LABH + BARH) + '" fill="transparent"/>' +
+        '<text class="fp-t" transform="translate(' + (fx + FW / 2 + 3) + ',' + (top - 3) + ') rotate(-90)" font-size="7.5">' + esc(f[0]) + '</text></g>');
+      f[1].forEach(function (r) {
+        if (isNa(b, r)) { return; }
+        var oc = outcomeOf(data, tool, r), fill = '#0072B2', stroke = '', extra = '';
+        if (tool !== null) {
+          if (oc === 'p') { fill = 'url(#fp-part-l)'; } else if (oc === 'm') { fill = '#ffffff'; stroke = ' stroke="#b3261e" stroke-width=".9"'; } else if (oc === '-') { fill = '#9aa3a8'; }
+        }
+        o.push('<rect x="' + (fx + .5) + '" y="' + (top + rank[r] * rh) + '" width="' + (FW - 1) + '" height="' + Math.max(1, rh - .6) + '" fill="' + fill + '"' + stroke + extra + '/>');
+      });
+    });
+    o.push('<line class="fp-axis" x1="' + p.x + '" x2="' + (p.x + p.w) + '" y1="' + (20 + BARH) + '" y2="' + (20 + BARH) + '" stroke-width=".5"/>');
+    if (!ann) { o.push('<text class="fp-t" x="' + (p.x + p.w / 2) + '" y="' + (20 + BARH - 6) + '" font-size="8" text-anchor="middle">not annotated</text>'); }
+  });
+  var xo = G.pos.length ? G.pos[G.pos.length - 1].x + G.pos[G.pos.length - 1].w + 4 : G.xM;
+  if (tool !== null) {
+    o.push('<text class="fp-t" transform="translate(' + (xo + 6) + ',' + (top - 4) + ') rotate(-60)" font-size="8">Outcome</text>');
+    order.forEach(function (r, k) {
+      var oc = outcomeOf(data, tool, r), f = oc === 'r' ? '#0072B2' : oc === 'p' ? 'url(#fp-part-l)' : oc === 'm' ? '#ffffff' : '#9aa3a8';
+      o.push('<rect x="' + xo + '" y="' + (top + k * rh) + '" width="10" height="' + rh + '" fill="' + f + '"' + (oc === 'm' ? ' stroke="#b3261e" stroke-width=".9"' : '') + '><title>' + esc(data.rows[r][1] + ': ' + OUT_NAME[oc]) + '</title></rect>');
+    });
+  }
+  order.forEach(function (r, k) {
+    o.push('<g class="fp-row" role="button" tabindex="-1" data-r="' + r + '" data-k="' + k + '" aria-label="' + esc('Plasmid ' + data.rows[r][1] + ' from ' + data.rows[r][0]) + '"><rect x="0" y="' + (top + k * rh) + '" width="' + G.width + '" height="' + rh + '" fill="transparent"/></g>');
+  });
+  o.push('<rect class="fp-sel" id="fp-selbox" x="0" y="0" width="0" height="0" fill="none" stroke-width="1.4" pointer-events="none"/>');
+  o.push('</svg>');
+  return {svg: o.join(''), order: order, geometry: G};
+}
+function quote(x) { var Q = String.fromCharCode(34); x = String(x); return x.indexOf(Q) >= 0 || x.indexOf(',') >= 0 || x.indexOf(String.fromCharCode(10)) >= 0 ? Q + x.split(Q).join(Q + Q) + Q : x; }
+function csv(data, order) {
+  var rows = [['plasmid', 'sample', 'length_bp'].concat(data.tracks.map(function (t) { return t.k; })).concat(data.blocks.filter(function (b) { return b.k !== 'amr_gene'; }).map(function (b) { return b.k; }))];
+  (order || data.order).forEach(function (r) {
+    var cells = [data.rows[r][1], data.rows[r][0], data.rows[r][2] === null ? '' : data.rows[r][2]];
+    data.tracks.forEach(function (t) { cells.push(t.vals[t.r[r]]); });
+    rowFeatures(data, r).forEach(function (rf) { if (rf.block.k !== 'amr_gene') { cells.push(rf.na ? 'not annotated' : rf.names.join(';')); } });
+    rows.push(cells);
+  });
+  return rows.map(function (r) { return r.map(quote).join(','); }).join(String.fromCharCode(10));
+}
+var api = {NOT_REC: NOT_REC, OUT_NAME: OUT_NAME, esc: esc, wilson: wilson, rowHeight: rowHeight, rowOrder: rowOrder, shownBlocks: shownBlocks, prepare: prepare, prevalence: prevalence,
+  outcomeOf: outcomeOf, toolRecovery: toolRecovery, prevalenceBy: prevalenceBy, rowFeatures: rowFeatures, geometry: geometry, svg: svg, csv: csv, isNa: isNa};
+root.FPCore = api;
+if (typeof module !== 'undefined' && module.exports) { module.exports = api; }
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
