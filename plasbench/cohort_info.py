@@ -68,7 +68,16 @@ def _country(geo: str) -> str:
     return (geo or "").split(":")[0].strip()
 
 
+def is_ledger(columns) -> bool:
+    """The accession ledger (cohorts/accepted_accessions.tsv) lists accessions only: biosample/sample_id/assembly_accession/sra_run/source_cohort,
+    with none of the curated metadata (organism, truth technology ...) a benchmark sheet needs, so a run on it fails stage 0."""
+    cols = set(columns)
+    return {"biosample", "source_cohort"} <= cols and not cols & {"organism", "truth_technology", "community_id"}
+
+
 def kind_of(name: str, columns) -> str:
+    if is_ledger(columns):
+        return "ledger"
     if name.startswith("metagenomics") or "community_id" in columns:
         return "example" if ".example" in name else "metagenomic"
     return "isolate"

@@ -30,7 +30,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__
-from . import jobrunner, runprogress, ui_schema
+from . import cohort_info, fsutil, jobrunner, runfolders, runprogress, ui_help, ui_schema
 from .gitops import GitError   # a refused git action is the user's error (400), not the server's
 from .terminal import Terminal, TerminalError
 from .sessionlog import SessionLog, describe as describe_event
@@ -58,6 +58,24 @@ MAX_LOG_CHUNK = 256 * 1024
 REPORT_CSP = ("default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; "
               "font-src data:; form-action 'none'; frame-ancestors 'self'; "
               "sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox")
+
+
+RELIABILITY_GROUP = "Reliability and downloads"
+# Environment settings the window may pass with a job (Jobs.start): the Settings keys of config/config.sh plus the download and reliability
+# names the wizard's "Downloads and reliability" card sets. Anything else (LD_PRELOAD, PATH ...) is refused.
+EXTRA_ENV_KEYS = frozenset(["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "TOOL_TIMEOUT_SECONDS",
+                            "ALLOW_ALL_TOOLS_FAILED", "NETWORK_RETRIES", "ENA_DOWNLOAD_CONNECTIONS"])
+ENV_KEY = re.compile(r"[A-Z][A-Z0-9_]*")
+ENV_FORBIDDEN = frozenset(["PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "PROJECT_ROOT"])
+ENV_VALUE_MAX = 200
+
+
+def _sheet_header(path: Path) -> list:
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.strip() and not line.startswith("#"):
+                return line.rstrip("\r\n").split("\t")
+    return []
 
 
 # --------------------------------------------------------------------------------------------- project facts
@@ -123,8 +141,16 @@ class Project:
     def settings_resolved(self) -> list[dict]:
         """settings(), each location default also resolved to the path it means on this computer."""
         rows = self.settings()
+        carried, prev_group = "", None
         for row in rows:
             row.update(self.resolve_setting_default(row))
+            if row.get("group") != prev_group:
+                carried, prev_group = "", row.get("group")
+            row["tooltip"] = ui_help.setting_tooltip(row, carried)
+            if row.get("comment"):
+                carried = row["comment"]
+            if row["key"] in ui_help.RELIABILITY_KEYS:
+                row["group"] = RELIABILITY_GROUP
         return rows
 
     def local_env_path(self) -> Path:
@@ -493,7 +519,11 @@ class Project:
             except OSError:
                 n = 0
             name = path.stem
-            out.append({"name": name, "path": str(path), "rows": max(n, 0), "locked": (path.parent / f"{name}.lock.json").is_file(),
+            try:
+                header = _sheet_header(path)
+            except OSError:
+                header = []
+            out.append({"name": name, "path": str(path), "rows": max(n, 0), "ledger": cohort_info.is_ledger(header), "locked": (path.parent / f"{name}.lock.json").is_file(),
                         "metagenomic": name.startswith("metagenomics"),
                         "selection": (path.parent / f"{name}.selection.json").is_file(),
                         "publication": (path.parent / f"{name}.publication.json").is_file()})
@@ -749,12 +779,47 @@ class Jobs:
         ok, message = ui_schema.validate_argv(argv)
         if not ok:
             raise ValueError(message)
+        env = self.check_env(env)
         refusal = self._lock_refusal(argv)
         if refusal:
             raise ValueError(refusal)
         command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(argv)
         shown = "plasbench " + " ".join(shlex.quote(a) for a in argv)
         return self._launch(command, shown, label, env, list(argv), "plasbench", self.project.root)
+
+    def running_results(self) -> list:
+        """The results folders of runs that are going (running or cancelling)."""
+        return [j.get("results") for j in self.jobs.values() if j.get("state") in ("running", "cancelling") and j.get("results")]
+
+    def env_allowlist(self) -> set:
+        """The names a job may carry: every Settings key in config/config.sh plus the download and reliability names, minus a few that would redirect the program itself."""
+        try:
+            keys = {row["key"] for row in self.project.settings()}
+        except OSError:
+            keys = set()
+        return (keys | EXTRA_ENV_KEYS) - ENV_FORBIDDEN
+
+    def check_env(self, env) -> dict | None:
+        """Refuse an environment the window may not set: only UPPER_SNAKE names on the allowlist, values of plain text under 200 characters. Returns the cleaned dict."""
+        if env in (None, {}):
+            return None
+        if not isinstance(env, dict):
+            raise ValueError("env must be an object of setting names and values")
+        allowed, clean = self.env_allowlist(), {}
+        for key, value in env.items():
+            if not isinstance(key, str) or not ENV_KEY.fullmatch(key):
+                raise ValueError(f"not a setting name: {key!r} (use UPPER_SNAKE_CASE)")
+            if key not in allowed:
+                raise ValueError(f"{key} is not a setting the window may pass to a run")
+            if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+                raise ValueError(f"the value of {key} must be text or a number")
+            value = str(value)
+            if "\n" in value or "\r" in value or "\x00" in value:
+                raise ValueError(f"the value of {key} must be one line of plain text")
+            if len(value) >= ENV_VALUE_MAX:
+                raise ValueError(f"the value of {key} is too long (under {ENV_VALUE_MAX} characters)")
+            clean[key] = value
+        return clean or None
 
     def start_git(self, command: list, label: str, cwd) -> dict:
         """A git network operation built by plasbench.gitops.argv (never from the request): runs like any job."""
@@ -909,6 +974,21 @@ class Jobs:
         return dict(job, log=text, offset=min(size, max(0, offset) + MAX_LOG_CHUNK), size=size, display_state=self.display_state(job),
                     idle_seconds=jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None)
 
+    def activity(self, job_id: str) -> dict:
+        """Which files the run (or the tools it started) wrote most recently, so a quiet log can be told from a stuck run: the job's results folder and the shared data folder."""
+        job = self.jobs.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        roots = []
+        if job.get("results"):
+            roots.append(job["results"])
+        if job.get("kind") == "plasbench":
+            roots.append(str(self.project.path_setting("DATA_DIR", "data")))
+        out = jobrunner.recent_activity(roots)
+        out["state"] = job.get("state")
+        out["idle_seconds"] = jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None
+        return out
+
     def list(self) -> list[dict]:
         return [dict(j, display_state=self.display_state(j)) for j in sorted(self.jobs.values(), key=lambda j: -j["started"])]
 
@@ -951,6 +1031,7 @@ class Jobs:
             except OSError:
                 activity = job["started"]
             out.append(dict(job, group=group, progress=progress, results=results, run_index=idx, last_activity=activity, display_state=self.display_state(job),
+                            idle_seconds=jobrunner.idle_seconds(str(self.dir), job["id"]) if state == "running" else None,
                             resumable=state in RESUMABLE_STATES and not any(j["state"] in ("running", "cancelling") and j.get("argv") == job["argv"] for j in self.jobs.values()),
                             reattached=bool(job.get("reattached"))))
         return out
@@ -1218,6 +1299,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.send(404, b"not found", "text/plain; charset=utf-8")
             try:
                 return self.api_get(path[len("/api/"):], q)
+            except runfolders.RunFolderError as exc:
+                return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
                 return self.jsend(404, {"error": str(exc).strip("'")})
             except (PermissionError, ValueError, GitError) as exc:
@@ -1335,6 +1418,17 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "workspace/check":
                 from . import workspace
                 return self.jsend(200, workspace.check(q.get("path", "")))
+            if route == "fs/list":
+                from . import studies
+                return self.jsend(200, runfolders.list_dir(project.root, studies.workspace(project.root), q.get("path", "")))
+            if route == "fs/properties":
+                from . import studies
+                return self.jsend(200, runfolders.properties(project.root, studies.workspace(project.root), q.get("path", "")))
+            if route == "runs/facts":              # what deleting a run folder would remove, shown before the user confirms
+                from . import studies
+                ws = studies.workspace(project.root)
+                real = runfolders.check_deletable(project.root, ws, Path.home(), q.get("path", ""), state.get("runs", []), jobs.running_results())
+                return self.jsend(200, runfolders.facts(ws, real))
             if route == "studies/facts":           # what a delete or archive would involve, shown before the user confirms
                 from . import study_manage
                 return self.jsend(200, study_manage.facts(project.root, q.get("name", "")))
@@ -1347,6 +1441,8 @@ def make_handler(project: Project, jobs: Jobs):
                 index = {r["path"]: i for i, r in enumerate(project.runs(state.get("runs", [])))}
                 index = {str(Path(k).resolve()): v for k, v in index.items()}
                 return self.jsend(200, {"sessions": jobs.sessions(index), "server_started": SERVER_STARTED})
+            if route.startswith("jobs/") and route.endswith("/activity"):
+                return self.jsend(200, jobs.activity(route[len("jobs/"):-len("/activity")]))
             if route.startswith("jobs/"):
                 return self.jsend(200, jobs.get(route[len("jobs/"):], int(q.get("offset", 0))))
             if route == "usertools":
@@ -1427,6 +1523,8 @@ def make_handler(project: Project, jobs: Jobs):
             try:
                 data = self.body()
                 return self.api_post(route, data)
+            except runfolders.RunFolderError as exc:
+                return self.jsend(exc.status, {"error": str(exc), "status": exc.status})
             except (FileNotFoundError, KeyError) as exc:
                 return self.jsend(404, {"error": str(exc).strip("'")})
             except (PermissionError, ValueError, GitError) as exc:
@@ -1605,6 +1703,16 @@ def make_handler(project: Project, jobs: Jobs):
                 state["runs"] = [r for r in state.get("runs", []) if r != data.get("path") and str(Path(r).resolve()) != gone]
                 save_state(state)
                 return self.jsend(200, {"ok": True})
+            if route == "runs/delete":
+                from . import studies
+                ws = studies.workspace(project.root)
+                state = load_state()
+                real = runfolders.check_deletable(project.root, ws, Path.home(), data.get("path", ""), state.get("runs", []), jobs.running_results())
+                removed = runfolders.delete(project.root, ws, Path.home(), str(real), data.get("confirm", ""), state.get("runs", []), jobs.running_results())
+                state["runs"] = [r for r in state.get("runs", []) if str(Path(r).resolve()) != str(real) and r != data.get("path")]
+                save_state(state)
+                session_log().event("run_deleted", path=str(real), files=removed["files"], bytes=removed["bytes"])
+                return self.jsend(200, dict(removed, ok=True, freed_files=removed["files"], freed_bytes=removed["bytes"]))
             if route == "usertools/validate":
                 return self.jsend(200, self.validate_manifest(data.get("text", "")))
             if route == "usertools/save":
@@ -1612,14 +1720,8 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "reveal":
                 target = Path(data.get("path", ""))
                 if not target.exists():
-                    raise FileNotFoundError(str(target))
-                if os.name == "nt":
-                    subprocess.Popen(["explorer", "/select,", str(target)] if target.is_file() else ["explorer", str(target)])
-                elif sys.platform == "darwin":
-                    subprocess.Popen(["open", "-R", str(target)])
-                else:
-                    subprocess.Popen(["xdg-open", str(target if target.is_dir() else target.parent)])
-                return self.jsend(200, {"ok": True})
+                    raise FileNotFoundError(f"{target} does not exist")
+                return self.jsend(200, fsutil.reveal(target))
             raise FileNotFoundError(f"no such API: {route}")
 
         # ---------------------------------------------------------------- git (plasbench/gitops.py)
