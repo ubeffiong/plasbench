@@ -119,6 +119,10 @@ def main():
     import user_tools
     check("the tooltip sentences are python/user_tools.py's own (one source, no drift)", ui_help.TASK_HELP == user_tools.TASK_HELP and ui_help.FORMAT_HELP == user_tools.FORMAT_HELP and ui_help.SOURCE_HELP == user_tools.SOURCE_HELP)
 
+    block = html.split("QCNOTE-BEGIN", 1)[-1].split("QCNOTE-END", 1)[0] if "QCNOTE-BEGIN" in html else ""
+    check("the Runs & reports view has a delimited, collapsible QC note drawn from ui_help.REPORT_NOTES['qc'] (title + text) through the schema",
+          "<details" in block and 'id="qcnote_title"' in block and 'id="qcnote_text"' in block and "renderQcNote" in html and ".report_notes" in html
+          and ui_schema.schema()["report_notes"]["qc"]["title"] == ui_help.REPORT_NOTES["qc"]["title"] and ui_schema.schema()["report_notes"]["qc"]["text"] == ui_help.REPORT_NOTES["qc"]["text"] and ui_help.REPORT_NOTES["qc"]["text"])
     node = shutil.which("node")
     if node:
         script = max(re.findall(r"<script[^>]*>(.*?)</script>", html, re.S), key=len)

@@ -917,6 +917,9 @@ body.gd-open #gdrawer{transform:none}
    <h3 style="margin:14px 0 8px">Results folders</h3>
    <div class="note info small" id="rankhelp" style="margin-bottom:12px"><svg class="ico"><use href="#i-info"/></svg><div><b>How to read a rank.</b>
     A rank is a tool's position within one task and one input track (short-read, long-read or hybrid), ordered by that task's headline metric (F1 for classification, length-weighted binning F1 for binning, CPRR for reassembly). Rank 1 is the best score, but a tied or overlapping confidence interval means two tools cannot be told apart, and a tool is only ranked on the isolates it ran on. "Leading" names the rank-1 tool of each task; the full table is in the report and the Leaderboard download. A run that says "Completed with warnings" finished normally but had failed tool runs.</div></div>
+   <!-- QCNOTE-BEGIN: the short-read QC panel and MultiQC (text: ui_help.REPORT_NOTES["qc"], the same sentence the report's QC panel shows) -->
+   <details class="note info small" id="qcnote" style="margin-bottom:12px" hidden><summary id="qcnote_title"></summary><div id="qcnote_text" style="margin-top:6px"></div></details>
+   <!-- QCNOTE-END -->
    <div class="card" id="runlist"><div class="bd mut">Looking for results…</div></div>
   </section>
 
@@ -5289,7 +5292,17 @@ window.reveal = async p => {
     if (r && r.opened === false) await showMessage({title: "No file manager is available here", body: "PlasBench could not open the folder from this window. Its path is:", detail: r.path || p, copy: r.path || p, buttonLabel: "Close"});
   } catch (e) { toast(e.message, "bad"); }
 };
+/* QCNOTE-JS-BEGIN */
+async function renderQcNote() {
+  const box = $("#qcnote"); if (!box) return;
+  try { const note = ((await getSchema()).report_notes || {}).qc;
+    if (!note || !note.text) { box.hidden = true; return; }
+    $("#qcnote_title").textContent = note.title || "About the QC panel"; $("#qcnote_text").textContent = note.text; box.hidden = false;
+  } catch { box.hidden = true; }
+}
+/* QCNOTE-JS-END */
 async function loadRuns(force) {
+  renderQcNote();
   try { const runs = await getRuns(true); refreshSessions();
     $("#s_runs").textContent = runs.length ? `${runs.length} found` : "None yet";
     setIfChanged($("#runlist"), runs.length ? runs.map(runRow).join("") : `<div class="bd"><div class="note info">${icon("info", "ico")}<div>No results yet. <a href="#" data-act="demo">Run the demo</a> to see a report in about a minute.</div></div></div>`);

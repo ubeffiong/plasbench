@@ -138,7 +138,8 @@ def schema():
     return {"commands": commands, "categories": categories, "global_args": globals_, "aliases": ALIASES,
             "wizard_help": {k: ui_help.tooltip(v) for k, v in ui_help.WIZARD.items()},
             "github_help": {k: ui_help.tooltip(v) for k, v in ui_help.GITHUB.items()},
-            "usertool_help": {k: ui_help.tooltip(v) for k, v in ui_help.USERTOOL.items()}}
+            "usertool_help": {k: ui_help.tooltip(v) for k, v in ui_help.USERTOOL.items()},
+            "report_notes": ui_help.REPORT_NOTES}
 
 
 def validate_argv(argv):
