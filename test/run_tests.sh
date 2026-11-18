@@ -99,7 +99,8 @@ python3 "$HERE/test_job_sleep_resume.py"
 bash "$HERE/test_stage_failure_visibility.sh"
 for t in test_run_isolation_lock.sh test_stage4_outcomes.sh test_adapter_no_output.sh test_stage8_fresh_prediction.sh test_score_failure_reason.sh test_stage4_preflight_and_fasta.sh test_run_lock_race.sh test_run_lock_heartbeat.sh test_tool_timeout_preset.sh; do bash "$HERE/$t"; done
 sleep 1
-SKIPPED="$(grep -c 'SKIP' "$RUN_LOG" || true)"
+# Count lines that START with a skip notice ("SKIP:", "SKIPPED:", "  skip  "), not every line that contains the word: passing checks such as "PASS: SKIP set: ..." mention it too.
+SKIPPED="$(grep -c -E '^[[:space:]]*(SKIP|SKIPPED|skip)([: ]|$)' "$RUN_LOG" || true)"
 echo "SKIPPED CHECKS: $SKIPPED (each is a test that did not run in this environment; see the SKIP lines above)"
 if [ "${REQUIRE_NO_SKIPS:-0}" = "1" ] && [ "$SKIPPED" != "0" ]; then echo "REQUIRE_NO_SKIPS=1 and $SKIPPED check(s) were skipped"; exit 1; fi
 echo "ALL PLASBENCH TESTS PASSED"

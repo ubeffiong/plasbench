@@ -33,6 +33,7 @@ benchmark (see "Not yet done").
 | R8 | 2026-11-15 to 11-16 | Field testing by the project lead on two Windows computers using WSL: first install, launch, upgrade, git use | Human (project lead, as user) | Whether it installs and starts on a machine that is not the developer's | v0.4.1 and `docs/PLASEVAL_REPLICATION.md` |
 | R9 | 2026-11-16 | Scientific reviewer interrogation: a 215-question bank in 15 domains, twelve oral-defence questions, a roadmap (PB-01 to PB-12) and a four-test assessment (truth, attribution, scoring and generalisation validity) | AI-assisted, supplied by the project lead; it states it did not inspect the live repository | Whether the metrics, references, inputs and statistics support the conclusions | [`REVIEWER_ASSESSMENT_MATRIX.md`](REVIEWER_ASSESSMENT_MATRIX.md), FAQ Q36 to Q42 |
 | R10 | 2026-11-16 | Literature and public-data review (PlasEval, Teixeira 2025, plsMD 2026, MOB-suite) with published AMR-context and relatedness figures | AI-assisted, supplied by the project lead; it states it could not run the code | Which public cohorts and evaluation dimensions to adopt; which published visual designs to adopt | [`cohorts/candidates/PUBLICATION_COHORTS.md`](../cohorts/candidates/PUBLICATION_COHORTS.md), FAQ Q43 |
+| R11 | 2026-11-17 | Independent audit of the whole project (53 findings, 16 of them executed), challenge and verification of the earlier audits, and a fix cycle | AI-assisted, run to the project lead's mandate; findings reproduced by running code where the register says EXECUTED | Whether the project is ready for independent validation, publication, production and HPC use | [`audit-2026-11-17/AUDIT_REPORT.md`](../audit-2026-11-17/AUDIT_REPORT.md), [`AUDIT_2026_11_17_STATUS.md`](AUDIT_2026_11_17_STATUS.md), [`INDEPENDENT_VERIFICATION.md`](INDEPENDENT_VERIFICATION.md), [`QA_RESULT_2026_11_18.md`](QA_RESULT_2026_11_18.md) |
 
 ## What each review found, what was done, and what remains
 
@@ -114,6 +115,15 @@ pangenome, host-range and transmission analyses, which are outside the benchmark
 `compare-published` comparison (`docs/PUBLICATION_COMPARISON.md`); Teixeira's 245 isolates without a deposited assembly still need a rebuilt truth. The remaining gaps were then closed in code (2026-11-17): PlasmidEC is a registered tool (stand-in tested), PLSDB novelty and a
 multivariable performance-drivers regression are stage-6 analyses with report sections, and `negative-controls-v1` provides 136 verified plasmid-free controls. Still open:
 running any tool on these cohorts (nothing here has been run on real tool output), a real PLSDB download for the novelty analysis, and rebuilding Teixeira's hybrid truth.
+
+### R11. The 17 November 2026 audit: what was found and done
+
+The audit concluded the project was not ready for independent validation, publication, production or HPC use, though fine for internal use with care. Its most serious finding, reproduced by running code,
+was that NMI, VI and ARI rewarded a missed plasmid (two exact bins and one wholly missed plasmid scored 1.0, 0.0, 1.0). Others: the truth-provenance patterns missed the real NCBI wording, so 218 short-read-first
+assemblies were `unknown` and nine Illumina-polished ones were called independent; an AMR gene on an unbinned record counted as correctly placed; the report card could show completion above 100%; run
+reports were served without a sandbox; two runs could share a temp folder. All 53 were worked: **42 are fixed, 10 partial and 1 not fixed** (status per finding in `AUDIT_2026_11_17_STATUS.md`, release notes in
+`docs/releases/v0.5.0.md`). A finding is called fixed only when a test fails on the old code and passes on the new. Still open: real-binary checks for 13 tools, a measured pilot for the download-size and timing figures,
+a pinned checksum for every database, a default tool time limit (a preset is opt-in), and a real-browser check of the window. The QA record is `QA_RESULT_2026_11_18.md`.
 
 ## Validation evidence
 

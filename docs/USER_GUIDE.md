@@ -731,6 +731,30 @@ to the circularity guard: a sample is skipped unless its long reads are
 declared independent of its truth assembly, or the tool's own
 `*_ALLOW_CIRCULAR_TRUTH` override is set (see `docs/COHORTS.md`).
 
+### Run reliability, timing and run-state settings (new in 0.5.0)
+
+All are optional; the defaults are safe. Set them in the environment or in `config/local.env`.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `ALLOW_ALL_TOOLS_FAILED` | `0` | Stage 4 exits with code **4** when every tool run failed (there is nothing to score). `1` continues with a warning. A run where only some tools failed always continues, and ends with "completed with warnings". |
+| `TOOL_TIMEOUT_SECONDS` | blank (no limit) | Stops a tool that runs longer than this per isolate. The default is no limit because a limit changes which runs complete, and so the scores. A start-of-run notice says when it is unset. |
+| `PLASBENCH_TOOL_TIMEOUT_PRESET` | unset | `generous` sets `TOOL_TIMEOUT_SECONDS=172800` (two days). An explicit `TOOL_TIMEOUT_SECONDS` wins; an unknown preset name is an error. |
+| `PLASBENCH_STALL_SECONDS` | `600` | The window shows a running job as `stalled` after this many seconds without output (`0` turns it off). |
+| `PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS` | `21600` (6 h) | Time limit for every helper subprocess in `python/` (`0` or `off` removes it). |
+| `MIN_FREE_DISK_GB` | `20` | A warning (never a stop) before stage 1 when the drive has less free space (`0` turns it off). |
+| `PLASBENCH_LOCK_HEARTBEAT_SECONDS`, `PLASBENCH_LOCK_STALE_SECONDS` | `5`, `60` | A run holds `RESULTS_DIR/.run.lock` and touches `.run.lock.heartbeat`. A second run is refused while the holder is alive; a lock whose heartbeat is older than the stale limit is taken over even if its process id is alive (covers a killed run and a reused id). |
+| `ALLOW_INCONSISTENT_RUNS` | `0` | Aggregation stops when the run tables disagree (missing columns, non-finite values, a status that contradicts a score). `1` continues and still prints the count. |
+| `ALLOW_INPUT_MISMATCH` (or `--allow-input-mismatch`) | `0` | The report builder refuses a leaderboard that was not ranked from the scores it is given. `1` builds anyway. |
+| `SHARED_MIN_FRACTION`, `SHARED_MIN_SAMPLES` | `0.5`, `5` | A shared-sample set smaller than this fraction of the largest tool's samples, or than this count, is flagged on the leaderboard (`ranking_warning`). The ranking itself is unchanged. |
+| `PLASBENCH_REQUIRE_CHECKSUMS` | `0` | `1` refuses a database download that has no pinned SHA-256 (environment variable such as `MOBSUITE_DB_SHA256`, or a row in `config/download_checksums.tsv`). Without it, a download with no pin prints a notice with the observed checksum and records it. |
+| `RUN_TRUTH_EXCLUSION_SENSITIVITY` | `1` | `0` skips the stage-6 table that reports the headline with and without the replicon-database exclusion. |
+| `REQUIRE_NO_SKIPS` (test runner) | `0` | `1` makes `test/run_tests.sh` fail when any check was skipped. The runner always prints how many were. |
+
+New files in a results folder: `.run.lock` and `.run.lock.heartbeat` (while a run is active), `.completed_with_warnings`, `stage_timing.tsv` (seconds per stage, including failed stages), `tool_run_resources.tsv` (threads, seconds per attempt and peak memory per tool run), `download_provenance.jsonl` (observed checksums of downloaded databases), `benchmark.input_fingerprint.json` (which scores and tools the leaderboard was ranked from), `benchmark.truth_exclusion_sensitivity.tsv` and `benchmark.truth_exclusion_sensitivity_reconstruction.tsv`, and a `recovered_shards` folder in the log directory when a killed run left work behind.
+
+Exit codes of a stage: `0` success, `3` an adapter found no output from its tool, `4` every tool run failed. The window shows these as `failed`, `completed_with_warnings`, `stalled` and `retrying`.
+
 ## Workflow
 
 `plasbench run` runs stages 0-6. Select stages explicitly to resume or iterate:

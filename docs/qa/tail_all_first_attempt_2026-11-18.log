@@ -1,0 +1,629 @@
+# FIRST ATTEMPT, KEPT AS RECORDED. Not a valid result: the loop ran Python tests with bash (every *.py 'FAIL rc=2' is that mistake), and stdin was shared with the loop.
+# Its genuine failures (test_operational_reconstruct, test_parallel_execution, test_stage8_fresh_prediction) were fixed afterwards. See docs/QA_RESULT_2026_11_18.md.
+FAIL test_operational_reconstruct.sh rc=4
+FAIL test_parallel_execution.sh rc=1
+[2026-11-18 01:09:13]   plasmidSPAdes (s1) ...
+[2026-11-18 01:09:14]   baseline_coverage (s1) ...
+[2026-11-18 01:09:15] WARNING: Stage 4 (run tools): 1 of 3 tool run(s) failed (the other 2 completed); the failed ones are excluded from scoring. See /tmp/tmp.UsMMg8my10/results/tool_status.tsv.
+[2026-11-18 01:09:15] Stage 4 (run tools) complete.
+ok   test_download_parallel.sh
+ok   test_assemble_parallel.sh
+ok   test_assemble_crash_safe.sh
+ok   test_truth_stage_speed.sh
+ok   test_score_parallel.sh
+ok   test_score_analysis_track.sh
+ok   test_pr_curve_stale_cleanup.sh
+ok   test_run_all_default_stages.sh
+ok   test_never_silent.sh
+ok   test_update_script.sh
+ok   test_install_latest.sh
+ok   test_release_archive.sh
+ok   test_bootstrap_conda.sh
+ok   test_setup_interactive.sh
+ok   test_database_installers.sh
+ok   test_plassembler.sh
+ok   test_flye_mob_recon_circularity.sh
+ok   test_long_read_truth_eligible.sh
+ok   test_hybracter.sh
+ok   test_hybracter_adapter.sh
+ok   test_trycycler_mob_recon.sh
+ok   test_genomad_adapter.sh
+ok   test_genomad_stage.sh
+ok   test_plasme_adapter.sh
+ok   test_plasme_stage.sh
+ok   test_plasgraph2_adapter.sh
+ok   test_plasgraph2_stage.sh
+ok   test_rfplasmid_adapter.sh
+ok   test_rfplasmid_stage.sh
+ok   test_plasmidhunter_adapter.sh
+ok   test_plasmidhunter_stage.sh
+ok   test_plasmer_adapter.sh
+ok   test_plasmer_stage.sh
+ok   test_plasmidec_adapter.sh
+ok   test_plasmidec_stage.sh
+ok   test_plascope_adapter.sh
+ok   test_plascope_stage.sh
+ok   test_self_assembled_hybrid_download.sh
+ok   test_simulated_download_stage.sh
+ok   test_build_hybrid_truth_stage.sh
+ok   test_difficulty_features_stage.sh
+ok   test_cohort_and_write_script.sh
+ok   test_stage_wiring_qc_model.sh
+ok   test_thread_scaling_sweep.sh
+ok   test_quast_diagnostics_stage.sh
+ok   test_stage_dimensions.sh
+ok   test_stage_contig_metrics.sh
+FAIL test_install_wiring.py rc=2
+test/test_install_wiring.py: line 21: import: command not found
+test/test_install_wiring.py: line 22: import: command not found
+test/test_install_wiring.py: line 24: syntax error near unexpected token `('
+test/test_install_wiring.py: line 24: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+ok   test_install_all_optional.sh
+FAIL test_materialize_bmock12_truth.py rc=2
+test/test_materialize_bmock12_truth.py: line 8: import: command not found
+test/test_materialize_bmock12_truth.py: line 9: from: command not found
+test/test_materialize_bmock12_truth.py: line 11: syntax error near unexpected token `('
+test/test_materialize_bmock12_truth.py: line 11: `ROOT = Path(__file__).resolve().parent.parent'
+FAIL test_question_bank_gaps.py rc=2
+test/test_question_bank_gaps.py: line 17: import: command not found
+test/test_question_bank_gaps.py: line 18: import: command not found
+test/test_question_bank_gaps.py: line 20: syntax error near unexpected token `('
+test/test_question_bank_gaps.py: line 20: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_metric_rubric.py rc=2
+test/test_metric_rubric.py: line 19: import: command not found
+test/test_metric_rubric.py: line 20: import: command not found
+test/test_metric_rubric.py: line 22: syntax error near unexpected token `('
+test/test_metric_rubric.py: line 22: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_label_schemes.py rc=2
+test/test_label_schemes.py: line 11: import: command not found
+test/test_label_schemes.py: line 12: from: command not found
+test/test_label_schemes.py: line 14: syntax error near unexpected token `('
+test/test_label_schemes.py: line 14: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_dimer_collapse.py rc=2
+test/test_dimer_collapse.py: line 10: import: command not found
+test/test_dimer_collapse.py: line 11: from: command not found
+test/test_dimer_collapse.py: line 13: syntax error near unexpected token `('
+test/test_dimer_collapse.py: line 13: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_mcc_abstention.py rc=2
+test/test_mcc_abstention.py: line 16: import: command not found
+test/test_mcc_abstention.py: line 17: from: command not found
+test/test_mcc_abstention.py: line 19: syntax error near unexpected token `('
+test/test_mcc_abstention.py: line 19: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_prereg_freeze.py rc=2
+test/test_prereg_freeze.py: line 11: import: command not found
+test/test_prereg_freeze.py: line 12: from: command not found
+test/test_prereg_freeze.py: line 14: syntax error near unexpected token `('
+test/test_prereg_freeze.py: line 14: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_bin_outcomes.py rc=2
+test/test_bin_outcomes.py: line 15: import: command not found
+test/test_bin_outcomes.py: line 16: from: command not found
+test/test_bin_outcomes.py: line 18: syntax error near unexpected token `('
+test/test_bin_outcomes.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_contig_scoring.py rc=2
+test/test_contig_scoring.py: line 17: import: command not found
+test/test_contig_scoring.py: line 18: from: command not found
+test/test_contig_scoring.py: line 20: syntax error near unexpected token `('
+test/test_contig_scoring.py: line 20: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_recommender_eval.py rc=2
+test/test_recommender_eval.py: line 21: import: command not found
+test/test_recommender_eval.py: line 22: from: command not found
+test/test_recommender_eval.py: line 24: syntax error near unexpected token `('
+test/test_recommender_eval.py: line 24: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_panel_operational.py rc=2
+test/test_panel_operational.py: line 15: import: command not found
+test/test_panel_operational.py: line 16: from: command not found
+test/test_panel_operational.py: line 18: syntax error near unexpected token `('
+test/test_panel_operational.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_wilcoxon.py rc=2
+test/test_wilcoxon.py: line 15: import: command not found
+test/test_wilcoxon.py: line 16: from: command not found
+test/test_wilcoxon.py: line 18: syntax error near unexpected token `('
+test/test_wilcoxon.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_leave_taxon_out.py rc=2
+test/test_leave_taxon_out.py: line 14: import: command not found
+test/test_leave_taxon_out.py: line 15: from: command not found
+test/test_leave_taxon_out.py: line 17: syntax error near unexpected token `('
+test/test_leave_taxon_out.py: line 17: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_rank_axes_new.py rc=2
+test/test_rank_axes_new.py: line 17: import: command not found
+test/test_rank_axes_new.py: line 18: from: command not found
+test/test_rank_axes_new.py: line 20: syntax error near unexpected token `('
+test/test_rank_axes_new.py: line 20: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_amr_placement.py rc=2
+test/test_amr_placement.py: line 20: import: command not found
+test/test_amr_placement.py: line 21: from: command not found
+test/test_amr_placement.py: line 23: syntax error near unexpected token `('
+test/test_amr_placement.py: line 23: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_amr_placement_by_task.py rc=2
+test/test_amr_placement_by_task.py: line 16: import: command not found
+test/test_amr_placement_by_task.py: line 17: from: command not found
+test/test_amr_placement_by_task.py: line 19: syntax error near unexpected token `('
+test/test_amr_placement_by_task.py: line 19: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_reference_independence.py rc=2
+test/test_reference_independence.py: line 14: import: command not found
+test/test_reference_independence.py: line 15: from: command not found
+test/test_reference_independence.py: line 17: syntax error near unexpected token `('
+test/test_reference_independence.py: line 17: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_scoring_spec.py rc=2
+test/test_report_scoring_spec.py: line 11: import: command not found
+test/test_report_scoring_spec.py: line 12: $'\r': command not found
+test/test_report_scoring_spec.py: line 13: syntax error near unexpected token `('
+test/test_report_scoring_spec.py: line 13: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_contig_crosscheck.py rc=2
+test/test_contig_crosscheck.py: line 21: import: command not found
+test/test_contig_crosscheck.py: line 22: from: command not found
+test/test_contig_crosscheck.py: line 24: syntax error near unexpected token `('
+test/test_contig_crosscheck.py: line 24: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_fetch_ena_reads.py rc=2
+test/test_fetch_ena_reads.py: line 11: from: command not found
+test/test_fetch_ena_reads.py: line 12: from: command not found
+test/test_fetch_ena_reads.py: line 14: syntax error near unexpected token `('
+test/test_fetch_ena_reads.py: line 14: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_svg.py rc=2
+test/test_report_svg.py: line 15: import: command not found
+test/test_report_svg.py: line 16: import: command not found
+test/test_report_svg.py: line 18: syntax error near unexpected token `('
+test/test_report_svg.py: line 18: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_maps.py rc=2
+test/test_report_maps.py: line 24: import: command not found
+test/test_report_maps.py: line 25: $'\r': command not found
+test/test_report_maps.py: line 26: syntax error near unexpected token `('
+test/test_report_maps.py: line 26: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_plasmid_viewer.py rc=2
+test/test_plasmid_viewer.py: line 26: import: command not found
+test/test_plasmid_viewer.py: line 27: $'\r': command not found
+test/test_plasmid_viewer.py: line 28: syntax error near unexpected token `('
+test/test_plasmid_viewer.py: line 28: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_3d.py rc=2
+test/test_report_3d.py: line 14: import: command not found
+test/test_report_3d.py: line 15: from: command not found
+test/test_report_3d.py: line 17: syntax error near unexpected token `('
+test/test_report_3d.py: line 17: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_scorecard.py rc=2
+test/test_report_scorecard.py: line 29: import: command not found
+test/test_report_scorecard.py: line 30: $'\r': command not found
+test/test_report_scorecard.py: line 31: syntax error near unexpected token `('
+test/test_report_scorecard.py: line 31: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_workflow.py rc=2
+test/test_report_workflow.py: line 17: import: command not found
+test/test_report_workflow.py: line 18: import: command not found
+test/test_report_workflow.py: line 20: syntax error near unexpected token `('
+test/test_report_workflow.py: line 20: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_surfaces.py rc=2
+test/test_report_surfaces.py: line 19: import: command not found
+test/test_report_surfaces.py: line 20: $'\r': command not found
+test/test_report_surfaces.py: line 21: syntax error near unexpected token `('
+test/test_report_surfaces.py: line 21: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_wiring.py rc=2
+test/test_report_wiring.py: line 18: import: command not found
+test/test_report_wiring.py: line 19: import: command not found
+test/test_report_wiring.py: line 21: syntax error near unexpected token `('
+test/test_report_wiring.py: line 21: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_condense.py rc=2
+test/test_report_condense.py: line 27: import: command not found
+test/test_report_condense.py: line 28: $'\r': command not found
+test/test_report_condense.py: line 29: syntax error near unexpected token `('
+test/test_report_condense.py: line 29: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_layout.py rc=2
+test/test_report_layout.py: line 11: import: command not found
+test/test_report_layout.py: line 12: import: command not found
+test/test_report_layout.py: line 14: syntax error near unexpected token `('
+test/test_report_layout.py: line 14: `ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")'
+FAIL test_report_pdf.py rc=2
+test/test_report_pdf.py: line 14: import: command not found
+test/test_report_pdf.py: line 15: import: command not found
+test/test_report_pdf.py: line 17: syntax error near unexpected token `('
+test/test_report_pdf.py: line 17: `ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")'
+FAIL test_report_feature_manifest.py rc=2
+test/test_report_feature_manifest.py: line 23: from: command not found
+test/test_report_feature_manifest.py: line 24: $'\r': command not found
+test/test_report_feature_manifest.py: line 25: syntax error near unexpected token `('
+test/test_report_feature_manifest.py: line 25: `HERE = Path(__file__).resolve().parent'
+FAIL test_report_merge.py rc=2
+test/test_report_merge.py: line 21: import: command not found
+test/test_report_merge.py: line 22: $'\r': command not found
+test/test_report_merge.py: line 23: syntax error near unexpected token `('
+test/test_report_merge.py: line 23: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_isolates.py rc=2
+test/test_report_isolates.py: line 20: import: command not found
+test/test_report_isolates.py: line 21: import: command not found
+test/test_report_isolates.py: line 23: syntax error near unexpected token `('
+test/test_report_isolates.py: line 23: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_names.py rc=2
+test/test_report_names.py: line 18: import: command not found
+test/test_report_names.py: line 19: import: command not found
+test/test_report_names.py: line 21: syntax error near unexpected token `('
+test/test_report_names.py: line 21: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_lazy_frames.py rc=2
+test/test_lazy_frames.py: line 19: import: command not found
+test/test_lazy_frames.py: line 20: import: command not found
+test/test_lazy_frames.py: line 22: syntax error near unexpected token `('
+test/test_lazy_frames.py: line 22: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_recommendation_task.py rc=2
+test/test_recommendation_task.py: line 17: from: command not found
+test/test_recommendation_task.py: line 18: from: command not found
+test/test_recommendation_task.py: line 20: syntax error near unexpected token `('
+test/test_recommendation_task.py: line 20: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_prune.py rc=2
+test/test_report_prune.py: line 13: import: command not found
+test/test_report_prune.py: line 14: from: command not found
+test/test_report_prune.py: line 16: syntax error near unexpected token `('
+test/test_report_prune.py: line 16: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_help.py rc=2
+test/test_report_help.py: line 15: import: command not found
+test/test_report_help.py: line 16: from: command not found
+test/test_report_help.py: line 18: syntax error near unexpected token `('
+test/test_report_help.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_sample_report.py rc=2
+test/test_sample_report.py: line 12: import: command not found
+test/test_sample_report.py: line 13: from: command not found
+test/test_sample_report.py: line 15: syntax error near unexpected token `('
+test/test_sample_report.py: line 15: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_refresh_sample_report.py rc=2
+test/test_refresh_sample_report.py: line 16: import: command not found
+test/test_refresh_sample_report.py: line 17: from: command not found
+test/test_refresh_sample_report.py: line 19: syntax error near unexpected token `('
+test/test_refresh_sample_report.py: line 19: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_reference_images.py rc=2
+test/test_reference_images.py: line 10: import: command not found
+test/test_reference_images.py: line 11: from: command not found
+test/test_reference_images.py: line 13: syntax error near unexpected token `('
+test/test_reference_images.py: line 13: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_scenario_definition.py rc=2
+test/test_scenario_definition.py: line 7: import: command not found
+test/test_scenario_definition.py: line 8: import: command not found
+test/test_scenario_definition.py: line 10: syntax error near unexpected token `('
+test/test_scenario_definition.py: line 10: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_results_dir.py rc=2
+test/test_report_results_dir.py: line 10: import: command not found
+test/test_report_results_dir.py: line 11: from: command not found
+test/test_report_results_dir.py: line 13: syntax error near unexpected token `('
+test/test_report_results_dir.py: line 13: `HERE = Path(__file__).resolve().parent'
+FAIL test_report_collapse.py rc=2
+test/test_report_collapse.py: line 16: import: command not found
+test/test_report_collapse.py: line 17: import: command not found
+test/test_report_collapse.py: line 19: syntax error near unexpected token `('
+test/test_report_collapse.py: line 19: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_fig_ladder.py rc=2
+test/test_report_fig_ladder.py: line 10: import: command not found
+test/test_report_fig_ladder.py: line 11: import: command not found
+test/test_report_fig_ladder.py: line 13: syntax error near unexpected token `('
+test/test_report_fig_ladder.py: line 13: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_report_fig_landscape.py rc=2
+test/test_report_fig_landscape.py: line 15: from: command not found
+test/test_report_fig_landscape.py: line 16: $'\r': command not found
+test/test_report_fig_landscape.py: line 17: syntax error near unexpected token `('
+test/test_report_fig_landscape.py: line 17: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_fig_heatmap.py rc=2
+test/test_report_fig_heatmap.py: line 15: import: command not found
+test/test_report_fig_heatmap.py: line 16: from: command not found
+test/test_report_fig_heatmap.py: line 18: syntax error near unexpected token `('
+test/test_report_fig_heatmap.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_fig_stats.py rc=2
+test/test_report_fig_stats.py: line 14: import: command not found
+test/test_report_fig_stats.py: line 15: from: command not found
+test/test_report_fig_stats.py: line 17: syntax error near unexpected token `('
+test/test_report_fig_stats.py: line 17: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_fig_pr.py rc=2
+test/test_report_fig_pr.py: line 14: from: command not found
+test/test_report_fig_pr.py: line 15: $'\r': command not found
+test/test_report_fig_pr.py: line 16: syntax error near unexpected token `('
+test/test_report_fig_pr.py: line 16: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_info.py rc=2
+test/test_report_info.py: line 25: import: command not found
+test/test_report_info.py: line 26: import: command not found
+test/test_report_info.py: line 28: syntax error near unexpected token `('
+test/test_report_info.py: line 28: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_demo_dataset_views.py rc=2
+test/test_demo_dataset_views.py: line 14: import: command not found
+test/test_demo_dataset_views.py: line 15: import: command not found
+test/test_demo_dataset_views.py: line 17: syntax error near unexpected token `('
+test/test_demo_dataset_views.py: line 17: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_recommender_truth_free.py rc=2
+test/test_recommender_truth_free.py: line 13: import: command not found
+test/test_recommender_truth_free.py: line 14: import: command not found
+test/test_recommender_truth_free.py: line 16: syntax error near unexpected token `('
+test/test_recommender_truth_free.py: line 16: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_primary_eligibility.py rc=2
+test/test_primary_eligibility.py: line 20: import: command not found
+test/test_primary_eligibility.py: line 21: from: command not found
+test/test_primary_eligibility.py: line 23: syntax error near unexpected token `('
+test/test_primary_eligibility.py: line 23: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_truth_evidence_record.py rc=2
+test/test_truth_evidence_record.py: line 16: import: command not found
+test/test_truth_evidence_record.py: line 17: from: command not found
+test/test_truth_evidence_record.py: line 19: syntax error near unexpected token `('
+test/test_truth_evidence_record.py: line 19: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_permutation_reporting.py rc=2
+test/test_permutation_reporting.py: line 15: from: command not found
+test/test_permutation_reporting.py: line 16: from: command not found
+test/test_permutation_reporting.py: line 18: syntax error near unexpected token `('
+test/test_permutation_reporting.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_simulate_validation.py rc=2
+test/test_simulate_validation.py: line 22: import: command not found
+test/test_simulate_validation.py: line 23: from: command not found
+test/test_simulate_validation.py: line 25: syntax error near unexpected token `('
+test/test_simulate_validation.py: line 25: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_truth_audits.py rc=2
+test/test_truth_audits.py: line 21: import: command not found
+test/test_truth_audits.py: line 22: from: command not found
+test/test_truth_audits.py: line 24: syntax error near unexpected token `('
+test/test_truth_audits.py: line 24: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_metric_registry.py rc=2
+test/test_metric_registry.py: line 14: import: command not found
+test/test_metric_registry.py: line 15: from: command not found
+test/test_metric_registry.py: line 17: syntax error near unexpected token `('
+test/test_metric_registry.py: line 17: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_metric_wiring.py rc=2
+test/test_metric_wiring.py: line 17: import: command not found
+test/test_metric_wiring.py: line 18: from: command not found
+test/test_metric_wiring.py: line 20: syntax error near unexpected token `('
+test/test_metric_wiring.py: line 20: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_burden_columns.py rc=2
+test/test_burden_columns.py: line 3: import: command not found
+test/test_burden_columns.py: line 4: from: command not found
+test/test_burden_columns.py: line 6: syntax error near unexpected token `('
+test/test_burden_columns.py: line 6: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_sv_prr.py rc=2
+test/test_sv_prr.py: line 5: import: command not found
+test/test_sv_prr.py: line 6: from: command not found
+test/test_sv_prr.py: line 8: syntax error near unexpected token `('
+test/test_sv_prr.py: line 8: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_dataset_features.py rc=2
+test/test_dataset_features.py: line 5: import: command not found
+test/test_dataset_features.py: line 6: from: command not found
+test/test_dataset_features.py: line 8: syntax error near unexpected token `('
+test/test_dataset_features.py: line 8: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_recommender_arms.py rc=2
+test/test_recommender_arms.py: line 10: import: command not found
+test/test_recommender_arms.py: line 11: from: command not found
+test/test_recommender_arms.py: line 13: syntax error near unexpected token `('
+test/test_recommender_arms.py: line 13: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_fig_radar.py rc=2
+test/test_report_fig_radar.py: line 5: import: command not found
+test/test_report_fig_radar.py: line 6: from: command not found
+test/test_report_fig_radar.py: line 8: syntax error near unexpected token `('
+test/test_report_fig_radar.py: line 8: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_promote_amr_truth.py rc=2
+test/test_promote_amr_truth.py: line 7: import: command not found
+test/test_promote_amr_truth.py: line 8: from: command not found
+test/test_promote_amr_truth.py: line 10: syntax error near unexpected token `('
+test/test_promote_amr_truth.py: line 10: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_database_provenance.py rc=2
+test/test_database_provenance.py: line 6: import: command not found
+test/test_database_provenance.py: line 7: from: command not found
+test/test_database_provenance.py: line 9: syntax error near unexpected token `('
+test/test_database_provenance.py: line 9: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_tool_validation_tiers.py rc=2
+test/test_tool_validation_tiers.py: line 4: import: command not found
+test/test_tool_validation_tiers.py: line 5: from: command not found
+test/test_tool_validation_tiers.py: line 7: syntax error near unexpected token `('
+test/test_tool_validation_tiers.py: line 7: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_integration_audit.py rc=2
+test/test_integration_audit.py: line 19: import: command not found
+test/test_integration_audit.py: line 20: from: command not found
+test/test_integration_audit.py: line 22: syntax error near unexpected token `('
+test/test_integration_audit.py: line 22: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_evaluation_tasks.py rc=2
+test/test_evaluation_tasks.py: line 19: import: command not found
+test/test_evaluation_tasks.py: line 20: from: command not found
+test/test_evaluation_tasks.py: line 22: syntax error near unexpected token `('
+test/test_evaluation_tasks.py: line 22: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_registry_tasks.py rc=2
+test/test_registry_tasks.py: line 12: import: command not found
+test/test_registry_tasks.py: line 13: from: command not found
+test/test_registry_tasks.py: line 15: syntax error near unexpected token `('
+test/test_registry_tasks.py: line 15: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_dominant_fallback.py rc=2
+test/test_dominant_fallback.py: line 15: import: command not found
+test/test_dominant_fallback.py: line 16: from: command not found
+test/test_dominant_fallback.py: line 18: syntax error near unexpected token `('
+test/test_dominant_fallback.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_docs_consistency.py rc=2
+test/test_docs_consistency.py: line 15: import: command not found
+test/test_docs_consistency.py: line 16: from: command not found
+test/test_docs_consistency.py: line 18: syntax error near unexpected token `('
+test/test_docs_consistency.py: line 18: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_real_tool_checks.py rc=2
+test/test_real_tool_checks.py: line 13: from: command not found
+test/test_real_tool_checks.py: line 14: $'\r': command not found
+test/test_real_tool_checks.py: line 15: syntax error near unexpected token `('
+test/test_real_tool_checks.py: line 15: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_report_fig_complexity.py rc=2
+test/test_report_fig_complexity.py: line 5: import: command not found
+test/test_report_fig_complexity.py: line 6: from: command not found
+test/test_report_fig_complexity.py: line 8: syntax error near unexpected token `('
+test/test_report_fig_complexity.py: line 8: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_recommend_evidence.py rc=2
+test/test_recommend_evidence.py: line 3: import: command not found
+test/test_recommend_evidence.py: line 4: from: command not found
+test/test_recommend_evidence.py: line 6: syntax error near unexpected token `('
+test/test_recommend_evidence.py: line 6: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_map_rings.py rc=2
+test/test_map_rings.py: line 4: import: command not found
+test/test_map_rings.py: line 5: import: command not found
+test/test_map_rings.py: line 7: syntax error near unexpected token `('
+test/test_map_rings.py: line 7: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_reference_groups.py rc=2
+test/test_reference_groups.py: line 17: import: command not found
+test/test_reference_groups.py: line 18: from: command not found
+test/test_reference_groups.py: line 20: syntax error near unexpected token `('
+test/test_reference_groups.py: line 20: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_bin_unaligned.py rc=2
+test/test_bin_unaligned.py: line 6: import: command not found
+test/test_bin_unaligned.py: line 7: import: command not found
+test/test_bin_unaligned.py: line 9: syntax error near unexpected token `('
+test/test_bin_unaligned.py: line 9: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_run_consistency.py rc=2
+test/test_run_consistency.py: line 8: import: command not found
+test/test_run_consistency.py: line 9: $'\r': command not found
+test/test_run_consistency.py: line 10: syntax error near unexpected token `('
+test/test_run_consistency.py: line 10: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_independent_truth_only.py rc=2
+test/test_independent_truth_only.py: line 8: import: command not found
+test/test_independent_truth_only.py: line 9: from: command not found
+test/test_independent_truth_only.py: line 11: syntax error near unexpected token `('
+test/test_independent_truth_only.py: line 11: `ROOT = Path(__file__).resolve().parent.parent'
+FAIL test_discover_negative_controls.py rc=2
+test/test_discover_negative_controls.py: line 7: import: command not found
+test/test_discover_negative_controls.py: line 8: import: command not found
+test/test_discover_negative_controls.py: line 10: syntax error near unexpected token `('
+test/test_discover_negative_controls.py: line 10: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_stratified_bootstrap_t.py rc=2
+test/test_stratified_bootstrap_t.py: line 5: import: command not found
+test/test_stratified_bootstrap_t.py: line 6: import: command not found
+test/test_stratified_bootstrap_t.py: line 8: syntax error near unexpected token `0,'
+test/test_stratified_bootstrap_t.py: line 8: `sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python"))'
+FAIL test_study_manage.py rc=2
+test/test_study_manage.py: line 10: import: command not found
+test/test_study_manage.py: line 11: from: command not found
+test/test_study_manage.py: line 13: syntax error near unexpected token `('
+test/test_study_manage.py: line 13: `ROOT = Path(__file__).resolve().parent.parent'
+FAIL test_threshold_freeze.py rc=2
+test/test_threshold_freeze.py: line 12: import: command not found
+test/test_threshold_freeze.py: line 13: import: command not found
+test/test_threshold_freeze.py: line 15: syntax error near unexpected token `('
+test/test_threshold_freeze.py: line 15: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_amr_unbinned.py rc=2
+test/test_amr_unbinned.py: line 9: import: command not found
+test/test_amr_unbinned.py: line 10: from: command not found
+test/test_amr_unbinned.py: line 12: syntax error near unexpected token `('
+test/test_amr_unbinned.py: line 12: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_bin_clustering_missed.py rc=2
+test/test_bin_clustering_missed.py: line 6: import: command not found
+test/test_bin_clustering_missed.py: line 7: from: command not found
+test/test_bin_clustering_missed.py: line 9: syntax error near unexpected token `('
+test/test_bin_clustering_missed.py: line 9: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_truth_provenance_tokens.py rc=2
+test/test_truth_provenance_tokens.py: line 10: import: command not found
+test/test_truth_provenance_tokens.py: line 11: import: command not found
+test/test_truth_provenance_tokens.py: line 13: syntax error near unexpected token `('
+test/test_truth_provenance_tokens.py: line 13: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_audit_web_fixes.py rc=2
+test/test_audit_web_fixes.py: line 15: from: command not found
+test/test_audit_web_fixes.py: line 16: from: command not found
+test/test_audit_web_fixes.py: line 18: syntax error near unexpected token `('
+test/test_audit_web_fixes.py: line 18: `ROOT = Path(__file__).resolve().parent.parent'
+FAIL test_input_validation.py rc=2
+test/test_input_validation.py: line 18: import: command not found
+test/test_input_validation.py: line 19: from: command not found
+test/test_input_validation.py: line 21: syntax error near unexpected token `('
+test/test_input_validation.py: line 21: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_audit_report_fixes.py rc=2
+test/test_audit_report_fixes.py: line 24: from: command not found
+test/test_audit_report_fixes.py: line 25: from: command not found
+test/test_audit_report_fixes.py: line 27: syntax error near unexpected token `('
+test/test_audit_report_fixes.py: line 27: `HERE = os.path.dirname(os.path.abspath(__file__))'
+FAIL test_job_stall_and_group.py rc=2
+test/test_job_stall_and_group.py: line 18: import: command not found
+test/test_job_stall_and_group.py: line 19: from: command not found
+test/test_job_stall_and_group.py: line 21: syntax error near unexpected token `('
+test/test_job_stall_and_group.py: line 21: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_performance_per_run_threads.py rc=2
+test/test_performance_per_run_threads.py: line 11: import: command not found
+test/test_performance_per_run_threads.py: line 12: import: command not found
+test/test_performance_per_run_threads.py: line 14: syntax error near unexpected token `('
+test/test_performance_per_run_threads.py: line 14: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_helper_timeouts_and_atomic_tables.py rc=2
+test/test_helper_timeouts_and_atomic_tables.py: line 17: import: command not found
+test/test_helper_timeouts_and_atomic_tables.py: line 18: import: command not found
+test/test_helper_timeouts_and_atomic_tables.py: line 20: syntax error near unexpected token `('
+test/test_helper_timeouts_and_atomic_tables.py: line 20: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_guard_boundaries.py rc=2
+test/test_guard_boundaries.py: line 5: import: command not found
+test/test_guard_boundaries.py: line 6: import: command not found
+test/test_guard_boundaries.py: line 8: syntax error near unexpected token `('
+test/test_guard_boundaries.py: line 8: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_interval_bounds.py rc=2
+test/test_interval_bounds.py: line 3: import: command not found
+test/test_interval_bounds.py: line 4: import: command not found
+test/test_interval_bounds.py: line 6: syntax error near unexpected token `('
+test/test_interval_bounds.py: line 6: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_amr_gene_recovery_definition.py rc=2
+test/test_amr_gene_recovery_definition.py: line 8: import: command not found
+test/test_amr_gene_recovery_definition.py: line 9: from: command not found
+test/test_amr_gene_recovery_definition.py: line 11: syntax error near unexpected token `('
+test/test_amr_gene_recovery_definition.py: line 11: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_bin_no_bins_undefined.py rc=2
+test/test_bin_no_bins_undefined.py: line 8: import: command not found
+test/test_bin_no_bins_undefined.py: line 9: from: command not found
+test/test_bin_no_bins_undefined.py: line 11: syntax error near unexpected token `('
+test/test_bin_no_bins_undefined.py: line 11: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_shared_readers.py rc=2
+test/test_shared_readers.py: line 12: import: command not found
+test/test_shared_readers.py: line 13: from: command not found
+test/test_shared_readers.py: line 15: syntax error near unexpected token `('
+test/test_shared_readers.py: line 15: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_guard_mutants.py rc=2
+test/test_guard_mutants.py: line 12: import: command not found
+test/test_guard_mutants.py: line 13: from: command not found
+test/test_guard_mutants.py: line 15: syntax error near unexpected token `('
+test/test_guard_mutants.py: line 15: `ROOT = Path(__file__).resolve().parent.parent'
+FAIL test_truth_exclusion_sensitivity.py rc=2
+test/test_truth_exclusion_sensitivity.py: line 13: import: command not found
+test/test_truth_exclusion_sensitivity.py: line 14: from: command not found
+test/test_truth_exclusion_sensitivity.py: line 16: syntax error near unexpected token `('
+test/test_truth_exclusion_sensitivity.py: line 16: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_popen_pipeline_timeouts.py rc=2
+test/test_popen_pipeline_timeouts.py: line 14: import: command not found
+test/test_popen_pipeline_timeouts.py: line 15: import: command not found
+test/test_popen_pipeline_timeouts.py: line 17: syntax error near unexpected token `('
+test/test_popen_pipeline_timeouts.py: line 17: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_download_checksum_registry.py rc=2
+test/test_download_checksum_registry.py: line 20: import: command not found
+test/test_download_checksum_registry.py: line 21: import: command not found
+test/test_download_checksum_registry.py: line 23: syntax error near unexpected token `('
+test/test_download_checksum_registry.py: line 23: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_window_git_show_and_rank_help.py rc=2
+test/test_window_git_show_and_rank_help.py: line 14: import: command not found
+test/test_window_git_show_and_rank_help.py: line 15: import: command not found
+test/test_window_git_show_and_rank_help.py: line 17: syntax error near unexpected token `('
+test/test_window_git_show_and_rank_help.py: line 17: `ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'
+FAIL test_job_retrying_state.py rc=2
+test/test_job_retrying_state.py: line 2: syntax error near unexpected token `exit'
+test/test_job_retrying_state.py: line 2: `"""A run whose last output line is stage 4's "failed (exit N); retry K of M" notice reads `retrying` (audit AU-010); any later output ends it.'
+FAIL test_truth_exclusion_reconstruction.py rc=2
+test/test_truth_exclusion_reconstruction.py: line 13: import: command not found
+test/test_truth_exclusion_reconstruction.py: line 14: from: command not found
+test/test_truth_exclusion_reconstruction.py: line 16: syntax error near unexpected token `('
+test/test_truth_exclusion_reconstruction.py: line 16: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_score_bins_paf_guards.py rc=2
+test/test_score_bins_paf_guards.py: line 11: import: command not found
+test/test_score_bins_paf_guards.py: line 12: from: command not found
+test/test_score_bins_paf_guards.py: line 14: syntax error near unexpected token `('
+test/test_score_bins_paf_guards.py: line 14: `ROOT = Path(__file__).resolve().parents[1]'
+ok   test_outcome_states.sh
+ok   test_preserve_downloads.sh
+ok   test_mobsuite_env.sh
+ok   test_isolated_tool_envs.sh
+ok   test_platon_db_download.sh
+ok   test_resumable_download.sh
+ok   test_preserve_databases.sh
+FAIL test_webui_inline_handlers.py rc=2
+test/test_webui_inline_handlers.py: line 5: syntax error near unexpected token `'${esc(name)}''
+test/test_webui_inline_handlers.py: line 5: `onclick="f('${esc(name)}')" turns &#39; back into ' and a name like  a');x();('  breaks out of the string. The safe form is'
+FAIL test_zero_plasmid_bin_scoring.py rc=2
+test/test_zero_plasmid_bin_scoring.py: line 13: import: command not found
+test/test_zero_plasmid_bin_scoring.py: line 14: from: command not found
+test/test_zero_plasmid_bin_scoring.py: line 16: syntax error near unexpected token `('
+test/test_zero_plasmid_bin_scoring.py: line 16: `ROOT = Path(__file__).resolve().parents[1]'
+FAIL test_job_sleep_resume.py rc=2
+test/test_job_sleep_resume.py: line 19: import: command not found
+test/test_job_sleep_resume.py: line 20: from: command not found
+test/test_job_sleep_resume.py: line 22: syntax error near unexpected token `('
+test/test_job_sleep_resume.py: line 22: `ROOT = Path(__file__).resolve().parents[1]'
+ok   test_stage_failure_visibility.sh
+ok   test_run_isolation_lock.sh
+ok   test_stage4_outcomes.sh
+ok   test_adapter_no_output.sh
+FAIL test_stage8_fresh_prediction.sh rc=1
+[2026-11-18 01:23:54] === Run tools on opS ===
+[2026-11-18 01:23:54] WARNING: platon: database not found (/tmp/tmp.umeSUWccRH/platon/db); not launched for opS
+[2026-11-18 01:23:55] ERROR: Stage 4 (run tools): all 1 tool run(s) failed and none completed; there is nothing to score. See /tmp/tmp.AqBAzcNa65/results/tool_status.tsv and the per-tool logs in /tmp/
+[2026-11-18 01:23:55] ERROR: 08_operational_reconstruct.sh stopped: `SAMPLE_SHEET="$TMP_SHEET" ONLY_TOOL="$TOOL" ANALYSIS_TRACK="$TRACK" bash "$HERE/04_run_tools.sh"` failed, every tool run of stage 4
+ok   test_score_failure_reason.sh
+ok   test_stage4_preflight_and_fasta.sh
+ok   test_run_lock_race.sh
+ok   test_run_lock_heartbeat.sh
+ok   test_tool_timeout_preset.sh
+ALLDONE

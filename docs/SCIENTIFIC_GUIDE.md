@@ -1,7 +1,7 @@
 # PlasBench Scientific Guide
 
 **What PlasBench does, how it does it, why, and how to check it.**
-This guide is for the people who must decide whether to trust and use the tool: microbiologists, bioinformaticians, AMR and public-health scientists, laboratory leads, programme implementers and reviewers. It describes PlasBench at version 0.4.1 (the version in `pyproject.toml`; `test/test_doc_versions.py` keeps the two in step). It does not require you to read the source code, and it tells you where the code is when you want to.
+This guide is for the people who must decide whether to trust and use the tool: microbiologists, bioinformaticians, AMR and public-health scientists, laboratory leads, programme implementers and reviewers. It describes PlasBench at version 0.5.0 (the version in `pyproject.toml`; `test/test_doc_versions.py` keeps the two in step). It does not require you to read the source code, and it tells you where the code is when you want to.
 
 <!-- TOC -->
 - [1. What PlasBench is, and what it is not](#1-what-plasbench-is-and-what-it-is-not)
@@ -933,7 +933,7 @@ This section records what has and has not been shown, so that a reader can judge
 
 | Not yet established | Consequence for you |
 |---|---|
-| **No benchmark result on real data ships with the repository.** The bundled leaderboards come from a synthetic demo and are explicitly not performance evidence. | You must run a cohort yourself (or wait for archived results) before drawing any conclusion about a tool. |
+| **The only real-data result is small and descriptive.** `results_real_cohort1/` scores three real tools on 10 real isolates, but only 1 of the 10 references reaches reference Tier 2, so it supports no ranking. The bundled sample report and leaderboards come from a synthetic demo and are explicitly not performance evidence. | Run a cohort yourself (the independent-truth subset of public-v4 is the intended panel) before drawing any conclusion about a tool. |
 | Database release dates are blank in `config/tool_database_releases.tsv`. | Database leakage is reported as *not assessed* until you fill them in. |
 | The shipped cohorts are small and taxonomically narrow: 17 of 32 `public-v2` isolates are *E. coli*, `public-v1` is mostly one study, and the added rows lack depth and plasmid counts. | A headline can rarely reach the 20-cluster species minimum, so the pooled basis often applies, and intervals are often unavailable; and when no isolate has a Tier 1-2 reference the primary analysis is reported unavailable. Do not generalise to other taxa. |
 | The nearest-reference Mash screen has not been validated against any independent plasmid partition and uses a 16-plasmid reference set. | Use it only as a distance report. |
