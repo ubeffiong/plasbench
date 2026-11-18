@@ -14,6 +14,8 @@ import csv
 import os
 from collections import defaultdict
 from plasbench_common import number as num  # noqa: E402
+from plasbench_common import display_tool_name  # noqa: E402
+import report_compare_apply as apply  # noqa: E402  (comparison tables that keep each plain table in a closed fold)
 
 TABLES = ("accuracy", "missing_regions", "feature_preservation", "ngoc", "bin_quality", "performance", "power",
           "scenarios", "scenario_performance", "composite", "composite_sensitivity", "reproducibility_tools", "stats_validation", "stats_validation_by_studies")
@@ -54,6 +56,19 @@ def table(esc, headers, body, empty_cols=None):
     head = "".join(f"<th>{esc(h)}</th>" for h in headers)
     rows = "".join("<tr>" + "".join(f"<td>{esc(str(c))}</td>" for c in row) + "</tr>" for row in body)
     return f"<div class='panel'><table class='sortable'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table></div>"
+
+
+def per_isolate(rows, column, scale=1.0):
+    """(track, tool) -> {isolate: value} of one column of a per-sample table (a blank is left out, never zero); `scale` 100 puts a fraction on the percent scale of the cell."""
+    def get(track, tool):
+        out = {}
+        for r in rows:
+            if r.get("tool") == tool and (not track or (r.get("analysis_track") or "") == track):
+                v = num(r.get(column))
+                if v is not None:
+                    out[r.get("sample", "")] = v * scale
+        return out
+    return get
 
 
 def empty(message):
@@ -103,8 +118,20 @@ def render(prefix, esc, link, scores_path=None, samples_path=None):
         "are reference stretches no retained alignment covers (a circular plasmid's gap across the origin counts as two). "
         "<strong>Descriptive only: it never changes the leaderboard.</strong> SNP concordance is not computed: it needs "
         "known variant positions, which a single same-isolate reference does not have.",
-        table(esc, ["Track", "Tool", "Samples", "Identity", "Mismatch", "Insertion", "Deletion", "Samples not assessable", "Blocks without CIGAR",
-                    "Plasmids", "Missing regions per plasmid", "Missing bp", "Longest gap (bp)"], rows)
+        apply.from_table("accuracy", "Sequence accuracy", rows, 1, [
+            ("Alignment accuracy", 3, "identity", "Identity", dict(source="accuracy", column="identity", unit="% of aligned columns", iso=per_isolate(data["accuracy"], "identity", 100))),
+            ("Alignment accuracy", 4, "mismatch", "Mismatch", dict(source="accuracy", column="mismatch_rate", unit="% of aligned columns", iso=per_isolate(data["accuracy"], "mismatch_rate", 100))),
+            ("Alignment accuracy", 5, "insertion", "Insertion", dict(dir="lower", unit="% of aligned columns", definition="Share of aligned columns that are insertions. A component of indel accuracy (A3 = 1 - insertions - deletions), so lower is better.", source="accuracy", column="insertion_rate", iso=per_isolate(data["accuracy"], "insertion_rate", 100))),
+            ("Alignment accuracy", 6, "deletion", "Deletion", dict(dir="lower", unit="% of aligned columns", definition="Share of aligned columns that are deletions. A component of indel accuracy (A3 = 1 - insertions - deletions), so lower is better.", source="accuracy", column="deletion_rate", iso=per_isolate(data["accuracy"], "deletion_rate", 100))),
+            ("Missing regions", 10, "missing_per", "Missing regions per plasmid", dict(dir=None, definition="Reference stretches no retained alignment covers, per plasmid. No direction is defined in the metric registry, so it is not shaded.")),
+            ("Missing regions", 11, "missing_bp", "Missing bp", dict(dir=None, unit="bp", definition="Reference bases in missing regions. No direction is defined in the metric registry, so it is not shaded.")),
+            ("Missing regions", 12, "longest_gap", "Longest gap (bp)", dict(dir=None, unit="bp", definition="The longest missing region. No direction is defined in the metric registry, so it is not shaded.")),
+            ("Counts", 2, "samples", "Samples", dict(dir=None, definition="Isolates scored for this tool. A count.")),
+            ("Counts", 7, "not_assessable", "Samples not assessable", dict(dir=None, definition="Samples whose truth was polished with the benchmark's own reads, so accuracy cannot be assessed.")),
+            ("Counts", 8, "no_cigar", "Blocks without CIGAR", dict(dir=None, definition="Alignment blocks that cannot be decoded; counted, never guessed.")),
+            ("Counts", 9, "plasmids", "Plasmids", dict(dir=None, definition="Truth plasmids examined for missing regions.")),
+        ], track_col=0, table_html=table(esc, ["Track", "Tool", "Samples", "Identity", "Mismatch", "Insertion", "Deletion", "Samples not assessable", "Blocks without CIGAR",
+                    "Plasmids", "Missing regions per plasmid", "Missing bp", "Longest gap (bp)"], rows), label=display_tool_name)
         if rows else empty("No accuracy table was available. It needs a PAF with CIGAR tags (<code>minimap2 -c</code>); "
                            "stage 5 writes it when <code>RUN_DIMENSION_ANALYSES=1</code>."),
         "accuracy", "missing_regions")
@@ -125,10 +152,15 @@ def render(prefix, esc, link, scores_path=None, samples_path=None):
                           int(total(items, "n_conserved") or 0), pct(ratio(total(items, "n_conserved"), pairs))])
     body = ""
     if rows:
-        body += table(esc, ["Track", "Tool", "Feature kind", "Expected", "Full length", "Truncated", "Missed",
-                            "Full-length rate", "Mean covered fraction"], rows)
+        body += apply.features(rows, table(esc, ["Track", "Tool", "Feature kind", "Expected", "Full length", "Truncated", "Missed",
+                            "Full-length rate", "Mean covered fraction"], rows), display_tool_name)
     if ngoc_rows:
-        body += table(esc, ["Track", "Tool", "Features used", "Adjacent pairs", "Conserved", "NGOC"], ngoc_rows)
+        body += apply.from_table("ngoc", "Gene-order conservation (NGOC)", ngoc_rows, 1, [
+            ("Gene order", 5, "ngoc", "NGOC", dict(source="ngoc", column="ngoc", iso=per_isolate(data["ngoc"], "ngoc", 100), unit="%")),
+            ("Gene order", 2, "features", "Features used", dict(dir=None, definition="Features the order was judged on. A count.")),
+            ("Gene order", 3, "pairs", "Adjacent pairs", dict(dir=None, definition="Adjacent feature pairs in the reference. A count.")),
+            ("Gene order", 4, "conserved", "Conserved", dict(dir=None, definition="Pairs still adjacent, in the same orientation, on the same predicted record. A count.")),
+        ], track_col=0, table_html=table(esc, ["Track", "Tool", "Features used", "Adjacent pairs", "Conserved", "NGOC"], ngoc_rows), label=display_tool_name)
     add("feature-preservation", "Feature preservation and gene order",
         "Whether the genes and functional elements survive, and stay in order. Each truth feature is projected through the "
         "alignments: <em>full length</em> means at least 95% covered, <em>truncated</em> means covered but less, "
@@ -159,8 +191,19 @@ def render(prefix, esc, link, scores_path=None, samples_path=None):
         "bin (a split plasmid is judged by its best bin). Homogeneity, completeness and V-measure use the same "
         "base-pair weighted table as NMI: informative about binning behaviour, not primary evidence, and not repeat-aware. "
         "<strong>Descriptive only.</strong> Binning-capable tools only.",
-        table(esc, ["Track", "Tool", "Bins", "High", "Medium", "Low", "Spurious", "High-quality yield",
-                    "Medium-or-better yield", "Homogeneity", "Completeness", "V-measure"], rows)
+        apply.from_table("binquality", "Bin quality tiers", rows, 1, [
+            ("Yield", 7, "hq_yield", "High-quality yield", dict(dir="higher", unit="% of truth plasmids", definition="Share of truth plasmids with a high-quality bin (at least 90% complete, at most 5% contaminated). Higher is better.", iso=per_isolate(data["bin_quality"], "high_quality_yield", 100))),
+            ("Yield", 8, "mq_yield", "Medium-or-better yield", dict(dir="higher", unit="% of truth plasmids", definition="Share of truth plasmids with a medium or better bin (at least 50% complete, at most 10% contaminated). Higher is better.", iso=per_isolate(data["bin_quality"], "medium_or_better_yield", 100))),
+            ("Agreement with the truth", 9, "homogeneity", "Homogeneity", dict(dir="higher", definition="Each bin holds sequence of one plasmid only (0 to 1; 1 is best).", iso=per_isolate(data["bin_quality"], "homogeneity"))),
+            ("Agreement with the truth", 10, "completeness", "Completeness", dict(dir="higher", definition="Each plasmid is held in one bin (0 to 1; 1 is best). Base-pair weighted, like NMI.", iso=per_isolate(data["bin_quality"], "completeness"))),
+            ("Agreement with the truth", 11, "v_measure", "V-measure", dict(dir="higher", definition="The harmonic mean of homogeneity and completeness (0 to 1; 1 is best).", iso=per_isolate(data["bin_quality"], "v_measure"))),
+            ("Bins by tier (counts)", 2, "bins", "Bins", dict(dir=None, definition="Bins produced. A count.")),
+            ("Bins by tier (counts)", 3, "high", "High", dict(dir=None, definition="High-quality bins. A count; it depends on how many plasmids the isolates hold.")),
+            ("Bins by tier (counts)", 4, "medium", "Medium", dict(dir=None, definition="Medium-quality bins. A count.")),
+            ("Bins by tier (counts)", 5, "low", "Low", dict(dir=None, definition="Low-quality bins on a plasmid. A count.")),
+            ("Bins by tier (counts)", 6, "spurious", "Spurious", dict(dir=None, definition="Bins that align to no plasmid. A count.")),
+        ], track_col=0, table_html=table(esc, ["Track", "Tool", "Bins", "High", "Medium", "Low", "Spurious", "High-quality yield",
+                    "Medium-or-better yield", "Homogeneity", "Completeness", "V-measure"], rows), label=display_tool_name)
         if rows else empty("No bin-quality table was available. It needs bins from a binning-capable tool."),
         "bin_quality")
 
@@ -179,9 +222,21 @@ def render(prefix, esc, link, scores_path=None, samples_path=None):
         "reference size (about 1 is linear) and are shown only with enough samples spanning a real size range; CPU "
         "utilisation only where CPU times were recorded. Wall-clock figures are comparable only on identical hardware and "
         "thread counts. <strong>Descriptive only.</strong>",
-        table(esc, ["Tool", "Runs", "Success rate", "Resource failures", "Median runtime (s)", "P90 runtime (s)",
+        apply.from_table("performance", "Computational performance", rows, 0, [
+            ("Reliability", 2, "success", "Success rate", dict(source="performance", column="success_rate", unit="% of runs")),
+            ("Reliability", 1, "runs", "Runs", dict(dir=None, definition="Runs attempted. A count.")),
+            ("Reliability", 3, "resource_failures", "Resource failures", dict(dir=None, definition="Timeouts and out-of-memory kills, kept apart from tool failures. A count.")),
+            ("Speed and memory", 4, "runtime", "Median runtime (s)", dict(source="performance", column="median_runtime_seconds", unit="s")),
+            ("Speed and memory", 5, "p90", "P90 runtime (s)", dict(dir=None, unit="s", definition="The 90th percentile of the wall-clock runtime. No direction is defined in the metric registry, so it is not shaded.")),
+            ("Speed and memory", 6, "memory", "Median peak memory (GB)", dict(source="performance", column="median_peak_memory_gb", unit="GB")),
+            ("Speed and memory", 7, "threads", "Threads", dict(dir=None, definition="Threads the tool was given. A setting, not a result.")),
+            ("Cost and scaling", 8, "thread_seconds", "Thread-s per recovered plasmid", dict(dir=None, definition="Thread-seconds divided by truth plasmids recovered. No direction is defined in the metric registry, so it is not shaded.")),
+            ("Cost and scaling", 9, "cpu", "CPU utilisation", dict(dir=None, definition="Share of the allotted CPU actually used. No direction is defined, so it is not shaded.")),
+            ("Cost and scaling", 10, "rt_exp", "Runtime exponent", dict(dir=None, definition="Log-log slope of runtime on reference size (about 1 is linear). No direction is defined, so it is not shaded.")),
+            ("Cost and scaling", 11, "mem_exp", "Memory exponent", dict(dir=None, definition="Log-log slope of memory on reference size (about 1 is linear). No direction is defined, so it is not shaded.")),
+        ], track_col=None, table_html=table(esc, ["Tool", "Runs", "Success rate", "Resource failures", "Median runtime (s)", "P90 runtime (s)",
                     "Median peak memory (GB)", "Threads", "Thread-s per recovered plasmid", "CPU utilisation",
-                    "Runtime exponent", "Memory exponent"], rows)
+                    "Runtime exponent", "Memory exponent"], rows), label=display_tool_name)
         if rows else empty("No performance table was available. It needs <code>tool_status.tsv</code> from stage 4."),
         "performance")
 
@@ -264,9 +319,18 @@ def render(prefix, esc, link, scores_path=None, samples_path=None):
         "and listed. A tool below the accuracy or completeness gate is shown but not ranked, however fast it is. The "
         "last columns show how the rank moves under 500 random reweightings: a ranking that does not survive them should "
         "not be reported as one. Always read the dimension scores, not only the composite.",
-        table(esc, ["Track", "Tool", "Accuracy", "Completeness", "Structure", "Biology", "Performance", "Composite",
+        apply.from_table("composite", "Five-dimension view", rows, 1, [
+            ("Dimension scores (0-100)", 2, "dim_accuracy", "Accuracy", dict(dir="higher", unit="0-100", definition="The accuracy dimension scored 0 to 100 (config/composite_weights.tsv). Higher is better.")),
+            ("Dimension scores (0-100)", 3, "dim_completeness", "Completeness", dict(dir="higher", unit="0-100", definition="The completeness dimension scored 0 to 100. Higher is better.")),
+            ("Dimension scores (0-100)", 4, "dim_structure", "Structure", dict(dir="higher", unit="0-100", definition="The structure dimension scored 0 to 100. Higher is better.")),
+            ("Dimension scores (0-100)", 5, "dim_biology", "Biology", dict(dir="higher", unit="0-100", definition="The biology dimension scored 0 to 100. Higher is better.")),
+            ("Dimension scores (0-100)", 6, "dim_performance", "Performance", dict(dir="higher", unit="0-100", definition="The performance dimension scored 0 to 100. Higher is better.")),
+            ("Composite (not the benchmark ranking)", 7, "composite", "Composite", dict(dir="higher", unit="0-100", definition="The weighted composite of the dimension scores. It is not the benchmark ranking and never changes it.")),
+            ("Composite (not the benchmark ranking)", 11, "mean_rank", "Mean rank under reweighting", dict(dir="lower", definition="Mean rank over 500 random reweightings (rank 1 is best), so lower is better.")),
+            ("Composite (not the benchmark ranking)", 13, "first", "First under reweighting", dict(dir="higher", definition="Share of the random reweightings in which the tool ranked first. Higher is better.")),
+        ], track_col=0, lead="Rank, status, gates failed, best-worst rank and dimensions dropped are in the Table below.", table_html=table(esc, ["Track", "Tool", "Accuracy", "Completeness", "Structure", "Biology", "Performance", "Composite",
                     "Rank", "Status", "Gates failed", "Mean rank under reweighting", "Best-worst rank",
-                    "First under reweighting", "Dimensions dropped"], rows)
+                    "First under reweighting", "Dimensions dropped"], rows), label=display_tool_name)
         if rows else empty("No composite table was available. It needs the dimension tables above."),
         "composite", "composite_sensitivity")
 

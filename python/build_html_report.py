@@ -15,6 +15,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import quote
 from plasbench_common import display_tool_name  # noqa: E402
+import report_compare_apply  # noqa: E402  (comparison tables that keep each plain table in a closed fold)
+import report_compare_table  # noqa: E402
 import data_nature  # noqa: E402
 import run_consistency  # noqa: E402
 from resampling import MIN_CLUSTERS_CI  # noqa: E402
@@ -2577,41 +2579,46 @@ def main():
             return "not-significant", "No (paired permutation)"
         return "not-assessed", "Not assessed (too few shared samples)"
 
-    def leaderboard_row_html(row):
+    def leaderboard_texts(row):
+        """The text of each cell of a leaderboard row, not escaped. The table and the comparison table (report_compare_apply) show these same strings."""
         sig_class, sig_text = significance_text(row)
+        return {
+            "rank": row.get("rank", "-"), "tool": row["tool"], "scored": row.get("n_samples", "0"), "completed": row.get("n_completed", "0"),
+            "failed": row.get("n_failed", "0"), "skipped": row.get("n_skipped", "0"), "precision": row["mean_precision"], "recall": row["mean_recall"],
+            "plasmid_recall": row.get("mean_plasmid_recall") or "not annotated",
+            "perfect": rate_text(row.get("reference_perfect_recovery_rate"), row.get("n_reference_perfect_assessed")),
+            "strict": rate_text(row.get("strict_reference_reconstruction_rate"), row.get("n_strict_reconstruction_assessed")),
+            "bin_f1": row.get("mean_bin_f1") or "not bin-scored", "nmi": row.get("mean_nmi") or "not bin-scored",
+            "vi": row.get("mean_variation_of_information") or "not bin-scored", "pr_auc": row.get("mean_pr_auc") or "not probability-scored",
+            "f1": row.get("mean_f1") or "-",
+            "score": f"{headline_value(row):.4f}" if headline_value(row) is not None else "-",
+            "ci": f"{row['ranking_ci_low']}–{row['ranking_ci_high']}" if row.get("ranking_ci_low") else f"< {MIN_CLUSTERS_CI} independent units",
+            "cprr": ((f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
+                      + (f"; per isolate {number(row['cprr_isolate_mean']):.1%}"
+                         if row.get("cprr_isolate_mean") else "")
+                      + (f"; SV-PRR {number(row['sv_prr']):.1%}" + (f" (CPRR on the same {row['sv_prr_isolates']} isolate(s): {number(row['cprr_on_sv_isolates']):.1%})"
+                                                                     if row.get("sv_prr_isolates") and row.get("cprr_on_sv_isolates") else "") if row.get("sv_prr") else "")
+                      + (f"; AUC {number(row['cprr_auc']):.3f}" if row.get("cprr_auc") else ""))
+                     if row.get("cprr") else "not bin-scored"),
+            "sig_class": sig_class, "sig_text": sig_text,
+        }
+
+    def leaderboard_row_html(row):
+        t = leaderboard_texts(row)
         return (
             "<tr><td>{rank}</td><td>{tool}</td><td>{scored}</td><td>{completed}</td>"
             "<td>{failed}</td><td>{skipped}</td><td>{precision}</td><td>{recall}</td><td>{plasmid_recall}</td><td>{perfect}</td><td>{strict}</td><td>{bin_f1}</td><td>{nmi}</td><td>{vi}</td><td>{pr_auc}</td>"
             "<td><strong class='score {band}'>{score}</strong><span class='f1-bar {band}'><i style='width:{f1_width}%'></i></span>{ranked_on}</td>"
             "<td>{ci}</td><td>{cprr}</td><td>{f1}</td>"
             "<td><span class='sig-badge {sig_class}'>{sig_text}</span></td></tr>".format(
-                rank=esc(row.get("rank", "-")), tool=esc(row["tool"]),
-                scored=esc(row.get("n_samples", "0")), completed=esc(row.get("n_completed", "0")),
-                failed=esc(row.get("n_failed", "0")), skipped=esc(row.get("n_skipped", "0")),
-                precision=esc(row["mean_precision"]), recall=esc(row["mean_recall"]),
-                plasmid_recall=esc(row.get("mean_plasmid_recall") or "not annotated"),
-                perfect=esc(rate_text(row.get("reference_perfect_recovery_rate"), row.get("n_reference_perfect_assessed"))),
-                strict=esc(rate_text(row.get("strict_reference_reconstruction_rate"), row.get("n_strict_reconstruction_assessed"))),
-                bin_f1=esc(row.get("mean_bin_f1") or "not bin-scored"),
-                nmi=esc(row.get("mean_nmi") or "not bin-scored"),
-                vi=esc(row.get("mean_variation_of_information") or "not bin-scored"),
-                pr_auc=esc(row.get("mean_pr_auc") or "not probability-scored"), f1=esc(row.get("mean_f1") or "-"),
-                score=esc(f"{headline_value(row):.4f}" if headline_value(row) is not None else "-"),
+                **{k: esc(v) for k, v in t.items() if k not in ("sig_class",)},
                 f1_width=max(0, min(100, round((headline_value(row) or 0) * 100))),
                 band=score_band(headline_value(row) or 0),
-                ci=esc(f"{row['ranking_ci_low']}–{row['ranking_ci_high']}" if row.get("ranking_ci_low") else f"< {MIN_CLUSTERS_CI} independent units"),
-                cprr=esc((f"{number(row['cprr']):.1%} ({row.get('cprr_correct')}/{row.get('cprr_plasmids')})"
-                          + (f"; per isolate {number(row['cprr_isolate_mean']):.1%}"
-                             if row.get("cprr_isolate_mean") else "")
-                          + (f"; SV-PRR {number(row['sv_prr']):.1%}" + (f" (CPRR on the same {row['sv_prr_isolates']} isolate(s): {number(row['cprr_on_sv_isolates']):.1%})"
-                                                                         if row.get("sv_prr_isolates") and row.get("cprr_on_sv_isolates") else "") if row.get("sv_prr") else "")
-                          + (f"; AUC {number(row['cprr_auc']):.3f}" if row.get("cprr_auc") else ""))
-                         if row.get("cprr") else "not bin-scored"),
                 ranked_on=(f"<small class='muted'> on {esc(row['n_ranking_samples'])} shared"
                            + (f" · {esc(row['ranking_species_basis'])}" if row.get("ranking_species_basis") else "")
                            + "</small>"
                            if row.get("n_ranking_samples") and row.get("ranking_basis") == "shared_samples" else ""),
-                sig_class=sig_class, sig_text=esc(sig_text),
+                sig_class=t["sig_class"],
             )
         )
 
@@ -2626,12 +2633,13 @@ def main():
 
     def single_table(rows):
         body = "".join(leaderboard_row_html(row) for row in rows) or "<tr><td colspan='20'>No scored tools yet.</td></tr>"
-        return ("<div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th>"
+        table_html = ("<div class='panel'><table class='sortable'><thead><tr><th>Rank</th><th>Tool</th><th>Scored</th>"
                 "<th>Completed</th><th>Failed</th><th>Skipped</th><th>Mean precision</th><th>Mean base recall</th>"
                 "<th>Mean plasmid recall</th><th>Perfect reference recovery</th><th>Strict reconstruction</th><th>Mean bin F1 (count-based)</th>"
                 "<th>Mean NMI</th><th>Mean VI</th><th>Mean PR-AUC</th><th>Ranking score</th><th>95% CI</th><th>CPRR</th>"
                 "<th>Mean base F1</th><th>Significant vs runner-up</th></tr></thead>"
                 f"<tbody>{body}</tbody></table></div>")
+        return report_compare_apply.leaderboard(rows, leaderboard_texts, scores, table_html, display_tool_name)
 
     def leaderboard_table(rows):
         """One ranked table per task within a track; never one mixed ranking."""
@@ -2675,7 +2683,14 @@ def main():
     robustness_html = robustness_section(track_leaderboards, ordered_tracks or list(track_leaderboards),
                                          report_wiring.overlap_statuses(str(results_dir)))
 
-    score_rows = "".join(score_row(row, metadata, tool_versions) for row in scores)
+    score_rows_list, seen_samples = [], set()
+    for row in scores:
+        html_row = score_row(row, metadata, tool_versions)
+        if row["sample"] not in seen_samples:      # the first row of an isolate carries the anchor the comparison tables link to
+            seen_samples.add(row["sample"])
+            html_row = html_row.replace("<tr data-sample=", f"<tr id='{report_compare_apply.isolate_anchor(row['sample'])}' data-sample=", 1)
+        score_rows_list.append(html_row)
+    score_rows = "".join(score_rows_list)
     score_rows = score_rows or "<tr><td colspan='13'>No score rows were produced.</td></tr>"
 
     bin_rows = []
@@ -2756,6 +2771,11 @@ def main():
             )
         )
     graded_tiers_html = "".join(graded_tier_rows) or "<tr><td colspan='4'>No tool was scored in this run.</td></tr>"
+    report_compare_table.set_glossary(GLOSSARY)
+    graded_html = report_compare_apply.graded_recovery(
+        leaderboard, scores,
+        "<div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead>"
+        f"<tbody>{graded_tiers_html}</tbody></table></div>", display_tool_name)
 
     # Isolate difficulty (python/compute_difficulty_features.py, gated by
     # RUN_DIFFICULTY_FEATURES, off by default): truth-derived, per-ISOLATE
@@ -3249,7 +3269,7 @@ def main():
 <section id='statistics'><h2>Paired tool comparisons</h2><p class='lead'>Differences are tool A minus tool B on shared samples. Confidence intervals and two-sided sign-flip permutation p-values resample whole BioProject clusters when the sample sheet records them (the cluster count is shown beside the pairs), and require at least six independent units (five for an interval). Holm values control family-wise error across comparisons and remain descriptive evidence, not a substitute for study design.</p>{comparison_tables}<p class='lead'>Score-stage isolation events:</p><ul>{score_failure_html}</ul></section>
 <section id='bin-diagnostics'><h2>Bin reconstruction diagnostics</h2><p class='lead'>Only tools with validated bin membership are shown. A split is one truth plasmid represented by multiple candidate bins; a merge is one candidate bin with high-completeness evidence for multiple truth plasmids. Repeat ambiguity is bin sequence with both plasmid and chromosome mapping alternatives. Contamination fraction is chromosome-aligned bp divided by all truth-mapped bin bp. Open each matches TSV for bin-to-truth assignments, unmatched bins, and missed plasmids.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Tool</th><th>Bin precision</th><th>Bin recall</th><th>Bin F1</th><th>Matched bins</th><th>Unmatched bins</th><th>Missed plasmids</th><th>Split events</th><th>Merge events</th><th>Contaminated bins</th><th>Repeat ambiguity bp</th><th>Contamination fraction</th><th>Record-level detail</th></tr></thead><tbody>{bin_diagnostics_html}</tbody></table></div></section>
 <section id='zero-plasmid'><h2>Zero-plasmid isolates (negative control)</h2><p class='lead'>Precision, recall, and F1 are correctly undefined on an isolate with no true plasmid at all -- there is nothing to recover, and a tool predicting nothing has made a correct abstention, not scored a zero. These isolates are still valuable: they are the only ones that directly measure false-positive behavior. Isolate specificity is 1 minus the fraction of that isolate's chromosome a tool wrongly called plasmid; chromosome FP bp is the same false call in raw bases, summed across every plasmid-free isolate a tool was scored on. A specificity below 1.0 means real chromosomal sequence was misclassified as plasmid on a sample where NO plasmid exists to justify it.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Plasmid-free isolates scored</th><th>Mean isolate specificity</th><th>Total chromosome FP bp</th></tr></thead><tbody>{zero_plasmid_html}</tbody></table></div></section>
-<section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered, among plasmids whose truth is circular (coverage of a circular plasmid, not a test that the prediction is circular), the strictest per-plasmid completeness band this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p><div class='panel'><table class='sortable'><thead><tr><th>Tool</th><th>Recall ≥50% complete</th><th>Recall ≥90% complete</th><th>Complete + circular recall</th></tr></thead><tbody>{graded_tiers_html}</tbody></table></div></section>
+<section id='graded-tiers'><h2>Graded plasmid recovery</h2><p class='lead'>Mean plasmid recall (in the main ranking table above) reports one configured completeness threshold. These columns break that single number into intermediate bands: the fraction of a tool's true plasmids that reached at least half covered, at least 90% covered, and -- for isolates with known circular truth -- essentially fully covered, among plasmids whose truth is circular (coverage of a circular plasmid, not a test that the prediction is circular), the strictest per-plasmid completeness band this report makes. None of these replace Mean F1 or Mean plasmid recall as the ranking metric; they exist to show WHERE a tool's misses tend to land, between total failure and perfect recovery.</p>{graded_html}</section>
 <section id='isolate-difficulty'><h2>Isolate difficulty</h2><p class='lead'>Truth-derived signals for how intrinsically hard THIS isolate is to correctly separate into plasmid vs. chromosome, independent of any tool's own performance on it -- never a tool-performance measure, and never wired into the recommendation model (see docs/METHODS.md). Off by default (RUN_DIFFICULTY_FEATURES); each field is independently optional and shown as "not available" rather than a guessed value when its own prerequisite (an assembly graph, short reads, or the external tool) was missing.</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>GFA dead-end count</th><th>Plasmid/chromosome depth ratio</th><th>Plasmid/chromosome Mash distance</th></tr></thead><tbody>{difficulty_html}</tbody></table></div>
 <h3>Dataset characteristics</h3><p class='lead'>Every isolate in one table, composed from the measurements the pipeline already makes (assembly statistics, read depth and quality, repeat content of the truth, the signals above). Each column says whether it is <strong>knowable without a reference</strong> (an isolate's own reads, assembly and organism: the only kind a live recommendation may use) or <strong>needs the reference</strong> (shown to explain results, never a model input). A value that was not measured says so; it is never a zero.</p><div class='panel'>{dataset_features_html}</div></section>
 <section id='cohort-qc'><h2>Cohort QC flags</h2><p class='lead'>Statistical, not rule-based: an isolate whose assembly N50, contig count, GC%, or plasmid count is a robust outlier (modified z-score) relative to the rest of this accepted cohort. <strong>Advisory only — never blocks or excludes a sample.</strong> An outlier may be the most scientifically interesting isolate in the cohort, not a bad one; review it, don't discard it on this signal alone. Only flagged values are shown here.{cohort_qc_download}</p><div class='panel'><table class='sortable'><thead><tr><th>Sample</th><th>Field</th><th>Value</th><th>Cohort median</th><th>Cohort MAD</th><th>Modified z-score</th><th>Note</th></tr></thead><tbody>{cohort_qc_html}</tbody></table></div></section>
@@ -3330,6 +3350,7 @@ document.querySelectorAll('table.sortable th').forEach((head,index)=>head.addEve
     page = report_maps.inject(page, str(results_dir), args.data_dir, args.scores)
     import report_figures   # the figure gallery: ladder, 3D landscape, heatmap, distributions, forest, precision-recall
     page = report_figures.inject(page, str(results_dir), args.data_dir, args.scores)
+    page = report_compare_table.finish(page)   # the style and the scripts of the comparison tables, once
     import report_post   # condense, fold and lay out the finished page (python/report_post.py lists the steps)
     page = report_post.run(page)
     # Outputs the report did not show before (per-plasmid detail, assembly quality, clonal groups, regret, truth depth, column

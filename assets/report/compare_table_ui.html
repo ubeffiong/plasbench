@@ -1,0 +1,260 @@
+<script>
+/* PlasBench comparison table, interface: toolbar, row shading, re-ordering, side panel, CSV. Reads the data block of each .ct and the pure
+   functions of compare_table_core.html (window.PBCT). The static grid is already complete; this only makes it interactive. */
+(function () {
+'use strict';
+var P = window.PBCT; if (!P) return;
+var esc = P.esc;
+function $(root, sel) { return root.querySelector(sel); }
+function $$(root, sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
+function fmtNum(x) { if (x == null) return ''; var a = Math.abs(x); return String(a !== 0 && (a < 0.001 || a >= 1e7) ? Number(x.toPrecision(4)) : Math.round(x * 10000) / 10000); }
+function dirText(d) { return d === 'higher' ? 'higher is better' : d === 'lower' ? 'lower is better' : 'direction not defined'; }
+var STATUS = {no_direction: 'direction not defined: not shaded', too_few: 'fewer than 2 tools assessed: not shaded', all_tied: 'every assessed tool is tied: not shaded'};
+
+function init(root) {
+  var blk = $(root, 'script.ct-data'); if (!blk) return;
+  var D; try { D = JSON.parse(blk.textContent); } catch (e) { return; }
+  var table = $(root, '.ct-grid'), panel = $(root, '.ct-panel'), main = $(root, '.ct-main'), head = $(root, '.ct-head');
+  var S = {order: D.cols.map(function (_, i) { return i; }), shown: {}, heat: true, collapsed: {}, res: {}, sel: null, q: ''};
+  var mIdx = {}, mList = [];
+  D.groups.forEach(function (g) { g.m.forEach(function (m) { m.g = g.t; mIdx[m.id] = mList.length; mList.push(m); }); });
+  D.cols.forEach(function (c, i) { S.shown[i] = true; });
+  root.classList.add('ct-js', 'ct-heat');
+  $$(table, 'tbody td[data-c]').forEach(function (td) { td.classList.add('ct-c'); td.setAttribute('role', 'gridcell'); td.tabIndex = -1; });
+  function rec(mid, ci) { var r = D.cells[mid][ci] || [], pairs = r[5] || []; return {disp: r[0] == null ? '' : r[0], v: r[1] == null ? null : r[1], n: r[2], lo: r[3], hi: r[4], iso: pairs, na: r[6] || ''}; }
+  function val(mid, ci) { var r = rec(mid, ci); return r.na ? null : r.v; }
+  function visible() { return S.order.filter(function (i) { return S.shown[i]; }); }
+  function label(ci) { return D.cols[ci].label; }
+  function cellEl(mid, ci) { return table.querySelector('tr[data-m="' + mid + '"] td[data-c="' + ci + '"]'); }
+  function live(msg) { var l = $(root, '.ct-live'); if (l) l.textContent = msg; }
+
+  /* ---- metric tooltips (definition, direction, unit, source), made from the data block so the static grid stays small */
+  $$(table, 'tbody tr.ct-row').forEach(function (tr) {
+    var m = mList[mIdx[tr.getAttribute('data-m')]], th = tr.querySelector('th'), tip = document.createElement('span'), id = D.id + '-tip-' + m.id;
+    tip.className = 'ct-tip'; tip.setAttribute('role', 'tooltip'); tip.id = id;
+    tip.textContent = (m.def || 'No definition is recorded for this metric.') + ' Direction: ' + (m.dir ? dirText(m.dir) : 'not defined, so the row is not shaded') + '.' + (m.unit ? ' Unit: ' + m.unit + '.' : '') + (m.src ? ' Source: ' + m.src + '.' : '');
+    th.appendChild(tip); var b = th.querySelector('.ct-mname'); if (b) b.setAttribute('aria-describedby', id);
+  });
+
+  /* ---- toolbar */
+  var tools = document.createElement('div'); tools.className = 'ct-tools';
+  var sortOpts = '<option value="orig">Original order</option><option value="mean">Mean rank, best first</option>' + mList.filter(function (m) { return m.dir; }).map(function (m) { return '<option value="m:' + esc(m.id) + '">By ' + esc(m.name) + '</option>'; }).join('');
+  tools.innerHTML = '<label><input type="checkbox" class="ct-heatbox" checked> Show heatmap</label>' +
+    '<label>Find tool <input type="search" class="ct-q" placeholder="filter tools" aria-label="Filter tools (columns)"></label>' +
+    '<label>Sort tools <select class="ct-sort" aria-label="Sort tools (columns)">' + sortOpts + '</select></label>' +
+    '<button type="button" class="ct-btn ct-allg">Collapse groups</button><button type="button" class="ct-btn ct-csv">Download CSV</button>';
+  head.appendChild(tools);
+  var lv = document.createElement('div'); lv.className = 'ct-live'; lv.setAttribute('aria-live', 'polite'); root.appendChild(lv);
+
+  /* ---- column handles */
+  $$(table, 'th.ct-col').forEach(function (th) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'ct-handle'; b.textContent = '⋮⋮';
+    b.setAttribute('aria-label', 'Move ' + (D.cols[+th.getAttribute('data-c')].label) + ' (drag, or press the left and right arrow keys)'); b.title = 'Drag to re-order; or Left / Right arrow keys';
+    th.insertBefore(b, th.firstChild);
+    b.addEventListener('mousedown', function () { th.draggable = true; });
+    b.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      var ci = +th.getAttribute('data-c'), v = visible(), pos = v.indexOf(ci), to = pos + (e.key === 'ArrowLeft' ? -1 : 1);
+      if (to < 0 || to >= v.length) return;
+      var target = v[to], a = S.order.indexOf(ci), t = S.order.indexOf(target);
+      S.order = P.moveItem(S.order, a, t); refresh(); b.focus(); live(label(ci) + ' moved to position ' + (to + 1) + ' of ' + v.length);
+    });
+    th.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', th.getAttribute('data-c')); e.dataTransfer.effectAllowed = 'move'; });
+    th.addEventListener('dragend', function () { th.draggable = false; $$(table, '.ct-dragover').forEach(function (x) { x.classList.remove('ct-dragover'); }); });
+    th.addEventListener('dragover', function (e) { e.preventDefault(); th.classList.add('ct-dragover'); });
+    th.addEventListener('dragleave', function () { th.classList.remove('ct-dragover'); });
+    th.addEventListener('drop', function (e) {
+      e.preventDefault(); th.classList.remove('ct-dragover');
+      var from = +e.dataTransfer.getData('text/plain'), to = +th.getAttribute('data-c');
+      if (from == null || from === to) return;
+      S.order = P.moveItem(S.order, S.order.indexOf(from), S.order.indexOf(to)); root.querySelector('.ct-sort').value = 'orig'; refresh();
+    });
+  });
+
+  /* ---- shading, order, visibility */
+  function refresh() {
+    var vis = visible(), shaded = {};
+    // order the columns in the DOM
+    $$(table, 'tr').forEach(function (tr) {
+      if (tr.classList.contains('ct-grp')) return;
+      S.order.forEach(function (ci) { var cell = tr.querySelector('[data-c="' + ci + '"]'); if (cell) tr.appendChild(cell); });
+    });
+    D.cols.forEach(function (c, ci) { $$(table, '[data-c="' + ci + '"]').forEach(function (el) { el.classList.toggle('ct-hide', !S.shown[ci]); }); });
+    mList.forEach(function (m) {
+      var res = P.rankShade(vis.map(function (ci) { return val(m.id, ci); }), m.dir); S.res[m.id] = {res: res, vis: vis};
+      var tr = table.querySelector('tr[data-m="' + m.id + '"]'), st = tr && $(tr, '[data-ct-stat]');
+      if (st) st.textContent = STATUS[res.status] || '';
+      vis.forEach(function (ci, k) {
+        var td = cellEl(m.id, ci), r = rec(m.id, ci); if (!td) return;
+        td.className = td.className.replace(/\bct-(s\d+|flat|na|best)\b/g, '').replace(/\s+/g, ' ').trim();
+        var aria = [], star = $(td, '.ct-star');
+        if (r.na) { td.classList.add('ct-na'); aria.push('not assessed: ' + r.na); }
+        else if (r.v == null) { td.classList.add('ct-flat'); aria.push('text, not ranked'); }
+        else if (res.bucket[k] != null) { td.classList.add('ct-s' + res.bucket[k]); aria.push('rank ' + res.rank[k] + ' of ' + res.m); }
+        else td.classList.add('ct-flat');
+        if (res.best[k]) { td.classList.add('ct-best'); aria.push('best in row'); if (!star) { star = document.createElement('span'); star.className = 'ct-star'; star.setAttribute('aria-hidden', 'true'); star.title = 'Best in row'; star.textContent = '★'; td.insertBefore(star, td.firstChild); } }
+        else if (star) star.remove();
+        td.setAttribute('aria-label', m.name + ', ' + label(ci) + ': ' + (r.disp || 'not assessed') + (aria.length ? '; ' + aria.join('; ') : ''));
+      });
+    });
+    root.classList.toggle('ct-heat', S.heat);
+    var first = null; $$(table, 'td[data-c]').forEach(function (td) { td.tabIndex = -1; if (!first && !td.classList.contains('ct-hide') && !td.parentNode.classList.contains('ct-hide')) first = td; });
+    var cur = table.querySelector('td[tabindex="0"]'); if (!cur && first) first.tabIndex = 0;
+    $(root, '.ct-count').textContent = mList.length + ' metrics by ' + vis.length + ' of ' + D.cols.length + ' tools';
+    if (S.sel) paintSel();
+  }
+  function applyGroups() {
+    $$(table, '.ct-row').forEach(function (tr) { tr.classList.toggle('ct-hide', !!S.collapsed[tr.getAttribute('data-g')]); });
+    $$(table, '.ct-gbtn').forEach(function (b) { b.setAttribute('aria-expanded', S.collapsed[b.getAttribute('data-ct-g')] ? 'false' : 'true'); });
+  }
+
+  /* ---- toolbar events */
+  $(root, '.ct-heatbox').addEventListener('change', function (e) { S.heat = e.target.checked; refresh(); });
+  $(root, '.ct-q').addEventListener('input', function (e) {
+    S.q = e.target.value.trim().toLowerCase();
+    D.cols.forEach(function (c, i) { S.shown[i] = !S.q || (c.label + ' ' + c.track + ' ' + c.task).toLowerCase().indexOf(S.q) >= 0; });
+    refresh(); live(visible().length + ' of ' + D.cols.length + ' tools shown');
+  });
+  $(root, '.ct-sort').addEventListener('change', function (e) {
+    var v = e.target.value, vis = visible(), n = D.cols.length;
+    if (v === 'orig') S.order = D.cols.map(function (_, i) { return i; });
+    else {
+      var rows = [];
+      (v === 'mean' ? mList : [mList[mIdx[v.slice(2)]]]).forEach(function (m) {
+        var res = P.rankShade(S.order.map(function (ci) { return S.shown[ci] ? val(m.id, ci) : null; }), m.dir), full = []; // ranks by column index
+        for (var j = 0; j < n; j++) full.push(null);
+        S.order.forEach(function (ci, k) { full[ci] = res.rank[k]; }); rows.push(full);
+      });
+      S.order = P.meanRankOrder(rows, n);
+    }
+    refresh(); live('Tools sorted: ' + e.target.options[e.target.selectedIndex].text);
+  });
+  $(root, '.ct-allg').addEventListener('click', function (e) {
+    var any = D.groups.some(function (g) { return !S.collapsed[g.t]; });
+    D.groups.forEach(function (g) { S.collapsed[g.t] = any; }); applyGroups(); e.target.textContent = any ? 'Expand groups' : 'Collapse groups';
+  });
+  $(root, '.ct-csv').addEventListener('click', function () {
+    var vis = visible(), rows = [['Group', 'Metric', 'Direction'].concat(vis.map(label))];
+    mList.forEach(function (m) { rows.push([m.g, m.name, dirText(m.dir)].concat(vis.map(function (ci) { var r = rec(m.id, ci); return r.disp || (r.na ? 'not assessed: ' + r.na : ''); }))); });
+    var text = P.csvText(rows), name = (D.id || 'comparison') + '.csv';
+    try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type: 'text/csv'})); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+    catch (e) { live('The browser blocked the download.'); }
+  });
+  $$(table, '.ct-gbtn').forEach(function (b) { b.addEventListener('click', function () { var g = b.getAttribute('data-ct-g'); S.collapsed[g] = !S.collapsed[g]; applyGroups(); }); });
+
+  /* ---- panel */
+  function chip(mid, ci) { var td = cellEl(mid, ci), m = /ct-s(\d+)/.exec(td ? td.className : ''); return '<span class="ct-chip ' + (m ? 'ct-s' + m[1] : (td && td.classList.contains('ct-na') ? 'ct-na' : '')) + '" aria-hidden="true"></span>'; }
+  function rankText(mid, ci) {
+    var R = S.res[mid], k = R.vis.indexOf(ci); if (k < 0) return 'not among the tools shown';
+    if (R.res.rank[k] == null) return STATUS[R.res.status] || 'not ranked';
+    return 'rank ' + R.res.rank[k] + ' of ' + R.res.m + (R.res.best[k] ? ' (best in row)' : '') + (R.res.status === 'all_tied' ? ' (all tied)' : '');
+  }
+  function strip(pairs, dir) {
+    var vals = pairs.map(function (p) { return p[1]; }), q = P.quartiles(vals); if (!q) return '';
+    var W = 320, H = 86, L = 10, R = 10, lo = q.min, hi = q.max, span = (hi - lo) || 1, x = function (v) { return L + (v - lo) / span * (W - L - R); };
+    var out = P.outliers(vals), isOut = {}; out.forEach(function (i) { isOut[i] = true; });
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Per-isolate values: ' + vals.length + ' isolates, from ' + fmtNum(q.min) + ' to ' + fmtNum(q.max) + ', median ' + fmtNum(q.median) + '"><title>Per-isolate values (strip with quartile box)</title>';
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="62" y2="62" stroke="currentColor" opacity=".35"/>';
+    if (vals.length >= 2) s += '<rect x="' + x(q.q1) + '" y="26" width="' + Math.max(1, x(q.q3) - x(q.q1)) + '" height="22" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="' + x(q.median) + '" x2="' + x(q.median) + '" y1="22" y2="52" stroke="currentColor" stroke-width="2.5"/>';
+    vals.forEach(function (v, i) { var cy = 37 + ((i * 7) % 5 - 2) * 3; s += '<circle cx="' + x(v) + '" cy="' + cy + '" r="' + (isOut[i] ? 4.5 : 3.2) + '" fill="' + (isOut[i] ? '#d55e00' : '#0072B2') + '" fill-opacity=".8" stroke="' + (isOut[i] ? '#7a2a00' : 'none') + '"><title>' + esc(pairs[i][0]) + ': ' + fmtNum(v) + (isOut[i] ? ' (outlier)' : '') + '</title></circle>'; });
+    s += '<text x="' + L + '" y="78" font-size="10" fill="currentColor">' + fmtNum(q.min) + '</text><text x="' + (W - R) + '" y="78" font-size="10" text-anchor="end" fill="currentColor">' + fmtNum(q.max) + '</text></svg>';
+    return {svg: s, q: q, out: isOut};
+  }
+  function cellPanel(mid, ci) {
+    var m = mList[mIdx[mid]], c = D.cols[ci], r = rec(mid, ci), h = '';
+    h += '<h4>' + esc(m.name) + ' × ' + esc(c.label) + '</h4><div class="ct-note">' + esc([c.track, c.task].filter(Boolean).join(' · ')) + '</div>';
+    h += '<div class="ct-big">' + esc(r.disp || 'not assessed') + '</div>';
+    if (r.na) h += '<p>Not assessed: ' + esc(r.na) + '. It is not shaded and is never read as zero.</p>';
+    h += '<dl class="ct-kv"><dt>Rank in row</dt><dd>' + esc(rankText(mid, ci)) + '</dd><dt>Direction</dt><dd>' + esc(dirText(m.dir)) + '</dd>' +
+      '<dt>Isolates (n)</dt><dd>' + (r.n != null ? r.n : 'not recorded') + '</dd><dt>Interval</dt><dd>' + (r.lo != null && r.hi != null ? fmtNum(r.lo) + ' to ' + fmtNum(r.hi) : 'none recorded for this value') + '</dd></dl>';
+    h += '<h5>Isolates behind this value</h5>';
+    var pairs = r.iso.map(function (p) { return [D.samples[p[0]], p[1], D.links ? D.links[p[0]] : null]; });
+    if (!pairs.length) h += '<p class="ct-note">Per-isolate values are not recorded for this cell.</p>';
+    else {
+      var st = strip(pairs, m.dir); h += st.svg;
+      h += '<p class="ct-note">' + pairs.length + ' isolates; median ' + fmtNum(st.q.median) + ', quartiles ' + fmtNum(st.q.q1) + ' to ' + fmtNum(st.q.q3) + ' (of the isolate values shown). Orange = outside 1.5 × IQR' + (pairs.length < 4 ? ' (not assessed with fewer than 4 values)' : '') + '.</p>';
+      var ranked = P.rankIsolates(pairs.map(function (p) { return [p[0], p[1]]; }), m.dir), link = {}; pairs.forEach(function (p) { link[p[0]] = p[2]; });
+      var outNames = {}; Object.keys(st.out).forEach(function (i) { outNames[pairs[i][0]] = true; });
+      h += '<h5>' + (m.dir ? 'Isolates, best to worst' : 'Isolates (direction not defined: input order)') + '</h5><ol class="ct-plist">' + ranked.map(function (p) {
+        var nm = link[p[0]] ? '<a href="' + esc(link[p[0]]) + '">' + esc(p[0]) + '</a>' : esc(p[0]);
+        return '<li><span>' + nm + (outNames[p[0]] ? ' <span class="ct-out">outlier</span>' : '') + '</span><span>' + fmtNum(p[1]) + '</span></li>'; }).join('') + '</ol>';
+    }
+    h += '<h5>Same metric, other tools</h5><ul class="ct-plist">' + visible().map(function (j) { var o = rec(mid, j);
+      return '<li class="' + (j === ci ? 'ct-sel' : '') + '"><span>' + chip(mid, j) + '<a href="#" data-ct-go="' + j + '">' + esc(label(j)) + '</a></span><span>' + esc(o.disp || 'not assessed') + '</span></li>'; }).join('') + '</ul>';
+    return h;
+  }
+  function metricPanel(mid) {
+    var m = mList[mIdx[mid]], h = '<h4>' + esc(m.name) + '</h4><div class="ct-note">' + esc(m.g) + '</div>';
+    h += '<p>' + esc(m.def || 'No definition is recorded for this metric.') + '</p><dl class="ct-kv"><dt>Direction</dt><dd>' + esc(dirText(m.dir)) + '</dd>' +
+      (m.unit ? '<dt>Unit</dt><dd>' + esc(m.unit) + '</dd>' : '') + '<dt>Comes from</dt><dd>' + esc(m.src || 'not recorded') + '</dd>' +
+      (m.reg ? '<dt>Registry id</dt><dd>' + esc(m.reg) + (m.ev ? ' (' + esc(m.ev.replace(/_/g, ' ')) + ')' : '') + '</dd>' : '<dt>Registry</dt><dd>not in the metric registry</dd>') +
+      (m.shown ? '<dt>Shown in</dt><dd><a href="#' + esc(m.shown) + '">' + esc(m.shown) + '</a></dd>' : '') + '</dl>';
+    if (m.lim) h += '<p class="ct-note"><strong>Limits.</strong> ' + esc(m.lim) + '</p>';
+    if (m.note) h += '<p class="ct-note">' + esc(m.note) + '</p>';
+    var R = S.res[mid]; h += '<p class="ct-note">' + esc(STATUS[R.res.status] || 'Shaded by rank among the tools shown.') + '</p>';
+    h += '<h5>Values</h5><ul class="ct-plist">' + visible().map(function (j) { var o = rec(mid, j); return '<li><span>' + chip(mid, j) + '<a href="#" data-ct-go="' + j + '">' + esc(label(j)) + '</a></span><span>' + esc(o.disp || 'not assessed') + '</span></li>'; }).join('') + '</ul>';
+    return h;
+  }
+  function toolPanel(ci) {
+    var c = D.cols[ci], best = 0, shaded = 0, h = '<h4>' + esc(c.label) + '</h4><div class="ct-note">' + esc([c.track, c.task].filter(Boolean).join(' · ')) + '</div>', body = '';
+    D.groups.forEach(function (g) {
+      body += '<h5>' + esc(g.t) + '</h5><ul class="ct-plist">' + g.m.map(function (m) {
+        var R = S.res[m.id], k = R.vis.indexOf(ci), o = rec(m.id, ci);
+        if (R.res.bucket[k] != null) shaded++; if (R.res.best[k]) best++;
+        return '<li><span>' + chip(m.id, ci) + '<a href="#" data-ct-metric-go="' + esc(m.id) + '">' + esc(m.name) + '</a></span><span>' + esc(o.disp || 'not assessed') + ' <span class="ct-note">' + esc(k < 0 ? '' : (R.res.rank[k] != null ? 'rank ' + R.res.rank[k] + '/' + R.res.m : '')) + '</span></span></li>'; }).join('') + '</ul>';
+    });
+    return h + '<p>Best in ' + best + ' of ' + shaded + ' shaded rows. Ranks are among the tools shown; rows with no direction or too few tools are not ranked.</p>' + body;
+  }
+  function open(kind, a, b, from) {
+    S.sel = {kind: kind, a: a, b: b};
+    panel.hidden = false; main.classList.add('ct-open');
+    panel.innerHTML = '<button type="button" class="ct-btn ct-pclose" aria-label="Close the details panel">Close</button>' + (kind === 'cell' ? cellPanel(a, b) : kind === 'metric' ? metricPanel(a) : toolPanel(a));
+    panel.setAttribute('aria-label', 'Details: ' + (kind === 'cell' ? mList[mIdx[a]].name + ', ' + label(b) : kind === 'metric' ? mList[mIdx[a]].name : label(a)));
+    S.from = from || S.from; paintSel();
+  }
+  function paintSel() {
+    $$(table, '[aria-selected="true"]').forEach(function (x) { x.removeAttribute('aria-selected'); });
+    if (S.sel && S.sel.kind === 'cell') { var td = cellEl(S.sel.a, S.sel.b); if (td) td.setAttribute('aria-selected', 'true'); }
+  }
+  function close() { S.sel = null; panel.hidden = true; main.classList.remove('ct-open'); paintSel(); if (S.from && document.body.contains(S.from)) S.from.focus(); }
+  panel.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.classList.contains('ct-pclose')) return close();
+    if (t.hasAttribute('data-ct-go')) { e.preventDefault(); if (S.sel.kind === 'cell') open('cell', S.sel.a, +t.getAttribute('data-ct-go')); else open('cell', S.sel.a, +t.getAttribute('data-ct-go')); }
+    else if (t.hasAttribute('data-ct-metric-go')) { e.preventDefault(); open('metric', t.getAttribute('data-ct-metric-go')); }
+  });
+  panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+
+  /* ---- grid events: click, keyboard */
+  table.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-ct-metric],[data-ct-tool],td[data-c]') : null; if (!t) return;
+    if (t.hasAttribute('data-ct-metric')) open('metric', t.getAttribute('data-ct-metric'), null, t);
+    else if (t.hasAttribute('data-ct-tool')) open('tool', +t.getAttribute('data-ct-tool'), null, t);
+    else { $$(table, 'td[tabindex="0"]').forEach(function (x) { x.tabIndex = -1; }); t.tabIndex = 0; open('cell', t.parentNode.getAttribute('data-m'), +t.getAttribute('data-c'), t); }
+  });
+  table.addEventListener('keydown', function (e) {
+    var td = e.target; if (!td.classList || !td.hasAttribute('data-c') || td.tagName !== 'TD') return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open('cell', td.parentNode.getAttribute('data-m'), +td.getAttribute('data-c'), td); return; }
+    if (e.key === 'Escape') { close(); return; }
+    var rows = $$(table, 'tr.ct-row').filter(function (r) { return !r.classList.contains('ct-hide'); }), tr = td.parentNode, ri = rows.indexOf(tr);
+    var cells = $$(tr, 'td[data-c]').filter(function (x) { return !x.classList.contains('ct-hide'); }), ci = cells.indexOf(td), next = null;
+    if (e.key === 'ArrowRight') next = cells[ci + 1]; else if (e.key === 'ArrowLeft') next = cells[ci - 1];
+    else if (e.key === 'Home') next = cells[0]; else if (e.key === 'End') next = cells[cells.length - 1];
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { var r2 = rows[ri + (e.key === 'ArrowDown' ? 1 : -1)]; if (r2) next = $$(r2, 'td[data-c]').filter(function (x) { return !x.classList.contains('ct-hide'); })[ci]; }
+    else return;
+    e.preventDefault(); if (next) { td.tabIndex = -1; next.tabIndex = 0; next.focus(); }
+  });
+  root.addEventListener('keydown', function (e) { if (e.key === 'Escape' && S.sel && !panel.hidden) close(); });
+
+  /* ---- print: shade everything, restore afterwards */
+  var heatBefore = true;
+  window.addEventListener('beforeprint', function () { heatBefore = S.heat; root.classList.add('ct-heat'); });
+  window.addEventListener('afterprint', function () { root.classList.toggle('ct-heat', heatBefore); });
+  if (/[?&]print=1/.test(location.search)) { S.heat = true; $(root, '.ct-heatbox').checked = true; }
+  refresh(); applyGroups();
+}
+function boot() { Array.prototype.slice.call(document.querySelectorAll('.ct[data-ct]')).forEach(function (r) { if (!r.classList.contains('ct-js')) init(r); }); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>

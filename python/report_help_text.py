@@ -200,6 +200,17 @@ HELP = {
         "The closer a line is to the top-right corner, the better.",
         "Shows how a tool behaves if you make it stricter or looser.",
         "If no tool wrote a curve file for a track, the figure says so and nothing is drawn."),
+    "compare-table": H(
+        "A grid that compares tools metric by metric, with the best and worst tool of every row shaded. Click anything in it for the detail behind it.",
+        "The same numbers as the plain table folded under it (it is kept, under 'Table'), plus the per-isolate values from the scores table where the run has them.",
+        "Each row is one metric. Tools are ranked inside the row, using the direction in the metric registry (higher or lower is better). The shade comes from the rank "
+        "(worst red, median white, best blue), not from the raw value, so a single huge value cannot hide the differences between the others. Tied tools share a rank.",
+        "Tick 'Show heatmap' to shade, untick to see plain numbers. A star marks the best tool in a row. A hatched cell was not assessed or is missing; it is never shaded and never zero. "
+        "A row says why it is not shaded when its direction is not defined, when fewer than two tools were assessed, or when all tools tie. Click a cell for the isolates behind it, "
+        "a metric name for its definition and source, a tool name for its profile. Drag a column handle, or use the arrow keys on it, to re-order; 'Download CSV' saves what is shown.",
+        "It shows quickly which tool leads on which measure, and which of the isolates drive a value, without leaving the page.",
+        "Shading compares tools within one row of one table, so it is not comparable across rows, tracks or tasks. With few isolates a spread is a description, not evidence of a difference. "
+        "Rank hides how far apart two tools are: read the values. Filtering tools re-ranks the rows among the tools still shown."),
     "fig-ladder": H(
         "A map of how this benchmark scores a result, from raw contigs to a verified plasmid.",
         "No data; it explains the five scoring steps.",
