@@ -4425,11 +4425,15 @@ $("#doclist").onclick = e => { const b = e.target.closest("[data-doc]"); if (b) 
 function md(src) {
   const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, "$1<i>$2</i>")
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, "<span class=\"mut\">$1</span>");
-  const out = [], lines = src.split(/\r?\n/); let i = 0;
+  const out = [], lines = src.split(/\r?\n/); let i = 0, last = -1, stuck = 0;
   while (i < lines.length) {
+    // Every pass must consume at least one line. A line no rule below handles used to be skipped by the paragraph rule without being taken (a "#####" heading, with only
+    // levels 1-4 known), so the loop never advanced and the window froze on opening that guide. If it ever happens again, take the line as plain text and go on.
+    if (i === last && ++stuck > 1) { out.push(`<p>${inline(lines[i])}</p>`); i++; stuck = 0; continue; }
+    if (i !== last) { last = i; stuck = 0; }
     const l = lines[i];
     if (/^```/.test(l)) { const buf = []; i++; while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]); i++; out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`); continue; }
-    const h = l.match(/^(#{1,4})\s+(.*)/); if (h) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+    const h = l.match(/^(#{1,6})\s+(.*)/); if (h) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
     if (/^\|/.test(l)) { const rows = []; while (i < lines.length && /^\|/.test(lines[i])) rows.push(lines[i++]);
       const cells = r => r.replace(/^\||\|$/g, "").split("|").map(c => c.trim());
       out.push(`<table><tr>${cells(rows[0]).map(c => `<th>${inline(c)}</th>`).join("")}</tr>${rows.slice(2).map(r => `<tr>${cells(r).map(c => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</table>`); continue; }
