@@ -465,16 +465,16 @@ HELP = {
         "It is optional, and it never changes a benchmark score."),
     "learn-readqc": H(
         "Whether each sample's raw reads were fit to assemble, decided before any tool ran.",
-        "One row per sample from the short-read QC gate.",
-        "Each read pair is measured (file integrity, read count, estimated depth, read length, GC) against thresholds fixed before the run and given PASS, WARN or REJECT with reasons.",
-        "PASS proceeds. WARN proceeds with a flag. REJECT is excluded from the primary analysis when the gate is set to enforce.",
+        "One row per sample from the short-read QC gate, shown as a MultiQC-style panel: a section list, a General statistics table with inline bars and a toolbar (Copy table, Configure columns, Scatter plot, Violin plot, Export as CSV), and a record per sample.",
+        "Each read pair is measured (file integrity, read count, estimated depth, Phred, Q30, read length, GC, adapters, duplication) against the thresholds and given PASS, WARN or REJECT with reasons. Click a sample, a row or a point, to open its record: each metric as a gauge against its limits, why it passed, warned or was rejected, and its assembly selection.",
+        "PASS proceeds. WARN proceeds with a flag. REJECT is excluded from the primary analysis when the gate is set to enforce. The panel also shows what the reviewer asked: how quality was assessed, the thresholds and their status and hash, what was excluded, whether the flagged samples change the ranking, and how the assembly was selected. All sections print stacked, in full.",
         "Separates poor sequencing data from a poor tool.",
-        "The thresholds are provisional and not platform-specific."),
+        "A run with no QC table says Not measured in this run and gives the command that produces it. A table marked Synthetic is the offline demo's, not a measurement. Check the thresholds status: provisional values are not universal cut-offs."),
     "learn-assembly": H(
         "Which short-read assembly the tools were run on, and why.",
-        "One column per candidate assembly with its measured quality.",
+        "One column per candidate assembly with its measured quality, as in QUAST's comparison table.",
         "Each candidate is measured and a declared rule picks one from those measurements only, never from a score; ineligible candidates are marked and their samples skipped.",
-        "The marked column is the one used. Colour runs from worst to best across the candidates.",
+        "The starred, outlined column is the one used, with the reason beneath. Colour runs from worst to best across the candidates; the Show heatmap box switches it off.",
         "A tool should not be blamed for an assembly it was given.",
         "Running every tool on every alternative assembly is a separate run per condition."),
     "learn-multiplicity": H(

@@ -29,6 +29,10 @@ SAMPLES="$DEMO/samples.tsv"
 
 python3 "$HERE/demo_dataset.py" --out-dir "$DEMO"
 
+# The demo has no reads, so there is no QC to measure. These are SYNTHETIC short-read QC and assembly-candidate tables (fixed figures, marked synthetic in a provenance
+# file, shown with a "Synthetic" note in the report's QC panel). The script refuses unless every sample in the sheet is marked synthetic, so it can never run on real data.
+python3 "$PY/make_demo_readqc.py" --results-dir "$DEMO" --sample-sheet "$SAMPLES"
+
 CAPABILITIES="$ROOT/config/tool_capabilities.tsv"
 binning_capable() {
     python3 "$PY/tool_capabilities.py" --registry "$CAPABILITIES" --tool "$1" --binning-capable >/dev/null 2>&1

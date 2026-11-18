@@ -47,7 +47,7 @@ def qc(sample, status, reasons="", pairs="200000", depth="80", q="35", q30="0.9"
 print("short-read QC dashboard")
 rows = [qc("good1", "PASS"), qc("warn1", "WARN", "q30_fraction 0.7 < 0.75 (warn)", q30="0.7"),
         qc("bad1", "REJECT", "mean_quality 15 < 20 (reject)", q="15"), qc("bad2", "REJECT", "integrity: truncated (R1)", integrity="truncated")]
-html = rv.readqc_section(rows)
+html = rv._readqc_legacy(rows)      # the earlier table, kept in the "All values" fold (the panel is tested in test_report_readqc_panel.py)
 check("a decision chip is a word, for every sample", all(w in html for w in ("PASS", "WARN", "REJECT")) and html.count("rv-chip") == 4)
 check("the cohort summary counts each decision", "1 PASS" in html and "1 WARN" in html and "2 REJECT" in html)
 check("rejected samples come first, then warnings, then passes", html.index("bad1") < html.index("warn1") < html.index("good1"))
@@ -61,7 +61,7 @@ check("provisional thresholds are said to be provisional, with their hash", "pro
       and "not universal cut-offs" in html)
 check("contamination is stated as not screened", "Taxonomic contamination is not screened" in html)
 check("the cohort bar is well-formed SVG", all(well_formed(s)[0] for s in svgs(html)) and len(svgs(html)) == 1)
-check("no table says it was not run, instead of staying silent", "Not run" in rv.readqc_section(None) and "short_read_qc.tsv" in rv.readqc_section(None))
+check("no table says it was not measured, instead of staying silent", "Not measured in this run" in rv.readqc_section(None) and "short_read_qc.tsv" in rv.readqc_section(None))
 check("frozen thresholds drop the provisional warning", "not universal cut-offs" not in rv.readqc_section([dict(qc("f", "PASS"), policy_status="frozen")]))
 
 print("assembly selection dashboard")
@@ -87,8 +87,8 @@ check("the policy summary counts the selections", "unicycler for 1 sample(s)" in
 check("the first sample is open and the others collapsed", "<details open><summary>s1" in html and "<details><summary>s2" in html)
 check("heat colours run from red through white to blue", rv.heat(0) != rv.heat(0.5) != rv.heat(1) and rv.heat(0.5) == "#ffffff")
 check("alternatives are said to be retained for sensitivity analysis, not yet run through the tools", "not done yet" in html)
-check("a missing table says it was not run", "Not run" in rv.assembly_section(None))
-check("sample names are escaped", "<script>" not in rv.assembly_section([cand("<script>x</script>", "a", "1", "1", "1", "yes")]))
+check("a missing table says it was not measured", "Not measured in this run" in rv.assembly_section(None))
+check("sample names are escaped", "<script>x</script>" not in rv.assembly_section([cand("<script>x</script>", "a", "1", "1", "1", "yes")]))
 
 print("reconstruction multiplicity dashboard")
 

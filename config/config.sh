@@ -665,6 +665,14 @@ export RUN_QUAST_DIAGNOSTICS="${RUN_QUAST_DIAGNOSTICS:-0}"
 export QUAST_DIAGNOSTICS_THREADS="${QUAST_DIAGNOSTICS_THREADS:-$THREADS}"
 export QUAST_DIAGNOSTICS_MIN_CONTIG="${QUAST_DIAGNOSTICS_MIN_CONTIG:-0}"
 
+# Optional MultiQC companion (python/run_multiqc.py, stage 6, before the report is built). PlasBench's own QC panel in the report is NOT made with
+# MultiQC (QC is fastp plus python/short_read_qc.py); MultiQC is the community-standard view of the same fastp (and QUAST) output files, with more plots
+# (per-base quality, adapter content, duplication). auto (default) = run `multiqc` only when it is installed (plasbench install-tools multiqc); on = always
+# try, and warn when it is missing; off = never. It writes results/multiqc/multiqc_report.html (a separate file the report links to, never embeds) and can
+# never fail a run: a problem is a warning in run_events.jsonl and a note in the report's QC panel.
+export MULTIQC_REPORT="${MULTIQC_REPORT:-auto}"
+export MULTIQC_TIMEOUT_SECONDS="${MULTIQC_TIMEOUT_SECONDS:-600}"
+
 # Optional operational-mode (no-truth) nearest-reference screen -- EXPERIMENTAL
 # AND UNVALIDATED (python/classify_operational_plasmid.py,
 # scripts/08_operational_reconstruct.sh): Mash distance from this isolate's own
