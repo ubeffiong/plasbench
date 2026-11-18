@@ -147,11 +147,28 @@ def tree_size(path):
 
 
 # -- downloading -----------------------------------------------------------------------------------------------------
+def _require_online(url):
+    """Say plainly, before a download starts, that the internet is not reachable (plasbench/netcheck.py, loaded through plasbench_common); never blocks when the check is unavailable."""
+    try:
+        import plasbench_common
+        module = plasbench_common.netcheck_module()
+    except Exception:  # noqa: BLE001 - the check is a courtesy
+        return
+    if module is None:
+        return
+    try:
+        module.require("internet", action=f"Downloading {urllib.parse.urlparse(url).netloc or 'the tool'}")
+    except module.NoInternet as exc:
+        raise SourceError(exc.message) from exc
+
+
 def http_fetch(url, dest, limit, timeout=DEFAULT_TIMEOUT, attempts=3, opener=urllib.request.urlopen):
     """Download `url` to `dest` (resuming `dest.part` after an interrupted connection). Returns {"final_url", "size"}.
     Refuses a response over `limit` bytes and a redirect that leaves https."""
     dest = Path(dest)
     part = Path(str(dest) + ".part")
+    if opener is urllib.request.urlopen:
+        _require_online(url)
     dest.parent.mkdir(parents=True, exist_ok=True)
     last = None
     for attempt in range(1, attempts + 1):

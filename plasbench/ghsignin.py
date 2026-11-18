@@ -191,7 +191,7 @@ class SignIn:
                 return
             self.exit = code
             if self._cancel:
-                self.state = "cancelled"
+                pass                    # cancel() and _expire() already set the state (cancelled or expired) and the message: do not overwrite it
             elif code == 0:
                 self.state = "signed_in"
             elif self.state == "waiting":
