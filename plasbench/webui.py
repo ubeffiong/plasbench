@@ -1099,15 +1099,28 @@ def read_study_file(root, raw: str) -> dict:
             "text": data.decode("utf-8", "replace")}
 
 
-def browse(path: str, files: bool) -> dict:
+def browse(path: str, files: bool, project=None) -> dict:
+    """The folder chooser's listing. An empty path is the root view: Quick places (Home, the workspace, the PlasBench folder, the shared data folder) and This PC (drive letters;
+    in WSL the Windows drives; on Linux /mnt, /media/$USER; on macOS /Volumes). A typed Windows or \\\\wsl.localhost path is converted to the Linux path in WSL."""
+    from . import chooser
+    wsl = chooser.in_wsl()
     if not path:
-        if os.name == "nt":
-            import string
-            drives = [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").exists()]
-            return {"path": "", "parent": None, "entries": [{"name": d, "path": d, "dir": True} for d in drives]}
-        path = str(Path.home())
+        places, pc = [], chooser.pc_places()
+        if project is not None:
+            from . import studies
+            from .cli import configured_data_dir
+            places = chooser.quick_places(project.root, studies.workspace(project.root), configured_data_dir(project.root))
+        else:
+            places = chooser.quick_places(Path.cwd(), Path.home())
+        help_text = ("A drive that is not listed is not mounted in Ubuntu. To mount a drive (E: as the example), run this in the Terminal tab; PlasBench never runs it for you: "
+                     + chooser.mount_command("E")) if wsl else ""
+        return {"path": "", "parent": None, "windows": "", "wsl": wsl, "places": places, "pc": pc, "help": help_text, "entries": places + pc}
+    path = chooser.to_linux(path)
     p = Path(path).expanduser()
     if not p.exists():
+        m = chooser.DRIVE_RE.match(str(path)) or (wsl and re.match(r"^/mnt/([A-Za-z])(/|$)", str(path)))
+        if wsl and m and re.match(r"^/mnt/([A-Za-z])(/|$)", str(p)):
+            raise FileNotFoundError(chooser.mount_help(re.match(r"^/mnt/([A-Za-z])", str(p)).group(1)))
         raise FileNotFoundError(f"{p} does not exist")
     if p.is_file():
         p = p.parent
@@ -1132,8 +1145,10 @@ def browse(path: str, files: bool) -> dict:
                 break
     except PermissionError:
         raise PermissionError(f"no permission to list {p}")
-    parent = str(p.parent) if p.parent != p else ("" if os.name == "nt" else None)
-    return {"path": str(p), "parent": parent, "entries": entries}
+    except OSError as exc:
+        raise PermissionError(f"cannot list {p}: {exc.strerror or exc}")
+    parent = str(p.parent) if p.parent != p else ""
+    return {"path": str(p), "parent": parent, "windows": chooser.to_windows(str(p)), "wsl": wsl, "entries": entries}
 
 
 class UIServer(ThreadingHTTPServer):
@@ -1345,7 +1360,7 @@ def make_handler(project: Project, jobs: Jobs):
             if route == "files/read":
                 return self.jsend(200, read_study_file(project.root, q.get("path", "")))
             if route == "browse":
-                return self.jsend(200, browse(q.get("path", ""), q.get("files") == "1"))
+                return self.jsend(200, browse(q.get("path", ""), q.get("files") == "1", project))
             if route == "docs":
                 return self.jsend(200, {"docs": project.docs()})
             if route == "doc":
@@ -1420,14 +1435,14 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, workspace.check(q.get("path", "")))
             if route == "fs/list":
                 from . import studies
-                return self.jsend(200, runfolders.list_dir(project.root, studies.workspace(project.root), q.get("path", "")))
+                return self.jsend(200, runfolders.list_dir(project.root, studies.workspace(project.root), q.get("path", ""), studies.external_folders(project.root)))
             if route == "fs/properties":
                 from . import studies
-                return self.jsend(200, runfolders.properties(project.root, studies.workspace(project.root), q.get("path", "")))
+                return self.jsend(200, runfolders.properties(project.root, studies.workspace(project.root), q.get("path", ""), studies.external_folders(project.root)))
             if route == "runs/facts":              # what deleting a run folder would remove, shown before the user confirms
                 from . import studies
                 ws = studies.workspace(project.root)
-                real = runfolders.check_deletable(project.root, ws, Path.home(), q.get("path", ""), state.get("runs", []), jobs.running_results())
+                real = runfolders.check_deletable(project.root, ws, Path.home(), q.get("path", ""), state.get("runs", []), jobs.running_results(), studies.external_folders(project.root))
                 return self.jsend(200, runfolders.facts(ws, real))
             if route == "studies/facts":           # what a delete or archive would involve, shown before the user confirms
                 from . import study_manage
@@ -1653,17 +1668,30 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, out)
             if route == "studies/create":
                 from . import studies
-                folder = studies.create(project.root, data.get("name", ""), data.get("note", ""))
+                folder = studies.create(project.root, data.get("name", ""), data.get("note", ""), data.get("location") or None)
                 session_log().event("study_created", path=str(folder))
                 return self.jsend(200, {"path": str(folder)})
-            if route.startswith("studies/") and route[len("studies/"):] in ("meta", "rename", "clone", "archive", "restore", "delete", "export", "import"):
+            if route == "studies/add_existing":
+                from . import studies
+                folder = studies.add_existing(project.root, self.linux_path(data.get("path", "")))
+                session_log().event("study_added", path=str(folder))
+                return self.jsend(200, {"path": str(folder), "name": folder.name})
+            if route == "fs/mkdir":
+                from . import chooser
+                made = chooser.make_folder(self.linux_path(data.get("parent", "")), data.get("name", ""))
+                session_log().event("folder_created", path=made)
+                return self.jsend(200, {"path": made})
+            if route.startswith("studies/") and route[len("studies/"):] in ("meta", "rename", "clone", "archive", "restore", "delete", "export", "import", "delete_data", "unregister"):
                 from . import study_manage as sm, studies, __version__
                 action, name = route[len("studies/"):], (data.get("name") or "").strip()
 
                 def busy():          # a run in progress that was started in this study
                     if action in ("restore", "import", "export", "meta", "clone"):
                         return False
-                    here = str(Path(studies.workspace(project.root)) / name).lower()
+                    try:
+                        here = str(studies.study_path(project.root, name)).lower()
+                    except ValueError:
+                        return False
                     for j in jobs.list():
                         if j["state"] in ("running", "cancelling") and (here in (j.get("command") or "").lower() or f"--study {name}".lower() in (j.get("command") or "").lower()
                                                                           or f"--study={name}".lower() in (j.get("command") or "").lower()):
@@ -1681,6 +1709,10 @@ def make_handler(project: Project, jobs: Jobs):
                     out = {"path": str(sm.restore(project.root, data.get("archive", "")))}
                 elif action == "delete":
                     out = sm.delete(project.root, name, data.get("confirm", ""), busy())
+                elif action == "delete_data":
+                    out = sm.delete_data(project.root, name, data.get("confirm", ""), busy())
+                elif action == "unregister":
+                    out = {"removed": sm.remove_from_list(project.root, name)}
                 elif action == "export":
                     stamp = time.strftime("%Y%m%d-%H%M%S")
                     target = Path(studies.workspace(project.root)) / ".exports" / f"{studies.valid_name(name)}-{stamp}.zip"
@@ -1707,8 +1739,9 @@ def make_handler(project: Project, jobs: Jobs):
                 from . import studies
                 ws = studies.workspace(project.root)
                 state = load_state()
-                real = runfolders.check_deletable(project.root, ws, Path.home(), data.get("path", ""), state.get("runs", []), jobs.running_results())
-                removed = runfolders.delete(project.root, ws, Path.home(), str(real), data.get("confirm", ""), state.get("runs", []), jobs.running_results())
+                ext = studies.external_folders(project.root)
+                real = runfolders.check_deletable(project.root, ws, Path.home(), data.get("path", ""), state.get("runs", []), jobs.running_results(), ext)
+                removed = runfolders.delete(project.root, ws, Path.home(), str(real), data.get("confirm", ""), state.get("runs", []), jobs.running_results(), ext)
                 state["runs"] = [r for r in state.get("runs", []) if str(Path(r).resolve()) != str(real) and r != data.get("path")]
                 save_state(state)
                 session_log().event("run_deleted", path=str(real), files=removed["files"], bytes=removed["bytes"])
@@ -1725,9 +1758,13 @@ def make_handler(project: Project, jobs: Jobs):
             raise FileNotFoundError(f"no such API: {route}")
 
         # ---------------------------------------------------------------- git (plasbench/gitops.py)
+        def linux_path(self, text):
+            from . import chooser
+            return chooser.to_linux(text)
+
         def git_roots(self):
             from . import studies
-            return [project.root, studies.workspace(project.root)]
+            return [project.root, studies.workspace(project.root)] + studies.external_folders(project.root)
 
         def git_choices(self) -> dict:
             """Version control tracks your runs in ONE repository in the working directory (the workspace that holds every

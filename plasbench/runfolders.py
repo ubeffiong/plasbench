@@ -72,7 +72,7 @@ def git_tracked(folder: Path, workspace: Path) -> bool:
         cur = cur.parent
 
 
-def check_deletable(project_root, workspace, home, path, registered=(), running_results=()) -> Path:
+def check_deletable(project_root, workspace, home, path, registered=(), running_results=(), extra_studies=()) -> Path:
     """The real folder for `path` when it may be deleted as a run folder; otherwise raises RunFolderError."""
     raw = str(path or "").strip()
     if not raw:
@@ -92,7 +92,8 @@ def check_deletable(project_root, workspace, home, path, registered=(), running_
         if real == protected or _inside(protected, real):
             raise RunFolderError(f"{real} is or contains {name}: refusing")
     allowed = False
-    if real.parent.parent == ws and (real.name == "results" or real.name.startswith("results_")) and (real.parent / "study.json").is_file():
+    study_roots = [ws] + [_real(e).parent for e in extra_studies]       # the workspace, and the folders that hold studies kept outside it
+    if any(real.parent.parent == r for r in study_roots) and (real.name == "results" or real.name.startswith("results_")) and (real.parent / "study.json").is_file():
         allowed = True                                       # (a) a results folder of a study
     elif any(real == _real(r) for r in registered):
         if (real / "study.json").is_file():
@@ -179,9 +180,9 @@ def facts(workspace, folder) -> dict:
     return out
 
 
-def delete(project_root, workspace, home, path, confirm, registered=(), running_results=()) -> dict:
+def delete(project_root, workspace, home, path, confirm, registered=(), running_results=(), extra_studies=()) -> dict:
     """Delete a run folder after check_deletable and the folder's own name typed back. Returns the facts of what was removed."""
-    real = check_deletable(project_root, workspace, home, path, registered, running_results)
+    real = check_deletable(project_root, workspace, home, path, registered, running_results, extra_studies)
     if (confirm or "").strip() != real.name:
         raise RunFolderError("type the folder's name exactly to confirm the delete", 400)
     removed = facts(workspace, real)
@@ -191,18 +192,21 @@ def delete(project_root, workspace, home, path, confirm, registered=(), running_
 
 
 # ---------------------------------------------------------------- the workspace tree
-def roots(project_root, workspace) -> list:
+def roots(project_root, workspace, extra=()) -> list:
     out = [_real(workspace)]
+    for e in extra:
+        if Path(e).is_dir() and _real(e) not in out:
+            out.append(_real(e))
     own = _real(Path(project_root) / "studies")
     if own not in out and own.is_dir():
         out.append(own)
     return out
 
 
-def resolve(project_root, workspace, path) -> tuple:
+def resolve(project_root, workspace, path, extra=()) -> tuple:
     """(real path, the root it is under) for a path inside the workspace tree. A relative path is relative to the workspace. Refuses anything outside, and any path that
     passes through a symbolic link below the root."""
-    rts = roots(project_root, workspace)
+    rts = roots(project_root, workspace, extra)
     raw = str(path or "").strip()
     p = Path(raw).expanduser() if raw else rts[0]
     if not p.is_absolute():
@@ -249,8 +253,8 @@ def _entry(full: Path, deadline) -> dict:
     return {"name": full.name, "kind": "file", "size": st.st_size, "mtime": st.st_mtime, "children": None}
 
 
-def list_dir(project_root, workspace, path) -> dict:
-    real, root = resolve(project_root, workspace, path)
+def list_dir(project_root, workspace, path, extra=()) -> dict:
+    real, root = resolve(project_root, workspace, path, extra)
     if not real.is_dir():
         raise RunFolderError(f"{real} is not a folder", 400)
     deadline = time.monotonic() + WALK_SECONDS
@@ -271,8 +275,8 @@ def list_dir(project_root, workspace, path) -> dict:
             "parent": None if real == root else str(real.parent), "entries": entries, "truncated": truncated}
 
 
-def properties(project_root, workspace, path) -> dict:
-    real, root = resolve(project_root, workspace, path)
+def properties(project_root, workspace, path, extra=()) -> dict:
+    real, root = resolve(project_root, workspace, path, extra)
     st = os.lstat(real)
     out = {"path": str(real), "name": real.name, "kind": "dir" if real.is_dir() else "file", "modified": st.st_mtime,
            "created": getattr(st, "st_birthtime", None) or (st.st_ctime if os.name == "nt" else None),
@@ -283,7 +287,11 @@ def properties(project_root, workspace, path) -> dict:
             rec = _study_json(real)
             runs = rec.get("runs") or []
             out["study"] = {"name": rec.get("name", real.name), "note": rec.get("note", ""), "tags": rec.get("tags", []), "created": rec.get("created"),
-                            "runs": len(runs), "last_command": (runs[-1] if runs else {}).get("command")}
+                            "runs": len(runs), "last_command": (runs[-1] if runs else {}).get("command"),
+                            "data_location": rec.get("data_location") or "shared", "data_dir": rec.get("data_dir")}
+            if rec.get("data_location") == "study" and (real / "data").is_dir():
+                dc = _count(real / "data", WALK_ENTRIES, WALK_SECONDS)
+                out["study"].update({"data_files": dc["files"], "data_bytes": dc["bytes"], "data_capped": dc["capped"]})
         if looks_like_results(real) or real.name == "results" or real.name.startswith("results_"):
             out["results"] = {"leaderboard": (real / "benchmark.leaderboard.tsv").is_file(), "report": (real / "benchmark.report.html").is_file(),
                               "tool_status": tool_status_counts(real)}

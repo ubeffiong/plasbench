@@ -776,6 +776,36 @@ Stage 1 downloads each isolate's reference assembly and its paired reads.
 | `ENA_SIZE_LOOKUP` | `1` | `0` skips the ENA size lookup for the estimate. |
 | `ENA_PORTAL_URL` | ENA's file-report address | Point the lookup at a mirror. |
 
+### Where your data and studies live
+
+Two different things are stored on disk, and each can be placed where you want.
+
+**Downloaded reads and assemblies (the "data").** By default every study uses ONE shared folder: `DATA_DIR` in `config/config.sh` (when PlasBench was installed with
+`install.sh` this is `~/.local/share/plasbench/data`, which under WSL is a Linux folder that Windows shows as `\\wsl.localhost\<distro>\home\<you>\.local\share\plasbench\data`).
+It is reused by every study, so nothing is downloaded twice, and it is kept when a study is deleted. For one run you can choose differently:
+
+| Choice | Command line | Window (New benchmark, step Options) | What it means |
+|---|---|---|---|
+| Shared folder | nothing (default) | Shared folder | Reused by every study; kept if a study is deleted. |
+| Inside the study | `--keep-data-in-study` | Inside this study folder | `<study>/data`; git-ignored; deleted together with the study. |
+| Another folder | `--data-dir PATH` | Another folder | Any folder on this computer or a connected drive. |
+
+The study remembers the choice (`data_location` and `data_dir` in its `study.json`), so Resume and later runs of the same study find the reads without repeating the flag; a flag
+given again overrides it. **Manage study → Delete downloaded data only** removes `<study>/data` and keeps the results.
+
+**The study folder itself (results, logs, the record).** It is `<workspace>/<name>` unless you say otherwise: `--study-location PARENT_DIR` creates `PARENT_DIR/<name>` (the folder
+must already exist), and the window's Study folder card and New study dialog have a Location choice. PlasBench remembers where an outside study is in a hidden list in the workspace,
+so `--study NAME`, the Workspace page and the folder tree find it. **Add an existing study folder** registers a folder that already holds a `study.json`. A study on a drive that is
+disconnected is listed as "not available" with Remove from list; nothing is created in its place. Rename, copy and archive are offered only for studies inside the workspace.
+
+**Windows drives from Ubuntu (WSL).** "Choose a folder" lists Quick places and This PC; under WSL This PC shows the Windows drives Ubuntu has mounted (`C: (Windows)` is `/mnt/c`).
+You can type a Windows path (`D:\data`, `\\wsl.localhost\Ubuntu\home\me`); it is converted and both forms are shown. A drive that is not listed is not mounted: run in the Terminal tab,
+for drive E, `sudo mkdir -p /mnt/e && sudo mount -t drvfs E: /mnt/e` (PlasBench never runs it for you).
+
+**Speed and sync folders.** A Windows drive seen from Ubuntu is slower than Ubuntu's own disk for many small files and for git; a cloud-sync folder (OneDrive, Dropbox) can lock
+or re-upload large files mid-run; an external or network drive stops the run if it disconnects (running again continues from the finished steps). The folder check shows these
+warnings, and the free space, under the path before you choose it.
+
 ## Workflow
 
 `plasbench run` runs stages 0-6. Select stages explicitly to resume or iterate:

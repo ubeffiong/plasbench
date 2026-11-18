@@ -315,6 +315,10 @@ dialog.wide{width:min(980px,96vw)}dialog.wide .bd{max-height:74vh}
 .help .hman{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;font:12px/1.5 var(--mono);overflow:auto;white-space:pre}
 dialog .hd{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}dialog .hd h3{flex:1;font-size:14px}
 dialog .bd{padding:12px 14px;max-height:62vh;overflow:auto}dialog .ft{display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-2)}
+dialog.fschoose{width:min(860px,96vw)}.fsbody{display:grid;grid-template-columns:200px minmax(0,1fr);gap:14px}.fsside{border-right:1px solid var(--line-2);padding-right:10px;max-height:52vh;overflow:auto}
+.fsside h6{margin:8px 0 4px;font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}.fsside button{display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;padding:5px 6px;border-radius:4px;font:inherit;cursor:pointer}
+.fsside button:hover,.fsside button:focus-visible{background:var(--surface-3)}.fsside .sub{display:block;color:var(--mut);font-size:11px}
+@media (max-width:640px){.fsbody{grid-template-columns:1fr}.fsside{border-right:0;border-bottom:1px solid var(--line-2);padding:0 0 8px;max-height:24vh}}
 .fs-list{border:1px solid var(--line);border-radius:var(--radius);max-height:44vh;overflow:auto}
 .fs-list button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line-2);background:transparent;padding:5px 10px;cursor:pointer;font:inherit;color:inherit}
 .fs-list button:hover{background:var(--surface-2)}.fs-list button.sel{background:var(--select)}.fs-list .sz{margin-left:auto;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
@@ -774,7 +778,9 @@ body.gd-open #gdrawer{transform:none}
        Create one here to name it yourself, then choose it on New benchmark.</p>
       <div class="field"><label for="st_name">Name</label><div class="ctl"><input type="text" id="st_name" placeholder="cohort1"></div><div class="help">Letters, digits, '.', '_' or '-'.</div></div>
       <div class="field"><label for="st_note">Note</label><div class="ctl"><input type="text" id="st_note" placeholder="What this study is for (optional)"></div></div>
-     </div><div class="ft"><button class="btn" id="st_create"><svg class="ico sm"><use href="#i-plus"/></svg>Create study</button></div></div>
+      <div class="field"><label for="st_loc">Location</label><div class="ctl"><input type="text" id="st_loc" placeholder="empty = the workspace" aria-label="Study location (empty means the workspace)" title="Empty: the workspace folder. Or choose another folder, on this computer or a connected drive."><button class="btn sec sm" data-browse="st_loc" data-dir="1">Choose a folder</button></div>
+       <div class="help" id="st_loccheck">The study folder is created as <i>location</i>/<i>name</i>. Leave empty to use the workspace.</div></div>
+     </div><div class="ft"><button class="btn sec" id="st_addex" title="Register a folder that already holds a study.json (for example a study on another drive)">Add an existing study folder…</button><button class="btn" id="st_create"><svg class="ico sm"><use href="#i-plus"/></svg>Create study</button></div></div>
      <div class="card"><div class="hd"><h3>Import a study</h3></div><div class="bd">
       <p class="mut small" style="margin-top:0">Bring in a study bundle (a <code>.zip</code> made by <b>Manage &rarr; Export</b>) from another computer or an earlier time. It becomes a new study; nothing is overwritten.</p>
       <div class="row"><input type="text" id="si_path" placeholder="D:\bundles\cohort1.zip" aria-label="Study bundle"><button class="btn sec sm" data-browse="si_path">Browse</button></div>
@@ -941,10 +947,14 @@ body.gd-open #gdrawer{transform:none}
 <dialog id="lbldlg" class="wide" aria-labelledby="lb_t"><div class="hd"><svg class="ico"><use href="#i-edit"/></svg><h3 id="lb_t">Label sequences</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd"><p class="mut" style="margin-top:0">For each sequence of the reference, say whether it is a <b>plasmid</b> or the <b>chromosome</b>. Every tool is scored against these labels, so PlasBench never fills them in for you. "Header says" is what the FASTA header states; where it says nothing, the choice is yours. Do not decide by size alone.</p><div id="lb_body"></div></div>
  <div class="ft"><span class="mut small grow" id="lb_msg"></span><button class="btn sec" data-close>Cancel</button><button class="btn" id="lb_save">Save labels</button></div></dialog>
-<dialog id="fsdlg"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="fs_title">Choose</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
- <div class="bd"><div class="row" style="margin-bottom:8px"><button class="btn sec sm" id="fs_up">Up</button><input type="text" id="fs_path" aria-label="Path"><button class="btn sec sm" id="fs_go">Go</button></div>
-  <div class="fs-list" id="fs_list"></div></div>
- <div class="ft"><span class="mut small grow" id="fs_sel"></span><button class="btn sec" data-close>Cancel</button><button class="btn" id="fs_ok">Choose</button></div></dialog>
+<dialog id="fsdlg" class="fschoose" role="dialog" aria-modal="true" aria-labelledby="fs_title" aria-describedby="fs_sel"><div class="hd"><svg class="ico"><use href="#i-folder"/></svg><h3 id="fs_title">Choose</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
+ <div class="bd fsbody"><nav class="fsside" aria-label="Places" id="fs_side"></nav>
+  <div class="fsmain"><nav class="crumbbar" id="fs_crumbs" aria-label="Folder path"></nav>
+   <div class="row" style="margin-bottom:6px"><button class="btn sec sm" id="fs_up" title="Up one folder">Up</button><input type="text" id="fs_path" aria-label="Path (a Windows path such as C:\Users\me\data also works)" title="Type or paste a path and press Enter. In Ubuntu a Windows path such as C:\Users\me\data or \\wsl.localhost\Ubuntu\home\me is converted."><button class="btn sec sm" id="fs_go" title="Show this folder">Go</button><button class="btn sec sm" id="fs_new" title="Create a new folder inside the folder shown">New folder</button></div>
+   <div class="small mut" id="fs_win" aria-live="polite"></div>
+   <div class="fs-list" id="fs_list" role="list"></div>
+   <div id="fs_check" class="small" aria-live="polite" style="margin-top:6px"></div><div id="fs_help" class="small mut" style="margin-top:6px"></div></div></div>
+ <div class="ft"><span class="mut small grow" id="fs_sel"></span><button class="btn sec" data-close>Cancel</button><button class="btn" id="fs_ok">Select</button></div></dialog>
 
 <dialog id="uthelp" class="wide" aria-labelledby="uh_t"><div class="hd"><svg class="ico"><use href="#i-help"/></svg><h3 id="uh_t">How "Add your own tool" works</h3><button class="btn ghost icon" data-close aria-label="Close"><svg class="ico"><use href="#i-x"/></svg></button></div>
  <div class="bd help">
@@ -2744,7 +2754,10 @@ function renderWizard() {
         <div class="field"><label>Which isolates${argTip("run", "isolate_order")}</label><div class="ctl"><select id="w_isolate_order" data-dest="isolate_order"><option value="">balanced (recommended)</option><option value="file" ${V.isolate_order === "file" ? "selected" : ""}>the first rows in the sheet</option></select></div></div></div></div>` : ""}
       ${W.source !== "demo" ? `<div class="card" style="margin-top:12px"><div class="hd"><h3>Study folder</h3><span class="sub">everything this benchmark produces goes here</span></div><div class="bd">
         <div class="field"><label for="wstudy">Study name${wizTip("study")}</label><div class="ctl"><input type="text" id="wstudy" value="${esc(V.study || "")}" placeholder="${esc(wizDefaultStudy())}"></div>
-        <div class="help" id="wstudyhelp">${esc(studyWhere())}</div></div></div></div>` : ""}`;
+        <div class="help" id="wstudyhelp">${esc(studyWhere())}</div></div>
+        <div class="field"><label>Location${wizTip("study_location")}</label><div class="ctl" style="flex-wrap:wrap;gap:14px"><label><input type="radio" name="wloc" value="workspace" ${(S.wizStudy || {}).where !== "other" ? "checked" : ""}> Workspace <span class="mono small">${esc(S.ws?.path || "")}</span></label>
+          <label><input type="radio" name="wloc" value="other" ${(S.wizStudy || {}).where === "other" ? "checked" : ""}> Another folder</label></div>
+          ${(S.wizStudy || {}).where === "other" ? `<div class="ctl" style="margin-top:6px"><input type="text" id="wloc_path" value="${esc((S.wizStudy || {}).location || "")}" placeholder="a folder on this computer or a connected drive" aria-label="Study location"><button class="btn sec sm" data-browse="wloc_path" data-dir="1">Choose a folder</button></div><div class="help" id="wloc_check" aria-live="polite"></div>` : `<div class="help">The study folder is created inside the workspace.</div>`}</div></div></div>` : ""}`;
   } else if (W.step === 1) {
     if (W.source === "demo" || W.source === "meta") html = `<div class="note info">${icon("info", "ico")}<div>${W.source === "demo" ? "The demo uses its own five synthetic methods." : "The metagenomics track scores the tools present in the predictions folder."} Press Next.</div></div>`;
     else {
@@ -2769,7 +2782,7 @@ function renderWizard() {
     // Database paths are overrides, not inputs: a run left blank reuses the installed copy, so
     // they sit in a closed "optional" fold with a one-line summary instead of in the main form.
     const DB_DESTS = ["platon_db", "genomad_db", "plasme_db", "plasgraph2_model_dir"];
-    const allIo = byGroup("inputs and outputs").filter(a => !["samples","cohort","local_inputs","open_report","no_report_prompt"].includes(a.dest));
+    const allIo = byGroup("inputs and outputs").filter(a => !["samples","cohort","local_inputs","open_report","no_report_prompt","data_dir","keep_data_in_study","study_location"].includes(a.dest));
     const io = allIo.filter(a => !DB_DESTS.includes(a.dest)), dbArgs = allIo.filter(a => DB_DESTS.includes(a.dest));
     const dbName = {platon_db: "Platon", genomad_db: "geNomad", plasme_db: "PLASMe"};
     const dbSummary = Object.entries(dbName).map(([d, n]) => { const s = S.info?.databases?.[d];
@@ -2793,8 +2806,16 @@ function renderWizard() {
         ${ef("retries", "Download retries", "network_retries", num("retries", "3", 1), "Empty = the default, 3.")}
         ${ef("connections", "Parallel downloads per isolate", "ena_download_connections", num("connections", "4", 1), "Empty = the default, 4. Applies to ENA downloads.")}
       </div></details>` : "";
+    const D = S.wizData = S.wizData || {mode: "shared", path: ""};
+    const radio = (v, title, lines) => `<label class="choice ${D.mode === v ? "on" : ""}" style="margin-bottom:8px"><input type="radio" name="wdata" value="${v}" ${D.mode === v ? "checked" : ""}><span><b>${title}</b>${lines}</span></label>`;
+    const dataCard = W.source === "cohort" || W.source === "sheet" ? `<div class="card" style="margin-bottom:16px"><div class="hd"><h3>Where to keep downloaded reads and assemblies ${wizTip("data_location")}</h3></div><div class="bd">
+        ${radio("shared", "Shared folder (default)", `<span class="mono small" style="overflow-wrap:anywhere">${esc(S.info?.data_dir || "")}</span><span class="small" id="wd_shared">checking the folder…</span><span>Reused by every study, so nothing is downloaded twice; kept if a study is deleted.</span>`)}
+        ${radio("study", "Inside this study folder", `<span class="mono small">&lt;study folder&gt;/data</span><span>Git-ignored; deleted with the study.</span>`)}
+        ${radio("custom", "Another folder", `<span>Any folder on this computer or a connected drive.</span>`)}
+        ${D.mode === "custom" ? `<div class="ctl" style="margin:0 0 6px 28px"><input type="text" id="wd_path" value="${esc(D.path || "")}" placeholder="a folder with room for the reads" aria-label="Folder for downloaded data"><button class="btn sec sm" data-browse="wd_path" data-dir="1">Choose a folder</button></div><div class="small" id="wd_check" aria-live="polite" style="margin-left:28px"></div>` : ""}
+      </div></div>` : "";
     html = W.source === "demo" ? `<div class="card"><div class="bd">${fieldHTML(command("demo").args.find(a => a.dest === "open_report"), V, "w")}</div></div>` :
-      reportCard + dlCard + `<div class="card"><div class="hd"><h3>Stages ${wizTip("stages")}</h3><span class="sub">leave all off to run the whole pipeline</span></div><div class="bd"><div class="chips" id="wstages">${
+      reportCard + dataCard + dlCard + `<div class="card"><div class="hd"><h3>Stages ${wizTip("stages")}</h3><span class="sub">leave all off to run the whole pipeline</span></div><div class="bd"><div class="chips" id="wstages">${
         [["0","Check"],["1","Download"],["2","Truth"],["3","Assemble"],["4","Run tools"],["5","Score"],["6","Aggregate & report"],["7","Long-read tools"]].map(([s, l]) =>
         `<button type="button" class="chip ${(V.stages || []).includes(s) ? "on" : ""}" data-stage="${s}">${s} · ${l}</button>`).join("")}</div>
         <p class="mut small" style="margin:10px 0 0">Choose stages to resume or re-run part of a benchmark, e.g. 5 and 6 to re-score and rebuild the report.</p></div></div>
@@ -2817,7 +2838,7 @@ function wizDefaultStudy() {
   return (W.source === "meta" ? "meta-" : "") + base.replace(/[^A-Za-z0-9._-]+/g, "-");
 }
 function studyWhere() {
-  const name = S.wiz.values.study || wizDefaultStudy(), base = S.ws?.path || "the workspace";
+  const name = S.wiz.values.study || wizDefaultStudy(), SW = S.wizStudy || {}, base = SW.where === "other" ? (SW.location || "(choose a folder)") : (S.ws?.path || "the workspace");
   return `${base}${S.info?.sep || "/"}${name}  (results, report, logs and study.json)` + (S.wiz.values.study ? "" : " — named after the isolates; type a name to choose your own");
 }
 function wizArgv() {
@@ -2828,6 +2849,10 @@ function wizArgv() {
   if (W.source === "meta") vals.mode = "metagenomics";
   vals.no_report_prompt = true;
   vals.open_report = W.source !== "meta" && !!V.open_report;
+  const D = S.wizData || {mode: "shared"}, SW = S.wizStudy || {};
+  delete vals.data_dir; delete vals.keep_data_in_study; delete vals.study_location;
+  if (W.source !== "meta") { if (D.mode === "custom" && D.path) vals.data_dir = D.path; if (D.mode === "study") vals.keep_data_in_study = true; }
+  if (SW.where === "other" && SW.location) vals.study_location = SW.location;
   const run = wizRun(), argv = buildArgv(run, vals, ["run"]);
   for (const u of V.user_tools || []) argv.push("--tool", u);
   return argv;
@@ -2854,6 +2879,8 @@ function wizSummary() {
   const on = Object.entries(V).filter(([k, v]) => v === "on").map(([k]) => k), off = Object.entries(V).filter(([k, v]) => v === "off").map(([k]) => k);
   return [["Isolates", src + (V.max_isolates ? ` (${V.max_isolates} only, ${V.isolate_order === "file" ? "the first rows" : "balanced"})` : "")], ["Study folder", W.source === "demo" ? "results_demo (the demo's own folder)" : (S.ws?.path || "") + (S.info?.sep || "/") + (V.study || wizDefaultStudy())], ["Tools changed for this run", [...on.map(t => "+" + t), ...off.map(t => "−" + t), ...(V.user_tools || []).map(u => "+" + u + " (yours)")].join(", ") || "defaults"],
           ["Threads per tool", V.threads || "default"], ["Results folder", V.results_dir || "default (results/)"], ["Stages", (V.stages || []).join(" ") || "all"], ["Assembler", V.assembler || "default"],
+          ["Downloaded data", W.source === "meta" ? "not used by the metagenomics track" : ({shared: "shared folder (default)", study: "inside the study folder (git-ignored)", custom: (S.wizData || {}).path || "another folder (choose one)"})[(S.wizData || {mode: "shared"}).mode]],
+          ["Study location", (S.wizStudy || {}).where === "other" ? ((S.wizStudy || {}).location || "another folder (choose one)") : "the workspace"],
           ["Open report when done", W.source === "demo" ? (V.open_report ? "yes" : "no") : W.source === "meta" ? "not for the metagenomics track" : V.open_report ? "yes" : "no"],
           ["Downloads and reliability", Object.entries(wizEnv()).map(([k, v]) => `${k}=${v}`).join(", ") || "defaults"]];
 }
@@ -2866,6 +2893,13 @@ function bindWizard() {
   if ($("#wpred")) $("#wpred").oninput = e => V.predictions_dir = e.target.value;
   if ($("#wlocal")) $("#wlocal").onchange = e => V.local_inputs = e.target.checked;
   if ($("#wopen")) $("#wopen").onchange = e => V.open_report = e.target.checked;
+  $$("[name=wdata]").forEach(r => r.onchange = () => { (S.wizData = S.wizData || {}).mode = r.value; renderWizard(); });
+  $$("[name=wloc]").forEach(r => r.onchange = () => { (S.wizStudy = S.wizStudy || {}).where = r.value; renderWizard(); });
+  const liveCheck = (inputId, outId, store, key) => { const el = $("#" + inputId); if (!el) return; let t = 0;
+    const run = async () => { const v = el.value.trim(); store[key] = v; if (!v) { $("#" + outId).innerHTML = ""; return; } try { $("#" + outId).innerHTML = checkHTML(await api(`workspace/check?path=${encodeURIComponent(v)}`)); } catch (e) { $("#" + outId).textContent = e.message; } };
+    el.addEventListener("input", () => { clearTimeout(t); t = setTimeout(run, 400); }); if (el.value) run(); };
+  liveCheck("wd_path", "wd_check", S.wizData = S.wizData || {mode: "shared", path: ""}, "path"); liveCheck("wloc_path", "wloc_check", S.wizStudy = S.wizStudy || {}, "location");
+  if ($("#wd_shared")) api(`workspace/check?path=${encodeURIComponent(S.info?.data_dir || "")}`).then(c => { const el = $("#wd_shared"); if (el) el.innerHTML = c.free != null ? `${esc(fmtGBytes(c.free))} free · ${esc(c.kind_label || "")}` : esc((c.errors || [])[0] || ""); }).catch(() => {});
   $$("[data-wenv]").forEach(i => { const f = () => { (S.wizEnv = S.wizEnv || {})[i.dataset.wenv] = i.type === "checkbox" ? i.checked : i.value; }; i.oninput = f; i.onchange = f; });
   $$("[data-wtool]").forEach(b => b.onclick = () => { V[b.dataset.wtool] = b.dataset.val; b.parentElement.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); });
   $$("[data-wuser]").forEach(c => c.onchange = () => { const s = new Set(V.user_tools || []); c.checked ? s.add(c.dataset.wuser) : s.delete(c.dataset.wuser); V.user_tools = [...s]; });
@@ -3254,7 +3288,7 @@ async function loadWorkspace(force) {
     $("#ws_tb").innerHTML = w.studies.map(st => {
       const run = (S.runs || []).find(r => r.study_dir && r.study_dir.replace(/[\\/]+$/, "") === st.path.replace(/[\\/]+$/, ""));
       const idx = run ? S.runs.indexOf(run) : -1;
-      return `<tr data-spath="${esc(st.path)}" data-sname="${esc(st.name)}"><td><b class="mono">${esc(st.name)}</b>${(st.tags || []).map(t => ` <span class="tag">${esc(t)}</span>`).join("")}${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}${st.cloned_from ? `<div class="mut small">copied from ${esc(st.cloned_from)}</div>` : ""}${st.imported_from ? `<div class="mut small">imported (was ${esc(st.imported_from)})</div>` : ""}</td>
+      return `<tr data-spath="${esc(st.path)}" data-sname="${esc(st.name)}"><td><b class="mono">${esc(st.name)}</b>${(st.tags || []).map(t => ` <span class="tag">${esc(t)}</span>`).join("")}${st.external ? ` <span class="tag" title="${esc(st.path)}">outside the workspace</span>` : ""}${st.available === false ? `<div class="bad-t small">${esc(st.unavailable)}</div>` : `<div class="mut small" title="${esc(st.data_dir || "")}">data: ${st.data_location === "study" ? `inside the study${st.data_bytes != null ? ` (${fmtGBytes(st.data_bytes)}${st.data_capped ? "+" : ""})` : ""}` : st.data_location === "custom" ? esc(st.data_dir || "another folder") : "shared folder"}</div>`}${st.note ? `<div class="mut small">${esc(st.note)}</div>` : ""}${st.migrated_from ? `<div class="mut small">moved from ${esc(st.migrated_from)}</div>` : ""}${st.cloned_from ? `<div class="mut small">copied from ${esc(st.cloned_from)}</div>` : ""}${st.imported_from ? `<div class="mut small">imported (was ${esc(st.imported_from)})</div>` : ""}</td>
         <td class="small">${esc(st.cohort || (st.sample_sheet ? st.sample_sheet.split(/[\\/]/).pop() : "–"))}</td><td>${st.runs}</td><td class="small">${fmtTime(st.modified)}</td>
         <td style="text-align:right;white-space:nowrap">${st.report && idx >= 0 ? `<a class="btn sec sm" href="/view/${idx}/benchmark.report.html" title="Open the report in a tab (Ctrl+click: in your browser)">Report</a>` : ""}
           <button class="btn ghost sm" onclick="benchStudy(${jsq(st.name)})">Run in this study</button>
@@ -3404,7 +3438,8 @@ async function wtProps(path) {
     await showMessage({title: `Properties: ${p.name}`, copy: p.path, buttonLabel: "Close", facts: [["Type", p.kind === "dir" ? (st ? "Study folder" : rs ? "Results folder" : "Folder") : "File"], ["Full path", p.path], ["Relative to the workspace", p.relative || "."],
       ["Size", p.bytes != null ? `${p.capped ? "at least " : ""}${fmtGBytes(p.bytes)} (${p.bytes.toLocaleString()} bytes)` : ""], ["Contains", p.kind === "dir" ? `${p.files.toLocaleString()}${p.capped ? "+" : ""} files, ${p.dirs.toLocaleString()}${p.capped ? "+" : ""} folders${p.capped ? " (counting stopped early: the folder is large)" : ""}` : ""],
       ["Created", p.created ? fmtTime(p.created) : ""], ["Modified", fmtTime(p.modified)], ["Tracked by git", p.tracked ? "yes (a repository of the working directory covers it)" : "no"],
-      ["Study notes", st ? st.note : ""], ["Study tags", st ? (st.tags || []).join(", ") : ""], ["Study created", st ? st.created : ""], ["Runs recorded", st ? String(st.runs) : ""], ["Latest run", st ? st.last_command : ""],
+      ["Study notes", st ? st.note : ""], ["Study tags", st ? (st.tags || []).join(", ") : ""], ["Study created", st ? st.created : ""], ["Downloaded data kept", st ? ({study: "inside the study folder (git-ignored)", custom: st.data_dir || "another folder", shared: "in the shared folder"})[st.data_location || "shared"] : ""],
+      ["Size of the study's own data", st && st.data_bytes != null ? `${fmtGBytes(st.data_bytes)} in ${(st.data_files || 0).toLocaleString()} files${st.data_capped ? " (counting stopped early)" : ""}` : ""], ["Runs recorded", st ? String(st.runs) : ""], ["Latest run", st ? st.last_command : ""],
       ["Holds", rs ? [rs.leaderboard ? "leaderboard" : "", rs.report ? "report" : "", ts.rows ? `${ts.rows} tool-status rows${ts.by_status ? " (" + Object.entries(ts.by_status).map(([k, v]) => `${v} ${k}`).join(", ") + ")" : ""}` : ""].filter(Boolean).join(", ") || "no leaderboard or report" : ""]]});
   } catch (e) { showMessage({title: "Properties not available", body: e.message, danger: true}); }
 }
@@ -3451,6 +3486,11 @@ async function wtProps(path) {
 const fmtGBytes = n => n < 1048576 ? (n / 1024).toFixed(0) + " KB" : n < 1073741824 ? (n / 1048576).toFixed(1) + " MB" : (n / 1073741824).toFixed(2) + " GB";
 window.manageStudy = async name => {
   const st = (S.ws?.studies || []).find(s => s.name === name); if (!st) return;
+  if (st.available === false) {
+    if (await askConfirm({title: "This study is not available", confirmLabel: "Remove from list", cancelLabel: "Keep in list", body: `${st.unavailable}\n\nNothing can be managed while its folder cannot be reached. Connect the drive again, or remove the entry from the list (the files, if they still exist, stay where they are).`})) {
+      try { await api("studies/unregister", {name}); toast("Removed from the list", "ok"); loadWorkspace(true); } catch (e) { toast(e.message, "bad"); } }
+    return;
+  }
   const d = document.createElement("dialog"); d.className = "card"; d.style.cssText = "max-width:640px;width:94vw;padding:0;border:1px solid var(--line)";
   d.innerHTML = `<div class="hd">${icon("folder", "ico")}<h3>Manage study <span class="mono">${esc(name)}</span></h3></div><div class="bd">
     <div class="field"><label for="sm_note">Note</label><div class="ctl"><input type="text" id="sm_note" value="${esc(st.note || "")}" maxlength="2000"></div></div>
@@ -3465,6 +3505,9 @@ window.manageStudy = async name => {
     <hr style="border:0;border-top:1px solid var(--line-2);margin:12px 0">
     <div class="field"><label>Archive</label><div class="help" style="margin-top:0">Moves the study out of the list into <code>.archive</code>. Nothing is deleted; restore it any time.
       <button class="btn sec sm" data-sm="archive">Archive</button></div></div>
+    ${st.data_in_study ? `<div class="field"><label>Downloaded data</label><div class="help" style="margin-top:0">This study keeps its reads and assemblies in <code>${esc(st.data_dir || "")}</code> (${st.data_bytes != null ? fmtGBytes(st.data_bytes) : "size unknown"}). Delete only that; results, the report and the record stay, and the next run downloads again.
+      <button class="btn danger sm" data-sm="delete_data">Delete downloaded data only…</button></div></div>` : ""}
+    ${st.external ? `<div class="field"><label>Outside the workspace</label><div class="help" style="margin-top:0">This study lives at <code>${esc(st.path)}</code>. Rename, copy and archive are not offered for it. <button class="btn sec sm" data-sm="unregister">Remove from list</button> (the files stay)</div></div>` : ""}
     <div class="note bad" id="sm_del" style="display:block;margin-top:10px"><div><b>Delete for good</b> <span class="mut small" id="sm_facts">(counting what it holds…)</span><br>
       <span class="small">It does not go to the recycle bin. Type the study's name to confirm.</span>
       <div class="row" style="margin-top:6px"><input type="text" id="sm_confirm" placeholder="${esc(name)}" aria-label="Type the study name"><button class="btn sm" data-sm="delete" id="sm_delbtn" disabled style="background:var(--bad)">Delete</button></div></div></div>
@@ -3481,6 +3524,14 @@ window.manageStudy = async name => {
       else if (act === "clone") { await api("studies/clone", {name, new_name: $("#sm_new", d).value.trim(), with_results: $("#sm_cres", d).checked}); toast("Copied", "ok"); close(); }
       else if (act === "export") { const r = await api("studies/export", {name, with_results: $("#sm_xres", d).checked}); toast(`Exported ${r.files} files (${fmtGBytes(r.bytes)})`, "ok"); reveal(r.path); }
       else if (act === "archive") { await api("studies/archive", {name}); toast("Archived: restore it from Archived studies", "ok"); close(); }
+      else if (act === "unregister") { await api("studies/unregister", {name}); toast("Removed from the list", "ok"); close(); }
+      else if (act === "delete_data") {
+        const f = await api(`studies/facts?name=${encodeURIComponent(name)}`);
+        if (!await askConfirm({title: "Delete the downloaded data of this study?", danger: true, typeToConfirm: name, confirmLabel: "Delete data", cancelLabel: "Keep it",
+          body: "Only the study's data folder is removed. Results, the report and the study record stay. The next run downloads the reads again.",
+          facts: [["Folder", f.data_dir], ["Files", (f.data_files || 0).toLocaleString()], ["Size", fmtGBytes(f.data_bytes || 0)]]})) return;
+        const r = await api("studies/delete_data", {name, confirm: name}); toast(`Deleted ${r.files.toLocaleString()} files (${fmtGBytes(r.bytes)}) of downloaded data`, "ok"); close();
+      }
       else if (act === "delete") { const r = await api("studies/delete", {name, confirm: $("#sm_confirm", d).value}); toast(`Deleted ${name} (${r.files} files)`, "ok"); close(); }
       S.runs = null; await getRuns(true).catch(() => {}); await loadWorkspace(true); if (window.loadPanelStudies) loadPanelStudies();
     } catch (e) { err.textContent = e.message; }
@@ -3513,10 +3564,13 @@ $("#si_go").onclick = async () => {
 
 $("#ws_reveal").onclick = () => S.ws && reveal(S.ws.path);
 $("#st_create").onclick = async () => {
-  try { const r = await api("studies/create", {name: $("#st_name").value.trim(), note: $("#st_note").value.trim()});
-    toast(`Created ${r.path}`, "ok"); $("#st_name").value = $("#st_note").value = ""; loadWorkspace(true); }
+  try { const r = await api("studies/create", {name: $("#st_name").value.trim(), note: $("#st_note").value.trim(), location: $("#st_loc").value.trim()});
+    toast(`Created ${r.path}`, "ok"); $("#st_name").value = $("#st_note").value = $("#st_loc").value = ""; $("#st_loccheck").textContent = ""; loadWorkspace(true); }
   catch (e) { toast(e.message, "bad"); }
 };
+$("#st_loc").addEventListener("input", async e => { const v = e.target.value.trim(); if (!v) { $("#st_loccheck").textContent = "Leave empty to use the workspace."; return; }
+  try { $("#st_loccheck").innerHTML = checkHTML(await api(`workspace/check?path=${encodeURIComponent(v)}`)); } catch (err) { $("#st_loccheck").textContent = err.message; } });
+$("#st_addex").onclick = () => pickPath(true, async p => { try { const r = await api("studies/add_existing", {path: p}); toast(`Added ${r.name}`, "ok"); loadWorkspace(true); } catch (e) { showMessage({title: "Not added", body: e.message, danger: true}); } }, "Choose a study folder (it must hold a study.json)");
 window.benchStudy = name => { S.wiz = {step: 0, source: S.wiz.source === "demo" ? "cohort" : S.wiz.source, values: {...S.wiz.values, study: name}}; go("wizard"); };
 
 /* VERSION CONTROL ------------------------------------------------------------------------------------ */
@@ -4219,25 +4273,65 @@ function md(src) {
 /* ===================================================================================================
    File and folder picker
    =================================================================================================== */
-let fsCb = null, fsDir = true, fsSel = null;
+/* ---- "Choose a folder": quick places and This PC (in Ubuntu also the Windows drives) on the left, breadcrumb, a path box that accepts Windows paths, New folder, the folder check ---- */
+const FS = {cb: null, dir: true, sel: null, path: "", opener: null, side: null, tick: 0};
+const fsFree = n => n == null ? "" : ` · ${fmtGBytes(n)} free`;
 function pickPath(dir, cb, title, start) {
-  fsCb = cb; fsDir = dir; fsSel = null; $("#fs_title").textContent = title || (dir ? "Choose a folder" : "Choose a file");
-  $("#fsdlg").showModal(); fsLoad(start || S.info?.root || "");
+  Object.assign(FS, {cb, dir, sel: null, opener: document.activeElement});
+  $("#fs_title").textContent = title || (dir ? "Choose a folder" : "Choose a file"); $("#fs_ok").textContent = dir ? "Select this folder" : "Select";
+  $("#fs_new").hidden = !dir; $("#fsdlg").showModal(); fsLoad(start || "");
+}
+function checkHTML(r) {
+  if (!r) return "";
+  const bits = [];
+  if (r.errors && r.errors.length) bits.push(...r.errors.map(e => `<div class="bad-t">${icon("x")} ${esc(e)}</div>`));
+  else bits.push(`<div class="ok-t">${icon("check")} ${esc(r.kind_label || "folder")}${r.free != null ? ` · ${esc(fmtGBytes(r.free))} free` : ""}${r.will_create ? " · will be created" : ""}</div>`);
+  bits.push(...(r.warnings || []).map(w => `<div class="warn-t">${icon("alert")} ${esc(w)}</div>`));
+  if (r.windows) bits.push(`<div class="mut">Windows path: <span class="mono">${esc(r.windows)}</span></div>`);
+  return bits.join("");
 }
 async function fsLoad(path) {
-  try { const r = await api(`browse?path=${encodeURIComponent(path)}&files=${fsDir ? 0 : 1}`);
-    $("#fs_path").value = r.path; $("#fs_up").dataset.p = r.parent ?? ""; $("#fs_up").disabled = r.parent == null; fsSel = fsDir ? r.path : null;
-    $("#fs_sel").textContent = fsSel ? `Selected: ${fsSel}` : "";
-    $("#fs_list").innerHTML = r.entries.map(e => `<button data-p="${esc(e.path)}" data-dir="${e.dir ? 1 : 0}">${icon(e.dir ? "folder" : "file")}<span>${esc(e.name)}</span>${e.size != null ? `<span class="sz">${(e.size / 1024).toFixed(e.size > 1e6 ? 0 : 1)} KB</span>` : ""}</button>`).join("") || `<div class="bd mut">Empty folder</div>`;
-  } catch (e) { toast(e.message, "bad"); }
+  try {
+    const r = await api(`browse?path=${encodeURIComponent(path)}&files=${FS.dir ? 0 : 1}`);
+    FS.path = r.path; $("#fs_path").value = r.path; $("#fs_up").disabled = !r.path; FS.sel = FS.dir && r.path ? r.path : null;
+    $("#fs_new").disabled = !r.path; $("#fs_ok").disabled = FS.dir && !r.path;
+    $("#fs_sel").textContent = FS.sel ? `Selected: ${FS.sel}` : (FS.dir ? "Open a folder, then Select" : "");
+    $("#fs_win").textContent = r.windows ? `Windows: ${r.windows}` : "";
+    if (!r.path) { FS.side = r; $("#fs_check").innerHTML = ""; }
+    const side = FS.side || {places: [], pc: []};
+    $("#fs_side").innerHTML = `<h6>Quick places</h6>` + side.places.map(p => `<button type="button" data-p="${esc(p.path)}" data-dir="1">${esc(p.name)}</button>`).join("") +
+      `<h6>This PC</h6>` + (side.pc.length ? side.pc.map(p => `<button type="button" data-p="${esc(p.path)}" data-dir="1">${esc(p.name)}<span class="sub">${esc(p.path)}${esc(fsFree(p.free))}</span></button>`).join("") : `<div class="small mut">No drives found.</div>`);
+    const seg = r.path ? r.path.split(/[\\/]+/).filter(Boolean) : [], isWin = /^[A-Za-z]:/.test(r.path), sep = isWin ? "\\" : "/"; let acc = isWin ? "" : "";
+    $("#fs_crumbs").innerHTML = `<button type="button" data-p="" data-dir="1" title="Places and drives">This PC</button>` + seg.map((p, i) => { acc = isWin ? (i === 0 ? p + sep : acc + p + sep) : acc + sep + p;
+      return `<span class="sepc" aria-hidden="true">›</span>` + (i === seg.length - 1 ? `<span class="cur" aria-current="location">${esc(p)}</span>` : `<button type="button" data-p="${esc(isWin ? acc : acc)}" data-dir="1">${esc(p)}</button>`); }).join("");
+    const rows = !r.path ? `<div class="small mut" style="padding:8px">Choose a place or a drive on the left, or type a path above.</div>` :
+      r.entries.map(e => `<button type="button" data-p="${esc(e.path)}" data-dir="${e.dir ? 1 : 0}">${icon(e.dir ? "folder" : "file")}<span>${esc(e.name)}</span>${e.size != null ? `<span class="sz">${(e.size / 1024).toFixed(e.size < 10240 ? 1 : 0)} KB</span>` : ""}</button>`).join("") || `<div class="mut small" style="padding:8px">No sub-folders here.</div>`;
+    $("#fs_list").innerHTML = rows;
+    $("#fs_help").textContent = r.help || "";
+    const mine = ++FS.tick;
+    if (FS.dir && r.path) api(`workspace/check?path=${encodeURIComponent(r.path)}`).then(c => { if (mine === FS.tick) $("#fs_check").innerHTML = checkHTML(c); }).catch(() => {});
+  } catch (e) { $("#fs_help").textContent = e.message; $("#fs_check").innerHTML = `<div class="bad-t">${esc(e.message)}</div>`; }
 }
-$("#fs_list").onclick = e => { const b = e.target.closest("[data-p]"); if (!b) return;
-  if (b.dataset.dir === "1") fsLoad(b.dataset.p); else { fsSel = b.dataset.p; $$("#fs_list button").forEach(x => x.classList.toggle("sel", x === b)); $("#fs_sel").textContent = `Selected: ${fsSel}`; } };
-$("#fs_list").ondblclick = e => { const b = e.target.closest("[data-p]"); if (b && b.dataset.dir === "0") $("#fs_ok").click(); };
-$("#fs_up").onclick = () => fsLoad($("#fs_up").dataset.p);
-$("#fs_go").onclick = () => fsLoad($("#fs_path").value);
-$("#fs_path").onkeydown = e => { if (e.key === "Enter") fsLoad(e.target.value); };
-$("#fs_ok").onclick = () => { if (!fsSel) return toast(fsDir ? "Open a folder first" : "Choose a file", "bad"); $("#fsdlg").close(); fsCb && fsCb(fsSel); };
+$("#fsdlg").addEventListener("click", e => {
+  const b = e.target.closest("[data-p]"); if (!b || !$("#fsdlg").contains(b)) return;
+  if (b.dataset.dir === "1") fsLoad(b.dataset.p);
+  else { FS.sel = b.dataset.p; $$("#fs_list button").forEach(x => x.classList.toggle("sel", x === b)); $("#fs_sel").textContent = `Selected: ${FS.sel}`; }
+});
+$("#fs_list").addEventListener("dblclick", e => { const b = e.target.closest("[data-p]"); if (b && b.dataset.dir === "0") $("#fs_ok").click(); });
+$("#fs_list").addEventListener("keydown", e => { if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return; const bs = [...$("#fs_list").querySelectorAll("button")], i = bs.indexOf(document.activeElement); if (i < 0) return;
+  e.preventDefault(); bs[Math.max(0, Math.min(bs.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))].focus(); });
+$("#fs_up").onclick = () => { const p = FS.path.replace(/[\\/]+$/, ""), up = p.replace(/[\\/][^\\/]*$/, ""); fsLoad(/^[A-Za-z]:$/.test(up) ? up + "\\" : /[\\/]/.test(p) ? (up || "/") : ""); };
+$("#fs_go").onclick = () => fsLoad($("#fs_path").value.trim());
+$("#fs_path").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); fsLoad(e.target.value.trim()); } };
+$("#fs_new").onclick = async () => {
+  const name = await askText({title: "New folder", label: `Folder name (created inside ${FS.path})`, confirmLabel: "Create folder", validate: v => !v.trim() ? "Type a name" : /[\\/:*?"<>|]/.test(v) ? 'A name cannot contain / \\ : * ? " < > |' : v.length > 80 ? "At most 80 characters" : ""});
+  if (name == null) return;
+  try { const r = await api("fs/mkdir", {parent: FS.path, name}); await fsLoad(r.path); } catch (e) { toast(e.message, "bad"); }
+};
+$("#fs_ok").onclick = () => { if (!FS.sel) return toast(FS.dir ? "Open a folder first" : "Choose a file", "bad"); $("#fsdlg").close(); FS.cb && FS.cb(FS.sel); };
+$("#fsdlg").addEventListener("close", () => { try { FS.opener && FS.opener.focus && FS.opener.focus(); } catch {} });
+$("#fsdlg").addEventListener("keydown", e => { if (e.key !== "Tab") return; const f = [...$("#fsdlg").querySelectorAll("button:not([disabled]):not([hidden]), input")].filter(x => x.offsetParent), i = f.indexOf(document.activeElement);
+  if (e.shiftKey && i === 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); } });
 document.addEventListener("click", e => { const b = e.target.closest("[data-browse]"); if (!b) return;
   const input = document.getElementById(b.dataset.browse);
   pickPath(b.dataset.dir === "1", p => { input.value = p; input.dispatchEvent(new Event("input", {bubbles:true})); input.dispatchEvent(new Event("change", {bubbles:true})); }, null, input.value || undefined); });

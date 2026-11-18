@@ -702,7 +702,14 @@ def build_parser():
         inputs.add_argument("--write-script", type=Path,
                             help="Write the exact resolved commands to this file instead of running them, "
                                  "so you can review or edit them before running it yourself with bash.")
-        inputs.add_argument("-d", "--data-dir", type=Path, help="Directory for downloaded references, reads, and assemblies.")
+        inputs.add_argument("-d", "--data-dir", type=Path,
+                            help="Folder for downloaded references, reads and assemblies. By default every study uses ONE shared folder (DATA_DIR in config/config.sh, "
+                                 "~/.local/share/plasbench/data when installed by install.sh): it is reused by every study, so nothing is downloaded twice, and it is kept "
+                                 "when a study is deleted. Give a folder here to use another one for this run; the study remembers it for its later runs.")
+        inputs.add_argument("--keep-data-in-study", action="store_true",
+                            help="Keep this run's downloaded reads and assemblies inside the study folder, in <study>/data, instead of the shared folder. That folder is "
+                                 "git-ignored and is deleted together with the study. The study remembers the choice, so Resume and later runs find the reads. "
+                                 "Cannot be combined with --data-dir.")
         inputs.add_argument("-o", "--results-dir", type=Path,
                             help="Directory for predictions, scores, and reports (instead of a study folder).")
         inputs.add_argument("--study", metavar="NAME",
@@ -710,6 +717,10 @@ def build_parser():
                                  "study.json record). A run names its study after the cohort or sample sheet when this "
                                  "is not given; `report --study NAME` rebuilds that study's report. The workspace is "
                                  "PLASBENCH_WORKSPACE, default <PlasBench folder>/studies.")
+        inputs.add_argument("--study-location", type=Path, metavar="PARENT_DIR",
+                            help="Create the study folder as PARENT_DIR/NAME instead of in the workspace: on another drive, or anywhere you choose. PlasBench remembers where "
+                                 "it is (a hidden list in the workspace), so `--study NAME` finds it again. The folder must already exist; it is never created for you, "
+                                 "so a disconnected drive is not silently replaced by a folder on this computer's disk.")
         inputs.add_argument("--open-report", action="store_true",
                             help="Open benchmark.report.html in your browser when the run finishes, without asking. Only for runs that write a report (not the metagenomics track).")
         inputs.add_argument("--no-report-prompt", action="store_true",
@@ -1189,13 +1200,15 @@ def main(argv=None):
             parser.error("plasbench run --mode meta requires --samples or --cohort bmock12")
         if args.study and args.results_dir:
             parser.error("give --study or --results-dir, not both")
+        if getattr(args, "study_location", None) and args.results_dir:
+            parser.error("--study-location needs a study folder: give it without --results-dir")
         if args.results_dir:
             meta_results = args.results_dir
         else:
             from . import studies
             try:
                 study_name = args.study or studies.default_name(args.cohort, args.samples, meta=True)
-                folder = studies.prepare(root, study_name, args.samples, args.cohort, argv or sys.argv[1:])
+                folder = studies.prepare(root, study_name, args.samples, args.cohort, argv or sys.argv[1:], location=getattr(args, "study_location", None))
             except ValueError as exc:
                 parser.error(str(exc))
             meta_results = folder / "results"
@@ -1232,6 +1245,12 @@ def main(argv=None):
                 parser.error(sheetcheck.refusal(args.samples, sheetcheck.cohort_sheets(root / "cohorts") if (root / "cohorts").is_dir() else []))
         if args.study and args.results_dir:
             parser.error("give --study or --results-dir, not both")
+        if getattr(args, "keep_data_in_study", False) and args.data_dir:
+            parser.error("give --keep-data-in-study or --data-dir, not both")
+        if getattr(args, "keep_data_in_study", False) and args.results_dir:
+            parser.error("--keep-data-in-study needs a study folder: give it without --results-dir")
+        if getattr(args, "study_location", None) and args.results_dir:
+            parser.error("--study-location needs a study folder: give it without --results-dir")
         # Every run keeps what it produces in its own study folder (plasbench/studies.py); downloads stay shared.
         # `report` uses a study only when named, so `report --results-dir DIR` and the old layout keep working.
         study_tmp = None
@@ -1242,9 +1261,15 @@ def main(argv=None):
             try:
                 study_name = args.study or studies.default_name(args.cohort, args.samples)
                 folder = studies.prepare(root, study_name, args.samples if args.command == "run" else None,
-                                         args.cohort, argv or sys.argv[1:])
+                                         args.cohort, argv or sys.argv[1:], location=getattr(args, "study_location", None))
+                if args.command == "run":
+                    data_folder, data_note = studies.resolve_data(root, folder, getattr(args, "keep_data_in_study", False), args.data_dir, configured_data_dir(root))
+                    if data_folder is not None:
+                        args.data_dir = data_folder
             except ValueError as exc:
                 parser.error(str(exc))
+            if args.command == "run" and data_note:
+                print(f"[plasbench] {data_note}")
             args.results_dir = folder / "results"
             if not args.log_dir:
                 args.log_dir = folder / "logs"
