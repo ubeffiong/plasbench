@@ -160,6 +160,15 @@ def main():
     check("it needs the token", call("/api/net/status", token=False)[0] == 403)
     code, body = call("/api/net/status?services=github,ncbi")
     check("services can be asked for by name", code == 200 and set(body["services"]) == {"github", "ncbi"}, body["services"])
+    netgate.set_backend(None)
+    os.environ["PLASBENCH_OFFLINE"] = "1"
+    code, body = call("/api/net/status")
+    direct = netcheck.check()
+    check("/api/net/status agrees with netcheck.check: same state, same service names (the catalogue's), same advice", code == 200 and body["state"] == direct["state"] == "forced_offline" and set(body["services"]) == set(direct["services"]) and body["advice"] == direct["advice"], (body["state"], direct["state"]))
+    code, body = call("/api/update-check")
+    check("with the real netcheck, forced offline: the update check answers 503 naming the state", code == 503 and body["state"] == "forced_offline" and body["service"] == "github", body)
+    os.environ.pop("PLASBENCH_OFFLINE")
+    netgate.set_backend(backend("offline"))
     for label, route, payload in (("a cohort run", "/api/jobs", {"argv": ["run", "--cohort", "public-v4"]}), ("install-tools", "/api/jobs", {"argv": ["install-tools", "core"]}), ("upgrade", "/api/jobs", {"argv": ["upgrade"]}),
                                   ("discover-cohort", "/api/jobs", {"argv": ["discover-cohort"]}), ("a git push", "/api/git", {"op": "clone", "url": "https://github.com/o/r.git", "dest": str(tmp / "c")}), ("the update check", "/api/update-check", None)):
         code, body = (call(route, payload) if payload is not None else call(route))
