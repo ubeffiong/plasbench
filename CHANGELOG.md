@@ -12,6 +12,17 @@ history is lost, only the numbering is cleaner. See
 [docs/releases/](docs/releases/) for the full per-version notes.
 
 ## [Unreleased]
+
+## [0.5.1] - 2026-11-18
+Summary. Nothing in this release changes a score, a ranking or a threshold.
+- **GitHub sign-in and actions.** Sign in from the window (device flow through the GitHub CLI) and run GitHub actions from the Version control page.
+- **Connectivity checks.** One internet check for everything online (`plasbench net`, `config/network_services.tsv`), used by the command line, the scripts and the window, so being offline is said plainly instead of timing out.
+- **Add-your-tool (multi-task, sources, outputs).** One tool can do several tasks; tools can come from a URL, a local folder or a small uploaded script; a tool can describe several outputs, and the Check panel says which output serves which task.
+- **Folder scan for isolates.** `plasbench scan-isolates FOLDER` and the window's Scan a folder find each isolate's reads and reference in one mixed folder (`plasbench intake scan/stage` stay).
+- **Report visuals.** The short-read QC panel, QUAST-style comparison tables with a heatmap, facet heatmaps, and the presence matrix.
+- **Optional MultiQC.** A companion report (`MULTIQC_REPORT`, `plasbench install-tools multiqc`) that never fails a run.
+- **Also:** workflow steps (what each optional step adds), and a fix for the Guides page freezing on a `#####` heading.
+
 ### Fixed -- opening a guide froze the window
 - **The Guides page hung on the README.** The window's Markdown converter knew headings only up to level 4. A `##### ...` line (README line 2168) matched no rule and the paragraph rule refused to take a line starting with `#`, so the loop never advanced and the page stopped responding. The converter now knows levels 1 to 6, every pass must consume a line, and a stuck pass takes the line as plain text, so no input can loop. `test/test_ui_markdown.py` runs the real converter in Node on the exact line that hung, on odd inputs, on 3000 random Markdown-looking documents and on all 36 guides in the repository (each converts in well under a second; the README now takes about 30 ms).
 ### Added -- one internet check for everything online, and `plasbench net` (no more silent timeouts when offline)
