@@ -1771,12 +1771,14 @@ def make_handler(project: Project, jobs: Jobs):
                 ut = project.user_tools()
                 tools = ut.discover()
                 return self.jsend(200, {"tools": [{"name": n, "display": t.display_name, "task": t.task, "track": t.track,
-                                                   "mode": t.get("run", "mode"), "format": t.get("output", "format"),
+                                                   "mode": t.get("run", "mode"), "format": t.get("output", "format"), "tasks": t.tasks,
+                                                   "formats_list": t.formats, "source": t.source_summary(),
                                                    "install": t.get("install", "method", "none"), "path": str(t.path)}
                                                   for n, t in sorted(tools.items())],
                                         "search_path": [str(p) for p in ut.search_path()],
                                         "placeholders": ut.PLACEHOLDERS, "formats": ut.FORMATS, "tasks": ut.TASKS,
-                                        "tracks": ut.TRACKS, "install_methods": ut.INSTALL_METHODS, "schema": {k: sorted(v) for k, v in ut.SCHEMA.items()}})
+                                        "tracks": ut.TRACKS, "install_methods": ut.INSTALL_METHODS, "task_help": ut.TASK_HELP,
+                                        "format_help": ut.FORMAT_HELP, "source_help": ut.SOURCE_HELP, "schema": {k: sorted(v) for k, v in ut.SCHEMA.items()}})
             if route == "usertools/get":
                 ut = project.user_tools()
                 tool = ut.discover().get(q.get("name", ""))
@@ -2258,6 +2260,9 @@ def make_handler(project: Project, jobs: Jobs):
         def validate_manifest(self, text):
             import tempfile
             ut = project.user_tools()
+            # The richer, pure result (per-task derivation, source summary, outputs) comes from user_tools.validate_text;
+            # the keys the window already reads (ok, problems, warnings, row, plan) keep their meaning.
+            rich = ut.validate_text(text)
             with tempfile.TemporaryDirectory() as tmp:
                 path = Path(tmp) / "plasbench-tool.ini"
                 path.write_text(text, encoding="utf-8")
@@ -2265,15 +2270,17 @@ def make_handler(project: Project, jobs: Jobs):
                     tool = ut.UserTool(path)
                 except ut.ManifestError as exc:
                     problems = [l.strip()[2:] for l in str(exc).splitlines()[1:] if l.strip().startswith("- ")] or [str(exc)]
-                    return {"ok": False, "problems": problems}
-                warnings = []
+                    return dict(rich, ok=False, problems=problems)
                 if tool.name in ut.builtin_tools():
-                    return {"ok": False, "problems": [f"'{tool.name}' is a built-in PlasBench tool; choose another name"]}
+                    return dict(rich, ok=False, problems=[f"'{tool.name}' is a built-in PlasBench tool; choose another name"])
+                warnings = list(rich.get("warnings", []))
                 for key in ("script",):
                     if tool.get("install", key) and not Path(tool.resolve(tool.get("install", key))).is_file():
-                        warnings.append(f"[install] {key} = {tool.get('install', key)} must be saved beside the manifest")
-                return {"ok": True, "problems": [], "warnings": warnings, "row": tool.capability_row(),
-                        "plan": tool.install_plan()}
+                        message = f"[install] {key} = {tool.get('install', key)} must be saved beside the manifest"
+                        if message not in warnings:
+                            warnings.append(message)
+                return dict(rich, ok=True, problems=[], warnings=warnings, row=tool.capability_row(),
+                            rows=[tool.capability_row(task) for _, task in tool.task_ids()], plan=tool.install_plan())
 
         def save_manifest(self, text, overwrite):
             ut = project.user_tools()

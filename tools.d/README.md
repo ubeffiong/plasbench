@@ -10,6 +10,6 @@ plasbench install-tools my_tool        # from its [install] section, into its ow
 plasbench run --tool my_tool ...       # benchmark it beside the built-in tools
 ```
 
-`examples/` holds one worked manifest per output format. They are templates: folders below `examples/` are not on
+`examples/` holds one worked manifest per output format, plus a multi-task, a URL, a local-folder and an auto-detect example. They are templates: folders below `examples/` are not on
 the search path and never run. Copy one (`plasbench tools add tools.d/examples/example_contig_bins`) and edit it.
 The full reference is [docs/ADDING_TOOLS.md](../docs/ADDING_TOOLS.md).

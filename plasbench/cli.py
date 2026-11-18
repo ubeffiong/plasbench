@@ -538,16 +538,28 @@ def build_parser():
     install_parser.add_argument("--env", default="plasbench", help="Conda/mamba environment name (default: plasbench).")
     install_parser.add_argument("--yes", action="store_true", help="Use non-interactive mode for supported installer profiles; database setup remains explicit in 'plasbench check --yes'.")
     tools_parser = sub.add_parser(
-        "tools", help="Add your own plasmid tool: create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
+        "tools", help="Add your own plasmid tool (one or several tasks; from conda, pip, an https URL or a folder on this computer): create, validate, list and install user tool manifests (docs/ADDING_TOOLS.md).")
     tools_sub = tools_parser.add_subparsers(dest="tools_command", required=True)
     tools_sub.add_parser("list", help="Every user tool PlasBench can see, with its task, track, run mode and output format.")
-    tools_validate = tools_sub.add_parser("validate", help="Check every manifest (or one); exit 1 with each problem listed.")
+    tools_validate = tools_sub.add_parser("validate", help="Check every manifest (or one); exit 1 with each problem listed. Prints, per task, whether it is native, derived or not possible from the declared output, and the tool's source.")
     tools_validate.add_argument("name", nargs="?")
     tools_show = tools_sub.add_parser("show", help="Print one tool's manifest as PlasBench reads it.")
     tools_show.add_argument("name")
     tools_new = tools_sub.add_parser("new", help="Write a commented manifest template to fill in.")
     tools_new.add_argument("name", help="Tool name: lower-case letters, digits and _.")
     tools_new.add_argument("--dir", type=Path, help="Where to create it (default: ~/.plasbench/tools).")
+    tools_new.add_argument("--task", default="binning_reconstruction", metavar="A[,B]",
+                           help="What the tool does: binning_reconstruction, sequence_reassembly, classification; a comma list for a tool that does several "
+                                "(the command runs once; each task gets its own leaderboard row). Default: binning_reconstruction.")
+    tools_new.add_argument("--source", choices=("installed", "conda", "pip", "url", "local", "script"), default="conda",
+                           help="Where the tool comes from: installed (already on PATH), conda, pip, url (an https download), local (a folder or file on this "
+                                "computer) or script (an install script beside the manifest). Default: conda.")
+    tools_new.add_argument("--url", default="", help="With --source url: the https URL of an archive (.zip .tar.gz .tgz .tar.xz .tar.bz2), a git repository or a file. http, ftp and file are refused.")
+    tools_new.add_argument("--sha256", default="", help="With --source url: the SHA-256 the download must have (a different file is refused; without it a warning is shown).")
+    tools_new.add_argument("--local-path", default="", help="With --source local: the file or folder on this computer ('~' and Windows paths work).")
+    tools_new.add_argument("--output-format", default="", metavar="F[,F]|auto",
+                           help="What the tool writes: contig_bins, contig_labels, plasmid_fasta, fasta_dir, adapter; a comma list for several, or auto to let "
+                                "PlasBench recognise the files by content. Default: what the task needs.")
     tools_add = tools_sub.add_parser("add", help="Validate a tool folder (or manifest) and copy it to ~/.plasbench/tools.")
     tools_add.add_argument("path", type=Path)
     tools_install = tools_sub.add_parser("install", help="Install a user tool from its [install] section (same as install-tools NAME).")
@@ -1160,6 +1172,11 @@ def main(argv=None):
                 command.append(args.name)
             if args.tools_command == "new" and args.dir:
                 command.extend(["--dir", str(args.dir)])
+            if args.tools_command == "new":
+                for flag, value in (("--task", args.task), ("--source", args.source), ("--url", args.url), ("--sha256", args.sha256),
+                                    ("--local-path", args.local_path), ("--output-format", args.output_format)):
+                    if value:
+                        command.extend([flag, value])
             if args.tools_command == "add":
                 command.append(str(args.path.resolve()))
             code = run(command, root)

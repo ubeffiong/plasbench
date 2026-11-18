@@ -71,8 +71,10 @@ def main():
     check("a placeholder the command uses but requires does not list is reported", "uses graph but requires" in bad, bad)
     bad = errors_of(GOOD.replace("{threads}", "{cores}"))
     check("an unknown placeholder is reported with the available ones", "{cores}" in bad and "{contigs}" in bad, bad)
-    bad = errors_of(GOOD.replace("task = reconstruction", "task = classification"))
-    check("contig_bins for a classifier is reported", "set [tool] task = binning_reconstruction" in bad, bad)
+    check("contig_bins for a classifier is valid: a contig in any bin is plasmid (derived)",
+          errors_of(GOOD.replace("task = reconstruction", "task = classification")) == "")
+    bad = errors_of(GOOD.replace("format = contig_bins", "format = plasmid_fasta"))
+    check("a legacy single-format manifest keeps validating (binning from a plasmid FASTA, with a note)", bad == "", bad)
     bad = errors_of(GOOD.replace("name = my_binner", "name = My-Binner"))
     check("a name that is not snake_case is reported", "lower-case" in bad, bad)
     bad = errors_of(GOOD.replace("release_date = 2024-03-01", "release_date = March 2024"))
@@ -181,8 +183,10 @@ def main():
 
     print("bundled examples")
     examples = sorted((ROOT / "tools.d" / "examples").glob("*/plasbench-tool.ini"))
-    check("tools.d/examples ships one manifest per output format",
-          {ut.UserTool(m).get("output", "format") for m in examples if _valid_in_place(m)} == set(ut.FORMATS))
+    check("tools.d/examples ships one manifest per output format (and auto)",
+          {f for m in examples if _valid_in_place(m) for f in ut.UserTool(m).formats} == set(ut.FORMATS))
+    check("tools.d/examples ships the multi-task, url, local and auto-detect examples",
+          {"example_multi_task", "example_url", "example_local", "example_auto"} <= {m.parent.name for m in examples})
     for manifest in examples:
         check(f"example {manifest.parent.name} validates (with the files it ships)", _valid_in_place(manifest))
     check("examples are not on the search path (they are templates, never run)",

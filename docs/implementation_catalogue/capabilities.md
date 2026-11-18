@@ -189,7 +189,7 @@ Failure is scored as zero and tools are ranked on the isolates all of them share
 
 - **What.** A user declares a tool in one manifest; PlasBench installs it, runs it, converts its output to the standard prediction files, scores it and reports it, with the same
   evaluation task and track rules as built-in tools. Commands: `plasbench tools list|validate|show|new|add|install`.
-- **Where.** `python/user_tools.py`, `user_tool_adapter.py`, `docs/ADDING_TOOLS.md`; PR #46. **Tests.** `test_user_tools_manifest.py`, `test_user_tool_adapter.py`, `test_user_tool_stage.sh`.
+- **Where.** `python/user_tools.py`, `user_tool_adapter.py`, `user_tool_detect.py`, `user_tool_source.py`, `docs/ADDING_TOOLS.md`; PR #46 (several tasks, URL/local sources and `format = auto` added afterwards). **Tests.** `test_user_tools_manifest.py`, `test_user_tool_adapter.py`, `test_user_tool_detect.py`, `test_user_tool_source.py`, `test_user_tool_multitask.py`, `test_user_tool_stage.sh`, `test_user_tool_multitask_stage.sh`.
 
 ### 3.17 The HTML report
 
