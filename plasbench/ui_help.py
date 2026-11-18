@@ -193,6 +193,10 @@ WIZARD = {
                            "setting": "TOOL_TIMEOUT_SECONDS", "when": "Leave empty for no limit, the default: a limit scores a slow tool zero. Set one only to stop a truly stuck run, and make it generous."},
     "allow_all_tools_failed": {"summary": "Stage 4 normally exits with code 4 when every tool run failed (nothing to score). Switched on, the run continues with a warning.",
                                "setting": "ALLOW_ALL_TOOLS_FAILED", "when": "Leave off unless you want the run to go on after every tool failed."},
+    "console_log": {"default": "on", "summary": "Keep a console log of the run in the study folder (logs/run_*.log, and logs/run.latest.log for the newest): everything the run prints, kept after the window is closed.",
+                    "setting": "RUN_CONSOLE_LOG", "when": "Leave on. Unchecked, the window sends RUN_CONSOLE_LOG=0 and no console log file is written."},
+    "log_retention_runs": {"default": "20", "summary": "How many console logs of earlier runs are kept in the study's logs folder; older ones are removed.",
+                           "setting": "LOG_RETENTION_RUNS", "when": "Leave empty for the default (20)."},
     "network_retries": {"default": "3", "summary": "Stage 1 retries each fetch this many times before recording the sample as failed.", "setting": "NETWORK_RETRIES", "when": "Leave empty for the default (3)."},
     "ena_download_connections": {"default": "4", "summary": "A large ENA read file is split into this many byte ranges fetched in parallel (aria2c is used when installed).",
                                  "setting": "ENA_DOWNLOAD_CONNECTIONS", "when": "Leave empty for the default (4). Only affects ENA downloads."},
@@ -212,10 +216,11 @@ SETTINGS = {
     "MAX_RUN_DOWNLOAD_GB": WIZARD["max_run_download_gb"], "WARN_RUN_DOWNLOAD_GB": WIZARD["warn_run_download_gb"],
     "PREFETCH_FAIL_LIMIT": WIZARD["prefetch_fail_limit"], "ALLOW_ALL_TOOLS_FAILED": WIZARD["allow_all_tools_failed"],
     "ENA_DOWNLOAD_CONNECTIONS": WIZARD["ena_download_connections"], "NETWORK_RETRIES": WIZARD["network_retries"],
+    "RUN_CONSOLE_LOG": WIZARD["console_log"], "LOG_RETENTION_RUNS": WIZARD["log_retention_runs"],
 }
 # Settings shown together in the "Reliability and downloads" group (only those config.sh defines).
 RELIABILITY_KEYS = ["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "NETWORK_RETRIES", "NETWORK_RETRY_DELAY_SECONDS",
-                    "ENA_DOWNLOAD_CONNECTIONS", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED"]
+                    "ENA_DOWNLOAD_CONNECTIONS", "PRESERVE_DOWNLOADS", "TOOL_RETRIES", "TOOL_TIMEOUT_SECONDS", "ALLOW_ALL_TOOLS_FAILED", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"]
 
 
 def _default_text(default, kind=None):

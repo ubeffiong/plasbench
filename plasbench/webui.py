@@ -65,10 +65,58 @@ RELIABILITY_GROUP = "Reliability and downloads"
 # Environment settings the window may pass with a job (Jobs.start): the Settings keys of config/config.sh plus the download and reliability
 # names the wizard's "Downloads and reliability" card sets. Anything else (LD_PRELOAD, PATH ...) is refused.
 EXTRA_ENV_KEYS = frozenset(["READ_SOURCE", "MAX_RUN_DOWNLOAD_GB", "WARN_RUN_DOWNLOAD_GB", "PREFETCH_FAIL_LIMIT", "TOOL_TIMEOUT_SECONDS",
-                            "ALLOW_ALL_TOOLS_FAILED", "NETWORK_RETRIES", "ENA_DOWNLOAD_CONNECTIONS"])
+                            "ALLOW_ALL_TOOLS_FAILED", "NETWORK_RETRIES", "ENA_DOWNLOAD_CONNECTIONS", "RUN_CONSOLE_LOG", "LOG_RETENTION_RUNS"])
 ENV_KEY = re.compile(r"[A-Z][A-Z0-9_]*")
 ENV_FORBIDDEN = frozenset(["PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "PROJECT_ROOT"])
 ENV_VALUE_MAX = 200
+
+
+# -- the Run status panel: python/run_status.py (written with the logging pipeline) summarises a results folder; the window only asks for it -----------
+STATUS_CACHE_SECONDS = 3.0
+_status_cache: dict = {}
+_status_lock = threading.Lock()
+
+
+def load_run_status(root):
+    """python/run_status.py imported by path, or None when this checkout does not have it."""
+    import importlib.util
+    path = Path(root) / "python" / "run_status.py"
+    if not path.is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("plasbench_run_status", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def run_status_json(root, results: Path, log_dir: Path, data_dir: Path, loader=None, now=time.monotonic) -> dict:
+    """run_status.summarize(results, log, data) as JSON-able data plus a `text` field (render(summary, diagnose=True)). Cached for 3 s per folder. Never raises:
+    a failure is {"state": "no-run", "error": reason}."""
+    key = str(results)
+    with _status_lock:
+        hit = _status_cache.get(key)
+        if hit and now() - hit[0] < STATUS_CACHE_SECONDS:
+            return hit[1]
+    try:
+        module = (loader or load_run_status)(root)
+        if module is None:
+            out = {"state": "no-run", "error": "this PlasBench has no python/run_status.py"}
+        else:
+            out = json.loads(json.dumps(module.summarize(results, log_dir, data_dir), default=str))
+            if not isinstance(out, dict):
+                out = {"state": "no-run", "error": "run_status returned something that is not a summary"}
+            else:
+                try:
+                    out["text"] = module.render(out, diagnose=True)
+                except Exception as exc:  # noqa: BLE001 - the summary is still useful without the text
+                    out["text"] = f"(the diagnosis text could not be made: {exc})"
+    except Exception as exc:  # noqa: BLE001
+        out = {"state": "no-run", "error": f"{type(exc).__name__}: {exc}"}
+    out.setdefault("state", "no-run")
+    out["results"], out["log_dir"] = key, str(log_dir)
+    with _status_lock:
+        _status_cache[key] = (now(), out)
+    return out
 
 
 def _sheet_header(path: Path) -> list:
@@ -1223,7 +1271,7 @@ def save_state(state: dict):
 
 
 TEXT_PREVIEW = {".tsv": "table", ".csv": "table", ".txt": "text", ".log": "text", ".md": "text", ".json": "text",
-                ".yaml": "text", ".yml": "text", ".ini": "text", ".sh": "text", ".py": "text", ".gff": "text", ".gff3": "text"}
+                ".jsonl": "text", ".yaml": "text", ".yml": "text", ".ini": "text", ".sh": "text", ".py": "text", ".gff": "text", ".gff3": "text"}
 MAX_PREVIEW = 2 * 2**20
 
 
@@ -1591,6 +1639,21 @@ def make_handler(project: Project, jobs: Jobs):
                 ws = studies.workspace(project.root)
                 real = runfolders.check_deletable(project.root, ws, Path.home(), q.get("path", ""), state.get("runs", []), jobs.running_results(), studies.external_folders(project.root))
                 return self.jsend(200, runfolders.facts(ws, real))
+            if route == "runs/status":             # the Run status panel: same confinement as the other run routes (a study's results folder, or a listed run folder)
+                from . import studies
+                from .cli import configured_data_dir
+                ws = studies.workspace(project.root)
+                real = runfolders.check_deletable(project.root, ws, Path.home(), q.get("path", ""), state.get("runs", []), (), studies.external_folders(project.root))
+                study = real.parent if (real.parent / "study.json").is_file() else None
+                log_dir = (study / "logs") if study else real.parent / "logs"
+                data_dir = configured_data_dir(project.root)
+                if study:
+                    try:
+                        recorded = json.loads((study / "study.json").read_text(encoding="utf-8")).get("data_dir")
+                        data_dir = Path(recorded) if recorded else data_dir
+                    except (OSError, ValueError):
+                        pass
+                return self.jsend(200, run_status_json(project.root, real, log_dir, data_dir))
             if route == "studies/facts":           # what a delete or archive would involve, shown before the user confirms
                 from . import study_manage
                 return self.jsend(200, study_manage.facts(project.root, q.get("name", "")))
