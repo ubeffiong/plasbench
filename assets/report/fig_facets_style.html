@@ -1,0 +1,50 @@
+<style>
+/* Facet heatmaps. The static figure (.fc-static) is the no-JavaScript and print version; the live app replaces it on screen. */
+.fc-root{--fc-bg:#fff;--fc-ink:#17231d;--fc-muted:#5a675f;--fc-line:#d9e1da;--fc-panel:#fbfcfb;--fc-accent:#0c6b4f;--fc-focus:#1a5fb4;margin:12px 0;font:13px/1.4 Arial,Helvetica,sans-serif;color:var(--fc-ink);position:relative}
+:root[data-theme=dark] .fc-root{--fc-bg:#14181a;--fc-ink:#e6ebe8;--fc-muted:#a3aea8;--fc-line:#33403a;--fc-panel:#1a2022;--fc-accent:#5dc89a;--fc-focus:#7fb2ff}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .fc-root{--fc-bg:#14181a;--fc-ink:#e6ebe8;--fc-muted:#a3aea8;--fc-line:#33403a;--fc-panel:#1a2022;--fc-accent:#5dc89a;--fc-focus:#7fb2ff}}
+.fc-root *{box-sizing:border-box}
+.fc-root.fc-live .fc-static{display:none}
+.fc-static .rpt-figure{background:#fff;color:#17231d}
+.fc-static svg,.fc-svg{display:block;width:100%;height:auto}
+.fc-app{border:1px solid var(--fc-line);border-radius:10px;background:var(--fc-bg);overflow:hidden}
+.fc-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-end;padding:10px 14px;border-bottom:1px solid var(--fc-line)}
+.fc-field{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--fc-muted)}
+.fc-field select,.fc-field input[type=number]{font:13px Arial,sans-serif;padding:4px 6px;border:1px solid var(--fc-line);border-radius:6px;background:var(--fc-bg);color:var(--fc-ink);min-height:30px}
+.fc-field input[type=number]{width:64px}
+.fc-metrics{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.fc-metrics legend{font-size:12px;color:var(--fc-muted);padding:0 0 2px}
+.fc-metrics label{display:inline-flex;gap:4px;align-items:center;cursor:pointer;min-height:28px}
+.fc-btn{border:1px solid var(--fc-line);background:var(--fc-bg);color:var(--fc-ink);border-radius:6px;padding:5px 10px;cursor:pointer;font:600 12px Arial,sans-serif;min-height:30px}
+.fc-btn:hover{background:var(--fc-panel)}
+.fc-btn[aria-pressed=true]{background:var(--fc-accent);color:#fff;border-color:var(--fc-accent)}
+.fc-root :focus-visible{outline:3px solid var(--fc-focus);outline-offset:2px}
+.fc-main{display:grid;grid-template-columns:minmax(0,1fr) 340px}
+.fc-main.fc-nopanel{grid-template-columns:minmax(0,1fr)}
+.fc-main.fc-nopanel .fc-panel{display:none}
+.fc-stage{min-width:0;padding:8px 12px;overflow-x:auto}
+.fc-stage .fc-svg{min-width:560px;max-height:86vh}
+.fc-t{fill:var(--fc-ink)}
+.fc-cell{cursor:pointer}
+.fc-cell:hover rect{stroke:var(--fc-ink);stroke-width:1.4}
+.fc-cell:focus{outline:none}
+.fc-cell:focus-visible rect,.fc-cell.fc-sel rect{stroke:var(--fc-focus);stroke-width:2.4}
+.fc-note{margin:6px 0 0;color:var(--fc-muted);font-size:12px}
+.fc-panel{border-left:1px solid var(--fc-line);background:var(--fc-panel);min-width:0;padding:10px 14px;max-height:86vh;overflow:auto}
+.fc-panel h3{margin:0 0 4px;font-size:14px}
+.fc-panel p{margin:4px 0}
+.fc-panel table{border-collapse:collapse;width:100%;font-size:12px;margin:6px 0}
+.fc-panel th,.fc-panel td{border-bottom:1px solid var(--fc-line);padding:3px 5px;text-align:left}
+.fc-panel td.fc-num{text-align:right;font-variant-numeric:tabular-nums}
+.fc-flag{display:inline-block;border:1px solid #a35c05;background:#f6ead1;color:#5b3d00;border-radius:10px;padding:0 8px;font-weight:bold;font-size:11.5px}
+.fc-kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px;margin:6px 0}
+.fc-kv dt{color:var(--fc-muted)}.fc-kv dd{margin:0}
+.fc-strip{width:100%;height:auto;display:block;margin:4px 0}
+.fc-strip .fc-t{font-size:9px}
+.fc-tip{position:fixed;z-index:50;pointer-events:none;background:var(--fc-bg);color:var(--fc-ink);border:1px solid var(--fc-line);border-radius:6px;padding:6px 9px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:280px}
+.fc-sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.fc-link{color:var(--fc-accent)}
+.fc-table{margin-top:10px}
+@media (max-width:900px){.fc-main{grid-template-columns:minmax(0,1fr)}.fc-panel{border-left:0;border-top:1px solid var(--fc-line);max-height:none}}
+@media print{.fc-app,.fc-tip{display:none!important}.fc-root.fc-live .fc-static{display:block}.fc-static .rpt-figure{break-inside:avoid}}
+</style>

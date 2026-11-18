@@ -1,0 +1,164 @@
+<script>
+/* PlasBench facet heatmaps: pure functions, vanilla JS, no libraries. Mirrors python/report_fig_facets.py (cell_stats, grid, colour, wilson);
+   test/test_report_fig_facets.py and test/test_report_fig_visuals_js.py check that the two agree. */
+(function (root) {
+'use strict';
+var Z = 1.959963984540054, NOT_REC = 'not recorded', MIN_N = 3;
+var STOPS = [[0, [68, 1, 84]], [0.25, [59, 82, 139]], [0.5, [33, 144, 140]], [0.75, [93, 200, 99]], [1, [253, 231, 37]]];
+var CW = 30, CH = 16, BG = 6, PG = 16, LW = 150, TOPH = 34, BOTH = 90;
+
+var ESCMAP = {'&': '&amp;', '<': '&lt;', '>': '&gt;'}; ESCMAP[String.fromCharCode(34)] = '&quot;'; ESCMAP[String.fromCharCode(39)] = '&#39;';
+function esc(s) { return String(s).split('').map(function (c) { return ESCMAP[c] || c; }).join(''); }
+function hex2(x) { var h = Math.round(x).toString(16); return h.length < 2 ? '0' + h : h; }
+function wilson(c, n) {
+  if (!n) { return null; }
+  var p = c / n, d = 1 + Z * Z / n, centre = (p + Z * Z / (2 * n)) / d, half = Z * Math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / d;
+  return [Math.max(0, centre - half), Math.min(1, centre + half)];
+}
+function colour(v) {
+  v = Math.min(1, Math.max(0, v));
+  for (var i = 0; i < STOPS.length - 1; i++) {
+    var a = STOPS[i], b = STOPS[i + 1];
+    if (v <= b[0]) { var f = (v - a[0]) / (b[0] - a[0]); return '#' + [0, 1, 2].map(function (k) { return hex2(a[1][k] + (b[1][k] - a[1][k]) * f); }).join(''); }
+  }
+  return '#' + STOPS[STOPS.length - 1][1].map(hex2).join('');
+}
+function inkOn(hex) {
+  var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140 ? '#ffffff' : '#111111';
+}
+function stratum(level, key) { for (var i = 0; i < level.strata.length; i++) { if (level.strata[i].k === key) { return i; } } return -1; }
+function defaultSelection(level, defaults) {
+  var multi = [], keys = level.strata.map(function (s) { return s.k; });
+  level.strata.forEach(function (s) { if (s.vals.filter(function (v) { return v !== NOT_REC; }).length >= 2) { multi.push(s.k); } });
+  var pick = multi.concat(keys.filter(function (k) { return multi.indexOf(k) < 0; }));
+  var have = level.metrics.map(function (m) { return m.k; });
+  var want = ((defaults || {})[level.unit] || []).filter(function (k) { return have.indexOf(k) >= 0; });
+  return {block: pick[0], row: pick.length > 1 ? pick[1] : null, metrics: want.length ? want : have.slice(0, 3)};
+}
+function grid(level, blockKey, rowKey) {
+  var bi = stratum(level, blockKey), ri = rowKey && rowKey !== blockKey ? stratum(level, rowKey) : -1;
+  if (bi < 0) { return []; }
+  var usedRows = [0];
+  if (ri >= 0) {
+    var seen = {}; level.units.forEach(function (u) { seen[u[2][ri]] = 1; });
+    usedRows = Object.keys(seen).map(Number).sort(function (a, b) { return a - b; });
+  }
+  var out = [];
+  level.strata[bi].vals.forEach(function (blabel, b) {
+    var members = []; level.units.forEach(function (u, i) { if (u[2][bi] === b) { members.push(i); } });
+    if (!members.length) { return; }
+    out.push({label: blabel, rows: usedRows.map(function (r) {
+      return {label: ri >= 0 ? level.strata[ri].vals[r] : 'all', units: members.filter(function (i) { return ri < 0 || level.units[i][2][ri] === r; })};
+    })});
+  });
+  return out;
+}
+function cellStats(level, tool, metric, units, minN) {
+  minN = minN === undefined ? MIN_N : minN;
+  var kind = level.metrics[metric].kind, byTool = level.vals[String(tool)], arr = byTool ? byTool[String(metric)] : null, items = [];
+  if (arr) { units.forEach(function (i) { if (arr[i] !== null && arr[i] !== undefined) { items.push([i, arr[i]]); } }); }
+  var n = items.length, out = {n: n, v: null, lo: null, hi: null, few: n > 0 && n < minN, kind: kind, units: items.map(function (x) { return x[0]; })};
+  if (!n) { return out; }
+  if (kind === 'prop') {
+    var c = 0, tot = 0; items.forEach(function (x) { c += x[1][0]; tot += x[1][1]; });
+    out.c = c; out.total = tot;
+    if (tot) { out.v = c / tot; var w = wilson(c, tot); out.lo = w[0]; out.hi = w[1]; }
+  } else {
+    var vs = items.map(function (x) { return x[1]; }), s = 0, mn = vs[0], mx = vs[0];
+    vs.forEach(function (v) { s += v; if (v < mn) { mn = v; } if (v > mx) { mx = v; } });
+    out.v = s / vs.length; out.lo = mn; out.hi = mx;
+  }
+  return out;
+}
+function unitValue(level, tool, metric, unit) {
+  var byTool = level.vals[String(tool)], arr = byTool ? byTool[String(metric)] : null, v = arr ? arr[unit] : null;
+  if (v === null || v === undefined) { return null; }
+  if (Array.isArray(v)) { return v[1] ? v[0] / v[1] : null; }
+  return v;
+}
+function columns(data, level, track) {
+  var cols = [];
+  data.tools.forEach(function (t, i) { if ((!track || t[0] === track) && level.vals[String(i)]) { cols.push(i); } });
+  return cols;
+}
+function fnum(v) { return v === null || v === undefined ? 'no value' : v.toFixed(2); }
+/* The live drawing. Cells carry data-p (panel), data-r (flat row), data-c (column) so the interface can move by arrow keys and open the side panel. */
+function svg(data, level, sel, opts) {
+  opts = opts || {};
+  var minN = opts.minN === undefined ? MIN_N : opts.minN, cols = columns(data, level, opts.track), g = grid(level, sel.block, sel.row);
+  var metrics = []; level.metrics.forEach(function (m, i) { if (sel.metrics.indexOf(m.k) >= 0) { metrics.push(i); } });
+  if (!metrics.length && level.metrics.length) { metrics = [0]; }
+  if (!cols.length || !g.length || !metrics.length) { return {svg: '', cells: [], cols: cols, grid: g, metrics: metrics}; }
+  var nrows = 0; g.forEach(function (b) { nrows += b.rows.length; });
+  var height = TOPH + nrows * CH + (g.length - 1) * BG + BOTH + 6, pw = cols.length * CW, width = LW + metrics.length * (pw + PG) + 70;
+  var o = ['<svg class="fc-svg" viewBox="0 0 ' + width + ' ' + height + '" role="group" aria-label="Facet heatmaps: ' + esc(sel.metrics.join(', ')) + '" font-family="Arial,Helvetica,sans-serif">',
+    '<defs><pattern id="fc-hatch-l" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#d8d8d8"/><line x1="0" y1="0" x2="0" y2="5" stroke="#555" stroke-width="1.6"/></pattern>',
+    '<linearGradient id="fc-bar-l" x1="0" y1="1" x2="0" y2="0">' + [0, 0.25, 0.5, 0.75, 1].map(function (a) { return '<stop offset="' + a + '" stop-color="' + colour(a) + '"/>'; }).join('') + '</linearGradient></defs>'];
+  var cells = [];
+  metrics.forEach(function (mi, k) {
+    var x0 = LW + k * (pw + PG), y = TOPH, flat = 0;
+    o.push('<text class="fc-t fc-ptitle" x="' + (x0 + pw / 2) + '" y="16" font-size="12" font-weight="bold" text-anchor="middle">' + esc(level.metrics[mi].l) + '</text>');
+    g.forEach(function (b, bi) {
+      b.rows.forEach(function (r, ri) {
+        cols.forEach(function (tool, c) {
+          var st = cellStats(level, tool, mi, r.units, minN), x = x0 + c * CW;
+          if (st.n === 0) { o.push('<rect class="fc-empty" x="' + x + '" y="' + y + '" width="' + CW + '" height="' + CH + '" fill="none" stroke="#9aa3a8" stroke-width=".4" stroke-dasharray="2 2"/>'); return; }
+          var fill = st.few ? 'url(#fc-hatch-l)' : colour(st.v), ink = st.few ? '#111111' : inkOn(colour(st.v));
+          var label = level.metrics[mi].l + ', ' + b.label + ', ' + r.label + ', ' + data.tools[tool][1] + ': ' + fnum(st.v) + ', n ' + st.n + (st.few ? ', too few to read' : '');
+          cells.push({p: k, mi: mi, b: bi, r: ri, flat: flat, c: c, tool: tool, units: r.units, label: label});
+          o.push('<g class="fc-cell" role="button" tabindex="-1" aria-label="' + esc(label) + '" data-k="' + (cells.length - 1) + '"><rect x="' + x + '" y="' + y + '" width="' + CW + '" height="' + CH + '" fill="' + fill + '" stroke="#fff" stroke-width=".6"/>' +
+            '<text x="' + (x + CW / 2) + '" y="' + (y + CH - 4.5) + '" font-size="8.5" text-anchor="middle" fill="' + ink + '" pointer-events="none">' + st.n + '</text></g>');
+        });
+        if (k === 0) { o.push('<text class="fc-t" x="' + (LW - 6) + '" y="' + (y + CH - 4) + '" font-size="9" text-anchor="end">' + esc(r.label) + '</text>'); }
+        y += CH; flat++;
+      });
+      if (k === 0) { o.push('<text class="fc-t" x="8" y="' + (y - b.rows.length * CH / 2 + 3) + '" font-size="10.5" font-weight="bold">' + esc(b.label) + '</text>'); }
+      y += BG;
+    });
+    cols.forEach(function (tool, c) {
+      o.push('<text class="fc-t" transform="translate(' + (x0 + c * CW + CW / 2) + ',' + (y - BG + 12) + ') rotate(45)" font-size="9.5">' + esc(data.tools[tool][1]) + '</text>');
+    });
+  });
+  var bx = LW + metrics.length * (pw + PG) + 6;
+  o.push('<rect x="' + bx + '" y="' + TOPH + '" width="12" height="120" fill="url(#fc-bar-l)" stroke="#666" stroke-width=".5"/>');
+  [0, 0.5, 1].forEach(function (v) { o.push('<text class="fc-t" x="' + (bx + 16) + '" y="' + (TOPH + 120 - v * 120 + 3) + '" font-size="9">' + v + '</text>'); });
+  o.push('<rect x="' + bx + '" y="' + (TOPH + 134) + '" width="12" height="12" fill="url(#fc-hatch-l)" stroke="#666" stroke-width=".5"/><text class="fc-t" x="' + (bx + 16) + '" y="' + (TOPH + 144) + '" font-size="9">n &lt; ' + minN + '</text></svg>');
+  return {svg: o.join(''), cells: cells, cols: cols, grid: g, metrics: metrics};
+}
+/* arrow-key move over the drawn cells: returns the index into cells, or the same index when there is no neighbour */
+function neighbour(cells, k, key) {
+  var cur = cells[k], best = k;
+  function find(p, flat, c) { for (var i = 0; i < cells.length; i++) { if (cells[i].p === p && cells[i].flat === flat && cells[i].c === c) { return i; } } return -1; }
+  var tries = [];
+  if (key === 'ArrowRight') { for (var c = cur.c + 1; c < 200; c++) { tries.push([cur.p, cur.flat, c]); } }
+  else if (key === 'ArrowLeft') { for (var c2 = cur.c - 1; c2 >= 0; c2--) { tries.push([cur.p, cur.flat, c2]); } }
+  else if (key === 'ArrowDown') { for (var f = cur.flat + 1; f < 400; f++) { tries.push([cur.p, f, cur.c]); } }
+  else if (key === 'ArrowUp') { for (var f2 = cur.flat - 1; f2 >= 0; f2--) { tries.push([cur.p, f2, cur.c]); } }
+  else if (key === 'PageDown') { tries.push([cur.p + 1, cur.flat, cur.c]); }
+  else if (key === 'PageUp') { tries.push([cur.p - 1, cur.flat, cur.c]); }
+  for (var i = 0; i < tries.length; i++) { var j = find(tries[i][0], tries[i][1], tries[i][2]); if (j >= 0) { best = j; break; } }
+  return best;
+}
+function quote(x) { var Q = String.fromCharCode(34); x = String(x); return x.indexOf(Q) >= 0 || x.indexOf(',') >= 0 || x.indexOf(String.fromCharCode(10)) >= 0 ? Q + x.split(Q).join(Q + Q) + Q : x; }
+function csv(data, level, sel, opts) {
+  opts = opts || {}; var minN = opts.minN === undefined ? MIN_N : opts.minN, cols = columns(data, level, opts.track), rows = [['block', 'row', 'tool', 'metric', 'n', 'value', 'low', 'high', 'flag']];
+  grid(level, sel.block, sel.row).forEach(function (b) {
+    b.rows.forEach(function (r) {
+      level.metrics.forEach(function (m, mi) {
+        if (sel.metrics.indexOf(m.k) < 0) { return; }
+        cols.forEach(function (t) {
+          var st = cellStats(level, t, mi, r.units, minN);
+          rows.push([b.label, r.label, data.tools[t][1], m.l, st.n, st.v === null ? '' : st.v.toFixed(4), st.lo === null ? '' : st.lo.toFixed(4), st.hi === null ? '' : st.hi.toFixed(4), st.few ? 'too few' : '']);
+        });
+      });
+    });
+  });
+  return rows.map(function (r) { return r.map(quote).join(','); }).join(String.fromCharCode(10));
+}
+var api = {MIN_N: MIN_N, NOT_REC: NOT_REC, esc: esc, wilson: wilson, colour: colour, inkOn: inkOn, stratum: stratum, defaultSelection: defaultSelection, grid: grid,
+  cellStats: cellStats, unitValue: unitValue, columns: columns, svg: svg, neighbour: neighbour, csv: csv, fnum: fnum};
+root.FCCore = api;
+if (typeof module !== 'undefined' && module.exports) { module.exports = api; }
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>

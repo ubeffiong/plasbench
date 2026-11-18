@@ -193,6 +193,20 @@ HELP = {
         "A downward slope shows a tool struggling as the characteristic grows; a flat cloud shows it does not matter for that tool.",
         "Explains low scores by the kind of isolate, and shows which characteristics could be known in advance.",
         "Each chart says whether the characteristic is knowable without a reference or needs it. With few isolates the correlation is a description, not evidence of cause; under five isolates it is not computed."),
+    "fig-facets": H(
+        "How each tool performs under each condition at once: sequencing depth, species, reference tier, plasmid size and more.",
+        "Per-isolate scores (precision, recall, F1, CPRR) from the score table, and per-plasmid results (recovered, CPRR correct, completeness) when the per-sample folders are present; the strata come from the sample sheet, the reference tiers and the truth tables.",
+        "Columns are tools, rows are conditions nested in blocks (you choose both from the strata the data record), and each panel is one metric on one shared 0 to 1 colour scale. A cell is the mean (or, for CPRR and recovered share, the pooled share) over the isolates or plasmids in it, and shows its n.",
+        "Brighter is better. A hatched cell has fewer than three units: it is labelled with its n and should not be read as a result. A dashed empty cell has no data (never zero). Click a cell to list the isolates or plasmids in it, their values, a strip plot and the interval.",
+        "Shows where a tool is strong or weak across conditions, which one overall ranking number hides, and which conditions are too thinly covered to say.",
+        "Cells hold few units in a small run. The interval for a mean is the range of the units, not a confidence interval; for a share it is a Wilson interval over plasmids, not cluster-aware. Conditions are not controlled: depth and species can be confounded with study. The table under the figure holds every cell."),
+    "fig-presence": H(
+        "Which resistance genes, replicon types, mobility types and other features each truth plasmid carries, and whether each tool recovered it.",
+        "The truth annotation tables of each sample (resistance genes, replicon and mobility features, other annotated gene classes) and, for the tool overlay, the per-plasmid results of each tool.",
+        "Plasmids are clustered on the features they carry (Jaccard distance, average linkage, deterministic). Bars above each block give the share of annotated plasmids that carry the feature, with n. Choosing a tool colours each present feature by that tool's real outcome on the plasmid.",
+        "Blue is present, blank is annotated and absent, hatched is not annotated (different from absent). With a tool chosen: solid is recovered, striped partly recovered, hollow red outline missed. Click a plasmid row or a feature column for its details.",
+        "Shows whether recovery depends on what a plasmid carries, for example whether a tool misses plasmids with a given resistance gene or replicon type.",
+        "Only features an annotation table lists appear; nothing is inferred. Prevalence is among plasmids annotated for that block. The clustering is a visual aid, not a phylogeny. Few plasmids give wide intervals; the table under the figure holds every plasmid."),
     "fig-pr": H(
         "The trade-off between finding plasmid sequence (recall) and not calling chromosome by mistake (precision).",
         "Plasmid bases recovered and falsely called, from tools that write a score for each call.",

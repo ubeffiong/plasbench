@@ -1,0 +1,178 @@
+<script>
+/* PlasBench presence/absence matrix, DOM glue. All numbers and drawing come from FPCore (fig_presence_core.html). */
+(function () {
+'use strict';
+var FP = window.FPCore, root = document.getElementById('fp-root'), dataEl = document.getElementById('fp-data');
+if (!FP || !root || !dataEl) { return; }
+var DATA; try { DATA = JSON.parse(dataEl.textContent); } catch (e) { return; }
+if (!DATA.rows || !DATA.rows.length || !DATA.blocks || !DATA.blocks.length) { return; }
+FP.prepare(DATA);
+var S = {tool: '', order: 'cluster', amr: DATA.defaultAmr, group: DATA.tracks.length ? DATA.tracks[0].k : '', panel: true, sel: null}, V = null;
+function el(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') { e.textContent = attrs[k]; } else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) { e.setAttribute(k, attrs[k]); } });
+  (kids || []).forEach(function (c) { e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return e;
+}
+var head = el('div', {'class': 'fp-head'}), main = el('div', {'class': 'fp-main'}), stage = el('div', {'class': 'fp-stage'}), panel = el('aside', {'class': 'fp-panel', id: 'fp-panel', 'aria-label': 'Plasmid and feature details'});
+var live = el('div', {'class': 'fp-sr', 'aria-live': 'polite', role: 'status'});
+main.appendChild(stage); main.appendChild(panel);
+root.appendChild(el('div', {'class': 'fp-app'}, [head, main])); root.appendChild(live);
+root.classList.add('fp-live');
+function field(label, control) { return el('label', {'class': 'fp-field'}, [label, control]); }
+function fill(sel, items, value) { sel.textContent = ''; items.forEach(function (it) { var o = el('option', {value: it[0], text: it[1]}); if (it[0] === value) { o.selected = true; } sel.appendChild(o); }); }
+var selTool = el('select', {id: 'fp-tool'}), selOrder = el('select', {id: 'fp-order'}), selAmr = el('select', {id: 'fp-amr'}), selGroup = el('select', {id: 'fp-group'});
+var panelBtn = el('button', {type: 'button', 'class': 'fp-btn', 'aria-pressed': 'true', 'aria-controls': 'fp-panel', text: 'Side panel'}), csvBtn = el('button', {type: 'button', 'class': 'fp-btn', text: 'Download CSV'});
+fill(selTool, [['', 'None (truth only)']].concat(DATA.tools.map(function (t, i) { return [String(i), t[1] + (new Set(DATA.tools.map(function (x) { return x[0]; })).size > 1 ? ' (' + t[0] + ')' : '')]; })), '');
+fill(selOrder, [['cluster', 'Clustering (dendrogram)']].concat(DATA.tracks.map(function (t) { return [t.k, 'Annotation: ' + t.l]; })), 'cluster');
+var hasGene = DATA.blocks.some(function (b) { return b.k === 'amr_gene'; }) && DATA.blocks.some(function (b) { return b.k === 'amr_class'; });
+fill(selAmr, [['amr_class', 'AMR gene classes'], ['amr_gene', 'AMR genes']], S.amr);
+fill(selGroup, DATA.tracks.map(function (t) { return [t.k, t.l]; }), S.group);
+if (DATA.tools.length) { head.appendChild(field('Tool overlay', selTool)); }
+head.appendChild(field('Order rows by', selOrder));
+if (hasGene) { head.appendChild(field('AMR detail', selAmr)); }
+if (DATA.tracks.length) { head.appendChild(field('Prevalence by', selGroup)); }
+head.appendChild(panelBtn); head.appendChild(csvBtn);
+selTool.addEventListener('change', function () { S.tool = selTool.value; draw(); });
+selOrder.addEventListener('change', function () { S.order = selOrder.value; S.sel = null; draw(); });
+selAmr.addEventListener('change', function () { S.amr = selAmr.value; S.sel = null; draw(); });
+selGroup.addEventListener('change', function () { S.group = selGroup.value; renderPanel(); });
+panelBtn.addEventListener('click', function () { S.panel = !S.panel; main.classList.toggle('fp-nopanel', !S.panel); panelBtn.setAttribute('aria-pressed', String(S.panel)); });
+csvBtn.addEventListener('click', function () {
+  try { var a = el('a', {href: URL.createObjectURL(new Blob([FP.csv(DATA, V ? V.order : null)], {type: 'text/csv'})), download: 'plasbench_presence.csv'}); document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+  catch (e) { announce('Download is not available in this browser.'); }
+});
+function announce(m) { live.textContent = ''; setTimeout(function () { live.textContent = m; }, 20); }
+
+function legend() {
+  var p = el('p', {'class': 'fp-note'});
+  p.textContent = 'Blue = present. Blank = annotated and absent. Hatched grey = not annotated (not the same as absent). Bars: share of annotated plasmids carrying the feature. ' +
+    (S.tool !== '' ? 'Overlay for ' + DATA.tools[+S.tool][1] + ': solid blue = recovered (counted correct), striped = partly recovered, hollow red outline = missed, grey = the tool has no value for that plasmid. ' : 'No tool selected: the truth only. ') +
+    (DATA.clustered || S.order !== 'cluster' ? '' : 'Too many distinct profiles for a dendrogram; rows are ordered by profile. ') + 'Arrow up/down moves between plasmids, left/right between features; Enter opens the details.';
+  return p;
+}
+function draw() {
+  V = FP.svg(DATA, {tool: S.tool === '' ? null : S.tool, order: S.order, amr: S.amr});
+  stage.textContent = '';
+  var wrap = el('div'); wrap.innerHTML = V.svg; var svg = wrap.firstChild; stage.appendChild(svg); stage.appendChild(legend());
+  var rows = svg.querySelectorAll('.fp-row'), cols = svg.querySelectorAll('.fp-col');
+  Array.prototype.forEach.call(rows, function (g) {
+    var r = +g.getAttribute('data-r'), k = +g.getAttribute('data-k');
+    g.addEventListener('click', function () { pick({kind: 'row', r: r, k: k}, true); });
+    g.addEventListener('keydown', function (ev) { rowKey(ev, k, rows); });
+    g.addEventListener('focus', function () { markFocus(g); });
+    g.addEventListener('mouseenter', function () { g.setAttribute('title', DATA.rows[r][1] + ' (' + DATA.rows[r][0] + ')'); });
+  });
+  Array.prototype.forEach.call(cols, function (g, i) {
+    var b = +g.getAttribute('data-b'), f = +g.getAttribute('data-f');
+    g.addEventListener('click', function () { pick({kind: 'col', b: b, f: f, i: i}, true); });
+    g.addEventListener('keydown', function (ev) { colKey(ev, i, cols); });
+  });
+  if (rows.length) { rows[0].setAttribute('tabindex', '0'); }
+  if (cols.length) { cols[0].setAttribute('tabindex', '0'); }
+  if (S.sel) { markSel(); }
+  renderPanel();
+}
+function markFocus() { /* the focus ring is drawn by CSS */ }
+function rowKey(ev, k, rows) {
+  if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick({kind: 'row', r: +rows[k].getAttribute('data-r'), k: k}, true); return; }
+  var d = ev.key === 'ArrowDown' ? 1 : ev.key === 'ArrowUp' ? -1 : ev.key === 'PageDown' ? 10 : ev.key === 'PageUp' ? -10 : ev.key === 'Home' ? -1e6 : ev.key === 'End' ? 1e6 : 0;
+  if (!d) { return; }
+  ev.preventDefault(); var j = Math.max(0, Math.min(rows.length - 1, k + d)); moveFocus(rows, k, j);
+}
+function colKey(ev, i, cols) {
+  if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick({kind: 'col', b: +cols[i].getAttribute('data-b'), f: +cols[i].getAttribute('data-f'), i: i}, true); return; }
+  var d = ev.key === 'ArrowRight' ? 1 : ev.key === 'ArrowLeft' ? -1 : ev.key === 'Home' ? -1e6 : ev.key === 'End' ? 1e6 : 0;
+  if (!d) { return; }
+  ev.preventDefault(); var j = Math.max(0, Math.min(cols.length - 1, i + d)); moveFocus(cols, i, j);
+}
+function moveFocus(list, from, to) { if (from === to) { return; } list[from].setAttribute('tabindex', '-1'); list[to].setAttribute('tabindex', '0'); list[to].focus(); }
+function markSel() {
+  var box = document.getElementById('fp-selbox'); if (!box || !V) { return; }
+  var G = V.geometry, svg = box.ownerSVGElement;
+  if (S.sel.kind === 'row') {
+    var k = V.order.indexOf(S.sel.r); if (k < 0) { return; }
+    box.setAttribute('x', 1); box.setAttribute('y', G.top + k * G.rh); box.setAttribute('width', G.width - 2); box.setAttribute('height', G.rh);
+  } else {
+    var pos = null; G.pos.forEach(function (p) { if (p.i === S.sel.b) { pos = p; } });
+    if (!pos) { return; }
+    box.setAttribute('x', pos.x + S.sel.f * 8); box.setAttribute('y', 20); box.setAttribute('width', 8); box.setAttribute('height', G.height - 40);
+  }
+  if (svg) { svg.appendChild(box); }
+}
+function pick(sel, user) {
+  S.sel = sel; markSel(); renderPanel();
+  if (user) { announce(sel.kind === 'row' ? 'Plasmid ' + DATA.rows[sel.r][1] + ' selected' : 'Feature ' + DATA.blocks[sel.b].f[sel.f][0] + ' selected'); if (!S.panel) { S.panel = true; main.classList.remove('fp-nopanel'); panelBtn.setAttribute('aria-pressed', 'true'); } }
+}
+function kv(items) { var dl = el('dl', {'class': 'fp-kv'}); items.forEach(function (p) { dl.appendChild(el('dt', {text: p[0]})); dl.appendChild(el('dd', {text: p[1]})); }); return dl; }
+function pct(x) { return x === null ? 'not computed' : Math.round(x * 100) + '%'; }
+function mapHref(r) {
+  if (!document.getElementById('plasmid-maps')) { return null; }
+  return '#plasmid-maps?msample=' + encodeURIComponent(DATA.rows[r][0]) + '&mplasmid=' + encodeURIComponent(DATA.rows[r][1]);
+}
+function renderPanel() {
+  panel.textContent = '';
+  if (!S.sel) {
+    panel.appendChild(el('h3', {text: 'Details'}));
+    panel.appendChild(el('p', {text: 'Click a plasmid row for its facts, features and the outcome of each tool, or a feature column for its prevalence and how well each tool recovers the plasmids that carry it.'}));
+    return;
+  }
+  if (S.sel.kind === 'row') { plasmidPanel(S.sel.r); } else { featurePanel(S.sel.b, S.sel.f); }
+}
+function plasmidPanel(r) {
+  var row = DATA.rows[r];
+  panel.appendChild(el('h3', {text: row[1]}));
+  var items = [['Sample', row[0]], ['Length', row[2] === null ? 'not recorded' : row[2].toLocaleString('en-US') + ' bp'], ['Circular truth', row[3] < 0 ? 'not recorded' : (row[3] ? 'yes' : 'no')]];
+  DATA.tracks.forEach(function (t) { items.push([t.l, t.vals[t.r[r]]]); });
+  panel.appendChild(kv(items));
+  var href = mapHref(r);
+  if (href) { panel.appendChild(el('p', {}, [el('a', {href: href, 'class': 'fp-link', text: 'Open this plasmid on the circular map'})])); }
+  panel.appendChild(el('h4', {text: 'Features'}));
+  FP.rowFeatures(DATA, r).forEach(function (rf) {
+    if (rf.block.k === 'amr_gene' && S.amr === 'amr_class') { return; }
+    if (rf.block.k === 'amr_class' && S.amr === 'amr_gene') { return; }
+    var p = el('p', {}, [el('strong', {text: rf.block.l + ': '})]);
+    if (rf.na) { p.appendChild(document.createTextNode('not annotated (this sample has no annotation table for this block)')); }
+    else if (!rf.names.length) { p.appendChild(document.createTextNode('none annotated')); }
+    else { rf.names.forEach(function (n) { p.appendChild(el('span', {'class': 'fp-chip', text: n})); }); }
+    panel.appendChild(p);
+  });
+  panel.appendChild(el('h4', {text: 'Outcome per tool'}));
+  if (!DATA.tools.length) { panel.appendChild(el('p', {text: 'Not available in this run: no per-plasmid result table (<tool>.per_plasmid.tsv) was found.'})); return; }
+  var t = el('table'); t.appendChild(el('thead', {}, [el('tr', {}, [el('th', {text: 'Tool'}), el('th', {text: 'Outcome'})])]));
+  var tb = el('tbody');
+  DATA.tools.forEach(function (tool, ti) {
+    var oc = FP.outcomeOf(DATA, ti, r);
+    tb.appendChild(el('tr', {}, [el('td', {text: tool[1]}), el('td', {text: (oc === 'r' ? '● ' : oc === 'p' ? '◐ ' : oc === 'm' ? '○ ' : '') + FP.OUT_NAME[oc]})]));
+  });
+  t.appendChild(tb); panel.appendChild(t);
+  panel.appendChild(el('p', {'class': 'fp-note', text: 'Recovered = counted correct by CPRR; partly = some truth bases covered but not counted correct; missed = none covered.'}));
+}
+function featurePanel(bi, fi) {
+  var b = DATA.blocks[bi], f = b.f[fi], pv = FP.prevalence(DATA, b, fi);
+  panel.appendChild(el('h3', {text: f[0]}));
+  panel.appendChild(kv([['Block', b.l], ['Carried by', pv.c + ' of ' + pv.n + ' annotated plasmids (' + pct(pv.share) + ')'],
+    ['Not annotated', b.na.length + ' plasmids (excluded from the share, not counted as absent)']]));
+  if (S.group) {
+    var tr = null; DATA.tracks.forEach(function (t) { if (t.k === S.group) { tr = t; } });
+    panel.appendChild(el('h4', {text: 'Prevalence by ' + (tr ? tr.l.toLowerCase() : 'group')}));
+    var t = el('table'); t.appendChild(el('thead', {}, [el('tr', {}, [el('th', {text: 'Group'}), el('th', {text: 'Carry'}), el('th', {text: 'n'}), el('th', {text: 'Share'})])]));
+    var tb = el('tbody');
+    FP.prevalenceBy(DATA, b, fi, S.group).forEach(function (g) { tb.appendChild(el('tr', {}, [el('td', {text: g.label}), el('td', {'class': 'fp-num', text: String(g.c)}), el('td', {'class': 'fp-num', text: String(g.n)}), el('td', {'class': 'fp-num', text: pct(g.c / g.n)})])); });
+    t.appendChild(tb); panel.appendChild(t);
+  }
+  panel.appendChild(el('h4', {text: 'Recovery of the plasmids that carry it'}));
+  if (!DATA.tools.length) { panel.appendChild(el('p', {text: 'Not available in this run: no per-plasmid result table was found.'})); return; }
+  var t2 = el('table'); t2.appendChild(el('thead', {}, [el('tr', {}, [el('th', {text: 'Tool'}), el('th', {text: 'Carriers recovered'}), el('th', {text: 'Others recovered'})])]));
+  var tb2 = el('tbody');
+  FP.toolRecovery(DATA, b, fi).forEach(function (x) {
+    function cell(o) { return o.n ? o.c + ' of ' + o.n + ' (' + pct(o.rate) + (o.ci ? '; ' + pct(o.ci[0]) + ' to ' + pct(o.ci[1]) : '') + ')' : 'no plasmids'; }
+    tb2.appendChild(el('tr', {}, [el('td', {text: x.tool[1]}), el('td', {text: cell(x.withFeature)}), el('td', {text: cell(x.without)})]));
+  });
+  t2.appendChild(tb2); panel.appendChild(t2);
+  panel.appendChild(el('p', {'class': 'fp-note', text: 'Recovered = counted correct by CPRR. The interval is a Wilson interval over plasmids, not cluster-aware; with few plasmids it is wide. Plasmids not annotated for this block are left out of both columns.'}));
+}
+window.addEventListener('beforeprint', function () { Array.prototype.forEach.call(document.querySelectorAll('details.fp-table'), function (d) { d.open = true; }); });
+draw();
+})();
+</script>

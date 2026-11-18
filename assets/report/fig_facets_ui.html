@@ -1,0 +1,176 @@
+<script>
+/* PlasBench facet heatmaps, DOM glue. All numbers and drawing come from FCCore (fig_facets_core.html). */
+(function () {
+'use strict';
+var FC = window.FCCore, root = document.getElementById('fc-root'), dataEl = document.getElementById('fc-data');
+if (!FC || !root || !dataEl) { return; }
+var DATA; try { DATA = JSON.parse(dataEl.textContent); } catch (e) { return; }
+var levelKeys = Object.keys(DATA.levels || {});
+if (!levelKeys.length) { return; }
+var S = {level: levelKeys[0], track: DATA.tracks[0], minN: DATA.minN || FC.MIN_N, sel: null, panel: true, cur: -1}, V = null, selByLevel = {};
+function el(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') { e.textContent = attrs[k]; } else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) { e.setAttribute(k, attrs[k]); } });
+  (kids || []).forEach(function (c) { e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return e;
+}
+function lvl() { return DATA.levels[S.level]; }
+function unitWord(n) { return lvl().unit + (n === 1 ? '' : 's'); }
+function selFor(level) {
+  if (!selByLevel[S.level]) { selByLevel[S.level] = FC.defaultSelection(level, DATA.defaults); }
+  return selByLevel[S.level];
+}
+var head = el('div', {'class': 'fc-head'}), main = el('div', {'class': 'fc-main'}), stage = el('div', {'class': 'fc-stage'}), panel = el('aside', {'class': 'fc-panel', id: 'fc-panel', 'aria-label': 'Cell details'});
+var live = el('div', {'class': 'fc-sr', 'aria-live': 'polite', role: 'status'}), tip = el('div', {'class': 'fc-tip', role: 'tooltip', hidden: 'hidden'});
+var app = el('div', {'class': 'fc-app'}, [head, main]);
+main.appendChild(stage); main.appendChild(panel);
+root.appendChild(app); root.appendChild(live); root.appendChild(tip);
+root.classList.add('fc-live');
+
+function field(label, control) { return el('label', {'class': 'fc-field'}, [label, control]); }
+function options(sel, items, value) {
+  sel.textContent = '';
+  items.forEach(function (it) { var o = el('option', {value: it[0], text: it[1]}); if (it[0] === value) { o.selected = true; } sel.appendChild(o); });
+}
+var selLevel = el('select', {id: 'fc-level'}), selTrack = el('select', {id: 'fc-track'}), selBlock = el('select', {id: 'fc-block'}), selRow = el('select', {id: 'fc-row'});
+var minN = el('input', {type: 'number', id: 'fc-minn', min: '1', max: '10', step: '1', value: String(S.minN)});
+var metricBox = el('fieldset', {'class': 'fc-metrics'}, [el('legend', {text: 'Metrics (one panel each)'})]);
+var panelBtn = el('button', {type: 'button', 'class': 'fc-btn', 'aria-pressed': 'true', 'aria-controls': 'fc-panel', text: 'Side panel'});
+var csvBtn = el('button', {type: 'button', 'class': 'fc-btn', text: 'Download CSV'});
+if (levelKeys.length > 1) { head.appendChild(field('Unit', selLevel)); }
+if (DATA.tracks.length > 1) { head.appendChild(field('Track', selTrack)); }
+head.appendChild(field('Blocks by', selBlock)); head.appendChild(field('Rows by', selRow)); head.appendChild(field('Hatch when n below', minN));
+head.appendChild(metricBox); head.appendChild(panelBtn); head.appendChild(csvBtn);
+options(selLevel, levelKeys.map(function (k) { return [k, k === 'isolate' ? 'Isolates' : 'Plasmids']; }), S.level);
+options(selTrack, DATA.tracks.map(function (t) { return [t, t]; }), S.track);
+
+function syncControls() {
+  var level = lvl(), sel = selFor(level);
+  options(selBlock, level.strata.map(function (s) { return [s.k, s.l]; }), sel.block);
+  options(selRow, [['', 'None']].concat(level.strata.filter(function (s) { return s.k !== sel.block; }).map(function (s) { return [s.k, s.l]; })), sel.row || '');
+  Array.prototype.slice.call(metricBox.querySelectorAll('label')).forEach(function (n) { metricBox.removeChild(n); });
+  level.metrics.forEach(function (m) {
+    var cb = el('input', {type: 'checkbox', value: m.k, title: m.d}); cb.checked = sel.metrics.indexOf(m.k) >= 0;
+    cb.addEventListener('change', function () { sel.metrics = level.metrics.filter(function (x) { return metricBox.querySelector('input[value="' + x.k + '"]').checked; }).map(function (x) { return x.k; }); if (!sel.metrics.length) { cb.checked = true; sel.metrics = [m.k]; } S.cur = -1; draw(); });
+    metricBox.appendChild(el('label', {title: m.d}, [cb, m.l]));
+  });
+}
+selLevel.addEventListener('change', function () { S.level = selLevel.value; S.cur = -1; syncControls(); draw(); });
+selTrack.addEventListener('change', function () { S.track = selTrack.value; S.cur = -1; draw(); });
+selBlock.addEventListener('change', function () { var sel = selFor(lvl()); sel.block = selBlock.value; if (sel.row === sel.block) { sel.row = null; } S.cur = -1; syncControls(); draw(); });
+selRow.addEventListener('change', function () { selFor(lvl()).row = selRow.value || null; S.cur = -1; draw(); });
+minN.addEventListener('change', function () { var n = parseInt(minN.value, 10); S.minN = isNaN(n) ? FC.MIN_N : Math.max(1, Math.min(10, n)); minN.value = String(S.minN); draw(); });
+panelBtn.addEventListener('click', function () { S.panel = !S.panel; main.classList.toggle('fc-nopanel', !S.panel); panelBtn.setAttribute('aria-pressed', String(S.panel)); });
+csvBtn.addEventListener('click', function () {
+  try {
+    var blob = new Blob([FC.csv(DATA, lvl(), selFor(lvl()), {track: S.track, minN: S.minN})], {type: 'text/csv'}), a = el('a', {href: URL.createObjectURL(blob), download: 'plasbench_facets.csv'});
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  } catch (e) { announce('Download is not available in this browser.'); }
+});
+function announce(msg) { live.textContent = ''; setTimeout(function () { live.textContent = msg; }, 20); }
+
+function draw() {
+  var level = lvl(), sel = selFor(level);
+  V = FC.svg(DATA, level, sel, {track: S.track, minN: S.minN});
+  stage.textContent = '';
+  if (!V.svg) { stage.appendChild(el('p', {'class': 'fc-note', text: 'Not available in this run: no tool has values for this unit and track with the chosen strata.'})); renderPanel(null); return; }
+  var wrap = el('div'); wrap.innerHTML = V.svg; var svg = wrap.firstChild; stage.appendChild(svg);
+  var note = el('p', {'class': 'fc-note', text: 'Number in a cell = n units. Hatched = fewer than ' + S.minN + ' (too few to read). Dashed empty = no data (never zero). Same tool order in every panel. Arrow keys move between cells, Enter opens the cell.'});
+  stage.appendChild(note);
+  var cells = svg.querySelectorAll('.fc-cell');
+  Array.prototype.forEach.call(cells, function (g) {
+    var k = parseInt(g.getAttribute('data-k'), 10);
+    g.addEventListener('click', function () { choose(k, true); });
+    g.addEventListener('mouseenter', function (ev) { showTip(k, ev); });
+    g.addEventListener('mousemove', function (ev) { moveTip(ev); });
+    g.addEventListener('mouseleave', function () { tip.hidden = true; });
+    g.addEventListener('focus', function () { S.cur = k; showTipAt(k, g); });
+    g.addEventListener('blur', function () { tip.hidden = true; });
+    g.addEventListener('keydown', function (ev) { keyOn(ev, k); });
+  });
+  if (V.cells.length) { var first = S.cur >= 0 && S.cur < V.cells.length ? S.cur : 0; cells[first].setAttribute('tabindex', '0'); }
+  if (S.cur >= 0 && S.cur < V.cells.length) { choose(S.cur, false); } else { renderPanel(null); }
+}
+function cellText(k) {
+  var c = V.cells[k], st = FC.cellStats(lvl(), c.tool, c.mi, c.units, S.minN);
+  return {c: c, st: st};
+}
+function showTip(k, ev) { fillTip(k); tip.hidden = false; moveTip(ev); }
+function showTipAt(k, g) { fillTip(k); tip.hidden = false; var r = g.getBoundingClientRect(); tip.style.left = Math.min(window.innerWidth - 290, r.right + 6) + 'px'; tip.style.top = Math.max(4, r.top - 4) + 'px'; }
+function fillTip(k) {
+  var x = cellText(k), level = lvl(), g = V.grid[x.c.b];
+  tip.textContent = '';
+  tip.appendChild(el('strong', {text: level.metrics[x.c.mi].l + ' / ' + DATA.tools[x.c.tool][1]}));
+  tip.appendChild(el('div', {text: g.label + ' / ' + g.rows[x.c.r].label}));
+  tip.appendChild(el('div', {text: FC.fnum(x.st.v) + ', n = ' + x.st.n + (x.st.few ? ' (too few)' : '')}));
+}
+function moveTip(ev) { tip.style.left = Math.min(window.innerWidth - 290, ev.clientX + 14) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; }
+function keyOn(ev, k) {
+  if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choose(k, true); return; }
+  if (ev.key === 'Escape') { tip.hidden = true; return; }
+  if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].indexOf(ev.key) < 0) { return; }
+  ev.preventDefault();
+  var j = FC.neighbour(V.cells, k, ev.key);
+  if (j !== k) { var all = stage.querySelectorAll('.fc-cell'); Array.prototype.forEach.call(all, function (g) { g.setAttribute('tabindex', '-1'); }); all[j].setAttribute('tabindex', '0'); all[j].focus(); }
+}
+function choose(k, user) {
+  S.cur = k;
+  Array.prototype.forEach.call(stage.querySelectorAll('.fc-cell'), function (g, i) { g.classList.toggle('fc-sel', i === k); });
+  renderPanel(k);
+  if (user) { var x = cellText(k); announce(x.c.label); if (!S.panel) { S.panel = true; main.classList.remove('fc-nopanel'); panelBtn.setAttribute('aria-pressed', 'true'); } }
+}
+function mapLink(uid) {
+  if (!document.getElementById('plasmid-maps')) { return null; }
+  var parts = uid.split('/'), q = '#plasmid-maps?msample=' + encodeURIComponent(parts[0]);
+  if (parts.length > 1) { q += '&mplasmid=' + encodeURIComponent(parts.slice(1).join('/')); }
+  return q;
+}
+function stripSvg(level, c, mi, st) {
+  var W = 300, H = 46, x = function (v) { return 10 + v * (W - 20); }, o = ['<svg class="fc-strip" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Values of the units in this cell on a scale from 0 to 1">',
+    '<line x1="10" x2="' + (W - 10) + '" y1="26" y2="26" stroke="#8a948d"/>'];
+  [0, 0.5, 1].forEach(function (v) { o.push('<line x1="' + x(v) + '" x2="' + x(v) + '" y1="22" y2="30" stroke="#8a948d"/><text class="fc-t" x="' + x(v) + '" y="42" text-anchor="middle">' + v + '</text>'); });
+  if (st.lo !== null) { o.push('<rect x="' + x(st.lo) + '" y="24.5" width="' + Math.max(1.5, x(st.hi) - x(st.lo)) + '" height="3" fill="#888" opacity=".55"/>'); }
+  var seen = {};
+  st.units.forEach(function (u) {
+    var v = FC.unitValue(level, c.tool, mi, u); if (v === null) { return; }
+    var key = v.toFixed(3), k = seen[key] || 0; seen[key] = k + 1;
+    o.push('<circle cx="' + x(v) + '" cy="' + (26 - 6 - k * 4.2) + '" r="2.8" fill="' + (st.few ? 'none' : FC.colour(v)) + '" stroke="#222" stroke-width=".8"/>');
+  });
+  if (st.v !== null) { o.push('<path d="M' + x(st.v) + ' 31 l-3 5 h6 z" fill="currentColor" class="fc-t"/>'); }
+  return o.join('') + '</svg>';
+}
+function renderPanel(k) {
+  panel.textContent = '';
+  if (k === null || k === undefined || !V || !V.cells[k]) {
+    panel.appendChild(el('h3', {text: 'Cell details'}));
+    panel.appendChild(el('p', {text: 'Click a cell (or focus it and press Enter) to list the ' + unitWord(2) + ' in it, their values and the interval.'}));
+    return;
+  }
+  var level = lvl(), sel = selFor(level), c = V.cells[k], g = V.grid[c.b], r = g.rows[c.r], tool = DATA.tools[c.tool];
+  var st = FC.cellStats(level, c.tool, c.mi, c.units, S.minN), m = level.metrics[c.mi];
+  panel.appendChild(el('h3', {text: m.l + ': ' + tool[1]}));
+  panel.appendChild(el('p', {text: level.strata[FC.stratum(level, sel.block)].l + ' = ' + g.label + (sel.row ? '; ' + level.strata[FC.stratum(level, sel.row)].l + ' = ' + r.label : '') + '; track ' + tool[0]}));
+  if (st.few) { panel.appendChild(el('p', {}, [el('span', {'class': 'fc-flag', text: 'Too few: n = ' + st.n + ' (below ' + S.minN + ')'}), ' Shown for completeness; do not read it as a result.'])); }
+  var kv = el('dl', {'class': 'fc-kv'});
+  [['n', st.n + ' ' + unitWord(st.n) + ' with a value (of ' + r.units.length + ' in the cell)'], ['Value', st.v === null ? 'no value' : st.v.toFixed(3) + (m.kind === 'prop' ? ' (' + st.c + ' of ' + st.total + ' pooled)' : ' (mean)')],
+   ['Interval', st.lo === null ? 'not available' : st.lo.toFixed(3) + ' to ' + st.hi.toFixed(3) + (m.kind === 'prop' ? ' (Wilson, plasmids pooled, not cluster-aware)' : ' (range of the ' + unitWord(2) + ', not a confidence interval)')]].forEach(function (p) { kv.appendChild(el('dt', {text: p[0]})); kv.appendChild(el('dd', {text: p[1]})); });
+  panel.appendChild(kv);
+  var host = el('div'); host.innerHTML = stripSvg(level, c, c.mi, st); panel.appendChild(host);
+  var picked = []; level.metrics.forEach(function (mm, i) { if (sel.metrics.indexOf(mm.k) >= 0) { picked.push(i); } });
+  var tbl = el('table'), hr = el('tr', {}, [el('th', {text: lvl().unit === 'plasmid' ? 'Plasmid' : 'Isolate'})]);
+  picked.forEach(function (i) { hr.appendChild(el('th', {text: level.metrics[i].l})); });
+  tbl.appendChild(el('thead', {}, [hr]));
+  var tb = el('tbody');
+  r.units.forEach(function (u) {
+    var uid = level.units[u][0], link = mapLink(uid), tr = el('tr');
+    tr.appendChild(el('td', {}, [link ? el('a', {href: link, 'class': 'fc-link', text: level.units[u][1], title: 'Open on the plasmid map'}) : level.units[u][1]]));
+    picked.forEach(function (i) { var v = FC.unitValue(level, c.tool, i, u); tr.appendChild(el('td', {'class': 'fc-num', text: v === null ? 'no value' : v.toFixed(3)})); });
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb); panel.appendChild(tbl);
+  panel.appendChild(el('p', {'class': 'fc-note', text: m.d}));
+}
+window.addEventListener('beforeprint', function () { Array.prototype.forEach.call(document.querySelectorAll('details.fc-table'), function (d) { d.open = true; }); });
+syncControls(); draw();
+})();
+</script>
