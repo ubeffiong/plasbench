@@ -17,6 +17,7 @@ Jobs object over the same folder:
 import json
 import os
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -140,9 +141,14 @@ def main():
 
     print("a runner that is slow to start, and a falsely interrupted run")
     slow_start = {"id": "20261116-000000-slowst", "label": "slow start", "argv": ["demo"], "command": "plasbench demo", "env": {}, "kind": "plasbench", "state": "running",
-                  "started": time.time(), "ended": None, "exit": None, "pid": 1, "results": ""}
+                  "started": time.time(), "ended": None, "exit": None, "pid": os.getpid(), "results": ""}
+    # The runner's pid must be a process that really exists: the test used pid 1, which is alive on Linux but not openable on Windows, so it passed in one place and failed in another.
     sixth.jobs[slow_start["id"]] = slow_start
     check("a run whose runner has not written a heartbeat yet is not called lost for the first minute", sixth._alive(slow_start))
+    check("...and a run with no pid recorded yet is still starting", sixth._alive(dict(slow_start, pid=None)))
+    gone = subprocess.Popen([sys.executable, "-c", "pass"])
+    gone.wait()
+    check("...but a runner whose process is already gone is not 'starting' (cancel does not wait out the grace period)", not sixth._alive(dict(slow_start, pid=gone.pid)))
     old = dict(slow_start, started=time.time() - 600)
     check("...but one that never did, a long time later, is", not sixth._alive(old))
     sixth.jobs.pop(slow_start["id"])
