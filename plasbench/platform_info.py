@@ -134,25 +134,16 @@ def wsl_installed() -> bool:
 
 
 def resources() -> dict:
-    cpus = os.cpu_count() or 1
-    ram = None
+    """CPUs this process may use and the memory of the environment it runs in (the WSL virtual machine under WSL, never the Windows host's); the window's
+    "This computer" card shows the full picture from computer_info.report()."""
     try:
-        if os.name == "nt":
-            import ctypes
-
-            class MS(ctypes.Structure):
-                _fields_ = [("l", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong),
-                            ("avail", ctypes.c_ulonglong), ("a", ctypes.c_ulonglong), ("b", ctypes.c_ulonglong),
-                            ("c", ctypes.c_ulonglong), ("d", ctypes.c_ulonglong), ("e", ctypes.c_ulonglong)]
-            ms = MS()
-            ms.l = ctypes.sizeof(MS)
-            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
-            ram = ms.total / 2**30
-        elif hasattr(os, "sysconf"):
-            ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
-    except (OSError, ValueError, AttributeError):
-        pass
-    return {"cpus": cpus, "ram_gb": round(ram, 1) if ram else None}
+        from . import computer_info
+        env = computer_info.environment(in_wsl=in_wsl())
+        total, avail = env.get("memory_total"), env.get("memory_available")
+        return {"cpus": env.get("usable_cpus") or os.cpu_count() or 1, "ram_gb": round(total / 2**30, 1) if total else None,
+                "ram_available_gb": round(avail / 2**30, 1) if avail else None}
+    except Exception:  # noqa: BLE001 - unknown, never a crash
+        return {"cpus": os.cpu_count() or 1, "ram_gb": None, "ram_available_gb": None}
 
 
 def detect(fast: bool = False) -> dict:
@@ -223,8 +214,9 @@ def recommend(info: dict) -> dict:
             warns.append("Docker is installed but not running: start Docker Desktop (or the docker service) to use the image.")
     res = info.get("resources") or {}
     if res.get("ram_gb") and res["ram_gb"] < 16:
-        warns.append(f"{res['ram_gb']} GB RAM: assembly (SPAdes) is comfortable with 16 GB or more; set a lower memory "
-                     "limit on New benchmark > Resources.")
+        whose = "WSL's virtual machine has" if info.get("in_wsl") else "This computer has"
+        warns.append(f"{whose} {res['ram_gb']} GB RAM: assembly (SPAdes) is comfortable with 16 GB or more; set a lower memory "
+                     "limit on New benchmark > Resources." + (" To give WSL more, set memory= in C:\\Users\\<you>\\.wslconfig and run wsl --shutdown." if info.get("in_wsl") else ""))
     return {"mode": mode, "summary": summary, "reasons": reasons, "steps": steps, "warnings": warns,
             "alternatives": alts, "docker_command": f"docker pull {IMAGE}:latest && PLASBENCH_IMAGE={IMAGE}:latest "
                                                    "scripts/docker_run.sh plasbench run --cohort public-v1"}

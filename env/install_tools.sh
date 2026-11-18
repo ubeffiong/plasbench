@@ -16,6 +16,96 @@ case "$PROFILE" in
     ;;
 esac
 
+# Details for the profiles PlasBench never installs for you (source checkouts, containers, workflows). The headline, the reasons and the exit code
+# (20 = manual step needed, not a failure) come from python/tool_installer_registry.py resolve; this adds the exact commands.
+manual_details() {
+    case "$1" in
+     ppr-meta)
+    cat <<'EOF'
+PPR-Meta is a legacy Python 2/TensorFlow 1/MATLAB-runtime application. To avoid
+an unpinned and unsafe install, PlasBench does not install it automatically.
+Use a locally validated, digest-pinned container, retain the image digest in
+your community manifest, then normalize its CSV with:
+    plasbench normalize-meta-classifier --tool ppr_meta --input result.csv --out tool/community.classification.tsv
+EOF
+        ;;
+     plsmd)
+    cat <<'EOF'
+plsMD is distributed as a Docker workflow with a PLSDB-dependent database.
+It is registered as an isolate short-read reconstruction candidate, but no
+floating image or database is installed automatically. Pin and validate the
+image digest and PLSDB release before using it in a benchmark.
+EOF
+        ;;
+     mobilome-map)
+    cat <<'EOF'
+The EBI Mobilome Annotation Pipeline is a Nextflow/container evidence workflow.
+It is intentionally not installed into the PlasBench conda environment. Run a
+pinned upstream release, then import its GFF3 as non-scoring evidence with:
+    plasbench import-mobilome-evidence --gff sample_mobilome.gff.gz --community ID --sample ID --out results/metagenomics.mobilome_evidence.tsv
+EOF
+        ;;
+     plasme)
+    cat <<'EOF'
+NOTE: PLASMe is distributed as a git checkout with its own conda environment
+      file, not a conda/bioconda package -- this profile cannot install it
+      automatically. Install it manually:
+          git clone https://github.com/HubertTang/PLASMe.git
+          cd PLASMe && conda env create -f plasme.yaml
+      then make PLASMe.py executable and available as `PLASMe.py` on PATH
+      (e.g. symlink it into the plasme conda env's bin/ directory) -- the
+      same manual-PATH step this project already documents for gplas2.
+      Download its database once with: bash env/download_plasme_db.sh
+      See INSTALL.md for the full walkthrough.
+EOF
+        ;;
+     plasgraph2)
+    cat <<'EOF'
+NOTE: plASgraph2 is distributed as a git checkout, not a conda/bioconda
+      package -- this profile cannot install it automatically. Install it
+      manually:
+          git clone https://github.com/cchauve/plASgraph2.git
+          cd plASgraph2
+          conda create -n plasgraph2 python=3.8
+          conda activate plasgraph2 && pip install -r requirements.txt
+      then make src/plASgraph2_classify.py executable and available as
+      `plASgraph2_classify.py` on PATH (e.g. symlink it into the plasgraph2
+      conda env's bin/ directory) -- the same manual-PATH step this project
+      already documents for gplas2/PLASMe. The pretrained model ships inside
+      the checkout at model/ESKAPEE_model/ -- point PLASGRAPH2_MODEL_DIR at
+      it (or your own trained model directory). No separate database
+      download is needed. See INSTALL.md for the full walkthrough.
+EOF
+        ;;
+     gplas2)
+    cat <<'EOF'
+gplas2 is a source-distributed isolated runtime. It is registered so that
+`plasbench install-tools list` and CI cannot forget it, but PlasBench will not
+clone a floating branch or install an unreviewed dependency set automatically.
+Use `plasbench install-tools plan` to see its verification contract, then
+follow INSTALL.md's pinned-source instructions after validating the exact
+gplas2 revision and its classifier-table provenance for your study.
+EOF
+        ;;
+    esac
+}
+
+# What kind of profile is this? A built-in one has nothing to install (exit 0); a manual one (source checkout, container, workflow) is never
+# installed for the user and is not a failure: it prints the exact steps and exits 20; an unknown name close to a real one is a usage error (exit 2)
+# with the nearest names. PLASBENCH_INSTALL_DRY_RUN=1 stops here, before any solver or network, for tests and for `plasbench install-tools --dry-run`.
+RESOLVE_STATUS=0
+RESOLVE_TEXT="$(python3 "$HERE/../python/tool_installer_registry.py" resolve "$PROFILE" 2>&1)" || RESOLVE_STATUS=$?
+case "$RESOLVE_STATUS" in
+  20) manual_details "$PROFILE"; echo "$RESOLVE_TEXT"; exit 20;;
+  10) echo "$RESOLVE_TEXT"; exit 0;;
+  0)  ;;
+  *)  echo "$RESOLVE_TEXT" >&2; exit "$RESOLVE_STATUS";;
+esac
+if [[ "${PLASBENCH_INSTALL_DRY_RUN:-0}" == "1" ]]; then
+    echo "[plasbench] dry run: '$PROFILE' would be installed by an automatic profile (no solver was started, nothing was downloaded)."
+    exit 0
+fi
+
 # Resolve the environment to an absolute PREFIX and install with -p, never -n.
 #
 # `-n NAME` means "look under this solver's own root prefix", and the solvers
@@ -227,34 +317,14 @@ case "$PROFILE" in
  # contig-classification baseline. Graph deconvolution tools with unpinned
  # upstream runtimes are intentionally not claimed as installed here.
  metagenomics) PKGS=(spades genomad);;
- ppr-meta)
-    cat >&2 <<'EOF'
-PPR-Meta is a legacy Python 2/TensorFlow 1/MATLAB-runtime application. To avoid
-an unpinned and unsafe install, PlasBench does not install it automatically.
-Use a locally validated, digest-pinned container, retain the image digest in
-your community manifest, then normalize its CSV with:
-    plasbench normalize-meta-classifier --tool ppr_meta --input result.csv --out tool/community.classification.tsv
-EOF
-    exit 2
-    ;;
- plsmd)
-    cat >&2 <<'EOF'
-plsMD is distributed as a Docker workflow with a PLSDB-dependent database.
-It is registered as an isolate short-read reconstruction candidate, but no
-floating image or database is installed automatically. Pin and validate the
-image digest and PLSDB release before using it in a benchmark.
-EOF
-    exit 2
-    ;;
- mobilome-map)
-    cat >&2 <<'EOF'
-The EBI Mobilome Annotation Pipeline is a Nextflow/container evidence workflow.
-It is intentionally not installed into the PlasBench conda environment. Run a
-pinned upstream release, then import its GFF3 as non-scoring evidence with:
-    plasbench import-mobilome-evidence --gff sample_mobilome.gff.gz --community ID --sample ID --out results/metagenomics.mobilome_evidence.tsv
-EOF
-    exit 2
-    ;;
+# Manual-install profiles are settled before this point (tool_installer_registry.py resolve -> manual_details, exit 20); these labels stay so the wiring tests and
+# `grep` see every profile, and so a profile reaching here still ends honestly.
+ ppr-meta) manual_details "$PROFILE"; echo "[PlasBench] $PROFILE needs a manual install. Nothing failed (exit code 20)."; exit 20;;
+ plsmd) manual_details "$PROFILE"; echo "[PlasBench] $PROFILE needs a manual install. Nothing failed (exit code 20)."; exit 20;;
+ mobilome-map) manual_details "$PROFILE"; echo "[PlasBench] $PROFILE needs a manual install. Nothing failed (exit code 20)."; exit 20;;
+ plasme) manual_details "$PROFILE"; echo "[PlasBench] $PROFILE needs a manual install. Nothing failed (exit code 20)."; exit 20;;
+ plasgraph2) manual_details "$PROFILE"; echo "[PlasBench] $PROFILE needs a manual install. Nothing failed (exit code 20)."; exit 20;;
+ gplas2) manual_details "$PROFILE"; echo "[PlasBench] $PROFILE needs a manual install. Nothing failed (exit code 20)."; exit 20;;
  reconstruction) PKGS=(mob_suite platon);;
  # filtlong is not needed to RUN flye_mob_recon -- it is what
  # `plasbench read-quality-ladder` filters long reads with, the long-read
@@ -350,48 +420,6 @@ EOF
  # RUN_DIFFICULTY_FEATURES) has no bioconda package at all -- there is no
  # profile for it here; see INSTALL.md for its manual-binary install steps.
  quast) PKGS=(quast);;
- plasme)
-    # PLASMe is distributed as a git checkout with its own conda env file,
-    # not a bioconda package -- there is no package for this profile to
-    # install, so give clear manual instructions instead (same idea as the
-    # gplas case above, but there is no installable-but-wrong fallback
-    # package here, so this exits rather than attempting a doomed install).
-    cat >&2 <<'EOF'
-NOTE: PLASMe is distributed as a git checkout with its own conda environment
-      file, not a conda/bioconda package -- this profile cannot install it
-      automatically. Install it manually:
-          git clone https://github.com/HubertTang/PLASMe.git
-          cd PLASMe && conda env create -f plasme.yaml
-      then make PLASMe.py executable and available as `PLASMe.py` on PATH
-      (e.g. symlink it into the plasme conda env's bin/ directory) -- the
-      same manual-PATH step this project already documents for gplas2.
-      Download its database once with: bash env/download_plasme_db.sh
-      See INSTALL.md for the full walkthrough.
-EOF
-    exit 1
-    ;;
- plasgraph2)
-    # plASgraph2 is a git checkout with its own dependency set (TensorFlow,
-    # Spektral), not a bioconda package -- same treatment as plasme above:
-    # clear manual instructions, exit rather than a doomed install attempt.
-    cat >&2 <<'EOF'
-NOTE: plASgraph2 is distributed as a git checkout, not a conda/bioconda
-      package -- this profile cannot install it automatically. Install it
-      manually:
-          git clone https://github.com/cchauve/plASgraph2.git
-          cd plASgraph2
-          conda create -n plasgraph2 python=3.8
-          conda activate plasgraph2 && pip install -r requirements.txt
-      then make src/plASgraph2_classify.py executable and available as
-      `plASgraph2_classify.py` on PATH (e.g. symlink it into the plasgraph2
-      conda env's bin/ directory) -- the same manual-PATH step this project
-      already documents for gplas2/PLASMe. The pretrained model ships inside
-      the checkout at model/ESKAPEE_model/ -- point PLASGRAPH2_MODEL_DIR at
-      it (or your own trained model directory). No separate database
-      download is needed. See INSTALL.md for the full walkthrough.
-EOF
-    exit 1
-    ;;
  # Shared utilities used by default or opt-in stages, which no profile installed before:
  #   mash     clonal grouping (stage 6), the truth-evidence plasmid sketch, difficulty
  #            features and the reference-set build
@@ -427,20 +455,6 @@ WARNING: bioconda's 'gplas' is version 0.6.1 and does NOT provide the
          SPAdes contig ids never match its GFA segment ids.
 EOF
     PKGS=(gplas);;
- gplas2)
-    # Kept separate from the legacy bioconda gplas package above. Calling it
-    # through the registry is useful, but resolving an unpinned package named
-    # "gplas2" would be an unsafe and misleading installation attempt.
-    cat >&2 <<'EOF'
-gplas2 is a source-distributed isolated runtime. It is registered so that
-`plasbench install-tools list` and CI cannot forget it, but PlasBench will not
-clone a floating branch or install an unreviewed dependency set automatically.
-Use `plasbench install-tools plan` to see its verification contract, then
-follow INSTALL.md's pinned-source instructions after validating the exact
-gplas2 revision and its classifier-table provenance for your study.
-EOF
-    exit 2
-    ;;
  # `all` is intentionally an orchestrator rather than a second, drifting
  # package list. Every verified automatic profile is invoked through its own
  # existing code path. Isolated-source runtimes remain visible in `plan` as

@@ -190,12 +190,16 @@ class Project:
     def settings_resolved(self) -> list[dict]:
         """settings(), each location default also resolved to the path it means on this computer."""
         rows = self.settings()
+        ranges = self.setting_ranges().load(self.root)
         carried, prev_group = "", None
         for row in rows:
             row.update(self.resolve_setting_default(row))
             if row.get("group") != prev_group:
                 carried, prev_group = "", row.get("group")
             row["tooltip"] = ui_help.setting_tooltip(row, carried)
+            if row["key"] in ranges:     # the range the code accepts, beside the setting and in its tooltip (config/setting_ranges.tsv)
+                row["range"] = self.setting_ranges().public(ranges[row["key"]], row.get("default"))
+                row["tooltip"]["summary"] = f"{row['tooltip']['summary']} Range: {row['range']['label']} {ranges[row['key']]['note']}"
             if row.get("comment"):
                 carried = row["comment"]
             if row["key"] in ui_help.RELIABILITY_KEYS:
@@ -225,6 +229,9 @@ class Project:
                 raise ValueError(f"not a setting name: {key}")
             if value is not None and ("\n" in str(value) or "\r" in str(value)):
                 raise ValueError(f"{key}: a value cannot contain a line break")
+        # A numeric Scoring-decision setting outside the range the code accepts is refused with a plain sentence (config/setting_ranges.tsv). Clearing, and a value
+        # equal to the one already saved, always pass, so an existing saved value never blocks a save.
+        self.setting_ranges().validate_changes(changes, self.local_env(), self.root)
         path = self.local_env_path()
         lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else \
             ["# PlasBench settings for this computer (read by config/config.sh). Written by `plasbench ui`; edit freely."]
@@ -268,6 +275,13 @@ class Project:
         d = self.intake_defaults()
         return Path(str(data.get("data_dir") or d["data_dir"])).expanduser(), Path(str(data.get("samples") or d["samples"])).expanduser()
 
+    def setting_ranges(self):
+        import importlib
+        python_dir = str(self.root / "python")
+        if python_dir not in sys.path:
+            sys.path.insert(0, python_dir)
+        return importlib.import_module("setting_ranges")
+
     # -- pre-registered scoring decisions (python/prereg_admin.py) --------------------------------------------------
     def prereg_admin(self):
         import importlib
@@ -281,6 +295,7 @@ class Project:
         admin = self.prereg_admin()
         settings = {s["key"]: s for s in self.settings()}
         local = self.local_env()
+        ranges = self.setting_ranges().load(self.root)
         rows = []
         for r in admin.load(self.root):
             var = (r.get("config_variable") or "").strip()
@@ -293,6 +308,7 @@ class Project:
                     current = (settings.get(var) or {}).get("default")
             rows.append({k: r[k] for k in ("parameter", "topic", "title", "meaning", "if_changed", "type", "choices", "where", "value", "status", "config_variable", "last_action",
                                            "decided_on", "decided_by", "decision_reason", "note")} | {"current": current,
+                         "range": self.setting_ranges().public(ranges[var], r["value"]) if var in ranges else None,
                          "departs": bool(var and current is not None and str(current).strip() != str(r["value"]).strip() and not admin.freeze_prereg_equal(r["value"], current))})
         return {"rows": rows, "status": admin.status(self.root), "topics": list(dict.fromkeys(r["topic"] for r in rows)), "history": admin.history(self.root)[-200:]}
 
@@ -592,6 +608,7 @@ class Project:
 # --------------------------------------------------------------------------------------------- jobs
 SESSION_COMMANDS = ("run", "demo", "report", "report-pdf")   # the commands that make a benchmark run session (everything else stays on the Jobs page)
 RESUMABLE_STATES = ("failed", "interrupted", "cancelled")
+MANUAL_STEP_EXIT = 20   # install-tools: the profile is installed by hand (plasbench/exitcodes.py); shown as "Manual step needed", not Failed
 KEEP_JOBS = 500                       # finished (`done`) jobs kept; a failed, interrupted or cancelled job is kept until deleted or past the retention
 JOB_RETENTION_DAYS_DEFAULT = 180
 LOCK_STALE_SECONDS = 15
@@ -898,8 +915,13 @@ class Jobs:
         if code not in (0, None):
             # Never end silently: the console's last line says how and why the command stopped.
             from .exitcodes import explain
-            reason = "cancelled from the window" if state == "cancelled" else explain(code)
-            self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
+            argv = job.get("argv") or []
+            if code == MANUAL_STEP_EXIT and argv[:1] == ["install-tools"]:
+                # Not an error: a profile PlasBench never installs for you. The notice above already lists the steps.
+                self._append_log(job_id, f"\n[PlasBench] Manual step needed (exit {code}): nothing failed. {explain(code)}.\n")
+            else:
+                reason = "cancelled from the window" if state == "cancelled" else explain(code, argv[0] if argv else None)
+                self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
         session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code, seconds=round(job["ended"] - job["started"], 1))
 
     def display_state(self, job: dict) -> str:
@@ -912,6 +934,8 @@ class Jobs:
             return "retrying"
         if state == "done" and job.get("warnings"):
             return "completed_with_warnings"
+        if state == "failed" and job.get("exit") == MANUAL_STEP_EXIT and (job.get("argv") or [])[:1] == ["install-tools"]:
+            return "manual_step"   # install-tools exit 20: a profile that is installed by hand; not a failure
         return state
 
     RETRY_LINE = re.compile(r"failed \(exit \d+\); retry (\d+) of (\d+)")
@@ -1624,6 +1648,16 @@ def make_handler(project: Project, jobs: Jobs):
                 from . import platform_info
                 info = platform_info.detect()
                 return self.jsend(200, {"info": info, "plan": platform_info.recommend(info)})
+            if route == "computer":
+                # CPU, memory, limits, the Windows host behind WSL, and every drive (plasbench/computer_info.py). Each call is a fresh look; the drives that
+                # appeared or went away since the previous call come back in "change". Probes fail to "unknown", never to an error.
+                from . import computer_info, studies
+                where = {"data folder": str(project.path_setting("DATA_DIR", "data")), "workspace": str(studies.workspace(project.root))}
+                if q.get("study"):
+                    where["current study"] = q["study"]
+                local = project.local_env()
+                over = {k: os.environ.get(k) or local.get(k) for k in ("THREADS", "MEMORY_GB")}
+                return self.jsend(200, computer_info.report(where, over))
             if route == "workspace":
                 from . import studies, workspace
                 info = workspace.describe(project.root)

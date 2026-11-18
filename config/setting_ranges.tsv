@@ -1,0 +1,33 @@
+# The range each numeric Scoring-decision setting accepts, read from the code that refuses values (min/max empty = no limit enforced).
+# enforced_by names the validator: prereg_admin = python/prereg_admin.py validate_value; score_*.py = the scorer's own check. test/test_setting_ranges.py runs them against this table.
+key	kind	unit	min	min_exclusive	max	max_exclusive	step	enforced_by	note
+TOOL_RETRIES	integer	retries	0				1	prereg_admin	How many times a failed tool run is repeated. No upper limit is enforced.
+TOOL_TIMEOUT_SECONDS	integer	seconds	1				1	prereg_admin	Whole seconds per tool per isolate; 0 is refused. Leave empty (the confirmed default) for no time limit.
+MIN_SPECIES_CLUSTERS	integer	clusters	0				1	prereg_admin	Independent clusters a species needs before it is averaged into the headline.
+CHROMID_MIN_BP	integer	bases	0				1	prereg_admin	Smallest size (bases) at which a large non-chromosomal replicon counts as a chromid.
+LARGE_PLASMID_BP	integer	bases	0				1	prereg_admin	Size (bases) from which a plasmid is called large.
+MIN_ALIGNMENT_LENGTH	integer	bases	1				1	score_bins.py, score_plasmids.py	Shortest alignment (bases) that counts; the scorers refuse 0.
+MIN_ALIGNMENT_MAPQ	integer	MAPQ	0				1	score_bins.py, score_plasmids.py	Minimum mapping quality; the scorers refuse a negative value and enforce no upper limit (minimap2 itself reports 0 to 60).
+CONTIG_MIN_LENGTH	integer	bases	0				1	prereg_admin, score_plasmids.py	Shortest contig (bases) that is labelled and scored.
+SCORECARD_MIN_SAMPLES	integer	samples	0				1	prereg_admin	Samples a scorecard row needs before it is shown.
+AMR_FLANK_BP	integer	bases	0				1	prereg_admin	Bases either side of a resistance-gene copy used as its flank context.
+HEADLINE_MAX_REFERENCE_TIER	integer	tier	0				1	prereg_admin	Highest reference-evidence tier allowed in the headline analysis.
+HEADLINE_MIN_CLUSTERS	integer	clusters	0				1	prereg_admin	Independent clusters the headline references must come from.
+MIN_ALIGNMENT_IDENTITY	decimal	fraction	0		1		0.01	score_bins.py, score_plasmids.py	A fraction: 0.90 means 90% identity. The scorers refuse values outside 0 to 1.
+MIN_ALIGNMENT_QUERY_COVERAGE	decimal	fraction	0		1		0.01	score_bins.py, score_plasmids.py	A fraction of the query that must align: 0.20 means 20%. The scorers refuse values outside 0 to 1.
+PLASMID_RECOVERY_THRESHOLD	decimal	fraction	0	yes	1		0.01	score_bins.py, score_plasmids.py	A fraction above 0 and up to 1 (0.90 means 90% of the plasmid recovered). The scorers refuse 0 and anything above 1.
+PERFECT_THRESHOLD	decimal	fraction	0				0.01	prereg_admin	A fraction (0.95 means 95%): precision and recall both at least this make a bin perfect. No upper limit is enforced, but a value above 1 can never be met.
+FRAGMENT_SHARE	decimal	fraction	0				0.01	prereg_admin	A fraction of a plasmid another bin must hold for it to count as fragmented. No upper limit is enforced.
+MISSED_RECALL	decimal	fraction	0				0.01	prereg_admin	A best-bin recall below this fraction counts the plasmid as missed. No upper limit is enforced.
+CONTIG_MIN_IDENTITY	decimal	fraction	0				0.01	prereg_admin	A fraction: identity a contig needs to be labelled. No upper limit is enforced.
+CONTIG_MIN_COVERAGE	decimal	fraction	0				0.01	prereg_admin	A fraction of the contig that must align to be labelled. No upper limit is enforced.
+DIMER_MIN_IDENTITY	decimal	fraction	0				0.01	prereg_admin	A fraction: identity between the two halves of a candidate dimer. No upper limit is enforced.
+DIMER_MIN_HALF_COVERAGE	decimal	fraction	0				0.01	prereg_admin	A fraction of each half that must align for a dimer call. No upper limit is enforced.
+NEAR_OPTIMAL_MARGIN	decimal	score difference	0				0.01	prereg_admin	How close to the best score still counts as near optimal. No upper limit is enforced.
+ORACLE_GAP_FLOOR	decimal	score difference	0				0.01	prereg_admin	Smallest gap to the best possible choice that is reported. No upper limit is enforced.
+RECOMMENDATION_FAILURE_REGRET	decimal	score difference	0				0.01	prereg_admin	Regret above which a recommendation counts as a failure. No upper limit is enforced.
+RECOMMENDATION_MIN_EXPECTED_SCORE	decimal	score	0				0.01	prereg_admin	Lowest expected score for which a method is still recommended. No upper limit is enforced.
+SMALLEST_DIFFERENCE	decimal	score difference	0				0.01	prereg_admin	Smallest difference between tools that is called meaningful. No upper limit is enforced.
+PLASBENCH_DOMINANT_SHARE	decimal	fraction	0				0.01	prereg_admin	Share of the headline one study may hold before it is flagged as dominant. No upper limit is enforced.
+COLLAPSE_DIMERS	flag	0 or 1	0		1		1	prereg_admin	1 scores the monomer; 0 only flags a dimer. Only 0 and 1 are accepted.
+ALLOW_PRIMARY_FALLBACK	flag	0 or 1	0		1		1	prereg_admin	1 lets the headline fall back when the primary analysis is unavailable. Only 0 and 1 are accepted.
