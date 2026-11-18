@@ -263,7 +263,8 @@ class Design:
 
     def identity_valid(self, sample):
         record = self.provenance.get(sample)
-        return record is None or record.get("base_level_metrics_valid") == "yes"
+        # No provenance record means the polish is unknown, and unknown is never assumed independent: identity criteria are not applied (audit AU-029)
+        return record is not None and record.get("base_level_metrics_valid") == "yes"
 
     def ambiguous_plasmids(self, sample):
         record = self.provenance.get(sample) or {}
@@ -306,7 +307,7 @@ def pair_statistics(diffs, groups, strata):
     worker processes; every resampling call seeds its own RNG, so the result
     does not depend on which process runs it or in what order.
     """
-    low, high = resampling_interval(diffs, groups, strata)   # INTERVAL_METHOD (PLASBENCH_CI_METHOD), or the percentile bootstrap when one study dominates
+    low, high = resampling_interval(diffs, groups, strata, bounds=(-1.0, 1.0))   # a difference of two [0, 1] scores; INTERVAL_METHOD (PLASBENCH_CI_METHOD), or the percentile bootstrap when one study dominates
     return low, high, stratified_permutation(diffs, groups, strata), interval_method_used(diffs, groups, strata)
 
 
@@ -359,6 +360,47 @@ def shared_values(rows, key, failed_samples=None, known_tools=None, eligible_sam
     return by_tool, shared, zeros
 
 
+# The shared-sample rule is a cliff: with one absent tool the shared set can fall to a handful of samples, or to nothing, and the ranking then silently rests on that
+# or (empty) on each tool's own samples. These limits decide when that is flagged; both can be set (SHARED_MIN_FRACTION, SHARED_MIN_SAMPLES).
+SHARED_MIN_FRACTION = 0.5
+SHARED_MIN_SAMPLES = 5
+
+
+def shared_set_assessment(by_tool, shared, min_fraction=None, min_samples=None):
+    """{'n_shared', 'n_largest', 'warning', 'shrunk_by'} for the ranking set of one (track, task).
+
+    A warning is raised (never a refusal, the numbers stay available) when two or more tools are ranked and the set every ranked tool shares is
+      * empty (each tool is then ranked on its own samples: the ranks are not comparable), or
+      * smaller than min_fraction of the largest tool's own sample count, or
+      * smaller than min_samples while some tool has more samples than that.
+    shrunk_by lists the tools whose removal would enlarge the shared set (all ranked tools when the set is empty and no single tool is to blame).
+    """
+    min_fraction = SHARED_MIN_FRACTION if min_fraction is None else min_fraction
+    min_samples = SHARED_MIN_SAMPLES if min_samples is None else min_samples
+    ranked = {tool: set(values) for tool, values in by_tool.items() if values}
+    n_largest = max((len(v) for v in ranked.values()), default=0)
+    result = {"n_shared": len(shared), "n_largest": n_largest, "warning": "", "shrunk_by": ""}
+    if len(ranked) < 2:
+        return result
+    small = len(shared) < min_fraction * n_largest or (len(shared) < min_samples and len(shared) < n_largest)
+    if shared and not small:
+        return result
+    shrinkers = []
+    for tool in sorted(ranked):
+        others = [v for t, v in ranked.items() if t != tool]
+        if len(set.intersection(*others)) > len(shared):
+            shrinkers.append(f"{tool} ({len(ranked[tool])} sample(s))")
+    if not shrinkers:
+        shrinkers = [f"{tool} ({len(ranked[tool])} sample(s))" for tool in sorted(ranked)]
+    if not shared:
+        result["warning"] = (f"no sample is shared by all {len(ranked)} ranked tools, so each tool is ranked on its own samples and the ranks are NOT comparable")
+    else:
+        result["warning"] = (f"only {len(shared)} sample(s) are shared by all {len(ranked)} ranked tools (the largest tool has {n_largest}), so the ranks rest on {len(shared)} sample(s); "
+                             f"this is below {min_fraction:.0%} of the largest tool's samples or below {min_samples}")
+    result["shrunk_by"] = "; ".join(shrinkers)
+    return result
+
+
 def ranking_fields(tool, by_tool, shared, design, metric):
     """ranking_score, its CI and basis for one tool."""
     values_by_sample = by_tool.get(tool, {})
@@ -378,7 +420,7 @@ def ranking_fields(tool, by_tool, shared, design, metric):
         basis = "pooled (no species with enough independent clusters)" if design and design.species else "pooled"
     values = [values_by_sample[s] for s in samples]
     groups = [design.cluster(s) if design else f"sample:{s}" for s in samples]
-    low, high = resampling_interval(values, groups, strata)
+    low, high = resampling_interval(values, groups, strata, bounds=(0.0, 1.0))   # the ranking metrics are proportions
     return {"ranking_metric": metric, "ranking_score": macro_mean(values, strata),
             "ranking_ci_low": low, "ranking_ci_high": high, "ranking_species_basis": basis,
             "ci_method": interval_method_used(values, groups, strata), "max_cluster_share": dominant_share(values, groups),

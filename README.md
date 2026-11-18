@@ -256,7 +256,7 @@ cannot match. This table states only what was verified in their repositories and
 | | PlasBench | plsMD | PlasEval | GAEMR |
 |---|---|---|---|---|
 | Main job | Benchmark many reconstruction and classification tools | Reconstruct plasmids from a Unicycler assembly using PLSDB | Score plasmid bins against truth bins | Evaluate a genome assembly in general |
-| Runs and compares several tools on one footing | Yes: a registry of 23 tools and three trivial baselines, with separate short-read, long-read and hybrid tracks | One tool | No (scores bin files you supply) | No |
+| Runs and compares several tools on one footing | Yes: a registry of 20 real tools, three trivial baselines and five demo stand-ins, with separate short-read, long-read and hybrid tracks | One tool | No (scores bin files you supply) | No |
 | Builds its own truth | Yes: complete long-read or hybrid references with evidence labels, reference tiers, labelling schemes, a dimer check, ambiguous replicons set aside | No: validated on the authors' own samples | No: truth bins must be supplied | No |
 | Scores against the reference rather than the assembly | Yes (per reference base), plus a contig layer and PlasEval-style bin agreement | Contig-level BLAST validation | Contig-level only | Reference comparison of an assembly |
 | Statistics across isolates | Cluster bootstrap, sign-flip permutation, Wilcoxon, Holm, species-balanced headline, rank-robustness variants | No significance testing in its validation scripts | Per-sample values only | None (single-assembly report) |

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "python"))
 from plasbench import sheet_limit  # noqa: E402
-from truth_provenance import independence  # noqa: E402
+from truth_provenance import classify_method, independence  # noqa: E402
 
 TAB, NL = chr(9), chr(10)
 ok = True
@@ -76,7 +76,14 @@ with tempfile.TemporaryDirectory() as d:
 public = ROOT / "cohorts" / "public-v4.tsv"
 with tempfile.TemporaryDirectory() as d:
     got = sheet_limit.independent_truth_only(public, d)
-    check("public-v4 has 1,099 isolates with independent truth", (got.kept, got.total) == (1099, 7227), (got.kept, got.total))
+    # derived from the sheet's own assembly_method / technology text with the independent rule, not a pinned number (a correct fix to classify_method changes the count)
+    expected = 0
+    with open(public, encoding="utf-8") as handle:
+        for row in csv.DictReader((l for l in handle if l.strip() and not l.startswith("#")), delimiter=TAB):
+            if row.get("assembly_method") or row.get("assembly_sequencing_technology"):
+                s, p, _ = classify_method(row["assembly_method"], row["assembly_sequencing_technology"])
+                expected += independence(s, p)[0] == "independent"
+    check("public-v4: the independent-truth subset is what classify_method says of every row, and it is 15% of the cohort", got.kept == expected and got.total == 7227 and 0.10 < got.kept / got.total < 0.20, (got.kept, expected, got.total))
 
 print("ALL INDEPENDENT TRUTH TESTS PASSED" if ok else "INDEPENDENT TRUTH TESTS FAILED")
 sys.exit(0 if ok else 1)

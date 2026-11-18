@@ -30,6 +30,7 @@ Conventions
 """
 import argparse
 import csv
+import os
 import itertools
 import math
 import sys
@@ -512,10 +513,13 @@ def cmd_merge(a):
         shard = shards.get((row["sample"], row["tool"]), {})
         for c in added:
             row[c] = shard.get(c, "")
-    with open(a.scores, "w", newline="", encoding="utf-8") as handle:
+    # Written beside the table and renamed over it, so a kill mid-write leaves the previous file intact (AU-049).
+    tmp_path = str(a.scores) + ".tmp"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, delimiter=chr(9), lineterminator=chr(10))
         writer.writeheader()
         writer.writerows(rows)
+    os.replace(tmp_path, a.scores)
     return 0
 
 

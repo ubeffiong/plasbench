@@ -37,6 +37,9 @@ OUT_DIR="$1"
 # shellcheck disable=SC2034  # BASE_ASM: positional adapter contract, unused here
 BASE_ASM="${2:-}"
 OUT_FASTA="$3"
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/_require_output.sh"
+require_tool_output plascope "$OUT_DIR" 'PlaScope_predictions/*' 'Centrifuge_results/*_list' || exit 3
 : > "$OUT_FASTA"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 

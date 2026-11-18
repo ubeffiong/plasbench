@@ -25,6 +25,7 @@ Standard library only.
 """
 
 import argparse
+import json
 import math
 import os
 import csv
@@ -155,7 +156,10 @@ def parse_sweep(text):
 
 
 def read_scores(path):
-    """Score rows; a malformed value stops the run with the file, the line and the value instead of a traceback."""
+    """Score rows; a malformed value stops the run with the file, the line and the value instead of a traceback.
+
+    A NaN or infinite number is read as blank (never as a value) and counted in read_scores.nonfinite; run_consistency reports each one, so a mean is never shortened silently."""
+    read_scores.nonfinite = 0
     try:
         return _read_scores(path)
     except (ValueError, IndexError, KeyError) as exc:
@@ -270,6 +274,10 @@ def _read_scores(path):
                 "cprr_sweep_correct_without_identity": (parse_sweep(f[idx["cprr_sweep_correct_without_identity"]])
                                                         if "cprr_sweep_correct_without_identity" in idx else None),
             })
+            for key, value in rows[-1].items():
+                if isinstance(value, float) and not math.isfinite(value):
+                    rows[-1][key] = None
+                    read_scores.nonfinite += 1
     return rows
 
 
@@ -451,6 +459,16 @@ def burden_fields(d):
             "precision_gap": (precision - strict) if precision is not None and strict is not None else None}
 
 
+def shared_set_limits():
+    """(min fraction of the largest tool's samples, min samples) below which the shared set is flagged; SHARED_MIN_FRACTION / SHARED_MIN_SAMPLES override the defaults."""
+    try:
+        fraction = float(os.environ.get("SHARED_MIN_FRACTION", hd.SHARED_MIN_FRACTION))
+        samples = int(os.environ.get("SHARED_MIN_SAMPLES", hd.SHARED_MIN_SAMPLES))
+    except ValueError:
+        raise SystemExit("ERROR: SHARED_MIN_FRACTION must be a number and SHARED_MIN_SAMPLES an integer")
+    return fraction, samples
+
+
 def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=None, design=None, metric="f1",
               plasmid_samples=None, resource_failures=None):
     by_tool = defaultdict(lambda: {"precision": [], "recall": [], "f1": [], "plasmid_recall": [], "bin_f1": [], "pr_auc": [], "perfect": [], "strict": [], "n": 0,
@@ -555,7 +573,7 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
             ranking_samples = [r["sample"] for r in rows if r["tool"] == tool and r["f1"] is not None]
             ranking_f1 = list(d["f1"])
         groups = cluster_labels(ranking_samples, clusters)
-        f1_ci_low, f1_ci_high = resampling_interval(ranking_f1, groups)
+        f1_ci_low, f1_ci_high = resampling_interval(ranking_f1, groups, bounds=(0.0, 1.0))
         summary.append({
             "tool": tool,
             "n_samples": d["n"],
@@ -621,8 +639,11 @@ def summarise(rows, status_counts, failed_samples=None, clusters=None, overlap=N
     # so without them the headline path would drop it exactly as the legacy path once did.
     by_metric, shared_metric, _ = hd.shared_values(
         rows, metric, failed_samples, known_tools=set(failed_samples or ()), eligible_samples=plasmid_samples)
+    # The shared-sample rule is a cliff (one absent tool can empty the set): flag it on every row of the group, keep the numbers, name the tools that shrink it.
+    assessment = hd.shared_set_assessment(by_metric, shared_metric, *shared_set_limits())
     for row in summary:
         row.update(hd.ranking_fields(row["tool"], by_metric, shared_metric, design, metric))
+        row.update(n_shared_samples=assessment["n_shared"], ranking_warning=assessment["warning"], shared_set_shrunk_by=assessment["shrunk_by"])
         row.update(hd.cprr_fields(row["tool"], rows, design))
         # SV-PRR follows CPRR's rule exactly: per isolate, the numerator WITH the identity criterion where the truth can judge identity, without it where it cannot
         # (headline_design.cprr_counts); and CPRR is also given over exactly the isolates SV-PRR covers, so the two are comparable even if structural calling failed for some isolate.
@@ -991,7 +1012,8 @@ def write_tsv(summary, path):
             "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp",
             "unmapped_fraction", "off_truth_fraction", "ambiguous_fraction", "precision_gap",
             "sv_prr", "sv_prr_correct", "sv_prr_plasmids", "sv_prr_isolates", "cprr_on_sv_isolates",
-            "ci_method", "max_cluster_share", "dominant_study"]
+            "ci_method", "max_cluster_share", "dominant_study",
+            "n_shared_samples", "ranking_warning", "shared_set_shrunk_by"]
     with open(path, "w") as fh:
         fh.write("\t".join(cols) + "\n")
         for i, s in enumerate(summary, start=1):
@@ -1071,6 +1093,7 @@ def write_tsv(summary, path):
                 s.get("ci_method") or INTERVAL_METHOD,
                 fmt4(s.get("max_cluster_share")),
                 "yes" if (s.get("max_cluster_share") or 0) > DOMINANT_STUDY_SHARE else ("no" if s.get("max_cluster_share") is not None else ""),
+                s.get("n_shared_samples", ""), s.get("ranking_warning", ""), s.get("shared_set_shrunk_by", ""),
             ]
             # The values are positional: a column added to `cols` without its value (or
             # the reverse) would shift every later column silently. Refuse instead.
@@ -1078,11 +1101,6 @@ def write_tsv(summary, path):
                 raise AssertionError(f"leaderboard writer: {len(cols)} columns but {len(values)} values; "
                                      "add each new column to both `cols` and `values`")
             fh.write("\t".join(str(x) for x in values) + "\n")
-
-
-def format_rate(rate, assessed):
-    """Display an availability-aware rate without turning missing evidence into zero."""
-    return f"{rate:.1%} (n={assessed})" if rate is not None else "not assessed"
 
 
 def write_md(summary, path, notes=()):
@@ -1128,6 +1146,8 @@ def write_md_table(fh, summary, track=None, task=None):
     note = ENDPOINT_NOTES.get(summary[0].get("ranking_metric", "") if summary else "") if task else None
     if note:
         fh.write(f"> {note}\n\n")
+    if summary and summary[0].get("ranking_warning"):
+        fh.write(f"> **RANKING WARNING: small or empty shared sample set.** {summary[0]['ranking_warning']}. Tools that shrink it: {summary[0].get('shared_set_shrunk_by') or 'none identified'}.\n\n")
     if summary and summary[0].get("primary_status") not in (None, "", hd.PRIMARY_AVAILABLE):
         fh.write(f"> **{'PROVISIONAL: primary analysis unavailable' if summary[0]['primary_status'] == hd.PRIMARY_UNAVAILABLE else 'FALLBACK ALLOWED: primary analysis unavailable'}.** "
                  f"Population: {summary[0].get('population', '')}. This is not the primary result.\n\n")
@@ -1141,7 +1161,7 @@ def write_md_table(fh, summary, track=None, task=None):
 
     for i, s in enumerate(summary, start=1):
         ci = (f"{s['ranking_ci_low']:.3f}–{s['ranking_ci_high']:.3f}"
-              if s.get("ranking_ci_low") is not None else "< 5 independent units")
+              if s.get("ranking_ci_low") is not None else f"< {MIN_CLUSTERS_CI} independent units")
         cprr = (f"{s['cprr']:.1%} ({s['cprr_correct']}/{s['cprr_plasmids']})"
                 if s.get("cprr") is not None else "not bin-scored")
         if s.get("cprr_isolate_mean") is not None:
@@ -1375,6 +1395,9 @@ def main():
     rows = read_scores(args.scores)
     if not rows:
         raise SystemExit("No score rows found in " + args.scores)
+    if read_scores.nonfinite:
+        print(f"[aggregate] WARNING: {read_scores.nonfinite} NaN or infinite value(s) in {args.scores} were read as blank (listed as non_finite_value in "
+              f"{args.out_prefix}.input_consistency.tsv); the means over those columns cover fewer runs.")
     findings = run_consistency.check(args.scores, args.tool_status, str(Path(args.scores).with_name("score_failures.tsv")), args.sample_sheet)
     run_consistency.write(args.out_prefix + ".input_consistency.tsv", findings)
     errors = [f for f in findings if f["severity"] == "error"]
@@ -1490,6 +1513,16 @@ def main():
         database_recovery(summary, args.database_containment, os.path.dirname(os.path.abspath(args.out_prefix)))
     comparisons = [row for *_, track_comparisons in per_track for row in track_comparisons]
     write_tsv(summary, args.out_prefix + ".leaderboard.tsv")
+    with open(args.out_prefix + ".input_fingerprint.json", "w", encoding="utf-8") as handle:
+        json.dump(run_consistency.fingerprint(args.scores), handle, indent=1)
+        handle.write("\n")
+    warned = set()
+    for row in summary:
+        if row.get("ranking_warning") and (row["analysis_track"], row["task"]) not in warned:
+            warned.add((row["analysis_track"], row["task"]))
+            detail = f"{row['analysis_track']} / {row['task']}: {row['ranking_warning']}. Tools that shrink the shared set: {row.get('shared_set_shrunk_by') or 'none identified'}."
+            notes.append(detail)
+            print(f"{chr(10)}[aggregate] WARNING: SHARED-SAMPLE RULE, {detail}{chr(10)}")
     write_md(summary, args.out_prefix + ".leaderboard.md", notes=notes)
     by_track = defaultdict(list)
     for track, _, _, track_summary, _ in per_track:

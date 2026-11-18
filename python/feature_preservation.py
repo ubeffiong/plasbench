@@ -39,7 +39,7 @@ import csv
 import os
 import sys
 from collections import defaultdict
-from plasbench_common import read_plasmid_lengths as read_truth  # noqa: E402
+from plasbench_common import read_plasmid_lengths as read_truth, iter_paf, paf_identity  # noqa: E402
 
 KIND_ALIASES = {"mob": "mobility", "is": "is_element", "isescan": "is_element"}
 SUMMARY_FIELDS = ("sample", "tool", "analysis_track", "feature_kind", "n_expected", "n_full_length",
@@ -84,26 +84,21 @@ def read_circular(path):
 
 def read_blocks(paf, plasmids, min_length, min_identity, min_mapq, min_qcov):
     blocks = defaultdict(list)
-    with open(paf, encoding="utf-8") as handle:
-        for line in handle:
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12 or "tp:A:S" in f[12:]:
-                continue
-            try:
-                qname, qlen, qs, qe, strand = f[0], int(f[1]), int(f[2]), int(f[3]), f[4]
-                tname, ts, te = f[5], int(f[7]), int(f[8])
-                matches, block, mapq = int(f[9]), int(f[10]), int(f[11])
-            except ValueError:
-                continue
-            if tname not in plasmids or block < min_length or mapq < min_mapq:
-                continue
-            if (matches / block if block else 0.0) < min_identity:
-                continue
-            if (abs(qe - qs) / qlen if qlen else 0.0) < min_qcov:
-                continue
-            ts, te = min(ts, te), max(ts, te)
-            qs, qe = min(qs, qe), max(qs, qe)
-            blocks[tname].append({"q": qname, "qs": qs, "qe": qe, "strand": strand, "ts": ts, "te": te})
+    for row in iter_paf(paf, label="feature-preservation PAF"):
+        if "tp:A:S" in row["tags"]:
+            continue
+        qname, qlen, qs, qe, strand = row["qname"], row["qlen"], row["qstart"], row["qend"], row["strand"]
+        tname, ts, te = row["tname"], row["tstart"], row["tend"]
+        matches, block, mapq = row["matches"], row["block_length"], row["mapq"]
+        if tname not in plasmids or block < min_length or mapq < min_mapq:
+            continue
+        if paf_identity(matches, block) < min_identity:
+            continue
+        if (abs(qe - qs) / qlen if qlen else 0.0) < min_qcov:
+            continue
+        ts, te = min(ts, te), max(ts, te)
+        qs, qe = min(qs, qe), max(qs, qe)
+        blocks[tname].append({"q": qname, "qs": qs, "qe": qe, "strand": strand, "ts": ts, "te": te})
     return blocks
 
 

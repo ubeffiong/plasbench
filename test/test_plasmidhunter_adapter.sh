@@ -49,6 +49,12 @@ echo "scores.tsv carries every contig's real 'Probability of 1' score, joined by
 
 # No predictions.tsv at all is a valid "predicted none", not a hard adapter failure.
 rm -rf "$TMP/out2"; mkdir -p "$TMP/out2"
+if bash "$ROOT/adapters/adapt_plasmidhunter.sh" "$TMP/out2" "$base_asm" "$TMP/pred_none.plasmid.fasta" 2> "$TMP/none.err"; then
+    echo "FAIL: plasmidhunter with no output files must fail (AU-008), not report an empty prediction" >&2; exit 1
+fi
+grep -q "no output from plasmidhunter" "$TMP/none.err" || { echo "FAIL: the failure must say 'no output from plasmidhunter'" >&2; exit 1; }
+echo "no output from plasmidhunter at all is a failed run, with the reason -> PASS"
+printf 'Prediction\tProbability of 1\n' > "$TMP/out2/predictions.tsv"   # ran, found nothing
 bash "$ROOT/adapters/adapt_plasmidhunter.sh" "$TMP/out2" "$base_asm" "$TMP/pred2.plasmid.fasta"
 [[ ! -s "$TMP/pred2.plasmid.fasta" ]] || { echo "FAIL: expected an empty prediction when no predictions.tsv exists" >&2; exit 1; }
 echo "no predictions.tsv is scored as 'no plasmids', not a failure -> PASS"

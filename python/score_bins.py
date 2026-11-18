@@ -28,9 +28,10 @@ import argparse
 import csv
 import math
 import os
+import sys
 from collections import defaultdict
 from plasbench_common import (  # noqa: E402
-    merge_intervals, interval_overlap_bp as overlap, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership, iter_fasta,
+    merge_intervals, interval_overlap_bp as overlap, iter_paf, paf_identity, CPRR_SWEEP_THRESHOLDS, union_length, read_bin_membership, iter_fasta,
     read_truth_split,
 )
 from matching import max_weight_matching  # noqa: E402
@@ -66,22 +67,19 @@ def bin_ambiguity(path, membership, plasmids, chromosomes, min_length=1, min_ide
     if not path:
         return {}
     by_query = defaultdict(lambda: defaultdict(list))
-    with open(path, encoding="utf-8") as handle:
-        for raw in handle:
-            fields = raw.rstrip("\n").split("\t")
-            if len(fields) < 12 or fields[0] not in membership: continue
-            try:
-                qlen = int(fields[1])
-                start, stop = sorted((int(fields[2]), int(fields[3])))
-                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
-            except ValueError: continue
-            identity = matches / block_length if block_length else 0.0
-            query_coverage = abs(stop - start) / qlen if qlen else 0.0
-            if (block_length < min_length or identity < min_identity or mapq < min_mapq
-                    or query_coverage < min_query_coverage): continue
-            target = fields[5]
-            if target in plasmids: by_query[fields[0]]["PLASMID"].append((start, stop))
-            elif target in chromosomes: by_query[fields[0]]["CHROMOSOME"].append((start, stop))
+    # Secondary rows are KEPT here on purpose: this PAF is the all-mapping one and the
+    # secondary placements are exactly what the ambiguity measure counts.
+    for row in iter_paf(path, label="ambiguity PAF"):
+        if row["qname"] not in membership: continue
+        qlen = row["qlen"]
+        start, stop = sorted((row["qstart"], row["qend"]))
+        identity = paf_identity(row["matches"], row["block_length"])
+        query_coverage = abs(stop - start) / qlen if qlen else 0.0
+        if (row["block_length"] < min_length or identity < min_identity or row["mapq"] < min_mapq
+                or query_coverage < min_query_coverage): continue
+        target = row["tname"]
+        if target in plasmids: by_query[row["qname"]]["PLASMID"].append((start, stop))
+        elif target in chromosomes: by_query[row["qname"]]["CHROMOSOME"].append((start, stop))
     by_bin = defaultdict(int)
     for query, types in by_query.items():
         if types["PLASMID"] and types["CHROMOSOME"]:
@@ -112,93 +110,15 @@ def bp_entropy(weights_by_label):
     return entropy
 
 
-def clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins):
-    """NMI and Variation of Information over a deliberately scoped bp-weighted
-    contingency table -- NOT just the matched-pair bins the Hungarian
-    assignment above picked, so a tool that over-merges everything into one
-    bin, or leaves plasmid sequence completely unassigned, is actually
-    penalized here rather than invisible to it (both would score well under
-    a "matched pairs only" metric).
+def _contingency(overlaps, plasmids, chromosome_bp):
+    """(rows, singleton_bp) of the bp-weighted contingency table the clustering metrics use.
 
-    Rows (predicted clusters): every real bin_id, plus a virtual
-    "__unassigned__" row for true-plasmid bp that NO bin covers at all
-    (a missed plasmid, or a partially-recovered one).
-    Columns (truth clusters): every true plasmid, plus a virtual
-    "CHROMOSOME" column for chromosome bp a bin wrongly claims.
-
-    Deliberately excluded: chromosome bp that no bin ever claims. That is
-    the correct, desired outcome for the vast majority of a bacterial
-    genome, not a clustering decision -- including it would swamp the
-    contingency table with an enormous, uninteresting "true negative" mass
-    and trivially inflate agreement, since neither NMI nor VI is being asked
-    to cluster the whole genome, only the fraction of it a tool actually made
-    a plasmid-related decision about (matches score_bins.py's precision/
-    recall/f1 above, which are also computed only over bins/plasmids, never
-    over unclaimed chromosome).
-
-    Returns (nmi, vi), or (None, None) if the table is empty (no true
-    plasmid bp and no wrongly-claimed chromosome bp at all).
+    rows: {bin: {truth class: bp}} for every real bin (truth classes are the true plasmids plus a virtual "CHROMOSOME" for chromosome bp a bin wrongly claims).
+    singleton_bp: {plasmid: bp} for true-plasmid bases NO bin covers. Each such base is a prediction cluster of its own (a "noise point"): it was not placed with
+    anything. The earlier version put all missed bases of one run in a single "__unassigned__" cluster, so exactly one wholly missed plasmid formed a cluster that
+    matched that plasmid one-to-one and scored a PERFECT NMI, VI and ARI (the 17 November audit's fixture: two exact bins and one missed plasmid gave 1.0, 0.0, 1.0),
+    contradicting the documented rule that unassigned sequence is penalised.
     """
-    row_weights = defaultdict(lambda: defaultdict(int))  # row -> {col: bp}
-    claimed_by_plasmid = defaultdict(int)
-    for (bin_id, plasmid), bp in overlaps.items():
-        if bp > 0:
-            row_weights[bin_id][plasmid] += bp
-            claimed_by_plasmid[plasmid] += bp
-    for bin_id, bp in chromosome_bp.items():
-        if bp > 0:
-            row_weights[bin_id]["CHROMOSOME"] += bp
-    for plasmid, length in plasmids.items():
-        missed = length - claimed_by_plasmid.get(plasmid, 0)
-        if missed > 0:
-            row_weights["__unassigned__"][plasmid] += missed
-
-    total = sum(sum(cols.values()) for cols in row_weights.values())
-    if total <= 0:
-        return None, None
-
-    row_totals = {row: sum(cols.values()) for row, cols in row_weights.items()}
-    col_totals = defaultdict(int)
-    for cols in row_weights.values():
-        for col, bp in cols.items():
-            col_totals[col] += bp
-
-    h_row = bp_entropy(row_totals)
-    h_col = bp_entropy(dict(col_totals))
-    mutual_information = 0.0
-    for row, cols in row_weights.items():
-        for col, bp in cols.items():
-            if bp <= 0:
-                continue
-            p_joint = bp / total
-            p_row = row_totals[row] / total
-            p_col = col_totals[col] / total
-            mutual_information += p_joint * math.log(p_joint / (p_row * p_col))
-
-    # Normalization convention: arithmetic mean of the two entropies (the
-    # same convention scikit-learn's normalized_mutual_info_score defaults
-    # to), so a reader can cross-check this against a familiar reference
-    # implementation. If both sides are a single point mass (H=0 for both --
-    # one bin, one plasmid, no chromosome contamination, nothing missed),
-    # agreement is perfect by construction. If only one side has zero
-    # entropy, no information could possibly be shared with the other side's
-    # real variability, so NMI is 0 by convention (matches scikit-learn).
-    if h_row == 0.0 and h_col == 0.0:
-        nmi = 1.0
-    elif h_row == 0.0 or h_col == 0.0:
-        nmi = 0.0
-    else:
-        nmi = 2 * mutual_information / (h_row + h_col)
-    vi = h_row + h_col - 2 * mutual_information
-    return nmi, vi
-
-
-def adjusted_rand(overlaps, plasmids, chromosome_bp):
-    """Base-pair-weighted Adjusted Rand Index over the same contingency table
-    clustering_agreement() uses (bins + unassigned plasmid bp as rows; truth
-    plasmids + wrongly claimed chromosome as columns). Each base is an item, so
-    pair counts are C(n, 2) of base counts. None when undefined (fewer than two
-    bases, or a degenerate table where expected == maximum)."""
     rows = defaultdict(lambda: defaultdict(int))
     claimed = defaultdict(int)
     for (bin_id, plasmid), bp in overlaps.items():
@@ -208,21 +128,78 @@ def adjusted_rand(overlaps, plasmids, chromosome_bp):
     for bin_id, bp in chromosome_bp.items():
         if bp > 0:
             rows[bin_id]["CHROMOSOME"] += bp
-    for plasmid, length in plasmids.items():
-        if length - claimed.get(plasmid, 0) > 0:
-            rows["__unassigned__"][plasmid] += length - claimed.get(plasmid, 0)
+    singleton_bp = {plasmid: length - claimed.get(plasmid, 0) for plasmid, length in plasmids.items() if length - claimed.get(plasmid, 0) > 0}
+    return rows, singleton_bp
+
+
+def clustering_agreement(overlaps, plasmids, chromosome_bp, all_bins):
+    """NMI and Variation of Information over a deliberately scoped bp-weighted contingency table -- NOT just the matched-pair bins the Hungarian assignment picked, so a
+    tool that over-merges everything into one bin, or leaves plasmid sequence completely unassigned, is actually penalized here rather than invisible to it.
+
+    Rows (predicted clusters): every real bin, plus one singleton cluster per UNASSIGNED true-plasmid base (see _contingency: sequence that no bin covers was placed
+    with nothing). Columns (truth clusters): every true plasmid, plus a virtual "CHROMOSOME" column for chromosome bp a bin wrongly claims.
+
+    Deliberately excluded: chromosome bp that no bin ever claims. That is the correct, desired outcome for most of a bacterial genome, not a clustering decision;
+    including it would swamp the table with a huge true-negative mass (matches the precision/recall/f1 above, which are computed only over bins and plasmids).
+
+    The singleton terms are added analytically (a missed plasmid of m bases adds m clusters of size 1), so a megabase miss costs no memory.
+    Returns (nmi, vi), or (None, None) if the table is empty (no true plasmid bp and no wrongly-claimed chromosome bp at all).
+    """
+    rows, singleton_bp = _contingency(overlaps, plasmids, chromosome_bp)
+    total = sum(sum(cols.values()) for cols in rows.values()) + sum(singleton_bp.values())
+    if total <= 0:
+        return None, None
+    row_totals = {row: sum(cols.values()) for row, cols in rows.items()}
+    col_totals = defaultdict(int)
+    for cols in rows.values():
+        for col, bp in cols.items():
+            col_totals[col] += bp
+    for plasmid, bp in singleton_bp.items():
+        col_totals[plasmid] += bp
+    singleton_total = sum(singleton_bp.values())
+    log_total = math.log(total)
+    h_row = -sum((r / total) * math.log(r / total) for r in row_totals.values() if r > 0) + (singleton_total / total) * log_total
+    h_col = -sum((c / total) * math.log(c / total) for c in col_totals.values() if c > 0)
+    mutual_information = 0.0
+    for row, cols in rows.items():
+        for col, bp in cols.items():
+            if bp > 0:
+                p_joint = bp / total
+                mutual_information += p_joint * math.log(p_joint / ((row_totals[row] / total) * (col_totals[col] / total)))
+    for plasmid, bp in singleton_bp.items():
+        # each base is its own row (p_row = 1/total), so its term is (1/total) * log(1 / p_col), summed over its bp
+        mutual_information += (bp / total) * math.log(total / col_totals[plasmid])
+    # Normalization: arithmetic mean of the two entropies (scikit-learn's default). Both sides a single point mass: perfect by construction; only one side:
+    # no information can be shared, NMI 0 by convention (matches scikit-learn).
+    if h_row <= 1e-12 and h_col <= 1e-12:
+        nmi = 1.0
+    elif h_row <= 1e-12 or h_col <= 1e-12:
+        nmi = 0.0
+    else:
+        nmi = max(0.0, min(1.0, 2 * mutual_information / (h_row + h_col)))
+    vi = max(0.0, h_row + h_col - 2 * mutual_information)
+    return nmi, vi
+
+
+def adjusted_rand(overlaps, plasmids, chromosome_bp):
+    """Base-pair-weighted Adjusted Rand Index over the same contingency table clustering_agreement() uses. Each base is an item, so pair counts are C(n, 2) of base
+    counts; unassigned true-plasmid bases are singleton clusters (they pair with nothing, which counts against the tool). None when undefined (fewer than two bases, or
+    a degenerate table where expected == maximum)."""
+    rows, singleton_bp = _contingency(overlaps, plasmids, chromosome_bp)
 
     def pairs(n):
         return n * (n - 1) / 2
 
-    total = sum(sum(c.values()) for c in rows.values())
+    total = sum(sum(c.values()) for c in rows.values()) + sum(singleton_bp.values())
     if total < 2:
         return None
     col_totals = defaultdict(int)
     for cols in rows.values():
         for col, bp in cols.items():
             col_totals[col] += bp
-    index = sum(pairs(bp) for cols in rows.values() for bp in cols.values())
+    for plasmid, bp in singleton_bp.items():
+        col_totals[plasmid] += bp
+    index = sum(pairs(bp) for cols in rows.values() for bp in cols.values())     # singleton clusters hold no pair
     row_sum = sum(pairs(sum(cols.values())) for cols in rows.values())
     col_sum = sum(pairs(bp) for bp in col_totals.values())
     expected = row_sum * col_sum / pairs(total)
@@ -429,28 +406,41 @@ def main():
     # Applies the same alignment-quality gate as score_plasmids.py (base-level
     # scoring), so a short, low-identity, or low-MAPQ placement that the base
     # score discards cannot still count toward bin completeness/purity.
-    with open(args.paf, encoding="utf-8") as handle:
-        for raw in handle:
-            fields = raw.rstrip("\n").split("\t")
-            if len(fields) < 12 or fields[0] not in membership: continue
-            try:
-                qlen, qstart, qend = int(fields[1]), int(fields[2]), int(fields[3])
-                start, stop = int(fields[7]), int(fields[8])
-                matches, block_length, mapq = int(fields[9]), int(fields[10]), int(fields[11])
-            except ValueError: continue
-            identity = matches / block_length if block_length else 0.0
-            query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
-            if (block_length < args.min_alignment_length or identity < args.min_alignment_identity
-                    or mapq < args.min_alignment_mapq or query_coverage < args.min_alignment_query_coverage):
-                continue
-            target, bin_id = fields[5], membership[fields[0]]
-            if target in plasmids:
-                identity_counts[(bin_id, target)][0] += matches
-                identity_counts[(bin_id, target)][1] += block_length
-            if target in plasmids or target in chromosomes:
-                query_aligned[fields[0]].append((max(0, min(qstart, qend)), min(qlen, max(qstart, qend))))
-            if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
-            elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
+    # Shared reader: a malformed row is dropped, counted and warned about once (AU-021).
+    secondary_ignored = 0
+    for paf_row in iter_paf(args.paf, label="bin PAF"):
+        if paf_row["qname"] not in membership: continue
+        # Primary-only, as score_plasmids.py: a user-supplied PAF may hold secondary rows
+        # (tp:A:S), which would let a repeat claim bases on several replicons (AU-048).
+        if "tp:A:S" in paf_row["tags"]:
+            secondary_ignored += 1
+            continue
+        qname, target = paf_row["qname"], paf_row["tname"]
+        qlen, qstart, qend = paf_row["qlen"], paf_row["qstart"], paf_row["qend"]
+        start, stop = paf_row["tstart"], paf_row["tend"]
+        matches, block_length, mapq = paf_row["matches"], paf_row["block_length"], paf_row["mapq"]
+        identity = paf_identity(matches, block_length)
+        query_coverage = abs(qend - qstart) / qlen if qlen else 0.0
+        if (block_length < args.min_alignment_length or identity < args.min_alignment_identity
+                or mapq < args.min_alignment_mapq or query_coverage < args.min_alignment_query_coverage):
+            continue
+        bin_id = membership[qname]
+        # Same rule as score_plasmids.py: a target length that disagrees with the truth means
+        # the PAF was made against a different reference, so refuse rather than score it (AU-048).
+        truth_length = plasmids.get(target, chromosomes.get(target))
+        if truth_length is not None and paf_row["tlen"] != truth_length:
+            raise ValueError(f"PAF target length for '{target}' ({paf_row['tlen']}) disagrees with truth "
+                             f"({truth_length})")
+        if target in plasmids:
+            identity_counts[(bin_id, target)][0] += matches
+            identity_counts[(bin_id, target)][1] += block_length
+        if target in plasmids or target in chromosomes:
+            query_aligned[qname].append((max(0, min(qstart, qend)), min(qlen, max(qstart, qend))))
+        if target in plasmids: plasmid_intervals[(bin_id, target)].append((max(0, start), min(plasmids[target], stop)))
+        elif target in chromosomes: chromosome_intervals[bin_id].append((max(0, start), min(chromosomes[target], stop)))
+    if secondary_ignored:
+        sys.stderr.write(f"[score_bins] ignored {secondary_ignored} secondary alignment row(s) (tp:A:S) "
+                         f"in {args.paf}; scoring is primary-only.\n")
     overlaps = {key: merge(value) for key, value in plasmid_intervals.items()}
     plasmid_bp = defaultdict(int)
     for (bin_id, _), bp in overlaps.items(): plasmid_bp[bin_id] += bp
@@ -478,8 +468,9 @@ def main():
         for bin_id in sorted(all_bins - used_bins): writer.writerow([bin_id, "", 0, "", f"{purity[bin_id]:.4f}", chromosome_bp.get(bin_id, 0), ambiguity_bp.get(bin_id, 0), f"{1 - purity[bin_id]:.4f}", "unmatched_bin"])
         for plasmid in sorted(set(plasmids) - used_plasmids): writer.writerow(["", plasmid, 0, "", "", "", "", "", "missed_plasmid"])
     if plasmids:
-        precision = len(matched) / len(all_bins) if all_bins else 0.0; recall = len(matched) / len(plasmids)
-        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        # Nothing binned: precision is undefined (blank), as score_plasmids.py leaves it when nothing was predicted; recall is 0 and so is F1 (audit AU-048).
+        precision = len(matched) / len(all_bins) if all_bins else None; recall = len(matched) / len(plasmids)
+        f1 = (2 * precision * recall / (precision + recall) if precision + recall else 0.0) if precision is not None else 0.0
     else:  # no true plasmid: same undefined-not-zero rule as the length-weighted metrics above
         precision, recall, f1 = (0.0 if all_bins else None), None, None
     total_bp, chromosome_total = sum(total_mapped.values()), sum(chromosome_bp.values())

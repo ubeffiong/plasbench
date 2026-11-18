@@ -44,6 +44,15 @@ log "Running stages: ${STAGES[*]}"
 # off. The next run says so, and reuses the finished work.
 mkdir -p "$RESULTS_DIR"
 RUN_MARK="$RESULTS_DIR/.run_in_progress"
+# The marker names the pid that wrote it: a marker whose process is still alive is a run in progress, not one that was cut off (AU-001).
+if [[ -s "$RUN_MARK" ]]; then
+    marker_pid="$(sed -n '1s/.*pid \([0-9][0-9]*\).*/\1/p' "$RUN_MARK")"
+    if [[ -n "$marker_pid" && "$marker_pid" != "$$" ]] && _pid_alive "$marker_pid"; then
+        die "another PlasBench run is in progress in $RESULTS_DIR ($(head -1 "$RUN_MARK")). Wait for it, stop it, or give this run its own results folder."
+    fi
+fi
+acquire_run_lock "run_all.sh stages ${STAGES[*]}"
+rm -f "$RESULTS_DIR/.completed_with_warnings"
 if [[ -s "$RUN_MARK" ]]; then
     warn "the previous run stopped before it finished, without a chance to report why ($(head -1 "$RUN_MARK")): the terminal, WSL or the computer ended it, or it ran out of memory. Finished work is reused; see $LOG_DIR for its last messages."
 fi
@@ -66,7 +75,16 @@ for s in "${STAGES[@]}"; do
     fi
 done
 rm -f "$RUN_MARK"
-log "############ DONE ############"
+# A run that finished but in which some tool runs failed is "completed with warnings": exit 0 (the other tools' results are valid), but never a plain DONE.
+n_failed=0
+[[ -f "$RESULTS_DIR/tool_status.tsv" ]] && n_failed="$(awk -F'\t' 'NR > 1 && ($3 == "failed" || $3 == "infrastructure_failure") { n++ } END { print n + 0 }' "$RESULTS_DIR/tool_status.tsv")"
+if [[ "$n_failed" -gt 0 ]]; then
+    printf '%s tool run(s) failed; see tool_status.tsv\n' "$n_failed" > "$RESULTS_DIR/.completed_with_warnings"
+    warn "the run finished WITH WARNINGS: $n_failed tool run(s) failed and are excluded from scoring (see $RESULTS_DIR/tool_status.tsv)"
+    log "############ DONE (completed with warnings) ############"
+else
+    log "############ DONE ############"
+fi
 if [[ -f "$RESULTS_DIR/benchmark.leaderboard.md" ]]; then
     echo; echo "Leaderboard:"; cat "$RESULTS_DIR/benchmark.leaderboard.md"
 fi

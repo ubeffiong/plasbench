@@ -88,9 +88,13 @@ def fetch_fasta(accession, email, api_key):
     params = {"db": "nuccore", "id": accession, "rettype": "fasta", "retmode": "text"}
     if email:
         params["email"] = email
+    headers = {"User-Agent": "PlasBench/0.1 reference-set builder"}
     if api_key:
+        # the key travels in the POST body, never in the URL (URLs end up in proxy logs, error messages and tracebacks)
         params["api_key"] = api_key
-    request = Request(EFETCH + "?" + urlencode(params), headers={"User-Agent": "PlasBench/0.1 reference-set builder"})
+        request = Request(EFETCH, data=urlencode(params).encode("ascii"), headers=headers)
+    else:
+        request = Request(EFETCH + "?" + urlencode(params), headers=headers)
     payload = fetch(request, timeout=60, retries=4, label=f"efetch {accession}")
     text = payload.decode("utf-8")
     if not text.startswith(">"):

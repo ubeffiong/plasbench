@@ -10,6 +10,9 @@ OUT_DIR="$1"
 # shellcheck disable=SC2034  # BASE_ASM: positional adapter contract, unused here
 BASE_ASM="$2"
 OUT_FASTA="$3"
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/_require_output.sh"
+require_tool_output plasmidspades "$OUT_DIR" 'contigs.fasta' 'scaffolds.fasta' 'before_rr.fasta' 'assembly_graph*' || exit 3
 : > "$OUT_FASTA"
 BINS="${OUT_FASTA%.plasmid.fasta}.bins.tsv"; printf 'bin_id\tsequence_id\n' > "$BINS"
 if [[ -s "$OUT_DIR/contigs.fasta" ]]; then

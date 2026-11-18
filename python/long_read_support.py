@@ -17,6 +17,7 @@ Standard library only.
 
 import argparse
 import csv
+from plasbench_common import iter_paf  # noqa: E402
 from collections import defaultdict
 
 
@@ -30,13 +31,11 @@ def main():
     with open(args.truth, newline="", encoding="utf-8") as handle:
         lengths = {row["sequence_id"]: int(row["length"]) for row in csv.DictReader(handle, delimiter="\t")}
     aligned, reads = defaultdict(int), defaultdict(set)
-    with open(args.paf, encoding="utf-8") as handle:
-        for line in handle:
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 12 or fields[5] not in lengths or int(fields[11]) < args.min_mapq:
-                continue
-            aligned[fields[5]] += abs(int(fields[8]) - int(fields[7]))
-            reads[fields[5]].add(fields[0])
+    for row in iter_paf(args.paf, label="long-read PAF"):
+        if row["tname"] not in lengths or row["mapq"] < args.min_mapq:
+            continue
+        aligned[row["tname"]] += abs(row["tend"] - row["tstart"])
+        reads[row["tname"]].add(row["qname"])
     with open(args.out, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(["sequence_id", "length", "mean_depth", "reads"])

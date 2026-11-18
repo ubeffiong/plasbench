@@ -7,7 +7,17 @@ source "$HERE/lib.sh"
 need python3
 
 SCORES="$RESULTS_DIR/scores.tsv"
-[[ -s "$SCORES" ]] || die "no scores found at $SCORES; run 05_score.sh first"
+mkdir -p "$RESULTS_DIR"
+stage_timing_begin 6
+if [[ ! -s "$SCORES" ]]; then
+    # Name the stage that is actually missing: a run in which no tool produced a prediction has nothing for stage 5 to score (AU-035).
+    if [[ ! -s "$RESULTS_DIR/tool_status.tsv" ]]; then
+        die "no scores found at $SCORES and no tool status at $RESULTS_DIR/tool_status.tsv: stage 4 (run tools) has not run for this results folder; run 04_run_tools.sh, then 05_score.sh"
+    elif ! awk -F'\t' 'NR > 1 && ($3 == "completed" || $3 == "reused") { f = 1 } END { exit !f }' "$RESULTS_DIR/tool_status.tsv"; then
+        die "no scores found at $SCORES because no tool run completed in stage 4 (see $RESULTS_DIR/tool_status.tsv and the tool logs in ${LOG_DIR:-logs}); there is nothing for stage 5 to score"
+    fi
+    die "no scores found at $SCORES although tools completed in stage 4; stage 5 (score) did not produce them: run 05_score.sh (see $RESULTS_DIR/score_failures.tsv)"
+fi
 # Optional structural evidence is accepted only after record, provenance, and
 # closure-support validation. Invalid evidence remains on disk for audit but is
 # excluded from selection reports.
@@ -163,6 +173,17 @@ job_audit_truth_labels() {
         || warn "truth-marker overlap failed; scores are unaffected"
 }
 
+# The headline with and without the evidence-based truth exclusion (python/truth_exclusion_sensitivity.py): reads the rank-robustness,
+# truth-marker-overlap and label-scheme tables, so it runs after the jobs above have finished (see the second wait below).
+# Descriptive only. RUN_TRUTH_EXCLUSION_SENSITIVITY=0 skips it.
+job_truth_exclusion_sensitivity() {
+    python3 "$HERE/../python/truth_exclusion_sensitivity.py" --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
+        --truth-marker-overlap "$RESULTS_DIR/benchmark.truth_marker_overlap.tsv" --label-schemes "$RESULTS_DIR/benchmark.label_schemes.tsv" \
+        --label-scheme "${TRUTH_LABEL_SCHEME:-ncbi}" --out "$RESULTS_DIR/benchmark.truth_exclusion_sensitivity.tsv" \
+        --rescore-reconstruction "$RESULTS_DIR" --data-dir "$DATA_DIR" \
+        || warn "truth-exclusion sensitivity was not written (needs rank_robustness with a scheme:evidence variant); scores are unaffected"
+}
+
 # Assembly adequacy (was the short-read assembly good enough to blame a tool?), plasmid
 # copy-number concordance, truth repeat content and truth depth anomalies, and tool-vs-tool
 # bin agreement (PlasEval-style dissimilarity). A table that cannot be produced is absent
@@ -287,6 +308,7 @@ advisory_job job_truth_depth_anomalies
 [[ "${RUN_BIN_AGREEMENT:-1}" == "1" ]] && advisory_job job_bin_agreement
 [[ "${RUN_CANDIDATE_MULTIPLICITY:-1}" == "1" ]] && advisory_job job_candidate_multiplicity
 wait
+[[ "${RUN_TRUTH_EXCLUSION_SENSITIVITY:-1}" == "1" ]] && job_truth_exclusion_sensitivity
 
 # One row per isolate on how far its reference can be trusted and why (python/reference_evidence_audit.py): joins the truth
 # provenance, repeat-content and depth-anomaly tables the jobs above wrote, so it runs after them. Descriptive only.
@@ -438,6 +460,8 @@ python3 "$HERE/../python/write_manifest.py" \
 # The interactive cohort dashboard repeats the heatmap and metric tables and adds about 1 MB: embedded only when REPORT_EMBED_DASHBOARD=1.
 REPORT_FLAGS=()
 if [ "${REPORT_EMBED_DASHBOARD:-0}" = "1" ]; then REPORT_FLAGS+=(--embed-dashboard); fi
+# Build the report even when the leaderboard was ranked from a different score table or tool set (audit AU-012); the mismatch is still printed.
+if [ "${ALLOW_INPUT_MISMATCH:-0}" = "1" ]; then REPORT_FLAGS+=(--allow-input-mismatch); fi
 
 python3 "$HERE/../python/build_html_report.py" \
     ${REPORT_FLAGS[@]+"${REPORT_FLAGS[@]}"} \
@@ -458,6 +482,7 @@ python3 "$HERE/../python/build_html_report.py" \
     --rank-robustness "$RESULTS_DIR/benchmark.rank_robustness.tsv" \
     --truth-label-audit "$RESULTS_DIR/benchmark.truth_label_audit.tsv" \
     --truth-marker-overlap "$RESULTS_DIR/benchmark.truth_marker_overlap.tsv" \
+    --truth-exclusion-sensitivity "$RESULTS_DIR/benchmark.truth_exclusion_sensitivity.tsv" \
     --dataset-features "$RESULTS_DIR/benchmark.dataset_features.tsv" \
     --stratified "$RESULTS_DIR/benchmark.stratified.tsv" \
     --orthogonal-summary "$RESULTS_DIR/orthogonal_validation.summary.json" \

@@ -63,8 +63,10 @@ valid_sample_id() {
 
 # True when a tool left something in its output directory. A tool that ran, even one that found no plasmid, writes at least a log or a
 # table there; a directory that is missing or empty means it crashed or wrote somewhere else, which must not be read as "no plasmids".
+# A log alone does not count (AU-008): only files that are not *.log, *.err, *.stderr, *.stdout, *.out or the run.log/command files are real output; each adapter
+# additionally checks for its own tool's result files (adapters/_require_output.sh).
 tool_output_present() {
-    [[ -d "$1" ]] && [[ -n "$(find "$1" -type f -print -quit 2>/dev/null)" ]]
+    [[ -d "$1" ]] && [[ -n "$(find "$1" -type f ! -iname '*.log' ! -iname '*.err' ! -iname '*.stderr' ! -iname '*.stdout' ! -iname '*.out' ! -name 'command*' -print -quit 2>/dev/null)" ]]
 }
 
 # --- crash-aware sample jobs ---------------------------------------------
@@ -146,14 +148,217 @@ warn_resource_oversubscription() {
 # stage has finished, in the caller-supplied deterministic order -- so the
 # merged file's row order matches today's sequential output exactly, whatever
 # order the parallel jobs actually completed in.
+# Every process gets its own temporary area (TMP_DIR/.run.XXXXXX, made on first use), so two runs that share TMP_DIR (two terminals, the window
+# beside a terminal, two non-study runs) can no longer wipe each other's shards (audit AU-001). It is removed when the process ends; a run killed with
+# SIGKILL leaves it behind and the next run reports and keeps it (recover_stale_run_dirs).
 shard_dir() {
     local stage_name="$1"
-    printf '%s/.shards.%s' "${TMP_DIR:-/tmp}" "$stage_name"
+    printf '%s/.shards.%s' "${RUN_TMP_DIR:-${TMP_DIR:-/tmp}}" "$stage_name"
 }
 
 reset_shard_dir() {
+    init_run_tmp
     local dir; dir="$(shard_dir "$1")"
     rm -rf "$dir"; mkdir -p "$dir"
+}
+
+# --- exit hooks, unique temp area, run lock, stage timing -------------------------------------------------------------
+_PLASBENCH_MAIN_PID="$BASHPID"
+_PLASBENCH_EXIT_HOOKS=()
+_PLASBENCH_EXIT_RC=0
+# on_exit_add FUNCTION: run FUNCTION (no arguments) when this script ends, however it ends (a subshell never runs them).
+_plasbench_run_exit_hooks() {
+    _PLASBENCH_EXIT_RC=$?
+    [[ "$BASHPID" == "$_PLASBENCH_MAIN_PID" ]] || return 0
+    trap - EXIT
+    local hook
+    for hook in "${_PLASBENCH_EXIT_HOOKS[@]}"; do "$hook" || true; done
+    return 0
+}
+on_exit_add() {
+    _PLASBENCH_EXIT_HOOKS+=("$1")
+    trap '_plasbench_run_exit_hooks' EXIT
+}
+
+init_run_tmp() {
+    [[ -n "${RUN_TMP_DIR:-}" && -d "${RUN_TMP_DIR:-}" && "${_RUN_TMP_OWNER:-}" == "$BASHPID" ]] && return 0
+    mkdir -p "${TMP_DIR:-/tmp}"
+    recover_stale_run_dirs
+    RUN_TMP_DIR="$(mktemp -d "${TMP_DIR:-/tmp}/.run.XXXXXX")"
+    _RUN_TMP_OWNER="$BASHPID"
+    printf '%s\n' "$$" > "$RUN_TMP_DIR/owner"
+    on_exit_add cleanup_run_tmp
+}
+
+cleanup_run_tmp() {
+    [[ "${_RUN_TMP_OWNER:-}" == "$BASHPID" && -n "${RUN_TMP_DIR:-}" ]] && rm -rf "$RUN_TMP_DIR"
+    return 0
+}
+
+# A run that was killed (SIGKILL, power loss) cannot clean up. Its temp area is moved to LOG_DIR/recovered_shards/ and reported, never silently
+# deleted: finished tools are reused through their .complete markers on the next run, and the shard rows show what the killed run had recorded.
+recover_stale_run_dirs() {
+    local d owner n dest
+    for d in "${TMP_DIR:-/tmp}"/.run.*; do
+        [[ -d "$d" ]] || continue
+        owner="$(cat "$d/owner" 2>/dev/null || true)"
+        if [[ "$owner" =~ ^[0-9]+$ ]] && kill -0 "$owner" 2>/dev/null; then continue; fi
+        n="$(find "$d" -name '*.tsv' 2>/dev/null | wc -l | tr -d ' ')"
+        dest="${LOG_DIR:-${TMP_DIR:-/tmp}}/recovered_shards"
+        mkdir -p "$dest" 2>/dev/null || true
+        if mv "$d" "$dest/$(basename "$d")" 2>/dev/null; then
+            warn "found the temporary results of a run that was killed (pid ${owner:-unknown}; ${n} unmerged status row file(s)); kept in $dest/$(basename "$d"). Tools it finished are reused through their .complete markers."
+        fi
+    done
+    return 0
+}
+
+_pid_alive() { [[ "${1:-}" =~ ^[0-9]+$ ]] && kill -0 "$1" 2>/dev/null; }
+# True when a process other than $2 (not a zombie) still belongs to process group $1.
+_pgroup_alive() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] || return 1
+    ps -eo pgid=,pid=,stat= 2>/dev/null | awk -v g="$1" -v me="${2:-0}" '$1 == g && $2 != me && $3 !~ /^Z/ { found = 1 } END { exit !found }'
+}
+
+# acquire_run_lock WHAT: one run at a time per results folder. The lock file RESULTS_DIR/.run.lock holds the pid, the start time and the process group
+# (when this run leads one: setsid, or the window's job runner). It refuses, with a message, while the pid or any member of the recorded group is alive,
+# and removes a stale lock (audit AU-001/AU-009). run_all.sh holds the lock for its stages and exports PLASBENCH_LOCK_PID, so they do not refuse themselves.
+# The check-then-remove-then-create sequence below runs inside a short mutex, the directory RESULTS_DIR/.run.lock.guard (mkdir is atomic): before it,
+# two starters that both saw the same stale lock could both delete it, and the second delete removed the first starter's fresh lock, so both ran
+# (AU-009). Residual limits: a guard left by a killed starter is reclaimed when its pid is dead (that reclaim is itself a small window); a guard
+# whose owner is alive is waited for up to ~10 s and then refused; the lock is still pid based, so pid reuse can refuse a start that was safe and
+# the pids of a WSL run are not visible to a Windows check (and the reverse); SIGKILL of the lock holder leaves the lock until the next start.
+# Heartbeat (AU-009 follow-up): the holder also touches RESULTS_DIR/.run.lock.heartbeat every PLASBENCH_LOCK_HEARTBEAT_SECONDS (default 5) from a small background
+# loop (its own session where setsid exists, so a killed run's group does not count it as a survivor; it ends when the holder's pid is gone or the file is
+# removed). A lock whose heartbeat file is older than PLASBENCH_LOCK_STALE_SECONDS (default 60) is stale EVEN WHEN ITS PID IS ALIVE: a pid that was reused by an
+# unrelated process after a SIGKILL or a reboot no longer blocks the next start, and neither does a holder that has been stopped for longer than the threshold.
+# Residual limits: a lock without a heartbeat file (written by an older version) is still judged by its pid alone; a holder that is merely suspended (SIGSTOP, a
+# laptop sleep, a machine too loaded to schedule the loop for the whole threshold) is declared stale and can be taken over while it still runs, which the
+# process-group check below only prevents for a holder that leads a group; a heartbeat younger than the threshold after a SIGKILL still refuses for up to that
+# long when the pid has been reused; the file clock is the local one, so a results folder on a network share with a skewed clock can misjudge; the WSL/Windows pid
+# difference above still applies.
+_lock_file_age() {   # seconds since the file was last modified; empty when it does not exist
+    local m
+    [[ -e "$1" ]] || return 0
+    m="$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true)"
+    [[ "$m" =~ ^[0-9]+$ ]] && echo $(( $(date +%s) - m ))
+    return 0
+}
+_lock_heartbeat_start() {
+    local hb="$1.heartbeat" interval="${PLASBENCH_LOCK_HEARTBEAT_SECONDS:-5}"
+    [[ "$interval" =~ ^[0-9]+([.][0-9]+)?$ ]] || interval=5
+    : > "$hb" 2>/dev/null || return 0
+    local loop='owner="$1"; hb="$2"; every="$3"; while kill -0 "$owner" 2>/dev/null && [[ -f "$hb" ]]; do sleep "$every"; [[ -f "$hb" ]] && touch "$hb" 2>/dev/null; done'
+    if command -v setsid >/dev/null 2>&1; then
+        setsid bash -c "$loop" _ "$$" "$hb" "$interval" >/dev/null 2>&1 < /dev/null &
+    else
+        bash -c "$loop" _ "$$" "$hb" "$interval" >/dev/null 2>&1 < /dev/null &
+    fi
+    disown 2>/dev/null || true
+}
+_lock_guard_enter() {
+    local guard="$1.guard" tries=0 owner
+    until mkdir "$guard" 2>/dev/null; do
+        owner="$(cat "$guard/pid" 2>/dev/null || true)"
+        if [[ -n "$owner" ]] && ! _pid_alive "$owner"; then rm -rf "$guard"; continue; fi
+        tries=$(( tries + 1 ))
+        if (( tries > 100 )); then
+            die "the run lock of $RESULTS_DIR is being changed by another start (guard $guard, pid ${owner:-unknown}) and did not free within 10 seconds; try again."
+        fi
+        sleep 0.1
+    done
+    printf '%s\n' "$$" > "$guard/pid"
+}
+
+_lock_guard_leave() {
+    local guard="${RESULTS_DIR:-/nonexistent}/.run.lock.guard"
+    [[ "$(cat "$guard/pid" 2>/dev/null || true)" == "$$" ]] && rm -rf "$guard"
+    return 0
+}
+
+acquire_run_lock() {
+    local what="$1" lock="${RESULTS_DIR:?}/.run.lock" holder_pid holder_pgid holder_start holder_what my_pgid hb_age stale_after
+    mkdir -p "$RESULTS_DIR"
+    if [[ -n "${PLASBENCH_LOCK_PID:-}" && -f "$lock" ]] && grep -qx "pid=$PLASBENCH_LOCK_PID" "$lock" && _pid_alive "$PLASBENCH_LOCK_PID"; then
+        return 0
+    fi
+    _lock_guard_enter "$lock"
+    on_exit_add _lock_guard_leave
+    if [[ -s "$lock" ]]; then
+        holder_pid="$(sed -n 's/^pid=//p' "$lock" | head -1)"
+        holder_pgid="$(sed -n 's/^pgid=//p' "$lock" | head -1)"
+        holder_start="$(sed -n 's/^started=//p' "$lock" | head -1)"
+        holder_what="$(sed -n 's/^what=//p' "$lock" | head -1)"
+        hb_age="$(_lock_file_age "$lock.heartbeat")"
+        stale_after="${PLASBENCH_LOCK_STALE_SECONDS:-60}"
+        [[ "$stale_after" =~ ^[0-9]+$ ]] || stale_after=60
+        if [[ "$holder_pid" != "$$" ]] && _pid_alive "$holder_pid" && [[ -n "$hb_age" ]] && (( hb_age > stale_after )); then
+            warn "the run lock in $RESULTS_DIR names pid $holder_pid, which is alive, but its heartbeat is ${hb_age} s old (limit ${stale_after} s): treating the lock as stale (the pid was probably reused by another program, or that run has been stopped)."
+        elif [[ "$holder_pid" != "$$" ]] && _pid_alive "$holder_pid"; then
+            _lock_guard_leave
+            die "another PlasBench run is already using $RESULTS_DIR (pid $holder_pid, ${holder_what:-unknown stage}, started ${holder_start:-unknown}). Wait for it, stop it, or give this run its own results folder (--results-dir or --study)."
+        fi
+        if _pgroup_alive "$holder_pgid" "$$"; then
+            _lock_guard_leave
+            die "a previous run in $RESULTS_DIR (pid ${holder_pid:-?}) is gone, but processes of its process group $holder_pgid are still running (a killed run leaves its tools behind). Stop them first (kill -- -$holder_pgid), then start again."
+        fi
+        warn "removing a stale run lock in $RESULTS_DIR (pid ${holder_pid:-unknown}, ${holder_what:-unknown stage}, started ${holder_start:-unknown}): that run is no longer alive."
+        rm -f "$lock" "$lock.heartbeat"
+    fi
+    my_pgid="$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ' || true)"
+    [[ "$my_pgid" == "$$" || ( -n "$my_pgid" && "${PLASBENCH_JOB_GROUP:-}" == "1" ) ]] || my_pgid=""
+    if ! ( set -o noclobber; printf 'pid=%s\npgid=%s\nstarted=%s\nwhat=%s\n' "$$" "$my_pgid" "$(date '+%Y-%m-%d %H:%M:%S')" "$what" > "$lock" ) 2>/dev/null; then
+        _lock_guard_leave
+        die "another PlasBench run took the lock on $RESULTS_DIR at the same moment ($(sed -n 's/^pid=//p' "$lock" 2>/dev/null | head -1)); start again when it has finished."
+    fi
+    _lock_heartbeat_start "$lock"
+    _lock_guard_leave
+    _RUN_LOCK_OWNER="$BASHPID"
+    export PLASBENCH_LOCK_PID="$$"
+    on_exit_add release_run_lock
+}
+
+release_run_lock() {
+    [[ "${_RUN_LOCK_OWNER:-}" == "$BASHPID" ]] && rm -f "${RESULTS_DIR:-/nonexistent}/.run.lock" "${RESULTS_DIR:-/nonexistent}/.run.lock.heartbeat"
+    return 0
+}
+
+# tool_timeout_notice: said once at the start of stage 4. No tool time limit is the confirmed default (a limit can score a slow tool zero), so a wedged tool can hold
+# a run for ever; this tells the user, and names the opt-in (AU-010). Silent when a limit is set.
+tool_timeout_notice() {
+    [[ -n "${TOOL_TIMEOUT_SECONDS:-}" ]] && return 0
+    log "NOTE: no tool time limit is set (TOOL_TIMEOUT_SECONDS is blank), so a tool that hangs will hold this run until you stop it. This is the default because a limit can score a slow but correct tool as failed. To guard against a stuck run set PLASBENCH_TOOL_TIMEOUT_PRESET=generous (two days per tool per isolate) or TOOL_TIMEOUT_SECONDS=<seconds>."
+}
+
+# stage_timing_begin STAGE: record how long this stage script ran into RESULTS_DIR/stage_timing.tsv when it ends (one row per stage, the latest run
+# replaces the earlier one), including a stage that failed (audit AU-033).
+stage_timing_begin() {
+    _STAGE_TIMING_ID="$1"; _STAGE_TIMING_START="$(date +%s)"
+    on_exit_add record_stage_timing
+}
+
+record_stage_timing() {
+    [[ -n "${_STAGE_TIMING_ID:-}" && -d "${RESULTS_DIR:-/nonexistent}" ]] || return 0
+    local file="$RESULTS_DIR/stage_timing.tsv" tmp end
+    tmp="$file.$$.tmp"; end="$(date +%s)"
+    {
+        printf 'stage\tstarted\tended\telapsed_seconds\texit_code\n'
+        if [[ -f "$file" ]]; then awk -F'\t' -v s="$_STAGE_TIMING_ID" 'NR > 1 && $1 != s' "$file"; fi
+        printf '%s\t%s\t%s\t%s\t%s\n' "$_STAGE_TIMING_ID" "$_STAGE_TIMING_START" "$end" "$(( end - _STAGE_TIMING_START ))" "$_PLASBENCH_EXIT_RC"
+    } > "$tmp" 2>/dev/null && mv -f "$tmp" "$file" 2>/dev/null
+    return 0
+}
+
+# check_free_disk DIR [MIN_GB]: warn (never stop) when the folder's drive has less than MIN_GB free (default MIN_FREE_DISK_GB, 20; 0 turns it off).
+check_free_disk() {
+    local dir="$1" min_gb="${2:-${MIN_FREE_DISK_GB:-20}}" kb
+    [[ "$min_gb" =~ ^[0-9]+$ && "$min_gb" -gt 0 ]] || return 0
+    kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }')"
+    [[ "$kb" =~ ^[0-9]+$ ]] || return 0
+    if (( kb / 1048576 < min_gb )); then
+        warn "only about $(( kb / 1048576 )) GB is free where $dir is (below the ${min_gb} GB threshold, MIN_FREE_DISK_GB): downloads and assemblies may fill the disk."
+    fi
+    return 0
 }
 
 # merge_shards STAGE_NAME OUT_FILE HEADER SHARD_FILE...
@@ -417,6 +622,48 @@ wait_online() {
     log "  internet is back: download resumed"
 }
 
+# download_pin LABEL URL: print the SHA-256 that config/download_checksums.tsv (override: PLASBENCH_DOWNLOAD_CHECKSUMS) pins for LABEL, or nothing.
+# A registry row applies to its own URL only (a custom URL gets no pin); a row with an empty url applies to any URL. Rows with status other than
+# "pinned", or a sha256 that is not 64 hex characters, give no pin (AU-026).
+download_pin() {
+    local label="$1" url="${2:-}" registry="${PLASBENCH_DOWNLOAD_CHECKSUMS:-${PROJECT_ROOT:-.}/config/download_checksums.tsv}"
+    [[ -f "$registry" ]] || return 0
+    awk -F'\t' -v label="$label" -v url="$url" '
+        NR > 1 && $1 == label && $5 == "pinned" && length($3) == 64 && $3 ~ /^[0-9A-Fa-f]+$/ && ($2 == "" || $2 == url) { print tolower($3); exit }' "$registry"
+}
+
+# verify_or_record_download FILE URL LABEL [EXPECTED_SHA256] [PROVENANCE_FILE]
+# Supply-chain check for a downloaded database or archive. Where a SHA-256 is configured, a mismatch fails (returns 1; the caller deletes the file).
+# EXPECTED_SHA256 defaults to the pin in config/download_checksums.tsv (see download_pin); PLASBENCH_REQUIRE_CHECKSUMS=1 refuses a download with no pin.
+# Where none is configured, the observed checksum is printed with an explicit notice and appended as one JSON line to PROVENANCE_FILE
+# (default: download_provenance.jsonl next to FILE), so the run can be traced to the exact bytes that were installed. Never fails on a missing pin.
+verify_or_record_download() {
+    local file="$1" url="$2" label="$3" want="${4:-}" prov="${5:-$(dirname "$1")/download_provenance.jsonl}" got verified=false
+    if have sha256sum; then got="$(sha256sum "$file" | awk '{print $1}')"
+    elif have shasum; then got="$(shasum -a 256 "$file" | awk '{print $1}')"
+    else got="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$file" 2>/dev/null || true)"; fi
+    [[ -n "$got" ]] || { warn "$label: no SHA-256 tool found; the download could not be checksummed"; return 0; }
+    [[ -n "$want" ]] || want="$(download_pin "$label" "$url")"
+    if [[ -z "$want" && "${PLASBENCH_REQUIRE_CHECKSUMS:-0}" == "1" ]]; then
+        warn "$label: no SHA-256 is pinned (environment variable or config/download_checksums.tsv) and PLASBENCH_REQUIRE_CHECKSUMS=1; refusing it. Observed SHA-256: $got"
+        return 1
+    fi
+    if [[ -n "$want" ]]; then
+        if [[ "$got" != "$(printf '%s' "$want" | tr 'A-F' 'a-f')" ]]; then
+            warn "$label: SHA-256 $got does not match the pinned $want"
+            return 1
+        fi
+        verified=true
+        log "$label: SHA-256 verified ($got)"
+    else
+        warn "NOTICE: no SHA-256 is pinned for the $label download, so it could not be verified. Observed SHA-256: $got (recorded in $prov). Pin it to make a later install fail on a changed file."
+    fi
+    mkdir -p "$(dirname "$prov")" 2>/dev/null || true
+    printf '{"label": "%s", "url": "%s", "file": "%s", "downloaded_utc": "%s", "sha256": "%s", "sha256_verified": %s}\n' \
+        "$label" "$url" "$(basename "$file")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$got" "$verified" >> "$prov" 2>/dev/null || true
+    return 0
+}
+
 # resumable_download URL DEST [EXPECTED_BYTES]
 # Downloads to DEST.part and keeps every byte already received: a dropped
 # connection, a closed laptop or a later re-run continues where it stopped
@@ -520,6 +767,7 @@ explain_exit() {
         0) echo "finished" ;;
         1) echo "a command reported an error" ;;
         2) echo "a command was given a wrong option or a missing file" ;;
+        4) echo "every tool run of stage 4 failed (nothing was produced to score)" ;;
         124) echo "a time limit was reached" ;;
         126) echo "a program could not be run (permissions)" ;;
         127) echo "a program was not found (not installed, or not on PATH)" ;;

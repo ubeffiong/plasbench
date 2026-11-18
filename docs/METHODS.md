@@ -464,8 +464,12 @@ one giant bin, or leaves plasmid sequence completely unassigned, is not
 automatically penalised by that alone. `score_bins.py` additionally computes
 **Normalized Mutual Information (NMI)** and **Variation of Information (VI)** over
 a deliberately wider, bp-weighted contingency table: every predicted bin as a row,
-every true plasmid as a column, plus two virtual categories — an
-`"__unassigned__"` row for true-plasmid bp no bin covers at all, and a
+every true plasmid as a column, plus two virtual categories — one
+**singleton cluster per unassigned true-plasmid base** (sequence no bin covers was
+placed with nothing; an earlier version pooled all such bases into one
+`"__unassigned__"` row, so a single wholly missed plasmid matched that row one to one and
+scored a perfect NMI, VI and ARI, corrected on 17 November 2026 and checked against a per-base
+brute force in `test_bin_clustering_missed.py`) — and a
 `"CHROMOSOME"` column for chromosome bp a bin wrongly claims. Chromosome bp no bin
 ever claims (the correct, desired outcome for most of a bacterial genome) is
 deliberately excluded, so the metric is not swamped by an enormous, uninteresting
@@ -564,6 +568,8 @@ the replicon and MOB callers ran according to `annotation_provenance.json`; othe
 result is `not_evaluated`. The audit never edits `truth.tsv` and never changes a score.
 
 `python/truth_marker_overlap.py` writes `benchmark.truth_marker_overlap.tsv`: for every tool that uses a reference database and every marker caller behind the truth labels (`config/truth_marker_databases.tsv`), whether the database is the same (`yes`), possibly overlapping in content (`possible`), not shared (`no`) or unknown. MOB-suite tools share the MOB-typing database with the truth evidence. It is a name-level screen, not a sequence-level proof (that is the database-leakage analysis).
+
+`python/truth_exclusion_sensitivity.py` writes `benchmark.truth_exclusion_sensitivity.tsv` (stage 6, after rank sensitivity; also shown in the report's Truth labels tab): the mean base-level F1 of every tool under the NCBI labels (no exclusion, the pre-registered primary) and under the evidence labels (marker-free plasmids and other ambiguous replicons excluded), the rank change, whether the top tool changes, and the mean change for tools that share a database with the truth markers against those that do not. This answers whether the replicon-database exclusion favours replicon-based tools by construction. It covers base-level F1 only; the reconstruction headlines are not re-scored under another truth. Advisory: it never changes a score or a rank.
 
 ```bash
 python3 python/stratify_recovery.py --results-dir results --data-dir data \
@@ -1053,7 +1059,7 @@ binning recall and F1 against that reachable length, so a tool is not penalised 
 contains.
 
 **ARI.** A base-pair-weighted Adjusted Rand Index over the same contingency table as NMI: bins plus
-unassigned plasmid bases as rows, truth plasmids plus wrongly claimed chromosome as columns, and each
+unassigned plasmid bases (each a singleton cluster) as rows, truth plasmids plus wrongly claimed chromosome as columns, and each
 base as one item. It is descriptive and never ranks tools.
 
 **Micro versus macro.** Ranking scores and `mean_*` columns are macro averages: per isolate, then
@@ -1121,7 +1127,7 @@ Cohen's kappa and both scorers' length-weighted F1 and MCC; "agree" when both di
 **Outcome states** (`04_run_tools.sh`, `aggregate_results.py`). completed, reused, failed (tool),
 failed (resource: exit 124/137), infrastructure failure (exit 125/126/127, or a full disk in the log:
 never scored), not applicable (skipped). `TOOL_RETRIES` automatic retries (not for 124/137);
-`TOOL_TIMEOUT_SECONDS` the same budget for all tools. `tool_outcomes.tsv` carries `exit_code`,
+`TOOL_TIMEOUT_SECONDS` the same budget for all tools (blank by default, with a notice at the start of stage 4; the opt-in `PLASBENCH_TOOL_TIMEOUT_PRESET=generous` sets 172800 s). `tool_outcomes.tsv` carries `exit_code`,
 `failure_class` and `attempts`; `tool_status.tsv` keeps its fixed schema.
 
 **Paired tests.** Beside the sign-flip permutation test: the Wilcoxon signed-rank p-value (zeros

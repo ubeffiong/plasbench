@@ -2,13 +2,14 @@
 """Validate source-backed structural evidence without inferring biological closure."""
 import argparse, csv, json
 from pathlib import Path
+from plasbench_common import iter_fasta  # noqa: E402
 
 REQUIRED = {"record_id", "evidence_type", "evidence_value", "evidence_source", "evidence_version"}
 ALLOWED = {"closure", "replicon", "mob", "amr_context", "ml_probability"}
 CLOSURE_SOURCES = {"long_read", "hybrid_assembly", "assembly_graph"}
 
 def fasta_ids(path):
-    return {line[1:].strip().split()[0] for line in path.read_text(encoding="utf-8").splitlines() if line.startswith(">")}
+    return {name for name, _, _ in iter_fasta(path) if name}  # shared reader (AU-021)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

@@ -31,6 +31,8 @@ import threading
 import time
 from pathlib import Path, PureWindowsPath
 
+from .sessionlog import redact_command
+
 MAX_OUTPUT = 200_000
 DEFAULT_TIMEOUT = 600
 MAX_COMMAND = 8_000
@@ -80,10 +82,6 @@ def wsl_distros() -> list:
     out.sort(key=lambda d: not d["default"])
     _wsl_cache.update(at=now, list=out)
     return out
-
-
-def wsl_available() -> bool:
-    return bool(wsl_distros())
 
 
 def git_for_windows_bash():
@@ -349,7 +347,7 @@ class Terminal:
         if self.on_record:
             try:
                 self.on_record({"shell": self.shell, "shell_label": shell_label(self.shell), "cwd": str(self.cwd),
-                                "command": command[:2000], "exit": code, "seconds": seconds})
+                                "command": redact_command(command[:2000]), "exit": code, "seconds": seconds})
             except Exception:  # noqa: BLE001 - the record never stops a command
                 pass
         self.history.append(command)
@@ -358,7 +356,7 @@ class Terminal:
             self.history_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.history_file, "a", encoding="utf-8") as handle:
                 handle.write(json.dumps({"when": time.strftime("%Y-%m-%d %H:%M:%S"), "shell": self.shell,
-                                         "cwd": str(self.cwd), "command": command[:2000], "exit": code,
+                                         "cwd": str(self.cwd), "command": redact_command(command[:2000]), "exit": code,
                                          "seconds": seconds}) + "\n")
         except OSError:
             pass

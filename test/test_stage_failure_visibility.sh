@@ -64,7 +64,8 @@ echo "ALLOW_CRASHED_SAMPLE_JOBS=1 continues with a warning -> PASS"
 T2="$TMP/p2"; make_project "$T2"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$T2/bin/mob_recon"; chmod +x "$T2/bin/mob_recon"
 rc="$(stage4 "$T2")"
-[[ "$rc" == "0" ]] || { echo "FAIL: a tool failure is recorded, it must not stop the stage (exit $rc)" >&2; tail -5 "$T2/stage.log" >&2; exit 1; }
+# The only tool failed on every sample: the stage now says so with its own exit code 4 (AU-011) after recording the rows; ALLOW_ALL_TOOLS_FAILED=1 continues.
+[[ "$rc" == "4" ]] || { echo "FAIL: every tool failed, stage 4 must exit 4 (exit $rc)" >&2; tail -5 "$T2/stage.log" >&2; exit 1; }
 [[ "$(status_of "$T2" s1 mob_recon)" == "failed" ]] || { echo "FAIL: a tool that wrote nothing must be 'failed'" >&2; cat "$T2/results/tool_status.tsv" >&2; exit 1; }
 echo "a tool that exits 0 and writes nothing is recorded as failed -> PASS"
 [[ ! -e "$T2/results/s1/pred_mob_recon.plasmid.fasta" ]] || { echo "FAIL: no prediction file may be left behind for a failed run" >&2; exit 1; }

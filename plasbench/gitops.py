@@ -127,6 +127,8 @@ SECRET_PATTERNS = [
     (re.compile(r"(^|/)config/local\.env$"), "this computer's PlasBench settings (holds the NCBI API key)"),
     (re.compile(r"(^|/)\.ncbi\.env$"), "NCBI credentials"),
     (re.compile(r"(^|/)(id_rsa|id_ed25519|credentials)", re.I), "credentials file"),
+    (re.compile(r"(^|/)config\.local(\.[^/]*)?$|(^|/)[^/]*\.local\.env$|(^|/)\.netrc$|(^|/)secrets?\.(ya?ml|json|toml|ini|cfg|env)$", re.I),
+     "local settings or secrets file"),
     (re.compile(r"\.(exe|dll)$", re.I), "Windows binary (not source code)"),
 ]
 SECRET_CONTENT = [
@@ -137,6 +139,22 @@ SECRET_CONTENT = [
     (re.compile(r"(?i)NCBI_API_KEY\s*=\s*['\"]?[0-9a-f]{30,}"), "NCBI API key"),
     (re.compile(r"(?i)(access[_-]?token|api[_-]?key|secret)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{24,}"), "access token or key"),
 ]
+# A credential assigned a literal in any text file (.cfg, .yml, config.local, ...): NAME = value, NAME: value, "name": "value".
+# A quoted literal of 6+ characters, or an unquoted one of 8+ characters with a digit; placeholders and references are not flagged.
+CREDENTIAL_ASSIGNMENT = re.compile(
+    r"""(?im)(?:^|[\s,{;"'])[A-Za-z0-9_.-]*(?:passw(?:or)?d|passwd|pwd|token|secret|api[_-]?key|apikey|access[_-]?key)["']?[ \t]*[:=][ \t]*"""
+    r"""(?:"(?P<dq>[^"\r\n]{6,})"|'(?P<sq>[^'\r\n]{6,})'|(?P<bare>(?=[^\s"'#;,]*\d)[^\s"'#;,$<>{}()\[\]]{8,}))""")
+PLACEHOLDER = re.compile(r"(?i)^(your|my|the|some|example|sample|dummy|placeholder|changeme|change[_-]?me|xxx|\*+|<|\$|\{|%|none$|null$|true$|false$|"
+                         r"os\.|env|getenv|input|prompt|read|get|args\.|self\.|config|settings|\.\.\.|redacted|hidden|secret$|token$|password$)")
+SCAN_MAX = 5 * 2**20      # text files up to this size are scanned for credentials (larger ones are data, not configuration)
+
+
+def credential_in(text: str) -> bool:
+    for m in CREDENTIAL_ASSIGNMENT.finditer(text):
+        value = m.group("dq") or m.group("sq") or m.group("bare") or ""
+        if not PLACEHOLDER.match(value.strip()) and not re.fullmatch(r"[A-Za-z_.]+", value):
+            return True
+    return False
 # Isolate metadata can carry patient information (clinical isolates): direct identifier columns block a commit.
 IDENTIFIER_CONTENT = [
     (re.compile(r"(?im)^.*\b(patient[_ ]?name|full[_ ]?name|surname|first[_ ]?name|date[_ ]?of[_ ]?birth|"
@@ -637,19 +655,27 @@ def scan_staged(repo) -> list[dict]:
             findings.append({"path": rel, "level": "block", "kind": "size", "why": f"{size / 2**20:.0f} MB: over GitHub's 100 MB limit (cannot be overridden)"})
         elif size > WARN_FILE:
             findings.append({"path": rel, "level": "warn", "kind": "size", "why": f"{size / 2**20:.0f} MB is large for a source repository"})
-        if size <= 1_000_000 and f.suffix.lower() in (".py", ".md", ".txt", ".json", ".yml", ".yaml", ".toml", ".cfg", ".ini", ".sh", ".ps1", ".nf", ".html", ".js", ".csv", ".tsv", ".env", ""):
+        if size <= SCAN_MAX:     # every text file under the cap (suffix does not matter: .cfg, .local, no suffix)
             try:
-                text = f.read_text(encoding="utf-8", errors="ignore")
+                raw = f.read_bytes()
             except OSError:
                 continue
+            if b"\0" in raw[:8192]:
+                continue         # binary
+            text = raw.decode("utf-8", errors="ignore")
             hit = False
             for pat, why in SECRET_CONTENT:
                 if pat.search(text):
                     findings.append({"path": rel, "level": "block", "kind": "secret", "why": f"looks like it contains a {why}"})
                     hit = True
                     break
+            if not hit and credential_in(text):
+                findings.append({"path": rel, "level": "block", "kind": "secret", "why": "looks like it contains a password, token or key assigned in plain text"})
+                hit = True
             if hit:
                 continue
+            if size > 1_000_000 or f.suffix.lower() not in (".py", ".md", ".txt", ".json", ".yml", ".yaml", ".toml", ".cfg", ".ini", ".sh", ".ps1", ".nf", ".html", ".js", ".csv", ".tsv", ".env", ""):
+                continue         # the patient-identifier scan keeps its narrower scope
             for pat, why in IDENTIFIER_CONTENT:
                 if pat.search(text):
                     findings.append({"path": rel, "level": "block", "kind": "patient_data",

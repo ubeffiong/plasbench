@@ -21,6 +21,7 @@ import subprocess
 import sys
 import urllib.request
 import zlib
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TAB, NL = chr(9), chr(10)
@@ -67,7 +68,7 @@ def pilot_one(row, out_dir, pairs, nbytes):
             handle.write("".join(NL.join(r) + NL for r in records))
     qc = os.path.join(out_dir, run + ".qc.tsv")
     done = subprocess.run([sys.executable, os.path.join(HERE, "short_read_qc.py"), "qc", "--sample", row["sample_id"], "--r1", r1, "--r2", r2, "--out", qc,
-                           "--max-pairs", str(n)], capture_output=True, text=True)
+                           "--max-pairs", str(n)], capture_output=True, text=True, timeout=subprocess_timeout())
     for path in (r1, r2):
         os.remove(path)
     if done.returncode != 0 or not os.path.exists(qc):

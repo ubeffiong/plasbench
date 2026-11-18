@@ -34,7 +34,7 @@ FIELDS = ["sample", "sequence_id", "length", "tools", "database", "best_record",
           "in_database"]
 
 
-from plasbench_common import iter_fasta  # noqa: E402
+from plasbench_common import iter_fasta, subprocess_timeout  # noqa: E402
 
 
 def read_fasta(path, wanted=None):
@@ -59,7 +59,7 @@ def merged_length(intervals):
 def containment(query_fasta, database_fasta, threads, preset="asm5"):
     """query -> (best_record, coverage, identity) over alignments to each record."""
     result = subprocess.run(["minimap2", "-c", "-x", preset, "-t", str(threads), database_fasta, query_fasta],
-                            text=True, capture_output=True)
+                            text=True, capture_output=True, timeout=subprocess_timeout())
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip()[:300])
     per_pair = defaultdict(lambda: {"q": [], "matches": 0, "block": 0, "qlen": 0})

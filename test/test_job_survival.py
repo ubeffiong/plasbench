@@ -16,6 +16,7 @@ Jobs object over the same folder:
 """
 import json
 import os
+import signal
 import sys
 import tempfile
 import time
@@ -84,6 +85,7 @@ def main():
     fourth.answer(ask["id"], "yes")
     check("the answer reaches the command and is logged as [you]", wait(lambda: fourth.jobs[ask["id"]]["state"] == "done") and "got yes" in fourth.get(ask["id"])["log"]
           and "[you] yes" in fourth.get(ask["id"])["log"], fourth.get(ask["id"])["log"][-200:])
+    time.sleep(2)   # fourth saves the shared job index just after it sees its job finish; let that write land before first adds the next job, or it can overwrite it
     secret = launch(first, "answer = input('Key? ')\nprint('len', len(answer), flush=True)", label="secret")
     wait(lambda: "Key?" in first.get(secret["id"])["log"])
     server().answer(secret["id"], "hunter2", secret=True)
@@ -99,7 +101,19 @@ def main():
     print("a run whose runner vanished")
     lost = launch(first, "import time\nprint('x', flush=True)\ntime.sleep(120)", label="lost run", argv=("demo", "--help"))
     wait(lambda: "x" in first.get(lost["id"])["log"])
-    first._kill(lost["id"], first.jobs[lost["id"]])   # the machine went away: no exit is recorded
+    # The machine went away: the runner is killed outright (SIGKILL cannot be caught), so no exit is recorded. _kill() is a cancel (it stops the command's group too and the
+    # runner records the stop), which is not this situation.
+    runner = 0
+    for _ in range(100):   # the runner's pid file can lag the log; never signal pid 0 or 1 (os.kill(0, ...) would hit this whole process group)
+        runner = int((jobrunner.read_json(first._paths(lost["id"])["pid"]) or {}).get("runner") or first.jobs[lost["id"]].get("pid") or 0)
+        if runner > 1:
+            break
+        time.sleep(0.1)
+    assert runner > 1, "no runner pid recorded for the lost run"
+    if os.name == "nt":
+        first._kill(lost["id"], first.jobs[lost["id"]])
+    else:
+        os.kill(runner, signal.SIGKILL)
     wait(lambda: not jobrunner.is_alive(str(first.dir), lost["id"]) or (time.time() - os.path.getmtime(str(Path(first.dir) / f"{lost['id']}.alive"))) > jobrunner.STALE_SECONDS, 60)
     time.sleep(jobrunner.STALE_SECONDS + 1)
     sixth = server()

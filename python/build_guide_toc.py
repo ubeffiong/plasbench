@@ -66,11 +66,6 @@ def render_toc(markdown):
     return "\n".join(lines)
 
 
-def current_block(markdown):
-    match = re.search(re.escape(OPEN) + r"\n(.*?)\n" + re.escape(CLOSE), markdown, re.S)
-    return match.group(1) if match else None
-
-
 def with_toc(markdown):
     """The guide with its contents list regenerated (markers added if absent)."""
     # The contents must not list itself, so build it from the document without a block.

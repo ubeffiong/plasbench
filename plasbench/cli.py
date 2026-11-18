@@ -251,6 +251,7 @@ ANALYSES = {
     "simulate-validation": ("simulate_validation.py", "Check by simulation that the intervals and tests are calibrated (smoke or full)"),
     "characterise-dataset": ("characterise_dataset.py", "One table of every isolate's characteristics, each marked knowable without a reference or not"),
     "truth-marker-overlap": ("truth_marker_overlap.py", "Which tools share a database with the truth's marker evidence"),
+    "truth-exclusion-sensitivity": ("truth_exclusion_sensitivity.py", "The headline F1 with and without the evidence-based truth exclusion"),
     "database-provenance": ("database_provenance.py", "Tool and database provenance table (collect), or the checksum of a database (checksum PATH)"),
 }
 

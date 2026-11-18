@@ -36,7 +36,7 @@ printf '@r1\nACGT\n+\nIIII\n' | gzip > "$TMP/data/s1/SRR1_2.trim.fastq.gz"
 printf 'sample_id\tassembly_accession\tsra_run\ns1\tNA\tSRR1\n' > "$TMP/config/accessions.tsv"
 
 export DATA_DIR="$TMP/data" RESULTS_DIR="$TMP/results" LOG_DIR="$TMP/logs" SAMPLE_SHEET="$TMP/config/accessions.tsv"
-export REQUIRE_CURATED_METADATA=0
+export REQUIRE_CURATED_METADATA=0 PLATON_DB="$TMP"   # the stage-4 database pre-flight needs a database directory
 PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/04_run_tools.sh" > "$TMP/stage.log" 2>&1 || {
     echo "FAIL: stage 4 must finish even when tools fail" >&2; tail -20 "$TMP/stage.log" >&2; exit 1; }
 

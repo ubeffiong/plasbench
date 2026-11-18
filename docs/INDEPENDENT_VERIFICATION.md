@@ -143,7 +143,7 @@ From a delegated read of `test/`, the workflows and `run_tests.sh`; items marked
 
 - **Modules:** 171 of 174 `python/*.py` files are reachable from a stage script, the CLI or another reachable module. Three are hand-run maintenance tools (`build_guide_toc`, `build_implementation_catalogue`, `build_publication_cohort_candidates`) named only in the catalogue (Read, delegated). Nine more are loaded dynamically (`report_fig_*`, `report_collapse`).
 - **Tools:** 22 of 27 registered tools have an adapter or builtin and an installer row; 5 are demo-only synthetic tools. Wiring was read, not executed. Several tools are `automated=planned`.
-- **CLI:** 58 subcommands, `--help` exits 0 for all of them; one documented command is wrong (N7); 3 subcommands are in no document.
+- **CLI:** 54 subcommands, `--help` exits 0 for all of them; one documented command is wrong (N7); 3 subcommands are in no document.
 - **Report:** the registry lists 201 outputs, none marked not surfaced; two registered sections (`learn-refaudit`, `learn-stability`) appear only when their inputs exist.
 - **Not found:** duplicate scoring implementations. Not searched exhaustively.
 

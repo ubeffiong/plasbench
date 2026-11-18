@@ -86,7 +86,8 @@ LEADERBOARD_COLUMN_GROUPS = {
     "Rank and basis": [
         "rank", "analysis_track", "task", "tool", "is_baseline", "beats_best_baseline", "ranking_metric", "ranking_score",
         "ranking_ci_low", "ranking_ci_high", "ranking_basis", "ranking_species_basis", "n_headline_species", "n_ranking_clusters",
-        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population", "ci_method", "max_cluster_share", "dominant_study"],
+        "significant_vs_runner_up", "n_independent_clusters", "n_ranking_samples", "primary_status", "population", "ci_method", "max_cluster_share", "dominant_study",
+        "n_shared_samples", "ranking_warning", "shared_set_shrunk_by"],
     "Predicted-sequence burden": [
         "total_predicted_bp", "total_unmapped_pred_bp", "total_off_truth_pred_bp", "total_ambiguous_pred_bp", "unmapped_fraction", "off_truth_fraction",
         "ambiguous_fraction", "precision_gap"],
@@ -264,6 +265,7 @@ def _file_entries():
         S("score_failures.tsv", ag, "Runs that could not be scored", "05_score.sh", "outcome-states", "shown", "Listed with the reason.", expected=False),
         S("tool_status.tsv", ag, "How each run ended", "04_run_tools.sh", "outcome-states", "shown", "Every run's status and reason.", expected=True),
         S("tool_outcomes.tsv", ag, "Outcome of each tool run", "aggregate_results.py", "outcome-states", "partly", "Folded into outcome states."),
+        S("benchmark.input_fingerprint.json", ag, "Input fingerprint", "aggregate_results.py", "leaderboard", "partly", "Which score table and tool set the leaderboard was ranked from; the report refuses a leaderboard paired with different scores.", expected=True),
         S("benchmark.input_consistency.tsv", ag, "Run tables that disagree", "run_consistency.py", "leaderboard", "partly", "Empty when the tables agree; otherwise a banner above the ranking and this list.", expected=True),
         S("assembly_status.tsv", ag, "How each assembly ended", "03_assemble.sh", "health", "partly", "Failures are counted in the health summary."),
         S("download_status.tsv", ag, "How each download ended", "01_download.sh", "health", "partly", "Failures are counted in the health summary."),
@@ -303,6 +305,7 @@ def _file_entries():
         S("benchmark.recovery_by_replicon.tsv", ag, "Recovery by replicon type", "stratify_recovery.py", "replicon-recovery", "shown", "Table."),
         S("benchmark.truth_label_audit.tsv", ag, "Truth-label audit", "audit_truth_labels.py", "truth-label-audit", "shown", "Table."),
         S("benchmark.truth_marker_overlap.tsv", ag, "Truth-marker databases shared with tools", "truth_marker_overlap.py", "truth-label-audit", "shown", "Table."),
+        S("benchmark.truth_exclusion_sensitivity.tsv", ag, "Headline with and without the truth exclusion", "truth_exclusion_sensitivity.py", "truth-label-audit", "shown", "Table."),
         S("benchmark.truth_provenance.tsv", ag, "Truth provenance", "truth_provenance.py", "headline-design", "shown", "Tier shown with the design."),
         S("benchmark.stratified.tsv", ag, "Performance by stratum", "select_operational_method.py", "stratified", "shown", "Table."),
         S("benchmark.recommendations.tsv", ag, "Recommendations", "select_operational_method.py", "recommendations", "shown", "Table."),

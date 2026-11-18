@@ -15,17 +15,10 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
-from plasbench_common import TOOL_DISPLAY_NAMES, display_tool_name  # noqa: E402,F401
+from plasbench_common import TOOL_DISPLAY_NAMES, display_tool_name, read_tsv, paf_identity  # noqa: E402,F401
 
 
 STATUSES = ["completed", "reused", "warning", "failed", "skipped"]
-
-
-def read_tsv(path):
-    if not Path(path).is_file():
-        return []
-    with open(path, newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle, delimiter="\t"))
 
 
 def number(value, scale=1.0):
@@ -204,7 +197,7 @@ def contig_rows(payload, tool, plasmid):
             # Named apart from the record-level percentage above: reusing that
             # name overwrote it, and every record then reported its last block's
             # identity fraction as if it were the record's percentage.
-            block_identity = block["matches"] / block["block_length"] if block["block_length"] else 1.0
+            block_identity = paf_identity(block["matches"], block["block_length"])
             # Most specific evidence first. "ambiguous" must precede "wrong_plasmid":
             # a record reaching several other targets cannot be assigned to one.
             if any(s[0] < span[1] and span[0] < s[1] for s in seen_spans):

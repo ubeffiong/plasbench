@@ -15,7 +15,7 @@ import gzip
 import shutil
 import subprocess
 from pathlib import Path
-from plasbench_common import link_or_copy  # noqa: E402
+from plasbench_common import link_or_copy, subprocess_timeout, watchdog  # noqa: E402
 
 
 def rows(path):
@@ -105,9 +105,17 @@ def main():
                     [args.filtlong, "--min_length", str(min_length), "--min_mean_q", str(min_mean_q), str(long_reads)],
                     stdout=subprocess.PIPE,
                 )
-                gzip_result = subprocess.run(["gzip", "-c"], stdin=filtlong.stdout, stdout=handle, check=False)
-                filtlong.stdout.close()
-                filtlong_result = filtlong.wait()
+                with watchdog(filtlong) as guard:
+                    try:
+                        gzip_result = subprocess.run(["gzip", "-c"], stdin=filtlong.stdout, stdout=handle, check=False, timeout=subprocess_timeout())
+                    except subprocess.TimeoutExpired:
+                        filtlong.kill()
+                        raise SystemExit(f"ERROR: filtering timed out for {sample} at {label} (PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS)")
+                    filtlong.stdout.close()
+                    filtlong_result = filtlong.wait()
+            if guard.fired:
+                target_reads.unlink(missing_ok=True)
+                raise SystemExit(f"ERROR: filtlong timed out for {sample} at {label} (PLASBENCH_SUBPROCESS_TIMEOUT_SECONDS)")
             if filtlong_result or gzip_result.returncode:
                 target_reads.unlink(missing_ok=True)
                 raise SystemExit(f"ERROR: filtering failed for {sample} at {label}")

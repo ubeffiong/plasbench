@@ -39,7 +39,7 @@ import os
 import re
 import sys
 from collections import defaultdict
-from plasbench_common import merge_intervals as merge  # noqa: E402
+from plasbench_common import merge_intervals as merge, iter_paf, paf_identity  # noqa: E402
 from plasbench_common import read_plasmid_lengths as read_truth  # noqa: E402
 
 CIGAR_OP = re.compile(r"(\d+)([MIDNSHP=X])")
@@ -83,42 +83,36 @@ def analyse(truth, paf, min_length, min_identity, min_mapq, min_qcov):
     covered = defaultdict(list)
     n_blocks = n_nocigar = 0
     aligned = inserted = deleted = mismatches = 0
-    with open(paf, encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            f = line.rstrip("\n").split("\t")
-            if len(f) < 12 or "tp:A:S" in f[12:]:
-                continue
-            try:
-                qlen, qstart, qend = int(f[1]), int(f[2]), int(f[3])
-                tname, tlen, tstart, tend = f[5], int(f[6]), int(f[7]), int(f[8])
-                matches, block, mapq = int(f[9]), int(f[10]), int(f[11])
-            except ValueError:
-                continue
-            identity = matches / block if block else 0.0
-            qcov = abs(qend - qstart) / qlen if qlen else 0.0
-            if block < min_length or identity < min_identity or mapq < min_mapq or qcov < min_qcov:
-                continue
-            if tname not in plasmids:
-                continue
-            tstart, tend = max(0, min(tstart, tend)), min(tlen, max(tstart, tend))
-            covered[tname].append((tstart, tend))
-            n_blocks += 1
-            tags = {t[:2]: t[5:] for t in f[12:] if len(t) > 5 and t[2] == ":"}
-            cigar = tags.get("cg")
-            if not cigar:
-                n_nocigar += 1
-                continue
-            nm = int(tags["NM"]) if tags.get("NM", "").isdigit() else None
-            a, i, d, mm = decode_cigar(cigar, nm)
-            if mm is None:
-                n_nocigar += 1
-                continue
-            aligned += a
-            inserted += i
-            deleted += d
-            mismatches += mm
+    # Shared reader (AU-021): a malformed row is dropped, counted and warned about once.
+    for row in iter_paf(paf, label="alignment-accuracy PAF"):
+        if "tp:A:S" in row["tags"]:
+            continue
+        qlen, qstart, qend = row["qlen"], row["qstart"], row["qend"]
+        tname, tlen, tstart, tend = row["tname"], row["tlen"], row["tstart"], row["tend"]
+        matches, block, mapq = row["matches"], row["block_length"], row["mapq"]
+        identity = paf_identity(matches, block)
+        qcov = abs(qend - qstart) / qlen if qlen else 0.0
+        if block < min_length or identity < min_identity or mapq < min_mapq or qcov < min_qcov:
+            continue
+        if tname not in plasmids:
+            continue
+        tstart, tend = max(0, min(tstart, tend)), min(tlen, max(tstart, tend))
+        covered[tname].append((tstart, tend))
+        n_blocks += 1
+        tags = {t[:2]: t[5:] for t in row["tags"] if len(t) > 5 and t[2] == ":"}
+        cigar = tags.get("cg")
+        if not cigar:
+            n_nocigar += 1
+            continue
+        nm = int(tags["NM"]) if tags.get("NM", "").isdigit() else None
+        a, i, d, mm = decode_cigar(cigar, nm)
+        if mm is None:
+            n_nocigar += 1
+            continue
+        aligned += a
+        inserted += i
+        deleted += d
+        mismatches += mm
     columns = aligned + inserted + deleted
     summary = {"n_blocks": n_blocks, "n_blocks_without_cigar": n_nocigar, "aligned_columns": columns,
                "mismatch_bp": mismatches, "inserted_bp": inserted, "deleted_bp": deleted}

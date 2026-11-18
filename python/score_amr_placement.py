@@ -76,6 +76,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import score_bins  # noqa: E402
+from plasbench_common import read_tsv  # noqa: E402
 import score_plasmids as sp  # noqa: E402
 import tool_capabilities as tc  # noqa: E402
 
@@ -86,13 +87,6 @@ SUMMARY_FIELDS = ["tool", "gene_class", "n_gene_copies", "n_recovered", "n_corre
                   "n_shared_contig", "n_unassigned_contig", "correct_plasmid_rate", "replicon_type_correct_rate",
                   "n_samples", "n_amr_plasmids", "amr_complete_rate", "amr_prr", "n_pairs", "n_colocalised_pairs", "colocalisation_rate", "flank_context_rate", "draft_truth_copies", "evaluation_task", "attribution_mode"]
 DEFAULT_CLASSES = Path(__file__).resolve().parents[1] / "config" / "amr_gene_classes.tsv"
-
-
-def read_tsv(path):
-    if not path or not os.path.isfile(path) or not os.path.getsize(path):
-        return []
-    with open(path, newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle, delimiter="\t"))
 
 
 FLANK_BP = int(os.environ.get("AMR_FLANK_BP", 1000))
@@ -178,6 +172,8 @@ def cmd_score(args):
         if target not in plasmids:
             continue
         for query, start, end in intervals:
+            if membership and query not in membership:
+                continue   # a record in no bin is unassigned, not a one-contig bin of its own (audit AU-004)
             overlaps[(membership.get(query, query), target)] += max(0, end - start)
     # bin_matching: a binner with bins, matched one-to-one. contig_attribution: a classifier or reassembler (or a binner that wrote no bins): each record is attributed to the truth sequence
     # (plasmid or chromosome) it aligns to most, many records may share one plasmid, and a record that is mostly chromosome is wrong for a plasmid gene.
@@ -195,8 +191,11 @@ def cmd_score(args):
         sid, start, end = row["sequence_id"], int(row["start"]), int(row["end"])
         length = max(1, end - start)
         best, best_bp = "", 0
+        per_query = defaultdict(list)
         for query, qs, qe in covered_by_query.get(sid, []):
-            bp = max(0, min(end, qe) - max(start, qs))
+            per_query[query].append((qs, qe))
+        for query, spans in per_query.items():   # a record's own alignments to the gene are united, so one record covering it in two blocks is one record
+            bp = covered_bp(spans, start, end)
             if bp > best_bp:
                 best, best_bp = query, bp
         record = {"sample": args.sample, "tool": args.tool, "copy_id": row.get("copy_id", ""),
@@ -205,12 +204,19 @@ def cmd_score(args):
                   "matched_plasmid": "", "placement": "not_recovered", "replicon_type_correct": "", "flank_covered": "",
                   "plasmid_cprr_correct": cprr.get(sid, ""), "plasmid_cprr_correct_no_identity": cprr_no_identity.get(sid, ""),
                   "truth_evidence_tier": (row.get("evidence_tier") or "").strip(), "evaluation_task": task, "attribution": attribution, "attribution_mode": mode}
-        if best and best_bp / length >= args.min_gene_coverage:
+        # Recovery is the union of every record's alignment, exactly as score_plasmids.py counts amr_gene_recall (audit AU-047): a gene split 0-48 + 52-100 is recovered
+        # in both. A gene no single record covers is recovered but cannot be placed on one record or bin, so it is reported as unassigned_contig.
+        union_bp = covered_bp([(qs, qe) for _q, qs, qe in covered_by_query.get(sid, [])], start, end)
+        if best and union_bp / length >= args.min_gene_coverage:
+            split = best_bp / length < args.min_gene_coverage
             # contig_attribution: the record is attributed on its own; there is no bin, so no co-localisation claim
-            bin_id = membership.get(best, best) if mode == "bin_matching" else ""
-            target = matched.get(bin_id if mode == "bin_matching" else best, "")
+            unbinned = (mode == "bin_matching" and best not in membership) or split
+            bin_id = membership.get(best, "") if mode == "bin_matching" and not split else ""
+            target = "" if unbinned else matched.get(bin_id if mode == "bin_matching" else best, "")
             label = labels.get(best, "")
-            if label == "AMBIGUOUS":
+            if unbinned:
+                placement = "unassigned_contig"   # the binner left this record out of every bin: the gene was not placed (audit AU-004)
+            elif label == "AMBIGUOUS":
                 placement = "shared_contig"
             elif label == "UNPLACED":
                 placement = "unassigned_contig"

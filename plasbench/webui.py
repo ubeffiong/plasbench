@@ -55,6 +55,9 @@ SERVABLE = {".html": "text/html; charset=utf-8", ".pdf": "application/pdf", ".ts
             ".fasta": "text/plain; charset=utf-8", ".fa": "text/plain; charset=utf-8", ".gz": "application/gzip",
             ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".zip": "application/zip"}
 MAX_LOG_CHUNK = 256 * 1024
+REPORT_CSP = ("default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; "
+              "font-src data:; form-action 'none'; frame-ancestors 'self'; "
+              "sandbox allow-scripts allow-downloads allow-popups allow-popups-to-escape-sandbox")
 
 
 # --------------------------------------------------------------------------------------------- project facts
@@ -167,6 +170,10 @@ class Project:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as _fh:
             _fh.write("\n".join(kept) + "\n")
+        try:
+            os.chmod(path, 0o600)     # holds the NCBI key: owner only (a no-op on Windows, where the profile folder's ACL applies)
+        except OSError:
+            pass
         return self.local_env()
 
     # -- your own isolates: sheet template, folder scan, staging, quick check (python/intake.py) -------------------------
@@ -439,6 +446,7 @@ class Project:
         candidates.update(Path(e) for e in extra)
         from . import studies
         candidates.update(Path(st["results"]) for st in studies.list_studies(self.root))
+        registered = {str(Path(e).resolve()) for e in extra}   # folders added by hand: these (and only these) can be forgotten
         rows = []
         for folder in sorted(candidates):
             if not folder.is_dir():
@@ -473,7 +481,7 @@ class Project:
                          "pdf": (folder / "benchmark.report.pdf").is_file(),
                          "summary_pdf": (folder / "benchmark.report.summary.pdf").is_file(),
                          "modified": stamp, "tools": len(tools - {None}), "samples": samples, "failed": failed,
-                         "leaders": leaders})
+                         "leaders": leaders, "leaderboard": leaderboard.is_file(), "registered": str(folder.resolve()) in registered})
         rows.sort(key=lambda r: -r["modified"])
         return rows
 
@@ -604,6 +612,7 @@ class Jobs:
             job.update(state="cancelled" if job["state"] == "cancelling" else "interrupted", ended=job.get("ended") or self._last_sign_of_life(job_id), exit=None)
             self._append_log(job_id, "\n[PlasBench] The run stopped without recording how it ended (the computer was shut down or the process was killed). "
                                      "Use Resume: finished work is kept and reused.\n")
+            self._reap_orphans(job_id)
 
     def _last_sign_of_life(self, job_id: str) -> float:
         times = []
@@ -653,6 +662,7 @@ class Jobs:
                 self._append_log(job_id, "\n[PlasBench] " + ("The run was cancelled." if job["state"] == "cancelled" else
                                  "The run stopped without recording how it ended. Use Resume: finished work is kept and reused.") + "\n")
                 session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=None, seconds=round(job["ended"] - job["started"], 1))
+                self._reap_orphans(job_id)
                 if job["state"] == "cancelled":
                     break
                 # interrupted: keep watching (see above)
@@ -664,6 +674,10 @@ class Jobs:
             code = int(code) if isinstance(code, (int, float)) else None
             state = "cancelled" if job["state"] == "cancelling" else ("done" if code == 0 else "failed")
             job.update(ended=ended or time.time(), exit=code, state=state)
+            if state == "done":
+                warning = self._run_warnings(job)
+                if warning:
+                    job["warnings"] = warning
             if save:
                 self._save()
         if code not in (0, None):
@@ -673,11 +687,71 @@ class Jobs:
             self._append_log(job_id, f"\n[PlasBench] ERROR: the command stopped: {reason} (exit {code}).\n")
         session_log().event("job_end", job=job_id, label=job["label"], state=job["state"], exit=code, seconds=round(job["ended"] - job["started"], 1))
 
+    def display_state(self, job: dict) -> str:
+        """What to show: the stored state, except that a run that is going but has printed nothing for the stall window (PLASBENCH_STALL_SECONDS, default 10 minutes) reads
+        `stalled` and a run that finished with failed tools reads `completed_with_warnings`. Derived, never stored, so it cannot outlive the condition."""
+        state = job.get("state", "")
+        if state == "running" and jobrunner.is_stalled(str(self.dir), job["id"]):
+            return "stalled"
+        if state == "running" and self._is_retrying(job["id"]):
+            return "retrying"
+        if state == "done" and job.get("warnings"):
+            return "completed_with_warnings"
+        return state
+
+    RETRY_LINE = re.compile(r"failed \(exit \d+\); retry (\d+) of (\d+)")
+
+    def _is_retrying(self, job_id: str) -> bool:
+        """True when the last line the run printed is stage 4's "<sample> / <tool> failed (exit N); retry K of M" notice: a tool failed and is being run again (AU-010).
+        Derived from the output, like `stalled`, so it ends as soon as the run prints anything else. `queued` (waiting for a free slot) is not shown: the window runs one benchmark at a time."""
+        try:
+            tail = _tail_bytes(self._paths(job_id)["log"], 2000).decode("utf-8", "replace")
+        except OSError:
+            return False
+        lines = [line for line in tail.splitlines() if line.strip()]
+        return bool(lines) and self.RETRY_LINE.search(lines[-1]) is not None
+
+    def _reap_orphans(self, job_id: str):
+        """The runner is gone (killed with SIGKILL, which nothing can catch) but the command it started may still be going, with nothing watching it. Stop the whole process group
+        and say so in the log, so the run is `interrupted` with no orphan left writing into the results folder. A runner that is merely asleep is left alone."""
+        state = jobrunner.run_state(str(self.dir), job_id)
+        if state["runner_alive"] or not state["group_alive"]:
+            return
+        stopped = jobrunner.kill_group(state["pgid"])
+        self._append_log(job_id, "\n[PlasBench] The runner was killed but its command was still running: " +
+                         ("its processes were stopped.\n" if stopped else f"some processes of group {state['pgid']} could not be stopped; Resume stays unavailable until they are gone.\n"))
+        session_log().event("job_orphans_stopped", job=job_id, group=state["pgid"], stopped=stopped)
+
+    def _lock_refusal(self, argv: list) -> str:
+        """Why a benchmark run cannot start now: its results folder is locked by a live run (pid or any member of its process group alive), or an empty string."""
+        results = self._results_dir(argv)
+        lock = jobrunner.lock_holder(results) if results else None
+        if not lock:
+            return ""
+        return (f"another run is using this results folder ({results}): pid {lock.get('pid', '?')}, {lock.get('what', 'a stage')}, started {lock.get('started', 'unknown')}. "
+                "Wait for it to finish or cancel it first; starting a second one would make them overwrite each other.")
+
+    def _run_warnings(self, job: dict) -> str:
+        """The note run_all.sh leaves in the results folder (.completed_with_warnings) when it finished but some tool runs failed, if this run wrote it."""
+        results = job.get("results") or ""
+        if not results:
+            return ""
+        marker = Path(results) / ".completed_with_warnings"
+        try:
+            if marker.stat().st_mtime >= job["started"] - 2:
+                return marker.read_text(encoding="utf-8", errors="replace").strip()[:300] or "some tool runs failed"
+        except OSError:
+            pass
+        return ""
+
     # -- starting, answering, cancelling, resuming -------------------------------------------------------------
     def start(self, argv: list[str], label: str = "", env: dict | None = None) -> dict:
         ok, message = ui_schema.validate_argv(argv)
         if not ok:
             raise ValueError(message)
+        refusal = self._lock_refusal(argv)
+        if refusal:
+            raise ValueError(refusal)
         command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(argv)
         shown = "plasbench " + " ".join(shlex.quote(a) for a in argv)
         return self._launch(command, shown, label, env, list(argv), "plasbench", self.project.root)
@@ -764,6 +838,9 @@ class Jobs:
         pid = int(info.get("runner") or job.get("pid") or 0)
         if not pid:
             return
+        if info.get("pgid") and os.name != "nt":
+            # the command is in its own process group: stop it (and everything it started) even if the runner is already gone
+            threading.Thread(target=jobrunner.kill_group, args=(info["pgid"],), daemon=True).start()
         if os.name == "nt":
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
         else:
@@ -797,6 +874,13 @@ class Jobs:
             raise ValueError("only a failed, interrupted or cancelled plasbench run can be resumed")
         if jobrunner.is_alive(str(self.dir), job_id):
             raise ValueError("this run is still going (its runner is alive), so it cannot be resumed; wait for it to finish or cancel it first")
+        left = jobrunner.run_state(str(self.dir), job_id)
+        if left["runner_alive"] or left["group_alive"]:
+            raise ValueError("this run cannot be resumed yet: a process it started is still running (a second run in the same results folder would overwrite its work). "
+                             "Cancel it, or wait for it to finish.")
+        refusal = self._lock_refusal(job["argv"])
+        if refusal:
+            raise ValueError(refusal)
         if any(j["state"] in ("running", "cancelling") and j.get("argv") == job["argv"] for j in self.jobs.values()):
             raise ValueError("the same command is already running")
         command = [sys.executable, "-u", "-m", "plasbench", "--project-root", str(self.project.root)] + list(job["argv"])
@@ -822,10 +906,11 @@ class Jobs:
             with open(log, "rb") as handle:
                 handle.seek(max(0, offset))
                 text = handle.read(MAX_LOG_CHUNK).decode("utf-8", "replace")
-        return dict(job, log=text, offset=min(size, max(0, offset) + MAX_LOG_CHUNK), size=size)
+        return dict(job, log=text, offset=min(size, max(0, offset) + MAX_LOG_CHUNK), size=size, display_state=self.display_state(job),
+                    idle_seconds=jobrunner.idle_seconds(str(self.dir), job_id) if job.get("state") == "running" else None)
 
     def list(self) -> list[dict]:
-        return sorted(self.jobs.values(), key=lambda j: -j["started"])
+        return [dict(j, display_state=self.display_state(j)) for j in sorted(self.jobs.values(), key=lambda j: -j["started"])]
 
     def progress(self, job_id: str) -> dict:
         """The parsed progress of a job's log, cached until the log changes."""
@@ -865,7 +950,7 @@ class Jobs:
                 activity = os.path.getmtime(log)
             except OSError:
                 activity = job["started"]
-            out.append(dict(job, group=group, progress=progress, results=results, run_index=idx, last_activity=activity,
+            out.append(dict(job, group=group, progress=progress, results=results, run_index=idx, last_activity=activity, display_state=self.display_state(job),
                             resumable=state in RESUMABLE_STATES and not any(j["state"] in ("running", "cancelling") and j.get("argv") == job["argv"] for j in self.jobs.values()),
                             reattached=bool(job.get("reattached"))))
         return out
@@ -1065,6 +1150,10 @@ def make_handler(project: Project, jobs: Jobs):
                 self.send_header("Content-Security-Policy",
                                  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
                                  "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+            elif (extra or {}).get("report") and (ctype.startswith("text/html") or ctype.startswith("image/svg")):
+                # run-file HTML/SVG is data from disk (a study bundle or a results folder can come from someone else): it keeps its inline script and style
+                # (filters, 3D) but runs in an opaque origin (sandbox without allow-same-origin) with connect-src 'none', so it cannot call this window's API
+                self.send_header("Content-Security-Policy", REPORT_CSP)
             if (extra or {}).get("page_seen") is not None:
                 self.send_header("X-PlasBench-Page-Seen", extra["page_seen"])
             if (extra or {}).get("disposition"):
@@ -1512,7 +1601,8 @@ def make_handler(project: Project, jobs: Jobs):
                 return self.jsend(200, {"runs": project.runs(state["runs"])})
             if route == "runs/forget":
                 state = load_state()
-                state["runs"] = [r for r in state.get("runs", []) if r != data.get("path")]
+                gone = str(Path(str(data.get("path", ""))).resolve())
+                state["runs"] = [r for r in state.get("runs", []) if r != data.get("path") and str(Path(r).resolve()) != gone]
                 save_state(state)
                 return self.jsend(200, {"ok": True})
             if route == "usertools/validate":

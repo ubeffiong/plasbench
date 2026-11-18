@@ -24,6 +24,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../config/config.sh"
 source "$HERE/lib.sh"
+mkdir -p "$RESULTS_DIR"
+stage_timing_begin 7
 
 # First raw (untrimmed) paired read file for one mate, in sorted glob order;
 # prints nothing when there is none. Replaces `ls | grep -v .trim. | head -1`.

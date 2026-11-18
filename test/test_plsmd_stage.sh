@@ -58,7 +58,7 @@ run_stage RUN_PLSMD=1 ASSEMBLER=unicycler PLSMD_DB=
 [[ "$(col 3)" == "skipped" && "$(col 5)" == *"PLSMD_DB"* ]] || { echo "FAIL: missing database should skip" >&2; cat "$STATUS" >&2; exit 1; }
 echo "a missing PLSDB index is a skip with the reason -> PASS"
 
-run_stage RUN_PLSMD=1 ASSEMBLER=unicycler PLSMD_DB="$TMP/db/plsdb" FAKE_PLSMD_FAIL=1 TOOL_RETRIES=0
+run_stage RUN_PLSMD=1 ASSEMBLER=unicycler PLSMD_DB="$TMP/db/plsdb" FAKE_PLSMD_FAIL=1 TOOL_RETRIES=0 ALLOW_ALL_TOOLS_FAILED=1
 [[ "$(col 3)" == "failed" ]] || { echo "FAIL: a crashing plsMD should be failed" >&2; cat "$STATUS" >&2; exit 1; }
 echo "a crashing plsMD is a tool failure -> PASS"
 

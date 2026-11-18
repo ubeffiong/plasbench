@@ -6,6 +6,7 @@ import signal
 _MEANING = {
     1: "a command reported an error",
     2: "a command was given a wrong option or a missing file",
+    4: "every tool run of stage 4 failed (nothing was produced to score)",
     124: "a time limit was reached",
     126: "a program could not be run (permissions)",
     127: "a program was not found (not installed, or not on PATH)",
@@ -35,7 +36,3 @@ def explain(code) -> str:
         except ValueError:
             return f"stopped by signal {code - 128}"
     return f"failed with exit code {code}"
-
-
-def is_signal(code) -> bool:
-    return code is not None and (int(code) < 0 or int(code) > 128)

@@ -26,10 +26,20 @@ if [[ "${REQUIRE_PREREG:-0}" == "1" ]]; then
 fi
 STATUS="$RESULTS_DIR/tool_status.tsv"
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
+acquire_run_lock "stage 4 (run tools)"
+tool_timeout_notice
+stage_timing_begin 4
+[[ -f "$SAMPLE_SHEET" ]] || die "stage 4: the sample sheet $SAMPLE_SHEET does not exist"
+[[ -n "$(read_samples "$SAMPLE_SHEET")" ]] || die "stage 4: the sample sheet $SAMPLE_SHEET lists no samples, so there is nothing to run (fill in the cohort, or run stages 1-3 first)"
+# GNU time for peak memory; PLASBENCH_TIME_BIN overrides the path (the tests point it at nothing to prove the blank-memory note, AU-033)
+TIME_BIN="${PLASBENCH_TIME_BIN:-/usr/bin/time}"; export TIME_BIN
+[[ -x "$TIME_BIN" ]] || warn "$TIME_BIN is not installed: peak memory and CPU time cannot be measured; peak_rss_kb stays blank and tool_run_resources.tsv says so for each run"
 reset_shard_dir "run_tools"
 STATUS_SHARDS="$(shard_dir "run_tools")"
 reset_shard_dir "run_tools_outcomes"
 OUTCOME_SHARDS="$(shard_dir "run_tools_outcomes")"
+reset_shard_dir "run_tools_resources"
+RESOURCE_SHARDS="$(shard_dir "run_tools_resources")"
 OUTCOMES="$RESULTS_DIR/tool_outcomes.tsv"
 
 # Every (sample, tool) pair gets record_status called at most once per run,
@@ -65,7 +75,23 @@ record_status() {
             status="infrastructure_failure"
             reason="${reason:+$reason; }infrastructure failure: rerun, not scored"
         fi
+        # AU-008: say why when the adapter found nothing (the full text is in the tool's log).
+        if [[ -s "$LOG_DIR/${sample}.${tool}.log" ]] && grep -qm1 'no output from ' "$LOG_DIR/${sample}.${tool}.log"; then
+            reason="${reason:+$reason; }$(grep -m1 -o 'no output from [A-Za-z0-9_]*' "$LOG_DIR/${sample}.${tool}.log")"
+        fi
         [[ "$attempts" -gt 1 ]] && reason="${reason:+$reason; }attempts=$attempts"
+    fi
+    # AU-035: a malformed prediction FASTA is caught here, at stage 4, not when stage 5 tries to score it. The run is recorded as failed (tool class)
+    # and its completion marker is removed, so stage 5 ignores it and a rerun redoes the tool.
+    if [[ "$status" == "completed" && -n "$4" && -s "$4" ]]; then
+        local malformed
+        if ! malformed="$(python3 "$HERE/../python/check_prediction_fasta.py" "$4" 2>&1)"; then
+            status="failed"; failure_class="tool"; exit_code=""
+            reason="malformed prediction FASTA: ${malformed:-unreadable} (stage-4 check; see $4)"
+            rm -f "$(dirname "$4")/.${tool}.complete"
+            set -- "$1" "$2" "$3" "" "$5" "${6:-}" "${7:-}"
+            warn "$tool: prediction for $sample is not valid FASTA ($malformed); marked failed"
+        fi
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$status" "$4" "$reason" "${6:-}" "$rss" \
         > "$STATUS_SHARDS/${sample}.${tool}.tsv"
@@ -73,6 +99,21 @@ record_status() {
     # for contribution files): sample, tool, status, exit_code, failure_class, attempts.
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$status" "$exit_code" "$failure_class" "$attempts" \
         > "$OUTCOME_SHARDS/${sample}.${tool}.tsv"
+    # Side table of what each run was given and used (performance_summary.py reads it): its own thread count, the seconds of every attempt, the peak
+    # memory over all attempts, and the reason when memory could not be measured.
+    if [[ "$status" == "completed" || "$status" == "failed" || "$status" == "infrastructure_failure" ]]; then
+        local tvar threads attempt_seconds="" rss_note=""
+        tvar="$(printf '%s' "$tool" | tr '[:lower:]' '[:upper:]')_THREADS"
+        [[ "$tool" == gplas2_* ]] && tvar="GPLAS_THREADS"
+        threads="${!tvar:-${THREADS:-}}"
+        [[ -s "$LOG_DIR/${sample}.${tool}.attempt_times" ]] && attempt_seconds="$(paste -sd, "$LOG_DIR/${sample}.${tool}.attempt_times")"
+        if [[ -z "$rss" ]]; then
+            if [[ ! -x "$TIME_BIN" ]]; then rss_note="/usr/bin/time not installed"
+            else rss_note="not measured (timed out, killed, or the tool does not run under the profiler)"; fi
+        fi
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$sample" "$tool" "$threads" "$attempt_seconds" "$rss" "$rss_note" \
+            > "$RESOURCE_SHARDS/${sample}.${tool}.tsv"
+    fi
 }
 
 # resource (124 timeout, 137 SIGKILL/OOM), infrastructure (125/126/127: the
@@ -115,16 +156,24 @@ with_budget() {
     "$@"
 }
 retry_exec() {
-    local attempts_file="$LOG_DIR/${SAMPLE}.${TOOL}.attempts" attempt=1 rc=0
-    local max=$(( 1 + ${TOOL_RETRIES:-1} ))
+    local attempts_file="$LOG_DIR/${SAMPLE}.${TOOL}.attempts" times_file="$LOG_DIR/${SAMPLE}.${TOOL}.attempt_times" attempt=1 rc=0 t0
+    local max=$(( 1 + ${TOOL_RETRIES:-1} )) out_existed=0
+    [[ -n "${OUT:-}" && -d "$OUT" ]] && out_existed=1
+    rm -f "$times_file"
     while true; do
-        rc=0
+        rc=0; t0="$(date +%s)"
         "$@" || rc=$?
         printf '%s\n' "$attempt" > "$attempts_file"
+        printf '%s:%s\n' "$attempt" "$(( $(date +%s) - t0 ))" >> "$times_file"
         if [[ "$rc" -eq 0 || "$rc" -eq 124 || "$rc" -eq 137 || "$attempt" -ge "$max" ]]; then
             return "$rc"
         fi
         warn "$SAMPLE / $TOOL failed (exit $rc); retry $attempt of $(( max - 1 ))"
+        # AU-031: a retry starts from the state the first attempt did (a tool that refuses an existing output folder, or reads a half-written one, would otherwise fail
+        # the retry for the wrong reason). RETRY_KEEP_OUT=1 (set by a runner whose folder holds its own inputs) leaves it alone.
+        if [[ -n "${OUT:-}" && "${RETRY_KEEP_OUT:-0}" != "1" && -d "$OUT" && "$OUT" != "/" ]]; then
+            if [[ "$out_existed" -eq 1 ]]; then find "$OUT" -mindepth 1 -delete 2>/dev/null || true; else rm -rf "$OUT"; fi
+        fi
         attempt=$(( attempt + 1 ))
     done
 }
@@ -133,11 +182,11 @@ profile_start() { date +%s; }
 profile_elapsed() { printf '%s' "$(( $(date +%s) - $1 ))"; }
 # /usr/bin/time writes 'maxrss user_cpu system_cpu' on its LAST line (a failed run adds a status line
 # before it); the memory figure is the first field, the CPU seconds are read by performance_summary.py.
-profile_rss() { [[ -s "$1" ]] && awk 'END{printf "%s", $1}' "$1" || true; }
+profile_rss() { [[ -s "$1" ]] && awk '$1 ~ /^[0-9]+$/ && NF == 3 { if ($1 + 0 > m) m = $1 + 0; seen = 1 } END { if (seen) printf "%d", m }' "$1" || true; }
 profile_exec() {
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
     local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file" "$LOG_DIR/${SAMPLE}.${TOOL}.attempts"
-    if [[ -x /usr/bin/time ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget /usr/bin/time -f '%M %U %S' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget "$@" || rc=$?; fi
+    if [[ -x "$TIME_BIN" ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget "$TIME_BIN" -a -f '%M %U %S' -o "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }
@@ -145,7 +194,7 @@ profile_exec_in_dir() {
     local run_dir="$1"; shift
     PROFILE_RSS_FILE="$LOG_DIR/${SAMPLE}.${TOOL}.rss"; rm -f "$PROFILE_RSS_FILE"
     local exit_file="$LOG_DIR/${SAMPLE}.${TOOL}.exit" rc=0; rm -f "$exit_file" "$LOG_DIR/${SAMPLE}.${TOOL}.attempts"
-    if [[ -x /usr/bin/time ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && /usr/bin/time -f "%M %U %S" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
+    if [[ -x "$TIME_BIN" ]]; then retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && "$TIME_BIN" -a -f "%M %U %S" -o "$2" "${@:3}"' _ "$run_dir" "$PROFILE_RSS_FILE" "$@" || rc=$?; else retry_exec run_with_heartbeat "$SAMPLE / $TOOL" with_budget bash -c 'cd "$1" && "${@:2}"' _ "$run_dir" "$@" || rc=$?; fi
     printf '%s\n' "$rc" > "$exit_file"
     return "$rc"
 }
@@ -259,6 +308,19 @@ tool_enabled() {
     fi
 }
 
+# Pre-flight for a tool that cannot run without its database (AU-035): when the path is unset or missing the tool is not launched at all (it would
+# fail the same way for every sample and every retry). It is recorded as an infrastructure failure (exit 127 in the log's .exit file: rerun after fixing
+# the database, never scored) with the path in the reason. Returns 0 when it handled the run, 1 when the database is there.
+db_preflight_fail() {
+    local sample="$1" tool="$2" path="$3"
+    [[ -n "$path" && -e "$path" ]] && return 1
+    warn "$tool: database not found (${path:-not set}); not launched for $sample"
+    printf 'pre-flight: %s database not found (%s); the tool was not launched\n' "$tool" "${path:-not set}" > "$LOG_DIR/${sample}.${tool}.log"
+    printf '127\n' > "$LOG_DIR/${sample}.${tool}.exit"; rm -f "$LOG_DIR/${sample}.${tool}.attempts"
+    record_status "$sample" "$tool" "failed" "" "database not found: ${path:-not set} (pre-flight; not launched)"
+    return 0
+}
+
 # run_adapter ADAPTER TOOL_OUTPUT_DIR ARGS... : run an adapter only when the tool actually wrote something into its output directory.
 # The adapters turn "no output found" into an empty prediction (the right answer for a tool that ran and found no plasmid), so a tool that
 # exited 0 after crashing silently, or wrote somewhere else, used to be recorded as "completed" with no plasmids. Exit 3 sends it to the
@@ -266,7 +328,7 @@ tool_enabled() {
 run_adapter() {
     local adapter="$1" out="$2"; shift 2
     if ! tool_output_present "$out"; then
-        echo "[$adapter] the tool exited 0 but wrote nothing under $out; recording the run as FAILED, not as 'no plasmids found'" >&2
+        echo "[$adapter] no output from $(basename "${adapter#adapt_}" .sh): the tool exited 0 but wrote nothing (no result file; a log does not count) under $out; recording the run as FAILED, not as 'no plasmids found'" >&2
         return 3
     fi
     bash "$ADAPT/$adapter" "$out" "$@"
@@ -280,9 +342,11 @@ run_adapter() {
 run_mob_recon() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_MOB_RECON mob_recon && have mob_recon; then
-        local TOOL="mob_recon" OUT="$RDIR/mob_recon" PRED="$RDIR/pred_mob_recon.plasmid.fasta" DONE="$RDIR/.mob_recon.complete"
+        local TOOL="mob_recon" OUT="$RDIR/mob_recon" PRED="$RDIR/pred_mob_recon.plasmid.fasta" DONE="$RDIR/.mob_recon.complete" mob_db=""
         if is_complete "$DONE" "$PRED"; then
             log "  mob_recon: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif mob_db="$(mobsuite_db_dir 2>/dev/null)"; [[ -n "$mob_db" ]] && ! mobsuite_db_complete "$mob_db" && db_preflight_fail "$SAMPLE" "$TOOL" "$mob_db/ncbi_plasmid_full_seqs.fas (incomplete MOB-suite database; run: bash env/download_mobsuite_db.sh)"; then
+            :
         else
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  mob_recon ($SAMPLE) ..."
@@ -303,6 +367,7 @@ run_mob_recon() {
 run_gplas2_mob() {
     local SAMPLE="$1" SDIR="$2" RDIR="$3" CONTIGS="$4"
     if tool_enabled RUN_GPLAS2_MOB gplas2_mob && have gplas; then
+        local RETRY_KEEP_OUT=1   # its classifier input lives in OUT
         local TOOL="gplas2_mob" OUT="$RDIR/gplas2_mob" PRED="$RDIR/pred_gplas2_mob.plasmid.fasta" DONE="$RDIR/.gplas2_mob.complete"
         local GRAPH="$SDIR/assembly_graph.gfa" MOB_OUT="$RDIR/mob_recon"
         local CLASSIFIER="$OUT/${SAMPLE}.mob_classifier.tsv" PROVENANCE="$OUT/${SAMPLE}.mob_classifier.provenance.json"
@@ -398,6 +463,7 @@ run_baseline() {
 run_plsmd() {
     local SAMPLE="$1" RDIR="$2" CONTIGS="$3"
     if tool_enabled RUN_PLSMD plsmd; then
+        local RETRY_KEEP_OUT=1   # two chained steps share OUT
         local TOOL="plsmd" OUT="$RDIR/plsmd" PRED="$RDIR/pred_plsmd.plasmid.fasta" DONE="$RDIR/.plsmd.complete"
         if ! have "$PLSMD_CMD"; then
             warn "plsmd is enabled but '$PLSMD_CMD' is not installed; skipped for $SAMPLE"
@@ -405,6 +471,8 @@ run_plsmd() {
         elif [[ -z "${PLSMD_DB:-}" ]]; then
             warn "plsmd needs PLSMD_DB (the PLSDB BLAST index prefix); skipped for $SAMPLE"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "PLSMD_DB not set"
+        elif ! compgen -G "${PLSMD_DB}.*" > /dev/null 2>&1 && db_preflight_fail "$SAMPLE" "$TOOL" "${PLSMD_DB}.nhr (BLAST index files not found)"; then
+            :
         elif [[ "${ASSEMBLER:-spades}" != "unicycler" ]]; then
             warn "plsmd needs a Unicycler assembly (ASSEMBLER=unicycler); skipped for $SAMPLE"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "assembly is not from Unicycler (set ASSEMBLER=unicycler)"
@@ -461,6 +529,8 @@ run_platon() {
         local TOOL="platon" OUT="$RDIR/platon" PRED="$RDIR/pred_platon.plasmid.fasta" DONE="$RDIR/.platon.complete"
         if is_complete "$DONE" "$PRED"; then
             log "  platon: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif db_preflight_fail "$SAMPLE" "$TOOL" "${PLATON_DB:-}"; then
+            :
         else
             rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT"
             log "  platon ($SAMPLE) ..."
@@ -514,7 +584,7 @@ run_gplas2_external() {
         elif [[ ! -s "$CLASSIFIER" ]]; then
             warn "  $TOOL prediction table missing: $CLASSIFIER"; record_status "$SAMPLE" "$TOOL" "skipped" "" "external classifier TSV unavailable"
         else
-            rm -rf "$OUT" "$PRED" "$DONE"; log "  $TOOL ($SAMPLE) ..."
+            rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT"; log "  $TOOL ($SAMPLE) ..."
             local START; START=$(profile_start)
             if python3 "$HERE/../python/validate_gplas_classifier.py" --graph "$GRAPH" --classifier "$CLASSIFIER" --min-contig-length "$GPLAS2_MIN_CONTIG_LENGTH" > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
                 profile_exec_in_dir "$OUT" gplas -i "$GRAPH" -P "$CLASSIFIER" -n "$SAMPLE" >> "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
@@ -536,6 +606,8 @@ run_genomad() {
         local TOOL="genomad" OUT="$RDIR/genomad" PRED="$RDIR/pred_genomad.plasmid.fasta" DONE="$RDIR/.genomad.complete"
         if is_complete "$DONE" "$PRED"; then
             log "  genomad: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif db_preflight_fail "$SAMPLE" "$TOOL" "${GENOMAD_DB:-}"; then
+            :
         else
             rm -rf "$OUT" "$PRED" "$DONE"
             log "  genomad ($SAMPLE) ..."
@@ -559,6 +631,8 @@ run_plasme() {
         local TOOL="plasme" OUT="$RDIR/plasme" PRED="$RDIR/pred_plasme.plasmid.fasta" DONE="$RDIR/.plasme.complete"
         if is_complete "$DONE" "$PRED"; then
             log "  plasme: reusing completed result"; record_status "$SAMPLE" "$TOOL" "reused" "$PRED" "completed result reused"
+        elif db_preflight_fail "$SAMPLE" "$TOOL" "${PLASME_DB:-}"; then
+            :
         else
             rm -rf "$OUT" "$PRED" "$DONE"; mkdir -p "$OUT"
             log "  plasme ($SAMPLE) ..."
@@ -686,6 +760,8 @@ run_plascope() {
         elif [[ -z "$db" ]]; then
             warn "  $TOOL has no database for organism '${organism:-not_recorded}'; skipped for $SAMPLE"
             record_status "$SAMPLE" "$TOOL" "skipped" "" "no PlaScope database for organism ${organism:-not_recorded}"
+        elif ! compgen -G "${db}*" > /dev/null 2>&1 && db_preflight_fail "$SAMPLE" "$TOOL" "$db"; then
+            :
         else
             # plaScope.sh errors out if <out>/<sample>_PlaScope/{PlaScope_predictions,
             # Centrifuge_results} already exist -- OUT must not exist yet; it
@@ -696,7 +772,7 @@ run_plascope() {
             if profile_exec plaScope.sh --fasta "$CONTIGS" -a "$ASSEMBLER" -o "$OUT" --sample "$SAMPLE" \
                     --db_dir "$(dirname "$db")" --db_name "$(basename "$db")" -t "$PLASCOPE_THREADS" \
                     > "$LOG_DIR/${SAMPLE}.${TOOL}.log" 2>&1 && \
-                bash "$ADAPT/adapt_plascope.sh" "$OUT/${SAMPLE}_PlaScope" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
+                run_adapter adapt_plascope.sh "$OUT/${SAMPLE}_PlaScope" "$CONTIGS" "$PRED" 2>> "$LOG_DIR/${SAMPLE}.${TOOL}.log"; then
                 mark_complete "$DONE"; record_status "$SAMPLE" "$TOOL" "completed" "$PRED" "database: $db" "$(profile_elapsed "$START")"
             else
                 rm -f "$PRED" "$DONE"; warn "$TOOL failed for $SAMPLE; excluded from scoring"; record_status "$SAMPLE" "$TOOL" "failed" "" "see $LOG_DIR/${SAMPLE}.${TOOL}.log" "$(profile_elapsed "$START")"
@@ -973,12 +1049,45 @@ while IFS=$'\t' read -r SAMPLE ASM SRA; do
         shards+=("$STATUS_SHARDS/${SAMPLE}.${tool}.tsv")
     done
 done < <(read_samples "$SAMPLE_SHEET")
-merge_shards "$STATUS" "$(printf 'sample\ttool\tstatus\tprediction_fasta\treason\truntime_seconds\tpeak_rss_kb')" "${shards[@]}"
+# AU-001: a cohort with tools to run must leave status shards. None means they were lost (another process wiped them, or every sample job died before
+# recording anything): fail loudly instead of writing a header-only table and reporting "complete".
+found_shards=0
+for shard in "${shards[@]}"; do [[ -s "$shard" ]] && found_shards=$(( found_shards + 1 )); done
+tools_wanted=0
+[[ ${#USER_TOOL_LIST[@]} -gt 0 ]] && tools_wanted=1
+for tool in mob_recon gplas2_mob platon plasmidspades gplas2_external genomad plasme rfplasmid plasmidhunter plasmer plascope plasmidec plasgraph2 baseline_coverage baseline_reference plsmd baseline_replicon plasbin_flow; do
+    flag="RUN_${tool^^}"
+    tool_enabled "$flag" "$tool" && tools_wanted=1
+done
+if [[ "$found_shards" -eq 0 && "$tools_wanted" -eq 1 && ${#shards[@]} -gt 0 ]]; then
+    die "stage 4: no tool status was recorded for any of the ${#shards[@]} sample x tool pair(s) (the status shards in $STATUS_SHARDS are missing or empty). Another process may have removed them, or every sample job died first; see $LOG_DIR/run_errors.log. Nothing was written to $STATUS."
+fi
+merge_shards "$STATUS.tmp" "$(printf 'sample\ttool\tstatus\tprediction_fasta\treason\truntime_seconds\tpeak_rss_kb')" "${shards[@]}"
+mv -f "$STATUS.tmp" "$STATUS"
 outcome_shards=("${shards[@]/#$STATUS_SHARDS/$OUTCOME_SHARDS}")
-merge_shards "$OUTCOMES" "$(printf 'sample\ttool\tstatus\texit_code\tfailure_class\tattempts')" "${outcome_shards[@]}"
-rm -rf "$STATUS_SHARDS" "$OUTCOME_SHARDS"
+merge_shards "$OUTCOMES.tmp" "$(printf 'sample\ttool\tstatus\texit_code\tfailure_class\tattempts')" "${outcome_shards[@]}"
+mv -f "$OUTCOMES.tmp" "$OUTCOMES"
+resource_shards=("${shards[@]/#$STATUS_SHARDS/$RESOURCE_SHARDS}")
+merge_shards "$RESULTS_DIR/tool_run_resources.tsv.tmp" "$(printf 'sample\ttool\tthreads\tattempt_seconds\tpeak_rss_kb\trss_note')" "${resource_shards[@]}"
+mv -f "$RESULTS_DIR/tool_run_resources.tsv.tmp" "$RESULTS_DIR/tool_run_resources.tsv"
+rm -rf "$STATUS_SHARDS" "$OUTCOME_SHARDS" "$RESOURCE_SHARDS"
 
 # After the merge, so the samples that did finish keep their rows: a sample whose job crashed has none, and that is reported, not hidden.
 report_crashed_sample_jobs "Stage 4 (run tools)" "$CRASHED_DIR"
+
+# AU-011: a stage in which every tool run failed produced nothing to score. Some failures among successes stay warnings.
+n_ok="$(awk -F'\t' 'NR > 1 && ($3 == "completed" || $3 == "reused") { n++ } END { print n + 0 }' "$STATUS")"
+n_failed="$(awk -F'\t' 'NR > 1 && ($3 == "failed" || $3 == "infrastructure_failure") { n++ } END { print n + 0 }' "$STATUS")"
+if [[ "$n_failed" -gt 0 && "$n_ok" -eq 0 ]]; then
+    msg="Stage 4 (run tools): all $n_failed tool run(s) failed and none completed; there is nothing to score. See $STATUS and the per-tool logs in $LOG_DIR."
+    if [[ "${ALLOW_ALL_TOOLS_FAILED:-0}" == "1" ]]; then
+        warn "$msg Continuing because ALLOW_ALL_TOOLS_FAILED=1."
+    else
+        _plasbench_record_error "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $msg"
+        exit 4
+    fi
+elif [[ "$n_failed" -gt 0 ]]; then
+    warn "Stage 4 (run tools): $n_failed of $(( n_ok + n_failed )) tool run(s) failed (the other $n_ok completed); the failed ones are excluded from scoring. See $STATUS."
+fi
 
 log "Stage 4 (run tools) complete."

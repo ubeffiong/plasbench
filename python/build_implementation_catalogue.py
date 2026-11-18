@@ -24,6 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import report_surfaces as rs  # noqa: E402
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 PARTS = os.path.join(ROOT, "docs", "implementation_catalogue")
 OUT = os.path.join(ROOT, "docs", "IMPLEMENTATION_CATALOGUE.md")
@@ -127,7 +128,7 @@ def switches_section():
 
 def refresh_history():
     done = subprocess.run(["gh", "pr", "list", "--state", "merged", "--limit", "300", "--json", "number,title,mergedAt",
-                           "-q", r'.[] | "\(.number)" + "\t" + (.mergedAt[:10]) + "\t" + .title'], capture_output=True, text=True, cwd=ROOT)
+                           "-q", r'.[] | "\(.number)" + "\t" + (.mergedAt[:10]) + "\t" + .title'], capture_output=True, text=True, cwd=ROOT, timeout=subprocess_timeout())
     if done.returncode or not done.stdout.strip():
         raise SystemExit("could not read merged pull requests with the GitHub CLI: " + (done.stderr.strip() or "no output"))
     rows = sorted((l for l in done.stdout.splitlines() if l.count(TAB) == 2), key=lambda l: int(l.split(TAB)[0]))

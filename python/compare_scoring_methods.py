@@ -58,6 +58,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from audit_three_class_scoring import read_truth  # noqa: E402
+from plasbench_common import subprocess_timeout  # noqa: E402
 
 
 def read_minimap2_f1(scores_path, sample, tool):
@@ -78,7 +79,7 @@ def run_blastn(blastn_path, query, subject, threads=1):
                "-max_target_seqs", "10000",
                "-outfmt", "6 qseqid qlen sseqid slen length pident qcovhsp",
                "-subject", str(subject), "-query", str(query)]
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=subprocess_timeout())
     if result.returncode != 0:
         sys.stderr.write(f"[compare_scoring_methods] blastn failed (exit {result.returncode}):\n{result.stderr[-2000:]}\n")
         return None

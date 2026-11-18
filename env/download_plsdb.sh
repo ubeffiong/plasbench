@@ -52,6 +52,8 @@ esac
 [[ -s "$TMP" ]] || die "download is empty"
 
 SHA="$(sha256sum "$TMP" | awk '{print $1}')"
+PLSDB_SHA256="${PLSDB_SHA256:-$(download_pin "PLSDB sequences" "$PLSDB_URL")}"   # config/download_checksums.tsv (AU-026)
+if [[ -z "${PLSDB_SHA256:-}" && "${PLASBENCH_REQUIRE_CHECKSUMS:-0}" == "1" ]]; then rm -f "$TMP"; die "no SHA-256 is pinned for PLSDB (set PLSDB_SHA256 or fill config/download_checksums.tsv) and PLASBENCH_REQUIRE_CHECKSUMS=1; refusing it"; fi
 if [[ -n "${PLSDB_SHA256:-}" ]]; then
     if [[ "$SHA" != "${PLSDB_SHA256,,}" ]]; then
         rm -f "$TMP"

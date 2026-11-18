@@ -47,7 +47,7 @@ FIELDS = ["sequence_id", "original_length", "corrected_length", "identity", "hal
 MAX_COPIES = 6
 
 
-from plasbench_common import iter_fasta  # noqa: E402
+from plasbench_common import iter_fasta, subprocess_timeout  # noqa: E402
 
 
 def read_fasta(path):
@@ -81,7 +81,7 @@ def minimap2_identity(a, b, threads=1):
             handle.write(f">b\n{b}\n")
         try:
             out = subprocess.run(["minimap2", "-x", "asm5", "--secondary=no", "-t", str(threads), tb, qa],
-                                 check=True, capture_output=True, text=True).stdout
+                                 check=True, capture_output=True, text=True, timeout=subprocess_timeout()).stdout
         except (OSError, subprocess.CalledProcessError):
             return None
     best = None

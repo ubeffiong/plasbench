@@ -54,7 +54,7 @@ export REQUIRE_CURATED_METADATA=0
 run_stage() {
     : > "$TMP/calls.log"
     rm -rf "$TMP/results"
-    PATH="$TMP/bin:$PATH" "$@" bash "$ROOT/scripts/04_run_tools.sh" > "$TMP/stage.log" 2>&1
+    PATH="$TMP/bin:$PATH" PLATON_DB="$TMP" "$@" bash "$ROOT/scripts/04_run_tools.sh" > "$TMP/stage.log" 2>&1
 }
 
 # Default (ONLY_TOOL unset): the three tools enabled by config.sh's defaults
